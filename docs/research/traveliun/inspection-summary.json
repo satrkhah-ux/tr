@@ -1,0 +1,10 @@
+{
+  "loginResult": {
+    "attempted": true,
+    "url": "https://app.traveliun.com/sign-in",
+    "title": "Sign in - Traveliun"
+  },
+  "finalUrl": "https://app.traveliun.com/dashboard",
+  "title": "Dashboard - Traveliun",
+  "capturedAt": "2026-07-01T22:39:43.336Z"
+}

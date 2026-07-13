@@ -1,0 +1,2803 @@
+[
+  {
+    "navText": "Airlines",
+    "title": "Airlines",
+    "route": "/airlines",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "code",
+        "label": "CODE",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "الخطوط الجوية العربية السعودية",
+        "english_name": "Saudi Arabian Airlines",
+        "code": "SV"
+      },
+      {
+        "arabic_name": "مصر للطيران",
+        "english_name": "Egypt Air",
+        "code": "MS"
+      },
+      {
+        "arabic_name": "طيران الإمارات",
+        "english_name": "Emirates airlines",
+        "code": "EK"
+      },
+      {
+        "arabic_name": "طيران اير آسيا ماليزيا",
+        "english_name": "Air Asia Malaysia",
+        "code": "AK"
+      },
+      {
+        "arabic_name": "طيران اديل",
+        "english_name": "flyadeal",
+        "code": "F3"
+      },
+      {
+        "arabic_name": "الطيران العماني",
+        "english_name": "Oman Air",
+        "code": "WY"
+      },
+      {
+        "arabic_name": "طيران الاتحاد",
+        "english_name": "Etihad Airways",
+        "code": "EY"
+      },
+      {
+        "arabic_name": "الخطوط الجوية القطرية",
+        "english_name": "Qatar Airways",
+        "code": "QR"
+      },
+      {
+        "arabic_name": "طيران السلام",
+        "english_name": "Salam Air",
+        "code": "OV"
+      },
+      {
+        "arabic_name": "طيران العربية",
+        "english_name": "Air Arabia",
+        "code": "G9"
+      }
+    ],
+    "extractedText": "Airlines هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME CODE الخطوط الجوية العربية السعودية Saudi Arabian Airlines SV مصر للطيران Egypt Air MS طيران الإمارات Emirates airlines EK طيران اير آسيا ماليزيا Air Asia Malaysia AK طيران اديل flyadeal F3 الطيران العماني Oman Air WY طيران الاتحاد Etihad Airways EY الخطوط الجوية القطرية Qatar Airways QR طيران السلام Salam Air OV طيران العربية Air Arabia G9 10 25 50 100 1 2 3 4 5"
+  },
+  {
+    "navText": "Airports Names",
+    "title": "Airports",
+    "route": "/airports",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "country",
+        "label": "COUNTRY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "city",
+        "label": "CITY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "code",
+        "label": "CODE",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Airports هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Country Select City Select Add COUNTRY CITY ARABIC NAME ENGLISH NAME CODE No Data Found 10 25 50 100"
+  },
+  {
+    "navText": "Connect Cars with Country",
+    "title": "Cars",
+    "route": "/cars",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "country",
+        "label": "COUNTRY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "car_type",
+        "label": "CAR TYPE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "number_of_passengers",
+        "label": "NUMBER OF PASSENGERS",
+        "minWidth": "180px"
+      },
+      {
+        "key": "number_of_bags",
+        "label": "NUMBER OF BAGS",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "country": "russia",
+        "car_type": "SMALL CAR",
+        "number_of_passengers": "3",
+        "number_of_bags": "2"
+      },
+      {
+        "country": "russia",
+        "car_type": "Mercedes van",
+        "number_of_passengers": "7",
+        "number_of_bags": "6"
+      },
+      {
+        "country": "russia",
+        "car_type": "Mini van",
+        "number_of_passengers": "7",
+        "number_of_bags": "6"
+      },
+      {
+        "country": "UAE",
+        "car_type": "SMALL CAR",
+        "number_of_passengers": "2",
+        "number_of_bags": "3"
+      },
+      {
+        "country": "Singaporean",
+        "car_type": "SMALL CAR",
+        "number_of_passengers": "2",
+        "number_of_bags": "3"
+      },
+      {
+        "country": "Singaporean",
+        "car_type": "Big bus",
+        "number_of_passengers": "6",
+        "number_of_bags": "5"
+      },
+      {
+        "country": "Turkiye",
+        "car_type": "Car sprinter",
+        "number_of_passengers": "12",
+        "number_of_bags": "8"
+      },
+      {
+        "country": "Turkiye",
+        "car_type": "Veto",
+        "number_of_passengers": "3",
+        "number_of_bags": "3"
+      },
+      {
+        "country": "Turkiye",
+        "car_type": "Mercedes van",
+        "number_of_passengers": "3",
+        "number_of_bags": "3"
+      },
+      {
+        "country": "Thailand",
+        "car_type": "40 seat bus",
+        "number_of_passengers": "25",
+        "number_of_bags": "25"
+      }
+    ],
+    "extractedText": "Cars هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Country Select Add COUNTRY CAR TYPE NUMBER OF PASSENGERS NUMBER OF BAGS russia SMALL CAR 3 2 russia Mercedes van 7 6 russia Mini van 7 6 UAE SMALL CAR 2 3 Singaporean SMALL CAR 2 3 Singaporean Big bus 6 5 Turkiye Car sprinter 12 8 Turkiye Veto 3 3 Turkiye Mercedes van 3 3 Thailand 40 seat bus 25 25 10 25 50 100 1 2 3 4"
+  },
+  {
+    "navText": "Cars Types in World",
+    "title": "Cars Types",
+    "route": "/cars-types",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "order",
+        "label": "ORDER",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "سيارة صغيرة",
+        "english_name": "SMALL CAR",
+        "order": "1"
+      },
+      {
+        "arabic_name": "سيارة متوسطة",
+        "english_name": "Medium car",
+        "order": "2"
+      },
+      {
+        "arabic_name": "باص كبير",
+        "english_name": "Big bus",
+        "order": "3"
+      },
+      {
+        "arabic_name": "فيتو",
+        "english_name": "Veto",
+        "order": "4"
+      },
+      {
+        "arabic_name": "فان مرسيدس",
+        "english_name": "Mercedes van",
+        "order": "5"
+      },
+      {
+        "arabic_name": "باص 14 مقعد",
+        "english_name": "14 Seater Car",
+        "order": "5"
+      },
+      {
+        "arabic_name": "باص 16 راكب",
+        "english_name": "bus 16 seater",
+        "order": "5"
+      },
+      {
+        "arabic_name": "باص 40 راكب",
+        "english_name": "40-person bus",
+        "order": "6"
+      },
+      {
+        "arabic_name": "باص 18 راكب",
+        "english_name": "bus18 seater",
+        "order": "7"
+      },
+      {
+        "arabic_name": "باص 25 مقعد",
+        "english_name": "Bus 25 passengers",
+        "order": "9"
+      }
+    ],
+    "extractedText": "Cars Types هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME ORDER سيارة صغيرة SMALL CAR 1 سيارة متوسطة Medium car 2 باص كبير Big bus 3 فيتو Veto 4 فان مرسيدس Mercedes van 5 باص 14 مقعد 14 Seater Car 5 باص 16 راكب bus 16 seater 5 باص 40 راكب 40-person bus 6 باص 18 راكب bus18 seater 7 باص 25 مقعد Bus 25 passengers 9 10 25 50 100 1 2"
+  },
+  {
+    "navText": "Tours",
+    "title": "Tours",
+    "route": "/cars/tours",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "order",
+        "label": "ORDER",
+        "minWidth": "140px"
+      },
+      {
+        "key": "country",
+        "label": "COUNTRY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "from_city",
+        "label": "FROM CITY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_description",
+        "label": "ARABIC DESCRIPTION",
+        "minWidth": "180px"
+      },
+      {
+        "key": "english_description",
+        "label": "ENGLISH DESCRIPTION",
+        "minWidth": "180px"
+      },
+      {
+        "key": "car_type",
+        "label": "CAR TYPE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "price",
+        "label": "PRICE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "currency",
+        "label": "CURRENCY",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Tours هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Country Select City Select Show Prices Active Add ORDER COUNTRY FROM CITY ARABIC NAME ENGLISH NAME ARABIC DESCRIPTION ENGLISH DESCRIPTION CAR TYPE PRICE CURRENCY No Data Found 10 25 50 100"
+  },
+  {
+    "navText": "Transfers",
+    "title": "Transfers",
+    "route": "/cars/transfers",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "type",
+        "label": "TYPE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "country",
+        "label": "COUNTRY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "from",
+        "label": "FROM",
+        "minWidth": "140px"
+      },
+      {
+        "key": "to",
+        "label": "TO",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_description",
+        "label": "ARABIC DESCRIPTION",
+        "minWidth": "180px"
+      },
+      {
+        "key": "english_description",
+        "label": "ENGLISH DESCRIPTION",
+        "minWidth": "180px"
+      },
+      {
+        "key": "car_type",
+        "label": "CAR TYPE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "price",
+        "label": "PRICE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "currency",
+        "label": "CURRENCY",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Transfers هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Country Select City Select Airport Select Type Select Show Prices Active Add TYPE COUNTRY FROM TO ARABIC DESCRIPTION ENGLISH DESCRIPTION CAR TYPE PRICE CURRENCY No Data Found 10 25 50 100"
+  },
+  {
+    "navText": "City",
+    "title": "Cities",
+    "route": "/cities",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "country",
+        "label": "COUNTRY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "default_hotel",
+        "label": "DEFAULT HOTEL",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "country": "MALASYIA",
+        "arabic_name": "كوالالمبور",
+        "english_name": "Kuala Lumpur",
+        "default_hotel": "Hotel Stripes Kuala Lumpur Autograph Collection"
+      },
+      {
+        "country": "Indonesia",
+        "arabic_name": "جاكرتا",
+        "english_name": "Jakarta",
+        "default_hotel": "Novotel Jakarta Cikini Hotel"
+      },
+      {
+        "country": "Indonesia",
+        "arabic_name": "بالي",
+        "english_name": "BALI",
+        "default_hotel": "tanadewa villas nusa dua bali by cross collection"
+      },
+      {
+        "country": "MALASYIA",
+        "arabic_name": "لنكاوي",
+        "english_name": "Langkawi",
+        "default_hotel": "Bayview Hotel Langkawi"
+      },
+      {
+        "country": "MALASYIA",
+        "arabic_name": "بينانج",
+        "english_name": "Penang",
+        "default_hotel": "Hompton Hotel by the Beach"
+      },
+      {
+        "country": "MALASYIA",
+        "arabic_name": "سيلانجور",
+        "english_name": "Selangor",
+        "default_hotel": "Sunway Pyramid Hotel"
+      },
+      {
+        "country": "Indonesia",
+        "arabic_name": "بونشاك",
+        "english_name": "Puncak",
+        "default_hotel": "Grand ASTON Puncak Hotel and Resort"
+      },
+      {
+        "country": "Indonesia",
+        "arabic_name": "باندونج",
+        "english_name": "Bandung",
+        "default_hotel": "Mercure Bandung City Centre"
+      },
+      {
+        "country": "MALASYIA",
+        "arabic_name": "جنتنج هايلاند",
+        "english_name": "Genting Highlands",
+        "default_hotel": ""
+      },
+      {
+        "country": "Turkiye",
+        "arabic_name": "اسطنبول",
+        "english_name": "Istanbul",
+        "default_hotel": "Mercure Istanbul Bomonti"
+      }
+    ],
+    "extractedText": "Cities هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Country Select Add COUNTRY ARABIC NAME ENGLISH NAME DEFAULT HOTEL MALASYIA كوالالمبور Kuala Lumpur Hotel Stripes Kuala Lumpur Autograph Collection Indonesia جاكرتا Jakarta Novotel Jakarta Cikini Hotel Indonesia بالي BALI tanadewa villas nusa dua bali by cross collection MALASYIA لنكاوي Langkawi Bayview Hotel Langkawi MALASYIA بينانج Penang Hompton Hotel by the Beach MALASYIA سيلانجور Selangor Sunway Pyramid Hotel Indonesia بونشاك Puncak Grand ASTON Puncak Hotel and Resort Indonesia باندونج Bandung Mercure Bandung City Centre MALASYIA جنتنج هايلاند Genting Highlands Turkiye اسطنبول Istanbul Mercure Istanbul Bomonti 10 25 50 100 1 2 3 4 5"
+  },
+  {
+    "navText": "Companies",
+    "title": "Companies",
+    "route": "/companies",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "logo",
+        "label": "LOGO",
+        "minWidth": "140px"
+      },
+      {
+        "key": "mobile",
+        "label": "MOBILE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "email",
+        "label": "EMAIL",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_address",
+        "label": "ARABIC ADDRESS",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_address",
+        "label": "ENGLISH ADDRESS",
+        "minWidth": "140px"
+      },
+      {
+        "key": "website",
+        "label": "WEBSITE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "trn_number",
+        "label": "TRN NUMBER",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "ترافليون للسفر والسياحة",
+        "english_name": "Traveliun Travel and Tourism",
+        "logo": "0569222111",
+        "mobile": "info@traaveliun.com",
+        "email": "المدينة المنورة - حي الاسكان - شارع عبدالسلام ابن حفص",
+        "arabic_address": "المدينة المنورة - حي الاسكان - شارع عبدالسلام ابن حفص",
+        "english_address": "https://www.traveliun.com.sa",
+        "website": "302023121500003",
+        "trn_number": ""
+      },
+      {
+        "arabic_name": "المطار الذهبي للسفر والسياحة",
+        "english_name": "Almatar Althahaby",
+        "logo": "",
+        "mobile": "",
+        "email": "",
+        "arabic_address": "",
+        "english_address": "",
+        "website": "",
+        "trn_number": ""
+      },
+      {
+        "arabic_name": "وورد وايت ترافل",
+        "english_name": "World White Travel",
+        "logo": "",
+        "mobile": "",
+        "email": "",
+        "arabic_address": "",
+        "english_address": "",
+        "website": "",
+        "trn_number": ""
+      },
+      {
+        "arabic_name": "حجوزاتي للسفر والسياحة",
+        "english_name": "My Bookings Travel & Toursim",
+        "logo": "966597254141+",
+        "mobile": "",
+        "email": "",
+        "arabic_address": "",
+        "english_address": "",
+        "website": "",
+        "trn_number": ""
+      },
+      {
+        "arabic_name": "بزنس كلاس للسفر والسياحة",
+        "english_name": "Business Class Travel and Tourism",
+        "logo": "0172262227",
+        "mobile": "",
+        "email": "",
+        "arabic_address": "",
+        "english_address": "",
+        "website": "",
+        "trn_number": ""
+      },
+      {
+        "arabic_name": "كاسبر برو للسفر والسياحة",
+        "english_name": "Casper Pro Travel and Tourism",
+        "logo": "96896747661",
+        "mobile": "مسقط",
+        "email": "مسقط",
+        "arabic_address": "",
+        "english_address": "",
+        "website": "",
+        "trn_number": ""
+      },
+      {
+        "arabic_name": "شركة لامير للسفر والسياحة",
+        "english_name": "Lamer Travel and Tourism",
+        "logo": "966550713144+",
+        "mobile": "",
+        "email": "",
+        "arabic_address": "",
+        "english_address": "",
+        "website": "",
+        "trn_number": ""
+      },
+      {
+        "arabic_name": "بوابة الشرق لسفر والسياحة",
+        "english_name": "East Gate Travel and Tourism",
+        "logo": "",
+        "mobile": "",
+        "email": "",
+        "arabic_address": "",
+        "english_address": "",
+        "website": "",
+        "trn_number": ""
+      },
+      {
+        "arabic_name": "عروض خاصه بشركات السياحة ( B2B )",
+        "english_name": "Special offers for companies ( B2B )",
+        "logo": "",
+        "mobile": "",
+        "email": "",
+        "arabic_address": "",
+        "english_address": "",
+        "website": "",
+        "trn_number": ""
+      },
+      {
+        "arabic_name": "الجناح الجوي للسفر والسياحة",
+        "english_name": "Air Wing Travel and Tourism",
+        "logo": "966558091777+",
+        "mobile": "",
+        "email": "",
+        "arabic_address": "",
+        "english_address": "",
+        "website": "",
+        "trn_number": ""
+      }
+    ],
+    "extractedText": "Companies هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME LOGO MOBILE EMAIL ARABIC ADDRESS ENGLISH ADDRESS WEBSITE TRN NUMBER ترافليون للسفر والسياحة Traveliun Travel and Tourism 0569222111 info@traaveliun.com المدينة المنورة - حي الاسكان - شارع عبدالسلام ابن حفص المدينة المنورة - حي الاسكان - شارع عبدالسلام ابن حفص https://www.traveliun.com.sa 302023121500003 المطار الذهبي للسفر والسياحة Almatar Althahaby وورد وايت ترافل World White Travel حجوزاتي للسفر والسياحة My Bookings Travel & Toursim 966597254141+ بزنس كلاس للسفر والسياحة Business Class Travel and Tourism 0172262227 كاسبر برو للسفر والسياحة Casper Pro Travel and Tourism 96896747661 مسقط مسقط شركة لامير للسفر والسياحة Lamer Travel and Tourism 966550713144+ بوابة الشرق لسفر والسياحة East Gate Travel and Tourism عروض خاصه بشركات السياحة ( B2B ) Special offers for companies ( B2B ) الجناح الجوي للسفر والسياحة Air Wing Travel and Tourism 966558091777+ 10 25 50 100 1 2 3 4 5"
+  },
+  {
+    "navText": "Companies Visits",
+    "title": "Companies Visits",
+    "route": "/companies-visits",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "company",
+        "label": "COMPANY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "date",
+        "label": "DATE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "status",
+        "label": "STATUS",
+        "minWidth": "140px"
+      },
+      {
+        "key": "employee",
+        "label": "EMPLOYEE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "details",
+        "label": "DETAILS",
+        "minWidth": "140px"
+      },
+      {
+        "key": "company_employee_name",
+        "label": "COMPANY EMPLOYEE NAME",
+        "minWidth": "180px"
+      },
+      {
+        "key": "company_employee_mobile",
+        "label": "COMPANY EMPLOYEE MOBILE",
+        "minWidth": "180px"
+      },
+      {
+        "key": "company_employee_email",
+        "label": "COMPANY EMPLOYEE EMAIL",
+        "minWidth": "180px"
+      }
+    ],
+    "rows": [
+      {
+        "company": "Madraj Travel and Tourism Company",
+        "date": "2024-11-20",
+        "status": "Appointment has been set",
+        "employee": "Admin",
+        "details": "بعد صلاة العصر",
+        "company_employee_name": "عبدالله العصيمي",
+        "company_employee_mobile": "0533393661",
+        "company_employee_email": ""
+      }
+    ],
+    "extractedText": "Companies Visits هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add COMPANY DATE STATUS EMPLOYEE DETAILS COMPANY EMPLOYEE NAME COMPANY EMPLOYEE MOBILE COMPANY EMPLOYEE EMAIL Madraj Travel and Tourism Company 2024-11-20 Appointment has been set Admin بعد صلاة العصر عبدالله العصيمي 0533393661 10 25 50 100"
+  },
+  {
+    "navText": "Visits Statuses",
+    "title": "Visits Statuses",
+    "route": "/companies-visits-statuses",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "لم يتم تحديد موعد",
+        "english_name": "Appointment not set"
+      },
+      {
+        "arabic_name": "تم تحديد الموعد",
+        "english_name": "Appointment has been set"
+      },
+      {
+        "arabic_name": "تمت الزيارة",
+        "english_name": "Visited"
+      }
+    ],
+    "extractedText": "Visits Statuses هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME لم يتم تحديد موعد Appointment not set تم تحديد الموعد Appointment has been set تمت الزيارة Visited 10 25 50 100"
+  },
+  {
+    "navText": "Country",
+    "title": "Countries",
+    "route": "/countries",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "default_currency",
+        "label": "DEFAULT CURRENCY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "weekend",
+        "label": "WEEKEND",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "ماليزيا",
+        "english_name": "MALASYIA",
+        "default_currency": "Ringgit Malaysia",
+        "weekend": "Saturday, Sunday"
+      },
+      {
+        "arabic_name": "اندونيسيا",
+        "english_name": "Indonesia",
+        "default_currency": "Indonesian rupiah",
+        "weekend": "Sunday, Saturday"
+      },
+      {
+        "arabic_name": "فرنسا",
+        "english_name": "Fransa",
+        "default_currency": "",
+        "weekend": ""
+      },
+      {
+        "arabic_name": "تركيا",
+        "english_name": "Turkiye",
+        "default_currency": "USD",
+        "weekend": "Sunday, Saturday"
+      },
+      {
+        "arabic_name": "روسيا",
+        "english_name": "russia",
+        "default_currency": "Russian ruble",
+        "weekend": "Saturday, Sunday"
+      },
+      {
+        "arabic_name": "تايلاند",
+        "english_name": "Thailand",
+        "default_currency": "Thai baht",
+        "weekend": "Sunday, Saturday"
+      },
+      {
+        "arabic_name": "سويسرا",
+        "english_name": "Switzerland",
+        "default_currency": "",
+        "weekend": ""
+      },
+      {
+        "arabic_name": "السعوديه",
+        "english_name": "Saudi Arabia",
+        "default_currency": "SAR",
+        "weekend": ""
+      },
+      {
+        "arabic_name": "كوريا الجنوبية",
+        "english_name": "South Korea",
+        "default_currency": "",
+        "weekend": ""
+      },
+      {
+        "arabic_name": "المغرب",
+        "english_name": "Morocco",
+        "default_currency": "",
+        "weekend": ""
+      }
+    ],
+    "extractedText": "Countries هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME DEFAULT CURRENCY WEEKEND ماليزيا MALASYIA Ringgit Malaysia Saturday, Sunday اندونيسيا Indonesia Indonesian rupiah Sunday, Saturday فرنسا Fransa تركيا Turkiye USD Sunday, Saturday روسيا russia Russian ruble Saturday, Sunday تايلاند Thailand Thai baht Sunday, Saturday سويسرا Switzerland السعوديه Saudi Arabia SAR كوريا الجنوبية South Korea المغرب Morocco 10 25 50 100 1 2 3 4"
+  },
+  {
+    "navText": "Persons",
+    "title": "Customers",
+    "route": "/customers",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "company",
+        "label": "COMPANY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "mobile",
+        "label": "MOBILE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "email",
+        "label": "EMAIL",
+        "minWidth": "140px"
+      },
+      {
+        "key": "second_mobile",
+        "label": "SECOND MOBILE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "birth_date",
+        "label": "BIRTH DATE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "passport_first_name",
+        "label": "PASSPORT FIRST NAME",
+        "minWidth": "180px"
+      },
+      {
+        "key": "passport_last_name",
+        "label": "PASSPORT LAST NAME",
+        "minWidth": "180px"
+      },
+      {
+        "key": "passport_number",
+        "label": "PASSPORT NUMBER",
+        "minWidth": "140px"
+      },
+      {
+        "key": "passport_issue_date",
+        "label": "PASSPORT ISSUE DATE",
+        "minWidth": "180px"
+      },
+      {
+        "key": "passport_expiry_date",
+        "label": "PASSPORT EXPIRY DATE",
+        "minWidth": "180px"
+      }
+    ],
+    "rows": [
+      {
+        "company": "Traveliun Travel and Tourism",
+        "arabic_name": "نايف الزهراني",
+        "english_name": "501040930",
+        "mobile": "",
+        "email": "",
+        "second_mobile": "",
+        "birth_date": "",
+        "passport_first_name": "",
+        "passport_last_name": "",
+        "passport_number": "",
+        "passport_issue_date": "",
+        "passport_expiry_date": ""
+      },
+      {
+        "company": "Traveliun Travel and Tourism",
+        "arabic_name": "ابو يوسف",
+        "english_name": "560007380",
+        "mobile": "",
+        "email": "",
+        "second_mobile": "",
+        "birth_date": "",
+        "passport_first_name": "",
+        "passport_last_name": "",
+        "passport_number": "",
+        "passport_issue_date": "",
+        "passport_expiry_date": ""
+      },
+      {
+        "company": "Traveliun Travel and Tourism",
+        "arabic_name": "+966537733106",
+        "english_name": "+966537733106",
+        "mobile": "",
+        "email": "",
+        "second_mobile": "",
+        "birth_date": "",
+        "passport_first_name": "",
+        "passport_last_name": "",
+        "passport_number": "",
+        "passport_issue_date": "",
+        "passport_expiry_date": ""
+      },
+      {
+        "company": "Traveliun Travel and Tourism",
+        "arabic_name": "الأستاذة هند",
+        "english_name": "+966544072627",
+        "mobile": "",
+        "email": "",
+        "second_mobile": "",
+        "birth_date": "",
+        "passport_first_name": "",
+        "passport_last_name": "",
+        "passport_number": "",
+        "passport_issue_date": "",
+        "passport_expiry_date": ""
+      },
+      {
+        "company": "Traveliun Travel and Tourism",
+        "arabic_name": "رؤى الردادي",
+        "english_name": "0553300417",
+        "mobile": "",
+        "email": "",
+        "second_mobile": "",
+        "birth_date": "",
+        "passport_first_name": "",
+        "passport_last_name": "",
+        "passport_number": "",
+        "passport_issue_date": "",
+        "passport_expiry_date": ""
+      },
+      {
+        "company": "Traveliun Travel and Tourism",
+        "arabic_name": "امجد",
+        "english_name": "+966583878771",
+        "mobile": "",
+        "email": "",
+        "second_mobile": "",
+        "birth_date": "",
+        "passport_first_name": "",
+        "passport_last_name": "",
+        "passport_number": "",
+        "passport_issue_date": "",
+        "passport_expiry_date": ""
+      },
+      {
+        "company": "Traveliun Travel and Tourism",
+        "arabic_name": "الاستاذ بندر حسين",
+        "english_name": "0566669980",
+        "mobile": "",
+        "email": "",
+        "second_mobile": "",
+        "birth_date": "",
+        "passport_first_name": "",
+        "passport_last_name": "",
+        "passport_number": "",
+        "passport_issue_date": "",
+        "passport_expiry_date": ""
+      },
+      {
+        "company": "الأستاذه أم كريم",
+        "arabic_name": "966561003748+",
+        "english_name": "",
+        "mobile": "",
+        "email": "",
+        "second_mobile": "",
+        "birth_date": "",
+        "passport_first_name": "",
+        "passport_last_name": "",
+        "passport_number": "",
+        "passport_issue_date": "",
+        "passport_expiry_date": ""
+      },
+      {
+        "company": "Traveliun Travel and Tourism",
+        "arabic_name": "+966562328513",
+        "english_name": "+966562328513",
+        "mobile": "",
+        "email": "",
+        "second_mobile": "",
+        "birth_date": "",
+        "passport_first_name": "",
+        "passport_last_name": "",
+        "passport_number": "",
+        "passport_issue_date": "",
+        "passport_expiry_date": ""
+      },
+      {
+        "company": "Traveliun Travel and Tourism",
+        "arabic_name": "+966561310170",
+        "english_name": "+966561310170",
+        "mobile": "",
+        "email": "",
+        "second_mobile": "",
+        "birth_date": "",
+        "passport_first_name": "",
+        "passport_last_name": "",
+        "passport_number": "",
+        "passport_issue_date": "",
+        "passport_expiry_date": ""
+      }
+    ],
+    "extractedText": "Customers هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add COMPANY ARABIC NAME ENGLISH NAME MOBILE EMAIL SECOND MOBILE BIRTH DATE PASSPORT FIRST NAME PASSPORT LAST NAME PASSPORT NUMBER PASSPORT ISSUE DATE PASSPORT EXPIRY DATE Traveliun Travel and Tourism نايف الزهراني 501040930 Traveliun Travel and Tourism ابو يوسف 560007380 Traveliun Travel and Tourism +966537733106 +966537733106 Traveliun Travel and Tourism الأستاذة هند +966544072627 Traveliun Travel and Tourism رؤى الردادي 0553300417 Traveliun Travel and Tourism امجد +966583878771 Traveliun Travel and Tourism الاستاذ بندر حسين 0566669980 الأستاذه أم كريم 966561003748+ Traveliun Travel and Tourism +966562328513 +966562328513 Traveliun Travel and Tourism +966561310170 +966561310170 10 25 50 100 1 2 3 4 5"
+  },
+  {
+    "navText": "Customers Care",
+    "title": "Customers Care",
+    "route": "/customers_care",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "serial",
+        "label": "SERIAL",
+        "minWidth": "140px"
+      },
+      {
+        "key": "added_by",
+        "label": "ADDED BY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "employee",
+        "label": "EMPLOYEE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "customer_name",
+        "label": "CUSTOMER NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "customer_mobile",
+        "label": "CUSTOMER MOBILE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "countries",
+        "label": "COUNTRIES",
+        "minWidth": "140px"
+      },
+      {
+        "key": "services",
+        "label": "SERVICES",
+        "minWidth": "140px"
+      },
+      {
+        "key": "notes",
+        "label": "NOTES",
+        "minWidth": "140px"
+      },
+      {
+        "key": "last_action_elapsed_time",
+        "label": "LAST ACTION ELAPSED TIME",
+        "minWidth": "180px"
+      },
+      {
+        "key": "total_elapsed_time",
+        "label": "TOTAL ELAPSED TIME",
+        "minWidth": "180px"
+      },
+      {
+        "key": "status",
+        "label": "STATUS",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Customers Care هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Date To Employee Select Country Select Service Select Status Select Added By Select Add SERIAL ADDED BY EMPLOYEE CUSTOMER NAME CUSTOMER MOBILE COUNTRIES SERVICES NOTES LAST ACTION ELAPSED TIME TOTAL ELAPSED TIME STATUS No Data Found 10 25 50 100"
+  },
+  {
+    "navText": "Dashboard",
+    "title": "Dashboard",
+    "route": "/customers_care/dashboard",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Dashboard هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Date To Employee Select Country Select Service Select Status Select Added By Select Apply Sorry there is an error happened OK"
+  },
+  {
+    "navText": "Service Type",
+    "title": "Services",
+    "route": "/customers_care/services",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "طيران",
+        "english_name": "Flight"
+      },
+      {
+        "arabic_name": "فندق",
+        "english_name": "Hotel"
+      },
+      {
+        "arabic_name": "برنامج سياحي",
+        "english_name": "Packages"
+      },
+      {
+        "arabic_name": "مواصلات",
+        "english_name": "Transfers"
+      },
+      {
+        "arabic_name": "تأجير سيارة",
+        "english_name": "Rent Car"
+      },
+      {
+        "arabic_name": "رخصة دولية",
+        "english_name": "International license"
+      },
+      {
+        "arabic_name": "تأشيرات",
+        "english_name": "Visa"
+      },
+      {
+        "arabic_name": "أخرى",
+        "english_name": "Other"
+      },
+      {
+        "arabic_name": "برنامج سياحي مع طيران دولي",
+        "english_name": "package with flight"
+      },
+      {
+        "arabic_name": "لايوجد",
+        "english_name": "nothing"
+      }
+    ],
+    "extractedText": "Services هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME طيران Flight فندق Hotel برنامج سياحي Packages مواصلات Transfers تأجير سيارة Rent Car رخصة دولية International license تأشيرات Visa أخرى Other برنامج سياحي مع طيران دولي package with flight لايوجد nothing 10 25 50 100 1 2"
+  },
+  {
+    "navText": "Table",
+    "title": "Dashboard",
+    "route": "/dashboard",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Dashboard هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Date To Employee Select Country Select Apply"
+  },
+  {
+    "navText": "Drivers Names",
+    "title": "Drivers",
+    "route": "/drivers",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "supplier",
+        "label": "SUPPLIER",
+        "minWidth": "140px"
+      },
+      {
+        "key": "supervisor",
+        "label": "SUPERVISOR",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "mobile",
+        "label": "MOBILE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "email",
+        "label": "EMAIL",
+        "minWidth": "140px"
+      },
+      {
+        "key": "has_access_login",
+        "label": "HAS ACCESS LOGIN",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Drivers هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add SUPPLIER SUPERVISOR ARABIC NAME ENGLISH NAME MOBILE EMAIL HAS ACCESS LOGIN No Data Found 10 25 50 100"
+  },
+  {
+    "navText": "Employees",
+    "title": "Employees",
+    "route": "/employees",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "mobile",
+        "label": "MOBILE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "email",
+        "label": "EMAIL",
+        "minWidth": "140px"
+      },
+      {
+        "key": "type",
+        "label": "TYPE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "role",
+        "label": "ROLE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "status",
+        "label": "STATUS",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "أدمن",
+        "english_name": "Admin",
+        "mobile": "admin@admin.com",
+        "email": "Company Employee",
+        "type": "All Permissions",
+        "role": "Active",
+        "status": ""
+      },
+      {
+        "arabic_name": "عبد الرزاق",
+        "english_name": "abd alrazaq",
+        "mobile": "abdulrazak@traveliun.com",
+        "email": "Company Employee",
+        "type": "sales",
+        "role": "Active",
+        "status": ""
+      },
+      {
+        "arabic_name": "ايمان الهاشمي",
+        "english_name": "imenelhachmi",
+        "mobile": "imen.elhachmi@traveliun.com",
+        "email": "Company Employee",
+        "type": "All Permissions",
+        "role": "Active",
+        "status": ""
+      },
+      {
+        "arabic_name": "احمد يوسف",
+        "english_name": "ahmed yousif",
+        "mobile": "sales.ksa@traveliun.com",
+        "email": "Company Employee",
+        "type": "All Permissions",
+        "role": "Active",
+        "status": ""
+      },
+      {
+        "arabic_name": "رهف",
+        "english_name": "rahaf",
+        "mobile": "rahaf@traveliun.com",
+        "email": "Company Employee",
+        "type": "All Permissions",
+        "role": "Active",
+        "status": ""
+      },
+      {
+        "arabic_name": "ريم",
+        "english_name": "reem",
+        "mobile": "visa1@traveliun.com",
+        "email": "Company Employee",
+        "type": "Visa",
+        "role": "Active",
+        "status": ""
+      },
+      {
+        "arabic_name": "محمد صالح",
+        "english_name": "saleh",
+        "mobile": "saleh@traveliun.com",
+        "email": "Company Employee",
+        "type": "All Permissions",
+        "role": "Active",
+        "status": ""
+      },
+      {
+        "arabic_name": "نسرين",
+        "english_name": "visa",
+        "mobile": "visa@traveliun.com",
+        "email": "Company Employee",
+        "type": "Visa",
+        "role": "Active",
+        "status": ""
+      },
+      {
+        "arabic_name": "هاني",
+        "english_name": "accounts",
+        "mobile": "accounts@traveliun.com",
+        "email": "Company Employee",
+        "type": "All Permissions",
+        "role": "Active",
+        "status": ""
+      },
+      {
+        "arabic_name": "عبدالله",
+        "english_name": "Abdullah",
+        "mobile": "abdallah_ali@traveliun.com",
+        "email": "Company Employee",
+        "type": "All Permissions",
+        "role": "Active",
+        "status": ""
+      }
+    ],
+    "extractedText": "Employees هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME MOBILE EMAIL TYPE ROLE STATUS أدمن Admin admin@admin.com Company Employee All Permissions Active عبد الرزاق abd alrazaq abdulrazak@traveliun.com Company Employee sales Active ايمان الهاشمي imenelhachmi imen.elhachmi@traveliun.com Company Employee All Permissions Active احمد يوسف ahmed yousif sales.ksa@traveliun.com Company Employee All Permissions Active رهف rahaf rahaf@traveliun.com Company Employee All Permissions Active ريم reem visa1@traveliun.com Company Employee Visa Active محمد صالح saleh saleh@traveliun.com Company Employee All Permissions Active نسرين visa visa@traveliun.com Company Employee Visa Active هاني accounts accounts@traveliun.com Company Employee All Permissions Active عبدالله Abdullah abdallah_ali@traveliun.com Company Employee All Permissions Active 10 25 50 100 1 2 3"
+  },
+  {
+    "navText": "Roles",
+    "title": "Roles",
+    "route": "/employees/roles",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "كل الصلاحيات",
+        "english_name": "All Permissions"
+      },
+      {
+        "arabic_name": "مبيعات",
+        "english_name": "sales"
+      },
+      {
+        "arabic_name": "الاوبريشن",
+        "english_name": "Operation"
+      },
+      {
+        "arabic_name": "التأشيرات",
+        "english_name": "Visa"
+      }
+    ],
+    "extractedText": "Roles هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME كل الصلاحيات All Permissions مبيعات sales الاوبريشن Operation التأشيرات Visa 10 25 50 100"
+  },
+  {
+    "navText": "Categories",
+    "title": "Categories",
+    "route": "/guide/categories",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "category",
+        "label": "CATEGORY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "category": "فن البيع",
+        "arabic_name": "",
+        "english_name": ""
+      },
+      {
+        "category": "تركيا",
+        "arabic_name": "",
+        "english_name": ""
+      },
+      {
+        "category": "الإدارة المالية",
+        "arabic_name": "",
+        "english_name": ""
+      },
+      {
+        "category": "إدارة الواتساب",
+        "arabic_name": "",
+        "english_name": ""
+      },
+      {
+        "category": "من هي ترافليون",
+        "arabic_name": "",
+        "english_name": ""
+      },
+      {
+        "category": "اندونيسيا",
+        "arabic_name": "",
+        "english_name": ""
+      },
+      {
+        "category": "أندونيسيا",
+        "arabic_name": "",
+        "english_name": ""
+      }
+    ],
+    "extractedText": "Categories هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Category Select Add CATEGORY ARABIC NAME ENGLISH NAME فن البيع تركيا الإدارة المالية إدارة الواتساب من هي ترافليون اندونيسيا أندونيسيا 10 25 50 100"
+  },
+  {
+    "navText": "Informations",
+    "title": "Informations",
+    "route": "/guide/informations",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "category",
+        "label": "CATEGORY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_header",
+        "label": "ARABIC HEADER",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_text",
+        "label": "ARABIC TEXT",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_header",
+        "label": "ENGLISH HEADER",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_text",
+        "label": "ENGLISH TEXT",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Informations هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Category Select Add CATEGORY ARABIC HEADER ARABIC TEXT ENGLISH HEADER ENGLISH TEXT No Data Found 10 25 50 100"
+  },
+  {
+    "navText": "Hotels",
+    "title": "Hotels",
+    "route": "/hotels",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "country",
+        "label": "COUNTRY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "city",
+        "label": "CITY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "number_of_stars",
+        "label": "NUMBER OF STARS",
+        "minWidth": "140px"
+      },
+      {
+        "key": "address",
+        "label": "ADDRESS",
+        "minWidth": "140px"
+      },
+      {
+        "key": "google_maps",
+        "label": "GOOGLE MAPS",
+        "minWidth": "140px"
+      },
+      {
+        "key": "contact_number",
+        "label": "CONTACT NUMBER",
+        "minWidth": "140px"
+      },
+      {
+        "key": "website",
+        "label": "WEBSITE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "default_hotel",
+        "label": "DEFAULT HOTEL",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Hotels هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Country Select City Select Has Prices Has Rooms Add COUNTRY CITY ARABIC NAME ENGLISH NAME NUMBER OF STARS ADDRESS GOOGLE MAPS CONTACT NUMBER WEBSITE DEFAULT HOTEL No Data Found 10 25 50 100"
+  },
+  {
+    "navText": "Kanban Board",
+    "title": "Kanban Board",
+    "route": "/kanban-board",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Kanban Board هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Only My Offers Active Not Confirmed Package Sent AD-2-1057-20260626 2026-06-26 0594135050 Countries: MALASYIA AD-3-7734-20260707 2026-07-07 0101 Countries: Thailand AD-1-6746-20251106 2025-11-06 0594135050 Countries: Indonesia AD-1-6526-20251024 2025-10-24 0594135050 Countries: MALASYIA AD-2-3171-20250501 2025-05-01 0594135050 Countries: Indonesia AD-1-6292-20251015 2025-10-15 0594135050 Countries: MALASYIA AD-3-6056-20250912 2025-09-12 011111101111 Countries: Azerbaijan AD-1-5612-20250822 2025-08-22 0594135050 Countries: MALASYIA AD-3-5236-20250725 2025-07-25 987 Countries: Thailand AD-1-5211-20260701 2026-07-01 0594135050 Countries: Turkiye AD-3-4486-20250618 2025-06-18 0594135050 Countries: AD-1-2056-20250320 2025-03-20 0594135050 Countries: MALASYIA AD-2-0556-20241220 2024-12-20 0 Countries: MALASYIA AD-1-0037-20241101 2024-11-01 6543265432 Countries: MALASYIA AD-2-0036-20241101 2024-11-01 0987654321 Countries: MALASYIA Follow"
+  },
+  {
+    "navText": "Packages",
+    "title": "Offers",
+    "route": "/offers",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "serial",
+        "label": "SERIAL",
+        "minWidth": "140px"
+      },
+      {
+        "key": "employee",
+        "label": "EMPLOYEE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "original_employee",
+        "label": "ORIGINAL EMPLOYEE",
+        "minWidth": "180px"
+      },
+      {
+        "key": "customer",
+        "label": "CUSTOMER",
+        "minWidth": "140px"
+      },
+      {
+        "key": "company",
+        "label": "COMPANY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "buy_price",
+        "label": "BUY PRICE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "sell_price",
+        "label": "SELL PRICE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "profit",
+        "label": "PROFIT",
+        "minWidth": "140px"
+      },
+      {
+        "key": "status",
+        "label": "STATUS",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "serial": "AD-1-1057-20260624",
+        "employee": "Admin",
+        "original_employee": "Admin",
+        "customer": "Traveliun Travel and Tourism",
+        "company": "6886.16",
+        "buy_price": "7368.19",
+        "sell_price": "482.03",
+        "profit": "Package Sent",
+        "status": ""
+      },
+      {
+        "serial": "AD-2-1057-20260626",
+        "employee": "Admin",
+        "original_employee": "Admin",
+        "customer": "Traveliun Travel and Tourism",
+        "company": "15728.3",
+        "buy_price": "18087.54",
+        "sell_price": "2359.24",
+        "profit": "Package Sent",
+        "status": ""
+      },
+      {
+        "serial": "AD-3-7734-20260707",
+        "employee": "Admin",
+        "original_employee": "abd alrazaq",
+        "customer": "trip captain Travel & Tourism",
+        "company": "10570.52",
+        "buy_price": "11204.75",
+        "sell_price": "634.23",
+        "profit": "Package Sent",
+        "status": ""
+      },
+      {
+        "serial": "AD-1-6746-20251106",
+        "employee": "Admin",
+        "original_employee": "Admin",
+        "customer": "Traveliun Travel and Tourism",
+        "company": "1200",
+        "buy_price": "1380",
+        "sell_price": "180.00",
+        "profit": "Package Sent",
+        "status": ""
+      },
+      {
+        "serial": "AD-1-5211-20260701",
+        "employee": "Admin",
+        "original_employee": "Admin",
+        "customer": "Traveliun Travel and Tourism",
+        "company": "7419.46",
+        "buy_price": "8419.46",
+        "sell_price": "1000.00",
+        "profit": "Package Sent",
+        "status": ""
+      }
+    ],
+    "extractedText": "Offers هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Programs Not Confirmed Programs Confirmed New Edit Last Edit Cancelled Confirmed Only My Offers Active Add SERIAL EMPLOYEE ORIGINAL EMPLOYEE CUSTOMER COMPANY BUY PRICE SELL PRICE PROFIT STATUS AD-1-1057-20260624 Admin Admin Traveliun Travel and Tourism 6886.16 7368.19 482.03 Package Sent AD-2-1057-20260626 Admin Admin Traveliun Travel and Tourism 15728.3 18087.54 2359.24 Package Sent AD-3-7734-20260707 Admin abd alrazaq trip captain Travel & Tourism 10570.52 11204.75 634.23 Package Sent AD-1-6746-20251106 Admin Admin Traveliun Travel and Tourism 1200 1380 180.00 Package Sent AD-1-5211-20260701 Admin Admin Traveliun Travel and Tourism 7419.46 8419.46 1000.00 Package Sent 10 25 50 100"
+  },
+  {
+    "navText": "Offer Includes",
+    "title": "Offer Includes",
+    "route": "/offers/offer-includes",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_text",
+        "label": "ARABIC TEXT",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_text",
+        "label": "ENGLISH TEXT",
+        "minWidth": "140px"
+      },
+      {
+        "key": "checked",
+        "label": "CHECKED",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_text": "الفنادق",
+        "english_text": "HOTELS",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "وجبة الإفطار",
+        "english_text": "BREAKFAST",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "الإستقبال والتوديع من المطار إلى الفندق والعكس",
+        "english_text": "Reception and farewell from the airport to the hotel and vice versa",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "الجولات السياحية",
+        "english_text": "Tours",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "الطيران الداخلي",
+        "english_text": "Domestic flight",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "الطيران الدولي",
+        "english_text": "International flight",
+        "checked": "No"
+      },
+      {
+        "arabic_text": "شريحة إتصال وباقة انترنت",
+        "english_text": "Internet and calls sim card",
+        "checked": "No"
+      },
+      {
+        "arabic_text": "خدمة عملاء 24 ساعة بالعربي",
+        "english_text": "hour customer service in english 24",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "جميع الجولات السياحية والتنقلات بسيارة خاصة بكم فقط",
+        "english_text": "All tours and transfers by your own private car only",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "شامل جميع الضرائب والرسوم ماعدا ضريبة المدينة إن وجدت",
+        "english_text": "All taxes and fees included except city tax if applicable.",
+        "checked": "Yes"
+      }
+    ],
+    "extractedText": "Offer Includes هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC TEXT ENGLISH TEXT CHECKED الفنادق HOTELS Yes وجبة الإفطار BREAKFAST Yes الإستقبال والتوديع من المطار إلى الفندق والعكس Reception and farewell from the airport to the hotel and vice versa Yes الجولات السياحية Tours Yes الطيران الداخلي Domestic flight Yes الطيران الدولي International flight No شريحة إتصال وباقة انترنت Internet and calls sim card No خدمة عملاء 24 ساعة بالعربي hour customer service in english 24 Yes جميع الجولات السياحية والتنقلات بسيارة خاصة بكم فقط All tours and transfers by your own private car only Yes شامل جميع الضرائب والرسوم ماعدا ضريبة المدينة إن وجدت All taxes and fees included except city tax if applicable. Yes 10 25 50 100"
+  },
+  {
+    "navText": "Offer Not Includes",
+    "title": "Offer Not Includes",
+    "route": "/offers/offer-not-includes",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_text",
+        "label": "ARABIC TEXT",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_text",
+        "label": "ENGLISH TEXT",
+        "minWidth": "140px"
+      },
+      {
+        "key": "checked",
+        "label": "CHECKED",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_text": "الطيران الدولي",
+        "english_text": "International flight",
+        "checked": "No"
+      },
+      {
+        "arabic_text": "وجبة الغداء والعشاء",
+        "english_text": "Lunch and dinner",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "رسوم تذاكر دخول الأماكن السياحية",
+        "english_text": "Tourist entrance tickets",
+        "checked": "Yes"
+      }
+    ],
+    "extractedText": "Offer Not Includes هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC TEXT ENGLISH TEXT CHECKED الطيران الدولي International flight No وجبة الغداء والعشاء Lunch and dinner Yes رسوم تذاكر دخول الأماكن السياحية Tourist entrance tickets Yes 10 25 50 100"
+  },
+  {
+    "navText": "Terms & Conditions",
+    "title": "Terms & Conditions",
+    "route": "/offers/terms-and-conditions",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_text",
+        "label": "ARABIC TEXT",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_text",
+        "label": "ENGLISH TEXT",
+        "minWidth": "140px"
+      },
+      {
+        "key": "checked",
+        "label": "CHECKED",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_text": "في حال لم يكن حجم السيارة ملائمًا لعدد الركاب والأمتعة يُرجى إعلامنا مسبقًا نود التنويه بأن الأسعار تختلف حسب حجم السيارة",
+        "english_text": "If the size of the car is not suitable for the number of passengers and luggage, please inform us in advance. We would like to note that prices vary according to the size of the car",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "عبارة ( يوم حر ) المدرجة في البرنامج تعني أن الشركة غير مسؤولة عن تأمين سيارة للعميل في ذلك اليوم وأن للعميل حرية اختيار الأماكن التي يرغب في زيارتها والطريقة التي يفضلها",
+        "english_text": "The phrase (free day) included in the program means that the company is not responsible for securing a car for the customer on that day and that the customer has the freedom to choose the places he wants to visit and the method he prefers.",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "يُطلب من العميل التحقق من الموظف المسؤول حول توفر الفنادق في التواريخ المدرجة في البرنامج قبل تثبيت الحجز",
+        "english_text": "The Customer is requested to check with the responsible employee about the availability of hotels on the dates listed in the program before confirming the reservation",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "جميع الحجوزات في الفنادق غير قابلة للإلغاء أو الاسترجاع أو التعديل",
+        "english_text": "All hotel reservations are not subject to cancellation, refund or modification",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "السيارة الصغيرة تتسع لشخصين بالغين وحقيبتين كبيرتين",
+        "english_text": "The small car can accommodate two adults with two large bags",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "جميع الجولات المدرجة في البرنامج هي مقترحات قابلة للتعديل حسب رغباتكم مع التنسيق مع السائق عند الوصول بشرط أن تكون داخل نطاق المدينة",
+        "english_text": "All tours included in the program are proposals that can be modified according to your desires, with coordination with the driver upon arrival, provided that they are within the city limits",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "نوع السرير في الغرفة سواء كان سريرًا كبيرًا أو سريرين منفصلين يتم تحديده من قبل الفندق عند الوصول",
+        "english_text": "The type of bed in the room, whether it is a king size bed or two separate beds, is determined by the hotel upon arrival",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "مدة الجولة السياحية هي 8 ساعات فقط ولا تشمل تذاكر الدخول إلى الأماكن السياحية",
+        "english_text": "The duration of the tour is only 8 hours and does not include entry tickets to tourist attractions",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "تجنبًا للأخطاء يُرجى فحص البرنامج والغرف المذكورة في البرنامج المرسل من قبلنا قبل التأكيد",
+        "english_text": "To avoid errors, please check the program and rooms mentioned in the program sent by us before confirming",
+        "checked": "Yes"
+      },
+      {
+        "arabic_text": "في حال عدم توفر الغرفة أو الفندق المرسلة من قبلنا سيتم اقتراح فندق بديل يتمتع بنفس المستوى والجودة",
+        "english_text": "If the room or hotel sent by us is not available an alternative hotel of the same level and quality will be suggested",
+        "checked": "Yes"
+      }
+    ],
+    "extractedText": "Terms & Conditions هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC TEXT ENGLISH TEXT CHECKED في حال لم يكن حجم السيارة ملائمًا لعدد الركاب والأمتعة يُرجى إعلامنا مسبقًا نود التنويه بأن الأسعار تختلف حسب حجم السيارة If the size of the car is not suitable for the number of passengers and luggage, please inform us in advance. We would like to note that prices vary according to the size of the car Yes عبارة ( يوم حر ) المدرجة في البرنامج تعني أن الشركة غير مسؤولة عن تأمين سيارة للعميل في ذلك اليوم وأن للعميل حرية اختيار الأماكن التي يرغب في زيارتها والطريقة التي يفضلها The phrase (free day) included in the program means that the company is not responsible for securing a car for the customer on that day and that the customer has the freedom to choose the places he wants to visit and the method he prefers. Yes يُطلب من العميل التحقق من الموظف المسؤول حول توفر الفنادق في التواريخ المدرجة في البرنامج قبل تثبيت الحجز The Customer is requested to check with the responsible employee about t"
+  },
+  {
+    "navText": "Ports Names",
+    "title": "Ports",
+    "route": "/ports",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "country",
+        "label": "COUNTRY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "city",
+        "label": "CITY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "code",
+        "label": "CODE",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Ports هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Country Select City Select Add COUNTRY CITY ARABIC NAME ENGLISH NAME CODE No Data Found 10 25 50 100"
+  },
+  {
+    "navText": "Ready Offers",
+    "title": "Ready Offers",
+    "route": "/ready-offers",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Ready Offers هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide all_offers Number of Offers: 8 MALASYIA Number of Offers: 1 Indonesia Number of Offers: 1 UAE Number of Offers: 1 Turkiye Number of Offers: 4 Thailand Number of Offers: 1"
+  },
+  {
+    "navText": "Rooms Types",
+    "title": "Rooms Types",
+    "route": "/rooms-types",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "جناح تيفاني",
+        "english_name": "Tiffany Suite"
+      },
+      {
+        "arabic_name": "غرفة ديولكس مطلة على البحر",
+        "english_name": "deluxe sea view"
+      },
+      {
+        "arabic_name": "غرفة تنفيذية",
+        "english_name": "Executive Room"
+      },
+      {
+        "arabic_name": "غرفة وصالة",
+        "english_name": "Suit one bedroom"
+      },
+      {
+        "arabic_name": "غرفتان وصالة",
+        "english_name": "Suit two bedroom"
+      },
+      {
+        "arabic_name": "ثلاث غرف وصالة",
+        "english_name": "Suit three bedrooms"
+      },
+      {
+        "arabic_name": "غرفة ضيافه ميليا",
+        "english_name": "guest room"
+      },
+      {
+        "arabic_name": "غرفة ضيافة بريمير",
+        "english_name": "Premier guest room"
+      },
+      {
+        "arabic_name": "عائليه من غرفتين نوم",
+        "english_name": "Two bedroom family"
+      },
+      {
+        "arabic_name": "ديلوكس بارك",
+        "english_name": "Deluxe Park"
+      }
+    ],
+    "extractedText": "Rooms Types هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME جناح تيفاني Tiffany Suite غرفة ديولكس مطلة على البحر deluxe sea view غرفة تنفيذية Executive Room غرفة وصالة Suit one bedroom غرفتان وصالة Suit two bedroom ثلاث غرف وصالة Suit three bedrooms غرفة ضيافه ميليا guest room غرفة ضيافة بريمير Premier guest room عائليه من غرفتين نوم Two bedroom family ديلوكس بارك Deluxe Park 10 25 50 100 1 2 3 4 5"
+  },
+  {
+    "navText": "Connect service to country",
+    "title": "Services",
+    "route": "/services",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "country",
+        "label": "COUNTRY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "service_type",
+        "label": "SERVICE TYPE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "buy_price",
+        "label": "BUY PRICE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "buy_currency",
+        "label": "BUY CURRENCY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "sell_price",
+        "label": "SELL PRICE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "sell_currency",
+        "label": "SELL CURRENCY",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Services هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Country Select Add COUNTRY SERVICE TYPE BUY PRICE BUY CURRENCY SELL PRICE SELL CURRENCY No Data Found 10 25 50 100"
+  },
+  {
+    "navText": "Services Types",
+    "title": "Services Types",
+    "route": "/services-types",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "شريحة اتصال وشرحة انترنت لامحدود",
+        "english_name": "Sim card and unlimited internet"
+      },
+      {
+        "arabic_name": "استقبال مميز بالورد مع سيارة مزينة من الداخل",
+        "english_name": "A special reception with flowers and a decorated car interior"
+      },
+      {
+        "arabic_name": "استقبال بالورد",
+        "english_name": "Welcome with roses"
+      },
+      {
+        "arabic_name": "شرائح انترنت 23 جيجا",
+        "english_name": "SIM Internet"
+      },
+      {
+        "arabic_name": "الإفطار العائم في فندق S18",
+        "english_name": "Floating breakfast"
+      },
+      {
+        "arabic_name": "سيارة خاصه بدون سائق",
+        "english_name": "Private car without driver"
+      },
+      {
+        "arabic_name": "افطار عائم في فلل بالي",
+        "english_name": "Floating breakfast in Bali villas"
+      },
+      {
+        "arabic_name": "تزيين الغرف في فنادق كوالالبمور",
+        "english_name": "Decorating rooms in Kuala Lumpur hotels"
+      },
+      {
+        "arabic_name": "استقبال VIP مع خدمة المسار السريع",
+        "english_name": "fast track service"
+      },
+      {
+        "arabic_name": "استقبال VIP مع خدمة المسار السريع وعربة القولف",
+        "english_name": "fast track service with golf car"
+      }
+    ],
+    "extractedText": "Services Types هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME شريحة اتصال وشرحة انترنت لامحدود Sim card and unlimited internet استقبال مميز بالورد مع سيارة مزينة من الداخل A special reception with flowers and a decorated car interior استقبال بالورد Welcome with roses شرائح انترنت 23 جيجا SIM Internet الإفطار العائم في فندق S18 Floating breakfast سيارة خاصه بدون سائق Private car without driver افطار عائم في فلل بالي Floating breakfast in Bali villas تزيين الغرف في فنادق كوالالبمور Decorating rooms in Kuala Lumpur hotels استقبال VIP مع خدمة المسار السريع fast track service استقبال VIP مع خدمة المسار السريع وعربة القولف fast track service with golf car 10 25 50 100 1 2 3"
+  },
+  {
+    "navText": "Currencies",
+    "title": "Currencies",
+    "route": "/setting/currencies",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "iso_code",
+        "label": "ISO CODE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "price_margin",
+        "label": "PRICE MARGIN",
+        "minWidth": "140px"
+      },
+      {
+        "key": "price_to_convert_to_sar",
+        "label": "PRICE TO CONVERT TO SAR",
+        "minWidth": "180px"
+      },
+      {
+        "key": "price_to_convert_from_sar",
+        "label": "PRICE TO CONVERT FROM SAR",
+        "minWidth": "180px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "ريال سعودي",
+        "english_name": "SAR",
+        "iso_code": "SAR",
+        "price_margin": "0",
+        "price_to_convert_to_sar": "1 Every 100 SAR = 100.00 SAR",
+        "price_to_convert_from_sar": "1 Every 100 SAR = 100.00 SAR"
+      },
+      {
+        "arabic_name": "دولار أمريكي",
+        "english_name": "USD",
+        "iso_code": "USD",
+        "price_margin": "0.005",
+        "price_to_convert_to_sar": "3.821656002271898 Every 100 USD = 382.17 SAR",
+        "price_to_convert_from_sar": "0.26166667 Every 100 SAR = 26.17 USD"
+      },
+      {
+        "arabic_name": "ليرة تركية",
+        "english_name": "Turkish Lira",
+        "iso_code": "TRY",
+        "price_margin": "0.4",
+        "price_to_convert_to_sar": "0.08299180497338798 Every 100 Turkish Lira = 8.30 SAR",
+        "price_to_convert_from_sar": "12.04938247 Every 100 SAR = 1204.94 Turkish Lira"
+      },
+      {
+        "arabic_name": "يورو",
+        "english_name": "Euro",
+        "iso_code": "EUR",
+        "price_margin": "0.035",
+        "price_to_convert_to_sar": "5.0162725372973656 Every 100 Euro = 501.63 SAR",
+        "price_to_convert_from_sar": "0.19935121 Every 100 SAR = 19.94 Euro"
+      },
+      {
+        "arabic_name": "روبية إندونيسي",
+        "english_name": "Indonesian rupiah",
+        "iso_code": "IDR",
+        "price_margin": "790",
+        "price_to_convert_to_sar": "0.00024949402859061263 Every 100 Indonesian rupiah = 0.02 SAR",
+        "price_to_convert_from_sar": "4008.1119602299996 Every 100 SAR = 400811.20 Indonesian rupiah"
+      },
+      {
+        "arabic_name": "بات تايلندي",
+        "english_name": "Thai baht",
+        "iso_code": "THB",
+        "price_margin": "0.8",
+        "price_to_convert_to_sar": "0.12352579483497224 Every 100 Thai baht = 12.35 SAR",
+        "price_to_convert_from_sar": "8.095475129999999 Every 100 SAR = 809.55 Thai baht"
+      },
+      {
+        "arabic_name": "رينجيت ماليزي",
+        "english_name": "Ringgit Malaysia",
+        "iso_code": "MYR",
+        "price_margin": "0.09",
+        "price_to_convert_to_sar": "0.9981510947826013 Every 100 Ringgit Malaysia = 99.82 SAR",
+        "price_to_convert_from_sar": "1.00185233 Every 100 SAR = 100.19 Ringgit Malaysia"
+      },
+      {
+        "arabic_name": "ريال عماني",
+        "english_name": "Omani Riyal",
+        "iso_code": "OMR",
+        "price_margin": "0.009",
+        "price_to_convert_to_sar": "10.67855146730772 Every 100 Omani Riyal = 1067.86 SAR",
+        "price_to_convert_from_sar": "0.09364566 Every 100 SAR = 9.36 Omani Riyal"
+      },
+      {
+        "arabic_name": "دولار سنغافوري",
+        "english_name": "Singapore Dollar",
+        "iso_code": "SGD",
+        "price_margin": "0",
+        "price_to_convert_to_sar": "2.893794919474224 Every 100 Singapore Dollar = 289.38 SAR",
+        "price_to_convert_from_sar": "0.34556699 Every 100 SAR = 34.56 Singapore Dollar"
+      },
+      {
+        "arabic_name": "درهم اماراتي",
+        "english_name": "UAE Dirham",
+        "iso_code": "AED",
+        "price_margin": "0",
+        "price_to_convert_to_sar": "1.0211027944897986 Every 100 UAE Dirham = 102.11 SAR",
+        "price_to_convert_from_sar": "0.97933333 Every 100 SAR = 97.93 UAE Dirham"
+      }
+    ],
+    "extractedText": "Currencies هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME ISO CODE PRICE MARGIN PRICE TO CONVERT TO SAR PRICE TO CONVERT FROM SAR ريال سعودي SAR SAR 0 1 Every 100 SAR = 100.00 SAR 1 Every 100 SAR = 100.00 SAR دولار أمريكي USD USD 0.005 3.821656002271898 Every 100 USD = 382.17 SAR 0.26166667 Every 100 SAR = 26.17 USD ليرة تركية Turkish Lira TRY 0.4 0.08299180497338798 Every 100 Turkish Lira = 8.30 SAR 12.04938247 Every 100 SAR = 1204.94 Turkish Lira يورو Euro EUR 0.035 5.0162725372973656 Every 100 Euro = 501.63 SAR 0.19935121 Every 100 SAR = 19.94 Euro روبية إندونيسي Indonesian rupiah IDR 790 0.00024949402859061263 Every 100 Indonesian rupiah = 0.02 SAR 4008.1119602299996 Every 100 SAR = 400811.20 Indonesian rupiah بات تايلندي Thai baht THB 0.8 0.12352579483497224 Every 100 Thai baht = 12.35 SAR 8.095475129999999 Every 100 SAR = 809.55 Thai baht رينجيت ماليزي Ringgit Malaysia MYR 0.09 0.9981510947826013 Every 100 Ringgit Malaysia = 99.82 SAR 1.00185233 Every 100"
+  },
+  {
+    "navText": "Profits",
+    "title": "Profits",
+    "route": "/setting/profits",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Profits هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Profit Setting Save Value % Is Profit Percentage Locked? No Yes Profit Setting (B2B) Save Value % Is Profit Percentage Locked? No Yes"
+  },
+  {
+    "navText": "Statuses",
+    "title": "Statuses",
+    "route": "/setting/statuses",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "group",
+        "label": "GROUP",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Statuses هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Type Select Add ARABIC NAME ENGLISH NAME GROUP No Data Found 10 25 50 100"
+  },
+  {
+    "navText": "Statuses Groups",
+    "title": "Statuses Groups",
+    "route": "/setting/statuses-groups",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "غير مؤكد",
+        "english_name": "Not Confirmed"
+      },
+      {
+        "arabic_name": "مؤكد",
+        "english_name": "Confirmed"
+      }
+    ],
+    "extractedText": "Statuses Groups هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME غير مؤكد Not Confirmed مؤكد Confirmed 10 25 50 100"
+  },
+  {
+    "navText": "Supervisors",
+    "title": "Supervisors",
+    "route": "/setting/supervisors",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "supplier",
+        "label": "SUPPLIER",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "mobile",
+        "label": "MOBILE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "email",
+        "label": "EMAIL",
+        "minWidth": "140px"
+      },
+      {
+        "key": "has_access_login",
+        "label": "HAS ACCESS LOGIN",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "Supervisors هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add SUPPLIER ARABIC NAME ENGLISH NAME MOBILE EMAIL HAS ACCESS LOGIN No Data Found 10 25 50 100"
+  },
+  {
+    "navText": "Suppliers",
+    "title": "Suppliers",
+    "route": "/setting/suppliers",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "employee_arabic_name",
+        "label": "EMPLOYEE ARABIC NAME",
+        "minWidth": "180px"
+      },
+      {
+        "key": "employee_english_name",
+        "label": "EMPLOYEE ENGLISH NAME",
+        "minWidth": "180px"
+      },
+      {
+        "key": "mobile",
+        "label": "MOBILE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "email",
+        "label": "EMAIL",
+        "minWidth": "140px"
+      },
+      {
+        "key": "has_access_login",
+        "label": "HAS ACCESS LOGIN",
+        "minWidth": "140px"
+      },
+      {
+        "key": "countries",
+        "label": "COUNTRIES",
+        "minWidth": "140px"
+      },
+      {
+        "key": "categories",
+        "label": "CATEGORIES",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "فر ع ماليزيا",
+        "english_name": "Malaysia Branch",
+        "employee_arabic_name": "محمد الزنداني",
+        "employee_english_name": "Mohammed Alzindani",
+        "mobile": "⁦+60 11-1111 4422⁩",
+        "email": "No",
+        "has_access_login": "MALASYIA",
+        "countries": "Transportation - Services",
+        "categories": ""
+      },
+      {
+        "arabic_name": "فر ع اندونيسيا",
+        "english_name": "Indonesia Branch",
+        "employee_arabic_name": "مالك",
+        "employee_english_name": "malik",
+        "mobile": "⁦+62 85777425178⁩",
+        "email": "No",
+        "has_access_login": "Indonesia",
+        "countries": "Transportation - Hotels - Services",
+        "categories": ""
+      },
+      {
+        "arabic_name": "فرع تايلاند",
+        "english_name": "Thailand Branch",
+        "employee_arabic_name": "جمال",
+        "employee_english_name": "Jamal",
+        "mobile": "⁦+62 81112512111⁩",
+        "email": "No",
+        "has_access_login": "Thailand",
+        "countries": "Transportation - Hotels - Services",
+        "categories": ""
+      },
+      {
+        "arabic_name": "قدرة",
+        "english_name": "KADRA",
+        "employee_arabic_name": "خليل",
+        "employee_english_name": "⁦+9053163610 49⁩",
+        "mobile": "No",
+        "email": "Turkiye",
+        "has_access_login": "Transportation",
+        "countries": "",
+        "categories": ""
+      },
+      {
+        "arabic_name": "TBO Holidays",
+        "english_name": "TBO Holidays",
+        "employee_arabic_name": "خالد بلوشي",
+        "employee_english_name": "⁦0549641203⁩",
+        "mobile": "No",
+        "email": "Flights - Transportation - Hotels - Services",
+        "has_access_login": "",
+        "countries": "",
+        "categories": ""
+      },
+      {
+        "arabic_name": "within earth",
+        "english_name": "Within Earth",
+        "employee_arabic_name": "محمد المطيري",
+        "employee_english_name": "⁦0594998670⁩",
+        "mobile": "No",
+        "email": "MALASYIA",
+        "has_access_login": "Transportation - Hotels - Services",
+        "countries": "",
+        "categories": ""
+      },
+      {
+        "arabic_name": "حيفاء",
+        "english_name": "Haifa",
+        "employee_arabic_name": "كريم",
+        "employee_english_name": "⁦+905428118747⁩",
+        "mobile": "No",
+        "email": "Turkiye",
+        "has_access_login": "Transportation - Hotels - Services",
+        "countries": "",
+        "categories": ""
+      },
+      {
+        "arabic_name": "اون تايم جورجيا",
+        "english_name": "On Time",
+        "employee_arabic_name": "عثمان",
+        "employee_english_name": "⁦+995599130386⁩",
+        "mobile": "No",
+        "email": "Georgia",
+        "has_access_login": "Transportation - Hotels - Services",
+        "countries": "",
+        "categories": ""
+      },
+      {
+        "arabic_name": "حول العالم البوسنه",
+        "english_name": "Worldwide bosna",
+        "employee_arabic_name": "انس",
+        "employee_english_name": "⁦+38761896434⁩",
+        "mobile": "No",
+        "email": "Bosnia",
+        "has_access_login": "Transportation - Hotels - Services",
+        "countries": "",
+        "categories": ""
+      },
+      {
+        "arabic_name": "توب غالري",
+        "english_name": "Top Glory",
+        "employee_arabic_name": "فادي سويرس",
+        "employee_english_name": "⁦+995557066633",
+        "mobile": "No",
+        "email": "Azerbaijan - Georgia",
+        "has_access_login": "Transportation - Hotels - Services",
+        "countries": "",
+        "categories": ""
+      }
+    ],
+    "extractedText": "Suppliers هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME EMPLOYEE ARABIC NAME EMPLOYEE ENGLISH NAME MOBILE EMAIL HAS ACCESS LOGIN COUNTRIES CATEGORIES فر ع ماليزيا Malaysia Branch محمد الزنداني Mohammed Alzindani ⁦+60 11-1111 4422⁩ No MALASYIA Transportation - Services فر ع اندونيسيا Indonesia Branch مالك malik ⁦+62 85777425178⁩ No Indonesia Transportation - Hotels - Services فرع تايلاند Thailand Branch جمال Jamal ⁦+62 81112512111⁩ No Thailand Transportation - Hotels - Services قدرة KADRA خليل ⁦+9053163610 49⁩ No Turkiye Transportation TBO Holidays TBO Holidays خالد بلوشي ⁦0549641203⁩ No Flights - Transportation - Hotels - Services within earth Within Earth محمد المطيري ⁦0594998670⁩ No MALASYIA Transportation - Hotels - Services حيفاء Haifa كريم ⁦+905428118747⁩ No Turkiye Transportation - Hotels - Services اون تايم جورجيا On Time عثمان ⁦+995599130386⁩ No Georgia Transportation - Hotels - Services حول العالم البوسنه Worldwide bosna انس ⁦+38761896434⁩ No Bosnia T"
+  },
+  {
+    "navText": "Suppliers Preferences",
+    "title": "Suppliers Preferences",
+    "route": "/setting/suppliers-preferences",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "supplier",
+        "label": "SUPPLIER",
+        "minWidth": "140px"
+      },
+      {
+        "key": "country",
+        "label": "COUNTRY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "category",
+        "label": "CATEGORY",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "supplier": "Malaysia Branch",
+        "country": "MALASYIA",
+        "category": "Transportation"
+      },
+      {
+        "supplier": "Malaysia Branch",
+        "country": "MALASYIA",
+        "category": "Services"
+      },
+      {
+        "supplier": "Within Earth",
+        "country": "Hotels",
+        "category": ""
+      },
+      {
+        "supplier": "Within Earth",
+        "country": "Services",
+        "category": ""
+      },
+      {
+        "supplier": "Indonesia Branch",
+        "country": "Indonesia",
+        "category": "Transportation"
+      },
+      {
+        "supplier": "Indonesia Branch",
+        "country": "Indonesia",
+        "category": "Services"
+      },
+      {
+        "supplier": "Indonesia Branch",
+        "country": "Indonesia",
+        "category": "Hotels"
+      },
+      {
+        "supplier": "Thailand Branch",
+        "country": "Thailand",
+        "category": "Transportation"
+      },
+      {
+        "supplier": "Thailand Branch",
+        "country": "Thailand",
+        "category": "Hotels"
+      },
+      {
+        "supplier": "Thailand Branch",
+        "country": "Thailand",
+        "category": "Services"
+      }
+    ],
+    "extractedText": "Suppliers Preferences هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add SUPPLIER COUNTRY CATEGORY Malaysia Branch MALASYIA Transportation Malaysia Branch MALASYIA Services Within Earth Hotels Within Earth Services Indonesia Branch Indonesia Transportation Indonesia Branch Indonesia Services Indonesia Branch Indonesia Hotels Thailand Branch Thailand Transportation Thailand Branch Thailand Hotels Thailand Branch Thailand Services 10 25 50 100 1 2"
+  },
+  {
+    "navText": "VISAs",
+    "title": "VISAs",
+    "route": "/visas",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "country",
+        "label": "COUNTRY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "visa_type",
+        "label": "VISA TYPE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "buy_price",
+        "label": "BUY PRICE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "buy_currency",
+        "label": "BUY CURRENCY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "sell_price",
+        "label": "SELL PRICE",
+        "minWidth": "140px"
+      },
+      {
+        "key": "sell_currency",
+        "label": "SELL CURRENCY",
+        "minWidth": "140px"
+      },
+      {
+        "key": "arabic_requirements",
+        "label": "ARABIC REQUIREMENTS",
+        "minWidth": "180px"
+      },
+      {
+        "key": "english_requirements",
+        "label": "ENGLISH REQUIREMENTS",
+        "minWidth": "180px"
+      }
+    ],
+    "rows": [
+      {
+        "country": "Fransa",
+        "visa_type": "Tourist Visa",
+        "buy_price": "250",
+        "buy_currency": "SAR",
+        "sell_price": "400",
+        "sell_currency": "SAR",
+        "arabic_requirements": "1- الجواز الاصل صالح لمده 6 شهور على الاقل بعد انتهاء الإقامة وبه صفحتين فارغتين 2- صورة بطاقة الاحوال + كارت العائلة للزوجة والأولاد 3- كشف حساب بنكي لأخر 3 شهور انجليزي للسعودي و6 شهور للمقيم مختوم وبه رصيد كافي لمصاريف السفرة ويفضل استخراجه قبل التبصيم بي 3 ايام لا يقل الرصيد عن 10 الاف ريال للشخص الواحد 4- خطاب تعريف من العمل مذكور به الراتب والمسمى الوظيفي ومصدق من الغرفة التجارية للعاملين بالقطاع الخاص باللغة الإنجليزية 5- خروج وعوده للمقيميين باللغة الإنجليزية 6- صورتين شخصيتين بخلفيه بيضاء بدون شماغ للراجل مقاس 3.5في 4.5 السعر بتحولنا 400 ريال رسوم الموعد والابليكشن والحجوزات والتامين والترجمه وبتدفع بالسفارة حوالي 400 ريال",
+        "english_requirements": ""
+      },
+      {
+        "country": "Spain",
+        "visa_type": "Tourist Visa",
+        "buy_price": "180",
+        "buy_currency": "SAR",
+        "sell_price": "400",
+        "sell_currency": "SAR",
+        "arabic_requirements": "1- الجواز الاصل صالح لمده 6 شهور على الاقل بعد انتهاء الإقامة وبه صفحتين فارغتين 2- صورة بطاقة الاحوال + كارت العائلة للزوجة والأولاد 3- كشف حساب بنكي لأخر 3 شهور انجليزي للسعودي و6 شهور للمقيم مختوم وبه رصيد كافي لمصاريف السفرة ويفضل استخراجه قبل التبصيم بي 3 ايام لا يقل الرصيد عن 10 الاف ريال 4- خطاب تعريف من العمل مذكور به الراتب والمسمى الوظيفي ومصدق من الغرفة التجارية للعاملين بالقطاع الخاص باللغة الإنجليزية للمقيم يسكون مكتوب تاريخ العقد والتجديد وضمان الشركه للعودته 5- خروج وعوده للمقيميين باللغة الإنجليزية 6- صورتين شخصيتين بخلفيه بيضاء بدون شماغ للراجل مقاس 3.5في 4.5 رسوم السفارة 400 ريال",
+        "english_requirements": ""
+      },
+      {
+        "country": "Indonesia",
+        "visa_type": "Tourist Visa",
+        "buy_price": "600",
+        "buy_currency": "SAR",
+        "sell_price": "950",
+        "sell_currency": "SAR",
+        "arabic_requirements": "صورة الجواز وصورة شخصيه 800 ريال السعر للتاشيره العاديه المستعجله 950 ريال",
+        "english_requirements": ""
+      },
+      {
+        "country": "Thailand",
+        "visa_type": "Tourist Visa",
+        "buy_price": "160",
+        "buy_currency": "SAR",
+        "sell_price": "350",
+        "sell_currency": "SAR",
+        "arabic_requirements": "صورة من الجواز صورة شخصيه اسم الوظيفه العنوان و رقم التليفون وتواريخ السفر وقت الانجاز اسبوع عمل اواكتر علي حسب الجنسيه",
+        "english_requirements": ""
+      },
+      {
+        "country": "Singaporean",
+        "visa_type": "Tourist Visa",
+        "buy_price": "290",
+        "buy_currency": "SAR",
+        "sell_price": "500",
+        "sell_currency": "SAR",
+        "arabic_requirements": "اول 3 صفحات من الجواز صوره شخصيه ديجتال تعريف الراتب كشف حساب بنك لاخر 6 شهور صورة الاقامه العنوان ورقم التليفون وتاريخ الدخول الي السعوديه والايميل والدخل السنوي في خلال اسبوع",
+        "english_requirements": ""
+      },
+      {
+        "country": "russia",
+        "visa_type": "Tourist Visa",
+        "buy_price": "190",
+        "buy_currency": "SAR",
+        "sell_price": "350",
+        "sell_currency": "SAR",
+        "arabic_requirements": "صورة من الجواز سكانر صوره شخصيه ديجتال بخلفيه بيضاء العنوان والوظيفه واسم الشركه اسم الوالدين والزوجه وتاريخ الميلاد للزوجه وقت الاصدار اسبوع عمل",
+        "english_requirements": ""
+      },
+      {
+        "country": "Bosnia",
+        "visa_type": "Tourist Visa",
+        "buy_price": "300",
+        "buy_currency": "SAR",
+        "sell_price": "450",
+        "sell_currency": "SAR",
+        "arabic_requirements": "الجواز الاصل وصوره منه تعريف الراتب مصدق من الغرفه التجاريه صورتين شخصيه بخلفيه بيضائ 5 في 6 صورة الهويات وكارت العيله في حاله السفر مع الزوجه تاخذ اسبوعين عمل التاشيره للمده شهر الحضور اجباري التكلفه هتدفع بالسفارة 250 ريال رسوم تجهيز الملف بالدعوة والحجوزات 450 ريال",
+        "english_requirements": ""
+      },
+      {
+        "country": "Egypt",
+        "visa_type": "Tourist Visa",
+        "buy_price": "550",
+        "buy_currency": "SAR",
+        "sell_price": "750",
+        "sell_currency": "SAR",
+        "arabic_requirements": "الجواز الاصل والاقامه صالحه 6 شهور او اكثر صورة الاقامه خروج وعوده صورتين شخصيه حديثه بيضاء 4 في 6 صورة هويه الكفيل السعر مفرده 750 ريال متعدده 900 ريال بدون مصاريف الشحن",
+        "english_requirements": ""
+      },
+      {
+        "country": "United States of America",
+        "visa_type": "Tourist Visa",
+        "buy_price": "710",
+        "buy_currency": "SAR",
+        "sell_price": "950",
+        "sell_currency": "SAR",
+        "arabic_requirements": "1-الجواز الاصل صالح لمده 6 شهور على الاقل بعد انتهاء الإقامة وبه صفحتين فارغتين 2- صورة بطاقة الاحوال + كارت العائلة للزوجة والأولاد 3- كشف حساب بنكي لأخر 6 شهور انجليزي ومختوم وبه رصيد كافي لمصاريف السفرة ويفضل استخراجه قبل التبصيم بي 3 ايام لا يقل الرصيد عن 10 الاف ريال 4- خطاب تعريف من العمل مذكور به الراتب والمسمى الوظيفي ومصدق من الغرفة التجارية للعاملين بالقطاع الخاص باللغة الإنجليزية 5- خروج وعوده للمقيميين باللغة الإنجليزية6- صورتين شخصيتين بخلفيه بيضاء بدون شماغ للراجل مقاس 5 في 5",
+        "english_requirements": ""
+      },
+      {
+        "country": "China",
+        "visa_type": "Tourist Visa",
+        "buy_price": "0",
+        "buy_currency": "SAR",
+        "sell_price": "0",
+        "sell_currency": "SAR",
+        "arabic_requirements": "الصين 1- الجواز الأصلي ويوجد به اكثر من 6 اشهر صلاحيه و3 صفحات فارغيين 2- صورتين شخصيه بخلفيه بيضاء مكشوفه الراس 3- خطاب تعريف موجه الي سفاره الصين الشعبيه بمدينه الرياض القسم القنصلي ويذكر فيه الاسم الجنسيه رقم الجواز الوظيفه الراتب 4- صورة من هويه المقيم السعر يختلف حسب الجنسيه",
+        "english_requirements": ""
+      }
+    ],
+    "extractedText": "VISAs هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Country Select Add COUNTRY VISA TYPE BUY PRICE BUY CURRENCY SELL PRICE SELL CURRENCY ARABIC REQUIREMENTS ENGLISH REQUIREMENTS Fransa Tourist Visa 250 SAR 400 SAR 1- الجواز الاصل صالح لمده 6 شهور على الاقل بعد انتهاء الإقامة وبه صفحتين فارغتين 2- صورة بطاقة الاحوال + كارت العائلة للزوجة والأولاد 3- كشف حساب بنكي لأخر 3 شهور انجليزي للسعودي و6 شهور للمقيم مختوم وبه رصيد كافي لمصاريف السفرة ويفضل استخراجه قبل التبصيم بي 3 ايام لا يقل الرصيد عن 10 الاف ريال للشخص الواحد 4- خطاب تعريف من العمل مذكور به الراتب والمسمى الوظيفي ومصدق من الغرفة التجارية للعاملين بالقطاع الخاص باللغة الإنجليزية 5- خروج وعوده للمقيميين باللغة الإنجليزية 6- صورتين شخصيتين بخلفيه بيضاء بدون شماغ للراجل مقاس 3.5في 4.5 السعر بتحولنا 400 ريال رسوم الموعد والابليكشن والحجوزات والتامين والترجمه وبتدفع بالسفارة حوالي 400 ريال Spain Tourist Visa 180 SAR 400 SAR 1- الجواز الاصل صالح لمده 6 شهور على الاقل بعد انتهاء الإقامة وبه صفحتين فارغتين 2- صورة بطاقة الاحوال + كارت العا"
+  },
+  {
+    "navText": "VISAs Types",
+    "title": "VISAs Types",
+    "route": "/visas-types",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [
+      {
+        "key": "arabic_name",
+        "label": "ARABIC NAME",
+        "minWidth": "140px"
+      },
+      {
+        "key": "english_name",
+        "label": "ENGLISH NAME",
+        "minWidth": "140px"
+      }
+    ],
+    "rows": [
+      {
+        "arabic_name": "تأشيرة سياحية",
+        "english_name": "Tourist Visa"
+      },
+      {
+        "arabic_name": "تأشيرة علاجية",
+        "english_name": "Medical visa"
+      },
+      {
+        "arabic_name": "تاشيرة دراسة",
+        "english_name": "Study visa"
+      }
+    ],
+    "extractedText": "VISAs Types هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Light Dark System Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME تأشيرة سياحية Tourist Visa تأشيرة علاجية Medical visa تاشيرة دراسة Study visa 10 25 50 100"
+  },
+  {
+    "navText": "",
+    "title": "الدليل",
+    "route": "/web-guide",
+    "searchPlaceholder": "Search",
+    "addLabel": "Add",
+    "columns": [],
+    "rows": [],
+    "emptyText": "No Data Found",
+    "extractedText": "الدليل فن البيع تركيا الإدارة المالية إدارة الواتساب من هي ترافليون اندونيسيا أندونيسيا"
+  }
+]

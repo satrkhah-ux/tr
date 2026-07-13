@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Background circle -->
+  <rect width="64" height="64" rx="16" fill="#000000"/>
+  <!-- Palm tree trunk -->
+  <rect x="30" y="34" width="4" height="18" rx="2" fill="#e2b700"/>
+  <!-- Palm fronds -->
+  <path d="M32 34 C32 34 18 22 14 16 C18 18 24 24 32 28 C40 24 46 18 50 16 C46 22 32 34 32 34Z" fill="#e2b700"/>
+  <path d="M32 30 C32 30 20 24 16 20 C20 21 26 26 32 28 C38 26 44 21 48 20 C44 24 32 30 32 30Z" fill="#e2b700" opacity="0.7"/>
+  <!-- Ground bump -->
+  <ellipse cx="32" cy="52" rx="8" ry="2" fill="#e2b700" opacity="0.5"/>
+</svg>

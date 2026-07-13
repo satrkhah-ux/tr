@@ -1,0 +1,1778 @@
+{
+  "title": "Dashboard - Traveliun",
+  "url": "https://app.traveliun.com/dashboard",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "bodyText": "هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Date To Employee Select Country Select Apply",
+  "textBlocks": [
+    "هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Date To Employee Select Country Select Apply",
+    "هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية",
+    "Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Date To Employee Select Country Select Apply",
+    "Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide",
+    "Dashboard",
+    "Kanban Board",
+    "Customers",
+    "Employees",
+    "Packages",
+    "Countries",
+    "Hotels",
+    "Flights",
+    "Sea Travels",
+    "Transportation",
+    "Services",
+    "VISAs",
+    "Setting",
+    "Customers Care",
+    "Traveliun Guide",
+    "Date To Employee Select Country Select Apply",
+    "Date To Employee Select Country Select",
+    "Date To",
+    "Date",
+    "To",
+    "Employee Select",
+    "Employee",
+    "Select",
+    "Country Select",
+    "Country",
+    "Apply"
+  ],
+  "buttons": [
+    {
+      "tag": "a",
+      "text": "",
+      "href": "https://app.traveliun.com/web-guide",
+      "classes": "cursor-pointer symbol symbol-35px",
+      "styles": {
+        "fontSize": "9.1px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "13.65px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "10px",
+        "display": "block",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "relative",
+        "zIndex": "auto",
+        "transition": "color 0.2s"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "",
+      "href": "https://app.traveliun.com/dashboard#",
+      "classes": "cursor-pointer symbol symbol-35px",
+      "styles": {
+        "fontSize": "9.1px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "13.65px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "10px",
+        "display": "block",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "relative",
+        "zIndex": "auto",
+        "transition": "color 0.2s"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "",
+      "href": "https://app.traveliun.com/dashboard#",
+      "classes": "cursor-pointer symbol symbol-35px",
+      "styles": {
+        "fontSize": "9.1px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "13.65px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "10px",
+        "display": "block",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "relative",
+        "zIndex": "auto",
+        "transition": "color 0.2s"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Table",
+      "href": "https://app.traveliun.com/dashboard",
+      "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2",
+      "styles": {
+        "fontSize": "12.35px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "18.525px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "padding": "6.5px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "color 0.2s"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Cards",
+      "href": "https://app.traveliun.com/dashboard",
+      "classes": "router-link-active router-link-exact-active menu-link px-2 py-2",
+      "styles": {
+        "fontSize": "12.35px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "18.525px",
+        "color": "rgb(74, 102, 74)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "6.5px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(74, 102, 74)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "",
+      "href": "https://app.traveliun.com/dashboard#",
+      "classes": "cursor-pointer symbol symbol-35px",
+      "styles": {
+        "fontSize": "9.1px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "13.65px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "10px",
+        "display": "block",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "relative",
+        "zIndex": "auto",
+        "transition": "color 0.2s"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Light",
+      "href": "https://app.traveliun.com/dashboard",
+      "classes": "router-link-active router-link-exact-active menu-link px-2 py-2",
+      "styles": {
+        "fontSize": "12.35px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "18.525px",
+        "color": "rgb(74, 102, 74)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "6.5px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(74, 102, 74)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Dark",
+      "href": "https://app.traveliun.com/dashboard",
+      "classes": "router-link-active router-link-exact-active menu-link px-2 py-2",
+      "styles": {
+        "fontSize": "12.35px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "18.525px",
+        "color": "rgb(74, 102, 74)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "6.5px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(74, 102, 74)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "System",
+      "href": "https://app.traveliun.com/dashboard",
+      "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2",
+      "styles": {
+        "fontSize": "12.35px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "18.525px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "padding": "6.5px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "color 0.2s"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Change Password",
+      "href": null,
+      "classes": "menu-link px-5",
+      "styles": {
+        "fontSize": "12.35px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "18.525px",
+        "color": "rgb(111, 138, 111)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 16.25px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(111, 138, 111)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Language English",
+      "href": "javascript:;",
+      "classes": "menu-link px-5",
+      "styles": {
+        "fontSize": "12.35px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "18.525px",
+        "color": "rgb(111, 138, 111)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 16.25px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(111, 138, 111)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "English",
+      "href": "https://app.traveliun.com/dashboard#",
+      "classes": "menu-link d-flex px-5 active",
+      "styles": {
+        "fontSize": "12.35px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "18.525px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgb(232, 242, 239)",
+        "padding": "9.75px 16.25px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "color 0.2s"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "العربية",
+      "href": "https://app.traveliun.com/dashboard#",
+      "classes": "menu-link d-flex px-5",
+      "styles": {
+        "fontSize": "12.35px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "18.525px",
+        "color": "rgb(111, 138, 111)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 16.25px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(111, 138, 111)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Sign Out",
+      "href": null,
+      "classes": "menu-link px-5",
+      "styles": {
+        "fontSize": "12.35px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "18.525px",
+        "color": "rgb(111, 138, 111)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 16.25px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(111, 138, 111)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Save",
+      "href": null,
+      "classes": "btn btn-primary",
+      "styles": {
+        "fontSize": "14.3px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "21.45px",
+        "color": "rgb(255, 255, 255)",
+        "backgroundColor": "rgb(24, 80, 69)",
+        "padding": "11.075px 20.5px",
+        "margin": "3.25px",
+        "display": "block",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(255, 255, 255)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "",
+      "href": "https://app.traveliun.com/",
+      "classes": "router-link-active",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "display": "inline",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "color 0.2s"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Dashboard",
+      "href": "https://app.traveliun.com/dashboard",
+      "classes": "active router-link-exact-active menu-link px-0",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgb(163, 185, 181)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "color 0.2s"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Kanban Board",
+      "href": "https://app.traveliun.com/kanban-board",
+      "classes": "menu-link px-0",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Persons",
+      "href": "https://app.traveliun.com/customers",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Companies",
+      "href": "https://app.traveliun.com/companies",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Companies Visits",
+      "href": "https://app.traveliun.com/companies-visits",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Visits Statuses",
+      "href": "https://app.traveliun.com/companies-visits-statuses",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Employees",
+      "href": "https://app.traveliun.com/employees",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Roles",
+      "href": "https://app.traveliun.com/employees/roles",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Ready Offers",
+      "href": "https://app.traveliun.com/ready-offers",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Packages",
+      "href": "https://app.traveliun.com/offers",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Country",
+      "href": "https://app.traveliun.com/countries",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "City",
+      "href": "https://app.traveliun.com/cities",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Hotels",
+      "href": "https://app.traveliun.com/hotels",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Rooms Types",
+      "href": "https://app.traveliun.com/rooms-types",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Airlines",
+      "href": "https://app.traveliun.com/airlines",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Airports Names",
+      "href": "https://app.traveliun.com/airports",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Ports Names",
+      "href": "https://app.traveliun.com/ports",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Cars Types in World",
+      "href": "https://app.traveliun.com/cars-types",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Connect Cars with Country",
+      "href": "https://app.traveliun.com/cars",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Transfers",
+      "href": "https://app.traveliun.com/cars/transfers",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Tours",
+      "href": "https://app.traveliun.com/cars/tours",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Drivers Names",
+      "href": "https://app.traveliun.com/drivers",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Services Types",
+      "href": "https://app.traveliun.com/services-types",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Connect service to country",
+      "href": "https://app.traveliun.com/services",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "VISAs Types",
+      "href": "https://app.traveliun.com/visas-types",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "VISAs",
+      "href": "https://app.traveliun.com/visas",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Profits",
+      "href": "https://app.traveliun.com/setting/profits",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Statuses Groups",
+      "href": "https://app.traveliun.com/setting/statuses-groups",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Statuses",
+      "href": "https://app.traveliun.com/setting/statuses",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Currencies",
+      "href": "https://app.traveliun.com/setting/currencies",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Suppliers",
+      "href": "https://app.traveliun.com/setting/suppliers",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Suppliers Preferences",
+      "href": "https://app.traveliun.com/setting/suppliers-preferences",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Supervisors",
+      "href": "https://app.traveliun.com/setting/supervisors",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Terms & Conditions",
+      "href": "https://app.traveliun.com/offers/terms-and-conditions",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Offer Includes",
+      "href": "https://app.traveliun.com/offers/offer-includes",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Offer Not Includes",
+      "href": "https://app.traveliun.com/offers/offer-not-includes",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Dashboard",
+      "href": "https://app.traveliun.com/customers_care/dashboard",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Customers Care",
+      "href": "https://app.traveliun.com/customers_care",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Service Type",
+      "href": "https://app.traveliun.com/customers_care/services",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Categories",
+      "href": "https://app.traveliun.com/guide/categories",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "a",
+      "text": "Informations",
+      "href": "https://app.traveliun.com/guide/informations",
+      "classes": "menu-link",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "9.75px 0px",
+        "display": "flex",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Apply",
+      "href": null,
+      "classes": "btn btn-primary w-100",
+      "styles": {
+        "fontSize": "14.3px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "21.45px",
+        "color": "rgb(255, 255, 255)",
+        "backgroundColor": "rgb(24, 80, 69)",
+        "padding": "11.075px 20.5px",
+        "display": "inline-block",
+        "borderRadius": "6.175px",
+        "border": "0px none rgb(255, 255, 255)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Today",
+      "href": null,
+      "classes": "el-picker-panel__shortcut",
+      "styles": {
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "28px",
+        "color": "rgb(96, 98, 102)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px 1px 12px",
+        "display": "block",
+        "border": "0px none rgb(96, 98, 102)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Yesterday",
+      "href": null,
+      "classes": "el-picker-panel__shortcut",
+      "styles": {
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "28px",
+        "color": "rgb(96, 98, 102)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px 1px 12px",
+        "display": "block",
+        "border": "0px none rgb(96, 98, 102)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Last Week",
+      "href": null,
+      "classes": "el-picker-panel__shortcut",
+      "styles": {
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "28px",
+        "color": "rgb(96, 98, 102)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px 1px 12px",
+        "display": "block",
+        "border": "0px none rgb(96, 98, 102)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Last Month",
+      "href": null,
+      "classes": "el-picker-panel__shortcut",
+      "styles": {
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "28px",
+        "color": "rgb(96, 98, 102)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px 1px 12px",
+        "display": "block",
+        "border": "0px none rgb(96, 98, 102)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Last 3 Months",
+      "href": null,
+      "classes": "el-picker-panel__shortcut",
+      "styles": {
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "28px",
+        "color": "rgb(96, 98, 102)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px 1px 12px",
+        "display": "block",
+        "border": "0px none rgb(96, 98, 102)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Last 6 Months",
+      "href": null,
+      "classes": "el-picker-panel__shortcut",
+      "styles": {
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "28px",
+        "color": "rgb(96, 98, 102)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px 1px 12px",
+        "display": "block",
+        "border": "0px none rgb(96, 98, 102)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Last Year",
+      "href": null,
+      "classes": "el-picker-panel__shortcut",
+      "styles": {
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "28px",
+        "color": "rgb(96, 98, 102)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px 1px 12px",
+        "display": "block",
+        "border": "0px none rgb(96, 98, 102)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Previous Year",
+      "href": null,
+      "classes": "el-picker-panel__icon-btn d-arrow-left",
+      "styles": {
+        "fontSize": "12px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "12px",
+        "color": "rgb(48, 49, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px",
+        "display": "block",
+        "border": "0px none rgb(48, 49, 51)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Previous Month",
+      "href": null,
+      "classes": "el-picker-panel__icon-btn arrow-left",
+      "styles": {
+        "fontSize": "12px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "12px",
+        "color": "rgb(48, 49, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px",
+        "display": "block",
+        "border": "0px none rgb(48, 49, 51)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Next Year",
+      "href": null,
+      "classes": "el-picker-panel__icon-btn is-disabled d-arrow-right",
+      "styles": {
+        "fontSize": "12px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "12px",
+        "color": "rgb(192, 196, 204)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px",
+        "display": "block",
+        "border": "0px none rgb(192, 196, 204)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Next Month",
+      "href": null,
+      "classes": "el-picker-panel__icon-btn is-disabled arrow-right",
+      "styles": {
+        "fontSize": "12px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "12px",
+        "color": "rgb(192, 196, 204)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px",
+        "display": "block",
+        "border": "0px none rgb(192, 196, 204)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "span",
+      "text": "2026",
+      "href": null,
+      "classes": "el-date-range-picker__header-label",
+      "styles": {
+        "fontSize": "16px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "22px",
+        "color": "rgb(96, 98, 102)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "0px 5px",
+        "display": "inline",
+        "border": "0px none rgb(96, 98, 102)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "span",
+      "text": "July",
+      "href": null,
+      "classes": "el-date-range-picker__header-label",
+      "styles": {
+        "fontSize": "16px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "22px",
+        "color": "rgb(96, 98, 102)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "0px 5px",
+        "display": "inline",
+        "border": "0px none rgb(96, 98, 102)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Previous Year",
+      "href": null,
+      "classes": "el-picker-panel__icon-btn d-arrow-left",
+      "styles": {
+        "fontSize": "12px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "12px",
+        "color": "rgb(48, 49, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px",
+        "display": "block",
+        "border": "0px none rgb(48, 49, 51)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Previous Month",
+      "href": null,
+      "classes": "el-picker-panel__icon-btn arrow-left",
+      "styles": {
+        "fontSize": "12px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "12px",
+        "color": "rgb(48, 49, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px",
+        "display": "block",
+        "border": "0px none rgb(48, 49, 51)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Next Year",
+      "href": null,
+      "classes": "el-picker-panel__icon-btn d-arrow-right",
+      "styles": {
+        "fontSize": "12px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "12px",
+        "color": "rgb(48, 49, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px",
+        "display": "block",
+        "border": "0px none rgb(48, 49, 51)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "button",
+      "text": "Next Month",
+      "href": null,
+      "classes": "el-picker-panel__icon-btn arrow-right",
+      "styles": {
+        "fontSize": "12px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "12px",
+        "color": "rgb(48, 49, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "1px 6px",
+        "display": "block",
+        "border": "0px none rgb(48, 49, 51)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "span",
+      "text": "2026",
+      "href": null,
+      "classes": "el-date-range-picker__header-label",
+      "styles": {
+        "fontSize": "16px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "22px",
+        "color": "rgb(96, 98, 102)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "0px 5px",
+        "display": "inline",
+        "border": "0px none rgb(96, 98, 102)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    },
+    {
+      "tag": "span",
+      "text": "August",
+      "href": null,
+      "classes": "el-date-range-picker__header-label",
+      "styles": {
+        "fontSize": "16px",
+        "fontWeight": "500",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "22px",
+        "color": "rgb(96, 98, 102)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "0px 5px",
+        "display": "inline",
+        "border": "0px none rgb(96, 98, 102)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    }
+  ],
+  "sections": [
+    {
+      "index": 0,
+      "tag": "div",
+      "id": null,
+      "classes": "card mb-3",
+      "rect": {
+        "x": 20,
+        "y": 60,
+        "width": 350,
+        "height": 319
+      },
+      "text": "Date To Employee Select Country Select Apply",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "margin": "0px 0px 9.75px",
+        "display": "flex",
+        "borderRadius": "8.125px",
+        "border": "1px solid rgb(197, 204, 197)",
+        "boxShadow": "rgba(0, 0, 0, 0.1) 4px 4px 4px 0px",
+        "position": "relative",
+        "zIndex": "auto",
+        "transition": "transform 0.3s, box-shadow 0.3s"
+      }
+    },
+    {
+      "index": 1,
+      "tag": "div",
+      "id": null,
+      "classes": "card-body",
+      "rect": {
+        "x": 21,
+        "y": 61,
+        "width": 348,
+        "height": 317
+      },
+      "text": "Date To Employee Select Country Select Apply",
+      "styles": {
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, Tajawal, sans-serif",
+        "lineHeight": "19.5px",
+        "color": "rgb(24, 80, 69)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "padding": "19.5px",
+        "display": "block",
+        "border": "0px none rgb(24, 80, 69)",
+        "position": "static",
+        "zIndex": "auto",
+        "transition": "all"
+      }
+    }
+  ],
+  "colors": [
+    "rgb(24, 80, 69)",
+    "rgba(0, 0, 0, 0)",
+    "rgb(24, 80, 69) rgb(24, 80, 69) rgb(197, 204, 197)",
+    "rgb(155, 176, 155)",
+    "rgb(248, 40, 90)",
+    "rgb(51, 51, 51)",
+    "rgb(24, 80, 71)",
+    "rgb(255, 255, 255)",
+    "rgb(24, 80, 69) rgb(197, 204, 197) rgb(24, 80, 69) rgb(24, 80, 69)",
+    "rgb(163, 185, 181)",
+    "rgba(24, 80, 69, 0.7)",
+    "rgb(197, 204, 197)",
+    "rgb(103, 194, 58)",
+    "rgb(168, 171, 178)",
+    "rgb(96, 98, 102)",
+    "rgb(48, 49, 51)",
+    "rgba(139, 69, 19, 0.16)"
+  ],
+  "fonts": [
+    "Inter, Tajawal, sans-serif",
+    "\"Font Awesome 6 Free\"",
+    "\"Font Awesome 6 Brands\""
+  ],
+  "assets": {
+    "images": [
+      {
+        "src": "https://app.traveliun.com/media/avatars/blank.png",
+        "alt": "user",
+        "width": 360,
+        "height": 360
+      },
+      {
+        "src": "https://app.traveliun.com/media/logos/logo_en_white.svg",
+        "alt": "Logo",
+        "width": 128,
+        "height": 58
+      },
+      {
+        "src": "https://app.traveliun.com/media/logos/logo_en_white-cropped.svg",
+        "alt": "Logo",
+        "width": 111,
+        "height": 147
+      },
+      {
+        "src": "https://app.traveliun.com/media/logos/logo_en.svg",
+        "alt": "",
+        "width": 128,
+        "height": 58
+      }
+    ],
+    "backgrounds": [
+      {
+        "element": "div app-navbar flex-shrink-0",
+        "backgroundImage": "linear-gradient(90deg, rgba(250, 250, 255, 0), rgba(222, 227, 222, 0.82))"
+      }
+    ],
+    "svgs": [
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M831.872 340.864 512 652.672 192.128 340.864a30.59 30.59 0 0 0-42.752 0 29.12 29.12 0 0 0 0 41.6L489.664 714.24a32 32 0 0 0 44.672 0l340.288-331.712a29.12 29.12 0 0 0 0-41.728 30.59 30.59 0 0 0-42.752 0z\"></path></svg>"
+      },
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M831.872 340.864 512 652.672 192.128 340.864a30.59 30.59 0 0 0-42.752 0 29.12 29.12 0 0 0 0 41.6L489.664 714.24a32 32 0 0 0 44.672 0l340.288-331.712a29.12 29.12 0 0 0 0-41.728 30.59 30.59 0 0 0-42.752 0z\"></path></svg>"
+      },
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M128 384v512h768V192H768v32a32 32 0 1 1-64 0v-32H320v32a32 32 0 0 1-64 0v-32H128v128h768v64zm192-256h384V96a32 32 0 1 1 64 0v32h160a32 32 0 0 1 32 32v768a32 32 0 0 1-32 32H96a32 32 0 0 1-32-32V160a32 32 0 0 1 32-32h160V96a32 32 0 0 1 64 0zm-32 384h64a32 32 0 0 1 0 64h-64a32 32 0 0 1 0-64m0 192h64a32 32 0 1 1 0 64h-64a32 32 0 1 1 0-64m192-192h64a32 32 0 0 1 0 64h-64a32 32 0 0 1 0-64m0 192h64a32 32 0 1 1 0"
+      },
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"m466.752 512-90.496-90.496a32 32 0 0 1 45.248-45.248L512 466.752l90.496-90.496a32 32 0 1 1 45.248 45.248L557.248 512l90.496 90.496a32 32 0 1 1-45.248 45.248L512 557.248l-90.496 90.496a32 32 0 0 1-45.248-45.248z\"></path><path fill=\"currentColor\" d=\"M512 896a384 384 0 1 0 0-768 384 384 0 0 0 0 768m0 64a448 448 0 1 1 0-896 448 448 0 0 1 0 896\"></path></svg>"
+      },
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M831.872 340.864 512 652.672 192.128 340.864a30.59 30.59 0 0 0-42.752 0 29.12 29.12 0 0 0 0 41.6L489.664 714.24a32 32 0 0 0 44.672 0l340.288-331.712a29.12 29.12 0 0 0 0-41.728 30.59 30.59 0 0 0-42.752 0z\"></path></svg>"
+      },
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M831.872 340.864 512 652.672 192.128 340.864a30.59 30.59 0 0 0-42.752 0 29.12 29.12 0 0 0 0 41.6L489.664 714.24a32 32 0 0 0 44.672 0l340.288-331.712a29.12 29.12 0 0 0 0-41.728 30.59 30.59 0 0 0-42.752 0z\"></path></svg>"
+      },
+      {
+        "box": null,
+        "text": "<svg id=\"SvgjsSvg1001\" width=\"2\" height=\"0\" xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xmlns:svgjs=\"http://svgjs.dev\" style=\"overflow: hidden; top: -100%; left: -100%; position: absolute; opacity: 0;\"><defs id=\"SvgjsDefs1002\"></defs><polyline id=\"SvgjsPolyline1003\" points=\"0,0\"></polyline><path id=\"SvgjsPath1004\" d=\"M0 0 \"></path></svg>"
+      },
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M529.408 149.376a29.12 29.12 0 0 1 41.728 0 30.59 30.59 0 0 1 0 42.688L259.264 511.936l311.872 319.936a30.59 30.59 0 0 1-.512 43.264 29.12 29.12 0 0 1-41.216-.512L197.76 534.272a32 32 0 0 1 0-44.672zm256 0a29.12 29.12 0 0 1 41.728 0 30.59 30.59 0 0 1 0 42.688L515.264 511.936l311.872 319.936a30.59 30.59 0 0 1-.512 43.264 29.12 29.12 0 0 1-41.216-.512L453.76 534.272a32 32 0 0 1 0-44.672z\"></path></svg>"
+      },
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M609.408 149.376 277.76 489.6a32 32 0 0 0 0 44.672l331.648 340.352a29.12 29.12 0 0 0 41.728 0 30.59 30.59 0 0 0 0-42.752L339.264 511.936l311.872-319.872a30.59 30.59 0 0 0 0-42.688 29.12 29.12 0 0 0-41.728 0\"></path></svg>"
+      },
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M452.864 149.312a29.12 29.12 0 0 1 41.728.064L826.24 489.664a32 32 0 0 1 0 44.672L494.592 874.624a29.12 29.12 0 0 1-41.728 0 30.59 30.59 0 0 1 0-42.752L764.736 512 452.864 192a30.59 30.59 0 0 1 0-42.688m-256 0a29.12 29.12 0 0 1 41.728.064L570.24 489.664a32 32 0 0 1 0 44.672L238.592 874.624a29.12 29.12 0 0 1-41.728 0 30.59 30.59 0 0 1 0-42.752L508.736 512 196.864 192a30.59 30.59 0 0 1 0-42.688\"></path></s"
+      },
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M340.864 149.312a30.59 30.59 0 0 0 0 42.752L652.736 512 340.864 831.872a30.59 30.59 0 0 0 0 42.752 29.12 29.12 0 0 0 41.728 0L714.24 534.336a32 32 0 0 0 0-44.672L382.592 149.376a29.12 29.12 0 0 0-41.728 0z\"></path></svg>"
+      },
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M529.408 149.376a29.12 29.12 0 0 1 41.728 0 30.59 30.59 0 0 1 0 42.688L259.264 511.936l311.872 319.936a30.59 30.59 0 0 1-.512 43.264 29.12 29.12 0 0 1-41.216-.512L197.76 534.272a32 32 0 0 1 0-44.672zm256 0a29.12 29.12 0 0 1 41.728 0 30.59 30.59 0 0 1 0 42.688L515.264 511.936l311.872 319.936a30.59 30.59 0 0 1-.512 43.264 29.12 29.12 0 0 1-41.216-.512L453.76 534.272a32 32 0 0 1 0-44.672z\"></path></svg>"
+      },
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M609.408 149.376 277.76 489.6a32 32 0 0 0 0 44.672l331.648 340.352a29.12 29.12 0 0 0 41.728 0 30.59 30.59 0 0 0 0-42.752L339.264 511.936l311.872-319.872a30.59 30.59 0 0 0 0-42.688 29.12 29.12 0 0 0-41.728 0\"></path></svg>"
+      },
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M452.864 149.312a29.12 29.12 0 0 1 41.728.064L826.24 489.664a32 32 0 0 1 0 44.672L494.592 874.624a29.12 29.12 0 0 1-41.728 0 30.59 30.59 0 0 1 0-42.752L764.736 512 452.864 192a30.59 30.59 0 0 1 0-42.688m-256 0a29.12 29.12 0 0 1 41.728.064L570.24 489.664a32 32 0 0 1 0 44.672L238.592 874.624a29.12 29.12 0 0 1-41.728 0 30.59 30.59 0 0 1 0-42.752L508.736 512 196.864 192a30.59 30.59 0 0 1 0-42.688\"></path></s"
+      },
+      {
+        "box": "0 0 1024 1024",
+        "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1024 1024\"><path fill=\"currentColor\" d=\"M340.864 149.312a30.59 30.59 0 0 0 0 42.752L652.736 512 340.864 831.872a30.59 30.59 0 0 0 0 42.752 29.12 29.12 0 0 0 41.728 0L714.24 534.336a32 32 0 0 0 0-44.672L382.592 149.376a29.12 29.12 0 0 0-41.728 0z\"></path></svg>"
+      }
+    ],
+    "favicons": [
+      {
+        "href": "https://app.traveliun.com/favicon.ico",
+        "rel": "icon",
+        "sizes": ""
+      }
+    ]
+  },
+  "htmlClass": "",
+  "bodyClass": "app-light-sidebar"
+}

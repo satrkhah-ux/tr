@@ -1,0 +1,323 @@
+@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "Tajawal", "Inter", "Inter Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  /* OKX custom tokens */
+  --color-okx-yellow: #e2b700;
+  --color-okx-yellow-hover: #f5ca00;
+  --color-okx-card: #141414;
+  --color-okx-card-hover: #1e1e1e;
+  --color-okx-border: rgba(255, 255, 255, 0.08);
+  --color-okx-muted: #8b8b8b;
+  --color-green: #0ecb81;
+  --color-red: #f6465d;
+  /* Traveliun elevated — surfaces & semantic state tokens (section 9) */
+  --color-tv-app: #eef3f1;
+  --color-tv-surface: #ffffff;
+  --color-tv-hairline: #e2ebe7;
+  --color-tv-hairline-strong: #dbe6e1;
+  --color-tv-row-line: #eef2f0;
+  --color-tv-muted: #557d78;
+  --color-tv-subtle: #6f8f88;
+  --color-tv-faint: #8aa29b;
+  --color-tv-mint: #2aa87a;
+  --color-tv-confirmed: #0f7a52;
+  --color-tv-confirmed-bg: #e3f6ee;
+  --color-tv-sent: #0e7490;
+  --color-tv-sent-bg: #dff1f4;
+  --color-tv-draft: #5b6b78;
+  --color-tv-draft-bg: #eef1f4;
+  --color-tv-cancelled: #be123c;
+  --color-tv-cancelled-bg: #fdeaef;
+  --color-tv-warning: #a86a10;
+  --color-tv-warning-bg: #fff8e8;
+  --color-tv-warning-border: #f2e2b4;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #003c3a;
+  --card: #ffffff;
+  --card-foreground: #003c3a;
+  --popover: #ffffff;
+  --popover-foreground: #003c3a;
+  --primary: #185045;
+  --primary-foreground: #ffffff;
+  --secondary: #edf3f0;
+  --secondary-foreground: #185045;
+  --muted: #edf3f0;
+  --muted-foreground: #557d78;
+  --accent: #185045;
+  --accent-foreground: #ffffff;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #c8d2cd;
+  --input: #ddd4d3;
+  --ring: #185045;
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #185045;
+  --sidebar-primary: #185045;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #d3e1dd;
+  --sidebar-accent-foreground: #185045;
+  --sidebar-border: #c8d2cd;
+  --sidebar-ring: #185045;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-color: #ffffff;
+    color: #003c3a;
+  }
+  html {
+    @apply font-sans;
+    scroll-behavior: smooth;
+  }
+}
+
+@keyframes traveliun-side-menu-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.traveliun-side-menu {
+  animation: traveliun-side-menu-in 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Crypto price ticker animations */
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.ticker-tape {
+  animation: ticker-scroll 40s linear infinite;
+}
+
+.ticker-tape:hover {
+  animation-play-state: paused;
+}
+
+/* Fade-in animation for sections */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.6s ease forwards;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #000;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 2px;
+}
+
+/* ===== Traveliun elevated identity (visual/direction/bidi only) ===== */
+.tv-app {
+  background: var(--color-tv-app);
+}
+.tv-app ::selection {
+  background: #c9e6da;
+}
+.tv-app ::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+.tv-app ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tv-app ::-webkit-scrollbar-thumb {
+  background: #cdddd6;
+  border-radius: 6px;
+  border: 2px solid var(--color-tv-app);
+}
+.tv-app ::-webkit-scrollbar-thumb:hover {
+  background: #b4cabf;
+}
+
+/* Motion keyframes — all ≤ 280ms (section 9) */
+@keyframes tv-fade-up {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tv-toast-in {
+  from { opacity: 0; transform: translateX(-18px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tv-pop {
+  from { opacity: 0; transform: translateY(-8px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tv-overlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes tv-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.tv-fade-up { animation: tv-fade-up 0.28s ease both; }
+.tv-fade-up-fast { animation: tv-fade-up 0.2s ease both; }
+.tv-overlay { animation: tv-overlay 0.16s ease both; }
+.tv-pop { animation: tv-pop 0.17s ease both; }
+.tv-toast-in { animation: tv-toast-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.tv-shimmer {
+  background: linear-gradient(90deg, #eef2f0 25%, #e0eae5 37%, #eef2f0 63%);
+  background-size: 200% 100%;
+  animation: tv-shimmer 1.4s infinite;
+}
+.tv-tnum { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ===== Dark theme layer (applied when .dark is on <html>) =====
+   A scoped remap of the neutral surfaces/borders/text used across the
+   Traveliun components, so the theme toggle produces a real dark UI without
+   editing every component. Semantic status tints (badges) and the green
+   brand color (#185045) are intentionally left untouched. */
+.dark .tv-app { background-color: #0b1a17; }
+.dark ::selection { background: #1f5346; }
+.dark .tv-app ::-webkit-scrollbar-thumb { background: #33554b; border-color: #0b1a17; }
+.dark .tv-shimmer { background: linear-gradient(90deg, #1b2d27 25%, #24382f 37%, #1b2d27 63%); background-size: 200% 100%; }
+
+/* surfaces */
+.dark .bg-white,
+.dark .bg-\[\#f7faf8\],
+.dark .bg-\[\#f6faf8\] { background-color: #14231f !important; }
+
+/* raised / hover / panel tints */
+.dark .bg-\[\#f4f8f6\],
+.dark .bg-\[\#eef4f1\],
+.dark .bg-\[\#edf3f0\],
+.dark .bg-\[\#f1f6f4\],
+.dark .bg-\[\#f4f6f8\],
+.dark .bg-\[\#f2f7f5\],
+.dark .bg-\[\#eef3f1\],
+.dark .bg-\[\#e8f1ed\] { background-color: #1b2d27 !important; }
+
+/* inputs / muted fields */
+.dark .bg-\[\#edf2ef\],
+.dark .bg-\[\#f5f8f7\],
+.dark .bg-\[\#f8fbf9\] { background-color: #0f1f1b !important; }
+
+/* borders */
+.dark .border-\[\#e2ebe7\],
+.dark .border-\[\#dbe6e1\],
+.dark .border-\[\#eef2f0\],
+.dark .border-\[\#c8d2cd\],
+.dark .border-\[\#d9e5e0\],
+.dark .border-\[\#dce7e2\],
+.dark .border-\[\#e0e9e5\],
+.dark .border-\[\#cfe0d9\],
+.dark .border-\[\#e1e9e5\],
+.dark .border-\[\#d8e3de\],
+.dark .border-\[\#e3ece8\],
+.dark .border-\[\#d9e0dc\],
+.dark .border-\[\#f1f5f3\] { border-color: #294039 !important; }
+
+/* text — headings, body-green, muted */
+.dark .text-\[\#003c3a\],
+.dark .text-\[\#0f3d38\] { color: #eaf3ef !important; }
+.dark .text-\[\#185045\] { color: #7fd3ba !important; }
+.dark .text-\[\#557d78\],
+.dark .text-\[\#6f8f88\],
+.dark .text-\[\#8aa29b\],
+.dark .text-\[\#93aaa3\],
+.dark .text-\[\#8ba09b\],
+.dark .text-\[\#95a9a3\],
+.dark .text-\[\#9cafaa\],
+.dark .text-\[\#a4b8b2\] { color: #9fb3ac !important; }
+
+/* Executive-dashboard chart chrome (dark mode). recharts writes axis text / grid
+   / legend / slice-separator colours as SVG presentation attributes and inline
+   styles; the light values are set in ExecutiveCharts.tsx and these rules adapt
+   them under .dark. A stylesheet rule with !important beats both SVG presentation
+   attributes and inline styles. (CSS variables can't be used here — Tailwind v4's
+   Lightning CSS prunes custom properties that no CSS rule references.) */
+.dark .recharts-cartesian-axis-tick-value,
+.dark .recharts-cartesian-axis-tick-label text { fill: #eaf3ef !important; }
+.dark .recharts-cartesian-axis-line,
+.dark .recharts-cartesian-grid line { stroke: #294039 !important; }
+.dark .recharts-label-list text { fill: #9fb3ac !important; }
+.dark .recharts-legend-item-text { color: #eaf3ef !important; }
+.dark .recharts-sector { stroke: #14231f !important; }

@@ -1,0 +1,3857 @@
+[
+  {
+    "route": "/dashboard",
+    "title": "Dashboard - Traveliun",
+    "url": "https://app.traveliun.com/dashboard",
+    "text": "Dashboard هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Date To Employee Select Country Select Apply",
+    "headings": [
+      "Dashboard",
+      "Change Password"
+    ],
+    "links": [
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/web-guide",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/dashboard#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/dashboard#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Table",
+        "href": "https://app.traveliun.com/dashboard",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "Cards",
+        "href": "https://app.traveliun.com/dashboard",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/dashboard#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Light",
+        "href": "https://app.traveliun.com/dashboard",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "Dark",
+        "href": "https://app.traveliun.com/dashboard",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "System",
+        "href": "https://app.traveliun.com/dashboard",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "English",
+        "href": "https://app.traveliun.com/dashboard#",
+        "classes": "menu-link d-flex px-5 active"
+      },
+      {
+        "text": "العربية",
+        "href": "https://app.traveliun.com/dashboard#",
+        "classes": "menu-link d-flex px-5"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/dashboard",
+        "classes": "active router-link-exact-active menu-link px-0"
+      },
+      {
+        "text": "Kanban Board",
+        "href": "https://app.traveliun.com/kanban-board",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Persons",
+        "href": "https://app.traveliun.com/customers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies",
+        "href": "https://app.traveliun.com/companies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies Visits",
+        "href": "https://app.traveliun.com/companies-visits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Visits Statuses",
+        "href": "https://app.traveliun.com/companies-visits-statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Employees",
+        "href": "https://app.traveliun.com/employees",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Roles",
+        "href": "https://app.traveliun.com/employees/roles",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ready Offers",
+        "href": "https://app.traveliun.com/ready-offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Packages",
+        "href": "https://app.traveliun.com/offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Country",
+        "href": "https://app.traveliun.com/countries",
+        "classes": "menu-link"
+      },
+      {
+        "text": "City",
+        "href": "https://app.traveliun.com/cities",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Hotels",
+        "href": "https://app.traveliun.com/hotels",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Rooms Types",
+        "href": "https://app.traveliun.com/rooms-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airlines",
+        "href": "https://app.traveliun.com/airlines",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airports Names",
+        "href": "https://app.traveliun.com/airports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ports Names",
+        "href": "https://app.traveliun.com/ports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Cars Types in World",
+        "href": "https://app.traveliun.com/cars-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect Cars with Country",
+        "href": "https://app.traveliun.com/cars",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Transfers",
+        "href": "https://app.traveliun.com/cars/transfers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Tours",
+        "href": "https://app.traveliun.com/cars/tours",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Drivers Names",
+        "href": "https://app.traveliun.com/drivers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Services Types",
+        "href": "https://app.traveliun.com/services-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect service to country",
+        "href": "https://app.traveliun.com/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs Types",
+        "href": "https://app.traveliun.com/visas-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs",
+        "href": "https://app.traveliun.com/visas",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Profits",
+        "href": "https://app.traveliun.com/setting/profits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses Groups",
+        "href": "https://app.traveliun.com/setting/statuses-groups",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses",
+        "href": "https://app.traveliun.com/setting/statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Currencies",
+        "href": "https://app.traveliun.com/setting/currencies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers",
+        "href": "https://app.traveliun.com/setting/suppliers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers Preferences",
+        "href": "https://app.traveliun.com/setting/suppliers-preferences",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Supervisors",
+        "href": "https://app.traveliun.com/setting/supervisors",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Terms & Conditions",
+        "href": "https://app.traveliun.com/offers/terms-and-conditions",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Includes",
+        "href": "https://app.traveliun.com/offers/offer-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Not Includes",
+        "href": "https://app.traveliun.com/offers/offer-not-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/customers_care/dashboard",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Customers Care",
+        "href": "https://app.traveliun.com/customers_care",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Service Type",
+        "href": "https://app.traveliun.com/customers_care/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Categories",
+        "href": "https://app.traveliun.com/guide/categories",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Informations",
+        "href": "https://app.traveliun.com/guide/informations",
+        "classes": "menu-link"
+      }
+    ],
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorSarAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalCurrentPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPasswordConfirmation",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": null,
+        "id": "d",
+        "label": null,
+        "placeholder": "Start Date",
+        "value": "2026-07-02",
+        "classes": "el-range-input"
+      },
+      {
+        "tag": "input",
+        "type": null,
+        "id": "a",
+        "label": null,
+        "placeholder": "End Date",
+        "value": "2026-07-02",
+        "classes": "el-range-input"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "employeeFilter",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "countryFilter",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      }
+    ]
+  },
+  {
+    "route": "/kanban-board",
+    "title": "Kanban Board - Traveliun",
+    "url": "https://app.traveliun.com/kanban-board",
+    "text": "Kanban Board هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Only My Offers Active Not Confirmed Package Sent AD-2-1057-20260626 2026-06-26 0594135050 Countries: MALASYIA AD-3-7734-20260707 2026-07-07 0101 Countries: Thailand AD-1-6746-20251106 2025-11-06 0594135050 Countries: Indonesia AD-1-6526-20251024 2025-10-24 0594135050 Countries: MALASYIA AD-2-3171-20250501 2025-05-01 0594135050 Countries: Indonesia AD-1-6292-20251015 2025-10-15 0594135050 Countries: MALASYIA AD-3-6056-20250912 2025-09-12 011111101111 Countries: Azerbaijan AD-1-5612-20250822 2025-08-22 0594135050 Countries: MALASYIA AD-3-5236-20250725 2025-07-25 987 Countries: Thailand AD-1-5211-20260701 2026-07-01 0594135050 Countries: Turkiye AD-3-4486-20250618 2025-06-18 0594135050 Countries: AD-1-2056-20250320 2025-03-20 0594135050 Countries: MALASYIA AD-2-0556-20241220 2024-12-20 0 Countries: MALASYIA AD-1-0037-20241101 2024-11-01 6543265432 Countries: MALASYIA AD-2-0036-20241101 2024-11-01 0987654321 Countries: MALASYIA Followed up with the client 1 AD-7-0939-20250113 2025-01-13 0563080050 Countries: Thailand Followed up with the client 2 AD-1-0819-20250101 2025-01-01 0594135050 Countries: MALASYIA Followed up with the client 3 AD-3-0111-20241206 2024-12-06 0556315255 Countries: Indonesia Not Serious Confirmed Hotels AD-2-0533-20250101 2025-01-01 0594135050 Countries: MALASYIA AD-1-0315-20241124 2024-11-24 05013196750 Countries: MALASYIA AD-1-0039-20241102 2024-11-02 535345345345 Countries: Indonesia AD-2-0034-20241108 2024-11-08 535345345345 Countries: Indonesia Flights AD-1-0011-20241006 2024-10-06 535345345345 Countries: Indonesia Transportation AD-2-5628-20250820 2025-08-20 0594135050 Countries: MALASYIA Accounting Cancel AD-3-0006-20241001 2024-10-01 535345345345 Countries: MALASYIA Completed",
+    "headings": [
+      "Kanban Board",
+      "Change Password"
+    ],
+    "links": [
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/web-guide",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/kanban-board#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/kanban-board#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Table",
+        "href": "https://app.traveliun.com/kanban-board",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "Cards",
+        "href": "https://app.traveliun.com/kanban-board",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/kanban-board#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Light",
+        "href": "https://app.traveliun.com/kanban-board",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "Dark",
+        "href": "https://app.traveliun.com/kanban-board",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "System",
+        "href": "https://app.traveliun.com/kanban-board",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "English",
+        "href": "https://app.traveliun.com/kanban-board#",
+        "classes": "menu-link d-flex px-5 active"
+      },
+      {
+        "text": "العربية",
+        "href": "https://app.traveliun.com/kanban-board#",
+        "classes": "menu-link d-flex px-5"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/dashboard",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Kanban Board",
+        "href": "https://app.traveliun.com/kanban-board",
+        "classes": "active router-link-exact-active menu-link px-0"
+      },
+      {
+        "text": "Persons",
+        "href": "https://app.traveliun.com/customers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies",
+        "href": "https://app.traveliun.com/companies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies Visits",
+        "href": "https://app.traveliun.com/companies-visits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Visits Statuses",
+        "href": "https://app.traveliun.com/companies-visits-statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Employees",
+        "href": "https://app.traveliun.com/employees",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Roles",
+        "href": "https://app.traveliun.com/employees/roles",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ready Offers",
+        "href": "https://app.traveliun.com/ready-offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Packages",
+        "href": "https://app.traveliun.com/offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Country",
+        "href": "https://app.traveliun.com/countries",
+        "classes": "menu-link"
+      },
+      {
+        "text": "City",
+        "href": "https://app.traveliun.com/cities",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Hotels",
+        "href": "https://app.traveliun.com/hotels",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Rooms Types",
+        "href": "https://app.traveliun.com/rooms-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airlines",
+        "href": "https://app.traveliun.com/airlines",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airports Names",
+        "href": "https://app.traveliun.com/airports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ports Names",
+        "href": "https://app.traveliun.com/ports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Cars Types in World",
+        "href": "https://app.traveliun.com/cars-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect Cars with Country",
+        "href": "https://app.traveliun.com/cars",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Transfers",
+        "href": "https://app.traveliun.com/cars/transfers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Tours",
+        "href": "https://app.traveliun.com/cars/tours",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Drivers Names",
+        "href": "https://app.traveliun.com/drivers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Services Types",
+        "href": "https://app.traveliun.com/services-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect service to country",
+        "href": "https://app.traveliun.com/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs Types",
+        "href": "https://app.traveliun.com/visas-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs",
+        "href": "https://app.traveliun.com/visas",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Profits",
+        "href": "https://app.traveliun.com/setting/profits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses Groups",
+        "href": "https://app.traveliun.com/setting/statuses-groups",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses",
+        "href": "https://app.traveliun.com/setting/statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Currencies",
+        "href": "https://app.traveliun.com/setting/currencies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers",
+        "href": "https://app.traveliun.com/setting/suppliers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers Preferences",
+        "href": "https://app.traveliun.com/setting/suppliers-preferences",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Supervisors",
+        "href": "https://app.traveliun.com/setting/supervisors",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Terms & Conditions",
+        "href": "https://app.traveliun.com/offers/terms-and-conditions",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Includes",
+        "href": "https://app.traveliun.com/offers/offer-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Not Includes",
+        "href": "https://app.traveliun.com/offers/offer-not-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/customers_care/dashboard",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Customers Care",
+        "href": "https://app.traveliun.com/customers_care",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Service Type",
+        "href": "https://app.traveliun.com/customers_care/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Categories",
+        "href": "https://app.traveliun.com/guide/categories",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Informations",
+        "href": "https://app.traveliun.com/guide/informations",
+        "classes": "menu-link"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/b0a2e81a-d08e-45fa-b234-9e5219fd10ed",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/a88a8929-516b-4ee6-9690-de70b80956d1",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/bfc32200-35c8-4b4a-adf2-f563e3bcb7cd",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/eb3aef16-6d8a-4b62-8582-21b62482c395",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/ca874652-b8f3-4e5a-88a6-c3a92ebc65ab",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/cf4a5abc-7f71-4119-b6aa-fcab41db98e2",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/ad7067f8-de56-44cd-ab53-bc3f03258eb7",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/d8213643-6669-41f3-a91f-bd70bd9e13a4",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/cc9c43c5-12eb-4291-b550-74882d4cfd82",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/bf642cea-92af-4720-bdd9-a7ad18983c0b",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/9e9cd81f-e0b3-477c-9893-312fba087cde",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/16e1c181-9863-4d8e-82b2-8bd0c5c819c3",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/fdd6e382-f0cb-477f-997e-c2cbc9d1fdd0",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/819d4504-0bde-47a3-b549-86e3b0c794e7",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/fafe306d-93e7-4c96-bba6-58f541babc0b",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/4ad483ab-5b8b-4f86-b369-c04f29817baa",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/adf9d6e9-6327-44ca-a2c5-c3ccad743ee4",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/64152d13-7138-403b-bf83-b006725dd9e0",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/74d559c8-3804-42ea-bf5b-1b70662181d0",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/cff4864b-990a-4b49-8d3d-7f0160ecec22",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/622ff9b3-57f9-4bd3-91c3-4371780aa723",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/a1d8a662-5d9e-4162-a90a-bbc006990b2a",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/af98bfa3-4d39-45c6-ac18-e0827e8721eb",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/f8a2b3a7-cb5c-4216-abac-78dcab64eff6",
+        "classes": "menu-link px-3"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/offer/eee08756-7ba6-4619-b7bf-9f4fe7b7b618",
+        "classes": "menu-link px-3"
+      }
+    ],
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorSarAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalCurrentPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPasswordConfirmation",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "id": "el-id-3364-12",
+        "label": null,
+        "placeholder": null,
+        "value": "on",
+        "classes": "el-switch__input"
+      }
+    ]
+  },
+  {
+    "route": "/customers",
+    "title": "Customers - Traveliun",
+    "url": "https://app.traveliun.com/customers",
+    "text": "Customers هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add COMPANY ARABIC NAME ENGLISH NAME MOBILE EMAIL SECOND MOBILE BIRTH DATE PASSPORT FIRST NAME PASSPORT LAST NAME PASSPORT NUMBER PASSPORT ISSUE DATE PASSPORT EXPIRY DATE Traveliun Travel and Tourism ابو يوسف 560007380 Traveliun Travel and Tourism +966537733106 +966537733106 Traveliun Travel and Tourism الأستاذة هند +966544072627 Traveliun Travel and Tourism رؤى الردادي 0553300417 Traveliun Travel and Tourism امجد +966583878771 Traveliun Travel and Tourism الاستاذ بندر حسين 0566669980 الأستاذه أم كريم 966561003748+ Traveliun Travel and Tourism +966562328513 +966562328513 Traveliun Travel and Tourism +966561310170 +966561310170 Traveliun Travel and Tourism 0541825050 0541825050 10 25 50 100 1 2 3 4 5",
+    "headings": [
+      "Customers",
+      "Change Password",
+      "Add Customer"
+    ],
+    "links": [
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/web-guide",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/customers#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/customers#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Table",
+        "href": "https://app.traveliun.com/customers",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "Cards",
+        "href": "https://app.traveliun.com/customers",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/customers#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Light",
+        "href": "https://app.traveliun.com/customers",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "Dark",
+        "href": "https://app.traveliun.com/customers",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "System",
+        "href": "https://app.traveliun.com/customers",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "English",
+        "href": "https://app.traveliun.com/customers#",
+        "classes": "menu-link d-flex px-5 active"
+      },
+      {
+        "text": "العربية",
+        "href": "https://app.traveliun.com/customers#",
+        "classes": "menu-link d-flex px-5"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/dashboard",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Kanban Board",
+        "href": "https://app.traveliun.com/kanban-board",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Persons",
+        "href": "https://app.traveliun.com/customers",
+        "classes": "active router-link-exact-active menu-link"
+      },
+      {
+        "text": "Companies",
+        "href": "https://app.traveliun.com/companies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies Visits",
+        "href": "https://app.traveliun.com/companies-visits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Visits Statuses",
+        "href": "https://app.traveliun.com/companies-visits-statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Employees",
+        "href": "https://app.traveliun.com/employees",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Roles",
+        "href": "https://app.traveliun.com/employees/roles",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ready Offers",
+        "href": "https://app.traveliun.com/ready-offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Packages",
+        "href": "https://app.traveliun.com/offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Country",
+        "href": "https://app.traveliun.com/countries",
+        "classes": "menu-link"
+      },
+      {
+        "text": "City",
+        "href": "https://app.traveliun.com/cities",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Hotels",
+        "href": "https://app.traveliun.com/hotels",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Rooms Types",
+        "href": "https://app.traveliun.com/rooms-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airlines",
+        "href": "https://app.traveliun.com/airlines",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airports Names",
+        "href": "https://app.traveliun.com/airports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ports Names",
+        "href": "https://app.traveliun.com/ports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Cars Types in World",
+        "href": "https://app.traveliun.com/cars-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect Cars with Country",
+        "href": "https://app.traveliun.com/cars",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Transfers",
+        "href": "https://app.traveliun.com/cars/transfers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Tours",
+        "href": "https://app.traveliun.com/cars/tours",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Drivers Names",
+        "href": "https://app.traveliun.com/drivers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Services Types",
+        "href": "https://app.traveliun.com/services-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect service to country",
+        "href": "https://app.traveliun.com/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs Types",
+        "href": "https://app.traveliun.com/visas-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs",
+        "href": "https://app.traveliun.com/visas",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Profits",
+        "href": "https://app.traveliun.com/setting/profits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses Groups",
+        "href": "https://app.traveliun.com/setting/statuses-groups",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses",
+        "href": "https://app.traveliun.com/setting/statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Currencies",
+        "href": "https://app.traveliun.com/setting/currencies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers",
+        "href": "https://app.traveliun.com/setting/suppliers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers Preferences",
+        "href": "https://app.traveliun.com/setting/suppliers-preferences",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Supervisors",
+        "href": "https://app.traveliun.com/setting/supervisors",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Terms & Conditions",
+        "href": "https://app.traveliun.com/offers/terms-and-conditions",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Includes",
+        "href": "https://app.traveliun.com/offers/offer-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Not Includes",
+        "href": "https://app.traveliun.com/offers/offer-not-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/customers_care/dashboard",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Customers Care",
+        "href": "https://app.traveliun.com/customers_care",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Service Type",
+        "href": "https://app.traveliun.com/customers_care/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Categories",
+        "href": "https://app.traveliun.com/guide/categories",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Informations",
+        "href": "https://app.traveliun.com/guide/informations",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Extra Information",
+        "href": "https://app.traveliun.com/customers#extra_information_tab",
+        "classes": "nav-link"
+      },
+      {
+        "text": "Passport Information",
+        "href": "https://app.traveliun.com/customers#passport_information_tab",
+        "classes": "nav-link"
+      },
+      {
+        "text": "Attachments",
+        "href": "https://app.traveliun.com/customers#attachments_tab",
+        "classes": "nav-link"
+      },
+      {
+        "text": "Customer Passports",
+        "href": "https://app.traveliun.com/customers#customer_passports_tab",
+        "classes": "nav-link"
+      },
+      {
+        "text": "International Aviation",
+        "href": "https://app.traveliun.com/customers#international_aviation_tab",
+        "classes": "nav-link"
+      },
+      {
+        "text": "Internal Aviation",
+        "href": "https://app.traveliun.com/customers#internal_aviation_tab",
+        "classes": "nav-link"
+      },
+      {
+        "text": "Hotels Bookings",
+        "href": "https://app.traveliun.com/customers#hotels_bookings_tab",
+        "classes": "nav-link"
+      },
+      {
+        "text": "Transportation",
+        "href": "https://app.traveliun.com/customers#transportation_tab",
+        "classes": "nav-link"
+      },
+      {
+        "text": "Invoices",
+        "href": "https://app.traveliun.com/customers#invoices_tab",
+        "classes": "nav-link"
+      },
+      {
+        "text": "Others",
+        "href": "https://app.traveliun.com/customers#others_tab",
+        "classes": "nav-link"
+      }
+    ],
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorSarAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalCurrentPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPasswordConfirmation",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "",
+        "label": null,
+        "placeholder": "Search",
+        "value": "",
+        "classes": "form-control form-control-solid w-250px ps-15"
+      },
+      {
+        "tag": "select",
+        "type": null,
+        "id": "items-per-page",
+        "label": null,
+        "placeholder": null,
+        "value": "10",
+        "classes": "form-select form-select-sm form-select-solid"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalCompany",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalArabicName",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalMobile",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalEnglishName",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalEmail",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalMobile2",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalLocalMobile",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalBirthDate",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalPassportFirstName",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalPassportLastName",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalPassportNumber",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalPassportIssueDate",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalPassportExpiryDate",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "file",
+        "id": "",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-upload__input"
+      },
+      {
+        "tag": "input",
+        "type": "file",
+        "id": "",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-upload__input"
+      },
+      {
+        "tag": "input",
+        "type": "file",
+        "id": "",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-upload__input"
+      },
+      {
+        "tag": "input",
+        "type": "file",
+        "id": "",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-upload__input"
+      },
+      {
+        "tag": "input",
+        "type": "file",
+        "id": "",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-upload__input"
+      },
+      {
+        "tag": "input",
+        "type": "file",
+        "id": "",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-upload__input"
+      },
+      {
+        "tag": "input",
+        "type": "file",
+        "id": "",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-upload__input"
+      }
+    ]
+  },
+  {
+    "route": "/employees",
+    "title": "Employees - Traveliun",
+    "url": "https://app.traveliun.com/employees",
+    "text": "Employees هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME MOBILE EMAIL TYPE ROLE STATUS أدمن Admin admin@admin.com Company Employee All Permissions Active عبد الرزاق abd alrazaq abdulrazak@traveliun.com Company Employee sales Active ايمان الهاشمي imenelhachmi imen.elhachmi@traveliun.com Company Employee All Permissions Active احمد يوسف ahmed yousif sales.ksa@traveliun.com Company Employee All Permissions Active رهف rahaf rahaf@traveliun.com Company Employee All Permissions Active ريم reem visa1@traveliun.com Company Employee Visa Active محمد صالح saleh saleh@traveliun.com Company Employee All Permissions Active نسرين visa visa@traveliun.com Company Employee Visa Active هاني accounts accounts@traveliun.com Company Employee All Permissions Active عبدالله Abdullah abdallah_ali@traveliun.com Company Employee All Permissions Active 10 25 50 100 1 2 3",
+    "headings": [
+      "Employees",
+      "Change Password",
+      "Add Employee"
+    ],
+    "links": [
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/web-guide",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/employees#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/employees#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Table",
+        "href": "https://app.traveliun.com/employees",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "Cards",
+        "href": "https://app.traveliun.com/employees",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/employees#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Light",
+        "href": "https://app.traveliun.com/employees",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "Dark",
+        "href": "https://app.traveliun.com/employees",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "System",
+        "href": "https://app.traveliun.com/employees",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "English",
+        "href": "https://app.traveliun.com/employees#",
+        "classes": "menu-link d-flex px-5 active"
+      },
+      {
+        "text": "العربية",
+        "href": "https://app.traveliun.com/employees#",
+        "classes": "menu-link d-flex px-5"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/dashboard",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Kanban Board",
+        "href": "https://app.traveliun.com/kanban-board",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Persons",
+        "href": "https://app.traveliun.com/customers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies",
+        "href": "https://app.traveliun.com/companies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies Visits",
+        "href": "https://app.traveliun.com/companies-visits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Visits Statuses",
+        "href": "https://app.traveliun.com/companies-visits-statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Employees",
+        "href": "https://app.traveliun.com/employees",
+        "classes": "active router-link-exact-active menu-link"
+      },
+      {
+        "text": "Roles",
+        "href": "https://app.traveliun.com/employees/roles",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ready Offers",
+        "href": "https://app.traveliun.com/ready-offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Packages",
+        "href": "https://app.traveliun.com/offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Country",
+        "href": "https://app.traveliun.com/countries",
+        "classes": "menu-link"
+      },
+      {
+        "text": "City",
+        "href": "https://app.traveliun.com/cities",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Hotels",
+        "href": "https://app.traveliun.com/hotels",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Rooms Types",
+        "href": "https://app.traveliun.com/rooms-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airlines",
+        "href": "https://app.traveliun.com/airlines",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airports Names",
+        "href": "https://app.traveliun.com/airports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ports Names",
+        "href": "https://app.traveliun.com/ports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Cars Types in World",
+        "href": "https://app.traveliun.com/cars-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect Cars with Country",
+        "href": "https://app.traveliun.com/cars",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Transfers",
+        "href": "https://app.traveliun.com/cars/transfers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Tours",
+        "href": "https://app.traveliun.com/cars/tours",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Drivers Names",
+        "href": "https://app.traveliun.com/drivers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Services Types",
+        "href": "https://app.traveliun.com/services-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect service to country",
+        "href": "https://app.traveliun.com/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs Types",
+        "href": "https://app.traveliun.com/visas-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs",
+        "href": "https://app.traveliun.com/visas",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Profits",
+        "href": "https://app.traveliun.com/setting/profits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses Groups",
+        "href": "https://app.traveliun.com/setting/statuses-groups",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses",
+        "href": "https://app.traveliun.com/setting/statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Currencies",
+        "href": "https://app.traveliun.com/setting/currencies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers",
+        "href": "https://app.traveliun.com/setting/suppliers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers Preferences",
+        "href": "https://app.traveliun.com/setting/suppliers-preferences",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Supervisors",
+        "href": "https://app.traveliun.com/setting/supervisors",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Terms & Conditions",
+        "href": "https://app.traveliun.com/offers/terms-and-conditions",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Includes",
+        "href": "https://app.traveliun.com/offers/offer-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Not Includes",
+        "href": "https://app.traveliun.com/offers/offer-not-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/customers_care/dashboard",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Customers Care",
+        "href": "https://app.traveliun.com/customers_care",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Service Type",
+        "href": "https://app.traveliun.com/customers_care/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Categories",
+        "href": "https://app.traveliun.com/guide/categories",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Informations",
+        "href": "https://app.traveliun.com/guide/informations",
+        "classes": "menu-link"
+      }
+    ],
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorSarAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalCurrentPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPasswordConfirmation",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "",
+        "label": null,
+        "placeholder": "Search",
+        "value": "",
+        "classes": "form-control form-control-solid w-250px ps-15"
+      },
+      {
+        "tag": "select",
+        "type": null,
+        "id": "items-per-page",
+        "label": null,
+        "placeholder": null,
+        "value": "10",
+        "classes": "form-select form-select-sm form-select-solid"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalArabicName",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalEnglishName",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalEmail",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalRole",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      }
+    ]
+  },
+  {
+    "route": "/packages",
+    "title": "Error 404 - Traveliun",
+    "url": "https://app.traveliun.com/404",
+    "text": "Oops! We can't find that page. Return Home",
+    "headings": [
+      "Oops!"
+    ],
+    "links": [
+      {
+        "text": "Return Home",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active btn btn-sm btn-primary"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "route": "/countries",
+    "title": "Countries - Traveliun",
+    "url": "https://app.traveliun.com/countries",
+    "text": "Countries هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Add ARABIC NAME ENGLISH NAME DEFAULT CURRENCY WEEKEND ماليزيا MALASYIA Ringgit Malaysia Saturday, Sunday اندونيسيا Indonesia Indonesian rupiah Sunday, Saturday فرنسا Fransa تركيا Turkiye USD Sunday, Saturday روسيا russia Russian ruble Saturday, Sunday تايلاند Thailand Thai baht Sunday, Saturday سويسرا Switzerland السعوديه Saudi Arabia SAR كوريا الجنوبية South Korea المغرب Morocco 10 25 50 100 1 2 3 4",
+    "headings": [
+      "Countries",
+      "Change Password",
+      "Add Country"
+    ],
+    "links": [
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/web-guide",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/countries#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/countries#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Table",
+        "href": "https://app.traveliun.com/countries",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "Cards",
+        "href": "https://app.traveliun.com/countries",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/countries#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Light",
+        "href": "https://app.traveliun.com/countries",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "Dark",
+        "href": "https://app.traveliun.com/countries",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "System",
+        "href": "https://app.traveliun.com/countries",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "English",
+        "href": "https://app.traveliun.com/countries#",
+        "classes": "menu-link d-flex px-5 active"
+      },
+      {
+        "text": "العربية",
+        "href": "https://app.traveliun.com/countries#",
+        "classes": "menu-link d-flex px-5"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/dashboard",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Kanban Board",
+        "href": "https://app.traveliun.com/kanban-board",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Persons",
+        "href": "https://app.traveliun.com/customers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies",
+        "href": "https://app.traveliun.com/companies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies Visits",
+        "href": "https://app.traveliun.com/companies-visits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Visits Statuses",
+        "href": "https://app.traveliun.com/companies-visits-statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Employees",
+        "href": "https://app.traveliun.com/employees",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Roles",
+        "href": "https://app.traveliun.com/employees/roles",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ready Offers",
+        "href": "https://app.traveliun.com/ready-offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Packages",
+        "href": "https://app.traveliun.com/offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Country",
+        "href": "https://app.traveliun.com/countries",
+        "classes": "active router-link-exact-active menu-link"
+      },
+      {
+        "text": "City",
+        "href": "https://app.traveliun.com/cities",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Hotels",
+        "href": "https://app.traveliun.com/hotels",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Rooms Types",
+        "href": "https://app.traveliun.com/rooms-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airlines",
+        "href": "https://app.traveliun.com/airlines",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airports Names",
+        "href": "https://app.traveliun.com/airports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ports Names",
+        "href": "https://app.traveliun.com/ports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Cars Types in World",
+        "href": "https://app.traveliun.com/cars-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect Cars with Country",
+        "href": "https://app.traveliun.com/cars",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Transfers",
+        "href": "https://app.traveliun.com/cars/transfers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Tours",
+        "href": "https://app.traveliun.com/cars/tours",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Drivers Names",
+        "href": "https://app.traveliun.com/drivers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Services Types",
+        "href": "https://app.traveliun.com/services-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect service to country",
+        "href": "https://app.traveliun.com/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs Types",
+        "href": "https://app.traveliun.com/visas-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs",
+        "href": "https://app.traveliun.com/visas",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Profits",
+        "href": "https://app.traveliun.com/setting/profits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses Groups",
+        "href": "https://app.traveliun.com/setting/statuses-groups",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses",
+        "href": "https://app.traveliun.com/setting/statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Currencies",
+        "href": "https://app.traveliun.com/setting/currencies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers",
+        "href": "https://app.traveliun.com/setting/suppliers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers Preferences",
+        "href": "https://app.traveliun.com/setting/suppliers-preferences",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Supervisors",
+        "href": "https://app.traveliun.com/setting/supervisors",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Terms & Conditions",
+        "href": "https://app.traveliun.com/offers/terms-and-conditions",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Includes",
+        "href": "https://app.traveliun.com/offers/offer-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Not Includes",
+        "href": "https://app.traveliun.com/offers/offer-not-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/customers_care/dashboard",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Customers Care",
+        "href": "https://app.traveliun.com/customers_care",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Service Type",
+        "href": "https://app.traveliun.com/customers_care/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Categories",
+        "href": "https://app.traveliun.com/guide/categories",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Informations",
+        "href": "https://app.traveliun.com/guide/informations",
+        "classes": "menu-link"
+      },
+      {
+        "text": "ماليزيا",
+        "href": "https://app.traveliun.com/countries/1",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "MALASYIA",
+        "href": "https://app.traveliun.com/countries/1",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "اندونيسيا",
+        "href": "https://app.traveliun.com/countries/2",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "Indonesia",
+        "href": "https://app.traveliun.com/countries/2",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "فرنسا",
+        "href": "https://app.traveliun.com/countries/3",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "Fransa",
+        "href": "https://app.traveliun.com/countries/3",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "تركيا",
+        "href": "https://app.traveliun.com/countries/4",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "Turkiye",
+        "href": "https://app.traveliun.com/countries/4",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "روسيا",
+        "href": "https://app.traveliun.com/countries/5",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "russia",
+        "href": "https://app.traveliun.com/countries/5",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "تايلاند",
+        "href": "https://app.traveliun.com/countries/6",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "Thailand",
+        "href": "https://app.traveliun.com/countries/6",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "سويسرا",
+        "href": "https://app.traveliun.com/countries/7",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "Switzerland",
+        "href": "https://app.traveliun.com/countries/7",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "السعوديه",
+        "href": "https://app.traveliun.com/countries/8",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "Saudi Arabia",
+        "href": "https://app.traveliun.com/countries/8",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "كوريا الجنوبية",
+        "href": "https://app.traveliun.com/countries/9",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "South Korea",
+        "href": "https://app.traveliun.com/countries/9",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "المغرب",
+        "href": "https://app.traveliun.com/countries/10",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "Morocco",
+        "href": "https://app.traveliun.com/countries/10",
+        "classes": "text-primary fw-bold"
+      }
+    ],
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorSarAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalCurrentPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPasswordConfirmation",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "",
+        "label": null,
+        "placeholder": "Search",
+        "value": "",
+        "classes": "form-control form-control-solid w-250px ps-15"
+      },
+      {
+        "tag": "select",
+        "type": null,
+        "id": "items-per-page",
+        "label": null,
+        "placeholder": null,
+        "value": "10",
+        "classes": "form-select form-select-sm form-select-solid"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalArabicName",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalEnglishName",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalDefaultCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalWeekend",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      }
+    ]
+  },
+  {
+    "route": "/hotels",
+    "title": "Hotels - Traveliun",
+    "url": "https://app.traveliun.com/hotels",
+    "text": "Hotels هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Country Select City Select Has Prices Has Rooms Add COUNTRY CITY ARABIC NAME ENGLISH NAME NUMBER OF STARS ADDRESS GOOGLE MAPS CONTACT NUMBER WEBSITE DEFAULT HOTEL No Data Found 10 25 50 100",
+    "headings": [
+      "Hotels",
+      "Change Password",
+      "Add Hotel"
+    ],
+    "links": [
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/web-guide",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/hotels#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/hotels#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Table",
+        "href": "https://app.traveliun.com/hotels",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "Cards",
+        "href": "https://app.traveliun.com/hotels",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/hotels#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Light",
+        "href": "https://app.traveliun.com/hotels",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "Dark",
+        "href": "https://app.traveliun.com/hotels",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "System",
+        "href": "https://app.traveliun.com/hotels",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "English",
+        "href": "https://app.traveliun.com/hotels#",
+        "classes": "menu-link d-flex px-5 active"
+      },
+      {
+        "text": "العربية",
+        "href": "https://app.traveliun.com/hotels#",
+        "classes": "menu-link d-flex px-5"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/dashboard",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Kanban Board",
+        "href": "https://app.traveliun.com/kanban-board",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Persons",
+        "href": "https://app.traveliun.com/customers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies",
+        "href": "https://app.traveliun.com/companies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies Visits",
+        "href": "https://app.traveliun.com/companies-visits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Visits Statuses",
+        "href": "https://app.traveliun.com/companies-visits-statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Employees",
+        "href": "https://app.traveliun.com/employees",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Roles",
+        "href": "https://app.traveliun.com/employees/roles",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ready Offers",
+        "href": "https://app.traveliun.com/ready-offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Packages",
+        "href": "https://app.traveliun.com/offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Country",
+        "href": "https://app.traveliun.com/countries",
+        "classes": "menu-link"
+      },
+      {
+        "text": "City",
+        "href": "https://app.traveliun.com/cities",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Hotels",
+        "href": "https://app.traveliun.com/hotels",
+        "classes": "active router-link-exact-active menu-link"
+      },
+      {
+        "text": "Rooms Types",
+        "href": "https://app.traveliun.com/rooms-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airlines",
+        "href": "https://app.traveliun.com/airlines",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airports Names",
+        "href": "https://app.traveliun.com/airports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ports Names",
+        "href": "https://app.traveliun.com/ports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Cars Types in World",
+        "href": "https://app.traveliun.com/cars-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect Cars with Country",
+        "href": "https://app.traveliun.com/cars",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Transfers",
+        "href": "https://app.traveliun.com/cars/transfers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Tours",
+        "href": "https://app.traveliun.com/cars/tours",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Drivers Names",
+        "href": "https://app.traveliun.com/drivers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Services Types",
+        "href": "https://app.traveliun.com/services-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect service to country",
+        "href": "https://app.traveliun.com/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs Types",
+        "href": "https://app.traveliun.com/visas-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs",
+        "href": "https://app.traveliun.com/visas",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Profits",
+        "href": "https://app.traveliun.com/setting/profits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses Groups",
+        "href": "https://app.traveliun.com/setting/statuses-groups",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses",
+        "href": "https://app.traveliun.com/setting/statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Currencies",
+        "href": "https://app.traveliun.com/setting/currencies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers",
+        "href": "https://app.traveliun.com/setting/suppliers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers Preferences",
+        "href": "https://app.traveliun.com/setting/suppliers-preferences",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Supervisors",
+        "href": "https://app.traveliun.com/setting/supervisors",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Terms & Conditions",
+        "href": "https://app.traveliun.com/offers/terms-and-conditions",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Includes",
+        "href": "https://app.traveliun.com/offers/offer-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Not Includes",
+        "href": "https://app.traveliun.com/offers/offer-not-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/customers_care/dashboard",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Customers Care",
+        "href": "https://app.traveliun.com/customers_care",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Service Type",
+        "href": "https://app.traveliun.com/customers_care/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Categories",
+        "href": "https://app.traveliun.com/guide/categories",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Informations",
+        "href": "https://app.traveliun.com/guide/informations",
+        "classes": "menu-link"
+      }
+    ],
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorSarAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalCurrentPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPasswordConfirmation",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "countryFilter",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "cityFilter",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "",
+        "label": null,
+        "placeholder": "Search",
+        "value": "",
+        "classes": "form-control form-control-solid w-250px ps-15"
+      },
+      {
+        "tag": "select",
+        "type": null,
+        "id": "items-per-page",
+        "label": null,
+        "placeholder": null,
+        "value": "10",
+        "classes": "form-select form-select-sm form-select-solid"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalCountry",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalCity",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalArabicName",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalEnglishName",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalAddress",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalGoogleMap",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalContactNumber",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalWebsite",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "checkbox",
+        "id": "el-id-3405-32",
+        "label": null,
+        "placeholder": null,
+        "value": "on",
+        "classes": "el-switch__input"
+      },
+      {
+        "tag": "input",
+        "type": "file",
+        "id": "",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-upload__input"
+      }
+    ]
+  },
+  {
+    "route": "/flights",
+    "title": "Error 404 - Traveliun",
+    "url": "https://app.traveliun.com/404",
+    "text": "Oops! We can't find that page. Return Home",
+    "headings": [
+      "Oops!"
+    ],
+    "links": [
+      {
+        "text": "Return Home",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active btn btn-sm btn-primary"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "route": "/sea-travels",
+    "title": "Error 404 - Traveliun",
+    "url": "https://app.traveliun.com/404",
+    "text": "Oops! We can't find that page. Return Home",
+    "headings": [
+      "Oops!"
+    ],
+    "links": [
+      {
+        "text": "Return Home",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active btn btn-sm btn-primary"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "route": "/transportation",
+    "title": "Error 404 - Traveliun",
+    "url": "https://app.traveliun.com/404",
+    "text": "Oops! We can't find that page. Return Home",
+    "headings": [
+      "Oops!"
+    ],
+    "links": [
+      {
+        "text": "Return Home",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active btn btn-sm btn-primary"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "route": "/services",
+    "title": "Services - Traveliun",
+    "url": "https://app.traveliun.com/services",
+    "text": "Services هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Country Select Add COUNTRY SERVICE TYPE BUY PRICE BUY CURRENCY SELL PRICE SELL CURRENCY No Data Found 10 25 50 100",
+    "headings": [
+      "Services",
+      "Change Password",
+      "Add Services"
+    ],
+    "links": [
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/web-guide",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/services#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/services#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Table",
+        "href": "https://app.traveliun.com/services",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "Cards",
+        "href": "https://app.traveliun.com/services",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/services#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Light",
+        "href": "https://app.traveliun.com/services",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "Dark",
+        "href": "https://app.traveliun.com/services",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "System",
+        "href": "https://app.traveliun.com/services",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "English",
+        "href": "https://app.traveliun.com/services#",
+        "classes": "menu-link d-flex px-5 active"
+      },
+      {
+        "text": "العربية",
+        "href": "https://app.traveliun.com/services#",
+        "classes": "menu-link d-flex px-5"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/dashboard",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Kanban Board",
+        "href": "https://app.traveliun.com/kanban-board",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Persons",
+        "href": "https://app.traveliun.com/customers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies",
+        "href": "https://app.traveliun.com/companies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies Visits",
+        "href": "https://app.traveliun.com/companies-visits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Visits Statuses",
+        "href": "https://app.traveliun.com/companies-visits-statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Employees",
+        "href": "https://app.traveliun.com/employees",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Roles",
+        "href": "https://app.traveliun.com/employees/roles",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ready Offers",
+        "href": "https://app.traveliun.com/ready-offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Packages",
+        "href": "https://app.traveliun.com/offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Country",
+        "href": "https://app.traveliun.com/countries",
+        "classes": "menu-link"
+      },
+      {
+        "text": "City",
+        "href": "https://app.traveliun.com/cities",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Hotels",
+        "href": "https://app.traveliun.com/hotels",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Rooms Types",
+        "href": "https://app.traveliun.com/rooms-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airlines",
+        "href": "https://app.traveliun.com/airlines",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airports Names",
+        "href": "https://app.traveliun.com/airports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ports Names",
+        "href": "https://app.traveliun.com/ports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Cars Types in World",
+        "href": "https://app.traveliun.com/cars-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect Cars with Country",
+        "href": "https://app.traveliun.com/cars",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Transfers",
+        "href": "https://app.traveliun.com/cars/transfers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Tours",
+        "href": "https://app.traveliun.com/cars/tours",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Drivers Names",
+        "href": "https://app.traveliun.com/drivers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Services Types",
+        "href": "https://app.traveliun.com/services-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect service to country",
+        "href": "https://app.traveliun.com/services",
+        "classes": "active router-link-exact-active menu-link"
+      },
+      {
+        "text": "VISAs Types",
+        "href": "https://app.traveliun.com/visas-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs",
+        "href": "https://app.traveliun.com/visas",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Profits",
+        "href": "https://app.traveliun.com/setting/profits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses Groups",
+        "href": "https://app.traveliun.com/setting/statuses-groups",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses",
+        "href": "https://app.traveliun.com/setting/statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Currencies",
+        "href": "https://app.traveliun.com/setting/currencies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers",
+        "href": "https://app.traveliun.com/setting/suppliers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers Preferences",
+        "href": "https://app.traveliun.com/setting/suppliers-preferences",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Supervisors",
+        "href": "https://app.traveliun.com/setting/supervisors",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Terms & Conditions",
+        "href": "https://app.traveliun.com/offers/terms-and-conditions",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Includes",
+        "href": "https://app.traveliun.com/offers/offer-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Not Includes",
+        "href": "https://app.traveliun.com/offers/offer-not-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/customers_care/dashboard",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Customers Care",
+        "href": "https://app.traveliun.com/customers_care",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Service Type",
+        "href": "https://app.traveliun.com/customers_care/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Categories",
+        "href": "https://app.traveliun.com/guide/categories",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Informations",
+        "href": "https://app.traveliun.com/guide/informations",
+        "classes": "menu-link"
+      }
+    ],
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorSarAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalCurrentPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPasswordConfirmation",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "countryFilter",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "",
+        "label": null,
+        "placeholder": "Search",
+        "value": "",
+        "classes": "form-control form-control-solid w-250px ps-15"
+      },
+      {
+        "tag": "select",
+        "type": null,
+        "id": "items-per-page",
+        "label": null,
+        "placeholder": null,
+        "value": "10",
+        "classes": "form-select form-select-sm form-select-solid"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalCountry",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      }
+    ]
+  },
+  {
+    "route": "/visas",
+    "title": "VISAs - Traveliun",
+    "url": "https://app.traveliun.com/visas",
+    "text": "VISAs هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدويا في البداية Dashboard Kanban Board Customers Employees Packages Countries Hotels Flights Sea Travels Transportation Services VISAs Setting Customers Care Traveliun Guide Country Select Add COUNTRY VISA TYPE BUY PRICE BUY CURRENCY SELL PRICE SELL CURRENCY ARABIC REQUIREMENTS ENGLISH REQUIREMENTS Fransa Tourist Visa 250 SAR 400 SAR 1- الجواز الاصل صالح لمده 6 شهور على الاقل بعد انتهاء الإقامة وبه صفحتين فارغتين 2- صورة بطاقة الاحوال + كارت العائلة للزوجة والأولاد 3- كشف حساب بنكي لأخر 3 شهور انجليزي للسعودي و6 شهور للمقيم مختوم وبه رصيد كافي لمصاريف السفرة ويفضل استخراجه قبل التبصيم بي 3 ايام لا يقل الرصيد عن 10 الاف ريال للشخص الواحد 4- خطاب تعريف من العمل مذكور به الراتب والمسمى الوظيفي ومصدق من الغرفة التجارية للعاملين بالقطاع الخاص باللغة الإنجليزية 5- خروج وعوده للمقيميين باللغة الإنجليزية 6- صورتين شخصيتين بخلفيه بيضاء بدون شماغ للراجل مقاس 3.5في 4.5 السعر بتحولنا 400 ريال رسوم الموعد والابليكشن والحجوزات والتامين والترجمه وبتدفع بالسفارة حوالي 400 ريال Spain Tourist Visa 180 SAR 400 SAR 1- الجواز الاصل صالح لمده 6 شهور على الاقل بعد انتهاء الإقامة وبه صفحتين فارغتين 2- صورة بطاقة الاحوال + كارت العائلة للزوجة والأولاد 3- كشف حساب بنكي لأخر 3 شهور انجليزي للسعودي و6 شهور للمقيم مختوم وبه رصيد كافي لمصاريف السفرة ويفضل استخراجه قبل التبصيم بي 3 ايام لا يقل الرصيد عن 10 الاف ريال 4- خطاب تعريف من العمل مذكور به الراتب والمسمى الوظيفي ومصدق من الغرفة التجارية للعاملين بالقطاع الخاص باللغة الإنجليزية للمقيم يسكون مكتوب تاريخ العقد والتجديد وضمان الشركه للعودته 5- خروج وعوده للمقيميين باللغة الإنجليزية 6- صورتين شخصيتين بخلفيه بيضاء بدون شماغ للراجل مقاس 3.5في 4.5 رسوم السفارة 400 ريال Indonesia Tourist Visa 600 SAR 950 SAR صورة الجواز وصورة شخصيه 800 ريال السعر للتاشيره العاديه المستعجله 950 ريال Thailand Tourist Visa 160 SAR 350 SAR صورة من الجواز صورة شخصيه اسم الوظيفه العنوان و رقم التليفون وتواريخ السفر وقت الانجاز اسبوع عمل اواكتر علي حسب الجنسيه Singaporean Tourist Visa 290 SAR 500 SAR اول 3 صفحات من الجواز صوره شخصيه ديجتال تعريف الراتب كشف حساب بنك لاخر 6 شهور صورة الاقامه العنوان ورقم التليفون وتاريخ الدخول الي السعوديه والايميل والدخل السنوي في خلال اسبوع russia Tourist Visa 190 SAR 350 SAR صورة من الجواز سكانر صوره شخصيه ديجتال بخلفيه بيضاء العنوان والوظيفه واسم الشركه اسم الوالدين والزوجه وتاريخ الميلاد للزوجه وقت الاصدار اسبوع عمل Bosnia Tourist Visa 300 SAR 450 SAR الجواز الاصل وصوره منه تعريف الراتب مصدق من الغرفه التجاريه صورتين شخصيه بخلفيه بيضائ 5 في 6 صورة الهويات وكارت العيله في حاله السفر مع الزوجه تاخذ اسبوعين عمل التاشيره للمده شهر الحضور اجباري التكلفه هتدفع بالسفارة 250 ريال رسوم تجهيز الملف بالدعوة والحجوزات 450 ريال Egypt Tourist Visa 550 SAR 750 SAR الجواز الاصل والاقامه صالحه 6 شهور او اكثر صورة الاقامه خروج وعوده صورتين شخصيه حديثه بيضاء 4 في 6 صورة هويه الكفيل السعر مفرده 750 ريال متعدده 900 ريال بدون مصاريف الشحن United States of America Tourist Visa 710 SAR 950 SAR 1-الجواز الاصل صالح لمده 6 شهور على الاقل بعد انتهاء الإقامة وبه صفحتين فارغتين 2- صورة بط",
+    "headings": [
+      "VISAs",
+      "Change Password",
+      "Add Visas"
+    ],
+    "links": [
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/web-guide",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/visas#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/visas#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Table",
+        "href": "https://app.traveliun.com/visas",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "Cards",
+        "href": "https://app.traveliun.com/visas",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/visas#",
+        "classes": "cursor-pointer symbol symbol-35px"
+      },
+      {
+        "text": "Light",
+        "href": "https://app.traveliun.com/visas",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "Dark",
+        "href": "https://app.traveliun.com/visas",
+        "classes": "router-link-active router-link-exact-active menu-link px-2 py-2"
+      },
+      {
+        "text": "System",
+        "href": "https://app.traveliun.com/visas",
+        "classes": "router-link-active router-link-exact-active active menu-link px-2 py-2"
+      },
+      {
+        "text": "English",
+        "href": "https://app.traveliun.com/visas#",
+        "classes": "menu-link d-flex px-5 active"
+      },
+      {
+        "text": "العربية",
+        "href": "https://app.traveliun.com/visas#",
+        "classes": "menu-link d-flex px-5"
+      },
+      {
+        "text": "",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/dashboard",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Kanban Board",
+        "href": "https://app.traveliun.com/kanban-board",
+        "classes": "menu-link px-0"
+      },
+      {
+        "text": "Persons",
+        "href": "https://app.traveliun.com/customers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies",
+        "href": "https://app.traveliun.com/companies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Companies Visits",
+        "href": "https://app.traveliun.com/companies-visits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Visits Statuses",
+        "href": "https://app.traveliun.com/companies-visits-statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Employees",
+        "href": "https://app.traveliun.com/employees",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Roles",
+        "href": "https://app.traveliun.com/employees/roles",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ready Offers",
+        "href": "https://app.traveliun.com/ready-offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Packages",
+        "href": "https://app.traveliun.com/offers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Country",
+        "href": "https://app.traveliun.com/countries",
+        "classes": "menu-link"
+      },
+      {
+        "text": "City",
+        "href": "https://app.traveliun.com/cities",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Hotels",
+        "href": "https://app.traveliun.com/hotels",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Rooms Types",
+        "href": "https://app.traveliun.com/rooms-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airlines",
+        "href": "https://app.traveliun.com/airlines",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Airports Names",
+        "href": "https://app.traveliun.com/airports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Ports Names",
+        "href": "https://app.traveliun.com/ports",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Cars Types in World",
+        "href": "https://app.traveliun.com/cars-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect Cars with Country",
+        "href": "https://app.traveliun.com/cars",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Transfers",
+        "href": "https://app.traveliun.com/cars/transfers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Tours",
+        "href": "https://app.traveliun.com/cars/tours",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Drivers Names",
+        "href": "https://app.traveliun.com/drivers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Services Types",
+        "href": "https://app.traveliun.com/services-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Connect service to country",
+        "href": "https://app.traveliun.com/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs Types",
+        "href": "https://app.traveliun.com/visas-types",
+        "classes": "menu-link"
+      },
+      {
+        "text": "VISAs",
+        "href": "https://app.traveliun.com/visas",
+        "classes": "active router-link-exact-active menu-link"
+      },
+      {
+        "text": "Profits",
+        "href": "https://app.traveliun.com/setting/profits",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses Groups",
+        "href": "https://app.traveliun.com/setting/statuses-groups",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Statuses",
+        "href": "https://app.traveliun.com/setting/statuses",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Currencies",
+        "href": "https://app.traveliun.com/setting/currencies",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers",
+        "href": "https://app.traveliun.com/setting/suppliers",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Suppliers Preferences",
+        "href": "https://app.traveliun.com/setting/suppliers-preferences",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Supervisors",
+        "href": "https://app.traveliun.com/setting/supervisors",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Terms & Conditions",
+        "href": "https://app.traveliun.com/offers/terms-and-conditions",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Includes",
+        "href": "https://app.traveliun.com/offers/offer-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Offer Not Includes",
+        "href": "https://app.traveliun.com/offers/offer-not-includes",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Dashboard",
+        "href": "https://app.traveliun.com/customers_care/dashboard",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Customers Care",
+        "href": "https://app.traveliun.com/customers_care",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Service Type",
+        "href": "https://app.traveliun.com/customers_care/services",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Categories",
+        "href": "https://app.traveliun.com/guide/categories",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Informations",
+        "href": "https://app.traveliun.com/guide/informations",
+        "classes": "menu-link"
+      },
+      {
+        "text": "Fransa",
+        "href": "https://app.traveliun.com/countries/3",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "Spain",
+        "href": "https://app.traveliun.com/countries/14",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "Indonesia",
+        "href": "https://app.traveliun.com/countries/2",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "Thailand",
+        "href": "https://app.traveliun.com/countries/6",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "Singaporean",
+        "href": "https://app.traveliun.com/countries/31",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "russia",
+        "href": "https://app.traveliun.com/countries/5",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "Bosnia",
+        "href": "https://app.traveliun.com/countries/11",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "Egypt",
+        "href": "https://app.traveliun.com/countries/13",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "United States of America",
+        "href": "https://app.traveliun.com/countries/17",
+        "classes": "text-primary fw-bold"
+      },
+      {
+        "text": "China",
+        "href": "https://app.traveliun.com/countries/20",
+        "classes": "text-primary fw-bold"
+      }
+    ],
+    "inputs": [
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorCurrency",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "currencyCalculatorSarAmount",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalCurrentPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPassword",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "password",
+        "id": "modalNewPasswordConfirmation",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-input__inner"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "countryFilter",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "",
+        "label": null,
+        "placeholder": "Search",
+        "value": "",
+        "classes": "form-control form-control-solid w-250px ps-15"
+      },
+      {
+        "tag": "select",
+        "type": null,
+        "id": "items-per-page",
+        "label": null,
+        "placeholder": null,
+        "value": "10",
+        "classes": "form-select form-select-sm form-select-solid"
+      },
+      {
+        "tag": "input",
+        "type": "text",
+        "id": "modalCountry",
+        "label": null,
+        "placeholder": null,
+        "value": "",
+        "classes": "el-select__input is-default"
+      }
+    ]
+  },
+  {
+    "route": "/settings",
+    "title": "Error 404 - Traveliun",
+    "url": "https://app.traveliun.com/404",
+    "text": "Oops! We can't find that page. Return Home",
+    "headings": [
+      "Oops!"
+    ],
+    "links": [
+      {
+        "text": "Return Home",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active btn btn-sm btn-primary"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "route": "/customers-care",
+    "title": "Error 404 - Traveliun",
+    "url": "https://app.traveliun.com/404",
+    "text": "Oops! We can't find that page. Return Home",
+    "headings": [
+      "Oops!"
+    ],
+    "links": [
+      {
+        "text": "Return Home",
+        "href": "https://app.traveliun.com/",
+        "classes": "router-link-active btn btn-sm btn-primary"
+      }
+    ],
+    "inputs": []
+  },
+  {
+    "route": "/web-guide",
+    "title": "Guide - Traveliun",
+    "url": "https://app.traveliun.com/web-guide",
+    "text": "الدليل فن البيع تركيا الإدارة المالية إدارة الواتساب من هي ترافليون اندونيسيا أندونيسيا",
+    "headings": [
+      "الدليل",
+      "فن البيع",
+      "الترحيب",
+      "بداية المحادثة",
+      "بداية المحادثة",
+      "البدايات",
+      "السلام عليكم حابب اشوف عروض ماليزيا ------ التاريخ و---- عدد الاشخاص --",
+      "عميل محتار مش عارف وين يسافر ؟",
+      "اخذت جميع المعلومات والان العميل منتظر البرنامج",
+      "عند ارسال البرنامج",
+      "الرد على أسئلة العميل",
+      "الرد على الاسئلة ---",
+      "بعد ارسال البرنامج للعميل بجميع الخطوات السابقه ....",
+      "العميل طلب تغيير البرنامج السياحي .",
+      "عميل قال لك لقيت نفس العرض في شركة ثانيه بس ارخص من عندكم ...؟",
+      "عميل طالب بس موصلات",
+      "اهتمام العميل بالسعر اكثر من الخدمات",
+      "لا تنفذ جميع طلبات العميل --",
+      "عند عدم التوفر او الاتاحه في شي محدد من قبل العميل--",
+      "البرنامج غالي --",
+      "كيف يمكنك التأكد من اتخاذ القرار الصحيح في اختيار الفنادق والعروض، وتثبت أنك تمتلك المعرفة والثقة في هذا المجال",
+      "الاقناع في سرعة الحجز",
+      "اسلوب الاقناع في سرعة التاكيد",
+      "العرض التقديمي",
+      "معرفة رغبة العميل",
+      "اعطي مجال للحوار مع العميل",
+      "التاثير النفسي على مشاعر العميل",
+      "الفصاحه في الرد",
+      "سوال عام",
+      "الاستكشاف",
+      "معرفة الميزانية",
+      "اعاده فتح الحوار اذ العميل طنش",
+      "من الضروري جدا",
+      "غلط اخبار العميل اذ ماعجبك البرنامج كلمني اعدل لك واجيب لك سعر اقل",
+      "متابعة العملاء",
+      "هام جدا",
+      "المتابعه الختاميه",
+      "تركيا",
+      "سيارات فيتو في اسطنبول",
+      "كوخ كيانا",
+      "شقة الفندقية ولتن شيشلي",
+      "دليل السياحي",
+      "اورانوس",
+      "سيارات فيتو في شمال التركي",
+      "اسئلة الشائعة لتركيا",
+      "fas",
+      "إسطنبول",
+      "اهم الاماكن السياحية في اسطنبول",
+      "جولات سياحية في اسطنبول",
+      "طرابزون",
+      "اهم الاماكن السياحية في طرابزون",
+      "جولات الشمال التركي",
+      "الإدارة المالية",
+      "آلية تعامل موظفي المبيعات مع الحسابات عند إتمام البيع",
+      "بيع برنامج سياحي أو باقة سفر",
+      "اليه التعامل مع الاداره الماليه",
+      "إدارة الواتساب",
+      "خدمة العملاء",
+      "مهام خدمة العملاء",
+      "ملفات ومعلومات خدمة العملاء",
+      "ملاحظة هامة",
+      "انواع العملاء والرسائل الواردة",
+      "نبذه عن الية عمل إدارة الواتساب",
+      "الرسالة الترحيبية",
+      "الموردون",
+      "التوظيف",
+      "المعلومات المطلوبة من العميل في العملاء",
+      "ملاحظات هامة خدمة العملاء",
+      "من هي ترافليون",
+      "اندونيسيا",
+      "المطارات الرئيسية",
+      "الإستقبال",
+      "الفنادق و الفلل الرئيسية التي نتعامل معها",
+      "السواقين",
+      "الجولات السياحية",
+      "النقلات",
+      "أندونيسيا"
+    ],
+    "links": [
+      {
+        "text": "الدليل السياحي_20240913_66e4b051c4f9a.pdf",
+        "href": "https://app.traveliun.com/storage/guide_informations_attachments/%D8%A7%D9%84%D8%AF%D9%84%D9%8A%D9%84%20%D8%A7%D9%84%D8%B3%D9%8A%D8%A7%D8%AD%D9%8A_20240913_66e4b051c4f9a.pdf",
+        "classes": ""
+      },
+      {
+        "text": "كل ما يخص تركيا الاسئلة الشائعة_20240918_66eb682b60dd7.pdf",
+        "href": "https://app.traveliun.com/storage/guide_informations_attachments/%D9%83%D9%84%20%D9%85%D8%A7%20%D9%8A%D8%AE%D8%B5%20%D8%AA%D8%B1%D9%83%D9%8A%D8%A7%20%D8%A7%D9%84%D8%A7%D8%B3%D8%A6%D9%84%D8%A9%20%D8%A7%D9%84%D8%B4%D8%A7%D8%A6%D8%B9%D8%A9_20240918_66eb682b60dd7.pdf",
+        "classes": ""
+      },
+      {
+        "text": "كل ما يخص تركيا الاسئلة الشائعة_20240930_66fb33a89b92a.pdf",
+        "href": "https://app.traveliun.com/storage/guide_informations_attachments/%D9%83%D9%84%20%D9%85%D8%A7%20%D9%8A%D8%AE%D8%B5%20%D8%AA%D8%B1%D9%83%D9%8A%D8%A7%20%D8%A7%D9%84%D8%A7%D8%B3%D8%A6%D9%84%D8%A9%20%D8%A7%D9%84%D8%B4%D8%A7%D8%A6%D8%B9%D8%A9_20240930_66fb33a89b92a.pdf",
+        "classes": ""
+      },
+      {
+        "text": "اهم الاماكن السياحية في اسطنبول_20240918_66ea90583ebba.pdf",
+        "href": "https://app.traveliun.com/storage/guide_informations_attachments/%D8%A7%D9%87%D9%85%20%D8%A7%D9%84%D8%A7%D9%85%D8%A7%D9%83%D9%86%20%D8%A7%D9%84%D8%B3%D9%8A%D8%A7%D8%AD%D9%8A%D8%A9%20%D9%81%D9%8A%20%D8%A7%D8%B3%D8%B7%D9%86%D8%A8%D9%88%D9%84_20240918_66ea90583ebba.pdf",
+        "classes": ""
+      },
+      {
+        "text": "جولات في اسطنبول_20240918_66ea90e6a35bb.pdf",
+        "href": "https://app.traveliun.com/storage/guide_informations_attachments/%D8%AC%D9%88%D9%84%D8%A7%D8%AA%20%D9%81%D9%8A%20%D8%A7%D8%B3%D8%B7%D9%86%D8%A8%D9%88%D9%84_20240918_66ea90e6a35bb.pdf",
+        "classes": ""
+      },
+      {
+        "text": "اهم العالم السياحية في الشمال التركي_20240918_66ea914a0b0e0.pdf",
+        "href": "https://app.traveliun.com/storage/guide_informations_attachments/%D8%A7%D9%87%D9%85%20%D8%A7%D9%84%D8%B9%D8%A7%D9%84%D9%85%20%D8%A7%D9%84%D8%B3%D9%8A%D8%A7%D8%AD%D9%8A%D8%A9%20%D9%81%D9%8A%20%D8%A7%D9%84%D8%B4%D9%85%D8%A7%D9%84%20%D8%A7%D9%84%D8%AA%D8%B1%D9%83%D9%8A_20240918_66ea914a0b0e0.pdf",
+        "classes": ""
+      },
+      {
+        "text": "جولات شمال التركي_20240918_66ea918f62657.pdf",
+        "href": "https://app.traveliun.com/storage/guide_informations_attachments/%D8%AC%D9%88%D9%84%D8%A7%D8%AA%20%D8%B4%D9%85%D8%A7%D9%84%20%D8%A7%D9%84%D8%AA%D8%B1%D9%83%D9%8A_20240918_66ea918f62657.pdf",
+        "classes": ""
+      },
+      {
+        "text": "اليه عمل المبيعات مع الحسابات_20241002_66fcd157e62dd.pdf",
+        "href": "https://app.traveliun.com/storage/guide_informations_attachments/%D8%A7%D9%84%D9%8A%D9%87%20%D8%B9%D9%85%D9%84%20%D8%A7%D9%84%D9%85%D8%A8%D9%8A%D8%B9%D8%A7%D8%AA%20%D9%85%D8%B9%20%D8%A7%D9%84%D8%AD%D8%B3%D8%A7%D8%A8%D8%A7%D8%AA_20241002_66fcd157e62dd.pdf",
+        "classes": ""
+      }
+    ],
+    "inputs": []
+  }
+]
