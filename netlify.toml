@@ -17,3 +17,14 @@
 # Next.js runtime (SSR, ISR, API routes, the proxy.ts auth gate as an Edge fn).
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Force runtime-read assets into the serverless function bundles. The Netlify
+# adapter does its own tracing (Next's outputFileTracingIncludes is not applied),
+# and both are read dynamically at request time:
+#  - public/fonts: Tajawal ttf embedded into the offer PDF + OG image
+#  - @sparticuz/chromium: the compressed Chromium binary for print-to-PDF
+[functions]
+  included_files = [
+    "public/fonts/**",
+    "node_modules/@sparticuz/chromium/bin/**",
+  ]
