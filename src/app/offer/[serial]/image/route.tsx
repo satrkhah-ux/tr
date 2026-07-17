@@ -2,6 +2,7 @@ import { getOfferBySerial } from "@/lib/data/offers";
 import { buildOfferImage } from "@/lib/offer-image";
 
 export const runtime = "nodejs";
+export const maxDuration = 26;
 
 export async function GET(_request: Request, { params }: { params: Promise<{ serial: string }> }) {
   const { serial } = await params;

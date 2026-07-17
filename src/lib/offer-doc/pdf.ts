@@ -14,8 +14,11 @@ import { fontFaceCss, loadTajawalBase64 } from "./fonts";
  * with no pagination. Printing the SAME DOM/CSS as the on-screen preview is what
  * guarantees preview === PDF.
  *
- * We use puppeteer-core against an already-installed Chrome/Edge (both are
- * Chromium) — no bundled-browser download. Override with CHROME_PATH if needed.
+ * Locally and on the Coolify/VPS target we use puppeteer-core against an
+ * already-installed Chrome/Edge (both are Chromium) — no bundled-browser
+ * download; override with CHROME_PATH. On serverless hosts (Netlify Functions /
+ * AWS Lambda) no desktop browser exists, so we launch the bundled
+ * @sparticuz/chromium binary instead.
  */
 const CANDIDATES: (string | undefined)[] = [
   process.env.CHROME_PATH,
@@ -38,6 +41,43 @@ function findExecutable(): string | null {
   return null;
 }
 
+/** True on Netlify Functions / AWS Lambda — hosts with no installed desktop browser. */
+function isServerless(): boolean {
+  return Boolean(
+    process.env.NETLIFY ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.AWS_EXECUTION_ENV ||
+      process.env.VERCEL,
+  );
+}
+
+/**
+ * Launch headless Chromium. On serverless hosts there is no installed browser,
+ * so use the bundled @sparticuz/chromium binary (loaded dynamically so it is
+ * never touched on the local/VPS path); elsewhere use the machine's Chrome/Edge.
+ */
+async function launchBrowser(): Promise<Browser> {
+  if (isServerless()) {
+    const { default: chromium } = await import("@sparticuz/chromium");
+    // No WebGL/graphics needed for print-to-PDF — disabling it speeds cold start.
+    chromium.setGraphicsMode = false;
+    return puppeteer.launch({
+      executablePath: await chromium.executablePath(),
+      args: chromium.args,
+      headless: true,
+    });
+  }
+  const executablePath = findExecutable();
+  if (!executablePath) {
+    throw new Error("No Chromium/Chrome/Edge executable found for PDF rendering. Set CHROME_PATH.");
+  }
+  return puppeteer.launch({
+    executablePath,
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--font-render-hinting=none"],
+  });
+}
+
 export type FooterInfo = { brand: string; serial: string; contact: string };
 
 function footerTemplate(info: FooterInfo, fontCss: string): string {
@@ -52,19 +92,11 @@ function footerTemplate(info: FooterInfo, fontCss: string): string {
 }
 
 export async function offerDocumentToPdf(html: string, footer: FooterInfo): Promise<Buffer> {
-  const executablePath = findExecutable();
-  if (!executablePath) {
-    throw new Error("No Chromium/Chrome/Edge executable found for PDF rendering. Set CHROME_PATH.");
-  }
   const fonts = await loadTajawalBase64();
 
   let browser: Browser | null = null;
   try {
-    browser = await puppeteer.launch({
-      executablePath,
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--font-render-hinting=none"],
-    });
+    browser = await launchBrowser();
     const page = await browser.newPage();
     await page.emulateMediaType("print");
     await page.setContent(html, { waitUntil: "load" });

@@ -8,6 +8,8 @@ import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
 import { can } from "@/lib/roles/roles";
 
 export const runtime = "nodejs";
+// Headless-Chromium cold start + render can exceed the default 10s; give it room.
+export const maxDuration = 26;
 
 /**
  * Staff PDF (authenticated — /offer/* is behind the auth gate).

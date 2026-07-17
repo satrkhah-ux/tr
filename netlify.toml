@@ -1,0 +1,19 @@
+# Netlify deploy config — App Travluin / Traveliun (Next.js 16, GitHub CI).
+#
+# Netlify auto-detects Next.js and installs the @netlify/plugin-nextjs runtime,
+# but we declare everything here so the build is reproducible from Git and the
+# Node version / build command are explicit.
+
+[build]
+  # `next build` only. Do NOT use `npm run check` (it also runs lint + typecheck
+  # and would fail deploys on a lint/type warning). Do NOT run db:apply here.
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  # The app requires Node >= 24 (see .nvmrc). Pin it explicitly for the CI image.
+  NODE_VERSION = "24"
+
+# Next.js runtime (SSR, ISR, API routes, the proxy.ts auth gate as an Edge fn).
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

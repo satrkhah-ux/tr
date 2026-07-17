@@ -11,13 +11,46 @@ export const AUTH_STORAGE_KEY = "traveliun-auth";
 /** Session cookie lifetime (7 days). Access tokens still auto-refresh. */
 export const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
+/**
+ * Reads an env var via BRACKET access so Next.js does NOT statically inline it
+ * at build time. On the server this returns the RUNTIME value — which is what
+ * makes the public Supabase config work on hosts (Coolify / VPS) where the
+ * NEXT_PUBLIC_* vars were not present during `next build`.
+ */
+function readEnv(name: string): string | undefined {
+  return process.env[name] || undefined;
+}
+
+/** Server-side: the PUBLIC Supabase config, read at RUNTIME. Null if unset. */
+export function getPublicSupabaseConfig(): { url: string; anonKey: string } | null {
+  const url = readEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const anonKey = readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  return url && anonKey ? { url, anonKey } : null;
+}
+
+/** Shape injected into the HTML by the root layout (see PublicEnvScript). */
+export type PublicEnv = { supabaseUrl?: string; supabaseAnonKey?: string };
+
 export function getSupabaseEnv(): { url: string; anonKey: string } {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // On the client, prefer the config injected by the server at runtime. This is
+  // what lets the app work when NEXT_PUBLIC_* were NOT baked into the bundle at
+  // build time (the common Coolify/VPS case) — the browser reads them from the
+  // server-rendered <script> instead of from the (empty) build-time constants.
+  if (typeof window !== "undefined") {
+    const injected = (window as unknown as { __ENV__?: PublicEnv }).__ENV__;
+    if (injected?.supabaseUrl && injected?.supabaseAnonKey) {
+      return { url: injected.supabaseUrl, anonKey: injected.supabaseAnonKey };
+    }
+  }
+
+  // Fallback: process.env (build-time inlined on the client for local dev;
+  // runtime on the server via readEnv).
+  const url = readEnv("NEXT_PUBLIC_SUPABASE_URL") ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY") ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
     throw new Error(
-      "Missing Supabase env vars. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local (see .env.example).",
+      "Missing Supabase env vars. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY (in .env.local locally, or as environment variables on your host).",
     );
   }
 

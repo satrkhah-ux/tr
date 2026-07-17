@@ -4,6 +4,8 @@ import { renderOfferDocumentHtml } from "@/lib/offer-doc/html";
 import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
 
 export const runtime = "nodejs";
+// Headless-Chromium cold start + render can exceed the default 10s; give it room.
+export const maxDuration = 26;
 
 /**
  * PUBLIC client PDF — the exact document that was sent. It renders the LATEST
