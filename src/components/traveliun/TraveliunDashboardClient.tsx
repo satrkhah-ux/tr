@@ -1,14 +1,20 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  BarChart3,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Columns3,
   Contact,
   Eye,
   EyeOff,
+  FilePlus2,
+  FileText,
+  FileUp,
   Inbox,
   Loader2,
   Package,
@@ -23,6 +29,7 @@ import {
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useRole } from "@/lib/roles/RoleContext";
+import type { Permission } from "@/lib/roles/roles";
 import {
   getAdminMetrics,
   getEmployeeMetrics,
@@ -34,6 +41,7 @@ import {
 } from "@/lib/data/metrics";
 import { TraveliunShell } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
+import { ExecutiveOverview } from "./ExecutiveDashboardClient";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -52,9 +60,9 @@ export function TraveliunDashboardClient() {
     <TraveliunShell title="nav.dashboard">
       <div className="tv-fade-up" dir={dir}>
         {dashboardView === "admin" ? (
-          <AdminDashboard />
+          <AdminHome />
         ) : dashboardView === "employee" ? (
-          <EmployeeDashboard />
+          <EmployeeHome />
         ) : (
           <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState title={t("dash.noPermission")} description={t("dash.noPermissionDesc")} />
@@ -62,6 +70,82 @@ export function TraveliunDashboardClient() {
         )}
       </div>
     </TraveliunShell>
+  );
+}
+
+// ---------- quick actions (the home page's working functions) ----------
+type QuickAction = { key: string; labelKey: TranslationKey; descKey: TranslationKey; href: string; icon: LucideIcon; color: string; perm?: Permission };
+const QUICK_ACTIONS: QuickAction[] = [
+  { key: "generator", labelKey: "nav.packageGenerator", descKey: "dash.qa.generator", href: "/package-generator", icon: FilePlus2, color: "#2aa87a" },
+  { key: "repackage", labelKey: "nav.repackage", descKey: "dash.qa.repackage", href: "/repackage", icon: FileUp, color: "#0e9bb5", perm: "repackage.write" },
+  { key: "kanban", labelKey: "nav.kanban", descKey: "dash.qa.kanban", href: "/kanban-board", icon: Columns3, color: "#d99a00" },
+  { key: "offers", labelKey: "nav.packages", descKey: "dash.qa.offers", href: "/offers", icon: FileText, color: "#185045" },
+];
+
+function QuickActions() {
+  const { t } = useTraveliunUI();
+  const { can } = useRole();
+  const actions = QUICK_ACTIONS.filter((a) => !a.perm || can(a.perm));
+  return (
+    <section className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+      {actions.map((a) => (
+        <Link
+          key={a.key}
+          href={a.href}
+          className="group flex items-center gap-3 rounded-[15px] border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]"
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-[12px] transition-transform group-hover:scale-105" style={{ color: a.color, background: `${a.color}1a` }}>
+            <a.icon className="size-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[13.5px] font-extrabold text-[#0f3d38]">{t(a.labelKey)}</span>
+            <span className="block truncate text-[11.5px] font-semibold text-[#93aaa3]">{t(a.descKey)}</span>
+          </span>
+        </Link>
+      ))}
+    </section>
+  );
+}
+
+// ---------- ADMIN home: quick actions + tabs (executive | team) ----------
+function AdminHome() {
+  const { t } = useTraveliunUI();
+  const { can } = useRole();
+  const canExec = can("pricing.internal");
+  const [tab, setTab] = useState<"exec" | "team">(canExec ? "exec" : "team");
+
+  const tabClass = (active: boolean) =>
+    `inline-flex h-10 items-center gap-2 rounded-[9px] px-4 text-[13px] font-bold transition-colors ${
+      active ? "bg-[#185045] text-white shadow-[0_2px_8px_rgba(24,80,69,0.25)]" : "text-[#557d78] hover:bg-[#f0f7f4]"
+    }`;
+
+  return (
+    <div className="space-y-4">
+      <QuickActions />
+
+      {canExec ? (
+        <div className="inline-flex rounded-[12px] border border-[#dbe6e1] bg-white p-1 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <button type="button" onClick={() => setTab("exec")} className={tabClass(tab === "exec")}>
+            <BarChart3 className="size-4" /> {t("dash.tab.executive")}
+          </button>
+          <button type="button" onClick={() => setTab("team")} className={tabClass(tab === "team")}>
+            <Users className="size-4" /> {t("dash.tab.team")}
+          </button>
+        </div>
+      ) : null}
+
+      {canExec && tab === "exec" ? <ExecutiveOverview /> : <TeamOperations />}
+    </div>
+  );
+}
+
+// ---------- EMPLOYEE home: quick actions + own metrics ----------
+function EmployeeHome() {
+  return (
+    <div className="space-y-4">
+      <QuickActions />
+      <EmployeeDashboard />
+    </div>
   );
 }
 
@@ -163,7 +247,7 @@ function EmployeeDashboard() {
   );
 }
 
-// ---------- ADMIN VIEW ----------
+// ---------- ADMIN: team & requests (live presence + request metrics) ----------
 type AdminCardDef = { key: string; label: TranslationKey; icon: LucideIcon; color: string; detail: TranslationKey; get: (m: AdminMetrics) => number };
 const ADMIN_CARDS: AdminCardDef[] = [
   { key: "onlineNow", label: "dash.onlineNow", icon: Wifi, color: "#2aa87a", detail: "dash.onlineNowDetail", get: (m) => m.onlineNow },
@@ -193,7 +277,7 @@ function loadLayout(): CardLayout {
   }
 }
 
-function AdminDashboard() {
+function TeamOperations() {
   const { t } = useTraveliunUI();
   const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
   const [loading, setLoading] = useState(true);

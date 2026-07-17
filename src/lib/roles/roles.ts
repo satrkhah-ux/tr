@@ -35,7 +35,9 @@ export type Permission =
   /** see the pricing stage of the package generator (sell prices). */
   | "pricing.view"
   /** see INTERNAL pricing: buy price / profit / margin. */
-  | "pricing.internal";
+  | "pricing.internal"
+  /** import & re-issue a supplier PDF (the repackage flow). */
+  | "repackage.write";
 
 const ALL_PERMISSIONS: Permission[] = [
   "dashboard.admin",
@@ -48,6 +50,7 @@ const ALL_PERMISSIONS: Permission[] = [
   "guide.view",
   "pricing.view",
   "pricing.internal",
+  "repackage.write",
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
@@ -55,7 +58,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   developer: ALL_PERMISSIONS,
   admin: ALL_PERMISSIONS,
   // Employees build offers (sell prices) but never see buy price / profit.
-  employee: ["dashboard.employee", "offers.write", "data.write", "kanban.view", "guide.view", "pricing.view"],
+  employee: ["dashboard.employee", "offers.write", "data.write", "kanban.view", "guide.view", "pricing.view", "repackage.write"],
   visitor: ["guide.view"],
 };
 

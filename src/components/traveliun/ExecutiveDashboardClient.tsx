@@ -17,7 +17,6 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { KANBAN_STAGES } from "@/lib/data/pipeline";
 import { getExecutiveDashboard, type ExecRow, type ExecutiveDashboard } from "@/lib/data/executive";
 import type { TranslationKey } from "@/lib/i18n";
-import { TraveliunShell } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { DestinationBar, MonthlyChart, StageBar, StatusDoughnut } from "./charts/ExecutiveCharts";
 
@@ -111,9 +110,14 @@ function aggregate(rows: ExecRow[]) {
   return { kpis, monthly, byDestination, stageBy, statusBy };
 }
 
-// ---------- shell + fetch orchestration ----------
-export function ExecutiveDashboardClient() {
-  const { t, dir } = useTraveliunUI();
+// ---------- fetch orchestration (embeddable — no shell wrapper) ----------
+/**
+ * The executive overview (filters + KPIs + charts + table), embedded in the
+ * main /dashboard for roles holding pricing.internal. Data stays gated
+ * server-side in getExecutiveDashboard().
+ */
+export function ExecutiveOverview() {
+  const { t } = useTraveliunUI();
   const [data, setData] = useState<ExecutiveDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -137,30 +141,28 @@ export function ExecutiveDashboardClient() {
   }, [load]);
 
   return (
-    <TraveliunShell title="nav.executiveDashboard">
-      <div className="tv-fade-up space-y-4" dir={dir}>
-        {loading ? (
-          <LoadingState />
-        ) : data && !data.authorized ? (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-            <EmptyState title={t("dash.noPermission")} description={t("dash.noPermissionDesc")} />
-          </section>
-        ) : error || !data ? (
-          <section className="rounded-2xl border border-[#f4c9d4] bg-[#fdeef2] p-6 text-center">
-            <p className="mb-3 text-sm font-bold text-[#c22850]">{t("exec.loadError")}</p>
-            <button type="button" onClick={load} className="inline-flex items-center gap-2 rounded-md bg-[#185045] px-4 py-2 text-sm font-bold text-white hover:bg-[#0f4439]">
-              <RotateCcw className="size-4" /> {t("exec.retry")}
-            </button>
-          </section>
-        ) : data.rows.length === 0 ? (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-            <EmptyState icon={Package} title={t("exec.noData")} description={t("exec.noDataDesc")} />
-          </section>
-        ) : (
-          <ExecutiveContent data={data} />
-        )}
-      </div>
-    </TraveliunShell>
+    <div className="space-y-4">
+      {loading ? (
+        <LoadingState />
+      ) : data && !data.authorized ? (
+        <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <EmptyState title={t("dash.noPermission")} description={t("dash.noPermissionDesc")} />
+        </section>
+      ) : error || !data ? (
+        <section className="rounded-2xl border border-[#f4c9d4] bg-[#fdeef2] p-6 text-center">
+          <p className="mb-3 text-sm font-bold text-[#c22850]">{t("exec.loadError")}</p>
+          <button type="button" onClick={load} className="inline-flex items-center gap-2 rounded-md bg-[#185045] px-4 py-2 text-sm font-bold text-white hover:bg-[#0f4439]">
+            <RotateCcw className="size-4" /> {t("exec.retry")}
+          </button>
+        </section>
+      ) : data.rows.length === 0 ? (
+        <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <EmptyState icon={Package} title={t("exec.noData")} description={t("exec.noDataDesc")} />
+        </section>
+      ) : (
+        <ExecutiveContent data={data} />
+      )}
+    </div>
   );
 }
 

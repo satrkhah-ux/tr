@@ -25,7 +25,8 @@ export function proxy(request: NextRequest) {
   const session = parseSessionCookie(request.cookies.get(AUTH_STORAGE_KEY)?.value);
   const isAuthed = session !== null;
 
-  // Logged-in users shouldn't see the login screens.
+  // Logged-in users shouldn't see the login screens. The main dashboard now
+  // embeds the executive overview for roles that hold pricing.internal.
   if (isAuthed && LOGIN_PATHS.has(pathname)) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }

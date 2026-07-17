@@ -129,6 +129,12 @@ export type CreateOfferInput = {
   hotels?: OfferHotelInput[];
   /** optional per-item pricing rollup (migration 0008). */
   pricing_items?: OfferPricingItemInput[];
+  /** provenance (migration 0018). 'direct' for normal offers, 'repackaged' for
+   *  offers re-issued from an imported supplier PDF. Opaque ids only — never a
+   *  supplier NAME (offers is anon-readable). */
+  source_kind?: string;
+  source_supplier_id?: string | null;
+  source_import_id?: string | null;
 };
 
 export type CreateOfferResult = { ok: true; serial: string; id: string } | { ok: false; error: TranslationKey };
@@ -204,6 +210,9 @@ export async function createOffer(input: CreateOfferInput): Promise<CreateOfferR
         currency: input.currency,
         status: "draft",
         pipeline_stage: "active_not_confirmed",
+        source_kind: input.source_kind ?? "direct",
+        source_supplier_id: input.source_supplier_id ?? null,
+        source_import_id: input.source_import_id ?? null,
       })
       .select("id")
       .single();

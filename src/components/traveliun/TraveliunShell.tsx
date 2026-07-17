@@ -28,7 +28,6 @@ import {
   Headphones,
   Hotel,
   Languages,
-  LayoutDashboard,
   Loader2,
   LogOut,
   Menu,
@@ -72,7 +71,6 @@ type NavGroup = {
 
 const navGroups: NavGroup[] = [
   { labelKey: "nav.dashboard", href: "/dashboard", icon: BarChart3 },
-  { labelKey: "nav.executiveDashboard", href: "/executive-dashboard", icon: LayoutDashboard, perm: "dashboard.admin" },
   { labelKey: "nav.intelligenceHub", href: "/travel-intelligence", icon: Calculator },
   { labelKey: "nav.kanban", href: "/kanban-board", icon: Columns3 },
   {
@@ -104,6 +102,7 @@ const navGroups: NavGroup[] = [
       { labelKey: "nav.readyOffers", href: "/ready-offers" },
       { labelKey: "nav.packages", href: "/offers" },
       { labelKey: "nav.packageGenerator", href: "/package-generator" },
+      { labelKey: "nav.repackage", href: "/repackage" },
       { labelKey: "nav.markupRules", href: "/markup-rules" },
       { labelKey: "nav.hotelSuppliers", href: "/settings/suppliers" },
       { labelKey: "nav.terms", href: "/offers/terms-and-conditions" },
