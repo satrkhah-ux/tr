@@ -47,6 +47,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
 import { ROLE_LABEL_KEYS, ROLES, type Permission } from "@/lib/roles/roles";
 import { useTraveliunUI } from "./TraveliunUIProvider";
+import { MobileTabBar } from "./MobileTabBar";
 import { TraveliunLogo } from "./TraveliunLogo";
 
 type TraveliunShellProps = {
@@ -369,15 +370,19 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
           <div className="truncate text-lg font-extrabold leading-tight text-[#003c3a]">{displayTitle}</div>
           <div className="mt-0.5 text-[11.5px] font-semibold text-[#8aa29b]">{t("brand")}</div>
         </div>
-        <div className="mx-auto flex min-w-0 max-w-[520px] shrink items-center gap-2 rounded-full border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2 text-[#a86a10]">
+        {/* phones: compact app-style title; the trial pill shows from lg up. */}
+        <div className="min-w-0 flex-1 truncate text-center text-[15px] font-extrabold text-[#003c3a] lg:hidden">
+          {displayTitle}
+        </div>
+        <div className="mx-auto hidden min-w-0 max-w-[520px] shrink items-center gap-2 rounded-full border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2 text-[#a86a10] lg:flex">
           <AlertTriangle className="size-4 shrink-0" />
           <span className="truncate text-[12.5px] font-bold leading-tight">{t("notice.trial")}</span>
         </div>
-        <div className="hidden h-full shrink-0 items-center gap-1 sm:flex">
+        <div className="flex h-full shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={openPalette}
-            className="flex h-10 items-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] pe-3 ps-2 text-[13px] font-semibold text-[#6f8f88] transition-colors hover:border-[#b7d0c7] hover:bg-[#eef4f1]"
+            className="hidden h-10 items-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] pe-3 ps-2 text-[13px] font-semibold text-[#6f8f88] transition-colors hover:border-[#b7d0c7] hover:bg-[#eef4f1] sm:flex"
           >
             <Search className="size-[18px]" />
             <span className="hidden lg:inline">{t("quickSearch")}</span>
@@ -386,26 +391,32 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
             </kbd>
           </button>
 
-          <Popover open={panel === "guide"} onOpenChange={(o) => setPanel(o ? "guide" : null)}>
-            <PopoverTrigger render={<HeaderIcon label={t("header.guide")} icon={NotebookText} active={panel === "guide"} />} />
-            <PopoverContent className="w-[min(300px,calc(100vw-24px))]">
-              <GuidePanel close={() => setPanel(null)} />
-            </PopoverContent>
-          </Popover>
+          <div className="hidden sm:block">
+            <Popover open={panel === "guide"} onOpenChange={(o) => setPanel(o ? "guide" : null)}>
+              <PopoverTrigger render={<HeaderIcon label={t("header.guide")} icon={NotebookText} active={panel === "guide"} />} />
+              <PopoverContent className="w-[min(300px,calc(100vw-24px))]">
+                <GuidePanel close={() => setPanel(null)} />
+              </PopoverContent>
+            </Popover>
+          </div>
 
-          <Popover open={panel === "calculator"} onOpenChange={(o) => setPanel(o ? "calculator" : null)}>
-            <PopoverTrigger render={<HeaderIcon label={t("header.calculator")} icon={Calculator} active={panel === "calculator"} />} />
-            <PopoverContent>
-              <CalculatorPanel />
-            </PopoverContent>
-          </Popover>
+          <div className="hidden sm:block">
+            <Popover open={panel === "calculator"} onOpenChange={(o) => setPanel(o ? "calculator" : null)}>
+              <PopoverTrigger render={<HeaderIcon label={t("header.calculator")} icon={Calculator} active={panel === "calculator"} />} />
+              <PopoverContent>
+                <CalculatorPanel />
+              </PopoverContent>
+            </Popover>
+          </div>
 
-          <Popover open={panel === "view"} onOpenChange={(o) => setPanel(o ? "view" : null)}>
-            <PopoverTrigger render={<HeaderIcon label={t("view")} icon={Table2} active={panel === "view"} />} />
-            <PopoverContent className="w-[min(300px,calc(100vw-24px))]">
-              <ViewPanel view={view} setView={setView} close={() => setPanel(null)} />
-            </PopoverContent>
-          </Popover>
+          <div className="hidden sm:block">
+            <Popover open={panel === "view"} onOpenChange={(o) => setPanel(o ? "view" : null)}>
+              <PopoverTrigger render={<HeaderIcon label={t("view")} icon={Table2} active={panel === "view"} />} />
+              <PopoverContent className="w-[min(300px,calc(100vw-24px))]">
+                <ViewPanel view={view} setView={setView} close={() => setPanel(null)} />
+              </PopoverContent>
+            </Popover>
+          </div>
 
           <Popover open={panel === "settings"} onOpenChange={(o) => setPanel(o ? "settings" : null)}>
             <PopoverTrigger render={<HeaderIcon label={t("settings")} icon={Settings} active={panel === "settings"} />} />
@@ -440,7 +451,8 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
           menuOpen ? "lg:ms-[260px]" : "lg:ms-[74px]"
         }`}
       >
-        <div className="px-5 py-4 lg:px-[30px]">
+        {/* bottom padding on phones clears the fixed tab bar (+ safe area). */}
+        <div className="px-4 py-4 pb-[calc(84px+env(safe-area-inset-bottom))] sm:px-5 lg:px-[30px] lg:pb-4">
           {viewAs ? (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[11px] border border-[#f2c94c] bg-[#fff8e8] px-4 py-3 text-[#8a6a00]">
               <span className="text-[13px] font-bold">
@@ -451,11 +463,11 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
               </button>
             </div>
           ) : null}
-          <h1 className="mb-4 text-lg font-bold text-[#003c3a] lg:hidden">{displayTitle}</h1>
           {children}
         </div>
       </main>
 
+      <MobileTabBar pathname={pathname} />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} pathname={pathname} />
       <ChangePasswordDialog open={changeOpen} onOpenChange={setChangeOpen} />
     </div>

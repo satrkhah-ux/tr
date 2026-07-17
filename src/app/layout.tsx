@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/components/LanguageProvider";
@@ -18,7 +18,24 @@ export const metadata: Metadata = {
   title: "Traveliun Admin System",
   description:
     "A rebuilt Traveliun travel operations dashboard with structured, AI-friendly system data.",
-  icons: { icon: "/traveliun/favicon.ico" },
+  icons: {
+    icon: "/traveliun/favicon.ico",
+    apple: "/icons/apple-touch-icon.png",
+  },
+  // iOS installed-app chrome (Android reads the manifest instead).
+  appleWebApp: {
+    capable: true,
+    title: "Traveliun",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // lets the fixed bottom tab bar extend under the home indicator (safe-area).
+  viewportFit: "cover",
+  themeColor: "#185045",
 };
 
 export default async function RootLayout({
