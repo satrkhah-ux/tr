@@ -21,24 +21,33 @@ function isPublic(pathname: string): boolean {
 }
 
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const session = parseSessionCookie(request.cookies.get(AUTH_STORAGE_KEY)?.value);
-  const isAuthed = session !== null;
+  // FAIL-SAFE: this runs on the hosting edge for every page view. If anything
+  // in here ever throws, visitors would get the host's "edge function crashed"
+  // page — so on error we fail OPEN and serve the request. That only skips the
+  // redirect convenience: every page/action still verifies the session
+  // server-side (getServerUser + role checks), so content stays protected.
+  try {
+    const { pathname } = request.nextUrl;
+    const session = parseSessionCookie(request.cookies.get(AUTH_STORAGE_KEY)?.value);
+    const isAuthed = session !== null;
 
-  // Logged-in users shouldn't see the login screens. The main dashboard now
-  // embeds the executive overview for roles that hold pricing.internal.
-  if (isAuthed && LOGIN_PATHS.has(pathname)) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    // Logged-in users shouldn't see the login screens. The main dashboard now
+    // embeds the executive overview for roles that hold pricing.internal.
+    if (isAuthed && LOGIN_PATHS.has(pathname)) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
+    // Everything that isn't public requires a session.
+    if (!isAuthed && !isPublic(pathname)) {
+      const redirectUrl = new URL("/sign-in", request.url);
+      redirectUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    return NextResponse.next();
+  } catch {
+    return NextResponse.next();
   }
-
-  // Everything that isn't public requires a session.
-  if (!isAuthed && !isPublic(pathname)) {
-    const redirectUrl = new URL("/sign-in", request.url);
-    redirectUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  return NextResponse.next();
 }
 
 export const config = {
