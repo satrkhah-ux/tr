@@ -146,6 +146,8 @@ export interface Employee {
   type: string | null;
   status: string;
   auth_user_id: Uuid | null;
+  /** Telegram user id for Mini App auto sign-in (migration 0019). */
+  telegram_chat_id: number | null;
   created_at: IsoTimestamp;
 }
 

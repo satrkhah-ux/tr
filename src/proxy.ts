@@ -12,7 +12,7 @@ import { AUTH_STORAGE_KEY, parseSessionCookie } from "@/lib/supabase/constants";
  * expired but who still hold a refresh token.
  */
 
-const PUBLIC_PREFIXES = ["/sign-in", "/client-offer"];
+const PUBLIC_PREFIXES = ["/sign-in", "/client-offer", "/tg"];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
 
 function isPublic(pathname: string): boolean {
