@@ -783,6 +783,13 @@ export const ar: Dictionary = {
   // flights stage
   "pg.flightsTitle": "رحلات الطيران",
   "pg.addFlight": "إضافة رحلة",
+  "pg.flightsIntl": "الطيران الدولي",
+  "pg.flightsIntlHint": "الذهاب والعودة",
+  "pg.flightsDomestic": "الطيران الداخلي",
+  "pg.flightsDomesticHint": "اختياري — لبعض الوجهات فقط",
+  "pg.addFlightIntl": "إضافة رحلة دولية",
+  "pg.addFlightDomestic": "إضافة رحلة داخلية",
+  "pg.noDomesticFlights": "لا توجد رحلات داخلية — أضِفها فقط إذا كان البرنامج يتضمّن طيرانًا داخليًا.",
   "pg.airline": "شركة الطيران",
   "pg.flightNo": "رقم الرحلة",
   "pg.fromAirport": "من",

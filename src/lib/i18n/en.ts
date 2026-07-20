@@ -785,6 +785,13 @@ export const en = {
   // flights stage
   "pg.flightsTitle": "Flight legs",
   "pg.addFlight": "Add leg",
+  "pg.flightsIntl": "International flights",
+  "pg.flightsIntlHint": "Outbound & inbound",
+  "pg.flightsDomestic": "Domestic flights",
+  "pg.flightsDomesticHint": "Optional — only some destinations",
+  "pg.addFlightIntl": "Add international leg",
+  "pg.addFlightDomestic": "Add domestic leg",
+  "pg.noDomesticFlights": "No domestic legs — add one only if the itinerary includes an internal flight.",
   "pg.airline": "Airline",
   "pg.flightNo": "Flight no.",
   "pg.fromAirport": "From",

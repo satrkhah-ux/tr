@@ -29,6 +29,8 @@ export const AR = {
   tripSummary: "مسار الرحلة",
   nights: "ليالٍ",
   flights: "الطيران",
+  flightsIntl: "الطيران الدولي",
+  flightsDomestic: "الطيران الداخلي",
   flightLeg: "الاتجاه",
   airline: "شركة الطيران",
   flightNo: "رقم الرحلة",

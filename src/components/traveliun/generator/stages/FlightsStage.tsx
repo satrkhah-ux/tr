@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Plus, RotateCcw } from "lucide-react";
+import { AlertTriangle, Globe2, Plane, Plus, RotateCcw } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import {
   deriveCityDates,
@@ -27,13 +27,17 @@ import {
   type StageFormProps,
 } from "../stage-props";
 
-const LEG_ORDERS: FlightLegOrder[] = ["outbound", "inbound", "internal"];
+/** International legs the agent can pick between (domestic is its own section). */
+const INTL_LEG_ORDERS: FlightLegOrder[] = ["outbound", "inbound"];
 
 const LEG_LABEL_KEYS: Record<FlightLegOrder, TranslationKey> = {
   outbound: "pg.leg.outbound",
   inbound: "pg.leg.inbound",
   internal: "pg.leg.internal",
 };
+
+/** Domestic = the `internal` leg: a hop INSIDE the destination country. */
+const isDomestic = (f: DraftFlight) => f.leg_order === "internal";
 
 const rowLabelClass = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 
@@ -79,12 +83,23 @@ function emptyFlight(legOrder: FlightLegOrder): DraftFlight {
   };
 }
 
+type RowHandlers = {
+  updateRow: (index: number, slice: Partial<DraftFlight>) => void;
+  setAirport: (index: number, field: "from_airport" | "to_airport", value: string) => void;
+  setDeparture: (index: number, raw: string) => void;
+  restoreAuto: (index: number) => void;
+  removeRow: (index: number) => void;
+};
+
 /**
- * Stage 5 — flight legs, timezone-correct. Departure dates are trip-driven
- * (outbound → trip start, inbound → trip end) until the agent pins one; times
- * are LOCAL at each airport and the duration/day-offset are computed from the
- * airports' IANA zones. Any flight change re-derives the hotel check-in chain
- * (hotel dates follow the itinerary), all in ONE patch.
+ * Stage 5 — flight legs, timezone-correct, split into TWO sections:
+ *   • international (outbound / inbound) — always relevant;
+ *   • domestic (internal hops) — only some destinations have them, so the
+ *     section is clearly optional and starts empty.
+ * Departure dates are trip-driven (outbound → trip start, inbound → trip end)
+ * until the agent pins one; times are LOCAL at each airport and the duration /
+ * day-offset come from the airports' IANA zones. Any flight change re-derives
+ * the hotel check-in chain, all in ONE patch.
  */
 export function FlightsStage({ data, patch, lookups }: StageFormProps) {
   const { t } = useTraveliunUI();
@@ -126,13 +141,26 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
     updateRow(index, { date_user_set: false, departure_at: withDatePart(flight.departure_at, auto) });
   }
 
-  function addRow() {
-    commit([...flights, emptyFlight(flights.length === 0 ? "outbound" : "inbound")]);
+  /** International: first leg defaults to outbound, the next to inbound. */
+  function addInternational() {
+    const hasOutbound = flights.some((f) => f.leg_order === "outbound");
+    commit([...flights, emptyFlight(hasOutbound ? "inbound" : "outbound")]);
+  }
+
+  function addDomestic() {
+    commit([...flights, emptyFlight("internal")]);
   }
 
   function removeRow(index: number) {
     commit(flights.filter((_, i) => i !== index));
   }
+
+  const handlers: RowHandlers = { updateRow, setAirport, setDeparture, restoreAuto, removeRow };
+
+  // Rows keep their ORIGINAL index so edits/removals stay correct after grouping.
+  const rows = flights.map((flight, index) => ({ flight, index }));
+  const international = rows.filter((r) => !isDomestic(r.flight));
+  const domestic = rows.filter((r) => isDomestic(r.flight));
 
   return (
     <section className={sectionClass}>
@@ -144,176 +172,227 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
         ))}
       </datalist>
 
-      {flights.length === 0 ? (
-        <p className="mb-4 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
+      {/* ── international (outbound / inbound) ──────────────────────────────── */}
+      <div className="mb-2.5 flex flex-wrap items-center gap-2">
+        <h3 className="flex items-center gap-2 text-[13.5px] font-extrabold text-[#0f3d38]">
+          <Globe2 className="size-4 text-[#185045]" />
+          {t("pg.flightsIntl")}
+        </h3>
+        <span className="rounded-full bg-[#eef4f1] px-2 py-0.5 text-[10.5px] font-bold text-[#557d78]">
+          {t("pg.flightsIntlHint")}
+        </span>
+      </div>
+
+      {international.length === 0 ? (
+        <p className="mb-3 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">
           {t("pg.noFlightsYet")}
         </p>
       ) : (
-        <div className="mb-4 space-y-3">
-          {flights.map((flight, index) => {
-            const timing = flightTiming(flight);
-            const duration = formatDurationAr(timing.durationMinutes);
-            const bothDatesSet = Boolean(flight.departure_at && flight.arrival_at);
-            const dayUnit = timing.dayOffset === 1 ? t("pg.dayUnitOne") : t("pg.dayUnitMany");
-
-            return (
-              <div
-                key={index}
-                className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3"
-              >
-                <div className="grid items-start gap-3 md:grid-cols-2 lg:grid-cols-3">
-                  <label className={rowLabelClass}>
-                    {t("pg.legOrder")}
-                    <select
-                      value={flight.leg_order}
-                      onChange={(e) => updateRow(index, { leg_order: e.target.value as FlightLegOrder })}
-                      className={fieldClass}
-                    >
-                      {LEG_ORDERS.map((leg) => (
-                        <option key={leg} value={leg}>
-                          {t(LEG_LABEL_KEYS[leg])}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className={rowLabelClass}>
-                    {t("pg.airline")}
-                    <input
-                      value={flight.airline}
-                      onChange={(e) => updateRow(index, { airline: e.target.value })}
-                      className={fieldClass}
-                    />
-                  </label>
-                  <label className={rowLabelClass}>
-                    {t("pg.flightNo")}
-                    <input
-                      dir="ltr"
-                      value={flight.flight_no}
-                      onChange={(e) => updateRow(index, { flight_no: e.target.value })}
-                      className={`${fieldClass} tv-tnum text-start`}
-                    />
-                  </label>
-                  <label className={rowLabelClass}>
-                    {t("pg.fromAirport")}
-                    <input
-                      list="pg-airports"
-                      value={flight.from_airport}
-                      onChange={(e) => setAirport(index, "from_airport", e.target.value)}
-                      className={fieldClass}
-                    />
-                  </label>
-                  <label className={rowLabelClass}>
-                    {t("pg.toAirport")}
-                    <input
-                      list="pg-airports"
-                      value={flight.to_airport}
-                      onChange={(e) => setAirport(index, "to_airport", e.target.value)}
-                      className={fieldClass}
-                    />
-                  </label>
-                  <div />
-
-                  <label className={rowLabelClass}>
-                    {t("pg.departureAt")}
-                    <input
-                      type="datetime-local"
-                      dir="ltr"
-                      value={flight.departure_at ?? ""}
-                      onChange={(e) => setDeparture(index, e.target.value)}
-                      className={`${fieldClass} tv-tnum`}
-                    />
-                    <span className="text-[10.5px] font-semibold text-[#93aaa3]">
-                      {flight.from_tz ? t("pg.localTimeAt", { tz: flight.from_tz }) : t("pg.localTimePick")}
-                    </span>
-                    {flight.date_user_set ? (
-                      <span className="flex items-center gap-1.5 text-[10.5px] font-bold text-[#a86a10]">
-                        {t("pg.dateManualHint")}
-                        <button
-                          type="button"
-                          onClick={() => restoreAuto(index)}
-                          className="inline-flex items-center gap-1 rounded-md bg-[#fff2d6] px-1.5 py-0.5 font-extrabold text-[#8a5a0c] hover:bg-[#ffe9bd]"
-                        >
-                          <RotateCcw className="size-3" />
-                          {t("pg.restoreAutoDate")}
-                        </button>
-                      </span>
-                    ) : null}
-                  </label>
-                  <label className={rowLabelClass}>
-                    {t("pg.arrivalAt")}
-                    <input
-                      type="datetime-local"
-                      dir="ltr"
-                      value={flight.arrival_at ?? ""}
-                      onChange={(e) => updateRow(index, { arrival_at: e.target.value === "" ? null : e.target.value })}
-                      className={`${fieldClass} tv-tnum`}
-                    />
-                    <span className="text-[10.5px] font-semibold text-[#93aaa3]">
-                      {flight.to_tz ? t("pg.localTimeAt", { tz: flight.to_tz }) : t("pg.localTimePick")}
-                    </span>
-                  </label>
-                  <div />
-
-                  <label className={rowLabelClass}>
-                    {t("pg.cabin")}
-                    <input
-                      value={flight.cabin_class}
-                      onChange={(e) => updateRow(index, { cabin_class: e.target.value })}
-                      className={fieldClass}
-                    />
-                  </label>
-                  <label className={rowLabelClass}>
-                    {t("pg.baggage")}
-                    <input
-                      value={flight.baggage_allowance}
-                      onChange={(e) => updateRow(index, { baggage_allowance: e.target.value })}
-                      className={fieldClass}
-                    />
-                  </label>
-                </div>
-
-                {/* timing footer — duration, +N day badge, arrival-before-departure guard */}
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#e7f0ec] pt-3">
-                  {timing.arrivalBeforeDeparture ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fdeef2] px-2.5 py-1 text-[11.5px] font-bold text-[#c22850]">
-                      <AlertTriangle className="size-3.5" />
-                      {t("pg.flightArrivalBeforeDeparture")}
-                    </span>
-                  ) : duration ? (
-                    <>
-                      <span className="tv-tnum inline-flex items-center gap-1.5 rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11.5px] font-bold text-[#185045]">
-                        {t("pg.flightDuration")}
-                        {" · "}
-                        <DirText dir="ltr">{duration}</DirText>
-                      </span>
-                      {timing.dayOffset > 0 ? (
-                        <span className="tv-tnum inline-flex items-center gap-1 rounded-full bg-[#eaf1ff] px-2.5 py-1 text-[11.5px] font-extrabold text-[#2b57c4]">
-                          <DirText dir="ltr">{`+${timing.dayOffset}`}</DirText>
-                          {dayUnit}
-                        </span>
-                      ) : null}
-                    </>
-                  ) : bothDatesSet ? (
-                    <span className="text-[11px] font-semibold text-[#93aaa3]">{t("pg.durationNeedsAirports")}</span>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => removeRow(index)}
-                    className={`${removeButtonClass} ms-auto`}
-                  >
-                    {t("pg.removeRow")}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+        <div className="mb-3 space-y-3">
+          {international.map(({ flight, index }) => (
+            <FlightRow key={index} flight={flight} index={index} showLegSelect handlers={handlers} />
+          ))}
         </div>
       )}
 
-      <button type="button" onClick={addRow} className={addButtonClass}>
+      <button type="button" onClick={addInternational} className={addButtonClass}>
         <Plus className="size-4" />
-        {t("pg.addFlight")}
+        {t("pg.addFlightIntl")}
       </button>
+
+      {/* ── domestic (internal hops) — optional, destination-dependent ──────── */}
+      <div className="mt-6 border-t border-[#e7f0ec] pt-5">
+        <div className="mb-2.5 flex flex-wrap items-center gap-2">
+          <h3 className="flex items-center gap-2 text-[13.5px] font-extrabold text-[#0f3d38]">
+            <Plane className="size-4 text-[#0e9bb5]" />
+            {t("pg.flightsDomestic")}
+          </h3>
+          <span className="rounded-full bg-[#e8f6fa] px-2 py-0.5 text-[10.5px] font-bold text-[#0b6d80]">
+            {t("pg.flightsDomesticHint")}
+          </span>
+        </div>
+
+        {domestic.length === 0 ? (
+          <p className="mb-3 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">
+            {t("pg.noDomesticFlights")}
+          </p>
+        ) : (
+          <div className="mb-3 space-y-3">
+            {domestic.map(({ flight, index }) => (
+              <FlightRow key={index} flight={flight} index={index} handlers={handlers} />
+            ))}
+          </div>
+        )}
+
+        <button type="button" onClick={addDomestic} className={addButtonClass}>
+          <Plus className="size-4" />
+          {t("pg.addFlightDomestic")}
+        </button>
+      </div>
     </section>
+  );
+}
+
+/** One flight leg. `showLegSelect` is on for international rows (outbound/inbound). */
+function FlightRow({
+  flight,
+  index,
+  showLegSelect = false,
+  handlers,
+}: {
+  flight: DraftFlight;
+  index: number;
+  showLegSelect?: boolean;
+  handlers: RowHandlers;
+}) {
+  const { t } = useTraveliunUI();
+  const { updateRow, setAirport, setDeparture, restoreAuto, removeRow } = handlers;
+  const timing = flightTiming(flight);
+  const duration = formatDurationAr(timing.durationMinutes);
+  const bothDatesSet = Boolean(flight.departure_at && flight.arrival_at);
+  const dayUnit = timing.dayOffset === 1 ? t("pg.dayUnitOne") : t("pg.dayUnitMany");
+
+  return (
+    <div className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
+      <div className="grid items-start gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {showLegSelect ? (
+          <label className={rowLabelClass}>
+            {t("pg.legOrder")}
+            <select
+              value={flight.leg_order}
+              onChange={(e) => updateRow(index, { leg_order: e.target.value as FlightLegOrder })}
+              className={fieldClass}
+            >
+              {INTL_LEG_ORDERS.map((leg) => (
+                <option key={leg} value={leg}>
+                  {t(LEG_LABEL_KEYS[leg])}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        <label className={rowLabelClass}>
+          {t("pg.airline")}
+          <input
+            value={flight.airline}
+            onChange={(e) => updateRow(index, { airline: e.target.value })}
+            className={fieldClass}
+          />
+        </label>
+        <label className={rowLabelClass}>
+          {t("pg.flightNo")}
+          <input
+            dir="ltr"
+            value={flight.flight_no}
+            onChange={(e) => updateRow(index, { flight_no: e.target.value })}
+            className={`${fieldClass} tv-tnum text-start`}
+          />
+        </label>
+        <label className={rowLabelClass}>
+          {t("pg.fromAirport")}
+          <input
+            list="pg-airports"
+            value={flight.from_airport}
+            onChange={(e) => setAirport(index, "from_airport", e.target.value)}
+            className={fieldClass}
+          />
+        </label>
+        <label className={rowLabelClass}>
+          {t("pg.toAirport")}
+          <input
+            list="pg-airports"
+            value={flight.to_airport}
+            onChange={(e) => setAirport(index, "to_airport", e.target.value)}
+            className={fieldClass}
+          />
+        </label>
+
+        <label className={rowLabelClass}>
+          {t("pg.departureAt")}
+          <input
+            type="datetime-local"
+            dir="ltr"
+            value={flight.departure_at ?? ""}
+            onChange={(e) => setDeparture(index, e.target.value)}
+            className={`${fieldClass} tv-tnum`}
+          />
+          <span className="text-[10.5px] font-semibold text-[#93aaa3]">
+            {flight.from_tz ? t("pg.localTimeAt", { tz: flight.from_tz }) : t("pg.localTimePick")}
+          </span>
+          {flight.date_user_set ? (
+            <span className="flex items-center gap-1.5 text-[10.5px] font-bold text-[#a86a10]">
+              {t("pg.dateManualHint")}
+              <button
+                type="button"
+                onClick={() => restoreAuto(index)}
+                className="inline-flex items-center gap-1 rounded-md bg-[#fff2d6] px-1.5 py-0.5 font-extrabold text-[#8a5a0c] hover:bg-[#ffe9bd]"
+              >
+                <RotateCcw className="size-3" />
+                {t("pg.restoreAutoDate")}
+              </button>
+            </span>
+          ) : null}
+        </label>
+        <label className={rowLabelClass}>
+          {t("pg.arrivalAt")}
+          <input
+            type="datetime-local"
+            dir="ltr"
+            value={flight.arrival_at ?? ""}
+            onChange={(e) => updateRow(index, { arrival_at: e.target.value === "" ? null : e.target.value })}
+            className={`${fieldClass} tv-tnum`}
+          />
+          <span className="text-[10.5px] font-semibold text-[#93aaa3]">
+            {flight.to_tz ? t("pg.localTimeAt", { tz: flight.to_tz }) : t("pg.localTimePick")}
+          </span>
+        </label>
+
+        <label className={rowLabelClass}>
+          {t("pg.cabin")}
+          <input
+            value={flight.cabin_class}
+            onChange={(e) => updateRow(index, { cabin_class: e.target.value })}
+            className={fieldClass}
+          />
+        </label>
+        <label className={rowLabelClass}>
+          {t("pg.baggage")}
+          <input
+            value={flight.baggage_allowance}
+            onChange={(e) => updateRow(index, { baggage_allowance: e.target.value })}
+            className={fieldClass}
+          />
+        </label>
+      </div>
+
+      {/* timing footer — duration, +N day badge, arrival-before-departure guard */}
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#e7f0ec] pt-3">
+        {timing.arrivalBeforeDeparture ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fdeef2] px-2.5 py-1 text-[11.5px] font-bold text-[#c22850]">
+            <AlertTriangle className="size-3.5" />
+            {t("pg.flightArrivalBeforeDeparture")}
+          </span>
+        ) : duration ? (
+          <>
+            <span className="tv-tnum inline-flex items-center gap-1.5 rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11.5px] font-bold text-[#185045]">
+              {t("pg.flightDuration")}
+              {" · "}
+              <DirText dir="ltr">{duration}</DirText>
+            </span>
+            {timing.dayOffset > 0 ? (
+              <span className="tv-tnum inline-flex items-center gap-1 rounded-full bg-[#eaf1ff] px-2.5 py-1 text-[11.5px] font-extrabold text-[#2b57c4]">
+                <DirText dir="ltr">{`+${timing.dayOffset}`}</DirText>
+                {dayUnit}
+              </span>
+            ) : null}
+          </>
+        ) : bothDatesSet ? (
+          <span className="text-[11px] font-semibold text-[#93aaa3]">{t("pg.durationNeedsAirports")}</span>
+        ) : null}
+        <button type="button" onClick={() => removeRow(index)} className={`${removeButtonClass} ms-auto`}>
+          {t("pg.removeRow")}
+        </button>
+      </div>
+    </div>
   );
 }

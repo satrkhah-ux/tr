@@ -8,6 +8,8 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Circle,
   CircleDot,
   Eye,
@@ -133,6 +135,17 @@ export function GeneratorShell({
   const visibleStages = useMemo(() => STAGES.filter((s) => !s.gated || canPricing), [canPricing]);
   const showNights = stage === "cities" || stage === "hotels";
 
+  // Linear position drives the mobile prev/next bar and the "step N of M" chip.
+  const stageIndex = visibleStages.findIndex((s) => s.key === stage);
+  const prevStage = stageIndex > 0 ? visibleStages[stageIndex - 1] : null;
+  const nextStage = stageIndex >= 0 && stageIndex < visibleStages.length - 1 ? visibleStages[stageIndex + 1] : null;
+
+  // Keep the active chip visible in the horizontally-scrolling mobile stepper.
+  const activeChipRef = useRef<HTMLAnchorElement | null>(null);
+  useEffect(() => {
+    activeChipRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [stage]);
+
   const issueText = useCallback(
     (issue: DraftIssue): string => {
       if (issue.invariant) return language === "ar" ? issue.invariant.message_ar : issue.invariant.message_en;
@@ -182,6 +195,37 @@ export function GeneratorShell({
           </div>
         </div>
 
+        {/* MOBILE stepper — horizontal, tappable, current chip auto-scrolled into
+            view. Replaces the vertical rail below xl so the form is the first
+            thing the agent sees on a phone. */}
+        <nav aria-label={t("pg.progress")} className="mb-3 xl:hidden">
+          <div className="flex gap-1.5 overflow-x-auto pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {visibleStages.map((meta, index) => {
+              const active = meta.key === stage;
+              const status = validation.stages[meta.key];
+              return (
+                <Link
+                  key={meta.key}
+                  ref={active ? activeChipRef : undefined}
+                  href={stageHref(draftId, meta.key)}
+                  aria-current={active ? "step" : undefined}
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-[12.5px] font-bold transition-colors ${
+                    active
+                      ? "border-[#185045] bg-[#185045] text-white"
+                      : "border-[#dbe6e1] bg-white text-[#185045]"
+                  }`}
+                >
+                  <StatusIcon status={status} active={active} />
+                  <span>{t(meta.labelKey)}</span>
+                  <span className={`tv-tnum text-[10px] font-extrabold ${active ? "text-[#8fe3c4]" : "text-[#b6c9c2]"}`}>
+                    <DirText dir="ltr">{String(index + 1)}</DirText>
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+
         <div
           className={`grid gap-4 items-start ${
             stage !== "preview" && previewOpen
@@ -189,9 +233,10 @@ export function GeneratorShell({
               : "xl:grid-cols-[230px_minmax(0,1fr)]"
           }`}
         >
-          {/* progress rail + validation panel */}
-          <aside className="space-y-4">
-            <nav className="rounded-2xl border border-[#e2ebe7] bg-white p-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          {/* progress rail + validation panel — on mobile this drops BELOW the
+              form (order-2) so the agent lands straight on the inputs. */}
+          <aside className="order-2 space-y-4 xl:order-none">
+            <nav className="hidden rounded-2xl border border-[#e2ebe7] bg-white p-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)] xl:block">
               <p className="mb-2 px-2 text-[11px] font-extrabold tracking-wide text-[#93aaa3]">{t("pg.progress")}</p>
               <ol className="space-y-0.5">
                 {visibleStages.map((meta, index) => {
@@ -284,8 +329,39 @@ export function GeneratorShell({
           </aside>
 
           {/* stage form */}
-          <main className="min-w-0">
+          <main className="order-1 min-w-0 xl:order-none">
             <StageForm draftId={draftId} data={data} patch={patch} replace={replace} lookups={lookups} />
+
+            {/* MOBILE prev/next — the primary way to move through the wizard on a
+                phone. Sits inline under the form (not fixed) so it never covers
+                inputs and the agent reaches it by finishing the step. */}
+            <div className="mt-4 flex items-center gap-2 xl:hidden">
+              {prevStage ? (
+                <Link
+                  href={stageHref(draftId, prevStage.key)}
+                  className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-[12px] border border-[#dbe6e1] bg-white px-3 text-[13px] font-bold text-[#185045]"
+                >
+                  <ChevronRight className="size-4 ltr:rotate-180" />
+                  <span className="truncate">{t(prevStage.labelKey)}</span>
+                </Link>
+              ) : (
+                <span className="flex-1" />
+              )}
+              <span className="tv-tnum shrink-0 rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11px] font-extrabold text-[#557d78]">
+                <DirText dir="ltr">{`${stageIndex + 1}/${visibleStages.length}`}</DirText>
+              </span>
+              {nextStage ? (
+                <Link
+                  href={stageHref(draftId, nextStage.key)}
+                  className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-[#185045] px-3 text-[13px] font-bold text-white shadow-[0_2px_8px_rgba(24,80,69,0.25)]"
+                >
+                  <span className="truncate">{t(nextStage.labelKey)}</span>
+                  <ChevronLeft className="size-4 ltr:rotate-180" />
+                </Link>
+              ) : (
+                <span className="flex-1" />
+              )}
+            </div>
           </main>
 
           {/* live preview pane (desktop; hidden on the preview stage itself) */}

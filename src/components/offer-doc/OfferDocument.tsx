@@ -41,6 +41,10 @@ export function OfferDocument(props: OfferDocumentProps) {
   const perPerson = offer.total != null ? offer.total / travellers : null;
   const climateByCity = new Map(offer.climate.map((c) => [c.city_name, c]));
   const hasServices = offer.includes.length > 0 || offer.excludes.length > 0;
+  // `internal` = a domestic hop inside the destination country; everything else
+  // (outbound/inbound, and legs with no order) is international.
+  const internationalFlights = offer.flights.filter((f) => f.leg_order !== "internal");
+  const domesticFlights = offer.flights.filter((f) => f.leg_order === "internal");
 
   return (
     <article className="od-root" dir="rtl" lang="ar">
@@ -119,42 +123,20 @@ export function OfferDocument(props: OfferDocumentProps) {
           </section>
         ) : null}
 
-        {/* 4 — flights */}
-        {offer.flights.length > 0 ? (
+        {/* 4 — flights, split: international (outbound/inbound) then domestic
+             (internal hops). The domestic block only prints when the itinerary
+             actually has one — most destinations don't. */}
+        {internationalFlights.length > 0 ? (
           <section className="od-section">
-            <h2 className="od-h">{AR.flights}</h2>
-            <table className="od-table">
-              <thead>
-                <tr>
-                  <th>{AR.flightLeg}</th>
-                  <th>{AR.airline}</th>
-                  <th>{AR.flightNo}</th>
-                  <th>{AR.route}</th>
-                  <th>{AR.flightTime}</th>
-                  <th>{AR.cabin}</th>
-                  <th>{AR.baggage}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {offer.flights.map((f, i) => (
-                  <tr key={i}>
-                    <td>{f.leg_order ? LEG_AR[f.leg_order] : "—"}</td>
-                    <td>{f.airline || "—"}</td>
-                    <td>{f.flight_no ? <Ltr>{f.flight_no}</Ltr> : "—"}</td>
-                    <td><Ltr>{`${f.from_airport || "—"} → ${f.to_airport || "—"}`}</Ltr></td>
-                    <td className="od-tnum">
-                      {f.departure_at || f.arrival_at ? (
-                        <Ltr>{`${fmtDateTime(f.departure_at)} → ${fmtDateTime(f.arrival_at)}`}</Ltr>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>{f.cabin_class || "—"}</td>
-                    <td>{f.baggage_allowance || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <h2 className="od-h">{domesticFlights.length > 0 ? AR.flightsIntl : AR.flights}</h2>
+            <FlightTable flights={internationalFlights} />
+          </section>
+        ) : null}
+
+        {domesticFlights.length > 0 ? (
+          <section className="od-section">
+            <h2 className="od-h">{AR.flightsDomestic}</h2>
+            <FlightTable flights={domesticFlights} />
           </section>
         ) : null}
 
@@ -301,6 +283,44 @@ export function OfferDocument(props: OfferDocumentProps) {
         ) : null}
       </div>
     </article>
+  );
+}
+
+/** Flight table shared by the international and domestic sections. */
+function FlightTable({ flights }: { flights: ClientOfferDTO["flights"] }) {
+  return (
+    <table className="od-table">
+      <thead>
+        <tr>
+          <th>{AR.flightLeg}</th>
+          <th>{AR.airline}</th>
+          <th>{AR.flightNo}</th>
+          <th>{AR.route}</th>
+          <th>{AR.flightTime}</th>
+          <th>{AR.cabin}</th>
+          <th>{AR.baggage}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {flights.map((f, i) => (
+          <tr key={i}>
+            <td>{f.leg_order ? LEG_AR[f.leg_order] : "—"}</td>
+            <td>{f.airline || "—"}</td>
+            <td>{f.flight_no ? <Ltr>{f.flight_no}</Ltr> : "—"}</td>
+            <td><Ltr>{`${f.from_airport || "—"} → ${f.to_airport || "—"}`}</Ltr></td>
+            <td className="od-tnum">
+              {f.departure_at || f.arrival_at ? (
+                <Ltr>{`${fmtDateTime(f.departure_at)} → ${fmtDateTime(f.arrival_at)}`}</Ltr>
+              ) : (
+                "—"
+              )}
+            </td>
+            <td>{f.cabin_class || "—"}</td>
+            <td>{f.baggage_allowance || "—"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
