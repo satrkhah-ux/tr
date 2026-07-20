@@ -9,6 +9,8 @@ export const AR = {
   brand: "ترافليون للسفر والسياحة",
   brandLatin: "Traveliun",
   contact: "المدينة المنورة · اتصال وواتساب 0569222111",
+  /** running-footer page counter prefix ("صفحة 1 / 2" — CSS appends the numbers). */
+  page: "صفحة",
   serial: "رقم العرض",
   issueDate: "تاريخ الإصدار",
   validityDate: "صالح حتى",

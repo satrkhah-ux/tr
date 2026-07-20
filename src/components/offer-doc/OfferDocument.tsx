@@ -14,6 +14,7 @@ import {
   fmtNum,
   stars,
 } from "./labels";
+import { TRAVELIUN_MARK_DATA_URI } from "./logo";
 import { OFFER_DOC_CSS } from "./styles";
 
 /**
@@ -45,18 +46,38 @@ export function OfferDocument(props: OfferDocumentProps) {
     <article className="od-root" dir="rtl" lang="ar">
       <style dangerouslySetInnerHTML={{ __html: OFFER_DOC_CSS }} />
 
-      {/* 1 — brand header band */}
-      <header className="od-band">
-        <div>
-          <div className="od-band-brand">{AR.brand}</div>
-          <div className="od-band-sub">{AR.brandLatin} · Travel &amp; Tourism</div>
-        </div>
-        <div className="od-band-meta">
-          <div>{AR.serial}: <b><Ltr>{offer.serial}</Ltr></b></div>
-          {offer.issue_date ? <div>{AR.issueDate}: <b><Ltr>{fmtDate(offer.issue_date)}</Ltr></b></div> : null}
-          {offer.validity_date ? <div>{AR.validityDate}: <b><Ltr>{fmtDate(offer.validity_date)}</Ltr></b></div> : null}
+      {/* page background + watermark — fixed, so EVERY page carries the identity */}
+      <div className="od-page-bg" aria-hidden="true" />
+      <div className="od-watermark" aria-hidden="true">
+        <img src={TRAVELIUN_MARK_DATA_URI} alt="" />
+      </div>
+
+      {/* 1 — brand header band (RUNNING: repeats on every page) */}
+      <header className="od-fixed-head">
+        <div className="od-band">
+          <div className="od-band-id">
+            <img className="od-band-mark" src={TRAVELIUN_MARK_DATA_URI} alt="" />
+            <div>
+              <div className="od-band-brand">{AR.brand}</div>
+              <div className="od-band-sub">{AR.brandLatin} · Travel &amp; Tourism</div>
+            </div>
+          </div>
+          <div className="od-band-meta">
+            <div>{AR.serial}: <b><Ltr>{offer.serial}</Ltr></b></div>
+            {offer.issue_date ? <div>{AR.issueDate}: <b><Ltr>{fmtDate(offer.issue_date)}</Ltr></b></div> : null}
+            {offer.validity_date ? <div>{AR.validityDate}: <b><Ltr>{fmtDate(offer.validity_date)}</Ltr></b></div> : null}
+          </div>
         </div>
       </header>
+
+      {/* running footer: brand · serial · contact (the page counter is drawn by
+          Chromium's footerTemplate — CSS counters don't resolve in fixed boxes) */}
+      <footer className="od-fixed-foot">
+        <div className="od-foot">
+          <span><b>{AR.brand}</b> · <Ltr>{offer.serial}</Ltr></span>
+          <span>{AR.contact}</span>
+        </div>
+      </footer>
 
       <div className="od-body">
         {/* 2 — personal data with prominent destination */}

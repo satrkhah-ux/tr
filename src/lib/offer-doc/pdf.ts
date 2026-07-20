@@ -1,7 +1,6 @@
 import "server-only";
 import { existsSync } from "node:fs";
 import puppeteer, { type Browser } from "puppeteer-core";
-import { fontFaceCss, loadTajawalBase64 } from "./fonts";
 
 /**
  * Headless-Chromium print-to-PDF.
@@ -78,22 +77,25 @@ async function launchBrowser(): Promise<Browser> {
   });
 }
 
+/**
+ * Kept for call-site compatibility. The brand/serial/contact now live in the
+ * DOCUMENT's own running footer (OfferDocument + styles.ts), which prints with
+ * the real Tajawal font and the logo — things Chromium's native footer cannot do.
+ */
 export type FooterInfo = { brand: string; serial: string; contact: string };
 
-function footerTemplate(info: FooterInfo, fontCss: string): string {
-  // Chromium replaces .pageNumber / .totalPages; footer needs its own font + an
-  // explicit size (its default is ~0). RTL, brand+serial · page X of Y · contact.
-  return `<style>${fontCss}</style>
-<div style="font-family:Tajawal,'Segoe UI',sans-serif;direction:rtl;width:100%;box-sizing:border-box;padding:0 10mm;font-size:8px;color:#557d78;display:flex;justify-content:space-between;align-items:center;">
-  <span style="font-weight:700;color:#185045;">${info.brand} · <bdi dir="ltr">${info.serial}</bdi></span>
-  <span>صفحة <span class="pageNumber"></span> من <span class="totalPages"></span></span>
-  <span>${info.contact}</span>
+/**
+ * Chromium's footer — ONLY the page counter (Arabic label + "N / M"). It has no
+ * access to our embedded font, so it uses a system sans; the string is digits +
+ * one short word, which renders correctly everywhere.
+ */
+const PAGE_COUNTER_TEMPLATE = `
+<div style="width:100%;box-sizing:border-box;padding:0 16px;font-family:'Segoe UI',Tahoma,sans-serif;font-size:8px;color:#8aa29b;text-align:center;">
+  <span>صفحة </span><span class="pageNumber"></span><span> / </span><span class="totalPages"></span>
 </div>`;
-}
 
-export async function offerDocumentToPdf(html: string, footer: FooterInfo): Promise<Buffer> {
-  const fonts = await loadTajawalBase64();
-
+export async function offerDocumentToPdf(html: string, footer?: FooterInfo): Promise<Buffer> {
+  void footer; // superseded by the document's own running footer
   let browser: Browser | null = null;
   try {
     browser = await launchBrowser();
@@ -103,11 +105,18 @@ export async function offerDocumentToPdf(html: string, footer: FooterInfo): Prom
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
-      preferCSSPageSize: false,
+      // Split responsibility:
+      //  • the DOCUMENT paints the running header band, footer bar, page
+      //    background and watermark via position:fixed (styles.ts) — real font,
+      //    real logo, full-bleed colour on EVERY page;
+      //  • Chromium paints ONLY the page counter, because CSS counter(pages)
+      //    does not resolve inside a fixed box (renders 0/0). It lives in the
+      //    reserved 9mm bottom margin, just under our footer bar.
+      preferCSSPageSize: true,
       displayHeaderFooter: true,
       headerTemplate: "<span></span>",
-      footerTemplate: footerTemplate(footer, fontFaceCss(fonts)),
-      margin: { top: "12mm", bottom: "18mm", left: "9mm", right: "9mm" },
+      footerTemplate: PAGE_COUNTER_TEMPLATE,
+      margin: { top: "0", bottom: "9mm", left: "0", right: "0" },
     });
     return Buffer.from(pdf);
   } finally {
