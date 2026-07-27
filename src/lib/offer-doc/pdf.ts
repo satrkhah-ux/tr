@@ -78,24 +78,14 @@ async function launchBrowser(): Promise<Browser> {
 }
 
 /**
- * Kept for call-site compatibility. The brand/serial/contact now live in the
- * DOCUMENT's own running footer (OfferDocument + styles.ts), which prints with
- * the real Tajawal font and the logo — things Chromium's native footer cannot do.
+ * Kept for call-site compatibility. The brand/serial/contact live in the
+ * DOCUMENT itself (OfferDocument + styles.ts), which prints with the real
+ * Tajawal font and the real logo — things Chromium's native footer cannot do.
  */
 export type FooterInfo = { brand: string; serial: string; contact: string };
 
-/**
- * Chromium's footer — ONLY the page counter (Arabic label + "N / M"). It has no
- * access to our embedded font, so it uses a system sans; the string is digits +
- * one short word, which renders correctly everywhere.
- */
-const PAGE_COUNTER_TEMPLATE = `
-<div style="width:100%;box-sizing:border-box;padding:0 16px;font-family:'Segoe UI',Tahoma,sans-serif;font-size:8px;color:#8aa29b;text-align:center;">
-  <span>صفحة </span><span class="pageNumber"></span><span> / </span><span class="totalPages"></span>
-</div>`;
-
 export async function offerDocumentToPdf(html: string, footer?: FooterInfo): Promise<Buffer> {
-  void footer; // superseded by the document's own running footer
+  void footer; // superseded by the document's own per-page footer
   let browser: Browser | null = null;
   try {
     browser = await launchBrowser();
@@ -105,18 +95,14 @@ export async function offerDocumentToPdf(html: string, footer?: FooterInfo): Pro
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
-      // Split responsibility:
-      //  • the DOCUMENT paints the running header band, footer bar, page
-      //    background and watermark via position:fixed (styles.ts) — real font,
-      //    real logo, full-bleed colour on EVERY page;
-      //  • Chromium paints ONLY the page counter, because CSS counter(pages)
-      //    does not resolve inside a fixed box (renders 0/0). It lives in the
-      //    reserved 9mm bottom margin, just under our footer bar.
+      // The document lays out its own full-bleed A4 sheets (.od-page: 210×297mm,
+      // world-map background to the very edge, its own footer line), so every
+      // margin here must be ZERO — any Chromium margin would shrink the page box
+      // and leave a white gutter around the artwork. Nothing is drawn by
+      // Chromium: displayHeaderFooter stays off.
       preferCSSPageSize: true,
-      displayHeaderFooter: true,
-      headerTemplate: "<span></span>",
-      footerTemplate: PAGE_COUNTER_TEMPLATE,
-      margin: { top: "0", bottom: "9mm", left: "0", right: "0" },
+      displayHeaderFooter: false,
+      margin: { top: "0", bottom: "0", left: "0", right: "0" },
     });
     return Buffer.from(pdf);
   } finally {

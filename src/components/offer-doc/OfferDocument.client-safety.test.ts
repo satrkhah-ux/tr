@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { OfferDocument } from "./OfferDocument";
 import { computeOfferPricing } from "@/lib/offer/pricing";
 import { toClientOfferDTO, type InternalOfferDTO } from "@/lib/offer/dto";
+import { AR } from "./labels";
 
 /**
  * The definitive client-safety proof: render the EXACT component the client PDF
@@ -77,6 +78,7 @@ function internalOffer(): InternalOfferDTO {
     excludes: [],
     terms: ["قابل للتعديل"],
     climate: [],
+    days: [],
     pricing,
   };
 }
@@ -86,16 +88,27 @@ describe("client OfferDocument — content + safety", () => {
   const html = renderToStaticMarkup(createElement(OfferDocument, { variant: "client", offer: client }));
 
   it("SHOWS the client-safe fields (sell + board + room + cancellation + pay-at-hotel)", () => {
-    expect(html).toContain("سعر البكج"); // the price section (sell) renders
+    expect(html).toContain(AR.total); // the price block (sell) renders
     expect(html).toContain("4,600"); // the sell total
     expect(html).toContain("شامل الإفطار"); // board type BB
     expect(html).toContain("ديلوكس"); // room type
     expect(html).toContain("إلغاء مجاني"); // cancellation policy
     expect(html).toContain("يُدفع في الفندق مباشرة"); // excluded-surcharges label
     expect(html).toContain("رسوم المنتجع"); // the excluded surcharge name
-    expect(html).toContain("data:image"); // the hotel image
-    expect(html).toContain("أمور ترفيهية"); // facilities label
-    expect(html).toContain("مسبح"); // pool facility (Arabic)
+    expect(html).toContain("★★★★★"); // the star rating
+    expect(html).toContain("2026-08-01"); // check-in
+    expect(html).toContain("2026-08-05"); // check-out
+    expect(html).toContain(AR.nightsCount(4)); // nights on the date box
+  });
+
+  /**
+   * The stay card carries no photo and no facility chips — the approved layout
+   * gives each stay three columns (dates · hotel · rooms) and nothing else. The
+   * fields still travel in the DTO; only this document stops printing them.
+   */
+  it("does not print hotel photos or facility chips", () => {
+    expect(html).not.toContain("data:image/svg+xml"); // the fixture's hotel image
+    expect(html).not.toContain("أمور ترفيهية");
   });
 
   it("contains ZERO net price, supplier name, rate_key, or margin", () => {

@@ -5,152 +5,150 @@
  * preview page and the headless-Chromium print HTML.
  *
  * Font-face is intentionally NOT here — each wrapper supplies its own @font-face
- * (a URL in the browser preview, a base64 data-URI in the PDF) pointing at the
- * SAME Tajawal file, so glyph metrics — and therefore pagination — are identical.
+ * (URLs in the browser preview, base64 data-URIs in the PDF) pointing at the
+ * SAME Tajawal files, so glyph metrics — and therefore pagination — are identical.
  *
- * ANTI-GAP / PAGE-INDEPENDENCE (the heart of this spec):
- *   - break-inside: avoid on every atomic block (.od-avoid, hotel card, flight
- *     row, service item, terms clause) → a block never splits across two pages.
- *   - break-after: avoid on every heading → no heading stranded at a page bottom.
- *   - orphans/widows: 2 → never one dangling line.
- *   - thead { display: table-header-group } → table headers repeat on each page.
- *   - the ONLY forced break is break-before: page on the Terms section.
- *   - one spacing scale (--sp-*), no fixed heights, no ad-hoc margins → empty
- *     sections are omitted in JSX, so nothing renders as an empty gap.
+ * PAGE MODEL (the heart of this spec):
+ *   The document is a sequence of explicit A4 `.od-page` blocks, one per
+ *   section, each ending in `break-after: page`. Sections never bleed into one
+ *   another and every page carries the world-map identity, so the layout is
+ *   predictable instead of being whatever the flow happens to produce.
  *
- * RUNNING FURNITURE (every page carries the brand):
- *   position:fixed elements repeat on EVERY printed page in Chromium, so the
- *   header band, the footer bar and the watermark are painted per page rather
- *   than once in the flow. The page box reserves room for them via @page margins
- *   and .od-body's padding, so content never slides under the furniture.
- *   NOTE: this replaces Chromium's own headerTemplate/footerTemplate (which
- *   cannot render our font/logo reliably) — pdf.ts must print with
- *   displayHeaderFooter:false and margin:0.
+ *   `min-height` (not `height`) + no `overflow:hidden`: a page that receives
+ *   more content than fits GROWS and Chromium continues it onto a following
+ *   sheet — content is never silently clipped. The absolutely-positioned map
+ *   covers the grown block too. Sections that can be arbitrarily long (stays,
+ *   terms) are additionally chunked in the component.
+ *
+ *   Atomic blocks (`break-inside: avoid` on cards, rows, list items, clauses)
+ *   plus orphans/widows:2 and a repeating `thead` keep any continuation clean.
  */
 export const OFFER_DOC_CSS = `
 .od-root{
-  --od-green:#185045;--od-ink:#0f3d38;--od-muted:#557d78;--od-line:#dce7e2;--od-soft:#f4f8f6;--od-gold:#a86a10;
-  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:14px;--sp-5:16px;--sp-6:18px;
-  font-family:Tajawal,'Segoe UI',Arial,sans-serif;color:var(--od-ink);background:#fff;
-  font-size:12px;line-height:1.55;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+  --od-green:#135549;--od-green-2:#1f7667;--od-ink:#263633;--od-muted:#6b7c78;
+  --od-line:#c8dad6;--od-line-2:#d7e4e0;--od-soft:#eef6f3;--od-gold:#f0ad22;--od-notice:#d9a441;
+  --od-pad:13mm;
+  font-family:Tajawal,'Segoe UI',Arial,sans-serif;color:var(--od-ink);
+  -webkit-print-color-adjust:exact;print-color-adjust:exact;
 }
 .od-root *{box-sizing:border-box;}
-.od-root p{margin:0;}
-.od-tnum{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";}
+.od-root p,.od-root h1,.od-root h2,.od-root h3{margin-top:0;}
+.od-root table{width:100%;border-collapse:collapse;}
 .od-root bdi{unicode-bidi:isolate;}
-
-/* ── page geometry: reserve the running header/footer bands ───────────────── */
-.od-root{--od-head-h:74px;--od-foot-h:34px;--od-page-x:16px;}
-@page{size:A4;margin:0;}
-.od-body{padding:calc(var(--od-head-h) + var(--sp-4)) var(--od-page-x) calc(var(--od-foot-h) + var(--sp-4));}
-.od-section{margin-top:var(--sp-5);}
-.od-section:first-child{margin-top:0;}
-
-/* ── running furniture (repeats on every printed page) ────────────────────── */
-.od-fixed-head,.od-fixed-foot{position:fixed;inset-inline:0;z-index:2;}
-.od-fixed-head{top:0;height:var(--od-head-h);}
-.od-fixed-foot{bottom:0;height:var(--od-foot-h);}
-/* subtle page background so no page is ever a bare white sheet */
-.od-page-bg{position:fixed;inset:0;z-index:0;background:
-  radial-gradient(680px 320px at 108% -8%, rgba(24,80,69,.055), transparent 70%),
-  radial-gradient(520px 260px at -10% 104%, rgba(24,80,69,.045), transparent 70%),
-  #fff;}
-.od-watermark{position:fixed;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;opacity:.045;}
-.od-watermark img{width:300px;height:300px;filter:invert(24%) sepia(18%) saturate(1200%) hue-rotate(118deg) brightness(92%);}
-.od-body{position:relative;z-index:1;}
-.od-h{display:flex;align-items:center;gap:var(--sp-2);font-size:14px;font-weight:800;color:var(--od-green);margin:0 0 var(--sp-3);break-after:avoid;}
-.od-h::before{content:"";width:5px;height:16px;border-radius:3px;background:var(--od-green);display:inline-block;flex:0 0 auto;}
-.od-avoid{break-inside:avoid;}
+.od-tnum{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";}
 .od-root p,.od-root li{orphans:2;widows:2;}
 .od-root thead{display:table-header-group;}
 
-/* header band — now the RUNNING header (same visual language as before) */
-.od-band{display:flex;justify-content:space-between;align-items:center;height:100%;
-  background:linear-gradient(105deg,#0f3d38 0%,var(--od-green) 58%,#1c6252 100%);
-  color:#fff;padding:0 var(--od-page-x);box-shadow:0 1px 0 rgba(0,0,0,.08);}
-.od-band-id{display:flex;align-items:center;gap:11px;}
-.od-band-mark{width:34px;height:34px;flex:0 0 auto;}
-.od-band-brand{font-size:19px;font-weight:800;letter-spacing:.2px;line-height:1.15;}
-.od-band-sub{font-size:10px;color:#bfe0d6;margin-top:2px;letter-spacing:.3px;}
-.od-band-meta{text-align:left;font-size:10px;line-height:1.75;color:#d8ece3;}
-.od-band-meta b{color:#fff;font-weight:700;}
-/* gold hairline separating the band from the page */
-.od-band::after{content:"";position:absolute;inset-inline:0;bottom:0;height:2px;
-  background:linear-gradient(90deg,#d9a441,#f0cd7e,#d9a441);}
+/* ── the page ─────────────────────────────────────────────────────────────── */
+@page{size:A4;margin:0;}
+.od-page{
+  position:relative;width:210mm;min-height:297mm;padding:var(--od-pad);
+  background:#fff;break-after:page;
+}
+.od-page:last-child{break-after:auto;}
+/* world map — full-bleed identity on every page, lighter on the cover so the
+   hero text stays crisp */
+.od-page::before{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:var(--od-map,none) center center / cover no-repeat;opacity:.72;
+}
+.od-page.od-cover::before{opacity:.42;}
+.od-page > *{position:relative;z-index:1;}
+/* closing rule above the per-page footer */
+.od-page::after{
+  content:"";position:absolute;inset-inline:var(--od-pad);bottom:8mm;z-index:2;
+  border-bottom:1.5px solid var(--od-green);
+}
+.od-foot{
+  position:absolute;inset-inline:var(--od-pad);bottom:10mm;z-index:3;direction:ltr;
+  display:flex;justify-content:space-between;color:var(--od-muted);font-size:8.5pt;
+}
 
-/* running footer */
-.od-foot{display:flex;align-items:center;justify-content:space-between;height:100%;
-  padding:0 var(--od-page-x);border-top:1px solid var(--od-line);background:#fff;
-  font-size:9.5px;font-weight:600;color:var(--od-muted);}
-.od-foot b{color:var(--od-green);font-weight:800;}
-/* NOTE: counter(page)/counter(pages) do NOT resolve inside position:fixed in
-   Chromium's print engine (they render 0/0). The page number is therefore drawn
-   by Chromium's own footerTemplate, which sits in the reserved bottom margin —
-   see pdf.ts. This slot only holds the static brand/contact line. */
+/* on screen the pages stack as separate sheets; print ignores all of this */
+@media screen{
+  .od-root{background:#f5f7f4;padding:10px 0;}
+  .od-page{margin:0 auto 12px;box-shadow:0 6px 22px rgba(20,54,48,.14);}
+}
 
-.od-personal{border:1px solid var(--od-line);border-radius:12px;overflow:hidden;}
-.od-dest{background:#eef6f2;padding:var(--sp-4) var(--sp-5);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--od-line);}
-.od-dest .k{font-size:11px;font-weight:700;color:var(--od-muted);}
-.od-dest .v{font-size:22px;font-weight:800;color:var(--od-green);}
-.od-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-3) var(--sp-5);padding:var(--sp-4) var(--sp-5);}
-.od-field .k{font-size:10.5px;font-weight:700;color:var(--od-muted);}
-.od-field .v{font-size:12.5px;font-weight:700;margin-top:2px;}
+/* ── cover ────────────────────────────────────────────────────────────────── */
+.od-top{display:grid;grid-template-columns:1fr 1.05fr;gap:12mm;align-items:start;}
+.od-logo{width:62mm;max-height:32mm;object-fit:contain;object-position:right center;display:block;}
+.od-company{border-right:4px solid var(--od-green);padding:2mm 5mm 2mm 0;color:var(--od-green);line-height:1.85;font-size:10.7pt;}
+.od-company h2{margin:0 0 1mm;font-size:16.5pt;font-weight:700;line-height:1.3;}
+.od-hero{margin-top:19mm;text-align:center;color:var(--od-green);}
+.od-hero .od-hero-label{color:var(--od-muted);font-size:13pt;margin-bottom:3mm;}
+.od-hero h1{margin:0;font-size:31pt;font-weight:800;line-height:1.15;}
+.od-hero .od-hero-meta{margin-top:4mm;color:#34423f;font-size:14pt;font-weight:500;}
+.od-metrics{margin-top:17mm;display:grid;grid-template-columns:repeat(4,1fr);gap:4mm;}
+.od-metric{background:rgba(246,250,248,.94);border:1px solid #d8e4e1;border-radius:5mm;padding:5mm 3mm;text-align:center;min-height:25mm;break-inside:avoid;}
+.od-metric span{display:block;color:var(--od-muted);font-size:9.5pt;margin-bottom:2mm;}
+.od-metric strong{display:block;color:var(--od-green);font-size:17pt;font-weight:800;}
 
-.od-chips{display:flex;flex-wrap:wrap;gap:var(--sp-2);}
-.od-chip{display:inline-flex;align-items:center;gap:6px;background:var(--od-soft);border:1px solid var(--od-line);border-radius:999px;padding:6px 13px;font-size:11.5px;font-weight:700;break-inside:avoid;}
-.od-chip b{color:var(--od-green);}
-.od-chip .n{color:var(--od-muted);font-weight:700;}
+/* ── panel (client info, quick summary) ───────────────────────────────────── */
+.od-panel{margin-top:9mm;border:1px solid #adc4bf;border-radius:5mm;overflow:hidden;background:rgba(255,255,255,.96);box-shadow:0 8px 20px rgba(20,54,48,.08);break-inside:avoid;}
+.od-panel-head{background:var(--od-green);color:#fff;padding:4mm 5mm;font-size:13pt;font-weight:700;display:flex;justify-content:space-between;}
+.od-info{font-size:10.5pt;}
+.od-info th,.od-info td{border-top:1px solid var(--od-line-2);padding:4mm;vertical-align:middle;text-align:start;}
+.od-info th{color:#687a75;font-weight:500;width:18%;white-space:nowrap;}
 
-.od-table{width:100%;border-collapse:collapse;border:1px solid var(--od-line);border-radius:10px;overflow:hidden;}
-.od-table th{background:var(--od-green);color:#fff;font-size:10.5px;font-weight:700;padding:8px 10px;text-align:start;white-space:nowrap;}
-.od-table td{font-size:11.5px;padding:8px 10px;border-top:1px solid var(--od-line);vertical-align:middle;}
+/* ── section heading ──────────────────────────────────────────────────────── */
+.od-title{display:flex;align-items:flex-start;justify-content:space-between;gap:8mm;color:var(--od-green);margin-bottom:6mm;break-after:avoid;}
+.od-title h2{margin:0;font-size:21pt;font-weight:800;line-height:1.1;}
+.od-title small{color:var(--od-muted);font-size:10pt;line-height:1.5;text-align:left;max-width:68mm;}
+/* a block heading inside a page that carries more than one table */
+.od-subhead{display:flex;align-items:center;gap:2.5mm;color:var(--od-green);font-size:13pt;font-weight:700;margin:7mm 0 3mm;break-after:avoid;}
+.od-subhead:first-of-type{margin-top:0;}
+.od-subhead::before{content:"";width:1.3mm;height:5mm;border-radius:1mm;background:var(--od-green);flex:0 0 auto;}
+/* a full section that starts partway down a shared sheet */
+.od-subhead-major{font-size:16pt;font-weight:800;margin:9mm 0 4mm;}
+.od-subhead-major::before{height:7mm;width:1.6mm;}
+/* one section's run of blocks on a sheet */
+.od-run + .od-run{margin-top:0;}
+
+/* ── stays ────────────────────────────────────────────────────────────────── */
+.od-stay{display:grid;grid-template-columns:34mm 1fr 43mm;gap:5mm;border:1px solid #d1dfdc;border-radius:5mm;padding:4mm;margin-bottom:4mm;background:rgba(255,255,255,.96);box-shadow:0 5px 14px rgba(16,70,60,.06);min-height:37mm;break-inside:avoid;}
+.od-datebox{border-radius:4mm;background:var(--od-soft);border:1px solid #d4e4df;padding:3mm;text-align:center;color:var(--od-green);font-size:9.2pt;}
+.od-datebox strong{display:block;margin:.7mm 0 1.5mm;font-size:10.8pt;font-weight:800;}
+.od-hotel h3{margin:0 0 2mm;color:var(--od-green);font-size:13.3pt;line-height:1.35;font-weight:800;}
+.od-hotel p{margin:0;line-height:1.55;font-size:10.2pt;color:#34423f;}
+.od-stars{color:var(--od-gold);margin-top:1mm;direction:ltr;font-size:12pt;}
+.od-rooms{display:grid;gap:2mm;align-content:start;}
+.od-room{border:1px solid #dce7e4;border-radius:3mm;padding:2.4mm;background:#fbfdfc;font-size:8.6pt;line-height:1.45;}
+.od-room strong{color:var(--od-green);display:block;margin-bottom:1mm;font-weight:700;}
+.od-counts{display:flex;justify-content:space-between;gap:1.5mm;color:#53615e;white-space:nowrap;}
+.od-notice{margin-top:2mm;border-right:3px solid var(--od-notice);background:rgba(217,164,65,.12);color:#5f4b1d;padding:2mm 3mm;border-radius:2mm;font-size:9.5pt;}
+
+/* ── data tables (flights, tours, tickets, visas) ─────────────────────────── */
+.od-table{border:1px solid var(--od-line);border-radius:4mm;overflow:hidden;background:rgba(255,255,255,.96);font-size:9.8pt;}
+.od-table th{background:var(--od-green);color:#fff;padding:4mm 3mm;font-size:10.8pt;font-weight:700;white-space:nowrap;text-align:start;}
+.od-table td{border-top:1px solid var(--od-line-2);border-left:1px solid var(--od-line-2);padding:3.2mm;vertical-align:middle;line-height:1.45;}
+.od-table td:last-child{border-left:0;}
 .od-table tbody tr{break-inside:avoid;}
-.od-table tbody tr:nth-child(even) td{background:#f8fbf9;}
+.od-route{color:var(--od-green);font-weight:800;display:block;margin-bottom:1mm;}
+.od-sub{display:block;margin-top:1mm;color:var(--od-muted);font-size:8.8pt;}
+.od-note{margin-top:6mm;border:1px solid var(--od-line);border-radius:4mm;background:rgba(246,250,248,.94);padding:4mm 5mm;color:#53615e;font-size:10.5pt;break-inside:avoid;}
+.od-strip{margin-top:6mm;display:grid;grid-template-columns:1fr 38mm;border:1px solid var(--od-line);border-radius:4mm;overflow:hidden;background:#fff;font-size:11pt;break-inside:avoid;}
+.od-strip div{padding:5mm;}
+.od-strip .od-strip-label{background:var(--od-green);color:#fff;font-weight:700;text-align:center;}
 
-.od-hotel{break-inside:avoid;border:1px solid var(--od-line);border-radius:12px;padding:var(--sp-3) var(--sp-4);margin-top:var(--sp-2);}
-.od-hotel:first-of-type{margin-top:0;}
-.od-hotel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--sp-3);}
-.od-hotel-city{font-size:13px;font-weight:800;color:var(--od-green);}
-.od-hotel-name{font-size:12.5px;font-weight:700;margin-top:1px;}
-.od-stars{color:#e0a400;font-size:12px;letter-spacing:2px;white-space:nowrap;}
-.od-hotel-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--sp-2) var(--sp-3);margin-top:var(--sp-3);}
-.od-hotel-cell .k{font-size:9px;font-weight:700;color:var(--od-muted);}
-.od-hotel-cell .v{font-size:11px;font-weight:700;margin-top:1px;}
-.od-hotel-note{margin-top:var(--sp-2);font-size:10.5px;font-weight:600;color:#2a5f52;line-height:1.5;}
-.od-hotel-note b{color:var(--od-green);font-weight:800;}
-.od-hotel-img{width:100%;height:150px;object-fit:cover;border-radius:9px;margin-bottom:var(--sp-3);background:#e7f0ec;display:block;}
-.od-facil{margin-top:var(--sp-2);font-size:10.5px;font-weight:700;color:#2a5f52;}
-.od-facil b{color:var(--od-green);}
-.od-facil-chip{display:inline-block;margin:2px 0 0 4px;padding:2px 8px;border-radius:999px;background:#eef6f2;color:#2a5f52;font-weight:700;}
-.od-climate{margin-top:var(--sp-3);background:#eef6f2;border-radius:9px;padding:6px 10px;font-size:10.5px;font-weight:600;color:#2a5f52;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;}
-.od-climate b{color:var(--od-green);}
-.od-climate .t{white-space:nowrap;}
+/* ── services / price ─────────────────────────────────────────────────────── */
+.od-two{display:grid;grid-template-columns:1fr 1fr;gap:7mm;margin-top:7mm;}
+.od-listcard{border:1px solid #d1dfdc;border-radius:5mm;overflow:hidden;background:rgba(255,255,255,.96);min-height:70mm;}
+.od-listcard h3{margin:0;background:var(--od-green);color:#fff;padding:4.5mm;font-size:14pt;font-weight:700;text-align:center;}
+.od-listcard ul{list-style:none;margin:0;padding:3mm 5mm 5mm;font-size:10.5pt;line-height:1.75;}
+.od-listcard li{border-bottom:1px solid #edf2f0;padding:1.9mm 0;break-inside:avoid;}
+.od-listcard li:last-child{border-bottom:0;}
+.od-price{margin-top:9mm;border-radius:6mm;padding:7mm;background:linear-gradient(90deg,var(--od-green),var(--od-green-2));color:#fff;display:flex;align-items:center;justify-content:space-between;box-shadow:0 10px 22px rgba(19,85,73,.18);break-inside:avoid;}
+.od-price span{font-size:13pt;font-weight:500;}
+.od-price strong{font-size:23pt;font-weight:800;}
 
-.od-cols{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-5);}
-.od-sub{font-size:12px;font-weight:800;margin:0 0 var(--sp-2);}
-.od-sub.yes{color:#0f7a52;}
-.od-sub.no{color:#c22850;}
-.od-list{list-style:none;margin:0;padding:0;}
-.od-list li{break-inside:avoid;display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:11.5px;border-bottom:1px dashed #eaf0ed;}
-.od-list li:last-child{border-bottom:0;}
-.od-mark.yes{color:#0f7a52;font-weight:800;}
-.od-mark.no{color:#c22850;font-weight:800;}
+/* ── terms ────────────────────────────────────────────────────────────────── */
+.od-terms{border:1px solid var(--od-line);border-radius:5mm;overflow:hidden;background:rgba(255,255,255,.97);}
+.od-terms h2{margin:0;background:var(--od-green);color:#fff;text-align:center;padding:4mm;font-size:15pt;font-weight:700;break-after:avoid;}
+.od-terms ol{margin:0;padding:3mm 9mm 3mm 4mm;font-size:9.35pt;line-height:1.58;}
+.od-terms li{padding:2mm 0;border-bottom:1px solid #edf2f0;break-inside:avoid;}
+.od-terms li:last-child{border-bottom:0;}
 
-.od-price{break-inside:avoid;background:var(--od-green);color:#fff;border-radius:12px;padding:var(--sp-4) var(--sp-5);display:flex;justify-content:space-between;align-items:center;}
-.od-price .label{font-size:13px;font-weight:800;}
-.od-price .value{font-size:24px;font-weight:800;}
-.od-price .per{font-size:11px;color:#bfe0d6;margin-top:4px;}
-.od-pay{margin-top:var(--sp-3);font-size:11px;color:var(--od-muted);line-height:1.9;}
-
-.od-internal-note{margin-bottom:var(--sp-3);font-size:10.5px;font-weight:700;color:var(--od-gold);background:#fff8e8;border:1px solid #f2e2b4;border-radius:8px;padding:7px 11px;}
-
-/* Forced new page for the terms.
-   CAVEAT: .od-body's top padding only clears the running header on the FIRST
-   page — after a forced break Chromium starts the new page at the page box top,
-   so content would slide under the fixed band. The section therefore carries its
-   own header-height spacer (::before) that pushes it into the safe area. */
-.od-terms{break-before:page;margin-top:0;}
-.od-terms::before{content:"";display:block;height:calc(var(--od-head-h) + var(--sp-3));}
-.od-clause{break-inside:avoid;display:flex;gap:8px;padding:5px 0;font-size:11px;color:var(--od-muted);line-height:1.8;}
-.od-clause .n{font-weight:800;color:var(--od-green);flex:0 0 auto;}
+/* ── internal-only pricing (never in the client tree) ─────────────────────── */
+.od-internal-note{margin-bottom:5mm;font-size:10.5pt;font-weight:700;color:#a86a10;background:#fff8e8;border:1px solid #f2e2b4;border-radius:3mm;padding:3mm 4mm;}
 `;

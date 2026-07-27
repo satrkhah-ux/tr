@@ -14,6 +14,7 @@ import {
 } from "@/lib/offer/dto";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { getClimateNote } from "./climate-actions";
+import { getCurrentEmployeeId } from "./metrics";
 import { getRates } from "./rates-actions";
 import { STAGE_KEYS } from "./pipeline";
 
@@ -129,12 +130,29 @@ export type CreateOfferInput = {
   hotels?: OfferHotelInput[];
   /** optional per-item pricing rollup (migration 0008). */
   pricing_items?: OfferPricingItemInput[];
+  /** optional day-by-day program with its weather snapshot (migration 0020). */
+  days?: OfferDayInput[];
   /** provenance (migration 0018). 'direct' for normal offers, 'repackaged' for
    *  offers re-issued from an imported supplier PDF. Opaque ids only — never a
    *  supplier NAME (offers is anon-readable). */
   source_kind?: string;
   source_supplier_id?: string | null;
   source_import_id?: string | null;
+};
+
+/** One printed day. Text + a weather reading; carries no money by design. */
+export type OfferDayInput = {
+  day_number: number;
+  day_date: string | null;
+  city_name: string;
+  title: string;
+  activities: string[];
+  temp_max: number | null;
+  temp_min: number | null;
+  rain_chance: number | null;
+  weather_code: number | null;
+  weather_source: "forecast" | "normals" | null;
+  weather_fetched_at: string | null;
 };
 
 export type CreateOfferResult = { ok: true; serial: string; id: string } | { ok: false; error: TranslationKey };
@@ -194,12 +212,18 @@ export async function createOffer(input: CreateOfferInput): Promise<CreateOfferR
     const supabase = await db();
     const serial = generateSerial();
 
+    // «الموظف المختص» on the printed document. The builder picks an employee
+    // explicitly; the generator and the repackage wizard do not, so the offer is
+    // stamped with whoever is signed in — otherwise the field prints empty and
+    // management cannot tell who issued the offer.
+    const employee_id = input.employee_id ?? (await getCurrentEmployeeId());
+
     const { data: offer, error: offerError } = await supabase
       .from("offers")
       .insert({
         serial,
         customer_id: input.customer_id,
-        employee_id: input.employee_id,
+        employee_id,
         destination: input.destination.trim(),
         duration: input.duration,
         offer_date: input.offer_date,
@@ -253,6 +277,24 @@ export async function createOffer(input: CreateOfferInput): Promise<CreateOfferR
           baggage_allowance: f.baggage_allowance ?? null,
           leg_order: f.leg_order ?? null,
           sort: index,
+        })),
+      );
+    }
+    if (input.days && input.days.length > 0) {
+      await supabase.from("offer_days").insert(
+        input.days.map((d) => ({
+          offer_id: offerId,
+          day_number: d.day_number,
+          day_date: d.day_date,
+          city_name: d.city_name,
+          title: d.title,
+          activities: d.activities,
+          temp_max: d.temp_max,
+          temp_min: d.temp_min,
+          rain_chance: d.rain_chance,
+          weather_code: d.weather_code,
+          weather_source: d.weather_source,
+          weather_fetched_at: d.weather_fetched_at,
         })),
       );
     }
@@ -628,6 +670,26 @@ function parseStringArray(value: unknown): string[] {
   return value.filter((v): v is string => typeof v === "string");
 }
 
+/** pg returns `numeric` as a string — coerce, and never turn junk into 0. */
+function toNumberOrNull(value: unknown): number | null {
+  if (value == null) return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+type OfferDayRow = {
+  day_number: number;
+  day_date: string | null;
+  city_name: string | null;
+  title: string | null;
+  activities: unknown;
+  temp_max: unknown;
+  temp_min: unknown;
+  rain_chance: unknown;
+  weather_code: unknown;
+  weather_source: string | null;
+};
+
 /** Parse the offer_hotels.excluded_surcharges jsonb into a client-safe list. */
 function parseExcludedSurcharges(value: unknown): { name: string; amount: number; currency: string }[] {
   if (!Array.isArray(value)) return [];
@@ -692,12 +754,13 @@ export async function getInternalOffer(serial: string): Promise<InternalOfferDTO
     const customer = customerRes.data as { arabic_name: string | null; mobile: string | null } | null;
     const employee = employeeRes.data as { arabic_name: string | null } | null;
 
-    const [hotelsRes, flightsRes, servicesRes, termsRes, itemsRes] = await Promise.all([
+    const [hotelsRes, flightsRes, servicesRes, termsRes, itemsRes, daysRes] = await Promise.all([
       supabase.from("offer_hotels").select("hotel_id, hotel_name, room_type_id, board_type, rooms_count, nights, check_in, check_out, buy_price, buy_currency, sell_price, sell_currency, cancellation_policy, excluded_surcharges, valid_until, supplier_id, supplier_name, rate_key, net_base, net_source_currency, fx_rate, fx_date, ref_sell_base, markup_amount, markup_pct, image_url, facilities, content_star_rating, room_type_name").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_flights").select("airline, carrier, flight_no, from_airport, to_airport, departure_at, arrival_at, cabin_class, cabin, baggage_allowance, baggage, leg_order").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_services").select("label, kind").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_terms").select("text").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_pricing_items").select("item_type, description, quantity, buy_price, buy_currency, sell_price, sell_currency").eq("offer_id", offer.id).order("sort"),
+      supabase.from("offer_days").select("day_number, day_date, city_name, title, activities, temp_max, temp_min, rain_chance, weather_code, weather_source").eq("offer_id", offer.id).order("day_number"),
     ]);
 
     const hotelRows = (hotelsRes.data ?? []) as HotelRow[];
@@ -705,6 +768,7 @@ export async function getInternalOffer(serial: string): Promise<InternalOfferDTO
     const serviceRows = (servicesRes.data ?? []) as { label: string; kind: string }[];
     const termRows = (termsRes.data ?? []) as { text: string }[];
     const itemRows = (itemsRes.data ?? []) as PricingItemRow[];
+    const dayRows = (daysRes.data ?? []) as OfferDayRow[];
 
     // resolve room-type display names
     const roomTypeIds = [...new Set(hotelRows.map((h) => h.room_type_id).filter((id): id is string => Boolean(id)))];
@@ -876,6 +940,20 @@ export async function getInternalOffer(serial: string): Promise<InternalOfferDTO
       excludes: serviceRows.filter((s) => s.kind === "exclude").map((s) => s.label),
       terms: termRows.map((t) => t.text),
       climate,
+      // numerics come back from pg as strings — coerce so the document formats
+      // them as numbers instead of printing "30.0" verbatim.
+      days: dayRows.map((d) => ({
+        day_number: d.day_number,
+        date: d.day_date,
+        city_name: d.city_name ?? "",
+        title: d.title ?? "",
+        activities: parseStringArray(d.activities),
+        temp_max: toNumberOrNull(d.temp_max),
+        temp_min: toNumberOrNull(d.temp_min),
+        rain_chance: toNumberOrNull(d.rain_chance),
+        weather_code: toNumberOrNull(d.weather_code),
+        weather_source: d.weather_source === "forecast" || d.weather_source === "normals" ? d.weather_source : null,
+      })),
       pricing,
     };
   } catch {

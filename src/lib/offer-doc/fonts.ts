@@ -3,25 +3,42 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /**
- * The Tajawal Arabic font, base64-encoded, so both the PDF HTML and the print
- * footer embed the exact same glyphs (Arabic shaping + tabular numerals) with no
- * network fetch — the on-screen preview uses the same file via a URL @font-face,
- * so metrics (and therefore pagination) match.
+ * The Tajawal Arabic font, base64-encoded, so the PDF HTML embeds the exact same
+ * glyphs (Arabic shaping + tabular numerals) with no network fetch — the
+ * on-screen preview loads the same files by URL, so metrics (and therefore
+ * pagination) match.
+ *
+ * Four weights, because the document's type scale uses all of them:
+ * 400 body · 500 labels/table headers · 700 headings · 800 hero numbers.
  */
-let cache: { regular: string; bold: string } | null = null;
+const WEIGHTS = [
+  { weight: 400, file: "Tajawal-Regular.ttf" },
+  { weight: 500, file: "Tajawal-Medium.ttf" },
+  { weight: 700, file: "Tajawal-Bold.ttf" },
+  { weight: 800, file: "Tajawal-ExtraBold.ttf" },
+] as const;
 
-export async function loadTajawalBase64(): Promise<{ regular: string; bold: string }> {
+export type TajawalFaces = { weight: number; base64: string }[];
+
+let cache: TajawalFaces | null = null;
+
+export async function loadTajawalBase64(): Promise<TajawalFaces> {
   if (cache) return cache;
-  const [regular, bold] = await Promise.all([
-    readFile(join(process.cwd(), "public/fonts/Tajawal-Regular.ttf")),
-    readFile(join(process.cwd(), "public/fonts/Tajawal-Bold.ttf")),
-  ]);
-  cache = { regular: regular.toString("base64"), bold: bold.toString("base64") };
+  cache = await Promise.all(
+    WEIGHTS.map(async ({ weight, file }) => ({
+      weight,
+      base64: (await readFile(join(process.cwd(), "public/fonts", file))).toString("base64"),
+    })),
+  );
   return cache;
 }
 
-export function fontFaceCss(fonts: { regular: string; bold: string }): string {
-  return `
-@font-face{font-family:Tajawal;font-style:normal;font-weight:400;src:url(data:font/ttf;base64,${fonts.regular}) format('truetype');}
-@font-face{font-family:Tajawal;font-style:normal;font-weight:700;src:url(data:font/ttf;base64,${fonts.bold}) format('truetype');}`;
+export function fontFaceCss(faces: TajawalFaces): string {
+  return faces
+    .map(
+      (f) =>
+        `@font-face{font-family:Tajawal;font-style:normal;font-weight:${f.weight};` +
+        `src:url(data:font/ttf;base64,${f.base64}) format('truetype');}`,
+    )
+    .join("\n");
 }

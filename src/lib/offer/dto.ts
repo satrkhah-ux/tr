@@ -88,6 +88,25 @@ export type ClimateLine = {
   advice_en: string | null;
 };
 
+/**
+ * One printed day of the «البرنامج اليومي». Fully client-safe by construction:
+ * it carries text and a weather reading, never money or supplier identity.
+ * `weather_source` travels with the numbers so the document can state whether
+ * they are a forecast or a climate average.
+ */
+export type ItineraryDayLine = {
+  day_number: number;
+  date: string | null;
+  city_name: string;
+  title: string;
+  activities: string[];
+  temp_max: number | null;
+  temp_min: number | null;
+  rain_chance: number | null;
+  weather_code: number | null;
+  weather_source: "forecast" | "normals" | null;
+};
+
 export type InternalOfferDTO = {
   serial: string;
   destination: string | null;
@@ -115,6 +134,8 @@ export type InternalOfferDTO = {
   excludes: string[];
   terms: string[];
   climate: ClimateLine[];
+  /** day-by-day program; empty when the agent did not write one. */
+  days: ItineraryDayLine[];
   /** full pricing incl. total_buy / profit / margin_pct. */
   pricing: OfferPricingSummary;
 };

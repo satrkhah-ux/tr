@@ -82,6 +82,7 @@ const internal: InternalOfferDTO = {
   excludes: [],
   terms: ["قابل للتعديل"],
   climate: [],
+  days: [],
   pricing,
 };
 

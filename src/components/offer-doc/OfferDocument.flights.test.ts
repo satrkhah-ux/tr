@@ -58,6 +58,7 @@ function offerWith(flights: InternalFlightLine[]): InternalOfferDTO {
     excludes: [],
     terms: [],
     climate: [],
+    days: [],
     pricing: computeOfferPricing([], { SAR: 1 }, "SAR"),
   };
 }
