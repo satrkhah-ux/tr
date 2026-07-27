@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Copy, Loader2, Plus, Sparkles } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { copyProgramIntoDraft, findReusablePrograms, getDraft } from "@/lib/data/drafts";
-import { deriveCityDates, type DraftCity, type ReusableProgram } from "@/lib/offer/draft-types";
+import { deriveCityDates, findLookupCountry, type DraftCity, type ReusableProgram } from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import {
@@ -27,7 +27,7 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
   const [copying, setCopying] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const country = lookups.countries.find((c) => c.name === data.trip.country);
+  const country = findLookupCountry(lookups.countries, data.trip.country);
   const cityOptions = country?.cities ?? [];
 
   // reuse eligibility is DERIVED (no synchronous setState); the async load only

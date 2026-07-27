@@ -4,14 +4,19 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import {
+  defaultServicesFromLibrary,
   deriveCityDates,
   emptyDraftData,
+  emptyTermLibrary,
   normalizeDraftData,
   type DraftData,
   type GeneratorLookups,
   type ReusableProgram,
+  type TermLibrary,
+  type TermLibraryItem,
 } from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
+import { draftDaySkeleton } from "@/lib/offer/itinerary";
 import { validateDraft } from "@/lib/offer/draft-validation";
 import { createOffer, publishOffer, type OfferHotelInput, type OfferPricingItemInput } from "./offers";
 
@@ -63,14 +68,34 @@ export async function listDrafts(): Promise<DraftSummary[]> {
 
 export type CreateDraftResult = { ok: true; id: string } | { ok: false; error: TranslationKey };
 
-export async function createDraft(): Promise<CreateDraftResult> {
+/**
+ * `seed` pre-fills slices of the new draft — used by «العروض الجاهزة» to pour a
+ * company package in. It is merged through normalizeDraftData, so a partial or
+ * stale seed can never produce a malformed draft.
+ */
+export async function createDraft(seed?: Partial<DraftData>): Promise<CreateDraftResult> {
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
     const supabase = await db();
+    // A new draft opens with the company's approved default wording (the rows
+    // ticked in /offers/offer-includes, /offers/offer-not-includes and
+    // /offers/terms-and-conditions). A seed that brings its own services — a
+    // ready-made package — wins, since those were written for that package.
+    const base = emptyDraftData();
+    if (!seed?.services) {
+      const { termLibrary } = await getGeneratorLookups();
+      base.services = defaultServicesFromLibrary(termLibrary);
+    }
+    const initial = seed
+      ? normalizeDraftData({ ...base, ...seed } as unknown as Record<string, unknown>)
+      : base;
     const { data, error } = await supabase
       .from("offer_drafts")
-      .insert({ data: emptyDraftData() as unknown as Record<string, unknown> })
+      .insert({
+        data: initial as unknown as Record<string, unknown>,
+        ...(seed?.source?.title ? { title: seed.source.title } : {}),
+      })
       .select("id")
       .single();
     if (error || !data) return { ok: false, error: "err.createFailed" };
@@ -137,10 +162,12 @@ export async function deleteDraft(draftId: string): Promise<SaveDraftResult> {
 
 // ---------- lookups for the stage forms ----------
 export async function getGeneratorLookups(): Promise<GeneratorLookups> {
-  const empty: GeneratorLookups = { countries: [], roomTypes: [], airports: [], carTypes: [] };
+  const empty: GeneratorLookups = {
+    countries: [], roomTypes: [], airports: [], carTypes: [], termLibrary: emptyTermLibrary(),
+  };
   try {
     const supabase = await db();
-    const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transfersRes, transportRes] = await Promise.all([
+    const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transfersRes, transportRes, termsRes] = await Promise.all([
       supabase.from("countries").select("id, arabic_name, status").order("arabic_name"),
       supabase.from("cities").select("id, arabic_name, country_id").order("arabic_name"),
       supabase.from("hotels").select("id, arabic_name, stars, city_id"),
@@ -148,6 +175,7 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       supabase.from("airports").select("id, arabic_name, code, iana_timezone, status").order("code"),
       supabase.from("transfers").select("car_type"),
       supabase.from("transportation_types").select("arabic_name, status").order("arabic_name"),
+      supabase.from("terms").select("kind, arabic_text, checked, sort").order("sort", { ascending: true }),
     ]);
 
     // a reference row is offered to the generator unless the admin disabled it
@@ -190,10 +218,26 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
         .filter((a) => active(a.status))
         .map((a) => ({ id: a.id, name: a.arabic_name, code: a.code, timezone: a.iana_timezone })),
       carTypes,
+      termLibrary: buildTermLibrary(termsRes.data),
     };
   } catch {
     return empty;
   }
+}
+
+/**
+ * The company's approved wording, straight from the `terms` table that
+ * /offers/offer-includes, /offers/offer-not-includes and
+ * /offers/terms-and-conditions administer. Agents pick from these lists instead
+ * of retyping, so what the document prints is what the company approved.
+ */
+function buildTermLibrary(rows: unknown): TermLibrary {
+  const list = (rows ?? []) as { kind: string; arabic_text: string | null; checked: boolean | null }[];
+  const of = (kind: string): TermLibraryItem[] =>
+    list
+      .filter((r) => r.kind === kind && r.arabic_text && r.arabic_text.trim())
+      .map((r) => ({ text: (r.arabic_text as string).trim(), checked: r.checked !== false }));
+  return { includes: of("include"), excludes: of("exclude"), terms: of("term") };
 }
 
 // ---------- reuse a previous program ----------
@@ -464,6 +508,23 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       terms: data.services.terms,
       hotels,
       pricing_items,
+      // Only days with actual content are printed — an untouched skeleton must
+      // not publish a page of empty day cards.
+      days: draftDaySkeleton(data)
+        .filter((d) => d.title.trim() || d.activities.some((a) => a.trim()))
+        .map((d) => ({
+          day_number: d.day_number,
+          day_date: d.date,
+          city_name: d.city_name,
+          title: d.title.trim(),
+          activities: d.activities.map((a) => a.trim()).filter(Boolean),
+          temp_max: d.weather?.temp_max ?? null,
+          temp_min: d.weather?.temp_min ?? null,
+          rain_chance: d.weather?.rain_chance ?? null,
+          weather_code: d.weather?.code ?? null,
+          weather_source: d.weather?.source ?? null,
+          weather_fetched_at: d.weather?.fetched_at || null,
+        })),
     });
 
     if (!result.ok) return { ok: false, error: result.error };

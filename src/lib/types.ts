@@ -540,6 +540,11 @@ export interface Profit {
   created_at: IsoTimestamp;
 }
 
+/**
+ * A company-prepared seasonal package («العروض الجاهزة»), synced from
+ * marketing's Google Sheet. `seed` holds a Partial<DraftData> that the package
+ * generator pours into a new draft — see lib/ready-offers.
+ */
 export interface ReadyOffer {
   id: Uuid;
   title: string;
@@ -548,6 +553,26 @@ export interface ReadyOffer {
   price: number | null;
   currency: string | null;
   created_at: IsoTimestamp;
+  /** stable sync key; null on rows entered by hand before the sync existed. */
+  code: string | null;
+  tier: string | null;
+  variant: string | null;
+  nights: number | null;
+  cities_summary: string | null;
+  main_hotels: string | null;
+  tours_text: string | null;
+  domestic_flight: string | null;
+  includes_text: string | null;
+  excludes_text: string | null;
+  validity_raw: string | null;
+  valid_from: string | null;
+  valid_to: string | null;
+  design_url: string | null;
+  status: string | null;
+  active: boolean;
+  seed: Record<string, unknown> | null;
+  source_row: Record<string, string> | null;
+  synced_at: IsoTimestamp | null;
 }
 
 export interface CareTicket {

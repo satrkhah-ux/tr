@@ -131,7 +131,18 @@ export function validateDraft(data: DraftData): DraftValidation {
     warnings.push({ severity: "warning", stage: "flights", key: "pg.warn.landingDateDiffers" });
   }
   if (data.services.includes.length === 0) warnings.push({ severity: "warning", stage: "services", key: "pg.warn.noServices" });
-  if (data.pricing.items.length === 0) warnings.push({ severity: "warning", stage: "pricing", key: "pg.warn.noPricing" });
+
+  // ---- ready-made company package («العروض الجاهزة») ----
+  // Its price is fixed by management and carried in pricing.final_total instead
+  // of priced line items, so the usual "no pricing lines" advice would be wrong.
+  if (isFixedPrice(data)) {
+    warnings.push({ severity: "warning", stage: "pricing", key: "ro.warn.fixedPrice" });
+    if (outOfSeason(data)) {
+      warnings.push({ severity: "warning", stage: "trip", key: "ro.warn.outOfSeason" });
+    }
+  } else if (data.pricing.items.length === 0) {
+    warnings.push({ severity: "warning", stage: "pricing", key: "pg.warn.noPricing" });
+  }
 
   return {
     ok: blocking.length === 0,
@@ -140,6 +151,20 @@ export function validateDraft(data: DraftData): DraftValidation {
     stages: stageStatuses(data, blocking),
     nights: { used, total, match: used === total && total > 0 },
   };
+}
+
+/** A draft seeded from a ready offer whose company price is already locked in. */
+function isFixedPrice(data: DraftData): boolean {
+  return Boolean(data.source && data.pricing.final_total && data.pricing.final_total > 0);
+}
+
+/** Travel date falls outside the season the company published the package for. */
+function outOfSeason(data: DraftData): boolean {
+  const date = data.trip.arrival_date;
+  const from = data.source?.valid_from;
+  const to = data.source?.valid_to;
+  if (!date || (!from && !to)) return false;
+  return Boolean((from && date < from) || (to && date > to));
 }
 
 function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey, StageStatus> {
@@ -153,7 +178,9 @@ function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey
     data.cities.length > 0 &&
     data.cities.every((c) => data.hotels.some((h) => h.city_name === c.city_name)) &&
     data.hotels.every((h) => Boolean((h.room_type_id || h.sourcing) && h.board_type));
-  const pricingComplete = data.pricing.items.length > 0 && data.pricing.items.every((i) => i.sell_price != null);
+  const pricingComplete =
+    isFixedPrice(data) || (data.pricing.items.length > 0 && data.pricing.items.every((i) => i.sell_price != null));
+  const writtenDays = data.days.filter((d) => d.title.trim().length > 0);
 
   const status = (touched: boolean, complete: boolean, stage: StageKey): StageStatus => {
     if (hasBlocking(stage) && touched) return "error";
@@ -175,7 +202,10 @@ function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey
       "services",
     ),
     visas: status(data.visas.length > 0, data.visas.length > 0, "visas"),
-    pricing: status(data.pricing.items.length > 0, pricingComplete, "pricing"),
+    // The daily program is OPTIONAL — it never blocks publishing. A day counts
+    // as written only when it has a title; a bare skeleton is still "empty".
+    itinerary: status(writtenDays.length > 0, writtenDays.length === data.days.length && data.days.length > 0, "itinerary"),
+    pricing: status(data.pricing.items.length > 0 || isFixedPrice(data), pricingComplete, "pricing"),
     preview: data.produced_serial ? "complete" : "empty",
   };
 }

@@ -20,6 +20,7 @@ export const STAGE_KEYS = [
   "transport",
   "services",
   "visas",
+  "itinerary",
   "pricing",
   "preview",
 ] as const;
@@ -42,6 +43,7 @@ export const STAGES: StageMeta[] = [
   { key: "transport", labelKey: "pg.stage.transport" },
   { key: "services", labelKey: "pg.stage.services" },
   { key: "visas", labelKey: "pg.stage.visas" },
+  { key: "itinerary", labelKey: "pg.stage.itinerary" },
   { key: "pricing", labelKey: "pg.stage.pricing", gated: true },
   { key: "preview", labelKey: "pg.stage.preview" },
 ];
@@ -181,11 +183,56 @@ export type DraftPricingItem = {
   sell_currency: string;
 };
 
+/**
+ * A weather reading SNAPSHOTTED into the draft, not fetched at render time —
+ * the published client document must print the same numbers forever, and a PDF
+ * render must never depend on an external API being up.
+ */
+export type DayWeatherSnapshot = {
+  temp_max: number | null;
+  temp_min: number | null;
+  rain_chance: number | null;
+  /** WMO code; null for climate normals (an average has no single condition). */
+  code: number | null;
+  /** "forecast" = a real forecast for that date; "normals" = the climate average. */
+  source: "forecast" | "normals";
+  /** ISO timestamp — the document prints when the reading was taken. */
+  fetched_at: string;
+};
+
+/** One day of the «البرنامج اليومي». Date + city are derived (see lib/offer/itinerary). */
+export type DraftDay = {
+  /** 1-based position in the program. */
+  day_number: number;
+  date: string | null;
+  city_name: string;
+  title: string;
+  activities: string[];
+  weather: DayWeatherSnapshot | null;
+  /** true when the text came from the AI and no human has edited it since. */
+  ai_generated: boolean;
+};
+
 export type DraftPricing = {
   items: DraftPricingItem[];
   display_currency: string;
   /** rounded client-facing total (sell); editable override. */
   final_total: number | null;
+};
+
+/**
+ * Provenance when the draft was seeded from a ready-made company package
+ * («العروض الجاهزة»). Drives the fixed-price notice and the season-window
+ * warning; never reaches the client document — produceOfferFromDraft does not
+ * map it into the offer.
+ */
+export type DraftSource = {
+  ready_offer_id: string;
+  code: string;
+  tier: string;
+  title: string;
+  valid_from: string | null;
+  valid_to: string | null;
 };
 
 export type DraftData = {
@@ -197,9 +244,13 @@ export type DraftData = {
   transport: DraftTransport[];
   services: DraftServices;
   visas: DraftVisa[];
+  /** day-by-day program; derived from trip+cities, text authored or AI-drafted. */
+  days: DraftDay[];
   pricing: DraftPricing;
   /** set once the draft has been produced into a real offer. */
   produced_serial: string | null;
+  /** set when the draft was seeded from a ready-made package; null otherwise. */
+  source: DraftSource | null;
 };
 
 export function emptyDraftData(): DraftData {
@@ -222,8 +273,40 @@ export function emptyDraftData(): DraftData {
     transport: [],
     services: { includes: [], excludes: [], terms: [] },
     visas: [],
+    days: [],
     pricing: { items: [], display_currency: "SAR", final_total: null },
     produced_serial: null,
+    source: null,
+  };
+}
+
+/** Normalize a day list from an untrusted source (old jsonb, or a client action). */
+export function normalizeDraftDays(raw: unknown): DraftDay[] {
+  return Array.isArray(raw) ? raw.map(normalizeDraftDay) : [];
+}
+
+/** Backfill the day slice for drafts saved before the itinerary stage existed. */
+function normalizeDraftDay(raw: unknown, index: number): DraftDay {
+  const d = (raw && typeof raw === "object" ? raw : {}) as Partial<DraftDay>;
+  const w = d.weather && typeof d.weather === "object" ? (d.weather as Partial<DayWeatherSnapshot>) : null;
+  return {
+    day_number: Number.isFinite(d.day_number) ? Number(d.day_number) : index + 1,
+    date: typeof d.date === "string" ? d.date : null,
+    city_name: typeof d.city_name === "string" ? d.city_name : "",
+    title: typeof d.title === "string" ? d.title : "",
+    activities: Array.isArray(d.activities) ? d.activities.filter((a): a is string => typeof a === "string") : [],
+    weather:
+      w && (w.source === "forecast" || w.source === "normals")
+        ? {
+            temp_max: typeof w.temp_max === "number" ? w.temp_max : null,
+            temp_min: typeof w.temp_min === "number" ? w.temp_min : null,
+            rain_chance: typeof w.rain_chance === "number" ? w.rain_chance : null,
+            code: typeof w.code === "number" ? w.code : null,
+            source: w.source,
+            fetched_at: typeof w.fetched_at === "string" ? w.fetched_at : "",
+          }
+        : null,
+    ai_generated: d.ai_generated === true,
   };
 }
 
@@ -260,8 +343,24 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     transport: Array.isArray(source.transport) ? source.transport : [],
     services: { ...empty.services, ...(source.services ?? {}) },
     visas: Array.isArray(source.visas) ? source.visas : [],
+    days: normalizeDraftDays(source.days),
     pricing: { ...empty.pricing, ...(source.pricing ?? {}) },
     produced_serial: typeof source.produced_serial === "string" ? source.produced_serial : null,
+    source: normalizeDraftSource(source.source),
+  };
+}
+
+function normalizeDraftSource(raw: unknown): DraftSource | null {
+  if (!raw || typeof raw !== "object") return null;
+  const s = raw as Partial<DraftSource>;
+  if (typeof s.ready_offer_id !== "string" || !s.ready_offer_id) return null;
+  return {
+    ready_offer_id: s.ready_offer_id,
+    code: typeof s.code === "string" ? s.code : "",
+    tier: typeof s.tier === "string" ? s.tier : "",
+    title: typeof s.title === "string" ? s.title : "",
+    valid_from: typeof s.valid_from === "string" ? s.valid_from : null,
+    valid_to: typeof s.valid_to === "string" ? s.valid_to : null,
   };
 }
 
@@ -312,11 +411,55 @@ export type LookupCountry = { id: string; name: string; cities: LookupCity[] };
 export type LookupRoomType = { id: string; name: string; hotel_id: string | null; default_board: BoardType | null };
 export type LookupAirport = { id: string; name: string; code: string | null; timezone: string | null };
 
+/**
+ * One approved line from the `terms` table — the company's master lists behind
+ * /offers/offer-includes, /offers/offer-not-includes and
+ * /offers/terms-and-conditions. `checked` marks the ones a new offer starts with.
+ */
+export type TermLibraryItem = { text: string; checked: boolean };
+
+export type TermLibrary = {
+  includes: TermLibraryItem[];
+  excludes: TermLibraryItem[];
+  terms: TermLibraryItem[];
+};
+
+export const emptyTermLibrary = (): TermLibrary => ({ includes: [], excludes: [], terms: [] });
+
+/** The `checked` lines only — what a brand-new draft is seeded with. */
+export function defaultServicesFromLibrary(library: TermLibrary): DraftServices {
+  const picked = (items: TermLibraryItem[]) => items.filter((i) => i.checked).map((i) => i.text);
+  return {
+    includes: picked(library.includes),
+    excludes: picked(library.excludes),
+    terms: picked(library.terms),
+  };
+}
+
+/**
+ * Match a country by name across the usual Arabic spelling variants.
+ *
+ * A draft's `trip.country` is free text — typed by an agent, copied from a past
+ * offer, or seeded from the ready-offers sheet — while the countries table holds
+ * one canonical spelling. «إندونيسيا» vs «اندونيسيا» is a real case in this
+ * data, and an exact match silently shows an EMPTY city list, which reads as
+ * "the system has no cities" rather than "the spelling differs".
+ */
+export function findLookupCountry(countries: LookupCountry[], name: string): LookupCountry | undefined {
+  const fold = (v: string) =>
+    v.replace(/[إأآٱ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/[ـ\s]/g, "");
+  const target = fold(name);
+  if (!target) return undefined;
+  return countries.find((c) => c.name === name) ?? countries.find((c) => fold(c.name) === target);
+}
+
 export type GeneratorLookups = {
   countries: LookupCountry[];
   roomTypes: LookupRoomType[];
   airports: LookupAirport[];
   carTypes: string[];
+  /** the admin-managed includes / excludes / terms lists. */
+  termLibrary: TermLibrary;
 };
 
 // ---------- reusable programs ----------

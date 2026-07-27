@@ -21,6 +21,20 @@ function startOfTodayIso(): string {
   return d.toISOString();
 }
 
+/**
+ * The signed-in user's employee row id, or null when they have none.
+ * Used to stamp «الموظف المختص» on an offer at creation time.
+ */
+export async function getCurrentEmployeeId(): Promise<string | null> {
+  try {
+    const user = await getServerUser();
+    if (!user) return null;
+    return await employeeIdForUser(await db(), user.id);
+  } catch {
+    return null;
+  }
+}
+
 async function employeeIdForUser(supabase: SupabaseClient, userId: string): Promise<string | null> {
   const { data } = await supabase.from("employees").select("id").eq("auth_user_id", userId).maybeSingle();
   return (data as { id: string } | null)?.id ?? null;

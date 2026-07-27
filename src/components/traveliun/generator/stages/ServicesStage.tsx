@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Plus, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, ListPlus, Plus, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
-import type { DraftServices } from "@/lib/offer/draft-types";
+import type { DraftServices, TermLibraryItem } from "@/lib/offer/draft-types";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import {
@@ -20,6 +20,8 @@ type ListEditorProps = {
   titleKey: TranslationKey;
   variant: ListVariant;
   items: string[];
+  /** the company's approved wording for this list (from the `terms` table). */
+  library: TermLibraryItem[];
   onChange: (next: string[]) => void;
 };
 
@@ -46,9 +48,16 @@ function Bullet({ variant, index }: { variant: ListVariant; index: number }) {
 }
 
 /** One editable string list (includes / excludes / terms) with add + remove. */
-function ListEditor({ titleKey, variant, items, onChange }: ListEditorProps) {
+function ListEditor({ titleKey, variant, items, library, onChange }: ListEditorProps) {
   const { t } = useTraveliunUI();
   const [value, setValue] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // approved lines the agent has not used yet — the only ones worth offering
+  const unused = useMemo(
+    () => library.filter((entry) => !items.includes(entry.text)),
+    [library, items],
+  );
 
   function addItem() {
     const trimmed = value.trim();
@@ -86,6 +95,35 @@ function ListEditor({ titleKey, variant, items, onChange }: ListEditorProps) {
         </ul>
       )}
 
+      {unused.length > 0 ? (
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={() => setPickerOpen((open) => !open)}
+            className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#185045] hover:underline"
+          >
+            <ListPlus className="size-4" />
+            {t("pg.fromLibrary", { count: String(unused.length) })}
+          </button>
+          {pickerOpen ? (
+            <ul className="mt-2 max-h-[180px] space-y-1 overflow-y-auto rounded-[10px] border border-[#e2ebe7] bg-white p-2">
+              {unused.map((entry) => (
+                <li key={entry.text}>
+                  <button
+                    type="button"
+                    onClick={() => onChange([...items, entry.text])}
+                    className="w-full rounded-[8px] px-2 py-1.5 text-start text-[12.5px] text-[#41615b] hover:bg-[#f4f8f6]"
+                  >
+                    <Plus className="me-1 inline size-3.5 text-[#0f7a52]" />
+                    {entry.text}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -108,10 +146,19 @@ function ListEditor({ titleKey, variant, items, onChange }: ListEditorProps) {
   );
 }
 
-/** Stage 7 — included / excluded services + terms. Edits ONLY data.services. */
-export function ServicesStage({ data, patch }: StageFormProps) {
+/**
+ * Stage 7 — included / excluded services + terms. Edits ONLY data.services.
+ *
+ * The three lists mirror the company's approved wording, administered at
+ * /offers/offer-includes, /offers/offer-not-includes and
+ * /offers/terms-and-conditions: a new draft opens with the ticked rows already
+ * in place, and «اختر من القائمة المعتمدة» adds any of the rest. Free text stays
+ * available for the one-off line a particular offer needs.
+ */
+export function ServicesStage({ data, patch, lookups }: StageFormProps) {
   const { t } = useTraveliunUI();
   const services = data.services;
+  const library = lookups.termLibrary;
 
   function update(slice: Partial<DraftServices>) {
     patch({ services: { ...services, ...slice } });
@@ -125,12 +172,14 @@ export function ServicesStage({ data, patch }: StageFormProps) {
           titleKey="pg.includes"
           variant="includes"
           items={services.includes}
+          library={library.includes}
           onChange={(next) => update({ includes: next })}
         />
         <ListEditor
           titleKey="pg.excludes"
           variant="excludes"
           items={services.excludes}
+          library={library.excludes}
           onChange={(next) => update({ excludes: next })}
         />
         <div className="md:col-span-2">
@@ -138,6 +187,7 @@ export function ServicesStage({ data, patch }: StageFormProps) {
             titleKey="pg.terms"
             variant="terms"
             items={services.terms}
+            library={library.terms}
             onChange={(next) => update({ terms: next })}
           />
         </div>

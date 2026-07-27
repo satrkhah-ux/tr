@@ -304,18 +304,9 @@ const CONFIGS: TableConfig[] = [
     searchable: ["category", "title", "body"],
     defaultSort: { column: "created_at", ascending: false },
   },
-  {
-    route: "/ready-offers", table: "ready_offers", titleKey: "nav.readyOffers",
-    columns: [
-      { key: "title", labelKey: "col.title", minWidth: "200px" },
-      { key: "country", labelKey: "filter.country" },
-      { key: "days", labelKey: "col.days", type: "number" },
-      { key: "price", labelKey: "col.price", type: "currency" },
-      { key: "currency", labelKey: "col.currency" },
-    ],
-    searchable: ["title", "country"],
-    defaultSort: { column: "created_at", ascending: false },
-  },
+  // /ready-offers is NOT a generic grid: src/app/ready-offers/page.tsx renders
+  // the seasonal-package catalog (sync + "start an offer"), and the sheet is the
+  // source of truth for its content. See lib/ready-offers.
   {
     route: "/customers_care", table: "care_tickets", titleKey: "nav.customerCare",
     columns: [

@@ -7,6 +7,7 @@ import {
   BOARD_LABEL_KEYS,
   BOARD_TYPES,
   deriveCityDates,
+  findLookupCountry,
   type DraftHotel,
 } from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
@@ -49,7 +50,7 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
   const [selecting, setSelecting] = useState<string | null>(null);
   const [filters, setFilters] = useState({ minStars: 0, board: "", refundableOnly: false, maxPrice: "" });
 
-  const country = lookups.countries.find((c) => c.name === data.trip.country);
+  const country = findLookupCountry(lookups.countries, data.trip.country);
   const derivedCities = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
 
   function lineFor(cityName: string): DraftHotel {
