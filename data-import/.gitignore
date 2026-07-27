@@ -1,0 +1,8 @@
+# Landing area for database dumps from the OLD system.
+#
+# ⚠️ These files hold REAL customer names, phone numbers and pricing. This
+# repository is PUBLIC — nothing in here may ever be committed. Ignore
+# everything except this file and the README.
+*
+!.gitignore
+!README.md

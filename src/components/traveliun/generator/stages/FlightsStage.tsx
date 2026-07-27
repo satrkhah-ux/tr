@@ -1,7 +1,10 @@
 "use client";
 
-import { AlertTriangle, Globe2, Plane, Plus, RotateCcw } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { AlertTriangle, Globe2, Loader2, Plane, Plus, RotateCcw, Search } from "lucide-react";
 import { DirText } from "@/components/DirText";
+import { getAssistantAvailability, lookupFlightNumber } from "@/lib/data/itinerary-actions";
+import type { FlightLookupHit } from "@/lib/providers/flight-lookup";
 import {
   deriveCityDates,
   type DraftFlight,
@@ -89,7 +92,40 @@ type RowHandlers = {
   setDeparture: (index: number, raw: string) => void;
   restoreAuto: (index: number) => void;
   removeRow: (index: number) => void;
+  applyLookup: (index: number, hit: FlightLookupHit) => void;
 };
+
+/** "HH:mm" out of a "YYYY-MM-DDTHH:mm" wall clock. */
+function timePart(value: string | null): string | null {
+  return value && value.length >= 16 ? value.slice(11, 16) : null;
+}
+
+/** Whole days between two wall-clock stamps (an overnight leg is +1). */
+function dayOffsetBetween(from: string | null, to: string | null): number {
+  if (!from || !to) return 0;
+  const a = Date.parse(`${from.slice(0, 10)}T00:00:00Z`);
+  const b = Date.parse(`${to.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(a) || Number.isNaN(b)) return 0;
+  return Math.max(Math.round((b - a) / 86_400_000), 0);
+}
+
+function addDaysIso(iso: string, days: number): string {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Prefer OUR airport row for a looked-up IATA code — it carries the IANA zone
+ * the duration maths needs. Fall back to the provider's own name so the field
+ * is never left blank.
+ */
+function airportValueFor(iata: string, providerName: string, airports: LookupAirport[]): string {
+  const known = airports.find((a) => (a.code ?? "").toUpperCase() === iata.toUpperCase());
+  if (known) return airportDisplay(known);
+  const name = providerName.trim();
+  return iata ? (name ? `${name} (${iata})` : iata) : name;
+}
 
 /**
  * Stage 5 — flight legs, timezone-correct, split into TWO sections:
@@ -155,7 +191,35 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
     commit(flights.filter((_, i) => i !== index));
   }
 
-  const handlers: RowHandlers = { updateRow, setAirport, setDeparture, restoreAuto, removeRow };
+  /**
+   * Apply a looked-up route to a row. The provider's schedule is from ANOTHER
+   * date, so only the TIME OF DAY is taken — the trip's own departure date is
+   * kept (and the arrival date follows the provider's overnight offset). This
+   * is why the agent still confirms: real times, our dates.
+   */
+  function applyLookup(index: number, hit: FlightLookupHit) {
+    const flight = flights[index];
+    const from_airport = airportValueFor(hit.from_iata, hit.from_airport, airports);
+    const to_airport = airportValueFor(hit.to_iata, hit.to_airport, airports);
+    const depDate = localDatePart(flight.departure_at) ?? autoDepartureDate(data.trip, flight.leg_order);
+    const depTime = timePart(hit.departure_at);
+    const arrTime = timePart(hit.arrival_at);
+    const offset = dayOffsetBetween(hit.departure_at, hit.arrival_at);
+
+    updateRow(index, {
+      airline: hit.airline || flight.airline,
+      flight_no: hit.flight_iata || flight.flight_no,
+      from_airport,
+      to_airport,
+      // our own airport rows win for the zone; the provider's is the fallback
+      from_tz: resolveTz(from_airport, airports) ?? hit.from_tz,
+      to_tz: resolveTz(to_airport, airports) ?? hit.to_tz,
+      departure_at: depDate && depTime ? `${depDate}T${depTime}` : flight.departure_at,
+      arrival_at: depDate && arrTime ? `${addDaysIso(depDate, offset)}T${arrTime}` : flight.arrival_at,
+    });
+  }
+
+  const handlers: RowHandlers = { updateRow, setAirport, setDeparture, restoreAuto, removeRow, applyLookup };
 
   // Rows keep their ORIGINAL index so edits/removals stay correct after grouping.
   const rows = flights.map((flight, index) => ({ flight, index }));
@@ -233,6 +297,78 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
   );
 }
 
+/**
+ * «جلب بيانات الرحلة» — look the typed flight number up and offer the published
+ * routes as candidates. Nothing is applied automatically: the agent picks the
+ * route, and the panel states which date the schedule was observed on so the
+ * times get checked rather than trusted blindly.
+ *
+ * The button is hidden entirely when the provider is not configured — an agent
+ * should never be offered a control that cannot work.
+ */
+function FlightLookup({ flightNo, onPick }: { flightNo: string; onPick: (hit: FlightLookupHit) => void }) {
+  const { t } = useTraveliunUI();
+  const [enabled, setEnabled] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [hits, setHits] = useState<FlightLookupHit[] | null>(null);
+  const [error, setError] = useState<TranslationKey | null>(null);
+
+  useEffect(() => {
+    void getAssistantAvailability().then((a) => setEnabled(a.flightLookup));
+  }, []);
+
+  if (!enabled) return null;
+
+  function run() {
+    setError(null);
+    setHits(null);
+    startTransition(async () => {
+      const result = await lookupFlightNumber(flightNo);
+      if (result.ok) setHits(result.hits);
+      else setError(result.error);
+    });
+  }
+
+  return (
+    <div className="grid gap-1.5">
+      <button
+        type="button"
+        onClick={run}
+        disabled={pending || !flightNo.trim()}
+        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] transition-colors hover:bg-[#f0f7f4] disabled:opacity-50"
+      >
+        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Search className="size-3.5" />}
+        {t("pg.flightLookup.button")}
+      </button>
+      {error ? <span className="text-[10.5px] font-bold text-[#c43d3d]">{t(error)}</span> : null}
+      {hits?.map((hit, i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => {
+            onPick(hit);
+            setHits(null);
+          }}
+          className="grid gap-0.5 rounded-[8px] border border-[#cfe0d9] bg-[#f4f8f6] px-2.5 py-1.5 text-start transition-colors hover:bg-[#e7f2ec]"
+        >
+          <span className="tv-tnum text-[11.5px] font-extrabold text-[#185045]">
+            <DirText dir="ltr">{`${hit.from_iata} → ${hit.to_iata}`}</DirText>
+            {hit.departure_at ? (
+              <span className="ms-1.5 font-bold text-[#557d78]">
+                <DirText dir="ltr">{`${timePart(hit.departure_at) ?? ""}–${timePart(hit.arrival_at) ?? ""}`}</DirText>
+              </span>
+            ) : null}
+          </span>
+          <span className="text-[10px] font-bold text-[#93aaa3]">
+            {hit.airline}
+            {hit.schedule_date ? ` · ${t("pg.flightLookup.scheduleFrom", { date: hit.schedule_date })}` : ""}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** One flight leg. `showLegSelect` is on for international rows (outbound/inbound). */
 function FlightRow({
   flight,
@@ -246,7 +382,7 @@ function FlightRow({
   handlers: RowHandlers;
 }) {
   const { t } = useTraveliunUI();
-  const { updateRow, setAirport, setDeparture, restoreAuto, removeRow } = handlers;
+  const { updateRow, setAirport, setDeparture, restoreAuto, removeRow, applyLookup } = handlers;
   const timing = flightTiming(flight);
   const duration = formatDurationAr(timing.durationMinutes);
   const bothDatesSet = Boolean(flight.departure_at && flight.arrival_at);
@@ -279,15 +415,22 @@ function FlightRow({
             className={fieldClass}
           />
         </label>
-        <label className={rowLabelClass}>
-          {t("pg.flightNo")}
-          <input
-            dir="ltr"
-            value={flight.flight_no}
-            onChange={(e) => updateRow(index, { flight_no: e.target.value })}
-            className={`${fieldClass} tv-tnum text-start`}
+        <div className={rowLabelClass}>
+          <label className="grid gap-1.5">
+            {t("pg.flightNo")}
+            <input
+              dir="ltr"
+              value={flight.flight_no}
+              onChange={(e) => updateRow(index, { flight_no: e.target.value })}
+              placeholder={t("pg.flightLookup.placeholder")}
+              className={`${fieldClass} tv-tnum text-start`}
+            />
+          </label>
+          <FlightLookup
+            flightNo={flight.flight_no}
+            onPick={(hit) => applyLookup(index, hit)}
           />
-        </label>
+        </div>
         <label className={rowLabelClass}>
           {t("pg.fromAirport")}
           <input

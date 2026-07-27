@@ -8,6 +8,7 @@ import {
   type StageKey,
 } from "@/lib/offer/draft-types";
 import { flightTiming, formatDurationAr, itineraryStartDate } from "@/lib/offer/schedule";
+import { formatWeatherAr, isWeatherEmpty, weatherSourceAr } from "@/lib/offer/weather-format";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
 /**
@@ -65,6 +66,8 @@ export function OfferDocument({
   // date), not merely the trip start — same rule as the generator and produce.
   const cities = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
   const hotelByCity = new Map(data.hotels.map((h) => [h.city_name, h]));
+  // an untouched day skeleton must not render as a wall of empty cards
+  const writtenDays = data.days.filter((d) => d.title.trim() || d.activities.some((a) => a.trim()));
 
   return (
     <article className="mx-auto w-full max-w-[794px] overflow-hidden rounded-[14px] border border-[#dce7e2] bg-white text-[#0f3d38] shadow-[0_10px_30px_rgba(0,60,58,0.08)]">
@@ -202,7 +205,47 @@ export function OfferDocument({
                   })}
                 </tbody>
               </table>
+              {/* mirrors the client document: air fares only lock at ticketing. */}
+              <p className="mt-2 text-[10px] font-semibold leading-relaxed text-[#557d78]">
+                {t("pg.flightPriceNote")}
+              </p>
             </div>
+          </Section>
+        ) : null}
+
+        {/* day-by-day program — only days the agent actually wrote */}
+        {writtenDays.length > 0 ? (
+          <Section onSectionClick={onSectionClick} stage="itinerary">
+            <h3 className="mb-2 text-[13px] font-extrabold text-[#185045]">{t("pg.itin.title")}</h3>
+            <ol className="space-y-2">
+              {writtenDays.map((day) => (
+                <li key={day.day_number} className="rounded-[10px] border border-[#e2ebe7] px-3 py-2.5">
+                  <div className="mb-1 flex flex-wrap items-baseline gap-2">
+                    <span className="tv-tnum inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#185045] px-1.5 text-[10px] font-extrabold text-white">
+                      <DirText dir="ltr">{String(day.day_number)}</DirText>
+                    </span>
+                    <span className="text-[12.5px] font-extrabold text-[#185045]">{day.title || day.city_name}</span>
+                    <span className="ms-auto flex gap-2 text-[10px] font-bold text-[#93aaa3]">
+                      {day.city_name ? <span>{day.city_name}</span> : null}
+                      {day.date ? <span className="tv-tnum"><DirText dir="ltr">{day.date}</DirText></span> : null}
+                    </span>
+                  </div>
+                  {day.activities.length > 0 ? (
+                    <ul className="space-y-0.5 text-[11.5px] text-[#0f3d38]">
+                      {day.activities.map((a, i) => (
+                        <li key={i} className="flex items-start gap-2"><span className="mt-0.5 text-[#0f7a52]">•</span>{a}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {!isWeatherEmpty(day.weather) ? (
+                    <p className="tv-tnum mt-1.5 rounded-[7px] bg-[#eef6f2] px-2 py-1 text-[10.5px] font-bold text-[#2a5f52]">
+                      {formatWeatherAr(day.weather)}
+                      <span className="text-[#93aaa3]"> ({weatherSourceAr(day.weather!.source)})</span>
+                    </p>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
           </Section>
         ) : null}
 

@@ -88,6 +88,24 @@ ENV HOSTNAME="0.0.0.0"
 # Uncomment the following line in case you want to disable telemetry during the run time.
 # ENV NEXT_TELEMETRY_DISABLED=1
 
+# The offer PDF is produced by driving headless Chromium (puppeteer-core). This
+# base image ships NEITHER a browser NOR an Arabic font, so without these two
+# lines every PDF download fails at runtime — the browser lookup finds nothing,
+# and even if it did, Arabic would render as empty boxes.
+#
+# @sparticuz/chromium is NOT used here: it exists for serverless hosts (Netlify /
+# Lambda). On a real container an apt Chromium is smaller, faster to start and
+# always matches the OS libraries.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    chromium \
+    fonts-noto-core \
+    fonts-noto-color-emoji \
+  && rm -rf /var/lib/apt/lists/*
+
+# pdf.ts probes CHROME_PATH first, then a list of well-known locations.
+ENV CHROME_PATH=/usr/bin/chromium
+
 # Copy production assets
 COPY --from=builder --chown=node:node /app/public ./public
 

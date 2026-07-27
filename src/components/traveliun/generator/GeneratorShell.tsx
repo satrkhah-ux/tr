@@ -42,6 +42,7 @@ import { FlightsStage } from "./stages/FlightsStage";
 import { TransportStage } from "./stages/TransportStage";
 import { ServicesStage } from "./stages/ServicesStage";
 import { VisasStage } from "./stages/VisasStage";
+import { ItineraryStage } from "./stages/ItineraryStage";
 import { PricingStage } from "./stages/PricingStage";
 import { PreviewStage } from "./stages/PreviewStage";
 
@@ -54,6 +55,7 @@ const STAGE_FORMS: Record<StageKey, (props: StageFormProps) => React.ReactNode> 
   transport: TransportStage,
   services: ServicesStage,
   visas: VisasStage,
+  itinerary: ItineraryStage,
   pricing: PricingStage,
   preview: PreviewStage,
 };

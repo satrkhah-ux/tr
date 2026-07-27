@@ -33,8 +33,13 @@ function adapterFor(row: HotelSupplierRow): HotelSupplier {
 /** Enabled suppliers ordered by priority; falls back to the mock when none are enabled. */
 export async function getEnabledHotelSuppliers(): Promise<HotelSupplier[]> {
   const rows = (await getSupplierRows()).filter((r) => r.enabled);
-  if (rows.length === 0) return [buildHotelSupplier("mock", null, null)];
-  return rows.map(adapterFor);
+  const list = rows.map(adapterFor);
+  // DEMO MODE: inject the Almosafer demo supplier WITHOUT a DB row, so the
+  // management demo runs locally on captured-real data with no server wiring.
+  // Guarded by an env flag; never set it in production (it serves fixtures).
+  if (process.env.ALMOSAFER_DEMO === "1") list.unshift(buildHotelSupplier("almosafer", null, null));
+  if (list.length === 0) return [buildHotelSupplier("mock", null, null)];
+  return list;
 }
 
 /** The adapter for one supplier code (uses its stored, decrypted credentials). */

@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "pizzara",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:/Users/al3r1/OneDrive/Desktop/pizzara.iq", "run", "dev", "--", "--port", "3001"],
+      "port": 3001,
+      "autoPort": true
     }
   ]
 }
