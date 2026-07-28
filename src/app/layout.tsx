@@ -14,10 +14,50 @@ const inter = Inter({
   weight: ["300", "400", "500", "600", "700", "800"],
 });
 
+/**
+ * The link card people actually see. Sharing the URL in WhatsApp used to show
+ * the framework's default mark and an English developer sentence, because there
+ * was no Open Graph block at all — so the crawler fell back to the favicon.
+ *
+ * `metadataBase` matters: without it the OG image resolves relative to the
+ * request and crawlers that fetch without a Host header get nothing. It follows
+ * NEXT_PUBLIC_BASE_URL so the VPS and any other deploy each advertise their own
+ * absolute URL.
+ */
+const SITE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://pkg.traveliun.com";
+const SITE_NAME = "ترافليون للسفر والسياحة";
+const SITE_TITLE = "ترافليون — نظام إدارة الباقات السياحية";
+const SITE_DESCRIPTION =
+  "نظام ترافليون لبناء العروض السياحية وتسعيرها وإصدار مستند العميل الجاهز للإرسال — الباقات والفنادق والطيران والتأشيرات في مكان واحد.";
+
 export const metadata: Metadata = {
-  title: "Traveliun Admin System",
-  description:
-    "A rebuilt Traveliun travel operations dashboard with structured, AI-friendly system data.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: SITE_TITLE, template: `%s · ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  openGraph: {
+    type: "website",
+    locale: "ar_SA",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [
+      {
+        url: "/seo/og-cover.png",
+        width: 1200,
+        height: 630,
+        alt: SITE_NAME,
+        type: "image/png",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ["/seo/og-cover.png"],
+  },
   icons: {
     icon: "/traveliun/favicon.ico",
     apple: "/icons/apple-touch-icon.png",
@@ -25,9 +65,11 @@ export const metadata: Metadata = {
   // iOS installed-app chrome (Android reads the manifest instead).
   appleWebApp: {
     capable: true,
-    title: "Traveliun",
+    title: "ترافليون",
     statusBarStyle: "default",
   },
+  // an internal tool: keep it out of search results
+  robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {
