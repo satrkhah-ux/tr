@@ -142,6 +142,10 @@ export type RepackageSource = {
   /** true when the PDF was scanned but no OCR provider was configured. */
   ocr_unavailable: boolean;
   imported_at: string | null;
+  /** which reader produced the fields: the model (text/vision) or the parser. */
+  how: "ai-text" | "ai-vision" | "parser" | "none" | null;
+  /** the model's short Arabic recap of the document. */
+  summary: string;
 };
 
 /** Frozen at first edit so the edit stage can render a before→after diff. */
@@ -205,6 +209,8 @@ export function emptyRepackageData(): RepackageData {
       ocr_used: false,
       ocr_unavailable: false,
       imported_at: null,
+      how: null,
+      summary: "",
     },
     extracted: null,
     confidence: {},
@@ -306,6 +312,11 @@ export function normalizeRepackageData(raw: Record<string, unknown> | null | und
       ocr_used: source.ocr_used === true,
       ocr_unavailable: source.ocr_unavailable === true,
       imported_at: typeof source.imported_at === "string" ? source.imported_at : null,
+      how:
+        source.how === "ai-text" || source.how === "ai-vision" || source.how === "parser" || source.how === "none"
+          ? source.how
+          : null,
+      summary: str(source.summary),
     },
     extracted: normalizeExtracted(s.extracted),
     confidence,

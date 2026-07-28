@@ -13,7 +13,7 @@ import {
   type RepackageData,
 } from "@/lib/repackage/repackage-types";
 import { validateRepackage } from "@/lib/repackage/repackage-validation";
-import { runExtraction } from "@/lib/repackage/extract/extract";
+import { runExtraction, type ExtractionHow, type ExtractionSource } from "@/lib/repackage/extract/extract";
 import {
   createOffer,
   publishOffer,
@@ -184,41 +184,119 @@ async function findOrCreateSupplier(supabase: SupabaseClient, name: string): Pro
 
 // ---------- import + extract ----------
 export type ImportResult =
-  | { ok: true; autoAdvance: boolean; ocrUnavailable: boolean }
+  | { ok: true; autoAdvance: boolean; ocrUnavailable: boolean; how: ExtractionHow; summary: string }
   | { ok: false; error: TranslationKey };
 
+/** How big a fetched page or uploaded file may be before we refuse it. */
+const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
+
 /**
- * Upload the supplier PDF (private bucket, internal audit only), run the
- * extraction engine, and persist the extracted fields + per-field confidence.
- * Returns autoAdvance=true when confidence is HIGH (→ skip /review, go to /edit).
+ * Turn a public web page into readable text. Suppliers often send a link to a
+ * hosted brochure rather than the file, and a link to a PDF or an image is
+ * handled as that file — the URL is just another envelope.
+ */
+async function fetchUrlSource(raw: string): Promise<ExtractionSource | null> {
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    return null;
+  }
+  // Only public web addresses; never let a pasted link reach an internal host.
+  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+  if (/^(localhost$|127\.|10\.|192\.168\.|169\.254\.|\[?::1)/i.test(url.hostname)) return null;
+
+  const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) return null;
+  const type = (res.headers.get("content-type") ?? "").toLowerCase();
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > MAX_SOURCE_BYTES) return null;
+
+  if (type.includes("pdf")) return { kind: "pdf", bytes: buf };
+  if (type.startsWith("image/")) return { kind: "image", bytes: buf };
+  // strip the markup: script/style out, tags to spaces, entities decoded
+  const text = buf
+    .toString("utf8")
+    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return text.length > 0 ? { kind: "text", text } : null;
+}
+
+/**
+ * Import a supplier package from whatever the supplier actually sent — a PDF, a
+ * picture, a pasted message, or a link — run the extraction engine over it, and
+ * persist the fields with their per-field confidence.
+ *
+ * The original file is kept in a private bucket for internal audit; its path
+ * never appears on client output. Returns autoAdvance=true when confidence is
+ * HIGH (→ skip /review, go straight to /edit).
  */
 export async function importFromPdf(id: string, formData: FormData): Promise<ImportResult> {
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
 
-    const file = formData.get("file");
-    if (!(file instanceof File) || file.size === 0) return { ok: false, error: "rp.err.noFileUpload" };
-    if (file.type && !file.type.includes("pdf")) return { ok: false, error: "rp.err.notPdf" };
     const supplierName = String(formData.get("supplier") ?? "").trim();
+    const pastedText = String(formData.get("text") ?? "").trim();
+    const pastedUrl = String(formData.get("url") ?? "").trim();
+    const file = formData.get("file");
+    const hasFile = file instanceof File && file.size > 0;
 
-    const bytes = Buffer.from(await file.arrayBuffer());
+    let source: ExtractionSource | null = null;
+    let bytes: Buffer | null = null;
+    let contentType = "application/octet-stream";
+    let sourceName = "";
+
+    if (hasFile) {
+      if (file.size > MAX_SOURCE_BYTES) return { ok: false, error: "rp.err.tooLarge" };
+      bytes = Buffer.from(await file.arrayBuffer());
+      contentType = file.type || "application/octet-stream";
+      sourceName = file.name;
+      const isPdf = contentType.includes("pdf") || /\.pdf$/i.test(file.name);
+      const isImage = contentType.startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(file.name);
+      if (!isPdf && !isImage) return { ok: false, error: "rp.err.notSupported" };
+      source = isPdf ? { kind: "pdf", bytes } : { kind: "image", bytes };
+    } else if (pastedText.length > 0) {
+      source = { kind: "text", text: pastedText };
+      sourceName = "pasted.txt";
+    } else if (pastedUrl.length > 0) {
+      try {
+        source = await fetchUrlSource(pastedUrl);
+      } catch {
+        source = null;
+      }
+      if (!source) return { ok: false, error: "rp.err.badUrl" };
+      if (source.kind !== "text") {
+        bytes = source.bytes;
+        contentType = source.kind === "pdf" ? "application/pdf" : "image/png";
+      }
+      sourceName = pastedUrl.slice(-80);
+    }
+    if (!source) return { ok: false, error: "rp.err.noFileUpload" };
+
     const supabase = await db();
 
-    // store the original (internal only) — path never appears on client output.
-    const safeName = file.name.replace(/[^\w.\-]+/g, "_").slice(-80);
-    const path = `${id}/${Date.now()}-${safeName}`;
-    const { error: upErr } = await supabase.storage
-      .from(BUCKET)
-      .upload(path, bytes, { contentType: "application/pdf", upsert: true });
-    const originalPath = upErr ? null : path;
+    // keep the original for internal audit; text/link imports have no file
+    let originalPath: string | null = null;
+    if (bytes) {
+      const safeName = (sourceName || "source").replace(/[^\w.\-]+/g, "_").slice(-80);
+      const path = `${id}/${Date.now()}-${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, bytes, { contentType, upsert: true });
+      if (!upErr) originalPath = path;
+    }
 
     const supplierId = await findOrCreateSupplier(supabase, supplierName);
 
-    // run the extraction engine (text layer or OCR)
+    // run the extraction engine (model over text/pictures, parser as fallback)
     let extraction;
     try {
-      extraction = await runExtraction(bytes);
+      extraction = await runExtraction(source);
     } catch {
       return { ok: false, error: "rp.err.extractFailed" };
     }
@@ -236,6 +314,8 @@ export async function importFromPdf(id: string, formData: FormData): Promise<Imp
         ocr_used: extraction.ocr_used,
         ocr_unavailable: extraction.ocr_unavailable,
         imported_at: new Date().toISOString(),
+        how: extraction.how,
+        summary: extraction.summary,
       },
       extracted: pkg,
       confidence: extraction.confidence,
@@ -257,7 +337,13 @@ export async function importFromPdf(id: string, formData: FormData): Promise<Imp
     if (!saved.ok) return { ok: false, error: saved.error ?? "err.db" };
 
     const validation = validateRepackage(nextData);
-    return { ok: true, autoAdvance: validation.reviewClear, ocrUnavailable: extraction.ocr_unavailable };
+    return {
+      ok: true,
+      autoAdvance: validation.reviewClear,
+      ocrUnavailable: extraction.ocr_unavailable,
+      how: extraction.how,
+      summary: extraction.summary,
+    };
   } catch {
     return { ok: false, error: "err.db" };
   }
