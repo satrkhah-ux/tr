@@ -25,6 +25,9 @@ export type SupplierCredentials = {
   password: string;
 };
 
+/** hotel_suppliers.environment — suppliers issue a different host per environment. */
+export type SupplierEnvironment = "sandbox" | "live";
+
 export type SupplierImage = { url: string; order: number; caption: string | null };
 
 export type SupplierHotelContent = {
@@ -263,15 +266,24 @@ class TboHotelSupplier implements HotelSupplier {
   readonly name = "TBO Holidays";
   private readonly creds: SupplierCredentials | null;
   private readonly baseUrl: string;
+  /** true when the row says 'sandbox' but no sandbox host was ever entered. */
+  private readonly unsafeSandbox: boolean;
 
-  constructor(creds: SupplierCredentials | null, baseUrl: string | null) {
+  constructor(creds: SupplierCredentials | null, baseUrl: string | null, environment: SupplierEnvironment = "live") {
     this.creds = creds;
+    const stored = baseUrl?.trim() || "";
     // A stored base URL wins (TBO issues per-account hosts), else the public one.
-    this.baseUrl = (baseUrl?.trim() || TBO_DEFAULT_BASE).replace(/\/+$/, "");
+    this.baseUrl = (stored || TBO_DEFAULT_BASE).replace(/\/+$/, "");
+    // TBO issues a SEPARATE host for testing. Falling back to the built-in
+    // production host while the row is marked 'sandbox' would send what an admin
+    // believes are test calls to the live account — burning quota and, once
+    // booking exists, touching real inventory. Fail closed instead of guessing a
+    // sandbox hostname we were never given.
+    this.unsafeSandbox = environment === "sandbox" && stored === "";
   }
 
   private ready(): boolean {
-    return Boolean(this.creds?.username && this.creds?.password);
+    return !this.unsafeSandbox && Boolean(this.creds?.username && this.creds?.password);
   }
 
   private authHeader(): string {
@@ -325,6 +337,13 @@ class TboHotelSupplier implements HotelSupplier {
   }
 
   async testConnection(): Promise<TestConnectionResult> {
+    if (this.unsafeSandbox) {
+      return {
+        ok: false,
+        message:
+          "البيئة مضبوطة على «تجريبي» بلا رابط خدمة — الصق رابط البيئة التجريبية الذي زوّدك به TBO في حقل «رابط الخدمة»، أو بدّل البيئة إلى «مباشر».",
+      };
+    }
     if (!this.ready()) {
       return { ok: false, message: "بيانات الاعتماد غير مكتملة — أدخل اسم المستخدم وكلمة المرور." };
     }
@@ -891,8 +910,9 @@ export function buildHotelSupplier(
   code: string,
   creds: SupplierCredentials | null,
   baseUrl: string | null,
+  environment: SupplierEnvironment = "live",
 ): HotelSupplier {
-  if (code === "tbo") return new TboHotelSupplier(creds, baseUrl);
+  if (code === "tbo") return new TboHotelSupplier(creds, baseUrl, environment);
   if (code === "hotelbeds") return new HotelbedsHotelSupplier(creds, baseUrl);
   if (code === "almosafer") return new AlmosaferDemoHotelSupplier();
   return new MockHotelSupplier();

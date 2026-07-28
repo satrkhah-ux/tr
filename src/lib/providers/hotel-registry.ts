@@ -2,7 +2,12 @@ import "server-only";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { decryptJson } from "@/lib/crypto/secrets";
 import type { HotelSupplierRow } from "@/lib/types";
-import { buildHotelSupplier, type HotelSupplier, type SupplierCredentials } from "./hotel-supplier";
+import {
+  buildHotelSupplier,
+  type HotelSupplier,
+  type SupplierCredentials,
+  type SupplierEnvironment,
+} from "./hotel-supplier";
 
 /**
  * Server-side supplier registry: reads hotel_suppliers, DECRYPTS credentials, and
@@ -27,7 +32,9 @@ function adapterFor(row: HotelSupplierRow): HotelSupplier {
   // Per the hard rule: credentials absent → the MOCK adapter runs (nothing breaks).
   if (!creds) return buildHotelSupplier("mock", null, null);
   const withBase: SupplierCredentials = { ...creds, base_url: creds.base_url || row.base_url || "" };
-  return buildHotelSupplier(row.code, withBase, row.base_url);
+  // environment is a DB free-text column; anything that isn't 'sandbox' is live.
+  const env: SupplierEnvironment = row.environment === "sandbox" ? "sandbox" : "live";
+  return buildHotelSupplier(row.code, withBase, row.base_url, env);
 }
 
 /** Enabled suppliers ordered by priority; falls back to the mock when none are enabled. */
