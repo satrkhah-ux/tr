@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CheckCircle2, ExternalLink, FileText, Loader2, Sparkles, XCircle } from "lucide-react";
 import { DirText } from "@/components/DirText";
+import { OfferDocument } from "@/components/offer-doc/OfferDocument";
 import { produceRepackageOffer } from "@/lib/data/repackage";
+import { repackageToPreviewOffer } from "@/lib/offer/preview-dto";
 import { validateRepackage } from "@/lib/repackage/repackage-validation";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { sectionClass } from "../stage-props";
@@ -16,6 +18,7 @@ export function PreviewStage({ draftId, data, patch }: RepackageStageProps) {
   const [error, setError] = useState<string | null>(null);
 
   const validation = useMemo(() => validateRepackage(data), [data]);
+  const preview = useMemo(() => repackageToPreviewOffer(data), [data]);
   const pkg = data.extracted;
   const serial = data.produced_serial;
 
@@ -43,44 +46,18 @@ export function PreviewStage({ draftId, data, patch }: RepackageStageProps) {
         <p className="mt-1 text-[13px] text-[#557d78]">{t("rp.preview.hint")}</p>
       </header>
 
-      {/* branded client-facing summary (SELL only — no supplier cost / profit) */}
-      <div className="overflow-hidden rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-        <div className="flex items-center justify-between bg-[#185045] px-5 py-3 text-white">
-          <span className="text-[15px] font-extrabold">ترافليون للسفر والسياحة</span>
-          <span className="text-[12px] font-bold text-[#bfe0d6]">Traveliun</span>
-        </div>
-        <div className="space-y-3 p-5">
-          <p className="text-[17px] font-extrabold text-[#0f3d38]">برنامج {pkg.destination || pkg.country}</p>
-          <div className="flex flex-wrap gap-2 text-[12.5px] font-bold text-[#185045]">
-            {pkg.trip_nights ? <Chip>{pkg.trip_nights} ليالٍ</Chip> : null}
-            <Chip>{pkg.adults} كبير · {pkg.children} صغير</Chip>
-            {pkg.arrival_date ? <Chip><DirText dir="ltr">{pkg.arrival_date}</DirText></Chip> : null}
+      {/*
+        THE document — the very same component the published client page and the
+        PDF render, fed by an adapter over the imported package. This stage used
+        to draw its own little summary card, so the screen never showed what the
+        client would actually receive.
+      */}
+      <div className="overflow-hidden rounded-2xl border border-[#e2ebe7] bg-[#f5f7f4]">
+        {preview ? (
+          <div className="origin-top scale-[0.62] [width:161.3%]">
+            <OfferDocument variant="client" offer={preview} />
           </div>
-
-          {pkg.cities.length > 0 ? (
-            <div>
-              <p className="mb-1 text-[11px] font-extrabold text-[#93aaa3]">{t("rp.field.cities")}</p>
-              <ul className="space-y-1 text-[13px] text-[#0f3d38]">
-                {pkg.cities.map((c, i) => {
-                  const h = pkg.hotels.find((x) => x.city_name === c.city_name) ?? pkg.hotels[i];
-                  return <li key={i}>• {c.city_name}{c.nights ? ` — ${c.nights} ليالٍ` : ""}{h?.hotel_name ? ` — ${h.hotel_name}` : ""}</li>;
-                })}
-              </ul>
-            </div>
-          ) : null}
-
-          {pkg.includes.length > 0 ? (
-            <div>
-              <p className="mb-1 text-[11px] font-extrabold text-[#93aaa3]">{t("rp.field.includes")}</p>
-              <ul className="grid gap-1 text-[12.5px] text-[#0f3d38] sm:grid-cols-2">{pkg.includes.map((s, i) => <li key={i}>✓ {s}</li>)}</ul>
-            </div>
-          ) : null}
-
-          <div className="flex items-center justify-between rounded-[12px] bg-[#e3f6ee] px-4 py-3">
-            <span className="text-[14px] font-extrabold text-[#0f7a52]">الإجمالي</span>
-            <DirText dir="ltr"><span className="tv-tnum text-[18px] font-extrabold text-[#0f7a52]">{data.final_total ?? "—"} {data.final_currency}</span></DirText>
-          </div>
-        </div>
+        ) : null}
       </div>
 
       {/* produce / result */}
@@ -108,6 +85,3 @@ export function PreviewStage({ draftId, data, patch }: RepackageStageProps) {
   );
 }
 
-function Chip({ children }: { children: React.ReactNode }) {
-  return <span className="rounded-full bg-[#f0f7f4] px-3 py-1">{children}</span>;
-}

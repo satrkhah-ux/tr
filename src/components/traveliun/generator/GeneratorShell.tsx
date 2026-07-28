@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -32,7 +31,8 @@ import { nightsStatus } from "@/lib/offer/schedule";
 import { useRole } from "@/lib/roles/RoleContext";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
-import { OfferDocument } from "./OfferDocument";
+import { OfferDocument } from "@/components/offer-doc/OfferDocument";
+import { draftToPreviewOffer } from "@/lib/offer/preview-dto";
 import type { StageFormProps } from "./stage-props";
 import { CustomerStage } from "./stages/CustomerStage";
 import { TripStage } from "./stages/TripStage";
@@ -79,7 +79,6 @@ export function GeneratorShell({
   initialData: DraftData;
   lookups: GeneratorLookups;
 }) {
-  const router = useRouter();
   const { t, language } = useTraveliunUI();
   const { can } = useRole();
   const canPricing = can("pricing.view");
@@ -373,7 +372,7 @@ export function GeneratorShell({
                 <p className="mb-2 text-[11px] font-bold text-[#93aaa3]">{t("pg.previewHint")}</p>
                 <div className="max-h-[calc(100vh-160px)] overflow-y-auto rounded-[14px]">
                   <div className="origin-top scale-[0.62] rtl:origin-top-right ltr:origin-top-left" style={{ width: "161%" }}>
-                    <OfferDocument data={data} onSectionClick={(target) => router.push(stageHref(draftId, target))} />
+                    <OfferDocument variant="client" offer={draftToPreviewOffer(data)} />
                   </div>
                 </div>
               </div>

@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CheckCircle2, FileText, Link2, Loader2, Rocket } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { produceOfferFromDraft } from "@/lib/data/drafts";
-import { stageHref } from "@/lib/offer/draft-types";
 import { validateDraft } from "@/lib/offer/draft-validation";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
-import { OfferDocument } from "../OfferDocument";
+import { OfferDocument } from "@/components/offer-doc/OfferDocument";
+import { draftToPreviewOffer } from "@/lib/offer/preview-dto";
 import { sectionClass, type StageFormProps } from "../stage-props";
 
 /**
@@ -18,7 +17,6 @@ import { sectionClass, type StageFormProps } from "../stage-props";
  * remain; the button then lists what to fix.
  */
 export function PreviewStage({ draftId, data, patch }: StageFormProps) {
-  const router = useRouter();
   const { t, language } = useTraveliunUI();
   const [producing, setProducing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +102,7 @@ export function PreviewStage({ draftId, data, patch }: StageFormProps) {
         </p>
       ) : null}
 
-      <OfferDocument data={data} onSectionClick={(target) => router.push(stageHref(draftId, target))} />
+      <OfferDocument variant="client" offer={draftToPreviewOffer(data)} />
     </div>
   );
 }
