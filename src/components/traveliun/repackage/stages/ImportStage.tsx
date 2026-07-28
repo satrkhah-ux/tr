@@ -192,8 +192,11 @@ export function ImportStage({ draftId, data }: RepackageStageProps) {
           </div>
           <p className="mb-2 text-[12px] text-[#93aaa3]">{t(SOURCES.find((s) => s.key === kind)!.hintKey)}</p>
 
+          {/* the keys matter: without them React reconciles the file <input> into the
+              url <input> in place, and the same DOM node flips uncontrolled → controlled */}
           {kind === "file" || kind === "image" ? (
             <input
+              key="src-file"
               ref={inputRef}
               type="file"
               accept={kind === "image" ? "image/*" : "application/pdf,.pdf"}
@@ -213,6 +216,7 @@ export function ImportStage({ draftId, data }: RepackageStageProps) {
             />
           ) : (
             <input
+              key="src-url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               disabled={loading}

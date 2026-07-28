@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { FilePlus2, FileText, Loader2, Trash2 } from "lucide-react";
+import { FileText, Loader2, Trash2, Wand2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { createRepackage, deleteRepackage, type RepackageSummary } from "@/lib/data/repackage";
@@ -55,7 +55,7 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
             disabled={creating}
             className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
           >
-            {creating ? <Loader2 className="size-4 animate-spin" /> : <FilePlus2 className="size-4" />}
+            {creating ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
             {creating ? t("pg.creating") : t("rp.new")}
           </button>
         </section>
