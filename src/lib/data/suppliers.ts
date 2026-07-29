@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { getCurrentRole } from "@/lib/data/metrics";
+import { logAudit } from "@/lib/data/audit";
 import { can } from "@/lib/roles/roles";
 import { encryptJson } from "@/lib/crypto/secrets";
 import { getSupplierAdapter, getSupplierRows } from "@/lib/providers/hotel-registry";
@@ -33,26 +34,6 @@ async function requireAdmin(): Promise<Admin | null> {
   const role = await getCurrentRole();
   if (!can(role, "settings.manage")) return null;
   return { id: user.id, email: user.email ?? null };
-}
-
-async function logAudit(
-  supabase: SupabaseClient,
-  actor: Admin,
-  action: string,
-  entityId: string,
-  meta: Record<string, unknown>,
-): Promise<void> {
-  try {
-    await supabase.from("audit_logs").insert({
-      actor_email: actor.email,
-      action,
-      entity: "hotel_suppliers",
-      entity_id: entityId,
-      meta,
-    });
-  } catch {
-    /* audit is best-effort; never block the primary action */
-  }
 }
 
 /** A credential-free view of a supplier row — safe to send to the browser. */
@@ -157,10 +138,15 @@ export async function saveSupplier(input: SaveSupplierInput): Promise<SaveResult
     const { error } = await supabase.from("hotel_suppliers").update(patch).eq("code", input.code);
     if (error) return { ok: false, error: "updateFailed" };
 
-    await logAudit(supabase, admin, replacingCreds ? "supplier.credentials_changed" : "supplier.updated", input.code, {
-      // NEVER the credential values — only which non-secret fields changed.
-      fields: Object.keys(patch).filter((k) => k !== "credentials_encrypted" && k !== "updated_at"),
-      credentials_changed: replacingCreds,
+    await logAudit({
+      action: replacingCreds ? "supplier.credentials_changed" : "supplier.updated",
+      entity: "hotel_suppliers",
+      entity_id: input.code,
+      meta: {
+        // NEVER the credential values — only which non-secret fields changed.
+        fields: Object.keys(patch).filter((k) => k !== "credentials_encrypted" && k !== "updated_at"),
+        credentials_changed: replacingCreds,
+      },
     });
     return { ok: true };
   } catch {
@@ -193,7 +179,7 @@ export async function testSupplierConnection(code: string): Promise<TestConnecti
         last_error: result.ok ? null : result.message,
       })
       .eq("code", code);
-    await logAudit(supabase, admin, "supplier.test_connection", code, { ok: result.ok });
+    await logAudit({ action: "supplier.test_connection", entity: "hotel_suppliers", entity_id: code, meta: { ok: result.ok } });
   } catch {
     /* status update is best-effort */
   }

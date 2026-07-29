@@ -15,6 +15,7 @@ import {
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { getClimateNote } from "./climate-actions";
 import { getCurrentEmployeeId } from "./metrics";
+import { setOfferStatus } from "./offer-status";
 import { getRates } from "./rates-actions";
 import { STAGE_KEYS } from "./pipeline";
 
@@ -963,25 +964,6 @@ export async function getInternalOffer(serial: string): Promise<InternalOfferDTO
 
 // ---------- publishing (versioned client render + status transition) ----------
 export type PublishResult = { ok: true; serial: string; version: number } | { ok: false; error: TranslationKey };
-
-/** Transition an offer's status and record it in offer_status_history. */
-async function setOfferStatus(
-  supabase: SupabaseClient,
-  offerId: string,
-  toStatus: string,
-  note: string | null,
-): Promise<void> {
-  const { data: current } = await supabase.from("offers").select("status").eq("id", offerId).maybeSingle();
-  const fromStatus = (current as { status: string } | null)?.status ?? null;
-  if (fromStatus === toStatus) return;
-  await supabase.from("offers").update({ status: toStatus }).eq("id", offerId);
-  await supabase.from("offer_status_history").insert({
-    offer_id: offerId,
-    from_status: fromStatus,
-    to_status: toStatus,
-    note,
-  });
-}
 
 /**
  * Publish an offer: freeze an immutable CLIENT snapshot (+ an internal one for
