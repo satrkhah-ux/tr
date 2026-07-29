@@ -30,9 +30,11 @@ function completeDraft(): DraftData {
     normalizeDraftHotel({ city_name: "كوالالمبور", hotel_id: "h1", hotel_name: "فندق 1", room_type_id: "rt1", room_type_name: "ديلوكس", board_type: "BB", rooms_count: 1 }),
     normalizeDraftHotel({ city_name: "لنكاوي", hotel_id: "h2", hotel_name: "فندق 2", room_type_id: "rt2", room_type_name: "سوبيريور", board_type: "HB", rooms_count: 1 }),
   ];
-  data.flights = [
-    { airline: "SV", flight_no: "SV832", from_airport: "RUH", to_airport: "KUL", departure_at: "2026-06-01T01:00", arrival_at: "2026-06-01T14:00", from_tz: "Asia/Riyadh", to_tz: "Asia/Kuala_Lumpur", date_user_set: false, cabin_class: "Y", baggage_allowance: "30kg", leg_order: "outbound" },
-  ];
+  data.flights = normalizeDraftData({
+    flights: [
+      { airline: "SV", flight_no: "SV832", from_airport: "RUH", to_airport: "KUL", departure_at: "2026-06-01T01:00", arrival_at: "2026-06-01T14:00", from_tz: "Asia/Riyadh", to_tz: "Asia/Kuala_Lumpur", date_user_set: false, cabin_class: "Y", baggage_allowance: "30kg", leg_order: "outbound" },
+    ],
+  }).flights;
   data.services = { includes: ["الفنادق"], excludes: [], terms: ["قابل للتعديل"] };
   data.pricing = {
     items: [{ item_type: "hotel", description: "فنادق", quantity: 1, buy_price: 1000, buy_currency: "SAR", sell_price: 1500, sell_currency: "SAR" }],

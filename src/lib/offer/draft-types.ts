@@ -324,7 +324,17 @@ export type DraftFlight = {
   /** true once the agent manually edited the departure DATE → stop auto-syncing it. */
   date_user_set: boolean;
   cabin_class: string;
+  /** free text kept for legacy drafts and anything the two fields below miss. */
   baggage_allowance: string;
+  /**
+   * Checked baggage, split because a traveller is told two different numbers and
+   * an airline enforces both: "30 kg" says nothing about whether that is one
+   * bag or two, and "2 bags" says nothing about the weight allowed in each.
+   * A single free-text field made agents write one and drop the other.
+   */
+  baggage_kg: number | null;
+  baggage_pieces: number | null;
+  cabin_baggage_kg: number | null;
   leg_order: FlightLegOrder;
 };
 
@@ -511,8 +521,28 @@ function normalizeDraftFlight(raw: unknown): DraftFlight {
     date_user_set: f.date_user_set === true,
     cabin_class: typeof f.cabin_class === "string" ? f.cabin_class : "",
     baggage_allowance: typeof f.baggage_allowance === "string" ? f.baggage_allowance : "",
+    baggage_kg: typeof f.baggage_kg === "number" ? f.baggage_kg : null,
+    baggage_pieces: typeof f.baggage_pieces === "number" ? f.baggage_pieces : null,
+    cabin_baggage_kg: typeof f.cabin_baggage_kg === "number" ? f.cabin_baggage_kg : null,
     leg_order: f.leg_order === "inbound" || f.leg_order === "internal" ? f.leg_order : "outbound",
   };
+}
+
+/**
+ * The one baggage line a document prints, built from whichever fields are set.
+ *
+ * Falls back to the legacy free text so a draft written before the split still
+ * shows what the agent typed — silently dropping it would look like the airline
+ * allows nothing.
+ */
+export function baggageLabel(f: Pick<DraftFlight, "baggage_kg" | "baggage_pieces" | "cabin_baggage_kg" | "baggage_allowance">): string {
+  const parts: string[] = [];
+  if (f.baggage_pieces && f.baggage_kg) parts.push(`${f.baggage_pieces} × ${f.baggage_kg} كجم`);
+  else if (f.baggage_kg) parts.push(`${f.baggage_kg} كجم`);
+  else if (f.baggage_pieces) parts.push(`${f.baggage_pieces} قطعة`);
+  if (f.cabin_baggage_kg) parts.push(`يد ${f.cabin_baggage_kg} كجم`);
+  if (parts.length > 0) return parts.join(" · ");
+  return f.baggage_allowance.trim();
 }
 
 /** Merge unknown jsonb into a full DraftData (tolerates old/partial drafts). */
@@ -595,6 +625,17 @@ export function deriveCityDates(arrivalDate: string | null, cities: DraftCity[])
     cursor = check_out;
     return { ...c, check_in, check_out };
   });
+}
+
+/**
+ * A day the agent deliberately left free, as opposed to one they have not
+ * written yet. The two look identical in the data — the difference is the title
+ * — so the check lives here rather than being re-derived in each screen.
+ */
+export const FREE_DAY_TITLE = "يوم حر";
+
+export function isFreeDay(day: Pick<DraftDay, "title">): boolean {
+  return day.title.trim() === FREE_DAY_TITLE;
 }
 
 /** Sum of allocated city nights. */

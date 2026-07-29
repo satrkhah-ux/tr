@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { CloudSun, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { CloudSun, Coffee, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
-import type { DraftDay } from "@/lib/offer/draft-types";
+import { FREE_DAY_TITLE, isFreeDay, type DraftDay } from "@/lib/offer/draft-types";
 import { daysNeedRebuild, draftDaySkeleton } from "@/lib/offer/itinerary";
 import { formatWeatherAr, isWeatherEmpty, weatherSourceAr } from "@/lib/offer/weather-format";
 import { itineraryStartDate } from "@/lib/offer/schedule";
@@ -167,6 +167,33 @@ export function ItineraryStage({ draftId, data, patch, replace }: StageFormProps
                   </span>
                 ) : null}
               </header>
+
+              {/*
+                A free day is a real part of a programme, not a gap in it. Left
+                blank the day reads as unfinished work — to the agent reviewing
+                the draft and to the client reading the document. One press
+                writes it as a deliberate choice, and pressing again gives the
+                day back rather than trapping it.
+              */}
+              <button
+                type="button"
+                onClick={() =>
+                  updateDay(
+                    index,
+                    isFreeDay(day)
+                      ? { title: "", activities: [], ai_generated: false }
+                      : { title: FREE_DAY_TITLE, activities: [t("pg.freeDayHint")], ai_generated: false },
+                  )
+                }
+                className={`mb-2 inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11.5px] font-bold transition-colors ${
+                  isFreeDay(day)
+                    ? "border-[#185045] bg-[#185045] text-white"
+                    : "border-[#b7d0c7] bg-white text-[#185045] hover:bg-[#f0f7f4]"
+                }`}
+              >
+                <Coffee className="size-3.5" />
+                {t("pg.freeDay")}
+              </button>
 
               <label className="mb-2 grid gap-1.5 text-[12px] font-bold text-[#185045]">
                 {t("pg.itin.dayTitle")}

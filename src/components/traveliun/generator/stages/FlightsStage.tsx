@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { AlertTriangle, Globe2, Loader2, Plane, Plus, RotateCcw, Search } from "lucide-react";
+import { AlertTriangle, Clock, Globe2, Loader2, Plane, Plus, RotateCcw, Search, TimerReset } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { getAssistantAvailability, lookupFlightNumber } from "@/lib/data/itinerary-actions";
 import type { FlightLookupHit } from "@/lib/providers/flight-lookup";
@@ -10,6 +10,7 @@ import {
   type DraftFlight,
   type LookupAirport,
 } from "@/lib/offer/draft-types";
+import { buildJourneys, formatWaitAr, type JourneyLeg } from "@/lib/offer/journey";
 import {
   autoDepartureDate,
   flightTiming,
@@ -82,6 +83,9 @@ function emptyFlight(legOrder: FlightLegOrder): DraftFlight {
     date_user_set: false,
     cabin_class: "",
     baggage_allowance: "",
+    baggage_kg: null,
+    baggage_pieces: null,
+    cabin_baggage_kg: null,
     leg_order: legOrder,
   };
 }
@@ -226,6 +230,14 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
   const international = rows.filter((r) => !isDomestic(r.flight));
   const domestic = rows.filter((r) => isDomestic(r.flight));
 
+  // Grouped into chains so a transit reads as ONE journey with a wait in the
+  // middle, rather than two flights that happen to share an offer.
+  const journeys = buildJourneys(flights);
+  const intlJourneys = journeys.filter((j) => j.leg_order !== "internal");
+  const domesticJourney = journeys.find((j) => j.leg_order === "internal") ?? null;
+  /** identity lookup — the array index is the edit handle everything else uses. */
+  const indexOf = (flight: DraftFlight) => flights.indexOf(flight);
+
   return (
     <section className={sectionClass}>
       <h2 className="mb-4 text-base font-extrabold text-[#003c3a]">{t("pg.flightsTitle")}</h2>
@@ -252,9 +264,31 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
           {t("pg.noFlightsYet")}
         </p>
       ) : (
-        <div className="mb-3 space-y-3">
-          {international.map(({ flight, index }) => (
-            <FlightRow key={index} flight={flight} index={index} showLegSelect handlers={handlers} />
+        <div className="mb-3 space-y-4">
+          {intlJourneys.map((journey) => (
+            <div key={journey.leg_order} className="rounded-[12px] border border-[#e2ebe7] bg-[#fbfdfc] p-2.5">
+              <JourneyHeader journey={journey} />
+              <div className="space-y-2">
+                {journey.legs.map((jl) => {
+                  const index = indexOf(jl.flight);
+                  return (
+                    <div key={index}>
+                      {/* the wait BEFORE this leg — the thing a client asks about
+                          and the only number here the eye cannot check, because
+                          the two clocks are in different timezones */}
+                      <LayoverBar leg={jl} airport={jl.flight.from_airport} />
+                      <FlightRow
+                        flight={jl.flight}
+                        index={index}
+                        segment={journey.isTransit ? jl.segment : undefined}
+                        showLegSelect
+                        handlers={handlers}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -281,10 +315,21 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
             {t("pg.noDomesticFlights")}
           </p>
         ) : (
-          <div className="mb-3 space-y-3">
-            {domestic.map(({ flight, index }) => (
-              <FlightRow key={index} flight={flight} index={index} handlers={handlers} />
-            ))}
+          <div className="mb-3 space-y-2">
+            {domesticJourney?.legs.map((jl) => {
+              const index = indexOf(jl.flight);
+              return (
+                <div key={index}>
+                  <LayoverBar leg={jl} airport={jl.flight.from_airport} />
+                  <FlightRow
+                    flight={jl.flight}
+                    index={index}
+                    segment={domesticJourney.isTransit ? jl.segment : undefined}
+                    handlers={handlers}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -369,15 +414,85 @@ function FlightLookup({ flightNo, onPick }: { flightNo: string; onPick: (hit: Fl
   );
 }
 
+/** «الذهاب · ترانزيت · إجمالي ١٠ س ٣٠ د» — the chain at a glance. */
+function JourneyHeader({ journey }: { journey: ReturnType<typeof buildJourneys>[number] }) {
+  const { t } = useTraveliunUI();
+  const total = formatDurationAr(journey.totalMinutes);
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+      <span className="text-[12.5px] font-extrabold text-[#0f3d38]">{t(LEG_LABEL_KEYS[journey.leg_order])}</span>
+      {journey.isTransit ? (
+        <span className="rounded-full bg-[#eaf1ff] px-2 py-0.5 text-[10.5px] font-extrabold text-[#2b57c4]">
+          {t("pg.transit")}
+        </span>
+      ) : (
+        <span className="rounded-full bg-[#e9f7f0] px-2 py-0.5 text-[10.5px] font-bold text-[#0f7a52]">
+          {t("pg.direct")}
+        </span>
+      )}
+      {total ? (
+        <span className="tv-tnum inline-flex items-center gap-1 rounded-full bg-[#eef4f1] px-2 py-0.5 text-[10.5px] font-bold text-[#557d78]">
+          <Clock className="size-3" />
+          {t("pg.journeyTotal")} <DirText dir="ltr">{total}</DirText>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The wait at the transit airport.
+ *
+ * Nothing is drawn for the first leg of a chain. When the zones are unknown the
+ * bar says so rather than showing a number computed from wall clocks that belong
+ * to different timezones — a wrong layover is what makes someone book a
+ * connection they cannot make.
+ */
+function LayoverBar({ leg, airport }: { leg: JourneyLeg<DraftFlight>; airport: string }) {
+  const { t } = useTraveliunUI();
+  if (leg.segment === 1) return null;
+
+  const wait = formatWaitAr(leg.layoverMinutes);
+  const impossible = leg.layoverMinutes !== null && leg.layoverMinutes < 0;
+  const tone = impossible || leg.layoverTooShort
+    ? "border-[#f4c9d4] bg-[#fdeef2] text-[#c22850]"
+    : leg.layoverLong
+      ? "border-[#f2e2b4] bg-[#fff8e8] text-[#a86a10]"
+      : "border-[#d6eadf] bg-[#f2fbf6] text-[#0f7a52]";
+
+  return (
+    <div className={`my-1.5 flex flex-wrap items-center gap-2 rounded-[10px] border px-3 py-2 text-[11.5px] font-bold ${tone}`}>
+      <TimerReset className="size-3.5" />
+      <span>{t("pg.layoverAt", { airport: airport || "—" })}</span>
+      {impossible ? (
+        <span>{t("pg.layoverImpossible")}</span>
+      ) : wait ? (
+        <>
+          <DirText dir="ltr">
+            <span className="tv-tnum">{wait}</span>
+          </DirText>
+          {leg.layoverTooShort ? <span>· {t("pg.layoverShort")}</span> : null}
+          {leg.layoverLong ? <span>· {t("pg.layoverLong")}</span> : null}
+        </>
+      ) : (
+        <span>{t("pg.layoverUnknown")}</span>
+      )}
+    </div>
+  );
+}
+
 /** One flight leg. `showLegSelect` is on for international rows (outbound/inbound). */
 function FlightRow({
   flight,
   index,
+  segment,
   showLegSelect = false,
   handlers,
 }: {
   flight: DraftFlight;
   index: number;
+  /** 1-based position in its chain; undefined for a direct journey. */
+  segment?: number;
   showLegSelect?: boolean;
   handlers: RowHandlers;
 }) {
@@ -390,6 +505,11 @@ function FlightRow({
 
   return (
     <div className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
+      {segment ? (
+        <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11px] font-extrabold text-[#185045]">
+          {t("pg.segmentN", { n: segment })}
+        </p>
+      ) : null}
       <div className="grid items-start gap-3 md:grid-cols-2 lg:grid-cols-3">
         {showLegSelect ? (
           <label className={rowLabelClass}>
@@ -498,14 +618,37 @@ function FlightRow({
             className={fieldClass}
           />
         </label>
-        <label className={rowLabelClass}>
-          {t("pg.baggage")}
-          <input
-            value={flight.baggage_allowance}
-            onChange={(e) => updateRow(index, { baggage_allowance: e.target.value })}
-            className={fieldClass}
-          />
-        </label>
+        {/* two numbers, not one string: an airline enforces the weight AND the
+            piece count, and "30 kg" alone leaves the agent guessing which. */}
+        <div className="grid grid-cols-3 gap-2">
+          <label className={rowLabelClass}>
+            {t("pg.baggageKg")}
+            <input
+              type="number" min={0} dir="ltr"
+              value={flight.baggage_kg ?? ""}
+              onChange={(e) => updateRow(index, { baggage_kg: e.target.value === "" ? null : Number(e.target.value) })}
+              className={`${fieldClass} tv-tnum text-center`}
+            />
+          </label>
+          <label className={rowLabelClass}>
+            {t("pg.baggagePieces")}
+            <input
+              type="number" min={0} dir="ltr"
+              value={flight.baggage_pieces ?? ""}
+              onChange={(e) => updateRow(index, { baggage_pieces: e.target.value === "" ? null : Number(e.target.value) })}
+              className={`${fieldClass} tv-tnum text-center`}
+            />
+          </label>
+          <label className={rowLabelClass}>
+            {t("pg.cabinBaggageKg")}
+            <input
+              type="number" min={0} dir="ltr"
+              value={flight.cabin_baggage_kg ?? ""}
+              onChange={(e) => updateRow(index, { cabin_baggage_kg: e.target.value === "" ? null : Number(e.target.value) })}
+              className={`${fieldClass} tv-tnum text-center`}
+            />
+          </label>
+        </div>
       </div>
 
       {/* timing footer — duration, +N day badge, arrival-before-departure guard */}
