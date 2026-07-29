@@ -45,14 +45,24 @@ const INVARIANT_STAGE: Record<InvariantViolation["code"], StageKey> = {
 };
 
 /**
- * How this hotel line states its room — an internal room-type row, a name
+ * How this hotel line states its rooms — internal room-type rows, names
  * inherited from the trip default, or a supplier rate that names its own room.
- * Returns null only when the line says nothing about the room at all.
+ *
+ * EVERY room must be stated, not just the first: a second room added for a
+ * driver and left blank would otherwise print as an unnamed room on a document
+ * the client signs.
  */
 function statedRoom(h: DraftData["hotels"][number]): string | null {
-  if (h.room_type_id) return h.room_type_id;
-  if (h.room_type_name.trim()) return "named";
+  const rooms = h.rooms.length > 0 ? h.rooms : [{ room_type_id: h.room_type_id, room_type_name: h.room_type_name }];
+  const allStated = rooms.every((r) => Boolean(r.room_type_id || r.room_type_name.trim()));
+  if (allStated) return "stated";
   return h.sourcing ? "supplier" : null;
+}
+
+/** null unless EVERY room says what it includes — same reasoning as statedRoom. */
+function statedBoard(h: DraftData["hotels"][number]): string | null {
+  const rooms = h.rooms.length > 0 ? h.rooms : [{ board_type: h.board_type }];
+  return rooms.every((r) => Boolean(r.board_type)) ? (h.board_type ?? "stated") : null;
 }
 
 export function validateDraft(data: DraftData): DraftValidation {
@@ -91,7 +101,7 @@ export function validateDraft(data: DraftData): DraftValidation {
         // inherited from the trip default is a name until a hotel is picked —
         // both are a stated room, and neither should block publishing.
         room_type_id: statedRoom(h),
-        board_type: h.board_type,
+        board_type: statedBoard(h),
         nights: city?.nights ?? null,
         check_in: city?.check_in ?? null,
         check_out: city?.check_out ?? null,
@@ -203,7 +213,7 @@ function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey
   const hotelsComplete =
     data.cities.length > 0 &&
     data.cities.every((c) => data.hotels.some((h) => h.city_name === c.city_name)) &&
-    data.hotels.every((h) => Boolean(statedRoom(h) && h.board_type));
+    data.hotels.every((h) => Boolean(statedRoom(h) && statedBoard(h)));
   const pricingComplete =
     isFixedPrice(data) || (data.pricing.items.length > 0 && data.pricing.items.every((i) => i.sell_price != null));
   const writtenDays = data.days.filter((d) => d.title.trim().length > 0);

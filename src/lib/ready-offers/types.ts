@@ -6,7 +6,7 @@
  * the server actions and the tests alike (mirrors lib/offer/draft-types.ts).
  */
 
-import { emptyDraftData, type DraftData } from "@/lib/offer/draft-types";
+import { emptyDraftData, normalizeDraftHotel, type DraftData } from "@/lib/offer/draft-types";
 
 export const TIERS = ["economy", "premium"] as const;
 export type Tier = (typeof TIERS)[number];
@@ -155,15 +155,12 @@ export function buildSeed(offer: ParsedOffer, readyOfferId: string): Partial<Dra
       nights: offer.nights ?? 0,
     },
     cities: cities.map((c) => ({ city_name: c.city_name, nights: c.nights, check_in: null, check_out: null })),
-    hotels: cities.map((c, i) => ({
-      city_name: c.city_name,
-      hotel_id: null,
-      hotel_name: offer.hotels_by_city[i] ?? offer.main_hotels,
-      room_type_id: null,
-      room_type_name: "",
-      board_type: null,
-      rooms_count: 1,
-    })),
+    hotels: cities.map((c, i) =>
+      normalizeDraftHotel({
+        city_name: c.city_name,
+        hotel_name: offer.hotels_by_city[i] ?? offer.main_hotels,
+      }),
+    ),
     services: { includes: offer.includes, excludes: offer.excludes, terms },
     pricing: { items: [], display_currency: offer.currency, final_total: offer.price },
     source: {

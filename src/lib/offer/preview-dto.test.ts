@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { draftToPreviewOffer, repackageToPreviewOffer } from "./preview-dto";
-import { emptyDraftData } from "./draft-types";
+import { emptyDraftData, normalizeDraftHotel } from "./draft-types";
 import { emptyRepackageData, type ExtractedPackage } from "@/lib/repackage/repackage-types";
 
 /**
@@ -98,8 +98,8 @@ describe("draftToPreviewOffer", () => {
       { city_name: "بينانج", nights: 2, check_in: null, check_out: null },
     ];
     draft.hotels = [
-      { city_name: "كوالالمبور", hotel_id: null, hotel_name: "أ", room_type_id: null, room_type_name: "", board_type: "BB", rooms_count: 1 },
-      { city_name: "بينانج", hotel_id: null, hotel_name: "ب", room_type_id: null, room_type_name: "", board_type: "BB", rooms_count: 1 },
+      normalizeDraftHotel({ city_name: "كوالالمبور", hotel_name: "أ", board_type: "BB" }),
+      normalizeDraftHotel({ city_name: "بينانج", hotel_name: "ب", board_type: "BB" }),
     ];
     const preview = draftToPreviewOffer(draft);
     expect(preview.hotels[0].check_in).toBe("2026-08-01");

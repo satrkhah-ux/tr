@@ -6,11 +6,17 @@ import { DirText } from "@/components/DirText";
 import {
   BOARD_LABEL_KEYS,
   BOARD_TYPES,
+  CURRENCIES,
   deriveCityDates,
   findLookupCountry,
+  normalizeDraftHotel,
+  resizeRooms,
   roomTypeNames,
+  withRooms,
   type DraftHotel,
+  type DraftRoomSpec,
   type DraftTrip,
+  type LookupRoomType,
 } from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { getDraft } from "@/lib/data/drafts";
@@ -22,22 +28,26 @@ import { fieldClass, sectionClass, type StageFormProps } from "../stage-props";
 
 const rowLabelClass = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 
+/** Everything on a hotel line EXCEPT the rooms and the scalars mirroring them. */
+type HotelScalarSlice = Omit<
+  Partial<DraftHotel>,
+  "rooms" | "rooms_count" | "room_type_id" | "room_type_name" | "board_type"
+>;
+
 /**
  * A city's hotel line starts from the trip defaults the agent entered with the
  * customer — room count, room type and board. Per-city edits happen here on top
  * of that, so the common case (same room everywhere) is zero extra typing.
  */
 function defaultLine(cityName: string, trip: DraftTrip): DraftHotel {
-  return {
+  // Every room starts as the trip default: the id is per-hotel and gets resolved
+  // by name once a hotel is chosen.
+  const room = { room_type_id: null, room_type_name: trip.default_room_type_name, board_type: trip.default_board };
+  return normalizeDraftHotel({
     city_name: cityName,
-    hotel_id: null,
-    hotel_name: "",
-    // the id is per-hotel; it is resolved by name once a hotel is chosen
-    room_type_id: null,
-    room_type_name: trip.default_room_type_name,
-    board_type: trip.default_board,
+    rooms: Array.from({ length: Math.max(trip.rooms || 1, 1) }, () => ({ ...room })),
     rooms_count: Math.max(trip.rooms || 1, 1),
-  };
+  });
 }
 
 function minutesAgo(iso: string | null): number | null {
@@ -73,7 +83,37 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
     return data.hotels.find((h) => h.city_name === cityName) ?? defaultLine(cityName, data.trip);
   }
 
-  function setHotel(cityName: string, slice: Partial<DraftHotel>) {
+  /**
+   * Replace a city's WHOLE line — used whenever rooms[] changes, because the
+   * array and its mirrors (rooms_count, room 1's type/board) must move together
+   * and only withRooms() is allowed to set them.
+   *
+   * A supplier rate is priced for a specific room product, so changing the hotel
+   * or any room voids it rather than leaving a stale price attached to something
+   * the supplier never quoted.
+   */
+  function setLine(cityName: string, next: DraftHotel) {
+    const rebuilt = data.cities.map((city) => {
+      const line = lineFor(city.city_name);
+      if (city.city_name !== cityName) return line;
+      const productChanged =
+        next.hotel_name !== line.hotel_name ||
+        next.rooms.length !== line.rooms.length ||
+        next.rooms.some(
+          (r, i) => r.room_type_name !== line.rooms[i]?.room_type_name || r.board_type !== line.rooms[i]?.board_type,
+        );
+      return productChanged && line.sourcing ? { ...next, sourcing: null } : next;
+    });
+    patch({ hotels: rebuilt });
+  }
+
+  /**
+   * Patch the NON-room fields of a city's line. The rooms array and its mirrors
+   * are excluded at the type level: writing `board_type` here would change what
+   * validation reads on room 1 while rooms[0] still said something else, and the
+   * two would disagree silently. Room edits go through setLine + withRooms.
+   */
+  function setHotel(cityName: string, slice: HotelScalarSlice) {
     const productChanged = "hotel_name" in slice || "hotel_id" in slice || "board_type" in slice || "rooms_count" in slice;
     const rebuilt = data.cities.map((city) => {
       const line = lineFor(city.city_name);
@@ -252,17 +292,17 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                       onChange={(e) => {
                         const name = e.target.value;
                         const match = hotelOptions.find((h) => h.name === name) ?? null;
-                        // the room type inherited from the customer stage is a NAME;
-                        // pin it to this hotel's own row now that we know the hotel
+                        // the room types inherited from the customer stage are NAMES;
+                        // pin them to this hotel's own rows now that we know the hotel
                         const hotelId = match ? match.id : null;
-                        const rt = lookups.roomTypes.find(
-                          (r) => (r.hotel_id === hotelId || r.hotel_id === null) && r.name === line.room_type_name,
-                        );
-                        setHotel(city.city_name, {
-                          hotel_name: name,
-                          hotel_id: hotelId,
-                          room_type_id: rt?.id ?? null,
-                        });
+                        const pinned = line.rooms.map((r) => ({
+                          ...r,
+                          room_type_id:
+                            lookups.roomTypes.find(
+                              (rt) => (rt.hotel_id === hotelId || rt.hotel_id === null) && rt.name === r.room_type_name,
+                            )?.id ?? null,
+                        }));
+                        setLine(city.city_name, withRooms({ ...line, hotel_name: name, hotel_id: hotelId }, pinned));
                       }}
                       className={fieldClass}
                     >
@@ -277,43 +317,77 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                     {t("pg.customHotel")}
                     <input value={line.hotel_id === null ? line.hotel_name : ""} onChange={(e) => setHotel(city.city_name, { hotel_name: e.target.value, hotel_id: null })} className={fieldClass} />
                   </label>
+                  {/* the Latin name a traveller shows a taxi driver */}
                   <label className={rowLabelClass}>
-                    {t("pg.roomType")}
-                    <select
-                      // keyed by NAME, not id: a line can carry a room type
-                      // inherited from the trip default before any hotel was
-                      // picked, and an id-keyed select would show it as blank.
-                      value={line.room_type_name}
-                      onChange={(e) => {
-                        const name = e.target.value;
-                        const roomType = roomTypeOptions.find((rt) => rt.name === name) ?? null;
-                        const slice: Partial<DraftHotel> = { room_type_id: roomType?.id ?? null, room_type_name: name };
-                        if (line.board_type === null && roomType?.default_board) slice.board_type = roomType.default_board;
-                        setHotel(city.city_name, slice);
-                      }}
-                      className={fieldClass}
-                    >
-                      <option value="">{t("pg.chooseRoomType")}</option>
-                      {roomTypeNames(roomTypeOptions).map((name) => <option key={name} value={name}>{name}</option>)}
-                      {line.room_type_name && !roomTypeOptions.some((rt) => rt.name === line.room_type_name) ? (
-                        <option value={line.room_type_name}>{line.room_type_name}</option>
-                      ) : null}
-                    </select>
+                    {t("pg.hotelNameEn")}
+                    <input
+                      dir="ltr"
+                      value={line.hotel_name_en}
+                      onChange={(e) => setHotel(city.city_name, { hotel_name_en: e.target.value })}
+                      className={`${fieldClass} text-start`}
+                      placeholder="Baku Center Hotel"
+                    />
                   </label>
-                  <div className="grid grid-cols-[1fr_110px] gap-3">
+                  <label className={rowLabelClass}>
+                    {t("pg.roomsCount")}
+                    <input
+                      type="number" min={1} dir="ltr"
+                      value={line.rooms_count}
+                      onChange={(e) => setLine(city.city_name, resizeRooms(line, Number(e.target.value)))}
+                      className={`${fieldClass} tv-tnum text-center`}
+                    />
+                  </label>
+                </div>
+
+                {/* ONE block per room: a second room is often a different product
+                    (the driver's), and it is booked but never labelled as such. */}
+                <div className="mt-3 space-y-2">
+                  {line.rooms.map((room, roomIndex) => (
+                    <RoomRow
+                      key={roomIndex}
+                      room={room}
+                      index={roomIndex}
+                      single={line.rooms.length === 1}
+                      roomTypeOptions={roomTypeOptions}
+                      onChange={(slice) =>
+                        setLine(
+                          city.city_name,
+                          withRooms(line, line.rooms.map((r, i) => (i === roomIndex ? { ...r, ...slice } : r))),
+                        )
+                      }
+                    />
+                  ))}
+                </div>
+
+                {/* manual price — used when the supplier search is not the source */}
+                {!line.sourcing ? (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px]">
                     <label className={rowLabelClass}>
-                      {t("pg.board")}
-                      <select value={line.board_type ?? ""} onChange={(e) => setHotel(city.city_name, { board_type: e.target.value === "" ? null : (e.target.value as BoardType) })} className={fieldClass}>
-                        <option value="">{t("pg.chooseBoard")}</option>
-                        {BOARD_TYPES.map((board) => <option key={board} value={board}>{t(BOARD_LABEL_KEYS[board])}</option>)}
+                      {t("pg.manualPrice")}
+                      <input
+                        type="number" min={0} dir="ltr"
+                        value={line.manual_price ?? ""}
+                        onChange={(e) =>
+                          setHotel(city.city_name, {
+                            manual_price: e.target.value === "" ? null : Number(e.target.value),
+                          })
+                        }
+                        className={`${fieldClass} tv-tnum text-center`}
+                        placeholder="0"
+                      />
+                    </label>
+                    <label className={rowLabelClass}>
+                      {t("pg.currencyCol")}
+                      <select
+                        value={line.manual_currency}
+                        onChange={(e) => setHotel(city.city_name, { manual_currency: e.target.value })}
+                        className={fieldClass}
+                      >
+                        {CURRENCIES.map((code) => <option key={code} value={code}>{code}</option>)}
                       </select>
                     </label>
-                    <label className={rowLabelClass}>
-                      {t("pg.roomsCount")}
-                      <input type="number" min={1} dir="ltr" value={line.rooms_count} onChange={(e) => setHotel(city.city_name, { rooms_count: Math.max(Number(e.target.value) || 1, 1) })} className={`${fieldClass} tv-tnum text-center`} />
-                    </label>
                   </div>
-                </div>
+                ) : null}
 
                 {/* selected supplier rate — image, facilities, price, freshness */}
                 {line.sourcing ? (
@@ -325,6 +399,72 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * One room of a hotel line: its type and what it includes.
+ *
+ * Numbered only when there is more than one — «الغرفة ١» on a single-room stay
+ * is noise, but on a two-room stay the number is the only thing distinguishing
+ * the family's double from the room quietly booked for the driver.
+ */
+function RoomRow({
+  room,
+  index,
+  single,
+  roomTypeOptions,
+  onChange,
+}: {
+  room: DraftRoomSpec;
+  index: number;
+  single: boolean;
+  roomTypeOptions: LookupRoomType[];
+  onChange: (slice: Partial<DraftRoomSpec>) => void;
+}) {
+  const { t } = useTraveliunUI();
+  const names = roomTypeNames(roomTypeOptions);
+
+  return (
+    <div className="grid gap-3 rounded-[10px] border border-[#e7f0ec] bg-white p-2.5 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
+      <span className="self-center rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11.5px] font-extrabold text-[#185045]">
+        {single ? t("pg.roomOne") : t("pg.roomN", { n: index + 1 })}
+      </span>
+      <label className={rowLabelClass}>
+        {t("pg.roomType")}
+        <select
+          // keyed by NAME: a room can carry a type inherited from the trip
+          // default before any hotel was picked, and an id-keyed select would
+          // show that as blank.
+          value={room.room_type_name}
+          onChange={(e) => {
+            const name = e.target.value;
+            const rt = roomTypeOptions.find((o) => o.name === name) ?? null;
+            const slice: Partial<DraftRoomSpec> = { room_type_id: rt?.id ?? null, room_type_name: name };
+            if (room.board_type === null && rt?.default_board) slice.board_type = rt.default_board;
+            onChange(slice);
+          }}
+          className={fieldClass}
+        >
+          <option value="">{t("pg.chooseRoomType")}</option>
+          {names.map((name) => <option key={name} value={name}>{name}</option>)}
+          {room.room_type_name && !names.includes(room.room_type_name) ? (
+            <option value={room.room_type_name}>{room.room_type_name}</option>
+          ) : null}
+        </select>
+      </label>
+      <label className={rowLabelClass}>
+        {t("pg.board")}
+        <select
+          value={room.board_type ?? ""}
+          onChange={(e) => onChange({ board_type: e.target.value === "" ? null : (e.target.value as BoardType) })}
+          className={fieldClass}
+        >
+          <option value="">{t("pg.chooseBoard")}</option>
+          {BOARD_TYPES.map((b) => <option key={b} value={b}>{t(BOARD_LABEL_KEYS[b])}</option>)}
+        </select>
+      </label>
+    </div>
   );
 }
 

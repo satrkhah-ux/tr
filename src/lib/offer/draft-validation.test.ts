@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { deriveCityDates, emptyDraftData, normalizeDraftData, type DraftData } from "./draft-types";
+import {
+  deriveCityDates,
+  emptyDraftData,
+  normalizeDraftData,
+  normalizeDraftHotel,
+  withRooms,
+  type DraftData,
+} from "./draft-types";
 import { validateDraft } from "./draft-validation";
 
 function completeDraft(): DraftData {
@@ -20,8 +27,8 @@ function completeDraft(): DraftData {
     { city_name: "لنكاوي", nights: 2, check_in: null, check_out: null },
   ]);
   data.hotels = [
-    { city_name: "كوالالمبور", hotel_id: "h1", hotel_name: "فندق 1", room_type_id: "rt1", room_type_name: "ديلوكس", board_type: "BB", rooms_count: 1 },
-    { city_name: "لنكاوي", hotel_id: "h2", hotel_name: "فندق 2", room_type_id: "rt2", room_type_name: "سوبيريور", board_type: "HB", rooms_count: 1 },
+    normalizeDraftHotel({ city_name: "كوالالمبور", hotel_id: "h1", hotel_name: "فندق 1", room_type_id: "rt1", room_type_name: "ديلوكس", board_type: "BB", rooms_count: 1 }),
+    normalizeDraftHotel({ city_name: "لنكاوي", hotel_id: "h2", hotel_name: "فندق 2", room_type_id: "rt2", room_type_name: "سوبيريور", board_type: "HB", rooms_count: 1 }),
   ];
   data.flights = [
     { airline: "SV", flight_no: "SV832", from_airport: "RUH", to_airport: "KUL", departure_at: "2026-06-01T01:00", arrival_at: "2026-06-01T14:00", from_tz: "Asia/Riyadh", to_tz: "Asia/Kuala_Lumpur", date_user_set: false, cabin_class: "Y", baggage_allowance: "30kg", leg_order: "outbound" },
@@ -75,7 +82,8 @@ describe("validateDraft", () => {
 
   it("BLOCKS on a hotel missing room type / board and attributes it to hotels", () => {
     const data = completeDraft();
-    data.hotels[1] = { ...data.hotels[1], room_type_id: null, board_type: null };
+    // through withRooms — the rooms array is the truth, the scalars only mirror it
+    data.hotels[1] = withRooms(data.hotels[1], [{ room_type_id: null, room_type_name: "", board_type: null }]);
     const result = validateDraft(data);
     expect(result.ok).toBe(false);
     const violation = result.blocking.find((i) => i.invariant?.code === "hotel_missing_room_or_board");

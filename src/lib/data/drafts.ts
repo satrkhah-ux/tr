@@ -9,6 +9,7 @@ import {
   emptyDraftData,
   emptyTermLibrary,
   normalizeDraftData,
+  normalizeDraftHotel,
   type DraftData,
   type GeneratorLookups,
   type ReusableProgram,
@@ -324,15 +325,13 @@ export async function copyProgramIntoDraft(draftId: string, serial: string): Pro
       itineraryStartDate(record.data.trip, record.data.flights),
       cityRows.map((c) => ({ city_name: c.city_name, nights: c.nights ?? 1, check_in: null, check_out: null })),
     );
-    const hotels = cityRows.map((c) => ({
-      city_name: c.city_name,
-      hotel_id: null,
-      hotel_name: c.hotel_name ?? "",
-      room_type_id: null,
-      room_type_name: c.room_type ?? "",
-      board_type: null,
-      rooms_count: 1,
-    }));
+    const hotels = cityRows.map((c) =>
+      normalizeDraftHotel({
+        city_name: c.city_name,
+        hotel_name: c.hotel_name ?? "",
+        room_type_name: c.room_type ?? "",
+      }),
+    );
 
     return saveDraftStages(draftId, {
       cities,

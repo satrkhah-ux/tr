@@ -9,7 +9,14 @@ import { getEnabledHotelSuppliers, getSupplierAdapter } from "@/lib/providers/ho
 import type { HotelSearchQuery } from "@/lib/providers/hotel-supplier";
 import { priceSupplierRate } from "@/lib/pricing/price-line";
 import type { MarkupContext } from "@/lib/pricing/markup";
-import { deriveCityDates, type DraftHotel, type DraftHotelSourcing, type DraftPricingItem } from "@/lib/offer/draft-types";
+import {
+  deriveCityDates,
+  normalizeDraftHotel,
+  withRooms,
+  type DraftHotel,
+  type DraftHotelSourcing,
+  type DraftPricingItem,
+} from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import type { BoardType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
@@ -214,25 +221,24 @@ export async function selectHotelRate(
   // set the chosen hotel on the city's line (rebuild from cities like the stage does)
   const hotels: DraftHotel[] = data.cities.map((c) => {
     const existing = data.hotels.find((h) => h.city_name === c.city_name);
-    const base: DraftHotel = existing ?? {
-      city_name: c.city_name,
-      hotel_id: null,
-      hotel_name: "",
-      room_type_id: null,
-      room_type_name: "",
-      board_type: null,
-      rooms_count: 1,
-    };
+    const base: DraftHotel = existing ?? normalizeDraftHotel({ city_name: c.city_name });
     if (c.city_name !== cityName) return base;
-    return {
-      ...base,
-      hotel_id: null, // supplier hotel — not an internal mapping
-      hotel_name: content?.name_ar || base.hotel_name || rate.hotel_name,
-      room_type_id: null,
-      room_type_name: rate.room_category_raw,
-      board_type: rate.board_type,
-      sourcing,
-    };
+    // The supplier rate describes ONE room product; every room on this line
+    // becomes that product (withRooms keeps rooms_count and the mirrors in step).
+    return withRooms(
+      {
+        ...base,
+        hotel_id: null, // supplier hotel — not an internal mapping
+        hotel_name: content?.name_ar || base.hotel_name || rate.hotel_name,
+        // the content cache carries no Latin name; whatever the agent typed stays
+        sourcing,
+      },
+      base.rooms.map(() => ({
+        room_type_id: null,
+        room_type_name: rate.room_category_raw,
+        board_type: rate.board_type,
+      })),
+    );
   });
 
   // keep the offer rollup in sync (one hotel pricing item per line)

@@ -204,18 +204,109 @@ export type DraftHotelSourcing = {
   rate_fetched_at: string | null;
 };
 
+/**
+ * One booked room. A city often needs more than one and they are not alike — a
+ * double for the family plus a single that is really the driver's, which is
+ * booked but never labelled as such on the client document.
+ */
+export type DraftRoomSpec = {
+  room_type_id: string | null;
+  room_type_name: string;
+  board_type: BoardType | null;
+};
+
+export function emptyRoomSpec(): DraftRoomSpec {
+  return { room_type_id: null, room_type_name: "", board_type: null };
+}
+
 /** One hotel line per city (aligned by city_name). Prices live in the pricing stage. */
 export type DraftHotel = {
   city_name: string;
   hotel_id: string | null;
   hotel_name: string;
+  /**
+   * The hotel's Latin name. Printed beside the Arabic one because a traveller
+   * who cannot read Arabic still has to find the building, show the name to a
+   * taxi driver, and match it against the booking.
+   */
+  hotel_name_en: string;
+  /**
+   * THE rooms. `rooms_count` and the room-type/board scalars below mirror
+   * rooms.length and rooms[0] — keep them in step with withRooms(), never by
+   * hand. The mirrors exist so the document, the DTO and the invariants that
+   * predate multi-room lines keep working untouched.
+   */
+  rooms: DraftRoomSpec[];
   room_type_id: string | null;
   room_type_name: string;
   board_type: BoardType | null;
   rooms_count: number;
+  /** manual sell price for the whole stay, when not priced from a supplier. */
+  manual_price: number | null;
+  manual_currency: string;
   /** present once priced from a supplier rate; undefined for manually-priced lines. */
   sourcing?: DraftHotelSourcing | null;
 };
+
+/**
+ * The ONLY writer of the rooms array and its mirrors. Anything that changes the
+ * rooms goes through here, so rooms_count and the room-1 scalars can never drift
+ * from the array the UI is editing.
+ */
+export function withRooms(line: DraftHotel, rooms: DraftRoomSpec[]): DraftHotel {
+  const safe = rooms.length > 0 ? rooms : [emptyRoomSpec()];
+  const first = safe[0];
+  return {
+    ...line,
+    rooms: safe,
+    rooms_count: safe.length,
+    room_type_id: first.room_type_id,
+    room_type_name: first.room_type_name,
+    board_type: first.board_type,
+  };
+}
+
+/** Grow/shrink the rooms of a line, cloning the first room into any new slot. */
+export function resizeRooms(line: DraftHotel, count: number): DraftHotel {
+  const n = Math.max(Math.trunc(count) || 1, 1);
+  const current = line.rooms.length > 0 ? line.rooms : [emptyRoomSpec()];
+  const template = current[0];
+  return withRooms(
+    line,
+    Array.from({ length: n }, (_, i) => current[i] ?? { ...template }),
+  );
+}
+
+/** Backfill a hotel line saved before it carried rooms[] / the English name. */
+export function normalizeDraftHotel(raw: unknown): DraftHotel {
+  const h = (raw && typeof raw === "object" ? raw : {}) as Partial<DraftHotel>;
+  const count = Math.max(Math.trunc(Number(h.rooms_count)) || 1, 1);
+  const legacy: DraftRoomSpec = {
+    room_type_id: typeof h.room_type_id === "string" ? h.room_type_id : null,
+    room_type_name: typeof h.room_type_name === "string" ? h.room_type_name : "",
+    board_type: (h.board_type ?? null) as BoardType | null,
+  };
+  // An old line described ONE room and a count; every room was that room.
+  const rooms = Array.isArray(h.rooms) && h.rooms.length > 0 ? h.rooms : Array.from({ length: count }, () => ({ ...legacy }));
+  const base: DraftHotel = {
+    city_name: typeof h.city_name === "string" ? h.city_name : "",
+    hotel_id: typeof h.hotel_id === "string" ? h.hotel_id : null,
+    hotel_name: typeof h.hotel_name === "string" ? h.hotel_name : "",
+    hotel_name_en: typeof h.hotel_name_en === "string" ? h.hotel_name_en : "",
+    rooms,
+    room_type_id: legacy.room_type_id,
+    room_type_name: legacy.room_type_name,
+    board_type: legacy.board_type,
+    rooms_count: count,
+    manual_price: typeof h.manual_price === "number" ? h.manual_price : null,
+    manual_currency: typeof h.manual_currency === "string" && h.manual_currency ? h.manual_currency : "SAR",
+    // deliberately NOT `sourcing: h.sourcing ?? null` — a seeded line must carry
+    // no supplier key at all, and a null one still reads as "priced from a
+    // supplier, expired" to anything checking for the property.
+    ...(h.sourcing ? { sourcing: h.sourcing } : {}),
+  };
+  return withRooms(base, rooms);
+}
 
 export type DraftFlight = {
   airline: string;
@@ -442,7 +533,7 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     },
     scope: normalizeScope(source.scope),
     cities: Array.isArray(source.cities) ? source.cities : [],
-    hotels: Array.isArray(source.hotels) ? source.hotels : [],
+    hotels: Array.isArray(source.hotels) ? source.hotels.map(normalizeDraftHotel) : [],
     flights: Array.isArray(source.flights) ? source.flights.map(normalizeDraftFlight) : [],
     transport: Array.isArray(source.transport) ? source.transport : [],
     services: { ...empty.services, ...(source.services ?? {}) },
