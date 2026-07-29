@@ -33,6 +33,8 @@ import {
 import { CLIENT_STATES, EXECUTION_STATES, canAdvanceClient, canAdvanceExecution } from "@/lib/operations/state";
 import type { PassportRead, TravelerListItem } from "@/lib/operations/traveler-dto";
 import type { TranslationKey } from "@/lib/i18n";
+import type { OperationBooking, OperationDocument } from "@/lib/data/operation-bookings";
+import { DocumentsPanel } from "./DocumentsPanel";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
@@ -48,10 +50,16 @@ export function OperationCase({
   operation,
   travelers,
   payments,
+  bookings,
+  documents,
+  hasDays,
 }: {
   operation: OperationCard;
   travelers: TravelerListItem[];
   payments: OperationPayment[];
+  bookings: OperationBooking[];
+  documents: OperationDocument[];
+  hasDays: boolean;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -122,6 +130,13 @@ export function OperationCase({
             />
           </div>
         </section>
+
+        <DocumentsPanel
+          operationId={operation.id}
+          bookings={bookings}
+          documents={documents}
+          hasDays={hasDays}
+        />
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <TravelersPanel operationId={operation.id} travelers={travelers} />

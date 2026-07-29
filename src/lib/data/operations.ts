@@ -5,6 +5,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { getCurrentEmployeeId, getCurrentRole } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
+import { notifyOperationConfirmed } from "@/lib/data/ops-notify";
 import { setOfferStatus } from "@/lib/data/offer-status";
 import { can } from "@/lib/roles/roles";
 import {
@@ -136,6 +137,33 @@ export async function confirmOffer(input: {
       entity_id: id,
       meta: { offer_id: input.offer_id, channel: input.channel ?? "phone" },
     });
+
+    // Push it at the ops team rather than waiting for someone to open the board.
+    // Best-effort: a failed notification must not undo a confirmation that has
+    // already been recorded — the operation exists either way.
+    try {
+      const offerRes = await supabase
+        .from("offers")
+        .select("serial, destination, customers(arabic_name)")
+        .eq("id", input.offer_id)
+        .maybeSingle();
+      const o = offerRes.data as unknown as {
+        serial: string;
+        destination: string | null;
+        customers: { arabic_name: string | null } | { arabic_name: string | null }[] | null;
+      } | null;
+      await notifyOperationConfirmed({
+        serial: o?.serial ?? "",
+        customer: one(o?.customers)?.arabic_name ?? null,
+        destination: o?.destination ?? null,
+        travelStart: snap.arrival_date ?? null,
+        operationId: id,
+        confirmedBy: (await getServerUser())?.email ?? null,
+      });
+    } catch {
+      /* notification is best-effort */
+    }
+
     return { ok: true, id };
   } catch {
     return { ok: false, error: "err.db" };

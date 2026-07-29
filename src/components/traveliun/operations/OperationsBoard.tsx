@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Loader2, Plus, Search, Users } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Search, Users } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { confirmOffer, type ConfirmableOffer, type OperationCard } from "@/lib/data/operations";
+import type { OperationCard } from "@/lib/data/operations";
 import { severityRank, type OperationSignal } from "@/lib/operations/signals";
 import type { TranslationKey } from "@/lib/i18n";
 import { TraveliunShell } from "../TraveliunShell";
@@ -29,11 +29,14 @@ type Filter = "needs_action" | "all" | "unpaid" | "travelling_soon";
 
 export function OperationsBoard({
   operations,
-  confirmable,
   today,
 }: {
+  /**
+   * ONLY confirmed cases. The board deliberately does not list unconfirmed
+   * offers: ops staff work what sales has handed over, and showing the whole
+   * customer pipeline here made the one screen they live in unreadable.
+   */
   operations: (OperationCard & { signals: OperationSignal[] })[];
-  confirmable: ConfirmableOffer[];
   /** injected by the server page so the board and the signals agree on "now". */
   today: string;
 }) {
@@ -130,7 +133,6 @@ export function OperationsBoard({
           </div>
         )}
 
-        <StartPanel offers={confirmable} />
         {/* today is injected so the server and the client agree on the clock */}
         <span className="hidden" data-today={today} />
       </div>
@@ -217,57 +219,5 @@ function Track({ label, value, tone }: { label: string; value: string; tone: "br
       <span className="opacity-60">{label}</span>
       {value}
     </span>
-  );
-}
-
-/** Confirmed offers with no operation yet — one click starts the file. */
-function StartPanel({ offers }: { offers: ConfirmableOffer[] }) {
-  const { t } = useTraveliunUI();
-  const [pending, startTransition] = useTransition();
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  if (offers.length === 0) return null;
-
-  function start(offerId: string) {
-    setBusy(offerId);
-    setError(null);
-    startTransition(async () => {
-      const res = await confirmOffer({ offer_id: offerId, channel: "whatsapp" });
-      setBusy(null);
-      if (!res.ok) setError(t(res.error));
-      else window.location.assign(`/operations/${res.id}`);
-    });
-  }
-
-  return (
-    <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-      <h2 className="text-sm font-extrabold text-[#185045]">{t("ops.startFromOffer")}</h2>
-      <p className="mt-1 text-[12px] font-semibold text-[#93aaa3]">{t("ops.startHint")}</p>
-      {error ? <p role="alert" className="mt-2 text-[12.5px] font-bold text-[#c22850]">{error}</p> : null}
-
-      <ul className="mt-3 space-y-2">
-        {offers.map((o) => (
-          <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 rounded-[11px] border border-[#e2ebe7] px-4 py-2.5">
-            <div className="min-w-0">
-              <p className="truncate text-[13px] font-extrabold text-[#0f3d38]">{o.customer_name || "—"}</p>
-              <p className="tv-tnum mt-0.5 text-[11.5px] font-bold text-[#93aaa3]">
-                <DirText dir="ltr">{o.serial}</DirText>
-                {o.destination ? <span className="ms-2 font-semibold">{o.destination}</span> : null}
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => start(o.id)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
-            >
-              {busy === o.id ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-              {busy === o.id ? t("ops.confirming") : t("ops.confirm")}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

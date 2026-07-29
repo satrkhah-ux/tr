@@ -1290,4 +1290,9 @@ export const en = {
   "ops.err.noConversation": "No WhatsApp conversation with this contact — use copy or open WhatsApp.",
   "ops.err.emailUnavailable": "Email is not configured yet.",
   "ops.err.notFound": "Operation not found.",
+  "ops.err.titleRequired": "Give the booking a title.",
+  "ops.err.confirmationRequired": "The confirmation number is required.",
+  "ops.err.nothingToIssue": "Nothing confirmed to issue a document from yet.",
+  "ops.doc.flight_ticket": "Flight ticket",
+  "ops.doc.itinerary": "Itinerary",
 } as const;

@@ -1288,4 +1288,9 @@ export const ar: Dictionary = {
   "ops.err.noConversation": "لا توجد محادثة واتساب مع هذه الجهة — استخدم النسخ أو فتح واتساب.",
   "ops.err.emailUnavailable": "البريد الإلكتروني غير مُهيّأ بعد.",
   "ops.err.notFound": "العملية غير موجودة.",
+  "ops.err.titleRequired": "أعطِ الحجز عنواناً.",
+  "ops.err.confirmationRequired": "رقم التأكيد مطلوب.",
+  "ops.err.nothingToIssue": "لا يوجد حجز مؤكّد لإصدار مستند منه.",
+  "ops.doc.flight_ticket": "تذكرة طيران",
+  "ops.doc.itinerary": "الجدول السياحي",
 };

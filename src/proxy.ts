@@ -12,7 +12,12 @@ import { AUTH_STORAGE_KEY, parseSessionCookie } from "@/lib/supabase/constants";
  * expired but who still hold a refresh token.
  */
 
-const PUBLIC_PREFIXES = ["/sign-in", "/client-offer", "/tg"];
+// `/voucher` is public in the same sense `/client-offer` is: the traveller who
+// holds the link is not a system user. It is NOT unguarded — the route handler
+// validates a 24-byte token and a revoked_at through the service role, because
+// RLS cannot see a URL. A session check here would simply lock the traveller out
+// of the document they were handed.
+const PUBLIC_PREFIXES = ["/sign-in", "/client-offer", "/voucher", "/tg"];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
 
 function isPublic(pathname: string): boolean {

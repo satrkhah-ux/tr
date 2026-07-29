@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, Eye, Loader2, Search, X } from "lucide-react";
+import { CalendarDays, ClipboardCheck, Eye, Loader2, Search, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { StatusBadge, statusTone } from "@/components/ui/StatusBadge";
 import { listKanban, updateOfferStage, type KanbanCard, type KanbanColumn } from "@/lib/data/offers";
+import { confirmOffer } from "@/lib/data/operations";
 import { KANBAN_STAGES } from "@/lib/data/pipeline";
 import type { TranslationKey } from "@/lib/i18n";
 import { TraveliunShell } from "./TraveliunShell";
@@ -203,9 +204,13 @@ export function TraveliunKanban() {
                 <StatusBadge tone={statusTone(selected.status)} />
               </div>
             </div>
+            {/* Confirmation belongs HERE, with the salesperson who owns the
+                offer and just came off the call — not on the operations board,
+                where listing every unconfirmed client buried the actual work. */}
+            <ConfirmToOperations offerId={selected.id} />
             <Link
               href={`/client-offer/${selected.serial}`}
-              className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[11px] bg-[#185045] text-sm font-bold text-white hover:bg-[#0f4439]"
+              className="mt-2 inline-flex h-11 w-full items-center justify-center gap-2 rounded-[11px] border border-[#dbe6e1] bg-white text-sm font-bold text-[#185045] hover:bg-[#f4f8f6]"
             >
               {t("offers.openClientLink")}
             </Link>
@@ -213,6 +218,46 @@ export function TraveliunKanban() {
         </div>
       ) : null}
     </TraveliunShell>
+  );
+}
+
+/**
+ * «تم تأكيد العميل» — the handover from sales to operations.
+ *
+ * Pressing it records the confirmation, opens the operation, and pushes a
+ * Telegram notice at whoever runs bookings. Idempotent server-side, so a second
+ * click lands on the same case rather than creating a duplicate.
+ */
+function ConfirmToOperations({ offerId }: { offerId: string }) {
+  const { t } = useTraveliunUI();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run() {
+    setBusy(true);
+    setError(null);
+    const res = await confirmOffer({ offer_id: offerId, channel: "whatsapp" });
+    if (!res.ok) {
+      setError(t(res.error));
+      setBusy(false);
+      return;
+    }
+    window.location.assign(`/operations/${res.id}`);
+  }
+
+  return (
+    <div className="mt-5">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => void run()}
+        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[11px] bg-[#185045] text-sm font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+      >
+        {busy ? <Loader2 className="size-4 animate-spin" /> : <ClipboardCheck className="size-4" />}
+        {busy ? t("ops.confirming") : t("ops.confirm")}
+      </button>
+      {error ? <p className="mt-1.5 text-[12px] font-bold text-[#c22850]">{error}</p> : null}
+    </div>
   );
 }
 

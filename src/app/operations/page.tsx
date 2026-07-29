@@ -1,5 +1,5 @@
 import { OperationsBoard } from "@/components/traveliun/operations/OperationsBoard";
-import { listConfirmableOffers, listOperations } from "@/lib/data/operations";
+import { listOperations } from "@/lib/data/operations";
 import { listTravelers } from "@/lib/data/operation-travelers";
 import { operationSignals, type OperationSnapshot } from "@/lib/operations/signals";
 
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function OperationsPage() {
   const today = new Date().toISOString().slice(0, 10);
-  const [operations, confirmable] = await Promise.all([listOperations(), listConfirmableOffers()]);
+  const operations = await listOperations();
 
   const withSignals = await Promise.all(
     operations.map(async (op) => {
@@ -36,5 +36,5 @@ export default async function OperationsPage() {
     }),
   );
 
-  return <OperationsBoard operations={withSignals} confirmable={confirmable} today={today} />;
+  return <OperationsBoard operations={withSignals} today={today} />;
 }
