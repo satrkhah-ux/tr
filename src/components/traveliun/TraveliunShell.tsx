@@ -20,6 +20,7 @@ import {
   Car,
   ChevronDown,
   ChevronLeft,
+  ClipboardCheck,
   Columns3,
   Contact,
   FileText,
@@ -74,6 +75,9 @@ const navGroups: NavGroup[] = [
   { labelKey: "nav.dashboard", href: "/dashboard", icon: BarChart3 },
   { labelKey: "nav.intelligenceHub", href: "/travel-intelligence", icon: Calculator },
   { labelKey: "nav.kanban", href: "/kanban-board", icon: Columns3 },
+  // Operations sits with the board, not under Packages: it is where a confirmed
+  // sale goes to be executed, and an ops agent lives here all day.
+  { labelKey: "nav.operations", href: "/operations", icon: ClipboardCheck, perm: "operations.write" },
   {
     labelKey: "nav.customers",
     href: "/customers",
