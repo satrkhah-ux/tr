@@ -9,6 +9,7 @@ import {
   BOARD_TYPES,
   SCOPE_KEYS,
   resizeAges,
+  roomTypeNames,
   type DraftHotel,
   type DraftScope,
 } from "@/lib/offer/draft-types";
@@ -313,7 +314,7 @@ function RoomsBlock({ data, patch, lookups }: Pick<StageFormProps, "data" | "pat
   const { t } = useTraveliunUI();
   const trip = data.trip;
 
-  function applyDefault<K extends "rooms_count" | "room_type_id" | "board_type">(
+  function applyDefault<K extends "rooms_count" | "room_type_name" | "board_type">(
     field: K,
     oldValue: DraftHotel[K],
     newValue: DraftHotel[K],
@@ -327,13 +328,11 @@ function RoomsBlock({ data, patch, lookups }: Pick<StageFormProps, "data" | "pat
     patch({ trip: { ...trip, rooms }, hotels: applyDefault("rooms_count", trip.rooms, rooms) });
   }
 
-  function setRoomType(id: string) {
-    const rt = lookups.roomTypes.find((r) => r.id === id) ?? null;
+  /** A NAME — the id is per-hotel and gets resolved once a hotel is picked. */
+  function setRoomType(name: string) {
     patch({
-      trip: { ...trip, default_room_type_id: rt?.id ?? null, default_room_type_name: rt?.name ?? "" },
-      hotels: applyDefault("room_type_id", trip.default_room_type_id, rt?.id ?? null, {
-        room_type_name: rt?.name ?? "",
-      }),
+      trip: { ...trip, default_room_type_name: name },
+      hotels: applyDefault("room_type_name", trip.default_room_type_name, name, { room_type_id: null }),
     });
   }
 
@@ -362,10 +361,12 @@ function RoomsBlock({ data, patch, lookups }: Pick<StageFormProps, "data" | "pat
         </label>
         <label className={smallLabelClass}>
           {t("pg.roomType")}
-          <select value={trip.default_room_type_id ?? ""} onChange={(e) => setRoomType(e.target.value)} className={fieldClass}>
+          <select value={trip.default_room_type_name} onChange={(e) => setRoomType(e.target.value)} className={fieldClass}>
             <option value="">{t("pg.chooseRoomType")}</option>
-            {lookups.roomTypes.map((rt) => (
-              <option key={rt.id} value={rt.id}>{rt.name}</option>
+            {/* distinct NAMES: the raw table has one row per hotel, so the same
+                «جناح» would otherwise repeat once for every hotel in the system */}
+            {roomTypeNames(lookups.roomTypes).map((name) => (
+              <option key={name} value={name}>{name}</option>
             ))}
           </select>
         </label>

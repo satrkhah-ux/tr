@@ -44,6 +44,17 @@ const INVARIANT_STAGE: Record<InvariantViolation["code"], StageKey> = {
   hotel_missing_room_or_board: "hotels",
 };
 
+/**
+ * How this hotel line states its room — an internal room-type row, a name
+ * inherited from the trip default, or a supplier rate that names its own room.
+ * Returns null only when the line says nothing about the room at all.
+ */
+function statedRoom(h: DraftData["hotels"][number]): string | null {
+  if (h.room_type_id) return h.room_type_id;
+  if (h.room_type_name.trim()) return "named";
+  return h.sourcing ? "supplier" : null;
+}
+
 export function validateDraft(data: DraftData): DraftValidation {
   const blocking: DraftIssue[] = [];
   const warnings: DraftIssue[] = [];
@@ -75,9 +86,11 @@ export function validateDraft(data: DraftData): DraftValidation {
       const city = cityByName.get(h.city_name);
       return {
         hotel_name: h.hotel_name || h.city_name,
-        // a supplier-selected hotel carries the rate's room name (not an internal
-        // room_type_id) — treat its sourcing as satisfying the room requirement.
-        room_type_id: h.room_type_id ?? (h.sourcing ? "supplier" : null),
+        // The rule is "this line states a room", not "this line has an internal
+        // FK". A supplier rate carries the room in its own name, and a room type
+        // inherited from the trip default is a name until a hotel is picked —
+        // both are a stated room, and neither should block publishing.
+        room_type_id: statedRoom(h),
         board_type: h.board_type,
         nights: city?.nights ?? null,
         check_in: city?.check_in ?? null,
@@ -190,7 +203,7 @@ function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey
   const hotelsComplete =
     data.cities.length > 0 &&
     data.cities.every((c) => data.hotels.some((h) => h.city_name === c.city_name)) &&
-    data.hotels.every((h) => Boolean((h.room_type_id || h.sourcing) && h.board_type));
+    data.hotels.every((h) => Boolean(statedRoom(h) && h.board_type));
   const pricingComplete =
     isFixedPrice(data) || (data.pricing.items.length > 0 && data.pricing.items.every((i) => i.sell_price != null));
   const writtenDays = data.days.filter((d) => d.title.trim().length > 0);

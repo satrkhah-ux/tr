@@ -8,6 +8,7 @@ import {
   BOARD_TYPES,
   deriveCityDates,
   findLookupCountry,
+  roomTypeNames,
   type DraftHotel,
   type DraftTrip,
 } from "@/lib/offer/draft-types";
@@ -31,7 +32,8 @@ function defaultLine(cityName: string, trip: DraftTrip): DraftHotel {
     city_name: cityName,
     hotel_id: null,
     hotel_name: "",
-    room_type_id: trip.default_room_type_id,
+    // the id is per-hotel; it is resolved by name once a hotel is chosen
+    room_type_id: null,
     room_type_name: trip.default_room_type_name,
     board_type: trip.default_board,
     rooms_count: Math.max(trip.rooms || 1, 1),
@@ -250,7 +252,17 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                       onChange={(e) => {
                         const name = e.target.value;
                         const match = hotelOptions.find((h) => h.name === name) ?? null;
-                        setHotel(city.city_name, { hotel_name: name, hotel_id: match ? match.id : null });
+                        // the room type inherited from the customer stage is a NAME;
+                        // pin it to this hotel's own row now that we know the hotel
+                        const hotelId = match ? match.id : null;
+                        const rt = lookups.roomTypes.find(
+                          (r) => (r.hotel_id === hotelId || r.hotel_id === null) && r.name === line.room_type_name,
+                        );
+                        setHotel(city.city_name, {
+                          hotel_name: name,
+                          hotel_id: hotelId,
+                          room_type_id: rt?.id ?? null,
+                        });
                       }}
                       className={fieldClass}
                     >
@@ -268,17 +280,24 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                   <label className={rowLabelClass}>
                     {t("pg.roomType")}
                     <select
-                      value={line.room_type_id ?? ""}
+                      // keyed by NAME, not id: a line can carry a room type
+                      // inherited from the trip default before any hotel was
+                      // picked, and an id-keyed select would show it as blank.
+                      value={line.room_type_name}
                       onChange={(e) => {
-                        const roomType = lookups.roomTypes.find((rt) => rt.id === e.target.value) ?? null;
-                        const slice: Partial<DraftHotel> = { room_type_id: roomType ? roomType.id : null, room_type_name: roomType ? roomType.name : "" };
+                        const name = e.target.value;
+                        const roomType = roomTypeOptions.find((rt) => rt.name === name) ?? null;
+                        const slice: Partial<DraftHotel> = { room_type_id: roomType?.id ?? null, room_type_name: name };
                         if (line.board_type === null && roomType?.default_board) slice.board_type = roomType.default_board;
                         setHotel(city.city_name, slice);
                       }}
                       className={fieldClass}
                     >
                       <option value="">{t("pg.chooseRoomType")}</option>
-                      {roomTypeOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+                      {roomTypeNames(roomTypeOptions).map((name) => <option key={name} value={name}>{name}</option>)}
+                      {line.room_type_name && !roomTypeOptions.some((rt) => rt.name === line.room_type_name) ? (
+                        <option value={line.room_type_name}>{line.room_type_name}</option>
+                      ) : null}
                     </select>
                   </label>
                   <div className="grid grid-cols-[1fr_110px] gap-3">

@@ -99,10 +99,24 @@ export type DraftTrip = {
    * room for a driver is booked in some cities and not others).
    */
   rooms: number;
-  default_room_type_id: string | null;
+  /**
+   * A room-type NAME, not an id: room_types rows belong to a hotel, and at this
+   * point no hotel is chosen. The agent means "a suite", and the hotel stage
+   * resolves that to the picked hotel's own row when it has one.
+   */
   default_room_type_name: string;
   default_board: BoardType | null;
 };
+
+/** Distinct room-type names across all hotels — what a trip-wide default offers. */
+export function roomTypeNames(roomTypes: LookupRoomType[]): string[] {
+  const seen = new Set<string>();
+  for (const rt of roomTypes) {
+    const name = rt.name.trim();
+    if (name) seen.add(name);
+  }
+  return [...seen].sort((a, b) => a.localeCompare(b, "ar"));
+}
 
 /**
  * Which service families this offer actually covers.
@@ -342,7 +356,6 @@ export function emptyDraftData(): DraftData {
       children_ages: [],
       infant_ages: [],
       rooms: 1,
-      default_room_type_id: null,
       default_room_type_name: "",
       default_board: null,
     },
