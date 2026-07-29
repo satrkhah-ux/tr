@@ -4,8 +4,15 @@ import { useEffect, useState } from "react";
 import { Copy, Loader2, Plus, Sparkles } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { copyProgramIntoDraft, findReusablePrograms, getDraft } from "@/lib/data/drafts";
-import { deriveCityDates, findLookupCountry, type DraftCity, type ReusableProgram } from "@/lib/offer/draft-types";
+import {
+  deriveCityDates,
+  findLookupCountry,
+  totalCityNights,
+  type DraftCity,
+  type ReusableProgram,
+} from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
+import { NightsIndicator } from "../NightsIndicator";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import {
   addButtonClass,
@@ -29,6 +36,7 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
 
   const country = findLookupCountry(lookups.countries, data.trip.country);
   const cityOptions = country?.cities ?? [];
+  const used = totalCityNights(data.cities);
 
   // reuse eligibility is DERIVED (no synchronous setState); the async load only
   // runs when eligible, and stale results are ignored via the `active` flag.
@@ -146,6 +154,11 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
           <Plus className="size-4" />
           {t("pg.addCity")}
         </button>
+
+        {/* the running total sits right under the numbers being typed */}
+        <div className="mt-4">
+          <NightsIndicator used={used} total={data.trip.nights} match={used === data.trip.nights && data.trip.nights > 0} />
+        </div>
       </section>
 
       {/* reuse a previous program */}

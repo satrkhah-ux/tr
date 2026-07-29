@@ -28,8 +28,8 @@ import {
   type StageKey,
 } from "@/lib/offer/draft-types";
 import { validateDraft, type DraftIssue, type StageStatus } from "@/lib/offer/draft-validation";
-import { nightsStatus } from "@/lib/offer/schedule";
 import { useRole } from "@/lib/roles/RoleContext";
+import { NightsIndicator } from "./NightsIndicator";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
@@ -136,7 +136,9 @@ export function GeneratorShell({
     };
   }, [data, canPricing]);
   const visibleStages = useMemo(() => visibleStagesFor(data.scope, canPricing), [data.scope, canPricing]);
-  const showNights = stage === "cities" || stage === "hotels";
+  // The cities stage renders its own indicator directly under the last city —
+  // where the numbers are actually being typed. The rail keeps it for hotels.
+  const showNights = stage === "hotels";
 
   // Linear position drives the mobile prev/next bar and the "step N of M" chip.
   const stageIndex = visibleStages.findIndex((s) => s.key === stage);
@@ -266,30 +268,13 @@ export function GeneratorShell({
               </ol>
             </nav>
 
-            {/* nights indicator — cities & hotels stages ONLY */}
+            {/* nights indicator — hotels stage only (cities renders its own) */}
             {showNights ? (
-              <div
-                className={`rounded-2xl border p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] ${
-                  validation.nights.match ? "border-[#bfe5d4] bg-[#e9f7f0]" : "border-[#f2e2b4] bg-[#fff8e8]"
-                }`}
-              >
-                <p className="flex items-center gap-2 text-[12px] font-extrabold text-[#185045]">
-                  <MoonStar className="size-4" />
-                  {t("pg.nightsIndicator")}
-                </p>
-                <p className="tv-tnum mt-1.5 text-[13px] font-bold text-[#0f3d38]">
-                  {t("pg.nightsOf", { used: validation.nights.used, total: validation.nights.total })}
-                </p>
-                <p className={`mt-1 text-[11.5px] font-bold ${validation.nights.match ? "text-[#0f7a52]" : "text-[#a86a10]"}`}>
-                  {(() => {
-                    if (validation.nights.match) return t("pg.nightsComplete");
-                    const ns = nightsStatus(validation.nights.used, validation.nights.total);
-                    return ns.status === "excess"
-                      ? t("pg.nightsExcessN", { n: ns.diff })
-                      : t("pg.nightsRemainingN", { n: ns.diff });
-                  })()}
-                </p>
-              </div>
+              <NightsIndicator
+                used={validation.nights.used}
+                total={validation.nights.total}
+                match={validation.nights.match}
+              />
             ) : null}
 
             {/* validation panel */}
