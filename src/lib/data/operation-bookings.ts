@@ -118,6 +118,12 @@ export type OperationBooking = {
    */
   is_paid: boolean;
   origin: "manual" | "offer";
+  /** who is actually doing this one — see operation-assign.ts. */
+  assignee_kind: "ops" | "employee" | "partner";
+  assignee_employee_id: string | null;
+  assignee_partner_id: string | null;
+  assignee_label: string | null;
+  handoff_note: string | null;
   confirmation_number: string | null;
   quoted_net: number | null;
   net_charged: number | null;
@@ -134,11 +140,25 @@ export async function listBookings(operationId: string): Promise<OperationBookin
     const { data } = await supabase
       .from("operation_bookings")
       .select(
-        "id, operation_id, kind, title, city_name, start_date, end_date, detail, supplier_name, source, status, is_paid, origin, confirmation_number, quoted_net, net_charged, currency, cancellation_policy, cancellation_deadline, note",
+        "id, operation_id, kind, title, city_name, start_date, end_date, detail, supplier_name, source, status, is_paid, origin, assignee_kind, assignee_employee_id, assignee_partner_id, handoff_note, confirmation_number, quoted_net, net_charged, currency, cancellation_policy, cancellation_deadline, note, employees:assignee_employee_id(arabic_name), booking_partners:assignee_partner_id(name)",
       )
       .eq("operation_id", operationId)
       .order("start_date", { ascending: true, nullsFirst: false });
-    return (data ?? []) as OperationBooking[];
+
+    // PostgREST returns an embedded relation as an array even when to-one.
+    const pick = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
+    return ((data ?? []) as unknown as (OperationBooking & {
+      employees?: { arabic_name: string | null } | { arabic_name: string | null }[] | null;
+      booking_partners?: { name: string } | { name: string }[] | null;
+    })[]).map((b) => ({
+      ...b,
+      assignee_label:
+        b.assignee_kind === "partner"
+          ? (pick(b.booking_partners)?.name ?? null)
+          : b.assignee_kind === "employee"
+            ? (pick(b.employees)?.arabic_name ?? null)
+            : null,
+    }));
   } catch {
     return [];
   }

@@ -34,6 +34,7 @@ import { CLIENT_STATES, EXECUTION_STATES, canAdvanceClient, canAdvanceExecution 
 import type { PassportRead, TravelerListItem } from "@/lib/operations/traveler-dto";
 import type { TranslationKey } from "@/lib/i18n";
 import type { OperationBooking, OperationDocument } from "@/lib/data/operation-bookings";
+import type { AssigneeOption, SentRequest } from "@/lib/data/operation-assign";
 import { DocumentsPanel } from "./DocumentsPanel";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
@@ -54,6 +55,8 @@ export function OperationCase({
   documents,
   hasDays,
   clientToken,
+  assignees,
+  sentRequests,
 }: {
   operation: OperationCard;
   travelers: TravelerListItem[];
@@ -62,6 +65,8 @@ export function OperationCase({
   documents: OperationDocument[];
   hasDays: boolean;
   clientToken: string | null;
+  assignees: AssigneeOption[];
+  sentRequests: SentRequest[];
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -139,6 +144,8 @@ export function OperationCase({
           documents={documents}
           hasDays={hasDays}
           clientToken={clientToken}
+          assignees={assignees}
+          sentRequests={sentRequests}
         />
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">

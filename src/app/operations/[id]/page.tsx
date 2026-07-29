@@ -3,6 +3,7 @@ import { OperationCase } from "@/components/traveliun/operations/OperationCase";
 import { listOperationPayments, listOperations } from "@/lib/data/operations";
 import { listBookings, listDocuments } from "@/lib/data/operation-bookings";
 import { listTravelers } from "@/lib/data/operation-travelers";
+import { listAssignees, listSentRequests } from "@/lib/data/operation-assign";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +14,13 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
   const operation = operations.find((o) => o.id === id);
   if (!operation) notFound();
 
-  const [travelers, payments, bookings, documents] = await Promise.all([
+  const [travelers, payments, bookings, documents, assignees, sentRequests] = await Promise.all([
     listTravelers(id),
     listOperationPayments(id),
     listBookings(id),
     listDocuments(id),
+    listAssignees(),
+    listSentRequests(id),
   ]);
 
   // The itinerary voucher needs the day-by-day program that was authored in the
@@ -46,6 +49,8 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
       documents={documents}
       hasDays={(count ?? 0) > 0}
       clientToken={clientToken}
+      assignees={assignees}
+      sentRequests={sentRequests}
     />
   );
 }

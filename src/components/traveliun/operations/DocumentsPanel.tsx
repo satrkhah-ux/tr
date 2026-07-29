@@ -34,6 +34,8 @@ import { seedBookingsFromOffer } from "@/lib/data/operation-seed";
 import { ensureClientLink, revokeClientLink } from "@/lib/data/operation-hub";
 import type { VoucherKind } from "@/lib/operations/voucher-dto";
 import type { TranslationKey } from "@/lib/i18n";
+import type { AssigneeOption, SentRequest } from "@/lib/data/operation-assign";
+import { AssignBooking, AssigneeChip } from "./AssignBooking";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
 const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
@@ -59,12 +61,16 @@ export function DocumentsPanel({
   documents,
   hasDays,
   clientToken,
+  assignees,
+  sentRequests,
 }: {
   operationId: string;
   bookings: OperationBooking[];
   documents: OperationDocument[];
   hasDays: boolean;
   clientToken: string | null;
+  assignees: AssigneeOption[];
+  sentRequests: SentRequest[];
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -175,10 +181,37 @@ export function DocumentsPanel({
         ) : (
           <ul className="space-y-2">
             {bookings.map((b) => (
-              <BookingRow key={b.id} booking={b} onDone={() => router.refresh()} />
+              <BookingRow
+                key={b.id}
+                booking={b}
+                operationId={operationId}
+                assignees={assignees}
+                onDone={() => router.refresh()}
+              />
             ))}
           </ul>
         )}
+
+        {sentRequests.length > 0 ? (
+          <div className="mt-3 border-t border-[#f0f4f2] pt-3">
+            <p className="mb-2 text-[11.5px] font-extrabold text-[#557d78]">{t("ops.request.sentLog")}</p>
+            <ul className="space-y-1.5">
+              {sentRequests.map((r) => (
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 text-[11.5px] font-bold text-[#93aaa3]">
+                  <span className="text-[#0f3d38]">{r.to_label}</span>
+                  <span>
+                    {r.channel === "whatsapp" ? t("ops.dispatch.whatsapp") : t("ops.dispatch.manual")}
+                    {r.sent_at ? (
+                      <span className="tv-tnum ms-2">
+                        <DirText dir="ltr">{r.sent_at.slice(0, 16).replace("T", " ")}</DirText>
+                      </span>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </section>
 
       {/* ---- documents ---- */}
@@ -436,7 +469,17 @@ function AddBooking({ operationId, onDone }: { operationId: string; onDone: () =
   );
 }
 
-function BookingRow({ booking, onDone }: { booking: OperationBooking; onDone: () => void }) {
+function BookingRow({
+  booking,
+  operationId,
+  assignees,
+  onDone,
+}: {
+  booking: OperationBooking;
+  operationId: string;
+  assignees: AssigneeOption[];
+  onDone: () => void;
+}) {
   const { t } = useTraveliunUI();
   const [confirming, setConfirming] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -470,6 +513,7 @@ function BookingRow({ booking, onDone }: { booking: OperationBooking; onDone: ()
                 {t("ops.booking.confirmationNo")} <DirText dir="ltr">{booking.confirmation_number}</DirText>
               </span>
             ) : null}
+            <AssigneeChip kind={booking.assignee_kind} label={booking.assignee_label} />
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -536,6 +580,8 @@ function BookingRow({ booking, onDone }: { booking: OperationBooking; onDone: ()
         )}
         </div>
       </div>
+
+      <AssignBooking booking={booking} operationId={operationId} assignees={assignees} onDone={onDone} />
 
       {editing ? (
         <div className="mt-2 grid gap-2 rounded-[9px] border border-[#e2ebe7] bg-[#f8fbf9] p-3 sm:grid-cols-2">
