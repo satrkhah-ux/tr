@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
 
 /**
  * Tell the operations team a case has landed.
@@ -96,4 +97,70 @@ export async function notifyOperationConfirmed(notice: OpsNotice): Promise<numbe
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+export type BookingChangeNotice = {
+  operationId: string;
+  serial: string;
+  customer: string | null;
+  /** what changed, already in Arabic. */
+  what: string;
+  bookingTitle: string;
+  by: string | null;
+};
+
+/**
+ * Tell the SALESPERSON when operations changes something on their case.
+ *
+ * They are the one the client phones. Finding out from the client that the hotel
+ * moved is the failure this prevents — and it is a different audience from the
+ * ops notice, which goes to whoever is doing the booking.
+ *
+ * Two channels, because they answer different questions: WhatsApp through
+ * Teletel reaches them where they already talk to clients, and the admin bot is
+ * the fallback that works even when no WhatsApp thread exists.
+ */
+export async function notifyBookingChanged(notice: BookingChangeNotice): Promise<{ whatsapp: boolean; telegram: number }> {
+  const base = readEnv("NEXT_PUBLIC_SITE_URL") ?? "https://pkg.traveliun.com";
+  const plain = [
+    "تحديث من قسم العمليات",
+    "",
+    `العميل: ${notice.customer ?? "—"}`,
+    `العرض: ${notice.serial}`,
+    `الحجز: ${notice.bookingTitle}`,
+    `التغيير: ${notice.what}`,
+    notice.by ? `نفّذه: ${notice.by}` : null,
+    "",
+    `${base}/operations/${notice.operationId}`,
+  ]
+    .filter((l): l is string => l !== null)
+    .join("\n");
+
+  let whatsapp = false;
+  try {
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { data } = await supabase
+      .from("operations")
+      .select("confirmed_by, employees:confirmed_by(mobile, telegram_chat_id, arabic_name)")
+      .eq("id", notice.operationId)
+      .maybeSingle();
+    const row = data as unknown as {
+      employees: { mobile: string | null; telegram_chat_id: number | string | null } | { mobile: string | null; telegram_chat_id: number | string | null }[] | null;
+    } | null;
+    const emp = Array.isArray(row?.employees) ? row?.employees[0] : row?.employees;
+
+    if (emp?.mobile) {
+      const conversationId = await conversationForPhone(emp.mobile);
+      // No existing WhatsApp thread → do NOT invent one; Telegram carries it.
+      if (conversationId) whatsapp = (await sendTeletelMessage(conversationId, plain)) !== null;
+    }
+
+    if (emp?.telegram_chat_id) {
+      const ok = await send(Number(emp.telegram_chat_id), escapeHtml(plain));
+      return { whatsapp, telegram: ok ? 1 : 0 };
+    }
+  } catch {
+    /* notification is best-effort — never block the edit it describes */
+  }
+  return { whatsapp, telegram: 0 };
 }

@@ -2,18 +2,34 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { CheckCircle2, Copy, Download, ExternalLink, FileText, Link2, Loader2, Plus, Ticket, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  Copy,
+  Download,
+  ExternalLink,
+  FileText,
+  Layers,
+  Link2,
+  Loader2,
+  Pencil,
+  Plus,
+  Ticket,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { DirText } from "@/components/DirText";
 import {
   addBooking,
   confirmBookingManually,
+  deleteBooking,
   issueDocument,
+  markBookingPaid,
   revokeDocument,
+  updateBooking,
   type BookingKind,
   type OperationBooking,
   type OperationDocument,
 } from "@/lib/data/operation-bookings";
-import { markBookingPaid } from "@/lib/data/operation-bookings";
 import { seedBookingsFromOffer } from "@/lib/data/operation-seed";
 import { ensureClientLink, revokeClientLink } from "@/lib/data/operation-hub";
 import type { VoucherKind } from "@/lib/operations/voucher-dto";
@@ -55,6 +71,7 @@ export function DocumentsPanel({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [perHotel, setPerHotel] = useState(false);
 
   const confirmed = bookings.filter((b) => b.status === "confirmed");
   const outstanding = bookings.filter((b) => b.status !== "confirmed" && b.status !== "cancelled");
@@ -74,9 +91,27 @@ export function DocumentsPanel({
     return pool.length > 0 ? { can: true, reason: null } : { can: false, reason: "ops.err.nothingToIssue" };
   }
 
+  /**
+   * ONE document is the default, deliberately: a client carries a single sheet
+   * and a desk is handed a single sheet. Per-hotel is the exception an agent
+   * asks for when each property wants its own paper, so it lives behind a
+   * switch rather than doubling the buttons.
+   */
   function issue(kind: VoucherKind) {
     startTransition(async () => {
       setError(null);
+      if (kind === "hotel_voucher" && perHotel) {
+        const hotels = confirmed.filter((b) => b.kind === "hotel");
+        for (const h of hotels) {
+          const res = await issueDocument({ operation_id: operationId, kind, booking_id: h.id });
+          if (!res.ok) {
+            setError(t(res.error));
+            return;
+          }
+        }
+        router.refresh();
+        return;
+      }
       const res = await issueDocument({ operation_id: operationId, kind });
       if (!res.ok) setError(t(res.error));
       else router.refresh();
@@ -175,6 +210,19 @@ export function DocumentsPanel({
             );
           })}
         </div>
+
+        {confirmed.some((b) => b.kind === "hotel") ? (
+          <label className="mb-3 inline-flex cursor-pointer items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-[#f8fbf9] px-3 py-2 text-[11.5px] font-bold text-[#557d78]">
+            <input
+              type="checkbox"
+              checked={perHotel}
+              onChange={(e) => setPerHotel(e.target.checked)}
+              className="size-4 accent-[#185045]"
+            />
+            <Layers className="size-3.5" />
+            {t("ops.doc.perHotel")}
+          </label>
+        ) : null}
 
         {live.length === 0 ? (
           <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">
@@ -391,7 +439,14 @@ function AddBooking({ operationId, onDone }: { operationId: string; onDone: () =
 function BookingRow({ booking, onDone }: { booking: OperationBooking; onDone: () => void }) {
   const { t } = useTraveliunUI();
   const [confirming, setConfirming] = useState(false);
-  const [ref, setRef] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [ref, setRef] = useState(booking.confirmation_number ?? "");
+  const [form, setForm] = useState({
+    title: booking.title,
+    city_name: booking.city_name,
+    start_date: booking.start_date ?? "",
+    end_date: booking.end_date ?? "",
+  });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -417,6 +472,33 @@ function BookingRow({ booking, onDone }: { booking: OperationBooking; onDone: ()
             ) : null}
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* corrective work is the norm here — a date read wrong off a supplier
+              email, a room the hotel downgraded. Without edit the only recourse
+              is delete-and-retype, which loses the confirmation number too. */}
+          <button
+            type="button"
+            onClick={() => setEditing((v) => !v)}
+            aria-label={t("edit")}
+            className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6]"
+          >
+            <Pencil className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            aria-label={t("delete")}
+            onClick={() =>
+              startTransition(async () => {
+                const res = await deleteBooking(booking.id);
+                if (!res.ok) setError(t(res.error));
+                else onDone();
+              })
+            }
+            className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#f2c7c7] text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
         {!done ? (
           <button
             type="button"
@@ -452,7 +534,68 @@ function BookingRow({ booking, onDone }: { booking: OperationBooking; onDone: ()
             </button>
           </div>
         )}
+        </div>
       </div>
+
+      {editing ? (
+        <div className="mt-2 grid gap-2 rounded-[9px] border border-[#e2ebe7] bg-[#f8fbf9] p-3 sm:grid-cols-2">
+          <label className={label}>
+            {t("pg.desc")}
+            <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} className={field} />
+          </label>
+          <label className={label}>
+            {t("pg.city")}
+            <input value={form.city_name} onChange={(e) => setForm((f) => ({ ...f, city_name: e.target.value }))} className={field} />
+          </label>
+          <label className={label}>
+            {t("pg.checkIn")}
+            <input
+              type="date"
+              dir="ltr"
+              value={form.start_date}
+              onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
+              className={`${field} tv-tnum`}
+            />
+          </label>
+          <label className={label}>
+            {t("pg.checkOut")}
+            <input
+              type="date"
+              dir="ltr"
+              value={form.end_date}
+              onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
+              className={`${field} tv-tnum`}
+            />
+          </label>
+          <div className="sm:col-span-2">
+            <button
+              type="button"
+              disabled={pending || !form.title.trim()}
+              onClick={() =>
+                startTransition(async () => {
+                  setError(null);
+                  const res = await updateBooking({
+                    id: booking.id,
+                    title: form.title,
+                    city_name: form.city_name,
+                    start_date: form.start_date || null,
+                    end_date: form.end_date || null,
+                  });
+                  if (!res.ok) setError(t(res.error));
+                  else {
+                    setEditing(false);
+                    onDone();
+                  }
+                })
+              }
+              className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+            >
+              {pending ? <Loader2 className="size-4 animate-spin" /> : <Pencil className="size-4" />}
+              {t("save")}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {confirming && !done ? (
         <div className="mt-2 flex flex-wrap items-end gap-2">

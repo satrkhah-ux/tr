@@ -8,6 +8,7 @@ import { getCurrentEmployeeId, getCurrentRole } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { can } from "@/lib/roles/roles";
 import { listTravelers } from "@/lib/data/operation-travelers";
+import { notifyBookingChanged } from "@/lib/data/ops-notify";
 import type { VoucherBooking, VoucherDTO, VoucherKind } from "@/lib/operations/voucher-dto";
 
 /**
@@ -30,6 +31,68 @@ async function requireOps(): Promise<TranslationKey | null> {
   const user = await getServerUser();
   if (!user) return "err.session";
   return can(await getCurrentRole(), "operations.write") ? null : "ops.err.forbidden";
+}
+
+
+/**
+ * Tell the salesperson what operations just did to their case.
+ *
+ * They are the one the client phones, and finding out from the client that the
+ * hotel moved is the failure this prevents. Best-effort and awaited only for its
+ * side effect — a notification that fails must never roll back the edit it
+ * describes.
+ */
+async function announce(bookingId: string, what: string): Promise<void> {
+  try {
+    const supabase = await db();
+    const { data } = await supabase
+      .from("operation_bookings")
+      .select("title, operation_id, operations(offers(serial, customers(arabic_name)))")
+      .eq("id", bookingId)
+      .maybeSingle();
+    const row = data as unknown as {
+      title: string;
+      operation_id: string;
+      operations: { offers: unknown } | { offers: unknown }[] | null;
+    } | null;
+    if (!row) return;
+
+    const op = Array.isArray(row.operations) ? row.operations[0] : row.operations;
+    const offerRaw = (op as { offers?: unknown } | null)?.offers;
+    const offer = (Array.isArray(offerRaw) ? offerRaw[0] : offerRaw) as
+      | { serial: string; customers: { arabic_name: string | null } | { arabic_name: string | null }[] | null }
+      | null;
+    const custRaw = offer?.customers;
+    const cust = (Array.isArray(custRaw) ? custRaw[0] : custRaw) as { arabic_name: string | null } | null;
+
+    const user = await getServerUser();
+    await notifyBookingChanged({
+      operationId: row.operation_id,
+      serial: offer?.serial ?? "",
+      customer: cust?.arabic_name ?? null,
+      bookingTitle: row.title,
+      what,
+      by: user?.email ?? null,
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
+
+/** Turn a patch into one Arabic sentence the salesperson can act on. */
+function describeEdit(patch: Record<string, unknown>): string {
+  const words: string[] = [];
+  if ("title" in patch) words.push("الاسم");
+  if ("start_date" in patch || "end_date" in patch) words.push("التواريخ");
+  if ("detail" in patch) words.push("التفاصيل");
+  if ("confirmation_number" in patch) {
+    words.push(patch.confirmation_number ? "رقم التأكيد" : "إزالة رقم التأكيد");
+  }
+  if ("cancellation_policy" in patch) words.push("سياسة الإلغاء");
+  if ("supplier_name" in patch) words.push("المزوّد");
+  if ("note" in patch) words.push("ملاحظة");
+  return words.length > 0 ? `تعديل ${words.join("، ")}` : "تعديل على الحجز";
 }
 
 export type BookingKind = "hotel" | "flight" | "visa" | "transport" | "service";
@@ -175,6 +238,7 @@ export async function confirmBookingManually(input: {
       entity_id: input.booking_id,
       meta: { confirmation_number: input.confirmation_number.trim(), source: "manual" },
     });
+    await announce(input.booking_id, `تأكيد الحجز برقم ${input.confirmation_number.trim()}`);
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -204,6 +268,68 @@ export async function markBookingPaid(bookingId: string, paid: boolean): Promise
       entity_id: bookingId,
       meta: { is_paid: paid },
     });
+    await announce(bookingId, paid ? "صدرت التذكرة/الحجز وسُدّد" : "أُلغيت حالة السداد");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/**
+ * Edit a booking.
+ *
+ * Ops work is corrective by nature — a date read wrong off a supplier email, a
+ * room type the hotel downgraded, a flight the airline rescheduled. Without an
+ * edit the only recourse is delete-and-retype, which loses the confirmation
+ * number and the audit trail along with the typo.
+ */
+export async function updateBooking(input: {
+  id: string;
+  title?: string;
+  city_name?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  detail?: Record<string, string>;
+  supplier_name?: string;
+  confirmation_number?: string | null;
+  cancellation_policy?: string | null;
+  note?: string | null;
+}): Promise<{ ok: true } | Fail> {
+  const denied = await requireOps();
+  if (denied) return { ok: false, error: denied };
+  if (input.title !== undefined && !input.title.trim()) return { ok: false, error: "ops.err.titleRequired" };
+
+  try {
+    const patch: Record<string, unknown> = {};
+    if (input.title !== undefined) patch.title = input.title.trim();
+    if (input.city_name !== undefined) patch.city_name = input.city_name;
+    if (input.start_date !== undefined) patch.start_date = input.start_date;
+    if (input.end_date !== undefined) patch.end_date = input.end_date;
+    if (input.detail !== undefined) patch.detail = input.detail;
+    if (input.supplier_name !== undefined) patch.supplier_name = input.supplier_name;
+    if (input.cancellation_policy !== undefined) patch.cancellation_policy = input.cancellation_policy;
+    if (input.note !== undefined) patch.note = input.note;
+    // Clearing the reference drops the booking back to a provisional hold —
+    // "confirmed" without a number is a claim nobody can check at the desk.
+    if (input.confirmation_number !== undefined) {
+      const ref = input.confirmation_number?.trim() || null;
+      patch.confirmation_number = ref;
+      patch.status = ref ? "confirmed" : "pending";
+      patch.confirmed_at = ref ? new Date().toISOString() : null;
+      if (!ref) patch.is_paid = false;
+    }
+    if (Object.keys(patch).length === 0) return { ok: true };
+
+    const supabase = await db();
+    const { error } = await supabase.from("operation_bookings").update(patch).eq("id", input.id);
+    if (error) return { ok: false, error: "err.updateFailed" };
+    await logAudit({
+      action: "booking.created",
+      entity: "operation_bookings",
+      entity_id: input.id,
+      meta: { edited: Object.keys(patch) },
+    });
+    await announce(input.id, describeEdit(patch));
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -221,6 +347,7 @@ export async function cancelBooking(bookingId: string, reason: string): Promise<
       .eq("id", bookingId);
     if (error) return { ok: false, error: "err.updateFailed" };
     await logAudit({ action: "booking.cancelled", entity: "operation_bookings", entity_id: bookingId, meta: { reason } });
+    await announce(bookingId, `إلغاء الحجز — ${reason || "بلا سبب مذكور"}`);
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -335,6 +462,9 @@ export async function issueDocument(input: {
 
     // Only confirmed bookings belong on a document handed to a traveller.
     const confirmed = allBookings.filter((b) => b.status === "confirmed");
+    // A booking_id means "this hotel alone gets its own document"; without one
+    // every confirmed hotel goes on ONE voucher, which is what a client wants to
+    // carry and what a desk wants to be handed.
     const scoped = input.booking_id
       ? confirmed.filter((b) => b.id === input.booking_id)
       : input.kind === "hotel_voucher"

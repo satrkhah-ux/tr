@@ -1265,7 +1265,7 @@ export const ar: Dictionary = {
   "ops.dispatch.sentAt": "أُرسلت {at}",
   "ops.dispatch.reviewFirst": "راجع النص — لا يُرسل شيء حتى تضغط إرسال.",
   "ops.doc.issue": "إصدار فاوتشر",
-  "ops.doc.hotel_voucher": "فاوتشر فندق",
+  "ops.doc.hotel_voucher": "فوتشر الفنادق",
   "ops.doc.flight_confirmation": "تأكيد طيران",
   "ops.doc.booking_summary": "ملخص الحجوزات",
   "ops.doc.open": "فتح",
@@ -1303,4 +1303,5 @@ export const ar: Dictionary = {
   "ops.clientLinkCopy": "نسخ الرابط",
   "ops.clientLinkRevoke": "إلغاء الرابط",
   "ops.fromOffer": "من العرض",
+  "ops.doc.perHotel": "مستند منفصل لكل فندق",
 };

@@ -50,10 +50,19 @@ function asRecord(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 }
 
-async function api<T>(config: TeletelConfig, path: string): Promise<T | null> {
+/**
+ * One transport for both directions. `body` is what makes it a POST — the
+ * signature stays optional so every existing read call is untouched.
+ */
+async function api<T>(config: TeletelConfig, path: string, body?: unknown): Promise<T | null> {
   try {
     const res = await fetch(`${config.baseUrl}/api/v1/accounts/${config.accountId}${path}`, {
-      headers: { api_access_token: config.token },
+      method: body === undefined ? "GET" : "POST",
+      headers:
+        body === undefined
+          ? { api_access_token: config.token }
+          : { api_access_token: config.token, "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(8000),
       cache: "no-store",
     });
@@ -62,6 +71,54 @@ async function api<T>(config: TeletelConfig, path: string): Promise<T | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * The most recent conversation with a contact, resolved at send time.
+ *
+ * Not stored: a conversation id goes stale when an agent resolves and reopens a
+ * thread, and a cached wrong id sends a booking update into a closed chat where
+ * nobody looks. One 8-second GET is cheaper than that failure.
+ */
+export async function findTeletelConversation(contactId: number): Promise<number | null> {
+  const config = getTeletelConfig();
+  if (!config) return null;
+  const res = await api<{ payload?: { id?: number }[] } | { id?: number }[]>(
+    config,
+    `/contacts/${contactId}/conversations`,
+  );
+  const list = Array.isArray(res) ? res : (res?.payload ?? []);
+  const id = list.find((c) => typeof c?.id === "number")?.id;
+  return typeof id === "number" ? id : null;
+}
+
+/**
+ * Send into an EXISTING conversation.
+ *
+ * Deliberately cannot open a new one: creating a conversation needs a channel
+ * `source_id` whose format is provider-specific and unverified here, and
+ * guessing it would post into the wrong thread. No conversation → the caller
+ * falls back to Telegram or to copy-and-paste, which is honest.
+ */
+export async function sendTeletelMessage(conversationId: number, content: string): Promise<number | null> {
+  const config = getTeletelConfig();
+  if (!config || !content.trim()) return null;
+  const res = await api<{ id?: number }>(config, `/conversations/${conversationId}/messages`, {
+    content,
+    message_type: "outgoing",
+    private: false,
+  });
+  return typeof res?.id === "number" ? res.id : null;
+}
+
+/** Find the contact by phone, then their conversation. null when either misses. */
+export async function conversationForPhone(phone: string): Promise<number | null> {
+  const hits = await searchTeletelContacts(phone, 3);
+  const digits = phone.replace(/\D/g, "").slice(-9);
+  const match =
+    hits.find((h) => h.phone.replace(/\D/g, "").endsWith(digits)) ?? (digits ? undefined : hits[0]);
+  if (!match) return null;
+  return findTeletelConversation(match.id);
 }
 
 /** Contact search (name / phone / email). Returns [] on any failure. */

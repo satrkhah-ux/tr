@@ -1305,4 +1305,5 @@ export const en = {
   "ops.clientLinkCopy": "Copy the link",
   "ops.clientLinkRevoke": "Revoke",
   "ops.fromOffer": "from the offer",
+  "ops.doc.perHotel": "A separate document per hotel",
 } as const;

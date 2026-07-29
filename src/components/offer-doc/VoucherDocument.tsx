@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { AR, COMPANY, fmtDate } from "./labels";
 import { OFFER_DOC_CSS } from "./styles";
 import { DEFAULT_OFFER_DOC_ASSETS, type OfferDocAssets } from "./assets";
-import type { VoucherDTO, VoucherKind } from "@/lib/operations/voucher-dto";
+import type { VoucherBooking, VoucherDTO, VoucherKind } from "@/lib/operations/voucher-dto";
 
 /**
  * The operational documents — hotel voucher, flight ticket, itinerary, booking
@@ -18,16 +18,19 @@ import type { VoucherDTO, VoucherKind } from "@/lib/operations/voucher-dto";
  * the same zero-margin sheet handling as the sales PDF.
  */
 
+// «فوتشر» is what the Gulf trade actually calls this, on both sides of the desk.
+// «قسيمة» is a translation nobody uses, and a document titled in words the hotel
+// does not recognise is a document the guest has to explain.
 const KIND_TITLE: Record<VoucherKind, string> = {
-  hotel_voucher: "قسيمة إقامة فندقية",
-  flight_ticket: "تأكيد حجز طيران",
+  hotel_voucher: "فوتشر الفنادق",
+  flight_ticket: "تذكرة الطيران",
   itinerary: "الجدول السياحي",
   booking_summary: "ملخص الحجوزات",
 };
 
 const KIND_NOTE: Record<VoucherKind, string> = {
-  hotel_voucher: "تُقدَّم هذه القسيمة عند الوصول إلى الفندق مع إثبات هوية كل نزيل.",
-  flight_ticket: "يُرجى الحضور إلى المطار قبل موعد الإقلاع بثلاث ساعات للرحلات الدولية.",
+  hotel_voucher: "يُقدَّم هذا الفوتشر عند الوصول إلى الفندق مع إثبات هوية كل نزيل.",
+  flight_ticket: "يُرجى الحضور إلى المطار قبل موعد الإقلاع بثلاث ساعات للرحلات الدولية. تُراجَع مواعيد الرحلات مع شركة الطيران قبل السفر بـ٢٤ ساعة.",
   itinerary: "المواعيد استرشادية وقد تتغيّر حسب حركة السير والطقس.",
   booking_summary: "ملخص داخلي لكل ما تم حجزه ضمن هذا البرنامج.",
 };
@@ -160,7 +163,13 @@ function Bookings({ voucher }: { voucher: VoucherDTO }) {
     <div style={{ marginTop: "9mm" }}>
       <SectionTitle title={KIND_TITLE[voucher.kind]} />
       {voucher.bookings.map((b, i) => (
-        <div key={i} className="od-stay" style={{ gridTemplateColumns: "40mm 1fr", minHeight: "auto" }}>
+        <div
+          key={i}
+          className="od-stay"
+          // 38mm date column, auto height, and never split across a sheet — a
+          // voucher torn in half at the confirmation number is worthless.
+          style={{ gridTemplateColumns: "38mm 1fr", minHeight: "auto", breakInside: "avoid", marginBottom: "5mm" }}
+        >
           <div className="od-datebox">
             <span>{AR.checkIn}</span>
             <strong>
@@ -183,27 +192,13 @@ function Bookings({ voucher }: { voucher: VoucherDTO }) {
               </div>
             ) : null}
             {/*
-              An acknowledged booking is not a paid one. Printing this loudly is
-              the difference between a traveller who knows to chase it and a
-              family turned away at the counter holding a document that looked
-              confirmed.
+              THREE states, not two, because a traveller's day depends on which:
+              no reference at all is a provisional hold, a reference without
+              payment is confirmed-not-issued, and both are printed loudly. A
+              family turned away at a counter is holding a document that said
+              nothing about the difference.
             */}
-            {!b.is_paid ? (
-              <div
-                style={{
-                  marginTop: "2.5mm",
-                  padding: "2mm 3mm",
-                  borderRadius: "2mm",
-                  border: "1px solid var(--od-notice)",
-                  background: "#fff6e3",
-                  color: "#8a5a0c",
-                  fontSize: "10.5pt",
-                  fontWeight: 800,
-                }}
-              >
-                ⚠ الحجز غير مؤكّد — لم يُصدر/يُسدَّد بعد. لا يُعتمد للسفر حتى إشعار آخر من قسم العمليات.
-              </div>
-            ) : null}
+            <BookingState booking={b} />
             <table className="od-table" style={{ marginTop: "3mm" }}>
               <tbody>
                 {Object.entries(b.detail).map(([k, v]) => (
@@ -226,6 +221,44 @@ function Bookings({ voucher }: { voucher: VoucherDTO }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * What this line actually IS today.
+ *
+ *   no confirmation number → حجز مبدئي   (nothing is held yet)
+ *   number, not paid       → حجز مؤكّد غير مُصدر
+ *   number and paid        → حجز كامل    (clean, no band)
+ */
+function BookingState({ booking }: { booking: VoucherBooking }) {
+  const hasRef = Boolean(booking.confirmation_number);
+  if (hasRef && booking.is_paid) {
+    return (
+      <div style={{ marginTop: "2mm", fontSize: "10pt", fontWeight: 800, color: "#0f7a52" }}>
+        ✓ حجز كامل — صادر ومُسدَّد
+      </div>
+    );
+  }
+  const text = hasRef
+    ? "⚠ حجز مؤكّد غير مُصدر — لم تُسدَّد قيمته بعد. لا يُعتمد للسفر حتى إشعار من قسم العمليات."
+    : "⚠ حجز مبدئي — لم يصدر رقم التأكيد بعد. هذا المستند للاطلاع ولا يُعتمد لدى المزوّد.";
+  return (
+    <div
+      style={{
+        marginTop: "2.5mm",
+        padding: "2mm 3mm",
+        borderRadius: "2mm",
+        border: "1px solid var(--od-notice)",
+        background: "#fff6e3",
+        color: "#8a5a0c",
+        fontSize: "10pt",
+        fontWeight: 800,
+        lineHeight: 1.6,
+      }}
+    >
+      {text}
     </div>
   );
 }
