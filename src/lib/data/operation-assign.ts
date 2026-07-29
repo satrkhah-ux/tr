@@ -290,7 +290,15 @@ export async function sendBookingRequest(input: {
       sent_at: new Date().toISOString(),
     });
 
-    await supabase.from("operation_bookings").update({ status: "pending" }).eq("id", input.booking_id);
+    // «مطلوب» — but only if the supplier has not already answered. Re-sending a
+    // request (an amendment, a chase, a second copy) must never erase a
+    // confirmation number that is already printed on a voucher in the client's
+    // hands, and must not resurrect a cancelled booking either.
+    await supabase
+      .from("operation_bookings")
+      .update({ status: "pending" })
+      .eq("id", input.booking_id)
+      .in("status", ["pending", "prebooked", "in_flight", "failed"]);
 
     await logAudit({
       action: "dispatch.sent",
