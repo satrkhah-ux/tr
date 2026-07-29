@@ -53,6 +53,7 @@ export function OperationCase({
   bookings,
   documents,
   hasDays,
+  clientToken,
 }: {
   operation: OperationCard;
   travelers: TravelerListItem[];
@@ -60,6 +61,7 @@ export function OperationCase({
   bookings: OperationBooking[];
   documents: OperationDocument[];
   hasDays: boolean;
+  clientToken: string | null;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -136,6 +138,7 @@ export function OperationCase({
           bookings={bookings}
           documents={documents}
           hasDays={hasDays}
+          clientToken={clientToken}
         />
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">

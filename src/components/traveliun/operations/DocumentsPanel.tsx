@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { CheckCircle2, ExternalLink, FileText, Loader2, Plus, XCircle } from "lucide-react";
+import { CheckCircle2, Copy, Download, ExternalLink, FileText, Link2, Loader2, Plus, Ticket, XCircle } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import {
   addBooking,
@@ -13,6 +13,9 @@ import {
   type OperationBooking,
   type OperationDocument,
 } from "@/lib/data/operation-bookings";
+import { markBookingPaid } from "@/lib/data/operation-bookings";
+import { seedBookingsFromOffer } from "@/lib/data/operation-seed";
+import { ensureClientLink, revokeClientLink } from "@/lib/data/operation-hub";
 import type { VoucherKind } from "@/lib/operations/voucher-dto";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
@@ -39,11 +42,13 @@ export function DocumentsPanel({
   bookings,
   documents,
   hasDays,
+  clientToken,
 }: {
   operationId: string;
   bookings: OperationBooking[];
   documents: OperationDocument[];
   hasDays: boolean;
+  clientToken: string | null;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -84,15 +89,34 @@ export function DocumentsPanel({
       <section className={card}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-extrabold text-[#185045]">{t("ops.bookings")}</h2>
-          <button
-            type="button"
-            onClick={() => setAdding((v) => !v)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
-          >
-            <Plus className="size-3.5" />
-            {t("ops.booking.add")}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  setError(null);
+                  const res = await seedBookingsFromOffer(operationId);
+                  if (!res.ok) setError(t(res.error));
+                  else router.refresh();
+                })
+              }
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+            >
+              {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+              {t("ops.seedFromOffer")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdding((v) => !v)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+            >
+              <Plus className="size-3.5" />
+              {t("ops.booking.add")}
+            </button>
+          </div>
         </div>
+        <p className="mb-3 text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.seedHint")}</p>
 
         {/* the two counts an ops agent is actually tracking */}
         <div className="mb-3 flex flex-wrap gap-2 text-[11.5px] font-bold">
@@ -208,7 +232,88 @@ export function DocumentsPanel({
             ))}
           </ul>
         )}
+
+        <ClientLinkBlock operationId={operationId} token={clientToken} />
       </section>
+    </div>
+  );
+}
+
+/**
+ * ONE link the client keeps.
+ *
+ * Individual documents already have their own share tokens; this is the folder,
+ * and it updates itself — issuing a voucher tomorrow makes it appear on the same
+ * URL. Without it the agent sends four links over four days and the client loses
+ * track of which is current, which is exactly why ops keeps being asked "did the
+ * hotel come through?".
+ */
+function ClientLinkBlock({ operationId, token }: { operationId: string; token: string | null }) {
+  const { t } = useTraveliunUI();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [copied, setCopied] = useState(false);
+  const url = token ? `${typeof window === "undefined" ? "" : window.location.origin}/trip/${token}` : "";
+
+  return (
+    <div className="mt-4 rounded-[12px] border border-[#d6eadf] bg-[#f2fbf6] p-3">
+      <p className="flex items-center gap-1.5 text-[12.5px] font-extrabold text-[#0f7a52]">
+        <Link2 className="size-4" />
+        {t("ops.clientLink")}
+      </p>
+      <p className="mt-1 text-[11.5px] font-semibold text-[#557d78]">{t("ops.clientLinkHint")}</p>
+
+      {token ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <input
+            readOnly
+            dir="ltr"
+            value={url}
+            className="h-9 min-w-0 flex-1 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] text-[#185045]"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.writeText(url);
+              setCopied(true);
+              window.setTimeout(() => setCopied(false), 1600);
+            }}
+            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439]"
+          >
+            <Copy className="size-3.5" />
+            {copied ? t("copied") : t("ops.clientLinkCopy")}
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                await revokeClientLink(operationId);
+                router.refresh();
+              })
+            }
+            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#f2c7c7] px-2.5 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+          >
+            <XCircle className="size-3.5" />
+            {t("ops.clientLinkRevoke")}
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              await ensureClientLink(operationId);
+              router.refresh();
+            })
+          }
+          className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
+        >
+          {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Link2 className="size-3.5" />}
+          {t("ops.clientLink")}
+        </button>
+      )}
     </div>
   );
 }
@@ -321,10 +426,31 @@ function BookingRow({ booking, onDone }: { booking: OperationBooking; onDone: ()
             {t("ops.booking.manual")}
           </button>
         ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e9f7f0] px-2.5 py-1 text-[11px] font-bold text-[#0f7a52]">
-            <CheckCircle2 className="size-3.5" />
-            {t("ops.booking.status.confirmed")}
-          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e9f7f0] px-2.5 py-1 text-[11px] font-bold text-[#0f7a52]">
+              <CheckCircle2 className="size-3.5" />
+              {t("ops.booking.status.confirmed")}
+            </span>
+            {/* Acknowledged is not ticketed. The voucher prints a warning band
+                until this is switched on, so it has to be a deliberate second
+                action rather than something that follows from confirmation. */}
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  await markBookingPaid(booking.id, !booking.is_paid);
+                  onDone();
+                })
+              }
+              className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold transition-colors disabled:opacity-60 ${
+                booking.is_paid ? "bg-[#185045] text-white" : "border border-[#f2e2b4] bg-[#fff8e8] text-[#a86a10]"
+              }`}
+            >
+              <Ticket className="size-3.5" />
+              {booking.is_paid ? t("ops.booking.markPaid") : t("ops.booking.unpaid")}
+            </button>
+          </div>
         )}
       </div>
 

@@ -182,6 +182,28 @@ function Bookings({ voucher }: { voucher: VoucherDTO }) {
                 رقم التأكيد: <Ltr>{b.confirmation_number}</Ltr>
               </div>
             ) : null}
+            {/*
+              An acknowledged booking is not a paid one. Printing this loudly is
+              the difference between a traveller who knows to chase it and a
+              family turned away at the counter holding a document that looked
+              confirmed.
+            */}
+            {!b.is_paid ? (
+              <div
+                style={{
+                  marginTop: "2.5mm",
+                  padding: "2mm 3mm",
+                  borderRadius: "2mm",
+                  border: "1px solid var(--od-notice)",
+                  background: "#fff6e3",
+                  color: "#8a5a0c",
+                  fontSize: "10.5pt",
+                  fontWeight: 800,
+                }}
+              >
+                ⚠ الحجز غير مؤكّد — لم يُصدر/يُسدَّد بعد. لا يُعتمد للسفر حتى إشعار آخر من قسم العمليات.
+              </div>
+            ) : null}
             <table className="od-table" style={{ marginTop: "3mm" }}>
               <tbody>
                 {Object.entries(b.detail).map(([k, v]) => (

@@ -17,7 +17,7 @@ import { AUTH_STORAGE_KEY, parseSessionCookie } from "@/lib/supabase/constants";
 // validates a 24-byte token and a revoked_at through the service role, because
 // RLS cannot see a URL. A session check here would simply lock the traveller out
 // of the document they were handed.
-const PUBLIC_PREFIXES = ["/sign-in", "/client-offer", "/voucher", "/tg"];
+const PUBLIC_PREFIXES = ["/sign-in", "/client-offer", "/voucher", "/trip", "/tg"];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
 
 function isPublic(pathname: string): boolean {

@@ -29,6 +29,14 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
     .select("id", { count: "exact", head: true })
     .eq("offer_id", operation.offer_id);
 
+  const linkRes = await supabase
+    .from("operations")
+    .select("client_token, client_token_revoked_at")
+    .eq("id", id)
+    .maybeSingle();
+  const link = linkRes.data as { client_token: string | null; client_token_revoked_at: string | null } | null;
+  const clientToken = link?.client_token && !link.client_token_revoked_at ? link.client_token : null;
+
   return (
     <OperationCase
       operation={operation}
@@ -37,6 +45,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
       bookings={bookings}
       documents={documents}
       hasDays={(count ?? 0) > 0}
+      clientToken={clientToken}
     />
   );
 }

@@ -27,6 +27,8 @@ export type VoucherBooking = {
   /** free-form label→value pairs: room/board/rooms, or flight no/route/times. */
   detail: Record<string, string>;
   cancellation_policy: string | null;
+  /** false = the supplier acknowledged it but it is not ticketed/paid yet. */
+  is_paid: boolean;
 };
 
 export type VoucherDay = {

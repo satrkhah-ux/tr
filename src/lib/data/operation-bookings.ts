@@ -47,6 +47,14 @@ export type OperationBooking = {
   supplier_name: string;
   source: "manual" | "api";
   status: BookingStatus;
+  /**
+   * Acknowledged by the supplier is NOT the same as ticketed. An airline holding
+   * a seat and an issued ticket are different facts, and a voucher printed for
+   * the first has to say so — otherwise a family is turned away at the counter
+   * holding a document that looked confirmed.
+   */
+  is_paid: boolean;
+  origin: "manual" | "offer";
   confirmation_number: string | null;
   quoted_net: number | null;
   net_charged: number | null;
@@ -63,7 +71,7 @@ export async function listBookings(operationId: string): Promise<OperationBookin
     const { data } = await supabase
       .from("operation_bookings")
       .select(
-        "id, operation_id, kind, title, city_name, start_date, end_date, detail, supplier_name, source, status, confirmation_number, quoted_net, net_charged, currency, cancellation_policy, cancellation_deadline, note",
+        "id, operation_id, kind, title, city_name, start_date, end_date, detail, supplier_name, source, status, is_paid, origin, confirmation_number, quoted_net, net_charged, currency, cancellation_policy, cancellation_deadline, note",
       )
       .eq("operation_id", operationId)
       .order("start_date", { ascending: true, nullsFirst: false });
@@ -173,6 +181,35 @@ export async function confirmBookingManually(input: {
   }
 }
 
+/**
+ * Mark a confirmed booking as actually paid / ticketed.
+ *
+ * Separate from confirmation on purpose — see OperationBooking.is_paid. Only a
+ * paid booking prints a clean voucher; a confirmed-but-unpaid one prints with a
+ * warning band across it.
+ */
+export async function markBookingPaid(bookingId: string, paid: boolean): Promise<{ ok: true } | Fail> {
+  const denied = await requireOps();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const supabase = await db();
+    const { error } = await supabase
+      .from("operation_bookings")
+      .update({ is_paid: paid, paid_at: paid ? new Date().toISOString() : null })
+      .eq("id", bookingId);
+    if (error) return { ok: false, error: "err.updateFailed" };
+    await logAudit({
+      action: "booking.confirmed",
+      entity: "operation_bookings",
+      entity_id: bookingId,
+      meta: { is_paid: paid },
+    });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
 export async function cancelBooking(bookingId: string, reason: string): Promise<{ ok: true } | Fail> {
   const denied = await requireOps();
   if (denied) return { ok: false, error: denied };
@@ -240,6 +277,7 @@ function toVoucherBooking(b: OperationBooking): VoucherBooking {
     supplier_name: b.supplier_name,
     detail: b.detail ?? {},
     cancellation_policy: b.cancellation_policy,
+    is_paid: b.is_paid,
   };
 }
 
