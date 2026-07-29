@@ -62,7 +62,7 @@ type NavLink = {
   href: string;
 };
 
-type NavGroup = {
+export type NavGroup = {
   labelKey: TranslationKey;
   href: string;
   icon: LucideIcon;
@@ -71,7 +71,12 @@ type NavGroup = {
   perm?: Permission;
 };
 
-const navGroups: NavGroup[] = [
+/**
+ * The single source of truth for what sections exist. Exported so the dashboard
+ * can derive its «الأقسام السابقة» list from it — a hand-written second copy
+ * would go stale the first time a route is added here.
+ */
+export const navGroups: NavGroup[] = [
   { labelKey: "nav.dashboard", href: "/dashboard", icon: BarChart3 },
   { labelKey: "nav.intelligenceHub", href: "/travel-intelligence", icon: Calculator },
   { labelKey: "nav.kanban", href: "/kanban-board", icon: Columns3 },

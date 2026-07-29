@@ -426,8 +426,28 @@ export const ar: Dictionary = {
   "dash.qa.repackage": "استيراد ملف مورّد",
   "dash.qa.kanban": "تتبّع مسار العروض",
   "dash.qa.offers": "تصفّح كل العروض",
+  "dash.qa.operations": "تنفيذ الملفات المؤكَّدة",
+  "dash.qa.readyOffers": "باقات الشركة الجاهزة",
   "dash.cardError": "تعذّر تحميل هذه البطاقة.",
   "dash.retry": "إعادة المحاولة",
+
+  // ---------- dashboard: operations panel + section grouping ----------
+  "dash.ops.title": "العمليات — ما يحتاج إجراءً",
+  "dash.ops.hint": "الملفات الجارية فقط، مرتّبة بما يسوء أولاً إن لم يلمسه أحد.",
+  "dash.ops.openBoard": "فتح لوحة العمليات",
+  "dash.ops.criticalN": "{n} حرِج",
+  "dash.ops.openBookings": "حجوزات لم تُؤكَّد",
+  "dash.ops.vouchersPending": "فوتشرات لم تصدر",
+  "dash.ops.travelSoon": "سفر خلال ٧ أيام",
+  "dash.ops.outstanding": "مبالغ لم تُحصَّل",
+  "dash.ops.moreCurrencies": "+{n} عملة أخرى",
+  "dash.ops.liveCases": "ملفات جارية",
+  "dash.ops.urgent": "الأكثر إلحاحاً",
+  "dash.readySections": "الأقسام الجاهزة",
+  "dash.readyHint": "مبنيّة وتعمل — ابدأ من هنا.",
+  "dash.preparedSettings": "بيانات وقواعد جهّزناها",
+  "dash.previousSections": "الأقسام السابقة",
+  "dash.previousHint": "الشاشات القديمة كما هي — افتحها عند الحاجة.",
 
   // ---------- intelligence hub ----------
   "hub.heading": "مركز تشغيل العروض والعملاء",

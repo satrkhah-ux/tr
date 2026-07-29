@@ -49,8 +49,10 @@ export type OperationSnapshot = {
     title: string;
     status: string;
     cancellation_deadline: string | null;
+    /** when the supplier's confirmation was recorded. Optional: unknown = lenient. */
+    confirmed_at?: string | null;
   }[];
-  documents: { kind: string; booking_id: string | null }[];
+  documents: { kind: string; booking_id: string | null; created_at?: string | null }[];
   travelers: { display_name: string; passport_expiry: string | null }[];
 };
 
@@ -78,10 +80,48 @@ export function hotelAwaitingConfirmation(op: OperationSnapshot): string[] {
     .map((b) => b.title);
 }
 
-/** Confirmed bookings with no voucher issued against them yet. */
+type SnapshotBooking = OperationSnapshot["bookings"][number];
+type SnapshotDocument = OperationSnapshot["documents"][number];
+
+/** Which document kinds actually carry a booking of this kind. */
+function coveringKinds(bookingKind: string): string[] {
+  if (bookingKind === "hotel") return ["hotel_voucher", "booking_summary"];
+  if (bookingKind === "flight") return ["flight_ticket", "booking_summary"];
+  return ["booking_summary"];
+}
+
+/**
+ * Does a live document actually cover this booking?
+ *
+ * A document with NO booking_id is the combined voucher — the default the ops
+ * team asked for — and it carries every booking of its kind. Treating only
+ * per-booking documents as coverage would leave «فاوتشر لم يصدر» shouting forever
+ * on a case whose voucher is already in the client's hands.
+ *
+ * The time test is what also catches the stale case: a hotel confirmed AFTER the
+ * combined voucher was printed is not on that paper, so it still needs one.
+ * Unknown timestamps are treated as covered — a signal that cannot be sure is
+ * noise, and noise is what stops people reading signals.
+ */
+function documented(b: SnapshotBooking, documents: SnapshotDocument[]): boolean {
+  const covering = coveringKinds(b.kind);
+  return documents.some((d) => {
+    if (d.booking_id != null) {
+      if (d.booking_id !== b.id) return false;
+    } else if (!covering.includes(d.kind)) {
+      return false;
+    }
+    if (!b.confirmed_at || !d.created_at) return true;
+    const issued = Date.parse(d.created_at);
+    const confirmed = Date.parse(b.confirmed_at);
+    if (Number.isNaN(issued) || Number.isNaN(confirmed)) return true;
+    return issued >= confirmed;
+  });
+}
+
+/** Confirmed bookings the traveller still has no valid document for. */
 export function vouchersPending(op: OperationSnapshot): string[] {
-  const documented = new Set(op.documents.map((d) => d.booking_id).filter((id): id is string => Boolean(id)));
-  return op.bookings.filter((b) => b.status === "confirmed" && !documented.has(b.id)).map((b) => b.title);
+  return op.bookings.filter((b) => b.status === "confirmed" && !documented(b, op.documents)).map((b) => b.title);
 }
 
 /** The trip starts within the week and something is still unbooked. */

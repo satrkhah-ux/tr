@@ -428,8 +428,28 @@ export const en = {
   "dash.qa.repackage": "Import a supplier PDF",
   "dash.qa.kanban": "Track the offers pipeline",
   "dash.qa.offers": "Browse all offers",
+  "dash.qa.operations": "Execute confirmed cases",
+  "dash.qa.readyOffers": "The company's ready packages",
   "dash.cardError": "Could not load this card.",
   "dash.retry": "Retry",
+
+  // ---------- dashboard: operations panel + section grouping ----------
+  "dash.ops.title": "Operations — what needs action",
+  "dash.ops.hint": "Live cases only, ordered by what goes wrong first if nobody touches it.",
+  "dash.ops.openBoard": "Open the operations board",
+  "dash.ops.criticalN": "{n} critical",
+  "dash.ops.openBookings": "Bookings not confirmed",
+  "dash.ops.vouchersPending": "Vouchers not issued",
+  "dash.ops.travelSoon": "Travelling within 7 days",
+  "dash.ops.outstanding": "Money not collected",
+  "dash.ops.moreCurrencies": "+{n} more currency",
+  "dash.ops.liveCases": "Live cases",
+  "dash.ops.urgent": "Most urgent",
+  "dash.readySections": "Ready sections",
+  "dash.readyHint": "Built and in use — start here.",
+  "dash.preparedSettings": "Prepared data & rules",
+  "dash.previousSections": "Previous sections",
+  "dash.previousHint": "The older screens, unchanged — open when you need them.",
 
   // ---------- intelligence hub ----------
   "hub.heading": "Offers & customers operations center",

@@ -69,6 +69,37 @@ export async function listTravelers(operationId: string): Promise<TravelerListIt
   }
 }
 
+/**
+ * The same redacted list for MANY operations in one query.
+ *
+ * The board and the dashboard both need every case's travelers at once; asking
+ * per operation cost one round-trip per card, which is the difference between a
+ * board that opens and a board that crawls once the season fills up.
+ */
+export async function listTravelersByOperation(
+  operationIds: string[],
+): Promise<Record<string, TravelerListItem[]>> {
+  if (operationIds.length === 0) return {};
+  if (await requireOps()) return {};
+  try {
+    const { data } = await db()
+      .from("operation_travelers")
+      .select("*")
+      .in("operation_id", operationIds)
+      .order("sort", { ascending: true });
+
+    const out: Record<string, TravelerListItem[]> = {};
+    for (const row of (data ?? []) as (TravelerRow & { operation_id: string })[]) {
+      // Group by the parent BEFORE redacting — operation_id is not part of the
+      // list item, and it must not become part of it.
+      (out[row.operation_id] ??= []).push(toTravelerListItem(row));
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 export async function upsertTraveler(input: {
   id?: string;
   /** required on insert; ignored on update. */

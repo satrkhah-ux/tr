@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  ClipboardCheck,
   Columns3,
   Contact,
   Eye,
@@ -16,8 +17,8 @@ import {
   FileText,
   FileUp,
   Inbox,
-  Loader2,
   Package,
+  PackageCheck,
   RotateCcw,
   Search,
   SlidersHorizontal,
@@ -39,13 +40,15 @@ import {
   type EmployeeMetrics,
   type EmployeeOption,
 } from "@/lib/data/metrics";
-import { TraveliunShell } from "./TraveliunShell";
+import type { OpsSummary } from "@/lib/data/operations-work";
+import { TraveliunShell, navGroups } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { ExecutiveOverview } from "./ExecutiveDashboardClient";
+import { OperationsSnapshot } from "./operations/OperationsSnapshot";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import type { TranslationKey } from "@/lib/i18n";
 
-export function TraveliunDashboardClient() {
+export function TraveliunDashboardClient({ opsSummary }: { opsSummary: OpsSummary }) {
   const { dashboardView } = useRole();
   const { t, dir } = useTraveliunUI();
 
@@ -60,9 +63,9 @@ export function TraveliunDashboardClient() {
     <TraveliunShell title="nav.dashboard">
       <div className="tv-fade-up" dir={dir}>
         {dashboardView === "admin" ? (
-          <AdminHome />
+          <AdminHome opsSummary={opsSummary} />
         ) : dashboardView === "employee" ? (
-          <EmployeeHome />
+          <EmployeeHome opsSummary={opsSummary} />
         ) : (
           <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState title={t("dash.noPermission")} description={t("dash.noPermissionDesc")} />
@@ -73,42 +76,156 @@ export function TraveliunDashboardClient() {
   );
 }
 
-// ---------- quick actions (the home page's working functions) ----------
-type QuickAction = { key: string; labelKey: TranslationKey; descKey: TranslationKey; href: string; icon: LucideIcon; color: string; perm?: Permission };
-const QUICK_ACTIONS: QuickAction[] = [
+// ---------- sections: what is ready, and what came before ----------
+/**
+ * The home page lists the surfaces we have actually built or rebuilt. Everything
+ * else — the older screens, still there and still working — moves inside one
+ * collapsed disclosure, so the dashboard stops reading as a directory of 60 links
+ * and starts reading as today's work.
+ *
+ * `PREVIOUS` is DERIVED from the shell's own nav rather than hand-listed: a
+ * second list of every screen would rot the first time someone adds a route.
+ */
+type ReadyAction = { key: string; labelKey: TranslationKey; descKey: TranslationKey; href: string; icon: LucideIcon; color: string; perm?: Permission };
+
+const READY_ACTIONS: ReadyAction[] = [
+  { key: "operations", labelKey: "nav.operations", descKey: "dash.qa.operations", href: "/operations", icon: ClipboardCheck, color: "#185045", perm: "operations.write" },
   { key: "generator", labelKey: "nav.packageGenerator", descKey: "dash.qa.generator", href: "/package-generator", icon: FilePlus2, color: "#2aa87a" },
+  { key: "readyOffers", labelKey: "nav.readyOffers", descKey: "dash.qa.readyOffers", href: "/ready-offers", icon: PackageCheck, color: "#8b5cf6" },
   { key: "repackage", labelKey: "nav.repackage", descKey: "dash.qa.repackage", href: "/repackage", icon: FileUp, color: "#0e9bb5", perm: "repackage.write" },
   { key: "kanban", labelKey: "nav.kanban", descKey: "dash.qa.kanban", href: "/kanban-board", icon: Columns3, color: "#d99a00" },
-  { key: "offers", labelKey: "nav.packages", descKey: "dash.qa.offers", href: "/offers", icon: FileText, color: "#185045" },
+  { key: "offers", labelKey: "nav.packages", descKey: "dash.qa.offers", href: "/offers", icon: FileText, color: "#0f7a52" },
 ];
 
-function QuickActions() {
+/** Reference data and rules we filled and verified — reached rarely, but ours. */
+const PREPARED: { labelKey: TranslationKey; href: string; perm?: Permission }[] = [
+  { labelKey: "nav.markupRules", href: "/markup-rules" },
+  { labelKey: "nav.hotelSuppliers", href: "/settings/suppliers" },
+  { labelKey: "nav.climate", href: "/setting/climate", perm: "settings.manage" },
+  { labelKey: "nav.countries", href: "/countries" },
+  { labelKey: "nav.cities", href: "/cities" },
+  { labelKey: "nav.airports", href: "/airports" },
+  { labelKey: "nav.roomTypes", href: "/rooms-types" },
+  { labelKey: "nav.carTypes", href: "/cars-types" },
+  { labelKey: "nav.roles", href: "/employees/roles", perm: "employees.manage" },
+];
+
+const HANDLED_HREFS = new Set<string>([
+  "/dashboard",
+  ...READY_ACTIONS.map((a) => a.href),
+  ...PREPARED.map((p) => p.href),
+]);
+
+function ReadySections() {
   const { t } = useTraveliunUI();
   const { can } = useRole();
-  const actions = QUICK_ACTIONS.filter((a) => !a.perm || can(a.perm));
+  const actions = READY_ACTIONS.filter((a) => !a.perm || can(a.perm));
+  const prepared = PREPARED.filter((p) => !p.perm || can(p.perm));
+
   return (
-    <section className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
-      {actions.map((a) => (
-        <Link
-          key={a.key}
-          href={a.href}
-          className="group flex items-center gap-3 rounded-[15px] border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]"
-        >
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-[12px] transition-transform group-hover:scale-105" style={{ color: a.color, background: `${a.color}1a` }}>
-            <a.icon className="size-5" />
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-[13.5px] font-extrabold text-[#0f3d38]">{t(a.labelKey)}</span>
-            <span className="block truncate text-[11.5px] font-semibold text-[#93aaa3]">{t(a.descKey)}</span>
-          </span>
-        </Link>
-      ))}
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-base font-extrabold text-[#003c3a]">{t("dash.readySections")}</h2>
+        <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("dash.readyHint")}</p>
+      </div>
+
+      <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+        {actions.map((a) => (
+          <Link
+            key={a.key}
+            href={a.href}
+            className="group flex items-center gap-3 rounded-[15px] border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]"
+          >
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-[12px] transition-transform group-hover:scale-105" style={{ color: a.color, background: `${a.color}1a` }}>
+              <a.icon className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-[13.5px] font-extrabold text-[#0f3d38]">{t(a.labelKey)}</span>
+              <span className="block truncate text-[11.5px] font-semibold text-[#93aaa3]">{t(a.descKey)}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      {prepared.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-[13px] border border-[#e8efeb] bg-white px-4 py-3">
+          <span className="text-[11.5px] font-extrabold text-[#557d78]">{t("dash.preparedSettings")}</span>
+          {prepared.map((p) => (
+            <Link
+              key={p.href}
+              href={p.href}
+              className="rounded-full border border-[#dbe6e1] px-3 py-1 text-[11.5px] font-bold text-[#185045] transition-colors hover:border-[#2aa87a] hover:bg-[#f0f7f4]"
+            >
+              {t(p.labelKey)}
+            </Link>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
 
-// ---------- ADMIN home: quick actions + tabs (executive | team) ----------
-function AdminHome() {
+/**
+ * The older sections, collapsed.
+ *
+ * A native <details> rather than a JS disclosure: the browser already owns the
+ * open/close state, the keyboard behaviour and the accessibility, and it works
+ * before hydration.
+ */
+function PreviousSections() {
+  const { t } = useTraveliunUI();
+  const { can } = useRole();
+
+  const groups = navGroups
+    .filter((group) => !group.perm || can(group.perm))
+    .map((group) => ({
+      labelKey: group.labelKey,
+      icon: group.icon,
+      links: (group.children ?? [{ labelKey: group.labelKey, href: group.href }]).filter((c) => !HANDLED_HREFS.has(c.href)),
+    }))
+    .filter((group) => group.links.length > 0);
+
+  const count = groups.reduce((n, g) => n + g.links.length, 0);
+  if (count === 0) return null;
+
+  return (
+    <details className="group rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-5 py-4 marker:content-none">
+        <ChevronDown className="size-4 text-[#557d78] transition-transform duration-200 group-open:rotate-180" />
+        <span className="text-sm font-extrabold text-[#185045]">{t("dash.previousSections")}</span>
+        <span className="tv-tnum rounded-full bg-[#eef4f1] px-2 py-0.5 text-[11px] font-bold text-[#557d78]">
+          <DirText dir="ltr">{String(count)}</DirText>
+        </span>
+        <span className="ms-auto text-[11.5px] font-semibold text-[#93aaa3]">{t("dash.previousHint")}</span>
+      </summary>
+      <div className="grid gap-4 border-t border-[#eef2f0] p-5 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
+        {groups.map((group) => (
+          <div key={group.labelKey}>
+            <p className="mb-2 flex items-center gap-1.5 text-[12px] font-extrabold text-[#557d78]">
+              <group.icon className="size-4" />
+              {t(group.labelKey)}
+            </p>
+            <ul className="space-y-0.5">
+              {group.links.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="block truncate rounded-[8px] px-2 py-1.5 text-[12.5px] font-semibold text-[#185045] transition-colors hover:bg-[#f4f8f6]"
+                  >
+                    {t(link.labelKey)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+// ---------- ADMIN home: operations first, then sections, then the tabs ----------
+function AdminHome({ opsSummary }: { opsSummary: OpsSummary }) {
   const { t } = useTraveliunUI();
   const { can } = useRole();
   const canExec = can("pricing.internal");
@@ -121,7 +238,10 @@ function AdminHome() {
 
   return (
     <div className="space-y-4">
-      <QuickActions />
+      {/* live work before navigation: a case whose free-cancellation window
+          closes tomorrow matters more than a link to the generator. */}
+      <OperationsSnapshot summary={opsSummary} />
+      <ReadySections />
 
       {canExec ? (
         <div className="inline-flex rounded-[12px] border border-[#dbe6e1] bg-white p-1 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
@@ -135,16 +255,20 @@ function AdminHome() {
       ) : null}
 
       {canExec && tab === "exec" ? <ExecutiveOverview /> : <TeamOperations />}
+
+      <PreviousSections />
     </div>
   );
 }
 
-// ---------- EMPLOYEE home: quick actions + own metrics ----------
-function EmployeeHome() {
+// ---------- EMPLOYEE home: operations + sections + own metrics ----------
+function EmployeeHome({ opsSummary }: { opsSummary: OpsSummary }) {
   return (
     <div className="space-y-4">
-      <QuickActions />
+      <OperationsSnapshot summary={opsSummary} />
+      <ReadySections />
       <EmployeeDashboard />
+      <PreviousSections />
     </div>
   );
 }

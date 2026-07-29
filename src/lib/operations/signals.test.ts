@@ -89,6 +89,46 @@ describe("vouchersPending", () => {
     });
     expect(vouchersPending(op)).toEqual([]);
   });
+
+  // The DEFAULT document is one combined voucher (booking_id null). Before this
+  // was handled, the signal shouted forever on a case already served.
+  it("accepts the combined voucher as covering every hotel on it", () => {
+    const op = snap({
+      bookings: [
+        { id: "b1", kind: "hotel", title: "أ", status: "confirmed", cancellation_deadline: null },
+        { id: "b2", kind: "hotel", title: "ب", status: "confirmed", cancellation_deadline: null },
+      ],
+      documents: [{ kind: "hotel_voucher", booking_id: null }],
+    });
+    expect(vouchersPending(op)).toEqual([]);
+  });
+
+  it("does not let a hotel voucher cover a flight", () => {
+    const op = snap({
+      bookings: [{ id: "f1", kind: "flight", title: "رحلة", status: "confirmed", cancellation_deadline: null }],
+      documents: [{ kind: "hotel_voucher", booking_id: null }],
+    });
+    expect(vouchersPending(op)).toEqual(["رحلة"]);
+  });
+
+  it("counts a booking confirmed AFTER the combined voucher was printed — it is not on that paper", () => {
+    const op = snap({
+      bookings: [
+        { id: "b1", kind: "hotel", title: "أ", status: "confirmed", cancellation_deadline: null, confirmed_at: "2026-07-20T10:00:00Z" },
+        { id: "b2", kind: "hotel", title: "ب", status: "confirmed", cancellation_deadline: null, confirmed_at: "2026-07-28T10:00:00Z" },
+      ],
+      documents: [{ kind: "hotel_voucher", booking_id: null, created_at: "2026-07-25T10:00:00Z" }],
+    });
+    expect(vouchersPending(op)).toEqual(["ب"]);
+  });
+
+  it("stays lenient when a timestamp is missing — an unsure signal is noise", () => {
+    const op = snap({
+      bookings: [{ id: "b1", kind: "hotel", title: "أ", status: "confirmed", cancellation_deadline: null, confirmed_at: null }],
+      documents: [{ kind: "hotel_voucher", booking_id: null, created_at: "2026-07-25T10:00:00Z" }],
+    });
+    expect(vouchersPending(op)).toEqual([]);
+  });
 });
 
 describe("travelApproachingIncomplete", () => {
