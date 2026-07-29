@@ -10,6 +10,8 @@ import { validateInvariants, type InvariantViolation } from "./invariants";
 import {
   deriveCityDates,
   totalCityNights,
+  SCOPE_KEYS,
+  SCOPE_STAGE,
   type DraftData,
   type StageKey,
 } from "./draft-types";
@@ -91,7 +93,7 @@ export function validateDraft(data: DraftData): DraftValidation {
 
   // Cities exist but no hotel lines yet → the offer can't print an itinerary.
   const missingHotelCities = cities.filter((c) => !data.hotels.some((h) => h.city_name === c.city_name));
-  if (data.cities.length > 0 && missingHotelCities.length > 0) {
+  if (data.scope.hotels && data.cities.length > 0 && missingHotelCities.length > 0) {
     blocking.push({ severity: "blocking", stage: "hotels", key: "pg.err.missingHotels" });
   }
 
@@ -116,7 +118,9 @@ export function validateDraft(data: DraftData): DraftValidation {
   // ---- warnings ----
   if (!data.customer.customer_name.trim()) warnings.push({ severity: "warning", stage: "customer", key: "pg.warn.noName" });
   if (!data.customer.customer_phone.trim()) warnings.push({ severity: "warning", stage: "customer", key: "pg.warn.noPhone" });
-  if (data.flights.length === 0) warnings.push({ severity: "warning", stage: "flights", key: "pg.warn.noFlights" });
+  if (data.scope.flights && data.flights.length === 0) {
+    warnings.push({ severity: "warning", stage: "flights", key: "pg.warn.noFlights" });
+  }
 
   // ---- flight guard rails (timezone-aware) ----
   // An impossible flight (arrives before it departs, once both airports resolve).
@@ -144,11 +148,20 @@ export function validateDraft(data: DraftData): DraftValidation {
     warnings.push({ severity: "warning", stage: "pricing", key: "pg.warn.noPricing" });
   }
 
+  // ONE gate for scope, rather than a guard on every push above: a stage the sale
+  // excludes is hidden from the rail, so an issue pointing at it would be an
+  // unfixable blocker — the agent cannot open the page to resolve it.
+  const inScope = (issue: DraftIssue) => {
+    const key = SCOPE_KEYS.find((k) => SCOPE_STAGE[k] === issue.stage);
+    return key ? data.scope[key] : true;
+  };
+  const scopedBlocking = blocking.filter(inScope);
+
   return {
-    ok: blocking.length === 0,
-    blocking,
-    warnings,
-    stages: stageStatuses(data, blocking),
+    ok: scopedBlocking.length === 0,
+    blocking: scopedBlocking,
+    warnings: warnings.filter(inScope),
+    stages: stageStatuses(data, scopedBlocking),
     nights: { used, total, match: used === total && total > 0 },
   };
 }

@@ -1,11 +1,28 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, MapPin, Search, Tag, UserRound } from "lucide-react";
+import { BedDouble, Check, ListChecks, Loader2, MapPin, Minus, Search, Tag, UserRound, Users } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { searchCustomersFromTeletel, type TeletelCustomerHit } from "@/lib/data/teletel-actions";
+import {
+  BOARD_LABEL_KEYS,
+  BOARD_TYPES,
+  SCOPE_KEYS,
+  resizeAges,
+  type DraftHotel,
+  type DraftScope,
+} from "@/lib/offer/draft-types";
+import type { TranslationKey } from "@/lib/i18n";
+import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass, labelClass, sectionClass, type StageFormProps } from "../stage-props";
+
+const SCOPE_LABEL_KEYS: Record<keyof DraftScope, TranslationKey> = {
+  flights: "pg.stage.flights",
+  hotels: "pg.stage.hotels",
+  visas: "pg.stage.visas",
+  transport: "pg.stage.transport",
+};
 
 /**
  * Stage 1 — customer / company.
@@ -13,7 +30,7 @@ import { fieldClass, labelClass, sectionClass, type StageFormProps } from "../st
  * fills name+phone, and label-derived destinations («رحلة جورجيا») become chips
  * that fill the trip destination. Manual fields stay as the fallback.
  */
-export function CustomerStage({ data, patch }: StageFormProps) {
+export function CustomerStage({ data, patch, lookups }: StageFormProps) {
   const { t } = useTraveliunUI();
   const customer = data.customer;
 
@@ -173,6 +190,233 @@ export function CustomerStage({ data, patch }: StageFormProps) {
           />
         </label>
       </div>
+
+      <TravelersBlock data={data} patch={patch} />
+      <RoomsBlock data={data} patch={patch} lookups={lookups} />
+      <ScopeBlock data={data} patch={patch} />
     </section>
+  );
+}
+
+const blockClass = "mt-5 border-t border-[#e7f0ec] pt-5";
+const blockTitleClass = "flex items-center gap-2 text-[13.5px] font-extrabold text-[#0f3d38]";
+const smallLabelClass = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
+
+/**
+ * Travelers live WITH the customer, not with the trip frame: "who is going" is
+ * the first thing an agent is told on the phone. Ages are captured too — a
+ * child's age changes the hotel rate and the airline fare, so "2 children" with
+ * no ages is a quote the supplier can reprice after the client has agreed.
+ */
+function TravelersBlock({ data, patch }: Pick<StageFormProps, "data" | "patch">) {
+  const { t } = useTraveliunUI();
+  const trip = data.trip;
+
+  /** Counts and ages move together — the ages list is always count-long. */
+  function setCount(field: "children" | "infants", raw: number) {
+    const count = Math.max(Math.trunc(raw) || 0, 0);
+    const agesField = field === "children" ? "children_ages" : "infant_ages";
+    patch({ trip: { ...trip, [field]: count, [agesField]: resizeAges(trip[agesField], count) } });
+  }
+
+  function setAge(field: "children_ages" | "infant_ages", index: number, raw: number) {
+    const next = trip[field].map((age, i) => (i === index ? Math.max(Math.trunc(raw) || 0, 0) : age));
+    patch({ trip: { ...trip, [field]: next } });
+  }
+
+  return (
+    <div className={blockClass}>
+      <h3 className={blockTitleClass}>
+        <Users className="size-4 text-[#185045]" />
+        {t("pg.travelersTitle")}
+      </h3>
+
+      <div className="mt-3 grid grid-cols-3 gap-4">
+        <label className={smallLabelClass}>
+          {t("pg.adults")}
+          <input
+            type="number" min={0} dir="ltr"
+            value={trip.adults}
+            onChange={(e) => patch({ trip: { ...trip, adults: Math.max(Number(e.target.value) || 0, 0) } })}
+            className={`${fieldClass} tv-tnum text-center`}
+          />
+        </label>
+        <label className={smallLabelClass}>
+          {t("pg.children")}
+          <input
+            type="number" min={0} dir="ltr"
+            value={trip.children}
+            onChange={(e) => setCount("children", Number(e.target.value))}
+            className={`${fieldClass} tv-tnum text-center`}
+          />
+        </label>
+        <label className={smallLabelClass}>
+          {t("pg.infants")}
+          <input
+            type="number" min={0} dir="ltr"
+            value={trip.infants}
+            onChange={(e) => setCount("infants", Number(e.target.value))}
+            className={`${fieldClass} tv-tnum text-center`}
+          />
+        </label>
+      </div>
+
+      {trip.children_ages.length > 0 || trip.infant_ages.length > 0 ? (
+        <div className="mt-3 rounded-[11px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
+          <p className="mb-2 text-[11.5px] font-bold text-[#557d78]">{t("pg.agesHint")}</p>
+          <div className="flex flex-wrap gap-2">
+            {trip.children_ages.map((age, i) => (
+              <AgeField
+                key={`c${i}`}
+                label={t("pg.childAgeN", { n: i + 1 })}
+                value={age}
+                onChange={(v) => setAge("children_ages", i, v)}
+              />
+            ))}
+            {trip.infant_ages.map((age, i) => (
+              <AgeField
+                key={`i${i}`}
+                label={t("pg.infantAgeN", { n: i + 1 })}
+                value={age}
+                onChange={(v) => setAge("infant_ages", i, v)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AgeField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <label className="grid gap-1 text-[11px] font-bold text-[#557d78]">
+      {label}
+      <input
+        type="number" min={0} max={17} dir="ltr"
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={`${fieldClass} tv-tnum h-9 w-20 text-center`}
+      />
+    </label>
+  );
+}
+
+/**
+ * Room defaults, entered once here and inherited by every city.
+ *
+ * Changing a default re-applies it ONLY to hotel lines that still carry the old
+ * one. A city where the agent deliberately booked an extra room (the driver's,
+ * which is never labelled as such) keeps its own number.
+ */
+function RoomsBlock({ data, patch, lookups }: Pick<StageFormProps, "data" | "patch" | "lookups">) {
+  const { t } = useTraveliunUI();
+  const trip = data.trip;
+
+  function applyDefault<K extends "rooms_count" | "room_type_id" | "board_type">(
+    field: K,
+    oldValue: DraftHotel[K],
+    newValue: DraftHotel[K],
+    extra?: Partial<DraftHotel>,
+  ) {
+    return data.hotels.map((h) => (h[field] === oldValue ? { ...h, [field]: newValue, ...extra } : h));
+  }
+
+  function setRooms(raw: number) {
+    const rooms = Math.max(Math.trunc(raw) || 1, 1);
+    patch({ trip: { ...trip, rooms }, hotels: applyDefault("rooms_count", trip.rooms, rooms) });
+  }
+
+  function setRoomType(id: string) {
+    const rt = lookups.roomTypes.find((r) => r.id === id) ?? null;
+    patch({
+      trip: { ...trip, default_room_type_id: rt?.id ?? null, default_room_type_name: rt?.name ?? "" },
+      hotels: applyDefault("room_type_id", trip.default_room_type_id, rt?.id ?? null, {
+        room_type_name: rt?.name ?? "",
+      }),
+    });
+  }
+
+  function setBoard(value: string) {
+    const board = value === "" ? null : (value as BoardType);
+    patch({ trip: { ...trip, default_board: board }, hotels: applyDefault("board_type", trip.default_board, board) });
+  }
+
+  return (
+    <div className={blockClass}>
+      <h3 className={blockTitleClass}>
+        <BedDouble className="size-4 text-[#185045]" />
+        {t("pg.roomsTitle")}
+      </h3>
+      <p className="mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.roomsHint")}</p>
+
+      <div className="mt-3 grid gap-4 sm:grid-cols-3">
+        <label className={smallLabelClass}>
+          {t("pg.roomsCount")}
+          <input
+            type="number" min={1} dir="ltr"
+            value={trip.rooms}
+            onChange={(e) => setRooms(Number(e.target.value))}
+            className={`${fieldClass} tv-tnum text-center`}
+          />
+        </label>
+        <label className={smallLabelClass}>
+          {t("pg.roomType")}
+          <select value={trip.default_room_type_id ?? ""} onChange={(e) => setRoomType(e.target.value)} className={fieldClass}>
+            <option value="">{t("pg.chooseRoomType")}</option>
+            {lookups.roomTypes.map((rt) => (
+              <option key={rt.id} value={rt.id}>{rt.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className={smallLabelClass}>
+          {t("pg.board")}
+          <select value={trip.default_board ?? ""} onChange={(e) => setBoard(e.target.value)} className={fieldClass}>
+            <option value="">{t("pg.chooseBoard")}</option>
+            {BOARD_TYPES.map((b) => (
+              <option key={b} value={b}>{t(BOARD_LABEL_KEYS[b])}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+/** Service scope — the switches that decide which stages exist for this offer. */
+function ScopeBlock({ data, patch }: Pick<StageFormProps, "data" | "patch">) {
+  const { t } = useTraveliunUI();
+  const scope = data.scope;
+
+  return (
+    <div className={blockClass}>
+      <h3 className={blockTitleClass}>
+        <ListChecks className="size-4 text-[#185045]" />
+        {t("pg.scopeTitle")}
+      </h3>
+      <p className="mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.scopeHint")}</p>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {SCOPE_KEYS.map((key) => {
+          const on = scope[key];
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => patch({ scope: { ...scope, [key]: !on } })}
+              aria-pressed={on}
+              className={`flex items-center gap-2 rounded-[11px] border px-3 py-2.5 text-[13px] font-bold transition-colors ${
+                on
+                  ? "border-[#185045] bg-[#185045] text-white"
+                  : "border-[#dbe6e1] bg-white text-[#93aaa3] hover:bg-[#f4f8f6]"
+              }`}
+            >
+              {on ? <Check className="size-4" /> : <Minus className="size-4" />}
+              {t(SCOPE_LABEL_KEYS[key])}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

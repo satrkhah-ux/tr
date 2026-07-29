@@ -6,7 +6,7 @@
  * the server actions and the tests alike (mirrors lib/offer/draft-types.ts).
  */
 
-import type { DraftData } from "@/lib/offer/draft-types";
+import { emptyDraftData, type DraftData } from "@/lib/offer/draft-types";
 
 export const TIERS = ["economy", "premium"] as const;
 export type Tier = (typeof TIERS)[number];
@@ -145,16 +145,14 @@ export function buildSeed(offer: ParsedOffer, readyOfferId: string): Partial<Dra
   terms.push(READY_OFFER_TERMS.refundGeneral);
 
   return {
+    // spread the system defaults so a field added to DraftTrip later (room
+    // defaults, traveler ages) is inherited rather than silently missing here.
     trip: {
+      ...emptyDraftData().trip,
       country: offer.country,
       destination: offer.cities_summary || offer.country,
-      arrival_date: null,
-      departure_date: null,
       days: offer.days ?? 0,
       nights: offer.nights ?? 0,
-      adults: 2,
-      children: 0,
-      infants: 0,
     },
     cities: cities.map((c) => ({ city_name: c.city_name, nights: c.nights, check_in: null, check_out: null })),
     hotels: cities.map((c, i) => ({

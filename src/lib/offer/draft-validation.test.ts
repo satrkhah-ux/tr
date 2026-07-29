@@ -6,6 +6,7 @@ function completeDraft(): DraftData {
   const data = emptyDraftData();
   data.customer = { customer_name: "نايف الجهني", customer_phone: "0555555555", company: "" };
   data.trip = {
+    ...data.trip,
     country: "ماليزيا",
     destination: "ماليزيا",
     arrival_date: "2026-06-01",
@@ -13,8 +14,6 @@ function completeDraft(): DraftData {
     days: 6,
     nights: 5,
     adults: 2,
-    children: 0,
-    infants: 0,
   };
   data.cities = deriveCityDates("2026-06-01", [
     { city_name: "كوالالمبور", nights: 3, check_in: null, check_out: null },

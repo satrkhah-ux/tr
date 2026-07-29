@@ -16,6 +16,13 @@ function nightsBetween(arrival: string | null, departure: string | null): number
   return Math.max(Math.round((end - start) / DAY_MS), 0);
 }
 
+/** ISO date + N days, in UTC so a DST change can never shift the calendar day. */
+function addDaysIso(iso: string, days: number): string {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 /**
  * Stage 2 — trip frame: country, destination, dates, duration and travelers.
  * Edits ONLY data.trip — with one contract exception: when the arrival date
@@ -29,15 +36,6 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
     patch({ trip: { ...trip, ...slice } });
   }
 
-  /** Fold auto-computed days/nights into a date slice when both dates are set. */
-  function withDerivedDuration(slice: Partial<DraftTrip>): Partial<DraftTrip> {
-    const arrival = slice.arrival_date !== undefined ? slice.arrival_date : trip.arrival_date;
-    const departure = slice.departure_date !== undefined ? slice.departure_date : trip.departure_date;
-    const nights = nightsBetween(arrival, departure);
-    if (nights === null) return slice;
-    return { ...slice, nights, days: nights + 1 };
-  }
-
   function setCountry(nextCountry: string) {
     const slice: Partial<DraftTrip> = { country: nextCountry };
     if (!trip.destination.trim() || trip.destination === trip.country) {
@@ -46,12 +44,16 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
     update(slice);
   }
 
-  function setArrival(value: string) {
-    // Trip dates drive the flight departure dates (outbound → arrival, inbound →
-    // departure) unless the agent has manually pinned a leg. Hotel dates then
-    // follow the itinerary start (the outbound flight's local landing date, or
-    // the trip arrival when no flight is set yet). All folded into ONE patch.
-    const nextTrip = { ...trip, ...withDerivedDuration({ arrival_date: value || null }) };
+  /**
+   * Commit a trip slice and re-derive everything that hangs off the dates.
+   *
+   * Trip dates drive the flight departure dates (outbound → arrival, inbound →
+   * departure) unless the agent has pinned a leg; hotel check-ins then follow
+   * the itinerary start (the outbound flight's local landing date, or the trip
+   * arrival when no flight is set yet). All folded into ONE patch.
+   */
+  function commit(slice: Partial<DraftTrip>) {
+    const nextTrip = { ...trip, ...slice };
     const flights = syncDepartureDates(nextTrip, data.flights);
     patch({
       trip: nextTrip,
@@ -60,20 +62,47 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
     });
   }
 
+  /**
+   * Each date/duration field has ONE consequence, so the three of them never
+   * fight each other:
+   *   arrival   → the trip MOVES, its length is kept  (departure follows)
+   *   duration  → the trip STRETCHES from the arrival (departure follows)
+   *   departure → the length is re-measured           (days/nights follow)
+   * Arrival is the anchor: an agent who types "8 days" expects the return date
+   * to appear, not the start date to jump.
+   */
+  function setArrival(value: string) {
+    const arrival = value || null;
+    // Keep the length when there is one; otherwise measure it from the dates.
+    if (arrival && trip.nights > 0) {
+      commit({ arrival_date: arrival, departure_date: addDaysIso(arrival, trip.nights) });
+      return;
+    }
+    const nights = nightsBetween(arrival, trip.departure_date);
+    commit(nights === null ? { arrival_date: arrival } : { arrival_date: arrival, nights, days: nights + 1 });
+  }
+
   function setDeparture(value: string) {
-    const nextTrip = { ...trip, ...withDerivedDuration({ departure_date: value || null }) };
-    const flights = syncDepartureDates(nextTrip, data.flights);
-    patch({ trip: nextTrip, flights });
+    const departure = value || null;
+    const nights = nightsBetween(trip.arrival_date, departure);
+    commit(nights === null ? { departure_date: departure } : { departure_date: departure, nights, days: nights + 1 });
+  }
+
+  /** Duration typed → the departure date is written/shifted to match. */
+  function setDuration(days: number, nights: number) {
+    const slice: Partial<DraftTrip> = { days, nights };
+    if (trip.arrival_date) slice.departure_date = addDaysIso(trip.arrival_date, nights);
+    commit(slice);
   }
 
   function setDays(value: number) {
     const days = Math.max(value, 0);
-    update({ days, nights: Math.max(days - 1, 0) });
+    setDuration(days, Math.max(days - 1, 0));
   }
 
   function setNights(value: number) {
     const nights = Math.max(value, 0);
-    update({ nights, days: nights + 1 });
+    setDuration(nights + 1, nights);
   }
 
   return (
@@ -148,42 +177,6 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
         </label>
       </div>
       <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.daysAuto")}</p>
-
-      <div className="mt-4 grid grid-cols-3 gap-4">
-        <label className={labelClass}>
-          {t("pg.adults")}
-          <input
-            type="number"
-            min={0}
-            dir="ltr"
-            value={trip.adults}
-            onChange={(e) => update({ adults: Math.max(Number(e.target.value) || 0, 0) })}
-            className={`${fieldClass} tv-tnum text-center`}
-          />
-        </label>
-        <label className={labelClass}>
-          {t("pg.children")}
-          <input
-            type="number"
-            min={0}
-            dir="ltr"
-            value={trip.children}
-            onChange={(e) => update({ children: Math.max(Number(e.target.value) || 0, 0) })}
-            className={`${fieldClass} tv-tnum text-center`}
-          />
-        </label>
-        <label className={labelClass}>
-          {t("pg.infants")}
-          <input
-            type="number"
-            min={0}
-            dir="ltr"
-            value={trip.infants}
-            onChange={(e) => update({ infants: Math.max(Number(e.target.value) || 0, 0) })}
-            className={`${fieldClass} tv-tnum text-center`}
-          />
-        </label>
-      </div>
     </section>
   );
 }

@@ -9,6 +9,7 @@ import {
   deriveCityDates,
   findLookupCountry,
   type DraftHotel,
+  type DraftTrip,
 } from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { getDraft } from "@/lib/data/drafts";
@@ -20,8 +21,21 @@ import { fieldClass, sectionClass, type StageFormProps } from "../stage-props";
 
 const rowLabelClass = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 
-function defaultLine(cityName: string): DraftHotel {
-  return { city_name: cityName, hotel_id: null, hotel_name: "", room_type_id: null, room_type_name: "", board_type: null, rooms_count: 1 };
+/**
+ * A city's hotel line starts from the trip defaults the agent entered with the
+ * customer — room count, room type and board. Per-city edits happen here on top
+ * of that, so the common case (same room everywhere) is zero extra typing.
+ */
+function defaultLine(cityName: string, trip: DraftTrip): DraftHotel {
+  return {
+    city_name: cityName,
+    hotel_id: null,
+    hotel_name: "",
+    room_type_id: trip.default_room_type_id,
+    room_type_name: trip.default_room_type_name,
+    board_type: trip.default_board,
+    rooms_count: Math.max(trip.rooms || 1, 1),
+  };
 }
 
 function minutesAgo(iso: string | null): number | null {
@@ -54,7 +68,7 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
   const derivedCities = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
 
   function lineFor(cityName: string): DraftHotel {
-    return data.hotels.find((h) => h.city_name === cityName) ?? defaultLine(cityName);
+    return data.hotels.find((h) => h.city_name === cityName) ?? defaultLine(cityName, data.trip);
   }
 
   function setHotel(cityName: string, slice: Partial<DraftHotel>) {

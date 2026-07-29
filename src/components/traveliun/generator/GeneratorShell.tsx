@@ -22,6 +22,7 @@ import { saveDraftStages } from "@/lib/data/drafts";
 import {
   STAGES,
   stageHref,
+  visibleStagesFor,
   type DraftData,
   type GeneratorLookups,
   type StageKey,
@@ -123,6 +124,7 @@ export function GeneratorShell({
 
   // Issues that belong to permission-gated stages are hidden from roles without
   // access — a visitor must see NO trace of the pricing stage anywhere.
+  // (validateDraft already drops issues for out-of-scope stages.)
   const validation = useMemo(() => {
     const raw = validateDraft(data);
     if (canPricing) return raw;
@@ -133,7 +135,7 @@ export function GeneratorShell({
       warnings: raw.warnings.filter((issue) => !gatedStages.has(issue.stage)),
     };
   }, [data, canPricing]);
-  const visibleStages = useMemo(() => STAGES.filter((s) => !s.gated || canPricing), [canPricing]);
+  const visibleStages = useMemo(() => visibleStagesFor(data.scope, canPricing), [data.scope, canPricing]);
   const showNights = stage === "cities" || stage === "hotels";
 
   // Linear position drives the mobile prev/next bar and the "step N of M" chip.

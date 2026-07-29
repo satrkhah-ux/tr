@@ -749,7 +749,7 @@ export const en = {
   "pg.adults": "Adults",
   "pg.children": "Children",
   "pg.infants": "Infants",
-  "pg.daysAuto": "Days/nights are derived from the dates; you can adjust them.",
+  "pg.daysAuto": "The arrival date is the anchor: type the number of days and the departure date is computed, growing or shrinking with it. Edit the departure directly and the days/nights are re-measured.",
   // cities stage
   "pg.citiesTitle": "Cities & nights",
   "pg.addCity": "Add city",
@@ -783,6 +783,15 @@ export const en = {
   "pg.board.HB": "Half board",
   "pg.board.FB": "Full board",
   "pg.board.AI": "All inclusive",
+  // customer stage — travelers, rooms, scope
+  "pg.travelersTitle": "Travelers",
+  "pg.agesHint": "Ages of the children and infants — they change the hotel rate and the airline fare.",
+  "pg.childAgeN": "Child {n} age",
+  "pg.infantAgeN": "Infant {n} age",
+  "pg.roomsTitle": "Rooms",
+  "pg.roomsHint": "Base count, room type and board — applied to every city; adjust any city later in the hotels stage.",
+  "pg.scopeTitle": "Services in this offer",
+  "pg.scopeHint": "Switch off what the sale excludes — its stage disappears from the rail and stops asking to be completed.",
   // flights stage
   "pg.flightsTitle": "Flight legs",
   "pg.addFlight": "Add leg",

@@ -52,6 +52,21 @@ export function stageHref(draftId: string, stage: StageKey): string {
   return `/package-generator/${draftId}/${stage}`;
 }
 
+/**
+ * The stages an agent actually sees: permission-gated ones need pricing.view,
+ * and a scope switch that is OFF removes its stage entirely.
+ *
+ * A stage the sale excludes is not merely disabled — it is gone from the rail,
+ * because a visible-but-pointless step is the thing agents waste time on.
+ */
+export function visibleStagesFor(scope: DraftScope, canPricing: boolean): StageMeta[] {
+  return STAGES.filter((s) => {
+    if (s.gated && !canPricing) return false;
+    const switchKey = SCOPE_KEYS.find((k) => SCOPE_STAGE[k] === s.key);
+    return switchKey ? scope[switchKey] : true;
+  });
+}
+
 // ---------- slices ----------
 export type DraftCustomer = {
   customer_name: string;
@@ -70,7 +85,63 @@ export type DraftTrip = {
   adults: number;
   children: number;
   infants: number;
+  /**
+   * Ages of the children/infants counted above. Kept the SAME LENGTH as the
+   * count by resizeAges() — a child's age changes the hotel rate and some
+   * airlines' fare, so an offer that says "2 children" without ages is a quote
+   * the supplier can reprice later.
+   */
+  children_ages: number[];
+  infant_ages: number[];
+  /**
+   * Room defaults for the whole trip, entered once with the customer and
+   * inherited by every city's hotel line (still editable per city — an extra
+   * room for a driver is booked in some cities and not others).
+   */
+  rooms: number;
+  default_room_type_id: string | null;
+  default_room_type_name: string;
+  default_board: BoardType | null;
 };
+
+/**
+ * Which service families this offer actually covers.
+ *
+ * Not every destination needs every service: a Gulf trip needs no visa, a client
+ * may buy flights only, a self-drive package has no transfers. An unchecked
+ * family hides its stage from the rail AND stops its validation from blocking —
+ * otherwise the agent is nagged forever about a hotel that was never part of
+ * the sale.
+ */
+export type DraftScope = {
+  flights: boolean;
+  hotels: boolean;
+  visas: boolean;
+  transport: boolean;
+};
+
+/** The stage each scope switch governs. Stages absent here are always shown. */
+export const SCOPE_STAGE: Record<keyof DraftScope, StageKey> = {
+  flights: "flights",
+  hotels: "hotels",
+  visas: "visas",
+  transport: "transport",
+};
+
+export const SCOPE_KEYS = Object.keys(SCOPE_STAGE) as (keyof DraftScope)[];
+
+/**
+ * Grow/shrink an ages list to match a traveler count, preserving what was typed.
+ * Pure — the same helper backs both the children and the infant lists.
+ */
+export function resizeAges(ages: number[], count: number, fallback = 0): number[] {
+  const n = Math.max(Math.trunc(count) || 0, 0);
+  const safe = Array.isArray(ages) ? ages : [];
+  return Array.from({ length: n }, (_, i) => {
+    const v = safe[i];
+    return Number.isFinite(v) && v >= 0 ? Number(v) : fallback;
+  });
+}
 
 export type DraftCity = {
   city_name: string;
@@ -238,6 +309,8 @@ export type DraftSource = {
 export type DraftData = {
   customer: DraftCustomer;
   trip: DraftTrip;
+  /** which service families this offer covers; drives stage visibility. */
+  scope: DraftScope;
   cities: DraftCity[];
   hotels: DraftHotel[];
   flights: DraftFlight[];
@@ -266,7 +339,16 @@ export function emptyDraftData(): DraftData {
       adults: 2,
       children: 0,
       infants: 0,
+      children_ages: [],
+      infant_ages: [],
+      rooms: 1,
+      default_room_type_id: null,
+      default_room_type_name: "",
+      default_board: null,
     },
+    // Everything on by default: a new draft behaves exactly as it did before the
+    // scope switches existed, and the agent opts OUT of what this sale excludes.
+    scope: { flights: true, hotels: true, visas: true, transport: true },
     cities: [],
     hotels: [],
     flights: [],
@@ -334,9 +416,18 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
   const empty = emptyDraftData();
   if (!raw || typeof raw !== "object") return empty;
   const source = raw as Partial<DraftData>;
+  const trip = { ...empty.trip, ...(source.trip ?? {}) };
   return {
     customer: { ...empty.customer, ...(source.customer ?? {}) },
-    trip: { ...empty.trip, ...(source.trip ?? {}) },
+    // ages are re-fitted to the counts: a draft saved before the ages existed has
+    // none, and a hand-edited jsonb could disagree with the count.
+    trip: {
+      ...trip,
+      children_ages: resizeAges(trip.children_ages, trip.children),
+      infant_ages: resizeAges(trip.infant_ages, trip.infants),
+      rooms: Math.max(Math.trunc(Number(trip.rooms)) || 1, 1),
+    },
+    scope: normalizeScope(source.scope),
     cities: Array.isArray(source.cities) ? source.cities : [],
     hotels: Array.isArray(source.hotels) ? source.hotels : [],
     flights: Array.isArray(source.flights) ? source.flights.map(normalizeDraftFlight) : [],
@@ -347,6 +438,21 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     pricing: { ...empty.pricing, ...(source.pricing ?? {}) },
     produced_serial: typeof source.produced_serial === "string" ? source.produced_serial : null,
     source: normalizeDraftSource(source.source),
+  };
+}
+
+/**
+ * Old drafts have no scope key at all. Defaulting each switch to TRUE is the
+ * only safe reading: a draft that already carries flights and hotels must not
+ * have them silently dropped from the document by a field added afterwards.
+ */
+function normalizeScope(raw: unknown): DraftScope {
+  const s = (raw && typeof raw === "object" ? raw : {}) as Partial<DraftScope>;
+  return {
+    flights: s.flights !== false,
+    hotels: s.hotels !== false,
+    visas: s.visas !== false,
+    transport: s.transport !== false,
   };
 }
 
