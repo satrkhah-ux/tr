@@ -5,7 +5,7 @@ import { Lock, Plus, Wand2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getRates } from "@/lib/data/rates-actions";
-import { computeOfferPricing, type CurrencyRates } from "@/lib/offer/pricing";
+import { computeOfferPricing, type CurrencyRates, type LinePricing } from "@/lib/offer/pricing";
 import { CURRENCIES, type DraftPricingItem } from "@/lib/offer/draft-types";
 import type { PricingItemType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
@@ -145,9 +145,6 @@ export function PricingStage({ data, patch }: StageFormProps) {
     if (suggestions.length > 0) setItems([...pricing.items, ...suggestions]);
   }
 
-  const th = "px-2 py-2.5 text-[11px] font-bold text-white whitespace-nowrap";
-  const tdField = `${fieldClass} h-9 rounded-[8px] px-2 text-[12.5px]`;
-
   return (
     <div className="space-y-4">
       <section className={sectionClass}>
@@ -170,89 +167,33 @@ export function PricingStage({ data, patch }: StageFormProps) {
           </p>
         ) : null}
 
-        <div className="overflow-x-auto">
-          <table className="min-w-[760px] w-full border-collapse text-start text-sm">
-            <thead>
-              <tr className="bg-[#185045]">
-                <th className={th}>{t("pg.itemType")}</th>
-                <th className={`${th} w-full`}>{t("pg.desc")}</th>
-                <th className={th}>{t("pg.qty")}</th>
-                {canInternal ? <th className={th}>{t("pg.buyPrice")}</th> : null}
-                <th className={th}>{t("pg.sellPrice")}</th>
-                <th className={th}>{t("pg.currencyCol")}</th>
-                <th className={th} />
-              </tr>
-            </thead>
-            <tbody>
-              {pricing.items.map((item, index) => (
-                <tr key={index} className="border-b border-[#eef2f0] align-middle">
-                  <td className="px-2 py-2">
-                    <select
-                      value={item.item_type}
-                      onChange={(e) => updateItem(index, { item_type: e.target.value as PricingItemType })}
-                      className={tdField}
-                    >
-                      {ITEM_TYPES.map((type) => (
-                        <option key={type} value={type}>{t(ITEM_TYPE_KEYS[type])}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-2 py-2">
-                    <input value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} className={tdField} />
-                  </td>
-                  <td className="px-2 py-2 w-[72px]">
-                    <input
-                      type="number"
-                      min={1}
-                      dir="ltr"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, { quantity: Math.max(Number(e.target.value) || 1, 1) })}
-                      className={`${tdField} tv-tnum w-[64px] text-center`}
-                    />
-                  </td>
-                  {canInternal ? (
-                    <td className="px-2 py-2 w-[108px]">
-                      <input
-                        type="number"
-                        min={0}
-                        dir="ltr"
-                        value={item.buy_price ?? ""}
-                        onChange={(e) => updateItem(index, { buy_price: e.target.value === "" ? null : Number(e.target.value) })}
-                        className={`${tdField} tv-tnum w-[100px] text-center`}
-                      />
-                    </td>
-                  ) : null}
-                  <td className="px-2 py-2 w-[108px]">
-                    <input
-                      type="number"
-                      min={0}
-                      dir="ltr"
-                      value={item.sell_price ?? ""}
-                      onChange={(e) => updateItem(index, { sell_price: e.target.value === "" ? null : Number(e.target.value) })}
-                      className={`${tdField} tv-tnum w-[100px] text-center`}
-                    />
-                  </td>
-                  <td className="px-2 py-2 w-[92px]">
-                    <select
-                      value={item.sell_currency}
-                      onChange={(e) => updateItem(index, { sell_currency: e.target.value, buy_currency: e.target.value })}
-                      className={tdField}
-                    >
-                      {CURRENCIES.map((code) => (
-                        <option key={code} value={code}>{code}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-2 py-2">
-                    <button type="button" onClick={() => setItems(pricing.items.filter((_, i) => i !== index))} className={removeButtonClass}>
-                      {t("pg.removeRow")}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/*
+          One CARD per line, not a seven-column table.
+          The table version had to live in the same column as a preview pane, so
+          every numeric field collapsed to a few pixels and could not be typed
+          into. Cards give each field a full-height input and a label of its own,
+          and — more importantly — put each line's buy/sell/profit next to the
+          numbers that produce it, which is the decision the agent is actually
+          making on this screen.
+        */}
+        {pricing.items.length === 0 ? (
+          <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
+            {t("pg.warn.noPricing")}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {pricing.items.map((item, index) => (
+              <PricingCard
+                key={index}
+                item={item}
+                line={summary.lines[index]}
+                canInternal={canInternal}
+                onChange={(slice) => updateItem(index, slice)}
+                onRemove={() => setItems(pricing.items.filter((_, i) => i !== index))}
+              />
+            ))}
+          </div>
+        )}
 
         {summary.missing_rates.length > 0 ? (
           <p className="mt-3 rounded-[10px] border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2 text-[12px] font-bold text-[#a86a10]">
@@ -301,6 +242,139 @@ export function PricingStage({ data, patch }: StageFormProps) {
         </div>
       </section>
     </div>
+  );
+}
+
+const cardLabelClass = "grid gap-1.5 text-[11.5px] font-bold text-[#557d78]";
+
+/**
+ * One pricing line. Prices are PER UNIT; the strip underneath shows what the
+ * quantity multiplies them into, so an agent typing 600 against qty 2 sees 1200
+ * without doing the arithmetic — and sees the profit turn red the moment the
+ * sell drops under the buy.
+ */
+function PricingCard({
+  item,
+  line,
+  canInternal,
+  onChange,
+  onRemove,
+}: {
+  item: DraftPricingItem;
+  line: LinePricing | undefined;
+  canInternal: boolean;
+  onChange: (slice: Partial<DraftPricingItem>) => void;
+  onRemove: () => void;
+}) {
+  const { t } = useTraveliunUI();
+  const profit = line?.profit_base ?? null;
+  const losing = profit != null && profit < 0;
+
+  return (
+    <div className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
+      <div className="grid gap-3 sm:grid-cols-[170px_minmax(0,1fr)_auto] sm:items-end">
+        <label className={cardLabelClass}>
+          {t("pg.itemType")}
+          <select
+            value={item.item_type}
+            onChange={(e) => onChange({ item_type: e.target.value as PricingItemType })}
+            className={fieldClass}
+          >
+            {ITEM_TYPES.map((type) => (
+              <option key={type} value={type}>{t(ITEM_TYPE_KEYS[type])}</option>
+            ))}
+          </select>
+        </label>
+        <label className={cardLabelClass}>
+          {t("pg.desc")}
+          <input value={item.description} onChange={(e) => onChange({ description: e.target.value })} className={fieldClass} />
+        </label>
+        <button type="button" onClick={onRemove} className={`${removeButtonClass} h-11`}>
+          {t("pg.removeRow")}
+        </button>
+      </div>
+
+      <div className={`mt-3 grid gap-3 ${canInternal ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
+        <label className={cardLabelClass}>
+          {t("pg.qty")}
+          <input
+            type="number" min={1} dir="ltr"
+            value={item.quantity}
+            onChange={(e) => onChange({ quantity: Math.max(Number(e.target.value) || 1, 1) })}
+            className={`${fieldClass} tv-tnum text-center`}
+          />
+        </label>
+        {canInternal ? (
+          <label className={cardLabelClass}>
+            {t("pg.buyPrice")}
+            <input
+              type="number" min={0} dir="ltr"
+              value={item.buy_price ?? ""}
+              onChange={(e) => onChange({ buy_price: e.target.value === "" ? null : Number(e.target.value) })}
+              className={`${fieldClass} tv-tnum text-center`}
+              placeholder="0"
+            />
+          </label>
+        ) : null}
+        <label className={cardLabelClass}>
+          {t("pg.sellPrice")}
+          <input
+            type="number" min={0} dir="ltr"
+            value={item.sell_price ?? ""}
+            onChange={(e) => onChange({ sell_price: e.target.value === "" ? null : Number(e.target.value) })}
+            className={`${fieldClass} tv-tnum text-center`}
+            placeholder="0"
+          />
+        </label>
+        <label className={cardLabelClass}>
+          {t("pg.currencyCol")}
+          <select
+            value={item.sell_currency}
+            onChange={(e) => onChange({ sell_currency: e.target.value, buy_currency: e.target.value })}
+            className={fieldClass}
+          >
+            {CURRENCIES.map((code) => (
+              <option key={code} value={code}>{code}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {/* what the quantity multiplies those unit prices into */}
+      {line ? (
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[#e7f0ec] pt-2.5 text-[11.5px] font-bold">
+          {canInternal && line.total_buy != null ? (
+            <LineFigure label={t("pg.totalBuy")} value={`${formatMoney(line.total_buy)} ${line.buy_currency ?? ""}`} tone="muted" />
+          ) : null}
+          {line.total_sell != null ? (
+            <LineFigure label={t("pg.totalSell")} value={`${formatMoney(line.total_sell)} ${line.sell_currency ?? ""}`} tone="brand" />
+          ) : null}
+          {canInternal && profit != null ? (
+            <LineFigure
+              label={t("pg.profitCol")}
+              value={`${formatMoney(profit)} SAR`}
+              tone={losing ? "bad" : "good"}
+            />
+          ) : null}
+          {canInternal && line.margin_pct != null ? (
+            <LineFigure label={t("pg.marginCol")} value={`${line.margin_pct}%`} tone={losing ? "bad" : "good"} />
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function LineFigure({ label, value, tone }: { label: string; value: string; tone: "brand" | "good" | "bad" | "muted" }) {
+  const toneClass =
+    tone === "brand" ? "text-[#185045]" : tone === "good" ? "text-[#0f7a52]" : tone === "bad" ? "text-[#c22850]" : "text-[#93aaa3]";
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-[#93aaa3]">{label}</span>
+      <span className={`tv-tnum ${toneClass}`}>
+        <DirText dir="ltr">{value}</DirText>
+      </span>
+    </span>
   );
 }
 
