@@ -536,6 +536,15 @@ function Cover({
                 <Ltr>{`${offer.infants}`}</Ltr> {AR.infants}
               </td>
             </tr>
+            {/* the programme window — this used to be a second «ملخص سريع» panel
+                further down the document, repeating the duration and travellers
+                already stated here. One table, read once, on the first page. */}
+            <tr>
+              <th>{AR.programStart}</th>
+              <td><Ltr>{fmtDate(offer.arrival_date)}</Ltr></td>
+              <th>{AR.programEnd}</th>
+              <td><Ltr>{fmtDate(offer.departure_date)}</Ltr></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -760,7 +769,10 @@ function DayWeather({ day }: { day: ClientOfferDTO["days"][number] }) {
 function servicesHeightMm(offer: ClientOfferDTO): number {
   const rows = Math.max(offer.includes.length, offer.excludes.length);
   const cards = offer.includes.length + offer.excludes.length > 0 ? Math.max(70, 16 + rows * 8) : 0;
-  return cards + 34 + 20 + 48;
+  // cards + price band + payment note. The «ملخص سريع» panel that used to add
+  // ~48mm here now lives on the cover, so this section is that much shorter —
+  // leaving the estimate high would waste most of a sheet.
+  return cards + 34 + 20;
 }
 
 function ServicesAndPrice({
@@ -805,32 +817,6 @@ function ServicesAndPrice({
         <span>{offer.currency ?? ""}</span>
       </div>
       <p className="od-note">{AR.paymentTerms}</p>
-
-      <div className="od-panel">
-        <div className="od-panel-head">
-          <span>{AR.quickSummary}</span>
-          <span>{offer.destination || ""}</span>
-        </div>
-        <table className="od-info">
-          <tbody>
-            <tr>
-              <th>{AR.tripLength}</th>
-              <td>{AR.daysNights(days, nights)}</td>
-              <th>{AR.travelers}</th>
-              <td>
-                <Ltr>{String(offer.adults)}</Ltr> {AR.adults} · <Ltr>{String(offer.children)}</Ltr>{" "}
-                {AR.children} · <Ltr>{String(offer.infants)}</Ltr> {AR.infants}
-              </td>
-            </tr>
-            <tr>
-              <th>{AR.programStart}</th>
-              <td><Ltr>{fmtDate(offer.arrival_date)}</Ltr></td>
-              <th>{AR.programEnd}</th>
-              <td><Ltr>{fmtDate(offer.departure_date)}</Ltr></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </>
   );
 }
