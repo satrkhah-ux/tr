@@ -38,6 +38,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
  */
 
 const card = "rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+const MONEY = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 export function DraftsList({ drafts }: { drafts: DraftSummary[] }) {
   const router = useRouter();
@@ -148,13 +149,17 @@ export function DraftsList({ drafts }: { drafts: DraftSummary[] }) {
             />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] border-collapse text-[12.5px]">
+              <table className="w-full min-w-[1240px] border-collapse text-[12.5px]">
                 <thead>
                   <tr className="bg-[#185045] text-white">
+                    <Th>{t("col.serial")}</Th>
                     <Th>{t("col.customer")}</Th>
                     <Th>{t("col.destination")}</Th>
-                    <Th>{t("pg.col.people")}</Th>
                     <Th>{t("pg.col.duration")}</Th>
+                    <Th>{t("col.date")}</Th>
+                    <Th>{t("col.adults")}</Th>
+                    <Th>{t("pg.col.people")}</Th>
+                    <Th>{t("col.total")}</Th>
                     <Th>{t("pg.col.state")}</Th>
                     <Th>{t("pg.col.updated")}</Th>
                     <Th />
@@ -163,6 +168,19 @@ export function DraftsList({ drafts }: { drafts: DraftSummary[] }) {
                 <tbody>
                   {visible.map((draft) => (
                     <tr key={draft.id} className="border-b border-[#eef2f0] last:border-b-0 hover:bg-[#f8fbfa]">
+                      {/* The programme number leads the row: it is what everyone
+                          quotes — on WhatsApp, on the phone, on the ops board. A
+                          draft that has not been issued has none yet and says so,
+                          rather than showing an empty cell. */}
+                      <Td>
+                        {draft.produced_serial ? (
+                          <DirText dir="ltr">
+                            <span className="tv-tnum font-extrabold text-[#185045]">{draft.produced_serial}</span>
+                          </DirText>
+                        ) : (
+                          <span className="text-[11.5px] font-semibold text-[#b6c4bf]">{t("pg.noSerial")}</span>
+                        )}
+                      </Td>
                       <Td>
                         <span className="block font-extrabold text-[#0f3d38]">
                           {draft.customer_name || draft.title || t("pg.untitledDraft")}
@@ -173,27 +191,52 @@ export function DraftsList({ drafts }: { drafts: DraftSummary[] }) {
                       </Td>
                       <Td>{draft.destination || "—"}</Td>
                       <Td>
-                        <span className="inline-flex items-center gap-1.5 font-bold text-[#557d78]">
-                          <Users className="size-3.5" />
-                          <DirText dir="ltr">
-                            <span className="tv-tnum">{[draft.adults, draft.children, draft.infants].join(" · ")}</span>
-                          </DirText>
-                        </span>
-                      </Td>
-                      <Td>
                         {draft.days > 0 || draft.nights > 0
                           ? t("pg.daysNights", { d: String(draft.days), n: String(draft.nights) })
                           : "—"}
                       </Td>
                       <Td>
-                        {draft.produced_serial ? (
-                          <span className="inline-flex flex-col gap-0.5">
-                            <span className="w-fit rounded-full bg-[#e4f6ef] px-2.5 py-0.5 text-[10.5px] font-bold text-[#10966b]">
-                              {t("pg.state.issued")}
+                        {draft.travel_date ? (
+                          <DirText dir="ltr">
+                            <span className="tv-tnum">{draft.travel_date}</span>
+                          </DirText>
+                        ) : (
+                          "—"
+                        )}
+                      </Td>
+                      <Td>
+                        <DirText dir="ltr">
+                          <span className="tv-tnum font-bold">{String(draft.adults)}</span>
+                        </DirText>
+                      </Td>
+                      {/* the breakdown stays on hover: the column is a count, and
+                          «2 · 0 · 0» in every row reads as noise */}
+                      <Td>
+                        <span
+                          className="inline-flex items-center gap-1.5 font-bold text-[#557d78]"
+                          title={`${draft.adults} · ${draft.children} · ${draft.infants}`}
+                        >
+                          <Users className="size-3.5" />
+                          <DirText dir="ltr">
+                            <span className="tv-tnum">{String(draft.travelers)}</span>
+                          </DirText>
+                        </span>
+                      </Td>
+                      <Td>
+                        {draft.total != null ? (
+                          <DirText dir="ltr">
+                            <span className="tv-tnum font-bold text-[#0f3d38]">
+                              {`${MONEY.format(draft.total)} ${draft.currency}`}
                             </span>
-                            <DirText dir="ltr">
-                              <span className="tv-tnum text-[10.5px] font-bold text-[#93aaa3]">{draft.produced_serial}</span>
-                            </DirText>
+                          </DirText>
+                        ) : (
+                          <span className="text-[11.5px] font-semibold text-[#b6c4bf]">{t("pg.noPrice")}</span>
+                        )}
+                      </Td>
+                      <Td>
+                        {draft.produced_serial ? (
+                          <span className="rounded-full bg-[#e4f6ef] px-2.5 py-0.5 text-[10.5px] font-bold text-[#10966b]">
+                            {t("pg.state.issued")}
                           </span>
                         ) : (
                           <span className="rounded-full bg-[#fff8e8] px-2.5 py-0.5 text-[10.5px] font-bold text-[#a86a10]">
@@ -238,10 +281,10 @@ export function DraftsList({ drafts }: { drafts: DraftSummary[] }) {
                             type="button"
                             onClick={() => void onDelete(draft.id)}
                             disabled={busyId === draft.id}
-                            aria-label={t("pg.deleteDraft")}
-                            className="inline-flex size-9 items-center justify-center rounded-[9px] border border-[#f2c7c7] text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+                            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#f2c7c7] px-3 text-[11.5px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
                           >
                             <Trash2 className="size-3.5" />
+                            {t("pg.deleteDraft")}
                           </button>
                         </div>
                       </Td>

@@ -817,6 +817,8 @@ export const en = {
   "pg.startNewHint": "Build it stage by stage: client, trip, hotels, flights, pricing.",
   "pg.startRepackage": "Redesign a supplier package",
   "pg.startRepackageHint": "Import a supplier's PDF, image, text or link and re-issue it as ours.",
+  "pg.noSerial": "not issued",
+  "pg.noPrice": "not priced",
   "pg.col.people": "Travelers",
   "pg.col.duration": "Duration",
   "pg.col.updated": "Last edited",

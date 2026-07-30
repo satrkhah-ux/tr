@@ -18,6 +18,7 @@ import {
   type TermLibrary,
   type TermLibraryItem,
 } from "@/lib/offer/draft-types";
+import { draftSellTotal } from "@/lib/offer/preview-dto";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { draftDaySkeleton } from "@/lib/offer/itinerary";
 import { validateDraft } from "@/lib/offer/draft-validation";
@@ -44,8 +45,15 @@ export type DraftSummary = {
   adults: number;
   children: number;
   infants: number;
+  /** every traveller on the file — the column «المسافرون». */
+  travelers: number;
   days: number;
   nights: number;
+  /** the trip's own start date, not the row's timestamp. */
+  travel_date: string | null;
+  total: number | null;
+  currency: string;
+  /** the issued programme's number, e.g. AD-6-3427-20260729. */
   produced_serial: string | null;
   updated_at: string;
 };
@@ -70,8 +78,12 @@ export async function listDrafts(): Promise<DraftSummary[]> {
           adults: draft.trip.adults,
           children: draft.trip.children,
           infants: draft.trip.infants,
+          travelers: draft.trip.adults + draft.trip.children + draft.trip.infants,
           days: draft.trip.days,
           nights: draft.trip.nights,
+          travel_date: draft.trip.arrival_date || null,
+          total: draftSellTotal(draft),
+          currency: draft.pricing.display_currency,
           produced_serial: draft.produced_serial,
           updated_at: row.updated_at,
         };

@@ -815,6 +815,8 @@ export const ar: Dictionary = {
   "pg.startNewHint": "ابنِه مرحلة بمرحلة: العميل، الرحلة، الفنادق، الطيران، التسعير.",
   "pg.startRepackage": "إعادة تصميم بكج مورّد",
   "pg.startRepackageHint": "استورد ملف المورّد أو صورته أو نصه أو رابطه وأعد إصداره باسمنا.",
+  "pg.noSerial": "لم يصدر",
+  "pg.noPrice": "بلا تسعير",
   "pg.col.people": "المسافرون",
   "pg.col.duration": "المدة",
   "pg.col.updated": "آخر تعديل",

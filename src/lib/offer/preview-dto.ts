@@ -156,6 +156,18 @@ export function draftToPreviewOffer(data: DraftData): ClientOfferDTO {
   };
 }
 
+/**
+ * The draft's sell total — the number the client would see.
+ *
+ * Exported so the drafts list prints exactly what the preview prints: a fixed
+ * company price when the draft came from a ready package, otherwise the priced
+ * items. A second implementation in the list would drift the first time either
+ * rule changed.
+ */
+export function draftSellTotal(data: DraftData): number | null {
+  return data.pricing.final_total ?? sumItems(data);
+}
+
 function sumItems(data: DraftData): number | null {
   const priced = data.pricing.items.filter((i) => i.sell_price != null);
   if (priced.length === 0) return null;
