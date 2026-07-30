@@ -78,12 +78,16 @@ export const OFFER_DOC_CSS = `
 }
 
 /* ── cover ────────────────────────────────────────────────────────────────── */
-.od-top{display:grid;grid-template-columns:1fr 1.05fr;gap:12mm;align-items:start;}
-.od-logo{width:62mm;max-height:32mm;object-fit:contain;object-position:right center;display:block;}
+/* Company block on the READING side (right, in Arabic), logo opposite it. The
+   logo is held away from the trimmed edge — a mark that touches the paper edge
+   reads as a printing accident, and management asked for the gap. */
+.od-top{display:grid;grid-template-columns:1.05fr 1fr;gap:10mm;align-items:center;}
+.od-logo{width:58mm;max-height:30mm;object-fit:contain;object-position:center;display:block;margin-inline-start:auto;margin-inline-end:8mm;}
 /* a partner with no logo file yet: their name, set like a mark */
-.od-wordmark{width:62mm;min-height:32mm;display:flex;align-items:center;color:var(--od-green);
-  font-size:19pt;font-weight:800;line-height:1.25;}
-.od-company{border-right:4px solid var(--od-green);padding:2mm 5mm 2mm 0;color:var(--od-green);line-height:1.85;font-size:10.7pt;}
+.od-wordmark{width:58mm;min-height:30mm;display:flex;align-items:center;justify-content:center;
+  color:var(--od-green);font-size:19pt;font-weight:800;line-height:1.25;
+  margin-inline-start:auto;margin-inline-end:8mm;text-align:center;}
+.od-company{border-inline-end:4px solid var(--od-green);padding:2mm 0 2mm 6mm;color:var(--od-green);line-height:1.85;font-size:10.7pt;}
 .od-company h2{margin:0 0 1mm;font-size:16.5pt;font-weight:700;line-height:1.3;}
 .od-hero{margin-top:19mm;text-align:center;color:var(--od-green);}
 .od-hero .od-hero-label{color:var(--od-muted);font-size:13pt;margin-bottom:3mm;}
@@ -102,9 +106,13 @@ export const OFFER_DOC_CSS = `
 .od-info th{color:var(--od-muted);font-weight:500;width:18%;white-space:nowrap;}
 
 /* ── section heading ──────────────────────────────────────────────────────── */
-.od-title{display:flex;align-items:flex-start;justify-content:space-between;gap:8mm;color:var(--od-green);margin-bottom:6mm;break-after:avoid;}
-.od-title h2{margin:0;font-size:21pt;font-weight:800;line-height:1.1;}
-.od-title small{color:var(--od-muted);font-size:10pt;line-height:1.5;text-align:left;max-width:68mm;}
+/* Heading centred at the top of the sheet with its note directly beneath it,
+   as management asked: the note explains the section, so reading it beside the
+   title — on the far side of the page — meant reading it last. */
+.od-title{text-align:center;color:var(--od-green);margin:0 0 6mm;padding-bottom:3mm;
+  border-bottom:1px solid var(--od-line);break-after:avoid;}
+.od-title h2{margin:0;font-size:21pt;font-weight:800;line-height:1.15;}
+.od-title small{display:block;margin:2mm auto 0;color:var(--od-muted);font-size:10pt;line-height:1.55;text-align:center;max-width:150mm;}
 /* a block heading inside a page that carries more than one table */
 .od-subhead{display:flex;align-items:center;gap:2.5mm;color:var(--od-green);font-size:13pt;font-weight:700;margin:7mm 0 3mm;break-after:avoid;}
 .od-subhead:first-of-type{margin-top:0;}

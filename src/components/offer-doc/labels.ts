@@ -95,7 +95,8 @@ export const AR = {
   colNotes: "ملاحظات",
   services: "الخدمات",
   servicesAndPrice: "الخدمات ونطاق البرنامج والتكلفة",
-  servicesAndPriceNote: "ما يشمله البرنامج وما لا يشمله، مع الإجمالي والملخص السريع.",
+  /** The quick-summary panel moved to the cover, so the note no longer promises it. */
+  servicesAndPriceNote: "ما يشمله البرنامج وما لا يشمله، مع الإجمالي.",
   /** the same section when the file is issued with no price on it. */
   servicesOnly: "الخدمات ونطاق البرنامج",
   includes: "يشمل العرض",

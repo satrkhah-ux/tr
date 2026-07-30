@@ -517,15 +517,10 @@ function Cover({
 }) {
   return (
     <>
+      {/* Company first in the DOM, so it lands on the right in Arabic; the logo
+          second, on the left. Order in the markup is the order on the page here —
+          not a float — so the same source prints identically. */}
       <div className="od-top">
-        <div>
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img className="od-logo" src={logoUrl} alt={brand.nameLatin} />
-          ) : (
-            <div className="od-wordmark">{brand.nameAr}</div>
-          )}
-        </div>
         {/* Each contact line renders only if the brand has it: a partner who gave
             us no website gets a shorter block, never our address under their
             logo. */}
@@ -536,6 +531,14 @@ function Cover({
           {brand.whatsapp ? <div>{AR.whatsappLabel}: <Ltr>{brand.whatsapp}</Ltr></div> : null}
           {brand.website ? <div>{AR.webLabel}: <Ltr>{brand.website}</Ltr></div> : null}
           {brand.email ? <div>{AR.emailLabel}: <Ltr>{brand.email}</Ltr></div> : null}
+        </div>
+        <div>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="od-logo" src={logoUrl} alt={brand.nameLatin} />
+          ) : (
+            <div className="od-wordmark">{brand.nameAr}</div>
+          )}
         </div>
       </div>
 
