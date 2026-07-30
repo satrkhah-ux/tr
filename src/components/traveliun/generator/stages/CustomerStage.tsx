@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BedDouble, Check, ListChecks, Loader2, MapPin, Minus, Search, Tag, UserRound, Users } from "lucide-react";
+import { BedDouble, Building2, Check, ListChecks, Loader2, MapPin, Minus, Search, Tag, UserRound, Users } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { searchCustomersFromTeletel, type TeletelCustomerHit } from "@/lib/data/teletel-actions";
 import {
   BOARD_LABEL_KEYS,
   BOARD_TYPES,
   SCOPE_KEYS,
+  matchPartner,
   resizeAges,
   roomTypeNames,
   type DraftHotel,
@@ -34,6 +35,7 @@ const SCOPE_LABEL_KEYS: Record<keyof DraftScope, TranslationKey> = {
 export function CustomerStage({ data, patch, lookups }: StageFormProps) {
   const { t } = useTraveliunUI();
   const customer = data.customer;
+  const companySale = Boolean(customer.partner_company_id || customer.company.trim());
 
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<TeletelCustomerHit[]>([]);
@@ -162,9 +164,15 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
         </div>
       ) : null}
 
+      {/* The company comes FIRST: choosing one says this file is not being sold
+          to a walk-in client at all, which changes what the rest of the stage
+          needs. */}
+      <CompanyPicker data={data} patch={patch} lookups={lookups} />
+
       <div className="grid gap-4 md:grid-cols-2">
         <label className={labelClass}>
           {t("pg.customerName")}
+          {companySale ? <span className="text-[11px] font-semibold text-[#93aaa3]">{t("pg.company.clientOptional")}</span> : null}
           <input
             value={customer.customer_name}
             onChange={(e) => update({ customer_name: e.target.value })}
@@ -182,20 +190,80 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
             placeholder="05xxxxxxxx"
           />
         </label>
-        <label className={`${labelClass} md:col-span-2`}>
-          {t("pg.company")}
-          <input
-            value={customer.company}
-            onChange={(e) => update({ company: e.target.value })}
-            className={fieldClass}
-          />
-        </label>
       </div>
 
       <TravelersBlock data={data} patch={patch} />
       <RoomsBlock data={data} patch={patch} lookups={lookups} />
       <ScopeBlock data={data} patch={patch} />
     </section>
+  );
+}
+
+/**
+ * Whose file is this?
+ *
+ * Picking a registered partner company does three things at once: the produced
+ * offer stores that company, the document comes out under their name, logo and
+ * colours, and the client-details advisories fall silent — the partner has the
+ * client, and their contact details are not ours to collect.
+ *
+ * A company typed into a draft before this picker existed is kept as a disabled
+ * option, so an old draft still shows what it said.
+ */
+function CompanyPicker({ data, patch, lookups }: Pick<StageFormProps, "data" | "patch" | "lookups">) {
+  const { t } = useTraveliunUI();
+  const customer = data.customer;
+  const partners = lookups.partners;
+  const selected = matchPartner(customer, partners);
+  const legacy = !selected && customer.company.trim() ? customer.company.trim() : null;
+
+  function pick(id: string) {
+    const partner = partners.find((p) => p.id === id) ?? null;
+    patch({
+      customer: {
+        ...customer,
+        partner_company_id: partner?.id ?? null,
+        // keep the NAME too: reports and the legacy `company` field still read it
+        company: partner?.name ?? "",
+      },
+    });
+  }
+
+  return (
+    <div className="mb-4 rounded-[12px] border border-[#dbe6e1] bg-[#f8fbfa] p-3.5">
+      <div className="flex flex-wrap items-end gap-3">
+        <label className={`${labelClass} min-w-[240px] flex-1`}>
+          <span className="flex items-center gap-1.5">
+            <Building2 className="size-4" />
+            {t("pg.company")}
+          </span>
+          <select
+            value={selected?.id ?? ""}
+            onChange={(e) => pick(e.target.value)}
+            className={fieldClass}
+          >
+            <option value="">{t("pg.company.direct")}</option>
+            {partners.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+            {legacy ? <option value="" disabled>{legacy}</option> : null}
+          </select>
+        </label>
+
+        {selected ? (
+          <div className="flex items-center gap-2 pb-1">
+            <span className="size-6 rounded-[7px] border border-[#dbe6e1]" style={{ background: selected.brand_color }} />
+            <span className="size-6 rounded-[7px] border border-[#dbe6e1]" style={{ background: selected.accent_color }} />
+            <span className="rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11px] font-bold text-[#557d78]">
+              {selected.show_prices ? t("doc.withPrices") : t("doc.withoutPrices")}
+            </span>
+          </div>
+        ) : null}
+      </div>
+      <p className="mt-1.5 text-[11.5px] font-semibold text-[#93aaa3]">
+        {selected ? t("pg.company.brandedHint", { name: selected.name }) : t("pg.company.hint")}
+      </p>
+    </div>
   );
 }
 

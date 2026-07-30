@@ -13,9 +13,10 @@
  * so buy price / supplier cost are structurally out of reach.
  */
 
+import { partnerBrand, type DocBrand } from "@/components/offer-doc/brand";
 import type { BoardType } from "@/lib/types";
 import type { ClientOfferDTO } from "./dto";
-import { deriveCityDates, type DraftData } from "./draft-types";
+import { deriveCityDates, matchPartner, type DraftData, type GeneratorLookups } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
 import type { ExtractedPackage, RepackageData } from "@/lib/repackage/repackage-types";
 
@@ -237,4 +238,20 @@ export function repackageToPreviewOffer(data: RepackageData): ClientOfferDTO | n
     excludes: pkg.excludes,
     terms: pkg.terms,
   };
+}
+
+/**
+ * The brand the in-generator preview should draw.
+ *
+ * Same resolution the server does at export time, from the same two fields — so
+ * an agent sees the partner's cover and colours BEFORE producing, not after.
+ * Kept here rather than in the shell so both preview surfaces share it.
+ */
+export function draftBrand(
+  data: DraftData,
+  partners: GeneratorLookups["partners"],
+): { brand: DocBrand | undefined; showPrices: boolean } {
+  const partner = matchPartner(data.customer, partners);
+  if (!partner) return { brand: undefined, showPrices: true };
+  return { brand: partnerBrand(partner, partner.logo_url), showPrices: partner.show_prices };
 }

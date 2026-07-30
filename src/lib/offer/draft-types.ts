@@ -71,8 +71,36 @@ export function visibleStagesFor(scope: DraftScope, canPricing: boolean): StageM
 export type DraftCustomer = {
   customer_name: string;
   customer_phone: string;
+  /** the company's NAME, kept alongside the id so legacy drafts still read. */
   company: string;
+  /**
+   * A registered partner company (booking_partners) this file is being built FOR.
+   *
+   * Set it and the sale is B2B: the document comes out under their name, logo and
+   * colours, and the end client's details are none of our business — so the
+   * customer-name and phone advisories fall silent (draft-validation.ts).
+   */
+  partner_company_id: string | null;
 };
+
+/**
+ * Which partner company this draft is for.
+ *
+ * The id decides. But the company used to be a free-text field, so a draft in
+ * flight may carry only a NAME — matching it means an agent who typed the company
+ * yesterday gets the branded document today, without re-entering anything.
+ */
+export function matchPartner<T extends { id: string; name: string }>(
+  customer: DraftCustomer,
+  partners: T[],
+): T | null {
+  if (customer.partner_company_id) {
+    return partners.find((p) => p.id === customer.partner_company_id) ?? null;
+  }
+  const typed = customer.company.trim().toLowerCase();
+  if (!typed) return null;
+  return partners.find((p) => p.name.trim().toLowerCase() === typed) ?? null;
+}
 
 export type DraftTrip = {
   country: string;
@@ -443,7 +471,7 @@ export type DraftData = {
 
 export function emptyDraftData(): DraftData {
   return {
-    customer: { customer_name: "", customer_phone: "", company: "" },
+    customer: { customer_name: "", customer_phone: "", company: "", partner_company_id: null },
     trip: {
       country: "",
       destination: "",
@@ -711,6 +739,25 @@ export type GeneratorLookups = {
   carTypes: string[];
   /** the admin-managed includes / excludes / terms lists. */
   termLibrary: TermLibrary;
+  /**
+   * Partner companies that resell our files, for the customer stage's company
+   * picker. Only name + colours: enough to choose and to preview the identity,
+   * nothing the generator has any use for.
+   */
+  partners: {
+    id: string;
+    name: string;
+    name_latin: string | null;
+    logo_url: string | null;
+    brand_color: string;
+    accent_color: string;
+    address: string | null;
+    phone: string | null;
+    whatsapp: string | null;
+    website: string | null;
+    email: string | null;
+    show_prices: boolean;
+  }[];
 };
 
 // ---------- reusable programs ----------

@@ -8,7 +8,7 @@ import { produceOfferFromDraft } from "@/lib/data/drafts";
 import { validateDraft } from "@/lib/offer/draft-validation";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
-import { draftToPreviewOffer } from "@/lib/offer/preview-dto";
+import { draftBrand, draftToPreviewOffer } from "@/lib/offer/preview-dto";
 import { sectionClass, type StageFormProps } from "../stage-props";
 
 /**
@@ -16,7 +16,7 @@ import { sectionClass, type StageFormProps } from "../stage-props";
  * client variant (sell price only). Producing is blocked while blocking errors
  * remain; the button then lists what to fix.
  */
-export function PreviewStage({ draftId, data, patch }: StageFormProps) {
+export function PreviewStage({ draftId, data, patch, lookups }: StageFormProps) {
   const { t, language } = useTraveliunUI();
   const [producing, setProducing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +102,7 @@ export function PreviewStage({ draftId, data, patch }: StageFormProps) {
         </p>
       ) : null}
 
-      <OfferDocument variant="client" offer={draftToPreviewOffer(data)} />
+      <OfferDocument variant="client" offer={draftToPreviewOffer(data)} {...draftBrand(data, lookups.partners)} />
     </div>
   );
 }

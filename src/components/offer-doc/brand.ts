@@ -95,6 +95,18 @@ export function brandVars(primary: string, accent: string): Record<string, strin
   };
 }
 
+/**
+ * The logo's public URL from its storage path.
+ *
+ * Lives here, in the pure module, because three callers need it and they cannot
+ * import from each other: the server data layer, the generator lookups, and the
+ * browser preview.
+ */
+export function publicBrandLogoUrl(supabaseUrl: string, path: string | null): string | null {
+  if (!path) return null;
+  return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/brands/${path}`;
+}
+
 /** What the admin screen stores, and the document needs. */
 export type PartnerBrandRow = {
   name: string;

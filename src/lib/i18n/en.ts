@@ -802,6 +802,10 @@ export const en = {
   "pg.customerName": "Customer name",
   "pg.customerPhone": "Customer phone",
   "pg.company": "Company (optional)",
+  "pg.company.direct": "Direct sale (Traveliun)",
+  "pg.company.hint": "Leave it as a direct sale, or pick the partner company this file is being built for.",
+  "pg.company.brandedHint": "The document will be issued under {name} — their logo, colours and contact details.",
+  "pg.company.clientOptional": "optional for a company file",
   // trip stage
   "pg.tripTitle": "Trip details",
   "pg.country": "Country",

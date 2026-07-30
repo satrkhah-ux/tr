@@ -800,6 +800,10 @@ export const ar: Dictionary = {
   "pg.customerName": "اسم العميل",
   "pg.customerPhone": "هاتف العميل",
   "pg.company": "الشركة (اختياري)",
+  "pg.company.direct": "بيع مباشر (ترافليون)",
+  "pg.company.hint": "اتركه بيعاً مباشراً، أو اختر الشركة المتعاونة التي يُبنى هذا الملف لها.",
+  "pg.company.brandedHint": "سيصدر المستند باسم {name} — بشعارها وألوانها وبيانات تواصلها.",
+  "pg.company.clientOptional": "اختياري في ملف شركة",
   // trip stage
   "pg.tripTitle": "بيانات الرحلة",
   "pg.country": "الدولة",

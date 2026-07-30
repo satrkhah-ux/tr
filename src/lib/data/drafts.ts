@@ -3,11 +3,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { publicBrandLogoUrl } from "@/components/offer-doc/brand";
 import {
   defaultServicesFromLibrary,
   deriveCityDates,
   emptyDraftData,
   emptyTermLibrary,
+  matchPartner,
   normalizeDraftData,
   normalizeDraftHotel,
   type DraftData,
@@ -164,11 +166,11 @@ export async function deleteDraft(draftId: string): Promise<SaveDraftResult> {
 // ---------- lookups for the stage forms ----------
 export async function getGeneratorLookups(): Promise<GeneratorLookups> {
   const empty: GeneratorLookups = {
-    countries: [], roomTypes: [], airports: [], carTypes: [], termLibrary: emptyTermLibrary(),
+    countries: [], roomTypes: [], airports: [], carTypes: [], termLibrary: emptyTermLibrary(), partners: [],
   };
   try {
     const supabase = await db();
-    const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transfersRes, transportRes, termsRes] = await Promise.all([
+    const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transfersRes, transportRes, termsRes, partnersRes] = await Promise.all([
       supabase.from("countries").select("id, arabic_name, status").order("arabic_name"),
       supabase.from("cities").select("id, arabic_name, country_id").order("arabic_name"),
       supabase.from("hotels").select("id, arabic_name, stars, city_id"),
@@ -177,6 +179,14 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       supabase.from("transfers").select("car_type"),
       supabase.from("transportation_types").select("arabic_name, status").order("arabic_name"),
       supabase.from("terms").select("kind, arabic_text, checked, sort").order("sort", { ascending: true }),
+      // resellers only: a hotel supplier we assign bookings to has no business in
+      // the picker that decides whose name is printed on the cover.
+      supabase
+        .from("booking_partners")
+        .select("id, name, name_latin, logo_path, brand_color, accent_color, address, phone, whatsapp, website, email, show_prices")
+        .eq("resells", true)
+        .eq("active", true)
+        .order("name"),
     ]);
 
     // a reference row is offered to the generator unless the admin disabled it
@@ -220,6 +230,11 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
         .map((a) => ({ id: a.id, name: a.arabic_name, code: a.code, timezone: a.iana_timezone })),
       carTypes,
       termLibrary: buildTermLibrary(termsRes.data),
+      // logo_path → public URL here, so the in-generator preview draws the real
+      // logo the PDF will carry rather than a placeholder.
+      partners: ((partnersRes.data ?? []) as (Omit<GeneratorLookups["partners"][number], "logo_url"> & { logo_path: string | null })[]).map(
+        ({ logo_path, ...p }) => ({ ...p, logo_url: publicBrandLogoUrl(process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? "", logo_path) }),
+      ),
     };
   } catch {
     return empty;
@@ -459,9 +474,21 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     );
     const visaIncludes = data.visas.map((v) => `تأشيرة ${v.country || v.visa_type} × ${v.count}`);
 
+    // Chosen in the customer stage. A draft that predates the picker carries only
+    // the typed company NAME, so resolve that too rather than losing the branding.
+    let partnerCompanyId = data.customer.partner_company_id;
+    if (!partnerCompanyId && data.customer.company.trim()) {
+      const supabase = await db();
+      const { data: rows } = await supabase.from("booking_partners").select("id, name").eq("resells", true);
+      partnerCompanyId = matchPartner(data.customer, (rows ?? []) as { id: string; name: string }[])?.id ?? null;
+    }
+
     const result = await createOffer({
       customer_id: null,
       employee_id: null,
+      // From here the preview, the PDF and the client link all resolve their
+      // branding from this one column.
+      partner_company_id: partnerCompanyId,
       destination: data.trip.destination || data.trip.country,
       duration: `${data.trip.days} أيام / ${data.trip.nights} ليالي`,
       offer_date: data.trip.arrival_date,

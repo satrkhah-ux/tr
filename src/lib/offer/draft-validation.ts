@@ -139,8 +139,14 @@ export function validateDraft(data: DraftData): DraftValidation {
   }
 
   // ---- warnings ----
-  if (!data.customer.customer_name.trim()) warnings.push({ severity: "warning", stage: "customer", key: "pg.warn.noName" });
-  if (!data.customer.customer_phone.trim()) warnings.push({ severity: "warning", stage: "customer", key: "pg.warn.noPhone" });
+  // A file built FOR a partner company is not sold to a person we know: the
+  // partner has the client, and asking us for their name and phone would be
+  // asking for data we are not entitled to. So the two advisories only apply to
+  // a direct sale.
+  if (!isCompanySale(data)) {
+    if (!data.customer.customer_name.trim()) warnings.push({ severity: "warning", stage: "customer", key: "pg.warn.noName" });
+    if (!data.customer.customer_phone.trim()) warnings.push({ severity: "warning", stage: "customer", key: "pg.warn.noPhone" });
+  }
   if (data.scope.flights && data.flights.length === 0) {
     warnings.push({ severity: "warning", stage: "flights", key: "pg.warn.noFlights" });
   }
@@ -189,6 +195,11 @@ export function validateDraft(data: DraftData): DraftValidation {
   };
 }
 
+/** Built for a registered partner company rather than for a walk-in client. */
+export function isCompanySale(data: DraftData): boolean {
+  return Boolean(data.customer.partner_company_id) || Boolean(data.customer.company.trim());
+}
+
 /** A draft seeded from a ready offer whose company price is already locked in. */
 function isFixedPrice(data: DraftData): boolean {
   return Boolean(data.source && data.pricing.final_total && data.pricing.final_total > 0);
@@ -206,7 +217,9 @@ function outOfSeason(data: DraftData): boolean {
 function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey, StageStatus> {
   const hasBlocking = (stage: StageKey) => blocking.some((issue) => issue.stage === stage);
 
-  const customerTouched = Boolean(data.customer.customer_name.trim() || data.customer.customer_phone.trim());
+  const customerTouched = Boolean(
+    data.customer.customer_name.trim() || data.customer.customer_phone.trim() || isCompanySale(data),
+  );
   const tripTouched = Boolean(data.trip.country || data.trip.arrival_date || data.trip.days > 0);
   const tripComplete = Boolean(data.trip.country.trim() && data.trip.arrival_date && data.trip.days > 0 && data.trip.adults > 0);
   const used = totalCityNights(data.cities);
@@ -226,7 +239,8 @@ function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey
   };
 
   return {
-    customer: status(customerTouched, Boolean(data.customer.customer_name.trim()), "customer"),
+    // Naming the partner company completes the stage on its own.
+    customer: status(customerTouched, isCompanySale(data) || Boolean(data.customer.customer_name.trim()), "customer"),
     trip: status(tripTouched, tripComplete, "trip"),
     cities: status(data.cities.length > 0, data.cities.length > 0 && used === data.trip.nights && data.trip.nights > 0, "cities"),
     hotels: status(data.hotels.length > 0, hotelsComplete, "hotels"),

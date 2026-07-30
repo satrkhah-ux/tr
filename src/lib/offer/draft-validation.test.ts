@@ -11,7 +11,7 @@ import { validateDraft } from "./draft-validation";
 
 function completeDraft(): DraftData {
   const data = emptyDraftData();
-  data.customer = { customer_name: "نايف الجهني", customer_phone: "0555555555", company: "" };
+  data.customer = { ...data.customer, customer_name: "نايف الجهني", customer_phone: "0555555555" };
   data.trip = {
     ...data.trip,
     country: "ماليزيا",
@@ -150,6 +150,37 @@ describe("validateDraft", () => {
     const result = validateDraft(data);
     expect(result.ok).toBe(false);
     expect(result.blocking.some((i) => i.key === "pg.supplier.blocked")).toBe(true);
+  });
+});
+
+/**
+ * A file built for a partner company is a B2B sale: the partner keeps the client,
+ * so asking us for the traveller's name and phone is asking for data we do not
+ * have and are not entitled to.
+ */
+describe("a company file needs no client details", () => {
+  function withoutClient(): DraftData {
+    const data = completeDraft();
+    data.customer = { ...data.customer, customer_name: "", customer_phone: "" };
+    return data;
+  }
+
+  it("advises about the missing name and phone on a DIRECT sale", () => {
+    const result = validateDraft(withoutClient());
+    expect(result.warnings.some((w) => w.key === "pg.warn.noName")).toBe(true);
+    expect(result.warnings.some((w) => w.key === "pg.warn.noPhone")).toBe(true);
+    expect(result.stages.customer).not.toBe("complete");
+  });
+
+  it("stays silent once a partner company is chosen, and counts the stage done", () => {
+    const data = withoutClient();
+    data.customer = { ...data.customer, partner_company_id: "31ed6f37", company: "شركة الأفق" };
+    const result = validateDraft(data);
+    expect(result.warnings.some((w) => w.key === "pg.warn.noName")).toBe(false);
+    expect(result.warnings.some((w) => w.key === "pg.warn.noPhone")).toBe(false);
+    expect(result.stages.customer).toBe("complete");
+    // and it is still only advice either way — never a reason to block a sale
+    expect(result.ok).toBe(true);
   });
 });
 

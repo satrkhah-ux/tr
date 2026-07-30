@@ -7,7 +7,7 @@ import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser 
 import { getCurrentRole } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { can } from "@/lib/roles/roles";
-import { TRAVELIUN_BRAND, partnerBrand, type DocBrand } from "@/components/offer-doc/brand";
+import { TRAVELIUN_BRAND, partnerBrand, publicBrandLogoUrl, type DocBrand } from "@/components/offer-doc/brand";
 
 /**
  * «الشركات المتعاونة» — the companies we work with, and how their documents look.
@@ -69,10 +69,7 @@ const COLUMNS =
  * cannot share a session: the staff preview, a client's browser on the offer
  * link, and a saved PDF. A signed URL would expire inside the file.
  */
-function publicLogoUrl(supabaseUrl: string, path: string | null): string | null {
-  if (!path) return null;
-  return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${BUCKET}/${path}`;
-}
+const publicLogoUrl = publicBrandLogoUrl;
 
 function baseUrl(): string {
   // Runtime read (window.__ENV__ equivalent on the server) — see runtime-env.

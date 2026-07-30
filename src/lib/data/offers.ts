@@ -139,6 +139,8 @@ export type CreateOfferInput = {
   source_kind?: string;
   source_supplier_id?: string | null;
   source_import_id?: string | null;
+  /** partner company this file is issued FOR — drives the document's branding. */
+  partner_company_id?: string | null;
 };
 
 /** One printed day. Text + a weather reading; carries no money by design. */
@@ -238,6 +240,7 @@ export async function createOffer(input: CreateOfferInput): Promise<CreateOfferR
         source_kind: input.source_kind ?? "direct",
         source_supplier_id: input.source_supplier_id ?? null,
         source_import_id: input.source_import_id ?? null,
+        partner_company_id: input.partner_company_id ?? null,
       })
       .select("id")
       .single();
