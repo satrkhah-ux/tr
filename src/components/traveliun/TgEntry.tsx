@@ -23,6 +23,19 @@ function getWebApp(): TgWebApp | null {
   return w.Telegram?.WebApp ?? null;
 }
 
+/**
+ * Where to land after the Mini App signs someone in.
+ *
+ * `?to=` lets one verified bridge serve every bot and every deep link — the
+ * operations bot sends «/operations», a notice sends «/operations/<id>». Only
+ * INTERNAL paths are honoured: `to=https://elsewhere` would turn our own signed
+ * sign-in into an open redirect that hands the session to whoever asked.
+ */
+function landing(): string {
+  const to = new URLSearchParams(window.location.search).get("to") ?? "";
+  return /^\/[A-Za-z0-9/_-]*$/.test(to) ? to : "/dashboard";
+}
+
 type Phase = "boot" | "connecting" | "login_needed" | "not_telegram" | "error";
 
 export function TgEntry() {
@@ -43,7 +56,7 @@ export function TgEntry() {
 
     const auth = await telegramSignIn(initData);
     if (auth.ok) {
-      window.location.replace("/dashboard");
+      window.location.replace(landing());
       return;
     }
     if (auth.code === "unconfigured") { setErrorKey("tg.errUnconfigured"); setPhase("error"); return; }
@@ -54,7 +67,7 @@ export function TgEntry() {
     if (auth.code === "not_linked") {
       const link = await linkTelegramAccount(initData);
       if (link.ok) {
-        window.location.replace("/dashboard");
+        window.location.replace(landing());
         return;
       }
       if (link.code === "session") { setPhase("login_needed"); return; }

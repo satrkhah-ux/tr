@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
+import { miniAppUrl, sendMessage } from "@/lib/telegram/ops-bot";
 
 /**
  * Tell the operations team a case has landed.
@@ -22,20 +23,15 @@ function readEnv(name: string): string | undefined {
   return process.env[name];
 }
 
-async function send(chatId: number, text: string): Promise<boolean> {
-  const token = readEnv("TELEGRAM_WEBAPP_BOT_TOKEN");
-  if (!token) return false;
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true }),
-      signal: AbortSignal.timeout(8000),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+/**
+ * Sent by the OPERATIONS bot when one is configured, else the admin bot.
+ *
+ * The notice carries a button that opens the case itself inside Telegram, so the
+ * distance between "a case landed" and "I am working on it" is one tap instead of
+ * finding a laptop.
+ */
+async function send(chatId: number, text: string, path?: string): Promise<boolean> {
+  return sendMessage(chatId, text, path ? [[{ text: "🗂️ فتح الملف", web_app: { url: miniAppUrl(path) } }]] : undefined);
 }
 
 /**
@@ -88,7 +84,7 @@ export async function notifyOperationConfirmed(notice: OpsNotice): Promise<numbe
     ].filter((l): l is string => l !== null);
 
     const text = lines.join("\n");
-    const results = await Promise.all(chatIds.map((id) => send(id, text)));
+    const results = await Promise.all(chatIds.map((id) => send(id, text, `/operations/${notice.operationId}`)));
     return results.filter(Boolean).length;
   } catch {
     return 0;
