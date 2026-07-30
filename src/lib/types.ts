@@ -354,6 +354,23 @@ export interface OfferRevision {
 }
 
 // ---------- lookup tables (migration 0003; airport cols in 0011) ----------
+/**
+ * A carrier (migration 0031). The IATA designator is the key everything joins on:
+ * a flight number contains it, so «SV820» both names the airline and finds its mark.
+ */
+export interface Airline {
+  id: string;
+  /** two characters, as printed on a ticket. Unique. */
+  iata: string;
+  icao: string | null;
+  arabic_name: string;
+  english_name: string | null;
+  /** path inside the PUBLIC `airlines` storage bucket. */
+  logo_path: string | null;
+  status: string;
+  created_at: string;
+}
+
 export interface Airport {
   id: Uuid;
   arabic_name: string;
@@ -634,6 +651,7 @@ export interface Database {
       offer_drafts: TableShape<OfferDraft>;
       city_climate_notes: TableShape<CityClimateNote>;
       airports: TableShape<Airport>;
+      airlines: TableShape<Airline>;
       transportation_types: TableShape<TransportationType>;
       markup_rules: TableShape<MarkupRuleRow>;
       hotel_suppliers: TableShape<HotelSupplierRow>;

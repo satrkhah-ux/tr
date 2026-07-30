@@ -344,6 +344,7 @@ export const en = {
   "col.iso2": "ISO",
   "col.timezone": "Timezone",
   "col.visaRequired": "Visa required",
+  "col.logo": "Logo",
   "col.iata": "IATA",
   "col.icao": "ICAO",
   "col.vehicleClass": "Vehicle class",

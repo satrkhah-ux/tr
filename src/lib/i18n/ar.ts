@@ -342,6 +342,7 @@ export const ar: Dictionary = {
   "col.iso2": "الرمز الدولي",
   "col.timezone": "المنطقة الزمنية",
   "col.visaRequired": "تأشيرة مطلوبة",
+  "col.logo": "الشعار",
   "col.iata": "IATA",
   "col.icao": "ICAO",
   "col.vehicleClass": "فئة المركبة",

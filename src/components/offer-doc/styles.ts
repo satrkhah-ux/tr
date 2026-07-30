@@ -142,6 +142,10 @@ export const OFFER_DOC_CSS = `
 .od-table td{border-top:1px solid var(--od-line-2);border-left:1px solid var(--od-line-2);padding:3.2mm;vertical-align:middle;line-height:1.45;}
 .od-table td:last-child{border-left:0;}
 .od-table tbody tr{break-inside:avoid;}
+/* carrier cell: the mark, then the name. The logo is height-capped so a tall one
+   cannot stretch the row and push the table onto another sheet. */
+.od-carrier{display:flex;align-items:center;gap:2.5mm;}
+.od-carrier-logo{width:14mm;height:6mm;object-fit:contain;object-position:center;flex:0 0 auto;}
 .od-route{color:var(--od-green);font-weight:800;display:block;margin-bottom:1mm;}
 .od-sub{display:block;margin-top:1mm;color:var(--od-muted);font-size:8.8pt;}
 .od-note{margin-top:6mm;border:1px solid var(--od-line);border-radius:4mm;background:var(--od-fill);padding:4mm 5mm;color:var(--od-muted);font-size:10.5pt;break-inside:avoid;}

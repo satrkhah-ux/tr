@@ -102,7 +102,7 @@ export function PreviewStage({ draftId, data, patch, lookups }: StageFormProps) 
         </p>
       ) : null}
 
-      <OfferDocument variant="client" offer={draftToPreviewOffer(data)} {...draftBrand(data, lookups.partners)} />
+      <OfferDocument variant="client" offer={draftToPreviewOffer(data, lookups.airlines)} {...draftBrand(data, lookups.partners)} />
     </div>
   );
 }

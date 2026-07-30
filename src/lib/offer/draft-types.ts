@@ -338,6 +338,11 @@ export function normalizeDraftHotel(raw: unknown): DraftHotel {
 
 export type DraftFlight = {
   airline: string;
+  /**
+   * IATA designator, e.g. "SV". Resolved from the flight number the agent types,
+   * and the key the document draws the carrier's mark from.
+   */
+  airline_iata: string;
   flight_no: string;
   from_airport: string;
   to_airport: string;
@@ -539,6 +544,7 @@ function normalizeDraftFlight(raw: unknown): DraftFlight {
   const f = (raw && typeof raw === "object" ? raw : {}) as Partial<DraftFlight>;
   return {
     airline: typeof f.airline === "string" ? f.airline : "",
+    airline_iata: typeof f.airline_iata === "string" ? f.airline_iata.toUpperCase() : "",
     flight_no: typeof f.flight_no === "string" ? f.flight_no : "",
     from_airport: typeof f.from_airport === "string" ? f.from_airport : "",
     to_airport: typeof f.to_airport === "string" ? f.to_airport : "",
@@ -744,6 +750,8 @@ export type GeneratorLookups = {
    * picker. Only name + colours: enough to choose and to preview the identity,
    * nothing the generator has any use for.
    */
+  /** the carriers, for the flight stage's picker and the document's marks. */
+  airlines: { iata: string; name: string; logo_url: string | null }[];
   partners: {
     id: string;
     name: string;

@@ -148,6 +148,19 @@ export function isHouseColor(hex: string): boolean {
   return hex.trim().toLowerCase() === "#135549";
 }
 
+/**
+ * A carrier's mark, from its path in the public `airlines` bucket.
+ *
+ * Same shape and same reason as the partner logo above: public so it renders for a
+ * client with no session, and stored by us so a saved PDF does not depend on
+ * someone else's CDN still being up.
+ */
+export function airlineLogoUrl(path: string | null): string | null {
+  if (!path) return null;
+  const base = (process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? "").replace(/\/$/, "");
+  return base ? `${base}/storage/v1/object/public/airlines/${path}` : null;
+}
+
 /** What the admin screen stores, and the document needs. */
 export type PartnerBrandRow = {
   name: string;

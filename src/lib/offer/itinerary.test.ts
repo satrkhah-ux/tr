@@ -159,6 +159,7 @@ describe("draftDaySkeleton (whole draft, as the stage calls it)", () => {
     flights: [
       {
         airline: "اير اسيا",
+        airline_iata: "AK",
         flight_no: "",
         from_airport: "مطار كوالالمبور الدولي (KUL)",
         to_airport: "مطار أثينا الدولي (ATH)",

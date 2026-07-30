@@ -157,6 +157,21 @@ const CONFIGS: TableConfig[] = [
     isOffers: true,
     defaultSort: { column: "offer_date", ascending: false },
   },
+  // «شركات الطيران» — the carriers and their marks (migration 0031). The logos are
+  // fetched once by scripts/fetch-airline-logos.mjs, keyed by IATA designator.
+  {
+    route: "/airlines", table: "airlines", titleKey: "nav.airlines",
+    columns: [
+      { key: "logo_path", labelKey: "col.logo", type: "logo", editable: false, minWidth: "90px" },
+      { key: "arabic_name", labelKey: "col.arabicName" },
+      { key: "english_name", labelKey: "col.englishName" },
+      { key: "iata", labelKey: "col.iata", type: "serial" },
+      { key: "icao", labelKey: "col.icao", type: "serial" },
+      { key: "status", labelKey: "col.status", type: "status" },
+    ],
+    searchable: ["arabic_name", "english_name", "iata", "icao"],
+    defaultSort: { column: "arabic_name", ascending: true },
+  },
   // ---- lookup tables (migration 0003) ----
   {
     route: "/airports", table: "airports", titleKey: "nav.airports",

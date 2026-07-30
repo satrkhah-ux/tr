@@ -22,6 +22,7 @@ import {
 } from "@/lib/offer/schedule";
 import type { TranslationKey } from "@/lib/i18n";
 import type { FlightLegOrder } from "@/lib/types";
+import { parseFlightNumber } from "@/lib/offer/flight-number";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import {
   addButtonClass,
@@ -73,6 +74,7 @@ function resolveTz(value: string, airports: LookupAirport[]): string | null {
 function emptyFlight(legOrder: FlightLegOrder): DraftFlight {
   return {
     airline: "",
+    airline_iata: "",
     flight_no: "",
     from_airport: "",
     to_airport: "",
@@ -92,6 +94,7 @@ function emptyFlight(legOrder: FlightLegOrder): DraftFlight {
 
 type RowHandlers = {
   updateRow: (index: number, slice: Partial<DraftFlight>) => void;
+  resolveCarrier: (index: number, flightNo: string) => void;
   setAirport: (index: number, field: "from_airport" | "to_airport", value: string) => void;
   setDeparture: (index: number, raw: string) => void;
   restoreAuto: (index: number) => void;
@@ -145,6 +148,7 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
   const { t } = useTraveliunUI();
   const flights = data.flights;
   const airports = lookups.airports;
+  const airlines = lookups.airlines;
 
   /** Persist flights + keep the trip-driven departure dates and hotel chain in sync. */
   function commit(next: DraftFlight[]) {
@@ -201,6 +205,36 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
    * kept (and the arrival date follows the provider's overnight offset). This
    * is why the agent still confirms: real times, our dates.
    */
+  /**
+   * The smart bit, and it costs nothing: the flight number already contains the
+   * carrier. «SV820» → SV → «الخطوط السعودية» + its mark, with no API call, no key
+   * and no waiting. A name the agent typed themselves is never overwritten — only
+   * an empty field, or one this same resolution filled.
+   */
+  function resolveCarrier(index: number, flightNo: string) {
+    const parsed = parseFlightNumber(flightNo);
+    const current = flights[index];
+    const match = parsed
+      ? airlines.find((a) => a.iata === parsed.carrier) ??
+        airlines.find((a) => a.iata === parsed.carrier.slice(0, 2))
+      : null;
+
+    const patch: Partial<DraftFlight> = { flight_no: flightNo };
+    if (!match) {
+      updateRow(index, patch);
+      return;
+    }
+    patch.airline_iata = match.iata;
+    const typedByHand = current.airline.trim() && current.airline !== previousName(current.airline_iata);
+    if (!typedByHand) patch.airline = match.name;
+    updateRow(index, patch);
+  }
+
+  /** the name this resolution would have written for a designator, if any. */
+  function previousName(iata: string): string {
+    return airlines.find((a) => a.iata === iata)?.name ?? "";
+  }
+
   function applyLookup(index: number, hit: FlightLookupHit) {
     const flight = flights[index];
     const from_airport = airportValueFor(hit.from_iata, hit.from_airport, airports);
@@ -210,8 +244,13 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
     const arrTime = timePart(hit.arrival_at);
     const offset = dayOffsetBetween(hit.departure_at, hit.arrival_at);
 
+    const parsed = parseFlightNumber(hit.flight_iata || flight.flight_no);
+    const carrier = parsed ? airlines.find((a) => a.iata === parsed.carrier) : null;
+
     updateRow(index, {
-      airline: hit.airline || flight.airline,
+      // our own row's Arabic name wins over the provider's Latin one
+      airline: carrier?.name || hit.airline || flight.airline,
+      airline_iata: carrier?.iata ?? flight.airline_iata,
       flight_no: hit.flight_iata || flight.flight_no,
       from_airport,
       to_airport,
@@ -223,7 +262,7 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
     });
   }
 
-  const handlers: RowHandlers = { updateRow, setAirport, setDeparture, restoreAuto, removeRow, applyLookup };
+  const handlers: RowHandlers = { updateRow, resolveCarrier, setAirport, setDeparture, restoreAuto, removeRow, applyLookup };
 
   // Rows keep their ORIGINAL index so edits/removals stay correct after grouping.
   const rows = flights.map((flight, index) => ({ flight, index }));
@@ -497,7 +536,7 @@ function FlightRow({
   handlers: RowHandlers;
 }) {
   const { t } = useTraveliunUI();
-  const { updateRow, setAirport, setDeparture, restoreAuto, removeRow, applyLookup } = handlers;
+  const { updateRow, resolveCarrier, setAirport, setDeparture, restoreAuto, removeRow, applyLookup } = handlers;
   const timing = flightTiming(flight);
   const duration = formatDurationAr(timing.durationMinutes);
   const bothDatesSet = Boolean(flight.departure_at && flight.arrival_at);
@@ -541,7 +580,7 @@ function FlightRow({
             <input
               dir="ltr"
               value={flight.flight_no}
-              onChange={(e) => updateRow(index, { flight_no: e.target.value })}
+              onChange={(e) => resolveCarrier(index, e.target.value)}
               placeholder={t("pg.flightLookup.placeholder")}
               className={`${fieldClass} tv-tnum text-start`}
             />

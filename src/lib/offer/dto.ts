@@ -70,6 +70,9 @@ export type InternalFlightLine = {
   arrival_at: string | null;
   cabin_class: string | null;
   baggage_allowance: string | null;
+  /** IATA designator, and the carrier's mark resolved from it. */
+  airline_iata?: string | null;
+  airline_logo_url?: string | null;
   leg_order: FlightLegOrder | null;
   sell_price: number | null;
   sell_currency: string | null;

@@ -19,6 +19,7 @@ import {
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatusBadge, statusTone } from "@/components/ui/StatusBadge";
+import { airlineLogoUrl } from "@/components/offer-doc/brand";
 import {
   createRow,
   deleteRow,
@@ -432,6 +433,14 @@ function Cell({ column, value }: { column: ColumnDef; value: DataValue }) {
   const { t } = useTraveliunUI();
   if (value === null || value === undefined || value === "") return <span className="text-[#c2cfca]">—</span>;
   if (column.type === "status") return <StatusBadge tone={statusTone(String(value))} />;
+  // A carrier's mark, from its path in the public bucket. Drawn small and
+  // contained: the row height must not follow the image.
+  if (column.type === "logo") {
+    const url = airlineLogoUrl(String(value));
+    if (!url) return <span className="text-[#c2cfca]">—</span>;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt="" className="h-6 w-14 object-contain object-center" />;
+  }
   if (BOOLEAN_KEYS.has(column.key) || typeof value === "boolean") {
     const truthy = value === true || value === "true" || value === "Yes";
     return <span className={truthy ? "font-bold text-[#0f7a52]" : "text-[#8aa29b]"}>{truthy ? t("yes") : t("no")}</span>;

@@ -222,7 +222,17 @@ function withLists<T extends ClientOfferDTO>(offer: T): T {
   const list = <V,>(value: V[] | undefined): V[] => (Array.isArray(value) ? value : []);
   return {
     ...offer,
-    hotels: list(offer.hotels),
+    // The NESTED arrays too, not only the top-level ones. A snapshot frozen before
+    // `excluded_surcharges` existed reached stayHeightMm as undefined and threw —
+    // so an old published offer produced a 500 on its own PDF while its preview,
+    // which reads live data, was fine. Every list the document iterates is
+    // defaulted here, once.
+    hotels: list(offer.hotels).map((h) => ({
+      ...h,
+      excluded_surcharges: list(h.excluded_surcharges),
+      facilities: list(h.facilities),
+    })),
+    days: list(offer.days).map((d) => ({ ...d, activities: list(d.activities) })),
     flights: list(offer.flights),
     transport: list(offer.transport),
     visas: list(offer.visas),
@@ -230,7 +240,6 @@ function withLists<T extends ClientOfferDTO>(offer: T): T {
     excludes: list(offer.excludes),
     terms: list(offer.terms),
     climate: list(offer.climate),
-    days: list(offer.days),
   };
 }
 
@@ -721,7 +730,19 @@ function FlightTable({ flights }: { flights: ClientOfferDTO["flights"] }) {
         {flights.map((f, i) => (
           <tr key={i}>
             <td>{f.leg_order ? LEG_AR[f.leg_order] : "—"}</td>
-            <td>{f.airline || "—"}</td>
+            {/* The carrier's mark beside its name: a client scanning the page
+                recognises the logo before they read the Arabic, and management
+                asked for it. No logo on file → the name alone, never a
+                placeholder box. */}
+            <td>
+              <span className="od-carrier">
+                {f.airline_logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="od-carrier-logo" src={f.airline_logo_url} alt={f.airline_iata ?? ""} />
+                ) : null}
+                <span>{f.airline || "—"}</span>
+              </span>
+            </td>
             <td>{f.flight_no ? <Ltr>{f.flight_no}</Ltr> : "—"}</td>
             <td><Ltr>{`${f.from_airport || "—"} → ${f.to_airport || "—"}`}</Ltr></td>
             <td className="od-tnum"><Ltr>{fmtDateTime(f.departure_at)}</Ltr></td>

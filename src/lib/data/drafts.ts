@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
-import { publicBrandLogoUrl } from "@/components/offer-doc/brand";
+import { airlineLogoUrl, publicBrandLogoUrl } from "@/components/offer-doc/brand";
 import {
   defaultServicesFromLibrary,
   deriveCityDates,
@@ -223,11 +223,11 @@ export async function deleteDraft(draftId: string): Promise<SaveDraftResult> {
 // ---------- lookups for the stage forms ----------
 export async function getGeneratorLookups(): Promise<GeneratorLookups> {
   const empty: GeneratorLookups = {
-    countries: [], roomTypes: [], airports: [], carTypes: [], termLibrary: emptyTermLibrary(), partners: [],
+    countries: [], roomTypes: [], airports: [], carTypes: [], termLibrary: emptyTermLibrary(), partners: [], airlines: [],
   };
   try {
     const supabase = await db();
-    const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transfersRes, transportRes, termsRes, partnersRes] = await Promise.all([
+    const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transfersRes, transportRes, termsRes, airlinesRes, partnersRes] = await Promise.all([
       supabase.from("countries").select("id, arabic_name, status").order("arabic_name"),
       supabase.from("cities").select("id, arabic_name, country_id").order("arabic_name"),
       supabase.from("hotels").select("id, arabic_name, stars, city_id"),
@@ -238,6 +238,11 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       supabase.from("terms").select("kind, arabic_text, checked, sort").order("sort", { ascending: true }),
       // resellers only: a hotel supplier we assign bookings to has no business in
       // the picker that decides whose name is printed on the cover.
+      supabase
+        .from("airlines")
+        .select("iata, arabic_name, logo_path")
+        .neq("status", "Disabled")
+        .order("arabic_name"),
       supabase
         .from("booking_partners")
         .select("id, name, name_latin, logo_path, brand_color, accent_color, address, phone, whatsapp, website, email")
@@ -287,6 +292,11 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
         .map((a) => ({ id: a.id, name: a.arabic_name, code: a.code, timezone: a.iana_timezone })),
       carTypes,
       termLibrary: buildTermLibrary(termsRes.data),
+      airlines: ((airlinesRes.data ?? []) as { iata: string; arabic_name: string; logo_path: string | null }[]).map((a) => ({
+        iata: a.iata,
+        name: a.arabic_name,
+        logo_url: airlineLogoUrl(a.logo_path),
+      })),
       // logo_path → public URL here, so the in-generator preview draws the real
       // logo the PDF will carry rather than a placeholder.
       partners: ((partnersRes.data ?? []) as (Omit<GeneratorLookups["partners"][number], "logo_url"> & { logo_path: string | null })[]).map(
@@ -580,6 +590,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         baggage: f.baggage_allowance || null,
         airline: f.airline || null,
         flight_no: f.flight_no || null,
+        airline_iata: f.airline_iata || null,
         departure_at: f.departure_at,
         arrival_at: f.arrival_at,
         cabin_class: f.cabin_class || null,

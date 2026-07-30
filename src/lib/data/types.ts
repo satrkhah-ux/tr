@@ -8,7 +8,8 @@ export type AllowedTable = keyof Database["public"]["Tables"];
 export type DataValue = string | number | boolean | null;
 export type DataRow = Record<string, DataValue>;
 
-export type ColumnType = "text" | "number" | "currency" | "date" | "serial" | "status" | "phone" | "url";
+/** `logo` renders the value as an image path inside a public storage bucket. */
+export type ColumnType = "text" | "number" | "currency" | "date" | "serial" | "status" | "phone" | "url" | "logo";
 
 export type ColumnDef = {
   key: string;

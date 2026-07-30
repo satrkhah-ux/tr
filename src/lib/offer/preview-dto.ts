@@ -75,7 +75,11 @@ const emptyBase = (): Pick<
  * produceOfferFromDraft derives them, so the preview and the produced offer
  * agree on check-in/check-out.
  */
-export function draftToPreviewOffer(data: DraftData): ClientOfferDTO {
+export function draftToPreviewOffer(
+  data: DraftData,
+  /** carriers, so the preview draws the same marks the produced PDF will. */
+  airlines: GeneratorLookups["airlines"] = [],
+): ClientOfferDTO {
   const start = itineraryStartDate(data.trip, data.flights);
   const cities = deriveCityDates(start, data.cities);
   const cityByName = new Map(cities.map((c) => [c.city_name, c]));
@@ -121,6 +125,8 @@ export function draftToPreviewOffer(data: DraftData): ClientOfferDTO {
     }),
     flights: data.flights.map((f) => ({
       airline: f.airline || null,
+      airline_iata: f.airline_iata || null,
+      airline_logo_url: airlines.find((a) => a.iata === f.airline_iata)?.logo_url ?? null,
       flight_no: f.flight_no || null,
       from_airport: f.from_airport || null,
       to_airport: f.to_airport || null,

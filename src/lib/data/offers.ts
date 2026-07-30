@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
+import { airlineLogoUrl } from "@/components/offer-doc/brand";
 import type { BoardType, PricingItemType, RenderVariant } from "@/lib/types";
 import { computeOfferPricing, type PricingLineInput } from "@/lib/offer/pricing";
 import {
@@ -54,6 +55,8 @@ export type OfferFlightInput = {
   arrival_at?: string | null;
   cabin_class?: string | null;
   baggage_allowance?: string | null;
+  /** IATA designator — the key the document draws the carrier's mark from. */
+  airline_iata?: string | null;
   leg_order?: import("@/lib/types").FlightLegOrder | null;
 };
 
@@ -282,6 +285,7 @@ export async function createOffer(input: CreateOfferInput): Promise<CreateOfferR
           arrival_at: f.arrival_at ?? null,
           cabin_class: f.cabin_class ?? null,
           baggage_allowance: f.baggage_allowance ?? null,
+          airline_iata: f.airline_iata ?? null,
           leg_order: f.leg_order ?? null,
           sort: index,
         })),
@@ -722,6 +726,9 @@ type FlightRow = {
   baggage_allowance: string | null;
   baggage: string | null;
   leg_order: import("@/lib/types").FlightLegOrder | null;
+  airline_iata: string | null;
+  /** PostgREST types an embedded to-one relation as an array. */
+  airlines: { logo_path: string | null } | { logo_path: string | null }[] | null;
 };
 type PricingItemRow = {
   item_type: PricingItemType;
@@ -763,7 +770,7 @@ export async function getInternalOffer(serial: string): Promise<InternalOfferDTO
 
     const [hotelsRes, flightsRes, servicesRes, termsRes, itemsRes, daysRes] = await Promise.all([
       supabase.from("offer_hotels").select("hotel_id, hotel_name, room_type_id, board_type, rooms_count, nights, check_in, check_out, buy_price, buy_currency, sell_price, sell_currency, cancellation_policy, excluded_surcharges, valid_until, supplier_id, supplier_name, rate_key, net_base, net_source_currency, fx_rate, fx_date, ref_sell_base, markup_amount, markup_pct, image_url, facilities, content_star_rating, room_type_name").eq("offer_id", offer.id).order("sort"),
-      supabase.from("offer_flights").select("airline, carrier, flight_no, from_airport, to_airport, departure_at, arrival_at, cabin_class, cabin, baggage_allowance, baggage, leg_order").eq("offer_id", offer.id).order("sort"),
+      supabase.from("offer_flights").select("airline, carrier, flight_no, from_airport, to_airport, departure_at, arrival_at, cabin_class, cabin, baggage_allowance, baggage, leg_order, airline_iata, airlines:airline_iata(logo_path)").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_services").select("label, kind").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_terms").select("text").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_pricing_items").select("item_type, description, quantity, buy_price, buy_currency, sell_price, sell_currency").eq("offer_id", offer.id).order("sort"),
@@ -844,6 +851,10 @@ export async function getInternalOffer(serial: string): Promise<InternalOfferDTO
 
     const flights: InternalFlightLine[] = flightRows.map((f) => ({
       airline: f.airline ?? f.carrier,
+      airline_iata: f.airline_iata ?? null,
+      // The mark is resolved HERE, from the designator stored on the leg, so a
+      // renamed airline row cannot change what an already-sent document shows.
+      airline_logo_url: airlineLogoUrl((Array.isArray(f.airlines) ? f.airlines[0] : f.airlines)?.logo_path ?? null),
       flight_no: f.flight_no,
       from_airport: f.from_airport,
       to_airport: f.to_airport,

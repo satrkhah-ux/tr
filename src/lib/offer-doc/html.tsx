@@ -17,7 +17,30 @@ export async function renderOfferDocumentHtml(props: OfferDocumentProps): Promis
   // site, so no print path can ship a document whose cover logo is a broken box.
   const remote = props.brand?.logoUrl ?? null;
   const brand = remote ? { ...props.brand!, logoUrl: (await inlineImage(remote)) ?? null } : props.brand;
-  return renderDocHtml((assets) => <OfferDocument {...props} brand={brand} assets={assets} />);
+
+  // Every carrier mark on the flight page needs the same treatment as the brand
+  // logo: Chromium prints with no network, so a storage URL would come out a
+  // broken box. Fetched once per distinct URL, in parallel.
+  const urls = [...new Set((props.offer.flights ?? []).map((f) => f.airline_logo_url).filter((u): u is string => Boolean(u)))];
+  const inlined = new Map(await Promise.all(urls.map(async (url) => [url, await inlineImage(url)] as const)));
+  // One cast on the whole props object, not on `offer`: spreading the offer alone
+  // widens the client/internal union and the variant discriminant is lost.
+  const withMarks = (
+    urls.length
+      ? {
+          ...props,
+          offer: {
+            ...props.offer,
+            flights: props.offer.flights.map((f) => ({
+              ...f,
+              airline_logo_url: f.airline_logo_url ? (inlined.get(f.airline_logo_url) ?? null) : null,
+            })),
+          },
+        }
+      : props
+  ) as OfferDocumentProps;
+
+  return renderDocHtml((assets) => <OfferDocument {...withMarks} brand={brand} assets={assets} />);
 }
 
 /**
