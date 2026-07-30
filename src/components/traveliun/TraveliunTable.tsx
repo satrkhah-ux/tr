@@ -80,10 +80,14 @@ export function TraveliunTable({
       if (value) list.push({ column: def.column ?? def.key, op: "eq", value });
     }
     if (config.isOffers) {
+      // ISSUED offers only. A `draft` row was created and never published — it is
+      // work in progress, and it belongs in the generator's drafts list, not in a
+      // screen the office reads as "what the clients have". `cancelled` stays:
+      // it WAS issued, and its own status badge says what became of it.
       list.push(
         offersMode === "confirmed"
           ? { column: "status", op: "eq", value: "confirmed" }
-          : { column: "status", op: "in", value: ["draft", "sent"] },
+          : { column: "status", op: "in", value: ["sent", "cancelled"] },
       );
       if (dateFrom) list.push({ column: "offer_date", op: "gte", value: dateFrom });
       if (dateTo) list.push({ column: "offer_date", op: "lte", value: dateTo });

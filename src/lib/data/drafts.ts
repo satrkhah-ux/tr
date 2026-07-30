@@ -39,6 +39,13 @@ export type DraftSummary = {
   title: string | null;
   destination: string | null;
   customer_name: string | null;
+  /** the partner company this draft is being built for, if any. */
+  company: string | null;
+  adults: number;
+  children: number;
+  infants: number;
+  days: number;
+  nights: number;
   produced_serial: string | null;
   updated_at: string;
 };
@@ -59,6 +66,12 @@ export async function listDrafts(): Promise<DraftSummary[]> {
           title: row.title,
           destination: draft.trip.destination || draft.trip.country || null,
           customer_name: draft.customer.customer_name || null,
+          company: draft.customer.company || null,
+          adults: draft.trip.adults,
+          children: draft.trip.children,
+          infants: draft.trip.infants,
+          days: draft.trip.days,
+          nights: draft.trip.nights,
           produced_serial: draft.produced_serial,
           updated_at: row.updated_at,
         };
@@ -102,6 +115,38 @@ export async function createDraft(seed?: Partial<DraftData>): Promise<CreateDraf
       .select("id")
       .single();
     if (error || !data) return { ok: false, error: "err.createFailed" };
+    return { ok: true, id: (data as { id: string }).id };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/**
+ * Copy a draft into a NEW one.
+ *
+ * This is what «إعادة الإصدار» does for a draft that already produced an offer:
+ * re-running the producer would mint a second offer against the same draft and
+ * overwrite the serial it remembers, so the same programme for the next client
+ * starts as its own draft instead — the issued offer stays exactly as it was sent.
+ */
+export async function duplicateDraft(draftId: string): Promise<CreateDraftResult> {
+  try {
+    const user = await getServerUser();
+    if (!user) return { ok: false, error: "err.session" };
+    const record = await getDraft(draftId);
+    if (!record) return { ok: false, error: "err.loadFailed" };
+
+    const supabase = await db();
+    const copy: DraftData = { ...record.data, produced_serial: null };
+    const { data, error } = await supabase
+      .from("offer_drafts")
+      .insert({
+        data: copy as unknown as Record<string, unknown>,
+        title: copy.customer.customer_name || copy.trip.destination || copy.trip.country || null,
+      })
+      .select("id")
+      .single();
+    if (error || !data) return { ok: false, error: "err.copyFailed" };
     return { ok: true, id: (data as { id: string }).id };
   } catch {
     return { ok: false, error: "err.db" };

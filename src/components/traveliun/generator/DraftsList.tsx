@@ -2,22 +2,50 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { FilePlus2, FileText, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import {
+  ArrowUpRight,
+  Copy,
+  FilePlus2,
+  FileText,
+  FileUp,
+  Loader2,
+  Search,
+  Sparkles,
+  Trash2,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { createDraft, deleteDraft, type DraftSummary } from "@/lib/data/drafts";
+import { createDraft, deleteDraft, duplicateDraft, type DraftSummary } from "@/lib/data/drafts";
 import { stageHref } from "@/lib/offer/draft-types";
+import type { TranslationKey } from "@/lib/i18n";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
-/** /package-generator — the drafts list. Every draft resumes exactly where it left off. */
+/**
+ * /package-generator — where a package starts.
+ *
+ * Three doors, said plainly, because an agent arriving here has exactly three
+ * intentions: take one of the company's ready packages, build one from nothing, or
+ * re-issue a supplier's file as ours. Those used to be a link, a button, and a
+ * separate menu entry two clicks away.
+ *
+ * Below them the drafts, as a TABLE rather than cards: an agent looking for the
+ * Baku programme they were on yesterday scans by destination, travellers and
+ * duration — none of which the cards showed.
+ */
+
+const card = "rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
+
 export function DraftsList({ drafts }: { drafts: DraftSummary[] }) {
   const router = useRouter();
   const { t } = useTraveliunUI();
   const [creating, setCreating] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [rows, setRows] = useState(drafts);
+  const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function onCreate() {
@@ -34,39 +62,56 @@ export function DraftsList({ drafts }: { drafts: DraftSummary[] }) {
   }
 
   async function onDelete(id: string) {
-    setDeleting(id);
+    setBusyId(id);
     const result = await deleteDraft(id);
-    setDeleting(null);
+    setBusyId(null);
     if (result.ok) setRows((current) => current.filter((row) => row.id !== id));
     else if (result.error) setError(t(result.error));
   }
 
+  /** «إعادة الإصدار»: a fresh draft from the same programme — see duplicateDraft. */
+  async function onDuplicate(id: string) {
+    setBusyId(id);
+    setError(null);
+    const result = await duplicateDraft(id);
+    setBusyId(null);
+    if (!result.ok) {
+      setError(t(result.error));
+      return;
+    }
+    router.push(stageHref(result.id, "customer"));
+  }
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((d) =>
+      [d.title, d.destination, d.customer_name, d.company, d.produced_serial]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q)),
+    );
+  }, [rows, query]);
+
   return (
     <TraveliunShell title="nav.packageGenerator">
       <div className="tv-fade-up space-y-4">
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#e2ebe7] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-          <div>
-            <h1 className="text-lg font-extrabold text-[#003c3a]">{t("pg.draftsTitle")}</h1>
-            <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("pg.draftsSubtitle")}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/ready-offers"
-              className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#dbe6e1] px-4 text-sm font-bold text-[#185045] transition-colors hover:bg-[#f4f8f6]"
-            >
-              <Sparkles className="size-4" />
-              {t("ro.start")}
-            </Link>
-            <button
-              type="button"
-              onClick={() => void onCreate()}
-              disabled={creating}
-              className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
-            >
-              {creating ? <Loader2 className="size-4 animate-spin" /> : <FilePlus2 className="size-4" />}
-              {creating ? t("pg.creating") : t("pg.newDraft")}
-            </button>
-          </div>
+        <section className={`${card} px-5 py-4`}>
+          <h1 className="text-lg font-extrabold text-[#003c3a]">{t("pg.hubTitle")}</h1>
+          <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("pg.hubSubtitle")}</p>
+        </section>
+
+        {/* the three doors */}
+        <section className="grid gap-3 md:grid-cols-3">
+          <StartCard titleKey="pg.startReady" hintKey="pg.startReadyHint" icon={Sparkles} color="#8b5cf6" href="/ready-offers" />
+          <StartCard
+            titleKey="pg.startNew"
+            hintKey="pg.startNewHint"
+            icon={FilePlus2}
+            color="#2aa87a"
+            onClick={() => void onCreate()}
+            busy={creating}
+          />
+          <StartCard titleKey="pg.startRepackage" hintKey="pg.startRepackageHint" icon={FileUp} color="#0e9bb5" href="/repackage" />
         </section>
 
         {error ? (
@@ -75,55 +120,202 @@ export function DraftsList({ drafts }: { drafts: DraftSummary[] }) {
           </p>
         ) : null}
 
-        {rows.length === 0 ? (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-            <EmptyState icon={FileText} title={t("pg.noDrafts")} description={t("pg.noDraftsDesc")} />
-          </section>
-        ) : (
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {rows.map((draft) => (
-              <article
-                key={draft.id}
-                className="flex flex-col justify-between rounded-[14px] border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]"
-              >
-                <div>
-                  <div className="mb-1 flex items-start justify-between gap-2">
-                    <h2 className="min-w-0 truncate text-[15px] font-extrabold text-[#185045]">
-                      {draft.title || t("pg.untitledDraft")}
-                    </h2>
-                    {draft.produced_serial ? (
-                      <span className="shrink-0 rounded-full bg-[#e4f6ef] px-2.5 py-0.5 text-[10.5px] font-bold text-[#10966b]">
-                        {t("pg.producedBadge")}
-                      </span>
-                    ) : null}
-                  </div>
-                  {draft.destination ? <p className="text-[12.5px] font-semibold text-[#557d78]">{draft.destination}</p> : null}
-                  <p className="tv-tnum mt-1.5 text-[11px] text-[#93aaa3]">
-                    {t("pg.lastUpdated")}: <DirText dir="ltr">{draft.updated_at.slice(0, 16).replace("T", " ")}</DirText>
-                  </p>
-                </div>
-                <div className="mt-4 flex items-center gap-2">
-                  <Link
-                    href={stageHref(draft.id, "customer")}
-                    className="inline-flex h-10 flex-1 items-center justify-center rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white transition-colors hover:bg-[#0f4439]"
-                  >
-                    {t("pg.continueEditing")}
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => void onDelete(draft.id)}
-                    disabled={deleting === draft.id}
-                    aria-label={t("pg.deleteDraft")}
-                    className="inline-flex size-10 items-center justify-center rounded-[10px] border border-[#f2c7c7] text-[#c43d3d] transition-colors hover:bg-[#fff1f1] disabled:opacity-60"
-                  >
-                    {deleting === draft.id ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </section>
-        )}
+        {/* the drafts */}
+        <section className={`${card} p-5`}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-extrabold text-[#003c3a]">{t("pg.draftsTitle")}</h2>
+              <p className="mt-0.5 text-[11.5px] font-semibold text-[#93aaa3]">
+                {t("pg.draftsCount", { n: String(rows.length) })} · {t("pg.draftsSubtitle")}
+              </p>
+            </div>
+            <div className="relative">
+              <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("pg.searchDrafts")}
+                className="h-10 w-[min(340px,70vw)] rounded-[10px] border border-[#dbe6e1] bg-white px-3 pe-9 text-sm text-[#185045] outline-none focus:border-[#2aa87a]"
+              />
+            </div>
+          </div>
+
+          {visible.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title={rows.length === 0 ? t("pg.noDrafts") : t("noResults")}
+              description={rows.length === 0 ? t("pg.noDraftsDesc") : ""}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[820px] border-collapse text-[12.5px]">
+                <thead>
+                  <tr className="bg-[#185045] text-white">
+                    <Th>{t("col.customer")}</Th>
+                    <Th>{t("col.destination")}</Th>
+                    <Th>{t("pg.col.people")}</Th>
+                    <Th>{t("pg.col.duration")}</Th>
+                    <Th>{t("pg.col.state")}</Th>
+                    <Th>{t("pg.col.updated")}</Th>
+                    <Th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((draft) => (
+                    <tr key={draft.id} className="border-b border-[#eef2f0] last:border-b-0 hover:bg-[#f8fbfa]">
+                      <Td>
+                        <span className="block font-extrabold text-[#0f3d38]">
+                          {draft.customer_name || draft.title || t("pg.untitledDraft")}
+                        </span>
+                        {draft.company ? (
+                          <span className="block text-[11px] font-semibold text-[#8b5cf6]">{draft.company}</span>
+                        ) : null}
+                      </Td>
+                      <Td>{draft.destination || "—"}</Td>
+                      <Td>
+                        <span className="inline-flex items-center gap-1.5 font-bold text-[#557d78]">
+                          <Users className="size-3.5" />
+                          <DirText dir="ltr">
+                            <span className="tv-tnum">{[draft.adults, draft.children, draft.infants].join(" · ")}</span>
+                          </DirText>
+                        </span>
+                      </Td>
+                      <Td>
+                        {draft.days > 0 || draft.nights > 0
+                          ? t("pg.daysNights", { d: String(draft.days), n: String(draft.nights) })
+                          : "—"}
+                      </Td>
+                      <Td>
+                        {draft.produced_serial ? (
+                          <span className="inline-flex flex-col gap-0.5">
+                            <span className="w-fit rounded-full bg-[#e4f6ef] px-2.5 py-0.5 text-[10.5px] font-bold text-[#10966b]">
+                              {t("pg.state.issued")}
+                            </span>
+                            <DirText dir="ltr">
+                              <span className="tv-tnum text-[10.5px] font-bold text-[#93aaa3]">{draft.produced_serial}</span>
+                            </DirText>
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-[#fff8e8] px-2.5 py-0.5 text-[10.5px] font-bold text-[#a86a10]">
+                            {t("pg.state.draft")}
+                          </span>
+                        )}
+                      </Td>
+                      <Td>
+                        <DirText dir="ltr">
+                          <span className="tv-tnum text-[11.5px] text-[#93aaa3]">
+                            {draft.updated_at.slice(0, 16).replace("T", " ")}
+                          </span>
+                        </DirText>
+                      </Td>
+                      <Td>
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          <Link
+                            href={stageHref(draft.id, "customer")}
+                            className="inline-flex h-9 items-center rounded-[9px] bg-[#185045] px-3 text-[11.5px] font-bold text-white hover:bg-[#0f4439]"
+                          >
+                            {t("pg.continueEditing")}
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => void onDuplicate(draft.id)}
+                            disabled={busyId === draft.id}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
+                          >
+                            {busyId === draft.id ? <Loader2 className="size-3.5 animate-spin" /> : <Copy className="size-3.5" />}
+                            {t("pg.reissue")}
+                          </button>
+                          {draft.produced_serial ? (
+                            <Link
+                              href={`/offer/${draft.produced_serial}/preview`}
+                              className="inline-flex h-9 items-center gap-1 rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#0e9bb5] hover:bg-[#f0fafc]"
+                            >
+                              {t("pg.openIssued")}
+                              <ArrowUpRight className="size-3" />
+                            </Link>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => void onDelete(draft.id)}
+                            disabled={busyId === draft.id}
+                            aria-label={t("pg.deleteDraft")}
+                            className="inline-flex size-9 items-center justify-center rounded-[9px] border border-[#f2c7c7] text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </div>
     </TraveliunShell>
+  );
+}
+
+function Th({ children }: { children?: ReactNode }) {
+  return (
+    <th className="whitespace-nowrap px-3 py-2.5 text-start text-[11.5px] font-extrabold first:rounded-se-[10px] last:rounded-ss-[10px]">
+      {children}
+    </th>
+  );
+}
+
+function Td({ children }: { children: ReactNode }) {
+  return <td className="px-3 py-2.5 align-middle text-[#557d78]">{children}</td>;
+}
+
+/** One of the three ways to start. A link or a button, the same shape either way. */
+function StartCard({
+  titleKey,
+  hintKey,
+  icon: Icon,
+  color,
+  href,
+  onClick,
+  busy,
+}: {
+  titleKey: TranslationKey;
+  hintKey: TranslationKey;
+  icon: LucideIcon;
+  color: string;
+  href?: string;
+  onClick?: () => void;
+  busy?: boolean;
+}) {
+  const { t } = useTraveliunUI();
+  const body = (
+    <>
+      <span
+        className="flex size-12 shrink-0 items-center justify-center rounded-[13px] transition-transform group-hover:scale-105"
+        style={{ color, background: `${color}1a` }}
+      >
+        {busy ? <Loader2 className="size-6 animate-spin" /> : <Icon className="size-6" />}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[14.5px] font-extrabold text-[#0f3d38]">{t(titleKey)}</span>
+        <span className="mt-0.5 block text-[11.5px] font-semibold text-[#93aaa3]">{t(hintKey)}</span>
+      </span>
+    </>
+  );
+
+  const className =
+    "group flex h-full items-center gap-3.5 rounded-[15px] border border-[#e2ebe7] bg-white p-4 text-start shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]";
+
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} disabled={busy} className={`${className} disabled:opacity-70`}>
+      {body}
+    </button>
   );
 }
