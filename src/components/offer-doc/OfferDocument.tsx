@@ -4,7 +4,6 @@ import type { ClientOfferDTO, InternalOfferDTO } from "@/lib/offer/dto";
 import {
   AR,
   BOARD_AR,
-  COMPANY,
   ITEM_TYPE_AR,
   LEG_AR,
   fmtDate,
@@ -20,6 +19,7 @@ import {
   weatherSourceAr,
 } from "@/lib/offer/weather-format";
 import { DEFAULT_OFFER_DOC_ASSETS, type OfferDocAssets } from "./assets";
+import { TRAVELIUN_BRAND, type DocBrand } from "./brand";
 import { OFFER_DOC_CSS } from "./styles";
 
 /**
@@ -49,7 +49,21 @@ import { OFFER_DOC_CSS } from "./styles";
 export type OfferDocumentProps = (
   | { variant: "client"; offer: ClientOfferDTO }
   | { variant: "internal"; offer: InternalOfferDTO }
-) & { assets?: OfferDocAssets };
+) & {
+  assets?: OfferDocAssets;
+  /**
+   * Whose document this is. Defaults to ours; a partner reselling the file gets
+   * their own cover, logo and palette (see brand.ts).
+   */
+  brand?: DocBrand;
+  /**
+   * false → print no money at all: no total band, no per-service amounts, no
+   * payment terms. A reseller adds their own margin, so our number on the page
+   * would undercut them. Ignored for the internal variant, which exists to show
+   * exactly those figures.
+   */
+  showPrices?: boolean;
+};
 
 const Ltr = ({ children }: { children: ReactNode }) => <DirText dir="ltr">{children}</DirText>;
 
@@ -223,9 +237,13 @@ function withLists<T extends ClientOfferDTO>(offer: T): T {
 export function OfferDocument(props: OfferDocumentProps) {
   const offer = withLists(props.offer); // union — shared (sell-side) fields only
   const assets = props.assets ?? DEFAULT_OFFER_DOC_ASSETS;
+  const brand = props.brand ?? TRAVELIUN_BRAND;
+  // The internal document exists to show buy/sell/profit — hiding money there
+  // would leave an empty page and no way to ask for the numbers.
+  const showPrices = props.variant === "internal" ? true : props.showPrices !== false;
   const nights = tripNights(offer);
   const days = nights > 0 ? nights + 1 : 0;
-  const title = offer.destination ? AR.offerTitleFor(offer.destination) : AR.brand;
+  const title = offer.destination ? AR.offerTitleFor(offer.destination) : brand.nameAr;
 
   // `internal` = a domestic hop inside the destination country; everything else
   // (outbound/inbound, and legs with no order) is international.
@@ -271,7 +289,9 @@ export function OfferDocument(props: OfferDocumentProps) {
       ),
     });
   }
-  if (intlRows + domesticRows > 0) {
+  // The note is about prices moving until ticketing; with no price printed it
+  // would be answering a question the document never asks.
+  if (intlRows + domesticRows > 0 && showPrices) {
     blocks.push({
       group: "flights",
       title: AR.flights,
@@ -337,11 +357,13 @@ export function OfferDocument(props: OfferDocumentProps) {
 
   blocks.push({
     group: "services",
-    title: AR.servicesAndPrice,
-    note: AR.servicesAndPriceNote,
-    heightMm: servicesHeightMm(offer),
+    // With no price on the page the section is only what is included and what is
+    // not, so the heading must not promise a price.
+    title: showPrices ? AR.servicesAndPrice : AR.servicesOnly,
+    note: showPrices ? AR.servicesAndPriceNote : undefined,
+    heightMm: servicesHeightMm(offer, showPrices),
     kind: "node",
-    node: <ServicesAndPrice offer={offer} nights={nights} days={days} />,
+    node: <ServicesAndPrice offer={offer} nights={nights} days={days} showPrices={showPrices} />,
   });
 
   if (props.variant === "internal") {
@@ -428,9 +450,21 @@ export function OfferDocument(props: OfferDocumentProps) {
   const pages = [
     {
       key: "cover",
-      section: `${AR.brandLatin} Travel Offer`,
+      section: `${brand.nameLatin} Travel Offer`,
       cover: true,
-      body: <Cover offer={offer} nights={nights} days={days} title={title} logoUrl={assets.logoUrl} />,
+      body: (
+        <Cover
+          offer={offer}
+          nights={nights}
+          days={days}
+          title={title}
+          brand={brand}
+          // Our logo above a partner's name would be the worst of both — the
+          // house asset is a fallback for the HOUSE brand only. A partner with no
+          // logo yet gets their name set as a wordmark instead.
+          logoUrl={brand.vars ? brand.logoUrl : (brand.logoUrl ?? assets.logoUrl)}
+        />
+      ),
     },
     ...rendered.map((p) => ({ ...p, cover: false })),
   ];
@@ -442,7 +476,10 @@ export function OfferDocument(props: OfferDocumentProps) {
       className="od-root"
       dir="rtl"
       lang="ar"
-      style={{ ["--od-map" as string]: `url("${assets.mapUrl}")` }}
+      // brand.vars is null for our own document, so its hand-tuned palette in
+      // styles.ts stands untouched; a partner's two colours override the whole
+      // derived set at once.
+      style={{ ["--od-map" as string]: `url("${assets.mapUrl}")`, ...(brand.vars ?? {}) }}
     >
       <style dangerouslySetInnerHTML={{ __html: OFFER_DOC_CSS }} />
       {pages.map((p) => (
@@ -468,28 +505,37 @@ function Cover({
   nights,
   days,
   title,
+  brand,
   logoUrl,
 }: {
   offer: ClientOfferDTO;
   nights: number;
   days: number;
   title: string;
-  logoUrl: string;
+  brand: DocBrand;
+  logoUrl: string | null;
 }) {
   return (
     <>
       <div className="od-top">
         <div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="od-logo" src={logoUrl} alt={AR.brandLatin} />
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="od-logo" src={logoUrl} alt={brand.nameLatin} />
+          ) : (
+            <div className="od-wordmark">{brand.nameAr}</div>
+          )}
         </div>
+        {/* Each contact line renders only if the brand has it: a partner who gave
+            us no website gets a shorter block, never our address under their
+            logo. */}
         <div className="od-company">
-          <h2>{COMPANY.nameAr}</h2>
-          <div>{COMPANY.address}</div>
-          <div>{AR.callLabel}: <Ltr>{COMPANY.phone}</Ltr></div>
-          <div>{AR.whatsappLabel}: <Ltr>{COMPANY.whatsapp}</Ltr></div>
-          <div>{AR.webLabel}: <Ltr>{COMPANY.website}</Ltr></div>
-          <div>{AR.emailLabel}: <Ltr>{COMPANY.email}</Ltr></div>
+          <h2>{brand.nameAr}</h2>
+          {brand.address ? <div>{brand.address}</div> : null}
+          {brand.phone ? <div>{AR.callLabel}: <Ltr>{brand.phone}</Ltr></div> : null}
+          {brand.whatsapp ? <div>{AR.whatsappLabel}: <Ltr>{brand.whatsapp}</Ltr></div> : null}
+          {brand.website ? <div>{AR.webLabel}: <Ltr>{brand.website}</Ltr></div> : null}
+          {brand.email ? <div>{AR.emailLabel}: <Ltr>{brand.email}</Ltr></div> : null}
         </div>
       </div>
 
@@ -766,23 +812,27 @@ function DayWeather({ day }: { day: ClientOfferDTO["days"][number] }) {
 
 // ---------------- services / price ----------------
 /** The block is tall and near-fixed: two list cards, the total, and the summary. */
-function servicesHeightMm(offer: ClientOfferDTO): number {
+function servicesHeightMm(offer: ClientOfferDTO, showPrices: boolean): number {
   const rows = Math.max(offer.includes.length, offer.excludes.length);
   const cards = offer.includes.length + offer.excludes.length > 0 ? Math.max(70, 16 + rows * 8) : 0;
   // cards + price band + payment note. The «ملخص سريع» panel that used to add
   // ~48mm here now lives on the cover, so this section is that much shorter —
-  // leaving the estimate high would waste most of a sheet.
-  return cards + 34 + 20;
+  // leaving the estimate high would waste most of a sheet. A price-less file
+  // loses both the band and the note, so the estimate has to lose them too or
+  // the packer reserves 54mm of nothing.
+  return cards + (showPrices ? 34 + 20 : 0);
 }
 
 function ServicesAndPrice({
   offer,
   nights,
   days,
+  showPrices,
 }: {
   offer: ClientOfferDTO;
   nights: number;
   days: number;
+  showPrices: boolean;
 }) {
   return (
     <>
@@ -811,12 +861,16 @@ function ServicesAndPrice({
         </div>
       ) : null}
 
-      <div className="od-price">
-        <span>{AR.total}</span>
-        <strong><Ltr>{offer.total != null ? fmtNum(offer.total, 2) : "—"}</Ltr></strong>
-        <span>{offer.currency ?? ""}</span>
-      </div>
-      <p className="od-note">{AR.paymentTerms}</p>
+      {showPrices ? (
+        <>
+          <div className="od-price">
+            <span>{AR.total}</span>
+            <strong><Ltr>{offer.total != null ? fmtNum(offer.total, 2) : "—"}</Ltr></strong>
+            <span>{offer.currency ?? ""}</span>
+          </div>
+          <p className="od-note">{AR.paymentTerms}</p>
+        </>
+      ) : null}
     </>
   );
 }

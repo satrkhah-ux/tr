@@ -16,6 +16,7 @@ import {
   Badge,
   BarChart3,
   BookOpen,
+  Building2,
   Calculator,
   Car,
   ChevronDown,
@@ -120,6 +121,9 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.offerExcludes", href: "/offers/offer-not-includes" },
     ],
   },
+  // Partner companies live beside Packages: choosing whose name a file carries
+  // is part of issuing it, and the same record is what operations assigns work to.
+  { labelKey: "nav.partnerCompanies", href: "/partner-companies", icon: Building2 },
   {
     labelKey: "nav.countries",
     href: "/countries",

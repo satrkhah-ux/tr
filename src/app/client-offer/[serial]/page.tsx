@@ -1,6 +1,7 @@
 import { Download, ShieldCheck } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
+import { resolveDocBrand } from "@/lib/data/partner-companies";
 import { getPublishedClientOffer } from "@/lib/data/offers";
 
 /**
@@ -17,6 +18,10 @@ const PREVIEW_FONT = `
 export default async function ClientOfferPage({ params }: { params: Promise<{ serial: string }> }) {
   const { serial } = await params;
   const published = await getPublishedClientOffer(serial);
+  // Same resolution the PDF route uses, with no query override: the page and the
+  // downloaded file must be the same document, and a public URL must not be able
+  // to restyle or reprice it.
+  const { brand, showPrices } = await resolveDocBrand({ serial });
 
   return (
     <main className="min-h-screen bg-[#eef3f1] py-6" dir="rtl">
@@ -48,7 +53,7 @@ export default async function ClientOfferPage({ params }: { params: Promise<{ se
             </a>
           </div>
           <div className="overflow-hidden rounded-[14px] bg-white shadow-[0_10px_30px_rgba(0,60,58,0.12)]">
-            <OfferDocument variant="client" offer={published.offer} />
+            <OfferDocument variant="client" offer={published.offer} brand={brand} showPrices={showPrices} />
           </div>
         </div>
       )}

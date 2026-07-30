@@ -43,7 +43,10 @@ export type AuditAction =
   | "booking.cancelled"
   | "dispatch.sent"
   | "voucher.issued"
-  | "voucher.revoked";
+  | "voucher.revoked"
+  // partner companies (identity + branding)
+  | "partner.created"
+  | "partner.updated";
 
 export type AuditInput = {
   action: AuditAction;

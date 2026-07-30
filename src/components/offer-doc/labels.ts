@@ -96,6 +96,8 @@ export const AR = {
   services: "الخدمات",
   servicesAndPrice: "الخدمات ونطاق البرنامج والتكلفة",
   servicesAndPriceNote: "ما يشمله البرنامج وما لا يشمله، مع الإجمالي والملخص السريع.",
+  /** the same section when the file is issued with no price on it. */
+  servicesOnly: "الخدمات ونطاق البرنامج",
   includes: "يشمل العرض",
   excludes: "لا يشمل العرض",
   includesCard: "البرنامج يشمل",

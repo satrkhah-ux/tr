@@ -73,6 +73,9 @@ export const OFFER_DOC_CSS = `
 /* ── cover ────────────────────────────────────────────────────────────────── */
 .od-top{display:grid;grid-template-columns:1fr 1.05fr;gap:12mm;align-items:start;}
 .od-logo{width:62mm;max-height:32mm;object-fit:contain;object-position:right center;display:block;}
+/* a partner with no logo file yet: their name, set like a mark */
+.od-wordmark{width:62mm;min-height:32mm;display:flex;align-items:center;color:var(--od-green);
+  font-size:19pt;font-weight:800;line-height:1.25;}
 .od-company{border-right:4px solid var(--od-green);padding:2mm 5mm 2mm 0;color:var(--od-green);line-height:1.85;font-size:10.7pt;}
 .od-company h2{margin:0 0 1mm;font-size:16.5pt;font-weight:700;line-height:1.3;}
 .od-hero{margin-top:19mm;text-align:center;color:var(--od-green);}

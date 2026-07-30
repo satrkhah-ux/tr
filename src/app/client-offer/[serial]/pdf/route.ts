@@ -1,4 +1,5 @@
 import { AR } from "@/components/offer-doc/labels";
+import { resolveDocBrand } from "@/lib/data/partner-companies";
 import { getPublishedClientOffer } from "@/lib/data/offers";
 import { renderOfferDocumentHtml } from "@/lib/offer-doc/html";
 import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
@@ -19,8 +20,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ser
   const published = await getPublishedClientOffer(serial);
   if (!published) return new Response("لم يتم نشر هذا العرض بعد", { status: 404 });
 
-  const html = await renderOfferDocumentHtml({ variant: "client", offer: published.offer });
-  const pdf = await offerDocumentToPdf(html, { brand: AR.brand, serial, contact: AR.contact });
+  // The public link follows the offer's OWN branding — no query override here:
+  // a URL anyone can construct must not be able to restyle or reprice the
+  // document that was sent.
+  const { brand, showPrices } = await resolveDocBrand({ serial });
+
+  const html = await renderOfferDocumentHtml({ variant: "client", offer: published.offer, brand, showPrices });
+  const pdf = await offerDocumentToPdf(html, {
+    brand: brand.nameAr,
+    serial,
+    contact: brand.vars ? [brand.phone, brand.website].filter(Boolean).join(" · ") : AR.contact,
+  });
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",

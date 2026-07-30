@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardCheck,
+  Building2,
   Columns3,
   Contact,
   Eye,
@@ -95,6 +96,7 @@ const READY_ACTIONS: ReadyAction[] = [
   { key: "repackage", labelKey: "nav.repackage", descKey: "dash.qa.repackage", href: "/repackage", icon: FileUp, color: "#0e9bb5", perm: "repackage.write" },
   { key: "kanban", labelKey: "nav.kanban", descKey: "dash.qa.kanban", href: "/kanban-board", icon: Columns3, color: "#d99a00" },
   { key: "offers", labelKey: "nav.packages", descKey: "dash.qa.offers", href: "/offers", icon: FileText, color: "#0f7a52" },
+  { key: "partners", labelKey: "nav.partnerCompanies", descKey: "dash.qa.partners", href: "/partner-companies", icon: Building2, color: "#b45309" },
 ];
 
 /** Reference data and rules we filled and verified — reached rarely, but ours. */

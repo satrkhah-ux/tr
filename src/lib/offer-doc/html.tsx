@@ -2,7 +2,7 @@ import "server-only";
 import type { ReactNode } from "react";
 import { OfferDocument, type OfferDocumentProps } from "@/components/offer-doc/OfferDocument";
 import type { OfferDocAssets } from "@/components/offer-doc/assets";
-import { loadOfferDocAssets } from "./assets";
+import { inlineImage, loadOfferDocAssets } from "./assets";
 import { fontFaceCss, loadTajawalBase64 } from "./fonts";
 
 /**
@@ -13,7 +13,11 @@ import { fontFaceCss, loadTajawalBase64 } from "./fonts";
  * PDF and the preview are the same layout.
  */
 export async function renderOfferDocumentHtml(props: OfferDocumentProps): Promise<string> {
-  return renderDocHtml((assets) => <OfferDocument {...props} assets={assets} />);
+  // A partner's logo is a storage URL. Inline it HERE rather than at each call
+  // site, so no print path can ship a document whose cover logo is a broken box.
+  const remote = props.brand?.logoUrl ?? null;
+  const brand = remote ? { ...props.brand!, logoUrl: (await inlineImage(remote)) ?? null } : props.brand;
+  return renderDocHtml((assets) => <OfferDocument {...props} brand={brand} assets={assets} />);
 }
 
 /**
