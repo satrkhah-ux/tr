@@ -6,7 +6,7 @@ import { useState } from "react";
 import { ArrowUpRight, CheckCircle2, FileText, Link2, Loader2, Send } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { publishOffer } from "@/lib/data/offers";
-import { setOfferPartner } from "@/lib/data/partner-companies";
+import { setOfferPartner, setOfferShowPrices } from "@/lib/data/partner-companies";
 
 /**
  * Staff toolbar over the live offer preview: publish (freeze snapshot + send),
@@ -47,8 +47,10 @@ export function OfferPreviewToolbar({
     if (variant === "internal") p.set("variant", "internal");
     const brand = over.brand === undefined ? brandId : over.brand;
     if (brand) p.set("brand", brand);
+    // ALWAYS explicit. Emitting nothing for "with prices" let the stored value
+    // win, so the button looked pressed and changed nothing.
     const prices = over.prices === undefined ? showPrices : over.prices;
-    if (!prices) p.set("prices", "off");
+    p.set("prices", prices ? "on" : "off");
     const s = p.toString();
     return s ? `?${s}` : "";
   };
@@ -58,8 +60,23 @@ export function OfferPreviewToolbar({
     setPending(true);
     await setOfferPartner(serial, next === "ours" ? null : next);
     setPending(false);
+    // push ONLY — a refresh() chased straight after a push cancels it, which is
+    // why the selection used to snap back to what it was.
     router.push(`/offer/${serial}/preview${query({ brand: next })}`);
-    router.refresh();
+  }
+
+  /**
+   * With or without a price is decided HERE, per file — not in the company's
+   * settings, where the same reseller could not have a priced file for one client
+   * and a bare programme for the next. Saved on the offer so the PDF and the
+   * client link follow the same answer.
+   */
+  async function pickPrices(next: boolean) {
+    if (next === showPrices) return;
+    setPending(true);
+    await setOfferShowPrices(serial, next);
+    setPending(false);
+    router.push(`/offer/${serial}/preview${query({ prices: next })}`);
   }
 
   async function onPublish() {
@@ -157,20 +174,21 @@ export function OfferPreviewToolbar({
 
         <span className="ms-2 text-[11.5px] font-extrabold text-[#557d78]">الأسعار</span>
         <div className="inline-flex rounded-[9px] border border-[#dbe6e1] p-0.5">
-          <Link
-            href={`/offer/${serial}/preview${query({ prices: true })}`}
-            className={`inline-flex h-8 items-center rounded-[7px] px-3 text-[12px] font-bold ${showPrices ? "bg-[#185045] text-white" : "text-[#557d78]"}`}
-          >
-            مع الأسعار
-          </Link>
-          <Link
-            href={`/offer/${serial}/preview${query({ prices: false })}`}
-            className={`inline-flex h-8 items-center rounded-[7px] px-3 text-[12px] font-bold ${showPrices ? "text-[#557d78]" : "bg-[#185045] text-white"}`}
-          >
-            بدون أسعار
-          </Link>
+          {([true, false] as const).map((value) => (
+            <button
+              key={String(value)}
+              type="button"
+              disabled={pending}
+              onClick={() => void pickPrices(value)}
+              className={`inline-flex h-8 items-center rounded-[7px] px-3 text-[12px] font-bold transition-colors disabled:opacity-60 ${
+                showPrices === value ? "bg-[#185045] text-white" : "text-[#557d78] hover:bg-[#f0f7f4]"
+              }`}
+            >
+              {value ? "مع الأسعار" : "بدون أسعار"}
+            </button>
+          ))}
         </div>
-        <span className="text-[11px] font-semibold text-[#93aaa3]">الغلاف والشعار والألوان تتبع الشركة المختارة.</span>
+        <span className="text-[11px] font-semibold text-[#93aaa3]">الغلاف والشعار والألوان تتبع الشركة المختارة، والسعر قرار هذا الملف — يُحفظ عليه ويتبعه رابط العميل.</span>
       </div>
 
       {publishedVersion != null && message == null ? (

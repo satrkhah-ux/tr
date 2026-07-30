@@ -41,7 +41,6 @@ type Draft = {
   brand_color: string;
   accent_color: string;
   resells: boolean;
-  show_prices: boolean;
   active: boolean;
   note: string;
 };
@@ -61,7 +60,6 @@ function toDraft(c?: PartnerCompany): Draft {
     brand_color: c?.brand_color ?? startingBrandColor(c?.name ?? String(Date.now())),
     accent_color: c?.accent_color ?? "#f0ad22",
     resells: c?.resells ?? true,
-    show_prices: c?.show_prices ?? false,
     active: c?.active ?? true,
     note: c?.note ?? "",
   };
@@ -91,7 +89,6 @@ export function PartnerCompanies({ companies }: { companies: PartnerCompany[] })
         brand_color: draft.brand_color,
         accent_color: draft.accent_color,
         resells: draft.resells,
-        show_prices: draft.show_prices,
         active: draft.active,
         note: draft.note || null,
       });
@@ -210,7 +207,6 @@ export function PartnerCompanies({ companies }: { companies: PartnerCompany[] })
 
             <div className="mt-4 flex flex-wrap gap-4">
               <Toggle checked={draft.resells} onChange={(v) => setDraft({ ...draft, resells: v })} text={t("partner.resells")} hint={t("partner.resellsHint")} />
-              <Toggle checked={draft.show_prices} onChange={(v) => setDraft({ ...draft, show_prices: v })} text={t("partner.showPrices")} hint={t("partner.showPricesHint")} />
               <Toggle checked={draft.active} onChange={(v) => setDraft({ ...draft, active: v })} text={t("partner.active")} />
             </div>
 
@@ -384,9 +380,6 @@ function CompanyRow({ company, onEdit }: { company: PartnerCompany; onEdit: () =
             {company.resells ? (
               <span className="rounded-full bg-[#e9f7f0] px-2.5 py-1 text-[#0f7a52]">{t("partner.resells")}</span>
             ) : null}
-            <span className={`rounded-full px-2.5 py-1 ${company.show_prices ? "bg-[#fff8e8] text-[#a86a10]" : "bg-[#eef4f1] text-[#557d78]"}`}>
-              {company.show_prices ? t("doc.withPrices") : t("doc.withoutPrices")}
-            </span>
             {!company.active ? <span className="rounded-full bg-[#fdeef2] px-2.5 py-1 text-[#c22850]">{t("partner.deactivated")}</span> : null}
           </div>
         </div>

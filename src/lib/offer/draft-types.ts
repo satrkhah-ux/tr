@@ -756,7 +756,6 @@ export type GeneratorLookups = {
     whatsapp: string | null;
     website: string | null;
     email: string | null;
-    show_prices: boolean;
   }[];
 };
 

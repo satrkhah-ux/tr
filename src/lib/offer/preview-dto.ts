@@ -253,5 +253,7 @@ export function draftBrand(
 ): { brand: DocBrand | undefined; showPrices: boolean } {
   const partner = matchPartner(data.customer, partners);
   if (!partner) return { brand: undefined, showPrices: true };
-  return { brand: partnerBrand(partner, partner.logo_url), showPrices: partner.show_prices };
+  // Matches what produceOfferFromDraft will write, so the preview here is what
+  // comes out — and the export screen can still flip it per file afterwards.
+  return { brand: partnerBrand(partner, partner.logo_url), showPrices: false };
 }

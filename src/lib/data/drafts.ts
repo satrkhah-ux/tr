@@ -183,7 +183,7 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       // the picker that decides whose name is printed on the cover.
       supabase
         .from("booking_partners")
-        .select("id, name, name_latin, logo_path, brand_color, accent_color, address, phone, whatsapp, website, email, show_prices")
+        .select("id, name, name_latin, logo_path, brand_color, accent_color, address, phone, whatsapp, website, email")
         .eq("resells", true)
         .eq("active", true)
         .order("name"),
@@ -489,6 +489,10 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       // From here the preview, the PDF and the client link all resolve their
       // branding from this one column.
       partner_company_id: partnerCompanyId,
+      // A reseller's file starts WITHOUT our price on it — they set their own.
+      // Not a company setting: an initial value, flipped per file from the
+      // export screen.
+      show_prices: !partnerCompanyId,
       destination: data.trip.destination || data.trip.country,
       duration: `${data.trip.days} أيام / ${data.trip.nights} ليالي`,
       offer_date: data.trip.arrival_date,

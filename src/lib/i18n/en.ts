@@ -475,8 +475,6 @@ export const en = {
   "partner.noLogo": "No logo yet",
   "partner.resells": "Resells our files",
   "partner.resellsHint": "Only these companies appear in the document brand picker.",
-  "partner.showPrices": "Show prices by default",
-  "partner.showPricesHint": "A reseller adds their own margin, so this normally stays off.",
   "partner.active": "Active",
   "partner.note": "Note",
   "partner.none": "No partner companies yet",

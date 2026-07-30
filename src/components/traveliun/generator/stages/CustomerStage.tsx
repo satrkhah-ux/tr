@@ -254,9 +254,6 @@ function CompanyPicker({ data, patch, lookups }: Pick<StageFormProps, "data" | "
           <div className="flex items-center gap-2 pb-1">
             <span className="size-6 rounded-[7px] border border-[#dbe6e1]" style={{ background: selected.brand_color }} />
             <span className="size-6 rounded-[7px] border border-[#dbe6e1]" style={{ background: selected.accent_color }} />
-            <span className="rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11px] font-bold text-[#557d78]">
-              {selected.show_prices ? t("doc.withPrices") : t("doc.withoutPrices")}
-            </span>
           </div>
         ) : null}
       </div>

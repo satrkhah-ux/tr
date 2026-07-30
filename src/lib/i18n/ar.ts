@@ -473,8 +473,6 @@ export const ar: Dictionary = {
   "partner.noLogo": "لا يوجد شعار بعد",
   "partner.resells": "تعيد بيع ملفاتنا",
   "partner.resellsHint": "هذه الشركات فقط تظهر في اختيار هوية المستند.",
-  "partner.showPrices": "إظهار الأسعار افتراضياً",
-  "partner.showPricesHint": "الشركة المعيدة للبيع تضيف هامشها، فالغالب أن يبقى مغلقاً.",
   "partner.active": "مفعّلة",
   "partner.note": "ملاحظة",
   "partner.none": "لا توجد شركات متعاونة بعد",

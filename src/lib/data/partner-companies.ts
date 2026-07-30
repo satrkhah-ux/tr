@@ -53,14 +53,13 @@ export type PartnerCompany = {
   website: string | null;
   email: string | null;
   contact_name: string | null;
-  show_prices: boolean;
   resells: boolean;
   active: boolean;
   note: string | null;
 };
 
 const COLUMNS =
-  "id, name, name_latin, logo_path, brand_color, accent_color, address, phone, whatsapp, website, email, contact_name, show_prices, resells, active, note";
+  "id, name, name_latin, logo_path, brand_color, accent_color, address, phone, whatsapp, website, email, contact_name, resells, active, note";
 
 /**
  * The logo's public URL.
@@ -106,7 +105,6 @@ export async function upsertPartnerCompany(input: {
   website?: string | null;
   email?: string | null;
   contact_name?: string | null;
-  show_prices?: boolean;
   resells?: boolean;
   active?: boolean;
   note?: string | null;
@@ -130,7 +128,6 @@ export async function upsertPartnerCompany(input: {
       "website",
       "email",
       "contact_name",
-      "show_prices",
       "resells",
       "active",
       "note",
@@ -232,6 +229,19 @@ export async function setOfferPartner(serial: string, partnerId: string | null):
   }
 }
 
+/** Whether THIS file prints a price. Written from the export screen. */
+export async function setOfferShowPrices(serial: string, showPrices: boolean): Promise<{ ok: true } | Fail> {
+  const denied = await requireWrite();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const supabase = await db();
+    const { error } = await supabase.from("offers").update({ show_prices: showPrices }).eq("serial", serial);
+    return error ? { ok: false, error: "err.updateFailed" } : { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
 export type ResolvedBrand = { brand: DocBrand; showPrices: boolean; partnerId: string | null };
 
 /**
@@ -256,12 +266,18 @@ export async function resolveDocBrand(input: {
     // name, logo and colours the document is meant to display.
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
 
-    let id = input.partnerId ?? null;
-    if (id === null) {
-      const offer = await supabase.from("offers").select("partner_company_id").eq("serial", input.serial).maybeSingle();
-      id = (offer.data as { partner_company_id: string | null } | null)?.partner_company_id ?? null;
-    }
-    if (!id) return fallback;
+    // One read: whose file it is, and whether it prints a price. Both live on the
+    // offer, so the export screen, the PDF and the client link cannot disagree.
+    const offerRes = await supabase
+      .from("offers")
+      .select("partner_company_id, show_prices")
+      .eq("serial", input.serial)
+      .maybeSingle();
+    const offer = offerRes.data as { partner_company_id: string | null; show_prices: boolean } | null;
+    const storedPrices = offer?.show_prices ?? true;
+
+    const id = input.partnerId ?? offer?.partner_company_id ?? null;
+    if (!id) return { ...fallback, showPrices: input.showPrices ?? storedPrices };
 
     const { data } = await supabase.from("booking_partners").select(COLUMNS).eq("id", id).maybeSingle();
     const row = data as Omit<PartnerCompany, "logo_url"> | null;
@@ -269,8 +285,9 @@ export async function resolveDocBrand(input: {
 
     return {
       brand: partnerBrand(row, publicLogoUrl(baseUrl(), row.logo_path)),
-      // The company's own default decides, unless the export screen said otherwise.
-      showPrices: input.showPrices ?? row.show_prices,
+      // An explicit choice from the export screen wins; otherwise whatever that
+      // screen last saved on this offer.
+      showPrices: input.showPrices ?? storedPrices,
       partnerId: row.id,
     };
   } catch {
