@@ -454,6 +454,8 @@ export const en = {
 
   // ---------- partner companies (branding + resale) ----------
   "nav.partnerCompanies": "Partner companies",
+  "nav.dataSection": "Data",
+  "nav.adminSection": "Administration",
   "partner.title": "Partner companies",
   "partner.subtitle": "Agencies that resell our files, and the ones that execute our bookings — one record each.",
   "partner.add": "Add a company",

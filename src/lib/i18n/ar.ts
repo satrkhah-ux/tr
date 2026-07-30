@@ -452,6 +452,8 @@ export const ar: Dictionary = {
 
   // ---------- partner companies (branding + resale) ----------
   "nav.partnerCompanies": "الشركات المتعاونة",
+  "nav.dataSection": "قسم البيانات",
+  "nav.adminSection": "قسم الإدارة",
   "partner.title": "الشركات المتعاونة",
   "partner.subtitle": "الشركات التي تعيد بيع ملفاتنا، والتي تنفّذ حجوزاتنا — سجل واحد لكل شركة.",
   "partner.add": "إضافة شركة",

@@ -13,34 +13,24 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   AlertTriangle,
-  Badge,
   BarChart3,
-  BookOpen,
   Building2,
   Calculator,
-  Car,
   ChevronDown,
   ChevronLeft,
   ClipboardCheck,
-  Columns3,
-  Contact,
+  Database,
   FileText,
-  Globe2,
-  Handshake,
-  Headphones,
-  Hotel,
   Languages,
   Loader2,
   LogOut,
   Menu,
   NotebookText,
-  Plane,
   Search,
   Settings,
-  Ship,
+  Settings2,
   Table2,
   UserCircle,
-  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -61,6 +51,13 @@ type TraveliunShellProps = {
 type NavLink = {
   labelKey: TranslationKey;
   href: string;
+  /**
+   * Small caption printed above this link inside a drawer, to keep the two big
+   * sections readable: «قسم البيانات» carries seventeen links and «قسم الإدارة»
+   * twenty, so they are grouped under the names the sections used to have rather
+   * than listed as one wall of items.
+   */
+  captionKey?: TranslationKey;
 };
 
 export type NavGroup = {
@@ -80,31 +77,6 @@ export type NavGroup = {
 export const navGroups: NavGroup[] = [
   { labelKey: "nav.dashboard", href: "/dashboard", icon: BarChart3 },
   { labelKey: "nav.intelligenceHub", href: "/travel-intelligence", icon: Calculator },
-  { labelKey: "nav.kanban", href: "/kanban-board", icon: Columns3 },
-  // Operations sits with the board, not under Packages: it is where a confirmed
-  // sale goes to be executed, and an ops agent lives here all day.
-  { labelKey: "nav.operations", href: "/operations", icon: ClipboardCheck, perm: "operations.write" },
-  {
-    labelKey: "nav.customers",
-    href: "/customers",
-    icon: Contact,
-    children: [
-      { labelKey: "nav.people", href: "/customers" },
-      { labelKey: "nav.companies", href: "/companies" },
-      { labelKey: "nav.companiesVisits", href: "/companies-visits" },
-      { labelKey: "nav.visitStatuses", href: "/companies-visits-statuses" },
-    ],
-  },
-  {
-    labelKey: "nav.employees",
-    href: "/employees",
-    icon: Users,
-    perm: "employees.manage",
-    children: [
-      { labelKey: "nav.employees", href: "/employees" },
-      { labelKey: "nav.roles", href: "/employees/roles" },
-    ],
-  },
   {
     labelKey: "nav.packages",
     href: "/offers",
@@ -121,74 +93,55 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.offerExcludes", href: "/offers/offer-not-includes" },
     ],
   },
-  // Partner companies live beside Packages: choosing whose name a file carries
-  // is part of issuing it, and the same record is what operations assigns work to.
   { labelKey: "nav.partnerCompanies", href: "/partner-companies", icon: Building2 },
+  // Operations was not in the requested list, and it stays at the top level on
+  // purpose: it is the screen an ops agent lives in all day, and one that only
+  // appears for whoever holds the permission. Burying it two clicks deep would
+  // cost more than the tidier menu is worth.
+  { labelKey: "nav.operations", href: "/operations", icon: ClipboardCheck, perm: "operations.write" },
+
+  // ---------- «قسم البيانات» — the reference tables the generator reads ----------
   {
-    labelKey: "nav.countries",
-    href: "/countries",
-    icon: Globe2,
-    children: [
-      { labelKey: "nav.countries", href: "/countries" },
-      { labelKey: "nav.cities", href: "/cities" },
-    ],
-  },
-  {
-    labelKey: "nav.hotels",
+    labelKey: "nav.dataSection",
     href: "/hotels",
-    icon: Hotel,
+    icon: Database,
     children: [
-      { labelKey: "nav.hotels", href: "/hotels" },
+      { labelKey: "nav.hotels", href: "/hotels", captionKey: "nav.hotels" },
       { labelKey: "nav.roomTypes", href: "/rooms-types" },
-    ],
-  },
-  {
-    labelKey: "nav.airlines",
-    href: "/airlines",
-    icon: Plane,
-    children: [
-      { labelKey: "nav.airlines", href: "/airlines" },
+      { labelKey: "nav.countries", href: "/countries", captionKey: "nav.countries" },
+      { labelKey: "nav.cities", href: "/cities" },
+      { labelKey: "nav.airlines", href: "/airlines", captionKey: "nav.airlines" },
       { labelKey: "nav.airports", href: "/airports" },
-    ],
-  },
-  { labelKey: "nav.seaTravels", href: "/ports", icon: Ship, children: [{ labelKey: "nav.ports", href: "/ports" }] },
-  {
-    labelKey: "nav.transportation",
-    href: "/cars",
-    icon: Car,
-    children: [
-      { labelKey: "nav.carTypes", href: "/cars-types" },
+      { labelKey: "nav.ports", href: "/ports", captionKey: "nav.seaTravels" },
+      { labelKey: "nav.carTypes", href: "/cars-types", captionKey: "nav.transportation" },
       { labelKey: "nav.cars", href: "/cars" },
       { labelKey: "nav.transfers", href: "/cars/transfers" },
       { labelKey: "nav.tours", href: "/cars/tours" },
       { labelKey: "nav.drivers", href: "/drivers" },
-    ],
-  },
-  {
-    labelKey: "nav.services",
-    href: "/services",
-    icon: Handshake,
-    children: [
-      { labelKey: "nav.serviceTypes", href: "/services-types" },
+      { labelKey: "nav.serviceTypes", href: "/services-types", captionKey: "nav.services" },
       { labelKey: "nav.servicesByCountry", href: "/services" },
-    ],
-  },
-  {
-    labelKey: "nav.visas",
-    href: "/visas",
-    icon: Badge,
-    children: [
-      { labelKey: "nav.visaTypes", href: "/visas-types" },
+      { labelKey: "nav.visaTypes", href: "/visas-types", captionKey: "nav.visas" },
       { labelKey: "nav.visas", href: "/visas" },
+      { labelKey: "nav.kanban", href: "/kanban-board", captionKey: "nav.kanban" },
     ],
   },
+
+  // ---------- «قسم الإدارة» — people, configuration and the guide ----------
   {
-    labelKey: "nav.settings",
-    href: "/setting/currencies",
-    icon: Settings,
-    perm: "settings.manage",
+    labelKey: "nav.adminSection",
+    href: "/customers",
+    icon: Settings2,
     children: [
-      { labelKey: "nav.profits", href: "/setting/profits" },
+      { labelKey: "nav.people", href: "/customers", captionKey: "nav.customers" },
+      { labelKey: "nav.companies", href: "/companies" },
+      { labelKey: "nav.companiesVisits", href: "/companies-visits" },
+      { labelKey: "nav.visitStatuses", href: "/companies-visits-statuses" },
+      { labelKey: "nav.employees", href: "/employees", captionKey: "nav.employees" },
+      { labelKey: "nav.roles", href: "/employees/roles" },
+      { labelKey: "nav.careDashboard", href: "/customers_care/dashboard", captionKey: "nav.customerCare" },
+      { labelKey: "nav.customerCare", href: "/customers_care" },
+      { labelKey: "nav.careServiceType", href: "/customers_care/services" },
+      { labelKey: "nav.profits", href: "/setting/profits", captionKey: "nav.settings" },
       { labelKey: "nav.statusGroups", href: "/setting/statuses-groups" },
       { labelKey: "nav.statuses", href: "/setting/statuses" },
       { labelKey: "nav.currencies", href: "/setting/currencies" },
@@ -196,24 +149,7 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.supplierPreferences", href: "/setting/suppliers-preferences" },
       { labelKey: "nav.supervisors", href: "/setting/supervisors" },
       { labelKey: "nav.climate", href: "/setting/climate" },
-    ],
-  },
-  {
-    labelKey: "nav.customerCare",
-    href: "/customers_care",
-    icon: Headphones,
-    children: [
-      { labelKey: "nav.careDashboard", href: "/customers_care/dashboard" },
-      { labelKey: "nav.customerCare", href: "/customers_care" },
-      { labelKey: "nav.careServiceType", href: "/customers_care/services" },
-    ],
-  },
-  {
-    labelKey: "nav.traveliunGuide",
-    href: "/web-guide",
-    icon: BookOpen,
-    children: [
-      { labelKey: "nav.guide", href: "/web-guide" },
+      { labelKey: "nav.guide", href: "/web-guide", captionKey: "nav.traveliunGuide" },
       { labelKey: "nav.guideCategories", href: "/guide/categories" },
       { labelKey: "nav.guideInfo", href: "/guide/informations" },
     ],
@@ -634,6 +570,12 @@ function SideMenu({
                   {group.children.map((child) => {
                     const childActive = pathname === child.href;
                     return (
+                      <div key={child.href}>
+                      {child.captionKey ? (
+                        <p className="mt-2 px-6 pb-1 text-[10.5px] font-extrabold uppercase tracking-[0.04em] text-[#9cafaa] first:mt-0">
+                          {t(child.captionKey)}
+                        </p>
+                      ) : null}
                       <Link
                         key={child.href}
                         href={child.href}
@@ -652,6 +594,7 @@ function SideMenu({
                         <span className="ms-2">•</span>
                         {t(child.labelKey)}
                       </Link>
+                      </div>
                     );
                   })}
                 </div>
