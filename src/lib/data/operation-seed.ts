@@ -4,11 +4,11 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
-import { getCurrentEmployeeId, getCurrentRole } from "@/lib/data/metrics";
+import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
-import { can } from "@/lib/roles/roles";
 import { BOARD_AR } from "@/components/offer-doc/labels";
 import type { BoardType } from "@/lib/types";
+import { currentCan } from "@/lib/roles/current";
 
 /**
  * Pull the bookings straight out of the offer the client agreed to.
@@ -34,7 +34,7 @@ type Fail = { ok: false; error: TranslationKey };
 async function requireOps(): Promise<TranslationKey | null> {
   const user = await getServerUser();
   if (!user) return "err.session";
-  return can(await getCurrentRole(), "operations.write") ? null : "ops.err.forbidden";
+  return await currentCan("operations.write") ? null : "ops.err.forbidden";
 }
 
 /**

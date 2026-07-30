@@ -25,9 +25,27 @@ const ALLOWED_TABLES: AllowedTable[] = [
   "city_climate_notes",
 ];
 
+/**
+ * Readable by the generic engine, but NEVER writable through it.
+ *
+ * A permission row and an employee's section decide what a person can do, so they
+ * are edited only by src/lib/data/team.ts — which checks `employees.manage` and
+ * writes an audit row. The generic editor has no gate beyond "is signed in", and
+ * the database no longer has a write policy for these two either (0030), so this
+ * guard is the third lock rather than the only one.
+ */
+const READ_ONLY_TABLES: AllowedTable[] = ["employees", "roles"];
+
 function assertTable(table: AllowedTable): void {
   if (!ALLOWED_TABLES.includes(table)) {
     throw new Error(`Table not allowed: ${table}`);
+  }
+}
+
+function assertWritable(table: AllowedTable): void {
+  assertTable(table);
+  if (READ_ONLY_TABLES.includes(table)) {
+    throw new Error(`Table is managed elsewhere: ${table}`);
   }
 }
 
@@ -81,7 +99,7 @@ export async function listRows(input: ListInput): Promise<ListResult> {
 
 export async function createRow(table: AllowedTable, values: DataRow): Promise<MutateResult> {
   try {
-    assertTable(table);
+    assertWritable(table);
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
     const supabase = await createSupabaseServerClient();
@@ -99,7 +117,7 @@ export async function createRow(table: AllowedTable, values: DataRow): Promise<M
 
 export async function updateRow(table: AllowedTable, id: string, values: DataRow): Promise<MutateResult> {
   try {
-    assertTable(table);
+    assertWritable(table);
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
     const supabase = await createSupabaseServerClient();
@@ -118,7 +136,7 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
 
 export async function deleteRow(table: AllowedTable, id: string): Promise<DeleteResult> {
   try {
-    assertTable(table);
+    assertWritable(table);
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
     const supabase = await createSupabaseServerClient();

@@ -2,11 +2,10 @@ import { AR } from "@/components/offer-doc/labels";
 import { resolveDocBrand } from "@/lib/data/partner-companies";
 import type { OfferDocumentProps } from "@/components/offer-doc/OfferDocument";
 import { getInternalOffer, getPublishedClientOffer } from "@/lib/data/offers";
-import { getCurrentRole } from "@/lib/data/metrics";
 import { toClientOfferDTO } from "@/lib/offer/dto";
 import { renderOfferDocumentHtml } from "@/lib/offer-doc/html";
 import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
-import { can } from "@/lib/roles/roles";
+import { currentCan } from "@/lib/roles/current";
 
 export const runtime = "nodejs";
 // Headless-Chromium cold start + render can exceed the default 10s; give it room.
@@ -30,8 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ seri
 
   let props: OfferDocumentProps;
   if (wantsInternal) {
-    const role = await getCurrentRole();
-    if (!can(role, "pricing.internal")) return new Response("غير مصرح بعرض التسعير الداخلي", { status: 403 });
+    if (!await currentCan("pricing.internal")) return new Response("غير مصرح بعرض التسعير الداخلي", { status: 403 });
     const internal = await getInternalOffer(serial);
     if (!internal) return new Response("العرض غير متاح", { status: 404 });
     props = { variant: "internal", offer: internal };

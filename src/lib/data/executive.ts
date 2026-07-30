@@ -2,8 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
-import { getCurrentRole } from "@/lib/data/metrics";
-import { can } from "@/lib/roles/roles";
+import { currentCan } from "@/lib/roles/current";
 
 /**
  * INTERNAL executive dashboard data. Each row carries buy/profit, so the whole
@@ -87,8 +86,7 @@ export async function getExecutiveDashboard(): Promise<ExecutiveDashboard> {
   try {
     const user = await getServerUser();
     if (!user) return emptyDashboard(false);
-    const role = await getCurrentRole();
-    if (!can(role, "pricing.internal")) return emptyDashboard(false);
+    if (!await currentCan("pricing.internal")) return emptyDashboard(false);
   } catch {
     return emptyDashboard(false);
   }

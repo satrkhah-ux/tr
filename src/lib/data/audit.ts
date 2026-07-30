@@ -46,7 +46,14 @@ export type AuditAction =
   | "voucher.revoked"
   // partner companies (identity + branding)
   | "partner.created"
-  | "partner.updated";
+  | "partner.updated"
+  // sections, permissions and who is in them
+  | "role.created"
+  | "role.updated"
+  | "role.deleted"
+  | "employee.created"
+  | "employee.updated"
+  | "employee.role_changed";
 
 export type AuditInput = {
   action: AuditAction;

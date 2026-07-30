@@ -4,10 +4,9 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
-import { getCurrentRole } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
-import { can } from "@/lib/roles/roles";
 import { TRAVELIUN_BRAND, partnerBrand, publicBrandLogoUrl, type DocBrand } from "@/components/offer-doc/brand";
+import { currentCan } from "@/lib/roles/current";
 
 /**
  * «الشركات المتعاونة» — the companies we work with, and how their documents look.
@@ -35,7 +34,7 @@ type Fail = { ok: false; error: TranslationKey };
 async function requireWrite(): Promise<TranslationKey | null> {
   const user = await getServerUser();
   if (!user) return "err.session";
-  return can(await getCurrentRole(), "data.write") ? null : "err.forbidden";
+  return await currentCan("data.write") ? null : "err.forbidden";
 }
 
 export type PartnerCompany = {

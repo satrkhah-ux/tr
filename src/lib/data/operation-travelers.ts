@@ -4,9 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
-import { getCurrentRole } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
-import { can } from "@/lib/roles/roles";
 import { decryptJson, encryptJson, isVaultConfigured } from "@/lib/crypto/secrets";
 import {
   toTravelerListItem,
@@ -16,6 +14,7 @@ import {
   type TravelerListItem,
   type TravelerRow,
 } from "@/lib/operations/traveler-dto";
+import { currentCan } from "@/lib/roles/current";
 
 /**
  * Travelers and their passports.
@@ -44,14 +43,14 @@ type Fail = { ok: false; error: TranslationKey };
 async function requireOps(): Promise<TranslationKey | null> {
   const user = await getServerUser();
   if (!user) return "err.session";
-  return can(await getCurrentRole(), "operations.write") ? null : "ops.err.forbidden";
+  return await currentCan("operations.write") ? null : "ops.err.forbidden";
 }
 
 /** The stricter gate: decrypt identifiers / open a scan. */
 async function requirePassport(): Promise<TranslationKey | null> {
   const user = await getServerUser();
   if (!user) return "err.session";
-  return can(await getCurrentRole(), "operations.passport") ? null : "ops.err.forbiddenPassport";
+  return await currentCan("operations.passport") ? null : "ops.err.forbiddenPassport";
 }
 
 /** The list view — redacted by construction, never carries ciphertext or paths. */

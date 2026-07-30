@@ -3,12 +3,11 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
-import { getCurrentRole } from "@/lib/data/metrics";
-import { can } from "@/lib/roles/roles";
 import { createDraft } from "./drafts";
 import type { DraftData } from "@/lib/offer/draft-types";
 import { parseSheet } from "@/lib/ready-offers/parse";
 import { buildSeed, type ParsedOffer, type ReadyOfferRecord, type SyncDiff, type Tier } from "@/lib/ready-offers/types";
+import { currentCan } from "@/lib/roles/current";
 
 /**
  * «العروض الجاهزة» — the company's prepared seasonal packages.
@@ -35,8 +34,7 @@ async function db(): Promise<SupabaseClient> {
 async function requireManage(): Promise<string | null> {
   const user = await getServerUser();
   if (!user) return "err.session";
-  const role = await getCurrentRole();
-  return can(role, "settings.manage") ? null : "ro.err.forbidden";
+  return await currentCan("settings.manage") ? null : "ro.err.forbidden";
 }
 
 export async function listReadyOffers(includeInactive = false): Promise<ReadyOfferRecord[]> {

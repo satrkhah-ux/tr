@@ -1,11 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
 import { OfferPreviewToolbar } from "@/components/offer-doc/OfferPreviewToolbar";
-import { getCurrentRole } from "@/lib/data/metrics";
 import { getInternalOffer, getPublishedClientOffer } from "@/lib/data/offers";
 import { listPartnerCompanies, resolveDocBrand } from "@/lib/data/partner-companies";
 import { toClientOfferDTO } from "@/lib/offer/dto";
-import { can } from "@/lib/roles/roles";
+import { currentCan } from "@/lib/roles/current";
 
 /**
  * Staff, on-screen preview of an offer — the SAME <OfferDocument> the PDF prints
@@ -28,8 +27,7 @@ export default async function OfferPreviewPage({
   const { serial } = await params;
   const { variant: variantParam, brand: brandParam, prices: pricesParam } = await searchParams;
 
-  const role = await getCurrentRole();
-  const canInternal = can(role, "pricing.internal");
+  const canInternal = await currentCan("pricing.internal");
   const wantsInternal = variantParam === "internal";
   if (wantsInternal && !canInternal) redirect(`/offer/${serial}/preview`);
 

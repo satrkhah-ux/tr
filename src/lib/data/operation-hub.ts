@@ -4,10 +4,9 @@ import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
-import { getCurrentRole } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
-import { can } from "@/lib/roles/roles";
 import type { VoucherKind } from "@/lib/operations/voucher-dto";
+import { currentCan } from "@/lib/roles/current";
 
 /**
  * ONE link for the client.
@@ -27,7 +26,7 @@ type Fail = { ok: false; error: TranslationKey };
 async function requireOps(): Promise<TranslationKey | null> {
   const user = await getServerUser();
   if (!user) return "err.session";
-  return can(await getCurrentRole(), "operations.write") ? null : "ops.err.forbidden";
+  return await currentCan("operations.write") ? null : "ops.err.forbidden";
 }
 
 /** Mint the client link, or return the existing one. Idempotent. */

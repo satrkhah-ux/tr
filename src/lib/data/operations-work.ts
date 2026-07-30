@@ -2,13 +2,12 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
-import { getCurrentRole } from "@/lib/data/metrics";
-import { can } from "@/lib/roles/roles";
 import { listOperations, type OperationCard } from "@/lib/data/operations";
 import { listTravelersByOperation } from "@/lib/data/operation-travelers";
 import { operationSignals, severityRank, type OperationSignal, type OperationSnapshot } from "@/lib/operations/signals";
 import { isLiveCase, summarizeOperations, type OpsCase, type OpsCounts } from "@/lib/operations/summary";
 import type { ExecutionStatus } from "@/lib/operations/state";
+import { currentCan } from "@/lib/roles/current";
 
 /**
  * One loader behind both operations views: the board and the dashboard panel.
@@ -59,7 +58,7 @@ async function load(): Promise<Loaded> {
   try {
     const user = await getServerUser();
     if (!user) return closed;
-    if (!can(await getCurrentRole(), "operations.write")) return closed;
+    if (!await currentCan("operations.write")) return closed;
 
     const operations = await listOperations();
     if (operations.length === 0) return { ...closed, ok: true };

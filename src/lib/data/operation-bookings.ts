@@ -4,12 +4,12 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
-import { getCurrentEmployeeId, getCurrentRole } from "@/lib/data/metrics";
+import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
-import { can } from "@/lib/roles/roles";
 import { listTravelers } from "@/lib/data/operation-travelers";
 import { notifyBookingChanged } from "@/lib/data/ops-notify";
 import type { VoucherBooking, VoucherDTO, VoucherKind } from "@/lib/operations/voucher-dto";
+import { currentCan } from "@/lib/roles/current";
 
 /**
  * Bookings and the documents issued from them.
@@ -30,7 +30,7 @@ type Fail = { ok: false; error: TranslationKey };
 async function requireOps(): Promise<TranslationKey | null> {
   const user = await getServerUser();
   if (!user) return "err.session";
-  return can(await getCurrentRole(), "operations.write") ? null : "ops.err.forbidden";
+  return await currentCan("operations.write") ? null : "ops.err.forbidden";
 }
 
 

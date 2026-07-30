@@ -2,10 +2,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
-import { getCurrentRole } from "@/lib/data/metrics";
-import { can } from "@/lib/roles/roles";
 import { getSupplierAdapter } from "@/lib/providers/hotel-registry";
 import type { HotelContentCacheRow } from "@/lib/types";
+import { currentCan } from "@/lib/roles/current";
 
 /**
  * STATIC hotel content cache. Content (name/stars/images/facilities/room
@@ -143,8 +142,7 @@ export async function ensureHotelContentCached(
 export async function refreshHotelContent(supplier: string, supplierHotelId: string): Promise<{ ok: boolean }> {
   const user = await getServerUser();
   if (!user) return { ok: false };
-  const role = await getCurrentRole();
-  if (!can(role, "settings.manage")) return { ok: false };
+  if (!await currentCan("settings.manage")) return { ok: false };
   const adapter = await getSupplierAdapter(supplier);
   if (!adapter) return { ok: false };
   const content = await adapter.fetchContent(supplierHotelId);

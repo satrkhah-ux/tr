@@ -3,11 +3,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
-import { getCurrentEmployeeId, getCurrentRole } from "@/lib/data/metrics";
+import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { notifyOperationConfirmed } from "@/lib/data/ops-notify";
 import { setOfferStatus } from "@/lib/data/offer-status";
-import { can } from "@/lib/roles/roles";
 import {
   canAdvanceClient,
   canAdvanceExecution,
@@ -17,6 +16,7 @@ import {
   type ClientStatus,
   type ExecutionStatus,
 } from "@/lib/operations/state";
+import { currentCan } from "@/lib/roles/current";
 
 /**
  * «العمليات» — the execution hub. This module is the ONLY writer of
@@ -33,8 +33,7 @@ function db(): Promise<SupabaseClient> {
 async function requireOps(): Promise<TranslationKey | null> {
   const user = await getServerUser();
   if (!user) return "err.session";
-  const role = await getCurrentRole();
-  return can(role, "operations.write") ? null : "ops.err.forbidden";
+  return await currentCan("operations.write") ? null : "ops.err.forbidden";
 }
 
 export type ConfirmChannel = "phone" | "whatsapp" | "office" | "other";

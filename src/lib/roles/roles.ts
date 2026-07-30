@@ -80,6 +80,81 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   visitor: ["guide.view"],
 };
 
+/** Is this string one of ours? The DB stores permission keys as free text. */
+export function isPermission(value: unknown): value is Permission {
+  return typeof value === "string" && (ALL_PERMISSIONS as readonly string[]).includes(value);
+}
+
+/**
+ * The permission vocabulary, arranged the way an administrator reads it: by the
+ * part of the system it opens, and split into what the holder SEES and what they
+ * can DO. A flat list of thirteen keys is unanswerable — "what does someone in
+ * this section see?" is the actual question, and this is the shape that answers it.
+ *
+ * `sensitive` marks the three that deserve a second thought before ticking:
+ * identity documents, cost and profit, and the ability to grant permissions.
+ */
+export type PermissionKind = "view" | "do";
+
+export type PermissionItem = {
+  key: Permission;
+  kind: PermissionKind;
+  sensitive?: boolean;
+};
+
+export type PermissionGroup = {
+  /** i18n key for the group heading. */
+  key: string;
+  items: PermissionItem[];
+};
+
+export const PERMISSION_GROUPS: PermissionGroup[] = [
+  {
+    key: "perm.group.dashboard",
+    items: [
+      { key: "dashboard.admin", kind: "view" },
+      { key: "dashboard.employee", kind: "view" },
+      { key: "pricing.internal", kind: "view", sensitive: true },
+    ],
+  },
+  {
+    key: "perm.group.offers",
+    items: [
+      { key: "offers.write", kind: "do" },
+      { key: "pricing.view", kind: "view" },
+      { key: "repackage.write", kind: "do" },
+      { key: "kanban.view", kind: "view" },
+    ],
+  },
+  {
+    key: "perm.group.operations",
+    items: [
+      { key: "operations.write", kind: "do" },
+      { key: "operations.passport", kind: "view", sensitive: true },
+    ],
+  },
+  {
+    key: "perm.group.data",
+    items: [
+      { key: "data.write", kind: "do" },
+      { key: "settings.manage", kind: "do" },
+    ],
+  },
+  {
+    key: "perm.group.team",
+    items: [{ key: "employees.manage", kind: "do", sensitive: true }],
+  },
+  {
+    key: "perm.group.guide",
+    items: [{ key: "guide.view", kind: "view" }],
+  },
+];
+
+/** Compile-time proof that the groups above cover the whole vocabulary. */
+const GROUPED = PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i.key));
+type _EveryPermissionGrouped = typeof GROUPED extends Permission[] ? true : never;
+export const UNGROUPED_PERMISSIONS: Permission[] = ALL_PERMISSIONS.filter((p) => !GROUPED.includes(p));
+
 export function can(role: Role, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role].includes(permission);
 }

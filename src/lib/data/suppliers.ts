@@ -2,13 +2,12 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
-import { getCurrentRole } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
-import { can } from "@/lib/roles/roles";
 import { encryptJson } from "@/lib/crypto/secrets";
 import { getSupplierAdapter, getSupplierRows } from "@/lib/providers/hotel-registry";
 import type { TestConnectionResult } from "@/lib/providers/hotel-supplier";
 import type { HotelSupplierRow, MarkupRuleRow } from "@/lib/types";
+import { currentCan } from "@/lib/roles/current";
 
 /**
  * Supplier registry admin actions. EVERY action is gated on the admin role
@@ -31,8 +30,7 @@ type Admin = { id: string; email: string | null };
 async function requireAdmin(): Promise<Admin | null> {
   const user = await getServerUser();
   if (!user) return null;
-  const role = await getCurrentRole();
-  if (!can(role, "settings.manage")) return null;
+  if (!await currentCan("settings.manage")) return null;
   return { id: user.id, email: user.email ?? null };
 }
 

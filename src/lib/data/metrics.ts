@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import type { Role } from "@/lib/roles/roles";
+import { currentRole } from "@/lib/roles/current";
 
 /**
  * Dashboard metric queries — the ONLY place that reads metric data. Backend
@@ -40,23 +41,16 @@ async function employeeIdForUser(supabase: SupabaseClient, userId: string): Prom
   return (data as { id: string } | null)?.id ?? null;
 }
 
-/** Resolve the signed-in user's real role from their linked employee record. */
+/**
+ * The signed-in user's role label.
+ *
+ * Delegates to the permission resolver so there is ONE truth: the role a person
+ * holds is whatever their role row grants. This used to compare
+ * `english_name === 'All Permissions'`, which made an administrator out of anyone
+ * who could rename a row — and until migration 0030 any signed-in user could.
+ */
 export async function getCurrentRole(): Promise<Role> {
-  const user = await getServerUser();
-  if (!user) return "visitor";
-  try {
-    const supabase = await db();
-    const { data: emp } = await supabase.from("employees").select("id, role_id").eq("auth_user_id", user.id).maybeSingle();
-    const employee = emp as { id: string; role_id: string | null } | null;
-    if (!employee) return "employee";
-    if (employee.role_id) {
-      const { data: role } = await supabase.from("roles").select("english_name").eq("id", employee.role_id).maybeSingle();
-      if ((role as { english_name: string | null } | null)?.english_name === "All Permissions") return "admin";
-    }
-    return "employee";
-  } catch {
-    return "visitor";
-  }
+  return currentRole();
 }
 
 /** Heartbeat — keeps the signed-in employee's presence row fresh (online-now). */
