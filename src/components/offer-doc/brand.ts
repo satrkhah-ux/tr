@@ -65,6 +65,14 @@ export function tint(hex: string, amount: number): string {
   return toHex(r + (255 - r) * amount, g + (255 - g) * amount, b + (255 - b) * amount);
 }
 
+/** `rgba()` from a hex colour — panel fills and shadows must stay translucent so
+ *  the world-map identity shows through them. */
+export function rgba(hex: string, alpha: number): string {
+  if (!HEX.test(hex)) return hex;
+  const [r, g, b] = channels(hex);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 /** Mix a colour toward black. `amount` 0 = unchanged, 1 = black. */
 export function shade(hex: string, amount: number): string {
   if (!HEX.test(hex)) return hex;
@@ -90,8 +98,19 @@ export function brandVars(primary: string, accent: string): Record<string, strin
     "--od-soft": tint(p, 0.9),
     "--od-line": tint(p, 0.62),
     "--od-line-2": tint(p, 0.74),
+    // the hairlines between list rows and clauses
+    "--od-line-3": tint(p, 0.88),
+    // the near-white wash inside room boxes
+    "--od-tint": tint(p, 0.96),
+    // translucent so the world map still reads through a card
+    "--od-fill": rgba(tint(p, 0.955), 0.94),
+    "--od-shadow": rgba(shade(p, 0.35), 0.08),
+    "--od-shadow-2": rgba(shade(p, 0.35), 0.06),
     "--od-gold": a,
     "--od-notice": shade(a, 0.1),
+    // the cancellation / pay-at-hotel notice follows the accent, not our amber
+    "--od-notice-soft": rgba(a, 0.12),
+    "--od-notice-ink": shade(a, 0.62),
   };
 }
 
@@ -105,6 +124,28 @@ export function brandVars(primary: string, accent: string): Record<string, strin
 export function publicBrandLogoUrl(supabaseUrl: string, path: string | null): string | null {
   if (!path) return null;
   return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/brands/${path}`;
+}
+
+/**
+ * The colour a NEW partner company starts on.
+ *
+ * Never ours. The form used to seed #135549 — Traveliun's green — so a company
+ * created without touching the swatch produced a document that looked exactly
+ * like ours under their name, and "choosing a company" appeared to do nothing.
+ * Derived from the name so it is stable (re-opening the form does not reshuffle
+ * it) and distinct per company.
+ */
+const START_COLORS = ["#7c3aed", "#0b4f6c", "#b45309", "#9d174d", "#166534", "#1e3a8a", "#7c2d12", "#4a5568"] as const;
+
+export function startingBrandColor(name: string): string {
+  let hash = 0;
+  for (const ch of name.trim()) hash = (hash * 31 + ch.codePointAt(0)!) % 100000;
+  return START_COLORS[hash % START_COLORS.length];
+}
+
+/** True when a colour is our own — the one thing a partner's brand must not be. */
+export function isHouseColor(hex: string): boolean {
+  return hex.trim().toLowerCase() === "#135549";
 }
 
 /** What the admin screen stores, and the document needs. */

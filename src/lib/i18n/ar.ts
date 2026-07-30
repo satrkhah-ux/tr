@@ -482,6 +482,7 @@ export const ar: Dictionary = {
   "partner.deactivated": "أُلغي تفعيلها (عليها حجوزات مسجّلة)",
   "partner.deleteConfirm": "حذف هذه الشركة؟",
   "partner.brandPreview": "هوية المستند",
+  "partner.err.houseColor": "هذا أخضر ترافليون نفسه — سيصدر المستند بمظهرنا تحت اسمهم. اختر لونهم.",
   "partner.err.nameRequired": "أدخل اسم الشركة.",
   "partner.err.duplicate": "توجد شركة بهذا الاسم.",
   "partner.err.logoTooLarge": "الشعار كبير جداً (الحد ٢ ميجابايت).",

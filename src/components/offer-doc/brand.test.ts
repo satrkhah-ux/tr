@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TRAVELIUN_BRAND, brandVars, partnerBrand, shade, tint } from "./brand";
+import { OFFER_DOC_CSS } from "./styles";
 
 /**
  * The document's colours reach the stylesheet as a style attribute, so this
@@ -33,7 +34,26 @@ describe("brandVars", () => {
     expect(vars["--od-gold"]).toBe("#f59e0b");
     // the soft fill must be near-white, or text on it stops being readable
     expect(vars["--od-soft"]).toBe(tint("#7c3aed", 0.9));
-    expect(Object.keys(vars)).toHaveLength(7);
+  });
+
+  /**
+   * THE regression guard for "the document kept Traveliun's colour".
+   *
+   * Every colour the stylesheet declares on .od-root must be overridable, or a
+   * partner's document keeps our green for that one rule — half-branded, which
+   * reads as a mistake. Adding a var default to styles.ts without adding it here
+   * fails this test instead of shipping a green border on a purple document.
+   */
+  it("overrides every colour variable the stylesheet declares", () => {
+    const declared = [...OFFER_DOC_CSS.matchAll(/(--od-[a-z0-9-]+)\s*:/g)].map((m) => m[1]);
+    // --od-map is the page background image, --od-pad a length, and ink/muted are
+    // deliberately neutral: body text does not turn purple for a purple brand.
+    const NOT_BRANDED = new Set(["--od-map", "--od-pad", "--od-ink", "--od-muted"]);
+    const expected = [...new Set(declared)].filter((name) => !NOT_BRANDED.has(name));
+    const vars = brandVars("#7c3aed", "#f59e0b");
+
+    expect(expected.length).toBeGreaterThan(7);
+    for (const name of expected) expect(Object.keys(vars)).toContain(name);
   });
 
   it("refuses anything that is not a six-digit hex — this string lands in CSS", () => {

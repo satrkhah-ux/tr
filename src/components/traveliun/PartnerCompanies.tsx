@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { Building2, Check, ImageUp, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { AlertTriangle, Building2, Check, ImageUp, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { brandVars } from "@/components/offer-doc/brand";
+import { brandVars, isHouseColor, startingBrandColor } from "@/components/offer-doc/brand";
 import {
   deletePartnerCompany,
   upsertPartnerCompany,
@@ -57,7 +57,8 @@ function toDraft(c?: PartnerCompany): Draft {
     whatsapp: c?.whatsapp ?? "",
     website: c?.website ?? "",
     email: c?.email ?? "",
-    brand_color: c?.brand_color ?? "#135549",
+    // a NEW company starts on a colour that is visibly not ours
+    brand_color: c?.brand_color ?? startingBrandColor(c?.name ?? String(Date.now())),
     accent_color: c?.accent_color ?? "#f0ad22",
     resells: c?.resells ?? true,
     show_prices: c?.show_prices ?? false,
@@ -200,6 +201,12 @@ export function PartnerCompanies({ companies }: { companies: PartnerCompany[] })
               <BrandPreview primary={draft.brand_color} accent={draft.accent_color} name={draft.name} />
             </div>
             <p className="mt-1.5 text-[11px] font-semibold text-[#93aaa3]">{t("partner.colorsHint")}</p>
+            {isHouseColor(draft.brand_color) ? (
+              <p className="mt-1.5 flex items-center gap-1.5 rounded-[9px] bg-[#fff8e8] px-3 py-2 text-[11.5px] font-bold text-[#a86a10]">
+                <AlertTriangle className="size-3.5 shrink-0" />
+                {t("partner.err.houseColor")}
+              </p>
+            ) : null}
 
             <div className="mt-4 flex flex-wrap gap-4">
               <Toggle checked={draft.resells} onChange={(v) => setDraft({ ...draft, resells: v })} text={t("partner.resells")} hint={t("partner.resellsHint")} />

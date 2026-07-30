@@ -484,6 +484,7 @@ export const en = {
   "partner.deactivated": "Deactivated (it has bookings on record)",
   "partner.deleteConfirm": "Delete this company?",
   "partner.brandPreview": "Document identity",
+  "partner.err.houseColor": "This is Traveliun's own green — the document would look like ours under their name. Pick their colour.",
   "partner.err.nameRequired": "Enter the company name.",
   "partner.err.duplicate": "A company with this name already exists.",
   "partner.err.logoTooLarge": "The logo is too large (max 2 MB).",
