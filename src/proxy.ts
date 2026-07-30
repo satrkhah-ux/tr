@@ -17,7 +17,12 @@ import { AUTH_STORAGE_KEY, parseSessionCookie } from "@/lib/supabase/constants";
 // validates a 24-byte token and a revoked_at through the service role, because
 // RLS cannot see a URL. A session check here would simply lock the traveller out
 // of the document they were handed.
-const PUBLIC_PREFIXES = ["/sign-in", "/client-offer", "/voucher", "/trip", "/tg"];
+// `/api/telegram` is a WEBHOOK target: Telegram posts to it with no cookie and
+// follows no redirect, so guarding it would not protect anything — it would just
+// send every update into a 307 and the bot would answer nothing. Each webhook
+// route authenticates its own caller instead (shared secret + resolving the
+// Telegram account to an employee).
+const PUBLIC_PREFIXES = ["/sign-in", "/client-offer", "/voucher", "/trip", "/tg", "/api/telegram"];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
 
 function isPublic(pathname: string): boolean {
