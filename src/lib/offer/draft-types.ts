@@ -692,7 +692,17 @@ export const CURRENCIES = ["SAR", "USD", "EUR", "TRY", "MYR", "THB", "IDR", "AED
 // ---------- lookups (loaded server-side, passed to stage pages) ----------
 export type LookupHotel = { id: string; name: string; stars: number | null };
 export type LookupCity = { id: string; name: string; hotels: LookupHotel[] };
-export type LookupCountry = { id: string; name: string; cities: LookupCity[] };
+export type LookupCountry = {
+  id: string;
+  name: string;
+  /**
+   * ISO-3166 alpha-2. Required by every real hotel supplier — they resolve a
+   * city WITHIN a country, so a live search without this returns nothing and
+   * looks like "the supplier has no hotels there".
+   */
+  iso2: string | null;
+  cities: LookupCity[];
+};
 export type LookupRoomType = { id: string; name: string; hotel_id: string | null; default_board: BoardType | null };
 export type LookupAirport = { id: string; name: string; code: string | null; timezone: string | null };
 

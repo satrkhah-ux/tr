@@ -20,7 +20,13 @@ import {
 } from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { getDraft } from "@/lib/data/drafts";
-import { searchHotelsForCity, selectHotelRate, type SearchHotel, type SearchRate } from "@/lib/data/hotel-search";
+import {
+  searchHotelsForCity,
+  selectHotelRate,
+  type SearchHotel,
+  type SearchRate,
+  type SupplierNote,
+} from "@/lib/data/hotel-search";
 import { useRole } from "@/lib/roles/RoleContext";
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
@@ -75,8 +81,21 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
   const [searchError, setSearchError] = useState<string | null>(null);
   const [selecting, setSelecting] = useState<string | null>(null);
   const [filters, setFilters] = useState({ minStars: 0, board: "", refundableOnly: false, maxPrice: "" });
+  const [notes, setNotes] = useState<SupplierNote[]>([]);
+  /**
+   * Where hotels come from, per city.
+   *
+   * "internal" is the company's own list — the dropdown below, with a price the
+   * agent types. "tbo" is the live supplier. Kept explicit rather than searching
+   * everything at once: they are different jobs. The internal list is what we
+   * have contracts for; the supplier is live inventory at a live price, and an
+   * agent should know which one they are quoting.
+   */
+  const [source, setSource] = useState<Record<string, "internal" | "tbo">>({});
 
   const country = findLookupCountry(lookups.countries, data.trip.country);
+  /** Live search is impossible without it — say so before the agent presses. */
+  const canSearchLive = Boolean(country?.iso2);
   const derivedCities = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
 
   function lineFor(cityName: string): DraftHotel {
@@ -128,12 +147,15 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
   async function openSearch(cityName: string) {
     setSearchCity(cityName);
     setResults(null);
+    setNotes([]);
     setSearchError(null);
     setFilters({ minStars: 0, board: "", refundableOnly: false, maxPrice: "" });
     setSearching(true);
-    const res = await searchHotelsForCity(draftId, cityName);
-    if (res.ok) setResults(res.hotels);
-    else setSearchError(t(res.error));
+    const res = await searchHotelsForCity(draftId, cityName, "tbo");
+    if (res.ok) {
+      setResults(res.hotels);
+      setNotes(res.notes);
+    } else setSearchError(t(res.error));
     setSearching(false);
   }
 
@@ -188,16 +210,67 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                         <> {" · "}<DirText dir="ltr">{`${city.check_in} → ${city.check_out}`}</DirText></>
                       ) : null}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => (isSearching ? setSearchCity(null) : void openSearch(city.city_name))}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439]"
-                    >
-                      <Search className="size-3.5" />
-                      {t("pg.supplier.searchHotels")}
-                    </button>
+                    {/* The source choice. Internal = our own contracted list,
+                        priced by hand; TBO = live inventory at a live price. */}
+                    <div className="inline-flex overflow-hidden rounded-[9px] border border-[#cfe0d9]">
+                      {(["internal", "tbo"] as const).map((key) => {
+                        const active = (source[city.city_name] ?? "internal") === key;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              setSource((s) => ({ ...s, [city.city_name]: key }));
+                              if (key === "internal" && isSearching) setSearchCity(null);
+                            }}
+                            className={`h-8 px-3 text-[11.5px] font-bold transition-colors ${
+                              active ? "bg-[#185045] text-white" : "bg-white text-[#557d78] hover:bg-[#f0f7f4]"
+                            }`}
+                          >
+                            {key === "internal" ? "النظام الداخلي" : "TBO"}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {(source[city.city_name] ?? "internal") === "tbo" ? (
+                      <button
+                        type="button"
+                        disabled={!canSearchLive}
+                        title={canSearchLive ? undefined : "الدولة بلا رمز ISO — لا يمكن البحث لدى المورّد"}
+                        onClick={() => (isSearching ? setSearchCity(null) : void openSearch(city.city_name))}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+                      >
+                        <Search className="size-3.5" />
+                        {t("pg.supplier.searchHotels")}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
+
+                {/* Occupancy is NOT re-entered here: it was agreed with the
+                    customer on stage 1 and the supplier is asked for exactly
+                    that. Shown so the agent can see what is being priced. */}
+                {(source[city.city_name] ?? "internal") === "tbo" ? (
+                  <p className="tv-tnum mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-[#557d78]">
+                    <span>
+                      البحث لـ <DirText dir="ltr">{data.trip.adults}</DirText> بالغ
+                      {data.trip.children > 0 ? (
+                        <> و<DirText dir="ltr">{data.trip.children}</DirText> طفل</>
+                      ) : null}{" "}
+                      · <DirText dir="ltr">{line.rooms_count}</DirText> غرفة
+                    </span>
+                    <span className="text-[#93aaa3]">
+                      {country?.iso2 ? (
+                        <>
+                          الدولة <DirText dir="ltr">{country.iso2}</DirText> · جنسية التسعير{" "}
+                          <DirText dir="ltr">SA</DirText>
+                        </>
+                      ) : (
+                        <span className="text-[#c22850]">الدولة «{data.trip.country}» بلا رمز ISO في قسم الدول.</span>
+                      )}
+                    </span>
+                  </p>
+                ) : null}
 
                 {/* supplier search panel */}
                 {isSearching ? (
@@ -278,7 +351,28 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                         })}
                       </div>
                     ) : (
-                      <p className="py-2 text-[12.5px] text-[#93aaa3]">{t("pg.supplier.noResults")}</p>
+                      <div className="py-2 text-[12.5px] text-[#93aaa3]">
+                        <p>{t("pg.supplier.noResults")}</p>
+                        {/* An empty list used to look identical whether the
+                            supplier refused us, could not be reached, or the
+                            city is genuinely full. Those need different actions. */}
+                        {notes.map((n) => (
+                          <p key={n.supplier} className="mt-1 text-[11.5px] font-bold">
+                            {n.reason === "no_country" ? (
+                              <span className="text-[#c22850]">
+                                {n.name}: الدولة بلا رمز ISO — أضِفه في قسم الدول ثم أعد البحث.
+                              </span>
+                            ) : n.reason === "error" ? (
+                              <span className="text-[#c22850]">{n.name}: تعذّر الوصول إلى المورّد.</span>
+                            ) : n.reason === "nothing" ? (
+                              <span className="text-[#a86a10]">
+                                {n.name}: لم يُرجع أي غرفة لهذه المدينة والتواريخ — تحقّق من حالة الاتصال في
+                                إعدادات المزوّدين.
+                              </span>
+                            ) : null}
+                          </p>
+                        ))}
+                      </div>
                     )}
                   </div>
                 ) : null}

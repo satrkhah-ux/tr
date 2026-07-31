@@ -9,9 +9,10 @@ import { findLookupCountry, type LookupCountry } from "./draft-types";
  */
 const city = (name: string) => ({ id: name, name, hotels: [] });
 const countries: LookupCountry[] = [
-  { id: "1", name: "اندونيسيا", cities: [city("جاكرتا"), city("بالي")] },
-  { id: "2", name: "ماليزيا", cities: [city("كوالالمبور")] },
-  { id: "3", name: "جنوب أفريقيا", cities: [city("كيب تاون")] },
+  { id: "1", name: "اندونيسيا", iso2: "ID", cities: [city("جاكرتا"), city("بالي")] },
+  { id: "2", name: "ماليزيا", iso2: "MY", cities: [city("كوالالمبور")] },
+  // A country with no code is the case that silently breaks a live search.
+  { id: "3", name: "جنوب أفريقيا", iso2: null, cities: [city("كيب تاون")] },
 ];
 
 describe("findLookupCountry", () => {

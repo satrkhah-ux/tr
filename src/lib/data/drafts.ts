@@ -228,7 +228,9 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
   try {
     const supabase = await db();
     const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transfersRes, transportRes, termsRes, airlinesRes, partnersRes] = await Promise.all([
-      supabase.from("countries").select("id, arabic_name, status").order("arabic_name"),
+      // iso2 is not decoration: a real hotel supplier looks a city up WITHIN a
+      // country, so a live search without it returns nothing at all.
+      supabase.from("countries").select("id, arabic_name, iso2, status").order("arabic_name"),
       supabase.from("cities").select("id, arabic_name, country_id").order("arabic_name"),
       supabase.from("hotels").select("id, arabic_name, stars, city_id"),
       supabase.from("room_types").select("id, arabic_name, hotel_id, default_board").order("arabic_name"),
@@ -255,11 +257,12 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
     const active = (status: string | null | undefined) => status !== "Disabled";
     const hotels = (hotelsRes.data ?? []) as { id: string; arabic_name: string; stars: number | null; city_id: string | null }[];
     const cities = (citiesRes.data ?? []) as { id: string; arabic_name: string; country_id: string | null }[];
-    const countries = ((countriesRes.data ?? []) as { id: string; arabic_name: string; status: string | null }[]).filter((c) => active(c.status));
+    const countries = ((countriesRes.data ?? []) as { id: string; arabic_name: string; iso2: string | null; status: string | null }[]).filter((c) => active(c.status));
 
     const builtCountries = countries.map((country) => ({
       id: country.id,
       name: country.arabic_name,
+      iso2: country.iso2 ?? null,
       cities: cities
         .filter((c) => c.country_id === country.id)
         .map((c) => ({

@@ -3,13 +3,14 @@
 import { getServerUser } from "@/lib/supabase/server";
 import { getRates } from "./rates-actions";
 import { getActiveMarkupRules } from "./markup-rules";
-import { getDraft, saveDraftStages } from "./drafts";
+import { getDraft, getGeneratorLookups, saveDraftStages } from "./drafts";
 import { ensureHotelContentCached } from "./hotel-content";
 import { getEnabledHotelSuppliers, getSupplierAdapter } from "@/lib/providers/hotel-registry";
 import type { HotelSearchQuery } from "@/lib/providers/hotel-supplier";
 import { priceSupplierRate } from "@/lib/pricing/price-line";
 import type { MarkupContext } from "@/lib/pricing/markup";
 import {
+  findLookupCountry,
   deriveCityDates,
   normalizeDraftHotel,
   withRooms,
@@ -45,9 +46,41 @@ export type SearchHotel = {
   rates: SearchRate[];
 };
 
+/**
+ * Why each supplier returned what it did.
+ *
+ * An empty result had exactly one appearance — «لا توجد فنادق مطابقة» — whether
+ * the supplier was unreachable, the country was unresolvable, or the city
+ * genuinely has no availability. Those need different actions from the agent,
+ * and only one of them is about hotels.
+ */
+export type SupplierNote = {
+  supplier: string;
+  name: string;
+  hotels: number;
+  reason: "ok" | "no_country" | "nothing" | "error";
+};
+
 export type SearchResult =
-  | { ok: true; hotels: SearchHotel[]; fetched_at: string; check_in: string; check_out: string }
+  | {
+      ok: true;
+      hotels: SearchHotel[];
+      fetched_at: string;
+      check_in: string;
+      check_out: string;
+      notes: SupplierNote[];
+    }
   | { ok: false; error: TranslationKey };
+
+/** Suppliers the agent may pick between on the hotels stage. */
+export type SupplierChoice = { code: string; name: string; live: boolean };
+
+export async function listHotelSourceOptions(): Promise<SupplierChoice[]> {
+  const user = await getServerUser();
+  if (!user) return [];
+  const suppliers = await getEnabledHotelSuppliers();
+  return suppliers.map((s) => ({ code: s.code, name: s.name, live: typeof s.prebook === "function" }));
+}
 
 type Stay = { check_in: string; check_out: string; rooms: number };
 
@@ -74,15 +107,27 @@ function contextFor(country: string | null, city: string, supplierId: string, da
  * Returns hotels with a thumbnail + LIVE rates priced to the client SELL (net is
  * NEVER sent to the browser). Rates are always fresh — nothing here is cached.
  */
-export async function searchHotelsForCity(draftId: string, cityName: string): Promise<SearchResult> {
+export async function searchHotelsForCity(
+  draftId: string,
+  cityName: string,
+  /** search ONE supplier. Omitted = every enabled one, as before. */
+  supplierCode?: string,
+): Promise<SearchResult> {
   const user = await getServerUser();
   if (!user) return { ok: false, error: "err.session" };
   const resolved = await resolveStay(draftId, cityName);
   if (!resolved) return { ok: false, error: "pg.supplier.noDates" };
   const { data, stay } = resolved;
 
-  const [{ sarPer }, rules, suppliers] = await Promise.all([getRates(), getActiveMarkupRules(), getEnabledHotelSuppliers()]);
+  const [{ sarPer }, rules, all] = await Promise.all([getRates(), getActiveMarkupRules(), getEnabledHotelSuppliers()]);
+  const suppliers = supplierCode ? all.filter((s) => s.code === supplierCode) : all;
   const fxDate = new Date().toISOString().slice(0, 10);
+
+  // THE field this call used to omit. A real supplier resolves a city inside a
+  // country, so TBO returned an empty list for every search from this screen —
+  // which read as "no hotels in Baku" rather than "we never told it which Baku".
+  const countryCode = await resolveCountryCode(data.trip.country);
+
   const query: HotelSearchQuery = {
     city: cityName,
     check_in: stay.check_in,
@@ -90,14 +135,27 @@ export async function searchHotelsForCity(draftId: string, cityName: string): Pr
     adults: data.trip.adults,
     children: data.trip.children,
     rooms: stay.rooms,
+    country_code: countryCode,
+    // Hotel net rates are nationality-dependent (resident vs GCC vs other), so
+    // the wrong one quotes a price the supplier will not honour.
+    nationality: "SA",
   };
 
+  const notes: SupplierNote[] = [];
   const hotels: SearchHotel[] = [];
   for (const supplier of suppliers) {
+    const before = hotels.length;
+    // A supplier that needs a country and has none cannot be asked; say that
+    // rather than showing an empty list it did not produce.
+    if (!countryCode && supplier.code !== "mock") {
+      notes.push({ supplier: supplier.code, name: supplier.name, hotels: 0, reason: "no_country" });
+      continue;
+    }
     let results;
     try {
       results = await supplier.searchHotels(query);
     } catch {
+      notes.push({ supplier: supplier.code, name: supplier.name, hotels: 0, reason: "error" });
       continue;
     }
     for (const h of results) {
@@ -129,9 +187,41 @@ export async function searchHotelsForCity(draftId: string, cityName: string): Pr
         });
       }
     }
+    notes.push({
+      supplier: supplier.code,
+      name: supplier.name,
+      hotels: hotels.length - before,
+      reason: hotels.length > before ? "ok" : "nothing",
+    });
   }
 
-  return { ok: true, hotels, fetched_at: new Date().toISOString(), check_in: stay.check_in, check_out: stay.check_out };
+  return {
+    ok: true,
+    hotels,
+    fetched_at: new Date().toISOString(),
+    check_in: stay.check_in,
+    check_out: stay.check_out,
+    notes,
+  };
+}
+
+/**
+ * The draft's country name → ISO-2.
+ *
+ * `trip.country` is free text an agent typed, and the countries table holds one
+ * canonical spelling with the code — so this reuses `findLookupCountry`'s
+ * spelling tolerance («إندونيسيا» vs «اندونيسيا») rather than adding a second,
+ * stricter matcher that would fail on the same data.
+ */
+async function resolveCountryCode(countryName: string): Promise<string | null> {
+  if (!countryName?.trim()) return null;
+  try {
+    const { countries } = await getGeneratorLookups();
+    const hit = findLookupCountry(countries, countryName.trim());
+    return hit?.iso2?.trim().toUpperCase() || null;
+  } catch {
+    return null;
+  }
 }
 
 export type SelectResult = { ok: true; blocked: boolean } | { ok: false; error: TranslationKey };
@@ -169,6 +259,10 @@ export async function selectHotelRate(
       children: data.trip.children,
       rooms: stay.rooms,
       supplier_hotel_id: supplierHotelId,
+      // Same omission as the search had: without these the re-fetch comes back
+      // empty and the agent is told the rate expired, seconds after seeing it.
+      country_code: await resolveCountryCode(data.trip.country),
+      nationality: "SA",
     });
   } catch {
     return { ok: false, error: "pg.supplier.rateExpired" };
