@@ -76,6 +76,13 @@ export type HotelSearchQuery = {
    * Defaults to SA.
    */
   nationality?: string | null;
+  /**
+   * Narrow to hotels whose name contains this. Sent to the supplier where the
+   * API supports it (TBO: `Filters.HotelName`) so the filtering happens before
+   * the 200-hotel cap, not after — a name filter applied to our side of that cap
+   * silently hides hotels that exist.
+   */
+  hotel_name?: string | null;
 };
 
 export type TestConnectionResult = {
@@ -608,7 +615,12 @@ class TboHotelSupplier implements HotelSupplier {
       })),
       ResponseTime: 23,
       IsDetailedResponse: true,
-      Filters: { Refundable: false, NoOfRooms: 0, MealType: "All" },
+      Filters: {
+        Refundable: false,
+        NoOfRooms: 0,
+        MealType: "All",
+        ...(query.hotel_name?.trim() ? { HotelName: query.hotel_name.trim() } : {}),
+      },
     });
 
     return (avail?.HotelResult ?? [])

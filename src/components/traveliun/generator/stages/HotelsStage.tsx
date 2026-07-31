@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, RefreshCw, Search, Star } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Search, Star, Trash2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import {
   BOARD_LABEL_KEYS,
@@ -9,6 +9,7 @@ import {
   CURRENCIES,
   deriveCityDates,
   findLookupCountry,
+  hotelCoverage,
   normalizeDraftHotel,
   resizeRooms,
   roomTypeNames,
@@ -33,6 +34,25 @@ import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass, sectionClass, type StageFormProps } from "../stage-props";
 
 const rowLabelClass = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
+
+/**
+ * Eight results first, more on request.
+ *
+ * A city can return a hundred hotels and an agent reads the first handful. The
+ * cap is about the reading, not the fetching — everything is already priced, so
+ * "عرض المزيد" costs nothing but scrolling.
+ */
+const PAGE = 8;
+
+const EMPTY_FILTERS = {
+  name: "",
+  minStars: 0,
+  board: "",
+  /** all | yes | no — "غير قابل للاسترداد" is a deliberate choice, not just the absence of one. */
+  refundable: "all" as "all" | "yes" | "no",
+  maxPrice: "",
+  sort: "price" as "price" | "price_desc" | "stars",
+};
 
 /** Everything on a hotel line EXCEPT the rooms and the scalars mirroring them. */
 type HotelScalarSlice = Omit<
@@ -75,12 +95,15 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
   const { can } = useRole();
   const canInternal = can("pricing.internal");
 
-  const [searchCity, setSearchCity] = useState<string | null>(null);
+  /** the STAY whose search panel is open — not the city, since a city can hold two. */
+  const [searchStay, setSearchStay] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<SearchHotel[] | null>(null);
+  const [searchNights, setSearchNights] = useState(0);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [selecting, setSelecting] = useState<string | null>(null);
-  const [filters, setFilters] = useState({ minStars: 0, board: "", refundableOnly: false, maxPrice: "" });
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [shown, setShown] = useState(PAGE);
   const [notes, setNotes] = useState<SupplierNote[]>([]);
   /**
    * Where hotels come from, per city.
@@ -98,12 +121,19 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
   const canSearchLive = Boolean(country?.iso2);
   const derivedCities = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
 
-  function lineFor(cityName: string): DraftHotel {
-    return data.hotels.find((h) => h.city_name === cityName) ?? defaultLine(cityName, data.trip);
-  }
+  /**
+   * The lines we actually render: whatever the draft holds, plus a starter line
+   * for any city that has none. Orphans (a city the agent deleted) fall away,
+   * which is what the old rebuild-from-cities did too.
+   */
+  const lines: DraftHotel[] = derivedCities.flatMap((c) => {
+    const mine = data.hotels.filter((h) => h.city_name === c.city_name);
+    return mine.length > 0 ? mine : [defaultLine(c.city_name, data.trip)];
+  });
+  const coverage = hotelCoverage(derivedCities, lines);
 
   /**
-   * Replace a city's WHOLE line — used whenever rooms[] changes, because the
+   * Replace ONE stay's whole line — used whenever rooms[] changes, because the
    * array and its mirrors (rooms_count, room 1's type/board) must move together
    * and only withRooms() is allowed to set them.
    *
@@ -111,61 +141,94 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
    * or any room voids it rather than leaving a stale price attached to something
    * the supplier never quoted.
    */
-  function setLine(cityName: string, next: DraftHotel) {
-    const rebuilt = data.cities.map((city) => {
-      const line = lineFor(city.city_name);
-      if (city.city_name !== cityName) return line;
-      const productChanged =
-        next.hotel_name !== line.hotel_name ||
-        next.rooms.length !== line.rooms.length ||
-        next.rooms.some(
-          (r, i) => r.room_type_name !== line.rooms[i]?.room_type_name || r.board_type !== line.rooms[i]?.board_type,
-        );
-      return productChanged && line.sourcing ? { ...next, sourcing: null } : next;
+  function setLine(id: string, next: DraftHotel) {
+    patch({
+      hotels: lines.map((line) => {
+        if (line.id !== id) return line;
+        const productChanged =
+          next.hotel_name !== line.hotel_name ||
+          next.rooms.length !== line.rooms.length ||
+          next.rooms.some(
+            (r, i) => r.room_type_name !== line.rooms[i]?.room_type_name || r.board_type !== line.rooms[i]?.board_type,
+          );
+        return productChanged && line.sourcing ? { ...next, sourcing: null } : next;
+      }),
     });
-    patch({ hotels: rebuilt });
   }
 
   /**
-   * Patch the NON-room fields of a city's line. The rooms array and its mirrors
-   * are excluded at the type level: writing `board_type` here would change what
+   * Patch the NON-room fields of one stay. The rooms array and its mirrors are
+   * excluded at the type level: writing `board_type` here would change what
    * validation reads on room 1 while rooms[0] still said something else, and the
    * two would disagree silently. Room edits go through setLine + withRooms.
    */
-  function setHotel(cityName: string, slice: HotelScalarSlice) {
+  function setHotel(id: string, slice: HotelScalarSlice) {
     const productChanged = "hotel_name" in slice || "hotel_id" in slice || "board_type" in slice || "rooms_count" in slice;
-    const rebuilt = data.cities.map((city) => {
-      const line = lineFor(city.city_name);
-      if (city.city_name !== cityName) return line;
-      const next = { ...line, ...slice };
-      if (productChanged && line.sourcing) next.sourcing = null;
-      return next;
+    patch({
+      hotels: lines.map((line) => {
+        if (line.id !== id) return line;
+        const next = { ...line, ...slice };
+        if (productChanged && line.sourcing) next.sourcing = null;
+        return next;
+      }),
     });
-    patch({ hotels: rebuilt });
   }
 
-  async function openSearch(cityName: string) {
-    setSearchCity(cityName);
+  /**
+   * A second hotel in the same city.
+   *
+   * It is inserted directly after that city's last line — order is what decides
+   * the dates, so appending to the end of the whole array would give the new
+   * stay another city's nights.
+   */
+  function addStay(cityName: string) {
+    const next = [...lines];
+    let at = -1;
+    next.forEach((l, i) => {
+      if (l.city_name === cityName) at = i;
+    });
+    // The city's remaining nights are the obvious suggestion; the agent adjusts.
+    const cov = coverage.find((c) => c.city_name === cityName);
+    const left = Math.max(0, (cov?.needed ?? 0) - (cov?.covered ?? 0));
+    const fresh = { ...defaultLine(cityName, data.trip), nights: left };
+    next.splice(at + 1, 0, fresh);
+    patch({ hotels: next });
+  }
+
+  function removeStay(id: string) {
+    patch({ hotels: lines.filter((l) => l.id !== id) });
+    if (searchStay === id) setSearchStay(null);
+  }
+
+  /** Open the panel for a stay, and run the search with the current filters. */
+  async function openSearch(cityName: string, stayId: string, keepFilters = false) {
+    setSearchStay(stayId);
     setResults(null);
     setNotes([]);
     setSearchError(null);
-    setFilters({ minStars: 0, board: "", refundableOnly: false, maxPrice: "" });
+    setShown(PAGE);
+    const active = keepFilters ? filters : EMPTY_FILTERS;
+    if (!keepFilters) setFilters(EMPTY_FILTERS);
     setSearching(true);
-    const res = await searchHotelsForCity(draftId, cityName, "tbo");
+    // The hotel NAME goes to the supplier; everything else narrows what came
+    // back. A name filtered on our side would hide hotels beyond the supplier's
+    // own result cap — which is exactly the hotel someone is searching for.
+    const res = await searchHotelsForCity(draftId, cityName, "tbo", stayId, { hotel_name: active.name });
     if (res.ok) {
       setResults(res.hotels);
       setNotes(res.notes);
+      setSearchNights(res.nights);
     } else setSearchError(t(res.error));
     setSearching(false);
   }
 
-  async function choose(cityName: string, hotel: SearchHotel, rate: SearchRate) {
+  async function choose(cityName: string, stayId: string, hotel: SearchHotel, rate: SearchRate) {
     setSelecting(rate.rate_key);
-    const res = await selectHotelRate(draftId, cityName, hotel.supplier, hotel.supplier_hotel_id, rate.rate_key);
+    const res = await selectHotelRate(draftId, cityName, hotel.supplier, hotel.supplier_hotel_id, rate.rate_key, stayId);
     if (res.ok) {
       const fresh = await getDraft(draftId);
       if (fresh) replace(fresh.data);
-      setSearchCity(null);
+      setSearchStay(null);
       setResults(null);
     } else {
       setSearchError(t(res.error));
@@ -175,10 +238,23 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
 
   function rateMatches(hotel: SearchHotel, rate: SearchRate): boolean {
     if (filters.board && rate.board_type !== filters.board) return false;
-    if (filters.refundableOnly && !rate.refundable) return false;
-    if (filters.maxPrice && rate.sell > Number(filters.maxPrice)) return false;
+    if (filters.refundable === "yes" && !rate.refundable) return false;
+    if (filters.refundable === "no" && rate.refundable) return false;
+    // Compared per NIGHT, because that is the number in the box beside it.
+    if (filters.maxPrice && rate.per_night > Number(filters.maxPrice)) return false;
     if (filters.minStars && (hotel.star_rating ?? 0) < filters.minStars) return false;
     return true;
+  }
+
+  /** Hotels that still have a matching rate, in the order the agent asked for. */
+  function visibleHotels(): SearchHotel[] {
+    const kept = (results ?? []).filter((h) => h.rates.some((r) => rateMatches(h, r)));
+    const cheapest = (h: SearchHotel) =>
+      Math.min(...h.rates.filter((r) => rateMatches(h, r)).map((r) => r.per_night));
+    return [...kept].sort((a, b) => {
+      if (filters.sort === "stars") return (b.star_rating ?? 0) - (a.star_rating ?? 0);
+      return filters.sort === "price_desc" ? cheapest(b) - cheapest(a) : cheapest(a) - cheapest(b);
+    });
   }
 
   return (
@@ -192,72 +268,137 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
         </p>
       ) : (
         <div className="space-y-3">
-          {derivedCities.map((city, index) => {
-            const line = lineFor(city.city_name);
-            const lookupCity = country?.cities.find((c) => c.name === city.city_name);
+          {coverage.map((cov, cityIndex) => {
+            const city = derivedCities[cityIndex];
+            const lookupCity = country?.cities.find((c) => c.name === cov.city_name);
             const hotelOptions = lookupCity?.hotels ?? [];
-            const roomTypeOptions = lookups.roomTypes.filter((rt) => rt.hotel_id === line.hotel_id || rt.hotel_id === null);
-            const isSearching = searchCity === city.city_name;
+            const short = cov.covered !== cov.needed;
 
             return (
-              <div key={index} className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
+              <div key={cityIndex} className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-sm font-extrabold text-[#003c3a]">{city.city_name || "—"}</h3>
-                  <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-extrabold text-[#003c3a]">{cov.city_name || "—"}</h3>
+                  <div className="flex flex-wrap items-center gap-2">
                     <p className="tv-tnum text-[11.5px] font-semibold text-[#93aaa3]">
-                      {t("pg.cityNights")} <DirText dir="ltr">{city.nights}</DirText>
-                      {city.check_in && city.check_out ? (
-                        <> {" · "}<DirText dir="ltr">{`${city.check_in} → ${city.check_out}`}</DirText></>
+                      {city?.check_in && city?.check_out ? (
+                        <DirText dir="ltr">{`${city.check_in} → ${city.check_out}`}</DirText>
                       ) : null}
                     </p>
-                    {/* The source choice. Internal = our own contracted list,
-                        priced by hand; TBO = live inventory at a live price. */}
-                    <div className="inline-flex overflow-hidden rounded-[9px] border border-[#cfe0d9]">
-                      {(["internal", "tbo"] as const).map((key) => {
-                        const active = (source[city.city_name] ?? "internal") === key;
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => {
-                              setSource((s) => ({ ...s, [city.city_name]: key }));
-                              if (key === "internal" && isSearching) setSearchCity(null);
-                            }}
-                            className={`h-8 px-3 text-[11.5px] font-bold transition-colors ${
-                              active ? "bg-[#185045] text-white" : "bg-white text-[#557d78] hover:bg-[#f0f7f4]"
-                            }`}
-                          >
-                            {key === "internal" ? "النظام الداخلي" : "TBO"}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {(source[city.city_name] ?? "internal") === "tbo" ? (
-                      <button
-                        type="button"
-                        disabled={!canSearchLive}
-                        title={canSearchLive ? undefined : "الدولة بلا رمز ISO — لا يمكن البحث لدى المورّد"}
-                        onClick={() => (isSearching ? setSearchCity(null) : void openSearch(city.city_name))}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
-                      >
-                        <Search className="size-3.5" />
-                        {t("pg.supplier.searchHotels")}
-                      </button>
-                    ) : null}
+                    {/* Coverage, not «سطر موجود». A city split between two hotels
+                        with a night missing looked complete under the old rule. */}
+                    <span
+                      className={`tv-tnum rounded-full px-2.5 py-1 text-[11px] font-extrabold ${
+                        short ? "bg-[#fff8e8] text-[#a86a10]" : "bg-[#e9f7f0] text-[#0f7a52]"
+                      }`}
+                    >
+                      <DirText dir="ltr">{`${cov.covered}/${cov.needed}`}</DirText> ليالٍ مغطّاة
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => addStay(cov.city_name)}
+                      className="inline-flex h-8 items-center gap-1 rounded-[9px] border border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                    >
+                      <Plus className="size-3.5" />
+                      فندق آخر
+                    </button>
                   </div>
                 </div>
+
+                <div className="space-y-3">
+                  {cov.stays.map((stay, stayIndex) => {
+                    const line = stay.line;
+                    const roomTypeOptions = lookups.roomTypes.filter(
+                      (rt) => rt.hotel_id === line.hotel_id || rt.hotel_id === null,
+                    );
+                    const isSearching = searchStay === line.id;
+
+                    return (
+                      <div key={line.id} className="rounded-[11px] border border-[#e2ebe7] bg-white p-3">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[12px] font-extrabold text-[#185045]">
+                              {cov.stays.length > 1 ? `الفندق ${stayIndex + 1}` : "الفندق"}
+                            </span>
+                            <label className="flex items-center gap-1.5 text-[11px] font-bold text-[#557d78]">
+                              ليالٍ
+                              <input
+                                type="number"
+                                min={0}
+                                dir="ltr"
+                                value={line.nights || stay.nights}
+                                onChange={(e) => setHotel(line.id, { nights: Math.max(0, Number(e.target.value)) })}
+                                className={`${fieldClass} tv-tnum h-8 w-16 text-center`}
+                              />
+                            </label>
+                            {stay.check_in && stay.check_out ? (
+                              <span className="tv-tnum text-[11px] font-semibold text-[#93aaa3]">
+                                <DirText dir="ltr">{`${stay.check_in} → ${stay.check_out}`}</DirText>
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {/* The source choice. Internal = our own contracted
+                                list, priced by hand; TBO = live inventory at a
+                                live price. Per STAY, so a city can mix them. */}
+                            <div className="inline-flex overflow-hidden rounded-[9px] border border-[#cfe0d9]">
+                              {(["internal", "tbo"] as const).map((key) => {
+                                const active = (source[line.id] ?? "internal") === key;
+                                return (
+                                  <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => {
+                                      setSource((s) => ({ ...s, [line.id]: key }));
+                                      if (key === "internal" && isSearching) setSearchStay(null);
+                                    }}
+                                    className={`h-8 px-3 text-[11.5px] font-bold transition-colors ${
+                                      active ? "bg-[#185045] text-white" : "bg-white text-[#557d78] hover:bg-[#f0f7f4]"
+                                    }`}
+                                  >
+                                    {key === "internal" ? "النظام الداخلي" : "TBO"}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {(source[line.id] ?? "internal") === "tbo" ? (
+                              <button
+                                type="button"
+                                disabled={!canSearchLive}
+                                title={canSearchLive ? undefined : "الدولة بلا رمز ISO — لا يمكن البحث لدى المورّد"}
+                                onClick={() =>
+                                  isSearching ? setSearchStay(null) : void openSearch(cov.city_name, line.id)
+                                }
+                                className="inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+                              >
+                                <Search className="size-3.5" />
+                                {t("pg.supplier.searchHotels")}
+                              </button>
+                            ) : null}
+                            {cov.stays.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => removeStay(line.id)}
+                                aria-label={t("delete")}
+                                className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#f2c7c7] text-[#c43d3d] hover:bg-[#fff1f1]"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
 
                 {/* Occupancy is NOT re-entered here: it was agreed with the
                     customer on stage 1 and the supplier is asked for exactly
                     that. Shown so the agent can see what is being priced. */}
-                {(source[city.city_name] ?? "internal") === "tbo" ? (
+                {(source[line.id] ?? "internal") === "tbo" ? (
                   <p className="tv-tnum mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-[#557d78]">
                     <span>
                       البحث لـ <DirText dir="ltr">{data.trip.adults}</DirText> بالغ
                       {data.trip.children > 0 ? (
                         <> و<DirText dir="ltr">{data.trip.children}</DirText> طفل</>
                       ) : null}{" "}
-                      · <DirText dir="ltr">{line.rooms_count}</DirText> غرفة
+                      · <DirText dir="ltr">{line.rooms_count}</DirText> غرفة ·{" "}
+                      <DirText dir="ltr">{stay.nights}</DirText> ليلة
                     </span>
                     <span className="text-[#93aaa3]">
                       {country?.iso2 ? (
@@ -275,6 +416,33 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                 {/* supplier search panel */}
                 {isSearching ? (
                   <div className="mb-3 rounded-[10px] border border-[#d6eadf] bg-white p-3">
+                    {/* The name goes back to the SUPPLIER (it filters before its
+                        own result cap); everything below narrows what returned. */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void openSearch(cov.city_name, line.id, true);
+                      }}
+                      className="mb-2 flex flex-wrap items-end gap-2"
+                    >
+                      <label className="grid flex-1 gap-1 text-[11.5px] font-bold text-[#185045]">
+                        اسم الفندق
+                        <input
+                          value={filters.name}
+                          onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
+                          placeholder="اتركه فارغاً لعرض كل المتاح"
+                          className={`${fieldClass} h-9`}
+                        />
+                      </label>
+                      <button
+                        type="submit"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                      >
+                        <Search className="size-3.5" />
+                        ابحث
+                      </button>
+                    </form>
+
                     <div className="mb-3 flex flex-wrap items-end gap-2 text-[11.5px] font-bold text-[#185045]">
                       <label className="grid gap-1">
                         {t("pg.supplier.stars")}
@@ -291,12 +459,32 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                         </select>
                       </label>
                       <label className="grid gap-1">
-                        {t("pg.supplier.maxPrice")}
+                        الاسترداد
+                        <select
+                          value={filters.refundable}
+                          onChange={(e) => setFilters((f) => ({ ...f, refundable: e.target.value as typeof f.refundable }))}
+                          className={`${fieldClass} h-9`}
+                        >
+                          <option value="all">الكل</option>
+                          <option value="yes">قابل للاسترداد</option>
+                          <option value="no">غير قابل للاسترداد</option>
+                        </select>
+                      </label>
+                      <label className="grid gap-1">
+                        أعلى سعر لليلة
                         <input type="number" dir="ltr" value={filters.maxPrice} onChange={(e) => setFilters((f) => ({ ...f, maxPrice: e.target.value }))} className={`${fieldClass} tv-tnum h-9 w-24`} />
                       </label>
-                      <label className="flex items-center gap-1.5">
-                        <input type="checkbox" checked={filters.refundableOnly} onChange={(e) => setFilters((f) => ({ ...f, refundableOnly: e.target.checked }))} className="size-4 accent-[#185045]" />
-                        {t("pg.supplier.refundableOnly")}
+                      <label className="grid gap-1">
+                        الترتيب
+                        <select
+                          value={filters.sort}
+                          onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value as typeof f.sort }))}
+                          className={`${fieldClass} h-9`}
+                        >
+                          <option value="price">الأرخص</option>
+                          <option value="price_desc">الأغلى</option>
+                          <option value="stars">النجوم</option>
+                        </select>
                       </label>
                     </div>
 
@@ -304,9 +492,13 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                       <p className="flex items-center gap-2 py-4 text-[12.5px] font-bold text-[#557d78]"><Loader2 className="size-4 animate-spin" />{t("pg.supplier.searching")}</p>
                     ) : searchError ? (
                       <p className="py-2 text-[12.5px] font-bold text-[#c22850]">{searchError}</p>
-                    ) : results && results.length > 0 ? (
+                    ) : results && visibleHotels().length > 0 ? (
                       <div className="space-y-2">
-                        {results.map((hotel) => {
+                        <p className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+                          <DirText dir="ltr">{visibleHotels().length}</DirText> فندق متاح ·{" "}
+                          <DirText dir="ltr">{searchNights}</DirText> ليلة · السعر المعروض لليلة الواحدة
+                        </p>
+                        {visibleHotels().slice(0, shown).map((hotel) => {
                           const rates = hotel.rates.filter((r) => rateMatches(hotel, r));
                           if (rates.length === 0) return null;
                           return (
@@ -332,11 +524,19 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                                       <span className={`rounded-full px-2 py-0.5 font-bold ${rate.refundable ? "bg-[#e4f6ef] text-[#10966b]" : "bg-[#fdeef2] text-[#c22850]"}`}>
                                         {rate.refundable ? t("pg.supplier.refundable") : t("pg.supplier.nonRefundable")}
                                       </span>
-                                      <span className="tv-tnum font-extrabold text-[#0f3d38]"><DirText dir="ltr">{`${rate.sell} SAR`}</DirText></span>
+                                      {/* Per night first — it is what hotels are
+                                          compared by; the total follows it. */}
+                                      <span className="tv-tnum font-extrabold text-[#0f3d38]">
+                                        <DirText dir="ltr">{`${rate.per_night} SAR`}</DirText>
+                                        <span className="font-bold text-[#93aaa3]"> / ليلة</span>
+                                      </span>
+                                      <span className="tv-tnum font-bold text-[#557d78]">
+                                        <DirText dir="ltr">{`${rate.sell} SAR`}</DirText> إجمالي
+                                      </span>
                                       <button
                                         type="button"
                                         disabled={selecting !== null}
-                                        onClick={() => void choose(city.city_name, hotel, rate)}
+                                        onClick={() => void choose(cov.city_name, line.id, hotel, rate)}
                                         className="ms-auto inline-flex h-7 items-center gap-1 rounded-[8px] bg-[#185045] px-2.5 text-[11px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
                                       >
                                         {selecting === rate.rate_key ? <Loader2 className="size-3 animate-spin" /> : null}
@@ -349,6 +549,15 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                             </div>
                           );
                         })}
+                        {visibleHotels().length > shown ? (
+                          <button
+                            type="button"
+                            onClick={() => setShown((n) => n + PAGE)}
+                            className="tv-tnum w-full rounded-[9px] border border-[#cfe0d9] py-2 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                          >
+                            عرض المزيد ({visibleHotels().length - shown})
+                          </button>
+                        ) : null}
                       </div>
                     ) : (
                       <div className="py-2 text-[12.5px] text-[#93aaa3]">
@@ -396,7 +605,7 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                               (rt) => (rt.hotel_id === hotelId || rt.hotel_id === null) && rt.name === r.room_type_name,
                             )?.id ?? null,
                         }));
-                        setLine(city.city_name, withRooms({ ...line, hotel_name: name, hotel_id: hotelId }, pinned));
+                        setLine(line.id, withRooms({ ...line, hotel_name: name, hotel_id: hotelId }, pinned));
                       }}
                       className={fieldClass}
                     >
@@ -409,7 +618,7 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                   </label>
                   <label className={rowLabelClass}>
                     {t("pg.customHotel")}
-                    <input value={line.hotel_id === null ? line.hotel_name : ""} onChange={(e) => setHotel(city.city_name, { hotel_name: e.target.value, hotel_id: null })} className={fieldClass} />
+                    <input value={line.hotel_id === null ? line.hotel_name : ""} onChange={(e) => setHotel(line.id, { hotel_name: e.target.value, hotel_id: null })} className={fieldClass} />
                   </label>
                   {/* the Latin name a traveller shows a taxi driver */}
                   <label className={rowLabelClass}>
@@ -417,7 +626,7 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                     <input
                       dir="ltr"
                       value={line.hotel_name_en}
-                      onChange={(e) => setHotel(city.city_name, { hotel_name_en: e.target.value })}
+                      onChange={(e) => setHotel(line.id, { hotel_name_en: e.target.value })}
                       className={`${fieldClass} text-start`}
                       placeholder="Baku Center Hotel"
                     />
@@ -427,7 +636,7 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                     <input
                       type="number" min={1} dir="ltr"
                       value={line.rooms_count}
-                      onChange={(e) => setLine(city.city_name, resizeRooms(line, Number(e.target.value)))}
+                      onChange={(e) => setLine(line.id, resizeRooms(line, Number(e.target.value)))}
                       className={`${fieldClass} tv-tnum text-center`}
                     />
                   </label>
@@ -445,7 +654,7 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                       roomTypeOptions={roomTypeOptions}
                       onChange={(slice) =>
                         setLine(
-                          city.city_name,
+                          line.id,
                           withRooms(line, line.rooms.map((r, i) => (i === roomIndex ? { ...r, ...slice } : r))),
                         )
                       }
@@ -462,7 +671,7 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                         type="number" min={0} dir="ltr"
                         value={line.manual_price ?? ""}
                         onChange={(e) =>
-                          setHotel(city.city_name, {
+                          setHotel(line.id, {
                             manual_price: e.target.value === "" ? null : Number(e.target.value),
                           })
                         }
@@ -474,7 +683,7 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                       {t("pg.currencyCol")}
                       <select
                         value={line.manual_currency}
-                        onChange={(e) => setHotel(city.city_name, { manual_currency: e.target.value })}
+                        onChange={(e) => setHotel(line.id, { manual_currency: e.target.value })}
                         className={fieldClass}
                       >
                         {CURRENCIES.map((code) => <option key={code} value={code}>{code}</option>)}
@@ -485,8 +694,12 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
 
                 {/* selected supplier rate — image, facilities, price, freshness */}
                 {line.sourcing ? (
-                  <SelectedHotelCard sourcing={line.sourcing} canInternal={canInternal} onRefresh={() => void openSearch(city.city_name)} />
+                  <SelectedHotelCard sourcing={line.sourcing} canInternal={canInternal} onRefresh={() => void openSearch(cov.city_name, line.id)} />
                 ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}

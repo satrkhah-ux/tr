@@ -9,6 +9,9 @@ import type { TranslationKey } from "@/lib/i18n";
 import { validateInvariants, type InvariantViolation } from "./invariants";
 import {
   deriveCityDates,
+  deriveHotelStays,
+  hotelCoverage,
+  pricingRefFor,
   totalCityNights,
   SCOPE_KEYS,
   SCOPE_STAGE,
@@ -17,6 +20,7 @@ import {
 } from "./draft-types";
 import { flightTiming, itineraryStartDate, localDatePart } from "./schedule";
 import { sellBlocks } from "@/lib/pricing/markup";
+import { applyManualProfit } from "./pricing";
 
 export type DraftIssue = {
   severity: "blocking" | "warning";
@@ -81,9 +85,10 @@ export function validateDraft(data: DraftData): DraftValidation {
   if (data.cities.length === 0) blocking.push({ severity: "blocking", stage: "cities", key: "pg.err.noCities" });
 
   // ---- structural invariants (nights sum, date spans, room+board) ----
-  // Hotels inherit their city's derived dates; every hotel line must carry a
-  // room type + board type (invariant #3).
-  const cityByName = new Map(cities.map((c) => [c.city_name, c]));
+  // A city's nights are covered by one or more stays in sequence; each stay
+  // carries its own span, and every stay must state a room + board (invariant #3).
+  const stays = deriveHotelStays(cities, data.hotels);
+  const coverage = hotelCoverage(cities, data.hotels);
   const invariantResult = validateInvariants({
     trip_nights: total,
     cities: cities.map((c) => ({
@@ -92,21 +97,22 @@ export function validateDraft(data: DraftData): DraftValidation {
       check_in: c.check_in,
       check_out: c.check_out,
     })),
-    hotels: data.hotels.map((h) => {
-      const city = cityByName.get(h.city_name);
-      return {
-        hotel_name: h.hotel_name || h.city_name,
-        // The rule is "this line states a room", not "this line has an internal
-        // FK". A supplier rate carries the room in its own name, and a room type
-        // inherited from the trip default is a name until a hotel is picked —
-        // both are a stated room, and neither should block publishing.
-        room_type_id: statedRoom(h),
-        board_type: statedBoard(h),
-        nights: city?.nights ?? null,
-        check_in: city?.check_in ?? null,
-        check_out: city?.check_out ?? null,
-      };
-    }),
+    // Each stay is checked against ITS OWN span, not its city's. A city split
+    // across two hotels has two spans that are each shorter than the city, and
+    // handing the city's dates to both would fail the date invariant on a
+    // perfectly correct plan.
+    hotels: stays.map((s) => ({
+      hotel_name: s.line.hotel_name || s.city_name,
+      // The rule is "this line states a room", not "this line has an internal
+      // FK". A supplier rate carries the room in its own name, and a room type
+      // inherited from the trip default is a name until a hotel is picked —
+      // both are a stated room, and neither should block publishing.
+      room_type_id: statedRoom(s.line),
+      board_type: statedBoard(s.line),
+      nights: s.nights,
+      check_in: s.check_in,
+      check_out: s.check_out,
+    })),
   });
   for (const violation of invariantResult.violations) {
     // With no cities at all, the nights-sum violation duplicates pg.err.noCities.
@@ -114,9 +120,15 @@ export function validateDraft(data: DraftData): DraftValidation {
     blocking.push({ severity: "blocking", stage: INVARIANT_STAGE[violation.code], invariant: violation });
   }
 
-  // Cities exist but no hotel lines yet → the offer can't print an itinerary.
-  const missingHotelCities = cities.filter((c) => !data.hotels.some((h) => h.city_name === c.city_name));
-  if (data.scope.hotels && data.cities.length > 0 && missingHotelCities.length > 0) {
+  // Nights, not rows.
+  //
+  // The old rule was "every city has a hotel line", which a city split across
+  // two hotels satisfies while still leaving the guest without a room for two
+  // of its nights — the exact failure this stage exists to prevent. Under and
+  // over are both blocking: over means we are paying for a night the itinerary
+  // does not have.
+  const uncovered = coverage.filter((c) => c.covered !== c.needed);
+  if (data.scope.hotels && data.cities.length > 0 && uncovered.length > 0) {
     blocking.push({ severity: "blocking", stage: "hotels", key: "pg.err.missingHotels" });
   }
 
@@ -126,12 +138,20 @@ export function validateDraft(data: DraftData): DraftValidation {
   // pricing item the agent may have edited in the Pricing stage AFTER pricing — not
   // the (possibly stale) sell computed at pricing time, so the floors can't be
   // bypassed by lowering the sell later.
-  const supplierBlocked = data.hotels.some((h) => {
-    const s = h.sourcing;
+  const supplierBlocked = stays.some((stay) => {
+    const s = stay.line.sourcing;
     if (!s) return false;
-    const desc = `${h.city_name} — ${h.hotel_name}`;
-    const item = data.pricing.items.find((p) => p.item_type === "hotel" && p.description === desc);
-    const effectiveSell = item?.sell_price ?? s.sell_base;
+    const ref = pricingRefFor(stay);
+    const desc = `${stay.city_name} — ${stay.line.hotel_name}`;
+    const item = data.pricing.items.find(
+      (p) => p.item_type === "hotel" && (p.ref ? p.ref === ref : p.description === desc),
+    );
+    // The floor is checked against what will actually be PUBLISHED, so a manual
+    // profit counts here exactly as a typed sell price does — otherwise a line
+    // marked up by rule would be judged on the price before the markup.
+    const effectiveSell =
+      applyManualProfit(item?.buy_price ?? null, item?.sell_price ?? null, item?.profit_pct, item?.profit_amount) ??
+      s.sell_base;
     return sellBlocks(s.net_base, effectiveSell, { minMarginPct: s.min_margin_pct, floor: s.ref_sell_base }).length > 0;
   });
   if (supplierBlocked) {
@@ -225,7 +245,8 @@ function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey
   const used = totalCityNights(data.cities);
   const hotelsComplete =
     data.cities.length > 0 &&
-    data.cities.every((c) => data.hotels.some((h) => h.city_name === c.city_name)) &&
+    // «مكتمل» means every night has a bed, not "a row exists per city".
+    hotelCoverage(data.cities, data.hotels).every((c) => c.covered === c.needed) &&
     data.hotels.every((h) => Boolean(statedRoom(h) && statedBoard(h)));
   const pricingComplete =
     isFixedPrice(data) || (data.pricing.items.length > 0 && data.pricing.items.every((i) => i.sell_price != null));

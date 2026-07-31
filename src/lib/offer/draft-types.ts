@@ -249,7 +249,23 @@ export function emptyRoomSpec(): DraftRoomSpec {
 
 /** One hotel line per city (aligned by city_name). Prices live in the pricing stage. */
 export type DraftHotel = {
+  /**
+   * Stable identity for THIS stay.
+   *
+   * Two hotels in one city stopped being distinguishable by name the moment a
+   * city could hold more than one, and the pricing item that follows a stay has
+   * to point at something that survives a rename. Legacy lines have no id and
+   * are matched by description instead — see `pricingRefFor`.
+   */
+  id: string;
   city_name: string;
+  /**
+   * Nights THIS line covers, inside its city.
+   *
+   * The unit of the whole stage: a city's nights are covered by one or more
+   * stays in sequence, and «مكتمل» now means covered, not "a row exists".
+   */
+  nights: number;
   hotel_id: string | null;
   hotel_name: string;
   /**
@@ -317,7 +333,14 @@ export function normalizeDraftHotel(raw: unknown): DraftHotel {
   // An old line described ONE room and a count; every room was that room.
   const rooms = Array.isArray(h.rooms) && h.rooms.length > 0 ? h.rooms : Array.from({ length: count }, () => ({ ...legacy }));
   const base: DraftHotel = {
+    // A missing id means a draft written before a city could hold two hotels.
+    // It gets one now; the pricing item that references it by description keeps
+    // matching, because `pricingRefFor` falls back to the description.
+    id: typeof h.id === "string" && h.id ? h.id : newStayId(),
     city_name: typeof h.city_name === "string" ? h.city_name : "",
+    // 0 is meaningful ("not split yet") and distinct from a real 1-night stay:
+    // deriveHotelStays reads 0 as "take whatever the city has left".
+    nights: Number.isFinite(Number(h.nights)) ? Math.max(0, Math.trunc(Number(h.nights))) : 0,
     hotel_id: typeof h.hotel_id === "string" ? h.hotel_id : null,
     hotel_name: typeof h.hotel_name === "string" ? h.hotel_name : "",
     hotel_name_en: typeof h.hotel_name_en === "string" ? h.hotel_name_en : "",
@@ -400,6 +423,19 @@ export type DraftPricingItem = {
   buy_currency: string;
   sell_price: number | null;
   sell_currency: string;
+  /**
+   * The stay (or other draft row) this item prices — see `pricingRefFor`.
+   * Absent on items written before cities could hold two hotels, which is why
+   * reconciliation still accepts a description match.
+   */
+  ref?: string | null;
+  /**
+   * Manual profit ON TOP of the buy price, when the agent overrides the markup
+   * rules. Percentage wins if both are set. Null on both = keep `sell_price`
+   * exactly as the rules (or the agent) left it.
+   */
+  profit_pct?: number | null;
+  profit_amount?: number | null;
 };
 
 /**
@@ -659,6 +695,94 @@ export function deriveCityDates(arrivalDate: string | null, cities: DraftCity[])
     cursor = check_out;
     return { ...c, check_in, check_out };
   });
+}
+
+/** A stay: one hotel line, with the dates its position in the city gives it. */
+export type HotelStay = {
+  line: DraftHotel;
+  city_name: string;
+  nights: number;
+  check_in: string | null;
+  check_out: string | null;
+};
+
+/** Nights allocated vs nights owed, per city. */
+export type CityCoverage = {
+  city_name: string;
+  needed: number;
+  covered: number;
+  stays: HotelStay[];
+};
+
+/** Ids only have to be unique inside one draft, and readable in a log. */
+export function newStayId(): string {
+  return `stay-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * Hotel lines → stays with real dates.
+ *
+ * The rule that makes multi-hotel cities work: within a city, stays run in
+ * array order and each starts where the previous one ended. A line with
+ * `nights: 0` takes whatever the city has left — which is what a freshly added
+ * line means, and what every pre-existing single-hotel line means too, so old
+ * drafts derive exactly as they always did.
+ *
+ * Pure and total: cities without dates yield stays without dates rather than
+ * being dropped, because the hotels stage must still show them.
+ */
+export function deriveHotelStays(cities: DraftCity[], hotels: DraftHotel[]): HotelStay[] {
+  const out: HotelStay[] = [];
+  for (const city of cities) {
+    const lines = hotels.filter((h) => h.city_name === city.city_name);
+    // What the explicit numbers do not claim is left for the lines that ask for
+    // "the rest" — split evenly, remainder to the first, so 3 nights over 2
+    // blank lines is 2+1 rather than 1.5 each.
+    const explicit = lines.reduce((sum, l) => sum + Math.max(0, l.nights), 0);
+    const blanks = lines.filter((l) => l.nights <= 0).length;
+    let remaining = Math.max(0, city.nights - explicit);
+    let cursor = city.check_in;
+
+    lines.forEach((line, i) => {
+      let nights = Math.max(0, line.nights);
+      if (nights === 0 && blanks > 0) {
+        const share = Math.floor(remaining / blanks);
+        const isLastBlank = lines.filter((l, j) => l.nights <= 0 && j > i).length === 0;
+        nights = isLastBlank ? remaining : share;
+        remaining -= nights;
+      }
+      const check_in = cursor;
+      const check_out = check_in ? addDays(check_in, nights) : null;
+      cursor = check_out;
+      out.push({ line, city_name: city.city_name, nights, check_in, check_out });
+    });
+  }
+  return out;
+}
+
+/** Per-city allocated-vs-owed, for the coverage bar and the blocking check. */
+export function hotelCoverage(cities: DraftCity[], hotels: DraftHotel[]): CityCoverage[] {
+  const stays = deriveHotelStays(cities, hotels);
+  return cities.map((city) => {
+    const mine = stays.filter((s) => s.city_name === city.city_name);
+    return {
+      city_name: city.city_name,
+      needed: city.nights,
+      covered: mine.reduce((sum, s) => sum + s.nights, 0),
+      stays: mine,
+    };
+  });
+}
+
+/**
+ * What a pricing item points at.
+ *
+ * The stay's id when it has one; otherwise the old `«المدينة — الفندق»` string,
+ * so items written before this change keep matching their line instead of being
+ * reconciled away as phantoms on the next save.
+ */
+export function pricingRefFor(stay: { line: DraftHotel; city_name: string }): string {
+  return stay.line.id || `${stay.city_name} — ${stay.line.hotel_name}`;
 }
 
 /**

@@ -7,8 +7,10 @@ import { airlineLogoUrl, publicBrandLogoUrl } from "@/components/offer-doc/brand
 import {
   defaultServicesFromLibrary,
   deriveCityDates,
+  deriveHotelStays,
   emptyDraftData,
   emptyTermLibrary,
+  pricingRefFor,
   matchPartner,
   normalizeDraftData,
   normalizeDraftHotel,
@@ -19,6 +21,7 @@ import {
   type TermLibraryItem,
 } from "@/lib/offer/draft-types";
 import { draftSellTotal } from "@/lib/offer/preview-dto";
+import { applyManualProfit } from "@/lib/offer/pricing";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { draftDaySkeleton } from "@/lib/offer/itinerary";
 import { validateDraft } from "@/lib/offer/draft-validation";
@@ -455,14 +458,17 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     }
 
     const cities = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
-    const hotelByCity = new Map(data.hotels.map((h) => [h.city_name, h]));
+    // One row per STAY, not per city. The old Map keyed by city_name silently
+    // kept only the last hotel when a city held two — the offer would print one
+    // hotel and operations would book one, for a trip that needed both.
+    const stays = deriveHotelStays(cities, data.hotels);
     const boardLabel: Record<string, string> = { RO: "غرفة فقط", BB: "شامل الإفطار", HB: "نصف إقامة", FB: "إقامة كاملة", AI: "شامل كليًا" };
 
-    const hotels: OfferHotelInput[] = cities.flatMap((c) => {
-      const h = hotelByCity.get(c.city_name);
-      if (!h) return [];
+    const hotels: OfferHotelInput[] = stays.map((stay) => {
+      const h = stay.line;
+      const c = { check_in: stay.check_in, check_out: stay.check_out, nights: stay.nights };
       const s = h.sourcing;
-      return [{
+      return {
         hotel_id: h.hotel_id,
         hotel_name: h.hotel_name || null,
         room_type_id: h.room_type_id,
@@ -495,21 +501,28 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         facilities: s?.facilities ?? [],
         content_star_rating: s?.star_rating ?? null,
         room_type_name: s?.room_name ?? h.room_type_name ?? null,
-      }];
+      };
     });
 
-    // Reconcile pricing items against the CURRENT hotels: drop stale hotel items
-    // whose city/hotel no longer exists, so a removed hotel's (possibly below-floor)
+    // Reconcile pricing items against the CURRENT stays: drop stale hotel items
+    // whose stay no longer exists, so a removed hotel's (possibly below-floor)
     // price can never publish as a phantom line in the offer total.
-    const validHotelDescs = new Set(
-      cities.flatMap((c) => {
-        const h = hotelByCity.get(c.city_name);
-        return h ? [`${c.city_name} — ${h.hotel_name}`] : [];
-      }),
-    );
+    //
+    // Matched by stay id where there is one, and by the old
+    // «المدينة — الفندق» description otherwise — an item written before cities
+    // could hold two hotels must not be reconciled away as a phantom.
+    const validHotelRefs = new Set(stays.flatMap((s) => [pricingRefFor(s), `${s.city_name} — ${s.line.hotel_name}`]));
     const reconciledItems = data.pricing.items.filter(
-      (it) => it.item_type !== "hotel" || validHotelDescs.has(it.description ?? ""),
+      (it) => it.item_type !== "hotel" || validHotelRefs.has(it.ref ?? it.description ?? ""),
     );
+
+    // The sell the agent is actually looking at. A line priced with a manual
+    // profit («٪» or a flat amount) stores the ORIGINAL sell, so publishing
+    // `item.sell_price` directly would send the offer out at the price before
+    // the markup — the one number nobody would notice was wrong until the
+    // month's margin came in short.
+    const effectiveSell = (item: (typeof reconciledItems)[number]) =>
+      applyManualProfit(item.buy_price, item.sell_price, item.profit_pct, item.profit_amount);
 
     const pricing_items: OfferPricingItemInput[] = reconciledItems.map((item) => ({
       item_type: item.item_type,
@@ -517,7 +530,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       quantity: item.quantity,
       buy_price: item.buy_price,
       buy_currency: item.buy_currency || null,
-      sell_price: item.sell_price,
+      sell_price: effectiveSell(item),
       sell_currency: item.sell_currency || null,
     }));
 
@@ -526,7 +539,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       (reconciledItems.length > 0
         ? Number(
             reconciledItems
-              .reduce((sum, item) => sum + (item.sell_price ?? 0) * (item.quantity > 0 ? item.quantity : 1), 0)
+              .reduce((sum, item) => sum + (effectiveSell(item) ?? 0) * (item.quantity > 0 ? item.quantity : 1), 0)
               .toFixed(2),
           )
         : null);
@@ -572,11 +585,16 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       total: sellTotal,
       buy_total: buyTotal,
       currency: data.pricing.display_currency,
+      // The snapshot's city summary. With two hotels in a city it names the
+      // first and says how many follow, rather than picking one arbitrarily and
+      // printing it as though it were the whole stay.
       cities: cities.map((c) => {
-        const h = hotelByCity.get(c.city_name);
+        const mine = stays.filter((s) => s.city_name === c.city_name);
+        const h = mine[0]?.line;
+        const extra = mine.length > 1 ? ` + ${mine.length - 1}` : "";
         return {
           city_name: c.city_name,
-          hotel_name: h?.hotel_name || null,
+          hotel_name: h?.hotel_name ? `${h.hotel_name}${extra}` : null,
           room_type: h?.room_type_name || null,
           nights: c.nights,
           check_in: c.check_in,

@@ -44,6 +44,45 @@ function completeDraft(): DraftData {
   return data;
 }
 
+describe("a city split across two hotels", () => {
+  /** كوالالمبور's 3 nights as 1 + 2, which is the whole point of the change. */
+  function splitDraft(firstNights: number, secondNights: number): DraftData {
+    const data = completeDraft();
+    data.hotels = [
+      normalizeDraftHotel({ city_name: "كوالالمبور", hotel_name: "فندق 1", nights: firstNights, room_type_name: "ديلوكس", board_type: "BB", rooms_count: 1 }),
+      normalizeDraftHotel({ city_name: "كوالالمبور", hotel_name: "فندق 1ب", nights: secondNights, room_type_name: "ديلوكس", board_type: "BB", rooms_count: 1 }),
+      normalizeDraftHotel({ city_name: "لنكاوي", hotel_name: "فندق 2", nights: 2, room_type_name: "سوبيريور", board_type: "HB", rooms_count: 1 }),
+    ];
+    return data;
+  }
+
+  it("publishes when the nights add up", () => {
+    const result = validateDraft(splitDraft(1, 2));
+    expect(result.blocking).toEqual([]);
+    expect(result.stages.hotels).toBe("complete");
+  });
+
+  it("blocks when a night has no bed — the failure the old per-city rule allowed", () => {
+    // Both cities have a hotel row, so the previous rule called this complete
+    // while the guest had nowhere to sleep on the third night.
+    const result = validateDraft(splitDraft(1, 1));
+    expect(result.ok).toBe(false);
+    expect(result.blocking.some((b) => b.stage === "hotels")).toBe(true);
+    expect(result.stages.hotels).not.toBe("complete");
+  });
+
+  it("blocks over-allocation too — a night we pay for and the itinerary does not have", () => {
+    const result = validateDraft(splitDraft(2, 2));
+    expect(result.ok).toBe(false);
+    expect(result.blocking.some((b) => b.stage === "hotels")).toBe(true);
+  });
+
+  it("still accepts a single hotel with no nights of its own (every old draft)", () => {
+    const result = validateDraft(completeDraft());
+    expect(result.blocking).toEqual([]);
+  });
+});
+
 describe("deriveCityDates", () => {
   it("chains check-in/check-out from arrival through the nights order", () => {
     const cities = deriveCityDates("2026-06-01", [

@@ -23,7 +23,37 @@ export type PricingLineInput = {
   buy_currency: string | null;
   sell_price: number | null;
   sell_currency: string | null;
+  /**
+   * Manual profit on top of the buy price, overriding whatever sell was stored.
+   * Percentage wins when both are set — an agent who typed both meant the last
+   * thing they typed, and silently adding them would produce a number neither
+   * of them asked for.
+   *
+   * Applied to the UNIT buy price, so quantity multiplies the marked-up unit
+   * exactly as it multiplies a typed one.
+   */
+  profit_pct?: number | null;
+  profit_amount?: number | null;
 };
+
+/**
+ * The unit sell price after a manual profit override.
+ *
+ * Exported because the draft has to store the resulting sell (the offer, the
+ * document and the floor checks all read `sell_price`), and recomputing it in
+ * two places is how they drift.
+ */
+export function applyManualProfit(
+  buy: number | null,
+  sell: number | null,
+  profit_pct?: number | null,
+  profit_amount?: number | null,
+): number | null {
+  if (buy == null) return sell;
+  if (profit_pct != null && Number.isFinite(profit_pct)) return round2(buy * (1 + profit_pct / 100));
+  if (profit_amount != null && Number.isFinite(profit_amount)) return round2(buy + profit_amount);
+  return sell;
+}
 
 export type LinePricing = {
   item_type: PricingItemType | null;
@@ -79,7 +109,11 @@ function nativeTotal(unit: number | null, quantity: number): number | null {
 export function computeLine(line: PricingLineInput, rates: CurrencyRates, base: string): LinePricing {
   const quantity = Number.isFinite(line.quantity) && line.quantity > 0 ? line.quantity : 1;
   const total_buy = nativeTotal(line.buy_price, quantity);
-  const total_sell = nativeTotal(line.sell_price, quantity);
+  // A manual profit is stated against the buy price and in ITS currency, so it
+  // is applied before conversion — marking up a converted figure would move the
+  // margin every time the exchange rate did.
+  const unitSell = applyManualProfit(line.buy_price, line.sell_price, line.profit_pct, line.profit_amount);
+  const total_sell = nativeTotal(unitSell, quantity);
 
   const base_buy = total_buy == null ? null : convert(total_buy, line.buy_currency, rates, base);
   const base_sell = total_sell == null ? null : convert(total_sell, line.sell_currency, rates, base);

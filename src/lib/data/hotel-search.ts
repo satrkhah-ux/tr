@@ -12,6 +12,8 @@ import type { MarkupContext } from "@/lib/pricing/markup";
 import {
   findLookupCountry,
   deriveCityDates,
+  deriveHotelStays,
+  pricingRefFor,
   normalizeDraftHotel,
   withRooms,
   type DraftHotel,
@@ -32,6 +34,12 @@ export type SearchRate = {
   refundable: boolean;
   cancellation_policy: string;
   sell: number;
+  /**
+   * Sell ÷ nights. The number an agent actually compares hotels by — leaving it
+   * out makes them divide in their head against a total for a different number
+   * of nights, which is where the comparison goes wrong.
+   */
+  per_night: number;
   currency: string;
   valid_until: string | null;
   blocked: boolean;
@@ -68,9 +76,15 @@ export type SearchResult =
       fetched_at: string;
       check_in: string;
       check_out: string;
+      nights: number;
       notes: SupplierNote[];
     }
   | { ok: false; error: TranslationKey };
+
+/** What the agent typed into the search box, beyond the stay itself. */
+export type SearchFilters = {
+  hotel_name?: string | null;
+};
 
 /** Suppliers the agent may pick between on the hotels stage. */
 export type SupplierChoice = { code: string; name: string; live: boolean };
@@ -82,20 +96,34 @@ export async function listHotelSourceOptions(): Promise<SupplierChoice[]> {
   return suppliers.map((s) => ({ code: s.code, name: s.name, live: typeof s.prebook === "function" }));
 }
 
-type Stay = { check_in: string; check_out: string; rooms: number };
+type Stay = { check_in: string; check_out: string; rooms: number; nights: number };
 
-async function resolveStay(draftId: string, cityName: string) {
+/**
+ * The dates and occupancy to quote.
+ *
+ * Resolves ONE STAY, not one city: a city split across two hotels has two spans,
+ * and searching either half against the city's full dates asks the supplier for
+ * nights the guest will spend somewhere else — and prices them.
+ *
+ * `stayId` is optional so the older per-city callers keep working; without it
+ * the city's first stay is used, which for a single-hotel city is the city.
+ */
+async function resolveStay(draftId: string, cityName: string, stayId?: string | null) {
   const record = await getDraft(draftId);
   if (!record) return null;
   const data = record.data;
   const cities = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
+  const stays = deriveHotelStays(cities, data.hotels);
+  const mine = stays.filter((s) => s.city_name === cityName);
+  const stay = (stayId ? mine.find((s) => s.line.id === stayId) : null) ?? mine[0] ?? null;
+
   const city = cities.find((c) => c.city_name === cityName);
-  const check_in = city?.check_in ?? data.trip.arrival_date;
-  const check_out = city?.check_out ?? data.trip.departure_date;
-  const hotel = data.hotels.find((h) => h.city_name === cityName);
-  const rooms = hotel && hotel.rooms_count > 0 ? hotel.rooms_count : 1;
+  const check_in = stay?.check_in ?? city?.check_in ?? data.trip.arrival_date;
+  const check_out = stay?.check_out ?? city?.check_out ?? data.trip.departure_date;
+  const rooms = stay && stay.line.rooms_count > 0 ? stay.line.rooms_count : 1;
+  const nights = stay?.nights ?? city?.nights ?? 0;
   if (!check_in || !check_out) return null;
-  return { data, stay: { check_in, check_out, rooms } as Stay };
+  return { data, stay: { check_in, check_out, rooms, nights } as Stay };
 }
 
 function contextFor(country: string | null, city: string, supplierId: string, date: string | null): MarkupContext {
@@ -112,10 +140,13 @@ export async function searchHotelsForCity(
   cityName: string,
   /** search ONE supplier. Omitted = every enabled one, as before. */
   supplierCode?: string,
+  /** which stay in the city — its nights and dates are what gets quoted. */
+  stayId?: string | null,
+  filters?: SearchFilters,
 ): Promise<SearchResult> {
   const user = await getServerUser();
   if (!user) return { ok: false, error: "err.session" };
-  const resolved = await resolveStay(draftId, cityName);
+  const resolved = await resolveStay(draftId, cityName, stayId);
   if (!resolved) return { ok: false, error: "pg.supplier.noDates" };
   const { data, stay } = resolved;
 
@@ -139,6 +170,7 @@ export async function searchHotelsForCity(
     // Hotel net rates are nationality-dependent (resident vs GCC vs other), so
     // the wrong one quotes a price the supplier will not honour.
     nationality: "SA",
+    hotel_name: filters?.hotel_name?.trim() || null,
   };
 
   const notes: SupplierNote[] = [];
@@ -171,6 +203,9 @@ export async function searchHotelsForCity(
           refundable: rate.refundable,
           cancellation_policy: rate.cancellation_policy,
           sell: priced.line.sell,
+          // Computed once here rather than in every card, so the number the
+          // agent compares by is the same one everywhere it appears.
+          per_night: stay.nights > 0 ? Math.round((priced.line.sell / stay.nights) * 100) / 100 : priced.line.sell,
           currency: BASE,
           valid_until: rate.valid_until,
           blocked: priced.line.blocks.length > 0,
@@ -201,6 +236,7 @@ export async function searchHotelsForCity(
     fetched_at: new Date().toISOString(),
     check_in: stay.check_in,
     check_out: stay.check_out,
+    nights: stay.nights,
     notes,
   };
 }
@@ -238,10 +274,12 @@ export async function selectHotelRate(
   supplierCode: string,
   supplierHotelId: string,
   rateKey: string,
+  /** which stay in the city receives it. Omitted = the city's first. */
+  stayId?: string | null,
 ): Promise<SelectResult> {
   const user = await getServerUser();
   if (!user) return { ok: false, error: "err.session" };
-  const resolved = await resolveStay(draftId, cityName);
+  const resolved = await resolveStay(draftId, cityName, stayId);
   if (!resolved) return { ok: false, error: "pg.supplier.noDates" };
   const { data, stay } = resolved;
 
@@ -312,11 +350,19 @@ export async function selectHotelRate(
     rate_fetched_at: new Date().toISOString(),
   };
 
-  // set the chosen hotel on the city's line (rebuild from cities like the stage does)
-  const hotels: DraftHotel[] = data.cities.map((c) => {
-    const existing = data.hotels.find((h) => h.city_name === c.city_name);
-    const base: DraftHotel = existing ?? normalizeDraftHotel({ city_name: c.city_name });
-    if (c.city_name !== cityName) return base;
+  // Write onto THE chosen stay, leaving every other line — including the other
+  // hotels in the same city — exactly as it was. Rebuilding the array from
+  // cities (as this used to) would have collapsed a two-hotel city into one.
+  const targetId =
+    stayId ?? data.hotels.find((h) => h.city_name === cityName)?.id ?? null;
+  const existingForCity = data.hotels.some((h) => h.city_name === cityName);
+  const lines: DraftHotel[] = existingForCity
+    ? data.hotels
+    : [...data.hotels, normalizeDraftHotel({ city_name: cityName })];
+
+  const hotels: DraftHotel[] = lines.map((base) => {
+    const isTarget = targetId ? base.id === targetId : base.city_name === cityName;
+    if (!isTarget) return base;
     // The supplier rate describes ONE room product; every room on this line
     // becomes that product (withRooms keeps rooms_count and the mirrors in step).
     return withRooms(
@@ -335,11 +381,18 @@ export async function selectHotelRate(
     );
   });
 
-  // keep the offer rollup in sync (one hotel pricing item per line)
-  const desc = `${cityName} — ${content?.name_ar || rate.hotel_name}`;
+  // Keep the offer rollup in sync — ONE pricing item per stay.
+  //
+  // The old lookup matched the first item whose description started with the
+  // city name, which with two hotels in a city overwrote the first hotel's price
+  // with the second's and published a total that was missing a stay.
+  const hotelName = content?.name_ar || rate.hotel_name;
+  const target = hotels.find((h) => (targetId ? h.id === targetId : h.city_name === cityName));
+  const ref = target ? pricingRefFor({ line: target, city_name: cityName }) : `${cityName} — ${hotelName}`;
   const item: DraftPricingItem = {
     item_type: "hotel",
-    description: desc,
+    description: `${cityName} — ${hotelName}`,
+    ref,
     quantity: 1,
     buy_price: line.net,
     buy_currency: BASE,
@@ -347,8 +400,13 @@ export async function selectHotelRate(
     sell_currency: BASE,
   };
   const items = [...data.pricing.items];
-  const idx = items.findIndex((p) => p.item_type === "hotel" && p.description.startsWith(`${cityName} — `));
-  if (idx >= 0) items[idx] = item;
+  const idx = items.findIndex(
+    (p) =>
+      p.item_type === "hotel" &&
+      // by ref where there is one, else the legacy per-city description
+      (p.ref ? p.ref === ref : p.description.startsWith(`${cityName} — `)),
+  );
+  if (idx >= 0) items[idx] = { ...items[idx], ...item };
   else items.push(item);
 
   await saveDraftStages(draftId, { hotels, pricing: { ...data.pricing, items, display_currency: BASE } });

@@ -6,7 +6,14 @@ import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getRates } from "@/lib/data/rates-actions";
 import { computeOfferPricing, type CurrencyRates, type LinePricing } from "@/lib/offer/pricing";
-import { CURRENCIES, type DraftPricingItem } from "@/lib/offer/draft-types";
+import {
+  CURRENCIES,
+  deriveCityDates,
+  deriveHotelStays,
+  pricingRefFor,
+  type DraftPricingItem,
+} from "@/lib/offer/draft-types";
+import { itineraryStartDate } from "@/lib/offer/schedule";
 import type { PricingItemType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
@@ -109,14 +116,36 @@ export function PricingStage({ data, patch }: StageFormProps) {
     ]);
   }
 
+  /**
+   * How many nights a hotel line covers — for «سعر الليلة».
+   *
+   * Matched by the stay id where the item has one, and by the old
+   * «المدينة — الفندق» description otherwise, so items written before a city
+   * could hold two hotels still find their stay.
+   */
+  const stays = deriveHotelStays(
+    deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities),
+    data.hotels,
+  );
+  function nightsFor(item: DraftPricingItem): number {
+    if (item.item_type !== "hotel") return 0;
+    const stay = stays.find(
+      (s) => (item.ref ? pricingRefFor(s) === item.ref : `${s.city_name} — ${s.line.hotel_name}` === item.description),
+    );
+    return stay?.nights ?? 0;
+  }
+
   /** Seed one line per hotel / flight leg / transfer / visa already in the draft. */
   function suggestItems() {
     const existing = new Set(pricing.items.map((item) => item.description));
     const suggestions: DraftPricingItem[] = [
-      ...data.hotels.map((h) => ({
+      // One suggestion per STAY: two hotels in a city are two lines to price,
+      // and suggesting one of them silently drops the other's cost.
+      ...stays.map((s) => ({
         item_type: "hotel" as const,
-        description: `${h.city_name} — ${h.hotel_name || t("pg.hotel")}`,
-        quantity: h.rooms_count > 0 ? h.rooms_count : 1,
+        description: `${s.city_name} — ${s.line.hotel_name || t("pg.hotel")}`,
+        ref: pricingRefFor(s),
+        quantity: s.line.rooms_count > 0 ? s.line.rooms_count : 1,
       })),
       ...data.flights.map((f) => ({
         item_type: "flight" as const,
@@ -188,6 +217,7 @@ export function PricingStage({ data, patch }: StageFormProps) {
                 item={item}
                 line={summary.lines[index]}
                 canInternal={canInternal}
+                nights={nightsFor(item)}
                 onChange={(slice) => updateItem(index, slice)}
                 onRemove={() => setItems(pricing.items.filter((_, i) => i !== index))}
               />
@@ -257,18 +287,23 @@ function PricingCard({
   item,
   line,
   canInternal,
+  nights,
   onChange,
   onRemove,
 }: {
   item: DraftPricingItem;
   line: LinePricing | undefined;
   canInternal: boolean;
+  /** nights this line covers, for hotel lines — 0 for everything else. */
+  nights: number;
   onChange: (slice: Partial<DraftPricingItem>) => void;
   onRemove: () => void;
 }) {
   const { t } = useTraveliunUI();
   const profit = line?.profit_base ?? null;
   const losing = profit != null && profit < 0;
+  const manual = item.profit_pct != null || item.profit_amount != null;
+  const perNight = nights > 0 && line?.total_sell != null ? line.total_sell / nights : null;
 
   return (
     <div className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
@@ -321,8 +356,18 @@ function PricingCard({
           <input
             type="number" min={0} dir="ltr"
             value={item.sell_price ?? ""}
-            onChange={(e) => onChange({ sell_price: e.target.value === "" ? null : Number(e.target.value) })}
-            className={`${fieldClass} tv-tnum text-center`}
+            onChange={(e) =>
+              // Typing a sell price directly is an answer, so it clears any
+              // profit rule — otherwise the rule would immediately overwrite it
+              // and the number the agent typed would vanish as they looked at it.
+              onChange({
+                sell_price: e.target.value === "" ? null : Number(e.target.value),
+                profit_pct: null,
+                profit_amount: null,
+              })
+            }
+            disabled={manual}
+            className={`${fieldClass} tv-tnum text-center disabled:bg-[#f1f5f3] disabled:text-[#93aaa3]`}
             placeholder="0"
           />
         </label>
@@ -340,9 +385,60 @@ function PricingCard({
         </label>
       </div>
 
+      {/* Profit on top of the buy price — the fast way to price a line without
+          computing the sell by hand. Internal only: it is stated as margin. */}
+      {canInternal && item.buy_price != null ? (
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <label className={cardLabelClass}>
+            نسبة ربح ٪
+            <input
+              type="number" min={0} dir="ltr"
+              value={item.profit_pct ?? ""}
+              onChange={(e) =>
+                onChange({
+                  profit_pct: e.target.value === "" ? null : Number(e.target.value),
+                  profit_amount: null,
+                })
+              }
+              className={`${fieldClass} tv-tnum h-9 w-24 text-center`}
+              placeholder="—"
+            />
+          </label>
+          <label className={cardLabelClass}>
+            أو مبلغ ربح
+            <input
+              type="number" min={0} dir="ltr"
+              value={item.profit_amount ?? ""}
+              onChange={(e) =>
+                onChange({
+                  profit_amount: e.target.value === "" ? null : Number(e.target.value),
+                  profit_pct: null,
+                })
+              }
+              className={`${fieldClass} tv-tnum h-9 w-28 text-center`}
+              placeholder="—"
+            />
+          </label>
+          {manual ? (
+            <button
+              type="button"
+              onClick={() => onChange({ profit_pct: null, profit_amount: null })}
+              className="h-9 rounded-[9px] border border-[#dbe6e1] px-2.5 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6]"
+            >
+              إلغاء الربح اليدوي
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* what the quantity multiplies those unit prices into */}
       {line ? (
         <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[#e7f0ec] pt-2.5 text-[11.5px] font-bold">
+          {/* The number a hotel is judged by. Shown for hotel lines only —
+              a per-night visa fee would be meaningless. */}
+          {perNight != null ? (
+            <LineFigure label="سعر الليلة" value={`${formatMoney(perNight)} ${line.sell_currency ?? ""}`} tone="brand" />
+          ) : null}
           {canInternal && line.total_buy != null ? (
             <LineFigure label={t("pg.totalBuy")} value={`${formatMoney(line.total_buy)} ${line.buy_currency ?? ""}`} tone="muted" />
           ) : null}
