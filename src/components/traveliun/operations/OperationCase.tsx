@@ -57,6 +57,7 @@ export function OperationCase({
   clientToken,
   assignees,
   sentRequests,
+  canBook,
 }: {
   operation: OperationCard;
   travelers: TravelerListItem[];
@@ -67,6 +68,8 @@ export function OperationCase({
   clientToken: string | null;
   assignees: AssigneeOption[];
   sentRequests: SentRequest[];
+  /** may commit a reservation at the supplier — `operations.book`. */
+  canBook: boolean;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -146,6 +149,7 @@ export function OperationCase({
           clientToken={clientToken}
           assignees={assignees}
           sentRequests={sentRequests}
+          canBook={canBook}
         />
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">

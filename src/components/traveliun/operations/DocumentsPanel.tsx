@@ -36,6 +36,7 @@ import type { VoucherKind } from "@/lib/operations/voucher-dto";
 import type { TranslationKey } from "@/lib/i18n";
 import type { AssigneeOption, SentRequest } from "@/lib/data/operation-assign";
 import { AssignBooking, AssigneeChip } from "./AssignBooking";
+import { SupplierBooking } from "./SupplierBooking";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
 const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
@@ -63,6 +64,7 @@ export function DocumentsPanel({
   clientToken,
   assignees,
   sentRequests,
+  canBook,
 }: {
   operationId: string;
   bookings: OperationBooking[];
@@ -71,6 +73,7 @@ export function DocumentsPanel({
   clientToken: string | null;
   assignees: AssigneeOption[];
   sentRequests: SentRequest[];
+  canBook: boolean;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -186,6 +189,7 @@ export function DocumentsPanel({
                 booking={b}
                 operationId={operationId}
                 assignees={assignees}
+                canBook={canBook}
                 onDone={() => router.refresh()}
               />
             ))}
@@ -473,11 +477,13 @@ function BookingRow({
   booking,
   operationId,
   assignees,
+  canBook,
   onDone,
 }: {
   booking: OperationBooking;
   operationId: string;
   assignees: AssigneeOption[];
+  canBook: boolean;
   onDone: () => void;
 }) {
   const { t } = useTraveliunUI();
@@ -582,6 +588,9 @@ function BookingRow({
       </div>
 
       <AssignBooking booking={booking} operationId={operationId} assignees={assignees} onDone={onDone} />
+
+      {/* Hotels only — TBO is a hotel API, and flights/visas stay manual. */}
+      <SupplierBooking booking={booking} canBook={canBook} onDone={onDone} />
 
       {editing ? (
         <div className="mt-2 grid gap-2 rounded-[9px] border border-[#e2ebe7] bg-[#f8fbf9] p-3 sm:grid-cols-2">

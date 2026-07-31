@@ -54,3 +54,6 @@ next-env.d.ts
 
 # Local temp files
 temp/
+
+# TBO certification pack — real request/response logs with guest details
+tbo-certification/

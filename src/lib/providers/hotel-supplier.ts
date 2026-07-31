@@ -85,6 +85,80 @@ export type TestConnectionResult = {
   sampleCount?: number;
 };
 
+// ---------------------------------------------------------------------------
+// Booking — the part that spends money.
+// ---------------------------------------------------------------------------
+
+/**
+ * Why every booking call returns a discriminated union instead of `T | null`.
+ *
+ * "The supplier said no" and "we never reached the supplier" are opposite facts
+ * with opposite correct responses, and the whole cost of confusing them lands on
+ * one case: a `Book` that timed out. The reservation may exist. Retrying it
+ * books the room twice; treating it as failed leaves a guest with no room and us
+ * with a bill. So `unreachable` is its own outcome, and the caller is forced to
+ * handle it — TBO's own spec says to call BookingDetail 120 seconds later rather
+ * than assume anything.
+ */
+export type SupplierOutcome<T> =
+  | { kind: "ok"; data: T }
+  /** the supplier answered, and the answer was no. Safe to show and to stop on. */
+  | { kind: "rejected"; code: number | null; message: string }
+  /** no answer: timeout, network, non-JSON. State is UNKNOWN, never "failed". */
+  | { kind: "unreachable"; message: string };
+
+export type PrebookResult = {
+  booking_code: string;
+  /** the price the supplier will actually honour, for the whole stay. */
+  total_fare: number;
+  currency: string;
+  refundable: boolean;
+  cancellation_policy: string;
+  /** last moment a free cancellation is possible, ISO date, if any. */
+  cancellation_deadline: string | null;
+  room_name: string;
+};
+
+export type BookGuest = {
+  title: "Mr" | "Mrs" | "Ms";
+  first_name: string;
+  last_name: string;
+  type: "Adult" | "Child";
+};
+
+export type BookInput = {
+  booking_code: string;
+  /** one entry per ROOM; each entry lists that room's guests. */
+  rooms: { guests: BookGuest[] }[];
+  /** our idempotency key — the unique client_reference on the booking row. */
+  client_reference: string;
+  /** our own reference, persisted BEFORE the call so a lost answer is findable. */
+  booking_reference: string;
+  total_fare: number;
+  email: string;
+  phone: string;
+};
+
+export type BookResult = {
+  confirmation_number: string;
+  client_reference: string | null;
+};
+
+export type BookingDetailResult = {
+  status: string;
+  confirmation_number: string | null;
+  /** the HOTEL's own reference. TBO only has it when check-in is within 30 days. */
+  hotel_confirmation_number: string | null;
+  invoice_number: string | null;
+  check_in: string | null;
+  check_out: string | null;
+  total_fare: number | null;
+  currency: string | null;
+  cancellation_policy: string | null;
+  cancellation_deadline: string | null;
+  voucher: boolean;
+};
+
 export interface HotelSupplier {
   readonly code: string;
   readonly name: string;
@@ -96,7 +170,40 @@ export interface HotelSupplier {
   searchRates(query: HotelSearchQuery & { supplier_hotel_id: string }): Promise<SupplierRate[]>;
   /** STATIC content for one hotel — fetched ONCE, then cached. */
   fetchContent(supplierHotelId: string): Promise<SupplierHotelContent | null>;
+
+  // ---- optional: only suppliers we can actually book through implement these.
+  // Optional rather than throwing stubs, so `typeof s.book === "function"` is the
+  // honest test of whether a machine booking is possible at all.
+
+  /** re-validate a rate and get the price the supplier will honour NOW. */
+  prebook?(bookingCode: string): Promise<SupplierOutcome<PrebookResult>>;
+  /** commit. Spends money. */
+  book?(input: BookInput): Promise<SupplierOutcome<BookResult>>;
+  /** read a booking back — also the recovery path after a lost Book answer. */
+  bookingDetail?(ref: { confirmation_number?: string; booking_reference?: string }): Promise<SupplierOutcome<BookingDetailResult>>;
+  cancel?(confirmationNumber: string): Promise<SupplierOutcome<{ confirmation_number: string; message: string }>>;
 }
+
+/**
+ * One line per API call, handed to whoever built the adapter.
+ *
+ * The provider layer does not touch the database — it hands the record out and
+ * the data layer decides where it goes. That keeps every adapter testable with
+ * no Supabase, and keeps the certification log a by-product of real traffic
+ * rather than a second code path that can disagree with it.
+ */
+export type SupplierCallRecord = {
+  supplier_code: string;
+  method: string;
+  request: unknown;
+  response: unknown;
+  http_status: number | null;
+  status_code: number | null;
+  duration_ms: number;
+  ok: boolean;
+};
+
+export type SupplierCallRecorder = (record: SupplierCallRecord) => void;
 
 // ---------------------------------------------------------------------------
 // Deterministic mock data engine (shared by the mock adapter and the simulated
@@ -248,6 +355,44 @@ const TBO_DEFAULT_BASE = "https://api.tbotechnology.in/TBOHolidays_HotelAPI";
 type TboStatus = { Status?: { Code?: number; Description?: string } };
 
 /**
+ * TBO's status codes (spec §5), and what each one means for us.
+ *
+ * **Only 200 is success.** The previous implementation also accepted 201, which
+ * is `NO_AVAILABILITY` — so "there are no rooms" was being read as "here are
+ * your rooms", and the empty result that followed looked like a parsing problem
+ * rather than the supplier's answer.
+ *
+ * `500` is deliberately NOT a rejection. TBO calls it "any undefined error" and
+ * asks for the logs; after a Book that is indistinguishable from a reservation
+ * that may exist, and the only safe reading of "may exist" is: go and look.
+ */
+const TBO_UNKNOWN_CODES = new Set([500]);
+
+function tboMessage(code: number | null, description: string | undefined): string {
+  switch (code) {
+    case 201:
+    case 207:
+      return "لم تعد هذه الغرفة/السعر متاحة لدى المورّد.";
+    case 315:
+      return "انتهت صلاحية السعر (انقضت الجلسة) — أعد التحقق من السعر ثم احجز.";
+    case 300:
+      return "رصيد الشركة لدى المورّد لا يكفي لهذا الحجز.";
+    case 405:
+      return "رفض المورّد إنشاء الحجز.";
+    case 479:
+      return "تعذّر إلغاء الحجز لدى المورّد.";
+    case 401:
+      return "بيانات الاعتماد غير صحيحة أو الحساب غير مُفعّل لدى المورّد.";
+    case 400:
+      return "طلب غير صالح — راجع بيانات الحجز.";
+    case 429:
+      return "ضغط على واجهة المورّد — أعد المحاولة بعد قليل.";
+    default:
+      return description?.trim() || `رفض المورّد الطلب${code == null ? "" : ` (${code})`}.`;
+  }
+}
+
+/**
  * TBO Holidays adapter — REAL calls against the live HotelAPI.
  *
  * ⚠️ THIS ADAPTER NEVER INVENTS DATA. An earlier version fell back to the mock
@@ -261,6 +406,25 @@ type TboStatus = { Status?: { Code?: number; Description?: string } };
  * Rates are supplier NET. Nothing here is client-facing: the markup engine and
  * the DTO layer decide what a customer ever sees.
  */
+/**
+ * Per-method timeouts, from §3 of the spec — not one number for everything.
+ *
+ * This mattered more than it looks. The adapter used a flat 25s, and the spec
+ * allows Book **120 seconds**. A hotel booking that takes 40s is ordinary; with
+ * the old number we would have aborted from our side while TBO went on to
+ * confirm it, producing exactly the one state this integration must never
+ * produce — a real reservation the system believes failed.
+ */
+const TBO_TIMEOUT_MS: Record<string, number> = {
+  Search: 25_000,
+  search: 25_000,
+  PreBook: 25_000,
+  Book: 120_000,
+  BookingDetail: 30_000,
+  Cancel: 60_000,
+};
+const TBO_DEFAULT_TIMEOUT_MS = 25_000;
+
 class TboHotelSupplier implements HotelSupplier {
   readonly code = "tbo";
   readonly name = "TBO Holidays";
@@ -268,9 +432,16 @@ class TboHotelSupplier implements HotelSupplier {
   private readonly baseUrl: string;
   /** true when the row says 'sandbox' but no sandbox host was ever entered. */
   private readonly unsafeSandbox: boolean;
+  private readonly record: SupplierCallRecorder | null;
 
-  constructor(creds: SupplierCredentials | null, baseUrl: string | null, environment: SupplierEnvironment = "live") {
+  constructor(
+    creds: SupplierCredentials | null,
+    baseUrl: string | null,
+    environment: SupplierEnvironment = "live",
+    record: SupplierCallRecorder | null = null,
+  ) {
     this.creds = creds;
+    this.record = record;
     const stored = baseUrl?.trim() || "";
     // A stored base URL wins (TBO issues per-account hosts), else the public one.
     this.baseUrl = (stored || TBO_DEFAULT_BASE).replace(/\/+$/, "");
@@ -292,12 +463,26 @@ class TboHotelSupplier implements HotelSupplier {
   }
 
   /**
-   * One TBO call. Returns null on any failure — the caller shows "no results",
-   * never a fabricated one. The supplier's own error text is deliberately not
-   * propagated to the UI: it can leak the endpoint and the account identity.
+   * One TBO call, with the outcome kept intact.
+   *
+   * TBO answers HTTP 200 while putting the real verdict in `Status.Code` — a 401
+   * for bad credentials arrives inside a "successful" response. Reading only the
+   * HTTP status reports success for every authentication failure, so both are
+   * checked and both are recorded.
    */
-  private async call<T extends TboStatus>(path: string, body?: unknown): Promise<T | null> {
+  private async raw<T extends TboStatus>(path: string, body?: unknown): Promise<SupplierOutcome<T>> {
     const url = `${this.baseUrl}/${path}`;
+    const started = Date.now();
+    const emit = (r: Omit<SupplierCallRecord, "supplier_code" | "method" | "request" | "duration_ms">) => {
+      this.record?.({
+        supplier_code: this.code,
+        method: path,
+        request: body ?? null,
+        duration_ms: Date.now() - started,
+        ...r,
+      });
+    };
+
     try {
       const res = await fetch(url, {
         method: body === undefined ? "GET" : "POST",
@@ -307,7 +492,7 @@ class TboHotelSupplier implements HotelSupplier {
           accept: "application/json",
         },
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(25_000),
+        signal: AbortSignal.timeout(TBO_TIMEOUT_MS[path] ?? TBO_DEFAULT_TIMEOUT_MS),
         cache: "no-store",
       });
       const text = await res.text();
@@ -315,25 +500,44 @@ class TboHotelSupplier implements HotelSupplier {
       try {
         json = JSON.parse(text) as T;
       } catch {
-        /* non-JSON body — reported below */
+        /* non-JSON body — handled below */
       }
-      const code = json?.Status?.Code;
-      const ok = res.ok && (typeof code !== "number" || code === 200 || code === 201);
+      const code = json?.Status?.Code ?? null;
+      const ok = res.ok && (typeof code !== "number" || code === 200);
+      emit({ response: json ?? text.slice(0, 4000), http_status: res.status, status_code: code, ok });
+
+      if (json === null) {
+        // A body we cannot parse is not a decision — we do not know what happened.
+        return { kind: "unreachable", message: `رد غير مفهوم من المورّد (${res.status})` };
+      }
       if (!ok) {
         // SERVER LOG ONLY, and deliberately never the Authorization header or
         // the credentials: without this line a failure is undiagnosable — you
         // cannot tell a wrong password from a wrong path from a dead network.
-        console.warn(
-          `[tbo] ${path} failed — http=${res.status} bodyCode=${code ?? "none"} ` +
-            `desc=${json?.Status?.Description ?? text.slice(0, 200)}`,
-        );
-        return null;
+        console.warn(`[tbo] ${path} rejected — http=${res.status} bodyCode=${code ?? "none"} desc=${json?.Status?.Description ?? ""}`);
+        if (code != null && TBO_UNKNOWN_CODES.has(code)) {
+          return { kind: "unreachable", message: "خطأ غير محدّد لدى المورّد — تحقق من الحالة قبل أي إعادة." };
+        }
+        return { kind: "rejected", code, message: tboMessage(code, json?.Status?.Description) };
       }
-      return json;
+      return { kind: "ok", data: json };
     } catch (err) {
-      console.warn(`[tbo] ${path} threw — ${err instanceof Error ? err.message : String(err)}`);
-      return null;
+      const message = err instanceof Error ? err.message : String(err);
+      emit({ response: { error: message }, http_status: null, status_code: null, ok: false });
+      console.warn(`[tbo] ${path} threw — ${message}`);
+      return { kind: "unreachable", message: "تعذّر الوصول إلى المورّد" };
     }
+  }
+
+  /**
+   * The read-only shorthand: null on any failure.
+   *
+   * Correct for search and content, where "no answer" and "no results" lead to
+   * the same screen. Booking must NOT use this — see `raw`.
+   */
+  private async call<T extends TboStatus>(path: string, body?: unknown): Promise<T | null> {
+    const out = await this.raw<T>(path, body);
+    return out.kind === "ok" ? out.data : null;
   }
 
   async testConnection(): Promise<TestConnectionResult> {
@@ -461,6 +665,152 @@ class TboHotelSupplier implements HotelSupplier {
       check_out_time: null,
     };
   }
+
+  // -------------------------------------------------------------- booking ----
+
+  private notReady(): SupplierOutcome<never> | null {
+    if (this.unsafeSandbox) {
+      return { kind: "rejected", code: null, message: "البيئة «تجريبي» بلا رابط خدمة — لا يمكن الحجز." };
+    }
+    if (!this.ready()) {
+      return { kind: "rejected", code: null, message: "بيانات اعتماد المورّد غير مكتملة." };
+    }
+    return null;
+  }
+
+  /**
+   * Re-validate the rate. ALWAYS immediately before booking.
+   *
+   * A BookingCode carries a session token and a price that were true when the
+   * search ran. Between the agent quoting and the manager approving, the room
+   * can be gone or dearer, and the only honest way to know is to ask again.
+   */
+  async prebook(bookingCode: string): Promise<SupplierOutcome<PrebookResult>> {
+    const blocked = this.notReady();
+    if (blocked) return blocked;
+
+    const out = await this.raw<TboStatus & { HotelResult?: TboHotelResult[] }>("PreBook", {
+      BookingCode: bookingCode,
+      PaymentMode: "Limit",
+    });
+    if (out.kind !== "ok") return out;
+
+    const hotel = (out.data.HotelResult ?? [])[0];
+    const room = (hotel?.Rooms ?? [])[0];
+    if (!hotel || !room || typeof room.TotalFare !== "number") {
+      // A 200 with no room is the supplier's way of saying "gone". It is a
+      // decision, not a network problem — the caller must stop, not retry.
+      return { kind: "rejected", code: out.data.Status?.Code ?? null, message: "لم يعد هذا السعر متاحاً لدى المورّد." };
+    }
+
+    const policy = (room.CancelPolicies ?? [])[0];
+    return {
+      kind: "ok",
+      data: {
+        // TBO re-issues the code on PreBook; Book must use THIS one, not the
+        // search's, or it books against a stale session.
+        booking_code: room.BookingCode ?? bookingCode,
+        total_fare: Number(room.TotalFare.toFixed(2)),
+        currency: hotel.Currency ?? "USD",
+        refundable: room.IsRefundable === true,
+        cancellation_policy: policy?.FromDate ? `إلغاء مجاني حتى ${policy.FromDate}` : "غير قابل للإلغاء",
+        cancellation_deadline: policy?.FromDate ? policy.FromDate.slice(0, 10) : null,
+        room_name: (room.Name ?? []).join(" + ") || "Room",
+      },
+    };
+  }
+
+  async book(input: BookInput): Promise<SupplierOutcome<BookResult>> {
+    const blocked = this.notReady();
+    if (blocked) return blocked;
+
+    const out = await this.raw<TboStatus & { ConfirmationNumber?: string; ClientReferenceId?: string }>("Book", {
+      BookingCode: input.booking_code,
+      CustomerDetails: input.rooms.map((room) => ({
+        CustomerNames: room.guests.map((g) => ({
+          Title: g.title,
+          FirstName: g.first_name,
+          LastName: g.last_name,
+          Type: g.type,
+        })),
+      })),
+      ClientReferenceId: input.client_reference,
+      BookingReferenceId: input.booking_reference,
+      TotalFare: input.total_fare,
+      EmailId: input.email,
+      PhoneNumber: input.phone,
+      BookingType: "Voucher",
+      // Limit only. Card fields exist in the spec and are deliberately never
+      // sent: this system holds no card data, so there is none to leak.
+      PaymentMode: "Limit",
+    });
+    if (out.kind !== "ok") return out;
+
+    const confirmation = out.data.ConfirmationNumber?.trim();
+    if (!confirmation) {
+      // Success with no confirmation number is not success. Treat it as unknown
+      // and let the caller recover through BookingDetail — never as "failed",
+      // which would invite a second booking.
+      return { kind: "unreachable", message: "وافق المورّد بلا رقم تأكيد — تحقق من الحالة قبل أي إعادة محاولة." };
+    }
+    return { kind: "ok", data: { confirmation_number: confirmation, client_reference: out.data.ClientReferenceId ?? null } };
+  }
+
+  async bookingDetail(ref: { confirmation_number?: string; booking_reference?: string }): Promise<SupplierOutcome<BookingDetailResult>> {
+    const blocked = this.notReady();
+    if (blocked) return blocked;
+    if (!ref.confirmation_number && !ref.booking_reference) {
+      return { kind: "rejected", code: null, message: "لا رقم تأكيد ولا مرجع حجز." };
+    }
+
+    const out = await this.raw<TboStatus & { BookingDetail?: TboBookingDetail }>("BookingDetail", {
+      ...(ref.confirmation_number ? { ConfirmationNumber: ref.confirmation_number } : {}),
+      ...(ref.booking_reference ? { BookingReferenceId: ref.booking_reference } : {}),
+      PaymentMode: "Limit",
+    });
+    if (out.kind !== "ok") return out;
+
+    const d = out.data.BookingDetail;
+    if (!d) return { kind: "rejected", code: out.data.Status?.Code ?? null, message: "لا يوجد حجز بهذا المرجع لدى المورّد." };
+
+    const room = (d.Rooms ?? [])[0];
+    const policy = (room?.CancelPolicies ?? [])[0];
+    return {
+      kind: "ok",
+      data: {
+        status: d.BookingStatus ?? "",
+        confirmation_number: d.ConfirmationNumber ?? null,
+        // Only present when check-in is within 30 days — absence is normal, not
+        // an error, and must not be shown as a missing confirmation.
+        hotel_confirmation_number: d.HotelConfirmationNumber ?? null,
+        invoice_number: d.InvoiceNumber ?? null,
+        check_in: d.CheckIn ?? null,
+        check_out: d.CheckOut ?? null,
+        total_fare: typeof room?.TotalFare === "number" ? room.TotalFare : null,
+        currency: d.Rooms?.[0]?.Currency ?? null,
+        cancellation_policy: policy?.FromDate ? `إلغاء مجاني حتى ${policy.FromDate}` : null,
+        cancellation_deadline: policy?.FromDate ? policy.FromDate.slice(0, 10) : null,
+        voucher: String(d.VoucherStatus ?? "").toLowerCase() === "voucher" || d.VoucherStatus === true,
+      },
+    };
+  }
+
+  async cancel(confirmationNumber: string): Promise<SupplierOutcome<{ confirmation_number: string; message: string }>> {
+    const blocked = this.notReady();
+    if (blocked) return blocked;
+
+    const out = await this.raw<TboStatus & { ConfirmationNumber?: string }>("Cancel", {
+      ConfirmationNumber: confirmationNumber,
+    });
+    if (out.kind !== "ok") return out;
+    return {
+      kind: "ok",
+      data: {
+        confirmation_number: out.data.ConfirmationNumber ?? confirmationNumber,
+        message: out.data.Status?.Description ?? "Cancelled",
+      },
+    };
+  }
 }
 
 // ---------- TBO response shapes (only the fields we consume) ----------
@@ -482,6 +832,19 @@ type TboHotelResult = {
   HotelName?: string;
   Currency?: string;
   Rooms?: TboRoom[];
+};
+
+type TboBookingDetail = {
+  BookingStatus?: string;
+  VoucherStatus?: string | boolean;
+  ConfirmationNumber?: string;
+  HotelConfirmationNumber?: string;
+  InvoiceNumber?: string;
+  CheckIn?: string;
+  CheckOut?: string;
+  BookingDate?: string;
+  NoOfRooms?: number;
+  Rooms?: (TboRoom & { Currency?: string })[];
 };
 
 type TboHotelDetail = {
@@ -911,8 +1274,10 @@ export function buildHotelSupplier(
   creds: SupplierCredentials | null,
   baseUrl: string | null,
   environment: SupplierEnvironment = "live",
+  /** where each request/response pair goes; omitted in tests and read paths. */
+  record: SupplierCallRecorder | null = null,
 ): HotelSupplier {
-  if (code === "tbo") return new TboHotelSupplier(creds, baseUrl, environment);
+  if (code === "tbo") return new TboHotelSupplier(creds, baseUrl, environment, record);
   if (code === "hotelbeds") return new HotelbedsHotelSupplier(creds, baseUrl);
   if (code === "almosafer") return new AlmosaferDemoHotelSupplier();
   return new MockHotelSupplier();

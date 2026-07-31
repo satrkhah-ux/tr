@@ -56,7 +56,11 @@ export type AuditAction =
   | "employee.role_changed"
   // «عين الإدارة» — what it said, and what management did about it
   | "eye.report_sent"
-  | "eye.note_acked";
+  | "eye.note_acked"
+  // supplier API bookings — the calls that move money
+  | "supplier.prebooked"
+  | "supplier.booked"
+  | "supplier.cancelled";
 
 export type AuditInput = {
   action: AuditAction;

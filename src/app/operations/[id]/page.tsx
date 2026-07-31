@@ -5,6 +5,7 @@ import { listBookings, listDocuments } from "@/lib/data/operation-bookings";
 import { listTravelers } from "@/lib/data/operation-travelers";
 import { listAssignees, listSentRequests } from "@/lib/data/operation-assign";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { currentCan } from "@/lib/roles/current";
 
 export const dynamic = "force-dynamic";
 
@@ -14,13 +15,16 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
   const operation = operations.find((o) => o.id === id);
   if (!operation) notFound();
 
-  const [travelers, payments, bookings, documents, assignees, sentRequests] = await Promise.all([
+  const [travelers, payments, bookings, documents, assignees, sentRequests, canBook] = await Promise.all([
     listTravelers(id),
     listOperationPayments(id),
     listBookings(id),
     listDocuments(id),
     listAssignees(),
     listSentRequests(id),
+    // Only decides whether the button is DRAWN. The server action checks the
+    // same permission again — this is courtesy, not security.
+    currentCan("operations.book"),
   ]);
 
   // The itinerary voucher needs the day-by-day program that was authored in the
@@ -51,6 +55,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
       clientToken={clientToken}
       assignees={assignees}
       sentRequests={sentRequests}
+      canBook={canBook}
     />
   );
 }

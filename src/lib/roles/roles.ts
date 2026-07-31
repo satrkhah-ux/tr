@@ -48,6 +48,15 @@ export const ALL_PERMISSIONS = [
   /** run an operation after the client confirms: bookings, dispatch, vouchers. */
   "operations.write",
   /**
+   * COMMIT a reservation through a supplier's API, and cancel one.
+   *
+   * Split from operations.write because it is the only button in the system that
+   * spends company money without anyone typing an amount: it draws on our credit
+   * limit at the supplier, and a mis-click is a paid night, not a bad record.
+   * Re-checking a price stays on operations.write — asking costs nothing.
+   */
+  "operations.book",
+  /**
    * DECRYPT passport identifiers and open a passport scan. Split from
    * operations.write because "who is travelling / whose passport expires soon"
    * is everyday ops work, while reading the numbers is not — and every read is
