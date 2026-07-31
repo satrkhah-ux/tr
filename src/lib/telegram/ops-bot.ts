@@ -58,8 +58,10 @@ export async function sendMessage(
   chatId: number,
   text: string,
   buttons?: InlineButton[][],
+  /** which bot speaks. Defaults to operations; «عين الإدارة» passes its own. */
+  botToken?: string,
 ): Promise<boolean> {
-  const token = sendingToken();
+  const token = botToken ?? sendingToken();
   if (!token) return false;
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -80,8 +82,34 @@ export async function sendMessage(
   }
 }
 
-export async function answerCallback(callbackId: string, text?: string): Promise<void> {
-  const token = sendingToken();
+/**
+ * A voice note. Telegram wants OGG/opus for `sendVoice` — anything else arrives
+ * as a file attachment you have to download, which is not the same thing at all.
+ */
+export async function sendVoice(chatId: number, audio: Buffer, caption?: string, botToken?: string): Promise<boolean> {
+  const token = botToken ?? sendingToken();
+  if (!token) return false;
+  try {
+    const form = new FormData();
+    form.set("chat_id", String(chatId));
+    form.set("voice", new Blob([new Uint8Array(audio)], { type: "audio/ogg" }), "report.ogg");
+    if (caption) {
+      form.set("caption", caption.slice(0, 1000));
+      form.set("parse_mode", "HTML");
+    }
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendVoice`, {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(30_000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function answerCallback(callbackId: string, text?: string, botToken?: string): Promise<void> {
+  const token = botToken ?? sendingToken();
   if (!token) return;
   try {
     await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {

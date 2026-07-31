@@ -22,7 +22,11 @@ import { AUTH_STORAGE_KEY, parseSessionCookie } from "@/lib/supabase/constants";
 // send every update into a 307 and the bot would answer nothing. Each webhook
 // route authenticates its own caller instead (shared secret + resolving the
 // Telegram account to an employee).
-const PUBLIC_PREFIXES = ["/sign-in", "/client-offer", "/voucher", "/trip", "/tg", "/api/telegram"];
+// `/api/eye` is the same case with a different caller: a crontab on the VPS,
+// which carries no cookie either. It proves itself with ADMIN_API_SECRET in a
+// header — leaving it behind this gate would turn the nightly briefing into a
+// silent 307 that nobody notices until management asks why it stopped.
+const PUBLIC_PREFIXES = ["/sign-in", "/client-offer", "/voucher", "/trip", "/tg", "/api/telegram", "/api/eye"];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
 
 function isPublic(pathname: string): boolean {

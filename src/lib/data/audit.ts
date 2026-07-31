@@ -53,7 +53,10 @@ export type AuditAction =
   | "role.deleted"
   | "employee.created"
   | "employee.updated"
-  | "employee.role_changed";
+  | "employee.role_changed"
+  // «عين الإدارة» — what it said, and what management did about it
+  | "eye.report_sent"
+  | "eye.note_acked";
 
 export type AuditInput = {
   action: AuditAction;

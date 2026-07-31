@@ -61,9 +61,38 @@ export async function touchPresence(): Promise<void> {
     const supabase = await db();
     const empId = await employeeIdForUser(supabase, user.id);
     if (!empId) return;
+    const now = new Date().toISOString();
     await supabase
       .from("presence")
-      .upsert({ employee_id: empId, user_id: user.id, last_seen_at: new Date().toISOString() }, { onConflict: "employee_id" });
+      .upsert({ employee_id: empId, user_id: user.id, last_seen_at: now }, { onConflict: "employee_id" });
+
+    // The same beat, kept as a DAY. `presence` is overwritten on every heartbeat,
+    // so it can say who is online right now but never when they arrived — and
+    // «عين الإدارة» is asked exactly that. One row per person per day: the first
+    // beat sets the arrival and is never moved, later beats extend the day.
+    const day = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10); // Riyadh
+    const existing = await supabase
+      .from("attendance_days")
+      .select("beats")
+      .eq("employee_id", empId)
+      .eq("day", day)
+      .maybeSingle();
+    const beats = ((existing.data as { beats: number } | null)?.beats ?? 0) + 1;
+    await supabase
+      .from("attendance_days")
+      .upsert(
+        { employee_id: empId, day, first_seen_at: now, last_seen_at: now, beats },
+        { onConflict: "employee_id,day", ignoreDuplicates: false },
+      );
+    // first_seen_at must NOT move once set — the upsert above would overwrite it,
+    // so it is restored for every beat after the first.
+    if (beats > 1) {
+      await supabase
+        .from("attendance_days")
+        .update({ last_seen_at: now })
+        .eq("employee_id", empId)
+        .eq("day", day);
+    }
   } catch {
     /* presence is best-effort; never blocks the page */
   }
