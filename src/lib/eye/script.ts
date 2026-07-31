@@ -234,7 +234,10 @@ export function speechScript(report: EyeReport): string {
   }
 
   parts.push("هذا كل شي. لو تبي تفاصيل أي نقطة اسألني.");
-  return parts.join(" ");
+  // One sentence per line, not one long paragraph: a speech engine handed a wall
+  // of comma-joined text reads it in one flat breath. The line breaks are where
+  // it pauses, and pauses are most of what makes a voice sound like a person.
+  return parts.join("\n");
 }
 
 // --------------------------------------------------------------- written ----

@@ -17,9 +17,35 @@ import "server-only";
  */
 
 const DEFAULT_TTS_MODEL = "gpt-4o-mini-tts";
-/** A low, calm voice — this is a report, not an advertisement. */
-const DEFAULT_VOICE = "onyx";
+/**
+ * `ash`, not `onyx`.
+ *
+ * onyx is one of the original fixed voices: it renders the words and ignores the
+ * delivery you ask for, which in Arabic comes out as the flat, announcer-ish
+ * reading that made the first briefing sound like a machine. ash is one of the
+ * steerable voices — it actually follows `instructions`, which is the only lever
+ * that turns text into a dialect rather than a pronunciation.
+ */
+const DEFAULT_VOICE = "ash";
+/** Slightly under conversational pace. A report is listened to, not skimmed. */
+const DEFAULT_SPEED = 0.95;
 const DEFAULT_CHAT_MODEL = "gpt-4o-mini";
+
+/**
+ * The delivery, described the way you would describe it to a person.
+ *
+ * This is the part that does the work. A TTS engine cannot be trained here, but
+ * it can be directed, and the direction has to be specific: naming the dialect,
+ * the room, and the relationship. "Speak Arabic" gets you a newsreader; this
+ * gets you a colleague who called at the end of the day.
+ */
+const DELIVERY = [
+  "تحدّث بالعربية بلهجة سعودية عامية (نجدية) طبيعية تماماً، مثل موظف سعودي يكلّم مديره في نهاية الدوام.",
+  "النبرة: هادئة، واثقة، ودودة، فيها شيء من الابتسامة — لا نبرة نشرة أخبار، ولا إلقاء رسمي، ولا حماس إعلاني.",
+  "الإيقاع: متوسط إلى بطيء قليلاً، مع أنفاس طبيعية ووقفة واضحة عند نهاية كل سطر، ووقفة أطول قبل الملاحظات.",
+  "نوّع التنغيم بين الجمل ولا تقرأها بنبرة واحدة؛ اخفض الصوت قليلاً في الجمل التوضيحية بين الشرطتين.",
+  "انطق الأرقام والأسماء العربية بوضوح وعلى سجيّتها، ولا تتقن الإعراب — الكلام محكيّ لا مقروء.",
+].join(" ");
 
 function readEnv(name: string): string | undefined {
   return process.env[name] || undefined;
@@ -52,9 +78,8 @@ export async function speak(text: string): Promise<Buffer | null> {
         voice: readEnv("OPENAI_TTS_VOICE") ?? DEFAULT_VOICE,
         input: text,
         response_format: "opus",
-        instructions:
-          "تحدث بالعربية بلهجة سعودية عامية، بنبرة هادئة وواثقة ومهنية، " +
-          "كأنك موظف يقدّم تقريراً يومياً لمديره. سرعة متوسطة، ووقفات قصيرة بين الجُمل.",
+        speed: Number(readEnv("OPENAI_TTS_SPEED") ?? DEFAULT_SPEED),
+        instructions: DELIVERY,
       }),
     });
     if (!res.ok) return null;
