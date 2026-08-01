@@ -4,19 +4,15 @@ import { listDrafts } from "@/lib/data/drafts";
 export const dynamic = "force-dynamic";
 
 /**
- * «البكجات السياحية» — every programme, drafted or issued.
+ * «العروض السياحية» — what actually went out to a client.
  *
- * The same list the generator opens with, reached from the other direction: an
- * agent hunting for a file thinks of it either as the thing they are building
- * or the thing they built, and both roads should end at the same table with the
- * same actions — search, continue editing, duplicate, open the issued offer,
- * delete.
- *
- * Deliberately ONE component rather than a second table of `offers`: two lists
- * of the same work drift, and then someone has to decide which one is right.
- * A programme that has been issued carries its serial in this list already.
+ * Issued only: a programme earns its place here by having a serial, which it
+ * gets from `produceOfferFromDraft` and from nowhere else. Half-written work
+ * belongs in the generator, and mixing the two is how someone opens a list
+ * looking for the offer they sent and has to read past the ones they never did.
  */
-export default async function PackagesPage() {
+export default async function IssuedOffersPage() {
   const drafts = await listDrafts();
-  return <DraftsList drafts={drafts} titleKey="nav.packages" />;
+  const issued = drafts.filter((d) => Boolean(d.produced_serial));
+  return <DraftsList drafts={issued} titleKey="nav.issuedOffers" variant="issued" />;
 }

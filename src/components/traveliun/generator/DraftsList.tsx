@@ -48,7 +48,21 @@ const MONEY = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
  * they are building, or the thing they built. One list, one set of actions, so
  * the two entrances can never disagree about what exists.
  */
-export function DraftsList({ drafts, titleKey = "nav.packageGenerator" }: { drafts: DraftSummary[]; titleKey?: TranslationKey }) {
+export function DraftsList({
+  drafts,
+  titleKey = "nav.packageGenerator",
+  /**
+   * The three entry doors and the drafts belong to the GENERATOR. «العروض
+   * السياحية» shows only what was issued, so it turns them off: a screen for
+   * finished work should not open with three ways to start new work.
+   */
+  variant = "generator",
+}: {
+  drafts: DraftSummary[];
+  titleKey?: TranslationKey;
+  variant?: "generator" | "issued";
+}) {
+  const issuedOnly = variant === "issued";
   const router = useRouter();
   const { t } = useTraveliunUI();
   const [creating, setCreating] = useState(false);
@@ -105,11 +119,14 @@ export function DraftsList({ drafts, titleKey = "nav.packageGenerator" }: { draf
     <TraveliunShell title={titleKey}>
       <div className="tv-fade-up space-y-4">
         <section className={`${card} px-5 py-4`}>
-          <h1 className="text-lg font-extrabold text-[#003c3a]">{t("pg.hubTitle")}</h1>
-          <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("pg.hubSubtitle")}</p>
+          <h1 className="text-lg font-extrabold text-[#003c3a]">{issuedOnly ? t("nav.issuedOffers") : t("pg.hubTitle")}</h1>
+          <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">
+            {issuedOnly ? t("pg.issuedSubtitle") : t("pg.hubSubtitle")}
+          </p>
         </section>
 
-        {/* the three doors */}
+        {/* the three doors — the generator only */}
+        {issuedOnly ? null : (
         <section className="grid gap-3 md:grid-cols-3">
           <StartCard titleKey="pg.startReady" hintKey="pg.startReadyHint" icon={Sparkles} color="#8b5cf6" href="/ready-offers" />
           <StartCard
@@ -122,6 +139,7 @@ export function DraftsList({ drafts, titleKey = "nav.packageGenerator" }: { draf
           />
           <StartCard titleKey="pg.startRepackage" hintKey="pg.startRepackageHint" icon={FileUp} color="#0e9bb5" href="/repackage" />
         </section>
+        )}
 
         {error ? (
           <p role="alert" className="rounded-[10px] border border-[#f4c9d4] bg-[#fdeef2] px-4 py-3 text-[13px] font-semibold text-[#c22850]">

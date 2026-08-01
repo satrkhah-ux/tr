@@ -143,6 +143,7 @@ export const ar: Dictionary = {
   "nav.readyOffers": "العروض الجاهزة",
   "nav.packageGenerator": "مولد البكجات السياحية",
   "nav.issuePackage": "إصدار بكج سياحي",
+  "nav.issuedOffers": "العروض السياحية",
   "nav.terms": "الشروط والأحكام",
   "nav.offerIncludes": "يشمل العرض",
   "nav.offerExcludes": "لا يشمل العرض",
@@ -810,6 +811,7 @@ export const ar: Dictionary = {
 
   // ---------- package generator v2 (drafts) ----------
   "pg.hubTitle": "مولّد البكجات السياحية",
+  "pg.issuedSubtitle": "العروض التي صدرت فعلياً للعملاء — للبحث والمراجعة وإعادة الإصدار. المسودات في «إصدار بكج سياحي».",
   "pg.hubSubtitle": "ثلاث طرق للبدء، وكل مسوداتك المفتوحة أدناه.",
   "pg.startReady": "البكجات الجاهزة",
   "pg.startReadyHint": "باقات الشركة — اختر واحدة وتُعبَّأ المسودة منها.",

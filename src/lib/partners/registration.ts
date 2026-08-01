@@ -193,8 +193,13 @@ export async function issuePartnerAccount(input: {
     const { data: taken } = await supabase.from("partner_users").select("id").ilike("email", email).maybeSingle();
     if (taken) return { ok: false, message: "هذا البريد مُصدر له حساب بالفعل." };
 
+    // WITHOUT redirectTo the invitation lands on the site root, which does
+    // nothing at all: the account exists and there is no way to give it a
+    // password. /b2b/welcome is the other half of this button.
+    const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
     const { data: invite, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
       data: { partner_id: row.id, partner_name: row.name },
+      redirectTo: `${site}/b2b/welcome`,
     });
     if (inviteError || !invite?.user) {
       return { ok: false, message: "تعذّر إنشاء الحساب — تأكد من إعدادات البريد لدى Supabase." };

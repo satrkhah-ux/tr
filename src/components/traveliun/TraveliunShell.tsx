@@ -89,7 +89,8 @@ export const navGroups: NavGroup[] = [
     children: [
       { labelKey: "nav.issuePackage", href: "/package-generator" },
       { labelKey: "nav.readyOffers", href: "/ready-offers" },
-      { labelKey: "nav.packages", href: "/offers" },
+      // Issued only. Drafts stay where they are made.
+      { labelKey: "nav.issuedOffers", href: "/offers" },
       { labelKey: "nav.repackage", href: "/repackage" },
     ],
   },

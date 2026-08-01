@@ -145,6 +145,7 @@ export const en = {
   "nav.readyOffers": "Ready Offers",
   "nav.packageGenerator": "Package Generator",
   "nav.issuePackage": "Issue a Package",
+  "nav.issuedOffers": "Issued Offers",
   "nav.terms": "Terms & Conditions",
   "nav.offerIncludes": "Offer Includes",
   "nav.offerExcludes": "Offer Excludes",
@@ -812,6 +813,7 @@ export const en = {
 
   // ---------- package generator v2 (drafts) ----------
   "pg.hubTitle": "Package generator",
+  "pg.issuedSubtitle": "Offers actually issued to clients — search, review and re-issue. Drafts live under «Issue a Package».",
   "pg.hubSubtitle": "Three ways to start, and every draft you have open below.",
   "pg.startReady": "Ready packages",
   "pg.startReadyHint": "The company's own packages — pick one and it fills the draft.",
