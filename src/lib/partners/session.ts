@@ -1,6 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { publicBrandLogoUrl } from "@/components/offer-doc/brand";
+import type { PartnerBrand } from "./PartnerContext";
 import type { PartnerTerms } from "./pricing";
 
 /**
@@ -17,6 +19,8 @@ export type PartnerSession = {
   user_id: string;
   partner_id: string;
   partner_name: string;
+  partner_name_latin: string | null;
+  address: string | null;
   email: string;
   terms: PartnerTerms;
   brand_color: string;
@@ -45,7 +49,7 @@ export async function getPartnerSession(): Promise<PartnerSession | null> {
     const { data } = await db()
       .from("partner_users")
       .select(
-        "email, status, booking_partners!inner(id, name, status, price_adjust_kind, price_adjust_pct, brand_color, accent_color, logo_path)",
+        "email, status, booking_partners!inner(id, name, name_latin, address, status, price_adjust_kind, price_adjust_pct, brand_color, accent_color, logo_path)",
       )
       .eq("auth_user_id", user.id)
       .maybeSingle();
@@ -57,6 +61,8 @@ export async function getPartnerSession(): Promise<PartnerSession | null> {
         | {
             id: string;
             name: string;
+            name_latin: string | null;
+            address: string | null;
             status: string;
             price_adjust_kind: string;
             price_adjust_pct: number;
@@ -75,6 +81,8 @@ export async function getPartnerSession(): Promise<PartnerSession | null> {
       user_id: user.id,
       partner_id: company.id,
       partner_name: company.name,
+      partner_name_latin: company.name_latin,
+      address: company.address,
       email: row.email,
       terms: {
         kind: company.price_adjust_kind === "commission" ? "commission" : "markup",
@@ -87,6 +95,23 @@ export async function getPartnerSession(): Promise<PartnerSession | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * The same session, shaped for the UI: what the shell needs to wear their name
+ * instead of ours. Called once per request in the root layout.
+ */
+export async function getPartnerBrand(): Promise<PartnerBrand | null> {
+  const partner = await getPartnerSession();
+  if (!partner) return null;
+  return {
+    name: partner.partner_name,
+    nameLatin: partner.partner_name_latin,
+    logoUrl: publicBrandLogoUrl(process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? "", partner.logo_path),
+    brandColor: partner.brand_color,
+    accentColor: partner.accent_color,
+    address: partner.address,
+  };
 }
 
 /** True for a staff member — i.e. the app's mirror of the database's is_staff(). */

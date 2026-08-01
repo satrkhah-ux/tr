@@ -141,6 +141,8 @@ export const ar: Dictionary = {
   "nav.roles": "الأدوار",
   "nav.packages": "البكجات السياحية",
   "nav.readyOffers": "العروض الجاهزة",
+  "nav.myFiles": "بكجاتي",
+  "nav.myProfile": "الملف الشخصي",
   "nav.packageGenerator": "مولد البكجات السياحية",
   "nav.issuePackage": "إصدار بكج سياحي",
   "nav.issuedOffers": "العروض السياحية",

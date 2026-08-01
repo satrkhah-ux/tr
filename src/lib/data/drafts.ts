@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { airlineLogoUrl, publicBrandLogoUrl } from "@/components/offer-doc/brand";
+import { getPartnerSession } from "@/lib/partners/session";
 import {
   defaultServicesFromLibrary,
   deriveCityDates,
@@ -123,11 +124,29 @@ export async function createDraft(seed?: Partial<DraftData>): Promise<CreateDraf
     const initial = seed
       ? normalizeDraftData({ ...base, ...seed } as unknown as Record<string, unknown>)
       : base;
+
+    // A partner's file is stamped with their company HERE, at the one place every
+    // draft is born — the generator's new-file button, a ready offer, the portal.
+    // Stamping it per caller would mean the next caller forgets, and a draft with
+    // no company is one the partner's own policy immediately hides from them.
+    const partner = await getPartnerSession();
+    if (partner) {
+      initial.customer = { ...initial.customer, company: partner.partner_name };
+    }
+
     const { data, error } = await supabase
       .from("offer_drafts")
       .insert({
         data: initial as unknown as Record<string, unknown>,
         ...(seed?.source?.title ? { title: seed.source.title } : {}),
+        // A ready offer's own title wins — it names the package, which is more
+        // use than repeating the company on every row of their list.
+        ...(partner
+          ? {
+              partner_company_id: partner.partner_id,
+              ...(seed?.source?.title ? {} : { title: partner.partner_name }),
+            }
+          : {}),
       })
       .select("id")
       .single();
@@ -155,11 +174,15 @@ export async function duplicateDraft(draftId: string): Promise<CreateDraftResult
 
     const supabase = await db();
     const copy: DraftData = { ...record.data, produced_serial: null };
+    // Same stamp as createDraft: a partner re-issuing their own programme must
+    // not end up with a copy their policy hides.
+    const partner = await getPartnerSession();
     const { data, error } = await supabase
       .from("offer_drafts")
       .insert({
         data: copy as unknown as Record<string, unknown>,
         title: copy.customer.customer_name || copy.trip.destination || copy.trip.country || null,
+        ...(partner ? { partner_company_id: partner.partner_id } : {}),
       })
       .select("id")
       .single();

@@ -37,6 +37,7 @@ import {
 import { getRates } from "@/lib/data/rates-actions";
 import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
+import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { ROLE_LABEL_KEYS, ROLES, type Permission } from "@/lib/roles/roles";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { MobileTabBar } from "./MobileTabBar";
@@ -164,6 +165,83 @@ export const navGroups: NavGroup[] = [
   },
 ];
 
+/**
+ * What a partner company sees instead.
+ *
+ * Not a filtered version of ours — a different job. They issue packages and
+ * look at their own numbers; they do not maintain our reference tables, run
+ * our operations, or administer our people. «إعادة تصميم بكج مورّد» is absent
+ * for the same reason: it exists to take a supplier's PDF apart, which is our
+ * work, not theirs.
+ *
+ * Every route here is one the database already scopes to their company, so the
+ * menu and the policies say the same thing.
+ */
+export const partnerNavGroups: NavGroup[] = [
+  { labelKey: "nav.dashboard", href: "/b2b", icon: BarChart3 },
+  {
+    labelKey: "nav.issuePackage",
+    href: "/package-generator",
+    icon: FileText,
+    children: [
+      { labelKey: "nav.myFiles", href: "/package-generator" },
+      { labelKey: "nav.readyOffers", href: "/ready-offers" },
+    ],
+  },
+  { labelKey: "nav.myProfile", href: "/b2b/profile", icon: Building2 },
+];
+
+/**
+ * The menu this session should see: a partner's own, or ours filtered by what
+ * the role holds. One hook so the rail, the drawer and the mobile sheet cannot
+ * disagree about which sections exist.
+ */
+function useNavGroups(): NavGroup[] {
+  const partner = usePartnerBrand();
+  const { can } = useRole();
+  if (partner) return partnerNavGroups;
+  return navGroups.filter((group) => !group.perm || can(group.perm));
+}
+
+/**
+ * The mark in the corner: their logo, or ours.
+ *
+ * A partner is approved before a logo is uploaded, so the no-logo case is the
+ * normal first day rather than an error — it falls back to the first letter of
+ * the company name instead of a broken image.
+ */
+function BrandMark({
+  logoUrl,
+  name,
+  className,
+  dark = false,
+}: {
+  logoUrl: string | null;
+  name: string;
+  className?: string;
+  dark?: boolean;
+}) {
+  if (logoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL, no loader
+    return <img src={logoUrl} alt={name} className={cn("object-contain", className)} />;
+  }
+  if (name === "Traveliun") {
+    // eslint-disable-next-line @next/next/no-img-element -- static asset
+    return <img src="/traveliun/logo-en.svg" alt="Traveliun" className={cn("object-contain brightness-0 invert", className)} />;
+  }
+  return (
+    <span
+      className={cn(
+        "flex items-center justify-center rounded-[10px] text-lg font-extrabold",
+        dark ? "bg-[var(--tv-brand)] text-white" : "bg-white/15 text-white",
+        className,
+      )}
+    >
+      {name.trim().charAt(0)}
+    </span>
+  );
+}
+
 function isGroupActive(pathname: string, group: NavGroup) {
   if (pathname === group.href) return true;
   return group.children?.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`)) ?? false;
@@ -174,13 +252,14 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuPinned, setMenuPinned] = useState(false);
   const [menuHovered, setMenuHovered] = useState(false);
-  const [activeMenu, setActiveMenu] = useState<TranslationKey>(() => {
-    return navGroups.find((group) => isGroupActive(pathname, group))?.labelKey ?? navGroups[0].labelKey;
-  });
   const [panel, setPanel] = useState<"guide" | "calculator" | "view" | "settings" | "profile" | null>(null);
   const { language, setLanguage, view, setView, theme, setTheme, dir, t } = useTraveliunUI();
-  const { viewAs, resetViewAs, effectiveRole, can } = useRole();
-  const visibleNavGroups = navGroups.filter((group) => !group.perm || can(group.perm));
+  const { viewAs, resetViewAs, effectiveRole } = useRole();
+  const partner = usePartnerBrand();
+  const visibleNavGroups = useNavGroups();
+  const [activeMenu, setActiveMenu] = useState<TranslationKey>(() => {
+    return visibleNavGroups.find((group) => isGroupActive(pathname, group))?.labelKey ?? visibleNavGroups[0].labelKey;
+  });
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [changeOpen, setChangeOpen] = useState(false);
 
@@ -193,12 +272,13 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
   };
 
   useEffect(() => {
-    const matchingGroup = navGroups.find((group) => isGroupActive(pathname, group));
+    const matchingGroup = visibleNavGroups.find((group) => isGroupActive(pathname, group));
 
     if (matchingGroup) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing the active nav group to the URL is a legitimate route→state sync
       setActiveMenu(matchingGroup.labelKey);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleNavGroups is a fresh array each render; the URL is the only thing that should re-run this
   }, [pathname]);
 
   useEffect(() => {
@@ -230,10 +310,8 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
   }, [pathname]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const activeGroup = useMemo(
-    () => navGroups.find((group) => group.labelKey === activeMenu) ?? navGroups[0],
-    [activeMenu],
-  );
+  const activeGroup =
+    visibleNavGroups.find((group) => group.labelKey === activeMenu) ?? visibleNavGroups[0];
   const menuOpen = menuPinned || menuHovered;
   const displayTitle = t(title);
 
@@ -253,7 +331,7 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
       >
         <button
           type="button"
-          className="absolute -end-4 top-5 z-[120] flex size-8 items-center justify-center rounded-full border border-[#dce3df] bg-white text-[#185045] shadow-[0_2px_8px_rgba(24,80,69,0.16)] transition-colors duration-200 hover:bg-[#f4f8f6]"
+          className="absolute -end-4 top-5 z-[120] flex size-8 items-center justify-center rounded-full border border-[#dce3df] bg-white text-[var(--tv-brand)] shadow-[0_2px_8px_rgba(24,80,69,0.16)] transition-colors duration-200 hover:bg-[#f4f8f6]"
           aria-label={menuPinned ? t("aria.unpinSidebar") : t("aria.pinSidebar")}
           onClick={() => {
             setMenuPinned((value) => !value);
@@ -264,8 +342,12 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
         </button>
 
         <aside className="absolute start-0 top-0 z-10 h-screen w-[74px] border-e border-[#c8d2cd] bg-white">
-          <Link href="/dashboard" className="flex h-[74px] items-center justify-center bg-[#185045]">
-            <img src="/traveliun/logo-en.svg" alt="Traveliun" className="h-12 w-12 object-contain brightness-0 invert" />
+          <Link href={partner ? "/b2b" : "/dashboard"} className="flex h-[74px] items-center justify-center bg-[var(--tv-brand)]">
+            <BrandMark
+              logoUrl={partner?.logoUrl ?? null}
+              name={partner?.name ?? "Traveliun"}
+              className="h-12 w-12"
+            />
           </Link>
           <nav className="flex max-h-[calc(100vh-74px)] flex-col overflow-hidden py-2">
             {visibleNavGroups.map((group) => {
@@ -277,7 +359,7 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
                   type="button"
                   title={t(group.labelKey)}
                   className={`relative flex h-[44px] items-center justify-center transition-colors duration-200 ${
-                    active ? "bg-[#eef4f1] font-extrabold text-[#185045]" : "text-[#6f8f88] hover:bg-[#f4f8f6] hover:text-[#185045]"
+                    active ? "bg-[#eef4f1] font-extrabold text-[var(--tv-brand)]" : "text-[#6f8f88] hover:bg-[#f4f8f6] hover:text-[var(--tv-brand)]"
                   }`}
                   onClick={() => {
                     setActiveMenu(group.labelKey);
@@ -285,7 +367,7 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
                   }}
                 >
                   <span
-                    className={`absolute end-0 top-1/2 w-[3px] -translate-y-1/2 rounded-s-[3px] bg-[#185045] transition-[height] duration-150 ${
+                    className={`absolute end-0 top-1/2 w-[3px] -translate-y-1/2 rounded-s-[3px] bg-[var(--tv-brand)] transition-[height] duration-150 ${
                       active ? "h-[22px]" : "h-0"
                     }`}
                   />
@@ -441,6 +523,9 @@ type PaletteItem = {
 function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpenChange: (open: boolean) => void; pathname: string }) {
   const { t } = useTraveliunUI();
   const [query, setQuery] = useState("");
+  // ⌘K searches the same menu the sidebar draws — otherwise a partner could jump
+  // to a staff screen by typing its name.
+  const paletteGroups = useNavGroups();
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the search box when the palette closes
@@ -450,7 +535,7 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
   const items = useMemo<PaletteItem[]>(() => {
     const seen = new Set<string>();
     const list: PaletteItem[] = [];
-    for (const group of navGroups) {
+    for (const group of paletteGroups) {
       if (!seen.has(group.href)) {
         seen.add(group.href);
         list.push({ labelKey: group.labelKey, href: group.href, icon: group.icon });
@@ -463,7 +548,7 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
       }
     }
     return list;
-  }, []);
+  }, [paletteGroups]);
 
   const normalizedQuery = query.trim().toLowerCase();
   const results = normalizedQuery
@@ -503,7 +588,7 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
                   onClick={() => onOpenChange(false)}
                   className="flex w-full items-center gap-3 rounded-[10px] px-3 py-[11px] text-start text-[#0f3d38] transition-colors hover:bg-[#f2f7f5] dark:text-[#eaf3ef] dark:hover:bg-[#1b2d27]"
                 >
-                  <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[9px] bg-[#eff5f2] text-[#185045] dark:bg-[#1b2d27]">
+                  <span className="flex size-[34px] shrink-0 items-center justify-center rounded-[9px] bg-[#eff5f2] text-[var(--tv-brand)] dark:bg-[#1b2d27]">
                     <Icon className="size-[18px]" />
                   </span>
                   <span className="flex-1 text-sm font-semibold">{t(item.labelKey)}</span>
@@ -535,14 +620,19 @@ function SideMenu({
   close: () => void;
 }) {
   const { t } = useTraveliunUI();
-  const { can } = useRole();
+  const partner = usePartnerBrand();
+  const groups = useNavGroups();
   return (
     <aside className="traveliun-side-menu absolute start-0 top-0 z-30 h-screen w-[260px] overflow-hidden border-e border-[#d9e0dc] bg-white shadow-[0_8px_28px_rgba(0,0,0,0.12)]">
-      <div className="flex h-[96px] items-center justify-center bg-[#185045] px-6">
-        <img src="/traveliun/logo-en.svg" alt="Traveliun" className="max-h-[68px] w-[170px] object-contain brightness-0 invert" />
+      <div className="flex h-[96px] items-center justify-center bg-[var(--tv-brand)] px-6">
+        <BrandMark
+          logoUrl={partner?.logoUrl ?? null}
+          name={partner?.name ?? "Traveliun"}
+          className="max-h-[68px] w-[170px]"
+        />
       </div>
-      <nav className="h-[calc(100vh-96px)] overflow-y-auto py-2 text-[#185045]">
-        {navGroups.filter((group) => !group.perm || can(group.perm)).map((group) => {
+      <nav className="h-[calc(100vh-96px)] overflow-y-auto py-2 text-[var(--tv-brand)]">
+        {groups.map((group) => {
           const Icon = group.icon;
           const active = group.labelKey === activeGroup.labelKey;
           const hasChildren = Boolean(group.children?.length);
@@ -553,7 +643,7 @@ function SideMenu({
                   type="button"
                   onClick={() => setActiveMenu(group.labelKey)}
                   className={`flex w-full items-center gap-3 px-4 py-[11px] text-start text-[13px] font-bold transition-colors duration-200 ${
-                    active ? "bg-[#185045] text-white" : "text-[#185045] hover:bg-[#eef4f1]"
+                    active ? "bg-[var(--tv-brand)] text-white" : "text-[var(--tv-brand)] hover:bg-[#eef4f1]"
                   }`}
                 >
                   <Icon className="size-5" />
@@ -565,7 +655,7 @@ function SideMenu({
                   href={group.href}
                   onClick={close}
                   className={`flex w-full items-center gap-3 px-4 py-[11px] text-start text-[13px] font-bold transition-colors duration-200 ${
-                    active ? "bg-[#185045] text-white" : "text-[#185045] hover:bg-[#eef4f1]"
+                    active ? "bg-[var(--tv-brand)] text-white" : "text-[var(--tv-brand)] hover:bg-[#eef4f1]"
                   }`}
                 >
                   <Icon className="size-5" />
@@ -590,12 +680,12 @@ function SideMenu({
                         onClick={close}
                         className={`relative mx-[10px] block rounded-[7px] px-6 py-[10px] text-[13px] transition-colors duration-200 ${
                           childActive
-                            ? "bg-[#eef4f1] font-extrabold text-[#185045]"
-                            : "font-medium text-[#557d78] hover:bg-[#f4f8f6] hover:text-[#185045]"
+                            ? "bg-[#eef4f1] font-extrabold text-[var(--tv-brand)]"
+                            : "font-medium text-[#557d78] hover:bg-[#f4f8f6] hover:text-[var(--tv-brand)]"
                         }`}
                       >
                         <span
-                          className={`absolute end-0 top-1/2 w-[3px] -translate-y-1/2 rounded-s-[3px] bg-[#185045] transition-[height] duration-150 ${
+                          className={`absolute end-0 top-1/2 w-[3px] -translate-y-1/2 rounded-s-[3px] bg-[var(--tv-brand)] transition-[height] duration-150 ${
                             childActive ? "h-[18px]" : "h-0"
                           }`}
                         />
@@ -617,14 +707,22 @@ function SideMenu({
 
 function MobileMenu({ pathname, close }: { pathname: string; close: () => void }) {
   const { t } = useTraveliunUI();
-  const { can } = useRole();
+  const partner = usePartnerBrand();
+  const groups = useNavGroups();
   return (
     <>
       <div className="flex h-[76px] items-center justify-between border-b border-[#d9e0dc] px-5">
-        <TraveliunLogo />
+        {partner ? (
+          <span className="flex items-center gap-2">
+            <BrandMark logoUrl={partner.logoUrl} name={partner.name} className="size-9" dark />
+            <span className="text-[13px] font-extrabold text-[var(--tv-brand)]">{partner.name}</span>
+          </span>
+        ) : (
+          <TraveliunLogo />
+        )}
         <button
           type="button"
-          className="flex size-9 items-center justify-center rounded-md text-[#185045]"
+          className="flex size-9 items-center justify-center rounded-md text-[var(--tv-brand)]"
           onClick={close}
           aria-label={t("aria.closeMenu")}
         >
@@ -632,7 +730,7 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
         </button>
       </div>
       <nav className="p-3">
-        {navGroups.filter((group) => !group.perm || can(group.perm)).map((group) => {
+        {groups.map((group) => {
           const Icon = group.icon;
           const active = isGroupActive(pathname, group);
           return (
@@ -640,7 +738,7 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
               <Link
                 href={group.href}
                 className={`flex items-center gap-3 rounded-md px-3 py-3 text-sm ${
-                  active ? "bg-[#e8f1ed] font-semibold text-[#185045]" : "text-[#557d78]"
+                  active ? "bg-[#e8f1ed] font-semibold text-[var(--tv-brand)]" : "text-[#557d78]"
                 }`}
                 onClick={close}
               >
@@ -671,7 +769,7 @@ const HeaderIcon = forwardRef<
       aria-label={label}
       className={cn(
         "flex h-full min-w-[66px] items-center justify-center border-e border-[#eef2f0] outline-none transition-colors hover:bg-[#f5f8f6] focus-visible:bg-[#e8f1ed]",
-        active ? "bg-[#e8f1ed] text-[#185045]" : muted ? "bg-[#f0f2f2] text-[#b2b7bc]" : "text-[#185045]",
+        active ? "bg-[#e8f1ed] text-[var(--tv-brand)]" : muted ? "bg-[#f0f2f2] text-[#b2b7bc]" : "text-[var(--tv-brand)]",
         className,
       )}
       {...props}
@@ -685,7 +783,7 @@ function GuidePanel({ close }: { close: () => void }) {
   const { t } = useTraveliunUI();
   return (
     <div>
-      <h3 className="mb-3 text-sm font-bold text-[#185045]">{t("guideTitle")}</h3>
+      <h3 className="mb-3 text-sm font-bold text-[var(--tv-brand)]">{t("guideTitle")}</h3>
       <div className="grid gap-2">
         {([
           ["nav.guide", "/web-guide"],
@@ -740,7 +838,7 @@ function CalculatorPanel() {
 
   return (
     <div>
-      <h3 className="mb-3 text-sm font-bold text-[#185045]">{t("calcTitle")}</h3>
+      <h3 className="mb-3 text-sm font-bold text-[var(--tv-brand)]">{t("calcTitle")}</h3>
       {loading ? (
         <div className="tv-shimmer h-24 rounded-md" />
       ) : (
@@ -750,7 +848,7 @@ function CalculatorPanel() {
             dir="ltr"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="tv-tnum h-10 w-full rounded-md border border-[#ddd4d3] px-3 text-start text-sm outline-none focus:border-[#185045]"
+            className="tv-tnum h-10 w-full rounded-md border border-[#ddd4d3] px-3 text-start text-sm outline-none focus:border-[var(--tv-brand)]"
           />
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
             <select value={from} onChange={(e) => setFrom(e.target.value)} className="h-10 rounded-md border border-[#ddd4d3] bg-white px-2 text-sm outline-none">
@@ -759,7 +857,7 @@ function CalculatorPanel() {
             <button
               type="button"
               onClick={() => { setFrom(to); setTo(from); }}
-              className="flex size-8 items-center justify-center rounded-md border border-[#ddd4d3] text-[#185045] hover:bg-[#f4f8f6]"
+              className="flex size-8 items-center justify-center rounded-md border border-[#ddd4d3] text-[var(--tv-brand)] hover:bg-[#f4f8f6]"
               aria-label={t("aria.swap")}
             >
               ⇄
@@ -768,7 +866,7 @@ function CalculatorPanel() {
               {codes.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
           </div>
-          <div className="rounded-md bg-[#edf3f0] p-3 text-sm text-[#185045]">
+          <div className="rounded-md bg-[#edf3f0] p-3 text-sm text-[var(--tv-brand)]">
             {converted != null ? (
               <span className="tv-tnum font-bold">
                 <DirText dir="ltr">{new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(converted)}</DirText> {to}
@@ -803,7 +901,7 @@ function ViewPanel({
   const { t } = useTraveliunUI();
   return (
     <div>
-      <h3 className="mb-3 text-sm font-bold text-[#185045] dark:text-[#d6e5df]">{t("view")}</h3>
+      <h3 className="mb-3 text-sm font-bold text-[var(--tv-brand)] dark:text-[#d6e5df]">{t("view")}</h3>
       <div className="grid grid-cols-2 gap-2">
         {(["table", "cards"] as const).map((item) => (
           <button
@@ -814,7 +912,7 @@ function ViewPanel({
               close();
             }}
             className={`rounded-md border px-3 py-3 text-sm font-semibold ${
-              view === item ? "border-[#185045] bg-[#185045] text-white" : "border-[#dfe8e4] text-[#557d78]"
+              view === item ? "border-[var(--tv-brand)] bg-[var(--tv-brand)] text-white" : "border-[#dfe8e4] text-[#557d78]"
             }`}
           >
             {item === "table" ? t("viewTable") : t("viewCards")}
@@ -852,7 +950,7 @@ function SettingsPanel({
   };
   return (
     <div>
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-[#185045] dark:text-[#d6e5df]">
+      <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--tv-brand)] dark:text-[#d6e5df]">
         <Languages className="size-4" />
         {t("settings")}
       </h3>
@@ -925,7 +1023,7 @@ function ProfilePanel({ close, onChangePassword }: { close: () => void; onChange
       >
         <UserCircle className="size-10 text-[#b2b7bc]" />
         <div className="min-w-0 flex-1">
-          <p className="font-bold text-[#185045]">{t("account")} · {t(ROLE_LABEL_KEYS[effectiveRole])}</p>
+          <p className="font-bold text-[var(--tv-brand)]">{t("account")} · {t(ROLE_LABEL_KEYS[effectiveRole])}</p>
           <p dir="ltr" className="truncate text-start text-xs text-[#8ba09b]">{email || "—"}</p>
         </div>
         {devMode ? <ChevronDown className={`size-4 text-[#9caaa6] transition-transform ${showViewAs ? "rotate-180" : ""}`} /> : null}
@@ -946,7 +1044,7 @@ function ProfilePanel({ close, onChangePassword }: { close: () => void; onChange
                     else setViewAs(role);
                     close();
                   }}
-                  className={`rounded-md px-2 py-2 text-xs font-bold transition-colors ${active ? "bg-[#185045] text-white" : "border border-[#e2d8d4] text-[#185045] hover:bg-[#f4f8f6]"}`}
+                  className={`rounded-md px-2 py-2 text-xs font-bold transition-colors ${active ? "bg-[var(--tv-brand)] text-white" : "border border-[#e2d8d4] text-[var(--tv-brand)] hover:bg-[#f4f8f6]"}`}
                 >
                   {t("viewas.as", { role: t(ROLE_LABEL_KEYS[role]) })}
                 </button>
@@ -979,7 +1077,7 @@ function ProfilePanel({ close, onChangePassword }: { close: () => void; onChange
         type="button"
         onClick={signOut}
         disabled={signingOut}
-        className="flex w-full items-center justify-center gap-2 rounded-md bg-[#185045] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
+        className="flex w-full items-center justify-center gap-2 rounded-md bg-[var(--tv-brand)] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
       >
         {signingOut ? <Loader2 className="size-4 animate-spin" /> : <LogOut className="size-4" />}
         {signingOut ? t("signingOut") : t("signOut")}
@@ -1056,7 +1154,7 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             <button
               type="button"
               onClick={close}
-              className="h-11 w-full rounded-[10px] bg-[#185045] text-sm font-bold text-white transition-colors hover:bg-[#0f4439]"
+              className="h-11 w-full rounded-[10px] bg-[var(--tv-brand)] text-sm font-bold text-white transition-colors hover:bg-[#0f4439]"
             >
               {t("done")}
             </button>
@@ -1098,14 +1196,14 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenCha
               <button
                 type="button"
                 onClick={close}
-                className="h-11 rounded-[10px] border border-[#d8e3de] px-5 text-sm font-bold text-[#185045] transition-colors hover:bg-[#f4f8f6]"
+                className="h-11 rounded-[10px] border border-[#d8e3de] px-5 text-sm font-bold text-[var(--tv-brand)] transition-colors hover:bg-[#f4f8f6]"
               >
                 {t("cancel")}
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[#185045] px-6 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
+                className="flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[var(--tv-brand)] px-6 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
               >
                 {loading ? <Loader2 className="size-4 animate-spin" /> : null}
                 {loading ? t("saving") : t("save")}
@@ -1121,6 +1219,6 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 
 function panelButton(active: boolean) {
   return `rounded-md border px-3 py-2 text-sm font-semibold ${
-    active ? "border-[#185045] bg-[#185045] text-white" : "border-[#dfe8e4] text-[#557d78]"
+    active ? "border-[var(--tv-brand)] bg-[var(--tv-brand)] text-white" : "border-[#dfe8e4] text-[#557d78]"
   }`;
 }

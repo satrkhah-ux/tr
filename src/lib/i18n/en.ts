@@ -143,6 +143,8 @@ export const en = {
   "nav.roles": "Roles",
   "nav.packages": "Packages",
   "nav.readyOffers": "Ready Offers",
+  "nav.myFiles": "My Packages",
+  "nav.myProfile": "Company Profile",
   "nav.packageGenerator": "Package Generator",
   "nav.issuePackage": "Issue a Package",
   "nav.issuedOffers": "Issued Offers",

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PartnerSignIn } from "@/components/traveliun/partners/PartnerSignIn";
-import { PartnerPortal } from "@/components/traveliun/partners/PartnerPortal";
-import { listPartnerFiles } from "@/lib/partners/drafts";
+import { PartnerHome } from "@/components/traveliun/partners/PartnerHome";
+import { getPartnerHome } from "@/lib/partners/home";
 import { getPartnerSession, isStaffSession } from "@/lib/partners/session";
 import { describeTerms } from "@/lib/partners/pricing";
 
@@ -28,13 +28,9 @@ export default async function B2BPage() {
   const partner = await getPartnerSession();
 
   if (partner) {
-    const files = await listPartnerFiles();
+    const data = await getPartnerHome();
     return (
-      <PartnerPortal
-        partnerName={partner.partner_name}
-        terms={describeTerms(partner.terms)}
-        files={files}
-      />
+      <PartnerHome partnerName={partner.partner_name} terms={describeTerms(partner.terms)} data={data} />
     );
   }
 

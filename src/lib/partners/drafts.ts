@@ -3,7 +3,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { emptyDraftData, normalizeDraftData } from "@/lib/offer/draft-types";
+import { normalizeDraftData } from "@/lib/offer/draft-types";
+import { createDraft } from "@/lib/data/drafts";
 import { getPartnerSession } from "./session";
 
 /**
@@ -79,25 +80,9 @@ export async function createPartnerFile(): Promise<CreateResult> {
   const partner = await getPartnerSession();
   if (!partner) return { ok: false, error: "err.session" };
 
-  try {
-    const supabase = await db();
-    const base = emptyDraftData();
-    // The customer stage's company field, pre-answered — this file belongs to
-    // them, so the document's identity is settled before the first screen.
-    base.customer = { ...base.customer, company: partner.partner_name };
-
-    const { data, error } = await supabase
-      .from("offer_drafts")
-      .insert({
-        data: base as unknown as Record<string, unknown>,
-        title: partner.partner_name,
-        partner_company_id: partner.partner_id,
-      })
-      .select("id")
-      .single();
-    if (error || !data) return { ok: false, error: "err.createFailed" };
-    return { ok: true, id: (data as { id: string }).id };
-  } catch {
-    return { ok: false, error: "err.db" };
-  }
+  // Same creation path as everyone else — createDraft() stamps the company and
+  // seeds the approved default wording. A second insert here would be a second
+  // definition of what a new file starts with.
+  const res = await createDraft();
+  return res.ok ? { ok: true, id: res.id } : { ok: false, error: "err.createFailed" };
 }

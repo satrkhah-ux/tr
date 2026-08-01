@@ -80,6 +80,10 @@
 }
 
 :root {
+  /* The shell's brand colour. Ours by default; the root layout overrides it on
+     <body> for a signed-in partner company, so their portal is their green. */
+  --tv-brand: #185045;
+  --tv-accent: #2aa87a;
   --background: #ffffff;
   --foreground: #003c3a;
   --card: #ffffff;

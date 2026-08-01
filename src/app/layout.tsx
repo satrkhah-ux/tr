@@ -5,6 +5,8 @@ import { LanguageProvider } from "@/components/LanguageProvider";
 import { StoreProvider } from "@/lib/store";
 import { TraveliunUIProvider } from "@/components/traveliun/TraveliunUIProvider";
 import { RoleProvider } from "@/lib/roles/RoleContext";
+import { PartnerProvider } from "@/lib/partners/PartnerContext";
+import { getPartnerBrand } from "@/lib/partners/session";
 import { getCurrentRole } from "@/lib/data/metrics";
 import { getPublicSupabaseConfig } from "@/lib/supabase/constants";
 
@@ -86,13 +88,23 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const realRole = await getCurrentRole();
+  // A partner wears their own colours. Resolved here, on the server, so the very
+  // first paint is already theirs — a client-side swap would flash ours first.
+  const partnerBrand = await getPartnerBrand();
   // Public Supabase config, read at RUNTIME and injected so the browser gets it
   // even when NEXT_PUBLIC_* were not baked at build time (Coolify/VPS deploys).
   // These are public values (anon key + URL) — safe to embed in the HTML.
   const publicEnv = getPublicSupabaseConfig();
   return (
     <html lang="ar" dir="rtl" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-white text-[#003c3a] dark:bg-[#0b1a17] dark:text-[#e7f0ec]">
+      <body
+        className="min-h-full flex flex-col bg-white text-[#003c3a] dark:bg-[#0b1a17] dark:text-[#e7f0ec]"
+        style={
+          partnerBrand
+            ? ({ "--tv-brand": partnerBrand.brandColor, "--tv-accent": partnerBrand.accentColor } as React.CSSProperties)
+            : undefined
+        }
+      >
         <script
           dangerouslySetInnerHTML={{
             __html: `window.__ENV__=${JSON.stringify({
@@ -104,7 +116,9 @@ export default async function RootLayout({
         <StoreProvider>
           <LanguageProvider>
             <RoleProvider realRole={realRole}>
-              <TraveliunUIProvider>{children}</TraveliunUIProvider>
+              <PartnerProvider brand={partnerBrand}>
+                <TraveliunUIProvider>{children}</TraveliunUIProvider>
+              </PartnerProvider>
             </RoleProvider>
           </LanguageProvider>
         </StoreProvider>
