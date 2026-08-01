@@ -1,0 +1,142 @@
+<!--
+  «تأكيد البريد الجديد» — قالب بريد Supabase Auth · Change Email Address
+
+  أين يُلصق:
+    Supabase Dashboard → Authentication → Emails → Change Email Address
+    الموضوع (Subject): أكّد بريدك الجديد — ترافليون
+
+  المتغيّرات المستخدمة هنا (يملؤها Supabase عند الإرسال — لا تحذفها):
+    {{ .ConfirmationURL }}   رابط تأكيد التغيير
+    {{ .Email }}             البريد القديم
+    {{ .NewEmail }}          البريد الجديد
+
+  مبني بقواعد البريد لا الويب: جداول، أنماط داخل السطر، dir على الجدول نفسه،
+  بلا صور خارجية، والرابط مكرّر نصاً تحت الزر.
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       dir="rtl" style="margin:0;padding:0;background:#f4f8f6;">
+  <tr>
+    <td align="center" style="padding:32px 12px;">
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="max-width:560px;background:#ffffff;border:1px solid #e2ebe7;border-radius:16px;overflow:hidden;font-family:'Segoe UI',Tahoma,Arial,sans-serif;">
+
+        <!-- الترويسة -->
+        <tr>
+          <td style="background:#185045;padding:26px 28px;text-align:right;">
+            <div style="color:#ffffff;font-size:21px;font-weight:800;letter-spacing:-0.2px;">
+              ترافليون
+            </div>
+            <div style="color:#a9cfc4;font-size:12px;font-weight:600;padding-top:3px;letter-spacing:1px;">
+              TRAVELIUN &nbsp;·&nbsp; للسفر والسياحة
+            </div>
+          </td>
+        </tr>
+
+        <!-- المتن -->
+        <tr>
+          <td style="padding:30px 28px 8px;text-align:right;">
+            <h1 style="margin:0 0 12px;color:#003c3a;font-size:19px;font-weight:800;">
+              أكّد بريدك الإلكتروني الجديد
+            </h1>
+            <p style="margin:0 0 14px;color:#41615c;font-size:14px;line-height:1.9;">
+              طُلب تغيير البريد الإلكتروني لحسابك في ترافليون. لإتمام التغيير، أكّد البريد
+              الجديد بالضغط على الزر أدناه.
+            </p>
+
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background:#f2fbf6;border:1px solid #d6eadf;border-radius:12px;margin:0 0 22px;">
+              <tr>
+                <td style="padding:14px 16px 8px;text-align:right;">
+                  <div style="color:#78948f;font-size:11px;font-weight:700;padding-bottom:4px;">البريد الحالي</div>
+                  <div style="color:#78948f;font-size:13px;font-weight:700;direction:ltr;text-align:right;">{{ .Email }}</div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:0 16px 14px;text-align:right;">
+                  <div style="border-top:1px solid #d6eadf;padding-top:10px;color:#78948f;font-size:11px;font-weight:700;padding-bottom:4px;">البريد الجديد</div>
+                  <div style="color:#0f3d38;font-size:14px;font-weight:800;direction:ltr;text-align:right;">{{ .NewEmail }}</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- الزر -->
+        <tr>
+          <td align="center" style="padding:0 28px 8px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="background:#185045;border-radius:10px;">
+                  <a href="{{ .ConfirmationURL }}"
+                     style="display:inline-block;padding:14px 34px;color:#ffffff;font-size:15px;font-weight:800;text-decoration:none;">
+                    تأكيد البريد الجديد
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- الرابط نصاً، لعملاء البريد التي لا تعمل فيها الأزرار -->
+        <tr>
+          <td style="padding:16px 28px 4px;text-align:right;">
+            <p style="margin:0;color:#93aaa3;font-size:11px;line-height:1.8;">
+              إن لم يعمل الزر، انسخ هذا الرابط والصقه في المتصفح:
+            </p>
+            <p style="margin:6px 0 0;direction:ltr;text-align:right;word-break:break-all;">
+              <a href="{{ .ConfirmationURL }}" style="color:#2aa87a;font-size:11px;text-decoration:underline;">
+                {{ .ConfirmationURL }}
+              </a>
+            </p>
+          </td>
+        </tr>
+
+        <!-- ماذا يمكنكم فعله -->
+        <tr>
+          <td style="padding:22px 28px 6px;text-align:right;">
+            <div style="border-top:1px solid #eef4f1;padding-top:18px;">
+              <div style="color:#003c3a;font-size:13px;font-weight:800;padding-bottom:10px;">
+                بعد التأكيد
+              </div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><td style="padding:4px 0;color:#41615c;font-size:13px;">· يصبح البريد الجديد هو بريد الدخول</td></tr>
+                <tr><td style="padding:4px 0;color:#41615c;font-size:13px;">· تصل إليه كل رسائل النظام</td></tr>
+              </table>
+            </div>
+          </td>
+        </tr>
+
+        <!-- تنبيه أمني -->
+        <tr>
+          <td style="padding:18px 28px 0;text-align:right;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background:#fffdf7;border:1px solid #f2e2b4;border-radius:10px;">
+              <tr>
+                <td style="padding:12px 14px;color:#a86a10;font-size:12px;line-height:1.8;">
+                  إن لم تطلب هذا التغيير، تجاهل الرسالة — لن يتغيّر شيء، ويُفضَّل تغيير كلمة مرورك.
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- التذييل -->
+        <tr>
+          <td style="padding:24px 28px 26px;text-align:right;">
+            <div style="border-top:1px solid #eef4f1;padding-top:16px;color:#93aaa3;font-size:11px;line-height:1.9;">
+              شركة ترافليون للسفر والسياحة &nbsp;·&nbsp; المملكة العربية السعودية<br />
+              للاستفسار:
+              <a href="mailto:it@traveliun.com" style="color:#2aa87a;text-decoration:none;">it@traveliun.com</a>
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <div style="max-width:560px;padding:14px 8px 0;color:#a9bdb9;font-size:10.5px;text-align:center;">
+        وصلتك هذه الرسالة لتأكيد تغيير البريد الإلكتروني لحساب ترافليون.
+      </div>
+
+    </td>
+  </tr>
+</table>

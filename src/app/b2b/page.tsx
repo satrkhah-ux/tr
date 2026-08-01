@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { DirText } from "@/components/DirText";
 import { PartnerSignIn } from "@/components/traveliun/partners/PartnerSignIn";
+import { PartnerPortal } from "@/components/traveliun/partners/PartnerPortal";
+import { listPartnerFiles } from "@/lib/partners/drafts";
 import { getPartnerSession, isStaffSession } from "@/lib/partners/session";
 import { describeTerms } from "@/lib/partners/pricing";
 
@@ -27,32 +28,13 @@ export default async function B2BPage() {
   const partner = await getPartnerSession();
 
   if (partner) {
+    const files = await listPartnerFiles();
     return (
-      <main className="min-h-dvh bg-[#f4f8f6] px-4 py-10" dir="rtl">
-        <div className="mx-auto max-w-3xl">
-          <header className="mb-5">
-            <p className="text-[12px] font-bold text-[#93aaa3]">بوابة الشركات</p>
-            <h1 className="text-2xl font-extrabold text-[#003c3a]">{partner.partner_name}</h1>
-            <p className="mt-1 text-[12.5px] font-semibold text-[#557d78]">
-              شروط التعامل: {describeTerms(partner.terms)}
-            </p>
-          </header>
-
-          {/* The portal's rooms are being built. Saying which ones, and that the
-              account works, beats an empty shell that looks broken. */}
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white p-6">
-            <h2 className="text-base font-extrabold text-[#0f3d38]">حسابك جاهز</h2>
-            <p className="mt-2 text-[13px] font-semibold text-[#557d78]">
-              دخولك يعمل، وشركتك معتمدة بالشروط أعلاه. شاشات البوابة — بناء البكجات بهويتكم، وملفاتكم،
-              ومتابعة الحجوزات — قيد التجهيز، وسيصلكم إشعار فور تفعيلها.
-            </p>
-            <p className="mt-3 text-[12px] font-semibold text-[#93aaa3]">
-              للاستفسار تواصل مع فريق ترافليون على{" "}
-              <DirText dir="ltr">it@traveliun.com</DirText>
-            </p>
-          </section>
-        </div>
-      </main>
+      <PartnerPortal
+        partnerName={partner.partner_name}
+        terms={describeTerms(partner.terms)}
+        files={files}
+      />
     );
   }
 

@@ -1,0 +1,92 @@
+<!--
+  «رمز إعادة التحقق» — قالب بريد Supabase Auth · Reauthentication
+
+  أين يُلصق:
+    Supabase Dashboard → Authentication → Emails → Reauthentication
+    الموضوع (Subject): رمز التحقق — ترافليون
+
+  ⚠️ هذا القالب مختلف عن البقية: لا يحتوي رابطاً إطلاقاً.
+  Supabase يرسل هنا رمزاً من ٦ أرقام يكتبه المستخدم في الشاشة، والمتغيّر الوحيد
+  المتاح هو:
+    {{ .Token }}   رمز التحقق
+
+  فلا تضع فيه {{ .ConfirmationURL }} — لن يعمل، لأن هذه الرسالة لا تحمل رابطاً.
+
+  متى تُرسل؟ حين يطلب النظام تأكيد الهوية قبل عملية حسّاسة (مثل تغيير كلمة
+  المرور من داخل الحساب).
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       dir="rtl" style="margin:0;padding:0;background:#f4f8f6;">
+  <tr>
+    <td align="center" style="padding:32px 12px;">
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="max-width:560px;background:#ffffff;border:1px solid #e2ebe7;border-radius:16px;overflow:hidden;font-family:'Segoe UI',Tahoma,Arial,sans-serif;">
+
+        <tr>
+          <td style="background:#185045;padding:26px 28px;text-align:right;">
+            <div style="color:#ffffff;font-size:21px;font-weight:800;letter-spacing:-0.2px;">ترافليون</div>
+            <div style="color:#a9cfc4;font-size:12px;font-weight:600;padding-top:3px;letter-spacing:1px;">
+              TRAVELIUN &nbsp;·&nbsp; للسفر والسياحة
+            </div>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:30px 28px 6px;text-align:right;">
+            <h1 style="margin:0 0 12px;color:#003c3a;font-size:19px;font-weight:800;">رمز التحقق</h1>
+            <p style="margin:0 0 20px;color:#41615c;font-size:14px;line-height:1.9;">
+              لإتمام العملية التي طلبتها، أدخل الرمز التالي في الشاشة المفتوحة لديك.
+            </p>
+          </td>
+        </tr>
+
+        <!-- الرمز: كبير، متباعد، ويُقرأ من شاشة الجوال بلا تكبير -->
+        <tr>
+          <td align="center" style="padding:0 28px 6px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+                   style="background:#f2fbf6;border:1px solid #d6eadf;border-radius:12px;">
+              <tr>
+                <td align="center" style="padding:22px 12px;">
+                  <div style="color:#0f3d38;font-size:34px;font-weight:800;letter-spacing:10px;direction:ltr;font-family:'Courier New',monospace;">
+                    {{ .Token }}
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:16px 28px 0;text-align:right;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background:#fffdf7;border:1px solid #f2e2b4;border-radius:10px;">
+              <tr>
+                <td style="padding:12px 14px;color:#a86a10;font-size:12px;line-height:1.8;">
+                  الرمز صالح لدقائق معدودة ويُستخدم مرة واحدة. لا ترسله لأحد مهما كان —
+                  موظفو ترافليون لا يطلبونه منك أبداً. وإن لم تطلب هذه العملية، تجاهل الرسالة
+                  وغيّر كلمة مرورك.
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:24px 28px 26px;text-align:right;">
+            <div style="border-top:1px solid #eef4f1;padding-top:16px;color:#93aaa3;font-size:11px;line-height:1.9;">
+              شركة ترافليون للسفر والسياحة &nbsp;·&nbsp; المملكة العربية السعودية<br />
+              للاستفسار:
+              <a href="mailto:it@traveliun.com" style="color:#2aa87a;text-decoration:none;">it@traveliun.com</a>
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <div style="max-width:560px;padding:14px 8px 0;color:#a9bdb9;font-size:10.5px;text-align:center;">
+        وصلتك هذه الرسالة لأن عملية في حسابك طلبت تأكيد الهوية.
+      </div>
+
+    </td>
+  </tr>
+</table>
