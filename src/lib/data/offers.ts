@@ -13,7 +13,7 @@ import {
   type InternalFlightLine,
   type ClimateLine,
 } from "@/lib/offer/dto";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { getClimateNote } from "./climate-actions";
 import { getCurrentEmployeeId } from "./metrics";
 import { setOfferStatus } from "./offer-status";
@@ -1051,7 +1051,15 @@ export type PublishedRender = { version: number; offer: ClientOfferDTO; file_pat
  */
 export async function getPublishedClientOffer(serial: string): Promise<PublishedRender | null> {
   try {
-    const supabase = await db();
+    // SERVICE client, deliberately — the same call resolveDocBrand makes and for
+    // the same reason. This runs on the public client link and its PDF, where
+    // there is no session; with the user client it read as `anon`, which meant
+    // `offers` and `offer_renders` had to be open to anon, which meant the anon
+    // key in the browser bundle could LIST every offer we have ever issued.
+    // Knowing a serial and being able to enumerate them are different things.
+    // Nothing extra escapes: what leaves here is the published client snapshot,
+    // which is already the document the client was sent.
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data: offerRow } = await supabase.from("offers").select("id").eq("serial", serial).maybeSingle();
     if (!offerRow) return null;
     const { data: render } = await supabase
