@@ -40,7 +40,15 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 const card = "rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const MONEY = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
-export function DraftsList({ drafts }: { drafts: DraftSummary[] }) {
+/**
+ * The list of programmes, wherever it is shown.
+ *
+ * It appears under «إصدار بكج سياحي» and again under «البكجات السياحية»,
+ * because an agent looking for a file thinks of it either way — as the thing
+ * they are building, or the thing they built. One list, one set of actions, so
+ * the two entrances can never disagree about what exists.
+ */
+export function DraftsList({ drafts, titleKey = "nav.packageGenerator" }: { drafts: DraftSummary[]; titleKey?: TranslationKey }) {
   const router = useRouter();
   const { t } = useTraveliunUI();
   const [creating, setCreating] = useState(false);
@@ -94,7 +102,7 @@ export function DraftsList({ drafts }: { drafts: DraftSummary[] }) {
   }, [rows, query]);
 
   return (
-    <TraveliunShell title="nav.packageGenerator">
+    <TraveliunShell title={titleKey}>
       <div className="tv-fade-up space-y-4">
         <section className={`${card} px-5 py-4`}>
           <h1 className="text-lg font-extrabold text-[#003c3a]">{t("pg.hubTitle")}</h1>

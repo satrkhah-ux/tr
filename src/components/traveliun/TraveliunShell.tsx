@@ -81,16 +81,16 @@ export const navGroups: NavGroup[] = [
     labelKey: "nav.packages",
     href: "/offers",
     icon: FileText,
+    // The doing comes first, then what to do it from, then what came out of it.
+    // The reference lists (margin rules, hotel suppliers, includes/excludes,
+    // terms) moved to «قسم البيانات»: they are tables an admin maintains
+    // occasionally, and sitting here they made a nine-item menu out of a
+    // four-item job.
     children: [
+      { labelKey: "nav.issuePackage", href: "/package-generator" },
       { labelKey: "nav.readyOffers", href: "/ready-offers" },
       { labelKey: "nav.packages", href: "/offers" },
-      { labelKey: "nav.packageGenerator", href: "/package-generator" },
       { labelKey: "nav.repackage", href: "/repackage" },
-      { labelKey: "nav.markupRules", href: "/markup-rules" },
-      { labelKey: "nav.hotelSuppliers", href: "/settings/suppliers" },
-      { labelKey: "nav.terms", href: "/offers/terms-and-conditions" },
-      { labelKey: "nav.offerIncludes", href: "/offers/offer-includes" },
-      { labelKey: "nav.offerExcludes", href: "/offers/offer-not-includes" },
     ],
   },
   { labelKey: "nav.partnerCompanies", href: "/partner-companies", icon: Building2 },
@@ -123,6 +123,13 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.visaTypes", href: "/visas-types", captionKey: "nav.visas" },
       { labelKey: "nav.visas", href: "/visas" },
       { labelKey: "nav.kanban", href: "/kanban-board", captionKey: "nav.kanban" },
+      // Moved out of «البكجات السياحية»: the generator READS these, it does not
+      // live in them. They are maintained here with the other reference tables.
+      { labelKey: "nav.hotelSuppliers", href: "/settings/suppliers", captionKey: "nav.hotelSuppliers" },
+      { labelKey: "nav.markupRules", href: "/markup-rules" },
+      { labelKey: "nav.offerIncludes", href: "/offers/offer-includes" },
+      { labelKey: "nav.offerExcludes", href: "/offers/offer-not-includes" },
+      { labelKey: "nav.terms", href: "/offers/terms-and-conditions" },
     ],
   },
 
