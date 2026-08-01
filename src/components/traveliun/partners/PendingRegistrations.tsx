@@ -2,10 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, KeyRound, Loader2, XCircle } from "lucide-react";
+import { BadgeCheck, KeyRound, Loader2, RotateCcw, XCircle } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import type { PartnerCompany } from "@/lib/data/partner-companies";
-import { approvePartnerCompany, issuePartnerAccount, setPartnerStatus } from "@/lib/partners/registration";
+import {
+  approvePartnerCompany,
+  issuePartnerAccount,
+  resendPartnerPasswordLink,
+  setPartnerStatus,
+} from "@/lib/partners/registration";
 import { describeTerms } from "@/lib/partners/pricing";
 
 /**
@@ -167,6 +172,28 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
         {done ? "تم الإرسال" : "إصدار حساب"}
       </button>
+
+      {/* An invitation is single-use, so a company that lost the first link had
+          no way back in — «مُصدر له حساب بالفعل» was a dead end. This is it. */}
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() =>
+          startTransition(async () => {
+            setDone(false);
+            const res = await resendPartnerPasswordLink({ partner_id: company.id, email });
+            if (res.ok) {
+              setDone(true);
+              setMessage("أُرسل رابط جديد لتعيين كلمة المرور.");
+            } else setMessage(res.message);
+          })
+        }
+        className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] px-3 text-[12px] font-bold text-[#557d78] hover:bg-white disabled:opacity-60"
+      >
+        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
+        إعادة إرسال كلمة المرور
+      </button>
+
       {message ? (
         <p className={`basis-full text-[11.5px] font-bold ${done ? "text-[#0f7a52]" : "text-[#c22850]"}`}>{message}</p>
       ) : null}

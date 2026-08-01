@@ -226,3 +226,77 @@ export async function issuePartnerAccount(input: {
     return { ok: false, message: "تعذّر إصدار الحساب." };
   }
 }
+
+/**
+ * Send a fresh password link to a company that already has an account.
+ *
+ * An invitation is single-use, so «هذا البريد مُصدر له حساب بالفعل» used to be a
+ * dead end: the company had lost or never finished the first link and there was
+ * no way to give them another. This is the way out, and it is the only one an
+ * employee needs — we still never see or set the password.
+ *
+ * A RECOVERY link rather than a second invitation: the account exists, so this
+ * is a reset, and Supabase refuses to re-invite an existing user anyway.
+ */
+export async function resendPartnerPasswordLink(input: {
+  partner_id: string;
+  email: string;
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!(await currentCan("settings.manage"))) return { ok: false, message: "غير مصرّح لك بهذا الإجراء." };
+  const email = input.email.trim().toLowerCase();
+  if (!EMAIL.test(email)) return { ok: false, message: "البريد الإلكتروني غير صحيح." };
+
+  try {
+    const supabase = db();
+
+    // Only for an account that belongs to THIS company. Without this check the
+    // screen would become a way to send a password link to any address at all.
+    const { data } = await supabase
+      .from("partner_users")
+      .select("id, status")
+      .eq("partner_id", input.partner_id)
+      .ilike("email", email)
+      .maybeSingle();
+    const account = data as { id: string; status: string } | null;
+    if (!account) return { ok: false, message: "لا يوجد حساب بهذا البريد لهذه الشركة — أصدر حساباً أولاً." };
+    if (account.status !== "active") return { ok: false, message: "هذا الحساب موقوف — فعّله قبل إرسال الرابط." };
+
+    const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
+    const url = process.env["NEXT_PUBLIC_SUPABASE_URL"];
+    const anon = process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
+    if (!url || !anon) return { ok: false, message: "إعدادات الاتصال غير مكتملة على الخادم." };
+
+    // The public recovery endpoint, deliberately: it is what sends the mail
+    // through the configured SMTP. The admin API can only mint a link, which
+    // would leave us holding a credential-equivalent and mailing it ourselves.
+    //
+    // The landing page rides in the QUERY STRING — this endpoint takes
+    // redirect_to there, not in the body, and without it the link drops the
+    // company on the site root instead of the page that sets a password.
+    const recoverUrl = `${url}/auth/v1/recover?redirect_to=${encodeURIComponent(`${site}/b2b/welcome`)}`;
+    const res = await fetch(recoverUrl, {
+      method: "POST",
+      headers: { apikey: anon, "content-type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      return {
+        ok: false,
+        message: body.toLowerCase().includes("rate")
+          ? "أُرسل رابط قبل قليل — انتظر دقيقة ثم أعد المحاولة."
+          : "تعذّر إرسال الرابط — تأكد من إعدادات البريد لدى Supabase.",
+      };
+    }
+
+    await logAudit({
+      action: "partner.account_issued",
+      entity: "booking_partners",
+      entity_id: input.partner_id,
+      meta: { email, kind: "password_link_resent", redirect: `${site}/b2b/welcome` },
+    });
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "تعذّر إرسال الرابط." };
+  }
+}
