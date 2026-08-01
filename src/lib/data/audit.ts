@@ -60,7 +60,11 @@ export type AuditAction =
   // supplier API bookings — the calls that move money
   | "supplier.prebooked"
   | "supplier.booked"
-  | "supplier.cancelled";
+  | "supplier.cancelled"
+  // the B2B portal: who let a company in, on what terms, and who gave it a login
+  | "partner.approved"
+  | "partner.status_changed"
+  | "partner.account_issued";
 
 export type AuditInput = {
   action: AuditAction;

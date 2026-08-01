@@ -95,6 +95,40 @@ function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/**
+ * A company asked to work with us.
+ *
+ * Nobody watches a table for new rows. Without this the request sits as
+ * `pending` until somebody happens to open the partners screen, and a company
+ * that filled in a form and heard nothing for a week has already gone elsewhere.
+ */
+export async function notifyPartnerRegistration(notice: {
+  name: string;
+  email: string;
+  phone: string;
+}): Promise<number> {
+  try {
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const chatIds = await opsRecipients(supabase);
+    if (chatIds.length === 0) return 0;
+
+    const text = [
+      "🤝 <b>طلب شراكة جديد</b>",
+      "",
+      `الشركة: <b>${escapeHtml(notice.name)}</b>`,
+      `البريد: <code>${escapeHtml(notice.email)}</code>`,
+      `الجوال: <code>${escapeHtml(notice.phone)}</code>`,
+      "",
+      "راجع الطلب واعتمد الشروط من قسم الشركات المتعاونة.",
+    ].join("\n");
+
+    const results = await Promise.all(chatIds.map((id) => send(id, text, "/partner-companies")));
+    return results.filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+}
+
 export type BookingChangeNotice = {
   operationId: string;
   serial: string;

@@ -26,7 +26,20 @@ import { AUTH_STORAGE_KEY, parseSessionCookie } from "@/lib/supabase/constants";
 // which carries no cookie either. It proves itself with ADMIN_API_SECRET in a
 // header — leaving it behind this gate would turn the nightly briefing into a
 // silent 307 that nobody notices until management asks why it stopped.
-const PUBLIC_PREFIXES = ["/sign-in", "/client-offer", "/voucher", "/trip", "/tg", "/api/telegram", "/api/eye"];
+// `/b2b/register` is the public door for travel companies — the same kind of
+// surface as `/client-offer`: no session, and no database grant either. The form
+// posts to a server action that writes one `pending` row through the service
+// role, so being public costs nothing but the form itself.
+const PUBLIC_PREFIXES = [
+  "/sign-in",
+  "/client-offer",
+  "/voucher",
+  "/trip",
+  "/tg",
+  "/api/telegram",
+  "/api/eye",
+  "/b2b/register",
+];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
 
 function isPublic(pathname: string): boolean {
