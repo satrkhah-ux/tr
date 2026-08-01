@@ -18,6 +18,7 @@ import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass } from "../stage-props";
 import { HotelPicker, type PickerFilters, type PickerSource } from "./HotelPicker";
+import type { SearchBarGuests } from "./HotelSearchBar";
 import { StaySummary } from "./StaySummary";
 
 const rowLabelClass = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
@@ -44,7 +45,6 @@ export function StayCard({
   hotelOptions,
   roomTypeOptions,
   canInternal,
-  occupancy,
   picker,
   onSetLine,
   onSetHotel,
@@ -65,7 +65,6 @@ export function StayCard({
   hotelOptions: { id: string; name: string; stars: number | null }[];
   roomTypeOptions: LookupRoomType[];
   canInternal: boolean;
-  occupancy: string;
   picker: {
     sources: PickerSource[];
     source: string;
@@ -79,6 +78,16 @@ export function StayCard({
     notes: SupplierNote[];
     busyKey: string | null;
     onSelect: (hotel: HotelOption, rate: HotelRateOption | null) => void;
+    stay: {
+      cityName: string;
+      checkIn: string | null;
+      checkOut: string | null;
+      nights: number;
+      guests: SearchBarGuests;
+      onNights: (n: number) => void;
+      onGuests: (g: SearchBarGuests) => void;
+      hotelNames: string[];
+    };
   };
   onSetLine: (next: DraftHotel) => void;
   onSetHotel: (slice: Partial<DraftHotel>) => void;
@@ -143,7 +152,6 @@ export function StayCard({
       ) : (
         <HotelPicker
           {...picker}
-          occupancy={occupancy}
           manual={
             <ManualEntry
               line={line}

@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Search, SlidersHorizontal, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import { Loader2, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { BOARD_LABEL_KEYS, BOARD_TYPES } from "@/lib/offer/draft-types";
 import type { HotelOption, HotelRateOption, SupplierNote } from "@/lib/data/hotel-search";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass } from "../stage-props";
 import { HotelResultRow } from "./HotelResultRow";
+import { HotelSearchBar, type SearchBarGuests } from "./HotelSearchBar";
 
 /**
  * Choosing a hotel: one source, one search box, one list.
@@ -60,10 +62,10 @@ export function HotelPicker({
   error,
   results,
   notes,
-  occupancy,
   busyKey,
   onSelect,
   manual,
+  stay,
 }: {
   sources: PickerSource[];
   source: string;
@@ -75,12 +77,21 @@ export function HotelPicker({
   error: string | null;
   results: HotelOption[] | null;
   notes: SupplierNote[];
-  /** the line from stage 1 — read-only, never re-asked. */
-  occupancy: string;
   busyKey: string | null;
   onSelect: (hotel: HotelOption, rate: HotelRateOption | null) => void;
   /** the manual tab's form — rendered by the caller, which owns the draft line. */
   manual: React.ReactNode;
+  /** everything the bar shows, already known from stages 1–3. */
+  stay: {
+    cityName: string;
+    checkIn: string | null;
+    checkOut: string | null;
+    nights: number;
+    guests: SearchBarGuests;
+    onNights: (n: number) => void;
+    onGuests: (g: SearchBarGuests) => void;
+    hotelNames: string[];
+  };
 }) {
   const { t } = useTraveliunUI();
   const [showOptions, setShowOptions] = useState(false);
@@ -111,30 +122,34 @@ export function HotelPicker({
     });
 
   return (
-    <div className="rounded-[11px] border border-[#d6eadf] bg-white p-3">
-      {/* WHERE the hotel comes from — the first and only question at this point */}
-      <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] font-extrabold text-[#93aaa3]">المصدر</span>
-        <div className="inline-flex flex-wrap overflow-hidden rounded-[9px] border border-[#cfe0d9]">
-          {sources.map((s) => (
-            <button
-              key={s.code}
-              type="button"
-              disabled={!s.enabled}
-              title={s.enabled ? undefined : s.reason}
-              onClick={() => onSource(s.code)}
-              className={`h-8 border-s border-[#cfe0d9] px-3 text-[11.5px] font-bold transition-colors first:border-s-0 disabled:cursor-not-allowed disabled:opacity-45 ${
-                s.code === source ? "bg-[#185045] text-white" : "bg-white text-[#557d78] hover:bg-[#f0f7f4]"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-        {active && !active.enabled && active.reason ? (
-          <span className="text-[11px] font-bold text-[#a86a10]">{active.reason}</span>
-        ) : null}
-      </div>
+    <div>
+      {/* The bar: city, dates, party, system, search — all of it already known,
+          so it opens filled in rather than asking for the trip a second time. */}
+      <HotelSearchBar
+        cityName={stay.cityName}
+        nameFilter={filters.name}
+        onNameFilter={(v) => onFilters({ ...filters, name: v })}
+        checkIn={stay.checkIn}
+        checkOut={stay.checkOut}
+        nights={stay.nights}
+        onNights={stay.onNights}
+        guests={stay.guests}
+        onGuests={stay.onGuests}
+        sources={sources}
+        source={source}
+        onSource={onSource}
+        searching={searching}
+        onSearch={() => {
+          setShown(PAGE);
+          onSearch();
+        }}
+        hotelNames={stay.hotelNames}
+      />
+
+      <div className="mt-2 rounded-[11px] border border-[#d6eadf] bg-white p-3">
+      {active && !active.enabled && active.reason ? (
+        <p className="mb-2 text-[11px] font-bold text-[#a86a10]">{active.reason}</p>
+      ) : null}
 
       {/* Fixtures are one careless quote away from a real customer, so the
           warning sits above the results rather than in a tooltip. */}
@@ -149,46 +164,18 @@ export function HotelPicker({
         manual
       ) : (
         <>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setShown(PAGE);
-              onSearch();
-            }}
-            className="flex flex-wrap items-end gap-2"
+          {/* Everything else is behind one word, because the common search
+              needs none of it. */}
+          <button
+            type="button"
+            onClick={() => setShowOptions((v) => !v)}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold transition-colors ${
+              showOptions ? "border-[#185045] bg-[#f0f7f4] text-[#185045]" : "border-[#dbe6e1] text-[#557d78]"
+            }`}
           >
-            <label className="grid flex-1 gap-1 text-[11.5px] font-bold text-[#185045]">
-              اسم الفندق (اختياري)
-              <input
-                value={filters.name}
-                onChange={(e) => onFilters({ ...filters, name: e.target.value })}
-                placeholder="اتركه فارغاً لعرض كل المتاح"
-                className={`${fieldClass} h-9`}
-              />
-            </label>
-            <button
-              type="submit"
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-4 text-[12px] font-bold text-white hover:bg-[#0f4439]"
-            >
-              <Search className="size-3.5" />
-              بحث
-            </button>
-            {/* Everything else is behind one word, because the common search
-                needs none of it. */}
-            <button
-              type="button"
-              onClick={() => setShowOptions((v) => !v)}
-              className={`inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold transition-colors ${
-                showOptions ? "border-[#185045] bg-[#f0f7f4] text-[#185045]" : "border-[#dbe6e1] text-[#557d78]"
-              }`}
-            >
-              <SlidersHorizontal className="size-3.5" />
-              خيارات
-            </button>
-          </form>
-
-          {/* what stage 1 already decided — shown, never asked again */}
-          <p className="tv-tnum mt-1.5 text-[11px] font-bold text-[#93aaa3]">{occupancy}</p>
+            <SlidersHorizontal className="size-3.5" />
+            خيارات الفرز
+          </button>
 
           {showOptions ? (
             <div className="mt-2 flex flex-wrap items-end gap-2 rounded-[9px] bg-[#f8fbf9] p-2 text-[11.5px] font-bold text-[#185045]">
@@ -299,9 +286,9 @@ export function HotelPicker({
                         {n.name}: {n.detail}
                         {/* The one failure with a fix the agent can act on, so
                             it carries the way there instead of a dead end. */}
-                        <a href="/settings/suppliers" className="ms-1 underline">
+                        <Link href="/settings/suppliers" className="ms-1 underline">
                           افتح إعدادات المزوّدين
-                        </a>
+                        </Link>
                       </span>
                     ) : n.reason === "error" || n.reason === "supplier_error" ? (
                       <span className="text-[#c22850]">
@@ -317,6 +304,7 @@ export function HotelPicker({
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }

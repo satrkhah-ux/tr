@@ -8,6 +8,7 @@ import {
   findLookupCountry,
   hotelCoverage,
   normalizeDraftHotel,
+  resizeRooms,
   withRooms,
   type DraftHotel,
   type DraftTrip,
@@ -249,10 +250,20 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
     setBusyKey(null);
   }
 
-  const occupancyLine = (line: DraftHotel, nights: number) =>
-    `${data.trip.adults} بالغ${data.trip.children > 0 ? ` · ${data.trip.children} طفل` : ""} · ${line.rooms_count} غرفة · ${nights} ليلة${
-      country?.iso2 ? ` · ${country.iso2}` : ""
-    }`;
+  /**
+   * The party, edited from the search bar.
+   *
+   * Adults and children belong to the TRIP — correcting them in front of a price
+   * should correct them everywhere, not just for this one search, or the package
+   * ends up quoted for a different family than it is written for. Rooms belong
+   * to this hotel line, so it goes through resizeRooms with everything else.
+   */
+  function setGuests(line: DraftHotel, g: { adults: number; children: number; rooms: number }) {
+    if (g.adults !== data.trip.adults || g.children !== data.trip.children) {
+      patch({ trip: { ...data.trip, adults: g.adults, children: g.children } });
+    }
+    if (g.rooms !== line.rooms_count) setLine(line.id, resizeRooms(line, g.rooms));
+  }
 
   return (
     <section className={sectionClass}>
@@ -329,8 +340,23 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                         hotelOptions={hotelOptions}
                         roomTypeOptions={roomTypeOptions}
                         canInternal={canInternal}
-                        occupancy={occupancyLine(line, stay.nights)}
                         picker={{
+                          stay: {
+                            cityName: cov.city_name,
+                            checkIn: stay.check_in,
+                            checkOut: stay.check_out,
+                            nights: stay.nights,
+                            guests: {
+                              adults: data.trip.adults,
+                              children: data.trip.children,
+                              rooms: line.rooms_count,
+                            },
+                            // Moving the check-out IS changing how many nights
+                            // this hotel covers — one truth, not a private copy.
+                            onNights: (n) => setHotel(line.id, { nights: n }),
+                            onGuests: (g) => setGuests(line, g),
+                            hotelNames: hotelOptions.map((h) => h.name),
+                          },
                           sources,
                           source: sourceFor(line),
                           onSource: (code) => {
