@@ -886,6 +886,12 @@ export type GeneratorLookups = {
    */
   /** the carriers, for the flight stage's picker and the document's marks. */
   airlines: { iata: string; name: string; logo_url: string | null }[];
+  /**
+   * The hotel sources the agent may pick between, read from the enabled
+   * suppliers rather than written into the screen — so connecting a new supplier
+   * makes it appear on its own, and a demo one is flagged as demo.
+   */
+  hotelSources: { code: string; name: string; demo: boolean }[];
   partners: {
     id: string;
     name: string;

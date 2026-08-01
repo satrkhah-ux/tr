@@ -278,16 +278,6 @@ export async function searchInternalHotels(
   }
 }
 
-/** Suppliers the agent may pick between on the hotels stage. */
-export type SupplierChoice = { code: string; name: string; live: boolean };
-
-export async function listHotelSourceOptions(): Promise<SupplierChoice[]> {
-  const user = await getServerUser();
-  if (!user) return [];
-  const suppliers = await getEnabledHotelSuppliers();
-  return suppliers.map((s) => ({ code: s.code, name: s.name, live: typeof s.prebook === "function" }));
-}
-
 type Stay = { check_in: string; check_out: string; rooms: number; nights: number };
 
 /**

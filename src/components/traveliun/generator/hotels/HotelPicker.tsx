@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Search, SlidersHorizontal } from "lucide-react";
+import { Loader2, Search, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { BOARD_LABEL_KEYS, BOARD_TYPES } from "@/lib/offer/draft-types";
 import type { HotelOption, HotelRateOption, SupplierNote } from "@/lib/data/hotel-search";
@@ -24,6 +24,8 @@ export type PickerSource = {
   /** false → shown but unpickable, with `reason` saying why. Never hidden. */
   enabled: boolean;
   reason?: string;
+  /** fixtures, not inventory. Says so loudly wherever its results appear. */
+  demo?: boolean;
 };
 
 export type PickerFilters = {
@@ -133,6 +135,15 @@ export function HotelPicker({
           <span className="text-[11px] font-bold text-[#a86a10]">{active.reason}</span>
         ) : null}
       </div>
+
+      {/* Fixtures are one careless quote away from a real customer, so the
+          warning sits above the results rather than in a tooltip. */}
+      {active?.demo ? (
+        <p className="mb-2 flex items-center gap-1.5 rounded-[8px] bg-[#fff8e8] px-2.5 py-1.5 text-[11px] font-extrabold text-[#a86a10]">
+          <TriangleAlert className="size-3.5 shrink-0" />
+          بيانات تجريبية للتدريب والاختبار — لا تُسعَّر منها عروض حقيقية.
+        </p>
+      ) : null}
 
       {isManual ? (
         manual

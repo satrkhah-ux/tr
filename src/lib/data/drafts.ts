@@ -20,6 +20,7 @@ import {
   type TermLibrary,
   type TermLibraryItem,
 } from "@/lib/offer/draft-types";
+import { getEnabledHotelSuppliers } from "@/lib/providers/hotel-registry";
 import { draftSellTotal } from "@/lib/offer/preview-dto";
 import { applyManualProfit } from "@/lib/offer/pricing";
 import { itineraryStartDate } from "@/lib/offer/schedule";
@@ -227,6 +228,7 @@ export async function deleteDraft(draftId: string): Promise<SaveDraftResult> {
 export async function getGeneratorLookups(): Promise<GeneratorLookups> {
   const empty: GeneratorLookups = {
     countries: [], roomTypes: [], airports: [], carTypes: [], termLibrary: emptyTermLibrary(), partners: [], airlines: [],
+    hotelSources: [],
   };
   try {
     const supabase = await db();
@@ -308,6 +310,15 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       partners: ((partnersRes.data ?? []) as (Omit<GeneratorLookups["partners"][number], "logo_url"> & { logo_path: string | null })[]).map(
         ({ logo_path, ...p }) => ({ ...p, logo_url: publicBrandLogoUrl(process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? "", logo_path) }),
       ),
+      // The picker's tabs come from what is actually connected. `mock` is a
+      // deterministic fixture engine, so it is marked and the screen says so —
+      // invented hotels at invented prices are one careless quote away from a
+      // real customer.
+      hotelSources: (await getEnabledHotelSuppliers()).map((s) => ({
+        code: s.code,
+        name: s.code === "mock" ? "تجريبي (بيانات وهمية)" : s.name,
+        demo: s.code === "mock" || s.code === "almosafer",
+      })),
     };
   } catch {
     return empty;

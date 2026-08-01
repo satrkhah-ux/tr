@@ -99,12 +99,18 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
    */
   const sources: PickerSource[] = [
     { code: "internal", label: "النظام الداخلي", enabled: true },
-    {
-      code: "tbo",
-      label: "TBO",
-      enabled: Boolean(country?.iso2),
-      reason: country?.iso2 ? undefined : `الدولة «${data.trip.country}» بلا رمز ISO في قسم الدول`,
-    },
+    // Every connected supplier, straight from what is enabled — a new one
+    // appears here on its own, and none of them is written into this screen.
+    ...lookups.hotelSources.map((s) => ({
+      code: s.code,
+      label: s.name,
+      demo: s.demo,
+      // A live supplier resolves the city inside a country; the demo engine
+      // invents its own, so it works without one.
+      enabled: s.demo || Boolean(country?.iso2),
+      reason:
+        s.demo || country?.iso2 ? undefined : `الدولة «${data.trip.country}» بلا رمز ISO في قسم الدول`,
+    })),
     { code: "manual", label: "يدوي", enabled: true },
   ];
   const sourceLabel = (code: string) => sources.find((s) => s.code === code)?.label ?? code;
