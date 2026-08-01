@@ -26,10 +26,13 @@ import { AUTH_STORAGE_KEY, parseSessionCookie } from "@/lib/supabase/constants";
 // which carries no cookie either. It proves itself with ADMIN_API_SECRET in a
 // header — leaving it behind this gate would turn the nightly briefing into a
 // silent 307 that nobody notices until management asks why it stopped.
-// `/b2b/register` is the public door for travel companies — the same kind of
-// surface as `/client-offer`: no session, and no database grant either. The form
-// posts to a server action that writes one `pending` row through the service
-// role, so being public costs nothing but the form itself.
+// `/b2b` is the public door for travel companies — the same kind of surface as
+// `/client-offer`: no session, and no database grant either. The registration
+// form posts to a server action that writes one `pending` row through the
+// service role, and `/b2b` itself decides who is standing there (partner,
+// employee, or stranger) and shows each of them something useful. Guarding it
+// here would send a company that has an account to the STAFF sign-in screen,
+// which is the wrong door with the wrong error.
 const PUBLIC_PREFIXES = [
   "/sign-in",
   "/client-offer",
@@ -38,7 +41,7 @@ const PUBLIC_PREFIXES = [
   "/tg",
   "/api/telegram",
   "/api/eye",
-  "/b2b/register",
+  "/b2b",
 ];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
 
