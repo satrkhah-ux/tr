@@ -1,6 +1,6 @@
 "use server";
 
-import { getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { getRates } from "./rates-actions";
 import { getActiveMarkupRules } from "./markup-rules";
 import { getDraft, getGeneratorLookups, saveDraftStages } from "./drafts";
@@ -85,6 +85,140 @@ export type SearchResult =
 export type SearchFilters = {
   hotel_name?: string | null;
 };
+
+/**
+ * A hotel from OUR OWN list, with what we last charged for it.
+ *
+ * The hotels table holds no price — 155 hotels with a name, stars and a phone
+ * number. The only honest price for one of them is the price we actually quoted
+ * last time, so that is what this carries, along with when, so the agent can see
+ * at a glance whether it is a figure from last month or from last winter.
+ */
+export type InternalHotel = {
+  id: string;
+  name: string;
+  name_en: string | null;
+  stars: number | null;
+  /** null when we have never priced this hotel — the agent types one. */
+  last: {
+    sell_total: number;
+    per_night: number;
+    currency: string;
+    nights: number;
+    board_type: BoardType | null;
+    room_type_name: string | null;
+    /** check-in of the offer it came from. */
+    quoted_for: string | null;
+  } | null;
+};
+
+export type InternalSearchResult =
+  | { ok: true; hotels: InternalHotel[] }
+  | { ok: false; error: TranslationKey };
+
+/**
+ * The company's own hotels for a city, each with its most recent quoted price.
+ *
+ * Deliberately not a live search: these are the hotels we have contracts or a
+ * history with. Sorted by "we have priced this" first, because a hotel with a
+ * known price is the one an agent can actually build a package from.
+ */
+export async function searchInternalHotels(
+  draftId: string,
+  cityName: string,
+  filters?: SearchFilters,
+): Promise<InternalSearchResult> {
+  const user = await getServerUser();
+  if (!user) return { ok: false, error: "err.session" };
+
+  try {
+    const record = await getDraft(draftId);
+    if (!record) return { ok: false, error: "err.loadFailed" };
+    const supabase = await createSupabaseServerClient();
+
+    // Two small queries rather than getGeneratorLookups(), which runs nine —
+    // this is a search box, and it re-runs every time the agent presses it.
+    // The country still has to be resolved: «طرابلس» is a real city in two of
+    // them, and picking the wrong one lists the wrong hotels.
+    const { data: countryRows } = await supabase.from("countries").select("id, arabic_name");
+    const country = findLookupCountry(
+      ((countryRows ?? []) as { id: string; arabic_name: string }[]).map((c) => ({
+        id: c.id,
+        name: c.arabic_name,
+        iso2: null,
+        cities: [],
+      })),
+      record.data.trip.country,
+    );
+    if (!country) return { ok: true, hotels: [] };
+
+    const { data: cityRows } = await supabase
+      .from("cities")
+      .select("id, arabic_name")
+      .eq("country_id", country.id)
+      .eq("arabic_name", cityName)
+      .limit(1);
+    const city = ((cityRows ?? []) as { id: string }[])[0];
+    if (!city) return { ok: true, hotels: [] };
+    const wanted = (filters?.hotel_name ?? "").trim();
+    let query = supabase
+      .from("hotels")
+      .select("id, arabic_name, english_name, stars")
+      .eq("city_id", city.id)
+      .order("stars", { ascending: false });
+    if (wanted) query = query.ilike("arabic_name", `%${wanted}%`);
+    const { data } = await query;
+    const rows = (data ?? []) as { id: string; arabic_name: string; english_name: string | null; stars: number | null }[];
+    if (rows.length === 0) return { ok: true, hotels: [] };
+
+    // The price history, newest first, for exactly these hotels. One query, not
+    // one per hotel — this list runs to 155 rows in a busy city.
+    const { data: priced } = await supabase
+      .from("offer_hotels")
+      .select("hotel_id, nights, board_type, room_type_name, sell_price, sell_currency, check_in")
+      .in("hotel_id", rows.map((r) => r.id))
+      .not("sell_price", "is", null)
+      .order("check_in", { ascending: false, nullsFirst: false })
+      .limit(400);
+
+    const lastFor = new Map<string, InternalHotel["last"]>();
+    for (const h of (priced ?? []) as {
+      hotel_id: string;
+      nights: number | null;
+      board_type: string | null;
+      room_type_name: string | null;
+      sell_price: number;
+      sell_currency: string | null;
+      check_in: string | null;
+    }[]) {
+      if (lastFor.has(h.hotel_id)) continue; // ordered desc — the first is the latest
+      const nights = h.nights && h.nights > 0 ? h.nights : 1;
+      lastFor.set(h.hotel_id, {
+        sell_total: Number(h.sell_price),
+        per_night: Math.round((Number(h.sell_price) / nights) * 100) / 100,
+        currency: h.sell_currency ?? BASE,
+        nights,
+        board_type: (h.board_type as BoardType | null) ?? null,
+        room_type_name: h.room_type_name,
+        quoted_for: h.check_in,
+      });
+    }
+
+    const hotels: InternalHotel[] = rows.map((r) => ({
+      id: r.id,
+      name: r.arabic_name,
+      name_en: r.english_name,
+      stars: r.stars,
+      last: lastFor.get(r.id) ?? null,
+    }));
+    // Priced first: a hotel we have never quoted is one the agent has to price
+    // from scratch, which is the slower job.
+    hotels.sort((a, b) => Number(Boolean(b.last)) - Number(Boolean(a.last)) || (b.stars ?? 0) - (a.stars ?? 0));
+    return { ok: true, hotels };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
 
 /** Suppliers the agent may pick between on the hotels stage. */
 export type SupplierChoice = { code: string; name: string; live: boolean };

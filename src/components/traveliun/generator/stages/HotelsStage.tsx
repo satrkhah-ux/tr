@@ -23,7 +23,9 @@ import { itineraryStartDate } from "@/lib/offer/schedule";
 import { getDraft } from "@/lib/data/drafts";
 import {
   searchHotelsForCity,
+  searchInternalHotels,
   selectHotelRate,
+  type InternalHotel,
   type SearchHotel,
   type SearchRate,
   type SupplierNote,
@@ -99,6 +101,7 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
   const [searchStay, setSearchStay] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<SearchHotel[] | null>(null);
+  const [internal, setInternal] = useState<InternalHotel[] | null>(null);
   const [searchNights, setSearchNights] = useState(0);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [selecting, setSelecting] = useState<string | null>(null);
@@ -220,6 +223,53 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
       setSearchNights(res.nights);
     } else setSearchError(t(res.error));
     setSearching(false);
+  }
+
+  /** Our own list for this city, with what we last charged for each hotel. */
+  async function openInternal(cityName: string, stayId: string, keepFilters = false) {
+    setSearchStay(stayId);
+    setResults(null);
+    setInternal(null);
+    setNotes([]);
+    setSearchError(null);
+    setShown(PAGE);
+    const active = keepFilters ? filters : EMPTY_FILTERS;
+    if (!keepFilters) setFilters(EMPTY_FILTERS);
+    setSearching(true);
+    const res = await searchInternalHotels(draftId, cityName, { hotel_name: active.name });
+    if (res.ok) setInternal(res.hotels);
+    else setSearchError(t(res.error));
+    setSearching(false);
+  }
+
+  /**
+   * Take an internal hotel onto the line.
+   *
+   * The last quoted price is carried across as the manual price — it is the
+   * number the agent would have looked up anyway — but it is a STARTING POINT,
+   * shown with the date it came from so nobody mistakes last winter's rate for
+   * today's.
+   */
+  function chooseInternal(stayId: string, line: DraftHotel, hotel: InternalHotel) {
+    const board = hotel.last?.board_type ?? line.board_type;
+    const roomName = hotel.last?.room_type_name || line.room_type_name;
+    setLine(
+      stayId,
+      withRooms(
+        {
+          ...line,
+          hotel_id: hotel.id,
+          hotel_name: hotel.name,
+          hotel_name_en: hotel.name_en ?? line.hotel_name_en,
+          manual_price: hotel.last ? hotel.last.per_night * Math.max(1, line.nights || 1) : line.manual_price,
+          manual_currency: hotel.last?.currency ?? line.manual_currency,
+          sourcing: null,
+        },
+        line.rooms.map((r) => ({ ...r, room_type_name: roomName, board_type: board })),
+      ),
+    );
+    setSearchStay(null);
+    setInternal(null);
   }
 
   async function choose(cityName: string, stayId: string, hotel: SearchHotel, rate: SearchRate) {
@@ -349,7 +399,11 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                                     type="button"
                                     onClick={() => {
                                       setSource((s) => ({ ...s, [line.id]: key }));
-                                      if (key === "internal" && isSearching) setSearchStay(null);
+                                      // Switching source closes the other one's
+                                      // results — they price different things.
+                                      if (isSearching) setSearchStay(null);
+                                      setResults(null);
+                                      setInternal(null);
                                     }}
                                     className={`h-8 px-3 text-[11.5px] font-bold transition-colors ${
                                       active ? "bg-[#185045] text-white" : "bg-white text-[#557d78] hover:bg-[#f0f7f4]"
@@ -373,7 +427,18 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                                 <Search className="size-3.5" />
                                 {t("pg.supplier.searchHotels")}
                               </button>
-                            ) : null}
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  isSearching ? setSearchStay(null) : void openInternal(cov.city_name, line.id)
+                                }
+                                className="inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439]"
+                              >
+                                <Search className="size-3.5" />
+                                ابحث في فنادق النظام
+                              </button>
+                            )}
                             {cov.stays.length > 1 ? (
                               <button
                                 type="button"
@@ -413,8 +478,114 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                   </p>
                 ) : null}
 
+                {/* OUR OWN list — searched by name, priced from what we last charged */}
+                {isSearching && (source[line.id] ?? "internal") === "internal" ? (
+                  <div className="mb-3 rounded-[10px] border border-[#d6eadf] bg-white p-3">
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void openInternal(cov.city_name, line.id, true);
+                      }}
+                      className="mb-2 flex flex-wrap items-end gap-2"
+                    >
+                      <label className="grid flex-1 gap-1 text-[11.5px] font-bold text-[#185045]">
+                        اسم الفندق
+                        <input
+                          value={filters.name}
+                          onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
+                          placeholder="اتركه فارغاً لعرض كل فنادق المدينة"
+                          className={`${fieldClass} h-9`}
+                        />
+                      </label>
+                      <button
+                        type="submit"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                      >
+                        <Search className="size-3.5" />
+                        ابحث
+                      </button>
+                    </form>
+
+                    {searching ? (
+                      <p className="flex items-center gap-2 py-4 text-[12.5px] font-bold text-[#557d78]">
+                        <Loader2 className="size-4 animate-spin" />
+                        {t("pg.supplier.searching")}
+                      </p>
+                    ) : searchError ? (
+                      <p className="py-2 text-[12.5px] font-bold text-[#c22850]">{searchError}</p>
+                    ) : internal && internal.length > 0 ? (
+                      <div className="space-y-1.5">
+                        <p className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+                          <DirText dir="ltr">{internal.length}</DirText> فندق في النظام · السعر من آخر عرض صدر لهذا
+                          الفندق
+                        </p>
+                        {internal.slice(0, shown).map((h) => (
+                          <div
+                            key={h.id}
+                            className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[9px] border border-[#e2ebe7] p-2 text-[11.5px]"
+                          >
+                            <span className="font-extrabold text-[#003c3a]">{h.name}</span>
+                            {h.stars ? (
+                              <span className="inline-flex items-center text-[#e0a400]">
+                                {Array.from({ length: h.stars }).map((_, i) => (
+                                  <Star key={i} className="size-3 fill-current" />
+                                ))}
+                              </span>
+                            ) : null}
+                            {h.last ? (
+                              <>
+                                <span className="tv-tnum font-extrabold text-[#0f3d38]">
+                                  <DirText dir="ltr">{`${h.last.per_night} ${h.last.currency}`}</DirText>
+                                  <span className="font-bold text-[#93aaa3]"> / ليلة</span>
+                                </span>
+                                {h.last.board_type ? (
+                                  <span className="rounded-full bg-[#eef4f1] px-2 py-0.5 font-bold text-[#557d78]">
+                                    {t(BOARD_LABEL_KEYS[h.last.board_type])}
+                                  </span>
+                                ) : null}
+                                {h.last.room_type_name ? (
+                                  <span className="font-bold text-[#557d78]">{h.last.room_type_name}</span>
+                                ) : null}
+                                {/* The age of the number matters as much as the
+                                    number — last winter's rate is not today's. */}
+                                {h.last.quoted_for ? (
+                                  <span className="tv-tnum text-[11px] font-semibold text-[#93aaa3]">
+                                    آخر عرض <DirText dir="ltr">{h.last.quoted_for}</DirText>
+                                  </span>
+                                ) : null}
+                              </>
+                            ) : (
+                              <span className="font-bold text-[#a86a10]">لا يوجد سعر سابق — أدخِله يدوياً</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => chooseInternal(line.id, line, h)}
+                              className="ms-auto inline-flex h-7 items-center rounded-[8px] bg-[#185045] px-2.5 text-[11px] font-bold text-white hover:bg-[#0f4439]"
+                            >
+                              {t("pg.supplier.select")}
+                            </button>
+                          </div>
+                        ))}
+                        {internal.length > shown ? (
+                          <button
+                            type="button"
+                            onClick={() => setShown((n) => n + PAGE)}
+                            className="tv-tnum w-full rounded-[9px] border border-[#cfe0d9] py-2 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                          >
+                            عرض المزيد ({internal.length - shown})
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className="py-2 text-[12.5px] text-[#93aaa3]">
+                        لا توجد فنادق مسجّلة لهذه المدينة في النظام — أضِفها من قسم البيانات، أو استخدم TBO.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
                 {/* supplier search panel */}
-                {isSearching ? (
+                {isSearching && (source[line.id] ?? "internal") === "tbo" ? (
                   <div className="mb-3 rounded-[10px] border border-[#d6eadf] bg-white p-3">
                     {/* The name goes back to the SUPPLIER (it filters before its
                         own result cap); everything below narrows what returned. */}
@@ -516,9 +687,13 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                                     </span>
                                   ) : null}
                                 </div>
-                                <div className="mt-1 space-y-1">
+                                <div className="mt-1 space-y-1.5">
                                   {rates.map((rate) => (
                                     <div key={rate.rate_key} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px]">
+                                      {/* The refund terms in words, not just a
+                                          badge. "غير قابل للاسترداد" and "مجاني
+                                          حتى ١٢ أغسطس" are different promises,
+                                          and the client will be told one of them. */}
                                       <span className="font-bold text-[#185045]">{rate.room_name}</span>
                                       <span className="rounded-full bg-[#eef4f1] px-2 py-0.5 font-bold text-[#557d78]">{t(BOARD_LABEL_KEYS[rate.board_type])}</span>
                                       <span className={`rounded-full px-2 py-0.5 font-bold ${rate.refundable ? "bg-[#e4f6ef] text-[#10966b]" : "bg-[#fdeef2] text-[#c22850]"}`}>
@@ -542,6 +717,11 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
                                         {selecting === rate.rate_key ? <Loader2 className="size-3 animate-spin" /> : null}
                                         {t("pg.supplier.select")}
                                       </button>
+                                      {rate.cancellation_policy ? (
+                                        <p className="basis-full text-[11px] font-semibold text-[#93aaa3]">
+                                          {rate.cancellation_policy}
+                                        </p>
+                                      ) : null}
                                     </div>
                                   ))}
                                 </div>
