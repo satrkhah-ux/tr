@@ -26,6 +26,42 @@ import type { TranslationKey } from "@/lib/i18n";
 
 const BASE = "SAR";
 
+/**
+ * One hotel offered to the agent, whatever produced it.
+ *
+ * The internal list and a live supplier answer different questions, but the
+ * agent is making ONE decision, so they arrive in one shape and render through
+ * one row. Two result layouts on one screen is what made the stage feel random:
+ * the columns moved depending on which tab you were on.
+ */
+export type HotelRateOption = {
+  /** what identifies this rate to the selector — a supplier rate_key, or the hotel id. */
+  key: string;
+  room: string;
+  board: BoardType | null;
+  per_night: number;
+  total: number;
+  currency: string;
+  /** null = we do not know (an internal hotel carries no supplier terms). */
+  refundable: boolean | null;
+  policy: string | null;
+  /** provenance in words, e.g. «آخر عرض 2026-06-11». */
+  note?: string;
+  blocked?: boolean;
+};
+
+export type HotelOption = {
+  /** "internal" | a supplier code. */
+  source: string;
+  id: string;
+  name: string;
+  name_en: string | null;
+  stars: number | null;
+  image: string | null;
+  /** empty = we hold the hotel but have never priced it; the agent types one. */
+  rates: HotelRateOption[];
+};
+
 /** A live rate priced for the AGENT (sell only — no net). rate_key is a staff token. */
 export type SearchRate = {
   rate_key: string;
@@ -43,15 +79,6 @@ export type SearchRate = {
   currency: string;
   valid_until: string | null;
   blocked: boolean;
-};
-
-export type SearchHotel = {
-  supplier: string;
-  supplier_hotel_id: string;
-  name_ar: string;
-  star_rating: number | null;
-  thumbnail_url: string | null;
-  rates: SearchRate[];
 };
 
 /**
@@ -72,7 +99,7 @@ export type SupplierNote = {
 export type SearchResult =
   | {
       ok: true;
-      hotels: SearchHotel[];
+      hotels: HotelOption[];
       fetched_at: string;
       check_in: string;
       check_out: string;
@@ -94,26 +121,17 @@ export type SearchFilters = {
  * last time, so that is what this carries, along with when, so the agent can see
  * at a glance whether it is a figure from last month or from last winter.
  */
-export type InternalHotel = {
-  id: string;
-  name: string;
-  name_en: string | null;
-  stars: number | null;
-  /** null when we have never priced this hotel — the agent types one. */
-  last: {
-    sell_total: number;
-    per_night: number;
-    currency: string;
-    nights: number;
-    board_type: BoardType | null;
-    room_type_name: string | null;
-    /** check-in of the offer it came from. */
-    quoted_for: string | null;
-  } | null;
+type LastQuote = {
+  per_night: number;
+  currency: string;
+  board_type: BoardType | null;
+  room_type_name: string | null;
+  /** check-in of the offer it came from — the age of the number matters. */
+  quoted_for: string | null;
 };
 
 export type InternalSearchResult =
-  | { ok: true; hotels: InternalHotel[] }
+  | { ok: true; hotels: HotelOption[] }
   | { ok: false; error: TranslationKey };
 
 /**
@@ -126,6 +144,8 @@ export type InternalSearchResult =
 export async function searchInternalHotels(
   draftId: string,
   cityName: string,
+  /** the stay being filled — its nights turn a per-night price into a total. */
+  stayId?: string | null,
   filters?: SearchFilters,
 ): Promise<InternalSearchResult> {
   const user = await getServerUser();
@@ -134,6 +154,10 @@ export async function searchInternalHotels(
   try {
     const record = await getDraft(draftId);
     if (!record) return { ok: false, error: "err.loadFailed" };
+    // Same nights the supplier search would quote, so the two tabs' totals are
+    // comparable rather than each meaning something slightly different.
+    const resolved = await resolveStay(draftId, cityName, stayId);
+    const nightsWanted = Math.max(1, resolved?.stay.nights ?? 1);
     const supabase = await createSupabaseServerClient();
 
     // Two small queries rather than getGeneratorLookups(), which runs nine —
@@ -181,7 +205,7 @@ export async function searchInternalHotels(
       .order("check_in", { ascending: false, nullsFirst: false })
       .limit(400);
 
-    const lastFor = new Map<string, InternalHotel["last"]>();
+    const lastFor = new Map<string, LastQuote>();
     for (const h of (priced ?? []) as {
       hotel_id: string;
       nights: number | null;
@@ -194,26 +218,52 @@ export async function searchInternalHotels(
       if (lastFor.has(h.hotel_id)) continue; // ordered desc — the first is the latest
       const nights = h.nights && h.nights > 0 ? h.nights : 1;
       lastFor.set(h.hotel_id, {
-        sell_total: Number(h.sell_price),
+        // Stored per night, because the past stay's length is rarely this one's
+        // — quoting its total would price a different trip.
         per_night: Math.round((Number(h.sell_price) / nights) * 100) / 100,
         currency: h.sell_currency ?? BASE,
-        nights,
         board_type: (h.board_type as BoardType | null) ?? null,
         room_type_name: h.room_type_name,
         quoted_for: h.check_in,
       });
     }
 
-    const hotels: InternalHotel[] = rows.map((r) => ({
-      id: r.id,
-      name: r.arabic_name,
-      name_en: r.english_name,
-      stars: r.stars,
-      last: lastFor.get(r.id) ?? null,
-    }));
+    const hotels: HotelOption[] = rows.map((r) => {
+      const last = lastFor.get(r.id) ?? null;
+      return {
+        source: "internal",
+        id: r.id,
+        name: r.arabic_name,
+        name_en: r.english_name,
+        stars: r.stars,
+        image: null,
+        // A hotel we have never priced still belongs in the list — it just has
+        // no rate to show, and the agent types one. Hiding it would make our
+        // own inventory look emptier than it is.
+        rates: last
+          ? [
+              {
+                key: r.id,
+                room: last.room_type_name || "—",
+                board: last.board_type,
+                per_night: last.per_night,
+                total: last.per_night * nightsWanted,
+                currency: last.currency,
+                // Our own list carries no supplier terms; saying "refundable"
+                // would be inventing a promise.
+                refundable: null,
+                policy: null,
+                note: last.quoted_for ? `آخر عرض ${last.quoted_for}` : "سعر سابق",
+              },
+            ]
+          : [],
+      };
+    });
     // Priced first: a hotel we have never quoted is one the agent has to price
     // from scratch, which is the slower job.
-    hotels.sort((a, b) => Number(Boolean(b.last)) - Number(Boolean(a.last)) || (b.stars ?? 0) - (a.stars ?? 0));
+    hotels.sort(
+      (a, b) => Number(b.rates.length > 0) - Number(a.rates.length > 0) || (b.stars ?? 0) - (a.stars ?? 0),
+    );
     return { ok: true, hotels };
   } catch {
     return { ok: false, error: "err.db" };
@@ -308,7 +358,7 @@ export async function searchHotelsForCity(
   };
 
   const notes: SupplierNote[] = [];
-  const hotels: SearchHotel[] = [];
+  const hotels: HotelOption[] = [];
   for (const supplier of suppliers) {
     const before = hotels.length;
     // A supplier that needs a country and has none cannot be asked; say that
@@ -347,12 +397,27 @@ export async function searchHotelsForCity(
       }
       if (rates.length > 0) {
         hotels.push({
-          supplier: supplier.code,
-          supplier_hotel_id: h.supplier_hotel_id,
-          name_ar: h.name_ar,
-          star_rating: h.star_rating,
-          thumbnail_url: h.thumbnail_url,
-          rates,
+          source: supplier.code,
+          id: h.supplier_hotel_id,
+          name: h.name_ar,
+          name_en: null,
+          stars: h.star_rating,
+          image: h.thumbnail_url,
+          // Cheapest first, so the collapsed row shows the price the hotel
+          // competes on rather than whichever room the supplier listed first.
+          rates: rates
+            .map((r) => ({
+              key: r.rate_key,
+              room: r.room_name,
+              board: r.board_type,
+              per_night: r.per_night,
+              total: r.sell,
+              currency: r.currency,
+              refundable: r.refundable,
+              policy: r.cancellation_policy || null,
+              blocked: r.blocked,
+            }))
+            .sort((a, b) => a.per_night - b.per_night),
         });
       }
     }
