@@ -11,6 +11,8 @@ import {
   uploadPartnerLogo,
   type PartnerCompany,
 } from "@/lib/data/partner-companies";
+import { describeTerms } from "@/lib/partners/pricing";
+import { IssueAccount, PendingRegistrations } from "./partners/PendingRegistrations";
 import { TraveliunShell } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
@@ -122,6 +124,10 @@ export function PartnerCompanies({ companies }: { companies: PartnerCompany[] })
             </button>
           </div>
         </section>
+
+        {/* Requests from the public B2B form, above everything — a company that
+            filled in a form and heard nothing has already gone elsewhere. */}
+        <PendingRegistrations companies={companies} />
 
         {draft ? (
           <section className={card}>
@@ -414,6 +420,17 @@ function CompanyRow({ company, onEdit }: { company: PartnerCompany; onEdit: () =
       <div className="mt-3">
         <BrandPreview primary={company.brand_color} accent={company.accent_color} name={company.name} />
       </div>
+
+      {/* The terms this company works on, and its login — visible on the card so
+          nobody has to open a form to find out what we charge them. */}
+      {company.status === "approved" ? (
+        <>
+          <p className="mt-2 text-[11.5px] font-bold text-[#557d78]">
+            الشروط: {describeTerms({ kind: company.price_adjust_kind === "commission" ? "commission" : "markup", pct: Number(company.price_adjust_pct) || 0 })}
+          </p>
+          <IssueAccount company={company} />
+        </>
+      ) : null}
     </article>
   );
 }

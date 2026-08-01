@@ -55,10 +55,17 @@ export type PartnerCompany = {
   resells: boolean;
   active: boolean;
   note: string | null;
+  /** pending until an employee approves it — see partners/registration.ts. */
+  status: string;
+  price_adjust_kind: string;
+  price_adjust_pct: number;
+  approved_at: string | null;
+  registration_note: string | null;
+  contact_email: string | null;
 };
 
 const COLUMNS =
-  "id, name, name_latin, logo_path, brand_color, accent_color, address, phone, whatsapp, website, email, contact_name, resells, active, note";
+  "id, name, name_latin, logo_path, brand_color, accent_color, address, phone, whatsapp, website, email, contact_name, resells, active, note, status, price_adjust_kind, price_adjust_pct, approved_at, registration_note, contact_email";
 
 /**
  * The logo's public URL.
