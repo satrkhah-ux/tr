@@ -6,7 +6,7 @@ import { getActiveMarkupRules } from "./markup-rules";
 import { getDraft, getGeneratorLookups, saveDraftStages } from "./drafts";
 import { ensureHotelContentCached } from "./hotel-content";
 import { getEnabledHotelSuppliers, getSupplierAdapter } from "@/lib/providers/hotel-registry";
-import type { HotelSearchQuery } from "@/lib/providers/hotel-supplier";
+import type { HotelSearchQuery, SupplierCallRecord } from "@/lib/providers/hotel-supplier";
 import { priceSupplierRate } from "@/lib/pricing/price-line";
 import type { MarkupContext } from "@/lib/pricing/markup";
 import {
@@ -93,7 +93,15 @@ export type SupplierNote = {
   supplier: string;
   name: string;
   hotels: number;
-  reason: "ok" | "no_country" | "nothing" | "error";
+  /**
+   * `nothing` used to absorb every failure there is — a refused password, an
+   * expired account, a dead host — and the screen then told the agent «لا غرف
+   * لهذه المدينة والتواريخ», blaming the city for our credentials. Only a real
+   * 200-with-no-hotels earns it now.
+   */
+  reason: "ok" | "no_country" | "nothing" | "error" | "credentials" | "supplier_error";
+  /** the supplier's own words, for staff. Never shown to a client. */
+  detail?: string;
 };
 
 export type SearchResult =
@@ -334,7 +342,14 @@ export async function searchHotelsForCity(
   if (!resolved) return { ok: false, error: "pg.supplier.noDates" };
   const { data, stay } = resolved;
 
-  const [{ sarPer }, rules, all] = await Promise.all([getRates(), getActiveMarkupRules(), getEnabledHotelSuppliers()]);
+  // Read, never stored: the sink is how we find out whether an empty result was
+  // an empty city or a refusal. See getEnabledHotelSuppliers.
+  const calls: SupplierCallRecord[] = [];
+  const [{ sarPer }, rules, all] = await Promise.all([
+    getRates(),
+    getActiveMarkupRules(),
+    getEnabledHotelSuppliers(calls),
+  ]);
   const suppliers = supplierCode ? all.filter((s) => s.code === supplierCode) : all;
   const fxDate = new Date().toISOString().slice(0, 10);
 
@@ -361,6 +376,7 @@ export async function searchHotelsForCity(
   const hotels: HotelOption[] = [];
   for (const supplier of suppliers) {
     const before = hotels.length;
+    const callsBefore = calls.length;
     // A supplier that needs a country and has none cannot be asked; say that
     // rather than showing an empty list it did not produce.
     if (!countryCode && supplier.code !== "mock") {
@@ -421,12 +437,16 @@ export async function searchHotelsForCity(
         });
       }
     }
-    notes.push({
-      supplier: supplier.code,
-      name: supplier.name,
-      hotels: hotels.length - before,
-      reason: hotels.length > before ? "ok" : "nothing",
-    });
+    notes.push(
+      hotels.length > before
+        ? { supplier: supplier.code, name: supplier.name, hotels: hotels.length - before, reason: "ok" }
+        : {
+            supplier: supplier.code,
+            name: supplier.name,
+            hotels: 0,
+            ...emptyReason(calls.slice(callsBefore)),
+          },
+    );
   }
 
   return {
@@ -437,6 +457,32 @@ export async function searchHotelsForCity(
     check_out: stay.check_out,
     nights: stay.nights,
     notes,
+  };
+}
+
+/**
+ * Why a supplier returned no hotels, read off the calls it actually made.
+ *
+ * The adapter knows the difference — it saw the status code — but `searchHotels`
+ * answers with an array, so by the time we get here a 401 and a fully-booked
+ * city look identical. The recorded calls are what still hold the truth.
+ */
+function emptyReason(calls: SupplierCallRecord[]): Pick<SupplierNote, "reason" | "detail"> {
+  const failed = calls.find((c) => !c.ok);
+  if (!failed) return { reason: "nothing" };
+
+  const status = failed.status_code;
+  if (status === 401) {
+    return {
+      reason: "credentials",
+      detail: "المورّد رفض بيانات الاعتماد (401) — الحساب غير مُفعّل أو البيانات المحفوظة قديمة.",
+    };
+  }
+  if (status === 429) return { reason: "supplier_error", detail: "تجاوزنا حدّ الطلبات لدى المورّد — أعد المحاولة بعد قليل." };
+  if (failed.http_status === null) return { reason: "error", detail: "تعذّر الوصول إلى المورّد." };
+  return {
+    reason: "supplier_error",
+    detail: `المورّد ردّ برمز ${status ?? failed.http_status} على ${failed.method}.`,
   };
 }
 

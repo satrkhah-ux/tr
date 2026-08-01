@@ -280,15 +280,26 @@ export function HotelPicker({
                 {/* An empty list looked identical whether the supplier refused
                     us, could not be reached, or the city is genuinely full. */}
                 {notes.map((n) => (
-                  <p key={n.supplier} className="mt-1 text-[11.5px] font-bold">
+                  <div key={n.supplier} className="mt-1.5 text-[11.5px] font-bold">
                     {n.reason === "no_country" ? (
                       <span className="text-[#c22850]">{n.name}: الدولة بلا رمز ISO — أضِفه في قسم الدول.</span>
-                    ) : n.reason === "error" ? (
-                      <span className="text-[#c22850]">{n.name}: تعذّر الوصول إلى المورّد.</span>
+                    ) : n.reason === "credentials" ? (
+                      <span className="text-[#c22850]">
+                        {n.name}: {n.detail}
+                        {/* The one failure with a fix the agent can act on, so
+                            it carries the way there instead of a dead end. */}
+                        <a href="/settings/suppliers" className="ms-1 underline">
+                          افتح إعدادات المزوّدين
+                        </a>
+                      </span>
+                    ) : n.reason === "error" || n.reason === "supplier_error" ? (
+                      <span className="text-[#c22850]">
+                        {n.name}: {n.detail ?? "تعذّر الوصول إلى المورّد."}
+                      </span>
                     ) : n.reason === "nothing" ? (
                       <span className="text-[#a86a10]">{n.name}: لا غرف لهذه المدينة والتواريخ.</span>
                     ) : null}
-                  </p>
+                  </div>
                 ))}
               </div>
             )}

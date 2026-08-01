@@ -39,10 +39,18 @@ function adapterFor(row: HotelSupplierRow, record: SupplierCallRecorder | null =
   return buildHotelSupplier(row.code, withBase, row.base_url, env, record);
 }
 
-/** Enabled suppliers ordered by priority; falls back to the mock when none are enabled. */
-export async function getEnabledHotelSuppliers(): Promise<HotelSupplier[]> {
+/**
+ * Enabled suppliers ordered by priority; falls back to the mock when none are enabled.
+ *
+ * `sink` collects each call's request/response. The SEARCH path passes one not
+ * to store it — search runs constantly — but to read WHY a supplier returned
+ * nothing. `searchHotels` answers with an array, so a refusal and an empty city
+ * are the same empty array, and the screen ends up blaming the dates for a
+ * rejected password.
+ */
+export async function getEnabledHotelSuppliers(sink?: SupplierCallRecord[]): Promise<HotelSupplier[]> {
   const rows = (await getSupplierRows()).filter((r) => r.enabled);
-  const list = rows.map((row) => adapterFor(row));
+  const list = rows.map((row) => adapterFor(row, sink ? (rec) => sink.push(rec) : null));
   // DEMO MODE: inject the Almosafer demo supplier WITHOUT a DB row, so the
   // management demo runs locally on captured-real data with no server wiring.
   // Guarded by an env flag; never set it in production (it serves fixtures).
