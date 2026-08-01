@@ -25,6 +25,32 @@ const field =
 
 type Phase = "checking" | "ready" | "invalid" | "done";
 
+/**
+ * Supabase's refusal, in words the person reading it can act on.
+ *
+ * The generic «جرّب رابط الدعوة مرة أخرى» was actively misleading: the most
+ * common cause is a password that fails the project's strength rules, and
+ * re-opening the link produces the identical refusal. Anything unrecognised
+ * falls through with the original text rather than being hidden — a message we
+ * did not anticipate is still more useful than one we invented.
+ */
+function passwordError(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("should be at least") || m.includes("at least 6")) {
+    return "كلمة المرور قصيرة — اجعلها أطول.";
+  }
+  if (m.includes("characters of each") || m.includes("should contain")) {
+    return "كلمة المرور يجب أن تحتوي حروفاً كبيرة وصغيرة وأرقاماً ورمزاً (مثل: Traveliun#2026).";
+  }
+  if (m.includes("different from the old")) {
+    return "اختر كلمة مرور مختلفة عن السابقة.";
+  }
+  if (m.includes("session") || m.includes("jwt") || m.includes("token")) {
+    return "انتهت صلاحية رابط الدعوة. اطلب من ترافليون إرسال دعوة جديدة.";
+  }
+  return `تعذّر حفظ كلمة المرور: ${message}`;
+}
+
 export function PartnerWelcome() {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("checking");
@@ -139,7 +165,11 @@ export function PartnerWelcome() {
           const supabase = createSupabaseBrowserClient();
           const { error: e2 } = await supabase.auth.updateUser({ password });
           if (e2) {
-            setError("تعذّر حفظ كلمة المرور. جرّب رابط الدعوة مرة أخرى.");
+            // Say WHAT went wrong. "Try the link again" was useless advice for
+            // the most common cause by far — a password that does not meet the
+            // project's strength rules — because trying the link again produces
+            // exactly the same refusal.
+            setError(passwordError(e2.message));
             return;
           }
           setPhase("done");
