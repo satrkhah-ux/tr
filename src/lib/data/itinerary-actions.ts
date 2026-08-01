@@ -4,7 +4,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { getServerUser } from "@/lib/supabase/server";
 import { normalizeDraftDays, type DraftData, type DraftDay } from "@/lib/offer/draft-types";
 import { draftDaySkeleton, itineraryCities } from "@/lib/offer/itinerary";
-import { getCityWeather } from "@/lib/providers/weather";
+import { attachWeather } from "@/lib/offer/weather-attach";
 import { generateItineraryText, isOpenAIConfigured, type ItineraryPromptDay } from "@/lib/providers/openai";
 import { isFlightLookupConfigured, lookupFlight, type FlightLookupHit } from "@/lib/providers/flight-lookup";
 import { getDraft, saveDraftStages } from "./drafts";
@@ -58,44 +58,15 @@ export async function refreshItineraryWeather(draftId: string, localDays?: unkno
   // A day with no city yet still deserves weather — fall back to the trip's
   // destination so the agent is not forced to finish the cities stage first.
   const destination = (record.data.trip.destination || record.data.trip.country).trim();
-  const placeFor = (d: DraftDay) => d.city_name.trim() || destination;
-  const dated = days.filter((d) => d.date && placeFor(d));
-  if (dated.length === 0) return { ok: false, error: "pg.itin.err.noDates" };
-
-  const byCity = new Map<string, string[]>();
-  for (const day of dated) {
-    const place = placeFor(day);
-    const list = byCity.get(place) ?? [];
-    list.push(day.date as string);
-    byCity.set(place, list);
+  if (days.filter((d) => d.date && (d.city_name.trim() || destination)).length === 0) {
+    return { ok: false, error: "pg.itin.err.noDates" };
   }
 
-  const fetched_at = new Date().toISOString();
-  const results = await Promise.all(
-    [...byCity.entries()].map(async ([city, dates]) => ({ city, weather: await getCityWeather(city, dates) })),
-  );
-
-  const readings = new Map<string, DraftDay["weather"]>();
-  for (const { city, weather } of results) {
-    for (const day of weather.days) {
-      readings.set(`${city}|${day.date}`, {
-        temp_max: day.tempMax,
-        temp_min: day.tempMin,
-        rain_chance: day.rainChance,
-        code: day.code,
-        source: day.source,
-        fetched_at,
-      });
-    }
-  }
-  if (readings.size === 0) return { ok: false, error: "pg.itin.err.weatherFailed" };
-
-  // A city the provider could not resolve keeps whatever it had — a partial
-  // refresh must never blank out readings that are still good.
-  const next = days.map((d) => {
-    const hit = d.date ? readings.get(`${placeFor(d)}|${d.date}`) : undefined;
-    return hit ? { ...d, weather: hit } : d;
-  });
+  // Shared with the producer, which attaches weather automatically when an
+  // offer is issued without it. One implementation, so the button and the
+  // automatic pass can never disagree about what a reading is.
+  const { days: next, attached } = await attachWeather(days, destination);
+  if (attached === 0) return { ok: false, error: "pg.itin.err.weatherFailed" };
 
   const saved = await saveDraftStages(draftId, { days: next });
   if (!saved.ok) return { ok: false, error: saved.error ?? "err.updateFailed" };

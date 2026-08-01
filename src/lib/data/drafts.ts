@@ -23,6 +23,7 @@ import {
 import { getEnabledHotelSuppliers } from "@/lib/providers/hotel-registry";
 import { draftSellTotal } from "@/lib/offer/preview-dto";
 import { applyManualProfit } from "@/lib/offer/pricing";
+import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { draftDaySkeleton } from "@/lib/offer/itinerary";
 import { validateDraft } from "@/lib/offer/draft-validation";
@@ -457,6 +458,32 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     const record = await getDraft(draftId);
     if (!record) return { ok: false, error: "err.loadFailed" };
     const data = record.data;
+
+    // Weather, attached here rather than left to a button.
+    //
+    // The document prints «بيانات الطقس غير مرفقة في هذا العرض» when no day
+    // carries a reading, and that sentence was going out on finished offers for
+    // one reason only: nobody had pressed refresh on the itinerary stage. To a
+    // client it reads as something we forgot. The reading costs nothing (the
+    // provider is keyless) and the document already labels a forecast against a
+    // climate average, so there is no reason to make a human remember it.
+    //
+    // Best-effort on purpose: a provider that is down must never stop an offer
+    // from being issued. The old note is still there for that case.
+    if (weatherMissing(data.days)) {
+      try {
+        const { days, attached } = await attachWeather(
+          data.days,
+          data.trip.destination || data.trip.country,
+        );
+        if (attached > 0) {
+          data.days = days;
+          await saveDraftStages(draftId, { days });
+        }
+      } catch {
+        /* issue the offer anyway — the document says the data is not attached */
+      }
+    }
 
     const validation = validateDraft(data);
     if (!validation.ok) return { ok: false, error: "pg.err.blockingLeft" };
