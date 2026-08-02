@@ -53,6 +53,28 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   return NextResponse.json({ ok: true });
 }
 
+/**
+ * Record that someone reached for something.
+ *
+ * The bot ran for days delivering reports and could not say which part anyone
+ * used, or whether anyone opened it at all — a management instrument with no
+ * measure of its own use. One line per interaction fixes that; `logAudit` never
+ * throws and is deliberately not awaited into the reply path.
+ */
+function track(
+  employee: { id: string; name: string },
+  action: "eye.opened" | "eye.report_requested" | "eye.notes_viewed" | "eye.asked",
+  meta: Record<string, unknown> = {},
+): void {
+  void logAudit({
+    action,
+    entity: "eye",
+    entity_id: employee.id,
+    meta,
+    actor: { id: employee.id, label: employee.name },
+  });
+}
+
 async function handle(update: TgUpdate): Promise<void> {
   const chatId = update.message?.chat?.id ?? update.callback_query?.message?.chat?.id;
   if (!chatId) return;
@@ -80,14 +102,26 @@ async function handle(update: TgUpdate): Promise<void> {
     const data = update.callback_query.data ?? "";
     await eyeAnswer(update.callback_query.id, "تمام");
 
-    if (data === "report") return void (await sendReport(chatId));
-    if (data === "notes") return void (await sendNotes(chatId));
+    if (data === "report") {
+      track(employee, "eye.report_requested", { via: "button" });
+      return void (await sendReport(chatId));
+    }
+    if (data === "notes") {
+      track(employee, "eye.notes_viewed", { via: "button" });
+      return void (await sendNotes(chatId));
+    }
 
     if (data.startsWith("ack:") || data.startsWith("ignore:")) {
       const [verb, id] = data.split(":");
       const ok = await setNoteStatus(id, verb === "ack" ? "ack" : "ignored");
       if (ok) {
-        await logAudit({ action: "eye.note_acked", entity: "eye_notes", entity_id: id, meta: { verb } });
+        await logAudit({
+          action: "eye.note_acked",
+          entity: "eye_notes",
+          entity_id: id,
+          meta: { verb },
+          actor: { id: employee.id, label: employee.name },
+        });
         await eyeSend(chatId, verb === "ack" ? "✅ سُجّلت كمعالَجة." : "⚪️ تم تجاهلها.");
       }
       return;
@@ -98,6 +132,7 @@ async function handle(update: TgUpdate): Promise<void> {
   const text = (update.message?.text ?? "").trim();
 
   if (text.startsWith("/start") || text.startsWith("/help")) {
+    track(employee, "eye.opened", { command: text.split(/\s/)[0] });
     await eyeSend(
       chatId,
       [
@@ -117,17 +152,22 @@ async function handle(update: TgUpdate): Promise<void> {
   }
 
   if (text.startsWith("/report") || text.includes("التقرير") || text.includes("تقرير")) {
+    track(employee, "eye.report_requested", { via: "text" });
     await sendReport(chatId);
     return;
   }
 
   if (text.startsWith("/notes") || text.includes("الملاحظات")) {
+    track(employee, "eye.notes_viewed", { via: "text" });
     await sendNotes(chatId);
     return;
   }
 
   // ---- a question, answered ONLY from today's computed report ----
   if (text.length > 3) {
+    // The question itself, because "what do they ask?" is the whole point of
+    // measuring this — and it is the one signal a button count cannot give.
+    track(employee, "eye.asked", { question: text.slice(0, 300) });
     await eyeSend(chatId, "<i>لحظة…</i>");
     const { report } = await prepareBriefingLite();
     const answer = await discuss(text, JSON.stringify(report));

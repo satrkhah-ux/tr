@@ -57,6 +57,13 @@ export type AuditAction =
   // «عين الإدارة» — what it said, and what management did about it
   | "eye.report_sent"
   | "eye.note_acked"
+  // «عين الإدارة» — what management actually reaches for. The bot reported for
+  // days without recording a single interaction, so "which part do they use?"
+  // had no answer at all. These four give it one.
+  | "eye.opened"
+  | "eye.report_requested"
+  | "eye.notes_viewed"
+  | "eye.asked"
   // supplier API bookings — the calls that move money
   | "supplier.prebooked"
   | "supplier.booked"
@@ -72,6 +79,14 @@ export type AuditInput = {
   entity_id: string;
   /** NON-SECRET context only. Never a passport number, never a credential. */
   meta?: Record<string, unknown>;
+  /**
+   * Who did it, when there is no web session to ask.
+   *
+   * A Telegram webhook has no cookie — the actor is resolved from the chat id
+   * instead. Without this the bots' rows would all land with actor_id null,
+   * which is an audit trail that records everything except who.
+   */
+  actor?: { id: string | null; label: string | null };
 };
 
 function db(): SupabaseClient {
@@ -91,13 +106,16 @@ function db(): SupabaseClient {
  */
 export async function logAudit(input: AuditInput): Promise<boolean> {
   try {
-    const user = await getServerUser();
-    const employeeId = await getCurrentEmployeeId();
+    // An explicit actor short-circuits the session lookup entirely — a webhook
+    // has no cookie to read, and asking anyway would cost a round trip to learn
+    // nothing.
+    const user = input.actor ? null : await getServerUser();
+    const employeeId = input.actor ? input.actor.id : await getCurrentEmployeeId();
     const { error } = await db()
       .from("audit_logs")
       .insert({
         actor_id: employeeId,
-        actor_email: user?.email ?? null,
+        actor_email: input.actor ? input.actor.label : (user?.email ?? null),
         action: input.action,
         entity: input.entity,
         entity_id: input.entity_id,
