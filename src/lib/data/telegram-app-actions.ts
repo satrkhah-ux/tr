@@ -5,6 +5,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Employee } from "@/lib/types";
 import { AUTH_COOKIE_MAX_AGE, AUTH_STORAGE_KEY, getSupabaseEnv } from "@/lib/supabase/constants";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { logAudit } from "./audit";
 import { verifyTelegramInitData } from "@/lib/telegram-app/verify";
 
 /**
@@ -72,6 +73,16 @@ export async function telegramSignIn(initData: string): Promise<TelegramSignInRe
       sameSite: "lax",
       secure: readEnv("NODE_ENV") === "production",
     });
+    // The bot has no webhook and no buttons, so a sign-in IS its usage — and it
+    // was the one thing nobody was writing down. Without this the only trace was
+    // auth.users.last_sign_in_at, which cannot tell a Mini App from a browser.
+    void logAudit({
+      action: "tg.signed_in",
+      entity: "employees",
+      entity_id: employee.id,
+      meta: { telegram_user_id: verified.user.id },
+      actor: { id: employee.id, label: employee.email },
+    });
     return { ok: true };
   } catch {
     return { ok: false, code: "failed" };
@@ -111,6 +122,14 @@ export async function linkTelegramAccount(initData: string): Promise<TelegramLin
       .select("id");
     if (error) return { ok: false, code: "failed" };
     if (!updated || updated.length === 0) return { ok: false, code: "no_employee" };
+    const employeeId = (updated as { id: string }[])[0].id;
+    void logAudit({
+      action: "tg.linked",
+      entity: "employees",
+      entity_id: employeeId,
+      meta: { telegram_user_id: verified.user.id },
+      actor: { id: employeeId, label: user.email ?? null },
+    });
     return { ok: true };
   } catch {
     return { ok: false, code: "failed" };

@@ -64,6 +64,11 @@ export type AuditAction =
   | "eye.report_requested"
   | "eye.notes_viewed"
   | "eye.asked"
+  // the Mini App bridge — a bot with no webhook and no buttons, whose only act
+  // IS the sign-in. auth.users.last_sign_in_at cannot tell a Mini App from a
+  // browser, so without these two the bot had no measurable use at all.
+  | "tg.signed_in"
+  | "tg.linked"
   // supplier API bookings — the calls that move money
   | "supplier.prebooked"
   | "supplier.booked"
