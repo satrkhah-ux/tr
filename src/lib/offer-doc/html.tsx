@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { OfferDocument, type OfferDocumentProps } from "@/components/offer-doc/OfferDocument";
 import type { OfferDocAssets } from "@/components/offer-doc/assets";
 import { inlineImage, loadOfferDocAssets } from "./assets";
-import { fontFaceCss, loadTajawalBase64 } from "./fonts";
+import { fontFaceCss, loadFontFaces } from "./fonts";
+import { DEFAULT_DOC_FONT, type DocFont } from "./font-families";
 
 /**
  * Render the offer document to a complete, self-contained HTML page for headless
@@ -49,11 +50,19 @@ export async function renderOfferDocumentHtml(props: OfferDocumentProps): Promis
  * identical treatment without duplicating any of it: same embedded fonts, same
  * zero-margin sheet handling, same guarantee that preview equals print.
  */
-export async function renderDocHtml(build: (assets: OfferDocAssets) => ReactNode): Promise<string> {
+export async function renderDocHtml(
+  build: (assets: OfferDocAssets) => ReactNode,
+  /**
+   * Which Arabic family to embed. Defaults to ours — a caller that does not
+   * care must not have to know a font system exists. Only the chosen family is
+   * read and encoded, so a document never carries glyphs it will not draw.
+   */
+  font: DocFont = DEFAULT_DOC_FONT,
+): Promise<string> {
   // Dynamic import: react-dom/server is a Node-only concern for this print
   // pipeline, and a static import trips Next's RSC guard.
   const { renderToStaticMarkup } = await import("react-dom/server");
-  const [faces, assets] = await Promise.all([loadTajawalBase64(), loadOfferDocAssets()]);
+  const [faces, assets] = await Promise.all([loadFontFaces(font), loadOfferDocAssets()]);
   const body = renderToStaticMarkup(build(assets));
   return `<!doctype html>
 <html dir="rtl" lang="ar">

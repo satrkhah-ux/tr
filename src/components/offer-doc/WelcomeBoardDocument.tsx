@@ -24,6 +24,8 @@ export type WelcomeBoard = {
   logoUrl: string | null;
   brandColor: string;
   accentColor: string;
+  /** CSS font-family value — the company's own lettering. */
+  fontFamily: string;
 };
 
 /**
@@ -55,7 +57,7 @@ function isLatin(text: string): boolean {
 }
 
 export function WelcomeBoardDocument({ board }: { board: WelcomeBoard }) {
-  const { name, subtitle, companyNameAr, companyNameLatin, logoUrl, brandColor, accentColor } = board;
+  const { name, subtitle, companyNameAr, companyNameLatin, logoUrl, brandColor, accentColor, fontFamily } = board;
 
   return (
     <>
@@ -73,7 +75,7 @@ export function WelcomeBoardDocument({ board }: { board: WelcomeBoard }) {
         padding: "14mm 16mm",
         boxSizing: "border-box",
         background: "#ffffff",
-        fontFamily: "Tajawal, sans-serif",
+        fontFamily,
         display: "flex",
         flexDirection: "column",
         // A band of the company's colour down the leading edge: identity that

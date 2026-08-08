@@ -1,4 +1,9 @@
-@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap");
+/* The app's own face, plus the three a partner company may choose for its
+   printed documents — the picker in «الشركات المتعاونة» sets each sample IN the
+   family it offers, and a sample that falls back to the default is not a sample.
+   The PRINT pipeline does not use this: it embeds the .ttf files from
+   public/fonts as base64, so a PDF is correct with no network at all. */
+@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Almarai:wght@400;700;800&family=Cairo:wght@400;700;800&family=Amiri:wght@400;700&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";

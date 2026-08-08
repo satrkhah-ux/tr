@@ -475,6 +475,7 @@ export const en = {
   "partner.email": "Email",
   "partner.brandColor": "Primary colour",
   "partner.accentColor": "Accent colour",
+  "partner.docFont": "Company document font",
   "partner.colorsHint": "Every shade in the document is derived from these two.",
   "partner.logo": "Logo",
   "partner.uploadLogo": "Upload a logo",

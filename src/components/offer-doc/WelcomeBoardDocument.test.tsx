@@ -17,6 +17,7 @@ const base: WelcomeBoard = {
   logoUrl: null,
   brandColor: "#7a2048",
   accentColor: "#c9a227",
+  fontFamily: "Cairo, sans-serif",
 };
 
 const render = (board: Partial<WelcomeBoard> = {}) =>
@@ -54,6 +55,12 @@ describe("WelcomeBoardDocument", () => {
     const sizeOf = (html: string) =>
       Number(/font-size:(\d+)pt;font-weight:800;color:[^;]+;line-height:1\.15/.exec(html)?.[1] ?? 0);
     expect(sizeOf(short)).toBeGreaterThan(sizeOf(long));
+  });
+
+  it("letters the sheet in the company's own family", () => {
+    // A partner picks a typeface the way they pick a colour; the board must not
+    // quietly print in ours.
+    expect(render()).toContain("font-family:Cairo, sans-serif");
   });
 
   it("runs a Latin name left-to-right on an Arabic sheet", () => {

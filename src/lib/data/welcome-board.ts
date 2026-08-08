@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { resolveDocBrand } from "@/lib/data/partner-companies";
 import { getPartnerSession, isStaffSession } from "@/lib/partners/session";
+import { fontFamilyOf, type DocFont } from "@/lib/offer-doc/font-families";
 import type { WelcomeBoard } from "@/components/offer-doc/WelcomeBoardDocument";
 
 /**
@@ -38,6 +39,8 @@ export async function boardAccess(serial: string): Promise<BoardAccess> {
 
 export type BoardSource = {
   board: WelcomeBoard;
+  /** Which family the renderer must embed for this company. */
+  font: DocFont;
   /** The booking name, offered as the default the operator can overwrite. */
   defaultName: string;
 };
@@ -70,6 +73,7 @@ export async function getWelcomeBoard(
 
     return {
       defaultName,
+      font: brand.font,
       board: {
         name: (override?.name ?? "").trim() || defaultName || row.serial,
         subtitle: (override?.subtitle ?? "").trim() || null,
@@ -82,6 +86,7 @@ export async function getWelcomeBoard(
         // not placeholders.
         brandColor: brand.vars?.["--od-green"] ?? "#135549",
         accentColor: brand.vars?.["--od-gold"] ?? "#f0ad22",
+        fontFamily: fontFamilyOf(brand.font),
       },
     };
   } catch {

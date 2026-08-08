@@ -57,6 +57,8 @@ export type PartnerCompany = {
   note: string | null;
   /** pending until an employee approves it — see partners/registration.ts. */
   status: string;
+  /** Arabic family this company prints in — see font-families.ts. */
+  doc_font: string;
   price_adjust_kind: string;
   price_adjust_pct: number;
   approved_at: string | null;
@@ -65,7 +67,7 @@ export type PartnerCompany = {
 };
 
 const COLUMNS =
-  "id, name, name_latin, logo_path, brand_color, accent_color, address, phone, whatsapp, website, email, contact_name, resells, active, note, status, price_adjust_kind, price_adjust_pct, approved_at, registration_note, contact_email";
+  "id, name, name_latin, logo_path, brand_color, accent_color, address, phone, whatsapp, website, email, contact_name, resells, active, note, status, price_adjust_kind, price_adjust_pct, approved_at, registration_note, contact_email, doc_font";
 
 /**
  * The logo's public URL.
@@ -114,6 +116,7 @@ export async function upsertPartnerCompany(input: {
   resells?: boolean;
   active?: boolean;
   note?: string | null;
+  doc_font?: string;
 }): Promise<{ ok: true; id: string } | Fail> {
   const denied = await requireWrite();
   if (denied) return { ok: false, error: denied };
@@ -137,6 +140,7 @@ export async function upsertPartnerCompany(input: {
       "resells",
       "active",
       "note",
+      "doc_font",
     ] as const;
     for (const key of optional) if (input[key] !== undefined) patch[key] = input[key];
 

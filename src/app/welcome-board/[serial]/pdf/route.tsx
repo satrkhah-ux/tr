@@ -35,7 +35,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ serial: 
   });
   if (!source) return new NextResponse("Not found", { status: 404 });
 
-  const html = await renderDocHtml(() => <WelcomeBoardDocument board={source.board} />);
+  const html = await renderDocHtml(() => <WelcomeBoardDocument board={source.board} />, source.font);
   const pdf = await offerDocumentToPdf(html);
 
   return new NextResponse(new Uint8Array(pdf), {

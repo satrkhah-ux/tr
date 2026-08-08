@@ -14,6 +14,7 @@ import {
 import { describeTerms } from "@/lib/partners/pricing";
 import { IssueAccount, PendingRegistrations } from "./partners/PendingRegistrations";
 import { TraveliunShell } from "./TraveliunShell";
+import { docFontOptions, DEFAULT_DOC_FONT } from "@/lib/offer-doc/font-families";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
 /**
@@ -42,6 +43,7 @@ type Draft = {
   email: string;
   brand_color: string;
   accent_color: string;
+  doc_font: string;
   resells: boolean;
   active: boolean;
   note: string;
@@ -61,6 +63,7 @@ function toDraft(c?: PartnerCompany): Draft {
     // a NEW company starts on a colour that is visibly not ours
     brand_color: c?.brand_color ?? startingBrandColor(c?.name ?? String(Date.now())),
     accent_color: c?.accent_color ?? "#f0ad22",
+    doc_font: c?.doc_font ?? DEFAULT_DOC_FONT,
     resells: c?.resells ?? true,
     active: c?.active ?? true,
     note: c?.note ?? "",
@@ -90,6 +93,7 @@ export function PartnerCompanies({ companies }: { companies: PartnerCompany[] })
         email: draft.email || null,
         brand_color: draft.brand_color,
         accent_color: draft.accent_color,
+        doc_font: draft.doc_font,
         resells: draft.resells,
         active: draft.active,
         note: draft.note || null,
@@ -202,6 +206,41 @@ export function PartnerCompanies({ companies }: { companies: PartnerCompany[] })
                 />
               </label>
               <BrandPreview primary={draft.brand_color} accent={draft.accent_color} name={draft.name} />
+            </div>
+
+            {/* The typeface is an identity choice like the colours, so it sits
+                with them. A closed list, not a text box: only families we ship
+                can be embedded, and an unknown name would print as a silent
+                fallback nobody notices until a client is holding the sheet. */}
+            <div className="mt-4">
+              <span className={label}>{t("partner.docFont")}</span>
+              <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
+                {docFontOptions().map((option) => {
+                  const active = draft.doc_font === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setDraft({ ...draft, doc_font: option.value })}
+                      className={`rounded-[11px] border p-3 text-start transition-colors ${
+                        active
+                          ? "border-[#2aa87a] bg-[#f0faf6]"
+                          : "border-[#dbe6e1] bg-white hover:bg-[#f4f8f6]"
+                      }`}
+                    >
+                      <span
+                        className="block text-[19px] font-extrabold text-[#0f3d38]"
+                        // The sample is set IN the family being offered — the only
+                        // way to choose a typeface is to look at it.
+                        style={{ fontFamily: `${option.css}, sans-serif` }}
+                      >
+                        {option.labelAr} · أهلاً وسهلاً
+                      </span>
+                      <span className="mt-0.5 block text-[11px] font-semibold text-[#93aaa3]">{option.noteAr}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <p className="mt-1.5 text-[11px] font-semibold text-[#93aaa3]">{t("partner.colorsHint")}</p>
             {isHouseColor(draft.brand_color) ? (

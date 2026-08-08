@@ -473,6 +473,7 @@ export const ar: Dictionary = {
   "partner.email": "البريد الإلكتروني",
   "partner.brandColor": "اللون الأساسي",
   "partner.accentColor": "اللون المساعد",
+  "partner.docFont": "خط مستندات الشركة",
   "partner.colorsHint": "كل تدرّجات المستند تُشتق من هذين اللونين.",
   "partner.logo": "الشعار",
   "partner.uploadLogo": "رفع شعار",

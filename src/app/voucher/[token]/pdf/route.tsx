@@ -49,7 +49,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   if (voucher.kind === "welcome_board") {
     const source = await getWelcomeBoard(voucher.serial, { name: voucher.welcome_name ?? voucher.customer.name });
     if (!source) return new NextResponse("Not found", { status: 404 });
-    const boardHtml = await renderDocHtml(() => <WelcomeBoardDocument board={source.board} />);
+    const boardHtml = await renderDocHtml(() => <WelcomeBoardDocument board={source.board} />, source.font);
     const boardPdf = await offerDocumentToPdf(boardHtml);
     return new NextResponse(new Uint8Array(boardPdf), {
       headers: {

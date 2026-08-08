@@ -10,6 +10,7 @@
  * the admin screen all read the same brand shape.
  */
 import { AR, COMPANY } from "./labels";
+import { DEFAULT_DOC_FONT, toDocFont, type DocFont } from "@/lib/offer-doc/font-families";
 
 export type DocBrand = {
   nameAr: string;
@@ -28,6 +29,8 @@ export type DocBrand = {
    * hexes so the result stays coherent instead of one loud colour on our greens.
    */
   vars: Record<string, string> | null;
+  /** The Arabic family this company prints in — part of its identity too. */
+  font: DocFont;
 };
 
 /** The house identity — the stylesheet's literal palette, untouched. */
@@ -41,6 +44,7 @@ export const TRAVELIUN_BRAND: DocBrand = {
   email: COMPANY.email,
   logoUrl: null,
   vars: null,
+  font: DEFAULT_DOC_FONT,
 };
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -172,6 +176,10 @@ export type PartnerBrandRow = {
   whatsapp: string | null;
   website: string | null;
   email: string | null;
+  /** Nullable: rows written before 0038 have no choice recorded — toDocFont
+      turns that, and any unknown value, into ours rather than into a document
+      that silently prints in whatever Chromium falls back to. */
+  doc_font?: string | null;
 };
 
 /**
@@ -192,5 +200,6 @@ export function partnerBrand(row: PartnerBrandRow, logoUrl: string | null): DocB
     email: row.email ?? "",
     logoUrl,
     vars: brandVars(row.brand_color, row.accent_color),
+    font: toDocFont(row.doc_font),
   };
 }
