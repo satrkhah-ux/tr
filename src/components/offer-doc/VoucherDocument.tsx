@@ -26,6 +26,10 @@ const KIND_TITLE: Record<VoucherKind, string> = {
   flight_ticket: "تذكرة الطيران",
   itinerary: "الجدول السياحي",
   booking_summary: "ملخص الحجوزات",
+  // Never rendered by THIS component — a welcome board has its own document and
+  // its own route. The entry exists because VoucherKind is exhaustive, which is
+  // exactly how the compiler told us this file needed looking at.
+  welcome_board: "لوحة الاستقبال",
 };
 
 const KIND_NOTE: Record<VoucherKind, string> = {
@@ -33,6 +37,7 @@ const KIND_NOTE: Record<VoucherKind, string> = {
   flight_ticket: "يُرجى الحضور إلى المطار قبل موعد الإقلاع بثلاث ساعات للرحلات الدولية. تُراجَع مواعيد الرحلات مع شركة الطيران قبل السفر بـ٢٤ ساعة.",
   itinerary: "المواعيد استرشادية وقد تتغيّر حسب حركة السير والطقس.",
   booking_summary: "ملخص داخلي لكل ما تم حجزه ضمن هذا البرنامج.",
+  welcome_board: "",
 };
 
 const TRAVELERS_PER_PAGE = 12;

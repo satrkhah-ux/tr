@@ -14,7 +14,7 @@
  * Pure module — no crypto, no supabase, no server-only import.
  */
 
-export type VoucherKind = "hotel_voucher" | "flight_ticket" | "itinerary" | "booking_summary";
+export type VoucherKind = "hotel_voucher" | "flight_ticket" | "itinerary" | "booking_summary" | "welcome_board";
 
 export type VoucherBooking = {
   kind: string;
@@ -50,6 +50,15 @@ export type VoucherDTO = {
   bookings: VoucherBooking[];
   days: VoucherDay[];
   notes: string[];
+  /**
+   * «لوحة الاستقبال» only: the name to print on the airport sign.
+   *
+   * Separate from customer.name because it routinely differs — a client asks
+   * for a particular spelling, a title, or the name of whoever is actually
+   * meeting the driver. Frozen into the snapshot like every other voucher fact,
+   * so re-printing a board months later reproduces exactly what was handed over.
+   */
+  welcome_name?: string | null;
 };
 
 /** A booking's detail map, ordered so a voucher reads the same way every time. */

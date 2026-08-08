@@ -22,6 +22,7 @@ import { createDraft, deleteDraft, duplicateDraft, type DraftSummary } from "@/l
 import { stageHref } from "@/lib/offer/draft-types";
 import type { TranslationKey } from "@/lib/i18n";
 import { TraveliunShell } from "../TraveliunShell";
+import { WelcomeBoardButton } from "../WelcomeBoardButton";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
 /**
@@ -302,6 +303,15 @@ export function DraftsList({
                               {t("pg.openIssued")}
                               <ArrowUpRight className="size-3" />
                             </Link>
+                          ) : null}
+                          {/* Printable the moment the programme has a serial —
+                              the driver is often booked before the hotels are. */}
+                          {draft.produced_serial ? (
+                            <WelcomeBoardButton
+                              serial={draft.produced_serial}
+                              defaultName={draft.customer_name}
+                              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                            />
                           ) : null}
                           <button
                             type="button"

@@ -7,6 +7,7 @@ import { FilePlus2, Loader2, Wallet, Globe2, FileText, PackageCheck } from "luci
 import { DirText } from "@/components/DirText";
 import { TraveliunShell } from "../TraveliunShell";
 import { createPartnerFile } from "@/lib/partners/drafts";
+import { WelcomeBoardButton } from "../WelcomeBoardButton";
 import type { PartnerHomeData } from "@/lib/partners/home";
 
 /**
@@ -177,8 +178,14 @@ export function PartnerHome({
                         {EXECUTION_STATUS[r.execution_status] ?? r.execution_status}
                       </span>
                       {r.travel_start ? (
-                        <span className="tv-tnum ms-auto text-[11px] font-bold text-[#93aaa3]">
+                        <span className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
                           <DirText dir="ltr">{r.travel_start}</DirText>
+                        </span>
+                      ) : null}
+                      {/* Their guest, their sign — their logo on it. */}
+                      {r.serial ? (
+                        <span className="ms-auto">
+                          <WelcomeBoardButton serial={r.serial} />
                         </span>
                       ) : null}
                     </div>

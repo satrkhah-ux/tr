@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { VoucherDocument } from "@/components/offer-doc/VoucherDocument";
+import { WelcomeBoardDocument } from "@/components/offer-doc/WelcomeBoardDocument";
+import { getWelcomeBoard } from "@/lib/data/welcome-board";
 import { renderDocHtml } from "@/lib/offer-doc/html";
 import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
@@ -37,7 +39,28 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const html = await renderDocHtml((assets) => <VoucherDocument voucher={row.snapshot_json} assets={assets} />);
+  const voucher = row.snapshot_json;
+
+  // «لوحة الاستقبال» is a different sheet in every way — landscape, one name,
+  // the issuing company's own logo and colours — so it renders its own document
+  // rather than being a variant of the voucher's layout. It still travels the
+  // same token, the same table and the same revoke button, which is what makes
+  // it export alongside the vouchers instead of beside them.
+  if (voucher.kind === "welcome_board") {
+    const source = await getWelcomeBoard(voucher.serial, { name: voucher.welcome_name ?? voucher.customer.name });
+    if (!source) return new NextResponse("Not found", { status: 404 });
+    const boardHtml = await renderDocHtml(() => <WelcomeBoardDocument board={source.board} />);
+    const boardPdf = await offerDocumentToPdf(boardHtml);
+    return new NextResponse(new Uint8Array(boardPdf), {
+      headers: {
+        "content-type": "application/pdf",
+        "content-disposition": `inline; filename="welcome-${voucher.serial}.pdf"`,
+        "cache-control": "no-store",
+      },
+    });
+  }
+
+  const html = await renderDocHtml((assets) => <VoucherDocument voucher={voucher} assets={assets} />);
   const pdf = await offerDocumentToPdf(html);
 
   return new NextResponse(new Uint8Array(pdf), {

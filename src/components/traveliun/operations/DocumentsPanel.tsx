@@ -45,7 +45,7 @@ const field =
 const label = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 
 const BOOKING_KINDS: BookingKind[] = ["hotel", "flight", "transport", "visa", "service"];
-const DOC_KINDS: VoucherKind[] = ["hotel_voucher", "flight_ticket", "itinerary", "booking_summary"];
+const DOC_KINDS: VoucherKind[] = ["hotel_voucher", "flight_ticket", "itinerary", "booking_summary", "welcome_board"];
 
 /**
  * Bookings and the documents issued from them.
@@ -81,6 +81,7 @@ export function DocumentsPanel({
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [perHotel, setPerHotel] = useState(false);
+  const [welcomeName, setWelcomeName] = useState("");
 
   const confirmed = bookings.filter((b) => b.status === "confirmed");
   const outstanding = bookings.filter((b) => b.status !== "confirmed" && b.status !== "cancelled");
@@ -91,6 +92,9 @@ export function DocumentsPanel({
   /** Can a document of this kind be issued right now, and why not. */
   function availability(kind: VoucherKind): { can: boolean; reason: TranslationKey | null } {
     if (kind === "itinerary") return hasDays ? { can: true, reason: null } : { can: false, reason: "ops.err.nothingToIssue" };
+    // A welcome board needs nothing confirmed — it is a name on a sheet, and it
+    // is wanted EARLY, often before the first hotel comes back.
+    if (kind === "welcome_board") return { can: true, reason: null };
     const pool =
       kind === "hotel_voucher"
         ? confirmed.filter((b) => b.kind === "hotel")
@@ -121,7 +125,7 @@ export function DocumentsPanel({
         router.refresh();
         return;
       }
-      const res = await issueDocument({ operation_id: operationId, kind });
+      const res = await issueDocument({ operation_id: operationId, kind, welcome_name: kind === "welcome_board" ? welcomeName : null });
       if (!res.ok) setError(t(res.error));
       else router.refresh();
     });
@@ -246,6 +250,23 @@ export function DocumentsPanel({
               </button>
             );
           })}
+        </div>
+
+        {/* The one field on this panel that is a CHOICE rather than a fact.
+            Clients ask for a specific spelling, a title, or the name of whoever
+            is actually meeting the driver — so it is typed here, at the moment
+            of issuing, and frozen into that board's snapshot. */}
+        <div className="mt-3 max-w-md">
+          <label className={label}>
+            {t("ops.doc.welcomeName")}
+            <input
+              value={welcomeName}
+              onChange={(e) => setWelcomeName(e.target.value)}
+              placeholder="Mr. Ahmad Al-Rifaie"
+              className={field}
+            />
+          </label>
+          <p className="mt-1 text-[11px] font-semibold text-[#93aaa3]">{t("ops.doc.welcomeHint")}</p>
         </div>
 
         {confirmed.some((b) => b.kind === "hotel") ? (

@@ -10,7 +10,9 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/*.test.ts"],
+    // .tsx too: a print document IS a component, and the only honest way to
+    // check what lands on the paper is to render it.
+    include: ["src/**/*.test.{ts,tsx}"],
     environment: "node",
   },
 });

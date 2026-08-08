@@ -443,6 +443,8 @@ export async function issueDocument(input: {
   operation_id: string;
   kind: VoucherKind;
   booking_id?: string | null;
+  /** «لوحة الاستقبال» only — the name the client asked to see at the airport. */
+  welcome_name?: string | null;
 }): Promise<{ ok: true; id: string; token: string } | Fail> {
   const denied = await requireOps();
   if (denied) return { ok: false, error: denied };
@@ -509,7 +511,11 @@ export async function issueDocument(input: {
       activities: d.activities ?? [],
     }));
 
-    if (input.kind === "itinerary" ? days.length === 0 : scoped.length === 0) {
+    // A welcome board needs nothing confirmed: it is a name on a sheet, and the
+    // whole point is that it can be printed the moment the trip is sold — often
+    // before a single hotel has come back. Every other kind still requires
+    // something real to put on it.
+    if (input.kind === "itinerary" ? days.length === 0 : input.kind !== "welcome_board" && scoped.length === 0) {
       return { ok: false, error: "ops.err.nothingToIssue" };
     }
 
@@ -523,6 +529,15 @@ export async function issueDocument(input: {
       bookings: scoped.map(toVoucherBooking),
       days: input.kind === "itinerary" ? days : [],
       notes: [],
+      // Falls back to the lead traveller, then the booking name — a sign that
+      // says nothing is worse than one with the wrong spelling.
+      welcome_name:
+        input.kind === "welcome_board"
+          ? (input.welcome_name ?? "").trim() ||
+            travelers[0]?.display_name ||
+            customer?.arabic_name ||
+            null
+          : null,
     };
 
     const prev = await supabase
