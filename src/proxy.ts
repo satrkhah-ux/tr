@@ -83,5 +83,13 @@ export function proxy(request: NextRequest) {
 export const config = {
   // Run on all routes except Next internals and static assets. The PWA manifest
   // must stay public — the browser fetches it credential-less to install the app.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|webp|gif|ico|pdf)$).*)"],
+  // Fonts belong in this list for the same reason images do: a @font-face URL is
+  // fetched by the browser with no session, so without the exclusion every
+  // /fonts/*.ttf on the PUBLIC client-offer page answered with a redirect to
+  // sign-in and the Arabic text quietly fell back to a system face. The printed
+  // PDF was never affected — it embeds the files as base64 — which is exactly
+  // why this went unnoticed: the paper was right and the screen was not.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|webp|gif|ico|pdf|ttf|otf|woff|woff2)$).*)",
+  ],
 };
