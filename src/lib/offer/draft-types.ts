@@ -21,7 +21,6 @@ export const STAGE_KEYS = [
   "cities",
   "hotels",
   "flights",
-  "transport",
   "services",
   "visas",
   "itinerary",
@@ -45,7 +44,6 @@ export const STAGES: StageMeta[] = [
   { key: "cities", labelKey: "pg.stage.cities" },
   { key: "hotels", labelKey: "pg.stage.hotels" },
   { key: "flights", labelKey: "pg.stage.flights" },
-  { key: "transport", labelKey: "pg.stage.transport" },
   { key: "services", labelKey: "pg.stage.services" },
   { key: "visas", labelKey: "pg.stage.visas" },
   { key: "itinerary", labelKey: "pg.stage.itinerary" },
@@ -167,15 +165,21 @@ export type DraftScope = {
   transport: boolean;
 };
 
-/** The stage each scope switch governs. Stages absent here are always shown. */
-export const SCOPE_STAGE: Record<keyof DraftScope, StageKey> = {
+/**
+ * The stage each scope switch governs — where one exists.
+ *
+ * «المواصلات» deliberately has NO stage any more. How a group moves is three
+ * answers about vehicles, not a table of journeys, so it lives with the
+ * customer where it is decided and appears as a note on the day it happens.
+ * Its switch still turns the whole subject off.
+ */
+export const SCOPE_STAGE: Partial<Record<keyof DraftScope, StageKey>> = {
   flights: "flights",
   hotels: "hotels",
   visas: "visas",
-  transport: "transport",
 };
 
-export const SCOPE_KEYS = Object.keys(SCOPE_STAGE) as (keyof DraftScope)[];
+export const SCOPE_KEYS: (keyof DraftScope)[] = ["flights", "hotels", "visas", "transport"];
 
 /** A scope switch is named after the stage it turns on. */
 export const SCOPE_LABEL_KEYS: Record<keyof DraftScope, TranslationKey> = {
@@ -433,6 +437,10 @@ export type DraftFlight = {
   leg_order: FlightLegOrder;
 };
 
+/**
+ * A transport ROW as the document prints it. Derived now, not typed.
+ * See TransportPlan — an agent answers three questions and these come out.
+ */
 export type DraftTransport = {
   from_place: string;
   to_place: string;
@@ -440,6 +448,113 @@ export type DraftTransport = {
   date: string | null;
   note: string;
 };
+
+export type TransportMode = "car" | "flight" | "train";
+
+/**
+ * How this group actually moves — the three questions an agent is really asked,
+ * instead of a table of from/to rows they had to compose by hand.
+ *
+ * They are separate because the answers genuinely differ, and that difference
+ * costs money: two travellers with six suitcases need a van from the airport
+ * and a sedan for the day tours. One «نوع السيارة» for the whole file forced
+ * the agent to price the bigger car all week, or the smaller one at arrival and
+ * explain the luggage at the kerb.
+ *
+ * Intercity carries a MODE as well, because between cities the vehicle may not
+ * be a vehicle — a domestic flight or a train is the normal answer in Turkey,
+ * Japan, or Europe, and writing "سيارة" there was simply wrong.
+ */
+export type TransportLeg = {
+  enabled: boolean;
+  car_type: string;
+  note: string;
+};
+
+export type TransportPlan = {
+  /** airport → hotel on arrival, and hotel → airport on departure. */
+  airport: TransportLeg;
+  /** the day tours. */
+  tours: TransportLeg;
+  /** moving from one city to the next. */
+  intercity: TransportLeg & { mode: TransportMode };
+};
+
+export const TRANSPORT_MODE_AR: Record<TransportMode, string> = {
+  car: "سيارة",
+  flight: "طيران داخلي",
+  train: "قطار",
+};
+
+/**
+ * The plan, turned into the rows the document already knows how to print.
+ *
+ * Derived rather than authored, deliberately: the offer document, the pricing
+ * suggestions and the produce-time «يشمل» lines all read `transport[]`, and
+ * none of them had to change. The agent edits meaning; the paper keeps its
+ * shape.
+ *
+ * Intercity produces one row per HOP, not one row for the trip — «إسطنبول →
+ * طرابزون» is a thing that happens on a date and gets priced; "moving between
+ * cities" is not.
+ */
+export function deriveTransportRows(plan: TransportPlan, cities: { city_name: string; check_in: string | null }[]): DraftTransport[] {
+  const rows: DraftTransport[] = [];
+  const first = cities[0]?.city_name?.trim();
+  const last = cities[cities.length - 1]?.city_name?.trim();
+
+  if (plan.airport.enabled) {
+    rows.push({
+      from_place: "المطار",
+      to_place: first ? `فندق ${first}` : "الفندق",
+      car_type: plan.airport.car_type,
+      date: cities[0]?.check_in ?? null,
+      note: plan.airport.note,
+    });
+    rows.push({
+      from_place: last ? `فندق ${last}` : "الفندق",
+      to_place: "المطار",
+      car_type: plan.airport.car_type,
+      date: null,
+      note: plan.airport.note,
+    });
+  }
+
+  if (plan.tours.enabled) {
+    rows.push({
+      from_place: "الجولات السياحية",
+      to_place: first ?? "",
+      car_type: plan.tours.car_type,
+      date: null,
+      note: plan.tours.note,
+    });
+  }
+
+  if (plan.intercity.enabled) {
+    for (let i = 1; i < cities.length; i++) {
+      const from = cities[i - 1]?.city_name?.trim();
+      const to = cities[i]?.city_name?.trim();
+      if (!from || !to) continue;
+      rows.push({
+        from_place: from,
+        to_place: to,
+        car_type: plan.intercity.car_type || TRANSPORT_MODE_AR[plan.intercity.mode],
+        date: cities[i]?.check_in ?? null,
+        note: plan.intercity.note,
+      });
+    }
+  }
+
+  return rows;
+}
+
+export function emptyTransportPlan(): TransportPlan {
+  return {
+    airport: { enabled: true, car_type: "", note: "" },
+    tours: { enabled: true, car_type: "", note: "" },
+    intercity: { enabled: false, mode: "car", car_type: "", note: "" },
+  };
+}
 
 export type DraftServices = {
   includes: string[];
@@ -537,6 +652,9 @@ export type DraftData = {
   cities: DraftCity[];
   hotels: DraftHotel[];
   flights: DraftFlight[];
+  /** what the agent answers — see TransportPlan. */
+  transport_plan: TransportPlan;
+  /** DERIVED from transport_plan on every normalize; the document reads this. */
   transport: DraftTransport[];
   services: DraftServices;
   visas: DraftVisa[];
@@ -574,6 +692,7 @@ export function emptyDraftData(): DraftData {
     cities: [],
     hotels: [],
     flights: [],
+    transport_plan: emptyTransportPlan(),
     transport: [],
     services: { includes: [], excludes: [], terms: [] },
     visas: [],
@@ -660,6 +779,18 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
   if (!raw || typeof raw !== "object") return empty;
   const source = raw as Partial<DraftData>;
   const trip = { ...empty.trip, ...(source.trip ?? {}) };
+  const cities = Array.isArray(source.cities) ? source.cities : [];
+
+  // A draft written before the plan existed has authored rows and no plan. Its
+  // switches default to ON so the derived rows keep saying roughly what the old
+  // ones did, rather than the file silently losing its transfers.
+  const plan = (source.transport_plan ?? {}) as Partial<TransportPlan>;
+  const transportPlan: TransportPlan = {
+    airport: { ...empty.transport_plan.airport, ...(plan.airport ?? {}) },
+    tours: { ...empty.transport_plan.tours, ...(plan.tours ?? {}) },
+    intercity: { ...empty.transport_plan.intercity, ...(plan.intercity ?? {}) },
+  };
+
   return {
     customer: { ...empty.customer, ...(source.customer ?? {}) },
     // ages are re-fitted to the counts: a draft saved before the ages existed has
@@ -679,10 +810,13 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
       rooms: Math.max(Math.trunc(Number(trip.rooms)) || 1, 1),
     },
     scope: normalizeScope(source.scope),
-    cities: Array.isArray(source.cities) ? source.cities : [],
+    cities,
     hotels: Array.isArray(source.hotels) ? source.hotels.map(normalizeDraftHotel) : [],
     flights: Array.isArray(source.flights) ? source.flights.map(normalizeDraftFlight) : [],
-    transport: Array.isArray(source.transport) ? source.transport : [],
+    transport_plan: transportPlan,
+    // DERIVED, always. Rows are no longer authored, so a stale array from an
+    // older draft is simply replaced by what the plan says today.
+    transport: deriveTransportRows(transportPlan, cities),
     services: { ...empty.services, ...(source.services ?? {}) },
     visas: Array.isArray(source.visas) ? source.visas : [],
     days: normalizeDraftDays(source.days),

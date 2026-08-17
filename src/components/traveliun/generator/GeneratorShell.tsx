@@ -40,7 +40,6 @@ import { TripStage } from "./stages/TripStage";
 import { CitiesStage } from "./stages/CitiesStage";
 import { HotelsStage } from "./stages/HotelsStage";
 import { FlightsStage } from "./stages/FlightsStage";
-import { TransportStage } from "./stages/TransportStage";
 import { ServicesStage } from "./stages/ServicesStage";
 import { VisasStage } from "./stages/VisasStage";
 import { ItineraryStage } from "./stages/ItineraryStage";
@@ -54,7 +53,6 @@ const STAGE_FORMS: Record<StageKey, (props: StageFormProps) => React.ReactNode> 
   cities: CitiesStage,
   hotels: HotelsStage,
   flights: FlightsStage,
-  transport: TransportStage,
   services: ServicesStage,
   visas: VisasStage,
   itinerary: ItineraryStage,

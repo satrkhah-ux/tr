@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { CloudSun, Coffee, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { Bus, CloudSun, Coffee, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { FREE_DAY_TITLE, isFreeDay, type DraftDay } from "@/lib/offer/draft-types";
-import { daysNeedRebuild, draftDaySkeleton } from "@/lib/offer/itinerary";
+import {
+  transportNoteForDay, daysNeedRebuild, draftDaySkeleton } from "@/lib/offer/itinerary";
 import { formatWeatherAr, isWeatherEmpty, weatherSourceAr } from "@/lib/offer/weather-format";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import {
@@ -164,6 +165,15 @@ export function ItineraryStage({ draftId, data, patch, replace }: StageFormProps
                     <CloudSun className="size-3" />
                     {formatWeatherAr(day.weather)}
                     <span className="opacity-70">({weatherSourceAr(day.weather.source)})</span>
+                  </span>
+                ) : null}
+                {/* The vehicle for THIS day, derived from the transport plan the
+                    agent answered with the customer. A badge, because it is a
+                    fact about the day rather than something authored here. */}
+                {data.scope.transport && transportNoteForDay(data.transport_plan, days, index) ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#eef4f1] px-2 py-0.5 text-[10.5px] font-extrabold text-[#557d78]">
+                    <Bus className="size-3" />
+                    {transportNoteForDay(data.transport_plan, days, index)}
                   </span>
                 ) : null}
               </header>

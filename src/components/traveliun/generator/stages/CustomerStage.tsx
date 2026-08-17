@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BedDouble, Building2, Check, ListChecks, Loader2, MapPin, Minus, Search, Tag, UserRound, Users } from "lucide-react";
+import { BedDouble, Building2, Loader2, MapPin, Search, Tag, UserRound, Users } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { searchCustomersFromTeletel, type TeletelCustomerHit } from "@/lib/data/teletel-actions";
 import {
@@ -9,25 +9,16 @@ import {
   clampAge,
   BOARD_LABEL_KEYS,
   BOARD_TYPES,
-  SCOPE_KEYS,
   matchPartner,
   resizeAges,
   roomTypeNames,
   type DraftHotel,
-  type DraftScope,
 } from "@/lib/offer/draft-types";
-import type { TranslationKey } from "@/lib/i18n";
 import type { BoardType } from "@/lib/types";
 import { FieldIssue, useFieldRing } from "../FieldIssue";
+import { TransportBlock } from "../TransportBlock";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass, labelClass, sectionClass, type StageFormProps } from "../stage-props";
-
-const SCOPE_LABEL_KEYS: Record<keyof DraftScope, TranslationKey> = {
-  flights: "pg.stage.flights",
-  hotels: "pg.stage.hotels",
-  visas: "pg.stage.visas",
-  transport: "pg.stage.transport",
-};
 
 /**
  * Stage 1 — customer / company.
@@ -200,6 +191,11 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
       </div>
 
       <TravelersBlock data={data} patch={patch} />
+      {/* Transport lives HERE now — the vehicle is decided while the group is
+          being described, not in a stage three clicks later. */}
+      {data.scope.transport ? (
+        <TransportBlock plan={data.transport_plan} onChange={(transport_plan) => patch({ transport_plan })} />
+      ) : null}
       <RoomsBlock data={data} patch={patch} lookups={lookups} />
     </section>
   );

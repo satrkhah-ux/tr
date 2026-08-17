@@ -306,7 +306,6 @@ function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey
     cities: status(data.cities.length > 0, data.cities.length > 0 && used === data.trip.nights && data.trip.nights > 0, "cities"),
     hotels: status(data.hotels.length > 0, hotelsComplete, "hotels"),
     flights: status(data.flights.length > 0, data.flights.length > 0, "flights"),
-    transport: status(data.transport.length > 0, data.transport.length > 0, "transport"),
     services: status(
       data.services.includes.length + data.services.excludes.length + data.services.terms.length > 0,
       data.services.includes.length > 0,

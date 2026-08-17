@@ -10,7 +10,15 @@
  * Pure module: no React, no Supabase, no network. Safe to import anywhere.
  */
 
-import { deriveCityDates, type DraftCity, type DraftData, type DraftDay, type DraftTrip } from "./draft-types";
+import {
+  deriveCityDates,
+  TRANSPORT_MODE_AR,
+  type DraftCity,
+  type DraftData,
+  type DraftDay,
+  type DraftTrip,
+  type TransportPlan,
+} from "./draft-types";
 import { itineraryStartDate } from "./schedule";
 
 function addDays(iso: string, days: number): string {
@@ -136,4 +144,48 @@ export function itineraryCities(days: DraftDay[]): string[] {
     }
   }
   return out;
+}
+
+/**
+ * The transport line for one day of the programme.
+ *
+ * «المواصلات» stopped being a stage and became three answers about vehicles —
+ * which is how an agent thinks about it, but not how a CLIENT reads a
+ * programme. A client reads day by day, so the answer has to arrive on the day
+ * it applies to: the van at the airport on day one, the sedan on tour days, the
+ * train to the next city on the day the city changes.
+ *
+ * Returns null for a day with nothing to say, so callers can render it or not
+ * without a second condition.
+ */
+export function transportNoteForDay(
+  plan: TransportPlan,
+  days: DraftDay[],
+  index: number,
+): string | null {
+  const day = days[index];
+  if (!day) return null;
+
+  const first = index === 0;
+  const last = index === days.length - 1;
+  const cityChanged = index > 0 && days[index - 1]?.city_name !== day.city_name;
+
+  const parts: string[] = [];
+
+  if (plan.airport.enabled && (first || last)) {
+    const label = first ? "استقبال من المطار إلى الفندق" : "توديع من الفندق إلى المطار";
+    parts.push(plan.airport.car_type ? `${label} — ${plan.airport.car_type}` : label);
+  }
+
+  // A day the group changes city is a travel day, not a touring day; saying
+  // both would put two vehicles on one line and invite the question.
+  if (plan.intercity.enabled && cityChanged) {
+    const how = plan.intercity.car_type || TRANSPORT_MODE_AR[plan.intercity.mode];
+    parts.push(`الانتقال إلى ${day.city_name} — ${how}`);
+  } else if (plan.tours.enabled && !first && !last) {
+    const label = "سيارة الجولات";
+    parts.push(plan.tours.car_type ? `${label} — ${plan.tours.car_type}` : label);
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : null;
 }

@@ -2,5 +2,5 @@ import { GeneratorStagePage } from "@/components/traveliun/generator/GeneratorSt
 
 export default async function Page({ params }: { params: Promise<{ draftId: string }> }) {
   const { draftId } = await params;
-  return <GeneratorStagePage draftId={draftId} stage="transport" />;
+  return <GeneratorStagePage draftId={draftId} stage="scope" />;
 }
