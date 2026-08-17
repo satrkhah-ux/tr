@@ -4,8 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { PlaneLanding, Bus, CloudSun, Coffee, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { FREE_DAY_TITLE, isFreeDay, type DraftDay } from "@/lib/offer/draft-types";
-import {
-  transportNoteForDay, daysNeedRebuild, draftDaySkeleton } from "@/lib/offer/itinerary";
+import { daysNeedRebuild, draftDaySkeleton, transportNoteForDay } from "@/lib/offer/itinerary";
 import { formatWeatherAr, isWeatherEmpty, weatherSourceAr } from "@/lib/offer/weather-format";
 import { arrivalDayNoteAr, dayOneIsUsable } from "@/lib/offer/timezones";
 import { FieldIssue } from "../FieldIssue";
