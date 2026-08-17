@@ -849,6 +849,11 @@ export const en = {
   "pg.deleteDraft": "Delete draft",
   "pg.producedBadge": "Produced",
   // stages
+  "pg.stage.scope": "Services",
+  "pg.scopeStageHint": "Choose what this offer covers. Anything you switch off drops its stage from the bar above.",
+  "pg.scope.included": "Included",
+  "pg.scope.excluded": "Not included",
+  "pg.scope.noneOn": "Nothing selected — this offer would be empty. Switch on at least one service.",
   "pg.stage.customer": "Customer",
   "pg.stage.trip": "Trip",
   "pg.stage.cities": "Cities & nights",
@@ -952,6 +957,7 @@ export const en = {
   // customer stage — travelers, rooms, scope
   "pg.travelersTitle": "Travelers",
   "pg.agesHint": "Ages of the children and infants — they change the hotel rate and the airline fare.",
+  "pg.agesBands": "a child is 2–11; an infant is under 2",
   "pg.childAgeN": "Child {n} age",
   "pg.infantAgeN": "Infant {n} age",
   "pg.roomsTitle": "Rooms",

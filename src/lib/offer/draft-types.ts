@@ -12,6 +12,10 @@ import type { TranslationKey } from "@/lib/i18n";
 
 // ---------- stage registry ----------
 export const STAGE_KEYS = [
+  // FIRST, and deliberately: these switches decide which of the stages below
+  // exist at all, so choosing them last meant filling in a wizard whose shape
+  // was still undecided.
+  "scope",
   "customer",
   "trip",
   "cities",
@@ -35,6 +39,7 @@ export type StageMeta = {
 };
 
 export const STAGES: StageMeta[] = [
+  { key: "scope", labelKey: "pg.stage.scope" },
   { key: "customer", labelKey: "pg.stage.customer" },
   { key: "trip", labelKey: "pg.stage.trip" },
   { key: "cities", labelKey: "pg.stage.cities" },
@@ -172,10 +177,44 @@ export const SCOPE_STAGE: Record<keyof DraftScope, StageKey> = {
 
 export const SCOPE_KEYS = Object.keys(SCOPE_STAGE) as (keyof DraftScope)[];
 
+/** A scope switch is named after the stage it turns on. */
+export const SCOPE_LABEL_KEYS: Record<keyof DraftScope, TranslationKey> = {
+  flights: "pg.stage.flights",
+  hotels: "pg.stage.hotels",
+  visas: "pg.stage.visas",
+  transport: "pg.stage.transport",
+};
+
 /**
  * Grow/shrink an ages list to match a traveler count, preserving what was typed.
  * Pure — the same helper backs both the children and the infant lists.
  */
+/**
+ * What an airline and a hotel mean by these words, and therefore what the
+ * boxes may contain.
+ *
+ * The form used to accept any non-negative number: a «طفل» of 31 and a «رضيع»
+ * of 74 both saved happily, and both reach the supplier as a real passenger
+ * age — where the booking is refused, or priced as an adult, long after the
+ * client was quoted.
+ *
+ * 2–11 is the near-universal child band; an infant is under 2 and travels on
+ * the lap. A 12-year-old is an adult to every supplier we deal with, which is
+ * why the ceiling is 11 and not 17.
+ */
+export const AGE_BANDS = {
+  children: { min: 2, max: 11, fallback: 6 },
+  infants: { min: 0, max: 1, fallback: 1 },
+} as const;
+
+/** Force a typed age into its band. The form clamps; this is the guarantee. */
+export function clampAge(kind: keyof typeof AGE_BANDS, raw: number): number {
+  const band = AGE_BANDS[kind];
+  const n = Math.trunc(raw);
+  if (!Number.isFinite(n)) return band.fallback;
+  return Math.min(Math.max(n, band.min), band.max);
+}
+
 export function resizeAges(ages: number[], count: number, fallback = 0): number[] {
   const n = Math.max(Math.trunc(count) || 0, 0);
   const safe = Array.isArray(ages) ? ages : [];
@@ -627,8 +666,16 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     // none, and a hand-edited jsonb could disagree with the count.
     trip: {
       ...trip,
-      children_ages: resizeAges(trip.children_ages, trip.children),
-      infant_ages: resizeAges(trip.infant_ages, trip.infants),
+      // Clamped on the way IN, not just on the way out of the form: drafts
+      // written before the bands existed carry ages like 31 for a child and 74
+      // for an infant, and those would otherwise sit there until a supplier
+      // rejected the booking. Opening the file now repairs it.
+      children_ages: resizeAges(trip.children_ages, trip.children, AGE_BANDS.children.fallback).map((a) =>
+        clampAge("children", a),
+      ),
+      infant_ages: resizeAges(trip.infant_ages, trip.infants, AGE_BANDS.infants.fallback).map((a) =>
+        clampAge("infants", a),
+      ),
       rooms: Math.max(Math.trunc(Number(trip.rooms)) || 1, 1),
     },
     scope: normalizeScope(source.scope),

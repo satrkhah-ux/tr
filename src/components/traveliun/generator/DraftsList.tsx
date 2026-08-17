@@ -82,7 +82,9 @@ export function DraftsList({
       setCreating(false);
       return;
     }
-    router.push(stageHref(result.id, "customer"));
+    // A NEW file opens on «الخدمات»: what the offer includes decides which
+    // stages exist, so it is the first question, not a later one.
+    router.push(stageHref(result.id, "scope"));
   }
 
   async function onDelete(id: string) {

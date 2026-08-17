@@ -2,6 +2,7 @@
 
 import { deriveCityDates, type DraftTrip } from "@/lib/offer/draft-types";
 import { itineraryStartDate, syncDepartureDates } from "@/lib/offer/schedule";
+import { FieldIssue, useFieldRing } from "../FieldIssue";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass, labelClass, sectionClass, type StageFormProps } from "../stage-props";
 
@@ -29,6 +30,8 @@ function addDaysIso(iso: string, days: number): string {
  * moves, the city check-in/check-out chain is re-derived in the SAME patch.
  */
 export function TripStage({ data, patch, lookups }: StageFormProps) {
+  const countryRing = useFieldRing("trip.country");
+  const arrivalRing = useFieldRing("trip.arrival_date");
   const { t } = useTraveliunUI();
   const trip = data.trip;
 
@@ -112,7 +115,7 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
       <div className="grid gap-4 md:grid-cols-2">
         <label className={labelClass}>
           {t("pg.country")}
-          <select value={trip.country} onChange={(e) => setCountry(e.target.value)} className={fieldClass}>
+          <select value={trip.country} onChange={(e) => setCountry(e.target.value)} className={`${fieldClass}${countryRing}`}>
             <option value="">{t("pg.chooseCountry")}</option>
             {lookups.countries.map((country) => (
               <option key={country.id} value={country.name}>{country.name}</option>
@@ -121,6 +124,7 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
               <option value={trip.country}>{trip.country}</option>
             ) : null}
           </select>
+          <FieldIssue field="trip.country" />
         </label>
         <label className={labelClass}>
           {t("pg.destinationLabel")}
@@ -140,8 +144,9 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
             dir="ltr"
             value={trip.arrival_date ?? ""}
             onChange={(e) => setArrival(e.target.value)}
-            className={`${fieldClass} tv-tnum`}
+            className={`${fieldClass} tv-tnum${arrivalRing}`}
           />
+          <FieldIssue field="trip.arrival_date" />
         </label>
         <label className={labelClass}>
           {t("pg.departure")}

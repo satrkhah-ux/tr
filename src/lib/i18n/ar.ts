@@ -847,6 +847,11 @@ export const ar: Dictionary = {
   "pg.deleteDraft": "حذف المسودة",
   "pg.producedBadge": "تم الإنتاج",
   // stages
+  "pg.stage.scope": "الخدمات",
+  "pg.scopeStageHint": "اختر ما يشمله هذا العرض. ما تُطفئه تختفي مرحلته من الشريط أعلاه ولا تُطالَب بإكمالها.",
+  "pg.scope.included": "مشمول",
+  "pg.scope.excluded": "غير مشمول",
+  "pg.scope.noneOn": "لم تختر أي خدمة — العرض بهذا الشكل فارغ. فعّل خدمة واحدة على الأقل.",
   "pg.stage.customer": "العميل",
   "pg.stage.trip": "الرحلة",
   "pg.stage.cities": "المدن والليالي",
@@ -950,6 +955,7 @@ export const ar: Dictionary = {
   // customer stage — travelers, rooms, scope
   "pg.travelersTitle": "المسافرون",
   "pg.agesHint": "أعمار الأطفال والرضّع — تؤثر على سعر الفندق وتذكرة الطيران.",
+  "pg.agesBands": "الطفل من ٢ إلى ١١ سنة، والرضيع أقل من سنتين",
   "pg.childAgeN": "عمر الطفل {n}",
   "pg.infantAgeN": "عمر الرضيع {n}",
   "pg.roomsTitle": "الغرف",

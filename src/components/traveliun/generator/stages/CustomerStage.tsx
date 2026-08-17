@@ -5,6 +5,8 @@ import { BedDouble, Building2, Check, ListChecks, Loader2, MapPin, Minus, Search
 import { DirText } from "@/components/DirText";
 import { searchCustomersFromTeletel, type TeletelCustomerHit } from "@/lib/data/teletel-actions";
 import {
+  AGE_BANDS,
+  clampAge,
   BOARD_LABEL_KEYS,
   BOARD_TYPES,
   SCOPE_KEYS,
@@ -16,6 +18,7 @@ import {
 } from "@/lib/offer/draft-types";
 import type { TranslationKey } from "@/lib/i18n";
 import type { BoardType } from "@/lib/types";
+import { FieldIssue, useFieldRing } from "../FieldIssue";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass, labelClass, sectionClass, type StageFormProps } from "../stage-props";
 
@@ -33,6 +36,8 @@ const SCOPE_LABEL_KEYS: Record<keyof DraftScope, TranslationKey> = {
  * that fill the trip destination. Manual fields stay as the fallback.
  */
 export function CustomerStage({ data, patch, lookups }: StageFormProps) {
+  const nameRing = useFieldRing("customer.customer_name");
+  const phoneRing = useFieldRing("customer.customer_phone");
   const { t } = useTraveliunUI();
   const customer = data.customer;
   const companySale = Boolean(customer.partner_company_id || customer.company.trim());
@@ -176,8 +181,9 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
           <input
             value={customer.customer_name}
             onChange={(e) => update({ customer_name: e.target.value })}
-            className={fieldClass}
+            className={`${fieldClass}${nameRing}`}
           />
+          <FieldIssue field="customer.customer_name" />
         </label>
         <label className={labelClass}>
           {t("pg.customerPhone")}
@@ -186,15 +192,15 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
             inputMode="tel"
             value={customer.customer_phone}
             onChange={(e) => update({ customer_phone: e.target.value })}
-            className={`${fieldClass} tv-tnum text-start`}
+            className={`${fieldClass} tv-tnum text-start${phoneRing}`}
             placeholder="05xxxxxxxx"
           />
+          <FieldIssue field="customer.customer_phone" />
         </label>
       </div>
 
       <TravelersBlock data={data} patch={patch} />
       <RoomsBlock data={data} patch={patch} lookups={lookups} />
-      <ScopeBlock data={data} patch={patch} />
     </section>
   );
 }
@@ -275,6 +281,7 @@ const smallLabelClass = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
  * no ages is a quote the supplier can reprice after the client has agreed.
  */
 function TravelersBlock({ data, patch }: Pick<StageFormProps, "data" | "patch">) {
+  const adultsRing = useFieldRing("trip.adults");
   const { t } = useTraveliunUI();
   const trip = data.trip;
 
@@ -282,11 +289,20 @@ function TravelersBlock({ data, patch }: Pick<StageFormProps, "data" | "patch">)
   function setCount(field: "children" | "infants", raw: number) {
     const count = Math.max(Math.trunc(raw) || 0, 0);
     const agesField = field === "children" ? "children_ages" : "infant_ages";
-    patch({ trip: { ...trip, [field]: count, [agesField]: resizeAges(trip[agesField], count) } });
+    patch({
+      trip: {
+        ...trip,
+        [field]: count,
+        // A new row starts at a plausible age, not 0 — a «طفل» aged zero is an
+        // infant, and someone would have to notice and fix every one.
+        [agesField]: resizeAges(trip[agesField], count, AGE_BANDS[field].fallback).map((a) => clampAge(field, a)),
+      },
+    });
   }
 
   function setAge(field: "children_ages" | "infant_ages", index: number, raw: number) {
-    const next = trip[field].map((age, i) => (i === index ? Math.max(Math.trunc(raw) || 0, 0) : age));
+    const kind = field === "children_ages" ? "children" : "infants";
+    const next = trip[field].map((age, i) => (i === index ? clampAge(kind, raw) : age));
     patch({ trip: { ...trip, [field]: next } });
   }
 
@@ -304,8 +320,9 @@ function TravelersBlock({ data, patch }: Pick<StageFormProps, "data" | "patch">)
             type="number" min={0} dir="ltr"
             value={trip.adults}
             onChange={(e) => patch({ trip: { ...trip, adults: Math.max(Number(e.target.value) || 0, 0) } })}
-            className={`${fieldClass} tv-tnum text-center`}
+            className={`${fieldClass} tv-tnum text-center${adultsRing}`}
           />
+          <FieldIssue field="trip.adults" />
         </label>
         <label className={smallLabelClass}>
           {t("pg.children")}
@@ -329,13 +346,16 @@ function TravelersBlock({ data, patch }: Pick<StageFormProps, "data" | "patch">)
 
       {trip.children_ages.length > 0 || trip.infant_ages.length > 0 ? (
         <div className="mt-3 rounded-[11px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
-          <p className="mb-2 text-[11.5px] font-bold text-[#557d78]">{t("pg.agesHint")}</p>
+          <p className="mb-2 text-[11.5px] font-bold text-[#557d78]">
+            {t("pg.agesHint")} — {t("pg.agesBands")}
+          </p>
           <div className="flex flex-wrap gap-2">
             {trip.children_ages.map((age, i) => (
               <AgeField
                 key={`c${i}`}
                 label={t("pg.childAgeN", { n: i + 1 })}
                 value={age}
+                kind="children"
                 onChange={(v) => setAge("children_ages", i, v)}
               />
             ))}
@@ -344,6 +364,7 @@ function TravelersBlock({ data, patch }: Pick<StageFormProps, "data" | "patch">)
                 key={`i${i}`}
                 label={t("pg.infantAgeN", { n: i + 1 })}
                 value={age}
+                kind="infants"
                 onChange={(v) => setAge("infant_ages", i, v)}
               />
             ))}
@@ -354,12 +375,24 @@ function TravelersBlock({ data, patch }: Pick<StageFormProps, "data" | "patch">)
   );
 }
 
-function AgeField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function AgeField({
+  label,
+  value,
+  kind,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  kind: "children" | "infants";
+  onChange: (v: number) => void;
+}) {
+  const band = AGE_BANDS[kind];
   return (
     <label className="grid gap-1 text-[11px] font-bold text-[#557d78]">
       {label}
       <input
-        type="number" min={0} max={17} dir="ltr"
+        type="number" min={band.min} max={band.max} dir="ltr"
+        // The spinner and typing now agree; setAge clamps whatever arrives.
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className={`${fieldClass} tv-tnum h-9 w-20 text-center`}
@@ -449,40 +482,3 @@ function RoomsBlock({ data, patch, lookups }: Pick<StageFormProps, "data" | "pat
   );
 }
 
-/** Service scope — the switches that decide which stages exist for this offer. */
-function ScopeBlock({ data, patch }: Pick<StageFormProps, "data" | "patch">) {
-  const { t } = useTraveliunUI();
-  const scope = data.scope;
-
-  return (
-    <div className={blockClass}>
-      <h3 className={blockTitleClass}>
-        <ListChecks className="size-4 text-[#185045]" />
-        {t("pg.scopeTitle")}
-      </h3>
-      <p className="mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.scopeHint")}</p>
-
-      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        {SCOPE_KEYS.map((key) => {
-          const on = scope[key];
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => patch({ scope: { ...scope, [key]: !on } })}
-              aria-pressed={on}
-              className={`flex items-center gap-2 rounded-[11px] border px-3 py-2.5 text-[13px] font-bold transition-colors ${
-                on
-                  ? "border-[#185045] bg-[#185045] text-white"
-                  : "border-[#dbe6e1] bg-white text-[#93aaa3] hover:bg-[#f4f8f6]"
-              }`}
-            >
-              {on ? <Check className="size-4" /> : <Minus className="size-4" />}
-              {t(SCOPE_LABEL_KEYS[key])}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}

@@ -138,7 +138,7 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
     setBusy(true);
     setError(null);
     const res = await startDraftFromReadyOffer(offer.id);
-    if (res.ok) router.push(stageHref(res.id, "customer"));
+    if (res.ok) router.push(stageHref(res.id, "scope"));
     else {
       setError(t(res.error as TranslationKey));
       setBusy(false);

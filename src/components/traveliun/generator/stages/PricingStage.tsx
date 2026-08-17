@@ -17,6 +17,7 @@ import { itineraryStartDate } from "@/lib/offer/schedule";
 import type { PricingItemType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
+import { FieldIssue } from "../FieldIssue";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import {
   addButtonClass,
@@ -179,6 +180,7 @@ export function PricingStage({ data, patch }: StageFormProps) {
       <section className={sectionClass}>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-extrabold text-[#003c3a]">{t("pg.pricingTitle")}</h2>
+      <FieldIssue field="pricing" className="mb-3" />
           <div className="flex gap-2">
             <button type="button" onClick={suggestItems} className={addButtonClass}>
               <Wand2 className="size-4" />

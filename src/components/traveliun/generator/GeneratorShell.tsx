@@ -27,12 +27,14 @@ import {
 } from "@/lib/offer/draft-types";
 import { validateDraft, type DraftIssue, type StageStatus } from "@/lib/offer/draft-validation";
 import { useRole } from "@/lib/roles/RoleContext";
+import { FieldIssueProvider, fieldAnchorId } from "./FieldIssue";
 import { NightsIndicator } from "./NightsIndicator";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
 import { draftBrand, draftToPreviewOffer } from "@/lib/offer/preview-dto";
 import type { StageFormProps } from "./stage-props";
+import { ScopeStage } from "./stages/ScopeStage";
 import { CustomerStage } from "./stages/CustomerStage";
 import { TripStage } from "./stages/TripStage";
 import { CitiesStage } from "./stages/CitiesStage";
@@ -46,6 +48,7 @@ import { PricingStage } from "./stages/PricingStage";
 import { PreviewStage } from "./stages/PreviewStage";
 
 const STAGE_FORMS: Record<StageKey, (props: StageFormProps) => React.ReactNode> = {
+  scope: ScopeStage,
   customer: CustomerStage,
   trip: TripStage,
   cities: CitiesStage,
@@ -265,7 +268,13 @@ export function GeneratorShell({
               />
             ) : null}
 
-            {/* validation panel */}
+            {/* «فحص العرض» — the FINAL check, and only there.
+                On a working stage it now duplicates what the form already says
+                under each box, and a list on the far side of the screen was the
+                worse of the two ways to say it. At «المعاينة» it answers the
+                other question — "is this whole file ready to go out" — and each
+                row is a link straight to the box that is wrong. */}
+            {stage === "preview" ? (
             <div className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
               <p className="mb-2 text-[11px] font-extrabold tracking-wide text-[#93aaa3]">{t("pg.validationPanel")}</p>
               {validation.blocking.length === 0 && validation.warnings.length === 0 ? (
@@ -281,9 +290,7 @@ export function GeneratorShell({
                       titleClass="text-[#c22850]"
                       issues={validation.blocking}
                       draftId={draftId}
-                      currentStage={stage}
                       issueText={issueText}
-                      fixLabel={t("pg.fix")}
                       icon={<XCircle className="mt-0.5 size-3.5 shrink-0 text-[#c22850]" />}
                     />
                   ) : null}
@@ -293,15 +300,14 @@ export function GeneratorShell({
                       titleClass="text-[#a86a10]"
                       issues={validation.warnings}
                       draftId={draftId}
-                      currentStage={stage}
                       issueText={issueText}
-                      fixLabel={t("pg.fix")}
                       icon={<AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-[#a86a10]" />}
                     />
                   ) : null}
                 </div>
               )}
             </div>
+            ) : null}
 
             {/* live document, in the same column — it is something to LOOK at,
                 like the issue list above it, not something to fill in. */}
@@ -321,7 +327,12 @@ export function GeneratorShell({
 
           {/* stage form */}
           <main className="order-1 min-w-0 xl:col-start-1 xl:row-start-1">
-            <StageForm draftId={draftId} data={data} patch={patch} replace={replace} lookups={lookups} />
+            {/* Both lists, so a field shows its warning as readily as its
+                blocking error — an agent typing does not care which bucket we
+                filed it under, only that this box is wrong. */}
+            <FieldIssueProvider issues={[...validation.blocking, ...validation.warnings]} render={issueText}>
+              <StageForm draftId={draftId} data={data} patch={patch} replace={replace} lookups={lookups} />
+            </FieldIssueProvider>
 
             {/* MOBILE prev/next — the primary way to move through the wizard on a
                 phone. Sits inline under the form (not fixed) so it never covers
@@ -394,38 +405,40 @@ function IssueList({
   titleClass,
   issues,
   draftId,
-  currentStage,
   issueText,
-  fixLabel,
   icon,
 }: {
   title: string;
   titleClass: string;
   issues: DraftIssue[];
   draftId: string;
-  currentStage: StageKey;
   issueText: (issue: DraftIssue) => string;
-  fixLabel: string;
   icon: React.ReactNode;
 }) {
   return (
     <div>
       <p className={`mb-1.5 text-[11.5px] font-extrabold ${titleClass}`}>{title}</p>
-      <ul className="space-y-1.5">
-        {issues.map((issue, index) => (
-          <li key={index} className="flex items-start gap-2 text-[12px] leading-5 text-[#0f3d38]">
-            {icon}
-            <span className="flex-1">{issueText(issue)}</span>
-            {issue.stage !== currentStage ? (
+      <ul className="space-y-1">
+        {issues.map((issue, index) => {
+          // The WHOLE row is the link, not a small button beside it. The
+          // sentence is what the eye lands on and what the hand goes for; a
+          // separate «إصلاح» made the obvious target the wrong one.
+          // The hash carries the field, so the browser scrolls to the exact box
+          // rather than dropping the agent at the top of a long stage.
+          const href = `${stageHref(draftId, issue.stage)}${issue.field ? `#${fieldAnchorId(issue.field)}` : ""}`;
+          return (
+            <li key={index}>
               <Link
-                href={stageHref(draftId, issue.stage)}
-                className="shrink-0 rounded-md bg-[#f0f7f4] px-2 py-0.5 text-[10.5px] font-extrabold text-[#185045] hover:bg-[#e2ede9]"
+                href={href}
+                className="flex items-start gap-2 rounded-[8px] px-2 py-1.5 text-[12px] leading-5 text-[#0f3d38] transition-colors hover:bg-[#f0f7f4]"
               >
-                {fixLabel}
+                {icon}
+                <span className="flex-1">{issueText(issue)}</span>
+                <ChevronLeft className="mt-0.5 size-3.5 shrink-0 text-[#b6c9c2] ltr:rotate-180" />
               </Link>
-            ) : null}
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

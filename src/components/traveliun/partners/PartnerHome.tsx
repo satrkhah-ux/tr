@@ -100,7 +100,7 @@ export function PartnerHome({
               startTransition(async () => {
                 setError(null);
                 const res = await createPartnerFile();
-                if (res.ok) router.push(`/package-generator/${res.id}/customer`);
+                if (res.ok) router.push(`/package-generator/${res.id}/scope`);
                 else setError("تعذّر إنشاء الملف. حاول مرة أخرى.");
               })
             }

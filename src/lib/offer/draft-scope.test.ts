@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AGE_BANDS,
   emptyDraftData,
   normalizeDraftData,
   resizeAges,
@@ -93,6 +94,16 @@ describe("normalizeDraftData", () => {
 
   it("re-fits stale ages to the traveler counts", () => {
     const { trip } = normalizeDraftData({ trip: { children: 2, children_ages: [6] } });
-    expect(trip.children_ages).toEqual([6, 0]);
+    // The added child seeds INSIDE the child band. This used to be 0, which is
+    // an infant's age sitting in a child's row — see AGE_BANDS.
+    expect(trip.children_ages).toEqual([6, AGE_BANDS.children.fallback]);
+  });
+
+  it("repairs an out-of-band age left by an older draft", () => {
+    const { trip } = normalizeDraftData({
+      trip: { children: 1, children_ages: [31], infants: 1, infant_ages: [74] },
+    });
+    expect(trip.children_ages).toEqual([AGE_BANDS.children.max]);
+    expect(trip.infant_ages).toEqual([AGE_BANDS.infants.max]);
   });
 });

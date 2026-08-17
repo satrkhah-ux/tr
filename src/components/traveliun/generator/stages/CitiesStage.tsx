@@ -13,6 +13,7 @@ import {
 } from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { NightsIndicator } from "../NightsIndicator";
+import { FieldIssue } from "../FieldIssue";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import {
   addButtonClass,
@@ -90,6 +91,7 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-extrabold text-[#003c3a]">{t("pg.citiesTitle")}</h2>
           <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.datesAuto")}</p>
+      <FieldIssue field="cities" className="mb-3" />
         </div>
 
         {data.cities.length === 0 ? (

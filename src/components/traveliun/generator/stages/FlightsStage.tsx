@@ -23,6 +23,7 @@ import {
 import type { TranslationKey } from "@/lib/i18n";
 import type { FlightLegOrder } from "@/lib/types";
 import { parseFlightNumber } from "@/lib/offer/flight-number";
+import { FieldIssue } from "../FieldIssue";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import {
   addButtonClass,
@@ -280,6 +281,7 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
   return (
     <section className={sectionClass}>
       <h2 className="mb-4 text-base font-extrabold text-[#003c3a]">{t("pg.flightsTitle")}</h2>
+      <FieldIssue field="flights" className="mb-3" />
 
       <datalist id="pg-airports">
         {airports.map((airport) => (

@@ -22,9 +22,34 @@ import { flightTiming, itineraryStartDate, localDatePart } from "./schedule";
 import { sellBlocks } from "@/lib/pricing/markup";
 import { applyManualProfit } from "./pricing";
 
+/**
+ * Where an issue actually LIVES on the form.
+ *
+ * The panel could always say WHICH stage was wrong; it could never say which
+ * box. An agent read "اختر دولة الرحلة" in a column on the far side of the
+ * screen and then had to go hunting for the field it meant. These ids are what
+ * let the message sit under the input instead.
+ *
+ * A dotted path names a single input; a bare name ("cities", "flights") names a
+ * whole section, because "you have no cities" is not about one box.
+ */
+export type FieldId =
+  | "trip.country"
+  | "trip.arrival_date"
+  | "trip.adults"
+  | "customer.customer_name"
+  | "customer.customer_phone"
+  | "cities"
+  | "hotels"
+  | "flights"
+  | "services.includes"
+  | "pricing";
+
 export type DraftIssue = {
   severity: "blocking" | "warning";
   stage: StageKey;
+  /** which input on the form this is about — see FieldId. */
+  field?: FieldId;
   /** i18n key for draft-level issues… */
   key?: TranslationKey;
   /** …or a pre-rendered bilingual invariant violation. */
@@ -39,6 +64,13 @@ export type DraftValidation = {
   warnings: DraftIssue[];
   stages: Record<StageKey, StageStatus>;
   nights: { used: number; total: number; match: boolean };
+};
+
+const INVARIANT_FIELD: Record<InvariantViolation["code"], FieldId> = {
+  nights_sum_mismatch: "cities",
+  city_date_mismatch: "cities",
+  hotel_date_mismatch: "hotels",
+  hotel_missing_room_or_board: "hotels",
 };
 
 const INVARIANT_STAGE: Record<InvariantViolation["code"], StageKey> = {
@@ -79,10 +111,10 @@ export function validateDraft(data: DraftData): DraftValidation {
   const total = data.trip.nights;
 
   // ---- trip-level blocking ----
-  if (!data.trip.country.trim()) blocking.push({ severity: "blocking", stage: "trip", key: "pg.err.noCountry" });
-  if (!data.trip.arrival_date) blocking.push({ severity: "blocking", stage: "trip", key: "pg.err.noArrival" });
-  if (data.trip.adults <= 0) blocking.push({ severity: "blocking", stage: "trip", key: "pg.err.noAdults" });
-  if (data.cities.length === 0) blocking.push({ severity: "blocking", stage: "cities", key: "pg.err.noCities" });
+  if (!data.trip.country.trim()) blocking.push({ severity: "blocking", stage: "trip", field: "trip.country", key: "pg.err.noCountry" });
+  if (!data.trip.arrival_date) blocking.push({ severity: "blocking", stage: "trip", field: "trip.arrival_date", key: "pg.err.noArrival" });
+  if (data.trip.adults <= 0) blocking.push({ severity: "blocking", stage: "trip", field: "trip.adults", key: "pg.err.noAdults" });
+  if (data.cities.length === 0) blocking.push({ severity: "blocking", stage: "cities", field: "cities", key: "pg.err.noCities" });
 
   // ---- structural invariants (nights sum, date spans, room+board) ----
   // A city's nights are covered by one or more stays in sequence; each stay
@@ -117,7 +149,12 @@ export function validateDraft(data: DraftData): DraftValidation {
   for (const violation of invariantResult.violations) {
     // With no cities at all, the nights-sum violation duplicates pg.err.noCities.
     if (violation.code === "nights_sum_mismatch" && data.cities.length === 0) continue;
-    blocking.push({ severity: "blocking", stage: INVARIANT_STAGE[violation.code], invariant: violation });
+    blocking.push({
+      severity: "blocking",
+      stage: INVARIANT_STAGE[violation.code],
+      field: INVARIANT_FIELD[violation.code],
+      invariant: violation,
+    });
   }
 
   // Nights, not rows.
@@ -129,7 +166,7 @@ export function validateDraft(data: DraftData): DraftValidation {
   // does not have.
   const uncovered = coverage.filter((c) => c.covered !== c.needed);
   if (data.scope.hotels && data.cities.length > 0 && uncovered.length > 0) {
-    blocking.push({ severity: "blocking", stage: "hotels", key: "pg.err.missingHotels" });
+    blocking.push({ severity: "blocking", stage: "hotels", field: "hotels", key: "pg.err.missingHotels" });
   }
 
   // A supplier-priced line whose ACTUAL published SELL is below the supplier floor,
@@ -155,7 +192,7 @@ export function validateDraft(data: DraftData): DraftValidation {
     return sellBlocks(s.net_base, effectiveSell, { minMarginPct: s.min_margin_pct, floor: s.ref_sell_base }).length > 0;
   });
   if (supplierBlocked) {
-    blocking.push({ severity: "blocking", stage: "hotels", key: "pg.supplier.blocked" });
+    blocking.push({ severity: "blocking", stage: "hotels", field: "hotels", key: "pg.supplier.blocked" });
   }
 
   // ---- warnings ----
@@ -164,37 +201,37 @@ export function validateDraft(data: DraftData): DraftValidation {
   // asking for data we are not entitled to. So the two advisories only apply to
   // a direct sale.
   if (!isCompanySale(data)) {
-    if (!data.customer.customer_name.trim()) warnings.push({ severity: "warning", stage: "customer", key: "pg.warn.noName" });
-    if (!data.customer.customer_phone.trim()) warnings.push({ severity: "warning", stage: "customer", key: "pg.warn.noPhone" });
+    if (!data.customer.customer_name.trim()) warnings.push({ severity: "warning", stage: "customer", field: "customer.customer_name", key: "pg.warn.noName" });
+    if (!data.customer.customer_phone.trim()) warnings.push({ severity: "warning", stage: "customer", field: "customer.customer_phone", key: "pg.warn.noPhone" });
   }
   if (data.scope.flights && data.flights.length === 0) {
-    warnings.push({ severity: "warning", stage: "flights", key: "pg.warn.noFlights" });
+    warnings.push({ severity: "warning", stage: "flights", field: "flights", key: "pg.warn.noFlights" });
   }
 
   // ---- flight guard rails (timezone-aware) ----
   // An impossible flight (arrives before it departs, once both airports resolve).
   if (data.flights.some((f) => flightTiming(f).arrivalBeforeDeparture)) {
-    warnings.push({ severity: "warning", stage: "flights", key: "pg.warn.flightArrivalBeforeDeparture" });
+    warnings.push({ severity: "warning", stage: "flights", field: "flights", key: "pg.warn.flightArrivalBeforeDeparture" });
   }
   // The outbound flight lands on a different date than the declared trip arrival —
   // hotel dates follow the flight, so this is worth surfacing.
   const outbound = data.flights.find((f) => f.leg_order === "outbound");
   const landing = localDatePart(outbound?.arrival_at);
   if (landing && data.trip.arrival_date && landing !== data.trip.arrival_date) {
-    warnings.push({ severity: "warning", stage: "flights", key: "pg.warn.landingDateDiffers" });
+    warnings.push({ severity: "warning", stage: "flights", field: "flights", key: "pg.warn.landingDateDiffers" });
   }
-  if (data.services.includes.length === 0) warnings.push({ severity: "warning", stage: "services", key: "pg.warn.noServices" });
+  if (data.services.includes.length === 0) warnings.push({ severity: "warning", stage: "services", field: "services.includes", key: "pg.warn.noServices" });
 
   // ---- ready-made company package («العروض الجاهزة») ----
   // Its price is fixed by management and carried in pricing.final_total instead
   // of priced line items, so the usual "no pricing lines" advice would be wrong.
   if (isFixedPrice(data)) {
-    warnings.push({ severity: "warning", stage: "pricing", key: "ro.warn.fixedPrice" });
+    warnings.push({ severity: "warning", stage: "pricing", field: "pricing", key: "ro.warn.fixedPrice" });
     if (outOfSeason(data)) {
-      warnings.push({ severity: "warning", stage: "trip", key: "ro.warn.outOfSeason" });
+      warnings.push({ severity: "warning", stage: "trip", field: "trip.arrival_date", key: "ro.warn.outOfSeason" });
     }
   } else if (data.pricing.items.length === 0) {
-    warnings.push({ severity: "warning", stage: "pricing", key: "pg.warn.noPricing" });
+    warnings.push({ severity: "warning", stage: "pricing", field: "pricing", key: "pg.warn.noPricing" });
   }
 
   // ONE gate for scope, rather than a guard on every push above: a stage the sale
@@ -260,6 +297,9 @@ function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey
   };
 
   return {
+    // Always answered — the draft opens with a default scope, and every
+    // combination of switches is a legitimate one.
+    scope: "complete" as StageStatus,
     // Naming the partner company completes the stage on its own.
     customer: status(customerTouched, isCompanySale(data) || Boolean(data.customer.customer_name.trim()), "customer"),
     trip: status(tripTouched, tripComplete, "trip"),

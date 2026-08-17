@@ -5,6 +5,7 @@ import { Check, ListPlus, Plus, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import type { DraftServices, TermLibraryItem } from "@/lib/offer/draft-types";
 import type { TranslationKey } from "@/lib/i18n";
+import { FieldIssue } from "../FieldIssue";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import {
   addButtonClass,
@@ -167,6 +168,7 @@ export function ServicesStage({ data, patch, lookups }: StageFormProps) {
   return (
     <section className={sectionClass}>
       <h2 className="mb-4 text-base font-extrabold text-[#003c3a]">{t("pg.servicesTitle")}</h2>
+      <FieldIssue field="services.includes" className="mb-3" />
       <div className="grid gap-4 md:grid-cols-2">
         <ListEditor
           titleKey="pg.includes"

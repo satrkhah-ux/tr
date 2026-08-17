@@ -24,6 +24,7 @@ import {
   type SupplierNote,
 } from "@/lib/data/hotel-search";
 import { useRole } from "@/lib/roles/RoleContext";
+import { FieldIssue } from "../FieldIssue";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { sectionClass, type StageFormProps } from "../stage-props";
 import { StayCard } from "../hotels/StayCard";
@@ -269,6 +270,7 @@ export function HotelsStage({ draftId, data, patch, replace, lookups }: StageFor
     <section className={sectionClass}>
       <h2 className="mb-1 text-base font-extrabold text-[#003c3a]">{t("pg.hotelsTitle")}</h2>
       <p className="mb-4 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.supplier.searchHint")}</p>
+      <FieldIssue field="hotels" className="mb-3" />
 
       {data.cities.length === 0 ? (
         <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
