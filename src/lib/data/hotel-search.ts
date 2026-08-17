@@ -177,6 +177,7 @@ export async function searchInternalHotels(
       ((countryRows ?? []) as { id: string; arabic_name: string }[]).map((c) => ({
         id: c.id,
         name: c.arabic_name,
+        timezone: null,
         iso2: null,
         cities: [],
       })),

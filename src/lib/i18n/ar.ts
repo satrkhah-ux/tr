@@ -904,6 +904,7 @@ export const ar: Dictionary = {
   "pg.warn.noPhone": "هاتف العميل فارغ.",
   "pg.warn.noFlights": "لم تُضف رحلات طيران.",
   "pg.warn.noServices": "لا توجد خدمات مشمولة.",
+  "pg.warn.dayOneLateArrival": "الرحلة تهبط ليلاً — اليوم الأول يوم انتقال واستراحة، راجع الجولات المكتوبة عليه.",
   "pg.warn.noPricing": "لا توجد بنود تسعير.",
   // customer stage
   "pg.customerTitle": "بيانات العميل",

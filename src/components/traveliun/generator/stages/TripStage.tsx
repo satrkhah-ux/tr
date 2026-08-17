@@ -1,7 +1,9 @@
 "use client";
 
-import { deriveCityDates, type DraftTrip } from "@/lib/offer/draft-types";
+import { Clock } from "lucide-react";
+import { deriveCityDates, findLookupCountry, type DraftTrip } from "@/lib/offer/draft-types";
 import { itineraryStartDate, syncDepartureDates } from "@/lib/offer/schedule";
+import { describeOffsetAr, offsetFromHome } from "@/lib/offer/timezones";
 import { FieldIssue, useFieldRing } from "../FieldIssue";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass, labelClass, sectionClass, type StageFormProps } from "../stage-props";
@@ -32,6 +34,9 @@ function addDaysIso(iso: string, days: number): string {
 export function TripStage({ data, patch, lookups }: StageFormProps) {
   const countryRing = useFieldRing("trip.country");
   const arrivalRing = useFieldRing("trip.arrival_date");
+  const tzNote = describeOffsetAr(
+    offsetFromHome(findLookupCountry(lookups.countries, data.trip.country)?.timezone ?? null, data.trip.arrival_date),
+  );
   const { t } = useTraveliunUI();
   const trip = data.trip;
 
@@ -125,6 +130,15 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
             ) : null}
           </select>
           <FieldIssue field="trip.country" />
+          {/* Computed for the TRIP dates, not stored: 21 of our destinations
+              change their offset with daylight saving, so a number on the
+              country row would be wrong for half of every year. */}
+          {tzNote ? (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#557d78]">
+              <Clock className="size-3.5 text-[#93aaa3]" />
+              {tzNote}
+            </span>
+          ) : null}
         </label>
         <label className={labelClass}>
           {t("pg.destinationLabel")}

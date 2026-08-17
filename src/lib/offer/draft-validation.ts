@@ -19,6 +19,7 @@ import {
   type StageKey,
 } from "./draft-types";
 import { flightTiming, itineraryStartDate, localDatePart } from "./schedule";
+import { dayOneIsUsable } from "./timezones";
 import { sellBlocks } from "@/lib/pricing/markup";
 import { applyManualProfit } from "./pricing";
 
@@ -42,6 +43,7 @@ export type FieldId =
   | "cities"
   | "hotels"
   | "flights"
+  | "itinerary"
   | "services.includes"
   | "pricing";
 
@@ -220,6 +222,18 @@ export function validateDraft(data: DraftData): DraftValidation {
   if (landing && data.trip.arrival_date && landing !== data.trip.arrival_date) {
     warnings.push({ severity: "warning", stage: "flights", field: "flights", key: "pg.warn.landingDateDiffers" });
   }
+  // A group that lands at 04:00 or 23:40 is not touring that day. Selling one
+  // there is the mistake this catches — the client counts the day and asks what
+  // they paid for it.
+  {
+    const landing = data.flights.find((f) => f.leg_order === "outbound")?.arrival_at ?? null;
+    const dayOne = data.days[0];
+    const planned = Boolean(dayOne && (dayOne.title.trim() || dayOne.activities.some((a) => a.trim())));
+    if (landing && planned && !dayOneIsUsable(landing)) {
+      warnings.push({ severity: "warning", stage: "itinerary", field: "itinerary", key: "pg.warn.dayOneLateArrival" });
+    }
+  }
+
   if (data.services.includes.length === 0) warnings.push({ severity: "warning", stage: "services", field: "services.includes", key: "pg.warn.noServices" });
 
   // ---- ready-made company package («العروض الجاهزة») ----

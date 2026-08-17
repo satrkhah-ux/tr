@@ -1006,6 +1006,8 @@ export type LookupCountry = {
    * looks like "the supplier has no hotels there".
    */
   iso2: string | null;
+  /** IANA zone. Drives the time-difference note — see lib/offer/timezones.ts. */
+  timezone: string | null;
   cities: LookupCity[];
 };
 export type LookupRoomType = { id: string; name: string; hotel_id: string | null; default_board: BoardType | null };

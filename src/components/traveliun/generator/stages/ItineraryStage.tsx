@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Bus, CloudSun, Coffee, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { PlaneLanding, Bus, CloudSun, Coffee, Loader2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { FREE_DAY_TITLE, isFreeDay, type DraftDay } from "@/lib/offer/draft-types";
 import {
   transportNoteForDay, daysNeedRebuild, draftDaySkeleton } from "@/lib/offer/itinerary";
 import { formatWeatherAr, isWeatherEmpty, weatherSourceAr } from "@/lib/offer/weather-format";
+import { arrivalDayNoteAr, dayOneIsUsable } from "@/lib/offer/timezones";
+import { FieldIssue } from "../FieldIssue";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import {
   generateItineraryDays,
@@ -34,6 +36,12 @@ export function ItineraryStage({ draftId, data, patch, replace }: StageFormProps
   const [error, setError] = useState<TranslationKey | null>(null);
   const [available, setAvailable] = useState<{ ai: boolean; flightLookup: boolean } | null>(null);
   const days = data.days;
+
+  // What the outbound flight actually does to day one. The LOCAL landing time,
+  // which is the only version of it the group experiences.
+  const landing = data.flights.find((f) => f.leg_order === "outbound")?.arrival_at ?? null;
+  const arrivalNote = arrivalDayNoteAr(landing);
+  const dayOneUsable = dayOneIsUsable(landing);
 
   useEffect(() => {
     void getAssistantAvailability().then(setAvailable);
@@ -131,6 +139,8 @@ export function ItineraryStage({ draftId, data, patch, replace }: StageFormProps
         </p>
       ) : null}
 
+      <FieldIssue field="itinerary" className="mb-3" />
+
       {days.length === 0 ? (
         <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
           {t("pg.itin.empty")}
@@ -170,6 +180,19 @@ export function ItineraryStage({ draftId, data, patch, replace }: StageFormProps
                 {/* The vehicle for THIS day, derived from the transport plan the
                     agent answered with the customer. A badge, because it is a
                     fact about the day rather than something authored here. */}
+                {/* Day one is worth what is LEFT of it. A 04:00 landing buys a
+                    bed and an afternoon; a 23:40 landing buys nothing — and both
+                    used to read as a full first day with tours planned on it. */}
+                {index === 0 && arrivalNote ? (
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${
+                      dayOneUsable ? "bg-[#eef2fb] text-[#3c5a9a]" : "bg-[#fff8e8] text-[#a86a10]"
+                    }`}
+                  >
+                    <PlaneLanding className="size-3" />
+                    {arrivalNote}
+                  </span>
+                ) : null}
                 {data.scope.transport && transportNoteForDay(data.transport_plan, days, index) ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-[#eef4f1] px-2 py-0.5 text-[10.5px] font-extrabold text-[#557d78]">
                     <Bus className="size-3" />

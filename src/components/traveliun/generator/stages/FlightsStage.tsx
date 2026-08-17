@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { dayShiftNoteAr } from "@/lib/offer/timezones";
 import { AlertTriangle, Clock, Globe2, Loader2, Plane, Plus, RotateCcw, Search, TimerReset } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { getAssistantAvailability, lookupFlightNumber } from "@/lib/data/itinerary-actions";
@@ -542,7 +543,7 @@ function FlightRow({
   const timing = flightTiming(flight);
   const duration = formatDurationAr(timing.durationMinutes);
   const bothDatesSet = Boolean(flight.departure_at && flight.arrival_at);
-  const dayUnit = timing.dayOffset === 1 ? t("pg.dayUnitOne") : t("pg.dayUnitMany");
+  const dayUnit = Math.abs(timing.dayOffset) === 1 ? t("pg.dayUnitOne") : t("pg.dayUnitMany");
 
   return (
     <div className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
@@ -706,9 +707,17 @@ function FlightRow({
               {" · "}
               <DirText dir="ltr">{duration}</DirText>
             </span>
-            {timing.dayOffset > 0 ? (
-              <span className="tv-tnum inline-flex items-center gap-1 rounded-full bg-[#eaf1ff] px-2.5 py-1 text-[11.5px] font-extrabold text-[#2b57c4]">
-                <DirText dir="ltr">{`+${timing.dayOffset}`}</DirText>
+            {/* BOTH directions. It only ever rendered a POSITIVE shift, so a leg
+                whose arrival date landed BEFORE its departure date — a typo, or
+                the date line — showed no badge at all and read as same-day. */}
+            {timing.dayOffset !== 0 ? (
+              <span
+                title={dayShiftNoteAr(timing.dayOffset) ?? undefined}
+                className={`tv-tnum inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-extrabold ${
+                  timing.dayOffset > 0 ? "bg-[#eaf1ff] text-[#2b57c4]" : "bg-[#fdeef2] text-[#c22850]"
+                }`}
+              >
+                <DirText dir="ltr">{`${timing.dayOffset > 0 ? "+" : "−"}${Math.abs(timing.dayOffset)}`}</DirText>
                 {dayUnit}
               </span>
             ) : null}

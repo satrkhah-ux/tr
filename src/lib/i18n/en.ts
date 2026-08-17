@@ -906,6 +906,7 @@ export const en = {
   "pg.warn.noPhone": "Customer phone is empty.",
   "pg.warn.noFlights": "No flights added.",
   "pg.warn.noServices": "No included services.",
+  "pg.warn.dayOneLateArrival": "The flight lands at night — day one is a transfer day; review the tours written on it.",
   "pg.warn.noPricing": "No pricing items.",
   // customer stage
   "pg.customerTitle": "Customer details",
