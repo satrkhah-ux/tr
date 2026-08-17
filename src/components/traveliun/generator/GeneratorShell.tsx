@@ -9,12 +9,10 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Circle,
   CircleDot,
   Eye,
   EyeOff,
   Loader2,
-  MoonStar,
   XCircle,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
@@ -200,74 +198,64 @@ export function GeneratorShell({
           </div>
         </div>
 
-        {/* MOBILE stepper — horizontal, tappable, current chip auto-scrolled into
-            view. Replaces the vertical rail below xl so the form is the first
-            thing the agent sees on a phone. */}
-        <nav aria-label={t("pg.progress")} className="mb-3 xl:hidden">
-          <div className="flex gap-1.5 overflow-x-auto pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* THE stepper — one horizontal bar at every width.
+            It used to be a vertical rail beside the form on desktop and a
+            separate chip row on phones: two components drawing the same eleven
+            steps, and a 230px column spent on a list that reads perfectly well
+            as a line. Across the top it costs one row, gives the form the width
+            back, and shows the whole journey at once instead of a column the
+            eye has to travel down.
+            The dot carries the state — number normally, tick when the stage is
+            done, cross when it blocks — so status needs no second icon. */}
+        <nav
+          aria-label={t("pg.progress")}
+          className="mb-4 rounded-2xl border border-[#e2ebe7] bg-white p-1.5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]"
+        >
+          <ol className="flex gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {visibleStages.map((meta, index) => {
               const active = meta.key === stage;
               const status = validation.stages[meta.key];
               return (
-                <Link
-                  key={meta.key}
-                  ref={active ? activeChipRef : undefined}
-                  href={stageHref(draftId, meta.key)}
-                  aria-current={active ? "step" : undefined}
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-[12.5px] font-bold transition-colors ${
-                    active
-                      ? "border-[#185045] bg-[#185045] text-white"
-                      : "border-[#dbe6e1] bg-white text-[#185045]"
-                  }`}
-                >
-                  <StatusIcon status={status} active={active} />
-                  <span>{t(meta.labelKey)}</span>
-                  <span className={`tv-tnum text-[10px] font-extrabold ${active ? "text-[#8fe3c4]" : "text-[#b6c9c2]"}`}>
-                    <DirText dir="ltr">{String(index + 1)}</DirText>
-                  </span>
-                </Link>
+                <li key={meta.key} className="min-w-0 flex-1">
+                  <Link
+                    ref={active ? activeChipRef : undefined}
+                    href={stageHref(draftId, meta.key)}
+                    aria-current={active ? "step" : undefined}
+                    title={t(meta.labelKey)}
+                    className={`flex min-w-[86px] flex-col items-center gap-1.5 rounded-[11px] px-1.5 py-2 transition-colors ${
+                      active ? "bg-[#185045]" : "hover:bg-[#f0f7f4]"
+                    }`}
+                  >
+                    <StepDot index={index} status={status} active={active} />
+                    <span
+                      className={`w-full truncate text-center text-[12px] font-bold ${
+                        active ? "text-white" : "text-[#185045]"
+                      }`}
+                    >
+                      {t(meta.labelKey)}
+                    </span>
+                  </Link>
+                </li>
               );
             })}
-          </div>
+          </ol>
         </nav>
 
         <div
+          // Two columns now, and the form takes the width the rail used to
+          // hold. The right one widens only when the live document is in it —
+          // a 400px column with nothing but an issue list is wasted paper.
           className={`grid gap-4 items-start ${
             stage !== "preview" && previewOpen
-              ? "xl:grid-cols-[230px_minmax(0,1fr)_minmax(320px,420px)]"
-              : "xl:grid-cols-[230px_minmax(0,1fr)]"
+              ? "xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]"
+              : "xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]"
           }`}
         >
-          {/* progress rail + validation panel — on mobile this drops BELOW the
-              form (order-2) so the agent lands straight on the inputs. */}
-          <aside className="order-2 space-y-4 xl:order-none">
-            <nav className="hidden rounded-2xl border border-[#e2ebe7] bg-white p-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)] xl:block">
-              <p className="mb-2 px-2 text-[11px] font-extrabold tracking-wide text-[#93aaa3]">{t("pg.progress")}</p>
-              <ol className="space-y-0.5">
-                {visibleStages.map((meta, index) => {
-                  const status = validation.stages[meta.key];
-                  const active = meta.key === stage;
-                  return (
-                    <li key={meta.key}>
-                      <Link
-                        href={stageHref(draftId, meta.key)}
-                        aria-current={active ? "step" : undefined}
-                        className={`flex items-center gap-2.5 rounded-[9px] px-2.5 py-2 text-[13px] font-bold transition-colors ${
-                          active ? "bg-[#185045] text-white" : "text-[#185045] hover:bg-[#f0f7f4]"
-                        }`}
-                      >
-                        <StatusIcon status={status} active={active} />
-                        <span className="flex-1">{t(meta.labelKey)}</span>
-                        <span className={`tv-tnum text-[10px] font-extrabold ${active ? "text-[#8fe3c4]" : "text-[#b6c9c2]"}`}>
-                          <DirText dir="ltr">{String(index + 1)}</DirText>
-                        </span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ol>
-            </nav>
-
+          {/* Everything the agent CHECKS rather than fills: nights, the issue
+              list, and the live document. One column now that the steps left
+              it — on mobile it still drops below the form (order-2) so the
+              agent lands straight on the inputs. */}
+          <aside className="order-2 space-y-4">
             {/* nights indicator — hotels stage only (cities renders its own) */}
             {showNights ? (
               <NightsIndicator
@@ -314,10 +302,25 @@ export function GeneratorShell({
                 </div>
               )}
             </div>
+
+            {/* live document, in the same column — it is something to LOOK at,
+                like the issue list above it, not something to fill in. */}
+            {stage !== "preview" && previewOpen ? (
+              <div className="hidden xl:block">
+                <div className="sticky top-[90px]">
+                  <p className="mb-2 text-[11px] font-bold text-[#93aaa3]">{t("pg.previewHint")}</p>
+                  <div className="max-h-[calc(100vh-160px)] overflow-y-auto rounded-[14px]">
+                    <div className="origin-top scale-[0.62] rtl:origin-top-right ltr:origin-top-left" style={{ width: "161%" }}>
+                      <OfferDocument variant="client" offer={draftToPreviewOffer(data, lookups.airlines)} {...draftBrand(data, lookups.partners)} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </aside>
 
           {/* stage form */}
-          <main className="order-1 min-w-0 xl:order-none">
+          <main className="order-1 min-w-0 xl:col-start-1 xl:row-start-1">
             <StageForm draftId={draftId} data={data} patch={patch} replace={replace} lookups={lookups} />
 
             {/* MOBILE prev/next — the primary way to move through the wizard on a
@@ -352,31 +355,38 @@ export function GeneratorShell({
             </div>
           </main>
 
-          {/* live preview pane (desktop; hidden on the preview stage itself) */}
-          {stage !== "preview" && previewOpen ? (
-            <aside className="hidden xl:block">
-              <div className="sticky top-[90px]">
-                <p className="mb-2 text-[11px] font-bold text-[#93aaa3]">{t("pg.previewHint")}</p>
-                <div className="max-h-[calc(100vh-160px)] overflow-y-auto rounded-[14px]">
-                  <div className="origin-top scale-[0.62] rtl:origin-top-right ltr:origin-top-left" style={{ width: "161%" }}>
-                    <OfferDocument variant="client" offer={draftToPreviewOffer(data, lookups.airlines)} {...draftBrand(data, lookups.partners)} />
-                  </div>
-                </div>
-              </div>
-            </aside>
-          ) : null}
         </div>
       </div>
     </TraveliunShell>
   );
 }
 
-function StatusIcon({ status, active }: { status: StageStatus; active: boolean }) {
-  const base = active ? "text-white" : "";
-  if (status === "complete") return <CheckCircle2 className={`size-4 shrink-0 ${base || "text-[#0f7a52]"}`} />;
-  if (status === "error") return <XCircle className={`size-4 shrink-0 ${base || "text-[#c22850]"}`} />;
-  if (status === "partial") return <CircleDot className={`size-4 shrink-0 ${base || "text-[#d99a00]"}`} />;
-  return <Circle className={`size-4 shrink-0 ${base || "text-[#c2cfca]"}`} />;
+/**
+ * One step's dot: its number, or what happened to it.
+ *
+ * A number and a status badge side by side is two things to read per step, and
+ * eleven of those across a bar is noise. The dot IS the status — a tick when the
+ * stage is done, a cross when it blocks, the number when there is nothing to
+ * say. The number stays visible on the current step because "where am I in the
+ * eleven" is the one thing the bar exists to answer.
+ */
+function StepDot({ index, status, active }: { index: number; status: StageStatus; active: boolean }) {
+  const shell = "flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold";
+  if (active) {
+    return (
+      <span className={`${shell} bg-white text-[#185045]`}>
+        <DirText dir="ltr">{String(index + 1)}</DirText>
+      </span>
+    );
+  }
+  if (status === "complete") return <CheckCircle2 className="size-6 shrink-0 text-[#0f7a52]" />;
+  if (status === "error") return <XCircle className="size-6 shrink-0 text-[#c22850]" />;
+  if (status === "partial") return <CircleDot className="size-6 shrink-0 text-[#d99a00]" />;
+  return (
+    <span className={`${shell} bg-[#eef4f1] text-[#93aaa3]`}>
+      <DirText dir="ltr">{String(index + 1)}</DirText>
+    </span>
+  );
 }
 
 function IssueList({
