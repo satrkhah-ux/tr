@@ -1,7 +1,7 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
 
 /**
@@ -31,8 +31,15 @@ import { currentCan } from "@/lib/roles/current";
  * single aggregation implementation and filters stay live.
  */
 
+/**
+ * SERVICE client. 0039 withheld buy_total, profit and buy_price from the
+ * `authenticated` role, and this dashboard exists to show exactly those. The
+ * permission is checked ABOVE, explicitly, before a single row is read — which
+ * is the arrangement the check was always meant to be, rather than a policy
+ * that happened to let every employee through.
+ */
 async function db(): Promise<SupabaseClient> {
-  return (await createSupabaseServerClient()) as unknown as SupabaseClient;
+  return createSupabaseServiceClient() as unknown as SupabaseClient;
 }
 
 function round2(n: number): number {

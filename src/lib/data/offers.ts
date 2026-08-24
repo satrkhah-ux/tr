@@ -14,6 +14,7 @@ import {
   type ClimateLine,
 } from "@/lib/offer/dto";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { currentPermissions } from "@/lib/roles/current";
 import { getClimateNote } from "./climate-actions";
 import { getCurrentEmployeeId } from "./metrics";
 import { setOfferStatus } from "./offer-status";
@@ -748,8 +749,13 @@ type PricingItemRow = {
 export async function getInternalOffer(serial: string): Promise<InternalOfferDTO | null> {
   const user = await getServerUser();
   if (!user) return null;
+  // The internal document EXISTS to show cost and margin, so the permission is
+  // STATED here rather than inferred from a policy. 0039 withheld those columns
+  // from `authenticated`, so this reads with the service client — which makes
+  // this line the only thing between a salesperson and our buy price.
+  if (!(await currentPermissions()).includes("pricing.internal")) return null;
   try {
-    const supabase = await db();
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data: offer } = await supabase
       .from("offers")
       .select("id, serial, destination, duration, offer_date, adults, children, infants, total, currency, customer_id, employee_id, created_at")

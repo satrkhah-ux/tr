@@ -1,7 +1,7 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { CustomerType, MarkupRule, MarkupScope, MarkupType, RoundingRule } from "@/lib/pricing/markup";
 import type { MarkupRuleRow } from "@/lib/types";
 
@@ -34,7 +34,10 @@ function toMarkupRule(row: MarkupRuleRow): MarkupRule {
 /** Active markup rules as pure-engine rules (empty on any failure). */
 export async function getActiveMarkupRules(): Promise<MarkupRule[]> {
   try {
-    const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
+    // SERVICE client: 0039 withheld markup_rules from `authenticated` entirely.
+    // Nothing an employee is shown needs to know HOW we mark up — the engine
+    // applies the rule server-side and returns a price, not a policy.
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data } = await supabase.from("markup_rules").select("*").eq("status", "Active");
     return ((data ?? []) as MarkupRuleRow[]).map(toMarkupRule);
   } catch {
