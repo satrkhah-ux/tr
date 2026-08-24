@@ -1,0 +1,116 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Traveliun — ETG API booking flow</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  html,body { margin:0; padding:0; background:#fff; }
+  svg { display:block; width:297mm; height:210mm; }
+  @media screen { body { background:#5a6b66; padding:16px; } svg { box-shadow:0 8px 30px rgba(0,0,0,.35); margin:0 auto; } }
+  @media print { body { background:#fff; padding:0; } svg { box-shadow:none; } }
+</style></head><body>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1414 1000" width="297mm" height="210mm" preserveAspectRatio="xMidYMid meet" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="1414" height="1000" fill="#ffffff"/>
+
+  <!-- title -->
+  <text x="56" y="52" font-size="23" font-weight="700" fill="#0f3d38">Traveliun — ETG / RateHawk API booking flow</text>
+  <text x="56" y="78" font-size="13.5" fill="#6b807b">Search → Select → Prebook (recheck) → Client offer → Book → Voucher → Cancel</text>
+  <line x1="56" y1="94" x2="1358" y2="94" stroke="#d9e4e0" stroke-width="1"/>
+
+  <!-- lifelines -->
+  <g font-size="13" font-weight="700" text-anchor="middle">
+    <rect x="70"   y="112" width="170" height="42" rx="8" fill="#185045"/><text x="155"  y="139" fill="#fff">Sales agent</text>
+    <rect x="325"  y="112" width="200" height="42" rx="8" fill="#0f3d38"/><text x="425"  y="139" fill="#fff">Traveliun system</text>
+    <rect x="625"  y="112" width="170" height="42" rx="8" fill="#2b57c4"/><text x="710"  y="139" fill="#fff">ETG API</text>
+    <rect x="895"  y="112" width="160" height="42" rx="8" fill="#7a5230"/><text x="975"  y="139" fill="#fff">Client</text>
+    <rect x="1150" y="112" width="180" height="42" rx="8" fill="#a33b5a"/><text x="1240" y="139" fill="#fff">Operations</text>
+  </g>
+  <g stroke="#c8d5d0" stroke-width="1.4" stroke-dasharray="5 5">
+    <line x1="155"  y1="154" x2="155"  y2="950"/>
+    <line x1="425"  y1="154" x2="425"  y2="950"/>
+    <line x1="710"  y1="154" x2="710"  y2="950"/>
+    <line x1="975"  y1="154" x2="975"  y2="700"/>
+    <line x1="1240" y1="154" x2="1240" y2="844"/>
+  </g>
+
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#33504a"/></marker>
+    <marker id="b" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#2b57c4"/></marker>
+  </defs>
+
+  <g font-size="12.5" fill="#22423c">
+    <!-- 1 SEARCH -->
+    <text x="70" y="192" font-size="12" font-weight="700" fill="#93aaa3">1 — SEARCH</text>
+    <line x1="155" y1="210" x2="418" y2="210" stroke="#33504a" stroke-width="1.6" marker-end="url(#a)"/>
+    <text x="170" y="204">city · dates · rooms · guests · nationality</text>
+
+    <line x1="425" y1="242" x2="703" y2="242" stroke="#2b57c4" stroke-width="1.6" marker-end="url(#b)"/>
+    <text x="438" y="236" fill="#2b57c4">Search by region / hotel IDs — timeout 25 s</text>
+    <text x="438" y="258" font-size="11.5" fill="#7d8f9b">all enabled suppliers queried in parallel</text>
+
+    <line x1="710" y1="288" x2="432" y2="288" stroke="#2b57c4" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#b)"/>
+    <text x="440" y="282" fill="#2b57c4">rates + cancellation policy</text>
+
+    <rect x="300" y="304" width="250" height="48" rx="7" fill="#f2f7f5" stroke="#cfe0d9"/>
+    <text x="314" y="323" font-size="11.5">markup rules + minimum margin floor</text>
+    <text x="314" y="342" font-size="11.5">FX → SAR, rate pinned at quotation time</text>
+
+    <line x1="418" y1="376" x2="162" y2="376" stroke="#33504a" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#a)"/>
+    <text x="170" y="370">aggregated by hotel · room type · board type</text>
+
+    <!-- 2 SELECT + PREBOOK -->
+    <text x="70" y="416" font-size="12" font-weight="700" fill="#93aaa3">2 — SELECT &amp; PREBOOK (recheck)</text>
+    <line x1="155" y1="434" x2="418" y2="434" stroke="#33504a" stroke-width="1.6" marker-end="url(#a)"/>
+    <text x="170" y="428">agent picks the rate</text>
+
+    <line x1="425" y1="466" x2="703" y2="466" stroke="#2b57c4" stroke-width="1.6" marker-end="url(#b)"/>
+    <text x="438" y="460" fill="#2b57c4">Prebook — MANDATORY, timeout 25 s</text>
+
+    <line x1="710" y1="498" x2="432" y2="498" stroke="#2b57c4" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#b)"/>
+    <text x="440" y="492" fill="#2b57c4">confirmed price · availability · policy</text>
+
+    <rect x="140" y="514" width="470" height="62" rx="7" fill="#fff6f8" stroke="#e8b9c6"/>
+    <text x="154" y="533" font-size="11.5" font-weight="700" fill="#a33b5a">alt — price or policy differs from search</text>
+    <text x="154" y="551" font-size="11.5" fill="#a33b5a">surfaced to the agent with old and new figures — 0 % passed silently</text>
+    <text x="154" y="569" font-size="11.5" fill="#a33b5a">any quotation older than 5 minutes is automatically re-priced</text>
+
+    <!-- 3 CLIENT OFFER -->
+    <text x="70" y="612" font-size="12" font-weight="700" fill="#93aaa3">3 — CLIENT OFFER</text>
+    <line x1="425" y1="630" x2="968" y2="630" stroke="#33504a" stroke-width="1.6" marker-end="url(#a)"/>
+    <text x="440" y="624">offer PDF — SELL prices only</text>
+    <text x="440" y="646" font-size="11.5" fill="#7d8f9b">buy price and margin never leave the system</text>
+
+    <line x1="975" y1="676" x2="162" y2="676" stroke="#33504a" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#a)"/>
+    <text x="440" y="670">client approves</text>
+
+    <!-- 4 BOOK -->
+    <text x="70" y="716" font-size="12" font-weight="700" fill="#93aaa3">4 — BOOK</text>
+    <line x1="155" y1="734" x2="1233" y2="734" stroke="#33504a" stroke-width="1.6" marker-end="url(#a)"/>
+    <text x="600" y="728">handover to operations</text>
+
+    <rect x="1060" y="750" width="300" height="46" rx="7" fill="#fdf2f6" stroke="#e8b9c6"/>
+    <text x="1074" y="769" font-size="11.5" font-weight="700" fill="#a33b5a">ONE human press — never automatic</text>
+    <text x="1074" y="787" font-size="11.5" fill="#a33b5a">requires operations.book permission</text>
+
+    <line x1="1240" y1="820" x2="432" y2="820" stroke="#33504a" stroke-width="1.6" marker-end="url(#a)"/>
+    <text x="600" y="814">confirm booking</text>
+
+    <line x1="425" y1="850" x2="703" y2="850" stroke="#2b57c4" stroke-width="1.6" marker-end="url(#b)"/>
+    <text x="438" y="844" fill="#2b57c4">Book — timeout 120 s</text>
+
+    <line x1="710" y1="880" x2="432" y2="880" stroke="#2b57c4" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#b)"/>
+    <text x="440" y="874" fill="#2b57c4">booking reference + Hotel Confirmation Number</text>
+
+    <rect x="300" y="894" width="250" height="30" rx="7" fill="#f2f7f5" stroke="#cfe0d9"/>
+    <text x="314" y="913" font-size="11.5">written to audit log, by name</text>
+
+    <!-- 5 VOUCHER + CANCEL -->
+    <text x="810" y="880" font-size="12" font-weight="700" fill="#93aaa3">5 — VOUCHER &amp; POST-BOOKING</text>
+    <text x="810" y="902" font-size="11.5" fill="#22423c">voucher carrying the HCN, behind an</text>
+    <text x="810" y="920" font-size="11.5" fill="#22423c">unguessable token</text>
+    <text x="810" y="942" font-size="11.5" fill="#2b57c4">opt — Cancel 60 s · Order details 30 s</text>
+    <text x="810" y="960" font-size="11.5" fill="#2b57c4">human press, logged the same way</text>
+  </g>
+
+  <text x="56" y="984" font-size="11" fill="#93aaa3">Traveliun Travel &amp; Tourism · outbound IP 186.241.16.106 · no automatic booking at any step</text>
+</svg>
+
+</body></html>
