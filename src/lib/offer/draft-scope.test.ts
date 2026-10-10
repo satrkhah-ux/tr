@@ -204,3 +204,20 @@ describe("emptyFlight", () => {
     });
   });
 });
+
+describe("the card order", () => {
+  it("has no «نطاق العرض» card — the switches live on the trip card", () => {
+    // They decide what the trip card itself shows (vehicles, baggage) and which
+    // cards follow, so a screen of their own was a gate to click through.
+    const keys = visibleStagesFor(ALL_ON, true).map((s) => s.key);
+    expect(keys).not.toContain("scope");
+    expect(keys[0]).toBe("customer");
+    expect(keys[1]).toBe("trip");
+  });
+
+  it("still answers for the scope stage, so /scope resolves", () => {
+    // The KEY outlives the card: stageStatuses is typed by it and the old URL
+    // has to land somewhere.
+    expect(validateDraft(emptyDraftData()).stages.scope).toBeDefined();
+  });
+});

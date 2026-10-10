@@ -75,7 +75,7 @@ export function GeneratorShell({
   const visibleStages = useMemo(() => visibleStagesFor(data.scope, canPricing), [data.scope, canPricing]);
   // «الفنادق» has no chip of its own any more — the stays live inside their
   // city. A /hotels deep link still renders, under the city card's chip.
-  const railStage: StageKey = stage === "hotels" ? "cities" : stage;
+  const railStage: StageKey = stage === "hotels" ? "cities" : stage === "scope" ? "trip" : stage;
 
   // Linear position drives the mobile prev/next bar and the "step N of M" chip.
   const stageIndex = visibleStages.findIndex((s) => s.key === railStage);

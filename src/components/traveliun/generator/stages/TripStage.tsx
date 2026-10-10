@@ -5,6 +5,7 @@ import { deriveCityDates, findLookupCountry, type DraftTrip } from "@/lib/offer/
 import { itineraryStartDate, syncDepartureDates } from "@/lib/offer/schedule";
 import { describeOffsetAr, offsetFromHome } from "@/lib/offer/timezones";
 import { FieldIssue, useFieldRing } from "../FieldIssue";
+import { ScopeTiles } from "../ScopeTiles";
 import { TransportBlock } from "../TransportBlock";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass, labelClass, sectionClass, type StageFormProps } from "../stage-props";
@@ -116,7 +117,21 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
 
   return (
     <section className={sectionClass}>
-      <h2 className="mb-4 text-base font-extrabold text-[#003c3a]">{t("pg.tripTitle")}</h2>
+      <h2 className="mb-1 text-base font-extrabold text-[#003c3a]">{t("pg.tripTitle")}</h2>
+
+      {/*
+        What the programme includes, before anything else on this card.
+
+        These seven decide which cards come after — and two of them decide what
+        the REST of this card shows: tick «المواصلات» and the vehicles appear
+        below, tick a flight and its baggage does. So they are answered while
+        the agent is still describing the trip, not on a screen of their own
+        that had to be clicked through first.
+      */}
+      <p className="mb-3 text-[12.5px] font-semibold text-[#93aaa3]">{t("pg.scopeStageHint")}</p>
+      <div className="mb-5">
+        <ScopeTiles data={data} patch={patch} />
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className={labelClass}>

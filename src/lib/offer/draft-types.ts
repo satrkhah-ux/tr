@@ -42,7 +42,9 @@ export type StageMeta = {
 };
 
 export const STAGES: StageMeta[] = [
-  { key: "scope", labelKey: "pg.stage.scope" },
+  // No `scope` entry: «البرنامج يشمل» is answered on the trip card, with the
+  // country and the dates it belongs beside. The KEY stays — stage statuses are
+  // typed by it and /scope still has to land somewhere.
   { key: "customer", labelKey: "pg.stage.customer" },
   { key: "trip", labelKey: "pg.stage.trip" },
   // No `hotels` entry on purpose: the stays live inside the city card, so a
