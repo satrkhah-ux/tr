@@ -113,7 +113,7 @@ export async function sendTeletelMessage(conversationId: number, content: string
 
 /** Find the contact by phone, then their conversation. null when either misses. */
 export async function conversationForPhone(phone: string): Promise<number | null> {
-  const hits = await searchTeletelContacts(phone, 3);
+  const hits = (await searchTeletelContacts(phone, 3)) ?? [];
   const digits = phone.replace(/\D/g, "").slice(-9);
   const match =
     hits.find((h) => h.phone.replace(/\D/g, "").endsWith(digits)) ?? (digits ? undefined : hits[0]);
@@ -121,14 +121,24 @@ export async function conversationForPhone(phone: string): Promise<number | null
   return findTeletelConversation(match.id);
 }
 
-/** Contact search (name / phone / email). Returns [] on any failure. */
-export async function searchTeletelContacts(query: string, limit = 6): Promise<TeletelContact[]> {
+/**
+ * Contact search (name / phone / email).
+ *
+ * Returns NULL when the request failed and [] when it genuinely matched
+ * nobody. The difference is the whole point: an expired access token used to
+ * come back as zero rows, and the agent was told «لا يوجد عملاء مطابقون» about
+ * a customer who was sitting right there in Teletel. One reads as "type them
+ * in by hand", the other as "the integration needs a new token".
+ */
+export async function searchTeletelContacts(query: string, limit = 6): Promise<TeletelContact[] | null> {
   const config = getTeletelConfig();
-  if (!config || !query.trim()) return [];
+  if (!config) return null;
+  if (!query.trim()) return [];
   const data = await api<{ payload?: RawContact[] }>(
     config,
     `/contacts/search?q=${encodeURIComponent(query.trim())}&sort=-last_activity_at`,
   );
+  if (data === null) return null;
   const rows = Array.isArray(data?.payload) ? data.payload : [];
   return rows.slice(0, limit).map((r) => ({
     id: typeof r.id === "number" ? r.id : 0,

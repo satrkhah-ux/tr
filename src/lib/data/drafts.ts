@@ -260,7 +260,7 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
   };
   try {
     const supabase = await db();
-    const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transfersRes, transportRes, termsRes, airlinesRes, partnersRes] = await Promise.all([
+    const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transportRes, termsRes, airlinesRes, partnersRes] = await Promise.all([
       // iso2 is not decoration: a real hotel supplier looks a city up WITHIN a
       // country, so a live search without it returns nothing at all.
       supabase.from("countries").select("id, arabic_name, iso2, timezone, status").order("arabic_name"),
@@ -268,10 +268,9 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       supabase.from("hotels").select("id, arabic_name, stars, city_id"),
       supabase.from("room_types").select("id, arabic_name, hotel_id, default_board").order("arabic_name"),
       supabase.from("airports").select("id, arabic_name, code, iana_timezone, status").order("code"),
-      supabase.from("transfers").select("car_type"),
       supabase
         .from("transportation_types")
-        .select("arabic_name, english_name, pax_capacity, luggage_capacity, status")
+        .select("arabic_name, english_name, category, vehicle_class, pax_capacity, luggage_capacity, status")
         .order("pax_capacity", { ascending: true, nullsFirst: false }),
       supabase.from("terms").select("kind, arabic_text, checked, sort").order("sort", { ascending: true }),
       // resellers only: a hotel supplier we assign bookings to has no business in
@@ -314,40 +313,43 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
     /**
      * The vehicles the transport card offers, smallest first.
      *
-     * Sorted by capacity rather than by name because that is the question
-     * being answered — nine travellers need the first row that seats nine, and
-     * an alphabetical list makes the agent read all of them to find it.
+     * `transportation_types` is a catalogue of everything sellable, and most of
+     * it is not a vehicle: a train ticket, a metro pass, the cable car, «تأجير
+     * بالساعة ٨ ساعات», «استقبال من المطار (خاص)». Offering those here asked
+     * the agent the wrong question twice over — the LEG already says what the
+     * journey is, and this field answers only which vehicle carries it. So a
+     * row qualifies when it names a road vehicle and is not itself a journey,
+     * a duration or a ticket.
      *
-     * Ad-hoc car types typed onto past transfer rows come along at the end
-     * with no capacity: they are what older files already say, and dropping
-     * them would blank a vehicle an agent chose.
+     * Sorted by capacity rather than by name because that is what the choice
+     * turns on: nine travellers need the first row that seats nine, and an
+     * alphabetical list makes the agent read all of them to find it.
      */
-    const managed = ((transportRes.data ?? []) as {
+    const SERVICE_CATEGORY = new Set(["transfer", "disposal", "ticket"]);
+    const ROAD_VEHICLE = new Set(["sedan", "suv", "van", "minibus", "bus", "limousine", "shuttle", "scooter"]);
+
+    const carTypes: GeneratorLookups["carTypes"] = ((transportRes.data ?? []) as {
       arabic_name: string;
       english_name: string | null;
+      category: string | null;
+      vehicle_class: string | null;
       pax_capacity: number | null;
       luggage_capacity: number | null;
       status: string | null;
-    }[]).filter((t) => active(t.status) && t.arabic_name?.trim());
-
-    const seen = new Set(managed.map((t) => t.arabic_name.trim()));
-    const adHoc = [
-      ...new Set(
-        ((transfersRes.data ?? []) as { car_type: string | null }[])
-          .map((r) => r.car_type?.trim())
-          .filter((v): v is string => Boolean(v) && !seen.has(v as string)),
-      ),
-    ];
-
-    const carTypes: GeneratorLookups["carTypes"] = [
-      ...managed.map((t) => ({
+    }[])
+      .filter(
+        (t) =>
+          active(t.status) &&
+          t.arabic_name?.trim() &&
+          !SERVICE_CATEGORY.has(t.category ?? "") &&
+          ROAD_VEHICLE.has(t.vehicle_class ?? ""),
+      )
+      .map((t) => ({
         name: t.arabic_name.trim(),
         name_en: t.english_name?.trim() || null,
         pax: t.pax_capacity ?? null,
         luggage: t.luggage_capacity ?? null,
-      })),
-      ...adHoc.map((name) => ({ name, name_en: null, pax: null, luggage: null })),
-    ];
+      }));
 
     return {
       countries: builtCountries,

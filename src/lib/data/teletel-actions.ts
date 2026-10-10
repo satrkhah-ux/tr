@@ -24,18 +24,27 @@ export type TeletelCustomerHit = {
 };
 
 export type TeletelSearchResult =
-  | { ok: true; configured: boolean; hits: TeletelCustomerHit[] }
+  | {
+      ok: true;
+      configured: boolean;
+      /** false when Teletel answered with an error — NOT the same as no hits. */
+      reachable: boolean;
+      hits: TeletelCustomerHit[];
+    }
   | { ok: false; error: "err.session" };
 
 export async function searchCustomersFromTeletel(query: string): Promise<TeletelSearchResult> {
   const user = await getServerUser();
   if (!user) return { ok: false, error: "err.session" };
 
-  if (!getTeletelConfig()) return { ok: true, configured: false, hits: [] };
+  if (!getTeletelConfig()) return { ok: true, configured: false, reachable: false, hits: [] };
   const trimmed = query.trim();
-  if (trimmed.length < 2) return { ok: true, configured: true, hits: [] };
+  if (trimmed.length < 2) return { ok: true, configured: true, reachable: true, hits: [] };
 
   const contacts = await searchTeletelContacts(trimmed);
+  // The token expires. Saying «no matching customers» then is a lie the agent
+  // acts on — they retype a customer Teletel already has.
+  if (contacts === null) return { ok: true, configured: true, reachable: false, hits: [] };
 
   // labels drive the «رحلة جورجيا → جورجيا» suggestion; fetched per contact,
   // failures degrade to no-labels rather than failing the search.
@@ -53,5 +62,5 @@ export async function searchCustomersFromTeletel(query: string): Promise<Teletel
     }),
   );
 
-  return { ok: true, configured: true, hits };
+  return { ok: true, configured: true, reachable: true, hits };
 }

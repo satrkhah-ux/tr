@@ -421,6 +421,7 @@ export const en = {
   "tg.errFailed": "Connection failed. Try again.",
   "tl.search": "Search Teletel customers",
   "tl.searchPlaceholder": "Name or phone…",
+  "tl.unreachable": "Teletel refused the request — the access token is expired or invalid. Enter the customer manually and ask IT for a new token.",
   "tl.notConfigured": "Teletel is not connected yet — set the platform URL and token in the environment settings.",
   "tl.noResults": "No matching customers",
   "tl.unnamed": "Unnamed",

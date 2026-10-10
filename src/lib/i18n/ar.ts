@@ -419,6 +419,7 @@ export const ar: Dictionary = {
   "tg.errFailed": "تعذّر الاتصال. حاول مجددًا.",
   "tl.search": "ابحث في عملاء Teletel",
   "tl.searchPlaceholder": "الاسم أو الجوال…",
+  "tl.unreachable": "تيليتيل رفض الطلب — رمز الدخول منتهٍ أو غير صالح. أدخل العميل يدوياً، وأبلغ الفريق التقني بتجديد الرمز.",
   "tl.notConfigured": "لم يتم ربط Teletel بعد — أضف رابط المنصّة والرمز في إعدادات البيئة.",
   "tl.noResults": "لا يوجد عملاء مطابقون",
   "tl.unnamed": "بدون اسم",
