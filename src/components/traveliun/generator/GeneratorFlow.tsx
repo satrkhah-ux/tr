@@ -90,11 +90,12 @@ export function GeneratorFlow({
   }, [data, canPricing]);
 
   /**
-   * The cards, in order — everything except «التسعير», which stays on its own
-   * route. `visibleStagesFor` already drops what the scope switches exclude.
+   * The cards, in order. `visibleStagesFor` drops what the scope switches
+   * exclude, and «التسعير» with them for a role without pricing.view — so an
+   * agent who may not see cost never sees a gap where it would have been.
    */
   const cards: StageMeta[] = useMemo(
-    () => visibleStagesFor(data.scope, canPricing).filter((s) => s.key !== "pricing"),
+    () => visibleStagesFor(data.scope, canPricing),
     [data.scope, canPricing],
   );
 
