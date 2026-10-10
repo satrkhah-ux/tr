@@ -16,6 +16,7 @@ import {
 import type { HotelOption, HotelRateOption, SupplierNote } from "@/lib/data/hotel-search";
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
+import { ManualPriceRow } from "./ManualPriceRow";
 import { fieldClass } from "../stage-props";
 import { HotelPicker, type PickerFilters, type PickerSource } from "./HotelPicker";
 import type { SearchBarGuests } from "./HotelSearchBar";
@@ -49,6 +50,7 @@ export function StayCard({
   onSetLine,
   onSetHotel,
   onRemove,
+  onDone,
   onRefresh,
 }: {
   line: DraftHotel;
@@ -92,6 +94,8 @@ export function StayCard({
   onSetLine: (next: DraftHotel) => void;
   onSetHotel: (slice: Partial<DraftHotel>) => void;
   onRemove: () => void;
+  /** This stay is finished — the card closes and the next one opens. */
+  onDone?: () => void;
   onRefresh: () => void;
 }) {
   const { t } = useTraveliunUI();
@@ -211,32 +215,7 @@ export function StayCard({
               is a quote we were given; typing over it would produce a number no
               supplier ever agreed to. */}
           {!line.sourcing ? (
-            <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px]">
-              <label className={rowLabelClass}>
-                {t("pg.manualPrice")} — للإقامة كاملة
-                <input
-                  type="number"
-                  min={0}
-                  dir="ltr"
-                  value={line.manual_price ?? ""}
-                  onChange={(e) => onSetHotel({ manual_price: e.target.value === "" ? null : Number(e.target.value) })}
-                  className={`${fieldClass} tv-tnum text-center`}
-                  placeholder="0"
-                />
-              </label>
-              <label className={rowLabelClass}>
-                {t("pg.currencyCol")}
-                <select
-                  value={line.manual_currency}
-                  onChange={(e) => onSetHotel({ manual_currency: e.target.value })}
-                  className={fieldClass}
-                >
-                  {CURRENCIES.map((code) => (
-                    <option key={code} value={code}>{code}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            <ManualPriceRow line={line} onSetHotel={onSetHotel} onSaved={onDone} />
           ) : null}
         </div>
       ) : null}
@@ -305,32 +284,7 @@ function ManualEntry({
         </label>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px]">
-        <label className={rowLabelClass}>
-          {t("pg.manualPrice")} — للإقامة كاملة
-          <input
-            type="number"
-            min={0}
-            dir="ltr"
-            value={line.manual_price ?? ""}
-            onChange={(e) => onSetHotel({ manual_price: e.target.value === "" ? null : Number(e.target.value) })}
-            className={`${fieldClass} tv-tnum text-center`}
-            placeholder="0"
-          />
-        </label>
-        <label className={rowLabelClass}>
-          {t("pg.currencyCol")}
-          <select
-            value={line.manual_currency}
-            onChange={(e) => onSetHotel({ manual_currency: e.target.value })}
-            className={fieldClass}
-          >
-            {CURRENCIES.map((code) => (
-              <option key={code} value={code}>{code}</option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <ManualPriceRow line={line} onSetHotel={onSetHotel} />
 
       <button
         type="button"

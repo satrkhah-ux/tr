@@ -109,6 +109,27 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
   });
   const coverage = hotelCoverage(derivedCities, lines);
 
+  /**
+   * One stay card open at a time, in programme order.
+   *
+   * Every line without a hotel name used to render its own picker, so a
+   * four-night two-hotel trip opened three search panels at once and the agent
+   * had no idea which one they were answering. The card being worked on is the
+   * one explicitly opened, or else the first stay still missing a hotel.
+   */
+  const orderedLines = coverage.flatMap((cov) => cov.stays.map((stay) => stay.line));
+  const firstUnnamed = orderedLines.find((l) => !l.hotel_name.trim())?.id ?? null;
+  const openLine = choosing ?? firstUnnamed;
+
+  /** Finished here — hand the screen to the next stay that still needs one. */
+  function handOver(lineId: string) {
+    const at = orderedLines.findIndex((l) => l.id === lineId);
+    const next = orderedLines.slice(at + 1).find((l) => !l.hotel_name.trim());
+    setChoosing(next ? next.id : null);
+    setEditing(null);
+    resetPicker();
+  }
+
   // reuse eligibility is DERIVED (no synchronous setState); the async load only
   // runs when eligible, and stale results are ignored via the `active` flag.
   const reuseEligible = Boolean(data.trip.country && data.trip.days > 0);
@@ -307,8 +328,7 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
           })),
         ),
       );
-      setChoosing(null);
-      resetPicker();
+      handOver(line.id);
       return;
     }
 
@@ -318,8 +338,7 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
     if (res.ok) {
       const fresh = await getDraft(draftId);
       if (fresh) replace(fresh.data);
-      setChoosing(null);
-      resetPicker();
+      handOver(line.id);
     } else {
       setError(t(res.error));
     }
@@ -489,7 +508,7 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
                           const roomTypeOptions = lookups.roomTypes.filter(
                             (rt) => rt.hotel_id === line.hotel_id || rt.hotel_id === null,
                           );
-                          const isChoosing = choosing === line.id || !line.hotel_name.trim();
+                          const isChoosing = openLine === line.id;
 
                           return (
                             <StayCard
@@ -549,6 +568,7 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
                               onSetLine={(next) => setLine(line.id, next)}
                               onSetHotel={(slice) => setHotel(line.id, slice)}
                               onRemove={() => removeStay(line.id)}
+                              onDone={() => handOver(line.id)}
                               onRefresh={() => {
                                 setChoosing(line.id);
                                 resetPicker();
