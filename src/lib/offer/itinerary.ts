@@ -13,6 +13,7 @@
 import {
   deriveCityDates,
   TRANSPORT_MODE_AR,
+  vehicleText,
   type DraftCity,
   type DraftData,
   type DraftDay,
@@ -174,17 +175,19 @@ export function transportNoteForDay(
 
   if (plan.airport.enabled && (first || last)) {
     const label = first ? "استقبال من المطار إلى الفندق" : "توديع من الفندق إلى المطار";
-    parts.push(plan.airport.car_type ? `${label} — ${plan.airport.car_type}` : label);
+    const car = vehicleText(plan.airport);
+    parts.push(car ? `${label} — ${car}` : label);
   }
 
   // A day the group changes city is a travel day, not a touring day; saying
   // both would put two vehicles on one line and invite the question.
   if (plan.intercity.enabled && cityChanged) {
-    const how = plan.intercity.car_type || TRANSPORT_MODE_AR[plan.intercity.mode];
+    const how = vehicleText(plan.intercity, TRANSPORT_MODE_AR[plan.intercity.mode]);
     parts.push(`الانتقال إلى ${day.city_name} — ${how}`);
   } else if (plan.tours.enabled && !first && !last) {
     const label = "سيارة الجولات";
-    parts.push(plan.tours.car_type ? `${label} — ${plan.tours.car_type}` : label);
+    const car = vehicleText(plan.tours);
+    parts.push(car ? `${label} — ${car}` : label);
   }
 
   return parts.length > 0 ? parts.join(" · ") : null;

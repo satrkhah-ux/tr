@@ -57,3 +57,10 @@ temp/
 
 # TBO certification pack — real request/response logs with guest details
 tbo-certification/
+
+# Generated from the legacy dump: 2,400 hotels with addresses and phone
+# numbers, and — the reason this line exists — the agency's BUY prices and
+# margins on every service, transfer and tour. This repository is public.
+# Regenerate it instead: node scripts/legacy-extract-reference.mjs
+#                       node scripts/legacy-build-reference-sql.mjs
+scripts/legacy-import-app-reference.sql

@@ -1,34 +1,38 @@
 "use client";
 
-import { Check, Minus, Plane, BedDouble, StickyNote, Car } from "lucide-react";
+import { Check, Minus, Plane, PlaneTakeoff, BedDouble, StickyNote, Car, ConciergeBell, Camera } from "lucide-react";
 import { SCOPE_KEYS, SCOPE_LABEL_KEYS, type DraftScope } from "@/lib/offer/draft-types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { sectionClass, type StageFormProps } from "../stage-props";
 
 /**
- * Stage 1 — «خدمات هذا العرض».
+ * «البرنامج يشمل» — asked FIRST, deliberately.
  *
- * It was a block near the bottom of the customer stage, which had the order
- * backwards: these four switches decide WHICH STAGES EXIST. An agent used to
- * fill in the customer, walk into «الطيران», and only then learn the offer was
- * never meant to include flights — or worse, not notice and price a leg the
- * client never asked for.
+ * These switches decide WHICH STAGES EXIST. An agent used to fill in the
+ * customer, walk into «الطيران», and only then learn the offer was never meant
+ * to include flights — or worse, not notice and price a leg the client never
+ * asked for.
  *
- * Asked first, the wizard that follows is already the right shape: turn a
- * service off and its stage disappears from the bar above.
+ * «الجولات» is the odd one out and on purpose: it is not a scope key but the
+ * tours vehicle leg itself (transport_plan.tours.enabled). One fact, one place
+ * — a separate boolean beside it could disagree with it, and then neither the
+ * agent nor the document would know which one the client bought.
  */
 
 const SCOPE_ICON: Record<keyof DraftScope, typeof Plane> = {
-  flights: Plane,
   hotels: BedDouble,
-  visas: StickyNote,
+  flights_intl: Plane,
+  flights_domestic: PlaneTakeoff,
   transport: Car,
+  services: ConciergeBell,
+  visas: StickyNote,
 };
 
 export function ScopeStage({ data, patch }: StageFormProps) {
   const { t } = useTraveliunUI();
   const scope = data.scope;
-  const on = SCOPE_KEYS.filter((key) => scope[key]).length;
+  const tours = data.transport_plan.tours.enabled;
+  const on = SCOPE_KEYS.filter((key) => scope[key]).length + (tours ? 1 : 0);
 
   return (
     <section className={sectionClass}>
@@ -36,38 +40,28 @@ export function ScopeStage({ data, patch }: StageFormProps) {
       <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("pg.scopeStageHint")}</p>
 
       <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-        {SCOPE_KEYS.map((key) => {
-          const active = scope[key];
-          const Icon = SCOPE_ICON[key];
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => patch({ scope: { ...scope, [key]: !active } })}
-              aria-pressed={active}
-              className={`flex items-center gap-3 rounded-[13px] border p-4 text-start transition-colors ${
-                active
-                  ? "border-[#185045] bg-[#185045] text-white"
-                  : "border-[#dbe6e1] bg-white text-[#93aaa3] hover:bg-[#f4f8f6]"
-              }`}
-            >
-              <Icon className="size-6 shrink-0" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[14px] font-extrabold">{t(SCOPE_LABEL_KEYS[key])}</span>
-                <span className={`block text-[11px] font-bold ${active ? "text-[#8fe3c4]" : "text-[#b6c9c2]"}`}>
-                  {t(active ? "pg.scope.included" : "pg.scope.excluded")}
-                </span>
-              </span>
-              <span
-                className={`flex size-6 shrink-0 items-center justify-center rounded-full ${
-                  active ? "bg-white/20" : "bg-[#eef4f1]"
-                }`}
-              >
-                {active ? <Check className="size-3.5" /> : <Minus className="size-3.5" />}
-              </span>
-            </button>
-          );
-        })}
+        {SCOPE_KEYS.map((key) => (
+          <ScopeTile
+            key={key}
+            icon={SCOPE_ICON[key]}
+            label={t(SCOPE_LABEL_KEYS[key])}
+            active={scope[key]}
+            onToggle={() => patch({ scope: { ...scope, [key]: !scope[key] } })}
+          />
+        ))}
+        <ScopeTile
+          icon={Camera}
+          label={t("pg.scope.tours")}
+          active={tours}
+          onToggle={() =>
+            patch({
+              transport_plan: {
+                ...data.transport_plan,
+                tours: { ...data.transport_plan.tours, enabled: !tours },
+              },
+            })
+          }
+        />
       </div>
 
       {/* Turning everything off leaves a wizard with nothing in it. Said here
@@ -79,5 +73,46 @@ export function ScopeStage({ data, patch }: StageFormProps) {
         </p>
       ) : null}
     </section>
+  );
+}
+
+function ScopeTile({
+  icon: Icon,
+  label,
+  active,
+  onToggle,
+}: {
+  icon: typeof Plane;
+  label: string;
+  active: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useTraveliunUI();
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={active}
+      className={`flex items-center gap-3 rounded-[13px] border p-4 text-start transition-colors ${
+        active
+          ? "border-[#185045] bg-[#185045] text-white"
+          : "border-[#dbe6e1] bg-white text-[#93aaa3] hover:bg-[#f4f8f6]"
+      }`}
+    >
+      <Icon className="size-6 shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14px] font-extrabold">{label}</span>
+        <span className={`block text-[11px] font-bold ${active ? "text-[#8fe3c4]" : "text-[#b6c9c2]"}`}>
+          {t(active ? "pg.scope.included" : "pg.scope.excluded")}
+        </span>
+      </span>
+      <span
+        className={`flex size-6 shrink-0 items-center justify-center rounded-full ${
+          active ? "bg-white/20" : "bg-[#eef4f1]"
+        }`}
+      >
+        {active ? <Check className="size-3.5" /> : <Minus className="size-3.5" />}
+      </span>
+    </button>
   );
 }

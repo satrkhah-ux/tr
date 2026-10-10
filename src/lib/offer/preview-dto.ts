@@ -16,7 +16,14 @@
 import { partnerBrand, type DocBrand } from "@/components/offer-doc/brand";
 import type { BoardType } from "@/lib/types";
 import type { ClientOfferDTO } from "./dto";
-import { deriveCityDates, matchPartner, type DraftData, type GeneratorLookups } from "./draft-types";
+import {
+  baggageLabel,
+  deriveCityDates,
+  matchPartner,
+  mealPlanIncludeLine,
+  type DraftData,
+  type GeneratorLookups,
+} from "./draft-types";
 import { itineraryStartDate } from "./schedule";
 import type { ExtractedPackage, RepackageData } from "@/lib/repackage/repackage-types";
 
@@ -133,7 +140,7 @@ export function draftToPreviewOffer(
       departure_at: f.departure_at,
       arrival_at: f.arrival_at,
       cabin_class: f.cabin_class || null,
-      baggage_allowance: f.baggage_allowance || null,
+      baggage_allowance: baggageLabel(f) || null,
       leg_order: f.leg_order,
       sell_price: null,
       sell_currency: null,
@@ -142,7 +149,12 @@ export function draftToPreviewOffer(
       .map((t) => [t.from_place, t.to_place].filter(Boolean).join(" → ") + (t.car_type ? ` — ${t.car_type}` : ""))
       .filter((line) => line.trim().length > 1),
     visas: data.visas.map((v) => [v.country, v.visa_type].filter(Boolean).join(" — ")).filter(Boolean),
-    includes: data.services.includes,
+    // The meal plan is stated the same way the produced offer states it, so
+    // the agent is previewing the paper rather than something close to it.
+    includes: [
+      ...data.services.includes,
+      ...(mealPlanIncludeLine(data.trip) ? [mealPlanIncludeLine(data.trip)!] : []),
+    ],
     excludes: data.services.excludes,
     terms: data.services.terms,
     days: data.days

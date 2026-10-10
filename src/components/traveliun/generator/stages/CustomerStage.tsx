@@ -7,16 +7,18 @@ import { searchCustomersFromTeletel, type TeletelCustomerHit } from "@/lib/data/
 import {
   AGE_BANDS,
   clampAge,
-  BOARD_LABEL_KEYS,
-  BOARD_TYPES,
+  inheritBoard,
+  inheritRoomType,
   matchPartner,
+  MEAL_PLANS,
+  MEAL_PLAN_BOARD,
+  MEAL_PLAN_LABEL_KEYS,
+  resizeRooms,
   resizeAges,
   roomTypeNames,
-  type DraftHotel,
+  type MealPlan,
 } from "@/lib/offer/draft-types";
-import type { BoardType } from "@/lib/types";
 import { FieldIssue, useFieldRing } from "../FieldIssue";
-import { TransportBlock } from "../TransportBlock";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass, labelClass, sectionClass, type StageFormProps } from "../stage-props";
 
@@ -191,11 +193,9 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
       </div>
 
       <TravelersBlock data={data} patch={patch} />
-      {/* Transport lives HERE now — the vehicle is decided while the group is
-          being described, not in a stage three clicks later. */}
-      {data.scope.transport ? (
-        <TransportBlock plan={data.transport_plan} onChange={(transport_plan) => patch({ transport_plan })} />
-      ) : null}
+      {/* Transport moved to the TRIP card: the vehicle is decided once the
+          dates and the cities are known, and the car count belongs beside the
+          journey it carries rather than beside the client's phone number. */}
       <RoomsBlock data={data} patch={patch} lookups={lookups} />
     </section>
   );
@@ -398,41 +398,49 @@ function AgeField({
 }
 
 /**
- * Room defaults, entered once here and inherited by every city.
+ * Room and meal defaults, entered once here and inherited by every city.
  *
- * Changing a default re-applies it ONLY to hotel lines that still carry the old
- * one. A city where the agent deliberately booked an extra room (the driver's,
- * which is never labelled as such) keeps its own number.
+ * Changing a default re-applies it only to the ROOMS that still carry the old
+ * one. A city where the agent deliberately booked a different second room (the
+ * driver's, which is never labelled as such) keeps it, while its first room
+ * still follows the trip. Value equality is the flag — there is nothing to
+ * mark dirty and nothing to get out of step.
  */
 function RoomsBlock({ data, patch, lookups }: Pick<StageFormProps, "data" | "patch" | "lookups">) {
   const { t } = useTraveliunUI();
   const trip = data.trip;
 
-  function applyDefault<K extends "rooms_count" | "room_type_name" | "board_type">(
-    field: K,
-    oldValue: DraftHotel[K],
-    newValue: DraftHotel[K],
-    extra?: Partial<DraftHotel>,
-  ) {
-    return data.hotels.map((h) => (h[field] === oldValue ? { ...h, [field]: newValue, ...extra } : h));
-  }
-
   function setRooms(raw: number) {
     const rooms = Math.max(Math.trunc(raw) || 1, 1);
-    patch({ trip: { ...trip, rooms }, hotels: applyDefault("rooms_count", trip.rooms, rooms) });
+    patch({
+      trip: { ...trip, rooms },
+      // A count is a LINE fact, so the guard stays at line level — and it goes
+      // through resizeRooms, which keeps rooms[] and rooms_count in step.
+      // Writing the mirror alone used to publish three rooms of one type.
+      hotels: data.hotels.map((h) => (h.rooms_count === trip.rooms ? resizeRooms(h, rooms) : h)),
+    });
   }
 
   /** A NAME — the id is per-hotel and gets resolved once a hotel is picked. */
   function setRoomType(name: string) {
     patch({
       trip: { ...trip, default_room_type_name: name },
-      hotels: applyDefault("room_type_name", trip.default_room_type_name, name, { room_type_id: null }),
+      hotels: data.hotels.map((h) => inheritRoomType(h, trip.default_room_type_name, name)),
     });
   }
 
-  function setBoard(value: string) {
-    const board = value === "" ? null : (value as BoardType);
-    patch({ trip: { ...trip, default_board: board }, hotels: applyDefault("board_type", trip.default_board, board) });
+  /**
+   * The meal plan is the question the client is actually asked, and the board
+   * is the same answer in the suppliers' and the database's vocabulary. One
+   * deriver, one direction — the board is never typed.
+   */
+  function setMealPlan(value: string) {
+    const plan = value === "" ? null : (value as MealPlan);
+    const board = plan ? MEAL_PLAN_BOARD[plan] : null;
+    patch({
+      trip: { ...trip, meal_plan: plan, default_board: board },
+      hotels: data.hotels.map((h) => inheritBoard(h, trip.default_board, board)),
+    });
   }
 
   return (
@@ -465,16 +473,21 @@ function RoomsBlock({ data, patch, lookups }: Pick<StageFormProps, "data" | "pat
           </select>
         </label>
         <label className={smallLabelClass}>
-          {t("pg.board")}
-          <select value={trip.default_board ?? ""} onChange={(e) => setBoard(e.target.value)} className={fieldClass}>
+          {t("pg.meals")}
+          <select value={trip.meal_plan ?? ""} onChange={(e) => setMealPlan(e.target.value)} className={fieldClass}>
             <option value="">{t("pg.chooseBoard")}</option>
-            {BOARD_TYPES.map((b) => (
-              <option key={b} value={b}>{t(BOARD_LABEL_KEYS[b])}</option>
+            {MEAL_PLANS.map((plan) => (
+              <option key={plan} value={plan}>{t(MEAL_PLAN_LABEL_KEYS[plan])}</option>
             ))}
           </select>
         </label>
       </div>
+      {/* Said once, here, rather than discovered on the document: the five
+          answers do not map one-to-one onto the five board codes a supplier
+          understands, and the agent should know which half is which. */}
+      {trip.meal_plan === "lunch" || trip.meal_plan === "dinner" ? (
+        <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.mealsHint")}</p>
+      ) : null}
     </div>
   );
 }
-

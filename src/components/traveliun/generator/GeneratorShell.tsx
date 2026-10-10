@@ -28,39 +28,12 @@ import {
 import { validateDraft, type DraftIssue, type StageStatus } from "@/lib/offer/draft-validation";
 import { useRole } from "@/lib/roles/RoleContext";
 import { FieldIssueProvider, fieldAnchorId } from "./FieldIssue";
-import { NightsIndicator } from "./NightsIndicator";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
 import { draftBrand, draftToPreviewOffer } from "@/lib/offer/preview-dto";
-import type { StageFormProps } from "./stage-props";
-import { ScopeStage } from "./stages/ScopeStage";
-import { CustomerStage } from "./stages/CustomerStage";
-import { TripStage } from "./stages/TripStage";
-import { CitiesStage } from "./stages/CitiesStage";
-import { HotelsStage } from "./stages/HotelsStage";
-import { FlightsStage } from "./stages/FlightsStage";
-import { ServicesStage } from "./stages/ServicesStage";
-import { VisasStage } from "./stages/VisasStage";
-import { ItineraryStage } from "./stages/ItineraryStage";
-import { PricingStage } from "./stages/PricingStage";
-import { PreviewStage } from "./stages/PreviewStage";
-
-const STAGE_FORMS: Record<StageKey, (props: StageFormProps) => React.ReactNode> = {
-  scope: ScopeStage,
-  customer: CustomerStage,
-  trip: TripStage,
-  cities: CitiesStage,
-  hotels: HotelsStage,
-  flights: FlightsStage,
-  services: ServicesStage,
-  visas: VisasStage,
-  itinerary: ItineraryStage,
-  pricing: PricingStage,
-  preview: PreviewStage,
-};
-
-type SaveState = "idle" | "saving" | "saved" | "error";
+import { STAGE_FORMS } from "./stage-forms";
+import { useDraftState } from "./useDraftState";
 
 /**
  * Shared chrome for every /package-generator/[draftId]/* page:
@@ -83,43 +56,8 @@ export function GeneratorShell({
   const { can } = useRole();
   const canPricing = can("pricing.view");
 
-  const [data, setData] = useState<DraftData>(initialData);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const { data, patch, replace, flush, saveState } = useDraftState(draftId, initialData);
   const [previewOpen, setPreviewOpen] = useState(true);
-  const pendingRef = useRef<Partial<DraftData>>({});
-  const timerRef = useRef<number | null>(null);
-
-  const flush = useCallback(async () => {
-    const slice = pendingRef.current;
-    pendingRef.current = {};
-    if (Object.keys(slice).length === 0) return;
-    setSaveState("saving");
-    const result = await saveDraftStages(draftId, slice);
-    setSaveState(result.ok ? "saved" : "error");
-  }, [draftId]);
-
-  const patch = useCallback(
-    (slice: Partial<DraftData>) => {
-      setData((current) => ({ ...current, ...slice }));
-      pendingRef.current = { ...pendingRef.current, ...slice };
-      if (timerRef.current) window.clearTimeout(timerRef.current);
-      timerRef.current = window.setTimeout(() => void flush(), 700);
-    },
-    [flush],
-  );
-
-  const replace = useCallback((next: DraftData) => {
-    pendingRef.current = {};
-    setData(next);
-  }, []);
-
-  // never lose pending work on unmount / stage navigation
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) window.clearTimeout(timerRef.current);
-      void flush();
-    };
-  }, [flush]);
 
   // Issues that belong to permission-gated stages are hidden from roles without
   // access — a visitor must see NO trace of the pricing stage anywhere.
@@ -135,12 +73,12 @@ export function GeneratorShell({
     };
   }, [data, canPricing]);
   const visibleStages = useMemo(() => visibleStagesFor(data.scope, canPricing), [data.scope, canPricing]);
-  // The cities stage renders its own indicator directly under the last city —
-  // where the numbers are actually being typed. The rail keeps it for hotels.
-  const showNights = stage === "hotels";
+  // «الفنادق» has no chip of its own any more — the stays live inside their
+  // city. A /hotels deep link still renders, under the city card's chip.
+  const railStage: StageKey = stage === "hotels" ? "cities" : stage;
 
   // Linear position drives the mobile prev/next bar and the "step N of M" chip.
-  const stageIndex = visibleStages.findIndex((s) => s.key === stage);
+  const stageIndex = visibleStages.findIndex((s) => s.key === railStage);
   const prevStage = stageIndex > 0 ? visibleStages[stageIndex - 1] : null;
   const nextStage = stageIndex >= 0 && stageIndex < visibleStages.length - 1 ? visibleStages[stageIndex + 1] : null;
 
@@ -257,15 +195,6 @@ export function GeneratorShell({
               it — on mobile it still drops below the form (order-2) so the
               agent lands straight on the inputs. */}
           <aside className="order-2 space-y-4">
-            {/* nights indicator — hotels stage only (cities renders its own) */}
-            {showNights ? (
-              <NightsIndicator
-                used={validation.nights.used}
-                total={validation.nights.total}
-                match={validation.nights.match}
-              />
-            ) : null}
-
             {/* «فحص العرض» — the FINAL check, and only there.
                 On a working stage it now duplicates what the form already says
                 under each box, and a list on the far side of the screen was the
@@ -329,7 +258,7 @@ export function GeneratorShell({
                 blocking error — an agent typing does not care which bucket we
                 filed it under, only that this box is wrong. */}
             <FieldIssueProvider issues={[...validation.blocking, ...validation.warnings]} render={issueText}>
-              <StageForm draftId={draftId} data={data} patch={patch} replace={replace} lookups={lookups} />
+              <StageForm draftId={draftId} data={data} patch={patch} replace={replace} flush={flush} lookups={lookups} />
             </FieldIssueProvider>
 
             {/* MOBILE prev/next — the primary way to move through the wizard on a

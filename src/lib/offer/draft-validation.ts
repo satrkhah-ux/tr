@@ -13,8 +13,7 @@ import {
   hotelCoverage,
   pricingRefFor,
   totalCityNights,
-  SCOPE_KEYS,
-  SCOPE_STAGE,
+  STAGE_SCOPE,
   type DraftData,
   type StageKey,
 } from "./draft-types";
@@ -206,7 +205,7 @@ export function validateDraft(data: DraftData): DraftValidation {
     if (!data.customer.customer_name.trim()) warnings.push({ severity: "warning", stage: "customer", field: "customer.customer_name", key: "pg.warn.noName" });
     if (!data.customer.customer_phone.trim()) warnings.push({ severity: "warning", stage: "customer", field: "customer.customer_phone", key: "pg.warn.noPhone" });
   }
-  if (data.scope.flights && data.flights.length === 0) {
+  if (data.flights.length === 0) {
     warnings.push({ severity: "warning", stage: "flights", field: "flights", key: "pg.warn.noFlights" });
   }
 
@@ -234,7 +233,12 @@ export function validateDraft(data: DraftData): DraftValidation {
     }
   }
 
-  if (data.services.includes.length === 0) warnings.push({ severity: "warning", stage: "services", field: "services.includes", key: "pg.warn.noServices" });
+  // The ONE thing the «الخدمات» switch does: a sale that includes no ground
+  // services stops being nagged to list them. The stage itself stays — it
+  // holds the «لا يشمل» list, which every document prints.
+  if (data.scope.services && data.services.includes.length === 0) {
+    warnings.push({ severity: "warning", stage: "services", field: "services.includes", key: "pg.warn.noServices" });
+  }
 
   // ---- ready-made company package («العروض الجاهزة») ----
   // Its price is fixed by management and carried in pricing.final_total instead
@@ -248,12 +252,13 @@ export function validateDraft(data: DraftData): DraftValidation {
     warnings.push({ severity: "warning", stage: "pricing", field: "pricing", key: "pg.warn.noPricing" });
   }
 
+
   // ONE gate for scope, rather than a guard on every push above: a stage the sale
   // excludes is hidden from the rail, so an issue pointing at it would be an
   // unfixable blocker — the agent cannot open the page to resolve it.
   const inScope = (issue: DraftIssue) => {
-    const key = SCOPE_KEYS.find((k) => SCOPE_STAGE[k] === issue.stage);
-    return key ? data.scope[key] : true;
+    const keys = STAGE_SCOPE[issue.stage];
+    return keys ? keys.some((k) => data.scope[k]) : true;
   };
   const scopedBlocking = blocking.filter(inScope);
 
@@ -317,14 +322,30 @@ function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey
     // Naming the partner company completes the stage on its own.
     customer: status(customerTouched, isCompanySale(data) || Boolean(data.customer.customer_name.trim()), "customer"),
     trip: status(tripTouched, tripComplete, "trip"),
-    cities: status(data.cities.length > 0, data.cities.length > 0 && used === data.trip.nights && data.trip.nights > 0, "cities"),
+    // «المدن والفنادق» is ONE card now, so it has to answer for both: a hotel
+    // blocker used to sit on a chip of its own, and folding the cards without
+    // folding the status would show a green tick over an offer that cannot be
+    // produced.
+    cities:
+      (hasBlocking("cities") || hasBlocking("hotels")) && data.cities.length > 0
+        ? "error"
+        : status(
+            data.cities.length > 0,
+            data.cities.length > 0 &&
+              used === data.trip.nights &&
+              data.trip.nights > 0 &&
+              (!data.scope.hotels || hotelsComplete),
+            "cities",
+          ),
     hotels: status(data.hotels.length > 0, hotelsComplete, "hotels"),
     flights: status(data.flights.length > 0, data.flights.length > 0, "flights"),
     services: status(
-      data.services.includes.length + data.services.excludes.length + data.services.terms.length > 0,
+      data.services.includes.length + data.services.excludes.length > 0,
       data.services.includes.length > 0,
       "services",
     ),
+    // Terms never block and never warn — an offer may legitimately carry none.
+    terms: data.services.terms.length > 0 ? "complete" : "empty",
     visas: status(data.visas.length > 0, data.visas.length > 0, "visas"),
     // The daily program is OPTIONAL — it never blocks publishing. A day counts
     // as written only when it has a title; a bare skeleton is still "empty".

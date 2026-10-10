@@ -84,6 +84,20 @@ const CONFIGS: TableConfig[] = [
     defaultSort: { column: "arabic_name", ascending: true },
   },
   {
+    // The catalogue «أنواع الخدمات» was a ten-row static scrape until the
+    // legacy import filled it; the prices per country live in /services.
+    route: "/services-types", table: "service_types", titleKey: "nav.serviceTypes",
+    columns: [
+      { key: "arabic_name", labelKey: "col.arabicName", minWidth: "260px" },
+      { key: "english_name", labelKey: "col.englishName", minWidth: "260px" },
+      { key: "needs_quote", labelKey: "col.needsQuote" },
+      { key: "sort", labelKey: "col.sort", type: "number" },
+      { key: "status", labelKey: "col.status", type: "status" },
+    ],
+    searchable: ["arabic_name", "english_name"],
+    defaultSort: { column: "sort", ascending: true },
+  },
+  {
     route: "/services", table: "services", titleKey: "nav.services",
     columns: [
       { key: "arabic_name", labelKey: "col.arabicName" },

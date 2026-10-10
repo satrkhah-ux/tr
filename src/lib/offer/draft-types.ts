@@ -19,9 +19,13 @@ export const STAGE_KEYS = [
   "customer",
   "trip",
   "cities",
+  // «الفنادق» no longer has a card of its own — the stays are edited inside
+  // their city. The KEY stays: issues are still attributed to it, invariants
+  // still name it, and /hotels deep links still have to land somewhere.
   "hotels",
   "flights",
   "services",
+  "terms",
   "visas",
   "itinerary",
   "pricing",
@@ -41,10 +45,12 @@ export const STAGES: StageMeta[] = [
   { key: "scope", labelKey: "pg.stage.scope" },
   { key: "customer", labelKey: "pg.stage.customer" },
   { key: "trip", labelKey: "pg.stage.trip" },
+  // No `hotels` entry on purpose: the stays live inside the city card, so a
+  // separate chip would point at a screen the agent has already filled in.
   { key: "cities", labelKey: "pg.stage.cities" },
-  { key: "hotels", labelKey: "pg.stage.hotels" },
   { key: "flights", labelKey: "pg.stage.flights" },
   { key: "services", labelKey: "pg.stage.services" },
+  { key: "terms", labelKey: "pg.stage.terms" },
   { key: "visas", labelKey: "pg.stage.visas" },
   { key: "itinerary", labelKey: "pg.stage.itinerary" },
   { key: "pricing", labelKey: "pg.stage.pricing", gated: true },
@@ -53,6 +59,16 @@ export const STAGES: StageMeta[] = [
 
 export function stageHref(draftId: string, stage: StageKey): string {
   return `/package-generator/${draftId}/${stage}`;
+}
+
+/**
+ * Where "open this draft" goes — the card flow.
+ *
+ * Every caller used to pick its own entry stage, and they disagreed: creating
+ * landed on «الخدمات», duplicating and continuing on «العميل». One address.
+ */
+export function draftHref(draftId: string): string {
+  return `/package-generator/${draftId}`;
 }
 
 /**
@@ -65,8 +81,11 @@ export function stageHref(draftId: string, stage: StageKey): string {
 export function visibleStagesFor(scope: DraftScope, canPricing: boolean): StageMeta[] {
   return STAGES.filter((s) => {
     if (s.gated && !canPricing) return false;
-    const switchKey = SCOPE_KEYS.find((k) => SCOPE_STAGE[k] === s.key);
-    return switchKey ? scope[switchKey] : true;
+    const keys = STAGE_SCOPE[s.key];
+    // A stage lives while ANY of its switches is on — «الطيران» is governed by
+    // two of them now, and a file with the international leg off and a
+    // domestic hop on must keep the stage that holds that hop.
+    return keys ? keys.some((k) => scope[k]) : true;
   });
 }
 
@@ -136,8 +155,91 @@ export type DraftTrip = {
    * resolves that to the picked hotel's own row when it has one.
    */
   default_room_type_name: string;
+  /**
+   * The same answer as `meal_plan`, in the suppliers' and the database's
+   * vocabulary. DERIVED from it on write, never typed — the hotel rows need a
+   * real BoardType for validation and for the per-stay line on the document.
+   */
   default_board: BoardType | null;
+  /**
+   * What the client is fed, as the client is asked it: «غداء» and «عشاء» are
+   * different answers, and BoardType cannot tell them apart. Null on a draft
+   * saved before the question existed.
+   */
+  meal_plan: MealPlan | null;
+  /**
+   * Trip-wide flight baggage, typed once and copied into every NEW leg.
+   *
+   * International and domestic are separate because they genuinely differ: a
+   * 30 kg international ticket routinely allows 20 on the domestic hop, and one
+   * pair of numbers meant correcting every internal row by hand.
+   */
+  baggage_intl_pieces: number | null;
+  baggage_intl_kg: number | null;
+  baggage_intl_cabin_kg: number | null;
+  baggage_dom_pieces: number | null;
+  baggage_dom_kg: number | null;
+  baggage_dom_cabin_kg: number | null;
 };
+
+/** «الوجبات» — the five answers an agent is actually given on the phone. */
+export type MealPlan = "none" | "breakfast" | "lunch" | "dinner" | "all";
+
+export const MEAL_PLANS: MealPlan[] = ["none", "breakfast", "lunch", "dinner", "all"];
+
+/**
+ * The board a meal plan BOOKS as.
+ *
+ * Lunch and dinner both book HB: the CHECK on offer_hotels.board_type admits
+ * five codes and not one of them can say WHICH meal. So the exact word travels
+ * in the free-text meals column and in the «يشمل» line instead of in the enum.
+ */
+export const MEAL_PLAN_BOARD: Record<MealPlan, BoardType> = {
+  none: "RO",
+  breakfast: "BB",
+  lunch: "HB",
+  dinner: "HB",
+  all: "FB",
+};
+
+/** Document wording — Arabic in the module, like TRANSPORT_MODE_AR. */
+export const MEAL_PLAN_AR: Record<MealPlan, string> = {
+  none: "بدون وجبات",
+  breakfast: "إفطار فقط",
+  lunch: "غداء",
+  dinner: "عشاء",
+  all: "كل الوجبات",
+};
+
+export const MEAL_PLAN_LABEL_KEYS: Record<MealPlan, TranslationKey> = {
+  none: "pg.meals.none",
+  breakfast: "pg.meals.breakfast",
+  lunch: "pg.meals.lunch",
+  dinner: "pg.meals.dinner",
+  all: "pg.meals.all",
+};
+
+/**
+ * An old draft answered this question as a BOARD. Read back only what is
+ * unambiguous — «HB» stays unanswered, because it is either meal and guessing
+ * one would promise the client a lunch nobody bought.
+ */
+const BOARD_MEAL_PLAN: Partial<Record<BoardType, MealPlan>> = {
+  RO: "none",
+  BB: "breakfast",
+  FB: "all",
+  AI: "all",
+};
+
+/**
+ * The «يشمل» line that states the meals — the ONLY way the exact word reaches
+ * the client, because the document prints board codes and never reads
+ * offer_cities.meals.
+ */
+export function mealPlanIncludeLine(trip: Pick<DraftTrip, "meal_plan">): string | null {
+  if (!trip.meal_plan || trip.meal_plan === "none") return null;
+  return `الوجبات: ${MEAL_PLAN_AR[trip.meal_plan]}`;
+}
 
 /** Distinct room-type names across all hotels — what a trip-wide default offers. */
 export function roomTypeNames(roomTypes: LookupRoomType[]): string[] {
@@ -159,34 +261,49 @@ export function roomTypeNames(roomTypes: LookupRoomType[]): string[] {
  * the sale.
  */
 export type DraftScope = {
-  flights: boolean;
   hotels: boolean;
-  visas: boolean;
+  /** «الطيران الدولي» — the outbound and inbound legs. */
+  flights_intl: boolean;
+  /** «الطيران الداخلي» — the `internal` legs, a hop inside the destination. */
+  flights_domestic: boolean;
   transport: boolean;
+  /** «الخدمات» — whether this sale includes ground services at all. */
+  services: boolean;
+  visas: boolean;
 };
 
 /**
- * The stage each scope switch governs — where one exists.
+ * The switches that keep a stage in the rail — a stage lives while ANY of them
+ * is on.
  *
- * «المواصلات» deliberately has NO stage any more. How a group moves is three
- * answers about vehicles, not a table of journeys, so it lives with the
- * customer where it is decided and appears as a note on the day it happens.
- * Its switch still turns the whole subject off.
+ * «المواصلات» and «الخدمات» map to NOTHING on purpose. Transport has no stage:
+ * how a group moves is three answers about vehicles, not a table of journeys,
+ * so it lives on the trip card and appears as a note on the day it happens.
+ * And the services stage holds the «يشمل / لا يشمل» lists every document
+ * prints — hiding it would publish an offer that promises nothing.
  */
-export const SCOPE_STAGE: Partial<Record<keyof DraftScope, StageKey>> = {
-  flights: "flights",
-  hotels: "hotels",
-  visas: "visas",
+export const STAGE_SCOPE: Partial<Record<StageKey, (keyof DraftScope)[]>> = {
+  hotels: ["hotels"],
+  flights: ["flights_intl", "flights_domestic"],
+  visas: ["visas"],
 };
 
-export const SCOPE_KEYS: (keyof DraftScope)[] = ["flights", "hotels", "visas", "transport"];
+export const SCOPE_KEYS: (keyof DraftScope)[] = [
+  "hotels",
+  "flights_intl",
+  "flights_domestic",
+  "transport",
+  "services",
+  "visas",
+];
 
-/** A scope switch is named after the stage it turns on. */
 export const SCOPE_LABEL_KEYS: Record<keyof DraftScope, TranslationKey> = {
-  flights: "pg.stage.flights",
   hotels: "pg.stage.hotels",
-  visas: "pg.stage.visas",
+  flights_intl: "pg.scope.flightsIntl",
+  flights_domestic: "pg.scope.flightsDomestic",
   transport: "pg.stage.transport",
+  services: "pg.stage.services",
+  visas: "pg.stage.visas",
 };
 
 /**
@@ -353,6 +470,34 @@ export function withRooms(line: DraftHotel, rooms: DraftRoomSpec[]): DraftHotel 
   };
 }
 
+/**
+ * Re-apply a changed trip default to the rooms that still carry the old one.
+ *
+ * The rule, stated once: a room still holding the inherited value follows the
+ * default; a room the agent typed over keeps its own. There is no dirty flag —
+ * value equality IS the flag.
+ *
+ * Per ROOM, not per line: a city where the agent deliberately booked a second,
+ * different room (the driver's, which is never labelled as such) keeps it,
+ * while its first room still follows the trip.
+ */
+export function inheritRoomType(line: DraftHotel, from: string, to: string): DraftHotel {
+  return withRooms(
+    line,
+    line.rooms.map((r) =>
+      r.room_type_name === from ? { ...r, room_type_name: to, room_type_id: null } : r,
+    ),
+  );
+}
+
+/** Same, for the board — which now follows the trip's meal plan. */
+export function inheritBoard(line: DraftHotel, from: BoardType | null, to: BoardType | null): DraftHotel {
+  return withRooms(
+    line,
+    line.rooms.map((r) => (r.board_type === from ? { ...r, board_type: to } : r)),
+  );
+}
+
 /** Grow/shrink the rooms of a line, cloning the first room into any new slot. */
 export function resizeRooms(line: DraftHotel, count: number): DraftHotel {
   const n = Math.max(Math.trunc(count) || 1, 1);
@@ -438,6 +583,35 @@ export type DraftFlight = {
 };
 
 /**
+ * A new leg. Baggage starts from the trip defaults — the numbers were typed
+ * once on the trip card so they would not be retyped on every row.
+ *
+ * A COPY, not a live link: the agent then corrects one leg without the trip
+ * card rewriting the others behind their back.
+ */
+export function emptyFlight(legOrder: FlightLegOrder, trip?: DraftTrip): DraftFlight {
+  const dom = legOrder === "internal";
+  return {
+    airline: "",
+    airline_iata: "",
+    flight_no: "",
+    from_airport: "",
+    to_airport: "",
+    departure_at: null,
+    arrival_at: null,
+    from_tz: null,
+    to_tz: null,
+    date_user_set: false,
+    cabin_class: "",
+    baggage_allowance: "",
+    baggage_kg: (dom ? trip?.baggage_dom_kg : trip?.baggage_intl_kg) ?? null,
+    baggage_pieces: (dom ? trip?.baggage_dom_pieces : trip?.baggage_intl_pieces) ?? null,
+    cabin_baggage_kg: (dom ? trip?.baggage_dom_cabin_kg : trip?.baggage_intl_cabin_kg) ?? null,
+    leg_order: legOrder,
+  };
+}
+
+/**
  * A transport ROW as the document prints it. Derived now, not typed.
  * See TransportPlan — an agent answers three questions and these come out.
  */
@@ -468,6 +642,11 @@ export type TransportMode = "car" | "flight" | "train";
 export type TransportLeg = {
   enabled: boolean;
   car_type: string;
+  /**
+   * How many of that vehicle. Nine travellers are two vans, and «فان» on its
+   * own both priced and promised one.
+   */
+  cars: number;
   note: string;
 };
 
@@ -485,6 +664,20 @@ export const TRANSPORT_MODE_AR: Record<TransportMode, string> = {
   flight: "طيران داخلي",
   train: "قطار",
 };
+
+/**
+ * The vehicle as every reader prints it.
+ *
+ * The count rides INSIDE the car_type text on purpose: DraftTransport, the
+ * client DTO, the document's transport table, the produce-time «التوصيلات»
+ * line and the per-day note all already carry a car_type, and not one of them
+ * has to learn a new field.
+ */
+export function vehicleText(leg: TransportLeg, fallback = ""): string {
+  const base = leg.car_type.trim() || fallback;
+  if (!base) return "";
+  return leg.cars > 1 ? `${base} × ${leg.cars}` : base;
+}
 
 /**
  * The plan, turned into the rows the document already knows how to print.
@@ -507,14 +700,14 @@ export function deriveTransportRows(plan: TransportPlan, cities: { city_name: st
     rows.push({
       from_place: "المطار",
       to_place: first ? `فندق ${first}` : "الفندق",
-      car_type: plan.airport.car_type,
+      car_type: vehicleText(plan.airport),
       date: cities[0]?.check_in ?? null,
       note: plan.airport.note,
     });
     rows.push({
       from_place: last ? `فندق ${last}` : "الفندق",
       to_place: "المطار",
-      car_type: plan.airport.car_type,
+      car_type: vehicleText(plan.airport),
       date: null,
       note: plan.airport.note,
     });
@@ -524,7 +717,7 @@ export function deriveTransportRows(plan: TransportPlan, cities: { city_name: st
     rows.push({
       from_place: "الجولات السياحية",
       to_place: first ?? "",
-      car_type: plan.tours.car_type,
+      car_type: vehicleText(plan.tours),
       date: null,
       note: plan.tours.note,
     });
@@ -538,7 +731,7 @@ export function deriveTransportRows(plan: TransportPlan, cities: { city_name: st
       rows.push({
         from_place: from,
         to_place: to,
-        car_type: plan.intercity.car_type || TRANSPORT_MODE_AR[plan.intercity.mode],
+        car_type: vehicleText(plan.intercity, TRANSPORT_MODE_AR[plan.intercity.mode]),
         date: cities[i]?.check_in ?? null,
         note: plan.intercity.note,
       });
@@ -550,9 +743,9 @@ export function deriveTransportRows(plan: TransportPlan, cities: { city_name: st
 
 export function emptyTransportPlan(): TransportPlan {
   return {
-    airport: { enabled: true, car_type: "", note: "" },
-    tours: { enabled: true, car_type: "", note: "" },
-    intercity: { enabled: false, mode: "car", car_type: "", note: "" },
+    airport: { enabled: true, car_type: "", cars: 1, note: "" },
+    tours: { enabled: true, car_type: "", cars: 1, note: "" },
+    intercity: { enabled: false, mode: "car", car_type: "", cars: 1, note: "" },
   };
 }
 
@@ -685,10 +878,24 @@ export function emptyDraftData(): DraftData {
       rooms: 1,
       default_room_type_name: "",
       default_board: null,
+      meal_plan: null,
+      baggage_intl_pieces: null,
+      baggage_intl_kg: null,
+      baggage_intl_cabin_kg: null,
+      baggage_dom_pieces: null,
+      baggage_dom_kg: null,
+      baggage_dom_cabin_kg: null,
     },
     // Everything on by default: a new draft behaves exactly as it did before the
     // scope switches existed, and the agent opts OUT of what this sale excludes.
-    scope: { flights: true, hotels: true, visas: true, transport: true },
+    scope: {
+      hotels: true,
+      flights_intl: true,
+      flights_domestic: true,
+      transport: true,
+      services: true,
+      visas: true,
+    },
     cities: [],
     hotels: [],
     flights: [],
@@ -785,11 +992,18 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
   // switches default to ON so the derived rows keep saying roughly what the old
   // ones did, rather than the file silently losing its transfers.
   const plan = (source.transport_plan ?? {}) as Partial<TransportPlan>;
-  const transportPlan: TransportPlan = {
-    airport: { ...empty.transport_plan.airport, ...(plan.airport ?? {}) },
-    tours: { ...empty.transport_plan.tours, ...(plan.tours ?? {}) },
-    intercity: { ...empty.transport_plan.intercity, ...(plan.intercity ?? {}) },
+  // A leg saved before the count existed, or hand-edited to 0 or "2", still has
+  // to come back as at least one real vehicle.
+  const mergeLeg = <T extends TransportLeg>(base: T, incoming: Partial<T> | undefined): T => {
+    const merged = { ...base, ...(incoming ?? {}) };
+    return { ...merged, cars: Math.max(Math.trunc(Number(merged.cars)) || 1, 1) };
   };
+  const transportPlan: TransportPlan = {
+    airport: mergeLeg(empty.transport_plan.airport, plan.airport),
+    tours: mergeLeg(empty.transport_plan.tours, plan.tours),
+    intercity: mergeLeg(empty.transport_plan.intercity, plan.intercity),
+  };
+  const scope = normalizeScope(source.scope);
 
   return {
     customer: { ...empty.customer, ...(source.customer ?? {}) },
@@ -808,15 +1022,27 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
         clampAge("infants", a),
       ),
       rooms: Math.max(Math.trunc(Number(trip.rooms)) || 1, 1),
+      // A draft saved before the question existed answered it as a BOARD. Read
+      // back only what is unambiguous — HB is either meal, so it stays
+      // unanswered rather than promising a lunch nobody bought.
+      meal_plan: MEAL_PLANS.includes(trip.meal_plan as MealPlan)
+        ? (trip.meal_plan as MealPlan)
+        : trip.default_board
+          ? BOARD_MEAL_PLAN[trip.default_board] ?? null
+          : null,
     },
-    scope: normalizeScope(source.scope),
+    scope,
     cities,
     hotels: Array.isArray(source.hotels) ? source.hotels.map(normalizeDraftHotel) : [],
     flights: Array.isArray(source.flights) ? source.flights.map(normalizeDraftFlight) : [],
     transport_plan: transportPlan,
     // DERIVED, always. Rows are no longer authored, so a stale array from an
     // older draft is simply replaced by what the plan says today.
-    transport: deriveTransportRows(transportPlan, cities),
+    // A sale that excludes transport prints no transfers. The PLAN is kept —
+    // flip the switch back and the rows return — but leaving the rows derived
+    // meant the document still promised an airport pickup on a file whose
+    // transport switch was off.
+    transport: scope.transport ? deriveTransportRows(transportPlan, cities) : [],
     services: { ...empty.services, ...(source.services ?? {}) },
     visas: Array.isArray(source.visas) ? source.visas : [],
     days: normalizeDraftDays(source.days),
@@ -832,12 +1058,20 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
  * have them silently dropped from the document by a field added afterwards.
  */
 function normalizeScope(raw: unknown): DraftScope {
-  const s = (raw && typeof raw === "object" ? raw : {}) as Partial<DraftScope>;
+  const s = (raw && typeof raw === "object" ? raw : {}) as Partial<DraftScope> & { flights?: boolean };
+  // An old draft answered ONE question about flights. Both halves inherit that
+  // answer: the file may already carry an `internal` leg, and defaulting that
+  // half to false would hide a row the document still prints.
+  const legacyFlights = s.flights !== false;
   return {
-    flights: s.flights !== false,
     hotels: s.hotels !== false,
-    visas: s.visas !== false,
+    // `??`, not `!== false`: an ABSENT key inherits the old switch, while an
+    // explicit false is the agent's own answer and wins.
+    flights_intl: s.flights_intl ?? legacyFlights,
+    flights_domestic: s.flights_domestic ?? legacyFlights,
     transport: s.transport !== false,
+    services: s.services !== false,
+    visas: s.visas !== false,
   };
 }
 
@@ -1055,11 +1289,25 @@ export function findLookupCountry(countries: LookupCountry[], name: string): Loo
   return countries.find((c) => c.name === name) ?? countries.find((c) => fold(c.name) === target);
 }
 
+/**
+ * A vehicle the agency actually offers, from `transportation_types`.
+ *
+ * The capacity travels with the name because that is what the choice turns on:
+ * «فان» alone made an agent guess, and nine travellers in a seven-seater is
+ * discovered at the kerb.
+ */
+export type LookupCarType = {
+  name: string;
+  name_en: string | null;
+  pax: number | null;
+  luggage: number | null;
+};
+
 export type GeneratorLookups = {
   countries: LookupCountry[];
   roomTypes: LookupRoomType[];
   airports: LookupAirport[];
-  carTypes: string[];
+  carTypes: LookupCarType[];
   /** the admin-managed includes / excludes / terms lists. */
   termLibrary: TermLibrary;
   /**

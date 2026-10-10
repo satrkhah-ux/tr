@@ -1,10 +1,11 @@
 "use client";
 
-import { Clock } from "lucide-react";
+import { Clock, Luggage } from "lucide-react";
 import { deriveCityDates, findLookupCountry, type DraftTrip } from "@/lib/offer/draft-types";
 import { itineraryStartDate, syncDepartureDates } from "@/lib/offer/schedule";
 import { describeOffsetAr, offsetFromHome } from "@/lib/offer/timezones";
 import { FieldIssue, useFieldRing } from "../FieldIssue";
+import { TransportBlock } from "../TransportBlock";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass, labelClass, sectionClass, type StageFormProps } from "../stage-props";
 
@@ -196,6 +197,95 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
         </label>
       </div>
       <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.daysAuto")}</p>
+
+      {/* Transport belongs HERE, not with the customer: the vehicle and how
+          many of them follow from the dates and the cities, and the airport
+          pickup is a fact about the journey rather than about the client. */}
+      {data.scope.transport ? (
+        <div className="mt-5">
+          <TransportBlock
+            plan={data.transport_plan}
+            carTypes={lookups.carTypes}
+            onChange={(transport_plan) => patch({ transport_plan })}
+          />
+        </div>
+      ) : null}
+
+      {data.scope.flights_intl || data.scope.flights_domestic ? (
+        <BaggageBlock data={data} patch={patch} />
+      ) : null}
     </section>
+  );
+}
+
+/**
+ * Baggage, answered once for the whole trip.
+ *
+ * International and domestic are separate because they genuinely differ: a
+ * 30 kg international ticket routinely allows 20 on the domestic hop. Every NEW
+ * flight row copies these numbers; correcting one leg afterwards keeps the
+ * agent's own number, because the row holds a copy and not a live link.
+ */
+function BaggageBlock({ data, patch }: Pick<StageFormProps, "data" | "patch">) {
+  const { t } = useTraveliunUI();
+  const trip = data.trip;
+
+  function set(field: keyof DraftTrip, raw: string) {
+    const value = raw.trim() === "" ? null : Math.max(Number(raw) || 0, 0);
+    patch({ trip: { ...trip, [field]: value } });
+  }
+
+  const rows = [
+    {
+      show: data.scope.flights_intl,
+      label: t("pg.baggageIntl"),
+      pieces: "baggage_intl_pieces",
+      kg: "baggage_intl_kg",
+      cabin: "baggage_intl_cabin_kg",
+    },
+    {
+      show: data.scope.flights_domestic,
+      label: t("pg.baggageDom"),
+      pieces: "baggage_dom_pieces",
+      kg: "baggage_dom_kg",
+      cabin: "baggage_dom_cabin_kg",
+    },
+  ] as const;
+
+  return (
+    <div className="mt-5 rounded-2xl border border-[#e2ebe7] bg-[#fbfdfc] p-5">
+      <h3 className="flex items-center gap-2 text-[14px] font-extrabold text-[#0f3d38]">
+        <Luggage className="size-4 text-[#185045]" />
+        {t("pg.baggageDefaults")}
+      </h3>
+      <p className="mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.baggageDefaultsHint")}</p>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        {rows.filter((r) => r.show).map((row) => (
+          <div key={row.label} className="rounded-[13px] border border-[#cfe0d9] bg-white p-4">
+            <p className="mb-3 text-[12.5px] font-extrabold text-[#185045]">{row.label}</p>
+            <div className="grid grid-cols-3 gap-2.5">
+              {([
+                [t("pg.baggagePieces"), row.pieces],
+                [t("pg.baggageKg"), row.kg],
+                [t("pg.cabinBaggageKg"), row.cabin],
+              ] as const).map(([label, field]) => (
+                <label key={field} className="grid gap-1 text-[11px] font-bold text-[#557d78]">
+                  {label}
+                  <input
+                    type="number"
+                    min={0}
+                    dir="ltr"
+                    value={trip[field] ?? ""}
+                    onChange={(e) => set(field, e.target.value)}
+                    className={`${fieldClass} tv-tnum h-10 text-center`}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

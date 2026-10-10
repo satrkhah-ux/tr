@@ -30,7 +30,7 @@ const day = (n: number, city: string): DraftDay => ({
 describe("deriveTransportRows", () => {
   it("gives the airport its own vehicle in both directions", () => {
     const rows = deriveTransportRows(
-      plan({ airport: { enabled: true, car_type: "جي إم سي ٧ ركاب", note: "" }, tours: { enabled: false, car_type: "", note: "" } }),
+      plan({ airport: { enabled: true, car_type: "جي إم سي ٧ ركاب", cars: 1, note: "" }, tours: { enabled: false, car_type: "", cars: 1, note: "" } }),
       cities,
     );
     expect(rows).toHaveLength(2);
@@ -43,8 +43,8 @@ describe("deriveTransportRows", () => {
     // The whole point: heavy luggage at the airport, a sedan for the day tours.
     const rows = deriveTransportRows(
       plan({
-        airport: { enabled: true, car_type: "فان", note: "" },
-        tours: { enabled: true, car_type: "سيدان", note: "" },
+        airport: { enabled: true, car_type: "فان", cars: 1, note: "" },
+        tours: { enabled: true, car_type: "سيدان", cars: 1, note: "" },
       }),
       cities,
     );
@@ -55,9 +55,9 @@ describe("deriveTransportRows", () => {
   it("makes one row per city HOP, not one for the whole trip", () => {
     const rows = deriveTransportRows(
       plan({
-        airport: { enabled: false, car_type: "", note: "" },
-        tours: { enabled: false, car_type: "", note: "" },
-        intercity: { enabled: true, mode: "train", car_type: "", note: "" },
+        airport: { enabled: false, car_type: "", cars: 1, note: "" },
+        tours: { enabled: false, car_type: "", cars: 1, note: "" },
+        intercity: { enabled: true, mode: "train", car_type: "", cars: 1, note: "" },
       }),
       cities,
     );
@@ -69,8 +69,8 @@ describe("deriveTransportRows", () => {
     expect(
       deriveTransportRows(
         plan({
-          airport: { enabled: false, car_type: "", note: "" },
-          tours: { enabled: false, car_type: "", note: "" },
+          airport: { enabled: false, car_type: "", cars: 1, note: "" },
+          tours: { enabled: false, car_type: "", cars: 1, note: "" },
         }),
         cities,
       ),
@@ -81,9 +81,9 @@ describe("deriveTransportRows", () => {
 describe("transportNoteForDay", () => {
   const days = [day(1, "إسطنبول"), day(2, "إسطنبول"), day(3, "طرابزون"), day(4, "طرابزون")];
   const full = plan({
-    airport: { enabled: true, car_type: "فان", note: "" },
-    tours: { enabled: true, car_type: "سيدان", note: "" },
-    intercity: { enabled: true, mode: "flight", car_type: "", note: "" },
+    airport: { enabled: true, car_type: "فان", cars: 1, note: "" },
+    tours: { enabled: true, car_type: "سيدان", cars: 1, note: "" },
+    intercity: { enabled: true, mode: "flight", car_type: "", cars: 1, note: "" },
   });
 
   it("meets the client at the airport on day one", () => {
@@ -108,5 +108,34 @@ describe("transportNoteForDay", () => {
 
   it("is silent when there is nothing to say", () => {
     expect(transportNoteForDay(emptyTransportPlan(), [day(1, "إسطنبول")], 5)).toBeNull();
+  });
+});
+
+describe("the car count", () => {
+  /**
+   * Nine travellers are two vans. «فان» on its own both priced and promised
+   * one, and the second was argued about at the kerb — so the count rides
+   * inside the vehicle text, which every reader already prints.
+   */
+  const twoVans = plan({
+    airport: { enabled: true, car_type: "فان", cars: 2, note: "" },
+    tours: { enabled: false, car_type: "", cars: 1, note: "" },
+  });
+
+  it("reaches both airport rows", () => {
+    const rows = deriveTransportRows(twoVans, cities);
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.car_type === "فان × 2")).toBe(true);
+  });
+
+  it("reaches the day note too, so the two readings agree", () => {
+    expect(transportNoteForDay(twoVans, [day(1, "إسطنبول")], 0)).toBe(
+      "استقبال من المطار إلى الفندق — فان × 2",
+    );
+  });
+
+  it("says nothing extra for a single vehicle", () => {
+    const one = plan({ airport: { enabled: true, car_type: "فان", cars: 1, note: "" } });
+    expect(deriveTransportRows(one, cities)[0].car_type).toBe("فان");
   });
 });

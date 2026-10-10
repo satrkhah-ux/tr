@@ -3,6 +3,7 @@
 import { Bus, Car, PlaneTakeoff, TrainFront, Check, Minus } from "lucide-react";
 import {
   TRANSPORT_MODE_AR,
+  type LookupCarType,
   type TransportLeg,
   type TransportMode,
   type TransportPlan,
@@ -37,6 +38,7 @@ function LegCard({
   hint,
   icon: Icon,
   leg,
+  carTypes,
   onChange,
   children,
 }: {
@@ -44,6 +46,7 @@ function LegCard({
   hint: string;
   icon: typeof Car;
   leg: TransportLeg;
+  carTypes: LookupCarType[];
   onChange: (next: Partial<TransportLeg>) => void;
   children?: React.ReactNode;
 }) {
@@ -78,15 +81,49 @@ function LegCard({
       {leg.enabled ? (
         <div className="mt-3 grid gap-2.5">
           {children}
-          <label className="grid gap-1 text-[11.5px] font-bold text-[#557d78]">
-            {t("pg.transport.vehicle")}
-            <input
-              value={leg.car_type}
-              onChange={(e) => onChange({ car_type: e.target.value })}
-              placeholder={t("pg.transport.vehiclePlaceholder")}
-              className={`${fieldClass} h-10`}
-            />
-          </label>
+          <div className="grid grid-cols-[1fr_5.5rem] gap-2">
+            {/*
+              The vehicle is CHOSEN, not typed. It used to be a free-text box,
+              so the same van was written «فان», «ڤان» and «جي إم سي ٧ ركاب»
+              across three files, none of them saying how many people fit —
+              and the seat count is the whole question being answered.
+
+              A value an older draft already holds stays selectable even when
+              it is not in the catalogue: blanking an agent's own answer
+              because a list changed is worse than showing an unknown name.
+            */}
+            <label className="grid gap-1 text-[11.5px] font-bold text-[#557d78]">
+              {t("pg.transport.vehicle")}
+              <select
+                value={leg.car_type}
+                onChange={(e) => onChange({ car_type: e.target.value })}
+                className={`${fieldClass} h-10`}
+              >
+                <option value="">{t("pg.transport.chooseVehicle")}</option>
+                {carTypes.map((car) => (
+                  <option key={car.name} value={car.name}>
+                    {car.pax ? `${car.name} — ${car.pax} ركاب` : car.name}
+                  </option>
+                ))}
+                {leg.car_type && !carTypes.some((c) => c.name === leg.car_type) ? (
+                  <option value={leg.car_type}>{leg.car_type}</option>
+                ) : null}
+              </select>
+            </label>
+            {/* Nine travellers are two vans. «فان» on its own both priced and
+                promised one, and the second was argued about at the kerb. */}
+            <label className="grid gap-1 text-[11.5px] font-bold text-[#557d78]">
+              {t("pg.transport.cars")}
+              <input
+                type="number"
+                min={1}
+                dir="ltr"
+                value={leg.cars}
+                onChange={(e) => onChange({ cars: Math.max(Math.trunc(Number(e.target.value)) || 1, 1) })}
+                className={`${fieldClass} tv-tnum h-10 text-center`}
+              />
+            </label>
+          </div>
           <label className="grid gap-1 text-[11.5px] font-bold text-[#557d78]">
             {t("pg.transport.note")}
             <input
@@ -103,9 +140,11 @@ function LegCard({
 
 export function TransportBlock({
   plan,
+  carTypes,
   onChange,
 }: {
   plan: TransportPlan;
+  carTypes: LookupCarType[];
   onChange: (next: TransportPlan) => void;
 }) {
   const { t } = useTraveliunUI();
@@ -124,6 +163,7 @@ export function TransportBlock({
           hint={t("pg.transport.airportHint")}
           icon={Car}
           leg={plan.airport}
+          carTypes={carTypes}
           onChange={(next) => onChange({ ...plan, airport: { ...plan.airport, ...next } })}
         />
         <LegCard
@@ -131,6 +171,7 @@ export function TransportBlock({
           hint={t("pg.transport.toursHint")}
           icon={Bus}
           leg={plan.tours}
+          carTypes={carTypes}
           onChange={(next) => onChange({ ...plan, tours: { ...plan.tours, ...next } })}
         />
         <LegCard
@@ -138,6 +179,7 @@ export function TransportBlock({
           hint={t("pg.transport.intercityHint")}
           icon={MODE_ICON[plan.intercity.mode]}
           leg={plan.intercity}
+          carTypes={carTypes}
           onChange={(next) => onChange({ ...plan, intercity: { ...plan.intercity, ...next } })}
         >
           {/* Between cities the answer may not be a vehicle at all — a domestic

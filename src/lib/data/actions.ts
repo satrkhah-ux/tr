@@ -16,7 +16,7 @@ import type {
 
 /** Tables the engine may touch — everything in the typed schema. */
 const ALLOWED_TABLES: AllowedTable[] = [
-  "countries", "cities", "hotels", "room_types", "services", "terms", "flights",
+  "countries", "cities", "hotels", "room_types", "services", "service_types", "terms", "flights",
   "customers", "roles", "employees", "offers", "offer_cities", "offer_flights",
   "offer_hotels", "offer_services", "offer_terms", "offer_pricing_items",
   "offer_renders", "pricings", "offer_revisions",

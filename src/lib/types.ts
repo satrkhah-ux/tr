@@ -75,9 +75,26 @@ export interface RoomType {
   created_at: IsoTimestamp;
 }
 
+/**
+ * A sellable extra the agency offers — a SIM card, a VIP fast-track arrival,
+ * roses in the room. The catalogue; `Service` is one of these priced for one
+ * country.
+ */
+export interface ServiceType {
+  id: Uuid;
+  arabic_name: string;
+  english_name: string | null;
+  /** quoted per request rather than from a list price. */
+  needs_quote: boolean;
+  sort: number;
+  status: string;
+  created_at: IsoTimestamp;
+}
+
 export interface Service {
   id: Uuid;
   country_id: Uuid | null;
+  service_type_id: Uuid | null;
   arabic_name: string | null;
   english_name: string | null;
   service_type: string | null;
@@ -632,6 +649,7 @@ export interface Database {
       hotels: TableShape<Hotel>;
       room_types: TableShape<RoomType>;
       services: TableShape<Service>;
+      service_types: TableShape<ServiceType>;
       terms: TableShape<Term>;
       flights: TableShape<Flight>;
       customers: TableShape<Customer>;

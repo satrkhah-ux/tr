@@ -6,11 +6,15 @@ import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server
 import { airlineLogoUrl, publicBrandLogoUrl } from "@/components/offer-doc/brand";
 import { getPartnerSession } from "@/lib/partners/session";
 import {
+  baggageLabel,
   defaultServicesFromLibrary,
   deriveCityDates,
   deriveHotelStays,
   emptyDraftData,
   emptyTermLibrary,
+  mealPlanIncludeLine,
+  MEAL_PLAN_AR,
+  MEAL_PLAN_BOARD,
   pricingRefFor,
   matchPartner,
   normalizeDraftData,
@@ -265,7 +269,10 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       supabase.from("room_types").select("id, arabic_name, hotel_id, default_board").order("arabic_name"),
       supabase.from("airports").select("id, arabic_name, code, iana_timezone, status").order("code"),
       supabase.from("transfers").select("car_type"),
-      supabase.from("transportation_types").select("arabic_name, status").order("arabic_name"),
+      supabase
+        .from("transportation_types")
+        .select("arabic_name, english_name, pax_capacity, luggage_capacity, status")
+        .order("pax_capacity", { ascending: true, nullsFirst: false }),
       supabase.from("terms").select("kind, arabic_text, checked, sort").order("sort", { ascending: true }),
       // resellers only: a hotel supplier we assign bookings to has no business in
       // the picker that decides whose name is printed on the cover.
@@ -304,15 +311,42 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
         })),
     }));
 
-    // transport options: the admin-managed transportation types + any ad-hoc
-    // car types used on transfers (both feed the transport stage's datalist).
-    const carTypes = [
-      ...new Set([
-        ...((transportRes.data ?? []) as { arabic_name: string; status: string | null }[])
-          .filter((t) => active(t.status))
-          .map((t) => t.arabic_name),
-        ...((transfersRes.data ?? []) as { car_type: string | null }[]).map((r) => r.car_type),
-      ].filter((v): v is string => Boolean(v && v.trim()))),
+    /**
+     * The vehicles the transport card offers, smallest first.
+     *
+     * Sorted by capacity rather than by name because that is the question
+     * being answered — nine travellers need the first row that seats nine, and
+     * an alphabetical list makes the agent read all of them to find it.
+     *
+     * Ad-hoc car types typed onto past transfer rows come along at the end
+     * with no capacity: they are what older files already say, and dropping
+     * them would blank a vehicle an agent chose.
+     */
+    const managed = ((transportRes.data ?? []) as {
+      arabic_name: string;
+      english_name: string | null;
+      pax_capacity: number | null;
+      luggage_capacity: number | null;
+      status: string | null;
+    }[]).filter((t) => active(t.status) && t.arabic_name?.trim());
+
+    const seen = new Set(managed.map((t) => t.arabic_name.trim()));
+    const adHoc = [
+      ...new Set(
+        ((transfersRes.data ?? []) as { car_type: string | null }[])
+          .map((r) => r.car_type?.trim())
+          .filter((v): v is string => Boolean(v) && !seen.has(v as string)),
+      ),
+    ];
+
+    const carTypes: GeneratorLookups["carTypes"] = [
+      ...managed.map((t) => ({
+        name: t.arabic_name.trim(),
+        name_en: t.english_name?.trim() || null,
+        pax: t.pax_capacity ?? null,
+        luggage: t.luggage_capacity ?? null,
+      })),
+      ...adHoc.map((name) => ({ name, name_en: null, pax: null, luggage: null })),
     ];
 
     return {
@@ -449,11 +483,16 @@ export async function copyProgramIntoDraft(draftId: string, serial: string): Pro
       itineraryStartDate(record.data.trip, record.data.flights),
       cityRows.map((c) => ({ city_name: c.city_name, nights: c.nights ?? 1, check_in: null, check_out: null })),
     );
+    // The trip's own defaults come along: built without them every copied
+    // line failed `statedBoard` and blocked, so copying a programme produced
+    // a draft that was red before the agent had touched anything.
     const hotels = cityRows.map((c) =>
       normalizeDraftHotel({
         city_name: c.city_name,
         hotel_name: c.hotel_name ?? "",
         room_type_name: c.room_type ?? "",
+        board_type: record.data.trip.default_board,
+        rooms_count: record.data.trip.rooms,
       }),
     );
 
@@ -614,6 +653,13 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
           )
         : null;
 
+    // The meal plan, in the three vocabularies that need it: the exact Arabic
+    // word for the «يشمل» line and the internal column, and the board it was
+    // booked as, so a city whose stay deviates is not described by it.
+    const mealsText = data.trip.meal_plan ? MEAL_PLAN_AR[data.trip.meal_plan] : null;
+    const mealsBoard = data.trip.meal_plan ? MEAL_PLAN_BOARD[data.trip.meal_plan] : null;
+    const mealsLine = mealPlanIncludeLine(data.trip);
+
     const transportIncludes = data.transport.map((t) =>
       `التوصيلات: ${t.from_place} ← ${t.to_place}${t.car_type ? ` (${t.car_type})` : ""}`,
     );
@@ -661,7 +707,16 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
           nights: c.nights,
           check_in: c.check_in,
           check_out: c.check_out,
-          meals: h?.board_type ? (boardLabel[h.board_type] ?? null) : null,
+          // The precise wording only when this city's stay actually bought
+          // the board the trip asked for — an offer must never promise meals
+          // we did not buy. (Internal readers only: the client document
+          // prints the board code, so the exact word travels as an «يشمل»
+          // line instead.)
+          meals: h?.board_type
+            ? mealsText && h.board_type === mealsBoard
+              ? mealsText
+              : (boardLabel[h.board_type] ?? null)
+            : null,
         };
       }),
       flights: data.flights.map((f) => ({
@@ -670,18 +725,19 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         to_airport: f.to_airport || null,
         flight_date: f.departure_at ? f.departure_at.slice(0, 10) : null,
         passengers: data.trip.adults + data.trip.children,
-        baggage: f.baggage_allowance || null,
+        baggage: baggageLabel(f) || null,
         airline: f.airline || null,
         flight_no: f.flight_no || null,
         airline_iata: f.airline_iata || null,
         departure_at: f.departure_at,
         arrival_at: f.arrival_at,
         cabin_class: f.cabin_class || null,
-        baggage_allowance: f.baggage_allowance || null,
+        baggage_allowance: baggageLabel(f) || null,
         leg_order: f.leg_order,
       })),
       services: [
         ...data.services.includes.map((label) => ({ label, kind: "include" as const })),
+        ...(mealsLine ? [{ label: mealsLine, kind: "include" as const }] : []),
         ...transportIncludes.map((label) => ({ label, kind: "include" as const })),
         ...visaIncludes.map((label) => ({ label, kind: "include" as const })),
         ...data.services.excludes.map((label) => ({ label, kind: "exclude" as const })),

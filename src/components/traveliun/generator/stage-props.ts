@@ -8,6 +8,10 @@ import type { DraftData, GeneratorLookups } from "@/lib/offer/draft-types";
  *   debounced auto-save. Stages must only patch the slices they own.
  * - `replace(data)` swaps the whole local draft WITHOUT scheduling a save —
  *   used after server-side mutations (e.g. copying a previous program).
+ * - `flush()` forces the pending auto-save up NOW. Needed before any server
+ *   action that re-reads the draft: patch is debounced, so what the agent typed
+ *   two seconds ago may not be in the database yet, and reading it back would
+ *   silently discard it.
  * - `lookups` are the reference lists loaded by the stage's server page.
  */
 export type StageFormProps = {
@@ -15,6 +19,7 @@ export type StageFormProps = {
   data: DraftData;
   patch: (slice: Partial<DraftData>) => void;
   replace: (data: DraftData) => void;
+  flush: () => Promise<void>;
   lookups: GeneratorLookups;
 };
 
