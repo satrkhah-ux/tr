@@ -89,7 +89,16 @@ export const config = {
   // sign-in and the Arabic text quietly fell back to a system face. The printed
   // PDF was never affected — it embeds the files as base64 — which is exactly
   // why this went unnoticed: the paper was right and the screen was not.
+  //
+  // `sw.js` is excluded so that it 404s, and that 404 is the point. This app
+  // registers no service worker, but localhost:3000 is shared with every other
+  // project on the machine, and one of them left a worker registered on that
+  // origin — which then served ITS cached chunks to this app and broke the page
+  // with "module factory is not available". A worker can only be evicted by its
+  // own script 404ing on the browser's update check; while this path answered
+  // with a 307 to /sign-in the browser saw a MIME-type error instead and kept
+  // the stale registration alive.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|webp|gif|ico|pdf|ttf|otf|woff|woff2)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|webp|gif|ico|pdf|ttf|otf|woff|woff2)$).*)",
   ],
 };
