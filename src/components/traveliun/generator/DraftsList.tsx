@@ -19,7 +19,7 @@ import {
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { createDraft, deleteDraft, duplicateDraft, type DraftSummary } from "@/lib/data/drafts";
-import { stageHref } from "@/lib/offer/draft-types";
+import { draftHref, stageHref } from "@/lib/offer/draft-types";
 import type { TranslationKey } from "@/lib/i18n";
 import { TraveliunShell } from "../TraveliunShell";
 import { WelcomeBoardButton } from "../WelcomeBoardButton";
@@ -84,7 +84,7 @@ export function DraftsList({
     }
     // A NEW file opens on «الخدمات»: what the offer includes decides which
     // stages exist, so it is the first question, not a later one.
-    router.push(stageHref(result.id, "scope"));
+    router.push(draftHref(result.id));
   }
 
   async function onDelete(id: string) {
@@ -105,7 +105,7 @@ export function DraftsList({
       setError(t(result.error));
       return;
     }
-    router.push(stageHref(result.id, "customer"));
+    router.push(draftHref(result.id));
   }
 
   const visible = useMemo(() => {
@@ -283,7 +283,7 @@ export function DraftsList({
                       <Td>
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
                           <Link
-                            href={stageHref(draft.id, "customer")}
+                            href={draftHref(draft.id)}
                             className="inline-flex h-9 items-center rounded-[9px] bg-[#185045] px-3 text-[11.5px] font-bold text-white hover:bg-[#0f4439]"
                           >
                             {t("pg.continueEditing")}

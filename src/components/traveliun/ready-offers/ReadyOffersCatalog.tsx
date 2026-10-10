@@ -14,7 +14,7 @@ import {
 import type { TranslationKey, Translator } from "@/lib/i18n";
 import type { ReadyOfferRecord, SyncDiff, Tier } from "@/lib/ready-offers/types";
 import { parseList } from "@/lib/ready-offers/parse";
-import { stageHref } from "@/lib/offer/draft-types";
+import { draftHref } from "@/lib/offer/draft-types";
 import { useRole } from "@/lib/roles/RoleContext";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { TraveliunShell } from "../TraveliunShell";
@@ -138,7 +138,7 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
     setBusy(true);
     setError(null);
     const res = await startDraftFromReadyOffer(offer.id);
-    if (res.ok) router.push(stageHref(res.id, "scope"));
+    if (res.ok) router.push(draftHref(res.id));
     else {
       setError(t(res.error as TranslationKey));
       setBusy(false);

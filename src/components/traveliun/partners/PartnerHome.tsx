@@ -7,6 +7,7 @@ import { FilePlus2, Loader2, Wallet, Globe2, FileText, PackageCheck } from "luci
 import { DirText } from "@/components/DirText";
 import { TraveliunShell } from "../TraveliunShell";
 import { createPartnerFile } from "@/lib/partners/drafts";
+import { draftHref } from "@/lib/offer/draft-types";
 import { WelcomeBoardButton } from "../WelcomeBoardButton";
 import type { PartnerHomeData } from "@/lib/partners/home";
 
@@ -100,7 +101,7 @@ export function PartnerHome({
               startTransition(async () => {
                 setError(null);
                 const res = await createPartnerFile();
-                if (res.ok) router.push(`/package-generator/${res.id}/scope`);
+                if (res.ok) router.push(draftHref(res.id));
                 else setError("تعذّر إنشاء الملف. حاول مرة أخرى.");
               })
             }
