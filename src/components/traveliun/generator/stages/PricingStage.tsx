@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Lock, Plus, Wand2 } from "lucide-react";
+import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
+import { mergeSuggestions } from "@/lib/offer/pricing-suggest";
+import { Loader2, Lock, Plus, Wand2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getRates } from "@/lib/data/rates-actions";
@@ -49,7 +51,7 @@ function formatMoney(value: number): string {
  * Buy-side data never reaches the client document regardless (OfferDocument
  * renders sell-side only; ClientOfferDTO strips it structurally).
  */
-export function PricingStage({ data, patch }: StageFormProps) {
+export function PricingStage({ draftId, data, patch }: StageFormProps) {
   const { t } = useTraveliunUI();
   const { can } = useRole();
   const canView = can("pricing.view");
@@ -136,89 +138,37 @@ export function PricingStage({ data, patch }: StageFormProps) {
     return stay?.nights ?? 0;
   }
 
-  /** Seed one line per hotel / flight leg / transfer / visa already in the draft. */
-  function suggestItems() {
-    const existing = new Set(pricing.items.map((item) => item.description));
-    const suggestions: DraftPricingItem[] = [
-      // One suggestion per STAY: two hotels in a city are two lines to price,
-      // and suggesting one of them silently drops the other's cost.
-      // The hotel price is already known — the agent typed it on the stay, or
-      // a supplier quoted it — so carrying it here is the difference between a
-      // priced offer and a page of empty boxes. QUANTITY is the room count, so
-      // the figure is per room for the whole stay, which is what the stay card
-      // asks for.
-      ...stays.map((s) => ({
-        item_type: "hotel" as const,
-        description: `${s.city_name} — ${s.line.hotel_name || t("pg.hotel")}`,
-        ref: pricingRefFor(s),
-        quantity: s.line.rooms_count > 0 ? s.line.rooms_count : 1,
-        sell: s.line.sourcing ? s.line.sourcing.sell_base : s.line.manual_price,
-        buy: s.line.sourcing ? s.line.sourcing.net_base : null,
-        currency: s.line.sourcing ? "SAR" : s.line.manual_currency,
-      })),
-      // The draft holds no price for these three — a flight fare, a transfer
-      // and a visa fee are quoted per file. The LINE is what matters: it is
-      // named, counted and waiting, instead of being remembered or forgotten.
-      ...data.flights.map((f) => ({
-        item_type: "flight" as const,
-        description: `${f.airline || t("pg.airline")} ${f.flight_no}`.trim(),
-        quantity: 1,
-        sell: null as number | null,
-        buy: null as number | null,
-        currency: null as string | null,
-      })),
-      ...data.transport.map((tr) => ({
-        item_type: "transport" as const,
-        description: `${tr.from_place} ← ${tr.to_place}${tr.car_type ? ` (${tr.car_type})` : ""}`,
-        quantity: 1,
-        sell: null as number | null,
-        buy: null as number | null,
-        currency: null as string | null,
-      })),
-      ...data.visas.map((v) => ({
-        item_type: "visa" as const,
-        description: v.visa_type || v.country,
-        quantity: v.count > 0 ? v.count : 1,
-        sell: null as number | null,
-        buy: null as number | null,
-        currency: null as string | null,
-      })),
-      // «الخدمات» are authored as text, so one line per included service —
-      // priced per file, but never left off the sheet by accident.
-      ...(data.scope.services ? data.services.includes : []).map((label) => ({
-        item_type: "service" as const,
-        description: label,
-        quantity: 1,
-        sell: null as number | null,
-        buy: null as number | null,
-        currency: null as string | null,
-      })),
-    ]
-      .filter((s) => s.description.trim() !== "" && !existing.has(s.description))
-      .map(({ sell, buy, currency, ...rest }) => ({
-        ...rest,
-        buy_price: buy ?? null,
-        buy_currency: currency ?? pricing.display_currency,
-        sell_price: sell ?? null,
-        sell_currency: currency ?? pricing.display_currency,
-      }));
-    if (suggestions.length > 0) setItems([...pricing.items, ...suggestions]);
+  /**
+   * Build the sheet from the agency's own price lists.
+   *
+   * Server-side: the lists are 879 transfer prices and the buy side of every
+   * service, none of which belongs in a browser bundle — only the figures this
+   * draft needs come back. Existing lines are never touched, so a fare someone
+   * negotiated an hour ago survives a re-run.
+   */
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestNote, setSuggestNote] = useState<string | null>(null);
+
+  async function suggestItems() {
+    setSuggesting(true);
+    const result = await suggestPricingForDraft(draftId, { hotel: t("pg.hotel"), airline: t("pg.airline") });
+    setSuggesting(false);
+    if (!result.ok) return;
+    const merged = mergeSuggestions(pricing.items, result.items);
+    if (merged.added > 0) {
+      setItems(merged.items);
+      // Says how many arrived with a number, because the rest still need one
+      // and an agent who assumes otherwise sends out a half-priced offer.
+      setSuggestNote(t("pg.pricingSeeded", { added: String(merged.added), priced: String(merged.priced) }));
+      window.setTimeout(() => setSuggestNote(null), 6000);
+    }
   }
 
-  /**
-   * Build the lines the first time this card is opened.
-   *
-   * The button is still there — a programme edited after pricing needs it —
-   * but an empty pricing screen in front of an agent who has already entered
-   * every hotel, flight and transfer is a page of work the draft can do
-   * itself. Only when there is nothing yet: it must never overwrite a
-   * priced file.
-   */
   const seeded = useRef(false);
   useEffect(() => {
     if (seeded.current || pricing.items.length > 0) return;
     seeded.current = true;
-    suggestItems();
+    void suggestItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -229,8 +179,8 @@ export function PricingStage({ data, patch }: StageFormProps) {
           <h2 className="text-base font-extrabold text-[#003c3a]">{t("pg.pricingTitle")}</h2>
       <FieldIssue field="pricing" className="mb-3" />
           <div className="flex gap-2">
-            <button type="button" onClick={suggestItems} className={addButtonClass}>
-              <Wand2 className="size-4" />
+            <button type="button" onClick={() => void suggestItems()} disabled={suggesting} className={addButtonClass}>
+              {suggesting ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
               {t("pg.suggestItems")}
             </button>
             <button type="button" onClick={() => addItem()} className={addButtonClass}>
@@ -239,6 +189,11 @@ export function PricingStage({ data, patch }: StageFormProps) {
             </button>
           </div>
         </div>
+        {suggestNote ? (
+          <p className="mb-3 rounded-[10px] border border-[#bfe5d4] bg-[#e9f7f0] px-4 py-2.5 text-[12px] font-bold text-[#0f7a52]">
+            {suggestNote}
+          </p>
+        ) : null}
         {canInternal ? (
           <p className="mb-4 rounded-[10px] border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2.5 text-[12px] font-bold text-[#a86a10]">
             {t("pg.pricingNote")}

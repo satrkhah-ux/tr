@@ -1105,6 +1105,7 @@ export const en = {
   "pg.marginCol": "Margin %",
   "pg.displayCurrency": "Offer currency",
   "pg.finalTotal": "Final client total",
+  "pg.pricingSeeded": "{added} lines added, {priced} of them already priced from your own lists. The rest need a number.",
   "pg.suggestItems": "Suggest items from the stages",
   "pg.addPricingItem": "Add item",
   "pg.missingRatesWarn": "No exchange rate for: {codes} — excluded from totals.",

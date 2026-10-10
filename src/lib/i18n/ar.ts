@@ -1103,6 +1103,7 @@ export const ar: Dictionary = {
   "pg.marginCol": "الهامش %",
   "pg.displayCurrency": "عملة العرض",
   "pg.finalTotal": "الإجمالي النهائي للعميل",
+  "pg.pricingSeeded": "أُضيف {added} بنداً، {priced} منها مُسعَّرة من قوائمكم. الباقي يحتاج رقماً.",
   "pg.suggestItems": "اقتراح بنود من المراحل",
   "pg.addPricingItem": "إضافة بند",
   "pg.missingRatesWarn": "لا يوجد سعر صرف لـ: {codes} — مستبعدة من الإجماليات.",
