@@ -221,6 +221,7 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
           <TransportBlock
             plan={data.transport_plan}
             carTypes={lookups.carTypes}
+            cityCount={data.cities.length}
             onChange={(transport_plan) => patch({ transport_plan })}
           />
         </div>

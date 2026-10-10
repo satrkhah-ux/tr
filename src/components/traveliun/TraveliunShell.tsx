@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { forwardRef, useEffect, useMemo, useState, type ComponentProps, type FormEvent } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ComponentProps,
+  type FormEvent,
+} from "react";
 import { DirectionProvider } from "@base-ui/react/direction-provider";
 import { Dialog as PaletteDialog } from "@base-ui/react/dialog";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -18,6 +27,8 @@ import {
   Calculator,
   ChevronDown,
   ChevronLeft,
+  Pin,
+  PinOff,
   ClipboardCheck,
   Database,
   FileText,
@@ -75,6 +86,55 @@ export type NavGroup = {
  * can derive its «الأقسام السابقة» list from it — a hand-written second copy
  * would go stale the first time a route is added here.
  */
+/**
+ * Whether the sidebar is pinned open, remembered across page loads.
+ *
+ * It was component state, so every navigation un-pinned it and the menu went
+ * back to sliding out over the page whenever the pointer crossed it — the
+ * complaint this setting exists to answer.
+ *
+ * useSyncExternalStore rather than the hydrate-in-an-effect the theme provider
+ * uses: localStorage does not exist on the server, so that version renders the
+ * wrong state once and React flags the mismatch. getServerSnapshot answers
+ * "not pinned" for the server, and the first client read corrects it with no
+ * extra render pass.
+ */
+const PIN_KEY = "tv.sidebar.pinned";
+const PIN_EVENT = "tv:sidebar-pin";
+
+function subscribePin(onChange: () => void) {
+  // `storage` covers another tab; the custom event covers this one, which the
+  // browser never notifies about its own writes.
+  window.addEventListener("storage", onChange);
+  window.addEventListener(PIN_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(PIN_EVENT, onChange);
+  };
+}
+
+function readPin(): boolean {
+  try {
+    return window.localStorage.getItem(PIN_KEY) === "1";
+  } catch {
+    // private window, or site data blocked — an unpinned menu still works
+    return false;
+  }
+}
+
+function usePinnedSidebar(): [boolean, (next: boolean) => void] {
+  const pinned = useSyncExternalStore(subscribePin, readPin, () => false);
+  const setPinned = useCallback((next: boolean) => {
+    try {
+      window.localStorage.setItem(PIN_KEY, next ? "1" : "0");
+    } catch {
+      /* ignore — the pin just won't survive the next load */
+    }
+    window.dispatchEvent(new Event(PIN_EVENT));
+  }, []);
+  return [pinned, setPinned];
+}
+
 export const navGroups: NavGroup[] = [
   { labelKey: "nav.dashboard", href: "/dashboard", icon: BarChart3 },
   { labelKey: "nav.intelligenceHub", href: "/travel-intelligence", icon: Calculator },
@@ -250,7 +310,7 @@ function isGroupActive(pathname: string, group: NavGroup) {
 export function TraveliunShell({ title, children }: TraveliunShellProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [menuPinned, setMenuPinned] = useState(false);
+  const [menuPinned, setMenuPinned] = usePinnedSidebar();
   const [menuHovered, setMenuHovered] = useState(false);
   const [panel, setPanel] = useState<"guide" | "calculator" | "view" | "settings" | "profile" | null>(null);
   const { language, setLanguage, view, setView, theme, setTheme, dir, t } = useTraveliunUI();
@@ -331,14 +391,23 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
       >
         <button
           type="button"
-          className="absolute -end-4 top-5 z-[120] flex size-8 items-center justify-center rounded-full border border-[#dce3df] bg-white text-[var(--tv-brand)] shadow-[0_2px_8px_rgba(24,80,69,0.16)] transition-colors duration-200 hover:bg-[#f4f8f6]"
+          className={`absolute -end-4 top-5 z-[120] flex size-8 items-center justify-center rounded-full border shadow-[0_2px_8px_rgba(24,80,69,0.16)] transition-colors duration-200 ${
+            menuPinned
+              ? "border-[var(--tv-brand)] bg-[var(--tv-brand)] text-white hover:bg-[#0f4439]"
+              : "border-[#dce3df] bg-white text-[var(--tv-brand)] hover:bg-[#f4f8f6]"
+          }`}
+          aria-pressed={menuPinned}
+          title={menuPinned ? t("aria.unpinSidebar") : t("aria.pinSidebar")}
           aria-label={menuPinned ? t("aria.unpinSidebar") : t("aria.pinSidebar")}
           onClick={() => {
-            setMenuPinned((value) => !value);
+            setMenuPinned(!menuPinned);
             setMenuHovered(true);
           }}
         >
-          <ChevronLeft className={`size-5 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${menuOpen ? "rotate-180" : ""}`} />
+          {/* A PIN, not a chevron. The arrow read as «طَيّ/فتح» — which hovering
+              already does — so nobody found the control that stops the menu
+              sliding out over their work. */}
+          {menuPinned ? <Pin className="size-4 fill-current" /> : <PinOff className="size-4" />}
         </button>
 
         <aside className="absolute start-0 top-0 z-10 h-screen w-[74px] border-e border-[#c8d2cd] bg-white">

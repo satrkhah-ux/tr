@@ -141,10 +141,13 @@ function LegCard({
 export function TransportBlock({
   plan,
   carTypes,
+  cityCount,
   onChange,
 }: {
   plan: TransportPlan;
   carTypes: LookupCarType[];
+  /** How many cities the programme has — the intercity leg is derived from them. */
+  cityCount: number;
   onChange: (next: TransportPlan) => void;
 }) {
   const { t } = useTraveliunUI();
@@ -182,6 +185,20 @@ export function TransportBlock({
           carTypes={carTypes}
           onChange={(next) => onChange({ ...plan, intercity: { ...plan.intercity, ...next } })}
         >
+          {/*
+            The intercity rows are DERIVED from the city list — one per hop —
+            so with fewer than two cities this leg produces nothing anywhere:
+            no row on the document, no note on a day. Turning it on and seeing
+            no effect reads as a broken switch, and the cities are entered on
+            the NEXT card, so say which is missing rather than leaving the
+            agent to discover it.
+          */}
+          {cityCount < 2 ? (
+            <p className="rounded-[9px] border border-[#f2e2b4] bg-[#fffdf7] px-3 py-2 text-[11.5px] font-bold text-[#a86a10]">
+              {t("pg.transport.intercityNeedsCities")}
+            </p>
+          ) : null}
+
           {/* Between cities the answer may not be a vehicle at all — a domestic
               flight or a train is the normal choice in Turkey, Japan, Europe. */}
           <div className="grid gap-1 text-[11.5px] font-bold text-[#557d78]">

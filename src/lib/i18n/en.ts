@@ -871,6 +871,7 @@ export const en = {
   "pg.transport.toursHint": "The vehicle used on tour days",
   "pg.transport.intercity": "Between cities",
   "pg.transport.intercityHint": "City to city — car, domestic flight or train",
+  "pg.transport.intercityNeedsCities": "Nothing to move yet — this appears once the programme has two cities or more. Add them on the next card.",
   "pg.transport.mode": "Mode",
   "pg.transport.vehicle": "Vehicle type",
   "pg.transport.chooseVehicle": "— choose a vehicle —",

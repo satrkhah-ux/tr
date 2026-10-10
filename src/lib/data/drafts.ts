@@ -311,23 +311,19 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
     }));
 
     /**
-     * The vehicles the transport card offers, smallest first.
+     * The agency's own vehicles, smallest first.
      *
-     * `transportation_types` is a catalogue of everything sellable, and most of
-     * it is not a vehicle: a train ticket, a metro pass, the cable car, «تأجير
-     * بالساعة ٨ ساعات», «استقبال من المطار (خاص)». Offering those here asked
-     * the agent the wrong question twice over — the LEG already says what the
-     * journey is, and this field answers only which vehicle carries it. So a
-     * row qualifies when it names a road vehicle and is not itself a journey,
-     * a duration or a ticket.
+     * `transportation_types` is two things in one table: a product catalogue
+     * for pricing (an airport pickup, four hours of disposal, a metro pass)
+     * and the vehicles a group is actually put into. Only the second answers
+     * «نوع السيارة», and the difference is STATED — `category = 'fleet'` —
+     * because inferring it from the vehicle class offered a motorbike to a
+     * family of nine and listed the same car twice, once as a service.
      *
      * Sorted by capacity rather than by name because that is what the choice
      * turns on: nine travellers need the first row that seats nine, and an
      * alphabetical list makes the agent read all of them to find it.
      */
-    const SERVICE_CATEGORY = new Set(["transfer", "disposal", "ticket"]);
-    const ROAD_VEHICLE = new Set(["sedan", "suv", "van", "minibus", "bus", "limousine", "shuttle", "scooter"]);
-
     const carTypes: GeneratorLookups["carTypes"] = ((transportRes.data ?? []) as {
       arabic_name: string;
       english_name: string | null;
@@ -337,13 +333,7 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       luggage_capacity: number | null;
       status: string | null;
     }[])
-      .filter(
-        (t) =>
-          active(t.status) &&
-          t.arabic_name?.trim() &&
-          !SERVICE_CATEGORY.has(t.category ?? "") &&
-          ROAD_VEHICLE.has(t.vehicle_class ?? ""),
-      )
+      .filter((t) => active(t.status) && t.category === "fleet" && t.arabic_name?.trim())
       .map((t) => ({
         name: t.arabic_name.trim(),
         name_en: t.english_name?.trim() || null,

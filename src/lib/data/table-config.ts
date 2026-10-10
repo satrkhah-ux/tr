@@ -206,7 +206,22 @@ const CONFIGS: TableConfig[] = [
     columns: [
       { key: "arabic_name", labelKey: "col.arabicName", minWidth: "220px" },
       { key: "english_name", labelKey: "col.englishName", minWidth: "220px" },
-      { key: "category", labelKey: "col.category" },
+      {
+        // «fleet» is load-bearing: it is what puts a row in the generator's
+        // vehicle dropdown. A free-text box here meant a new car was added and
+        // never appeared.
+        key: "category",
+        labelKey: "col.category",
+        options: [
+          { value: "fleet", label: "fleet — مركبة تُختار في البكج" },
+          { value: "transfer", label: "transfer — توصيل" },
+          { value: "disposal", label: "disposal — تأجير بالساعة" },
+          { value: "tour", label: "tour — جولة" },
+          { value: "rental", label: "rental — تأجير" },
+          { value: "ticket", label: "ticket — تذكرة" },
+          { value: "special", label: "special — خاص" },
+        ],
+      },
       { key: "vehicle_class", labelKey: "col.vehicleClass" },
       { key: "pax_capacity", labelKey: "col.paxCapacity", type: "number" },
       { key: "luggage_capacity", labelKey: "col.luggageCapacity", type: "number" },

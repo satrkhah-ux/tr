@@ -869,6 +869,7 @@ export const ar: Dictionary = {
   "pg.transport.toursHint": "السيارة المرافقة في أيام الجولات",
   "pg.transport.intercity": "التنقّل بين المدن",
   "pg.transport.intercityHint": "من مدينة إلى التالية — سيارة أو طيران داخلي أو قطار",
+  "pg.transport.intercityNeedsCities": "لا انتقال بعد — يظهر حين يصير في البرنامج مدينتان أو أكثر. أضِفهما في البطاقة التالية.",
   "pg.transport.mode": "وسيلة التنقّل",
   "pg.transport.vehicle": "نوع السيارة",
   "pg.transport.chooseVehicle": "— اختر المركبة —",

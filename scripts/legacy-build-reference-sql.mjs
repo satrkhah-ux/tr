@@ -457,7 +457,7 @@ w("),");
 w("ins as (");
 w("  insert into public.transportation_types");
 w("    (id, arabic_name, english_name, category, vehicle_class, pax_capacity, luggage_capacity, with_driver, duration_unit, status)");
-w("  select new_id, arabic_name, english_name, 'private', vehicle_class, pax, bags, true, 'day', 'Active' from fresh");
+w("  select new_id, arabic_name, english_name, 'fleet', vehicle_class, pax, bags, true, 'day', 'Active' from fresh");
 w(")");
 w("insert into public.legacy_id_map (entity, source, legacy_id, new_id)");
 w("select 'car_type', 'app', legacy_id, new_id from fresh;");
