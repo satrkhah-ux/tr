@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { emptyDraftData, normalizeDraftHotel, type DraftData } from "./draft-types";
+import { emptyDraftData, normalizeDraftHotel, withRooms, type DraftData, type DraftHotelSourcing } from "./draft-types";
+
+/** A supplier quote prices the STAY; the rooms under it carry none. */
+const SUPPLIER_RATE: DraftHotelSourcing = {
+  supplier_id: "tbo", supplier_name: "TBO", rate_key: "k", net_base: 600,
+  net_source_currency: "USD", fx_rate: 3.75, fx_date: "2026-09-01", ref_sell_base: null,
+  sell_base: 900, markup_amount: 300, markup_pct: 50, margin_pct: 33,
+  min_margin_pct: null, cancellation_policy: "", excluded_surcharges: [],
+} as unknown as DraftHotelSourcing;
 import {
   findRoomPrice,
   findServicePrice,
@@ -105,16 +113,41 @@ function draftWithOneStay(over: Partial<DraftData["hotels"][number]> = {}): Draf
 describe("suggestPricing — the order of trust", () => {
   it("takes what the agent typed over what the room last cost", () => {
     const data = draftWithOneStay({ manual_price: 777, manual_currency: "SAR" });
+    // a legacy line: one figure, no per-room prices → price × rooms
     const rooms = [{ hotel_id: "h1", hotel_name: "", room_type_name: "استاندر", board_type: "BB", price: 500, currency: "SAR" }];
     const [hotel] = suggestPricing(data, { ...EMPTY, rooms }, LABELS);
-    expect(hotel.sell_price).toBe(777);
+    expect(hotel.sell_price).toBe(777 * 2);
+    expect(hotel.quantity).toBe(1);
     expect(hotel.source).toBe("typed");
+  });
+
+  it("adds the rooms up — a double and a triple are two different prices", () => {
+    const data = draftWithOneStay();
+    data.hotels[0] = withRooms(data.hotels[0], [
+      { room_type_id: null, room_type_name: "مزدوجة", board_type: "BB", price: 500 },
+      { room_type_id: null, room_type_name: "ثلاثية", board_type: "BB", price: 700 },
+    ]);
+    const [hotel] = suggestPricing(data, EMPTY, LABELS);
+    expect(hotel.sell_price).toBe(1200);
+    expect(hotel.quantity).toBe(1);
+  });
+
+  it("never adds a supplier's stay price to the rooms underneath it", () => {
+    const data = draftWithOneStay();
+    data.hotels[0] = withRooms(
+      { ...data.hotels[0], sourcing: SUPPLIER_RATE },
+      [{ room_type_id: null, room_type_name: "مزدوجة", board_type: "BB", price: 500 }],
+    );
+    const [hotel] = suggestPricing(data, EMPTY, LABELS);
+    expect(hotel.sell_price).toBe(900);
+    expect(hotel.buy_price).toBe(600);
   });
 
   it("falls back to the remembered price when nothing was typed", () => {
     const rooms = [{ hotel_id: "h1", hotel_name: "", room_type_name: "استاندر", board_type: "BB", price: 500, currency: "SAR" }];
     const [hotel] = suggestPricing(draftWithOneStay(), { ...EMPTY, rooms }, LABELS);
-    expect(hotel.sell_price).toBe(500);
+    // remembered is ONE room's price, and the stay has two
+    expect(hotel.sell_price).toBe(1000);
     expect(hotel.source).toBe("remembered");
   });
 
@@ -124,7 +157,7 @@ describe("suggestPricing — the order of trust", () => {
     expect(hotel.source).toBe("none");
   });
 
-  it("counts rooms for a hotel and travellers for a fare", () => {
+  it("counts travellers for a fare, and the stay as one priced thing", () => {
     const data = draftWithOneStay({ manual_price: 100 });
     data.flights = [
       {
@@ -135,7 +168,7 @@ describe("suggestPricing — the order of trust", () => {
       },
     ];
     const items = suggestPricing(data, EMPTY, LABELS);
-    expect(items.find((i) => i.item_type === "hotel")?.quantity).toBe(2); // rooms
+    expect(items.find((i) => i.item_type === "hotel")?.quantity).toBe(1); // the rooms are summed
     expect(items.find((i) => i.item_type === "flight")?.quantity).toBe(3); // 2 adults + 1 child
   });
 });

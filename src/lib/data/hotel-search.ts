@@ -609,10 +609,14 @@ export async function selectHotelRate(
         // the content cache carries no Latin name; whatever the agent typed stays
         sourcing,
       },
+      // The supplier quoted the STAY, not each room, and that figure lives on
+      // `sourcing`. Leaving the per-room price null keeps the two from being
+      // added together into a stay billed twice.
       base.rooms.map(() => ({
         room_type_id: null,
         room_type_name: rate.room_category_raw,
         board_type: rate.board_type,
+        price: null,
       })),
     );
   });

@@ -26,7 +26,7 @@ function draftWithHotel(rooms: { room_type_name: string; board_type: "BB" | "HB"
   data.hotels = [
     withRooms(
       normalizeDraftHotel({ city_name: "باكو", hotel_name: "فندق باكو سنتر" }),
-      rooms.map((r) => ({ room_type_id: null, ...r })),
+      rooms.map((r) => ({ room_type_id: null, price: null, ...r })),
     ),
   ];
   return data;
@@ -63,8 +63,8 @@ describe("normalizeDraftHotel", () => {
 describe("withRooms", () => {
   it("keeps rooms_count and the room-1 scalars in step with the array", () => {
     const line = withRooms(normalizeDraftHotel({ city_name: "باكو" }), [
-      { room_type_id: "rt1", room_type_name: "غرفة مزدوجة", board_type: "BB" },
-      { room_type_id: null, room_type_name: "غرفة مفردة", board_type: "HB" },
+      { room_type_id: "rt1", room_type_name: "غرفة مزدوجة", board_type: "BB" , price: null},
+      { room_type_id: null, room_type_name: "غرفة مفردة", board_type: "HB" , price: null},
     ]);
 
     expect(line.rooms_count).toBe(2);
@@ -81,21 +81,21 @@ describe("withRooms", () => {
 describe("resizeRooms", () => {
   it("clones room 1 into every new slot — the common case is the same room", () => {
     const line = withRooms(normalizeDraftHotel({ city_name: "باكو" }), [
-      { room_type_id: "rt1", room_type_name: "غرفة مزدوجة", board_type: "BB" },
+      { room_type_id: "rt1", room_type_name: "غرفة مزدوجة", board_type: "BB" , price: null},
     ]);
 
     const grown = resizeRooms(line, 3);
 
     expect(grown.rooms).toHaveLength(3);
-    expect(grown.rooms[2]).toEqual({ room_type_id: "rt1", room_type_name: "غرفة مزدوجة", board_type: "BB" });
+    expect(grown.rooms[2]).toEqual({ room_type_id: "rt1", room_type_name: "غرفة مزدوجة", board_type: "BB" , price: null});
     expect(grown.rooms_count).toBe(3);
   });
 
   it("shrinks without disturbing the rooms that survive", () => {
     const line = withRooms(normalizeDraftHotel({ city_name: "باكو" }), [
-      { room_type_id: null, room_type_name: "مزدوجة", board_type: "BB" },
-      { room_type_id: null, room_type_name: "مفردة", board_type: "HB" },
-      { room_type_id: null, room_type_name: "ثلاثية", board_type: "BB" },
+      { room_type_id: null, room_type_name: "مزدوجة", board_type: "BB" , price: null},
+      { room_type_id: null, room_type_name: "مفردة", board_type: "HB" , price: null},
+      { room_type_id: null, room_type_name: "ثلاثية", board_type: "BB" , price: null},
     ]);
 
     const shrunk = resizeRooms(line, 2);

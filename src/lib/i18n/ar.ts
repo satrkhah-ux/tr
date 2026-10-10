@@ -983,6 +983,7 @@ export const ar: Dictionary = {
   "pg.chooseBoard": "— الإقامة —",
   "pg.roomsCount": "الغرف",
   "pg.hotelNameEn": "اسم الفندق بالإنجليزية",
+  "pg.roomPrice": "سعر الغرفة ({currency})",
   "pg.roomOne": "الغرفة",
   "pg.roomN": "الغرفة {n}",
   "pg.rememberRateHint": "احفظ هذا السعر لهذا الفندق ونوع الغرفة والإقامة — والملف القادم يبدأ منه.",

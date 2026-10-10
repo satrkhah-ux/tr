@@ -985,6 +985,7 @@ export const en = {
   "pg.chooseBoard": "— board —",
   "pg.roomsCount": "Rooms",
   "pg.hotelNameEn": "Hotel name (Latin)",
+  "pg.roomPrice": "Price ({currency})",
   "pg.roomOne": "Room",
   "pg.roomN": "Room {n}",
   "pg.rememberRateHint": "Remember this price for this hotel, room type and board — the next file starts from it.",

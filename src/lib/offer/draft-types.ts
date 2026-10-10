@@ -403,10 +403,35 @@ export type DraftRoomSpec = {
   room_type_id: string | null;
   room_type_name: string;
   board_type: BoardType | null;
+  /**
+   * What THIS room costs for the whole stay.
+   *
+   * Per room, because a file routinely books two different ones — a double for
+   * the parents and a triple for the children — and one price for the line
+   * either overcharged for the smaller or undercharged for the larger. Null
+   * means «not priced yet», which is not the same as free.
+   */
+  price: number | null;
 };
 
 export function emptyRoomSpec(): DraftRoomSpec {
-  return { room_type_id: null, room_type_name: "", board_type: null };
+  return { room_type_id: null, room_type_name: "", board_type: null, price: null };
+}
+
+/**
+ * What the whole stay costs — every room added up.
+ *
+ * Null when no room carries a price at all, so «unpriced» stays
+ * distinguishable from «free»; a half-priced stay returns what it knows,
+ * because a partial total the agent can see beats a blank they cannot.
+ */
+export function stayTotal(line: Pick<DraftHotel, "rooms" | "manual_price">): number | null {
+  const priced = line.rooms.filter((r) => r.price != null);
+  if (priced.length > 0) return priced.reduce((sum, r) => sum + (r.price ?? 0), 0);
+  // A line written before rooms carried their own price keeps answering with
+  // the single figure it was given, multiplied by the rooms it covers.
+  if (line.manual_price != null) return line.manual_price * Math.max(line.rooms.length, 1);
+  return null;
 }
 
 /** One hotel line per city (aligned by city_name). Prices live in the pricing stage. */
@@ -519,9 +544,19 @@ export function normalizeDraftHotel(raw: unknown): DraftHotel {
     room_type_id: typeof h.room_type_id === "string" ? h.room_type_id : null,
     room_type_name: typeof h.room_type_name === "string" ? h.room_type_name : "",
     board_type: (h.board_type ?? null) as BoardType | null,
+    price: null,
   };
   // An old line described ONE room and a count; every room was that room.
-  const rooms = Array.isArray(h.rooms) && h.rooms.length > 0 ? h.rooms : Array.from({ length: count }, () => ({ ...legacy }));
+  const rawRooms =
+    Array.isArray(h.rooms) && h.rooms.length > 0 ? h.rooms : Array.from({ length: count }, () => ({ ...legacy }));
+  // Rooms saved before they carried a price get the field, empty. The line's
+  // own `manual_price` is NOT copied onto each of them: it was one figure for
+  // one room, and writing it into three would treble the stay on sight.
+  const rooms = rawRooms.map((r) => ({
+    ...emptyRoomSpec(),
+    ...(r && typeof r === "object" ? (r as Partial<DraftRoomSpec>) : {}),
+    price: typeof (r as Partial<DraftRoomSpec>)?.price === "number" ? (r as DraftRoomSpec).price : null,
+  }));
   const base: DraftHotel = {
     // A missing id means a draft written before a city could hold two hotels.
     // It gets one now; the pricing item that references it by description keeps

@@ -17,7 +17,7 @@
  * the money is lost.
  */
 
-import { deriveCityDates, deriveHotelStays, pricingRefFor, type DraftData } from "./draft-types";
+import { deriveCityDates, deriveHotelStays, pricingRefFor, stayTotal, type DraftData } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
 import type { DraftPricingItem } from "./draft-types";
 
@@ -183,22 +183,25 @@ export function suggestPricing(
       room?.board_type ?? line.board_type,
     );
 
+    const typed = stayTotal(line);
+
     // The order of trust, most binding first.
     const [sell, buy, cur, source]: [number | null, number | null, string, PriceSource] = line.sourcing
       ? [line.sourcing.sell_base, line.sourcing.net_base, "SAR", "supplier"]
-      : line.manual_price != null
-        ? [line.manual_price, null, line.manual_currency || currency, "typed"]
+      : typed != null
+        ? [typed, null, line.manual_currency || currency, "typed"]
         : remembered
-          ? [remembered.price, null, remembered.currency, "remembered"]
+          ? [remembered.price * Math.max(line.rooms.length, 1), null, remembered.currency, "remembered"]
           : [null, null, currency, "none"];
 
     items.push({
       item_type: "hotel",
       description: `${stay.city_name} — ${line.hotel_name || labels.hotel}`,
       ref: pricingRefFor(stay),
-      // Per ROOM for the whole stay: the quantity carries the room count, and
-      // the stay card asks for one room's price.
-      quantity: line.rooms_count > 0 ? line.rooms_count : 1,
+      // ONE, because the figure is already the whole stay: the rooms are priced
+      // individually on the card and added up there. Multiplying by the room
+      // count here would charge a two-room stay twice.
+      quantity: 1,
       buy_price: buy,
       buy_currency: cur,
       sell_price: sell,

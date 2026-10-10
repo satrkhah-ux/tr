@@ -204,6 +204,8 @@ export function StayCard({
                 index={roomIndex}
                 single={line.rooms.length === 1}
                 roomTypeOptions={roomTypeOptions}
+                currency={line.manual_currency || "SAR"}
+                priceable={!line.sourcing}
                 onChange={(slice) =>
                   onSetLine(withRooms(line, line.rooms.map((r, i) => (i === roomIndex ? { ...r, ...slice } : r))))
                 }
@@ -309,19 +311,24 @@ function RoomRow({
   index,
   single,
   roomTypeOptions,
+  currency,
+  priceable,
   onChange,
 }: {
   room: DraftRoomSpec;
   index: number;
   single: boolean;
   roomTypeOptions: LookupRoomType[];
+  currency: string;
+  /** false for a supplier rate — that price is the stay's, not this room's. */
+  priceable: boolean;
   onChange: (slice: Partial<DraftRoomSpec>) => void;
 }) {
   const { t } = useTraveliunUI();
   const names = roomTypeNames(roomTypeOptions);
 
   return (
-    <div className="grid gap-3 rounded-[10px] border border-[#e7f0ec] bg-white p-2.5 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
+    <div className="grid gap-3 rounded-[10px] border border-[#e7f0ec] bg-white p-2.5 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_130px] sm:items-end">
       <span className="self-center rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11.5px] font-extrabold text-[#185045]">
         {single ? t("pg.roomOne") : t("pg.roomN", { n: index + 1 })}
       </span>
@@ -363,6 +370,23 @@ function RoomRow({
           ))}
         </select>
       </label>
+      {/* Per ROOM, because a file routinely books two different ones — a double
+          for the parents and a triple for the children — and one figure for the
+          line either overcharged the smaller or undercharged the larger. */}
+      {priceable ? (
+        <label className={rowLabelClass}>
+          {t("pg.roomPrice", { currency })}
+          <input
+            type="number"
+            min={0}
+            dir="ltr"
+            value={room.price ?? ""}
+            onChange={(e) => onChange({ price: e.target.value === "" ? null : Number(e.target.value) })}
+            className={`${fieldClass} tv-tnum text-center`}
+            placeholder="0"
+          />
+        </label>
+      ) : null}
     </div>
   );
 }

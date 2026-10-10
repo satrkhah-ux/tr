@@ -1,16 +1,76 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { AUTH_STORAGE_KEY, parseSessionCookie } from "@/lib/supabase/constants";
+import {
+  AUTH_COOKIE_MAX_AGE,
+  AUTH_STORAGE_KEY,
+  getPublicSupabaseConfig,
+  parseSessionCookie,
+} from "@/lib/supabase/constants";
 
 /**
- * Auth gate (Next 16 `proxy` convention — successor to `middleware`).
+ * Auth gate (Next 16 `proxy` convention — successor to `middleware`), and the
+ * one place the access token is kept alive.
+ *
  * Unauthenticated visitors to protected routes are redirected to /sign-in;
  * authenticated visitors to the login screens are sent to /dashboard.
  *
- * Presence of a valid session cookie is the signal — token *validation* (and
- * refresh) happens in the browser client and in server components via
- * `getServerUser()`. This avoids bouncing users whose short-lived access token
- * expired but who still hold a refresh token.
+ * REFRESH, and why it is here. A Supabase access token lives an hour. The
+ * browser client refreshes it on a timer, which is fine while a tab is awake —
+ * but an agent who leaves the generator open over lunch comes back to a token
+ * that died twenty minutes ago, and the first thing they click is a server
+ * action that reads the cookie, finds it expired and answers «انتهت الجلسة».
+ * They had not gone anywhere.
+ *
+ * The proxy sees every one of those requests, including server actions, and it
+ * is the only layer that can WRITE a cookie back (an RSC cannot). So when the
+ * token is spent or nearly so, it is exchanged for a new one here and set on
+ * both the forwarded request and the response — so the action running inside
+ * THIS request already sees the fresh token, not the next one.
  */
+
+/**
+ * Refresh this far before expiry. Long enough that a slow page never races the
+ * deadline, short enough that an ordinary minute of clicking costs nothing: the
+ * exchange runs on the one request that crosses the line, not on every request.
+ */
+const REFRESH_MARGIN_SECONDS = 5 * 60;
+
+type RefreshedSession = { cookieValue: string } | null;
+
+/**
+ * Trade the refresh token for a new session.
+ *
+ * Returns the serialized cookie value to store, or null when the refresh token
+ * is itself spent — which is a real logout, and the caller treats it as one.
+ */
+async function refreshSession(refreshToken: string): Promise<RefreshedSession> {
+  const config = getPublicSupabaseConfig();
+  if (!config) return null;
+  try {
+    const res = await fetch(`${config.url}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST",
+      headers: { apikey: config.anonKey, "content-type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const session = (await res.json()) as { access_token?: string; expires_in?: number; expires_at?: number };
+    if (!session.access_token) return null;
+    // supabase-js persists whatever it was handed, and reads `expires_at` back.
+    // The endpoint usually sends it; compute it when it does not, or the very
+    // next request thinks the brand-new token is already stale and refreshes
+    // again, forever.
+    const withExpiry = {
+      ...session,
+      expires_at:
+        typeof session.expires_at === "number"
+          ? session.expires_at
+          : Math.floor(Date.now() / 1000) + (session.expires_in ?? 3600),
+    };
+    return { cookieValue: encodeURIComponent(JSON.stringify(withExpiry)) };
+  } catch {
+    return null;
+  }
+}
 
 // `/voucher` is public in the same sense `/client-offer` is: the traveller who
 // holds the link is not a system user. It is NOT unguarded — the route handler
@@ -50,7 +110,7 @@ function isPublic(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // FAIL-SAFE: this runs on the hosting edge for every page view. If anything
   // in here ever throws, visitors would get the host's "edge function crashed"
   // page — so on error we fail OPEN and serve the request. That only skips the
@@ -59,12 +119,50 @@ export function proxy(request: NextRequest) {
   try {
     const { pathname } = request.nextUrl;
     const session = parseSessionCookie(request.cookies.get(AUTH_STORAGE_KEY)?.value);
-    const isAuthed = session !== null;
+
+    // Spent, or close enough that this request could outlive it.
+    const now = Math.floor(Date.now() / 1000);
+    const expiring =
+      session !== null &&
+      session.refreshToken !== null &&
+      (session.expiresAt === null || session.expiresAt - now < REFRESH_MARGIN_SECONDS);
+
+    let refreshedCookie: string | null = null;
+    let isAuthed = session !== null;
+
+    if (expiring && session?.refreshToken) {
+      const next = await refreshSession(session.refreshToken);
+      if (next) {
+        refreshedCookie = next.cookieValue;
+        // The forwarded request carries the new token, so a server action in
+        // THIS request reads the fresh one rather than the corpse.
+        request.cookies.set(AUTH_STORAGE_KEY, next.cookieValue);
+      } else if (session.expiresAt !== null && session.expiresAt <= now) {
+        // The refresh token is spent too — this is a genuine logout, not a
+        // blip. Anything less and the agent loops on a dead session.
+        isAuthed = false;
+      }
+    }
+
+    /** Carry a refreshed cookie onto whatever answer we give. */
+    const withCookie = (response: NextResponse): NextResponse => {
+      if (refreshedCookie) {
+        response.cookies.set({
+          name: AUTH_STORAGE_KEY,
+          value: refreshedCookie,
+          path: "/",
+          maxAge: AUTH_COOKIE_MAX_AGE,
+          sameSite: "lax",
+          secure: request.nextUrl.protocol === "https:",
+        });
+      }
+      return response;
+    };
 
     // Logged-in users shouldn't see the login screens. The main dashboard now
     // embeds the executive overview for roles that hold pricing.internal.
     if (isAuthed && LOGIN_PATHS.has(pathname)) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      return withCookie(NextResponse.redirect(new URL("/dashboard", request.url)));
     }
 
     // Everything that isn't public requires a session.
@@ -74,7 +172,7 @@ export function proxy(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    return NextResponse.next();
+    return withCookie(NextResponse.next({ request }));
   } catch {
     return NextResponse.next();
   }

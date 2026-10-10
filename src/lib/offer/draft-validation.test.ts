@@ -124,7 +124,7 @@ describe("validateDraft", () => {
   it("BLOCKS on a hotel missing room type / board and attributes it to hotels", () => {
     const data = completeDraft();
     // through withRooms — the rooms array is the truth, the scalars only mirror it
-    data.hotels[1] = withRooms(data.hotels[1], [{ room_type_id: null, room_type_name: "", board_type: null }]);
+    data.hotels[1] = withRooms(data.hotels[1], [{ room_type_id: null, room_type_name: "", board_type: null, price: null }]);
     const result = validateDraft(data);
     expect(result.ok).toBe(false);
     const violation = result.blocking.find((i) => i.invariant?.code === "hotel_missing_room_or_board");

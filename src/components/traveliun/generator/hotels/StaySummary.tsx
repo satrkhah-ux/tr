@@ -2,7 +2,7 @@
 
 import { Pencil, RefreshCw, Repeat2, Star } from "lucide-react";
 import { DirText } from "@/components/DirText";
-import { BOARD_LABEL_KEYS, type DraftHotel } from "@/lib/offer/draft-types";
+import { BOARD_LABEL_KEYS, type DraftHotel, stayTotal } from "@/lib/offer/draft-types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 
 /**
@@ -37,7 +37,8 @@ export function StaySummary({
   const { t } = useTraveliunUI();
   const s = line.sourcing;
 
-  const total = s ? s.sell_base : line.manual_price;
+  // Every room added up — a double and a triple are two different numbers.
+  const total = s ? s.sell_base : stayTotal(line);
   const currency = s ? "SAR" : line.manual_currency;
   const perNight = total != null && nights > 0 ? Math.round((total / nights) * 100) / 100 : null;
   const room = s?.room_name || line.room_type_name;
