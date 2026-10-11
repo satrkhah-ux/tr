@@ -193,21 +193,21 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.cars", href: "/cars" },
       { labelKey: "nav.transfers", href: "/cars/transfers" },
       { labelKey: "nav.tours", href: "/cars/tours" },
+      { labelKey: "nav.tourPrograms", href: "/tour-programs" },
       { labelKey: "nav.drivers", href: "/drivers" },
       { labelKey: "nav.serviceTypes", href: "/services-types", captionKey: "nav.services" },
       { labelKey: "nav.servicesByCountry", href: "/services" },
       { labelKey: "nav.visaTypes", href: "/visas-types", captionKey: "nav.visas" },
-      { labelKey: "nav.tourPrograms", href: "/tour-programs" },
       { labelKey: "nav.visas", href: "/visas" },
       { labelKey: "nav.kanban", href: "/kanban-board", captionKey: "nav.kanban" },
       // Moved out of «البكجات السياحية»: the generator READS these, it does not
       // live in them. They are maintained here with the other reference tables.
       { labelKey: "nav.hotelSuppliers", href: "/settings/suppliers", captionKey: "nav.hotelSuppliers" },
+      { labelKey: "nav.companySuppliers", href: "/company-suppliers" },
       { labelKey: "nav.markupRules", href: "/markup-rules" },
       { labelKey: "nav.offerIncludes", href: "/offers/offer-includes" },
       { labelKey: "nav.offerExcludes", href: "/offers/offer-not-includes" },
       { labelKey: "nav.terms", href: "/offers/terms-and-conditions" },
-      { labelKey: "nav.companySuppliers", href: "/company-suppliers" },
     ],
   },
 
