@@ -17,7 +17,16 @@
  * the money is lost.
  */
 
-import { deriveCityDates, deriveHotelStays, pricingRefFor, stayTotal, type DraftData } from "./draft-types";
+import {
+  deriveCityDates,
+  deriveHotelStays,
+  pricingRefFor,
+  stayTotal,
+  TRANSPORT_AIRPORT,
+  TRANSPORT_HOTEL_PREFIX,
+  TRANSPORT_TOURS,
+  type DraftData,
+} from "./draft-types";
 import { itineraryStartDate } from "./schedule";
 import type { DraftPricingItem } from "./draft-types";
 
@@ -28,7 +37,14 @@ export type TransferPrice = {
   car_type: string | null;
   price: number;
   currency: string | null;
+  /** when the row was written — two rows for one road and vehicle, the newer wins. */
+  created_at?: string | null;
+  /** the old system's row id, for imported rows — what orders them when the timestamp cannot. */
+  legacy_id?: number | null;
 };
+
+/** One of the agency's own vehicles — what «نوع السيارة» can be. */
+export type FleetVehicle = { name: string; pax: number };
 
 /** A per-country service price from the reference list. */
 export type ServicePrice = {
@@ -54,6 +70,7 @@ export type PricingReference = {
   transfers: TransferPrice[];
   services: ServicePrice[];
   rooms: RoomPrice[];
+  fleet: FleetVehicle[];
 };
 
 /**
@@ -85,38 +102,114 @@ function vehicleCount(carType: string | null | undefined): number {
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
+/** Two rows for the same road and vehicle: the newer one is the price. */
+function latest(rows: TransferPrice[]): TransferPrice {
+  const time = (row: TransferPrice) => (row.created_at ? Date.parse(row.created_at) || 0 : 0);
+  return rows.reduce((best, row) => {
+    if (time(row) !== time(best)) return time(row) > time(best) ? row : best;
+    // The legacy import stamped every row with one timestamp and kept the
+    // retired prices beside the current one. The old system's current price is
+    // always the row it wrote LAST (452 roads of 452) — and never the higher
+    // number: retired prices run both ways, some in another currency.
+    // ponytail: a road whose every legacy row was retired still quotes the last
+    // of them. Upgrade: delete the retired legacy rows.
+    return (row.legacy_id ?? -1) > (best.legacy_id ?? -1) ? row : best;
+  });
+}
+
 /**
  * The price of one leg.
  *
- * A route is matched in BOTH directions: the list holds «إسطنبول → المطار» and
- * the programme needs the way back too, and it is the same car over the same
- * road. The vehicle must match exactly — a sedan's price on a 40-seat bus is
- * not an approximation, it is a wrong number.
+ * The exact direction first, the reverse only when the list knows the road one
+ * way: the way back is the same car over the same road, but some roads ARE
+ * priced per direction (جوهور بارو ↔ جنتنج on the 16-seat bus: 1000 one way,
+ * 1100 the other). The vehicle must match exactly — a sedan's price on a
+ * 40-seat bus is not an approximation, it is a wrong number.
+ *
+ * No vehicle chosen yet: the smallest of the agency's own vehicles that seats
+ * the group AND has a price on this road. The old "cheapest on the road"
+ * priced a two-seat car for nine people.
  */
 export function findTransferPrice(
   list: TransferPrice[],
   from: string,
   to: string,
   carType: string | null,
+  pax = 1,
+  fleet: FleetVehicle[] = [],
 ): TransferPrice | null {
   const a = normalizeName(from);
   const b = normalizeName(to);
-  const car = baseVehicle(carType);
   if (!a || !b) return null;
 
-  const sameRoute = list.filter((row) => {
-    const rf = normalizeName(row.from_city);
-    const rt = normalizeName(row.to_city);
-    return (rf === a && rt === b) || (rf === b && rt === a);
-  });
-  if (sameRoute.length === 0) return null;
+  const pick = (x: string, y: string, vehicle: string) => {
+    const rows = list.filter(
+      (row) => normalizeName(row.from_city) === x && normalizeName(row.to_city) === y && baseVehicle(row.car_type) === vehicle,
+    );
+    return rows.length > 0 ? latest(rows) : null;
+  };
+  const priceFor = (vehicle: string) => pick(a, b, vehicle) ?? pick(b, a, vehicle);
 
-  // No vehicle chosen yet: the cheapest on that road is a floor the agent can
-  // see and correct, not a guess at which car they meant.
-  if (!car) return sameRoute.reduce((low, row) => (row.price < low.price ? row : low));
+  const car = baseVehicle(carType);
+  if (car) return priceFor(car);
 
-  const exact = sameRoute.filter((row) => baseVehicle(row.car_type) === car);
-  return exact.length > 0 ? exact.reduce((low, row) => (row.price < low.price ? row : low)) : null;
+  for (const vehicle of [...fleet].sort((x, y) => x.pax - y.pax)) {
+    if (vehicle.pax < pax) continue;
+    const hit = priceFor(baseVehicle(vehicle.name));
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
+ * Airport ↔ city, when the plan only says «المطار».
+ *
+ * The list names the airport («مطار كوالالمبور الدولي → ايبوه»), so which
+ * airport is decided, in this order:
+ *   1. the airports this draft lands at (`flown` = arrival airports for the
+ *      way in, departure airports for the way out) — a transit airport drops
+ *      out on its own, having no row to this city;
+ *   2. no flights yet: the airport named after the city;
+ *   3. the only airport the list has for this city.
+ * Still more than one (Penang is reached from KUL and from PEN) → null, and
+ * the agent decides. A wrong airport is a wrong price that looks right — so
+ * flights that name an airport the list spells differently («مطار صبيحة كوكجن»
+ * against «مطار صبيحة جوكشين الدولي») never fall back to the city's namesake.
+ */
+export function findAirportTransfer(
+  list: TransferPrice[],
+  city: string,
+  leaving: boolean,
+  flown: string[],
+  carType: string | null,
+  pax = 1,
+  fleet: FleetVehicle[] = [],
+): TransferPrice | null {
+  const c = normalizeName(city);
+  if (!c) return null;
+
+  const isAirport = (name: string) => normalizeName(name).includes("مطار");
+  const rows = list.filter(
+    (row) =>
+      (isAirport(row.from_city) && normalizeName(row.to_city) === c) ||
+      (isAirport(row.to_city) && normalizeName(row.from_city) === c),
+  );
+  const airports = [...new Set(rows.map((row) => normalizeName(isAirport(row.from_city) ? row.from_city : row.to_city)))];
+  // «مطار كوالالمبور الدولي (KUL)» is how a flight stores it; the list has the name.
+  // The airports table and the list name the same airport two ways («مطار إسطنبول»
+  // and «مطار اسطنبول الدولي»), so either name containing the other is a match.
+  const flownNames = flown.map((a) => normalizeName(a.replace(/\s*\([A-Z0-9]{3,5}\)\s*$/, ""))).filter(Boolean);
+
+  const byFlight = airports.filter((a) => flownNames.some((f) => a.includes(f) || f.includes(a)));
+  const byName = airports.filter((a) => a.includes(c));
+  const pool = byFlight.length > 0 ? byFlight : flownNames.length > 0 ? airports : byName.length > 0 ? byName : airports;
+  if (pool.length !== 1) return null;
+
+  // The departure leg is the same road the other way: city → airport is tried
+  // first, and findTransferPrice falls back to the arrival row.
+  return leaving
+    ? findTransferPrice(rows, c, pool[0], carType, pax, fleet)
+    : findTransferPrice(rows, pool[0], c, carType, pax, fleet);
 }
 
 /** The agency's price for a named service in this country. */
@@ -227,16 +320,54 @@ export function suggestPricing(
     });
   }
 
+  // The derived rows say «المطار» and «فندق ايبوه»; the list says
+  // «مطار كوالالمبور الدولي» and «ايبوه». The labels are read back as keys.
+  const pax = Math.max(data.trip.adults + data.trip.children, 1);
+  // The way in is priced from where the flights land, the way out from where
+  // they leave: arriving at SAW and leaving from IST are two different roads.
+  const landed = data.flights.map((f) => f.to_airport);
+  const departed = data.flights.map((f) => f.from_airport);
+  const hotelCity = (place: string) =>
+    place.startsWith(TRANSPORT_HOTEL_PREFIX) ? place.slice(TRANSPORT_HOTEL_PREFIX.length) : place;
+  // 0 is how the old system left a price blank, not a price: quoted as one, it
+  // is a free transfer that no «بلا سعر» count would ever flag.
+  const transfers = reference.transfers.filter((row) => row.price > 0);
+
   for (const tr of data.transport) {
-    const hit = findTransferPrice(reference.transfers, tr.from_place, tr.to_place, tr.car_type);
+    const arriving = tr.from_place === TRANSPORT_AIRPORT;
+    const leaving = tr.to_place === TRANSPORT_AIRPORT;
+    const hit =
+      // One line for every tour of the trip, and the list cannot say which
+      // tours the package holds. Never through transfers: a same-city row there
+      // is a move from one hotel to another, not a tour day.
+      tr.from_place === TRANSPORT_TOURS
+        ? null
+        : arriving || leaving
+          ? findAirportTransfer(
+              transfers,
+              hotelCity(arriving ? tr.to_place : tr.from_place),
+              leaving,
+              leaving ? departed : landed,
+              tr.car_type,
+              pax,
+              reference.fleet,
+            )
+          : findTransferPrice(transfers, tr.from_place, tr.to_place, tr.car_type, pax, reference.fleet);
     items.push({
       item_type: "transport",
       description: `${tr.from_place} ← ${tr.to_place}${tr.car_type ? ` (${tr.car_type})` : ""}`,
+      // The vehicle is part of the ref: a leg re-planned from one car to two
+      // vans is a different line, not the old one with a new price on it.
+      ref: `transport:${tr.from_place}>${tr.to_place}>${tr.car_type ?? ""}`,
       // «فان × 2» is two vehicles at the one-vehicle price.
       quantity: vehicleCount(tr.car_type),
-      buy_price: null,
+      // The list price is what the agency PAYS — the legacy system put its
+      // margin in the exchange rate. Both sides carry it: the profit controls
+      // appear (they need a buy), and an agent without the internal view still
+      // sees a figure rather than a total that silently left the car out.
+      buy_price: hit?.price ?? null,
       buy_currency: hit?.currency || currency,
-      sell_price: hit ? hit.price : null,
+      sell_price: hit?.price ?? null,
       sell_currency: hit?.currency || currency,
       source: hit ? "list" : "none",
     });
@@ -283,18 +414,49 @@ export function suggestPricing(
  * Re-running after the programme changed must add the new city's hotel without
  * touching the fare someone negotiated an hour ago — so an existing line wins
  * on its ref, or on its description for the files written before refs existed.
+ *
+ * The one exception is a line with NO price at all: it is filled, because a
+ * re-run after the price list was fixed must be able to price the lines an
+ * earlier run left empty. Anything a human priced — either side — is left alone.
+ * Only a suggestion with a SELL price fills: a buy alone leaves the client
+ * figure empty, and would mark the line as priced so no later run could fix it.
+ *
+ * A line with a ref is filled from that ref alone: one hotel stayed in twice
+ * is two lines with one description, and each stay has its own price.
  */
 export function mergeSuggestions(
   existing: DraftPricingItem[],
   suggested: SuggestedItem[],
-): { items: DraftPricingItem[]; added: number; priced: number } {
+): { items: DraftPricingItem[]; added: number; filled: number; priced: number } {
   const byRef = new Set(existing.map((i) => i.ref).filter(Boolean) as string[]);
   const byText = new Set(existing.map((i) => i.description.trim()));
 
+  let filled = 0;
+  const kept = existing.map((line) => {
+    if (line.buy_price != null || line.sell_price != null) return line;
+    const hit = suggested.find(
+      (s) =>
+        s.item_type === line.item_type &&
+        (line.ref ? s.ref === line.ref : s.description.trim() === line.description.trim()) &&
+        s.sell_price != null,
+    );
+    if (!hit) return line;
+    filled++;
+    return {
+      ...line,
+      buy_price: hit.buy_price,
+      buy_currency: hit.buy_currency,
+      sell_price: hit.sell_price,
+      sell_currency: hit.sell_currency,
+    };
+  });
+
   const fresh = suggested.filter((s) => !(s.ref && byRef.has(s.ref)) && !byText.has(s.description.trim()));
   return {
-    items: [...existing, ...fresh.map(({ source: _source, ...item }) => item)],
+    items: [...kept, ...fresh.map(({ source: _source, ...item }) => item)],
     added: fresh.length,
-    priced: fresh.filter((s) => s.sell_price != null).length,
+    filled,
+    // every line this run gave a number — new or filled
+    priced: fresh.filter((s) => s.sell_price != null).length + filled,
   };
 }

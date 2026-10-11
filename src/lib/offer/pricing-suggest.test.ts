@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { emptyDraftData, normalizeDraftHotel, withRooms, type DraftData, type DraftHotelSourcing } from "./draft-types";
+import {
+  deriveTransportRows,
+  emptyDraftData,
+  emptyTransportPlan,
+  normalizeDraftHotel,
+  withRooms,
+  type DraftData,
+  type DraftHotelSourcing,
+  type DraftPricingItem,
+} from "./draft-types";
 
 /** A supplier quote prices the STAY; the rooms under it carry none. */
 const SUPPLIER_RATE: DraftHotelSourcing = {
@@ -9,6 +18,7 @@ const SUPPLIER_RATE: DraftHotelSourcing = {
   min_margin_pct: null, cancellation_policy: "", excluded_surcharges: [],
 } as unknown as DraftHotelSourcing;
 import {
+  findAirportTransfer,
   findRoomPrice,
   findServicePrice,
   findTransferPrice,
@@ -26,7 +36,7 @@ import {
  */
 
 const LABELS = { hotel: "فندق", airline: "الناقل" };
-const EMPTY: PricingReference = { transfers: [], services: [], rooms: [] };
+const EMPTY: PricingReference = { transfers: [], services: [], rooms: [], fleet: [] };
 
 describe("normalizeName", () => {
   it("reads the spellings the two systems actually use as the same place", () => {
@@ -37,33 +47,129 @@ describe("normalizeName", () => {
 });
 
 describe("findTransferPrice", () => {
+  // Shaped like the real list: the airport by its full name, the city by its own.
   const list = [
-    { from_city: "المطار", to_city: "إسطنبول", car_type: "سيارة صغيرة", price: 120, currency: "USD" },
-    { from_city: "المطار", to_city: "إسطنبول", car_type: "باص 40 مقعد", price: 400, currency: "USD" },
-    { from_city: "المطار", to_city: "اسطنبول", car_type: "سيارة صغيرة", price: 90, currency: "USD" },
+    { from_city: "مطار اسطنبول الدولي", to_city: "إسطنبول", car_type: "سيارة صغيرة", price: 120, currency: "USD" },
+    { from_city: "مطار اسطنبول الدولي", to_city: "إسطنبول", car_type: "باص 40 مقعد", price: 400, currency: "USD" },
+    { from_city: "مطار اسطنبول الدولي", to_city: "إسطنبول", car_type: "فان", price: 200, currency: "USD" },
+  ];
+  const fleet = [
+    { name: "باص 40 مقعد", pax: 40 },
+    { name: "سيارة صغيرة", pax: 3 },
+    { name: "سيارة متوسطة", pax: 5 }, // seats five, but has no price on this road
+    { name: "فان", pax: 8 },
   ];
 
-  it("matches the route in BOTH directions — the way back is the same road", () => {
-    const hit = findTransferPrice(list, "اسطنبول", "المطار", "سيارة صغيرة");
-    expect(hit?.price).toBe(90);
+  it("uses the arrival row for the way back when the list knows the road one way", () => {
+    expect(findTransferPrice(list, "اسطنبول", "مطار إسطنبول الدولي", "سيارة صغيرة")?.price).toBe(120);
+  });
+
+  it("takes the exact direction before the reverse — some roads are priced per direction", () => {
+    const road = [
+      { from_city: "جوهور بارو", to_city: "جنتنج", car_type: "باص 16 راكب", price: 1000, currency: "MYR" },
+      { from_city: "جنتنج", to_city: "جوهور بارو", car_type: "باص 16 راكب", price: 1100, currency: "MYR" },
+    ];
+    expect(findTransferPrice(road, "جوهور بارو", "جنتنج", "باص 16 راكب")?.price).toBe(1000);
+    expect(findTransferPrice(road, "جنتنج", "جوهور بارو", "باص 16 راكب")?.price).toBe(1100);
   });
 
   it("refuses to price a bus at a car's rate", () => {
     // The dangerous near-miss: the route matches, the vehicle does not. A
-    // guess here is 90 USD on a coach.
-    expect(findTransferPrice(list, "المطار", "إسطنبول", "ميني فان")).toBeNull();
+    // guess here is a car's price on a coach.
+    expect(findTransferPrice(list, "مطار اسطنبول الدولي", "إسطنبول", "ميني فان")).toBeNull();
   });
 
   it("ignores the «× 2» the count appends — the list price is per vehicle", () => {
-    expect(findTransferPrice(list, "المطار", "إسطنبول", "باص 40 مقعد × 3")?.price).toBe(400);
+    expect(findTransferPrice(list, "مطار اسطنبول الدولي", "إسطنبول", "باص 40 مقعد × 3")?.price).toBe(400);
   });
 
-  it("with no vehicle chosen, offers the cheapest on that road as a floor", () => {
-    expect(findTransferPrice(list, "المطار", "إسطنبول", null)?.price).toBe(90);
+  it("with no vehicle chosen, prices the smallest vehicle that seats the group AND has a row", () => {
+    // five travellers: the car seats three, the medium car has no price here
+    expect(findTransferPrice(list, "مطار اسطنبول الدولي", "إسطنبول", null, 5, fleet)?.car_type).toBe("فان");
+    expect(findTransferPrice(list, "مطار اسطنبول الدولي", "إسطنبول", "", 2, fleet)?.price).toBe(120);
+    // nothing seats fifty: no price, not the biggest car's
+    expect(findTransferPrice(list, "مطار اسطنبول الدولي", "إسطنبول", null, 50, fleet)).toBeNull();
+    // and without the fleet it does not guess at all
+    expect(findTransferPrice(list, "مطار اسطنبول الدولي", "إسطنبول", null, 2, [])).toBeNull();
+  });
+
+  it("takes the newer of two rows for one road, and the last legacy row on a timestamp tie", () => {
+    const row = { from_city: "مطار اسطنبول الدولي", to_city: "إسطنبول", car_type: "سيارة صغيرة", currency: "USD" };
+    const dated = [
+      { ...row, price: 150, created_at: "2025-01-01T00:00:00+00:00" },
+      { ...row, price: 100, created_at: "2026-02-01T00:00:00+00:00" },
+    ];
+    expect(findTransferPrice(dated, "مطار اسطنبول الدولي", "إسطنبول", "سيارة صغيرة")?.price).toBe(100);
+    // the legacy import: one timestamp for everything, the retired prices kept —
+    // higher (45 over the current 40) and in another currency (200 MYR)
+    const at = "2026-09-01T10:00:00+00:00";
+    const legacy = [
+      { ...row, price: 45, created_at: at, legacy_id: 310 },
+      { ...row, price: 200, currency: "MYR", created_at: at, legacy_id: 512 },
+      { ...row, price: 40, created_at: at, legacy_id: 1404 },
+      { ...row, price: 30, created_at: at, legacy_id: 77 },
+    ];
+    expect(findTransferPrice(legacy, "مطار اسطنبول الدولي", "إسطنبول", "سيارة صغيرة")).toMatchObject({
+      price: 40,
+      currency: "USD",
+    });
   });
 
   it("says nothing rather than something, for a road it does not know", () => {
-    expect(findTransferPrice(list, "المطار", "طرابزون", "سيارة صغيرة")).toBeNull();
+    expect(findTransferPrice(list, "مطار اسطنبول الدولي", "طرابزون", "سيارة صغيرة")).toBeNull();
+  });
+});
+
+/** Malaysia, as the list holds it: three airports, and a city two of them serve. */
+const MY = [
+  { from_city: "مطار كوالالمبور الدولي", to_city: "كوالالمبور", car_type: "سيارة صغيرة", price: 130, currency: "MYR" },
+  { from_city: "مطار كوالالمبور الدولي", to_city: "بينانج", car_type: "سيارة صغيرة", price: 900, currency: "MYR" },
+  { from_city: "مطار بينانج الدولي", to_city: "بينانج", car_type: "سيارة صغيرة", price: 100, currency: "MYR" },
+  { from_city: "مطار كوالالمبور الدولي", to_city: "جنتنج", car_type: "سيارة صغيرة", price: 300, currency: "MYR" },
+  { from_city: "مطار سوبانج", to_city: "جنتنج", car_type: "سيارة صغيرة", price: 280, currency: "MYR" },
+  { from_city: "ايبوه", to_city: "كوالالمبور", car_type: "سيارة صغيرة", price: 600, currency: "MYR" },
+  // a move from one hotel to another in the same city — NOT a tour
+  { from_city: "ايبوه", to_city: "ايبوه", car_type: "سيارة صغيرة", price: 200, currency: "MYR" },
+];
+const MY_FLEET = [{ name: "سيارة صغيرة", pax: 3 }];
+
+/** Turkey: the airports table and the list spell the same airports differently. */
+const TR = [
+  { from_city: "مطار اسطنبول الدولي", to_city: "اسطنبول", car_type: "فيتو", price: 40, currency: "USD" },
+  { from_city: "مطار صبيحة جوكشين الدولي", to_city: "اسطنبول", car_type: "فيتو", price: 45, currency: "USD" },
+];
+
+describe("findAirportTransfer", () => {
+  it("resolves «المطار» to the city's airport, and the departure uses the same row reversed", () => {
+    expect(findAirportTransfer(MY, "كوالالمبور", false, [], "سيارة صغيرة")?.price).toBe(130);
+    expect(findAirportTransfer(MY, "كوالالمبور", true, [], "سيارة صغيرة")?.price).toBe(130);
+  });
+
+  it("gives up when two airports serve the city and nothing says which", () => {
+    expect(findAirportTransfer(MY, "جنتنج", false, [], "سيارة صغيرة")).toBeNull();
+  });
+
+  it("lets the flights decide the airport, and a transit airport drop out", () => {
+    expect(findAirportTransfer(MY, "جنتنج", false, ["مطار سوبانج (SZB)"], "سيارة صغيرة")?.price).toBe(280);
+    expect(findAirportTransfer(MY, "بينانج", false, ["مطار بينانج الدولي (PEN)"], "سيارة صغيرة")?.price).toBe(100);
+    // DOH is in the flights but has no road to the city
+    const flown = ["مطار حمد الدولي (DOH)", "مطار كوالالمبور الدولي (KUL)"];
+    expect(findAirportTransfer(MY, "كوالالمبور", false, flown, "سيارة صغيرة")?.price).toBe(130);
+  });
+
+  it("without flights, takes the airport named after the city", () => {
+    expect(findAirportTransfer(MY, "بينانج", false, [], "سيارة صغيرة")?.price).toBe(100);
+  });
+
+  it("matches a flight's airport to the list's longer spelling of it", () => {
+    const flown = ["مطار الملك خالد الدولي (RUH)", "مطار إسطنبول (IST)"];
+    expect(findAirportTransfer(TR, "اسطنبول", false, flown, "فيتو")?.price).toBe(40);
+  });
+
+  it("never prices a flown airport it cannot place as the city's namesake airport", () => {
+    // «كوكجن» against «جوكشين»: no match, and IST's 40 is NOT the Sabiha price
+    const flown = ["مطار الملك خالد الدولي (RUH)", "مطار صبيحة كوكجن (SAW)"];
+    expect(findAirportTransfer(TR, "اسطنبول", false, flown, "فيتو")).toBeNull();
   });
 });
 
@@ -173,6 +279,85 @@ describe("suggestPricing — the order of trust", () => {
   });
 });
 
+/** The Malaysia draft: arrive in Ipoh, leave from Kuala Lumpur, two travellers, no vehicle chosen. */
+function malaysiaDraft(): DraftData {
+  const data = emptyDraftData();
+  data.trip = { ...data.trip, country: "ماليزيا", adults: 2, children: 0 };
+  data.cities = [
+    { city_name: "ايبوه", nights: 2, check_in: null, check_out: null },
+    { city_name: "كوالالمبور", nights: 3, check_in: null, check_out: null },
+  ];
+  data.transport = deriveTransportRows(emptyTransportPlan(), data.cities);
+  return data;
+}
+
+/** The same draft with the airport vehicle chosen. */
+function withAirportCar(data: DraftData, car_type: string, cars = 1): DraftData {
+  const plan = { ...emptyTransportPlan(), airport: { enabled: true, car_type, cars, note: "" } };
+  return { ...data, transport: deriveTransportRows(plan, data.cities) };
+}
+
+const flight = (from_airport: string, to_airport: string): DraftData["flights"][number] => ({
+  airline: "الخطوط السعودية", airline_iata: "SV", flight_no: "1", from_airport, to_airport,
+  departure_at: null, arrival_at: null, from_tz: null, to_tz: null, date_user_set: false,
+  cabin_class: "", baggage_allowance: "", baggage_kg: null, baggage_pieces: null,
+  cabin_baggage_kg: null, leg_order: "outbound",
+});
+
+describe("suggestPricing — transport", () => {
+  const transport = () =>
+    suggestPricing(malaysiaDraft(), { ...EMPTY, transfers: MY, fleet: MY_FLEET }, LABELS).filter(
+      (i) => i.item_type === "transport",
+    );
+
+  it("prices the departure from the airport row, buy AND sell, in the list's currency", () => {
+    const leave = transport().find((i) => i.description.startsWith("فندق كوالالمبور"));
+    expect(leave?.buy_price).toBe(130);
+    expect(leave?.sell_price).toBe(130);
+    expect(leave?.sell_currency).toBe("MYR");
+    expect(leave?.source).toBe("list");
+  });
+
+  it("leaves a road the list does not know unpriced — null, never 0", () => {
+    const arrive = transport().find((i) => i.description.startsWith("المطار"));
+    expect(arrive?.sell_price).toBeNull();
+    expect(arrive?.buy_price).toBeNull();
+  });
+
+  it("never prices the tours line through transfers, even with a same-city row", () => {
+    const tours = transport().find((i) => i.description.startsWith("الجولات السياحية"));
+    expect(tours?.sell_price).toBeNull();
+    expect(tours?.source).toBe("none");
+  });
+
+  it("never quotes a 0 — the old system's blank — as a price", () => {
+    const zero = [
+      { from_city: "مطار كوالالمبور الدولي", to_city: "كوالالمبور", car_type: "سيارة صغيرة", price: 0, currency: "MYR" },
+      { from_city: "مطار كوالالمبور الدولي", to_city: "كوالالمبور", car_type: "فان", price: 200, currency: "MYR" },
+    ];
+    const fleet = [{ name: "سيارة صغيرة", pax: 3 }, { name: "فان", pax: 8 }];
+    const leave = (data: DraftData) =>
+      suggestPricing(data, { ...EMPTY, transfers: zero, fleet }, LABELS).find((i) => i.description.startsWith("فندق كوالالمبور"));
+    // the small car chosen: it has no real price on this road
+    expect(leave(withAirportCar(malaysiaDraft(), "سيارة صغيرة"))?.sell_price).toBeNull();
+    // none chosen: the smallest vehicle with a REAL price
+    expect(leave(malaysiaDraft())?.sell_price).toBe(200);
+  });
+
+  it("prices the way in from where the flights land, the way out from where they leave", () => {
+    const data = malaysiaDraft();
+    data.cities = [{ city_name: "اسطنبول", nights: 3, check_in: null, check_out: null }];
+    data.transport = deriveTransportRows(emptyTransportPlan(), data.cities);
+    data.flights = [
+      flight("مطار الملك خالد الدولي (RUH)", "مطار صبيحة جوكشين الدولي (SAW)"),
+      flight("مطار اسطنبول الدولي (IST)", "مطار الملك خالد الدولي (RUH)"),
+    ];
+    const items = suggestPricing(data, { ...EMPTY, transfers: TR, fleet: [{ name: "فيتو", pax: 8 }] }, LABELS);
+    expect(items.find((i) => i.description.startsWith("المطار"))?.sell_price).toBe(45); // SAW
+    expect(items.find((i) => i.description.startsWith("فندق اسطنبول"))?.sell_price).toBe(40); // IST
+  });
+});
+
 describe("mergeSuggestions", () => {
   it("adds what is missing and never touches a price already negotiated", () => {
     const existing = [
@@ -185,6 +370,62 @@ describe("mergeSuggestions", () => {
     const merged = mergeSuggestions(existing, suggested);
     expect(merged.added).toBe(0);
     expect(merged.items[0].sell_price).toBe(999);
+  });
+
+  it("fills a line with no price on either side, and leaves a priced one alone", () => {
+    const line = (description: string, sell: number | null): DraftPricingItem => ({
+      item_type: "transport", description, quantity: 1,
+      buy_price: null, buy_currency: "SAR", sell_price: sell, sell_currency: "SAR",
+    });
+    const existing = [line("فندق كوالالمبور ← المطار", null), line("المطار ← فندق ايبوه", 500)];
+    const suggested = suggestPricing(malaysiaDraft(), { ...EMPTY, transfers: MY, fleet: MY_FLEET }, LABELS).filter(
+      (i) => i.item_type === "transport",
+    );
+    const merged = mergeSuggestions(existing, suggested);
+    expect(merged.filled).toBe(1);
+    expect(merged.items[0]).toMatchObject({ buy_price: 130, sell_price: 130, sell_currency: "MYR" });
+    expect(merged.items[1].sell_price).toBe(500);
+    expect(merged.added).toBe(1); // the tours line, still unpriced
+    expect(merged.priced).toBe(1);
+  });
+
+  it("fills each stay from its own ref, even when two stays read the same", () => {
+    // one hotel stayed in twice: one description, two stays, two prices
+    const stay = (ref: string, sell: number | null): DraftPricingItem => ({
+      item_type: "hotel", description: "إسطنبول — هيلتون", ref, quantity: 1,
+      buy_price: null, buy_currency: "SAR", sell_price: sell, sell_currency: "SAR",
+    });
+    const merged = mergeSuggestions(
+      [stay("s1", null), stay("s2", null)],
+      [{ ...stay("s1", 2000), source: "typed" }, { ...stay("s2", 4500), source: "typed" }],
+    );
+    expect(merged.items.map((i) => i.sell_price)).toEqual([2000, 4500]);
+  });
+
+  it("treats a re-planned vehicle as a new line, not a new price on the old one", () => {
+    const vans = [
+      ...MY,
+      { from_city: "مطار كوالالمبور الدولي", to_city: "كوالالمبور", car_type: "فان", price: 250, currency: "MYR" },
+    ];
+    // first run: no vehicle and no fleet, so nothing priced
+    const before = mergeSuggestions([], suggestPricing(malaysiaDraft(), { ...EMPTY, transfers: vans }, LABELS)).items;
+    // then two vans: one van's price on a one-car line would bill half the road
+    const after = suggestPricing(withAirportCar(malaysiaDraft(), "فان", 2), { ...EMPTY, transfers: vans }, LABELS);
+    const leave = mergeSuggestions(before, after).items.filter((i) => i.description.startsWith("فندق كوالالمبور"));
+    expect(leave).toHaveLength(2);
+    expect(leave[0].sell_price).toBeNull(); // the stale line, still counted as unpriced
+    expect(leave[1]).toMatchObject({ description: "فندق كوالالمبور ← المطار (فان × 2)", quantity: 2, sell_price: 250 });
+  });
+
+  it("does not fill from a buy price alone — the client figure would still be empty", () => {
+    const line: DraftPricingItem = {
+      item_type: "service", description: "شريحة اتصال", quantity: 1,
+      buy_price: null, buy_currency: "SAR", sell_price: null, sell_currency: "SAR",
+    };
+    const buyOnly = { ...line, buy_price: 50, source: "list" as const };
+    expect(mergeSuggestions([line], [buyOnly])).toMatchObject({ filled: 0, priced: 0 });
+    // so the run after the list gains a sell price can still fill it
+    expect(mergeSuggestions([line], [{ ...buyOnly, sell_price: 80 }])).toMatchObject({ filled: 1, priced: 1 });
   });
 
   it("reports how many of the new lines actually arrived with a number", () => {

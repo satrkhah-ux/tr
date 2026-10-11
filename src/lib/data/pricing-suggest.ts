@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { getDraft } from "./drafts";
+import { CURRENCIES } from "@/lib/offer/draft-types";
 import {
   suggestPricing,
   type PricingReference,
@@ -49,11 +50,11 @@ export async function suggestPricingForDraft(
 
     const hotelIds = [...new Set(data.hotels.map((h) => h.hotel_id).filter((id): id is string => Boolean(id)))];
 
-    const [transfersRes, servicesRes, memoryRes, historyRes] = await Promise.all([
+    const [transfersRes, servicesRes, memoryRes, historyRes, fleetRes, legacyRes] = await Promise.all([
       country
         ? supabase
             .from("transfers")
-            .select("from_city, to_city, car_type, price, currency")
+            .select("id, from_city, to_city, car_type, price, currency, created_at")
             .eq("country_id", country.id)
             .not("price", "is", null)
         : Promise.resolve({ data: [] }),
@@ -79,6 +80,21 @@ export async function suggestPricingForDraft(
             .not("sell_price", "is", null)
             .order("check_in", { ascending: false, nullsFirst: false })
             .limit(200)
+        : Promise.resolve({ data: [] }),
+      // The agency's own vehicles — what a transfer is priced in when the agent
+      // has not chosen one yet: the smallest that seats the group.
+      supabase
+        .from("transportation_types")
+        .select("arabic_name, pax_capacity")
+        .eq("category", "fleet")
+        .neq("status", "Disabled"),
+      // The legacy import stamped every transfer with one timestamp and kept the
+      // retired prices; the old system's own row id is what tells the current
+      // one apart. ponytail: the whole map in one read (~885 rows, under the API's
+      // 1000-row cap, and only a legacy import adds to it) — filter by the
+      // transfer ids if it ever grows past that.
+      country
+        ? supabase.from("legacy_id_map").select("legacy_id, new_id").eq("entity", "transfer").eq("source", "app")
         : Promise.resolve({ data: [] }),
     ]);
 
@@ -117,10 +133,29 @@ export async function suggestPricingForDraft(
         })),
     ];
 
+    // A transfer priced in a currency the sheet cannot hold would show under the
+    // wrong code in the dropdown — and be converted as that wrong code. The
+    // legacy list wrote Saudi riyals out in words; everything else unknown is
+    // dropped (the line stays unpriced, which the screen says).
+    const knownCurrency = (code: string | null): string | null => {
+      const c = code?.trim() === "ريال سعودي" ? "SAR" : (code?.trim().toUpperCase() ?? "");
+      return (CURRENCIES as readonly string[]).includes(c) ? c : null;
+    };
+    const legacyId = new Map(
+      ((legacyRes.data ?? []) as { legacy_id: number; new_id: string }[]).map((m) => [m.new_id, Number(m.legacy_id)]),
+    );
+    const transfers: TransferPrice[] = ((transfersRes.data ?? []) as (TransferPrice & { id: string })[]).flatMap((r) => {
+      const currency = knownCurrency(r.currency);
+      return currency ? [{ ...r, price: Number(r.price), currency, legacy_id: legacyId.get(r.id) ?? null }] : [];
+    });
+
     const reference: PricingReference = {
-      transfers: ((transfersRes.data ?? []) as TransferPrice[]).map((r) => ({ ...r, price: Number(r.price) })),
+      transfers,
       services: (servicesRes.data ?? []) as ServicePrice[],
       rooms,
+      fleet: ((fleetRes.data ?? []) as { arabic_name: string | null; pax_capacity: number | null }[]).flatMap((v) =>
+        v.arabic_name?.trim() && v.pax_capacity != null ? [{ name: v.arabic_name.trim(), pax: v.pax_capacity }] : [],
+      ),
     };
 
     return { ok: true, items: suggestPricing(data, reference, labels) };

@@ -717,6 +717,16 @@ export function vehicleText(leg: TransportLeg, fallback = ""): string {
 }
 
 /**
+ * The place labels `deriveTransportRows` writes. Exported because they are
+ * also KEYS: the pricing matcher reads «المطار» and «فندق X» back to find the
+ * airport and the city — a label that drifted here would silently unprice
+ * every transfer.
+ */
+export const TRANSPORT_AIRPORT = "المطار";
+export const TRANSPORT_TOURS = "الجولات السياحية";
+export const TRANSPORT_HOTEL_PREFIX = "فندق ";
+
+/**
  * The plan, turned into the rows the document already knows how to print.
  *
  * Derived rather than authored, deliberately: the offer document, the pricing
@@ -735,15 +745,15 @@ export function deriveTransportRows(plan: TransportPlan, cities: { city_name: st
 
   if (plan.airport.enabled) {
     rows.push({
-      from_place: "المطار",
-      to_place: first ? `فندق ${first}` : "الفندق",
+      from_place: TRANSPORT_AIRPORT,
+      to_place: first ? `${TRANSPORT_HOTEL_PREFIX}${first}` : "الفندق",
       car_type: vehicleText(plan.airport),
       date: cities[0]?.check_in ?? null,
       note: plan.airport.note,
     });
     rows.push({
-      from_place: last ? `فندق ${last}` : "الفندق",
-      to_place: "المطار",
+      from_place: last ? `${TRANSPORT_HOTEL_PREFIX}${last}` : "الفندق",
+      to_place: TRANSPORT_AIRPORT,
       car_type: vehicleText(plan.airport),
       date: null,
       note: plan.airport.note,
@@ -752,7 +762,7 @@ export function deriveTransportRows(plan: TransportPlan, cities: { city_name: st
 
   if (plan.tours.enabled) {
     rows.push({
-      from_place: "الجولات السياحية",
+      from_place: TRANSPORT_TOURS,
       to_place: first ?? "",
       car_type: vehicleText(plan.tours),
       date: null,

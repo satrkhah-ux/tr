@@ -51,7 +51,8 @@ with priced as (
   join legacy_app.transfers t on t.id = p.transfer_id
   left join legacy_app.cars_types ct on ct.id = p.car_type_id
   left join legacy_app.currencies cu on cu.id = p.currency_id
-  where coalesce(p.status, true)
+  -- NULL marks a RETIRED price in the legacy system; only an explicit true is current.
+  where coalesce(p.status, false)
     and not exists (
       select 1 from public.legacy_id_map m
       where m.entity = 'transfer' and m.source = 'app' and m.legacy_id = p.id

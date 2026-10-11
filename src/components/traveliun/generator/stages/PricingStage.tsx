@@ -7,7 +7,7 @@ import { Loader2, Lock, Plus, Wand2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getRates } from "@/lib/data/rates-actions";
-import { computeOfferPricing, type CurrencyRates, type LinePricing } from "@/lib/offer/pricing";
+import { applyManualProfit, computeOfferPricing, type CurrencyRates, type LinePricing } from "@/lib/offer/pricing";
 import {
   CURRENCIES,
   deriveCityDates,
@@ -69,6 +69,12 @@ export function PricingStage({ draftId, data, patch }: StageFormProps) {
   }, []);
 
   const pricing = data.pricing;
+  // An empty price field reads as "0" to a skimming eye; counting them is what
+  // stops a half-priced offer going out as a cheap one. A buy with a profit rule
+  // IS priced: its sell is derived, exactly as publishing derives it.
+  const unpriced = pricing.items.filter(
+    (item) => applyManualProfit(item.buy_price, item.sell_price, item.profit_pct, item.profit_amount) == null,
+  ).length;
   const summary = useMemo(
     () =>
       computeOfferPricing(
@@ -80,6 +86,10 @@ export function PricingStage({ draftId, data, patch }: StageFormProps) {
           buy_currency: item.buy_currency || null,
           sell_price: item.sell_price,
           sell_currency: item.sell_currency || null,
+          // the same manual profit issuing applies — without it the screen
+          // showed one total and the client was sent another
+          profit_pct: item.profit_pct,
+          profit_amount: item.profit_amount,
         })),
         rates,
         "SAR",
@@ -143,8 +153,9 @@ export function PricingStage({ draftId, data, patch }: StageFormProps) {
    *
    * Server-side: the lists are 879 transfer prices and the buy side of every
    * service, none of which belongs in a browser bundle — only the figures this
-   * draft needs come back. Existing lines are never touched, so a fare someone
-   * negotiated an hour ago survives a re-run.
+   * draft needs come back. A priced line is never touched, so a fare someone
+   * negotiated an hour ago survives a re-run; a line with no price on either
+   * side is filled, so a re-run can price what an earlier one left empty.
    */
   const [suggesting, setSuggesting] = useState(false);
   const [suggestNote, setSuggestNote] = useState<string | null>(null);
@@ -155,7 +166,7 @@ export function PricingStage({ draftId, data, patch }: StageFormProps) {
     setSuggesting(false);
     if (!result.ok) return;
     const merged = mergeSuggestions(pricing.items, result.items);
-    if (merged.added > 0) {
+    if (merged.added > 0 || merged.filled > 0) {
       setItems(merged.items);
       // Says how many arrived with a number, because the rest still need one
       // and an agent who assumes otherwise sends out a half-priced offer.
@@ -229,6 +240,11 @@ export function PricingStage({ draftId, data, patch }: StageFormProps) {
           </div>
         )}
 
+        {unpriced > 0 ? (
+          <p className="mt-3 rounded-[10px] border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2 text-[12px] font-bold text-[#a86a10]">
+            {t("pg.unpricedCount", { count: String(unpriced) })}
+          </p>
+        ) : null}
         {summary.missing_rates.length > 0 ? (
           <p className="mt-3 rounded-[10px] border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2 text-[12px] font-bold text-[#a86a10]">
             {t("pg.missingRatesWarn", { codes: summary.missing_rates.join(", ") })}
@@ -351,7 +367,7 @@ function PricingCard({
               value={item.buy_price ?? ""}
               onChange={(e) => onChange({ buy_price: e.target.value === "" ? null : Number(e.target.value) })}
               className={`${fieldClass} tv-tnum text-center`}
-              placeholder="0"
+              placeholder="—"
             />
           </label>
         ) : null}
@@ -372,7 +388,7 @@ function PricingCard({
             }
             disabled={manual}
             className={`${fieldClass} tv-tnum text-center disabled:bg-[#f1f5f3] disabled:text-[#93aaa3]`}
-            placeholder="0"
+            placeholder="—"
           />
         </label>
         <label className={cardLabelClass}>
