@@ -53,6 +53,16 @@ ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during the build.
 # ENV NEXT_TELEMETRY_DISABLED=1
 
+# A build must start on bare ground.
+#
+# Turbopack writes .next incrementally, and a build that finds a previous one
+# can emit a manifest referencing chunks it did not write — the server then
+# asks for a file that is not on disk, and the page renders from whatever
+# stale bundle still answers. The symptom is a deploy that reports success and
+# serves a version that no longer exists in the repository. .dockerignore keeps
+# .next out of the context; this removes anything a cached layer left behind.
+RUN rm -rf .next
+
 # Build Next.js application
 # If you want to speed up Docker rebuilds, you can cache the build artifacts
 # by adding: --mount=type=cache,target=/app/.next/cache

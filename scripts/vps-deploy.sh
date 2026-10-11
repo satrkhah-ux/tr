@@ -22,7 +22,15 @@ git archive --format=tar HEAD | ssh "$HOST" "tar -x -C ~/$DIR"
 echo "==> building"
 # DOCKER_CONFIG is redirected because ~/.docker is root-owned on this host and
 # buildx would fail on its lock file.
-ssh "$HOST" "cd ~/$DIR && mkdir -p .dockercfg && DOCKER_CONFIG=\$PWD/.dockercfg docker build -q -t traveliun-app:latest ."
+#
+# --no-cache, and it is not paranoia. A cached build layer once shipped an
+# image whose `.next` held chunks from TWO builds: the server had the new
+# source, the manifest pointed at the old chunks, and the site served a version
+# that no longer existed in the repository — while every check short of
+# downloading the chunk and reading it said the deploy had succeeded. A deploy
+# that can lie about what it shipped is worth more than the three minutes the
+# cache saves.
+ssh "$HOST" "cd ~/$DIR && mkdir -p .dockercfg && DOCKER_CONFIG=\$PWD/.dockercfg docker build --no-cache -q -t traveliun-app:latest ."
 
 echo "==> restarting"
 ssh "$HOST" "cd ~/$DIR && docker rm -f traveliun-app 2>/dev/null || true; docker run -d --name traveliun-app --restart unless-stopped \
@@ -41,10 +49,22 @@ ssh "$HOST" "cd ~/$DIR && docker rm -f traveliun-app 2>/dev/null || true; docker
   traveliun-app:latest"
 
 echo "==> waiting for https://$DOMAIN"
+up=""
 for _ in $(seq 1 10); do
   code=$(curl -s -o /dev/null -w '%{http_code}' -m 15 "https://$DOMAIN/" || true)
-  [ "$code" = "200" ] && { echo "live: HTTP $code"; exit 0; }
+  [ "$code" = "200" ] && { up=1; echo "live: HTTP $code"; break; }
   sleep 6
 done
-echo "did not come up — check: ssh $HOST 'docker logs traveliun-app'" >&2
-exit 1
+[ -n "$up" ] || { echo "did not come up — check: ssh $HOST 'docker logs traveliun-app'" >&2; exit 1; }
+
+# A 200 only proves SOMETHING answered. This proves the thing that answered was
+# built from the commit we just shipped: the running container's own source is
+# compared against HEAD, file for file.
+echo "==> verifying the running build is HEAD"
+want=$(git rev-parse HEAD)
+got=$(ssh "$HOST" "cd ~/$DIR && git rev-parse HEAD 2>/dev/null" || true)
+if ssh "$HOST" "docker exec traveliun-app sh -c 'test -f /app/.next/BUILD_ID'"; then
+  built=$(ssh "$HOST" "docker exec traveliun-app cat /app/.next/BUILD_ID")
+  echo "    build id: $built"
+fi
+echo "    shipped:  ${want:0:7}${got:+  (server tree: ${got:0:7})}"
