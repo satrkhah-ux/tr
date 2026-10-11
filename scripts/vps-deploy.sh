@@ -11,7 +11,13 @@
 # ~/apps/traveliun-app/.env (created once; this script never overwrites it).
 set -euo pipefail
 
-HOST=vps-deploy
+# CORRECTED 2026-10-11: the domain pkg.traveliun.com resolves to 186.241.16.106
+# (SSH alias `vps-new`). The old `vps-deploy` alias points at 187.124.112.104,
+# which stopped serving this domain after the migration (it 503s for it now) —
+# deploying there built and swapped containers nobody could see. If SSH to the
+# new server times out, it is the firewall/fail2ban: the deploying IP must be
+# allowed on 186.241.16.106:22, OR deploy from a machine that already is.
+HOST=vps-new
 DIR=apps/traveliun-app
 DOMAIN=pkg.traveliun.com
 
