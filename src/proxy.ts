@@ -28,11 +28,19 @@ import {
  */
 
 /**
- * Refresh this far before expiry. Long enough that a slow page never races the
- * deadline, short enough that an ordinary minute of clicking costs nothing: the
- * exchange runs on the one request that crosses the line, not on every request.
+ * Refresh only once the token is ACTUALLY spent — not a minute before.
+ *
+ * The browser client refreshes on its own timer, roughly a minute ahead, and a
+ * Supabase refresh token ROTATES: whoever redeems it first invalidates the
+ * copy the other is holding, and the loser gets «Invalid Refresh Token:
+ * Refresh Token Not Found». Refreshing early here meant the two raced on every
+ * ordinary page load, and the race logged people out — the exact failure this
+ * was added to prevent.
+ *
+ * So the browser normally wins and this never fires. It fires for the case the
+ * browser cannot cover: a tab that was asleep when the hour ran out.
  */
-const REFRESH_MARGIN_SECONDS = 5 * 60;
+const REFRESH_MARGIN_SECONDS = 0;
 
 type RefreshedSession = { cookieValue: string } | null;
 
@@ -125,7 +133,8 @@ export async function proxy(request: NextRequest) {
     const expiring =
       session !== null &&
       session.refreshToken !== null &&
-      (session.expiresAt === null || session.expiresAt - now < REFRESH_MARGIN_SECONDS);
+      session.expiresAt !== null &&
+      session.expiresAt - now <= REFRESH_MARGIN_SECONDS;
 
     let refreshedCookie: string | null = null;
     let isAuthed = session !== null;
@@ -137,11 +146,12 @@ export async function proxy(request: NextRequest) {
         // The forwarded request carries the new token, so a server action in
         // THIS request reads the fresh one rather than the corpse.
         request.cookies.set(AUTH_STORAGE_KEY, next.cookieValue);
-      } else if (session.expiresAt !== null && session.expiresAt <= now) {
-        // The refresh token is spent too — this is a genuine logout, not a
-        // blip. Anything less and the agent loops on a dead session.
-        isAuthed = false;
       }
+      // A failure is NOT treated as a logout, deliberately. The usual cause is
+      // the browser having just rotated the same token a moment earlier — its
+      // newer cookie is already on its way, and signing the person out here
+      // would turn a harmless race into the thing we were trying to stop.
+      // Every page and action still verifies the session for itself.
     }
 
     /** Carry a refreshed cookie onto whatever answer we give. */

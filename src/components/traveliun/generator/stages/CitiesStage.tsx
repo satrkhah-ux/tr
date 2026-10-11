@@ -182,7 +182,12 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
    * re-timing the trip can never leave a stale number behind.
    */
   function addCity() {
-    const name = cityOptions[0]?.name ?? "";
+    // The first city NOT already in the programme. Defaulting to the first in
+    // the list meant two presses produced two cities with the same name — and
+    // because hotels are keyed by city NAME, both cities then claimed the same
+    // stays, rendered them twice and double-counted their nights.
+    const taken = new Set(data.cities.map((c) => c.city_name));
+    const name = (cityOptions.find((o) => !taken.has(o.name)) ?? cityOptions[0])?.name ?? "";
     const left = Math.max(0, data.trip.nights - used);
     patch({
       cities: deriveCityDates(start, [
@@ -417,6 +422,12 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
             {data.cities.map((city, cityIndex) => {
               const derived = derivedCities[cityIndex];
               const cov = coverage.find((c) => c.city_name === city.city_name);
+              // A city name can still repeat — an agent may type one by hand,
+              // and an older draft may already hold one. Each stay belongs to
+              // the FIRST city of that name; the later one shows none rather
+              // than a duplicate of someone else's hotel.
+              const firstOfName = data.cities.findIndex((c) => c.city_name === city.city_name);
+              const ownsStays = firstOfName === cityIndex;
               const lookupCity = country?.cities.find((c) => c.name === city.city_name);
               const hotelOptions = lookupCity?.hotels ?? [];
               const short = cov ? cov.covered !== cov.needed : false;
@@ -479,7 +490,7 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
                     </button>
                   </div>
 
-                  {showHotels && cov ? (
+                  {showHotels && cov && ownsStays ? (
                     <div className="mt-3 border-t border-[#e7f0ec] pt-3">
                       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
                         {/* Coverage, not «a row exists»: a city split between
@@ -512,7 +523,7 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
 
                           return (
                             <StayCard
-                              key={line.id}
+                              key={`${cityIndex}-${line.id}`}
                               line={line}
                               index={stayIndex}
                               count={cov.stays.length}
