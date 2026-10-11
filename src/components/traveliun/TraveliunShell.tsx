@@ -217,6 +217,7 @@ export const navGroups: NavGroup[] = [
       // The personnel record and the LOGIN are two different things;
       // nine of twelve people had the first and not the second.
       { labelKey: "nav.employeeAccounts", href: "/employees/accounts" },
+      { labelKey: "nav.dataTransfer", href: "/settings/data-transfer" },
       { labelKey: "nav.roles", href: "/employees/roles" },
       { labelKey: "nav.careDashboard", href: "/customers_care/dashboard", captionKey: "nav.customerCare" },
       { labelKey: "nav.customerCare", href: "/customers_care" },

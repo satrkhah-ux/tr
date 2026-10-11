@@ -80,7 +80,9 @@ export type AuditAction =
   // staff logins — an employees row is a personnel record, the account is
   // separate, and who issued one is worth knowing
   | "employee.account_issued"
-  | "employee.account_linked";
+  | "employee.account_linked"
+  // the reference catalogue was exported/imported as a whole
+  | "catalog.imported";
 
 export type AuditInput = {
   action: AuditAction;
