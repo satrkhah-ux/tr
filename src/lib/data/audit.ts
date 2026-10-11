@@ -76,7 +76,11 @@ export type AuditAction =
   // the B2B portal: who let a company in, on what terms, and who gave it a login
   | "partner.approved"
   | "partner.status_changed"
-  | "partner.account_issued";
+  | "partner.account_issued"
+  // staff logins — an employees row is a personnel record, the account is
+  // separate, and who issued one is worth knowing
+  | "employee.account_issued"
+  | "employee.account_linked";
 
 export type AuditInput = {
   action: AuditAction;

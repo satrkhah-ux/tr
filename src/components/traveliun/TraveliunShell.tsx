@@ -214,6 +214,9 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.companiesVisits", href: "/companies-visits" },
       { labelKey: "nav.visitStatuses", href: "/companies-visits-statuses" },
       { labelKey: "nav.employees", href: "/employees", captionKey: "nav.employees" },
+      // The personnel record and the LOGIN are two different things;
+      // nine of twelve people had the first and not the second.
+      { labelKey: "nav.employeeAccounts", href: "/employees/accounts" },
       { labelKey: "nav.roles", href: "/employees/roles" },
       { labelKey: "nav.careDashboard", href: "/customers_care/dashboard", captionKey: "nav.customerCare" },
       { labelKey: "nav.customerCare", href: "/customers_care" },
