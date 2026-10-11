@@ -348,7 +348,7 @@ export function GeneratorFlow({
                 <div className="origin-top scale-[0.62]" style={{ width: "161%" }}>
                   <OfferDocument
                     variant="client"
-                    offer={draftToPreviewOffer(data, lookups.airlines)}
+                    offer={draftToPreviewOffer(data, lookups.airlines, lookups.sarPer)}
                     {...draftBrand(data, lookups.partners)}
                   />
                 </div>

@@ -25,6 +25,7 @@ import {
   type GeneratorLookups,
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
+import { offerTotals, type CurrencyRates } from "./pricing";
 import type { ExtractedPackage, RepackageData } from "@/lib/repackage/repackage-types";
 
 /** Placeholder serial shown while the offer has not been produced yet. */
@@ -86,6 +87,8 @@ export function draftToPreviewOffer(
   data: DraftData,
   /** carriers, so the preview draws the same marks the produced PDF will. */
   airlines: GeneratorLookups["airlines"] = [],
+  /** SAR per unit, so the preview totals in the quote currency the way issuing does. */
+  sarPer: CurrencyRates = { SAR: 1 },
 ): ClientOfferDTO {
   const start = itineraryStartDate(data.trip, data.flights);
   const cities = deriveCityDates(start, data.cities);
@@ -106,7 +109,7 @@ export function draftToPreviewOffer(
     adults: data.trip.adults,
     children: data.trip.children,
     infants: data.trip.infants,
-    total: data.pricing.final_total ?? sumItems(data),
+    total: draftSellTotal(data, sarPer),
     currency: data.pricing.display_currency,
     pricing: emptyPricing(data.pricing.display_currency),
     hotels: data.hotels.map((h) => {
@@ -182,14 +185,9 @@ export function draftToPreviewOffer(
  * items. A second implementation in the list would drift the first time either
  * rule changed.
  */
-export function draftSellTotal(data: DraftData): number | null {
-  return data.pricing.final_total ?? sumItems(data);
-}
-
-function sumItems(data: DraftData): number | null {
+export function draftSellTotal(data: DraftData, sarPer: CurrencyRates = { SAR: 1 }): number | null {
   const priced = data.pricing.items.filter((i) => i.sell_price != null);
-  if (priced.length === 0) return null;
-  return priced.reduce((sum, i) => sum + (i.sell_price ?? 0) * (i.quantity || 1), 0);
+  return offerTotals(priced, sarPer, data.pricing.display_currency, data.pricing.final_total).total;
 }
 
 /**

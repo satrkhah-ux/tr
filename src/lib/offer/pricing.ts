@@ -100,6 +100,69 @@ export function convert(
   return round2(amount * rate);
 }
 
+/**
+ * «1 SAR = n X» → «SAR per 1 X», the shape every converter here uses.
+ *
+ * Keys in any case (the exchange-api feed is lower-case); anything that is
+ * not a positive finite rate on a three-letter code is dropped rather than
+ * turned into a nonsense rate.
+ */
+export function sarPerFromPerSar(perSar: Record<string, unknown>): CurrencyRates {
+  const out: CurrencyRates = { SAR: 1 };
+  for (const [code, rate] of Object.entries(perSar)) {
+    if (/^[a-z]{3}$/i.test(code) && typeof rate === "number" && Number.isFinite(rate) && rate > 0) {
+      out[code.toUpperCase()] = 1 / rate;
+    }
+  }
+  return out;
+}
+
+/**
+ * Rates re-based on the currency the client is quoted in.
+ *
+ * getRates() answers «SAR per one unit of X». Dividing by the quote currency's
+ * own rate gives «quote currency per one unit of X», so computeOfferPricing
+ * totals straight into it. null when the quote currency itself has no rate —
+ * then no total can be trusted.
+ */
+export function rebase(sarPer: CurrencyRates, base: string): CurrencyRates | null {
+  const own = base === "SAR" ? 1 : sarPer[base];
+  if (own == null || !Number.isFinite(own) || own <= 0) return null;
+  const out: CurrencyRates = {};
+  for (const [code, rate] of Object.entries({ SAR: 1, ...sarPer })) out[code] = rate / own;
+  return out;
+}
+
+export type OfferTotals = { total: number | null; buy_total: number | null; missing_rates: string[] };
+
+/**
+ * The offer's sell and buy totals, in the currency the client is quoted in.
+ *
+ * Every line is converted BEFORE it is added. Issuing used to add the raw
+ * numbers, so a 1,200 THB transfer went into a SAR offer as 1,200 SAR — only
+ * the pricing screen converted, and the agent saw one total while the client
+ * was sent another. A line with no currency is in the quote currency, which
+ * is what the raw sum always assumed. `missing_rates` lists codes with no
+ * rate: the caller refuses to issue rather than print a sum that quietly left
+ * them out.
+ */
+export function offerTotals(
+  lines: PricingLineInput[],
+  sarPer: CurrencyRates,
+  base: string,
+  finalTotal: number | null,
+): OfferTotals {
+  if (lines.length === 0) return { total: finalTotal, buy_total: null, missing_rates: [] };
+  const rates = rebase(sarPer, base);
+  if (!rates) return { total: finalTotal, buy_total: null, missing_rates: [base] };
+  const summary = computeOfferPricing(
+    lines.map((l) => ({ ...l, buy_currency: l.buy_currency || base, sell_currency: l.sell_currency || base })),
+    rates,
+    base,
+  );
+  return { total: finalTotal ?? summary.total_sell, buy_total: summary.total_buy, missing_rates: summary.missing_rates };
+}
+
 function nativeTotal(unit: number | null, quantity: number): number | null {
   if (unit == null || !Number.isFinite(unit)) return null;
   return round2(unit * quantity);

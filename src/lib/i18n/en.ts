@@ -1153,6 +1153,7 @@ export const en = {
   "pg.pricingSeeded": "{added} lines added, {priced} of them already priced from your own lists. The rest need a number.",
   "pg.suggestItems": "Suggest items from the stages",
   "pg.addPricingItem": "Add item",
+  "pg.err.missingRates": "A line is in a currency with no exchange rate, so the total can't be computed correctly. Change that line to a supported currency.",
   "pg.missingRatesWarn": "No exchange rate for: {codes} — excluded from totals.",
   // preview stage
   "pg.previewTitle": "Offer preview",

@@ -1341,6 +1341,8 @@ export type LookupCarType = {
 };
 
 export type GeneratorLookups = {
+  /** SAR per unit of each currency (live, else the fallback table) — the preview's totals. */
+  sarPer?: Record<string, number>;
   countries: LookupCountry[];
   roomTypes: LookupRoomType[];
   airports: LookupAirport[];

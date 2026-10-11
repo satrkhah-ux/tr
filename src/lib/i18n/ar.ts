@@ -1151,6 +1151,7 @@ export const ar: Dictionary = {
   "pg.pricingSeeded": "أُضيف {added} بنداً، {priced} منها مُسعَّرة من قوائمكم. الباقي يحتاج رقماً.",
   "pg.suggestItems": "اقتراح بنود من المراحل",
   "pg.addPricingItem": "إضافة بند",
+  "pg.err.missingRates": "يوجد بند بعملة ليس لها سعر صرف، فلا يمكن حساب إجمالي صحيح. غيّر عملة ذلك البند إلى عملة مدعومة.",
   "pg.missingRatesWarn": "لا يوجد سعر صرف لـ: {codes} — مستبعدة من الإجماليات.",
   // preview stage
   "pg.previewTitle": "معاينة العرض",

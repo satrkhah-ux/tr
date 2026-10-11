@@ -27,7 +27,8 @@ import {
 } from "@/lib/offer/draft-types";
 import { getEnabledHotelSuppliers } from "@/lib/providers/hotel-registry";
 import { draftSellTotal } from "@/lib/offer/preview-dto";
-import { applyManualProfit } from "@/lib/offer/pricing";
+import { applyManualProfit, offerTotals } from "@/lib/offer/pricing";
+import { getRates } from "./rates-actions";
 import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { draftDaySkeleton } from "@/lib/offer/itinerary";
@@ -69,6 +70,7 @@ export type DraftSummary = {
 };
 
 export async function listDrafts(): Promise<DraftSummary[]> {
+  const { sarPer } = await getRates();
   try {
     const supabase = await db();
     const { data } = await supabase
@@ -92,7 +94,7 @@ export async function listDrafts(): Promise<DraftSummary[]> {
           days: draft.trip.days,
           nights: draft.trip.nights,
           travel_date: draft.trip.arrival_date || null,
-          total: draftSellTotal(draft),
+          total: draftSellTotal(draft, sarPer),
           currency: draft.pricing.display_currency,
           produced_serial: draft.produced_serial,
           updated_at: row.updated_at,
@@ -285,6 +287,7 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
   };
   try {
     const supabase = await db();
+    const ratesPromise = getRates();
     const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transportRes, termsRes, airlinesRes, partnersRes] = await Promise.all([
       // iso2 is not decoration: a real hotel supplier looks a city up WITHIN a
       // country, so a live search without it returns nothing at all.
@@ -397,6 +400,7 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       // deterministic fixture engine, so it is marked and the screen says so —
       // invented hotels at invented prices are one careless quote away from a
       // real customer.
+      sarPer: (await ratesPromise).sarPer,
       hotelSources: (await getEnabledHotelSuppliers()).map((s) => ({
         code: s.code,
         name: s.code === "mock" ? "تجريبي (بيانات وهمية)" : s.name,
@@ -659,23 +663,24 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       sell_currency: item.sell_currency || null,
     }));
 
-    const sellTotal =
-      data.pricing.final_total ??
-      (reconciledItems.length > 0
-        ? Number(
-            reconciledItems
-              .reduce((sum, item) => sum + (effectiveSell(item) ?? 0) * (item.quantity > 0 ? item.quantity : 1), 0)
-              .toFixed(2),
-          )
-        : null);
-    const buyTotal =
-      reconciledItems.length > 0
-        ? Number(
-            reconciledItems
-              .reduce((sum, item) => sum + (item.buy_price ?? 0) * (item.quantity > 0 ? item.quantity : 1), 0)
-              .toFixed(2),
-          )
-        : null;
+    // Into the quote currency line by line — never a raw sum of mixed
+    // currencies (see offerTotals). A currency with no rate blocks issuing:
+    // a total that silently skipped a line is worse than no total.
+    const totals = offerTotals(
+      reconciledItems.map((item) => ({
+        quantity: item.quantity,
+        buy_price: item.buy_price,
+        buy_currency: item.buy_currency,
+        sell_price: effectiveSell(item),
+        sell_currency: item.sell_currency,
+      })),
+      (await getRates()).sarPer,
+      data.pricing.display_currency,
+      data.pricing.final_total,
+    );
+    if (totals.missing_rates.length > 0) return { ok: false, error: "pg.err.missingRates" };
+    const sellTotal = totals.total;
+    const buyTotal = totals.buy_total;
 
     // The meal plan, in the three vocabularies that need it: the exact Arabic
     // word for the «يشمل» line and the internal column, and the board it was
