@@ -12,6 +12,7 @@ import {
   deriveHotelStays,
   emptyDraftData,
   emptyTermLibrary,
+  libraryForCountry,
   mealPlanIncludeLine,
   MEAL_PLAN_AR,
   MEAL_PLAN_BOARD,
@@ -29,6 +30,7 @@ import { getEnabledHotelSuppliers } from "@/lib/providers/hotel-registry";
 import { draftSellTotal } from "@/lib/offer/preview-dto";
 import { applyManualProfit, offerTotals } from "@/lib/offer/pricing";
 import { getRates } from "./rates-actions";
+import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { draftDaySkeleton } from "@/lib/offer/itinerary";
@@ -122,10 +124,12 @@ export async function createDraft(seed?: Partial<DraftData>): Promise<CreateDraf
     // ticked in /offers/offer-includes, /offers/offer-not-includes and
     // /offers/terms-and-conditions). A seed that brings its own services — a
     // ready-made package — wins, since those were written for that package.
+    // Global lines only: a new draft has no country yet, and choosing one in
+    // TripStage adds that country's lines (reseedForCountry).
     const base = emptyDraftData();
     if (!seed?.services) {
       const { termLibrary } = await getGeneratorLookups();
-      base.services = defaultServicesFromLibrary(termLibrary);
+      base.services = defaultServicesFromLibrary(libraryForCountry(termLibrary, null));
     }
     const initial = seed
       ? normalizeDraftData({ ...base, ...seed } as unknown as Record<string, unknown>)
@@ -283,15 +287,15 @@ async function allRows(
 export async function getGeneratorLookups(): Promise<GeneratorLookups> {
   const empty: GeneratorLookups = {
     countries: [], roomTypes: [], airports: [], carTypes: [], termLibrary: emptyTermLibrary(), partners: [], airlines: [],
-    hotelSources: [],
+    hotelSources: [], countryServices: [],
   };
   try {
     const supabase = await db();
     const ratesPromise = getRates();
-    const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transportRes, termsRes, airlinesRes, partnersRes] = await Promise.all([
+    const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transportRes, termsRes, airlinesRes, partnersRes, servicesRes] = await Promise.all([
       // iso2 is not decoration: a real hotel supplier looks a city up WITHIN a
       // country, so a live search without it returns nothing at all.
-      supabase.from("countries").select("id, arabic_name, iso2, timezone, status").order("arabic_name"),
+      supabase.from("countries").select("id, arabic_name, iso2, timezone, default_currency, status").order("arabic_name"),
       supabase.from("cities").select("id, arabic_name, country_id").order("arabic_name"),
       allRows((from, to) => supabase.from("hotels").select("id, arabic_name, stars, city_id").order("id").range(from, to)),
       allRows((from, to) =>
@@ -307,7 +311,7 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
         .from("transportation_types")
         .select("arabic_name, english_name, category, vehicle_class, pax_capacity, luggage_capacity, status")
         .order("pax_capacity", { ascending: true, nullsFirst: false }),
-      supabase.from("terms").select("kind, arabic_text, checked, sort").order("sort", { ascending: true }),
+      supabase.from("terms").select("kind, arabic_text, checked, sort, country_id").order("sort", { ascending: true }),
       // resellers only: a hotel supplier we assign bookings to has no business in
       // the picker that decides whose name is printed on the cover.
       supabase
@@ -321,19 +325,23 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
         .eq("resells", true)
         .eq("active", true)
         .order("name"),
+      // names only — partners use the generator, and a service's buy/sell price
+      // is for «اقتراح التسعير» on the server, never the browser
+      supabase.from("services").select("country_id, arabic_name").not("country_id", "is", null).order("arabic_name"),
     ]);
 
     // a reference row is offered to the generator unless the admin disabled it
     const active = (status: string | null | undefined) => status !== "Disabled";
     const hotels = (hotelsRes.data ?? []) as { id: string; arabic_name: string; stars: number | null; city_id: string | null }[];
     const cities = (citiesRes.data ?? []) as { id: string; arabic_name: string; country_id: string | null }[];
-    const countries = ((countriesRes.data ?? []) as { id: string; arabic_name: string; iso2: string | null; timezone: string | null; status: string | null }[]).filter((c) => active(c.status));
+    const countries = ((countriesRes.data ?? []) as { id: string; arabic_name: string; iso2: string | null; timezone: string | null; default_currency: string | null; status: string | null }[]).filter((c) => active(c.status));
 
     const builtCountries = countries.map((country) => ({
       id: country.id,
       name: country.arabic_name,
       iso2: country.iso2 ?? null,
       timezone: country.timezone ?? null,
+      default_currency: country.default_currency ?? null,
       cities: cities
         .filter((c) => c.country_id === country.id)
         .map((c) => ({
@@ -376,6 +384,7 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
         luggage: t.luggage_capacity ?? null,
       }));
 
+    const rates = await ratesPromise;
     return {
       countries: builtCountries,
       roomTypes: ((roomTypesRes.data ?? []) as { id: string; arabic_name: string; hotel_id: string | null; default_board: GeneratorLookups["roomTypes"][number]["default_board"] }[]).map(
@@ -386,6 +395,7 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
         .map((a) => ({ id: a.id, name: a.arabic_name, code: a.code, timezone: a.iana_timezone })),
       carTypes,
       termLibrary: buildTermLibrary(termsRes.data),
+      countryServices: buildCountryServices(servicesRes.data),
       airlines: ((airlinesRes.data ?? []) as { iata: string; arabic_name: string; logo_path: string | null }[]).map((a) => ({
         iata: a.iata,
         name: a.arabic_name,
@@ -400,7 +410,9 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       // deterministic fixture engine, so it is marked and the screen says so —
       // invented hotels at invented prices are one careless quote away from a
       // real customer.
-      sarPer: (await ratesPromise).sarPer,
+      sarPer: rates.sarPer,
+      ratesSource: rates.source,
+      ratesDate: rates.updatedAt,
       hotelSources: (await getEnabledHotelSuppliers()).map((s) => ({
         code: s.code,
         name: s.code === "mock" ? "تجريبي (بيانات وهمية)" : s.name,
@@ -419,12 +431,28 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
  * of retyping, so what the document prints is what the company approved.
  */
 function buildTermLibrary(rows: unknown): TermLibrary {
-  const list = (rows ?? []) as { kind: string; arabic_text: string | null; checked: boolean | null }[];
+  const list = (rows ?? []) as { kind: string; arabic_text: string | null; checked: boolean | null; country_id: string | null }[];
   const of = (kind: string): TermLibraryItem[] =>
     list
       .filter((r) => r.kind === kind && r.arabic_text && r.arabic_text.trim())
-      .map((r) => ({ text: (r.arabic_text as string).trim(), checked: r.checked !== false }));
+      .map((r) => ({ text: (r.arabic_text as string).trim(), checked: r.checked !== false, country_id: r.country_id ?? null }));
   return { includes: of("include"), excludes: of("exclude"), terms: of("term") };
+}
+
+/**
+ * One line per service name per country. The list files the same service more
+ * than once (Thailand has «استقبال بالورد» three times), and the agent is
+ * choosing a NAME — the price is found later, on the server, by that name.
+ */
+function buildCountryServices(rows: unknown): GeneratorLookups["countryServices"] {
+  const seen = new Set<string>();
+  return ((rows ?? []) as { country_id: string; arabic_name: string | null }[]).flatMap((row) => {
+    const name = row.arabic_name?.trim();
+    const key = `${row.country_id}|${normalizeName(name)}`;
+    if (!name || seen.has(key)) return [];
+    seen.add(key);
+    return [{ country_id: row.country_id, name }];
+  });
 }
 
 // ---------- reuse a previous program ----------
@@ -666,6 +694,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // Into the quote currency line by line — never a raw sum of mixed
     // currencies (see offerTotals). A currency with no rate blocks issuing:
     // a total that silently skipped a line is worse than no total.
+    const rates = await getRates();
     const totals = offerTotals(
       reconciledItems.map((item) => ({
         quantity: item.quantity,
@@ -674,7 +703,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         sell_price: effectiveSell(item),
         sell_currency: item.sell_currency,
       })),
-      (await getRates()).sarPer,
+      rates.sarPer,
       data.pricing.display_currency,
       data.pricing.final_total,
     );
@@ -722,6 +751,9 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       total: sellTotal,
       buy_total: buyTotal,
       currency: data.pricing.display_currency,
+      total_sar: totals.total_sar,
+      // the rates this total was computed at, frozen with the offer
+      fx: rates,
       // The snapshot's city summary. With two hotels in a city it names the
       // first and says how many follow, rather than picking one arbitrarily and
       // printing it as though it were the whole stay.

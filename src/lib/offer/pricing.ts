@@ -133,7 +133,13 @@ export function rebase(sarPer: CurrencyRates, base: string): CurrencyRates | nul
   return out;
 }
 
-export type OfferTotals = { total: number | null; buy_total: number | null; missing_rates: string[] };
+export type OfferTotals = {
+  total: number | null;
+  buy_total: number | null;
+  /** `total` in riyals, for the KPIs that add offers up — null when it cannot be converted. */
+  total_sar: number | null;
+  missing_rates: string[];
+};
 
 /**
  * The offer's sell and buy totals, in the currency the client is quoted in.
@@ -152,15 +158,66 @@ export function offerTotals(
   base: string,
   finalTotal: number | null,
 ): OfferTotals {
-  if (lines.length === 0) return { total: finalTotal, buy_total: null, missing_rates: [] };
+  const own = base === "SAR" ? 1 : sarPer[base];
+  const inSar = (total: number | null) => (total != null && own != null && Number.isFinite(own) ? round2(total * own) : null);
+  if (lines.length === 0) return { total: finalTotal, buy_total: null, total_sar: inSar(finalTotal), missing_rates: [] };
   const rates = rebase(sarPer, base);
-  if (!rates) return { total: finalTotal, buy_total: null, missing_rates: [base] };
+  if (!rates) return { total: finalTotal, buy_total: null, total_sar: null, missing_rates: [base] };
   const summary = computeOfferPricing(
     lines.map((l) => ({ ...l, buy_currency: l.buy_currency || base, sell_currency: l.sell_currency || base })),
     rates,
     base,
   );
-  return { total: finalTotal ?? summary.total_sell, buy_total: summary.total_buy, missing_rates: summary.missing_rates };
+  const total = finalTotal ?? summary.total_sell;
+  return { total, buy_total: summary.total_buy, total_sar: inSar(total), missing_rates: summary.missing_rates };
+}
+
+/**
+ * The rates an issued offer was priced at, cut down to the codes it uses.
+ *
+ * Stored on the offer (pricings.fx_rates) so its internal figures are
+ * recomputed at THESE rates later, not at whatever the feed says that day.
+ * Same «SAR per one unit» shape as getRates(), so it feeds rebase() as is.
+ */
+export function ratesFor(sarPer: CurrencyRates, codes: (string | null | undefined)[]): CurrencyRates {
+  const out: CurrencyRates = { SAR: 1 };
+  for (const code of codes) {
+    const rate = code ? sarPer[code] : undefined;
+    if (code && rate != null && Number.isFinite(rate)) out[code] = rate;
+  }
+  return out;
+}
+
+type OfferTotalRow = { total: unknown; total_sar?: unknown; currency?: string | null };
+
+const finiteOrNaN = (v: unknown) => (v == null || v === "" ? NaN : Number(v));
+
+/**
+ * An offer's total in riyals, for the KPIs that add offers up.
+ *
+ * A riyal offer (or one that never said) IS its `total` — read live, so a
+ * total edited on /offers counts as edited. Any other currency needs
+ * `total_sar`, written at issue time; without it a 4,000 USD offer counted as
+ * 4,000 SAR is the mixed-currency sum this replaced, so it counts as nothing.
+ */
+export function offerSarTotal(row: OfferTotalRow): number {
+  const value = finiteOrNaN(!row.currency || row.currency === "SAR" ? row.total : row.total_sar);
+  return Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * `total_sar` once an offer's total is edited by hand (/offers): the same
+ * figure for a riyal offer; else at the rate it was issued at (its old riyal
+ * total over its old total), or `todaysRate` when it never had one. Null when
+ * there is no rate to use — offerSarTotal then counts it as nothing.
+ */
+export function editedTotalSar(row: OfferTotalRow, total: number | null, todaysRate: number | null | undefined): number | null {
+  if (total == null || !Number.isFinite(total)) return null;
+  if (!row.currency || row.currency === "SAR") return total;
+  const was = finiteOrNaN(row.total);
+  const wasSar = finiteOrNaN(row.total_sar);
+  const rate = Number.isFinite(was) && was !== 0 && Number.isFinite(wasSar) ? wasSar / was : todaysRate;
+  return rate != null && Number.isFinite(rate) ? round2(total * rate) : null;
 }
 
 function nativeTotal(unit: number | null, quantity: number): number | null {

@@ -162,7 +162,8 @@ export async function priceDraftHotelsFromSupplier(draftId: string): Promise<Pri
 
     await saveDraftStages(draftId, {
       hotels,
-      pricing: { ...data.pricing, items: pricingItems, display_currency: BASE },
+      // the quote currency stays the agent's; the totals convert these SAR lines
+      pricing: { ...data.pricing, items: pricingItems },
     });
     return { ok: true, priced, blocked };
   } catch {

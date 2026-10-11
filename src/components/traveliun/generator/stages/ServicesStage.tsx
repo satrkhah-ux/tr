@@ -1,6 +1,6 @@
 "use client";
 
-import type { DraftServices } from "@/lib/offer/draft-types";
+import { findLookupCountry, libraryForCountry, type DraftServices } from "@/lib/offer/draft-types";
 import { FieldIssue } from "../FieldIssue";
 import { ListEditor } from "../services/ListEditor";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
@@ -13,7 +13,8 @@ import { sectionClass, type StageFormProps } from "../stage-props";
  * /offers/offer-includes and /offers/offer-not-includes: a new draft opens with
  * the ticked rows already in place, and «اختر من القائمة المعتمدة» adds any of
  * the rest. Free text stays available for the one-off line a particular offer
- * needs.
+ * needs. Both offer only the global lines and the trip country's own, and
+ * «يشمل» adds a third source: «خدمات الدولة», the country's services by name.
  *
  * «الشروط» used to sit underneath, full-width, and read as a footnote to the
  * services. It is its own card now (TermsStage) — but it is still the same
@@ -22,7 +23,9 @@ import { sectionClass, type StageFormProps } from "../stage-props";
 export function ServicesStage({ data, patch, lookups }: StageFormProps) {
   const { t } = useTraveliunUI();
   const services = data.services;
-  const library = lookups.termLibrary;
+  const countryId = findLookupCountry(lookups.countries, data.trip.country)?.id ?? null;
+  const library = libraryForCountry(lookups.termLibrary, countryId);
+  const countryServices = lookups.countryServices.filter((s) => s.country_id === countryId).map((s) => s.name);
 
   function update(slice: Partial<DraftServices>) {
     patch({ services: { ...services, ...slice } });
@@ -38,6 +41,7 @@ export function ServicesStage({ data, patch, lookups }: StageFormProps) {
           variant="includes"
           items={services.includes}
           library={library.includes}
+          countryServices={countryServices}
           onChange={(next) => update({ includes: next })}
         />
         <ListEditor

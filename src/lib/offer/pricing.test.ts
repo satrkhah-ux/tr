@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { convert, computeLine, computeOfferPricing, offerTotals, rebase, sarPerFromPerSar, type CurrencyRates } from "./pricing";
+import {
+  convert,
+  computeLine,
+  computeOfferPricing,
+  editedTotalSar,
+  offerSarTotal,
+  offerTotals,
+  ratesFor,
+  rebase,
+  sarPerFromPerSar,
+  type CurrencyRates,
+} from "./pricing";
 
 const rates: CurrencyRates = { SAR: 1, USD: 3.75 };
 
@@ -167,10 +178,60 @@ describe("offerTotals — the issued total converts every line", () => {
     expect(offerTotals([l], sarPer, "SAR", null)).toMatchObject({ total: 120, buy_total: 100 });
   });
   it("no lines → the typed total, no buy total", () => {
-    expect(offerTotals([], sarPer, "SAR", null)).toEqual({ total: null, buy_total: null, missing_rates: [] });
+    expect(offerTotals([], sarPer, "SAR", null)).toEqual({ total: null, buy_total: null, total_sar: null, missing_rates: [] });
+  });
+  it("total_sar is the quoted total back in riyals — typed or computed", () => {
+    expect(offerTotals(mixed, sarPer, "SAR", null).total_sar).toBe(3320);
+    expect(offerTotals(mixed, sarPer, "USD", 1000).total_sar).toBe(3750);
+    expect(offerTotals(mixed, sarPer, "XYZ", 1000).total_sar).toBeNull();
   });
   it("rebase keeps SAR reachable from any quote currency", () => {
     expect(rebase(sarPer, "USD")?.SAR).toBeCloseTo(1 / 3.75, 10);
+  });
+});
+
+describe("the issued offer's rate snapshot", () => {
+  const sarPer: CurrencyRates = { SAR: 1, USD: 3.75, THB: 0.1, EUR: 4.2 };
+  it("keeps only the codes the offer uses, plus SAR", () => {
+    expect(ratesFor(sarPer, ["THB", null, "", "USD", "VND"])).toEqual({ SAR: 1, THB: 0.1, USD: 3.75 });
+  });
+  it("recomputed at the stored rates, in the offer's own currency", () => {
+    const stored = ratesFor(sarPer, ["THB", "USD"]);
+    const lines = [{ quantity: 1, buy_price: 750, buy_currency: "THB", sell_price: 1000, sell_currency: "THB" }];
+    const summary = computeOfferPricing(lines, rebase(stored, "USD") ?? {}, "USD");
+    expect(summary).toMatchObject({ base: "USD", total_sell: 26.67, total_buy: 20, missing_rates: [] });
+  });
+});
+
+describe("offerSarTotal — KPIs add riyals, never mixed currencies", () => {
+  it("counts another currency at its stored riyal total", () => {
+    expect(offerSarTotal({ total: 1000, total_sar: 3750, currency: "USD" })).toBe(3750);
+  });
+  it("counts a riyal offer at its live total, not a riyal figure left behind by an edit", () => {
+    // issued at 10,000, then edited to 12,000 on /offers
+    expect(offerSarTotal({ total: 12000, total_sar: 10000, currency: "SAR" })).toBe(12000);
+  });
+  it("an older offer counts its total only when it was quoted in riyals or said nothing", () => {
+    expect(offerSarTotal({ total: 500, total_sar: null, currency: "SAR" })).toBe(500);
+    expect(offerSarTotal({ total: "500.00", total_sar: null, currency: null })).toBe(500);
+    expect(offerSarTotal({ total: 4000, total_sar: null, currency: "USD" })).toBe(0);
+  });
+  it("a missing total is nothing", () => {
+    expect(offerSarTotal({ total: null, currency: "SAR" })).toBe(0);
+  });
+});
+
+describe("editedTotalSar — an edited total moves its riyal figure with it", () => {
+  it("a riyal offer is its total", () => {
+    expect(editedTotalSar({ total: 10000, total_sar: 10000, currency: "SAR" }, 12000, 1)).toBe(12000);
+  });
+  it("another currency keeps the rate it was issued at, not today's", () => {
+    expect(editedTotalSar({ total: 1000, total_sar: 3750, currency: "USD" }, 1200, 3.8)).toBe(4500);
+  });
+  it("falls back to today's rate when it never had a riyal figure, and to null without one", () => {
+    expect(editedTotalSar({ total: 1000, total_sar: null, currency: "USD" }, 1200, 3.8)).toBe(4560);
+    expect(editedTotalSar({ total: 1000, total_sar: null, currency: "XYZ" }, 1200, undefined)).toBeNull();
+    expect(editedTotalSar({ total: 1000, total_sar: 3750, currency: "USD" }, null, 3.8)).toBeNull();
   });
 });
 

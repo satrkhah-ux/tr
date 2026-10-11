@@ -729,6 +729,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                           sourceLabel={sourceLabel(sourceFor(line))}
                           hotelOptions={hotelOptions}
                           roomTypeOptions={roomTypeOptions}
+                          countries={lookups.countries}
                           canInternal={canInternal}
                           picker={{
                             stay: {

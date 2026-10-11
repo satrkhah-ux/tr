@@ -4,7 +4,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { airlineLogoUrl } from "@/components/offer-doc/brand";
 import type { BoardType, PricingItemType, RenderVariant } from "@/lib/types";
-import { computeOfferPricing, type PricingLineInput } from "@/lib/offer/pricing";
+import {
+  computeOfferPricing,
+  offerSarTotal,
+  offerTotals,
+  ratesFor,
+  rebase,
+  type CurrencyRates,
+  type PricingLineInput,
+} from "@/lib/offer/pricing";
 import {
   toClientOfferDTO,
   type ClientOfferDTO,
@@ -18,7 +26,7 @@ import { currentPermissions } from "@/lib/roles/current";
 import { getClimateNote } from "./climate-actions";
 import { getCurrentEmployeeId } from "./metrics";
 import { setOfferStatus } from "./offer-status";
-import { getRates } from "./rates-actions";
+import { getRates, type RatesResult } from "./rates-actions";
 import { STAGE_KEYS } from "./pipeline";
 
 /**
@@ -127,6 +135,14 @@ export type CreateOfferInput = {
   /** internal buy total — stored in pricings only, NEVER exposed to clients. */
   buy_total: number | null;
   currency: string;
+  /** `total` in riyals, for the KPIs (migration 0044). Left out: converted at today's rates. */
+  total_sar?: number | null;
+  /**
+   * The rates the offer was priced at. Stored on its pricings row — only the
+   * codes its lines and quote currency use — so its internal figures are
+   * recomputed at these rates later, not at whatever the feed says that day.
+   */
+  fx?: RatesResult | null;
   cities: OfferCityInput[];
   flights: OfferFlightInput[];
   services: OfferServiceInput[];
@@ -240,6 +256,14 @@ export async function createOffer(input: CreateOfferInput): Promise<CreateOfferR
         children: input.children,
         infants: input.infants,
         total: input.total,
+        // Left out by the builder and the repackage wizard: converted here, or a
+        // USD offer would count as nothing in the KPIs.
+        total_sar:
+          input.total_sar !== undefined
+            ? input.total_sar
+            : !input.currency || input.currency === "SAR"
+              ? input.total
+              : offerTotals([], (await getRates()).sarPer, input.currency, input.total).total_sar,
         currency: input.currency,
         status: "draft",
         pipeline_stage: "active_not_confirmed",
@@ -392,6 +416,17 @@ export async function createOffer(input: CreateOfferInput): Promise<CreateOfferR
       buy_total: input.buy_total,
       sell_total: input.total,
       profit,
+      ...(input.fx
+        ? {
+            fx_rates: ratesFor(input.fx.sarPer, [
+              input.currency,
+              ...(input.pricing_items ?? []).flatMap((p) => [p.buy_currency, p.sell_currency]),
+              ...(input.hotels ?? []).flatMap((h) => [h.buy_currency, h.sell_currency]),
+            ]),
+            fx_source: input.fx.source,
+            fx_date: input.fx.updatedAt,
+          }
+        : {}),
     });
     await supabase.from("offer_revisions").insert({ offer_id: offerId, revision: 1, note: "created via builder" });
 
@@ -534,17 +569,18 @@ export async function getHubData(): Promise<HubData> {
   try {
     const supabase = await db();
     const [all, confirmed, latest] = await Promise.all([
-      supabase.from("offers").select("total"),
-      supabase.from("offers").select("total").eq("status", "confirmed"),
+      supabase.from("offers").select("total, total_sar, currency"),
+      supabase.from("offers").select("total, total_sar, currency").eq("status", "confirmed"),
       supabase.from("offers").select("serial").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
 
-    const allRows = (all.data ?? []) as { total: number | null }[];
-    const confirmedRows = (confirmed.data ?? []) as { total: number | null }[];
+    // In riyals: a USD or THB offer added in as its raw number inflated both.
+    const allRows = (all.data ?? []) as Parameters<typeof offerSarTotal>[0][];
+    const confirmedRows = (confirmed.data ?? []) as Parameters<typeof offerSarTotal>[0][];
     const offersCount = allRows.length;
     const confirmedCount = confirmedRows.length;
-    const revenue = confirmedRows.reduce((sum, r) => sum + (r.total ?? 0), 0);
-    const average = offersCount > 0 ? allRows.reduce((sum, r) => sum + (r.total ?? 0), 0) / offersCount : 0;
+    const revenue = confirmedRows.reduce((sum, r) => sum + offerSarTotal(r), 0);
+    const average = offersCount > 0 ? allRows.reduce((sum, r) => sum + offerSarTotal(r), 0) / offersCount : 0;
     const readiness = offersCount > 0 ? Math.round((confirmedCount / offersCount) * 100) : 0;
 
     const serial = latest.data?.serial;
@@ -774,13 +810,14 @@ export async function getInternalOffer(serial: string): Promise<InternalOfferDTO
     const customer = customerRes.data as { arabic_name: string | null; mobile: string | null } | null;
     const employee = employeeRes.data as { arabic_name: string | null } | null;
 
-    const [hotelsRes, flightsRes, servicesRes, termsRes, itemsRes, daysRes] = await Promise.all([
+    const [hotelsRes, flightsRes, servicesRes, termsRes, itemsRes, daysRes, fxRes] = await Promise.all([
       supabase.from("offer_hotels").select("hotel_id, hotel_name, room_type_id, board_type, rooms_count, nights, check_in, check_out, buy_price, buy_currency, sell_price, sell_currency, cancellation_policy, excluded_surcharges, valid_until, supplier_id, supplier_name, rate_key, net_base, net_source_currency, fx_rate, fx_date, ref_sell_base, markup_amount, markup_pct, image_url, facilities, content_star_rating, room_type_name").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_flights").select("airline, carrier, flight_no, from_airport, to_airport, departure_at, arrival_at, cabin_class, cabin, baggage_allowance, baggage, leg_order, airline_iata, airlines:airline_iata(logo_path)").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_services").select("label, kind").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_terms").select("text").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_pricing_items").select("item_type, description, quantity, buy_price, buy_currency, sell_price, sell_currency").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_days").select("day_number, day_date, city_name, title, activities, temp_max, temp_min, rain_chance, weather_code, weather_source").eq("offer_id", offer.id).order("day_number"),
+      supabase.from("pricings").select("fx_rates").eq("offer_id", offer.id).limit(1).maybeSingle(),
     ]);
 
     const hotelRows = (hotelsRes.data ?? []) as HotelRow[];
@@ -907,17 +944,26 @@ export async function getInternalOffer(serial: string): Promise<InternalOfferDTO
       }
     }
 
-    const { sarPer } = await getRates();
+    // At the rates the offer was issued at, so its cost and margin do not move
+    // with today's feed; an offer from before the snapshot existed has only
+    // today's. In the offer's own currency, so this table and the client total
+    // read in the same unit. A line with no currency is in it, as issuing assumed.
+    const stored = (fxRes.data as { fx_rates: unknown } | null)?.fx_rates;
+    const sarPer: CurrencyRates =
+      stored && typeof stored === "object" && !Array.isArray(stored) ? (stored as CurrencyRates) : (await getRates()).sarPer;
+    const quote = offer.currency || "SAR";
+    const quoteRates = rebase(sarPer, quote);
+    const base = quoteRates ? quote : "SAR";
     const lines: PricingLineInput[] = itemRows.map((p) => ({
       item_type: p.item_type,
       description: p.description,
       quantity: p.quantity,
       buy_price: p.buy_price,
-      buy_currency: p.buy_currency,
+      buy_currency: p.buy_currency || quote,
       sell_price: p.sell_price,
-      sell_currency: p.sell_currency,
+      sell_currency: p.sell_currency || quote,
     }));
-    const pricing = computeOfferPricing(lines, sarPer, "SAR");
+    const pricing = computeOfferPricing(lines, quoteRates ?? sarPer, base);
 
     // Transport + visas get dedicated document sections. They are stored either as
     // priced items (offer_pricing_items.item_type) or as prefixed include labels

@@ -649,6 +649,7 @@ export async function selectHotelRate(
   if (idx >= 0) items[idx] = { ...items[idx], ...item };
   else items.push(item);
 
-  await saveDraftStages(draftId, { hotels, pricing: { ...data.pricing, items, display_currency: BASE } });
+  // the quote currency is the agent's choice; the totals convert this SAR line into it
+  await saveDraftStages(draftId, { hotels, pricing: { ...data.pricing, items } });
   return { ok: true, blocked: sourcing.blocked };
 }

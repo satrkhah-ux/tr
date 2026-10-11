@@ -1275,6 +1275,24 @@ export const BOARD_LABEL_KEYS: Record<BoardType, TranslationKey> = {
 
 export const CURRENCIES = ["SAR", "USD", "EUR", "TRY", "MYR", "THB", "IDR", "AED"] as const;
 
+/**
+ * What a currency dropdown offers: the base set, every country's own currency,
+ * and whatever the line already holds.
+ *
+ * The last part is the one that matters. A `<select>` whose value is not among
+ * its options shows the FIRST option — so an SGD line read as SAR on screen,
+ * and the next edit saved it as SAR.
+ */
+export function currencyOptions(
+  countries: { default_currency?: string | null }[],
+  ...current: (string | null | undefined)[]
+): string[] {
+  const extra = [...countries.map((c) => c.default_currency), ...current]
+    .map((code) => code?.trim().toUpperCase() ?? "")
+    .filter((code) => /^[A-Z]{3}$/.test(code) && !(CURRENCIES as readonly string[]).includes(code));
+  return [...CURRENCIES, ...[...new Set(extra)].sort()];
+}
+
 // ---------- lookups (loaded server-side, passed to stage pages) ----------
 export type LookupHotel = { id: string; name: string; stars: number | null };
 export type LookupCity = { id: string; name: string; hotels: LookupHotel[] };
@@ -1289,6 +1307,8 @@ export type LookupCountry = {
   iso2: string | null;
   /** IANA zone. Drives the time-difference note — see lib/offer/timezones.ts. */
   timezone: string | null;
+  /** the country's own currency — offered in every currency dropdown. */
+  default_currency?: string | null;
   cities: LookupCity[];
 };
 export type LookupRoomType = { id: string; name: string; hotel_id: string | null; default_board: BoardType | null };
@@ -1297,9 +1317,10 @@ export type LookupAirport = { id: string; name: string; code: string | null; tim
 /**
  * One approved line from the `terms` table — the company's master lists behind
  * /offers/offer-includes, /offers/offer-not-includes and
- * /offers/terms-and-conditions. `checked` marks the ones a new offer starts with.
+ * /offers/terms-and-conditions. `checked` marks the ones a new offer starts with;
+ * `country_id` ties a line to one destination (null = every country).
  */
-export type TermLibraryItem = { text: string; checked: boolean };
+export type TermLibraryItem = { text: string; checked: boolean; country_id: string | null };
 
 export type TermLibrary = {
   includes: TermLibraryItem[];
@@ -1319,6 +1340,74 @@ export function defaultServicesFromLibrary(library: TermLibrary): DraftServices 
   };
 }
 
+/** The lines a trip to this country may use: the global ones plus its own. */
+export function libraryForCountry(library: TermLibrary, countryId: string | null): TermLibrary {
+  const mine = (items: TermLibraryItem[]) => items.filter((i) => i.country_id === null || i.country_id === countryId);
+  return { includes: mine(library.includes), excludes: mine(library.excludes), terms: mine(library.terms) };
+}
+
+/**
+ * The trip moved to another country: swap the old country's approved lines for
+ * the new one's ticked lines.
+ *
+ * Only text that is EXACTLY the previous country's library wording goes — a
+ * global line, or anything the agent typed or reworded, is the agent's and
+ * stays. A line the new country (or the global list) also carries stays too,
+ * rather than being dropped and re-added at the bottom.
+ */
+export function reseedForCountry(
+  services: DraftServices,
+  library: TermLibrary,
+  prevId: string | null,
+  nextId: string | null,
+): DraftServices {
+  if (prevId === nextId) return services;
+  const swap = (current: string[], items: TermLibraryItem[]) => {
+    const keep = new Set(items.filter((i) => i.country_id === null || i.country_id === nextId).map((i) => i.text));
+    const stale = new Set(items.filter((i) => prevId && i.country_id === prevId && !keep.has(i.text)).map((i) => i.text));
+    const kept = current.filter((line) => !stale.has(line));
+    const added = items.filter((i) => nextId && i.checked && i.country_id === nextId && !kept.includes(i.text)).map((i) => i.text);
+    return [...kept, ...new Set(added)];
+  };
+  return {
+    includes: swap(services.includes, library.includes),
+    excludes: swap(services.excludes, library.excludes),
+    terms: swap(services.terms, library.terms),
+  };
+}
+
+/**
+ * The trip moves to another country — from TripStage's picker or a Teletel
+ * destination chip, so both write `trip.country` through here.
+ *
+ * The country's services («خدمات الدولة») count as its unticked «يشمل» lines,
+ * so the old country's leave with its approved lines (reseedForCountry); and a
+ * «خدمة» pricing line for a line that left goes too — mergeSuggestions never
+ * drops a priced line, and a Malaysia offer must not charge for a Thai tour.
+ */
+export function moveTripCountry(
+  data: Pick<DraftData, "trip" | "services" | "pricing">,
+  lookups: Pick<GeneratorLookups, "countries" | "termLibrary" | "countryServices">,
+  trip: DraftTrip,
+): Pick<DraftData, "trip" | "services" | "pricing"> {
+  const id = (name: string) => findLookupCountry(lookups.countries, name)?.id ?? null;
+  const library: TermLibrary = {
+    ...lookups.termLibrary,
+    includes: [
+      ...lookups.termLibrary.includes,
+      ...lookups.countryServices.map((s) => ({ text: s.name, checked: false, country_id: s.country_id })),
+    ],
+  };
+  const services = reseedForCountry(data.services, library, id(data.trip.country), id(trip.country));
+  const gone = new Set(data.services.includes.filter((line) => !services.includes.includes(line)));
+  const items = data.pricing.items.filter((p) => !(p.item_type === "service" && gone.has(p.description)));
+  return {
+    trip,
+    services,
+    pricing: items.length === data.pricing.items.length ? data.pricing : { ...data.pricing, items },
+  };
+}
+
 /**
  * Match a country by name across the usual Arabic spelling variants.
  *
@@ -1328,12 +1417,21 @@ export function defaultServicesFromLibrary(library: TermLibrary): DraftServices 
  * data, and an exact match silently shows an EMPTY city list, which reads as
  * "the system has no cities" rather than "the spelling differs".
  */
-export function findLookupCountry(countries: LookupCountry[], name: string): LookupCountry | undefined {
+export function findLookupCountry<T extends { name: string }>(countries: T[], name: string): T | undefined {
   const fold = (v: string) =>
     v.replace(/[إأآٱ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/[ـ\s]/g, "");
+  // ponytail: naive fold — dropping every alef lets «تايلند» find «تايلاند», but
+  // two countries that differ only by an alef would collide; add a country alias
+  // column if that ever happens.
+  const bare = (v: string) => fold(v).replace(/ا/g, "");
   const target = fold(name);
   if (!target) return undefined;
-  return countries.find((c) => c.name === name) ?? countries.find((c) => fold(c.name) === target);
+  const stripped = bare(name);
+  return (
+    countries.find((c) => c.name === name) ??
+    countries.find((c) => fold(c.name) === target) ??
+    (stripped ? countries.find((c) => bare(c.name) === stripped) : undefined)
+  );
 }
 
 /**
@@ -1353,12 +1451,21 @@ export type LookupCarType = {
 export type GeneratorLookups = {
   /** SAR per unit of each currency (live, else the fallback table) — the preview's totals. */
   sarPer?: Record<string, number>;
+  /** where `sarPer` came from and the day it is for — said next to the pricing totals. */
+  ratesSource?: "live" | "fallback";
+  ratesDate?: string;
   countries: LookupCountry[];
   roomTypes: LookupRoomType[];
   airports: LookupAirport[];
   carTypes: LookupCarType[];
   /** the admin-managed includes / excludes / terms lists. */
   termLibrary: TermLibrary;
+  /**
+   * Each country's services (from /services), one per name — offered under
+   * «يشمل» as «خدمات الدولة». Names only: the prices stay on the server, and
+   * «اقتراح التسعير» finds them again by this exact name.
+   */
+  countryServices: { country_id: string; name: string }[];
   /**
    * Partner companies that resell our files, for the customer stage's company
    * picker. Only name + colours: enough to choose and to preview the identity,

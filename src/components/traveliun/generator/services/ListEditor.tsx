@@ -21,6 +21,12 @@ type ListEditorProps = {
   items: string[];
   /** the company's approved wording for this list (from the `terms` table). */
   library: TermLibraryItem[];
+  /**
+   * «خدمات الدولة» — the trip country's services from /services, a second
+   * source for «يشمل». Added by their exact name, which is what «اقتراح
+   * التسعير» looks the price up by.
+   */
+  countryServices?: string[];
   onChange: (next: string[]) => void;
 };
 
@@ -46,16 +52,54 @@ function Bullet({ variant, index }: { variant: ListVariant; index: number }) {
   );
 }
 
+/** A collapsible list of ready lines; picking one appends it. Hidden when empty. */
+function Picker({ label, entries, onPick }: { label: string; entries: string[]; onPick: (text: string) => void }) {
+  const [open, setOpen] = useState(false);
+  if (entries.length === 0) return null;
+  return (
+    <div className="mb-3">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#185045] hover:underline"
+      >
+        <ListPlus className="size-4" />
+        {label}
+      </button>
+      {open ? (
+        <ul className="mt-2 max-h-[180px] space-y-1 overflow-y-auto rounded-[10px] border border-[#e2ebe7] bg-white p-2">
+          {entries.map((text) => (
+            <li key={text}>
+              <button
+                type="button"
+                onClick={() => onPick(text)}
+                className="w-full rounded-[8px] px-2 py-1.5 text-start text-[12.5px] text-[#41615b] hover:bg-[#f4f8f6]"
+              >
+                <Plus className="me-1 inline size-3.5 text-[#0f7a52]" />
+                {text}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 /** One editable string list (includes / excludes / terms) with add + remove. */
-export function ListEditor({ titleKey, variant, items, library, onChange }: ListEditorProps) {
+export function ListEditor({ titleKey, variant, items, library, countryServices, onChange }: ListEditorProps) {
   const { t } = useTraveliunUI();
   const [value, setValue] = useState("");
-  const [pickerOpen, setPickerOpen] = useState(false);
 
-  // approved lines the agent has not used yet — the only ones worth offering
+  // ready lines the agent has not used yet — the only ones worth offering
   const unused = useMemo(
-    () => library.filter((entry) => !items.includes(entry.text)),
+    // (a set: a country's line may repeat a global one word for word)
+    () => [...new Set(library.map((entry) => entry.text))].filter((text) => !items.includes(text)),
     [library, items],
+  );
+  const unusedServices = useMemo(
+    () => (countryServices ?? []).filter((name) => !items.includes(name)),
+    [countryServices, items],
   );
 
   function addItem() {
@@ -94,34 +138,16 @@ export function ListEditor({ titleKey, variant, items, library, onChange }: List
         </ul>
       )}
 
-      {unused.length > 0 ? (
-        <div className="mb-3">
-          <button
-            type="button"
-            onClick={() => setPickerOpen((open) => !open)}
-            className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#185045] hover:underline"
-          >
-            <ListPlus className="size-4" />
-            {t("pg.fromLibrary", { count: String(unused.length) })}
-          </button>
-          {pickerOpen ? (
-            <ul className="mt-2 max-h-[180px] space-y-1 overflow-y-auto rounded-[10px] border border-[#e2ebe7] bg-white p-2">
-              {unused.map((entry) => (
-                <li key={entry.text}>
-                  <button
-                    type="button"
-                    onClick={() => onChange([...items, entry.text])}
-                    className="w-full rounded-[8px] px-2 py-1.5 text-start text-[12.5px] text-[#41615b] hover:bg-[#f4f8f6]"
-                  >
-                    <Plus className="me-1 inline size-3.5 text-[#0f7a52]" />
-                    {entry.text}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : null}
+      <Picker
+        label={t("pg.fromLibrary", { count: String(unused.length) })}
+        entries={unused}
+        onPick={(text) => onChange([...items, text])}
+      />
+      <Picker
+        label={t("pg.countryServices", { count: String(unusedServices.length) })}
+        entries={unusedServices}
+        onPick={(text) => onChange([...items, text])}
+      />
 
       <form
         onSubmit={(e) => {

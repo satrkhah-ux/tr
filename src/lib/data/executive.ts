@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
+import { offerSarTotal } from "@/lib/offer/pricing";
 
 /**
  * INTERNAL executive dashboard data. Each row carries buy/profit, so the whole
@@ -105,7 +106,7 @@ export async function getExecutiveDashboard(): Promise<ExecutiveDashboard> {
 
     const { data: offerData, error: offerErr } = await supabase
       .from("offers")
-      .select("id, serial, destination, offer_date, adults, children, infants, total, status, pipeline_stage, customer_id, employee_id")
+      .select("id, serial, destination, offer_date, adults, children, infants, total, total_sar, currency, status, pipeline_stage, customer_id, employee_id")
       .order("offer_date", { ascending: false });
 
     if (offerErr) return emptyDashboard(true);
@@ -113,6 +114,7 @@ export async function getExecutiveDashboard(): Promise<ExecutiveDashboard> {
     const offers = (offerData ?? []) as {
       id: string; serial: string; destination: string | null; offer_date: string | null;
       adults: number; children: number; infants: number; total: number | null;
+      total_sar: number | null; currency: string | null;
       status: string; pipeline_stage: string; customer_id: string | null; employee_id: string | null;
     }[];
 
@@ -156,11 +158,15 @@ export async function getExecutiveDashboard(): Promise<ExecutiveDashboard> {
 
     const rows: ExecRow[] = offers.map((o) => {
       const pr = pricingBy.get(o.id);
-      const sell = o.total ?? pr?.sell ?? 0;
+      // In riyals, like the hub's revenue — the tab is labelled ر.س. Buy and
+      // profit are in the offer's own currency too, so they move by the same rate.
+      const native = o.total ?? pr?.sell ?? 0;
+      const sell = offerSarTotal({ ...o, total: native });
+      const toSar = native !== 0 ? sell / native : 1;
       // Prefer the pricings buy_total; else fall back to the summed line items.
       let buy: number | null = null;
-      if (pr?.buy != null) buy = pr.buy;
-      else if (itemBuyBy.has(o.id)) buy = round2(itemBuyBy.get(o.id) ?? 0);
+      if (pr?.buy != null) buy = round2(pr.buy * toSar);
+      else if (itemBuyBy.has(o.id)) buy = round2((itemBuyBy.get(o.id) ?? 0) * toSar);
       const profit = buy != null ? round2(sell - buy) : null;
       return {
         serial: o.serial,

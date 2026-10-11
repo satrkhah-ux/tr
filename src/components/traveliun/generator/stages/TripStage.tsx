@@ -1,7 +1,7 @@
 "use client";
 
 import { Clock, Luggage } from "lucide-react";
-import { deriveCityDates, findLookupCountry, type DraftTrip } from "@/lib/offer/draft-types";
+import { deriveCityDates, findLookupCountry, moveTripCountry, type DraftTrip } from "@/lib/offer/draft-types";
 import { itineraryStartDate, syncDepartureDates } from "@/lib/offer/schedule";
 import { describeOffsetAr, offsetFromHome } from "@/lib/offer/timezones";
 import { FieldIssue, useFieldRing } from "../FieldIssue";
@@ -30,8 +30,10 @@ function addDaysIso(iso: string, days: number): string {
 
 /**
  * Stage 2 — trip frame: country, destination, dates, duration and travelers.
- * Edits ONLY data.trip — with one contract exception: when the arrival date
- * moves, the city check-in/check-out chain is re-derived in the SAME patch.
+ * Edits ONLY data.trip — with two contract exceptions, each in the SAME patch:
+ * when the arrival date moves, the city check-in/check-out chain is re-derived;
+ * when the country changes, its approved «يشمل / لا يشمل / الشروط» lines swap
+ * (and a priced «خدمة» line for one that left goes) — see moveTripCountry.
  */
 export function TripStage({ data, patch, lookups }: StageFormProps) {
   const countryRing = useFieldRing("trip.country");
@@ -51,7 +53,9 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
     if (!trip.destination.trim() || trip.destination === trip.country) {
       slice.destination = nextCountry;
     }
-    update(slice);
+    // The old country's lines leave and the new one's ticked lines arrive;
+    // global lines and anything the agent wrote are left alone.
+    patch(moveTripCountry(data, lookups, { ...trip, ...slice }));
   }
 
   /**

@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { getDraft } from "./drafts";
-import { CURRENCIES } from "@/lib/offer/draft-types";
+import { findLookupCountry } from "@/lib/offer/draft-types";
 import {
   suggestPricing,
   type PricingReference,
@@ -43,14 +43,16 @@ export async function suggestPricingForDraft(
 
     // The country scopes the price lists — a transfer in Tbilisi is not a
     // transfer in Istanbul, and the same service costs differently per market.
+    // Matched the way the generator matches it, so «تايلند» still finds «تايلاند».
     const { data: countryRows } = await supabase.from("countries").select("id, arabic_name");
-    const country = ((countryRows ?? []) as { id: string; arabic_name: string }[]).find(
-      (c) => c.arabic_name?.trim() === data.trip.country?.trim(),
+    const country = findLookupCountry(
+      ((countryRows ?? []) as { id: string; arabic_name: string }[]).map((c) => ({ id: c.id, name: c.arabic_name })),
+      data.trip.country?.trim() ?? "",
     );
 
     const hotelIds = [...new Set(data.hotels.map((h) => h.hotel_id).filter((id): id is string => Boolean(id)))];
 
-    const [transfersRes, servicesRes, memoryRes, historyRes, fleetRes, legacyRes] = await Promise.all([
+    const [transfersRes, servicesRes, memoryRes, historyRes, fleetRes, legacyRes, legacyServiceRes] = await Promise.all([
       country
         ? supabase
             .from("transfers")
@@ -61,7 +63,7 @@ export async function suggestPricingForDraft(
       country
         ? supabase
             .from("services")
-            .select("service_type, arabic_name, buy_price, buy_currency, sell_price, sell_currency")
+            .select("id, service_type, arabic_name, buy_price, buy_currency, sell_price, sell_currency, created_at")
             .eq("country_id", country.id)
         : Promise.resolve({ data: [] }),
       hotelIds.length > 0
@@ -95,6 +97,10 @@ export async function suggestPricingForDraft(
       // transfer ids if it ever grows past that.
       country
         ? supabase.from("legacy_id_map").select("legacy_id, new_id").eq("entity", "transfer").eq("source", "app")
+        : Promise.resolve({ data: [] }),
+      // The services were imported the same way (58 rows, one timestamp).
+      country
+        ? supabase.from("legacy_id_map").select("legacy_id, new_id").eq("entity", "service").eq("source", "app")
         : Promise.resolve({ data: [] }),
     ]);
 
@@ -133,25 +139,36 @@ export async function suggestPricingForDraft(
         })),
     ];
 
-    // A transfer priced in a currency the sheet cannot hold would show under the
-    // wrong code in the dropdown — and be converted as that wrong code. The
-    // legacy list wrote Saudi riyals out in words; everything else unknown is
-    // dropped (the line stays unpriced, which the screen says).
+    // Any ISO code is fine: the dropdowns now hold whatever a line carries, and
+    // a code with no rate is reported, never converted as something else. The
+    // legacy list wrote Saudi riyals out in words; anything else that is not a
+    // code — a blank included — is dropped (the line stays unpriced, which the
+    // screen says). Never guessed: the six Moscow transfers have no currency,
+    // and as roubles their 1,000 for Moscow → St Petersburg would be ~44 SAR.
     const knownCurrency = (code: string | null): string | null => {
       const c = code?.trim() === "ريال سعودي" ? "SAR" : (code?.trim().toUpperCase() ?? "");
-      return (CURRENCIES as readonly string[]).includes(c) ? c : null;
+      return /^[A-Z]{3}$/.test(c) ? c : null;
     };
     const legacyId = new Map(
-      ((legacyRes.data ?? []) as { legacy_id: number; new_id: string }[]).map((m) => [m.new_id, Number(m.legacy_id)]),
+      ([...(legacyRes.data ?? []), ...(legacyServiceRes.data ?? [])] as { legacy_id: number; new_id: string }[]).map((m) => [
+        m.new_id,
+        Number(m.legacy_id),
+      ]),
     );
     const transfers: TransferPrice[] = ((transfersRes.data ?? []) as (TransferPrice & { id: string })[]).flatMap((r) => {
       const currency = knownCurrency(r.currency);
       return currency ? [{ ...r, price: Number(r.price), currency, legacy_id: legacyId.get(r.id) ?? null }] : [];
     });
+    const services: ServicePrice[] = ((servicesRes.data ?? []) as (ServicePrice & { id: string })[]).flatMap((r) => {
+      const buy = knownCurrency(r.buy_currency);
+      const sell = knownCurrency(r.sell_currency);
+      if ((r.buy_price != null && !buy) || (r.sell_price != null && !sell)) return [];
+      return [{ ...r, buy_currency: buy, sell_currency: sell, legacy_id: legacyId.get(r.id) ?? null }];
+    });
 
     const reference: PricingReference = {
       transfers,
-      services: (servicesRes.data ?? []) as ServicePrice[],
+      services,
       rooms,
       fleet: ((fleetRes.data ?? []) as { arabic_name: string | null; pax_capacity: number | null }[]).flatMap((v) =>
         v.arabic_name?.trim() && v.pax_capacity != null ? [{ name: v.arabic_name.trim(), pax: v.pax_capacity }] : [],

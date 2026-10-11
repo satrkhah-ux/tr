@@ -54,6 +54,9 @@ export type ServicePrice = {
   buy_currency: string | null;
   sell_price: number | null;
   sell_currency: string | null;
+  /** as on TransferPrice: the same service filed twice, the newer row is the price. */
+  created_at?: string | null;
+  legacy_id?: number | null;
 };
 
 /** What a room last cost here — hotel_rate_memory, plus the offer history. */
@@ -102,9 +105,9 @@ function vehicleCount(carType: string | null | undefined): number {
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
-/** Two rows for the same road and vehicle: the newer one is the price. */
-function latest(rows: TransferPrice[]): TransferPrice {
-  const time = (row: TransferPrice) => (row.created_at ? Date.parse(row.created_at) || 0 : 0);
+/** Two rows for the same road and vehicle (or the same service): the newer one is the price. */
+function latest<T extends { created_at?: string | null; legacy_id?: number | null }>(rows: T[]): T {
+  const time = (row: T) => (row.created_at ? Date.parse(row.created_at) || 0 : 0);
   return rows.reduce((best, row) => {
     if (time(row) !== time(best)) return time(row) > time(best) ? row : best;
     // The legacy import stamped every row with one timestamp and kept the
@@ -216,9 +219,10 @@ export function findAirportTransfer(
 export function findServicePrice(list: ServicePrice[], label: string): ServicePrice | null {
   const wanted = normalizeName(label);
   if (!wanted) return null;
-  return (
-    list.find((row) => normalizeName(row.service_type) === wanted || normalizeName(row.arabic_name) === wanted) ?? null
-  );
+  // The import filed some services two and three times over, retired prices
+  // and all, under one timestamp — the same story as the transfer list.
+  const hits = list.filter((row) => normalizeName(row.service_type) === wanted || normalizeName(row.arabic_name) === wanted);
+  return hits.length > 0 ? latest(hits) : null;
 }
 
 /** What this exact room last cost — by hotel id first, then by name. */
