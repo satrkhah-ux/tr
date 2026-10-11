@@ -1,0 +1,31 @@
+{
+  "_about": "Round 2, 2026-10-12: cities that share one position once cities.lat/lng were filled (0051). Johor (state) / Johor Bahru (its capital) are both real and stay.",
+  "cities": {
+    "merge": [
+      {
+        "keep": "6e8369bd",
+        "drop": [
+          "b08b6011"
+        ],
+        "_why": "صبنجة = سبانجا (Sapanca); the one with 23 hotels stays"
+      },
+      {
+        "keep": "3e837010",
+        "drop": [
+          "5dddd3c0"
+        ],
+        "arabic_name": "هو تشي منه",
+        "english_name": "Ho Chi Minh City",
+        "_why": "«هوتشي» held the hotels under a truncated name"
+      }
+    ],
+    "rename": [
+      {
+        "id": "e800fa0b",
+        "arabic_name": "عرعر",
+        "english_name": "Arar",
+        "_why": "an airport filed as a city"
+      }
+    ]
+  }
+}

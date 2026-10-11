@@ -1135,6 +1135,13 @@ export const ar: Dictionary = {
   // visas stage
   // ---- البرنامج اليومي ----
   "pg.itin.title": "البرنامج اليومي",
+  "pg.itin.dayN": "اليوم {n}",
+  "pg.itin.nextDay": "اليوم التالي",
+  "pg.itin.prevDay": "اليوم السابق",
+  "pg.itin.pickTour": "اختر جولة جاهزة لـ{city}",
+  "pg.itin.fillFromPrograms": "تعبئة الأيام من البرامج الجاهزة",
+  "pg.itin.filledN": "عُبّئ {n} من أيام الجولات من البرامج الجاهزة — راجعها وعدّل ما تريد.",
+  "pg.itin.filledNone": "لا توجد أيام جولات فارغة، أو لا توجد برامج جاهزة لمدنها.",
   "pg.itin.generate": "صياغة بالذكاء الاصطناعي",
   "pg.itin.refreshWeather": "تحديث الطقس",
   "pg.itin.aiBadge": "مسودة ذكاء اصطناعي",

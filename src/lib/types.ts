@@ -48,6 +48,9 @@ export interface City {
   default_hotel: string | null;
   /** lower first in the generator's list; null = after the ordered ones, alphabetically. */
   sort_order: number | null;
+  /** where the city is (0051) — the weather is looked up by position, not by name. */
+  lat: number | null;
+  lng: number | null;
   created_at: IsoTimestamp;
 }
 

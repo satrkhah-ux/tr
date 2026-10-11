@@ -66,3 +66,4 @@ tbo-certification/
 scripts/legacy-import-app-reference.sql
 # Same, for the suppliers: contact names and mobile numbers.
 scripts/legacy-import-suppliers.sql
+scripts/legacy-import-tour-programs.sql

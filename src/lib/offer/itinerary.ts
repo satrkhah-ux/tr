@@ -192,3 +192,63 @@ export function transportNoteForDay(
 
   return parts.length > 0 ? parts.join(" · ") : null;
 }
+
+/** A ready-made day from the old system (tour_programs, 0052) — text only. */
+export type TourProgram = {
+  id: string;
+  city_name: string;
+  title: string;
+  description: string;
+  is_free_day: boolean;
+  sort_order: number | null;
+};
+
+/** «الجولة الأولى» says nothing on its own in a document; «الجولة الأولى في لنكاوي» does. */
+export function programDayText(program: TourProgram): Pick<DraftDay, "title" | "activities"> {
+  const generic = /^الجول[ةه] /.test(program.title) && !program.title.includes(program.city_name);
+  return {
+    title: generic ? `${program.title} في ${program.city_name}` : program.title,
+    activities: program.description.trim() ? [program.description.trim()] : [],
+  };
+}
+
+/**
+ * A day a tour can go on: not the arrival day, not the day home, and not a day
+ * the group changes city — those are travel days.
+ */
+export function isTouringDay(days: DraftDay[], index: number): boolean {
+  if (index <= 0 || index >= days.length - 1) return false;
+  return days[index - 1]?.city_name === days[index]?.city_name;
+}
+
+/**
+ * «تعبئة الأيام من البرامج الجاهزة» — each city's tours, in the old system's
+ * order, onto that city's EMPTY touring days.
+ *
+ * Never writes over a day that has a title or an activity: the agent's text,
+ * or the AI's, is theirs. A tour already used on another day is not repeated.
+ * Free-day templates are not tours and are never picked here.
+ */
+export function fillDaysFromPrograms(days: DraftDay[], programs: TourProgram[]): { days: DraftDay[]; filled: number } {
+  const used = new Set(days.map((d) => d.title.trim()).filter(Boolean));
+  const queue = new Map<string, TourProgram[]>();
+  for (const p of [...programs].sort((a, b) => (a.sort_order ?? 1e9) - (b.sort_order ?? 1e9))) {
+    if (p.is_free_day) continue;
+    queue.set(p.city_name, [...(queue.get(p.city_name) ?? []), p]);
+  }
+  let filled = 0;
+  const next = days.map((day, index) => {
+    if (day.title.trim() || day.activities.some((a) => a.trim()) || !isTouringDay(days, index)) return day;
+    const list = queue.get(day.city_name) ?? [];
+    while (list.length > 0) {
+      const program = list.shift()!;
+      const text = programDayText(program);
+      if (used.has(text.title)) continue;
+      used.add(text.title);
+      filled += 1;
+      return { ...day, ...text, ai_generated: false };
+    }
+    return day;
+  });
+  return { days: next, filled };
+}

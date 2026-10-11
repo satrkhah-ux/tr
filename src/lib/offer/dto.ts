@@ -108,6 +108,12 @@ export type ItineraryDayLine = {
   rain_chance: number | null;
   weather_code: number | null;
   weather_source: "forecast" | "normals" | null;
+  /**
+   * How the group moves THAT day — «استقبال من المطار إلى الفندق — فان»,
+   * «الانتقال إلى لنكاوي — طيران داخلي». Text only, client-safe. Null on a day
+   * with nothing to say, and on offers issued before 0053.
+   */
+  transport_note?: string | null;
 };
 
 export type InternalOfferDTO = {

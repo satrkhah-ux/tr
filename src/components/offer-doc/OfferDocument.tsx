@@ -232,7 +232,7 @@ function withLists<T extends ClientOfferDTO>(offer: T): T {
       excluded_surcharges: list(h.excluded_surcharges),
       facilities: list(h.facilities),
     })),
-    days: list(offer.days).map((d) => ({ ...d, activities: list(d.activities) })),
+    days: list(offer.days).map((d) => ({ ...d, activities: list(d.activities), transport_note: d.transport_note ?? null })),
     flights: list(offer.flights),
     transport: list(offer.transport),
     visas: list(offer.visas),
@@ -792,11 +792,15 @@ function ToursTable({ offer }: { offer: ClientOfferDTO }) {
               <td>
                 <span className="od-route">{day.title || day.city_name || "—"}</span>
                 {day.activities.join(" · ")}
+                {/* the vehicle goes on the day it is used — a client reads day by day */}
+                {day.transport_note ? <span className="od-sub od-day-move">{day.transport_note}</span> : null}
                 <DayWeather day={day} />
               </td>
             </tr>
           ))}
-          {offer.transport.map((t, i) => (
+          {/* An offer whose days carry their own transport line does not repeat
+              it as loose rows underneath; an older one still prints them. */}
+          {(offer.days.some((d) => d.transport_note) ? [] : offer.transport).map((t, i) => (
             <tr key={`t-${i}`}>
               <td>—</td>
               <td>{AR.transport}</td>

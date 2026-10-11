@@ -147,6 +147,8 @@ export const OFFER_DOC_CSS = `
 .od-carrier{display:flex;align-items:center;gap:2.5mm;}
 .od-carrier-logo{width:14mm;height:6mm;object-fit:contain;object-position:center;flex:0 0 auto;}
 .od-route{color:var(--od-green);font-weight:800;display:block;margin-bottom:1mm;}
+.od-day-move{display:block;margin-top:1mm;font-weight:700;}
+.od-day-move::before{content:"🚐 ";}
 .od-sub{display:block;margin-top:1mm;color:var(--od-muted);font-size:8.8pt;}
 .od-note{margin-top:6mm;border:1px solid var(--od-line);border-radius:4mm;background:var(--od-fill);padding:4mm 5mm;color:var(--od-muted);font-size:10.5pt;break-inside:avoid;}
 .od-strip{margin-top:6mm;display:grid;grid-template-columns:1fr 38mm;border:1px solid var(--od-line);border-radius:4mm;overflow:hidden;background:#fff;font-size:11pt;break-inside:avoid;}

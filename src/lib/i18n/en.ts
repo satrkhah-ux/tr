@@ -1137,6 +1137,13 @@ export const en = {
   // visas stage
   // ---- daily program (itinerary) ----
   "pg.itin.title": "Daily program",
+  "pg.itin.dayN": "Day {n}",
+  "pg.itin.nextDay": "Next day",
+  "pg.itin.prevDay": "Previous day",
+  "pg.itin.pickTour": "Pick a ready-made tour for {city}",
+  "pg.itin.fillFromPrograms": "Fill the days from ready-made programmes",
+  "pg.itin.filledN": "{n} touring days filled from ready-made programmes — review and edit them.",
+  "pg.itin.filledNone": "No empty touring days, or no ready-made programmes for these cities.",
   "pg.itin.generate": "Draft with AI",
   "pg.itin.refreshWeather": "Refresh weather",
   "pg.itin.aiBadge": "AI draft",

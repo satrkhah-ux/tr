@@ -140,6 +140,22 @@ describe("draftToPreviewOffer", () => {
       { day_number: 1, date: null, city_name: "كوالالمبور", title: "", activities: [], weather: null, ai_generated: false },
       { day_number: 2, date: null, city_name: "كوالالمبور", title: "جولة", activities: [], weather: null, ai_generated: false },
     ];
+    draft.scope.transport = false;
     expect(draftToPreviewOffer(draft).days).toHaveLength(1);
+  });
+
+  it("keeps an unwritten day that still has a transport line, and prints the line on it", () => {
+    const draft = emptyDraftData();
+    draft.scope.transport = true;
+    draft.transport_plan.airport.enabled = true;
+    draft.days = [
+      { day_number: 1, date: null, city_name: "كوالالمبور", title: "", activities: [], weather: null, ai_generated: false },
+      { day_number: 2, date: null, city_name: "كوالالمبور", title: "جولة", activities: [], weather: null, ai_generated: false },
+      { day_number: 3, date: null, city_name: "كوالالمبور", title: "", activities: [], weather: null, ai_generated: false },
+    ];
+    const days = draftToPreviewOffer(draft).days;
+    expect(days.map((d) => d.day_number)).toEqual([1, 2, 3]);
+    expect(days[0].transport_note).toMatch(/^استقبال من المطار إلى الفندق/);
+    expect(days[2].transport_note).toMatch(/^توديع من الفندق إلى المطار/);
   });
 });

@@ -17,6 +17,10 @@ import "server-only";
  */
 
 import { formatWeatherAr, weatherCodeAr } from "@/lib/offer/weather-format";
+import { normAr } from "@/lib/catalog/norm";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { bestGeoHit, type GeoHit } from "./geo-rank";
 
 export { weatherCodeAr };
 
@@ -153,16 +157,73 @@ async function getJson<T>(url: string): Promise<T | null> {
   }
 }
 
-type GeoResult = { results?: { name: string; latitude: number; longitude: number; country?: string }[] };
+type GeoResult = { results?: GeoHit[] };
 
-/** City name → coordinates. Arabic names work; falls back to the raw query. */
+type CatalogueCity = {
+  id: string;
+  arabic_name: string;
+  english_name: string | null;
+  lat: number | null;
+  lng: number | null;
+  countries: { iso2: string | null } | null;
+};
+
+/** Untyped, as elsewhere for writes: the generated Database shape types updates as never. */
+const service = () => createSupabaseServiceClient() as unknown as SupabaseClient;
+
+/** Our own row for a city, matched the way the catalogue folds names. */
+async function catalogueCity(name: string): Promise<CatalogueCity | null> {
+  try {
+    const { data } = await service()
+      .from("cities")
+      .select("id, arabic_name, english_name, lat, lng, countries(iso2)");
+    const rows = (data ?? []) as unknown as CatalogueCity[];
+    const target = normAr(name);
+    const same = rows.filter((c) => normAr(c.arabic_name) === target);
+    return same.find((c) => c.lat != null) ?? same[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * City name → coordinates.
+ *
+ * The CATALOGUE's position first (cities.lat/lng, 0051). The geocoder knows
+ * almost no Arabic city names — «سيلانجور», «لنكاوي», «بينانج» all came back
+ * empty — so a city without a position is looked up once by its ENGLISH name
+ * inside its country, ranked so «Langkawi» cannot land on «Langkawit» in Sabah,
+ * and the answer is kept on the row. A name typed outside the catalogue still
+ * gets one exact-name try in Arabic.
+ */
 export async function geocodeCity(city: string): Promise<{ lat: number; lon: number; name: string } | null> {
   const q = city.trim();
   if (!q) return null;
+
+  const row = await catalogueCity(q);
+  if (row?.lat != null && row.lng != null) return { lat: Number(row.lat), lon: Number(row.lng), name: row.arabic_name };
+
+  if (row?.english_name) {
+    const iso2 = row.countries?.iso2;
+    const data = await getJson<GeoResult>(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(row.english_name)}&count=10&language=en&format=json${iso2 ? `&countryCode=${iso2}` : ""}`,
+    );
+    const hit = bestGeoHit(row.english_name, data?.results ?? []);
+    if (hit) {
+      // Kept, so the next programme through this city does not ask again.
+      await service()
+        .from("cities")
+        .update({ lat: hit.latitude, lng: hit.longitude })
+        .eq("id", row.id)
+        .then(() => undefined, () => undefined);
+      return { lat: hit.latitude, lon: hit.longitude, name: row.arabic_name };
+    }
+  }
+
   const data = await getJson<GeoResult>(
-    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=ar&format=json`,
+    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=5&language=ar&format=json`,
   );
-  const hit = data?.results?.[0];
+  const hit = (data?.results ?? []).find((h) => normAr(h.name) === normAr(q));
   if (!hit) return null;
   return { lat: hit.latitude, lon: hit.longitude, name: hit.country ? `${hit.name} — ${hit.country}` : hit.name };
 }

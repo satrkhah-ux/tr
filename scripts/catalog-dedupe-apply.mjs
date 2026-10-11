@@ -4,6 +4,8 @@
 //   node scripts/catalog-dedupe-report.mjs            (refresh the candidates first)
 //   node scripts/catalog-dedupe-apply.mjs             (DRY RUN — rolls back, prints the plan)
 //   node scripts/catalog-dedupe-apply.mjs --commit    (backs up, then does it)
+//   --decisions <file>   a later round (default scripts/catalog-dedupe-decisions.json);
+//                        a round without a hotels / room_types section leaves them alone
 //
 // One transaction. Every reference to a dropped row is moved to the row that
 // stays BEFORE the drop — offers, rate memory, content cache, airports, climate
@@ -23,7 +25,9 @@ const COMMIT = process.argv.includes("--commit");
 const env = readFileSync(join(root, ".env.local"), "utf8");
 const url = env.match(/^SUPABASE_DB_URL=(.*)$/m)?.[1]?.trim().replace(/^["']|["']$/g, "");
 const cand = JSON.parse(readFileSync(join(root, "data-import/catalog-candidates.json"), "utf8"));
-const dec = JSON.parse(readFileSync(join(root, "scripts/catalog-dedupe-decisions.json"), "utf8"));
+const decArg = process.argv.indexOf("--decisions");
+const decFile = decArg > 0 ? process.argv[decArg + 1] : "scripts/catalog-dedupe-decisions.json";
+const dec = JSON.parse(readFileSync(join(root, decFile), "utf8"));
 
 // ------------------------------------------------------------ id resolution
 function resolver(rows, table) {
@@ -127,8 +131,8 @@ const arabicShare = (s) => {
 };
 const latinEnglish = (rows) => rows.map((r) => r.english_name).filter((e) => normEn(e));
 
-const hotelKeep = new Set((dec.hotels.keep ?? []).map(hotelId));
-const hotelPlan = mergeGroups(cand.hotels, dec.hotels, hotelId, allHotels).map((rows) => {
+const hotelKeep = new Set((dec.hotels?.keep ?? []).map(hotelId));
+const hotelPlan = (dec.hotels ? mergeGroups(cand.hotels, dec.hotels, hotelId, allHotels) : []).map((rows) => {
   const keep = pickSurvivor(rows, hotelKeep);
   const drop = rows.filter((r) => r.id !== keep.id);
   const named = namesFor(rows, dec.hotels.names, hotelId);
@@ -151,7 +155,7 @@ const hotelPlan = mergeGroups(cand.hotels, dec.hotels, hotelId, allHotels).map((
  */
 const taMarbuta = (s) => (tidy(s).match(/ة/g) ?? []).length;
 const doubled = (s) => (tidy(s).match(/(\p{L})\1/gu) ?? []).length;
-const roomPlan = mergeGroups(cand.room_types, dec.room_types, roomId, allRooms).map((rows) => {
+const roomPlan = (dec.room_types ? mergeGroups(cand.room_types, dec.room_types, roomId, allRooms) : []).map((rows) => {
   const keep = pickSurvivor(rows, new Set());
   const named = namesFor(rows, dec.room_types.names, roomId);
   const wording = [...rows]
@@ -171,14 +175,14 @@ const roomPlan = mergeGroups(cand.room_types, dec.room_types, roomId, allRooms).
   };
 });
 
-const cityPlan = dec.cities.merge.map((m) => ({
+const cityPlan = (dec.cities.merge ?? []).map((m) => ({
   keep: cityId(m.keep),
   drop: m.drop.map(cityId),
   arabic_name: m.arabic_name ?? null,
   english_name: m.english_name ?? null,
 }));
-const cityDelete = dec.cities.delete.ids.map(cityId);
-const cityRename = dec.cities.rename.map((r) => ({ id: cityId(r.id), arabic_name: r.arabic_name, english_name: r.english_name }));
+const cityDelete = (dec.cities.delete?.ids ?? []).map(cityId);
+const cityRename = (dec.cities.rename ?? []).map((r) => ({ id: cityId(r.id), arabic_name: r.arabic_name, english_name: r.english_name }));
 
 // Every overlap between plans is a bug in the decisions, not something to guess around.
 const seen = new Set();

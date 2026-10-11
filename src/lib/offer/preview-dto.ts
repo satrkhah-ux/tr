@@ -25,6 +25,7 @@ import {
   type GeneratorLookups,
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
+import { transportNoteForDay } from "./itinerary";
 import { offerTotals, type CurrencyRates } from "./pricing";
 import type { ExtractedPackage, RepackageData } from "@/lib/repackage/repackage-types";
 
@@ -161,8 +162,11 @@ export function draftToPreviewOffer(
     excludes: data.services.excludes,
     terms: data.services.terms,
     days: data.days
-      .filter((d) => d.title.trim() || d.activities.length > 0)
-      .map((d) => ({
+      // index on the FULL list: the transport line depends on a day's neighbours
+      .map((d, index) => ({ d, move: data.scope.transport ? transportNoteForDay(data.transport_plan, data.days, index) : null }))
+      .filter(({ d, move }) => d.title.trim() || d.activities.length > 0 || move)
+      .map(({ d, move }) => ({
+        transport_note: move,
         day_number: d.day_number,
         date: d.date,
         city_name: d.city_name,
