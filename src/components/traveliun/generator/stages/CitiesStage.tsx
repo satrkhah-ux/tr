@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BedDouble, Check, CheckCircle2, Copy, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { BedDouble, Check, CheckCircle2, Copy, Loader2, Plane, Plus, Sparkles, Trash2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { copyProgramIntoDraft, findReusablePrograms, getDraft } from "@/lib/data/drafts";
@@ -21,6 +21,7 @@ import {
   type ReusableProgram,
 } from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
+import { citiesFromFlights, citiesMatchFlights } from "@/lib/offer/flight-cities";
 import {
   searchHotelsForCity,
   searchInternalHotels,
@@ -208,8 +209,21 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
 
   function setCities(next: DraftCity[]) {
     // check-in chain starts at the itinerary start (outbound flight's local
-    // landing date, or the trip arrival when no flight is set yet).
-    patch({ cities: deriveCityDates(start, next) });
+    // landing date, or the trip arrival when no flight is set yet). A hand edit
+    // makes the cities the agent's: the flights stop rewriting them.
+    patch({ cities: deriveCityDates(start, next.map((c) => ({ ...c, from_flight: false }))) });
+  }
+
+  /** What the flights say the cities are — offered when the card holds something else. */
+  const fromFlights = citiesFromFlights(data.flights);
+  const differsFromFlights = Boolean(fromFlights && data.cities.length > 0 && !citiesMatchFlights(data.cities, fromFlights));
+  function takeCitiesFromFlights() {
+    if (!fromFlights) return;
+    const nights = fromFlights.reduce((sum, c) => sum + c.nights, 0);
+    patch({
+      cities: deriveCityDates(start, fromFlights),
+      trip: { ...data.trip, nights, days: nights + 1 },
+    });
   }
 
   /**
@@ -534,6 +548,23 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
         </div>
         <FieldIssue field="cities" className="mb-3" />
         <FieldIssue field="hotels" className="mb-3" />
+        {differsFromFlights && fromFlights ? (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[11px] border border-[#cfe0d9] bg-[#f2f8f5] px-3.5 py-2.5">
+            <Plane className="size-4 text-[#185045]" />
+            <span className="min-w-0 flex-1 text-[12px] font-bold text-[#185045]">
+              {t("pg.citiesFromFlightsOffer", {
+                cities: fromFlights.map((c) => `${c.city_name} ${c.nights}`).join(" · "),
+              })}
+            </span>
+            <button
+              type="button"
+              onClick={takeCitiesFromFlights}
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439]"
+            >
+              {t("pg.citiesFromFlightsTake")}
+            </button>
+          </div>
+        ) : null}
 
         {data.cities.length === 0 ? (
           <p className="mb-4 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
@@ -570,6 +601,12 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                       <span className="size-2.5 shrink-0 rounded-full bg-[#e0a92a]" />
                     )}
                     <span className="text-[13px] font-extrabold text-[#185045]">{city.city_name || t("pg.chooseCity")}</span>
+                    {city.from_flight ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#eef4f1] px-2 py-0.5 text-[10.5px] font-bold text-[#557d78]">
+                        <Plane className="size-3" />
+                        {t("pg.cityFromFlight")}
+                      </span>
+                    ) : null}
                     <span className="tv-tnum rounded-full bg-[#f2f7f5] px-2.5 py-1 text-[11.5px] font-bold text-[#557d78]">
                       <DirText dir="ltr">{String(city.nights)}</DirText> {t("pg.nightsShort")}
                     </span>

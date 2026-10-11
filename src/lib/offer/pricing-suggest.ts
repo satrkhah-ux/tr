@@ -307,20 +307,42 @@ export function suggestPricing(
     });
   }
 
-  for (const f of data.flights) {
-    const description = `${f.airline || labels.airline} ${f.flight_no}`.trim();
-    if (!description) continue;
+  // Flights are priced the way they are bought: ONE figure for the whole
+  // booking (every traveller, every leg), typed on the flights card. A booking
+  // without its figure yet still gets its line, unpriced, so it is not lost.
+  const bookings: { ref: string; legs: typeof data.flights; price: number | null; currency: string; label: string }[] = [
+    {
+      ref: "flight:intl",
+      legs: data.flights.filter((f) => f.leg_order !== "internal"),
+      price: data.flight_booking.intl_price,
+      currency: data.flight_booking.intl_currency || currency,
+      label: "طيران دولي",
+    },
+    {
+      ref: "flight:dom",
+      legs: data.flights.filter((f) => f.leg_order === "internal"),
+      price: data.flight_booking.dom_price,
+      currency: data.flight_booking.dom_currency || currency,
+      label: "طيران داخلي",
+    },
+  ];
+  for (const b of bookings) {
+    if (b.legs.length === 0) continue;
+    const numbers = b.legs
+      .map((f) => `${f.airline || labels.airline} ${f.flight_no}`.trim())
+      .filter(Boolean)
+      .join(" · ");
     items.push({
       item_type: "flight",
-      description,
-      // A fare is per traveller, and the sheet multiplies — so the head count
-      // belongs here rather than in the agent's arithmetic.
-      quantity: Math.max(data.trip.adults + data.trip.children, 1),
+      description: numbers ? `${b.label} — ${numbers}` : b.label,
+      ref: b.ref,
+      // the figure is already the whole booking
+      quantity: 1,
       buy_price: null,
-      buy_currency: currency,
-      sell_price: null,
-      sell_currency: currency,
-      source: "none",
+      buy_currency: b.currency,
+      sell_price: b.price,
+      sell_currency: b.currency,
+      source: b.price != null ? "typed" : "none",
     });
   }
 

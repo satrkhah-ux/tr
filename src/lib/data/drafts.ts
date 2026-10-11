@@ -255,7 +255,7 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
   try {
     const supabase = await db();
     const ratesPromise = getRates();
-    const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transportRes, termsRes, airlinesRes, partnersRes, servicesRes] = await Promise.all([
+    const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transportRes, termsRes, airlinesRes, partnersRes, servicesRes, suppliersRes] = await Promise.all([
       // iso2 is not decoration: a real hotel supplier looks a city up WITHIN a
       // country, so a live search without it returns nothing at all.
       supabase.from("countries").select("id, arabic_name, iso2, timezone, default_currency, status").order("arabic_name"),
@@ -275,7 +275,8 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
           .order("id")
           .range(from, to),
       ),
-      supabase.from("airports").select("id, arabic_name, code, iana_timezone, status").order("code"),
+      // the city an airport serves turns «landed at LGK» into «the next city is لنكاوي»
+      supabase.from("airports").select("id, arabic_name, code, iana_timezone, status, cities(arabic_name)").order("code"),
       supabase
         .from("transportation_types")
         .select("arabic_name, english_name, category, vehicle_class, pax_capacity, luggage_capacity, status")
@@ -297,6 +298,8 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       // names only — partners use the generator, and a service's buy/sell price
       // is for «اقتراح التسعير» on the server, never the browser
       supabase.from("services").select("country_id, arabic_name").not("country_id", "is", null).order("arabic_name"),
+      // who a flight or hotel price was booked through — names and what they sell, no contacts
+      supabase.from("company_suppliers").select("id, arabic_name, categories, status").order("arabic_name"),
     ]);
 
     // a reference row is offered to the generator unless the admin disabled it
@@ -359,9 +362,19 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       roomTypes: ((roomTypesRes.data ?? []) as { id: string; arabic_name: string; hotel_id: string | null; default_board: GeneratorLookups["roomTypes"][number]["default_board"] }[]).map(
         (r) => ({ id: r.id, name: r.arabic_name, hotel_id: r.hotel_id, default_board: r.default_board }),
       ),
-      airports: ((airportsRes.data ?? []) as { id: string; arabic_name: string; code: string | null; iana_timezone: string | null; status: string | null }[])
+      airports: ((airportsRes.data ?? []) as unknown as {
+        id: string;
+        arabic_name: string;
+        code: string | null;
+        iana_timezone: string | null;
+        status: string | null;
+        cities: { arabic_name: string } | null;
+      }[])
         .filter((a) => active(a.status))
-        .map((a) => ({ id: a.id, name: a.arabic_name, code: a.code, timezone: a.iana_timezone })),
+        .map((a) => ({ id: a.id, name: a.arabic_name, code: a.code, timezone: a.iana_timezone, city: a.cities?.arabic_name ?? null })),
+      companySuppliers: ((suppliersRes.data ?? []) as { id: string; arabic_name: string; categories: string | null; status: string | null }[])
+        .filter((s) => active(s.status))
+        .map((s) => ({ id: s.id, name: s.arabic_name, categories: s.categories ?? "" })),
       carTypes,
       termLibrary: buildTermLibrary(termsRes.data),
       countryServices: buildCountryServices(servicesRes.data),

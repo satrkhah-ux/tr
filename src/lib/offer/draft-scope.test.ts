@@ -198,12 +198,9 @@ describe("emptyFlight", () => {
     expect(emptyFlight("internal", trip)).toMatchObject({ baggage_kg: 20, baggage_pieces: 1 });
   });
 
-  it("stays empty with no trip to inherit from", () => {
-    expect(emptyFlight("outbound")).toMatchObject({
-      baggage_kg: null,
-      baggage_pieces: null,
-      cabin_baggage_kg: null,
-    });
+  it("starts from what most tickets allow when the trip says nothing", () => {
+    expect(emptyFlight("outbound")).toMatchObject({ baggage_pieces: 1, baggage_kg: 25, cabin_baggage_kg: 7 });
+    expect(emptyFlight("internal")).toMatchObject({ baggage_pieces: 1, baggage_kg: 15, cabin_baggage_kg: 7 });
   });
 });
 

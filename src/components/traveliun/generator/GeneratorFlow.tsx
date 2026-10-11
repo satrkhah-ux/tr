@@ -358,8 +358,9 @@ export function GeneratorFlow({
                         >
                           <p className="mb-1">{t("pg.flow.blocked")}</p>
                           <ul className="list-disc space-y-0.5 ps-5 font-semibold">
-                            {blockers.map((issue, i) => (
-                              <li key={`${issue.field ?? issue.stage}-${i}`}>{issueText(issue)}</li>
+                            {/* one line per message: the same rule failing on two flights is one thing to fix */}
+                            {[...new Set(blockers.map(issueText))].map((text) => (
+                              <li key={text}>{text}</li>
                             ))}
                           </ul>
                         </div>

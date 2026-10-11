@@ -357,6 +357,8 @@ export function resizeAges(ages: number[], count: number, fallback = 0): number[
 export type DraftCity = {
   city_name: string;
   nights: number;
+  /** true when the flights put this city here (and decide its nights). */
+  from_flight?: boolean;
   /** derived from trip.arrival_date + the nights chain (deriveCityDates). */
   check_in: string | null;
   check_out: string | null;
@@ -609,6 +611,14 @@ export type DraftFlight = {
   from_tz: string | null;
   /** destination IANA timezone (resolved from the picked airport); null until resolvable. */
   to_tz: string | null;
+  /**
+   * The catalogue cities the two airports belong to (airports.city_id), or ""
+   * when the airport is not linked. The cities card is built from these: the
+   * outbound flight's landing city is the first city, each domestic flight's
+   * landing city the next one.
+   */
+  from_city?: string;
+  to_city?: string;
   /** true once the agent manually edited the departure DATE → stop auto-syncing it. */
   date_user_set: boolean;
   cabin_class: string;
@@ -627,8 +637,18 @@ export type DraftFlight = {
 };
 
 /**
- * A new leg. Baggage starts from the trip defaults — the numbers were typed
- * once on the trip card so they would not be retyped on every row.
+ * What most of our tickets allow, written into every new leg so the agent only
+ * touches the one flight that differs: international 1 × 25 kg + 7 kg in the
+ * cabin, domestic 1 × 15 kg + 7 kg.
+ */
+export const FLIGHT_BAGGAGE = {
+  intl: { pieces: 1, kg: 25, cabin_kg: 7 },
+  domestic: { pieces: 1, kg: 15, cabin_kg: 7 },
+} as const;
+
+/**
+ * A new leg. Baggage starts from FLIGHT_BAGGAGE (or from the trip's own numbers
+ * on an older draft that set them).
  *
  * A COPY, not a live link: the agent then corrects one leg without the trip
  * card rewriting the others behind their back.
@@ -648,10 +668,62 @@ export function emptyFlight(legOrder: FlightLegOrder, trip?: DraftTrip): DraftFl
     date_user_set: false,
     cabin_class: "",
     baggage_allowance: "",
-    baggage_kg: (dom ? trip?.baggage_dom_kg : trip?.baggage_intl_kg) ?? null,
-    baggage_pieces: (dom ? trip?.baggage_dom_pieces : trip?.baggage_intl_pieces) ?? null,
-    cabin_baggage_kg: (dom ? trip?.baggage_dom_cabin_kg : trip?.baggage_intl_cabin_kg) ?? null,
+    baggage_kg: (dom ? trip?.baggage_dom_kg : trip?.baggage_intl_kg) ?? (dom ? FLIGHT_BAGGAGE.domestic : FLIGHT_BAGGAGE.intl).kg,
+    baggage_pieces:
+      (dom ? trip?.baggage_dom_pieces : trip?.baggage_intl_pieces) ?? (dom ? FLIGHT_BAGGAGE.domestic : FLIGHT_BAGGAGE.intl).pieces,
+    cabin_baggage_kg:
+      (dom ? trip?.baggage_dom_cabin_kg : trip?.baggage_intl_cabin_kg) ?? (dom ? FLIGHT_BAGGAGE.domestic : FLIGHT_BAGGAGE.intl).cabin_kg,
     leg_order: legOrder,
+    from_city: "",
+    to_city: "",
+  };
+}
+
+/**
+ * How the flights were booked — one price for the whole booking, the way the
+ * agency buys it: the international tickets for every traveller as one figure,
+ * the domestic hop as another. The supplier is who it was booked through.
+ */
+export type FlightBookingMode = "round" | "oneway" | "multi";
+
+export type FlightBooking = {
+  mode: FlightBookingMode;
+  cabin: string;
+  intl_price: number | null;
+  intl_currency: string;
+  intl_supplier: string;
+  dom_price: number | null;
+  dom_currency: string;
+  dom_supplier: string;
+};
+
+export function emptyFlightBooking(): FlightBooking {
+  return {
+    mode: "round",
+    cabin: "اقتصادية",
+    intl_price: null,
+    intl_currency: "SAR",
+    intl_supplier: "",
+    dom_price: null,
+    dom_currency: "SAR",
+    dom_supplier: "",
+  };
+}
+
+function normalizeFlightBooking(raw: unknown): FlightBooking {
+  const b = (raw && typeof raw === "object" ? raw : {}) as Partial<FlightBooking>;
+  const empty = emptyFlightBooking();
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const str = (v: unknown, fallback: string) => (typeof v === "string" ? v : fallback);
+  return {
+    mode: b.mode === "oneway" || b.mode === "multi" ? b.mode : "round",
+    cabin: str(b.cabin, empty.cabin),
+    intl_price: num(b.intl_price),
+    intl_currency: str(b.intl_currency, "SAR") || "SAR",
+    intl_supplier: str(b.intl_supplier, ""),
+    dom_price: num(b.dom_price),
+    dom_currency: str(b.dom_currency, "SAR") || "SAR",
+    dom_supplier: str(b.dom_supplier, ""),
   };
 }
 
@@ -867,6 +939,11 @@ export type DraftDay = {
   weather: DayWeatherSnapshot | null;
   /** true when the text came from the AI and no human has edited it since. */
   ai_generated: boolean;
+  /**
+   * "travel" for the day the group flies out and is not yet there — the
+   * programme starts when the plane leaves, the hotels when it lands.
+   */
+  kind?: "travel";
 };
 
 export type DraftPricing = {
@@ -899,6 +976,8 @@ export type DraftData = {
   cities: DraftCity[];
   hotels: DraftHotel[];
   flights: DraftFlight[];
+  /** the booking the flights belong to: mode, cabin, one price per booking. */
+  flight_booking: FlightBooking;
   /** what the agent answers — see TransportPlan. */
   transport_plan: TransportPlan;
   /** DERIVED from transport_plan on every normalize; the document reads this. */
@@ -953,6 +1032,7 @@ export function emptyDraftData(): DraftData {
     cities: [],
     hotels: [],
     flights: [],
+    flight_booking: emptyFlightBooking(),
     transport_plan: emptyTransportPlan(),
     transport: [],
     services: { includes: [], excludes: [], terms: [] },
@@ -991,6 +1071,7 @@ function normalizeDraftDay(raw: unknown, index: number): DraftDay {
           }
         : null,
     ai_generated: d.ai_generated === true,
+    ...(d.kind === "travel" ? { kind: "travel" as const } : {}),
   };
 }
 
@@ -1007,6 +1088,8 @@ function normalizeDraftFlight(raw: unknown): DraftFlight {
     arrival_at: typeof f.arrival_at === "string" ? f.arrival_at : null,
     from_tz: typeof f.from_tz === "string" ? f.from_tz : null,
     to_tz: typeof f.to_tz === "string" ? f.to_tz : null,
+    from_city: typeof f.from_city === "string" ? f.from_city : "",
+    to_city: typeof f.to_city === "string" ? f.to_city : "",
     date_user_set: f.date_user_set === true,
     cabin_class: typeof f.cabin_class === "string" ? f.cabin_class : "",
     baggage_allowance: typeof f.baggage_allowance === "string" ? f.baggage_allowance : "",
@@ -1089,6 +1172,7 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     cities,
     hotels: Array.isArray(source.hotels) ? source.hotels.map(normalizeDraftHotel) : [],
     flights: Array.isArray(source.flights) ? source.flights.map(normalizeDraftFlight) : [],
+    flight_booking: normalizeFlightBooking(source.flight_booking),
     transport_plan: transportPlan,
     // DERIVED, always. Rows are no longer authored, so a stale array from an
     // older draft is simply replaced by what the plan says today.
@@ -1319,7 +1403,8 @@ export type LookupCountry = {
   cities: LookupCity[];
 };
 export type LookupRoomType = { id: string; name: string; hotel_id: string | null; default_board: BoardType | null };
-export type LookupAirport = { id: string; name: string; code: string | null; timezone: string | null };
+/** `city` — the catalogue city the airport serves (airports.city_id), or null. */
+export type LookupAirport = { id: string; name: string; code: string | null; timezone: string | null; city: string | null };
 
 /**
  * One approved line from the `terms` table — the company's master lists behind
@@ -1486,6 +1571,11 @@ export type GeneratorLookups = {
    * makes it appear on its own, and a demo one is flagged as demo.
    */
   hotelSources: { code: string; name: string; demo: boolean }[];
+  /**
+   * The agency's own suppliers (company_suppliers), for «المزوّد» beside a
+   * flight or hotel price. `categories` is the admin's words: «فنادق، طيران».
+   */
+  companySuppliers?: { id: string; name: string; categories: string }[];
   partners: {
     id: string;
     name: string;

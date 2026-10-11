@@ -8,9 +8,16 @@ import { getAssistantAvailability, lookupFlightNumber } from "@/lib/data/itinera
 import type { FlightLookupHit } from "@/lib/providers/flight-lookup";
 import {
   deriveCityDates,
+  emptyFlight,
+  type DraftCity,
+  type DraftData,
   type DraftFlight,
+  type FlightBooking,
   type LookupAirport,
 } from "@/lib/offer/draft-types";
+import { citiesFromFlights } from "@/lib/offer/flight-cities";
+import { FlightBuilder, type BuilderSegment } from "../flights/FlightBuilder";
+import { SupplierPrice } from "../SupplierPrice";
 import { buildJourneys, formatWaitAr, type JourneyLeg } from "@/lib/offer/journey";
 import {
   autoDepartureDate,
@@ -59,40 +66,28 @@ function airportDisplay(a: LookupAirport): string {
  * free-typed airport we don't know — the duration then stays unknown (guarded),
  * never guessed from the server/browser tz.
  */
-function resolveTz(value: string, airports: LookupAirport[]): string | null {
+function resolveAirport(value: string, airports: LookupAirport[]): LookupAirport | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
   const exact = airports.find((a) => airportDisplay(a) === trimmed);
-  if (exact) return exact.timezone;
-  const codeMatch = trimmed.match(/\(([A-Za-z]{3})\)/);
+  if (exact) return exact;
+  const codeMatch = trimmed.match(/\(([A-Za-z0-9]{3,5})\)/);
   if (codeMatch) {
     const code = codeMatch[1].toUpperCase();
-    const byCode = airports.find((a) => (a.code ?? "").toUpperCase() === code);
-    if (byCode) return byCode.timezone;
+    return airports.find((a) => (a.code ?? "").toUpperCase() === code) ?? null;
   }
   return null;
 }
 
-function emptyFlight(legOrder: FlightLegOrder): DraftFlight {
-  return {
-    airline: "",
-    airline_iata: "",
-    flight_no: "",
-    from_airport: "",
-    to_airport: "",
-    departure_at: null,
-    arrival_at: null,
-    from_tz: null,
-    to_tz: null,
-    date_user_set: false,
-    cabin_class: "",
-    baggage_allowance: "",
-    baggage_kg: null,
-    baggage_pieces: null,
-    cabin_baggage_kg: null,
-    leg_order: legOrder,
-  };
+function resolveTz(value: string, airports: LookupAirport[]): string | null {
+  return resolveAirport(value, airports)?.timezone ?? null;
 }
+
+/** The catalogue city an airport serves — what turns a landing into the next city. */
+function resolveCity(value: string, airports: LookupAirport[]): string {
+  return resolveAirport(value, airports)?.city ?? "";
+}
+
 
 type RowHandlers = {
   updateRow: (index: number, slice: Partial<DraftFlight>) => void;
@@ -152,14 +147,59 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
   const airports = lookups.airports;
   const airlines = lookups.airlines;
 
-  /** Persist flights + keep the trip-driven departure dates and hotel chain in sync. */
-  function commit(next: DraftFlight[]) {
+  /**
+   * Persist flights + keep the trip-driven departure dates and hotel chain in
+   * sync. And the cities: while the cities card holds nothing the agent typed
+   * by hand, the flights decide it — the landing city first, each domestic
+   * hop's city next, the nights from the dates — and the trip's nights follow.
+   */
+  function commit(next: DraftFlight[], slice: Partial<DraftData> = {}) {
     const synced = syncDepartureDates(data.trip, next);
+    const start = itineraryStartDate(data.trip, synced);
+    const derived = citiesFromFlights(synced);
+    const followFlights = derived && (data.cities.length === 0 || data.cities.every((c) => c.from_flight));
+    const cities: DraftCity[] = followFlights ? derived : data.cities;
+    const nights = cities.reduce((sum, c) => sum + c.nights, 0);
     patch({
+      ...slice,
       flights: synced,
-      cities: deriveCityDates(itineraryStartDate(data.trip, synced), data.cities),
+      cities: deriveCityDates(start, cities),
+      ...(followFlights ? { trip: { ...data.trip, nights, days: nights + 1 } } : {}),
     });
   }
+
+  const booking = data.flight_booking;
+  function setBooking(slice: Partial<FlightBooking>) {
+    patch({ flight_booking: { ...booking, ...slice } });
+  }
+
+  /**
+   * The builder's segments → flight legs. The first leaves for the destination,
+   * the last comes home; anything between rides the outbound chain. Replaces
+   * the international legs only — the domestic hops are kept.
+   */
+  function buildLegs(segments: BuilderSegment[]) {
+    const legs = segments.map((seg, i) => {
+      const order: FlightLegOrder = i === segments.length - 1 && i > 0 ? "inbound" : "outbound";
+      const auto = autoDepartureDate(data.trip, order);
+      return {
+        ...emptyFlight(order, data.trip),
+        from_airport: seg.from,
+        to_airport: seg.to,
+        from_tz: resolveTz(seg.from, airports),
+        to_tz: resolveTz(seg.to, airports),
+        from_city: resolveCity(seg.from, airports),
+        to_city: resolveCity(seg.to, airports),
+        // the date the agent chose; the time comes with the flight number
+        departure_at: `${seg.date}T00:00`,
+        date_user_set: seg.date !== auto,
+        cabin_class: booking.cabin,
+      };
+    });
+    setRebuilding(false);
+    commit([...legs, ...flights.filter((f) => f.leg_order === "internal")]);
+  }
+  const [rebuilding, setRebuilding] = useState(false);
 
   function updateRow(index: number, slice: Partial<DraftFlight>) {
     commit(flights.map((f, i) => (i === index ? { ...f, ...slice } : f)));
@@ -167,7 +207,12 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
 
   function setAirport(index: number, field: "from_airport" | "to_airport", value: string) {
     const tzField = field === "from_airport" ? "from_tz" : "to_tz";
-    updateRow(index, { [field]: value, [tzField]: resolveTz(value, airports) } as Partial<DraftFlight>);
+    const cityField = field === "from_airport" ? "from_city" : "to_city";
+    updateRow(index, {
+      [field]: value,
+      [tzField]: resolveTz(value, airports),
+      [cityField]: resolveCity(value, airports),
+    } as Partial<DraftFlight>);
   }
 
   function setDeparture(index: number, raw: string) {
@@ -177,7 +222,8 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
     const newDate = localDatePart(value);
     // Diverging the DATE from the trip-driven date pins it ("user-set"); snapping
     // it back to the auto date (or clearing it) re-enables auto-sync.
-    const userSet = newDate !== null && newDate !== auto;
+    // a domestic hop has no trip-driven date, so there is nothing to diverge from
+    const userSet = auto !== null && newDate !== null && newDate !== auto;
     updateRow(index, { departure_at: value, date_user_set: userSet });
   }
 
@@ -190,11 +236,11 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
   /** International: first leg defaults to outbound, the next to inbound. */
   function addInternational() {
     const hasOutbound = flights.some((f) => f.leg_order === "outbound");
-    commit([...flights, emptyFlight(hasOutbound ? "inbound" : "outbound")]);
+    commit([...flights, emptyFlight(hasOutbound ? "inbound" : "outbound", data.trip)]);
   }
 
   function addDomestic() {
-    commit([...flights, emptyFlight("internal")]);
+    commit([...flights, emptyFlight("internal", data.trip)]);
   }
 
   function removeRow(index: number) {
@@ -259,6 +305,8 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
       // our own airport rows win for the zone; the provider's is the fallback
       from_tz: resolveTz(from_airport, airports) ?? hit.from_tz,
       to_tz: resolveTz(to_airport, airports) ?? hit.to_tz,
+      from_city: resolveCity(from_airport, airports),
+      to_city: resolveCity(to_airport, airports),
       departure_at: depDate && depTime ? `${depDate}T${depTime}` : flight.departure_at,
       arrival_at: depDate && arrTime ? `${addDaysIso(depDate, offset)}T${arrTime}` : flight.arrival_at,
     });
@@ -301,11 +349,33 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
         </span>
       </div>
 
-      {international.length === 0 ? (
-        <p className="mb-3 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">
-          {t("pg.noFlightsYet")}
-        </p>
-      ) : (
+      {international.length === 0 || rebuilding ? (
+        <div className="mb-3">
+          <FlightBuilder
+            mode={booking.mode}
+            onMode={(mode) => setBooking({ mode })}
+            cabin={booking.cabin}
+            onCabin={(cabin) => setBooking({ cabin })}
+            defaultDeparture={data.trip.arrival_date}
+            defaultReturn={data.trip.departure_date}
+            passengers={{ adults: data.trip.adults, children: data.trip.children, infants: data.trip.infants }}
+            onBuild={(segments) => {
+              if (international.length > 0 && !window.confirm(t("pg.fb.replaceConfirm"))) return;
+              buildLegs(segments);
+            }}
+          />
+          {rebuilding ? (
+            <button
+              type="button"
+              onClick={() => setRebuilding(false)}
+              className="mt-2 text-[12px] font-bold text-[#557d78] hover:underline"
+            >
+              {t("pg.cancel")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {international.length === 0 ? null : (
         <div className="mb-3 space-y-4">
           {intlJourneys.map((journey) => (
             <div key={journey.leg_order} className="rounded-[12px] border border-[#e2ebe7] bg-[#fbfdfc] p-2.5">
@@ -335,10 +405,39 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
         </div>
       )}
 
-      <button type="button" onClick={addInternational} className={addButtonClass}>
-        <Plus className="size-4" />
-        {t("pg.addFlightIntl")}
-      </button>
+      {international.length > 0 ? (
+        <>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setRebuilding(true)} className={addButtonClass}>
+              <Plane className="size-4" />
+              {t("pg.fb.rebuild")}
+            </button>
+            <button type="button" onClick={addInternational} className={addButtonClass}>
+              <Plus className="size-4" />
+              {t("pg.addFlightIntl")}
+            </button>
+          </div>
+          {/* ONE figure for the booking — every traveller, every leg — and who it was bought from */}
+          <div className="mt-3 rounded-[12px] border border-[#cfe0d9] bg-[#f8fbf9] p-3">
+            <SupplierPrice
+              label={t("pg.fb.intlPrice")}
+              price={booking.intl_price}
+              currency={booking.intl_currency}
+              supplier={booking.intl_supplier}
+              category="طيران"
+              lookups={lookups}
+              countries={lookups.countries}
+              onChange={(v) =>
+                setBooking({
+                  ...(v.price !== undefined ? { intl_price: v.price } : {}),
+                  ...(v.currency !== undefined ? { intl_currency: v.currency } : {}),
+                  ...(v.supplier !== undefined ? { intl_supplier: v.supplier } : {}),
+                })
+              }
+            />
+          </div>
+        </>
+      ) : null}
 
       {/* ── domestic (internal hops) — optional, destination-dependent ──────── */}
       <div className="mt-6 border-t border-[#e7f0ec] pt-5">
@@ -379,6 +478,26 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
           <Plus className="size-4" />
           {t("pg.addFlightDomestic")}
         </button>
+        {domestic.length > 0 ? (
+          <div className="mt-3 rounded-[12px] border border-[#cfe0d9] bg-[#f8fbf9] p-3">
+            <SupplierPrice
+              label={t("pg.fb.domPrice")}
+              price={booking.dom_price}
+              currency={booking.dom_currency}
+              supplier={booking.dom_supplier}
+              category="طيران"
+              lookups={lookups}
+              countries={lookups.countries}
+              onChange={(v) =>
+                setBooking({
+                  ...(v.price !== undefined ? { dom_price: v.price } : {}),
+                  ...(v.currency !== undefined ? { dom_currency: v.currency } : {}),
+                  ...(v.supplier !== undefined ? { dom_supplier: v.supplier } : {}),
+                })
+              }
+            />
+          </div>
+        ) : null}
       </div>
     </section>
   );

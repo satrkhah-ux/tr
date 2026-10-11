@@ -20,6 +20,7 @@ import {
   type StageKey,
 } from "./draft-types";
 import { flightTiming, itineraryStartDate, localDatePart } from "./schedule";
+import { citiesFromFlights, citiesMatchFlights, domesticMismatches } from "./flight-cities";
 import { dayOneIsUsable } from "./timezones";
 import { sellBlocks } from "@/lib/pricing/markup";
 import { applyManualProfit } from "./pricing";
@@ -152,6 +153,31 @@ export function validateDraft(data: DraftData): DraftValidation {
   if (data.scope.visas && (data.visas.length === 0 || data.visas.some((v) => !v.visa_type.trim()))) {
     need("visas", "visas", "pg.err.visaType");
   }
+  // ---- flights: complete legs, one priced booking each, through a supplier ----
+  // A ready-made package's locked total already holds the tickets.
+  const legDone = (f: DraftData["flights"][number]) =>
+    Boolean(f.from_airport.trim() && f.to_airport.trim() && f.flight_no.trim() && f.departure_at && f.arrival_at);
+  const intl = data.flights.filter((f) => f.leg_order !== "internal");
+  const dom = data.flights.filter((f) => f.leg_order === "internal");
+  const booking = data.flight_booking;
+  if (data.scope.flights_intl) {
+    if (intl.length === 0) need("flights", "flights", "pg.err.noIntlFlights");
+    else if (intl.some((f) => !legDone(f))) need("flights", "flights", "pg.err.flightIncomplete");
+    if (intl.length > 0 && !isFixedPrice(data)) {
+      if (booking.intl_price == null || booking.intl_price <= 0) need("flights", "flights", "pg.err.flightUnpriced");
+      if (!booking.intl_supplier.trim()) need("flights", "flights", "pg.err.flightSupplier");
+    }
+  }
+  if (data.scope.flights_domestic && dom.length > 0) {
+    if (dom.some((f) => !legDone(f))) need("flights", "flights", "pg.err.flightIncomplete");
+    if (!isFixedPrice(data)) {
+      if (booking.dom_price == null || booking.dom_price <= 0) need("flights", "flights", "pg.err.domFlightUnpriced");
+      if (!booking.dom_supplier.trim()) need("flights", "flights", "pg.err.domFlightSupplier");
+    }
+  }
+  // The booking and the programme must agree on where the group sleeps.
+  if (domesticMismatches(data.flights, cities).length > 0) need("flights", "flights", "pg.err.domesticMismatch");
+
   // A day with no title is a day the client reads as missing. «يوم حر» is a
   // title, so a deliberately empty day is one press away.
   if (data.days.length > 0 && data.days.some((d) => !d.title.trim())) need("itinerary", "itinerary", "pg.err.dayUntitled");
@@ -249,8 +275,14 @@ export function validateDraft(data: DraftData): DraftValidation {
   // partner has the client, and asking us for their name and phone would be
   // asking for data we are not entitled to. So the two advisories only apply to
   // a direct sale.
-  if (data.flights.length === 0) {
-    warnings.push({ severity: "warning", stage: "flights", field: "flights", key: "pg.warn.noFlights" });
+  // The flights describe other cities than the card holds — one press on the
+  // cities card takes the flights' version. Advice, not a block: a road city
+  // the agent added between two flights is a legitimate difference.
+  {
+    const derived = citiesFromFlights(data.flights);
+    if (derived && data.cities.length > 0 && !citiesMatchFlights(data.cities, derived)) {
+      warnings.push({ severity: "warning", stage: "cities", field: "cities", key: "pg.warn.citiesDifferFromFlights" });
+    }
   }
 
   // ---- flight guard rails (timezone-aware) ----
@@ -270,7 +302,7 @@ export function validateDraft(data: DraftData): DraftValidation {
   // they paid for it.
   {
     const landing = data.flights.find((f) => f.leg_order === "outbound")?.arrival_at ?? null;
-    const dayOne = data.days[0];
+    const dayOne = data.days.find((d) => d.kind !== "travel");
     const planned = Boolean(dayOne && (dayOne.title.trim() || dayOne.activities.some((a) => a.trim())));
     if (landing && planned && !dayOneIsUsable(landing)) {
       warnings.push({ severity: "warning", stage: "itinerary", field: "itinerary", key: "pg.warn.dayOneLateArrival" });

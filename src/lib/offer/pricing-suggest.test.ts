@@ -284,7 +284,7 @@ describe("suggestPricing — the order of trust", () => {
     expect(hotel.source).toBe("none");
   });
 
-  it("counts travellers for a fare, and the stay as one priced thing", () => {
+  it("prices a flight booking as one figure, and the stay as one priced thing", () => {
     const data = draftWithOneStay({ manual_price: 100 });
     data.flights = [
       {
@@ -294,9 +294,11 @@ describe("suggestPricing — the order of trust", () => {
         cabin_baggage_kg: null, leg_order: "outbound",
       },
     ];
+    data.flight_booking = { ...data.flight_booking, intl_price: 4200, intl_currency: "SAR" };
     const items = suggestPricing(data, EMPTY, LABELS);
     expect(items.find((i) => i.item_type === "hotel")?.quantity).toBe(1); // the rooms are summed
-    expect(items.find((i) => i.item_type === "flight")?.quantity).toBe(3); // 2 adults + 1 child
+    // the booking price already covers every traveller and every leg
+    expect(items.find((i) => i.item_type === "flight")).toMatchObject({ quantity: 1, sell_price: 4200, ref: "flight:intl", source: "typed" });
   });
 });
 

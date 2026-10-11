@@ -150,15 +150,21 @@ describe("validateDraft", () => {
     expect(tripKeys).toContain("pg.err.noAdults");
   });
 
-  it("treats empty optional stages as warnings, not blockers", () => {
+  it("will not move past the flights card with no international flight, and only advises on pricing", () => {
     const data = completeDraft();
     data.flights = [];
     data.pricing = { items: [], display_currency: "SAR", final_total: null };
     const result = validateDraft(data);
-    expect(result.ok).toBe(true);
-    const warnKeys = result.warnings.map((w) => w.key);
-    expect(warnKeys).toContain("pg.warn.noFlights");
-    expect(warnKeys).toContain("pg.warn.noPricing");
+    expect(result.blocking.some((i) => i.stage === "flights" && i.key === "pg.err.noIntlFlights")).toBe(true);
+    expect(result.warnings.map((w) => w.key)).toContain("pg.warn.noPricing");
+  });
+
+  it("asks for one booking price and its supplier per flight booking", () => {
+    const data = completeDraft();
+    data.flight_booking = { ...data.flight_booking, intl_price: null, intl_supplier: "" };
+    const keys = validateDraft(data).blocking.map((i) => i.key);
+    expect(keys).toContain("pg.err.flightUnpriced");
+    expect(keys).toContain("pg.err.flightSupplier");
   });
 
   it("BLOCKS when a supplier-priced hotel's sell is edited below the supplier floor after pricing", () => {

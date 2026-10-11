@@ -163,7 +163,7 @@ export function draftToPreviewOffer(
     terms: data.services.terms,
     days: data.days
       // index on the FULL list: the transport line depends on a day's neighbours
-      .map((d, index) => ({ d, move: data.scope.transport ? transportNoteForDay(data.transport_plan, data.days, index) : null }))
+      .map((d, index) => ({ d, move: data.scope.transport ? transportNoteForDay(data.transport_plan, data.days, index, data.flights) : null }))
       .filter(({ d, move }) => d.title.trim() || d.activities.length > 0 || move)
       .map(({ d, move }) => ({
         transport_note: move,

@@ -17,7 +17,7 @@ import {
 import { DirText } from "@/components/DirText";
 import { FREE_DAY_TITLE, isFreeDay, type DraftDay } from "@/lib/offer/draft-types";
 import {
-  daysNeedRebuild,
+  draftDaysNeedRebuild,
   draftDaySkeleton,
   fillDaysFromPrograms,
   programDayText,
@@ -73,17 +73,14 @@ export function ItineraryStage({ draftId, data, patch, replace }: StageFormProps
 
   // Keep the skeleton in step with the trip/cities. Runs only when something
   // actually moved, so it never fights the agent's typing.
-  const tripKey = `${itineraryStartDate(data.trip, data.flights)}|${data.trip.nights}|${data.trip.days}|${data.cities
+  const tripKey = `${itineraryStartDate(data.trip, data.flights)}|${data.flights.map((f) => f.departure_at).join(",")}|${data.trip.nights}|${data.trip.days}|${data.cities
     .map((c) => `${c.city_name}:${c.nights}`)
     .join(",")}`;
   const lastKey = useRef<string | null>(null);
   useEffect(() => {
     if (lastKey.current === tripKey) return;
     lastKey.current = tripKey;
-    const trip = { ...data.trip, arrival_date: itineraryStartDate(data.trip, data.flights) };
-    if (daysNeedRebuild(trip, data.cities, days, data.trip.destination || data.trip.country)) {
-      patch({ days: draftDaySkeleton(data) });
-    }
+    if (draftDaysNeedRebuild(data)) patch({ days: draftDaySkeleton(data) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripKey]);
 
@@ -146,7 +143,9 @@ export function ItineraryStage({ draftId, data, patch, replace }: StageFormProps
   const current = Math.min(Math.max(open, 0), Math.max(days.length - 1, 0));
   const day = days[current];
   const dayPrograms = day ? programs.filter((p) => p.city_name === day.city_name) : [];
-  const transportNote = day && data.scope.transport ? transportNoteForDay(data.transport_plan, days, current) : null;
+  const transportNote = day && data.scope.transport ? transportNoteForDay(data.transport_plan, days, current, data.flights) : null;
+  // the landing note goes on the day the group lands, after any travel day
+  const arrivalIndex = days.findIndex((d) => d.kind !== "travel");
 
   const dateFormatter = new Intl.DateTimeFormat(language === "ar" ? "ar-SA" : "en-GB", {
     weekday: "short",
@@ -288,7 +287,7 @@ export function ItineraryStage({ draftId, data, patch, replace }: StageFormProps
               {/* Day one is worth what is LEFT of it. A 04:00 landing buys a
                   bed and an afternoon; a 23:40 landing buys nothing — and both
                   used to read as a full first day with tours planned on it. */}
-              {current === 0 && arrivalNote ? (
+              {current === arrivalIndex && arrivalNote ? (
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-extrabold ${
                     dayOneUsable ? "bg-[#eef2fb] text-[#3c5a9a]" : "bg-[#fff8e8] text-[#a86a10]"
