@@ -137,6 +137,7 @@ export async function insertOffer(input: CreateOfferInput): Promise<CreateOfferR
           weather_code: d.weather_code,
           weather_source: d.weather_source,
           weather_fetched_at: d.weather_fetched_at,
+          transport_note: d.transport_note ?? null,
         })),
       );
     }

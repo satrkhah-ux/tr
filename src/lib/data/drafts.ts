@@ -34,7 +34,7 @@ import { getRates } from "./rates-actions";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
 import { itineraryStartDate } from "@/lib/offer/schedule";
-import { draftDaySkeleton } from "@/lib/offer/itinerary";
+import { draftDaySkeleton, transportNoteForDay } from "@/lib/offer/itinerary";
 import { validateDraft } from "@/lib/offer/draft-validation";
 import { publishOffer, type OfferHotelInput, type OfferPricingItemInput } from "./offers";
 import { insertOffer } from "./offer-insert";
@@ -789,11 +789,17 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       terms: data.services.terms,
       hotels,
       pricing_items,
-      // Only days with actual content are printed — an untouched skeleton must
-      // not publish a page of empty day cards.
+      // Only days with something to say are printed — an untouched skeleton
+      // must not publish a page of empty day cards. A day whose only content
+      // is how the group moves still prints: that IS its programme.
       days: draftDaySkeleton(data)
-        .filter((d) => d.title.trim() || d.activities.some((a) => a.trim()))
-        .map((d) => ({
+        .map((d, index, all) => ({
+          d,
+          move: data.scope.transport ? transportNoteForDay(data.transport_plan, all, index, data.flights) : null,
+        }))
+        .filter(({ d, move }) => d.title.trim() || d.activities.some((a) => a.trim()) || move)
+        .map(({ d, move }) => ({
+          transport_note: move,
           day_number: d.day_number,
           day_date: d.date,
           city_name: d.city_name,

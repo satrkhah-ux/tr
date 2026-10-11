@@ -628,6 +628,20 @@ export interface CompanySupplier {
   created_at: IsoTimestamp;
 }
 
+/** A ready-made day from the old system (0052): a city's tour, its order, its text. No money. */
+export interface TourProgram {
+  id: Uuid;
+  country_id: Uuid | null;
+  city_id: Uuid | null;
+  sort_order: number | null;
+  title: string;
+  description_ar: string;
+  description_en: string | null;
+  is_free_day: boolean;
+  status: string;
+  created_at: IsoTimestamp;
+}
+
 export interface CareTicket {
   id: Uuid;
   customer: string | null;
@@ -705,6 +719,7 @@ export interface Database {
       ready_offers: TableShape<ReadyOffer>;
       care_tickets: TableShape<CareTicket>;
       company_suppliers: TableShape<CompanySupplier>;
+      tour_programs: TableShape<TourProgram>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

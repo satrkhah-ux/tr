@@ -31,7 +31,7 @@ const ALLOWED_TABLES: AllowedTable[] = [
   "offer_services", "offer_terms", "offer_revisions",
   "airports", "airlines", "transportation_types", "markup_rules", "ports", "drivers", "tours", "transfers", "statuses",
   "supervisors", "guide_informations", "profits", "ready_offers", "care_tickets",
-  "city_climate_notes",
+  "city_climate_notes", "tour_programs", "company_suppliers",
 ];
 
 /**

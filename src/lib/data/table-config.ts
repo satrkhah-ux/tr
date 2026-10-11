@@ -29,6 +29,8 @@ const CONFIGS: TableConfig[] = [
       { key: "arabic_name", labelKey: "col.arabicName" },
       { key: "english_name", labelKey: "col.englishName" },
       { key: "default_hotel", labelKey: "col.defaultHotel", minWidth: "220px" },
+      // lower first in the generator's city list (ماليزيا: كوالالمبور 1 …); empty = alphabetical after
+      { key: "sort_order", labelKey: "col.sortOrder", type: "number" },
     ],
     searchable: ["arabic_name", "english_name", "default_hotel"],
     filters: [COUNTRY_FILTER],
@@ -284,6 +286,36 @@ const CONFIGS: TableConfig[] = [
     ],
     searchable: ["arabic_name", "english_name", "mobile"],
     filters: [COUNTRY_FILTER],
+    defaultSort: { column: "arabic_name", ascending: true },
+  },
+  {
+    // The old system's day programmes (0052), offered on each day of the
+    // «البرنامج اليومي» card for the day's city, in this order.
+    route: "/tour-programs", table: "tour_programs", titleKey: "nav.tourPrograms",
+    columns: [
+      { key: "title", labelKey: "col.title" },
+      { key: "description_ar", labelKey: "col.description", minWidth: "360px" },
+      { key: "sort_order", labelKey: "col.sortOrder", type: "number" },
+      { key: "status", labelKey: "col.status", type: "status" },
+    ],
+    searchable: ["title", "description_ar"],
+    filters: [CITY_FILTER],
+    defaultSort: { column: "sort_order", ascending: true },
+  },
+  {
+    // Who the agency books through — offered beside every typed flight and
+    // hotel price. «categories» is words the generator matches: فنادق، طيران، تنقلات، خدمات.
+    route: "/company-suppliers", table: "company_suppliers", titleKey: "nav.companySuppliers",
+    columns: [
+      { key: "arabic_name", labelKey: "col.arabicName" },
+      { key: "english_name", labelKey: "col.englishName" },
+      { key: "categories", labelKey: "col.categories", minWidth: "200px" },
+      { key: "contact_name", labelKey: "col.contactName" },
+      { key: "mobile", labelKey: "col.mobile", type: "phone" },
+      { key: "email", labelKey: "col.email" },
+      { key: "status", labelKey: "col.status", type: "status" },
+    ],
+    searchable: ["arabic_name", "english_name", "categories", "contact_name"],
     defaultSort: { column: "arabic_name", ascending: true },
   },
   {

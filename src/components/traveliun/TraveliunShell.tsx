@@ -193,6 +193,7 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.serviceTypes", href: "/services-types", captionKey: "nav.services" },
       { labelKey: "nav.servicesByCountry", href: "/services" },
       { labelKey: "nav.visaTypes", href: "/visas-types", captionKey: "nav.visas" },
+      { labelKey: "nav.tourPrograms", href: "/tour-programs" },
       { labelKey: "nav.visas", href: "/visas" },
       { labelKey: "nav.kanban", href: "/kanban-board", captionKey: "nav.kanban" },
       // Moved out of «البكجات السياحية»: the generator READS these, it does not
@@ -202,6 +203,7 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.offerIncludes", href: "/offers/offer-includes" },
       { labelKey: "nav.offerExcludes", href: "/offers/offer-not-includes" },
       { labelKey: "nav.terms", href: "/offers/terms-and-conditions" },
+      { labelKey: "nav.companySuppliers", href: "/company-suppliers" },
     ],
   },
 

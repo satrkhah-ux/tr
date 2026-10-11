@@ -176,6 +176,8 @@ export type OfferDayInput = {
   weather_code: number | null;
   weather_source: "forecast" | "normals" | null;
   weather_fetched_at: string | null;
+  /** how the group moves that day (0053) — text only. */
+  transport_note?: string | null;
 };
 
 export type CreateOfferResult = { ok: true; serial: string; id: string } | { ok: false; error: TranslationKey };
@@ -494,6 +496,7 @@ function toNumberOrNull(value: unknown): number | null {
 type OfferDayRow = {
   day_number: number;
   day_date: string | null;
+  transport_note: string | null;
   city_name: string | null;
   title: string | null;
   activities: unknown;
@@ -587,7 +590,7 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
       supabase.from("offer_services").select("label, kind").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_terms").select("text").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_pricing_items").select("item_type, description, quantity, buy_price, buy_currency, sell_price, sell_currency").eq("offer_id", offer.id).order("sort"),
-      supabase.from("offer_days").select("day_number, day_date, city_name, title, activities, temp_max, temp_min, rain_chance, weather_code, weather_source").eq("offer_id", offer.id).order("day_number"),
+      supabase.from("offer_days").select("day_number, day_date, city_name, title, activities, temp_max, temp_min, rain_chance, weather_code, weather_source, transport_note").eq("offer_id", offer.id).order("day_number"),
       supabase.from("pricings").select("fx_rates").eq("offer_id", offer.id).limit(1).maybeSingle(),
     ]);
 
@@ -794,6 +797,7 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
         rain_chance: toNumberOrNull(d.rain_chance),
         weather_code: toNumberOrNull(d.weather_code),
         weather_source: d.weather_source === "forecast" || d.weather_source === "normals" ? d.weather_source : null,
+        transport_note: d.transport_note ?? null,
       })),
       pricing,
     };
