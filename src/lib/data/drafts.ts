@@ -587,7 +587,8 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       }
     }
 
-    const validation = validateDraft(data);
+    // A partner cannot read our supplier list, so it is not asked to name one.
+    const validation = validateDraft(data, { requireSupplier: !(await getPartnerSession()) });
     if (!validation.ok) return { ok: false, error: "pg.err.blockingLeft" };
 
     // PreBook re-validation: a supplier rate must still be valid at CONFIRM time.

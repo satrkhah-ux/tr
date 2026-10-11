@@ -63,7 +63,7 @@ export function GeneratorShell({
   // access — a visitor must see NO trace of the pricing stage anywhere.
   // (validateDraft already drops issues for out-of-scope stages.)
   const validation = useMemo(() => {
-    const raw = validateDraft(data);
+    const raw = validateDraft(data, { requireSupplier: (lookups.companySuppliers?.length ?? 0) > 0 });
     if (canPricing) return raw;
     const gatedStages = new Set(STAGES.filter((s) => s.gated).map((s) => s.key));
     return {
@@ -71,7 +71,7 @@ export function GeneratorShell({
       blocking: raw.blocking.filter((issue) => !gatedStages.has(issue.stage)),
       warnings: raw.warnings.filter((issue) => !gatedStages.has(issue.stage)),
     };
-  }, [data, canPricing]);
+  }, [data, canPricing, lookups.companySuppliers]);
   const visibleStages = useMemo(() => visibleStagesFor(data.scope, canPricing), [data.scope, canPricing]);
   // «الفنادق» has no chip of its own any more — the stays live inside their
   // city. A /hotels deep link still renders, under the city card's chip.

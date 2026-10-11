@@ -159,6 +159,16 @@ describe("validateDraft", () => {
     expect(result.warnings.map((w) => w.key)).toContain("pg.warn.noPricing");
   });
 
+  it("does not ask a partner session for a supplier it cannot read", () => {
+    const data = completeDraft();
+    data.flight_booking = { ...data.flight_booking, intl_supplier: "" };
+    data.hotels = data.hotels.map((h) => ({ ...h, supplier: "" }));
+    const keys = validateDraft(data, { requireSupplier: false }).blocking.map((i) => i.key);
+    expect(keys).not.toContain("pg.err.flightSupplier");
+    expect(keys).not.toContain("pg.err.staySupplier");
+    expect(validateDraft(data).blocking.map((i) => i.key)).toContain("pg.err.staySupplier");
+  });
+
   it("asks for one booking price and its supplier per flight booking", () => {
     const data = completeDraft();
     data.flight_booking = { ...data.flight_booking, intl_price: null, intl_supplier: "" };

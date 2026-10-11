@@ -91,7 +91,8 @@ export function GeneratorFlow({
   // Issues that belong to permission-gated stages are hidden from roles without
   // access — a visitor must see NO trace of the pricing stage anywhere.
   const validation = useMemo(() => {
-    const raw = validateDraft(data);
+    // a partner session reads no supplier list (staff-only), so it is not asked for one
+    const raw = validateDraft(data, { requireSupplier: (lookups.companySuppliers?.length ?? 0) > 0 });
     if (canPricing) return raw;
     const gated = new Set(STAGES.filter((s) => s.gated).map((s) => s.key));
     return {
@@ -99,7 +100,7 @@ export function GeneratorFlow({
       blocking: raw.blocking.filter((issue) => !gated.has(issue.stage)),
       warnings: raw.warnings.filter((issue) => !gated.has(issue.stage)),
     };
-  }, [data, canPricing]);
+  }, [data, canPricing, lookups.companySuppliers]);
 
   /**
    * The cards, in order. `visibleStagesFor` drops what the scope switches
