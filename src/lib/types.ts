@@ -46,6 +46,8 @@ export interface City {
   arabic_name: string;
   english_name: string | null;
   default_hotel: string | null;
+  /** lower first in the generator's list; null = after the ordered ones, alphabetically. */
+  sort_order: number | null;
   created_at: IsoTimestamp;
 }
 
@@ -609,6 +611,20 @@ export interface ReadyOffer {
   synced_at: IsoTimestamp | null;
 }
 
+/** The agency's own suppliers (0049). Staff-only: the client never learns who we buy from. */
+export interface CompanySupplier {
+  id: Uuid;
+  arabic_name: string;
+  english_name: string | null;
+  /** what we buy from them, as words the admin edits: «فنادق، طيران، تنقلات، خدمات». */
+  categories: string;
+  contact_name: string | null;
+  mobile: string | null;
+  email: string | null;
+  status: string;
+  created_at: IsoTimestamp;
+}
+
 export interface CareTicket {
   id: Uuid;
   customer: string | null;
@@ -685,6 +701,7 @@ export interface Database {
       profits: TableShape<Profit>;
       ready_offers: TableShape<ReadyOffer>;
       care_tickets: TableShape<CareTicket>;
+      company_suppliers: TableShape<CompanySupplier>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

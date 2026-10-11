@@ -1,0 +1,383 @@
+{
+  "_about": "Human decisions over data-import/catalog-candidates.json, reviewed 2026-10-12. Ids are prefixes, resolved inside their own table; an ambiguous or missing prefix aborts the run. Carried out by scripts/catalog-dedupe-apply.mjs.",
+  "cities": {
+    "delete": {
+      "_why": "Not places. Each has 0 hotels and 0 airports, and every hotel named here already exists as a hotel in its real city.",
+      "ids": [
+        "c3778ab8",
+        "96717959",
+        "f8f39761",
+        "24a06508",
+        "dd63034c",
+        "296f7865",
+        "28d7c1e6",
+        "09a4ca30"
+      ]
+    },
+    "keep_reviewed": {
+      "_why": "Flagged by the geocoder, but real: a region, Saudi provinces and cities, and Kedah (a Malaysian state; Langkawi belongs to it).",
+      "ids": [
+        "f055d1ca",
+        "5ae1bbaa",
+        "a4179cde",
+        "9ac5cdcb",
+        "b572a5cc",
+        "a2cf6d9b"
+      ]
+    },
+    "merge": [
+      {
+        "keep": "a98cba32",
+        "drop": [
+          "839d82b3"
+        ],
+        "arabic_name": "باتايا",
+        "english_name": "Pattaya"
+      },
+      {
+        "keep": "ef4ca674",
+        "drop": [
+          "fc9b389b"
+        ],
+        "arabic_name": "شيانغ ماي",
+        "english_name": "Chiang Mai"
+      },
+      {
+        "keep": "39968ce2",
+        "drop": [
+          "12a09bf4"
+        ]
+      },
+      {
+        "keep": "f669cb2a",
+        "drop": [
+          "01e51884"
+        ],
+        "arabic_name": "سنغافورة",
+        "english_name": "Singapore"
+      },
+      {
+        "keep": "cf4b0171",
+        "drop": [
+          "092fd289"
+        ]
+      },
+      {
+        "keep": "5913c0a9",
+        "drop": [
+          "23842840"
+        ],
+        "arabic_name": "هوي آن",
+        "english_name": "Hoi An"
+      },
+      {
+        "keep": "1c0455b9",
+        "drop": [
+          "4eeeee23"
+        ]
+      }
+    ],
+    "rename": [
+      {
+        "id": "9c1e276b",
+        "arabic_name": "الدوحة",
+        "english_name": "Doha",
+        "_why": "a city named after its country"
+      }
+    ],
+    "sort": {
+      "ماليزيا": [
+        "كوالالمبور",
+        "سيلانجور",
+        "لنكاوي",
+        "بينانج"
+      ]
+    }
+  },
+  "hotels": {
+    "skip_groups": {
+      "_why": "Same name, but the other field names a DIFFERENT hotel — needs a person who knows them.",
+      "pairs": [
+        [
+          "0714a8",
+          "1bdaa6"
+        ],
+        [
+          "92f3cd",
+          "fbc2e2"
+        ],
+        [
+          "92f5dc",
+          "b0e405"
+        ]
+      ]
+    },
+    "approve_near": [
+      [
+        "4a3342",
+        "b314d7"
+      ],
+      [
+        "e26bb9",
+        "e014b1"
+      ],
+      [
+        "793b72",
+        "7842cf"
+      ],
+      [
+        "7c1b7f",
+        "10cb49"
+      ],
+      [
+        "06e701",
+        "db887c"
+      ],
+      [
+        "e70a16",
+        "7c8526"
+      ],
+      [
+        "fca50e",
+        "5ee403"
+      ],
+      [
+        "c2e935",
+        "fea1ef"
+      ],
+      [
+        "9b82cc",
+        "a67c65"
+      ],
+      [
+        "92d57a",
+        "102ae1"
+      ],
+      [
+        "7711ed",
+        "e1fe13"
+      ],
+      [
+        "f0d799",
+        "5a89a6"
+      ],
+      [
+        "f0d799",
+        "85b2ef"
+      ],
+      [
+        "695989",
+        "277b82"
+      ],
+      [
+        "d48607",
+        "cf7ca7"
+      ],
+      [
+        "937615",
+        "286530"
+      ],
+      [
+        "a37103",
+        "c8880a"
+      ]
+    ],
+    "keep": [
+      "e08efb",
+      "35115b",
+      "bc2006",
+      "43dfe9",
+      "ee181a",
+      "7842cf",
+      "10cb49",
+      "f0d799"
+    ],
+    "names": {
+      "_why": "Applied to whichever row of the group survives.",
+      "c8880a": {
+        "english_name": "Grand Dafam Braga Bandung"
+      },
+      "10cb49": {
+        "english_name": "Natya Resort Ubud"
+      },
+      "cf7ca7": {
+        "english_name": "Villa Machakhela"
+      },
+      "7842cf": {
+        "english_name": "Villa Jerami & Spa"
+      },
+      "277b82": {
+        "english_name": "Shangri-La Rasa Sentosa"
+      },
+      "43dfe9": {
+        "arabic_name": "منتجع ذا تيمز بول أكسس",
+        "english_name": "The Thames Pool Access Resort"
+      },
+      "ee181a": {
+        "arabic_name": "River home - Villa Sara",
+        "english_name": "River home - Villa Sara"
+      },
+      "90f833": {
+        "arabic_name": "أماري بانكوك"
+      },
+      "441e71": {
+        "arabic_name": "أيارا كامالا ريزورت آند سبا",
+        "english_name": "Ayara Kamala Resort & Spa"
+      },
+      "b9b170": {
+        "english_name": "Jaff Hotels & Spa Nisantasi"
+      }
+    }
+  },
+  "room_types": {
+    "skip_groups": {
+      "_why": "English collided after folding; the rooms differ (one has a jacuzzi, one adds a second room).",
+      "pairs": [
+        [
+          "582a31",
+          "e6631d"
+        ],
+        [
+          "7c517a",
+          "3ee2d7"
+        ]
+      ]
+    },
+    "approve_near": [
+      [
+        "6e0286",
+        "4da811"
+      ],
+      [
+        "6e0286",
+        "d0f617"
+      ],
+      [
+        "980a51",
+        "028178"
+      ],
+      [
+        "76add7",
+        "e03403"
+      ],
+      [
+        "0d1ef7",
+        "2a7582"
+      ],
+      [
+        "f815a5",
+        "1f9c0b"
+      ],
+      [
+        "e5b4da",
+        "8d4fd1"
+      ],
+      [
+        "d13b5d",
+        "080850"
+      ],
+      [
+        "773c3f",
+        "4a805e"
+      ],
+      [
+        "773c3f",
+        "5ab6e2"
+      ],
+      [
+        "661973",
+        "662841"
+      ],
+      [
+        "4a145e",
+        "2f48fe"
+      ],
+      [
+        "fd369e",
+        "b9610b"
+      ],
+      [
+        "fd369e",
+        "9bffc8"
+      ],
+      [
+        "9d1c0c",
+        "320757"
+      ],
+      [
+        "f7d100",
+        "ffd201"
+      ],
+      [
+        "32669c",
+        "4d5511"
+      ],
+      [
+        "7d0e5c",
+        "822677"
+      ],
+      [
+        "d14e80",
+        "86d974"
+      ],
+      [
+        "45253d",
+        "a8c1fa"
+      ],
+      [
+        "d827d8",
+        "ae6fed"
+      ],
+      [
+        "d9a7f0",
+        "b83844"
+      ],
+      [
+        "60408d",
+        "2117df"
+      ],
+      [
+        "618fa4",
+        "7578cc"
+      ],
+      [
+        "b53639",
+        "7578cc"
+      ],
+      [
+        "8f4e72",
+        "62c52e"
+      ],
+      [
+        "a3ded7",
+        "10a7b4"
+      ],
+      [
+        "2832c6",
+        "0809dc"
+      ]
+    ],
+    "auto_merge_near_at": 1,
+    "names": {
+      "_why": "Applied to whichever row of the group survives.",
+      "ce548c": {
+        "arabic_name": "جراند سوبيريور",
+        "english_name": "Grand Superior"
+      }
+    }
+  },
+  "suppliers": {
+    "_why": "Legacy ids. 33 «ويذن ايرث / withinearth» is 6 «Within Earth» typed twice; 17 «Hotels me» is retired (status null) and its phone is 14's.",
+    "merge": [
+      {
+        "keep": 6,
+        "drop": [
+          33
+        ]
+      }
+    ],
+    "skip": [
+      17
+    ]
+  }
+}

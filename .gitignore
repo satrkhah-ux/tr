@@ -64,3 +64,5 @@ tbo-certification/
 # Regenerate it instead: node scripts/legacy-extract-reference.mjs
 #                       node scripts/legacy-build-reference-sql.mjs
 scripts/legacy-import-app-reference.sql
+# Same, for the suppliers: contact names and mobile numbers.
+scripts/legacy-import-suppliers.sql

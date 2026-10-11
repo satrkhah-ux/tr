@@ -1016,6 +1016,7 @@ export const en = {
   "pg.cancel": "Cancel",
   "pg.saveHotels": "Save hotel",
   "pg.err.cityNameRequired": "Type the city name.",
+  "pg.err.didYouMean": "Did you mean «{name}»? It is already in the list.\nOK = use it · Cancel = add «{typed}» as a new one.",
   "pg.err.countryFirst": "Choose the country first in the trip card.",
   "pg.cityNights": "Nights",
   "pg.checkIn": "Check-in",

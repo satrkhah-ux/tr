@@ -58,6 +58,21 @@ const COUNTRY_ALIAS = {
  */
 const COUNTRY_SKIP = new Set([12]);
 
+/**
+ * Cities we renamed in the 2026-10-12 cleanup (scripts/catalog-dedupe-
+ * decisions.json). The city rows themselves are matched by legacy id, but
+ * transfers and tours carry the city as TEXT — without this a refreshed
+ * «سنغفورا» transfer would resolve to no country at all.
+ */
+const CITY_RENAMED = {
+  "بتايا": "باتايا",
+  "شنغماي": "شيانغ ماي",
+  "سنغفورا": "سنغافورة",
+  "هواي ان": "هوي آن",
+  "قطر": "الدوحة",
+};
+const cityText = (name) => (name == null ? name : (CITY_RENAMED[String(name).trim()] ?? name));
+
 /** Legacy ids with no match in our table that ARE real places. */
 const COUNTRY_NEW = { 16: { ar: "بولندا", en: "Poland", iso2: "PL", currency: "PLN", tz: "Europe/Warsaw" } };
 
@@ -573,7 +588,7 @@ for (const p of load("transfer_cars_prices")) {
   const carName = car ? collapse(car.arabic_name) || collapse(car.english_name) : "";
   const iso = currencies.get(p.currency_id)?.iso_code?.trim();
   const currency = /^[A-Z]{3}$/.test(iso ?? "") ? iso : null;
-  const cityName = legacyCityById.get(t.point_1_city)?.arabic_name ?? null;
+  const cityName = cityText(legacyCityById.get(t.point_1_city)?.arabic_name ?? null);
   const price = Number(p.price);
   if (!Number.isFinite(price)) continue;
 
@@ -590,8 +605,8 @@ for (const p of load("transfer_cars_prices")) {
       `  (${p.id}, ${q(carName ? `${base} (${carName})` : base)}, ${q(collapse(t.english_description))}, ${price}::numeric(12,2), ${q(currency)}, ${q(cityName)})`,
     );
   } else {
-    const from = collapse(t.point_1_arabic_name) || collapse(t.point_1_english_name);
-    const to = collapse(t.point_2_arabic_name) || collapse(t.point_2_english_name);
+    const from = cityText(collapse(t.point_1_arabic_name) || collapse(t.point_1_english_name));
+    const to = cityText(collapse(t.point_2_arabic_name) || collapse(t.point_2_english_name));
     if (!from || !to) continue;
     transferRows.push(
       `  (${p.id}, ${q(from)}, ${q(to)}, ${q(carName)}, ${price}::numeric(12,2), ${q(currency)}, ${q(cityName)})`,
@@ -649,8 +664,67 @@ w("insert into public.legacy_id_map (entity, source, legacy_id, new_id)");
 w("select 'tour', 'app', legacy_id, new_id from fresh;");
 w("");
 
+// ---------------------------------------------------------------- suppliers
+/**
+ * The agency's own suppliers. Kept as a separate list of lines so the same SQL
+ * also goes out as scripts/legacy-import-suppliers.sql — importing them must not
+ * mean replaying every section above against a live catalogue.
+ *
+ * 33 «ويذن ايرث» is 6 «Within Earth» typed a second time; 17 «Hotels me» is
+ * retired (status null) and shares 14's phone.
+ */
+const SUPPLIER_ALIAS = { 33: 6 };
+const SUPPLIER_SKIP = new Set([17]);
+const categoryName = new Map(load("categories").map((c) => [c.id, c.name]));
+/** The admin edits these on the generic screen, so they are words, not keys. */
+const CATEGORY_AR = { flights: "طيران", transportation: "تنقلات", hotels: "فنادق", services: "خدمات" };
+const supplierCats = new Map();
+for (const sc of load("supplier_categories")) {
+  const id = SUPPLIER_ALIAS[sc.supplier_id] ?? sc.supplier_id;
+  const name = CATEGORY_AR[categoryName.get(sc.category_id)];
+  if (!name) continue;
+  supplierCats.set(id, new Set([...(supplierCats.get(id) ?? []), name]));
+}
+// Bidi isolates (U+2066…U+2069) wrap most of the legacy phone numbers.
+const cleanPhone = (v) => collapse(String(v ?? "").replace(/[⁦-⁩]/g, "")) || null;
+const supplierValues = load("suppliers")
+  .filter((s) => !SUPPLIER_SKIP.has(s.id) && !SUPPLIER_ALIAS[s.id] && collapse(s.arabic_name))
+  .map((s) => {
+    const cats = [...(supplierCats.get(s.id) ?? [])];
+    return `  (${s.id}, ${q(collapse(s.arabic_name).replace(/^فر ع /, "فرع "))}, ${q(collapse(s.english_name))}, ${q(cats.join("، "))}, ${q(collapse(s.employee_arabic_name))}, ${q(cleanPhone(s.mobile))}, ${q(collapse(s.email))}, ${q(s.status === 1 ? "Active" : "Disabled")})`;
+  });
+const supplierSql = [
+  "-- ========== 12. company suppliers ==========",
+  `-- ${supplierValues.length} suppliers (merged/retired ones dropped). Matched by legacy id,`,
+  "-- then by folded name, so neither a re-run nor a hand-added row duplicates one.",
+  "with incoming (legacy_id, arabic_name, english_name, categories, contact_name, mobile, email, status) as (values",
+  supplierValues.join(",\n"),
+  "),",
+  "fresh as (",
+  "  select i.*, gen_random_uuid() as new_id from incoming i",
+  "  where not exists (select 1 from public.legacy_id_map m",
+  "      where m.entity='supplier' and m.source='app' and m.legacy_id = i.legacy_id)",
+  "    and not exists (select 1 from public.company_suppliers s",
+  "      where public.catalog_norm(s.arabic_name) = public.catalog_norm(i.arabic_name))",
+  "),",
+  "ins as (",
+  "  insert into public.company_suppliers (id, arabic_name, english_name, categories, contact_name, mobile, email, status)",
+  "  select new_id, arabic_name, english_name, categories, contact_name, mobile, email, status from fresh",
+  ")",
+  "insert into public.legacy_id_map (entity, source, legacy_id, new_id)",
+  "select 'supplier', 'app', legacy_id, new_id from fresh;",
+  "",
+];
+for (const line of supplierSql) w(line);
+
 w("commit;");
 w("");
+
+writeFileSync(
+  join(root, "scripts/legacy-import-suppliers.sql"),
+  ["-- GENERATED by scripts/legacy-build-reference-sql.mjs — do not edit.", "begin;", ...supplierSql, "commit;", ""].join("\n"),
+  "utf8",
+);
 
 const target = join(root, "scripts/legacy-import-app-reference.sql");
 writeFileSync(target, out.join("\n"), "utf8");

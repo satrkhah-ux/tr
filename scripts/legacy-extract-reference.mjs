@@ -45,6 +45,10 @@ const WANTED = new Set([
   "airlines",
   "transfers",
   "transfer_cars_prices",
+  // the agency's own suppliers, and which kinds of work each one does
+  "suppliers",
+  "supplier_categories",
+  "categories",
 ]);
 
 /**

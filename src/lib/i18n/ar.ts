@@ -1014,6 +1014,7 @@ export const ar: Dictionary = {
   "pg.cancel": "إلغاء",
   "pg.saveHotels": "حفظ الفندق",
   "pg.err.cityNameRequired": "اكتب اسم المدينة.",
+  "pg.err.didYouMean": "هل تقصد «{name}»؟ موجودة في القائمة.\nموافق = استخدمها · إلغاء = أضف «{typed}» جديدة.",
   "pg.err.countryFirst": "اختر الدولة أولاً في بطاقة الرحلة.",
   "pg.cityNights": "الليالي",
   "pg.checkIn": "الدخول",

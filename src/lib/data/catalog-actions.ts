@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
+import { closestName, normEn } from "@/lib/catalog/norm";
 
 /**
  * Add a hotel or a room type WITHOUT leaving the package.
@@ -34,7 +35,9 @@ export type CreatedHotel = { id: string; name: string; name_en: string | null; s
 
 export type CreateHotelResult =
   | { ok: true; hotel: CreatedHotel; cityCreated: boolean }
-  | { ok: false; error: "err.session" | "err.db" | "pg.err.hotelNameRequired" | "pg.err.cityRequired" };
+  | { ok: false; error: "err.session" | "err.db" | "pg.err.hotelNameRequired" | "pg.err.cityRequired" }
+  /** a near-identical hotel already exists in this city — ask before creating a second one. */
+  | { ok: false; error: "pg.err.didYouMean"; suggestion: CreatedHotel };
 
 export async function createHotelForCity(input: {
   countryName: string;
@@ -45,6 +48,8 @@ export async function createHotelForCity(input: {
   address?: string;
   contactNumber?: string;
   website?: string;
+  /** the agent saw «هل تقصد …؟» and said no — create it anyway. */
+  force?: boolean;
 }): Promise<CreateHotelResult> {
   if (!(await getServerUser())) return { ok: false, error: "err.session" };
   const name = input.arabicName.trim();
@@ -86,12 +91,18 @@ export async function createHotelForCity(input: {
       .from("hotels")
       .select("id, arabic_name, english_name, stars")
       .eq("city_id", cityId);
-    const match = ((existing ?? []) as CreatedHotelRow[]).find(
-      (h) => normalizeName(h.arabic_name) === normalizeName(name),
+    const rows = (existing ?? []) as CreatedHotelRow[];
+    const en = normEn(input.englishName);
+    const match = rows.find(
+      (h) => normalizeName(h.arabic_name) === normalizeName(name) || (en !== "" && normEn(h.english_name) === en),
     );
     if (match) {
       return { ok: true, hotel: toHotel(match), cityCreated };
     }
+    // «ليكسيز» beside «ليكسيس»: the same building one letter apart. Asked, not
+    // assumed — two real hotels can be one letter apart too.
+    const near = input.force ? null : closestName(name, rows, (h) => h.arabic_name, 0.85);
+    if (near) return { ok: false, error: "pg.err.didYouMean", suggestion: toHotel(near.row) };
 
     const { data: created, error: hotelError } = await supabase
       .from("hotels")
@@ -123,7 +134,8 @@ function toHotel(row: CreatedHotelRow): CreatedHotel {
 
 export type CreateRoomTypeResult =
   | { ok: true; name: string }
-  | { ok: false; error: "err.session" | "err.db" | "pg.err.roomNameRequired" };
+  | { ok: false; error: "err.session" | "err.db" | "pg.err.roomNameRequired" }
+  | { ok: false; error: "pg.err.didYouMean"; suggestion: string };
 
 /**
  * A room type the catalogue does not have yet.
@@ -132,7 +144,11 @@ export type CreateRoomTypeResult =
  * reads: one «جناح ملكي» offered everywhere beats the same name repeated once
  * per hotel, and the agent naming it here means the agency sells it.
  */
-export async function createRoomTypeOption(arabicName: string, englishName?: string): Promise<CreateRoomTypeResult> {
+export async function createRoomTypeOption(
+  arabicName: string,
+  englishName?: string,
+  force = false,
+): Promise<CreateRoomTypeResult> {
   if (!(await getServerUser())) return { ok: false, error: "err.session" };
   const name = arabicName.trim();
   if (!name) return { ok: false, error: "pg.err.roomNameRequired" };
@@ -140,10 +156,12 @@ export async function createRoomTypeOption(arabicName: string, englishName?: str
   try {
     const supabase = await db();
     const { data: existing } = await supabase.from("room_types").select("arabic_name").is("hotel_id", null);
-    const already = ((existing ?? []) as { arabic_name: string }[]).some(
-      (r) => normalizeName(r.arabic_name) === normalizeName(name),
-    );
-    if (already) return { ok: true, name };
+    const rows = (existing ?? []) as { arabic_name: string }[];
+    const same = rows.find((r) => normalizeName(r.arabic_name) === normalizeName(name));
+    // the catalogue's spelling, so the dropdown shows one «غرفة عائلية», not two
+    if (same) return { ok: true, name: same.arabic_name };
+    const near = force ? null : closestName(name, rows, (r) => r.arabic_name, 0.85);
+    if (near) return { ok: false, error: "pg.err.didYouMean", suggestion: near.row.arabic_name };
 
     const { error } = await supabase
       .from("room_types")
@@ -156,7 +174,8 @@ export async function createRoomTypeOption(arabicName: string, englishName?: str
 
 export type CreateCityResult =
   | { ok: true; name: string; created: boolean }
-  | { ok: false; error: "err.session" | "err.db" | "pg.err.cityNameRequired" | "pg.err.countryFirst" };
+  | { ok: false; error: "err.session" | "err.db" | "pg.err.cityNameRequired" | "pg.err.countryFirst" }
+  | { ok: false; error: "pg.err.didYouMean"; suggestion: string };
 
 /**
  * A city the country does not have yet.
@@ -169,7 +188,11 @@ export type CreateCityResult =
  * It needs a country: a city with no country_id is invisible to the
  * generator's list forever, which is the same dead end with extra steps.
  */
-export async function createCityForCountry(countryName: string, cityName: string): Promise<CreateCityResult> {
+export async function createCityForCountry(
+  countryName: string,
+  cityName: string,
+  force = false,
+): Promise<CreateCityResult> {
   if (!(await getServerUser())) return { ok: false, error: "err.session" };
   const name = cityName.trim();
   if (!name) return { ok: false, error: "pg.err.cityNameRequired" };
@@ -182,10 +205,12 @@ export async function createCityForCountry(countryName: string, cityName: string
     // «إسطنبول» typed beside an existing «اسطنبول» is the SAME city — hand back
     // the catalogue's spelling so the stays and the hotels stay on one row.
     const { data: rows } = await supabase.from("cities").select("arabic_name").eq("country_id", country.id);
-    const same = ((rows ?? []) as { arabic_name: string }[]).find(
-      (c) => normalizeName(c.arabic_name) === normalizeName(name),
-    );
+    const list = (rows ?? []) as { arabic_name: string }[];
+    const same = list.find((c) => normalizeName(c.arabic_name) === normalizeName(name));
     if (same) return { ok: true, name: same.arabic_name, created: false };
+    // «كوالالامبور» is «كوالالمبور» with one alef too many — ask before a second row.
+    const near = force ? null : closestName(name, list, (c) => c.arabic_name, 0.8);
+    if (near) return { ok: false, error: "pg.err.didYouMean", suggestion: near.row.arabic_name };
 
     const { error } = await supabase.from("cities").insert({ arabic_name: name, country_id: country.id });
     return error ? { ok: false, error: "err.db" } : { ok: true, name, created: true };

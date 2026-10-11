@@ -216,7 +216,15 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
     if (!name || cityBusy) return;
     setCityBusy(true);
     setCityError(null);
-    const res = await createCityForCountry(data.trip.country, name);
+    let res = await createCityForCountry(data.trip.country, name);
+    // A near-identical city already exists: the agent decides, natively and in
+    // one tap, whether they meant it — the list must not grow a second spelling.
+    if (!res.ok && res.error === "pg.err.didYouMean") {
+      const suggestion = res.suggestion;
+      res = window.confirm(t("pg.err.didYouMean", { name: suggestion, typed: name }))
+        ? { ok: true, name: suggestion, created: false }
+        : await createCityForCountry(data.trip.country, name, true);
+    }
     setCityBusy(false);
     if (!res.ok) {
       setCityError(t(res.error));

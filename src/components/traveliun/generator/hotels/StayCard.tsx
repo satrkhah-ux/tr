@@ -349,7 +349,13 @@ function RoomRow({
   async function addRoomType() {
     const typed = window.prompt(t("pg.addRoomType"))?.trim();
     if (!typed) return;
-    const result = await createRoomTypeOption(typed);
+    let result = await createRoomTypeOption(typed);
+    if (!result.ok && result.error === "pg.err.didYouMean") {
+      const suggestion = result.suggestion;
+      result = window.confirm(t("pg.err.didYouMean", { name: suggestion, typed }))
+        ? { ok: true, name: suggestion }
+        : await createRoomTypeOption(typed, undefined, true);
+    }
     if (!result.ok) return;
     onChange({ room_type_id: null, room_type_name: result.name });
   }

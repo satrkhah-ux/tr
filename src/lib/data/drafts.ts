@@ -296,7 +296,13 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       // iso2 is not decoration: a real hotel supplier looks a city up WITHIN a
       // country, so a live search without it returns nothing at all.
       supabase.from("countries").select("id, arabic_name, iso2, timezone, default_currency, status").order("arabic_name"),
-      supabase.from("cities").select("id, arabic_name, country_id").order("arabic_name"),
+      // the agency's own order first (sort_order — Malaysia opens on its four main
+      // cities), then alphabetical; the client-side filter by country keeps it
+      supabase
+        .from("cities")
+        .select("id, arabic_name, country_id")
+        .order("sort_order", { ascending: true, nullsFirst: false })
+        .order("arabic_name"),
       allRows((from, to) => supabase.from("hotels").select("id, arabic_name, stars, city_id").order("id").range(from, to)),
       allRows((from, to) =>
         supabase

@@ -39,13 +39,20 @@ export function AddHotelInline({
     if (!name.trim()) return;
     setError(null);
     startTransition(async () => {
-      const result = await createHotelForCity({
+      const input = {
         countryName,
         cityName,
         arabicName: name,
         englishName: nameEn,
         stars: stars ? Number(stars) : null,
-      });
+      };
+      let result = await createHotelForCity(input);
+      if (!result.ok && result.error === "pg.err.didYouMean") {
+        const suggestion = result.suggestion;
+        result = window.confirm(t("pg.err.didYouMean", { name: suggestion.name, typed: name }))
+          ? { ok: true, hotel: suggestion, cityCreated: false }
+          : await createHotelForCity({ ...input, force: true });
+      }
       if (!result.ok) {
         setError(t(result.error));
         return;
