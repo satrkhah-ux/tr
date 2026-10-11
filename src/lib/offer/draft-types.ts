@@ -915,6 +915,15 @@ export type DraftPricingItem = {
    */
   profit_pct?: number | null;
   profit_amount?: number | null;
+  /**
+   * The agent changed this line by hand on the pricing page: the lists and the
+   * cards no longer rewrite it. `list_sell` keeps what the list says, so
+   * «استعادة سعر القائمة» can put it back.
+   */
+  overridden?: boolean;
+  list_sell?: number | null;
+  /** a line the agent added by hand — nothing in the draft produces it, so a sync never drops it. */
+  manual?: boolean;
 };
 
 /**

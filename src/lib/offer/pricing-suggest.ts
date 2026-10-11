@@ -425,6 +425,10 @@ export function suggestPricing(
     for (const label of data.services.includes) {
       if (!label.trim()) continue;
       const hit = findServicePrice(reference.services, label);
+      // «يشمل» holds statements too — «الفنادق», «خدمة عملاء 24 ساعة» — and a
+      // statement is not something we sell. Only a line the agency's service
+      // list prices becomes a pricing line; the rest stay words on the paper.
+      if (!hit) continue;
       items.push({
         item_type: "service",
         description: label,
@@ -433,7 +437,7 @@ export function suggestPricing(
         buy_currency: hit?.buy_currency || currency,
         sell_price: hit?.sell_price ?? null,
         sell_currency: hit?.sell_currency || currency,
-        source: hit ? "list" : "none",
+        source: "list",
       });
     }
   }
@@ -457,6 +461,45 @@ export function suggestPricing(
  * A line with a ref is filled from that ref alone: one hotel stayed in twice
  * is two lines with one description, and each stay has its own price.
  */
+/**
+ * The pricing sheet, brought in line with the draft and the agency's lists.
+ *
+ * Unlike `mergeSuggestions` (which only fills blanks), this is what the
+ * pricing page runs every time it opens: the lines are DERIVED. A flight or a
+ * hotel takes the price typed on its own card; a transfer, tour, service or
+ * visa takes today's list price. Only three kinds of line are left alone:
+ *   • one the agent changed by hand here (`overridden`) — its list price is
+ *     still recorded, so it can be restored;
+ *   • one the agent added by hand (`manual`);
+ *   • anything the draft no longer produces is dropped (a removed hotel must
+ *     not stay on the bill), unless it is one of the two above.
+ */
+export function syncSuggestions(
+  existing: DraftPricingItem[],
+  suggested: SuggestedItem[],
+): DraftPricingItem[] {
+  const key = (i: Pick<DraftPricingItem, "item_type" | "ref" | "description">) =>
+    i.ref ? `ref:${i.ref}` : `${i.item_type}:${i.description.trim()}`;
+  const byKey = new Map(existing.map((i) => [key(i), i]));
+  const out: DraftPricingItem[] = [];
+  const used = new Set<string>();
+  for (const { source: _source, ...s } of suggested) {
+    const k = key(s);
+    used.add(k);
+    const prior = byKey.get(k);
+    if (prior?.overridden) {
+      out.push({ ...prior, list_sell: s.sell_price });
+    } else {
+      out.push({ ...s, list_sell: s.sell_price });
+    }
+  }
+  for (const item of existing) {
+    if (used.has(key(item))) continue;
+    if (item.overridden || item.manual) out.push(item);
+  }
+  return out;
+}
+
 export function mergeSuggestions(
   existing: DraftPricingItem[],
   suggested: SuggestedItem[],

@@ -23,6 +23,7 @@ import {
   findServicePrice,
   findTransferPrice,
   mergeSuggestions,
+  syncSuggestions,
   normalizeName,
   suggestPricing,
   type PricingReference,
@@ -458,5 +459,37 @@ describe("mergeSuggestions", () => {
     expect(merged.priced).toBe(1);
     // the `source` marker is a UI concern and must not reach the draft
     expect("source" in merged.items[0]).toBe(false);
+  });
+});
+
+describe("syncSuggestions", () => {
+  const line = (over: Partial<DraftPricingItem>): DraftPricingItem => ({
+    item_type: "transport",
+    description: "استقبال المطار",
+    quantity: 1,
+    buy_price: null,
+    buy_currency: "SAR",
+    sell_price: null,
+    sell_currency: "SAR",
+    ...over,
+  });
+  const suggested = (over: Partial<DraftPricingItem>) => ({ ...line(over), source: "list" as const });
+
+  it("takes today's list price on a line nobody touched", () => {
+    const out = syncSuggestions([line({ sell_price: 200 })], [suggested({ sell_price: 250 })]);
+    expect(out).toEqual([expect.objectContaining({ sell_price: 250, list_sell: 250 })]);
+  });
+
+  it("keeps a line the agent changed by hand, and remembers the list price for «استعادة»", () => {
+    const out = syncSuggestions([line({ sell_price: 180, overridden: true })], [suggested({ sell_price: 250 })]);
+    expect(out[0]).toMatchObject({ sell_price: 180, overridden: true, list_sell: 250 });
+  });
+
+  it("drops a line the draft no longer produces, but never a hand-added one", () => {
+    const out = syncSuggestions(
+      [line({ description: "فندق حُذف", item_type: "hotel", sell_price: 900 }), line({ description: "إكرامية", item_type: "other", manual: true, sell_price: 50 })],
+      [],
+    );
+    expect(out.map((i) => i.description)).toEqual(["إكرامية"]);
   });
 });

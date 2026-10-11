@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
-import { mergeSuggestions } from "@/lib/offer/pricing-suggest";
-import { Loader2, Lock, Plus, Wand2 } from "lucide-react";
+import { syncSuggestions } from "@/lib/offer/pricing-suggest";
+import { CheckCircle2, ChevronDown, Loader2, Lock, Pencil, Plus, RefreshCw, RotateCcw } from "lucide-react";
+import Link from "next/link";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { applyManualProfit, computeOfferPricing, rebase, type LinePricing } from "@/lib/offer/pricing";
@@ -39,6 +40,13 @@ const ITEM_TYPE_KEYS: Record<PricingItemType, TranslationKey> = {
   other: "pg.item.other",
 };
 
+/** Where the administration changes a list price, per kind of line. */
+const LIST_HREF: Partial<Record<PricingItemType, string>> = {
+  transport: "/cars/transfers",
+  service: "/services",
+  visa: "/visas",
+};
+
 function formatMoney(value: number): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
 }
@@ -61,12 +69,6 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
   // the same totals issuing computes (offerTotals), not a riyal sum labelled
   // with whatever the agent picked.
   const display = pricing.display_currency || "SAR";
-  // An empty price field reads as "0" to a skimming eye; counting them is what
-  // stops a half-priced offer going out as a cheap one. A buy with a profit rule
-  // IS priced: its sell is derived, exactly as publishing derives it.
-  const unpriced = pricing.items.filter(
-    (item) => applyManualProfit(item.buy_price, item.sell_price, item.profit_pct, item.profit_amount) == null,
-  ).length;
   const summary = useMemo(() => {
     const rates = rebase(lookups.sarPer ?? { SAR: 1 }, display);
     const computed = computeOfferPricing(
@@ -92,14 +94,6 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
   }, [pricing.items, lookups.sarPer, display]);
   const currencies = currencyOptions(lookups.countries, display);
 
-  if (!canView) {
-    return (
-      <section className={sectionClass}>
-        <EmptyState icon={Lock} title={t("pg.noPricingAccess")} description="" />
-      </section>
-    );
-  }
-
   function setItems(items: DraftPricingItem[]) {
     patch({ pricing: { ...pricing, items } });
   }
@@ -119,9 +113,17 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
         buy_currency: pricing.display_currency,
         sell_price: null,
         sell_currency: pricing.display_currency,
+        // nothing in the draft produces it, so a sync must never drop it
+        manual: true,
         ...seed,
       },
     ]);
+  }
+
+  /** An edit on this page is the agent's word: the lists stop rewriting the line. */
+  function editItem(index: number, slice: Partial<DraftPricingItem>) {
+    const priceTouched = ["sell_price", "buy_price", "quantity", "profit_pct", "profit_amount", "sell_currency"].some((k) => k in slice);
+    updateItem(index, priceTouched ? { ...slice, overridden: true } : slice);
   }
 
   /**
@@ -152,31 +154,46 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
    * negotiated an hour ago survives a re-run; a line with no price on either
    * side is filled, so a re-run can price what an earlier one left empty.
    */
-  const [suggesting, setSuggesting] = useState(false);
-  const [suggestNote, setSuggestNote] = useState<string | null>(null);
-
-  async function suggestItems() {
-    setSuggesting(true);
+  /**
+   * The sheet is DERIVED, every time the page opens: flights and hotels from
+   * the prices typed on their cards, everything else from today's lists. Only
+   * a line the agent changed here, or added here, is left as they left it —
+   * see syncSuggestions.
+   */
+  const [syncing, setSyncing] = useState(false);
+  async function syncFromLists() {
+    setSyncing(true);
     const result = await suggestPricingForDraft(draftId, { hotel: t("pg.hotel"), airline: t("pg.airline") });
-    setSuggesting(false);
+    setSyncing(false);
     if (!result.ok) return;
-    const merged = mergeSuggestions(pricing.items, result.items);
-    if (merged.added > 0 || merged.filled > 0) {
-      setItems(merged.items);
-      // Says how many arrived with a number, because the rest still need one
-      // and an agent who assumes otherwise sends out a half-priced offer.
-      setSuggestNote(t("pg.pricingSeeded", { added: String(merged.added), priced: String(merged.priced) }));
-      window.setTimeout(() => setSuggestNote(null), 6000);
-    }
+    setItems(syncSuggestions(pricing.items, result.items));
   }
-
-  const seeded = useRef(false);
+  const synced = useRef(false);
   useEffect(() => {
-    if (seeded.current || pricing.items.length > 0) return;
-    seeded.current = true;
-    void suggestItems();
+    if (synced.current) return;
+    synced.current = true;
+    void syncFromLists();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const canEditLists = can("settings.manage");
+  const [openGroup, setOpenGroup] = useState<PricingItemType | null>(null);
+
+  const priced = (item: DraftPricingItem) =>
+    applyManualProfit(item.buy_price, item.sell_price, item.profit_pct, item.profit_amount) != null;
+  const indexed = pricing.items.map((item, index) => ({ item, index }));
+  const missing = indexed.filter(({ item }) => !priced(item));
+  const groups = ITEM_TYPES.map((type) => ({ type, rows: indexed.filter(({ item }) => item.item_type === type) })).filter(
+    (g) => g.rows.length > 0,
+  );
+
+  if (!canView) {
+    return (
+      <section className={sectionClass}>
+        <EmptyState icon={Lock} title={t("pg.noPricingAccess")} description="" />
+      </section>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -185,9 +202,9 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
           <h2 className="text-base font-extrabold text-[#003c3a]">{t("pg.pricingTitle")}</h2>
       <FieldIssue field="pricing" className="mb-3" />
           <div className="flex gap-2">
-            <button type="button" onClick={() => void suggestItems()} disabled={suggesting} className={addButtonClass}>
-              {suggesting ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
-              {t("pg.suggestItems")}
+            <button type="button" onClick={() => void syncFromLists()} disabled={syncing} className={addButtonClass}>
+              {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+              {t("pg.syncFromLists")}
             </button>
             <button type="button" onClick={() => addItem()} className={addButtonClass}>
               <Plus className="size-4" />
@@ -195,53 +212,129 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
             </button>
           </div>
         </div>
-        {suggestNote ? (
-          <p className="mb-3 rounded-[10px] border border-[#bfe5d4] bg-[#e9f7f0] px-4 py-2.5 text-[12px] font-bold text-[#0f7a52]">
-            {suggestNote}
-          </p>
-        ) : null}
         {canInternal ? (
           <p className="mb-4 rounded-[10px] border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2.5 text-[12px] font-bold text-[#a86a10]">
             {t("pg.pricingNote")}
           </p>
         ) : null}
 
-        {/*
-          One CARD per line, not a seven-column table.
-          The table version had to live in the same column as a preview pane, so
-          every numeric field collapsed to a few pixels and could not be typed
-          into. Cards give each field a full-height input and a label of its own,
-          and — more importantly — put each line's buy/sell/profit next to the
-          numbers that produce it, which is the decision the agent is actually
-          making on this screen.
-        */}
+        {/* 1. What still has no price — the only thing that needs the agent here. */}
         {pricing.items.length === 0 ? (
           <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
-            {t("pg.warn.noPricing")}
+            {syncing ? t("pg.syncing") : t("pg.warn.noPricing")}
+          </p>
+        ) : missing.length === 0 ? (
+          <p className="flex items-center gap-2 rounded-[11px] border border-[#bfe5d4] bg-[#e9f7f0] px-4 py-3 text-[13px] font-extrabold text-[#0f7a52]">
+            <CheckCircle2 className="size-5" />
+            {t("pg.allPriced")}
           </p>
         ) : (
-          <div className="space-y-3">
-            {pricing.items.map((item, index) => (
-              <PricingCard
-                key={index}
-                item={item}
-                line={summary.lines[index]}
-                base={display}
-                currencies={currencyOptions(lookups.countries, item.sell_currency, item.buy_currency)}
-                canInternal={canInternal}
-                nights={nightsFor(item)}
-                onChange={(slice) => updateItem(index, slice)}
-                onRemove={() => setItems(pricing.items.filter((_, i) => i !== index))}
-              />
-            ))}
+          <div className="rounded-[12px] border border-[#f2d0d7] bg-[#fdf5f7] p-3">
+            <h3 className="mb-2 text-[13px] font-extrabold text-[#c22850]">{t("pg.unpricedTitle", { count: missing.length })}</h3>
+            <div className="space-y-3">
+              {missing.map(({ item, index }) =>
+                // A flight or a hotel is priced on its own card — that is where
+                // the figure lives, so that is where the agent is sent.
+                item.item_type === "hotel" || item.item_type === "flight" ? (
+                  <p key={index} className="flex flex-wrap items-center gap-2 text-[12.5px] font-bold text-[#185045]">
+                    <span className="min-w-0 flex-1">{item.description || t(ITEM_TYPE_KEYS[item.item_type])}</span>
+                    <span className="text-[11.5px] text-[#c22850]">
+                      {t(item.item_type === "hotel" ? "pg.priceOnHotels" : "pg.priceOnFlights")}
+                    </span>
+                  </p>
+                ) : (
+                  <PricingCard
+                    key={index}
+                    item={item}
+                    line={summary.lines[index]}
+                    base={display}
+                    currencies={currencyOptions(lookups.countries, item.sell_currency, item.buy_currency)}
+                    canInternal={canInternal}
+                    nights={nightsFor(item)}
+                    onChange={(slice) => editItem(index, slice)}
+                    onRemove={() => setItems(pricing.items.filter((_, i) => i !== index))}
+                  />
+                ),
+              )}
+            </div>
           </div>
         )}
 
-        {unpriced > 0 ? (
-          <p className="mt-3 rounded-[10px] border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2 text-[12px] font-bold text-[#a86a10]">
-            {t("pg.unpricedCount", { count: String(unpriced) })}
-          </p>
+        {/* 2. Everything else, one line per kind, opened only to change something. */}
+        {groups.length > 0 ? (
+          <div className="mt-3 space-y-2">
+            {groups.map(({ type, rows }) => {
+              const total = rows.reduce((sum, { index }) => sum + (summary.lines[index]?.base_sell ?? 0), 0);
+              const open = openGroup === type;
+              const listHref = LIST_HREF[type];
+              return (
+                <div key={type} className="rounded-[12px] border border-[#e2ebe7] bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setOpenGroup(open ? null : type)}
+                    aria-expanded={open}
+                    className="flex w-full flex-wrap items-center gap-2.5 px-3.5 py-2.5 text-start hover:bg-[#f8fbfa]"
+                  >
+                    <span className="text-[13px] font-extrabold text-[#185045]">{t(ITEM_TYPE_KEYS[type])}</span>
+                    <span className="rounded-full bg-[#f2f7f5] px-2 py-0.5 text-[11px] font-bold text-[#557d78]">{rows.length}</span>
+                    <span className="flex-1" />
+                    <DirText dir="ltr" className="tv-tnum text-[13px] font-extrabold text-[#185045]">
+                      {`${formatMoney(total)} ${display}`}
+                    </DirText>
+                    <ChevronDown className={`size-4 text-[#557d78] transition-transform ${open ? "rotate-180" : ""}`} />
+                  </button>
+                  {open ? (
+                    <div className="space-y-3 border-t border-[#e7f0ec] p-3">
+                      {canEditLists && listHref ? (
+                        <Link href={listHref} className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[#185045] hover:underline">
+                          <Pencil className="size-3.5" />
+                          {t("pg.editInList")}
+                        </Link>
+                      ) : null}
+                      {rows.map(({ item, index }) => (
+                        <div key={index}>
+                          {item.overridden ? (
+                            <p className="mb-1 flex flex-wrap items-center gap-2 text-[11px] font-bold text-[#a86a10]">
+                              <span className="rounded-full bg-[#fff8e8] px-2 py-0.5">{t("pg.overridden")}</span>
+                              {item.list_sell != null ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateItem(index, {
+                                      sell_price: item.list_sell ?? null,
+                                      profit_pct: null,
+                                      profit_amount: null,
+                                      overridden: false,
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-1 rounded-full border border-[#b7d0c7] px-2 py-0.5 text-[#185045] hover:bg-[#f0f7f4]"
+                                >
+                                  <RotateCcw className="size-3" />
+                                  {t("pg.restoreListPrice", { price: formatMoney(item.list_sell) })}
+                                </button>
+                              ) : null}
+                            </p>
+                          ) : null}
+                          <PricingCard
+                            item={item}
+                            line={summary.lines[index]}
+                            base={display}
+                            currencies={currencyOptions(lookups.countries, item.sell_currency, item.buy_currency)}
+                            canInternal={canInternal}
+                            nights={nightsFor(item)}
+                            onChange={(slice) => editItem(index, slice)}
+                            onRemove={() => setItems(pricing.items.filter((_, i) => i !== index))}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
         ) : null}
+
         {summary.missing_rates.length > 0 ? (
           <p className="mt-3 rounded-[10px] border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2 text-[12px] font-bold text-[#a86a10]">
             {t("pg.missingRatesWarn", { codes: summary.missing_rates.join(", ") })}
