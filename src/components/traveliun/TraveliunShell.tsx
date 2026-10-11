@@ -42,6 +42,7 @@ import {
   Table2,
   UserCircle,
   X,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { getRates } from "@/lib/data/rates-actions";
@@ -165,6 +166,9 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.repackage", href: "/repackage", perm: "repackage.write" },
     ],
   },
+  // The company's own one-page entry, on trial beside the generator: same
+  // drafts, fewer questions. Its own entry so it can be found — and removed — whole.
+  { labelKey: "nav.basic", href: "/basic", icon: Zap, perm: "offers.write" },
   { labelKey: "nav.partnerCompanies", href: "/partner-companies", icon: Building2 },
   // Operations was not in the requested list, and it stays at the top level on
   // purpose: it is the screen an ops agent lives in all day, and one that only
