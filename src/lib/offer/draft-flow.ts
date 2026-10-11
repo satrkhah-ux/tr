@@ -71,6 +71,13 @@ export function stageSummary(stage: StageKey, data: DraftData): string[] {
     }
     case "flights":
       return data.flights.length > 0 ? [`${data.flights.length} رحلة`] : [];
+    case "transport": {
+      const plan = data.transport_plan;
+      return [plan.airport, plan.tours, plan.intercity]
+        .filter((leg) => leg.enabled && leg.car_type.trim())
+        .map((leg) => leg.car_type.trim())
+        .filter((v, i, all) => all.indexOf(v) === i);
+    }
     case "services": {
       const parts = [
         data.services.includes.length > 0 ? `${data.services.includes.length} يشمل` : "",

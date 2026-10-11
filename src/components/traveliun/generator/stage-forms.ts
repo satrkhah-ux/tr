@@ -7,6 +7,7 @@ import { CustomerStage } from "./stages/CustomerStage";
 import { TripStage } from "./stages/TripStage";
 import { CitiesStage } from "./stages/CitiesStage";
 import { FlightsStage } from "./stages/FlightsStage";
+import { TransportStage } from "./stages/TransportStage";
 import { ServicesStage } from "./stages/ServicesStage";
 import { TermsStage } from "./stages/TermsStage";
 import { VisasStage } from "./stages/VisasStage";
@@ -30,6 +31,7 @@ export const STAGE_FORMS: Record<StageKey, (props: StageFormProps) => React.Reac
   cities: CitiesStage,
   hotels: CitiesStage,
   flights: FlightsStage,
+  transport: TransportStage,
   services: ServicesStage,
   terms: TermsStage,
   visas: VisasStage,

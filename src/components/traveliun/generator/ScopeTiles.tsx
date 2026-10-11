@@ -53,7 +53,6 @@ export function ScopeTiles({
   const { t } = useTraveliunUI();
   const scope = data.scope;
   const tours = data.transport_plan.tours.enabled;
-  const on = SCOPE_KEYS.filter((key) => scope[key]).length + (tours ? 1 : 0);
 
   return (
     <div>
@@ -86,14 +85,6 @@ export function ScopeTiles({
         )}
       </div>
 
-      {/* Turning everything off leaves a wizard with nothing in it. Said here
-          rather than caught later as a validation error, because the fix is one
-          tap away and the agent is looking right at it. */}
-      {on === 0 ? (
-        <p className="mt-4 rounded-[10px] border border-[#f2e2b4] bg-[#fffdf7] px-4 py-3 text-[12px] font-bold text-[#a86a10]">
-          {t("pg.scope.noneOn")}
-        </p>
-      ) : null}
     </div>
   );
 }

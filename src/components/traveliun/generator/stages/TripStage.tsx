@@ -6,7 +6,6 @@ import { itineraryStartDate, syncDepartureDates } from "@/lib/offer/schedule";
 import { describeOffsetAr, offsetFromHome } from "@/lib/offer/timezones";
 import { FieldIssue, useFieldRing } from "../FieldIssue";
 import { ScopeTiles } from "../ScopeTiles";
-import { TransportBlock } from "../TransportBlock";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass, labelClass, sectionClass, type StageFormProps } from "../stage-props";
 
@@ -135,6 +134,7 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
       <p className="mb-3 text-[12.5px] font-semibold text-[#93aaa3]">{t("pg.scopeStageHint")}</p>
       <div className="mb-5">
         <ScopeTiles data={data} patch={patch} />
+        <FieldIssue field="scope" className="mt-2" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -213,23 +213,11 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
             onChange={(e) => setNights(Number(e.target.value) || 0)}
             className={`${fieldClass} tv-tnum text-center`}
           />
+          <FieldIssue field="trip.nights" />
         </label>
       </div>
       <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.daysAuto")}</p>
 
-      {/* Transport belongs HERE, not with the customer: the vehicle and how
-          many of them follow from the dates and the cities, and the airport
-          pickup is a fact about the journey rather than about the client. */}
-      {data.scope.transport ? (
-        <div className="mt-5">
-          <TransportBlock
-            plan={data.transport_plan}
-            carTypes={lookups.carTypes}
-            cityCount={data.cities.length}
-            onChange={(transport_plan) => patch({ transport_plan })}
-          />
-        </div>
-      ) : null}
 
       {data.scope.flights_intl || data.scope.flights_domestic ? (
         <BaggageBlock data={data} patch={patch} />

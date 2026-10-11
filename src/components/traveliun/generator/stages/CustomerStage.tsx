@@ -474,6 +474,7 @@ function RoomsBlock({ data, patch, lookups }: Pick<StageFormProps, "data" | "pat
             onChange={(e) => setRooms(Number(e.target.value))}
             className={`${fieldClass} tv-tnum text-center`}
           />
+          <FieldIssue field="trip.rooms" />
         </label>
         <label className={smallLabelClass}>
           {t("pg.roomType")}
@@ -494,6 +495,7 @@ function RoomsBlock({ data, patch, lookups }: Pick<StageFormProps, "data" | "pat
               <option key={plan} value={plan}>{t(MEAL_PLAN_LABEL_KEYS[plan])}</option>
             ))}
           </select>
+          <FieldIssue field="trip.meal_plan" />
         </label>
       </div>
       {/* Said once, here, rather than discovered on the document: the five

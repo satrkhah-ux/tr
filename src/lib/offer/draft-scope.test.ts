@@ -11,6 +11,7 @@ import {
   type DraftScope,
 } from "./draft-types";
 import { validateDraft } from "./draft-validation";
+import { withRequiredAnswers } from "./draft-test-helpers";
 
 /**
  * Service scope + traveler ages.
@@ -26,7 +27,7 @@ function draftWithCitiesButNoHotels(): DraftData {
   const data = emptyDraftData();
   data.trip = { ...data.trip, country: "الإمارات", arrival_date: "2026-09-10", days: 4, nights: 3 };
   data.cities = [{ city_name: "دبي", nights: 3, check_in: "2026-09-10", check_out: "2026-09-13" }];
-  return data;
+  return withRequiredAnswers(data);
 }
 
 describe("resizeAges", () => {
@@ -60,8 +61,9 @@ describe("visibleStagesFor", () => {
 
     expect(keys).toContain("flights");
     expect(keys).not.toContain("visas");
-    // transport never had a stage — three answers on the trip card instead
-    expect(keys).not.toContain("transport");
+    // «التنقلات» is a card of its own now, after the cities — and goes with its switch
+    expect(keys).toContain("transport");
+    expect(visibleStagesFor({ ...ALL_ON, transport: false }, true).map((s) => s.key)).not.toContain("transport");
   });
 
   it("keeps «الطيران» while EITHER half is sold", () => {

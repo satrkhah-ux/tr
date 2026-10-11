@@ -3,6 +3,7 @@
 import { Plus } from "lucide-react";
 import type { DraftVisa } from "@/lib/offer/draft-types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
+import { FieldIssue } from "../FieldIssue";
 import {
   addButtonClass,
   fieldClass,
@@ -43,6 +44,7 @@ export function VisasStage({ data, patch, lookups }: StageFormProps) {
   return (
     <section className={sectionClass}>
       <h2 className="mb-4 text-base font-extrabold text-[#003c3a]">{t("pg.visasTitle")}</h2>
+      <FieldIssue field="visas" className="mb-3" />
 
       <datalist id="pg-visa-countries">
         {lookups.countries.map((country) => (

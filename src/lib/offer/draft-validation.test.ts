@@ -8,6 +8,7 @@ import {
   type DraftData,
 } from "./draft-types";
 import { validateDraft } from "./draft-validation";
+import { withRequiredAnswers } from "./draft-test-helpers";
 
 function completeDraft(): DraftData {
   const data = emptyDraftData();
@@ -41,7 +42,7 @@ function completeDraft(): DraftData {
     display_currency: "SAR",
     final_total: 1500,
   };
-  return data;
+  return withRequiredAnswers(data);
 }
 
 describe("a city split across two hotels", () => {
@@ -53,7 +54,7 @@ describe("a city split across two hotels", () => {
       normalizeDraftHotel({ city_name: "كوالالمبور", hotel_name: "فندق 1ب", nights: secondNights, room_type_name: "ديلوكس", board_type: "BB", rooms_count: 1 }),
       normalizeDraftHotel({ city_name: "لنكاوي", hotel_name: "فندق 2", nights: 2, room_type_name: "سوبيريور", board_type: "HB", rooms_count: 1 }),
     ];
-    return data;
+    return withRequiredAnswers(data);
   }
 
   it("publishes when the nights add up", () => {
@@ -204,21 +205,20 @@ describe("a company file needs no client details", () => {
     return data;
   }
 
-  it("advises about the missing name and phone on a DIRECT sale", () => {
+  it("will not move past a DIRECT sale with no name or phone", () => {
     const result = validateDraft(withoutClient());
-    expect(result.warnings.some((w) => w.key === "pg.warn.noName")).toBe(true);
-    expect(result.warnings.some((w) => w.key === "pg.warn.noPhone")).toBe(true);
-    expect(result.stages.customer).not.toBe("complete");
+    expect(result.blocking.some((w) => w.key === "pg.warn.noName" && w.stage === "customer")).toBe(true);
+    expect(result.blocking.some((w) => w.key === "pg.warn.noPhone" && w.stage === "customer")).toBe(true);
+    expect(result.ok).toBe(false);
   });
 
   it("stays silent once a partner company is chosen, and counts the stage done", () => {
     const data = withoutClient();
     data.customer = { ...data.customer, partner_company_id: "31ed6f37", company: "شركة الأفق" };
     const result = validateDraft(data);
-    expect(result.warnings.some((w) => w.key === "pg.warn.noName")).toBe(false);
-    expect(result.warnings.some((w) => w.key === "pg.warn.noPhone")).toBe(false);
+    expect(result.blocking.some((w) => w.key === "pg.warn.noName")).toBe(false);
+    expect(result.blocking.some((w) => w.key === "pg.warn.noPhone")).toBe(false);
     expect(result.stages.customer).toBe("complete");
-    // and it is still only advice either way — never a reason to block a sale
     expect(result.ok).toBe(true);
   });
 });

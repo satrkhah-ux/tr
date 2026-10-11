@@ -24,6 +24,7 @@ export const STAGE_KEYS = [
   // still name it, and /hotels deep links still have to land somewhere.
   "hotels",
   "flights",
+  "transport",
   "services",
   "terms",
   "visas",
@@ -47,10 +48,15 @@ export const STAGES: StageMeta[] = [
   // typed by it and /scope still has to land somewhere.
   { key: "customer", labelKey: "pg.stage.customer" },
   { key: "trip", labelKey: "pg.stage.trip" },
+  // The flights come BEFORE the cities: where the group lands and when is what
+  // the cities and their nights are measured from.
+  { key: "flights", labelKey: "pg.stage.flights" },
   // No `hotels` entry on purpose: the stays live inside the city card, so a
   // separate chip would point at a screen the agent has already filled in.
   { key: "cities", labelKey: "pg.stage.cities" },
-  { key: "flights", labelKey: "pg.stage.flights" },
+  // How the group moves — after the cities, because the vehicles follow from
+  // where they stay and how many times they change city.
+  { key: "transport", labelKey: "pg.stage.transport" },
   { key: "services", labelKey: "pg.stage.services" },
   { key: "terms", labelKey: "pg.stage.terms" },
   { key: "visas", labelKey: "pg.stage.visas" },
@@ -286,6 +292,7 @@ export type DraftScope = {
  */
 export const STAGE_SCOPE: Partial<Record<StageKey, (keyof DraftScope)[]>> = {
   hotels: ["hotels"],
+  transport: ["transport"],
   flights: ["flights_intl", "flights_domestic"],
   visas: ["visas"],
 };

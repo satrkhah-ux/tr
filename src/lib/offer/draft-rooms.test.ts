@@ -8,6 +8,7 @@ import {
   type DraftData,
 } from "./draft-types";
 import { validateDraft } from "./draft-validation";
+import { withRequiredAnswers } from "./draft-test-helpers";
 
 /**
  * Multi-room hotel lines.
@@ -29,7 +30,7 @@ function draftWithHotel(rooms: { room_type_name: string; board_type: "BB" | "HB"
       rooms.map((r) => ({ room_type_id: null, price: null, ...r })),
     ),
   ];
-  return data;
+  return withRequiredAnswers(data);
 }
 
 describe("normalizeDraftHotel", () => {

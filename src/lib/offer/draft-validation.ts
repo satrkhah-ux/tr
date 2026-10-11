@@ -12,6 +12,8 @@ import {
   deriveHotelStays,
   hotelCoverage,
   pricingRefFor,
+  SCOPE_KEYS,
+  stayTotal,
   totalCityNights,
   STAGE_SCOPE,
   type DraftData,
@@ -44,7 +46,13 @@ export type FieldId =
   | "flights"
   | "itinerary"
   | "services.includes"
-  | "pricing";
+  | "pricing"
+  | "trip.rooms"
+  | "trip.meal_plan"
+  | "trip.nights"
+  | "scope"
+  | "transport"
+  | "visas";
 
 export type DraftIssue = {
   severity: "blocking" | "warning";
@@ -117,6 +125,37 @@ export function validateDraft(data: DraftData): DraftValidation {
   if (data.trip.adults <= 0) blocking.push({ severity: "blocking", stage: "trip", field: "trip.adults", key: "pg.err.noAdults" });
   if (data.cities.length === 0) blocking.push({ severity: "blocking", stage: "cities", field: "cities", key: "pg.err.noCities" });
 
+  // ---- what each card may not leave empty ----
+  // The card flow will not move past a card with one of these open, so each
+  // names the card that owns the field. A partner company's file carries no
+  // client of ours, so a direct sale is the only one asked for a name and phone.
+  const need = (stage: StageKey, field: FieldId, key: TranslationKey) =>
+    blocking.push({ severity: "blocking", stage, field, key });
+  if (!isCompanySale(data)) {
+    if (!data.customer.customer_name.trim()) need("customer", "customer.customer_name", "pg.warn.noName");
+    if (!data.customer.customer_phone.trim()) need("customer", "customer.customer_phone", "pg.warn.noPhone");
+  }
+  if (data.trip.rooms <= 0) need("customer", "trip.rooms", "pg.err.noRooms");
+  if (!data.trip.meal_plan) need("customer", "trip.meal_plan", "pg.err.noMealPlan");
+  if (data.trip.nights <= 0) need("trip", "trip.nights", "pg.err.noNights");
+  const anyScope = SCOPE_KEYS.some((k) => data.scope[k]) || data.transport_plan.tours.enabled;
+  if (!anyScope) need("scope", "scope", "pg.scope.noneOn");
+  if (data.scope.transport) {
+    const plan = data.transport_plan;
+    // an intercity leg that is flown or taken by train needs no vehicle
+    const byCar = [plan.airport, plan.tours, ...(plan.intercity.mode === "car" ? [plan.intercity] : [])];
+    if (byCar.some((leg) => leg.enabled && (!leg.car_type.trim() || leg.cars <= 0))) {
+      need("transport", "transport", "pg.err.transportVehicle");
+    }
+  }
+  if (data.scope.services && data.services.includes.length === 0) need("services", "services.includes", "pg.warn.noServices");
+  if (data.scope.visas && (data.visas.length === 0 || data.visas.some((v) => !v.visa_type.trim()))) {
+    need("visas", "visas", "pg.err.visaType");
+  }
+  // A day with no title is a day the client reads as missing. «يوم حر» is a
+  // title, so a deliberately empty day is one press away.
+  if (data.days.length > 0 && data.days.some((d) => !d.title.trim())) need("itinerary", "itinerary", "pg.err.dayUntitled");
+
   // ---- structural invariants (nights sum, date spans, room+board) ----
   // A city's nights are covered by one or more stays in sequence; each stay
   // carries its own span, and every stay must state a room + board (invariant #3).
@@ -169,6 +208,15 @@ export function validateDraft(data: DraftData): DraftValidation {
   if (data.scope.hotels && data.cities.length > 0 && uncovered.length > 0) {
     blocking.push({ severity: "blocking", stage: "hotels", field: "hotels", key: "pg.err.missingHotels" });
   }
+  // The hotel's price is typed on its stay — it changes daily, so it is never
+  // taken from a list. A ready-made package carries its own locked total.
+  if (
+    data.scope.hotels &&
+    !isFixedPrice(data) &&
+    stays.some((s) => s.line.hotel_name.trim() && !s.line.sourcing && stayTotal(s.line) == null)
+  ) {
+    blocking.push({ severity: "blocking", stage: "hotels", field: "hotels", key: "pg.err.stayUnpriced" });
+  }
 
   // A supplier-priced line whose ACTUAL published SELL is below the supplier floor,
   // below the minimum margin, or non-positive BLOCKS publishing (prompt #2 min-margin,
@@ -201,10 +249,6 @@ export function validateDraft(data: DraftData): DraftValidation {
   // partner has the client, and asking us for their name and phone would be
   // asking for data we are not entitled to. So the two advisories only apply to
   // a direct sale.
-  if (!isCompanySale(data)) {
-    if (!data.customer.customer_name.trim()) warnings.push({ severity: "warning", stage: "customer", field: "customer.customer_name", key: "pg.warn.noName" });
-    if (!data.customer.customer_phone.trim()) warnings.push({ severity: "warning", stage: "customer", field: "customer.customer_phone", key: "pg.warn.noPhone" });
-  }
   if (data.flights.length === 0) {
     warnings.push({ severity: "warning", stage: "flights", field: "flights", key: "pg.warn.noFlights" });
   }
@@ -236,9 +280,6 @@ export function validateDraft(data: DraftData): DraftValidation {
   // The ONE thing the «الخدمات» switch does: a sale that includes no ground
   // services stops being nagged to list them. The stage itself stays — it
   // holds the «لا يشمل» list, which every document prints.
-  if (data.scope.services && data.services.includes.length === 0) {
-    warnings.push({ severity: "warning", stage: "services", field: "services.includes", key: "pg.warn.noServices" });
-  }
 
   // ---- ready-made company package («العروض الجاهزة») ----
   // Its price is fixed by management and carried in pricing.final_total instead
@@ -338,6 +379,11 @@ function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey
             "cities",
           ),
     hotels: status(data.hotels.length > 0, hotelsComplete, "hotels"),
+    transport: status(
+      data.transport_plan.airport.enabled || data.transport_plan.tours.enabled || data.transport_plan.intercity.enabled,
+      !hasBlocking("transport"),
+      "transport",
+    ),
     flights: status(data.flights.length > 0, data.flights.length > 0, "flights"),
     services: status(
       data.services.includes.length + data.services.excludes.length > 0,
