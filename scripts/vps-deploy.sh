@@ -25,9 +25,12 @@ HOST=deploy@vps-new
 DIR=apps/traveliun-app
 DOMAIN=pkg.traveliun.com
 
-echo "==> shipping HEAD ($(git rev-parse --short HEAD))"
+# The commit is pinned ONCE, here. Reading HEAD again at the end reported the
+# wrong commit when another one landed while this deploy was still building.
+SHIPPED=$(git rev-parse HEAD)
+echo "==> shipping ${SHIPPED:0:7}"
 ssh "$HOST" "mkdir -p ~/$DIR && find ~/$DIR -mindepth 1 -maxdepth 1 ! -name .env ! -name .dockercfg -exec rm -rf {} +"
-git archive --format=tar HEAD | ssh "$HOST" "tar -x -C ~/$DIR"
+git archive --format=tar "$SHIPPED" | ssh "$HOST" "tar -x -C ~/$DIR"
 
 echo "==> building"
 # DOCKER_CONFIG is redirected because ~/.docker is root-owned on this host and
@@ -71,7 +74,7 @@ done
 # built from the commit we just shipped: the running container's own source is
 # compared against HEAD, file for file.
 echo "==> verifying the running build is HEAD"
-want=$(git rev-parse HEAD)
+want=$SHIPPED
 got=$(ssh "$HOST" "cd ~/$DIR && git rev-parse HEAD 2>/dev/null" || true)
 if ssh "$HOST" "docker exec traveliun-app sh -c 'test -f /app/.next/BUILD_ID'"; then
   built=$(ssh "$HOST" "docker exec traveliun-app cat /app/.next/BUILD_ID")
