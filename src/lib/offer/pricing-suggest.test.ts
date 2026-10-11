@@ -182,6 +182,27 @@ describe("findServicePrice and findRoomPrice", () => {
     expect(findServicePrice(list, "شيء آخر")).toBeNull();
   });
 
+  it("prices a «خدمات الدولة» line in the service's own currency, at the old system's last row", () => {
+    const data = emptyDraftData();
+    data.scope = { ...data.scope, services: true };
+    // the line «خدمات الدولة» added: the service's exact arabic_name
+    data.services = { ...data.services, includes: ["استقبال بالورد"] };
+    // Thailand's three «استقبال بالورد» rows as the database returns them:
+    // one import timestamp, in no useful order — legacy 36 is the current price.
+    const at = "2026-10-10T21:43:02.949Z";
+    const row = { service_type: "استقبال", arabic_name: "استقبال بالورد", buy_currency: "THB", sell_currency: "THB", created_at: at };
+    const services = [
+      { ...row, buy_price: 800, sell_price: 1000, legacy_id: 20 },
+      { ...row, buy_price: 1600, sell_price: 2000, legacy_id: 36 },
+      { ...row, buy_price: 1200, sell_price: 1500, legacy_id: 29 },
+    ];
+    const [line] = suggestPricing(data, { ...EMPTY, services }, LABELS);
+    expect(line).toMatchObject({ item_type: "service", sell_price: 2000, sell_currency: "THB", buy_currency: "THB", source: "list" });
+    // a row the admin added later (no legacy id) beats every imported one
+    const added = { ...row, buy_price: 1700, sell_price: 2200, legacy_id: null, created_at: "2026-11-01T09:00:00.000Z" };
+    expect(findServicePrice([...services, added], "استقبال بالورد")?.sell_price).toBe(2200);
+  });
+
   it("prefers the same board, but a room's own price beats nothing", () => {
     const rooms = [
       { hotel_id: "h1", hotel_name: "", room_type_name: "استاندر", board_type: "BB", price: 500, currency: "SAR" },

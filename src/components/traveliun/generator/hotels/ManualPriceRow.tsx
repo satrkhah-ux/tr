@@ -4,11 +4,9 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Check, Loader2, Save } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { recallHotelRate, rememberHotelRate, type RememberedRate } from "@/lib/data/hotel-rates";
-import type { DraftHotel } from "@/lib/offer/draft-types";
+import { currencyOptions, type DraftHotel, type LookupCountry } from "@/lib/offer/draft-types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass } from "../stage-props";
-
-const CURRENCIES = ["SAR", "USD", "EUR", "TRY", "AED", "GEL", "EGP", "MYR", "THB", "IDR"];
 
 const rowLabelClass = "grid gap-1.5 text-[11.5px] font-bold text-[#557d78]";
 
@@ -26,10 +24,13 @@ const rowLabelClass = "grid gap-1.5 text-[11.5px] font-bold text-[#557d78]";
  */
 export function ManualPriceRow({
   line,
+  countries,
   onSetHotel,
   onSaved,
 }: {
   line: DraftHotel;
+  /** whose currencies the dropdown offers — every country's own, not a fixed ten. */
+  countries: Pick<LookupCountry, "default_currency">[];
   onSetHotel: (slice: Partial<DraftHotel>) => void;
   /** Called after a successful save, so the card can hand over to the next. */
   onSaved?: () => void;
@@ -120,7 +121,7 @@ export function ManualPriceRow({
             onChange={(e) => onSetHotel({ manual_currency: e.target.value })}
             className={fieldClass}
           >
-            {CURRENCIES.map((code) => (
+            {currencyOptions(countries, line.manual_currency).map((code) => (
               <option key={code} value={code}>{code}</option>
             ))}
           </select>

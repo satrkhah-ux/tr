@@ -1,6 +1,6 @@
 "use client";
 
-import type { DraftServices } from "@/lib/offer/draft-types";
+import { findLookupCountry, libraryForCountry, type DraftServices } from "@/lib/offer/draft-types";
 import { ListEditor } from "../services/ListEditor";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { sectionClass, type StageFormProps } from "../stage-props";
@@ -21,6 +21,7 @@ import { sectionClass, type StageFormProps } from "../stage-props";
 export function TermsStage({ data, patch, lookups }: StageFormProps) {
   const { t } = useTraveliunUI();
   const services = data.services;
+  const countryId = findLookupCountry(lookups.countries, data.trip.country)?.id ?? null;
 
   function update(slice: Partial<DraftServices>) {
     patch({ services: { ...services, ...slice } });
@@ -34,7 +35,7 @@ export function TermsStage({ data, patch, lookups }: StageFormProps) {
         titleKey="pg.terms"
         variant="terms"
         items={services.terms}
-        library={lookups.termLibrary.terms}
+        library={libraryForCountry(lookups.termLibrary, countryId).terms}
         onChange={(next) => update({ terms: next })}
       />
     </section>

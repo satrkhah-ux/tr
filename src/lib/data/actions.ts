@@ -2,6 +2,8 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getServerUser } from "@/lib/supabase/server";
+import { editedTotalSar, offerSarTotal } from "@/lib/offer/pricing";
+import { getRates } from "./rates-actions";
 import type {
   DataRow,
   DataValue,
@@ -121,6 +123,17 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
     const supabase = await createSupabaseServerClient();
+    // An offer total edited on /offers takes its riyal figure along, or the
+    // KPIs (offerSarTotal) keep counting the one it was issued at.
+    if (table === "offers" && "total" in values) {
+      const { data: was } = await supabase.from("offers").select("total, total_sar, currency").eq("id", id).maybeSingle();
+      if (was) {
+        const row = was as { total: number | null; total_sar: number | null; currency: string | null };
+        const total = values.total == null || values.total === "" ? null : Number(values.total);
+        const today = row.currency && row.currency !== "SAR" ? (await getRates()).sarPer[row.currency] : 1;
+        values = { ...values, total_sar: editedTotalSar(row, total, today) };
+      }
+    }
     const { data, error } = await supabase
       .from(table)
       .update(values as never)
@@ -231,7 +244,7 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
     const confirmedQ = offerFilter(
       supabase.from("offers").select("id", { count: "exact", head: true }).eq("status", "confirmed"),
     );
-    const revenueQ = offerFilter(supabase.from("offers").select("total").eq("status", "confirmed"));
+    const revenueQ = offerFilter(supabase.from("offers").select("total, total_sar, currency").eq("status", "confirmed"));
     const customersQ = supabase.from("customers").select("id", { count: "exact", head: true });
     const recentQ = offerFilter(
       supabase.from("offers").select("serial, destination, total, status, offer_date").order("offer_date", { ascending: false }).limit(6),
@@ -241,8 +254,9 @@ export async function getDashboardStats(filters: DashboardFilters): Promise<Dash
       totalQ, confirmedQ, revenueQ, customersQ, recentQ,
     ]);
 
-    const revenueRows = (revenue.data ?? []) as { total: number | null }[];
-    const revenueSum = revenueRows.reduce((sum, r) => sum + (r.total ?? 0), 0);
+    // labelled ر.س, so summed in riyals — never a USD total added in as SAR
+    const revenueRows = (revenue.data ?? []) as Parameters<typeof offerSarTotal>[0][];
+    const revenueSum = revenueRows.reduce((sum, r) => sum + offerSarTotal(r), 0);
 
     return {
       ok: true,

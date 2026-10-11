@@ -120,7 +120,8 @@ const CONFIGS: TableConfig[] = [
     searchable: ["arabic_name", "english_name"],
     defaultSort: { column: "arabic_name", ascending: true },
   },
-  // terms — three routes, one table, filtered by kind
+  // terms — three routes, one table, filtered by kind. A row added while a
+  // country is filtered belongs to that country; with none it is global.
   {
     route: "/offers/offer-includes", table: "terms", titleKey: "nav.offerIncludes",
     columns: [
@@ -130,6 +131,7 @@ const CONFIGS: TableConfig[] = [
     ],
     searchable: ["arabic_text", "english_text"],
     fixedValues: { kind: "include" },
+    filters: [COUNTRY_FILTER],
     defaultSort: { column: "sort", ascending: true },
   },
   {
@@ -141,6 +143,7 @@ const CONFIGS: TableConfig[] = [
     ],
     searchable: ["arabic_text", "english_text"],
     fixedValues: { kind: "exclude" },
+    filters: [COUNTRY_FILTER],
     defaultSort: { column: "sort", ascending: true },
   },
   {
@@ -152,6 +155,7 @@ const CONFIGS: TableConfig[] = [
     ],
     searchable: ["arabic_text", "english_text"],
     fixedValues: { kind: "term" },
+    filters: [COUNTRY_FILTER],
     defaultSort: { column: "sort", ascending: true },
   },
   // offers (with confirmed/unconfirmed toggle)

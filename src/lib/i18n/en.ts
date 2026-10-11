@@ -1156,6 +1156,8 @@ export const en = {
   "pg.addPricingItem": "Add item",
   "pg.err.missingRates": "A line is in a currency with no exchange rate, so the total can't be computed correctly. Change that line to a supported currency.",
   "pg.missingRatesWarn": "No exchange rate for: {codes} — excluded from totals.",
+  "pg.ratesLive": "Exchange rates: live · as of {date}",
+  "pg.ratesFallback": "Live exchange rates are unavailable — totals use a fallback table and may differ from today's rate.",
   // preview stage
   "pg.previewTitle": "Offer preview",
   "pg.previewNote": "This preview is the client PDF — exactly what will print. Buy prices never appear here.",
@@ -1351,6 +1353,7 @@ export const en = {
 
   // ---------- ready-made seasonal offers («العروض الجاهزة») ----------
   "pg.fromLibrary": "Add from the approved list ({count})",
+  "pg.countryServices": "The country's services ({count})",
   "rp.err.tooLarge": "The file is too large (20 MB maximum).",
   "rp.err.notSupported": "Unsupported file — send a PDF or an image.",
   "rp.err.badUrl": "Could not read that link. Check it is public and try again.",

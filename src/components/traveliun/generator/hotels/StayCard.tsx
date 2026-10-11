@@ -5,12 +5,12 @@ import { DirText } from "@/components/DirText";
 import {
   BOARD_LABEL_KEYS,
   BOARD_TYPES,
-  CURRENCIES,
   resizeRooms,
   roomTypeNames,
   withRooms,
   type DraftHotel,
   type DraftRoomSpec,
+  type LookupCountry,
   type LookupRoomType,
 } from "@/lib/offer/draft-types";
 import type { HotelOption, HotelRateOption, SupplierNote } from "@/lib/data/hotel-search";
@@ -49,6 +49,7 @@ export function StayCard({
   sourceLabel,
   hotelOptions,
   roomTypeOptions,
+  countries,
   canInternal,
   picker,
   onSetLine,
@@ -70,6 +71,8 @@ export function StayCard({
   sourceLabel: string;
   hotelOptions: { id: string; name: string; stars: number | null }[];
   roomTypeOptions: LookupRoomType[];
+  /** for the price row's currency list. */
+  countries: Pick<LookupCountry, "default_currency">[];
   canInternal: boolean;
   picker: {
     sources: PickerSource[];
@@ -167,6 +170,7 @@ export function StayCard({
               line={line}
               hotelOptions={hotelOptions}
               roomTypeOptions={roomTypeOptions}
+              countries={countries}
               onSetLine={onSetLine}
               onSetHotel={onSetHotel}
               onDone={() => onChoosing(false)}
@@ -223,7 +227,7 @@ export function StayCard({
               is a quote we were given; typing over it would produce a number no
               supplier ever agreed to. */}
           {!line.sourcing ? (
-            <ManualPriceRow line={line} onSetHotel={onSetHotel} onSaved={onDone} />
+            <ManualPriceRow line={line} countries={countries} onSetHotel={onSetHotel} onSaved={onDone} />
           ) : null}
         </div>
       ) : null}
@@ -236,6 +240,7 @@ function ManualEntry({
   line,
   hotelOptions,
   roomTypeOptions,
+  countries,
   onSetLine,
   onSetHotel,
   onDone,
@@ -243,6 +248,7 @@ function ManualEntry({
   line: DraftHotel;
   hotelOptions: { id: string; name: string; stars: number | null }[];
   roomTypeOptions: LookupRoomType[];
+  countries: Pick<LookupCountry, "default_currency">[];
   onSetLine: (next: DraftHotel) => void;
   onSetHotel: (slice: Partial<DraftHotel>) => void;
   onDone: () => void;
@@ -292,7 +298,7 @@ function ManualEntry({
         </label>
       </div>
 
-      <ManualPriceRow line={line} onSetHotel={onSetHotel} />
+      <ManualPriceRow line={line} countries={countries} onSetHotel={onSetHotel} />
 
       <button
         type="button"

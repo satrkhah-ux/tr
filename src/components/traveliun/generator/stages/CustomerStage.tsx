@@ -13,6 +13,7 @@ import {
   MEAL_PLANS,
   MEAL_PLAN_BOARD,
   MEAL_PLAN_LABEL_KEYS,
+  moveTripCountry,
   resizeRooms,
   resizeAges,
   roomTypeNames,
@@ -83,7 +84,8 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
   }
 
   function applyDestination(name: string) {
-    patch({ trip: { ...data.trip, country: name, destination: name } });
+    // the same swap as TripStage's picker: the chip is the other writer of the country
+    patch(moveTripCountry(data, lookups, { ...data.trip, country: name, destination: name }));
     setDestinations((prev) => prev.filter((d) => d !== name));
   }
 

@@ -358,8 +358,6 @@ export function hasUncertainCriticals(data: RepackageData): boolean {
   return CRITICAL_FIELDS.some((k) => !isFieldConfident(data, k));
 }
 
-export const CURRENCIES = ["SAR", "USD", "EUR", "TRY", "MYR", "THB", "IDR", "AED"] as const;
-
 // ---------- one-tap common items (edit stage) ----------
 export const DEFAULT_INCLUDES = [
   "الإقامة في الفنادق المذكورة",

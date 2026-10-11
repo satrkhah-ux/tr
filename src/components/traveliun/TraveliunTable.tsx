@@ -327,7 +327,10 @@ export function TraveliunTable({
           config={config}
           onClose={() => setAdding(false)}
           onSubmit={async (values) => {
-            const payload = { ...values, ...(config.fixedValues ?? {}) };
+            // A row added while a country is filtered belongs to that country
+            // (a Thailand-only term, a city in it); no filter → a global row.
+            const country = filterValues["country_id"];
+            const payload = { ...(country ? { country_id: country } : {}), ...values, ...(config.fixedValues ?? {}) };
             const result = await createRow(config.table, payload);
             if (!result.ok) return t(result.error);
             await fetchRows();

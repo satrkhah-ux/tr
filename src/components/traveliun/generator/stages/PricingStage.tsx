@@ -6,10 +6,9 @@ import { mergeSuggestions } from "@/lib/offer/pricing-suggest";
 import { Loader2, Lock, Plus, Wand2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { getRates } from "@/lib/data/rates-actions";
-import { applyManualProfit, computeOfferPricing, type CurrencyRates, type LinePricing } from "@/lib/offer/pricing";
+import { applyManualProfit, computeOfferPricing, rebase, type LinePricing } from "@/lib/offer/pricing";
 import {
-  CURRENCIES,
+  currencyOptions,
   deriveCityDates,
   deriveHotelStays,
   pricingRefFor,
@@ -51,51 +50,47 @@ function formatMoney(value: number): string {
  * Buy-side data never reaches the client document regardless (OfferDocument
  * renders sell-side only; ClientOfferDTO strips it structurally).
  */
-export function PricingStage({ draftId, data, patch }: StageFormProps) {
+export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) {
   const { t } = useTraveliunUI();
   const { can } = useRole();
   const canView = can("pricing.view");
   const canInternal = can("pricing.internal");
 
-  const [rates, setRates] = useState<CurrencyRates>({ SAR: 1 });
-  useEffect(() => {
-    let active = true;
-    getRates().then((result) => {
-      if (active) setRates(result.sarPer);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
   const pricing = data.pricing;
+  // Everything on this screen is in the currency the client is quoted in —
+  // the same totals issuing computes (offerTotals), not a riyal sum labelled
+  // with whatever the agent picked.
+  const display = pricing.display_currency || "SAR";
   // An empty price field reads as "0" to a skimming eye; counting them is what
   // stops a half-priced offer going out as a cheap one. A buy with a profit rule
   // IS priced: its sell is derived, exactly as publishing derives it.
   const unpriced = pricing.items.filter(
     (item) => applyManualProfit(item.buy_price, item.sell_price, item.profit_pct, item.profit_amount) == null,
   ).length;
-  const summary = useMemo(
-    () =>
-      computeOfferPricing(
-        pricing.items.map((item) => ({
-          item_type: item.item_type,
-          description: item.description,
-          quantity: item.quantity,
-          buy_price: item.buy_price,
-          buy_currency: item.buy_currency || null,
-          sell_price: item.sell_price,
-          sell_currency: item.sell_currency || null,
-          // the same manual profit issuing applies — without it the screen
-          // showed one total and the client was sent another
-          profit_pct: item.profit_pct,
-          profit_amount: item.profit_amount,
-        })),
-        rates,
-        "SAR",
-      ),
-    [pricing.items, rates],
-  );
+  const summary = useMemo(() => {
+    const rates = rebase(lookups.sarPer ?? { SAR: 1 }, display);
+    const computed = computeOfferPricing(
+      pricing.items.map((item) => ({
+        item_type: item.item_type,
+        description: item.description,
+        quantity: item.quantity,
+        buy_price: item.buy_price,
+        // no currency = the quote currency, exactly as issuing reads it
+        buy_currency: item.buy_currency || display,
+        sell_price: item.sell_price,
+        sell_currency: item.sell_currency || display,
+        // the same manual profit issuing applies — without it the screen
+        // showed one total and the client was sent another
+        profit_pct: item.profit_pct,
+        profit_amount: item.profit_amount,
+      })),
+      rates ?? {},
+      display,
+    );
+    // no rate for the quote currency itself: nothing but its own lines adds up
+    return rates ? computed : { ...computed, missing_rates: [...new Set([display, ...computed.missing_rates])] };
+  }, [pricing.items, lookups.sarPer, display]);
+  const currencies = currencyOptions(lookups.countries, display);
 
   if (!canView) {
     return (
@@ -231,6 +226,8 @@ export function PricingStage({ draftId, data, patch }: StageFormProps) {
                 key={index}
                 item={item}
                 line={summary.lines[index]}
+                base={display}
+                currencies={currencyOptions(lookups.countries, item.sell_currency, item.buy_currency)}
                 canInternal={canInternal}
                 nights={nightsFor(item)}
                 onChange={(slice) => updateItem(index, slice)}
@@ -256,23 +253,36 @@ export function PricingStage({ draftId, data, patch }: StageFormProps) {
       <section className={sectionClass}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {canInternal ? (
-            <Total label={t("pg.totalBuy")} value={`${formatMoney(summary.total_buy)} SAR`} tone="muted" />
+            <Total label={t("pg.totalBuy")} value={`${formatMoney(summary.total_buy)} ${display}`} tone="muted" />
           ) : null}
-          <Total label={t("pg.totalSell")} value={`${formatMoney(summary.total_sell)} SAR`} tone="brand" />
-          {canInternal ? <Total label={t("pg.profitCol")} value={`${formatMoney(summary.profit)} SAR`} tone="good" /> : null}
+          <Total label={t("pg.totalSell")} value={`${formatMoney(summary.total_sell)} ${display}`} tone="brand" />
+          {canInternal ? <Total label={t("pg.profitCol")} value={`${formatMoney(summary.profit)} ${display}`} tone="good" /> : null}
           {canInternal ? (
             <Total label={t("pg.marginCol")} value={summary.margin_pct != null ? `${summary.margin_pct}%` : "—"} tone="good" />
           ) : null}
         </div>
+        {/* Which rates the totals rest on. The fallback table is a dated copy —
+            fine to sketch with, worth a second look before quoting. */}
+        {lookups.ratesSource === "fallback" ? (
+          <p className="mt-3 rounded-[10px] border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2 text-[12px] font-bold text-[#a86a10]">
+            {t("pg.ratesFallback")}
+          </p>
+        ) : lookups.ratesDate ? (
+          <p className="mt-3 text-[11.5px] font-bold text-[#93aaa3]">
+            {t("pg.ratesLive", { date: lookups.ratesDate.slice(0, 10) })}
+          </p>
+        ) : null}
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <label className={labelClass}>
             {t("pg.displayCurrency")}
             <select
-              value={pricing.display_currency}
-              onChange={(e) => patch({ pricing: { ...pricing, display_currency: e.target.value } })}
+              value={display}
+              // A typed final total was in the OLD currency; kept, 4,500 SAR
+              // would go out as 4,500 USD.
+              onChange={(e) => patch({ pricing: { ...pricing, display_currency: e.target.value, final_total: null } })}
               className={fieldClass}
             >
-              {CURRENCIES.map((code) => (
+              {currencies.map((code) => (
                 <option key={code} value={code}>{code}</option>
               ))}
             </select>
@@ -306,6 +316,8 @@ const cardLabelClass = "grid gap-1.5 text-[11.5px] font-bold text-[#557d78]";
 function PricingCard({
   item,
   line,
+  base,
+  currencies,
   canInternal,
   nights,
   onChange,
@@ -313,6 +325,9 @@ function PricingCard({
 }: {
   item: DraftPricingItem;
   line: LinePricing | undefined;
+  /** the quote currency the line's profit is stated in. */
+  base: string;
+  currencies: string[];
   canInternal: boolean;
   /** nights this line covers, for hotel lines — 0 for everything else. */
   nights: number;
@@ -394,11 +409,19 @@ function PricingCard({
         <label className={cardLabelClass}>
           {t("pg.currencyCol")}
           <select
-            value={item.sell_currency}
-            onChange={(e) => onChange({ sell_currency: e.target.value, buy_currency: e.target.value })}
+            value={item.sell_currency || base}
+            // The buy follows only when it was in the same currency: a 20 USD
+            // buy under a 120 SAR sell is two currencies on purpose.
+            onChange={(e) =>
+              onChange(
+                !item.buy_currency || item.buy_currency === item.sell_currency
+                  ? { sell_currency: e.target.value, buy_currency: e.target.value }
+                  : { sell_currency: e.target.value },
+              )
+            }
             className={fieldClass}
           >
-            {CURRENCIES.map((code) => (
+            {currencies.map((code) => (
               <option key={code} value={code}>{code}</option>
             ))}
           </select>
@@ -468,7 +491,7 @@ function PricingCard({
           {canInternal && profit != null ? (
             <LineFigure
               label={t("pg.profitCol")}
-              value={`${formatMoney(profit)} SAR`}
+              value={`${formatMoney(profit)} ${base}`}
               tone={losing ? "bad" : "good"}
             />
           ) : null}
