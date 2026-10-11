@@ -22,6 +22,8 @@ import {
 } from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { citiesFromFlights, citiesMatchFlights } from "@/lib/offer/flight-cities";
+import { getHotelSearchSource } from "@/lib/data/app-settings";
+import { suppliersFor } from "../SupplierPrice";
 import {
   searchHotelsForCity,
   searchInternalHotels,
@@ -106,14 +108,19 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
   const [error, setError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [filters, setFilters] = useState<PickerFilters>(EMPTY_FILTERS);
-  /**
-   * The source per stay, and the one to use for the NEXT stay.
-   *
-   * Remembering it is the «الاعتماد على الإدخال السابق» the agent asked for: a
-   * four-city trip is four identical choices otherwise.
-   */
-  const [source, setSource] = useState<Record<string, string>>({});
+  /** The system every hotel search goes to — set by the administration, read once. */
   const [lastSource, setLastSource] = useState("internal");
+  // Which system the hotels are searched in is the administration's decision
+  // (/settings/suppliers), not a choice put in front of the agent.
+  useEffect(() => {
+    let live = true;
+    void getHotelSearchSource().then((code) => {
+      if (live) setLastSource(code);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   const country = findLookupCountry(lookups.countries, data.trip.country);
   const cityOptions = country?.cities ?? [];
@@ -350,7 +357,6 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
   // ---------- stays ----------
 
   function sourceFor(line: DraftHotel): string {
-    if (source[line.id]) return source[line.id];
     // A line already priced from a supplier says where it came from.
     if (line.sourcing) return line.sourcing.supplier_id;
     return lastSource;
@@ -453,7 +459,6 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
             hotel_id: hotel.id,
             hotel_name: hotel.name,
             hotel_name_en: hotel.name_en ?? line.hotel_name_en,
-            manual_price: rate ? Math.round(rate.total) : line.manual_price,
             manual_currency: rate?.currency ?? line.manual_currency,
             sourcing: null,
           },
@@ -466,9 +471,19 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
             ...r,
             room_type_name: r.room_type_name || (rate?.room && rate.room !== "—" ? rate.room : ""),
             board_type: r.board_type ?? rate?.board ?? null,
+            // the last price quoted for this hotel is the whole stay of ONE room
+            price: r.price ?? (rate && line.rooms.length === 1 ? Math.round(rate.total) : null),
           })),
         ),
       );
+      // No figure yet: open the room rows right away — the price is the next
+      // thing to type, and a closed card saying «افتح تعديل» is one click too many.
+      if (!rate) {
+        setChoosing(null);
+        resetPicker();
+        setEditing(line.id);
+        return;
+      }
       handOver(line.id);
       return;
     }
@@ -535,7 +550,6 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
       enabled: s.demo || Boolean(country?.iso2),
       reason: s.demo || country?.iso2 ? undefined : `الدولة «${data.trip.country}» بلا رمز ISO في قسم الدول`,
     })),
-    { code: "manual", label: "يدوي", enabled: true },
   ];
   const sourceLabel = (code: string) => sources.find((s) => s.code === code)?.label ?? code;
 
@@ -857,6 +871,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                           hotelOptions={hotelOptions}
                           roomTypeOptions={roomTypeOptions}
                           countries={lookups.countries}
+                          suppliers={suppliersFor(lookups, "فنادق")}
                           canInternal={canInternal}
                           picker={{
                             stay: {
@@ -883,11 +898,6 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                                 { source: "internal", id: hotel.id, name: hotel.name, name_en: hotel.name_en, stars: hotel.stars, image: null, rates: [] },
                                 null,
                               ),
-                            onSource: (code) => {
-                              setSource((s) => ({ ...s, [line.id]: code }));
-                              setLastSource(code);
-                              resetPicker();
-                            },
                             filters,
                             onFilters: setFilters,
                             onSearch: () => void runSearch(cov.city_name, line),

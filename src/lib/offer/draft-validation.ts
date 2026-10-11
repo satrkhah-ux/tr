@@ -19,7 +19,7 @@ import {
   type DraftData,
   type StageKey,
 } from "./draft-types";
-import { flightTiming, itineraryStartDate, localDatePart } from "./schedule";
+import { finalOutbound, flightTiming, itineraryStartDate, localDatePart } from "./schedule";
 import { citiesFromFlights, citiesMatchFlights, domesticMismatches } from "./flight-cities";
 import { dayOneIsUsable } from "./timezones";
 import { sellBlocks } from "@/lib/pricing/markup";
@@ -243,6 +243,13 @@ export function validateDraft(data: DraftData): DraftValidation {
   ) {
     blocking.push({ severity: "blocking", stage: "hotels", field: "hotels", key: "pg.err.stayUnpriced" });
   }
+  if (
+    data.scope.hotels &&
+    !isFixedPrice(data) &&
+    stays.some((s) => s.line.hotel_name.trim() && !s.line.sourcing && !s.line.supplier?.trim())
+  ) {
+    blocking.push({ severity: "blocking", stage: "hotels", field: "hotels", key: "pg.err.staySupplier" });
+  }
 
   // A supplier-priced line whose ACTUAL published SELL is below the supplier floor,
   // below the minimum margin, or non-positive BLOCKS publishing (prompt #2 min-margin,
@@ -292,7 +299,7 @@ export function validateDraft(data: DraftData): DraftValidation {
   }
   // The outbound flight lands on a different date than the declared trip arrival —
   // hotel dates follow the flight, so this is worth surfacing.
-  const outbound = data.flights.find((f) => f.leg_order === "outbound");
+  const outbound = finalOutbound(data.flights);
   const landing = localDatePart(outbound?.arrival_at);
   if (landing && data.trip.arrival_date && landing !== data.trip.arrival_date) {
     warnings.push({ severity: "warning", stage: "flights", field: "flights", key: "pg.warn.landingDateDiffers" });
@@ -301,7 +308,7 @@ export function validateDraft(data: DraftData): DraftValidation {
   // there is the mistake this catches — the client counts the day and asks what
   // they paid for it.
   {
-    const landing = data.flights.find((f) => f.leg_order === "outbound")?.arrival_at ?? null;
+    const landing = finalOutbound(data.flights)?.arrival_at ?? null;
     const dayOne = data.days.find((d) => d.kind !== "travel");
     const planned = Boolean(dayOne && (dayOne.title.trim() || dayOne.activities.some((a) => a.trim())));
     if (landing && planned && !dayOneIsUsable(landing)) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { deriveCityDates, emptyDraftData, emptyFlight, type DraftData } from "./draft-types";
 import { draftDaySkeleton, transportNoteForDay, travelDaysBefore } from "./itinerary";
+import { itineraryStartDate } from "./schedule";
 
 /** The user's own example: the plane leaves on the 15th and lands on the 16th. */
 function overnightTrip(): DraftData {
@@ -53,5 +54,34 @@ describe("the programme starts when the plane leaves, the hotels when it lands",
     data.days = [{ day_number: 1, date: "2026-10-16", city_name: "كوالالمبور", title: "الوصول", activities: [], weather: null, ai_generated: false }];
     const days = draftDaySkeleton(data);
     expect(days.find((d) => d.date === "2026-10-16")?.title).toBe("الوصول");
+  });
+
+  it("keeps every day's text when the whole trip moves, dropping only stale weather", () => {
+    const data = overnightTrip();
+    data.days = draftDaySkeleton(data).map((d, i) => ({
+      ...d,
+      title: `يوم ${i + 1}`,
+      weather: { temp_max: 30, temp_min: 24, rain_chance: 10, code: 1, source: "forecast" as const, fetched_at: "x" },
+    }));
+    // the same trip, one week later
+    data.flights = data.flights.map((f) => ({
+      ...f,
+      departure_at: f.departure_at!.replace("2026-10-", "2026-11-").replace(/-(\d\d)T/, (_m, d) => `-${String(Number(d)).padStart(2, "0")}T`),
+      arrival_at: f.arrival_at!.replace("2026-10-", "2026-11-"),
+    }));
+    data.cities = deriveCityDates("2026-11-16", data.cities);
+    const moved = draftDaySkeleton(data);
+    expect(moved.map((d) => d.title)).toEqual(data.days.map((d) => d.title));
+    expect(moved.every((d) => d.weather === null)).toBe(true);
+  });
+
+  it("starts the hotels where a transit outbound finally lands", () => {
+    const data = overnightTrip();
+    data.flights = [
+      { ...emptyFlight("outbound"), to_city: "", departure_at: "2026-10-15T08:00", arrival_at: "2026-10-15T10:00" },
+      { ...emptyFlight("outbound"), to_city: "كوالالمبور", departure_at: "2026-10-15T22:00", arrival_at: "2026-10-16T11:00" },
+      ...data.flights.slice(1),
+    ];
+    expect(itineraryStartDate(data.trip, data.flights)).toBe("2026-10-16");
   });
 });

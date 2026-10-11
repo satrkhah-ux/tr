@@ -67,6 +67,8 @@ export type RoomPrice = {
   board_type: string | null;
   price: number;
   currency: string;
+  /** true for hotel_rate_memory rows (0054): `price` is ONE night of ONE room. */
+  per_night?: boolean;
 };
 
 export type PricingReference = {
@@ -288,7 +290,12 @@ export function suggestPricing(
       : typed != null
         ? [typed, null, line.manual_currency || currency, "typed"]
         : remembered
-          ? [remembered.price * Math.max(line.rooms.length, 1), null, remembered.currency, "remembered"]
+          ? [
+              remembered.price * Math.max(line.rooms.length, 1) * (remembered.per_night ? Math.max(stay.nights, 1) : 1),
+              null,
+              remembered.currency,
+              "remembered",
+            ]
           : [null, null, currency, "none"];
 
     items.push({

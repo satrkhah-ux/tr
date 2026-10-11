@@ -76,6 +76,8 @@ export async function suggestPricingForDraft(
             .from("hotel_rate_memory")
             .select("hotel_id, room_type_name, board_type, price, currency")
             .in("hotel_id", hotelIds)
+            // per night since 0054; older rows were a stay of unknown length
+            .eq("per_night", true)
         : Promise.resolve({ data: [] }),
       // The last price actually quoted for these hotels, as a final fallback —
       // the same history the hotel search already shows as «آخر عرض».
@@ -124,6 +126,7 @@ export async function suggestPricingForDraft(
         board_type: r.board_type,
         price: Number(r.price),
         currency: r.currency || "SAR",
+        per_night: true,
       })),
       ...((historyRes.data ?? []) as {
         hotel_id: string | null;

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, KeyRound, Loader2, PlugZap, XCircle } from "lucide-react";
 import { DirText } from "@/components/DirText";
+import { setHotelSearchSource } from "@/lib/data/app-settings";
 import {
   saveSupplier,
   testSupplierConnection,
@@ -20,9 +21,12 @@ const labelClass = "grid gap-1 text-[12px] font-bold text-[#185045]";
 export function HotelSuppliersAdmin({
   suppliers,
   markupRules,
+  searchSource,
 }: {
   suppliers: SupplierView[];
   markupRules: MarkupOption[];
+  /** what the package generator searches — set here, never by the agent. */
+  searchSource: string;
 }) {
   const { t } = useTraveliunUI();
   return (
@@ -30,6 +34,8 @@ export function HotelSuppliersAdmin({
       <div className="tv-fade-up mx-auto max-w-[860px]">
         <h1 className="text-lg font-extrabold text-[#003c3a]">{t("settings.suppliers.title")}</h1>
         <p className="mt-1 mb-5 text-[12.5px] font-semibold text-[#93aaa3]">{t("settings.suppliers.subtitle")}</p>
+
+        <SearchSourceCard suppliers={suppliers} initial={searchSource} />
 
         {suppliers.length === 0 ? (
           <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-10 text-center text-sm text-[#93aaa3]">
@@ -44,6 +50,69 @@ export function HotelSuppliersAdmin({
         )}
       </div>
     </TraveliunShell>
+  );
+}
+
+/**
+ * «مصدر البحث عن الفنادق» — one decision for the whole agency.
+ *
+ * The agent used to choose the booking system in front of every hotel; now
+ * the administration decides it here and the hotel popup only asks for a name.
+ * A supplier must be enabled to be chosen, or the agents would search nothing.
+ */
+function SearchSourceCard({ suppliers, initial }: { suppliers: SupplierView[]; initial: string }) {
+  const { t } = useTraveliunUI();
+  const [value, setValue] = useState(initial);
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const options = [
+    { code: "internal", label: t("settings.searchSource.internal"), enabled: true },
+    ...suppliers.map((s) => ({ code: s.code, label: s.name_ar, enabled: s.enabled })),
+  ];
+
+  async function choose(code: string) {
+    const previous = value;
+    setValue(code);
+    setState("saving");
+    const result = await setHotelSearchSource(code);
+    if (result.ok) {
+      setState("saved");
+    } else {
+      setValue(previous);
+      setState("error");
+    }
+  }
+
+  return (
+    <section className="mb-5 rounded-[14px] border border-[#cfe0d9] bg-white p-4">
+      <h2 className="text-[14px] font-extrabold text-[#185045]">{t("settings.searchSource.title")}</h2>
+      <p className="mt-1 mb-3 text-[12px] font-semibold text-[#93aaa3]">{t("settings.searchSource.hint")}</p>
+      <div role="radiogroup" aria-label={t("settings.searchSource.title")} className="flex flex-wrap gap-2">
+        {options.map((o) => (
+          <button
+            key={o.code}
+            type="button"
+            role="radio"
+            aria-checked={value === o.code}
+            disabled={!o.enabled || state === "saving"}
+            onClick={() => void choose(o.code)}
+            className={`inline-flex h-10 items-center gap-2 rounded-[10px] border px-3.5 text-[12.5px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+              value === o.code
+                ? "border-[#185045] bg-[#185045] text-white"
+                : "border-[#dbe6e1] bg-white text-[#185045] hover:bg-[#f4f8f6]"
+            }`}
+          >
+            {value === o.code ? <CheckCircle2 className="size-4" /> : null}
+            {o.label}
+            {o.enabled ? "" : ` — ${t("settings.searchSource.disabled")}`}
+          </button>
+        ))}
+      </div>
+      {state === "saved" ? (
+        <p role="status" className="mt-2 text-[11.5px] font-bold text-[#0f7a52]">{t("settings.searchSource.saved")}</p>
+      ) : state === "error" ? (
+        <p role="alert" className="mt-2 text-[11.5px] font-bold text-[#c22850]">{t("err.db")}</p>
+      ) : null}
+    </section>
   );
 }
 

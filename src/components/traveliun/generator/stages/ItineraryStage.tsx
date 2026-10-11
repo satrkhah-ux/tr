@@ -27,7 +27,7 @@ import {
 import { formatWeatherAr, isWeatherEmpty, weatherSourceAr } from "@/lib/offer/weather-format";
 import { arrivalDayNoteAr, dayOneIsUsable } from "@/lib/offer/timezones";
 import { FieldIssue } from "../FieldIssue";
-import { itineraryStartDate } from "@/lib/offer/schedule";
+import { finalOutbound, itineraryStartDate } from "@/lib/offer/schedule";
 import {
   generateItineraryDays,
   getAssistantAvailability,
@@ -63,7 +63,7 @@ export function ItineraryStage({ draftId, data, patch, replace }: StageFormProps
 
   // What the outbound flight actually does to day one. The LOCAL landing time,
   // which is the only version of it the group experiences.
-  const landing = data.flights.find((f) => f.leg_order === "outbound")?.arrival_at ?? null;
+  const landing = finalOutbound(data.flights)?.arrival_at ?? null;
   const arrivalNote = arrivalDayNoteAr(landing);
   const dayOneUsable = dayOneIsUsable(landing);
 

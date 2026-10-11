@@ -84,15 +84,26 @@ export function buildDaySkeleton(
   const total = stay + travel;
   const dated = deriveCityDates(trip.arrival_date, cities);
   const start = trip.arrival_date ? addDays(trip.arrival_date, -travel) : null;
-  // Text follows its DATE when the days carry one: adding a travel day in
-  // front must not slide the arrival day's text onto the flight.
-  const byDate = new Map(existing.filter((d) => d.date).map((d) => [d.date as string, d]));
-  const byNumber = new Map(existing.filter((d) => !d.date).map((d) => [d.day_number, d]));
+  // Text follows its PLACE in the trip, never its date: moving the whole trip
+  // a day keeps every day's text (only a reading for a date that changed is
+  // dropped). Travel days and stay days are counted apart, so adding a travel
+  // day in front does not slide the arrival day's text onto the flight.
+  // A stay day's place is its day_number less the travel days before it.
+  const priorTravel = new Map<number, DraftDay>();
+  const priorStay = new Map<number, DraftDay>();
+  for (const d of existing) {
+    if (d.kind === "travel") {
+      priorTravel.set(d.day_number - 1, d);
+    } else {
+      const before = existing.filter((x) => x.kind === "travel" && x.day_number < d.day_number).length;
+      priorStay.set(d.day_number - 1 - before, d);
+    }
+  }
 
   return Array.from({ length: total }, (_, i) => {
     const day_number = i + 1;
     const date = start ? addDays(start, i) : null;
-    const prior = (date ? byDate.get(date) : undefined) ?? byNumber.get(day_number);
+    const prior = i < travel ? priorTravel.get(i) : priorStay.get(i - travel);
     if (i < travel) {
       // A travel day is in no city yet, and says so in its title.
       return {

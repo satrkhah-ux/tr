@@ -4,7 +4,10 @@ import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * What a room last cost — remembered per (hotel, room type, board).
+ * What ONE NIGHT of a room last cost — remembered per (hotel, room type, board).
+ *
+ * Per night (0054) so a 3-night figure is never offered to a 5-night stay as
+ * the whole price; the caller multiplies by its own nights.
  *
  * The agent prices a room once and the next file that books it starts from the
  * number they already decided, instead of an empty box and a guess. Saving is
@@ -15,6 +18,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * it, and the draft carries whatever they leave there.
  */
 
+/** `price` is per night. */
 export type RememberedRate = { price: number; currency: string; updated_at: string };
 
 async function db(): Promise<SupabaseClient> {
@@ -40,6 +44,8 @@ export async function recallHotelRate(
       .select("price, currency, updated_at, board_type")
       .eq("hotel_id", hotelId)
       .eq("room_type_name", roomTypeName.trim())
+      // rows saved before 0054 held a whole stay of unknown length
+      .eq("per_night", true)
       .limit(20);
 
     const rows = (data ?? []) as { price: number; currency: string; updated_at: string; board_type: string | null }[];
@@ -59,6 +65,7 @@ export async function rememberHotelRate(input: {
   hotelId: string;
   roomTypeName: string;
   boardType: string | null;
+  /** per night. */
   price: number;
   currency: string;
 }): Promise<RememberRateResult> {
@@ -86,6 +93,7 @@ export async function rememberHotelRate(input: {
     );
 
     const values = {
+      per_night: true,
       price: input.price,
       currency: input.currency?.trim() || "SAR",
       updated_at: new Date().toISOString(),

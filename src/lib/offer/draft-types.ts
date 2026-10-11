@@ -484,6 +484,11 @@ export type DraftHotel = {
   /** manual sell price for the whole stay, when not priced from a supplier. */
   manual_price: number | null;
   manual_currency: string;
+  /**
+   * Who the stay was booked through (company_suppliers) when the agent typed
+   * the price. Internal: never on the client document.
+   */
+  supplier?: string;
   /** present once priced from a supplier rate; undefined for manually-priced lines. */
   sourcing?: DraftHotelSourcing | null;
 };
@@ -585,6 +590,7 @@ export function normalizeDraftHotel(raw: unknown): DraftHotel {
     rooms_count: count,
     manual_price: typeof h.manual_price === "number" ? h.manual_price : null,
     manual_currency: typeof h.manual_currency === "string" && h.manual_currency ? h.manual_currency : "SAR",
+    ...(typeof h.supplier === "string" && h.supplier ? { supplier: h.supplier } : {}),
     // deliberately NOT `sourcing: h.sourcing ?? null` — a seeded line must carry
     // no supplier key at all, and a null one still reads as "priced from a
     // supplier, expired" to anything checking for the property.

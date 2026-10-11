@@ -69,16 +69,38 @@ export function citiesMatchFlights(cities: DraftCity[], derived: DraftCity[]): b
  * anything unknown is not called a mismatch.
  */
 export function domesticMismatches(flights: DraftFlight[], cities: DraftCity[]): DraftFlight[] {
-  return flights
-    .filter((f) => f.leg_order === "internal")
-    .filter((f) => {
-      const from = f.from_city?.trim();
-      const to = f.to_city?.trim();
-      const day = localDatePart(f.departure_at);
-      if (!from || !to || !day) return false;
-      const i = cities.findIndex((c, k) => c.city_name === from && cities[k + 1]?.city_name === to);
+  // A connection the same day (KUL → PEN → LGK) leaves no night in the middle
+  // city, so the two legs are ONE move: from the first leg's city to the last
+  // leg's, on the first leg's day.
+  const legs = flights.filter((f) => f.leg_order === "internal").sort(byDeparture);
+  const moves: { legs: DraftFlight[]; from: string; to: string; day: string | null }[] = [];
+  for (const leg of legs) {
+    const prev = moves.at(-1);
+    const last = prev?.legs.at(-1);
+    const connects =
+      last &&
+      last.to_city?.trim() &&
+      last.to_city.trim() === leg.from_city?.trim() &&
+      localDatePart(last.arrival_at) === localDatePart(leg.departure_at);
+    if (prev && connects) {
+      prev.legs.push(leg);
+      prev.to = leg.to_city?.trim() ?? "";
+    } else {
+      moves.push({
+        legs: [leg],
+        from: leg.from_city?.trim() ?? "",
+        to: leg.to_city?.trim() ?? "",
+        day: localDatePart(leg.departure_at),
+      });
+    }
+  }
+  return moves
+    .filter((m) => {
+      if (!m.from || !m.to || !m.day) return false;
+      const i = cities.findIndex((c, k) => c.city_name === m.from && cities[k + 1]?.city_name === m.to);
       if (i < 0) return true;
       const change = cities[i].check_out;
-      return Boolean(change && change !== day);
-    });
+      return Boolean(change && change !== m.day);
+    })
+    .flatMap((m) => m.legs);
 }

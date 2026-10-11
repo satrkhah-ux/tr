@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Building2, CalendarDays, ChevronDown, Loader2, MapPin, Minus, Plus, Search, UsersRound } from "lucide-react";
-import type { PickerSource } from "./HotelPicker";
+import { CalendarDays, ChevronDown, Loader2, MapPin, Minus, Plus, Search, UsersRound } from "lucide-react";
 
 /**
  * The hotel search bar — one row, six cells, the way every booking engine does it.
@@ -39,9 +38,6 @@ export function HotelSearchBar({
   onNights,
   guests,
   onGuests,
-  sources,
-  source,
-  onSource,
   searching,
   onSearch,
   hotelNames,
@@ -55,9 +51,6 @@ export function HotelSearchBar({
   onNights: (n: number) => void;
   guests: SearchBarGuests;
   onGuests: (g: SearchBarGuests) => void;
-  sources: PickerSource[];
-  source: string;
-  onSource: (code: string) => void;
   searching: boolean;
   onSearch: () => void;
   /** hotels we already know in this city, for the datalist. */
@@ -105,13 +98,13 @@ export function HotelSearchBar({
           e.preventDefault();
           onSearch();
         }}
-        className="relative grid items-stretch gap-2 rounded-[19px] border border-[#d5e5df] bg-white p-2 shadow-[0_8px_30px_rgba(15,79,71,0.055)] @max-[959px]:grid-cols-2 @min-[960px]:gap-0 @min-[960px]:[grid-template-columns:minmax(180px,1.35fr)_repeat(2,minmax(150px,1fr))_minmax(200px,1.25fr)_minmax(175px,1.05fr)_68px] @max-[559px]:grid-cols-1"
+        className="relative grid items-stretch gap-2 rounded-[19px] border border-[#d5e5df] bg-white p-2 shadow-[0_8px_30px_rgba(15,79,71,0.055)] grid-cols-1"
       >
-        {/* city / hotel name */}
-        <label className={`${cell} @max-[959px]:rounded-[13px] @max-[959px]:border @max-[959px]:border-[#e0ebe7]`}>
+        {/* the hotel's name — the one thing the agent types here */}
+        <label className={`${cell} rounded-[13px] border border-[#e0ebe7]`}>
           <MapPin className="size-[19px] shrink-0 text-[#0e5b52]" />
           <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className={cellLabel}>المدينة أو الفندق</span>
+            <span className={cellLabel}>اسم الفندق</span>
             <input
               value={nameFilter}
               onChange={(e) => onNameFilter(e.target.value)}
@@ -127,9 +120,11 @@ export function HotelSearchBar({
           </span>
         </label>
 
+        {/* the stay's dates and its nights, side by side: moving one moves the others */}
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2 @max-[459px]:grid-cols-1">
         {/* check-in — derived, and not movable on its own */}
         <label
-          className={`${cell} @max-[959px]:rounded-[13px] @max-[959px]:border @max-[959px]:border-[#e0ebe7]`}
+          className={`${cell} rounded-[13px] border border-[#e0ebe7]`}
           title="تاريخ الدخول يأتي من ترتيب المدن في البرنامج"
         >
           <CalendarDays className="size-[19px] shrink-0 text-[#0e5b52]" />
@@ -139,13 +134,36 @@ export function HotelSearchBar({
           </span>
         </label>
 
+        {/* nights — the stepper the agent reaches for; check-out follows */}
+        <div className="flex min-h-[70px] flex-col items-center justify-center gap-1 rounded-[13px] border border-[#e0ebe7] px-3">
+          <span className={cellLabel}>الليالي</span>
+          <span className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onNights(Math.max(1, nights - 1))}
+              disabled={nights <= 1}
+              aria-label="تقليل الليالي"
+              className="grid size-7 place-items-center rounded-[8px] border border-[#c9dcd6] text-[#0e5b52] disabled:opacity-40"
+            >
+              <Minus className="size-3.5" />
+            </button>
+            <b className="tv-tnum w-6 text-center text-[14px] font-extrabold text-[#123e3a]">{nights}</b>
+            <button
+              type="button"
+              onClick={() => onNights(nights + 1)}
+              aria-label="زيادة الليالي"
+              className="grid size-7 place-items-center rounded-[8px] border border-[#c9dcd6] text-[#0e5b52]"
+            >
+              <Plus className="size-3.5" />
+            </button>
+          </span>
+        </div>
+
         {/* check-out — editable, and it writes the stay's nights */}
-        <label className={`${cell} @max-[959px]:rounded-[13px] @max-[959px]:border @max-[959px]:border-[#e0ebe7]`}>
+        <label className={`${cell} rounded-[13px] border border-[#e0ebe7]`}>
           <CalendarDays className="size-[19px] shrink-0 text-[#0e5b52]" />
           <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className={cellLabel}>
-              تاريخ الخروج <span className="text-[#a9bdb9]">· {nights} ليلة</span>
-            </span>
+            <span className={cellLabel}>تاريخ الخروج</span>
             <input
               type="date"
               dir="ltr"
@@ -157,10 +175,13 @@ export function HotelSearchBar({
           </span>
         </label>
 
+        </div>
+
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
         {/* guests + rooms */}
         <div
           ref={guestRef}
-          className={`${cell} @max-[959px]:rounded-[13px] @max-[959px]:border @max-[959px]:border-[#e0ebe7] ${
+          className={`${cell} rounded-[13px] border border-[#e0ebe7] ${
             openGuests ? "z-[4] rounded-[13px] bg-[#f7fbf9]" : ""
           }`}
         >
@@ -216,36 +237,16 @@ export function HotelSearchBar({
           ) : null}
         </div>
 
-        {/* which system to search */}
-        <label className={`${cell} @max-[959px]:rounded-[13px] @max-[959px]:border @max-[959px]:border-[#e0ebe7]`}>
-          <Building2 className="size-[19px] shrink-0 text-[#0e5b52]" />
-          <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className={cellLabel}>نظام الحجز</span>
-            <select
-              value={source}
-              onChange={(e) => onSource(e.target.value)}
-              className={`${cellInput} cursor-pointer appearance-none pe-4`}
-            >
-              {sources.map((s) => (
-                <option key={s.code} value={s.code} disabled={!s.enabled}>
-                  {s.label}
-                  {s.enabled ? "" : " — غير متاح"}
-                </option>
-              ))}
-            </select>
-          </span>
-          <ChevronDown className="pointer-events-none absolute bottom-5 end-3.5 size-4 text-[#0e5b52]" />
-        </label>
-
         <button
           type="submit"
           disabled={searching}
           aria-label="البحث عن الفنادق"
-          className="flex min-w-0 items-center justify-center gap-2 rounded-[14px] bg-[linear-gradient(145deg,#176e63,#0b5048)] text-white shadow-[0_10px_20px_rgba(14,91,82,0.23)] transition-transform hover:-translate-y-0.5 disabled:opacity-60 @max-[959px]:col-span-full @max-[959px]:min-h-[52px]"
+          className="flex min-w-[140px] items-center justify-center gap-2 rounded-[14px] bg-[linear-gradient(145deg,#176e63,#0b5048)] px-5 text-white shadow-[0_10px_20px_rgba(14,91,82,0.23)] transition-transform hover:-translate-y-0.5 disabled:opacity-60"
         >
-          {searching ? <Loader2 className="size-5 animate-spin" /> : <Search className="size-[23px]" />}
-          <span className="text-[12px] font-extrabold @min-[960px]:hidden">ابحث الآن</span>
+          {searching ? <Loader2 className="size-5 animate-spin" /> : <Search className="size-[21px]" />}
+          <span className="text-[12.5px] font-extrabold">ابحث الآن</span>
         </button>
+        </div>
       </form>
     </section>
   );

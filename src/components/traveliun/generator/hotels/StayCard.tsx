@@ -17,7 +17,8 @@ import type { HotelOption, HotelRateOption, SupplierNote } from "@/lib/data/hote
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { createRoomTypeOption } from "@/lib/data/catalog-actions";
-import { ManualPriceRow } from "./ManualPriceRow";
+import { RoomPrice } from "./RoomPrice";
+import { currencyOptions } from "@/lib/offer/draft-types";
 
 /** Sentinel option value — never a real room-type name. */
 const ADD_ROOM_TYPE = "__add_room_type__";
@@ -50,6 +51,7 @@ export function StayCard({
   hotelOptions,
   roomTypeOptions,
   countries,
+  suppliers,
   canInternal,
   picker,
   onSetLine,
@@ -73,11 +75,12 @@ export function StayCard({
   roomTypeOptions: LookupRoomType[];
   /** for the price row's currency list. */
   countries: Pick<LookupCountry, "default_currency">[];
+  /** the agency's hotel suppliers, for «المزوّد». */
+  suppliers: { id: string; name: string }[];
   canInternal: boolean;
   picker: {
     sources: PickerSource[];
     source: string;
-    onSource: (code: string) => void;
     countryName: string;
     onHotelCreated: (hotel: { id: string; name: string; name_en: string | null; stars: number | null }) => void;
     filters: PickerFilters;
@@ -117,17 +120,21 @@ export function StayCard({
           <span className="text-[12px] font-extrabold text-[#185045]">
             {count > 1 ? `الفندق ${index + 1}` : "الفندق"}
           </span>
-          <label className="flex items-center gap-1.5 text-[11px] font-bold text-[#557d78]">
-            ليالٍ
-            <input
-              type="number"
-              min={0}
-              dir="ltr"
-              value={line.nights || nights}
-              onChange={(e) => onSetHotel({ nights: Math.max(0, Number(e.target.value)) })}
-              className={`${fieldClass} tv-tnum h-8 w-16 text-center`}
-            />
-          </label>
+          {/* While a hotel is being searched for, the nights live in the search
+              bar beside the two dates; here they would be a second copy. */}
+          {!choosing ? (
+            <label className="flex items-center gap-1.5 text-[11px] font-bold text-[#557d78]">
+              ليالٍ
+              <input
+                type="number"
+                min={0}
+                dir="ltr"
+                value={line.nights || nights}
+                onChange={(e) => onSetHotel({ nights: Math.max(0, Number(e.target.value)) })}
+                className={`${fieldClass} tv-tnum h-8 w-16 text-center`}
+              />
+            </label>
+          ) : null}
           {checkIn && checkOut ? (
             <span className="tv-tnum text-[11px] font-semibold text-[#93aaa3]">
               <DirText dir="ltr">{`${checkIn} → ${checkOut}`}</DirText>
@@ -163,20 +170,7 @@ export function StayCard({
           onRefresh={onRefresh}
         />
       ) : (
-        <HotelPicker
-          {...picker}
-          manual={
-            <ManualEntry
-              line={line}
-              hotelOptions={hotelOptions}
-              roomTypeOptions={roomTypeOptions}
-              countries={countries}
-              onSetLine={onSetLine}
-              onSetHotel={onSetHotel}
-              onDone={() => onChoosing(false)}
-            />
-          }
-        />
+        <HotelPicker {...picker} />
       )}
 
       {/* Details — the same fields as before, now opened deliberately. */}
@@ -216,6 +210,8 @@ export function StayCard({
                 roomTypeOptions={roomTypeOptions}
                 currency={line.manual_currency || "SAR"}
                 priceable={!line.sourcing}
+                nights={line.nights || nights}
+                hotelId={line.hotel_id}
                 onChange={(slice) =>
                   onSetLine(withRooms(line, line.rooms.map((r, i) => (i === roomIndex ? { ...r, ...slice } : r))))
                 }
@@ -223,91 +219,54 @@ export function StayCard({
             ))}
           </div>
 
-          {/* The price is editable only when it is OURS to edit. A supplier rate
-              is a quote we were given; typing over it would produce a number no
-              supplier ever agreed to. */}
+          {/* The price is OURS only when typed: a supplier rate is a quote we
+              were given. Typed prices are per room for the whole stay (above);
+              here is what they are in, and who the stay was booked through. */}
           {!line.sourcing ? (
-            <ManualPriceRow line={line} countries={countries} onSetHotel={onSetHotel} onSaved={onDone} />
+            <div className="mt-3 grid gap-3 sm:grid-cols-[130px_minmax(0,1fr)]">
+              <label className={rowLabelClass}>
+                {t("pg.currencyCol")}
+                <select
+                  value={line.manual_currency}
+                  onChange={(e) => onSetHotel({ manual_currency: e.target.value })}
+                  className={fieldClass}
+                >
+                  {currencyOptions(countries, line.manual_currency).map((code) => (
+                    <option key={code} value={code}>{code}</option>
+                  ))}
+                </select>
+              </label>
+              <label className={rowLabelClass}>
+                {t("pg.supplierLabel")}
+                <select
+                  value={line.supplier ?? ""}
+                  onChange={(e) => onSetHotel({ supplier: e.target.value })}
+                  className={fieldClass}
+                >
+                  <option value="">{t("pg.chooseSupplier")}</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
+                  ))}
+                  {line.supplier && !suppliers.some((s) => s.name === line.supplier) ? (
+                    <option value={line.supplier}>{line.supplier}</option>
+                  ) : null}
+                </select>
+              </label>
+            </div>
+          ) : null}
+          {onDone ? (
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={onDone}
+                className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439]"
+              >
+                {t("pg.stayDone")}
+              </button>
+            </div>
           ) : null}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-/** The «يدوي» tab: a hotel in neither system, named and priced by hand. */
-function ManualEntry({
-  line,
-  hotelOptions,
-  roomTypeOptions,
-  countries,
-  onSetLine,
-  onSetHotel,
-  onDone,
-}: {
-  line: DraftHotel;
-  hotelOptions: { id: string; name: string; stars: number | null }[];
-  roomTypeOptions: LookupRoomType[];
-  countries: Pick<LookupCountry, "default_currency">[];
-  onSetLine: (next: DraftHotel) => void;
-  onSetHotel: (slice: Partial<DraftHotel>) => void;
-  onDone: () => void;
-}) {
-  const { t } = useTraveliunUI();
-
-  return (
-    <div className="grid gap-3">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className={rowLabelClass}>
-          {t("pg.hotel")}
-          <select
-            value={line.hotel_name}
-            onChange={(e) => {
-              const name = e.target.value;
-              const match = hotelOptions.find((h) => h.name === name) ?? null;
-              const hotelId = match ? match.id : null;
-              // room types inherited from the customer stage are NAMES; pin them
-              // to this hotel's own rows now that we know the hotel
-              const pinned = line.rooms.map((r) => ({
-                ...r,
-                room_type_id:
-                  roomTypeOptions.find(
-                    (rt) => (rt.hotel_id === hotelId || rt.hotel_id === null) && rt.name === r.room_type_name,
-                  )?.id ?? null,
-              }));
-              onSetLine(withRooms({ ...line, hotel_name: name, hotel_id: hotelId }, pinned));
-            }}
-            className={fieldClass}
-          >
-            <option value="">{t("pg.chooseHotel")}</option>
-            {hotelOptions.map((option) => (
-              <option key={option.id} value={option.name}>{option.name}</option>
-            ))}
-            {line.hotel_name && !hotelOptions.some((h) => h.name === line.hotel_name) ? (
-              <option value={line.hotel_name}>{line.hotel_name}</option>
-            ) : null}
-          </select>
-        </label>
-        <label className={rowLabelClass}>
-          {t("pg.customHotel")}
-          <input
-            value={line.hotel_id === null ? line.hotel_name : ""}
-            onChange={(e) => onSetHotel({ hotel_name: e.target.value, hotel_id: null })}
-            className={fieldClass}
-          />
-        </label>
-      </div>
-
-      <ManualPriceRow line={line} countries={countries} onSetHotel={onSetHotel} />
-
-      <button
-        type="button"
-        disabled={!line.hotel_name.trim()}
-        onClick={onDone}
-        className="justify-self-start rounded-[9px] bg-[#185045] px-4 py-2 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
-      >
-        اعتمد هذا الفندق
-      </button>
     </div>
   );
 }
@@ -325,6 +284,8 @@ function RoomRow({
   roomTypeOptions,
   currency,
   priceable,
+  nights,
+  hotelId,
   onChange,
 }: {
   room: DraftRoomSpec;
@@ -334,6 +295,9 @@ function RoomRow({
   currency: string;
   /** false for a supplier rate — that price is the stay's, not this room's. */
   priceable: boolean;
+  /** the nights this room is booked for — its price is the total for them. */
+  nights: number;
+  hotelId: string | null;
   onChange: (slice: Partial<DraftRoomSpec>) => void;
 }) {
   const { t } = useTraveliunUI();
@@ -361,7 +325,7 @@ function RoomRow({
   }
 
   return (
-    <div className="grid gap-3 rounded-[10px] border border-[#e7f0ec] bg-white p-2.5 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_130px] sm:items-end">
+    <div className="grid gap-3 rounded-[10px] border border-[#e7f0ec] bg-white p-2.5 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_200px] sm:items-start">
       <span className="self-center rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11.5px] font-extrabold text-[#185045]">
         {single ? t("pg.roomOne") : t("pg.roomN", { n: index + 1 })}
       </span>
@@ -415,18 +379,7 @@ function RoomRow({
           for the parents and a triple for the children — and one figure for the
           line either overcharged the smaller or undercharged the larger. */}
       {priceable ? (
-        <label className={rowLabelClass}>
-          {t("pg.roomPrice", { currency })}
-          <input
-            type="number"
-            min={0}
-            dir="ltr"
-            value={room.price ?? ""}
-            onChange={(e) => onChange({ price: e.target.value === "" ? null : Number(e.target.value) })}
-            className={`${fieldClass} tv-tnum text-center`}
-            placeholder="0"
-          />
-        </label>
+        <RoomPrice room={room} nights={nights} currency={currency} hotelId={hotelId} onChange={onChange} />
       ) : null}
     </div>
   );

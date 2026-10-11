@@ -140,9 +140,20 @@ export function syncDepartureDates<T extends ScheduleFlight>(trip: ScheduleTrip,
  * flight — so an after-midnight landing checks in on the day it actually lands, not
  * the trip start. Falls back to the trip start when there is no outbound flight.
  */
+/**
+ * The outbound leg the group arrives on. A transit outbound is two legs and the
+ * group sleeps where the LAST one lands — the same leg the cities are built
+ * from (flight-cities.ts), so the start date and the first city agree.
+ */
+export function finalOutbound<T extends ScheduleFlight>(flights: T[]): T | undefined {
+  return flights
+    .filter((f) => f.leg_order === "outbound")
+    .sort((a, b) => (a.departure_at ?? "").localeCompare(b.departure_at ?? ""))
+    .at(-1);
+}
+
 export function itineraryStartDate(trip: ScheduleTrip, flights: ScheduleFlight[]): IsoDate | null {
-  const outbound = flights.find((f) => f.leg_order === "outbound");
-  return localDatePart(outbound?.arrival_at) ?? trip.arrival_date;
+  return localDatePart(finalOutbound(flights)?.arrival_at) ?? trip.arrival_date;
 }
 
 /** The last hotel check-out: the LOCAL departure date of the inbound (home-bound) flight. */

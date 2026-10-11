@@ -49,6 +49,18 @@ describe("domesticMismatches", () => {
     expect(domesticMismatches(moved, cities)).toHaveLength(1);
   });
 
+  it("treats a same-day connection through a city with no night as one move", () => {
+    const viaPenang = [
+      flights[0],
+      leg("internal", "كوالالمبور", "بينانج", "2026-10-19T08:00", "2026-10-19T09:00"),
+      leg("internal", "بينانج", "لنكاوي", "2026-10-19T10:00", "2026-10-19T10:40"),
+      flights[2],
+    ];
+    const chain = citiesFromFlights(viaPenang)!;
+    expect(chain.map((c) => c.city_name)).toEqual(["كوالالمبور", "لنكاوي"]);
+    expect(domesticMismatches(viaPenang, deriveCityDates("2026-10-16", chain))).toEqual([]);
+  });
+
   it("flags a hop between cities that do not follow each other", () => {
     const wrong = flights.map((f) => (f.leg_order === "internal" ? { ...f, to_city: "بينانج" } : f));
     expect(domesticMismatches(wrong, cities)).toHaveLength(1);

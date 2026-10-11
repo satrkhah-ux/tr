@@ -30,6 +30,8 @@ export function withRequiredAnswers(data: DraftData): DraftData {
     },
     services: data.services.includes.length > 0 ? data.services : { ...data.services, includes: ["الإقامة"] },
     visas: data.visas.length > 0 ? data.visas : [{ country: data.trip.country, visa_type: "سياحية", count: 1, note: "" }],
-    hotels: data.hotels.map((h) => withRooms(h, h.rooms.map((r) => ({ ...r, price: r.price ?? 100 })))),
+    hotels: data.hotels.map((h) =>
+      withRooms({ ...h, supplier: h.supplier || "TBO Holidays" }, h.rooms.map((r) => ({ ...r, price: r.price ?? 100 }))),
+    ),
   };
 }

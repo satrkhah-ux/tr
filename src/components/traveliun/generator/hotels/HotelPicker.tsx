@@ -55,7 +55,6 @@ const PAGE = 8;
 export function HotelPicker({
   sources,
   source,
-  onSource,
   filters,
   onFilters,
   onSearch,
@@ -65,14 +64,12 @@ export function HotelPicker({
   notes,
   busyKey,
   onSelect,
-  manual,
   stay,
   countryName,
   onHotelCreated,
 }: {
   sources: PickerSource[];
   source: string;
-  onSource: (code: string) => void;
   /** Resolves the city when a hotel is added from here. */
   countryName: string;
   onHotelCreated: (hotel: { id: string; name: string; name_en: string | null; stars: number | null }) => void;
@@ -85,8 +82,6 @@ export function HotelPicker({
   notes: SupplierNote[];
   busyKey: string | null;
   onSelect: (hotel: HotelOption, rate: HotelRateOption | null) => void;
-  /** the manual tab's form — rendered by the caller, which owns the draft line. */
-  manual: React.ReactNode;
   /** everything the bar shows, already known from stages 1–3. */
   stay: {
     cityName: string;
@@ -104,7 +99,6 @@ export function HotelPicker({
   const [shown, setShown] = useState(PAGE);
 
   const active = sources.find((s) => s.code === source);
-  const isManual = source === "manual";
 
   const matches = (hotel: HotelOption, rate: HotelRateOption) => {
     if (filters.board && rate.board !== filters.board) return false;
@@ -141,9 +135,6 @@ export function HotelPicker({
         onNights={stay.onNights}
         guests={stay.guests}
         onGuests={stay.onGuests}
-        sources={sources}
-        source={source}
-        onSource={onSource}
         searching={searching}
         onSearch={() => {
           setShown(PAGE);
@@ -166,9 +157,7 @@ export function HotelPicker({
         </p>
       ) : null}
 
-      {isManual ? (
-        manual
-      ) : (
+      {(
         <>
           {/* Everything else is behind one word, because the common search
               needs none of it. */}
