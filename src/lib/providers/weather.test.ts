@@ -38,7 +38,7 @@ describe("splitDatesByHorizon", () => {
   });
 
   it("treats the last forecastable day as a forecast and the next as normals", () => {
-    const edge = "2026-08-05"; // exactly FORECAST_HORIZON_DAYS ahead
+    const edge = "2026-08-04"; // exactly FORECAST_HORIZON_DAYS ahead
     expect(daysAhead(edge, today)).toBe(FORECAST_HORIZON_DAYS);
     const { forecast, normals } = splitDatesByHorizon([edge, "2026-08-06"], today);
     expect(forecast).toEqual([edge]);

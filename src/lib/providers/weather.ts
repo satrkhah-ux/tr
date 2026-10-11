@@ -57,8 +57,12 @@ export function daysAhead(date: string, today: string): number {
   return Math.round((a - b) / 86_400_000);
 }
 
-/** Open-Meteo serves a real forecast for ~16 days; beyond that we use normals. */
-export const FORECAST_HORIZON_DAYS = 16;
+/**
+ * The last day Open-Meteo forecasts: 16 days INCLUDING today, so today + 15.
+ * It was 16, and one date past the window fails the whole city's request — a
+ * trip whose last day fell on day 16 got no weather at all for that city.
+ */
+export const FORECAST_HORIZON_DAYS = 15;
 
 /** Split itinerary dates into the forecastable ones and the rest. */
 export function splitDatesByHorizon(
@@ -331,10 +335,11 @@ export async function getCityWeather(city: string, dates: string[], today?: stri
 
   const ref = today ?? new Date().toISOString().slice(0, 10);
   const { forecast, normals } = splitDatesByHorizon(unique, ref);
-  const [f, n] = await Promise.all([
-    fetchForecast(place.lat, place.lon, forecast),
-    fetchNormals(place.lat, place.lon, normals),
-  ]);
+  const f = await fetchForecast(place.lat, place.lon, forecast);
+  // A date the forecast did not return (its window ends in the provider's
+  // timezone, not ours) takes the climate average rather than staying blank.
+  const got = new Set(f.map((d) => d.date));
+  const n = await fetchNormals(place.lat, place.lon, [...normals, ...forecast.filter((d) => !got.has(d))]);
 
   const merged = [...f, ...n].sort((a, b) => a.date.localeCompare(b.date));
   return { city, resolvedName: place.name, days: merged };
