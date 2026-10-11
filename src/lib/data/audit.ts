@@ -81,6 +81,10 @@ export type AuditAction =
   // separate, and who issued one is worth knowing
   | "employee.account_issued"
   | "employee.account_linked"
+  // staff self-registration: who asked, and who let them in (or didn't)
+  | "staff_registration.submitted"
+  | "staff_registration.approved"
+  | "staff_registration.rejected"
   // the reference catalogue was exported/imported as a whole
   | "catalog.imported";
 

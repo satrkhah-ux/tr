@@ -1,5 +1,5 @@
 import { TeamMembers } from "@/components/traveliun/TeamMembers";
-import { listTeamMembers, listTeamRoles } from "@/lib/data/team";
+import { listPendingRegistrations, listTeamMembers, listTeamRoles } from "@/lib/data/team";
 import { currentCan } from "@/lib/roles/current";
 
 export const dynamic = "force-dynamic";
@@ -11,10 +11,13 @@ export const dynamic = "force-dynamic";
  * behind `employees.manage`, and so is every action it calls.
  */
 export default async function EmployeesPage() {
-  const [members, roles, canManage] = await Promise.all([
+  // listPendingRegistrations checks employees.manage itself and answers [] to
+  // anyone else, so it can run alongside the gate instead of after it.
+  const [members, roles, canManage, registrations] = await Promise.all([
     listTeamMembers(),
     listTeamRoles(),
     currentCan("employees.manage"),
+    listPendingRegistrations(),
   ]);
-  return <TeamMembers members={members} roles={roles} canManage={canManage} />;
+  return <TeamMembers members={members} roles={roles} registrations={registrations} canManage={canManage} />;
 }

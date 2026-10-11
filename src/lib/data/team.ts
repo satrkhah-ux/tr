@@ -1,11 +1,14 @@
 "use server";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
+import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { currentCan } from "@/lib/roles/current";
 import { isPermission, type Permission } from "@/lib/roles/roles";
+import { PENDING_BAN } from "@/lib/team/register-rules";
 
 /**
  * Sections, their permissions, and who is in them.
@@ -151,6 +154,8 @@ export async function saveRole(input: {
       : supabase.from("roles").insert(patch).select("id").single();
 
     const { data, error } = await query;
+    // employees_email_uniq (0046): the address already belongs to someone else.
+    if (error?.code === "23505") return { ok: false, error: "team.err.emailTaken" };
     if (error || !data) return { ok: false, error: input.id ? "err.updateFailed" : "err.createFailed" };
 
     const id = (data as { id: string }).id;
@@ -242,6 +247,8 @@ export async function saveMember(input: {
       : supabase.from("employees").insert(patch).select("id").single();
 
     const { data, error } = await query;
+    // employees_email_uniq (0046): the address already belongs to someone else.
+    if (error?.code === "23505") return { ok: false, error: "team.err.emailTaken" };
     if (error || !data) return { ok: false, error: input.id ? "err.updateFailed" : "err.createFailed" };
     const id = (data as { id: string }).id;
     await logAudit({
@@ -280,6 +287,161 @@ export async function suspendMember(employeeId: string, suspended: boolean): Pro
       entity_id: employeeId,
       meta: { suspended },
     });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/**
+ * Self-registrations waiting for a decision (staff_registrations, 0046).
+ *
+ * Read through the SERVICE client, unlike the reads above: the table has no
+ * policy and no grant for signed-in users, on purpose — an applicant's mobile
+ * and note are for the people who decide, not for every colleague.
+ */
+export type PendingRegistration = {
+  id: string;
+  arabic_name: string;
+  english_name: string | null;
+  email: string;
+  mobile: string;
+  note: string | null;
+  created_at: string;
+};
+
+export async function listPendingRegistrations(): Promise<PendingRegistration[]> {
+  if (await requireManage()) return [];
+  try {
+    const { data } = await service()
+      .from("staff_registrations")
+      .select("id, arabic_name, english_name, email, mobile, note, created_at")
+      .eq("status", "pending")
+      .order("created_at");
+    return (data ?? []) as PendingRegistration[];
+  } catch {
+    return [];
+  }
+}
+
+function approvalError(error: PostgrestError | null): TranslationKey {
+  if (error?.code === "23505") return "team.err.emailTaken";
+  if (error?.message.includes("bad_role")) return "team.err.roleRequired";
+  if (error?.message.includes("not_pending")) return "team.pending.handled";
+  return "err.createFailed";
+}
+
+/**
+ * Let an applicant in, into the section the approver chose.
+ *
+ * Order matters. The ban is lifted FIRST: for that moment the account has no
+ * employees row, which in this app means no permission at all (current.ts,
+ * is_staff()). Then one database call claims the request and creates the Active
+ * employee together. The other order would leave an Active employee whose login
+ * still refuses them, with the request already marked approved — nothing left to
+ * press. If the database call fails, the ban goes back on, unless someone else's
+ * approval got there first (then the account is theirs to keep).
+ *
+ * If the database cannot be reached at all, the call and the follow-up read both
+ * come back as errors (postgrest-js returns them, it does not throw) and the ban
+ * stays off: an account with no employees row and no permission (0045), its
+ * request still pending, so pressing approve or reject again finishes it. Not
+ * re-banned on an unknown outcome on purpose — if the call did commit, that
+ * would lock out a just-approved employee with nothing left to press.
+ */
+export async function approveRegistration(id: string, roleId: string): Promise<{ ok: true } | Fail> {
+  const denied = await requireManage();
+  if (denied) return { ok: false, error: denied };
+  if (!roleId) return { ok: false, error: "team.err.roleRequired" };
+
+  try {
+    const supabase = service();
+    const { data } = await supabase
+      .from("staff_registrations")
+      .select("status, auth_user_id")
+      .eq("id", id)
+      .maybeSingle();
+    const request = data as { status: string; auth_user_id: string | null } | null;
+    if (!request || request.status !== "pending" || !request.auth_user_id) {
+      return { ok: false, error: "team.pending.handled" };
+    }
+    const authUserId = request.auth_user_id;
+    // Before the ban is lifted: nothing that can throw may sit between the lift
+    // and the call, or the catch below would leave the account open.
+    const reviewer = await getCurrentEmployeeId();
+
+    const lifted = await supabase.auth.admin.updateUserById(authUserId, { ban_duration: "none" });
+    if (lifted.error) return { ok: false, error: "err.updateFailed" };
+
+    const { data: employeeId, error } = await supabase.rpc("approve_staff_registration", {
+      p_id: id,
+      p_role: roleId,
+      p_reviewer: reviewer,
+    });
+    if (error || !employeeId) {
+      const after = await supabase.from("staff_registrations").select("status").eq("id", id).maybeSingle();
+      if ((after.data as { status: string } | null)?.status === "pending") {
+        await supabase.auth.admin.updateUserById(authUserId, { ban_duration: PENDING_BAN });
+      }
+      return { ok: false, error: approvalError(error) };
+    }
+
+    await logAudit({
+      action: "staff_registration.approved",
+      entity: "staff_registrations",
+      entity_id: id,
+      meta: { employee_id: employeeId as string, role_id: roleId },
+    });
+    revalidatePath("/employees");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/**
+ * Turn a request down: the request keeps the reason, the account is deleted.
+ *
+ * The conditional update is the claim — a request someone already approved
+ * cannot be rejected out from under them. The same address cannot quietly
+ * re-apply for 30 days (staff-registration.ts).
+ */
+export async function rejectRegistration(id: string, reason: string): Promise<{ ok: true } | Fail> {
+  const denied = await requireManage();
+  if (denied) return { ok: false, error: denied };
+  const why = reason.trim().slice(0, 300);
+  if (why.length < 3) return { ok: false, error: "team.err.reasonRequired" };
+
+  try {
+    const supabase = service();
+    const { data, error } = await supabase
+      .from("staff_registrations")
+      .update({
+        status: "rejected",
+        reject_reason: why,
+        reviewed_by: await getCurrentEmployeeId(),
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("status", "pending")
+      .select("auth_user_id")
+      .maybeSingle();
+    if (error) return { ok: false, error: "err.updateFailed" };
+    if (!data) return { ok: false, error: "team.pending.handled" };
+
+    // Still banned if this fails, so it cannot sign in either way; the audit
+    // row says which, and «إصدار حساب» for that address clears the leftover
+    // (employee-accounts.ts).
+    const authUserId = (data as { auth_user_id: string | null }).auth_user_id;
+    const removed = authUserId ? !(await supabase.auth.admin.deleteUser(authUserId)).error : true;
+
+    await logAudit({
+      action: "staff_registration.rejected",
+      entity: "staff_registrations",
+      entity_id: id,
+      meta: { reason: why, account_deleted: removed },
+    });
+    revalidatePath("/employees");
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };

@@ -6,7 +6,8 @@ import { useState, useTransition } from "react";
 import { Check, KeyRound, Loader2, Pencil, Plus, Search, ShieldCheck, UserPlus, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { saveMember, setMemberRole, suspendMember, type TeamMember, type TeamRole } from "@/lib/data/team";
+import { saveMember, setMemberRole, suspendMember, type PendingRegistration, type TeamMember, type TeamRole } from "@/lib/data/team";
+import { PendingEmployees } from "./team/PendingEmployees";
 import { TraveliunShell } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
@@ -48,10 +49,13 @@ function toDraft(m?: TeamMember): Draft {
 export function TeamMembers({
   members,
   roles,
+  registrations,
   canManage,
 }: {
   members: TeamMember[];
   roles: TeamRole[];
+  /** self-registrations waiting for a decision — empty unless canManage. */
+  registrations: PendingRegistration[];
   /** false → the list is readable but every control is gone. */
   canManage: boolean;
 }) {
@@ -110,6 +114,7 @@ export function TeamMembers({
   return (
     <TraveliunShell title="nav.employees">
       <div className="tv-fade-up space-y-4">
+        {canManage ? <PendingEmployees pending={registrations} roles={roles} /> : null}
         <section className={card}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

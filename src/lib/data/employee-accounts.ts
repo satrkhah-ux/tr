@@ -1,9 +1,9 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "./audit";
-import { can } from "@/lib/roles/roles";
-import { getCurrentRole } from "./metrics";
+import { currentCan } from "@/lib/roles/current";
 
 /**
  * Issue a staff login from inside the system.
@@ -35,11 +35,17 @@ export type AccountsResult =
   | { ok: true; rows: EmployeeAccount[] }
   | { ok: false; error: "err.session" | "err.forbidden" | "err.db" };
 
-/** Only a role that may administer people may see or change their accounts. */
+/**
+ * Only a role that may administer people may see or change their accounts.
+ *
+ * Read from the role ROW's permission keys (current.ts), like every other gate
+ * on the Employees screen — not from the coarse admin/employee label, which
+ * would let a section that was never given `employees.manage` issue logins.
+ */
 async function guard(): Promise<"ok" | "err.session" | "err.forbidden"> {
   const user = await getServerUser();
   if (!user) return "err.session";
-  return can(await getCurrentRole(), "employees.manage") ? "ok" : "err.forbidden";
+  return (await currentCan("employees.manage")) ? "ok" : "err.forbidden";
 }
 
 export async function listEmployeeAccounts(): Promise<AccountsResult> {
@@ -116,7 +122,43 @@ export async function issueEmployeeAccount(employeeId: string): Promise<IssueRes
     // An address may already own an account from an earlier attempt. Inviting
     // again fails; linking the one that exists is what was actually wanted.
     const { data: page } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const existing = (page?.users ?? []).find((u) => u.email?.toLowerCase() === email);
+    let existing = (page?.users ?? []).find((u) => u.email?.toLowerCase() === email);
+    let removedLeftover: string | null = null;
+
+    if (existing?.banned_until && Date.parse(existing.banned_until) > Date.now()) {
+      // A banned account is a self-registration. Still in the queue: linking it
+      // here would approve it with no role decision and no record of who let
+      // them in. NOT in the queue (its request insert failed, or a rejection
+      // could not delete it): a leftover nothing else can clear, whose password
+      // was set by someone who never proved they own the address — removed, so
+      // the invite below goes to whoever does.
+      const { data: open, error: openError } = await (admin as unknown as SupabaseClient)
+        .from("staff_registrations")
+        .select("id")
+        .eq("auth_user_id", existing.id)
+        .eq("status", "pending")
+        .limit(1);
+      if (openError) return { ok: false, message: "تعذّر إصدار الحساب." };
+      if ((open ?? []).length > 0 || existing.user_metadata?.["self_registered"] !== true) {
+        return { ok: false, message: "لهذا البريد طلب تسجيل قيد المراجعة — قرّر فيه من قائمة الطلبات أعلى صفحة الموظفين." };
+      }
+      if ((await admin.auth.admin.deleteUser(existing.id)).error) return { ok: false, message: "تعذّر إصدار الحساب." };
+      removedLeftover = existing.id;
+      existing = undefined;
+    }
+
+    if (existing) {
+      // A partner login must never also be staff: it would pass is_staff() and
+      // the partner policies at the same time.
+      const { data: partner } = await admin
+        .from("partner_users")
+        .select("id")
+        .eq("auth_user_id", existing.id)
+        .limit(1);
+      if ((partner ?? []).length > 0) {
+        return { ok: false, message: "هذا البريد حساب شركة متعاونة — لا يُربط بموظف." };
+      }
+    }
 
     let authUserId = existing?.id ?? null;
     if (!authUserId) {
@@ -149,7 +191,7 @@ export async function issueEmployeeAccount(employeeId: string): Promise<IssueRes
       action: existing ? "employee.account_linked" : "employee.account_issued",
       entity: "employees",
       entity_id: row.id,
-      meta: { email },
+      meta: removedLeftover ? { email, removed_leftover_account: removedLeftover } : { email },
     });
 
     return { ok: true, email };

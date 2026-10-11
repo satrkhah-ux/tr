@@ -47,7 +47,10 @@ async function opsRecipients(supabase: SupabaseClient): Promise<number[]> {
   const { data } = await supabase
     .from("employees")
     .select("telegram_chat_id")
-    .not("telegram_chat_id", "is", null);
+    .not("telegram_chat_id", "is", null)
+    // a suspended employee keeps their chat id but must stop receiving
+    // operations — including new applicants' names
+    .eq("status", "Active");
   return ((data ?? []) as { telegram_chat_id: number | string }[])
     .map((e) => Number(e.telegram_chat_id))
     .filter((n) => Number.isFinite(n) && n !== 0);
@@ -123,6 +126,37 @@ export async function notifyPartnerRegistration(notice: {
     ].join("\n");
 
     const results = await Promise.all(chatIds.map((id) => send(id, text, "/partner-companies")));
+    return results.filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Someone asked to join the staff.
+ *
+ * Same reason as the partner notice: the request is invisible until someone
+ * opens the Employees screen. Bounded by the form's own caps (3 per origin a
+ * day, 20 open at once), so a flood cannot turn this into a flood of messages.
+ *
+ * The name only. This goes to every linked colleague, not just the people who
+ * decide; the applicant's email and mobile stay behind `employees.manage`.
+ */
+export async function notifyEmployeeRegistration(notice: { name: string }): Promise<number> {
+  try {
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const chatIds = await opsRecipients(supabase);
+    if (chatIds.length === 0) return 0;
+
+    const text = [
+      "🧑‍💼 <b>طلب تسجيل موظف جديد</b>",
+      "",
+      `الاسم: <b>${escapeHtml(notice.name)}</b>`,
+      "",
+      "تأكد من هويته ثم اعتمده واختر قسمه من صفحة الموظفين.",
+    ].join("\n");
+
+    const results = await Promise.all(chatIds.map((id) => send(id, text, "/employees")));
     return results.filter(Boolean).length;
   } catch {
     return 0;

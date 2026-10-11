@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -34,10 +35,14 @@ export function TraveliunSignIn() {
       });
 
       if (signInError) {
+        // A self-registered account is banned until the administration approves
+        // it (staff-registration.ts) — say so, rather than "could not sign in".
         setError(
-          signInError.message.toLowerCase().includes("invalid")
-            ? t("err.loginInvalid")
-            : t("err.loginFailed"),
+          signInError.code === "user_banned"
+            ? t("err.loginPending")
+            : signInError.message.toLowerCase().includes("invalid")
+              ? t("err.loginInvalid")
+              : t("err.loginFailed"),
         );
         return;
       }
@@ -120,6 +125,11 @@ export function TraveliunSignIn() {
               )}
             </button>
           </form>
+          <p className="mt-6 text-center text-[13px] font-semibold">
+            <Link href="/sign-in/register" className="text-[#185045] underline-offset-4 hover:underline">
+              {t("auth.registerLink")}
+            </Link>
+          </p>
         </div>
       </section>
       <section className="hidden min-h-screen bg-[url('/traveliun/auth-background.webp')] bg-cover bg-center lg:block" />
