@@ -26,7 +26,6 @@ import {
   Building2,
   Calculator,
   ChevronDown,
-  ChevronLeft,
   Pin,
   PinOff,
   ClipboardCheck,
@@ -57,6 +56,15 @@ import { TraveliunLogo } from "./TraveliunLogo";
 type TraveliunShellProps = {
   /** i18n key for the page title. */
   title: TranslationKey;
+  /**
+   * Hide the sidebar and the app header, and give the page the whole screen.
+   *
+   * For the one screen where navigating away mid-task is the mistake: building
+   * a package is twenty minutes of connected decisions, and a rail of twenty
+   * other destinations beside it is an invitation to lose the thread. The page
+   * owning this mode provides its own way out.
+   */
+  focus?: boolean;
   children: React.ReactNode;
 };
 
@@ -307,7 +315,7 @@ function isGroupActive(pathname: string, group: NavGroup) {
   return group.children?.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`)) ?? false;
 }
 
-export function TraveliunShell({ title, children }: TraveliunShellProps) {
+export function TraveliunShell({ title, focus = false, children }: TraveliunShellProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuPinned, setMenuPinned] = usePinnedSidebar();
@@ -378,6 +386,7 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
   return (
     <DirectionProvider direction={dir}>
     <div className="tv-app min-h-screen bg-[#eef3f1] font-sans text-[#0f3d38]" dir={dir}>
+      {focus ? null : (
       <div
         className={`fixed start-0 top-0 z-[90] hidden h-screen transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:block ${
           menuOpen ? "w-[260px]" : "w-[74px]"
@@ -460,7 +469,9 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
           />
         ) : null}
       </div>
+      )}
 
+      {focus ? null : (
       <header
         className={`fixed start-0 end-0 top-0 z-30 flex h-[60px] items-center gap-3 border-b border-[#dbe6e1] bg-white px-3 shadow-[0_1px_3px_rgba(0,60,58,0.05)] transition-[inset-inline-start] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:h-[74px] lg:px-5 ${
           menuOpen ? "lg:start-[260px]" : "lg:start-[74px]"
@@ -547,6 +558,7 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
           </Popover>
         </div>
       </header>
+      )}
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="inline-start" className="lg:hidden">
@@ -555,9 +567,13 @@ export function TraveliunShell({ title, children }: TraveliunShellProps) {
       </Sheet>
 
       <main
-        className={`pt-[60px] transition-[margin] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:pt-[74px] ${
-          menuOpen ? "lg:ms-[260px]" : "lg:ms-[74px]"
-        }`}
+        className={
+          focus
+            ? ""
+            : `pt-[60px] transition-[margin] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:pt-[74px] ${
+                menuOpen ? "lg:ms-[260px]" : "lg:ms-[74px]"
+              }`
+        }
       >
         {/* bottom padding on phones clears the fixed tab bar (+ safe area). */}
         <div className="px-4 py-4 pb-[calc(84px+env(safe-area-inset-bottom))] sm:px-5 lg:px-[30px] lg:pb-4">

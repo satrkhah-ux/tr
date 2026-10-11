@@ -9,6 +9,8 @@ import {
   CircleDot,
   Eye,
   EyeOff,
+  Focus,
+  Minimize2,
   Loader2,
   Rocket,
   XCircle,
@@ -75,6 +77,16 @@ export function GeneratorFlow({
 
   const { data, patch, replace, flush, saveState } = useDraftState(draftId, initialData);
   const [previewOpen, setPreviewOpen] = useState(true);
+  /**
+   * Full screen, nothing else.
+   *
+   * Building a package is twenty minutes of connected decisions, and a rail of
+   * twenty other destinations beside it is an invitation to lose the thread.
+   * Deliberately NOT remembered between visits: a mode that hides every exit
+   * should be entered on purpose each time, not inherited by whoever opens the
+   * laptop next.
+   */
+  const [focus, setFocus] = useState(false);
 
   // Issues that belong to permission-gated stages are hidden from roles without
   // access — a visitor must see NO trace of the pricing stage anywhere.
@@ -133,6 +145,15 @@ export function GeneratorFlow({
     el.querySelector<HTMLElement>("[data-flow-heading]")?.focus({ preventScroll: true });
   }, [current]);
 
+  useEffect(() => {
+    if (!focus) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFocus(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [focus]);
+
   const open = useCallback(
     (stage: StageKey) => {
       void flush();
@@ -165,7 +186,7 @@ export function GeneratorFlow({
       : t("pg.flow.next", { stage: t(next.labelKey) });
 
   return (
-    <TraveliunShell title="nav.packageGenerator">
+    <TraveliunShell title="nav.packageGenerator" focus={focus}>
       <div className="tv-fade-up">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -215,12 +236,31 @@ export function GeneratorFlow({
                 {previewOpen ? t("pg.hidePreview") : t("pg.showPreview")}
               </button>
             ) : null}
-            <Link
-              href={stageHref(draftId, current === "hotels" ? "cities" : current)}
-              className="inline-flex h-9 items-center gap-2 rounded-[9px] px-2 text-[11.5px] font-bold text-[#93aaa3] transition-colors hover:text-[#557d78]"
+            {/* The way back out is on the same row as the way in, and Escape
+                works too — a mode that hides the navigation must not hide its
+                own exit. */}
+            <button
+              type="button"
+              onClick={() => setFocus((v) => !v)}
+              aria-pressed={focus}
+              title={focus ? t("pg.flow.focusOff") : t("pg.flow.focusOn")}
+              className={`inline-flex h-9 items-center gap-2 rounded-[9px] border px-3 text-[12.5px] font-bold transition-colors ${
+                focus
+                  ? "border-[var(--tv-brand)] bg-[var(--tv-brand)] text-white hover:bg-[#0f4439]"
+                  : "border-[#dbe6e1] bg-white text-[#557d78] hover:bg-[#f4f8f6]"
+              }`}
             >
-              {t("pg.flow.classic")}
-            </Link>
+              {focus ? <Minimize2 className="size-4" /> : <Focus className="size-4" />}
+              {focus ? t("pg.flow.focusOff") : t("pg.flow.focusOn")}
+            </button>
+            {focus ? null : (
+              <Link
+                href={stageHref(draftId, current === "hotels" ? "cities" : current)}
+                className="inline-flex h-9 items-center gap-2 rounded-[9px] px-2 text-[11.5px] font-bold text-[#93aaa3] transition-colors hover:text-[#557d78]"
+              >
+                {t("pg.flow.classic")}
+              </Link>
+            )}
           </div>
         </div>
 

@@ -977,6 +977,8 @@ export const ar: Dictionary = {
   "pg.flow.buildItinerary": "إنشاء البرنامج السياحي",
   "pg.flow.edit": "تعديل",
   "pg.flow.notStarted": "لم يبدأ",
+  "pg.flow.focusOn": "تركيز",
+  "pg.flow.focusOff": "إنهاء التركيز",
   "pg.flow.classic": "المحرر السابق",
   "pg.flow.pricingLink": "التسعير",
   "pg.board": "الإقامة",

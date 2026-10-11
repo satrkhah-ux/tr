@@ -979,6 +979,8 @@ export const en = {
   "pg.flow.buildItinerary": "Create the itinerary",
   "pg.flow.edit": "Edit",
   "pg.flow.notStarted": "Not started",
+  "pg.flow.focusOn": "Focus",
+  "pg.flow.focusOff": "Exit focus",
   "pg.flow.classic": "Previous editor",
   "pg.flow.pricingLink": "Pricing",
   "pg.board": "Board",
