@@ -22,6 +22,14 @@ async function db(): Promise<SupabaseClient> {
   return (await createSupabaseServerClient()) as unknown as SupabaseClient;
 }
 
+/** The country, matched the way the generator matches it everywhere else. */
+async function matchCountry(supabase: SupabaseClient, name: string): Promise<{ id: string; arabic_name: string } | undefined> {
+  const { data } = await supabase.from("countries").select("id, arabic_name");
+  return ((data ?? []) as { id: string; arabic_name: string }[]).find(
+    (c) => normalizeName(c.arabic_name) === normalizeName(name),
+  );
+}
+
 export type CreatedHotel = { id: string; name: string; name_en: string | null; stars: number | null };
 
 export type CreateHotelResult =
@@ -47,11 +55,7 @@ export async function createHotelForCity(input: {
   try {
     const supabase = await db();
 
-    // The country, matched the way the generator matches it everywhere else.
-    const { data: countryRows } = await supabase.from("countries").select("id, arabic_name");
-    const country = ((countryRows ?? []) as { id: string; arabic_name: string }[]).find(
-      (c) => normalizeName(c.arabic_name) === normalizeName(input.countryName),
-    );
+    const country = await matchCountry(supabase, input.countryName);
 
     // The city, found or created. Matched on the normalized name because the
     // draft carries whatever the agent typed, and a second «إسطنبول» beside
@@ -145,6 +149,46 @@ export async function createRoomTypeOption(arabicName: string, englishName?: str
       .from("room_types")
       .insert({ arabic_name: name, english_name: englishName?.trim() || null });
     return error ? { ok: false, error: "err.db" } : { ok: true, name };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+export type CreateCityResult =
+  | { ok: true; name: string; created: boolean }
+  | { ok: false; error: "err.session" | "err.db" | "pg.err.cityNameRequired" | "pg.err.countryFirst" };
+
+/**
+ * A city the country does not have yet.
+ *
+ * 30 of the 57 countries came over with no city at all (the legacy system held
+ * cities for 27), so for Spain or France the list was empty and the agent could
+ * not even start the programme. The city goes into THAT country's catalogue
+ * here and is in the list for every package after.
+ *
+ * It needs a country: a city with no country_id is invisible to the
+ * generator's list forever, which is the same dead end with extra steps.
+ */
+export async function createCityForCountry(countryName: string, cityName: string): Promise<CreateCityResult> {
+  if (!(await getServerUser())) return { ok: false, error: "err.session" };
+  const name = cityName.trim();
+  if (!name) return { ok: false, error: "pg.err.cityNameRequired" };
+
+  try {
+    const supabase = await db();
+    const country = await matchCountry(supabase, countryName);
+    if (!country) return { ok: false, error: "pg.err.countryFirst" };
+
+    // «إسطنبول» typed beside an existing «اسطنبول» is the SAME city — hand back
+    // the catalogue's spelling so the stays and the hotels stay on one row.
+    const { data: rows } = await supabase.from("cities").select("arabic_name").eq("country_id", country.id);
+    const same = ((rows ?? []) as { arabic_name: string }[]).find(
+      (c) => normalizeName(c.arabic_name) === normalizeName(name),
+    );
+    if (same) return { ok: true, name: same.arabic_name, created: false };
+
+    const { error } = await supabase.from("cities").insert({ arabic_name: name, country_id: country.id });
+    return error ? { ok: false, error: "err.db" } : { ok: true, name, created: true };
   } catch {
     return { ok: false, error: "err.db" };
   }

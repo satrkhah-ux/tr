@@ -497,7 +497,7 @@ function TeamOperations() {
               </button>
             }
           />
-          <PopoverContent align="end" className="w-[min(340px,calc(100vw-24px))]">
+          <PopoverContent align="end" className="w-[min(340px,calc(100vw/var(--tv-zoom)_-_24px))]">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">{t("dash.customizeTitle")}</h3>
               <button type="button" onClick={() => persist({ order: ADMIN_CARDS.map((c) => c.key), hidden: [] })} className="inline-flex items-center gap-1 text-xs font-bold text-[#557d78] hover:text-[#185045]">

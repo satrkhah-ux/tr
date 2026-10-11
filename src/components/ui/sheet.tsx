@@ -48,9 +48,9 @@ function SheetContent({
           "fixed z-[160] flex flex-col overflow-y-auto bg-white shadow-[0_0_40px_rgba(0,0,0,0.2)] outline-none",
           "transition-transform duration-250 ease-[cubic-bezier(0.22,1,0.36,1)]",
           bottom
-            ? "inset-x-0 bottom-0 max-h-[85dvh] w-full rounded-t-[18px] pb-[env(safe-area-inset-bottom)] data-[starting-style]:translate-y-full data-[ending-style]:translate-y-full"
+            ? "inset-x-0 bottom-0 max-h-[calc(85dvh/var(--tv-zoom))] w-full rounded-t-[18px] pb-[env(safe-area-inset-bottom)] data-[starting-style]:translate-y-full data-[ending-style]:translate-y-full"
             : cn(
-                "inset-y-0 h-full w-[300px] max-w-[85vw]",
+                "inset-y-0 h-full w-[300px] max-w-[calc(85vw/var(--tv-zoom))]",
                 start
                   ? "start-0 data-[starting-style]:-translate-x-full data-[ending-style]:-translate-x-full rtl:data-[starting-style]:translate-x-full rtl:data-[ending-style]:translate-x-full"
                   : "end-0 data-[starting-style]:translate-x-full data-[ending-style]:translate-x-full rtl:data-[starting-style]:-translate-x-full rtl:data-[ending-style]:-translate-x-full",

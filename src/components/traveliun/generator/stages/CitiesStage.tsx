@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BedDouble, Copy, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { BedDouble, Check, Copy, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { copyProgramIntoDraft, findReusablePrograms, getDraft } from "@/lib/data/drafts";
+import { createCityForCountry } from "@/lib/data/catalog-actions";
 import {
   deriveCityDates,
   findLookupCountry,
@@ -69,7 +70,10 @@ function defaultLine(cityName: string, trip: DraftTrip): DraftHotel {
  * It also hosts the "start from a previous programme" panel (same country, same
  * day count, exact traveler matches ranked first).
  */
-export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFormProps) {
+/** The select value that means «add a city that is not in the list». */
+const NEW_CITY = "__new_city__";
+
+export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: StageFormProps) {
   const { t } = useTraveliunUI();
   const { can } = useRole();
   const canInternal = can("pricing.internal");
@@ -83,6 +87,13 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
   // card into a modal, so the agent enters cities first and only then opens
   // one city at a time to pick its hotels.
   const [hotelsFor, setHotelsFor] = useState<number | null>(null);
+  // A city typed in because the country has none (30 of 57 came over empty).
+  const [newCityFor, setNewCityFor] = useState<number | null>(null);
+  const [newCityName, setNewCityName] = useState("");
+  const [cityBusy, setCityBusy] = useState(false);
+  const [cityError, setCityError] = useState<string | null>(null);
+  /** cities added during this session — offered in every row until a reload brings them from the catalogue. */
+  const [extraCities, setExtraCities] = useState<string[]>([]);
   const [choosing, setChoosing] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
@@ -102,6 +113,13 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
 
   const country = findLookupCountry(lookups.countries, data.trip.country);
   const cityOptions = country?.cities ?? [];
+  const cityNames = [
+    ...cityOptions.map((o) => o.name),
+    ...extraCities.filter((n) => !cityOptions.some((o) => o.name === n)),
+  ];
+  // With no city in the list at all, the first unnamed row opens straight onto
+  // «add a city» — a dropdown with nothing in it is a dead end.
+  const newCityRow = newCityFor ?? (cityNames.length === 0 ? data.cities.findIndex((c) => !c.city_name.trim()) : -1);
   const used = totalCityNights(data.cities);
   const showHotels = data.scope.hotels;
   const start = itineraryStartDate(data.trip, data.flights);
@@ -170,13 +188,64 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
    */
   function setCityName(index: number, name: string) {
     const previous = data.cities[index]?.city_name ?? "";
+    const hotels = data.hotels.map((h) => (h.city_name === previous ? { ...h, city_name: name } : h));
     patch({
       cities: deriveCityDates(
         start,
         data.cities.map((c, i) => (i === index ? { ...c, city_name: name } : c)),
       ),
-      hotels: data.hotels.map((h) => (h.city_name === previous ? { ...h, city_name: name } : h)),
+      // A city that had no stay yet (it was still unnamed) gets its starter
+      // line in the same patch — addCity's rule, so the popup and the
+      // validation count the same stays.
+      hotels:
+        name && !hotels.some((h) => h.city_name === name)
+          ? [...hotels, { ...defaultLine(name, data.trip), nights: 0 }]
+          : hotels,
     });
+  }
+
+  function openNewCity(index: number) {
+    setNewCityFor(index);
+    setNewCityName("");
+    setCityError(null);
+  }
+
+  /** Into the country's catalogue, then onto this row — and offered in every package after. */
+  async function saveNewCity(index: number) {
+    const name = newCityName.trim();
+    if (!name || cityBusy) return;
+    setCityBusy(true);
+    setCityError(null);
+    const res = await createCityForCountry(data.trip.country, name);
+    setCityBusy(false);
+    if (!res.ok) {
+      setCityError(t(res.error));
+      return;
+    }
+    setExtraCities((prev) => (prev.includes(res.name) ? prev : [...prev, res.name]));
+    setCityName(index, res.name);
+    setNewCityFor(null);
+    setNewCityName("");
+  }
+
+  /**
+   * «حفظ الفندق»: make sure the edits reached the server, then hand the popup
+   * to the next city still without a hotel — the agent asked to move city by
+   * city, not to hunt for the next one. Every field already patched as it
+   * changed; the flush only drains the debounce before we move.
+   */
+  async function saveHotels() {
+    const from = hotelsFor ?? -1;
+    await flush();
+    setChoosing(null);
+    resetPicker();
+    const next = data.cities.findIndex((c, i) => {
+      if (i <= from || !c.city_name.trim()) return false;
+      if (data.cities.findIndex((x) => x.city_name === c.city_name) !== i) return false;
+      const cv = coverage.find((x) => x.city_name === c.city_name);
+      return !cv || cv.stays.some((s) => !s.line.hotel_name.trim());
+    });
+    setHotelsFor(next >= 0 ? next : null);
   }
 
   /**
@@ -196,7 +265,8 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
     // because hotels are keyed by city NAME, both cities then claimed the same
     // stays, rendered them twice and double-counted their nights.
     const taken = new Set(data.cities.map((c) => c.city_name).filter(Boolean));
-    const name = (cityOptions.find((o) => !taken.has(o.name)) ?? cityOptions[0])?.name ?? "";
+    // All taken (or none at all) -> an unnamed row the agent fills or adds to.
+    const name = cityNames.find((n) => !taken.has(n)) ?? "";
     const left = Math.max(0, data.trip.nights - used);
     patch({
       cities: deriveCityDates(start, [
@@ -452,16 +522,23 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
                       {t("pg.city")}
                       <select
                         value={city.city_name}
-                        onChange={(e) => setCityName(cityIndex, e.target.value)}
+                        onChange={(e) => {
+                          if (e.target.value === NEW_CITY) {
+                            openNewCity(cityIndex);
+                            return;
+                          }
+                          setCityName(cityIndex, e.target.value);
+                        }}
                         className={fieldClass}
                       >
                         <option value="">{t("pg.chooseCity")}</option>
-                        {cityOptions.map((option) => (
-                          <option key={option.id} value={option.name}>{option.name}</option>
+                        {cityNames.map((name, i) => (
+                          <option key={`${i}-${name}`} value={name}>{name}</option>
                         ))}
-                        {city.city_name && !cityOptions.some((o) => o.name === city.city_name) ? (
+                        {city.city_name && !cityNames.includes(city.city_name) ? (
                           <option value={city.city_name}>{city.city_name}</option>
                         ) : null}
+                        <option value={NEW_CITY}>{t("pg.addNewCity")}</option>
                       </select>
                     </label>
                     <label className="grid gap-1.5 text-[12px] font-bold text-[#185045]">
@@ -500,6 +577,49 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
                       {t("pg.removeRow")}
                     </button>
                   </div>
+
+                  {newCityRow === cityIndex ? (
+                    <div className="mt-3 rounded-[10px] border border-dashed border-[#b7d0c7] bg-white p-2.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          value={newCityName}
+                          onChange={(e) => setNewCityName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void saveNewCity(cityIndex);
+                            }
+                          }}
+                          placeholder={t("pg.newCityPlaceholder")}
+                          className={`${fieldClass} min-w-0 flex-1`}
+                        />
+                        <button
+                          type="button"
+                          disabled={cityBusy || !newCityName.trim()}
+                          onClick={() => void saveNewCity(cityIndex)}
+                          className="inline-flex h-11 items-center gap-1.5 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-50"
+                        >
+                          {cityBusy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                          {t("pg.saveCity")}
+                        </button>
+                        {newCityFor === cityIndex ? (
+                          <button
+                            type="button"
+                            onClick={() => setNewCityFor(null)}
+                            className="h-11 rounded-[10px] px-3 text-[12px] font-bold text-[#557d78] hover:bg-[#f0f7f4]"
+                          >
+                            {t("pg.cancel")}
+                          </button>
+                        ) : null}
+                      </div>
+                      <p className="mt-1.5 text-[11px] font-semibold text-[#93aaa3]">
+                        {t("pg.newCityHint", { country: data.trip.country || "—" })}
+                      </p>
+                      {cityError ? (
+                        <p role="alert" className="mt-1 text-[11.5px] font-bold text-[#c43d3d]">{cityError}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
 
                   {/* Hotels live in a POPUP, not inline. The agent enters the
                       cities first; the chosen hotels show here beside the name,
@@ -564,7 +684,7 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
             }
           }}
         >
-          <DialogContent className="w-[min(680px,calc(100vw-24px))]" dir="rtl">
+          <DialogContent className="w-[min(960px,calc(100vw/var(--tv-zoom)_-_24px))]" dir="rtl">
             {(() => {
               if (hotelsFor === null) return null;
               const city = data.cities[hotelsFor];
@@ -578,20 +698,11 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
               }
               return (
                 <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm font-extrabold text-[#003c3a]">
-                      {t("pg.cityHotels")} — {city.city_name}
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={() => addStay(cov.city_name)}
-                      className="inline-flex h-8 items-center gap-1 rounded-[9px] border border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
-                    >
-                      <Plus className="size-3.5" />
-                      فندق آخر
-                    </button>
-                  </div>
-                  <div className="max-h-[68vh] space-y-3 overflow-y-auto pe-1">
+                  {/* pe-10 keeps the title clear of the dialog's own close button */}
+                  <h3 className="pe-10 text-sm font-extrabold text-[#003c3a]">
+                    {t("pg.cityHotels")} — {city.city_name}
+                  </h3>
+                  <div className="space-y-3">
                     {cov.stays.map((stay, stayIndex) => {
                       const line = stay.line;
                       const roomTypeOptions = lookups.roomTypes.filter(
@@ -670,6 +781,24 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
                         />
                       );
                     })}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e7f0ec] pt-3">
+                    <button
+                      type="button"
+                      onClick={() => addStay(cov.city_name)}
+                      className="inline-flex h-10 items-center gap-1 rounded-[10px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                    >
+                      <Plus className="size-3.5" />
+                      فندق آخر
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void saveHotels()}
+                      className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#185045] px-5 text-[12.5px] font-bold text-white transition-colors hover:bg-[#0f4439]"
+                    >
+                      <Check className="size-4" />
+                      {t("pg.saveHotels")}
+                    </button>
                   </div>
                 </div>
               );

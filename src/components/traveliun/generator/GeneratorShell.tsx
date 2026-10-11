@@ -242,7 +242,7 @@ export function GeneratorShell({
               <div className="hidden xl:block">
                 <div className="sticky top-[90px]">
                   <p className="mb-2 text-[11px] font-bold text-[#93aaa3]">{t("pg.previewHint")}</p>
-                  <div className="max-h-[calc(100vh-160px)] overflow-y-auto rounded-[14px]">
+                  <div className="max-h-[calc(100vh/var(--tv-zoom)_-_160px)] overflow-y-auto rounded-[14px]">
                     <div className="origin-top scale-[0.62] rtl:origin-top-right ltr:origin-top-left" style={{ width: "161%" }}>
                       <OfferDocument variant="client" offer={draftToPreviewOffer(data, lookups.airlines)} {...draftBrand(data, lookups.partners)} />
                     </div>

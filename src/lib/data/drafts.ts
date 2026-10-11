@@ -253,6 +253,31 @@ export async function deleteDraft(draftId: string): Promise<SaveDraftResult> {
 }
 
 // ---------- lookups for the stage forms ----------
+
+/**
+ * Every row, not the first 1,000.
+ *
+ * PostgREST caps an unranged select at 1,000 rows and says nothing. Measured
+ * 2026-10-11: hotels came back 0-999 of 2,406 and room types 1,000 of 1,411,
+ * so the generator silently offered 42% of the hotels and no room type past
+ * the first thousand. The query must be ordered on something unique, or pages
+ * can overlap and skip rows.
+ */
+async function allRows(
+  page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>,
+): Promise<{ data: unknown[] }> {
+  const size = 1000;
+  const out: unknown[] = [];
+  for (let from = 0; ; from += size) {
+    const { data, error } = await page(from, from + size - 1);
+    if (error) break;
+    const rows = data ?? [];
+    out.push(...rows);
+    if (rows.length < size) break;
+  }
+  return { data: out };
+}
+
 export async function getGeneratorLookups(): Promise<GeneratorLookups> {
   const empty: GeneratorLookups = {
     countries: [], roomTypes: [], airports: [], carTypes: [], termLibrary: emptyTermLibrary(), partners: [], airlines: [],
@@ -265,8 +290,15 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
       // country, so a live search without it returns nothing at all.
       supabase.from("countries").select("id, arabic_name, iso2, timezone, status").order("arabic_name"),
       supabase.from("cities").select("id, arabic_name, country_id").order("arabic_name"),
-      supabase.from("hotels").select("id, arabic_name, stars, city_id"),
-      supabase.from("room_types").select("id, arabic_name, hotel_id, default_board").order("arabic_name"),
+      allRows((from, to) => supabase.from("hotels").select("id, arabic_name, stars, city_id").order("id").range(from, to)),
+      allRows((from, to) =>
+        supabase
+          .from("room_types")
+          .select("id, arabic_name, hotel_id, default_board")
+          .order("arabic_name")
+          .order("id")
+          .range(from, to),
+      ),
       supabase.from("airports").select("id, arabic_name, code, iana_timezone, status").order("code"),
       supabase
         .from("transportation_types")

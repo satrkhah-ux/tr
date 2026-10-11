@@ -41,6 +41,7 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
   const [configured, setConfigured] = useState(true);
   // Separate from `configured`: the token is set but Teletel refused it.
   const [reachable, setReachable] = useState(true);
+  const [failure, setFailure] = useState<"token" | "blocked" | "down" | undefined>();
   const [open, setOpen] = useState(false);
   const [destinations, setDestinations] = useState<string[]>([]);
   const seqRef = useRef(0);
@@ -66,6 +67,7 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
       if (!res.ok) return;
       setConfigured(res.configured);
       setReachable(res.reachable);
+      setFailure(res.reason);
       setHits(res.hits);
       setOpen(true);
     }, 350);
@@ -112,7 +114,9 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
           // Said plainly, because the agent's next move depends on it: a
           // rejected token used to read as «لا يوجد عملاء مطابقون», so they
           // retyped a customer Teletel already had.
-          <p className="mt-1.5 text-[11.5px] font-semibold text-[#c22850]">{t("tl.unreachable")}</p>
+          <p className="mt-1.5 text-[11.5px] font-semibold text-[#c22850]">
+            {t(failure === "blocked" ? "tl.blocked" : failure === "down" ? "tl.down" : "tl.unreachable")}
+          </p>
         ) : null}
         {open && configured && reachable && query.trim().length >= 2 ? (
           <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-[11px] border border-[#e2ebe7] bg-white shadow-lg dark:border-[#294039] dark:bg-[#0f1f1b]">

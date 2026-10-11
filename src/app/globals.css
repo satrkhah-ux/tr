@@ -344,3 +344,15 @@
 .dark .recharts-label-list text { fill: #9fb3ac !important; }
 .dark .recharts-legend-item-text { color: #eaf3ef !important; }
 .dark .recharts-sector { stroke: #14231f !important; }
+
+/*
+  Viewport units under the body zoom. Measured (Edge 155, 2026-10-11): inside a
+  zoomed body, 100vw / 100vh render 12% LARGER than the screen — a 390px phone
+  got a 410px box, an 800px-tall window an 860px "full height" — so full-height
+  shells and vw-capped popups overflowed. Dividing by the zoom gives back the
+  real viewport. Unlayered on purpose: it must beat Tailwind's utilities layer.
+  Arbitrary values in components divide inline the same way.
+*/
+.min-h-screen { min-height: calc(100vh / var(--tv-zoom)); }
+.h-screen { height: calc(100vh / var(--tv-zoom)); }
+.min-h-dvh { min-height: calc(100dvh / var(--tv-zoom)); }

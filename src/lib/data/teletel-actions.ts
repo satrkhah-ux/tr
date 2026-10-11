@@ -2,6 +2,7 @@
 
 import { getServerUser } from "@/lib/supabase/server";
 import {
+  diagnoseTeletel,
   getTeletelConfig,
   getTeletelContactLabels,
   inferDestinations,
@@ -29,6 +30,8 @@ export type TeletelSearchResult =
       configured: boolean;
       /** false when Teletel answered with an error — NOT the same as no hits. */
       reachable: boolean;
+      /** set only when unreachable: whose problem it is decides the message. */
+      reason?: "token" | "blocked" | "down";
       hits: TeletelCustomerHit[];
     }
   | { ok: false; error: "err.session" };
@@ -44,7 +47,9 @@ export async function searchCustomersFromTeletel(query: string): Promise<Teletel
   const contacts = await searchTeletelContacts(trimmed);
   // The token expires. Saying «no matching customers» then is a lie the agent
   // acts on — they retype a customer Teletel already has.
-  if (contacts === null) return { ok: true, configured: true, reachable: false, hits: [] };
+  if (contacts === null) {
+    return { ok: true, configured: true, reachable: false, reason: await diagnoseTeletel(), hits: [] };
+  }
 
   // labels drive the «رحلة جورجيا → جورجيا» suggestion; fetched per contact,
   // failures degrade to no-labels rather than failing the search.

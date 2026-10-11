@@ -456,7 +456,7 @@ function AddRecordModal({
   return (
     <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/25 p-4" role="dialog" aria-modal="true">
       <form
-        className="max-h-[90vh] w-full max-w-[860px] overflow-y-auto rounded-md border border-[#c8d2cd] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]"
+        className="max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[860px] overflow-y-auto rounded-md border border-[#c8d2cd] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]"
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit(prepareRow(page, form));
@@ -622,7 +622,7 @@ function EmployeeModal({
   return (
     <div className="fixed inset-0 z-[145] flex items-center justify-center bg-[#0d2823]/70 p-4" role="dialog" aria-modal="true">
       <form
-        className="flex max-h-[94vh] w-full max-w-[650px] flex-col overflow-hidden rounded-md bg-white text-[#185045] shadow-[0_18px_52px_rgba(0,0,0,0.24)]"
+        className="flex max-h-[calc(94vh/var(--tv-zoom))] w-full max-w-[650px] flex-col overflow-hidden rounded-md bg-white text-[#185045] shadow-[0_18px_52px_rgba(0,0,0,0.24)]"
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit({
@@ -845,7 +845,7 @@ function RolePermissionModal({
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center bg-[#0d2823]/70 p-4" role="dialog" aria-modal="true">
       <form
-        className="flex max-h-[96vh] w-full max-w-[650px] flex-col overflow-hidden rounded-md bg-white text-[#185045] shadow-[0_18px_52px_rgba(0,0,0,0.24)]"
+        className="flex max-h-[calc(96vh/var(--tv-zoom))] w-full max-w-[650px] flex-col overflow-hidden rounded-md bg-white text-[#185045] shadow-[0_18px_52px_rgba(0,0,0,0.24)]"
         onSubmit={(event) => {
           event.preventDefault();
           onSave(

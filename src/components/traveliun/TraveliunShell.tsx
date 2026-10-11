@@ -431,7 +431,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
               className="h-12 w-12"
             />
           </Link>
-          <nav className="flex max-h-[calc(100vh-74px)] flex-col overflow-hidden py-2">
+          <nav className="flex max-h-[calc(100vh/var(--tv-zoom)_-_74px)] flex-col overflow-hidden py-2">
             {visibleNavGroups.map((group) => {
               const Icon = group.icon;
               const active = isGroupActive(pathname, group);
@@ -517,7 +517,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
           <div className="hidden sm:block">
             <Popover open={panel === "guide"} onOpenChange={(o) => setPanel(o ? "guide" : null)}>
               <PopoverTrigger render={<HeaderIcon label={t("header.guide")} icon={NotebookText} active={panel === "guide"} />} />
-              <PopoverContent className="w-[min(300px,calc(100vw-24px))]">
+              <PopoverContent className="w-[min(300px,calc(100vw/var(--tv-zoom)_-_24px))]">
                 <GuidePanel close={() => setPanel(null)} />
               </PopoverContent>
             </Popover>
@@ -535,7 +535,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
           <div className="hidden sm:block">
             <Popover open={panel === "view"} onOpenChange={(o) => setPanel(o ? "view" : null)}>
               <PopoverTrigger render={<HeaderIcon label={t("view")} icon={Table2} active={panel === "view"} />} />
-              <PopoverContent className="w-[min(300px,calc(100vw-24px))]">
+              <PopoverContent className="w-[min(300px,calc(100vw/var(--tv-zoom)_-_24px))]">
                 <ViewPanel view={view} setView={setView} close={() => setPanel(null)} />
               </PopoverContent>
             </Popover>
@@ -543,14 +543,14 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
 
           <Popover open={panel === "settings"} onOpenChange={(o) => setPanel(o ? "settings" : null)}>
             <PopoverTrigger render={<HeaderIcon label={t("settings")} icon={Settings} active={panel === "settings"} />} />
-            <PopoverContent className="w-[min(320px,calc(100vw-24px))]">
+            <PopoverContent className="w-[min(320px,calc(100vw/var(--tv-zoom)_-_24px))]">
               <SettingsPanel language={language} setLanguage={setLanguage} theme={theme} setTheme={setTheme} close={() => setPanel(null)} />
             </PopoverContent>
           </Popover>
 
           <Popover open={panel === "profile"} onOpenChange={(o) => setPanel(o ? "profile" : null)}>
             <PopoverTrigger render={<HeaderIcon label={t("account")} icon={UserCircle} muted active={panel === "profile"} />} />
-            <PopoverContent className="w-[min(320px,calc(100vw-24px))]">
+            <PopoverContent className="w-[min(320px,calc(100vw/var(--tv-zoom)_-_24px))]">
               <ProfilePanel
                 close={() => setPanel(null)}
                 onChangePassword={() => {
@@ -651,7 +651,7 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
           className="fixed inset-0 z-[160] backdrop-blur-[2px] transition-opacity duration-150 data-[starting-style]:opacity-0 data-[ending-style]:opacity-0"
           style={{ background: "rgba(4,30,27,0.42)" }}
         />
-        <PaletteDialog.Popup className="tv-pop fixed left-1/2 top-[12vh] z-[170] h-fit w-[min(560px,92vw)] -translate-x-1/2 overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_rgba(0,40,36,0.4)] outline-none transition-[opacity,transform] duration-150 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 dark:bg-[#14231f]">
+        <PaletteDialog.Popup className="tv-pop fixed left-1/2 top-[calc(12vh/var(--tv-zoom))] z-[170] h-fit w-[min(560px,calc(92vw/var(--tv-zoom)))] -translate-x-1/2 overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_rgba(0,40,36,0.4)] outline-none transition-[opacity,transform] duration-150 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 dark:bg-[#14231f]">
           <div className="flex items-center gap-[11px] border-b border-[#eef2f0] px-[18px] py-[15px] dark:border-[#294039]">
             <Search className="size-[18px] text-[#93aaa3]" />
             <input
@@ -720,7 +720,7 @@ function SideMenu({
           className="max-h-[68px] w-[170px]"
         />
       </div>
-      <nav className="h-[calc(100vh-96px)] overflow-y-auto py-2 text-[var(--tv-brand)]">
+      <nav className="h-[calc(100vh/var(--tv-zoom)_-_96px)] overflow-y-auto py-2 text-[var(--tv-brand)]">
         {groups.map((group) => {
           const Icon = group.icon;
           const active = group.labelKey === activeGroup.labelKey;

@@ -350,7 +350,7 @@ function SyncDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
         }
       }}
     >
-      <DialogContent className="max-h-[85vh] max-w-[620px] overflow-y-auto" showClose={false}>
+      <DialogContent className="max-h-[calc(85vh/var(--tv-zoom))] max-w-[620px] overflow-y-auto" showClose={false}>
         <div className="mb-4 flex items-center justify-between border-b border-[#e1e9e5] pb-3">
           <h2 className="text-base font-extrabold text-[#003c3a]">{t("ro.syncTitle")}</h2>
           <button type="button" onClick={() => onOpenChange(false)} className="rounded-md p-2 text-[#557d78] hover:bg-[#edf3f0]">

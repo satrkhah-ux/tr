@@ -96,31 +96,19 @@ export function HotelSearchBar({
   }
 
   return (
-    <section className="rounded-[24px] border border-[#0e5b52]/12 bg-white/95 p-5 shadow-[0_24px_70px_rgba(14,77,68,0.10)]">
-      <div className="flex flex-wrap items-center justify-between gap-4 px-1 pb-4">
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-[#e9f4f0] text-[#0e5b52]">
-            <MapPin className="size-5" />
-          </span>
-          <span className="flex flex-col gap-0.5">
-            <small className="text-[10px] font-semibold text-[#78948f]">المدينة المختارة</small>
-            <strong className="text-[16px] font-extrabold text-[#123e3a]">{cityName || "—"}</strong>
-          </span>
-        </div>
-        <p className="hidden text-[11px] font-semibold text-[#89a09c] sm:block">
-          البيانات الحالية مسحوبة تلقائياً من الإدخال الأولي
-        </p>
-      </div>
-
+    // @container: the bar lays itself out by the width IT is given (the hotels
+    // popup), not the screen's — on a wide screen it used to insist on a
+    // six-column row ~940px wide inside a much narrower popup and spill out.
+    <section className="@container rounded-[24px] border border-[#0e5b52]/12 bg-white/95 p-4 shadow-[0_24px_70px_rgba(14,77,68,0.10)]">
       <form
         onSubmit={(e) => {
           e.preventDefault();
           onSearch();
         }}
-        className="relative grid items-stretch gap-2 rounded-[19px] border border-[#d5e5df] bg-white p-2 shadow-[0_8px_30px_rgba(15,79,71,0.055)] max-[1130px]:grid-cols-2 min-[1131px]:gap-0 min-[1131px]:[grid-template-columns:minmax(180px,1.35fr)_repeat(2,minmax(150px,1fr))_minmax(200px,1.25fr)_minmax(175px,1.05fr)_68px] max-[650px]:grid-cols-1"
+        className="relative grid items-stretch gap-2 rounded-[19px] border border-[#d5e5df] bg-white p-2 shadow-[0_8px_30px_rgba(15,79,71,0.055)] @max-[959px]:grid-cols-2 @min-[960px]:gap-0 @min-[960px]:[grid-template-columns:minmax(180px,1.35fr)_repeat(2,minmax(150px,1fr))_minmax(200px,1.25fr)_minmax(175px,1.05fr)_68px] @max-[559px]:grid-cols-1"
       >
         {/* city / hotel name */}
-        <label className={`${cell} max-[1130px]:rounded-[13px] max-[1130px]:border max-[1130px]:border-[#e0ebe7]`}>
+        <label className={`${cell} @max-[959px]:rounded-[13px] @max-[959px]:border @max-[959px]:border-[#e0ebe7]`}>
           <MapPin className="size-[19px] shrink-0 text-[#0e5b52]" />
           <span className="flex min-w-0 flex-1 flex-col gap-1">
             <span className={cellLabel}>المدينة أو الفندق</span>
@@ -141,7 +129,7 @@ export function HotelSearchBar({
 
         {/* check-in — derived, and not movable on its own */}
         <label
-          className={`${cell} max-[1130px]:rounded-[13px] max-[1130px]:border max-[1130px]:border-[#e0ebe7]`}
+          className={`${cell} @max-[959px]:rounded-[13px] @max-[959px]:border @max-[959px]:border-[#e0ebe7]`}
           title="تاريخ الدخول يأتي من ترتيب المدن في البرنامج"
         >
           <CalendarDays className="size-[19px] shrink-0 text-[#0e5b52]" />
@@ -152,7 +140,7 @@ export function HotelSearchBar({
         </label>
 
         {/* check-out — editable, and it writes the stay's nights */}
-        <label className={`${cell} max-[1130px]:rounded-[13px] max-[1130px]:border max-[1130px]:border-[#e0ebe7]`}>
+        <label className={`${cell} @max-[959px]:rounded-[13px] @max-[959px]:border @max-[959px]:border-[#e0ebe7]`}>
           <CalendarDays className="size-[19px] shrink-0 text-[#0e5b52]" />
           <span className="flex min-w-0 flex-1 flex-col gap-1">
             <span className={cellLabel}>
@@ -172,7 +160,7 @@ export function HotelSearchBar({
         {/* guests + rooms */}
         <div
           ref={guestRef}
-          className={`${cell} max-[1130px]:rounded-[13px] max-[1130px]:border max-[1130px]:border-[#e0ebe7] ${
+          className={`${cell} @max-[959px]:rounded-[13px] @max-[959px]:border @max-[959px]:border-[#e0ebe7] ${
             openGuests ? "z-[4] rounded-[13px] bg-[#f7fbf9]" : ""
           }`}
         >
@@ -189,7 +177,7 @@ export function HotelSearchBar({
           <ChevronDown className={`size-4 shrink-0 text-[#0e5b52] transition-transform ${openGuests ? "rotate-180" : ""}`} />
 
           {openGuests ? (
-            <div className="absolute end-0 top-[calc(100%+13px)] z-20 w-[min(330px,84vw)] rounded-[17px] border border-[#d5e5df] bg-white px-4 pb-4 pt-2 shadow-[0_22px_60px_rgba(11,66,59,0.18)]">
+            <div className="absolute end-0 top-[calc(100%+13px)] z-20 w-[min(330px,calc(84vw/var(--tv-zoom)))] rounded-[17px] border border-[#d5e5df] bg-white px-4 pb-4 pt-2 shadow-[0_22px_60px_rgba(11,66,59,0.18)]">
               <Counter
                 title="البالغون"
                 hint="العمر 13 سنة أو أكثر"
@@ -229,7 +217,7 @@ export function HotelSearchBar({
         </div>
 
         {/* which system to search */}
-        <label className={`${cell} max-[1130px]:rounded-[13px] max-[1130px]:border max-[1130px]:border-[#e0ebe7]`}>
+        <label className={`${cell} @max-[959px]:rounded-[13px] @max-[959px]:border @max-[959px]:border-[#e0ebe7]`}>
           <Building2 className="size-[19px] shrink-0 text-[#0e5b52]" />
           <span className="flex min-w-0 flex-1 flex-col gap-1">
             <span className={cellLabel}>نظام الحجز</span>
@@ -253,10 +241,10 @@ export function HotelSearchBar({
           type="submit"
           disabled={searching}
           aria-label="البحث عن الفنادق"
-          className="flex min-w-0 items-center justify-center gap-2 rounded-[14px] bg-[linear-gradient(145deg,#176e63,#0b5048)] text-white shadow-[0_10px_20px_rgba(14,91,82,0.23)] transition-transform hover:-translate-y-0.5 disabled:opacity-60 max-[1130px]:col-span-full max-[1130px]:min-h-[52px]"
+          className="flex min-w-0 items-center justify-center gap-2 rounded-[14px] bg-[linear-gradient(145deg,#176e63,#0b5048)] text-white shadow-[0_10px_20px_rgba(14,91,82,0.23)] transition-transform hover:-translate-y-0.5 disabled:opacity-60 @max-[959px]:col-span-full @max-[959px]:min-h-[52px]"
         >
           {searching ? <Loader2 className="size-5 animate-spin" /> : <Search className="size-[23px]" />}
-          <span className="text-[12px] font-extrabold min-[1131px]:hidden">ابحث الآن</span>
+          <span className="text-[12px] font-extrabold @min-[960px]:hidden">ابحث الآن</span>
         </button>
       </form>
     </section>

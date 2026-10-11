@@ -111,6 +111,34 @@ export async function sendTeletelMessage(conversationId: number, content: string
   return typeof res?.id === "number" ? res.id : null;
 }
 
+export type TeletelFailure = "token" | "blocked" | "down";
+
+/**
+ * Why Teletel refused — asked only after a search already failed.
+ *
+ * A 401 is the token. A 403 HTML page is the nginx in front of chat.teletel.io
+ * refusing THIS server's address before the token is even read (2026-10-11:
+ * the same token answered 200 from a PC and 403 from the VPS). Telling the
+ * agent «renew the token» for that one sends the team rotating a token that
+ * was never the problem.
+ */
+export async function diagnoseTeletel(): Promise<TeletelFailure> {
+  const config = getTeletelConfig();
+  if (!config) return "down";
+  try {
+    const res = await fetch(`${config.baseUrl}/api/v1/accounts/${config.accountId}/contacts/search?q=a`, {
+      headers: { api_access_token: config.token },
+      signal: AbortSignal.timeout(8000),
+      cache: "no-store",
+    });
+    if (res.status === 401) return "token";
+    if (res.status === 403) return (res.headers.get("content-type") ?? "").includes("json") ? "token" : "blocked";
+    return "down";
+  } catch {
+    return "down";
+  }
+}
+
 /** Find the contact by phone, then their conversation. null when either misses. */
 export async function conversationForPhone(phone: string): Promise<number | null> {
   const hits = (await searchTeletelContacts(phone, 3)) ?? [];

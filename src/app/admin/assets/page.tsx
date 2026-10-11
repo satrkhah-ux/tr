@@ -197,7 +197,7 @@ export default function AdminAssetsPage() {
       {/* Add / Edit Modal */}
       {modal.open && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0a0a0a] border border-white/12 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-[#0a0a0a] border border-white/12 rounded-2xl p-6 w-full max-w-lg max-h-[calc(90vh/var(--tv-zoom))] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-base font-semibold text-white">
                 {modal.editId ? "Edit Asset" : "Add New Asset"}
