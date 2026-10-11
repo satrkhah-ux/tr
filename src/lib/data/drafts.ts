@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { currentCan } from "@/lib/roles/current";
 import { airlineLogoUrl, publicBrandLogoUrl } from "@/components/offer-doc/brand";
 import { getPartnerSession } from "@/lib/partners/session";
 import {
@@ -35,14 +36,29 @@ import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { draftDaySkeleton } from "@/lib/offer/itinerary";
 import { validateDraft } from "@/lib/offer/draft-validation";
-import { createOffer, publishOffer, type OfferHotelInput, type OfferPricingItemInput } from "./offers";
+import { publishOffer, type OfferHotelInput, type OfferPricingItemInput } from "./offers";
+import { insertOffer } from "./offer-insert";
+import { keepDraftCost, redactDraftCost } from "@/lib/offer/draft-cost";
+import {
+  deleteDraftRow,
+  insertDraft,
+  listDraftRows,
+  loadDraft,
+  writeDraftStages,
+  type DraftRecord,
+  type InsertDraftResult,
+  type SaveDraftResult,
+} from "./draft-store";
 
 /**
  * Package-generator drafts. One row per draft; each stage page auto-saves its
  * slice through saveDraftStages (shallow top-level merge → concurrent stages
- * never clobber each other). Drafts are internal-only (may carry buy pricing).
+ * never clobber each other). Drafts carry buy pricing, so the rows themselves
+ * are reached only through draft-store.ts (offers.write, or a partner's own
+ * company), and the cost leaves here only for pricing.internal.
  */
 
+/** The user client — reference lookups and offers only, never `offer_drafts`. */
 async function db(): Promise<SupabaseClient> {
   return (await createSupabaseServerClient()) as unknown as SupabaseClient;
 }
@@ -74,13 +90,7 @@ export type DraftSummary = {
 export async function listDrafts(): Promise<DraftSummary[]> {
   const { sarPer } = await getRates();
   try {
-    const supabase = await db();
-    const { data } = await supabase
-      .from("offer_drafts")
-      .select("id, title, data, updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(100);
-    return ((data ?? []) as { id: string; title: string | null; data: Record<string, unknown>; updated_at: string }[]).map(
+    return (await listDraftRows()).map(
       (row) => {
         const draft = normalizeDraftData(row.data);
         return {
@@ -108,7 +118,7 @@ export async function listDrafts(): Promise<DraftSummary[]> {
   }
 }
 
-export type CreateDraftResult = { ok: true; id: string } | { ok: false; error: TranslationKey };
+export type CreateDraftResult = InsertDraftResult;
 
 /**
  * `seed` pre-fills slices of the new draft — used by «العروض الجاهزة» to pour a
@@ -119,7 +129,6 @@ export async function createDraft(seed?: Partial<DraftData>): Promise<CreateDraf
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
-    const supabase = await db();
     // A new draft opens with the company's approved default wording (the rows
     // ticked in /offers/offer-includes, /offers/offer-not-includes and
     // /offers/terms-and-conditions). A seed that brings its own services — a
@@ -128,40 +137,31 @@ export async function createDraft(seed?: Partial<DraftData>): Promise<CreateDraf
     // TripStage adds that country's lines (reseedForCountry).
     const base = emptyDraftData();
     if (!seed?.services) {
-      const { termLibrary } = await getGeneratorLookups();
-      base.services = defaultServicesFromLibrary(libraryForCountry(termLibrary, null));
+      // Only the terms are needed here. Calling getGeneratorLookups() for them
+      // fetched every hotel, room type, airport and the FX feed — ~4 s on the
+      // «إصدار بكج جديد» button — and the stage page loads all of that again.
+      const supabase = await db();
+      const { data: terms } = await supabase
+        .from("terms")
+        .select("kind, arabic_text, checked, sort, country_id")
+        .order("sort", { ascending: true });
+      base.services = defaultServicesFromLibrary(libraryForCountry(buildTermLibrary(terms), null));
     }
     const initial = seed
       ? normalizeDraftData({ ...base, ...seed } as unknown as Record<string, unknown>)
       : base;
 
-    // A partner's file is stamped with their company HERE, at the one place every
-    // draft is born — the generator's new-file button, a ready offer, the portal.
-    // Stamping it per caller would mean the next caller forgets, and a draft with
-    // no company is one the partner's own policy immediately hides from them.
+    // A partner's file names their company HERE, at the one place every draft is
+    // born — the generator's new-file button, a ready offer, the portal. The row
+    // itself is stamped by insertDraft, which is what makes it theirs.
     const partner = await getPartnerSession();
     if (partner) {
       initial.customer = { ...initial.customer, company: partner.partner_name };
     }
 
-    const { data, error } = await supabase
-      .from("offer_drafts")
-      .insert({
-        data: initial as unknown as Record<string, unknown>,
-        ...(seed?.source?.title ? { title: seed.source.title } : {}),
-        // A ready offer's own title wins — it names the package, which is more
-        // use than repeating the company on every row of their list.
-        ...(partner
-          ? {
-              partner_company_id: partner.partner_id,
-              ...(seed?.source?.title ? {} : { title: partner.partner_name }),
-            }
-          : {}),
-      })
-      .select("id")
-      .single();
-    if (error || !data) return { ok: false, error: "err.createFailed" };
-    return { ok: true, id: (data as { id: string }).id };
+    // A ready offer's own title wins — it names the package, which is more use
+    // than repeating the company on every row of their list.
+    return await insertDraft(initial, seed?.source?.title || partner?.partner_name || undefined);
   } catch {
     return { ok: false, error: "err.db" };
   }
@@ -179,80 +179,43 @@ export async function duplicateDraft(draftId: string): Promise<CreateDraftResult
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
-    const record = await getDraft(draftId);
+    const record = await loadDraft(draftId);
     if (!record) return { ok: false, error: "err.loadFailed" };
 
-    const supabase = await db();
     const copy: DraftData = { ...record.data, produced_serial: null };
-    // Same stamp as createDraft: a partner re-issuing their own programme must
-    // not end up with a copy their policy hides.
-    const partner = await getPartnerSession();
-    const { data, error } = await supabase
-      .from("offer_drafts")
-      .insert({
-        data: copy as unknown as Record<string, unknown>,
-        title: copy.customer.customer_name || copy.trip.destination || copy.trip.country || null,
-        ...(partner ? { partner_company_id: partner.partner_id } : {}),
-      })
-      .select("id")
-      .single();
-    if (error || !data) return { ok: false, error: "err.copyFailed" };
-    return { ok: true, id: (data as { id: string }).id };
+    const result = await insertDraft(
+      copy,
+      copy.customer.customer_name || copy.trip.destination || copy.trip.country || null,
+    );
+    return result.ok ? result : { ok: false, error: "err.copyFailed" };
   } catch {
     return { ok: false, error: "err.db" };
   }
 }
 
-export type DraftRecord = { id: string; data: DraftData; updated_at: string };
-
+/** The draft for the generator's screens — without the cost unless the viewer holds pricing.internal. */
 export async function getDraft(draftId: string): Promise<DraftRecord | null> {
-  try {
-    const supabase = await db();
-    const { data } = await supabase
-      .from("offer_drafts")
-      .select("id, data, updated_at")
-      .eq("id", draftId)
-      .maybeSingle();
-    if (!data) return null;
-    const row = data as { id: string; data: Record<string, unknown>; updated_at: string };
-    return { id: row.id, data: normalizeDraftData(row.data), updated_at: row.updated_at };
-  } catch {
-    return null;
-  }
+  const record = await loadDraft(draftId);
+  if (!record || (await currentCan("pricing.internal"))) return record;
+  return { ...record, data: redactDraftCost(record.data) };
 }
 
-export type SaveDraftResult = { ok: boolean; error?: TranslationKey };
-
-/** Merge one or more stage slices into the draft (shallow, top-level keys). */
+/**
+ * Merge one or more stage slices into the draft (shallow, top-level keys). A
+ * browser without pricing.internal never had the cost, so it is put back from
+ * the stored draft rather than taken from what was sent.
+ */
 export async function saveDraftStages(draftId: string, slices: Partial<DraftData>): Promise<SaveDraftResult> {
-  try {
-    const user = await getServerUser();
-    if (!user) return { ok: false, error: "err.session" };
-    const supabase = await db();
-    const { data: existing } = await supabase.from("offer_drafts").select("data").eq("id", draftId).maybeSingle();
-    if (!existing) return { ok: false, error: "err.loadFailed" };
-    const current = normalizeDraftData((existing as { data: Record<string, unknown> }).data);
-    const merged: DraftData = { ...current, ...slices };
-    const title = merged.customer.customer_name || merged.trip.destination || merged.trip.country || null;
-    const { error } = await supabase
-      .from("offer_drafts")
-      .update({ data: merged as unknown as Record<string, unknown>, title, updated_at: new Date().toISOString() })
-      .eq("id", draftId);
-    if (error) return { ok: false, error: "err.updateFailed" };
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "err.db" };
-  }
+  const user = await getServerUser();
+  if (!user) return { ok: false, error: "err.session" };
+  return writeDraftStages(draftId, slices, (await currentCan("pricing.internal")) ? undefined : keepDraftCost);
 }
 
 export async function deleteDraft(draftId: string): Promise<SaveDraftResult> {
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
-    const supabase = await db();
-    const { error } = await supabase.from("offer_drafts").delete().eq("id", draftId);
-    if (error) return { ok: false, error: "err.deleteFailed" };
-    return { ok: true };
+    return await deleteDraftRow(draftId);
   } catch {
     return { ok: false, error: "err.db" };
   }
@@ -471,7 +434,7 @@ function daysFromDuration(duration: string | null): number | null {
 /** Programs matching the draft's country + day count; exact traveler matches first. */
 export async function findReusablePrograms(draftId: string): Promise<ReusableProgram[]> {
   try {
-    const record = await getDraft(draftId);
+    const record = await loadDraft(draftId);
     if (!record) return [];
     const { country, days, adults } = { country: record.data.trip.country, days: record.data.trip.days, adults: record.data.trip.adults };
     if (!country.trim() || days <= 0) return [];
@@ -523,7 +486,7 @@ export async function copyProgramIntoDraft(draftId: string, serial: string): Pro
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
-    const record = await getDraft(draftId);
+    const record = await loadDraft(draftId);
     if (!record) return { ok: false, error: "err.loadFailed" };
 
     const supabase = await db();
@@ -558,7 +521,7 @@ export async function copyProgramIntoDraft(draftId: string, serial: string): Pro
       }),
     );
 
-    return saveDraftStages(draftId, {
+    return writeDraftStages(draftId, {
       cities,
       hotels,
       services: {
@@ -580,7 +543,8 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
-    const record = await getDraft(draftId);
+    // The full draft: the offer is issued with its buy prices whoever presses the button.
+    const record = await loadDraft(draftId);
     if (!record) return { ok: false, error: "err.loadFailed" };
     const data = record.data;
 
@@ -603,7 +567,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         );
         if (attached > 0) {
           data.days = days;
-          await saveDraftStages(draftId, { days });
+          await writeDraftStages(draftId, { days });
         }
       } catch {
         /* issue the offer anyway — the document says the data is not attached */
@@ -738,7 +702,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       partnerCompanyId = matchPartner(data.customer, (rows ?? []) as { id: string; name: string }[])?.id ?? null;
     }
 
-    const result = await createOffer({
+    const result = await insertOffer({
       customer_id: null,
       employee_id: null,
       // From here the preview, the PDF and the client link all resolve their
@@ -832,7 +796,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     });
 
     if (!result.ok) return { ok: false, error: result.error };
-    await saveDraftStages(draftId, { produced_serial: result.serial });
+    await writeDraftStages(draftId, { produced_serial: result.serial });
     // Producing an offer IS sending it: publish v1 (freeze client snapshot +
     // status draft→sent) so the client link + PDF work immediately.
     await publishOffer(result.serial);

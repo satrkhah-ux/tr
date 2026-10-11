@@ -1,4 +1,4 @@
-import type { FilterDef, TableConfig } from "./types";
+import type { AllowedTable, FilterDef, TableConfig } from "./types";
 
 const COUNTRY_FILTER: FilterDef = { key: "country_id", labelKey: "filter.country", kind: "select", source: "countries" };
 const CITY_FILTER: FilterDef = { key: "city_id", labelKey: "filter.city", kind: "select", source: "cities" };
@@ -379,4 +379,31 @@ export function resolveTableConfig(route: string): TableConfig | null {
 
 export function allTableConfigs(): TableConfig[] {
   return CONFIGS;
+}
+
+/**
+ * Cost columns, withheld from `authenticated` by 0047, read AND write — this is
+ * the mirror of its column grants (table-config.test.ts holds the two together). On these
+ * tables `select *` fails for every session, so without pricing.internal the
+ * engine names the granted columns, the screen drops the rest and a write never
+ * carries them; with it, the engine goes through the service role.
+ */
+export const GRANTED_COLUMNS: Partial<Record<AllowedTable, readonly string[]>> = {
+  services: [
+    "id", "country_id", "arabic_name", "english_name", "service_type", "service_type_id",
+    "sell_price", "sell_currency", "created_at",
+  ],
+  transportation_types: [
+    "id", "arabic_name", "english_name", "category", "vehicle_class", "pax_capacity", "luggage_capacity",
+    "with_driver", "duration_unit", "sell_price", "sell_currency", "status", "created_at",
+  ],
+};
+
+/** The margin policy itself — served to pricing.internal only, through the service role. */
+export const INTERNAL_TABLES: readonly AllowedTable[] = ["markup_rules", "profits"];
+
+/** A column a session without pricing.internal may neither see nor write. */
+export function isCostColumn(table: AllowedTable, column: string): boolean {
+  const granted = GRANTED_COLUMNS[table];
+  return granted !== undefined && !granted.includes(column);
 }

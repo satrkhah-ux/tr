@@ -78,6 +78,8 @@ type NavLink = {
    * than listed as one wall of items.
    */
   captionKey?: TranslationKey;
+  /** hides the link unless the role holds this permission. */
+  perm?: Permission;
 };
 
 export type NavGroup = {
@@ -156,11 +158,11 @@ export const navGroups: NavGroup[] = [
     // occasionally, and sitting here they made a nine-item menu out of a
     // four-item job.
     children: [
-      { labelKey: "nav.issuePackage", href: "/package-generator" },
-      { labelKey: "nav.readyOffers", href: "/ready-offers" },
+      { labelKey: "nav.issuePackage", href: "/package-generator", perm: "offers.write" },
+      { labelKey: "nav.readyOffers", href: "/ready-offers", perm: "offers.write" },
       // Issued only. Drafts stay where they are made.
-      { labelKey: "nav.issuedOffers", href: "/offers" },
-      { labelKey: "nav.repackage", href: "/repackage" },
+      { labelKey: "nav.issuedOffers", href: "/offers", perm: "offers.write" },
+      { labelKey: "nav.repackage", href: "/repackage", perm: "repackage.write" },
     ],
   },
   { labelKey: "nav.partnerCompanies", href: "/partner-companies", icon: Building2 },
@@ -272,7 +274,17 @@ function useNavGroups(): NavGroup[] {
   const partner = usePartnerBrand();
   const { can } = useRole();
   if (partner) return partnerNavGroups;
-  return navGroups.filter((group) => !group.perm || can(group.perm));
+  return navGroupsFor(can);
+}
+
+/** Our sections, and the links inside them, that this permission check opens. A section left empty goes. */
+export function navGroupsFor(can: (permission: Permission) => boolean): NavGroup[] {
+  return navGroups.flatMap((group) => {
+    if (group.perm && !can(group.perm)) return [];
+    if (!group.children) return [group];
+    const children = group.children.filter((link) => !link.perm || can(link.perm));
+    return children.length > 0 ? [{ ...group, children }] : [];
+  });
 }
 
 /**

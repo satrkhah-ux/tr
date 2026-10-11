@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { BOARD_AR } from "@/components/offer-doc/labels";
@@ -73,7 +73,9 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
     if (!op) return { ok: false, error: "ops.err.notFound" };
 
     const [hotelsRes, flightsRes, itemsRes, existingRes] = await Promise.all([
-      supabase
+      // Service client: the buy price seeds quoted_net, and 0047 withholds it
+      // from sessions. requireOps above is the gate.
+      (createSupabaseServiceClient() as unknown as SupabaseClient)
         .from("offer_hotels")
         .select(
           "id, hotel_name, room_type_name, rooms_count, board_type, check_in, check_out, nights, cancellation_policy, supplier_name, buy_price, buy_currency",

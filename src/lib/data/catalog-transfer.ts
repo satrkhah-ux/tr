@@ -1,8 +1,11 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { can } from "@/lib/roles/roles";
+import { currentCan } from "@/lib/roles/current";
+import { GRANTED_COLUMNS, isCostColumn } from "./table-config";
+import type { AllowedTable } from "./types";
 import { getCurrentRole } from "./metrics";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { logAudit } from "./audit";
@@ -69,14 +72,18 @@ export async function exportCatalog(): Promise<ExportResult> {
   if (gate !== "ok") return { ok: false, error: gate };
 
   try {
-    const supabase = await db();
+    // The buy side of services / vehicles is withheld from sessions (0047): the
+    // file carries it only for pricing.internal, read through the service role.
+    const internal = await currentCan("pricing.internal");
+    const supabase = internal ? (createSupabaseServiceClient() as unknown as SupabaseClient) : await db();
     const tables: Record<string, Record<string, unknown>[]> = {};
     const counts: Record<string, number> = {};
 
     for (const { table } of CATALOG) {
-      const { data, error } = await supabase.from(table).select("*");
+      const granted = internal ? undefined : GRANTED_COLUMNS[table];
+      const { data, error } = await supabase.from(table).select(granted ? granted.join(", ") : "*");
       if (error) return { ok: false, error: "err.db" };
-      const rows = (data ?? []) as Record<string, unknown>[];
+      const rows = (data ?? []) as unknown as Record<string, unknown>[];
       tables[table] = rows;
       counts[table] = rows.length;
     }
@@ -109,7 +116,10 @@ export async function importCatalog(payload: unknown): Promise<ImportResult> {
   }
 
   try {
-    const supabase = await db();
+    // Mirror of the export: a buy price from the file is written only by
+    // pricing.internal (service role) — no session may write it since 0047.
+    const internal = await currentCan("pricing.internal");
+    const supabase = internal ? (createSupabaseServiceClient() as unknown as SupabaseClient) : await db();
     const added: Record<string, number> = {};
     const skipped: Record<string, number> = {};
 
@@ -139,7 +149,9 @@ export async function importCatalog(payload: unknown): Promise<ImportResult> {
         seen.add(key);
         // The id and timestamps belong to the source system; let ours assign.
         const { id: _id, created_at: _c, updated_at: _u, ...rest } = raw as Record<string, unknown>;
-        toInsert.push(rest);
+        toInsert.push(
+          internal ? rest : Object.fromEntries(Object.entries(rest).filter(([c]) => !isCostColumn(table as AllowedTable, c))),
+        );
       }
 
       if (toInsert.length > 0) {

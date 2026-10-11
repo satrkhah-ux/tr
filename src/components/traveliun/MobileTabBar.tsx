@@ -34,9 +34,9 @@ type TabDest = { id: string; labelKey: TranslationKey; href: string; icon: Lucid
 const DESTINATIONS: TabDest[] = [
   { id: "dashboard", labelKey: "nav.dashboard", href: "/dashboard", icon: BarChart3 },
   { id: "kanban", labelKey: "nav.kanban", href: "/kanban-board", icon: Columns3 },
-  { id: "generator", labelKey: "nav.packageGenerator", href: "/package-generator", icon: FilePlus2 },
+  { id: "generator", labelKey: "nav.packageGenerator", href: "/package-generator", icon: FilePlus2, perm: "offers.write" },
   { id: "repackage", labelKey: "nav.repackage", href: "/repackage", icon: FileUp, perm: "repackage.write" },
-  { id: "offers", labelKey: "nav.packages", href: "/offers", icon: FileText },
+  { id: "offers", labelKey: "nav.packages", href: "/offers", icon: FileText, perm: "offers.write" },
   { id: "customers", labelKey: "nav.customers", href: "/customers", icon: Contact },
   { id: "hotels", labelKey: "nav.hotels", href: "/hotels", icon: Hotel },
   { id: "countries", labelKey: "nav.countries", href: "/countries", icon: Globe2 },

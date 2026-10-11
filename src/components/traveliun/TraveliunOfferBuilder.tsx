@@ -23,6 +23,7 @@ import {
   type OfferFlightInput,
   type OfferServiceInput,
 } from "@/lib/data/offers";
+import { useRole } from "@/lib/roles/RoleContext";
 import { TraveliunShell } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
@@ -30,6 +31,8 @@ const DEFAULT_INCLUDES = ["الفنادق", "وجبة الإفطار", "الاس
 
 export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
   const { t, dir } = useTraveliunUI();
+  // The buy figure is pricing.internal's; createOffer drops it from anyone else.
+  const canInternal = useRole().can("pricing.internal");
   const [customerId, setCustomerId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [countryName, setCountryName] = useState(data.countries[0]?.name ?? "");
@@ -290,6 +293,7 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
             </Field>
           </div>
 
+          {canInternal ? (
           <div className="mt-4 rounded-[12px] border border-[#f2e2b4] bg-[#fffdf5] p-4">
             <p className="mb-3 flex items-center gap-2 text-[13px] font-extrabold text-[#a86a10]">
               {t("builder.internalPricing")}
@@ -311,6 +315,7 @@ export function TraveliunOfferBuilder({ data }: { data: BuilderData }) {
               </Field>
             </div>
           </div>
+          ) : null}
         </Panel>
 
         <div className="flex justify-end">

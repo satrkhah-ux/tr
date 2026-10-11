@@ -1,8 +1,9 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
-import { getDraft } from "./drafts";
+import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { currentCan } from "@/lib/roles/current";
+import { loadDraft } from "./draft-store";
 import { findLookupCountry } from "@/lib/offer/draft-types";
 import {
   suggestPricing,
@@ -18,7 +19,8 @@ import {
  *
  * Server-side because the lists are large and internal: 879 transfer prices
  * and the buy side of every service. None of it belongs in a browser bundle,
- * and only the handful of figures this draft actually needs comes back.
+ * and only the handful of figures this draft actually needs comes back — the
+ * buy side of those only to someone holding pricing.internal.
  */
 
 async function db(): Promise<SupabaseClient> {
@@ -34,7 +36,8 @@ export async function suggestPricingForDraft(
   labels: { hotel: string; airline: string },
 ): Promise<SuggestPricingResult> {
   if (!(await getServerUser())) return { ok: false, error: "err.session" };
-  const record = await getDraft(draftId);
+  // The full draft: a supplier-priced stay's net is what its line is bought at.
+  const record = await loadDraft(draftId);
   if (!record) return { ok: false, error: "err.db" };
   const data = record.data;
 
@@ -60,8 +63,10 @@ export async function suggestPricingForDraft(
             .eq("country_id", country.id)
             .not("price", "is", null)
         : Promise.resolve({ data: [] }),
+      // Service role: 0047 withholds services.buy_price from every session. The
+      // buy side leaves this function only for pricing.internal (below).
       country
-        ? supabase
+        ? (createSupabaseServiceClient() as unknown as SupabaseClient)
             .from("services")
             .select("id, service_type, arabic_name, buy_price, buy_currency, sell_price, sell_currency, created_at")
             .eq("country_id", country.id)
@@ -175,7 +180,12 @@ export async function suggestPricingForDraft(
       ),
     };
 
-    return { ok: true, items: suggestPricing(data, reference, labels) };
+    const items = suggestPricing(data, reference, labels);
+    if (await currentCan("pricing.internal")) return { ok: true, items };
+    // Whoever cannot see a buy price is not sent one. Saving keeps the stored
+    // buy of a line that already had one (keepDraftCost); a line they add from
+    // this list is saved without its buy, which pricing.internal can fill in.
+    return { ok: true, items: items.map((item) => ({ ...item, buy_price: null, buy_currency: "" })) };
   } catch {
     return { ok: false, error: "err.db" };
   }

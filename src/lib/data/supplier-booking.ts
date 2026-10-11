@@ -3,7 +3,7 @@
 import { randomInt } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { listTravelers } from "@/lib/data/operation-travelers";
@@ -31,8 +31,13 @@ import type { BookGuest, SupplierCallRecord } from "@/lib/providers/hotel-suppli
  * names). One is a question, the other is a purchase.
  */
 
-function db(): Promise<SupabaseClient> {
-  return createSupabaseServerClient() as unknown as Promise<SupabaseClient>;
+/**
+ * Service client: a booking here runs on the supplier's net (quoted_net, the
+ * offer's rate_key), which 0047 withholds from sessions. Every export is behind
+ * requireWrite / requireBook, and that is the gate.
+ */
+async function db(): Promise<SupabaseClient> {
+  return createSupabaseServiceClient() as unknown as SupabaseClient;
 }
 
 type Fail = { ok: false; error: TranslationKey };

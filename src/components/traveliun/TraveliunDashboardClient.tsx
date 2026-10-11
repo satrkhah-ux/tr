@@ -42,7 +42,7 @@ import {
   type EmployeeOption,
 } from "@/lib/data/metrics";
 import type { OpsSummary } from "@/lib/data/operations-work";
-import { TraveliunShell, navGroups } from "./TraveliunShell";
+import { TraveliunShell, navGroupsFor } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { ExecutiveOverview } from "./ExecutiveDashboardClient";
 import { OperationsSnapshot } from "./operations/OperationsSnapshot";
@@ -91,11 +91,11 @@ type ReadyAction = { key: string; labelKey: TranslationKey; descKey: Translation
 
 const READY_ACTIONS: ReadyAction[] = [
   { key: "operations", labelKey: "nav.operations", descKey: "dash.qa.operations", href: "/operations", icon: ClipboardCheck, color: "#185045", perm: "operations.write" },
-  { key: "generator", labelKey: "nav.packageGenerator", descKey: "dash.qa.generator", href: "/package-generator", icon: FilePlus2, color: "#2aa87a" },
-  { key: "readyOffers", labelKey: "nav.readyOffers", descKey: "dash.qa.readyOffers", href: "/ready-offers", icon: PackageCheck, color: "#8b5cf6" },
+  { key: "generator", labelKey: "nav.packageGenerator", descKey: "dash.qa.generator", href: "/package-generator", icon: FilePlus2, color: "#2aa87a", perm: "offers.write" },
+  { key: "readyOffers", labelKey: "nav.readyOffers", descKey: "dash.qa.readyOffers", href: "/ready-offers", icon: PackageCheck, color: "#8b5cf6", perm: "offers.write" },
   { key: "repackage", labelKey: "nav.repackage", descKey: "dash.qa.repackage", href: "/repackage", icon: FileUp, color: "#0e9bb5", perm: "repackage.write" },
   { key: "kanban", labelKey: "nav.kanban", descKey: "dash.qa.kanban", href: "/kanban-board", icon: Columns3, color: "#d99a00" },
-  { key: "offers", labelKey: "nav.packages", descKey: "dash.qa.offers", href: "/offers", icon: FileText, color: "#0f7a52" },
+  { key: "offers", labelKey: "nav.packages", descKey: "dash.qa.offers", href: "/offers", icon: FileText, color: "#0f7a52", perm: "offers.write" },
   { key: "partners", labelKey: "nav.partnerCompanies", descKey: "dash.qa.partners", href: "/partner-companies", icon: Building2, color: "#b45309" },
 ];
 
@@ -178,8 +178,7 @@ function PreviousSections() {
   const { t } = useTraveliunUI();
   const { can } = useRole();
 
-  const groups = navGroups
-    .filter((group) => !group.perm || can(group.perm))
+  const groups = navGroupsFor(can)
     .map((group) => ({
       labelKey: group.labelKey,
       icon: group.icon,

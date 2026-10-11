@@ -1,9 +1,13 @@
 "use server";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getServerUser } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/types";
+import type { TranslationKey } from "@/lib/i18n";
+import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { currentCan } from "@/lib/roles/current";
 import { editedTotalSar, offerSarTotal } from "@/lib/offer/pricing";
 import { getRates } from "./rates-actions";
+import { GRANTED_COLUMNS, INTERNAL_TABLES, isCostColumn } from "./table-config";
 import type {
   DataRow,
   DataValue,
@@ -16,12 +20,15 @@ import type {
   AllowedTable,
 } from "./types";
 
-/** Tables the engine may touch — everything in the typed schema. */
+/**
+ * Tables the engine may touch. Not the offer's cost tables (offer_hotels,
+ * offer_pricing_items, pricings, offer_renders): no screen edits them, and a
+ * generic editor is the wrong door to what an offer was bought at.
+ */
 const ALLOWED_TABLES: AllowedTable[] = [
   "countries", "cities", "hotels", "room_types", "services", "service_types", "terms", "flights",
   "customers", "roles", "employees", "offers", "offer_cities", "offer_flights",
-  "offer_hotels", "offer_services", "offer_terms", "offer_pricing_items",
-  "offer_renders", "pricings", "offer_revisions",
+  "offer_services", "offer_terms", "offer_revisions",
   "airports", "airlines", "transportation_types", "markup_rules", "ports", "drivers", "tours", "transfers", "statuses",
   "supervisors", "guide_informations", "profits", "ready_offers", "care_tickets",
   "city_climate_notes",
@@ -32,9 +39,9 @@ const ALLOWED_TABLES: AllowedTable[] = [
  *
  * A permission row and an employee's section decide what a person can do, so they
  * are edited only by src/lib/data/team.ts — which checks `employees.manage` and
- * writes an audit row. The generic editor has no gate beyond "is signed in", and
- * the database no longer has a write policy for these two either (0030), so this
- * guard is the third lock rather than the only one.
+ * writes an audit row. The generic editor's gate is data.write, which every
+ * section holds, and the database refuses these writes too (0030's RLS, 0047's
+ * privileges), so this guard is the third lock rather than the only one.
  */
 const READ_ONLY_TABLES: AllowedTable[] = ["employees", "roles"];
 
@@ -49,6 +56,39 @@ function assertWritable(table: AllowedTable): void {
   if (READ_ONLY_TABLES.includes(table)) {
     throw new Error(`Table is managed elsewhere: ${table}`);
   }
+}
+
+type Access = { supabase: SupabaseClient<Database>; columns: string; internal: boolean };
+
+/**
+ * The client this caller reads and writes a table through, and the columns it
+ * may name (0047). pricing.internal reads the cost tables whole, through the
+ * service role; anyone else uses their own session and the granted columns —
+ * and gets nothing of markup_rules / profits, which ARE the margin policy.
+ */
+async function access(table: AllowedTable): Promise<Access | null> {
+  const internal = await currentCan("pricing.internal");
+  const internalOnly = INTERNAL_TABLES.includes(table);
+  if (internal && (internalOnly || GRANTED_COLUMNS[table])) {
+    return { supabase: createSupabaseServiceClient(), columns: "*", internal };
+  }
+  if (internalOnly) return null;
+  return { supabase: await createSupabaseServerClient(), columns: GRANTED_COLUMNS[table]?.join(", ") ?? "*", internal };
+}
+
+/** Signed in, holds data.write, may write this table — or why not. */
+async function writeAccess(table: AllowedTable): Promise<Access | TranslationKey> {
+  assertWritable(table);
+  const user = await getServerUser();
+  if (!user) return "err.session";
+  if (!(await currentCan("data.write"))) return "err.forbidden";
+  return (await access(table)) ?? "err.forbidden";
+}
+
+/** A write from someone who cannot see the cost never carries it. */
+function writable(table: AllowedTable, values: DataRow, internal: boolean): DataRow {
+  if (internal) return values;
+  return Object.fromEntries(Object.entries(values).filter(([column]) => !isCostColumn(table, column)));
 }
 
 function sanitizeSearch(value: string): string {
@@ -75,11 +115,13 @@ function applyFilters<T>(query: T, filters: Filter[] | undefined): T {
 export async function listRows(input: ListInput): Promise<ListResult> {
   try {
     assertTable(input.table);
-    const supabase = await createSupabaseServerClient();
+    const granted = await access(input.table);
+    if (!granted) return { ok: false, error: "err.forbidden" };
+    const { supabase, columns } = granted;
     const from = Math.max(input.page - 1, 0) * input.pageSize;
     const to = from + input.pageSize - 1;
 
-    let query = supabase.from(input.table).select("*", { count: "exact" });
+    let query = supabase.from(input.table).select(columns, { count: "exact" });
     query = applyFilters(query, input.filters);
 
     const search = input.search ? sanitizeSearch(input.search) : "";
@@ -101,14 +143,13 @@ export async function listRows(input: ListInput): Promise<ListResult> {
 
 export async function createRow(table: AllowedTable, values: DataRow): Promise<MutateResult> {
   try {
-    assertWritable(table);
-    const user = await getServerUser();
-    if (!user) return { ok: false, error: "err.session" };
-    const supabase = await createSupabaseServerClient();
+    const granted = await writeAccess(table);
+    if (typeof granted === "string") return { ok: false, error: granted };
+    const { supabase, columns, internal } = granted;
     const { data, error } = await supabase
       .from(table)
-      .insert(values as never)
-      .select("*")
+      .insert(writable(table, values, internal) as never)
+      .select(columns)
       .single();
     if (error) return { ok: false, error: "err.createFailed" };
     return { ok: true, row: data as unknown as DataRow };
@@ -119,10 +160,10 @@ export async function createRow(table: AllowedTable, values: DataRow): Promise<M
 
 export async function updateRow(table: AllowedTable, id: string, values: DataRow): Promise<MutateResult> {
   try {
-    assertWritable(table);
-    const user = await getServerUser();
-    if (!user) return { ok: false, error: "err.session" };
-    const supabase = await createSupabaseServerClient();
+    const granted = await writeAccess(table);
+    if (typeof granted === "string") return { ok: false, error: granted };
+    const { supabase, columns, internal } = granted;
+    values = writable(table, values, internal);
     // An offer total edited on /offers takes its riyal figure along, or the
     // KPIs (offerSarTotal) keep counting the one it was issued at.
     if (table === "offers" && "total" in values) {
@@ -138,7 +179,7 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
       .from(table)
       .update(values as never)
       .eq("id", id)
-      .select("*")
+      .select(columns)
       .single();
     if (error) return { ok: false, error: "err.updateFailed" };
     return { ok: true, row: data as unknown as DataRow };
@@ -149,11 +190,9 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
 
 export async function deleteRow(table: AllowedTable, id: string): Promise<DeleteResult> {
   try {
-    assertWritable(table);
-    const user = await getServerUser();
-    if (!user) return { ok: false, error: "err.session" };
-    const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.from(table).delete().eq("id", id);
+    const granted = await writeAccess(table);
+    if (typeof granted === "string") return { ok: false, error: granted };
+    const { error } = await granted.supabase.from(table).delete().eq("id", id);
     if (error) return { ok: false, error: "err.deleteFailed" };
     return { ok: true };
   } catch {
@@ -164,11 +203,9 @@ export async function deleteRow(table: AllowedTable, id: string): Promise<Delete
 /** Duplicate a row (used by the "نسخ" action). */
 export async function duplicateRow(table: AllowedTable, id: string): Promise<MutateResult> {
   try {
-    assertTable(table);
-    const user = await getServerUser();
-    if (!user) return { ok: false, error: "err.session" };
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase.from(table).select("*").eq("id", id).single();
+    const granted = await writeAccess(table);
+    if (typeof granted === "string") return { ok: false, error: granted };
+    const { data, error } = await granted.supabase.from(table).select(granted.columns).eq("id", id).single();
     if (error || !data) return { ok: false, error: "err.copyFailed" };
     const source = data as Record<string, DataValue>;
     const clone: DataRow = {};

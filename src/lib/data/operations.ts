@@ -2,7 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { notifyOperationConfirmed } from "@/lib/data/ops-notify";
@@ -95,26 +95,27 @@ export async function confirmOffer(input: {
     await setOfferStatus(supabase, input.offer_id, "confirmed", input.note ?? "confirmed by agent");
 
     // Point at the frozen internal render rather than copying the document.
-    // offer_renders is append-only, so this IS an immutable snapshot.
-    const render = await supabase
+    // offer_renders is append-only, so this IS an immutable snapshot. Service
+    // client because that render is the cost sheet (0047 closed the table) — so
+    // only its id and the two dates leave the database, not the snapshot.
+    const render = await (createSupabaseServiceClient() as unknown as SupabaseClient)
       .from("offer_renders")
-      .select("id, snapshot_json")
+      .select("id, arrival_date:snapshot_json->>arrival_date, departure_date:snapshot_json->>departure_date")
       .eq("offer_id", input.offer_id)
       .eq("variant", "internal")
       .order("version", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    const snapshot = (render.data as { id: string; snapshot_json: Record<string, unknown> } | null) ?? null;
-    const snap = (snapshot?.snapshot_json ?? {}) as { arrival_date?: string | null; departure_date?: string | null };
+    const snapshot = render.data as { id: string; arrival_date: string | null; departure_date: string | null } | null;
 
     const { data, error } = await supabase
       .from("operations")
       .insert({
         offer_id: input.offer_id,
         render_id: snapshot?.id ?? null,
-        travel_start: snap.arrival_date ?? null,
-        travel_end: snap.departure_date ?? null,
+        travel_start: snapshot?.arrival_date ?? null,
+        travel_end: snapshot?.departure_date ?? null,
         confirm_channel: input.channel ?? "phone",
         confirmed_by: await getCurrentEmployeeId(),
         note: input.note ?? null,
@@ -155,7 +156,7 @@ export async function confirmOffer(input: {
         serial: o?.serial ?? "",
         customer: one(o?.customers)?.arabic_name ?? null,
         destination: o?.destination ?? null,
-        travelStart: snap.arrival_date ?? null,
+        travelStart: snapshot?.arrival_date ?? null,
         operationId: id,
         confirmedBy: (await getServerUser())?.email ?? null,
       });

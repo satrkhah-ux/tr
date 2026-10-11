@@ -3,12 +3,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { airlineLogoUrl } from "@/components/offer-doc/brand";
-import type { BoardType, PricingItemType, RenderVariant } from "@/lib/types";
+import type { BoardType, PricingItemType } from "@/lib/types";
 import {
   computeOfferPricing,
   offerSarTotal,
-  offerTotals,
-  ratesFor,
   rebase,
   type CurrencyRates,
   type PricingLineInput,
@@ -22,9 +20,9 @@ import {
   type ClimateLine,
 } from "@/lib/offer/dto";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
-import { currentPermissions } from "@/lib/roles/current";
+import { currentCan } from "@/lib/roles/current";
 import { getClimateNote } from "./climate-actions";
-import { getCurrentEmployeeId } from "./metrics";
+import { insertOffer } from "./offer-insert";
 import { setOfferStatus } from "./offer-status";
 import { getRates, type RatesResult } from "./rates-actions";
 import { STAGE_KEYS } from "./pipeline";
@@ -219,221 +217,31 @@ function addDaysIso(iso: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-function generateSerial(): string {
-  const now = new Date();
-  const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-  const employeeNo = Math.floor(Math.random() * 9) + 1;
-  const seq = Math.floor(Math.random() * 9000) + 1000;
-  return `AD-${employeeNo}-${seq}-${stamp}`;
-}
-
-/** Creates an offer + all children + pricing + first revision. Requires auth. */
+/**
+ * The builder's save (/offer). Its arguments come from a browser, so only the
+ * builder's own fields are taken, and its buy figure only from pricing.internal
+ * — every other caller computes the cost on the server and calls insertOffer.
+ */
 export async function createOffer(input: CreateOfferInput): Promise<CreateOfferResult> {
-  try {
-    const user = await getServerUser();
-    if (!user) return { ok: false, error: "err.session" };
-    if (!input.destination.trim()) return { ok: false, error: "err.destinationRequired" };
-
-    const supabase = await db();
-    const serial = generateSerial();
-
-    // «الموظف المختص» on the printed document. The builder picks an employee
-    // explicitly; the generator and the repackage wizard do not, so the offer is
-    // stamped with whoever is signed in — otherwise the field prints empty and
-    // management cannot tell who issued the offer.
-    const employee_id = input.employee_id ?? (await getCurrentEmployeeId());
-
-    const { data: offer, error: offerError } = await supabase
-      .from("offers")
-      .insert({
-        serial,
-        customer_id: input.customer_id,
-        employee_id,
-        destination: input.destination.trim(),
-        duration: input.duration,
-        offer_date: input.offer_date,
-        adults: input.adults,
-        children: input.children,
-        infants: input.infants,
-        total: input.total,
-        // Left out by the builder and the repackage wizard: converted here, or a
-        // USD offer would count as nothing in the KPIs.
-        total_sar:
-          input.total_sar !== undefined
-            ? input.total_sar
-            : !input.currency || input.currency === "SAR"
-              ? input.total
-              : offerTotals([], (await getRates()).sarPer, input.currency, input.total).total_sar,
-        currency: input.currency,
-        status: "draft",
-        pipeline_stage: "active_not_confirmed",
-        source_kind: input.source_kind ?? "direct",
-        source_supplier_id: input.source_supplier_id ?? null,
-        source_import_id: input.source_import_id ?? null,
-        partner_company_id: input.partner_company_id ?? null,
-        show_prices: input.show_prices ?? true,
-      })
-      .select("id")
-      .single();
-    if (offerError || !offer) return { ok: false, error: "err.saveOfferFailed" };
-
-    const offerId = offer.id;
-
-    if (input.cities.length > 0) {
-      await supabase.from("offer_cities").insert(
-        input.cities.map((c, index) => ({
-          offer_id: offerId,
-          city_name: c.city_name,
-          hotel_name: c.hotel_name,
-          room_type: c.room_type,
-          nights: c.nights,
-          check_in: c.check_in,
-          check_out: c.check_out,
-          meals: c.meals,
-          sort: index,
-        })),
-      );
-    }
-    if (input.flights.length > 0) {
-      await supabase.from("offer_flights").insert(
-        input.flights.map((f, index) => ({
-          offer_id: offerId,
-          carrier: f.carrier,
-          from_airport: f.from_airport,
-          to_airport: f.to_airport,
-          flight_date: f.flight_date,
-          passengers: f.passengers,
-          baggage: f.baggage,
-          airline: f.airline ?? null,
-          flight_no: f.flight_no ?? null,
-          departure_at: f.departure_at ?? null,
-          arrival_at: f.arrival_at ?? null,
-          cabin_class: f.cabin_class ?? null,
-          baggage_allowance: f.baggage_allowance ?? null,
-          airline_iata: f.airline_iata ?? null,
-          leg_order: f.leg_order ?? null,
-          sort: index,
-        })),
-      );
-    }
-    if (input.days && input.days.length > 0) {
-      await supabase.from("offer_days").insert(
-        input.days.map((d) => ({
-          offer_id: offerId,
-          day_number: d.day_number,
-          day_date: d.day_date,
-          city_name: d.city_name,
-          title: d.title,
-          activities: d.activities,
-          temp_max: d.temp_max,
-          temp_min: d.temp_min,
-          rain_chance: d.rain_chance,
-          weather_code: d.weather_code,
-          weather_source: d.weather_source,
-          weather_fetched_at: d.weather_fetched_at,
-        })),
-      );
-    }
-    if (input.hotels && input.hotels.length > 0) {
-      await supabase.from("offer_hotels").insert(
-        input.hotels.map((h, index) => ({
-          offer_id: offerId,
-          offer_city_id: h.offer_city_id ?? null,
-          hotel_id: h.hotel_id ?? null,
-          hotel_name: h.hotel_name,
-          room_type_id: h.room_type_id,
-          rooms_count: h.rooms_count,
-          board_type: h.board_type,
-          check_in: h.check_in,
-          check_out: h.check_out,
-          nights: h.nights,
-          buy_price: h.buy_price,
-          buy_currency: h.buy_currency,
-          sell_price: h.sell_price,
-          sell_currency: h.sell_currency,
-          // supplier sourcing (migration 0014); safe defaults when absent
-          cancellation_policy: h.cancellation_policy ?? null,
-          excluded_surcharges: h.excluded_surcharges ?? [],
-          valid_until: h.valid_until ?? null,
-          supplier_id: h.supplier_id ?? null,
-          supplier_name: h.supplier_name ?? null,
-          rate_key: h.rate_key ?? null,
-          net_base: h.net_base ?? null,
-          net_source_currency: h.net_source_currency ?? null,
-          fx_rate: h.fx_rate ?? null,
-          fx_date: h.fx_date ?? null,
-          ref_sell_base: h.ref_sell_base ?? null,
-          markup_amount: h.markup_amount ?? null,
-          markup_pct: h.markup_pct ?? null,
-          image_url: h.image_url ?? null,
-          facilities: h.facilities ?? [],
-          content_star_rating: h.content_star_rating ?? null,
-          room_type_name: h.room_type_name ?? null,
-          sort: index,
-        })),
-      );
-    }
-    if (input.pricing_items && input.pricing_items.length > 0) {
-      await supabase.from("offer_pricing_items").insert(
-        input.pricing_items.map((p, index) => {
-          const qty = Number.isFinite(p.quantity) && p.quantity > 0 ? p.quantity : 1;
-          const total_buy = p.buy_price == null ? null : Number((p.buy_price * qty).toFixed(2));
-          const total_sell = p.sell_price == null ? null : Number((p.sell_price * qty).toFixed(2));
-          return {
-            offer_id: offerId,
-            item_type: p.item_type,
-            item_id: p.item_id ?? null,
-            description: p.description,
-            quantity: qty,
-            buy_price: p.buy_price,
-            buy_currency: p.buy_currency,
-            sell_price: p.sell_price,
-            sell_currency: p.sell_currency,
-            total_buy,
-            total_sell,
-            sort: index,
-          };
-        }),
-      );
-    }
-    if (input.services.length > 0) {
-      await supabase.from("offer_services").insert(
-        input.services.map((s, index) => ({ offer_id: offerId, label: s.label, kind: s.kind, sort: index })),
-      );
-    }
-    if (input.terms.length > 0) {
-      await supabase.from("offer_terms").insert(
-        input.terms.map((text, index) => ({ offer_id: offerId, text, sort: index })),
-      );
-    }
-
-    const profit =
-      input.total != null && input.buy_total != null ? Number((input.total - input.buy_total).toFixed(2)) : null;
-    await supabase.from("pricings").insert({
-      offer_id: offerId,
-      total: input.total,
-      currency: input.currency,
-      buy_total: input.buy_total,
-      sell_total: input.total,
-      profit,
-      ...(input.fx
-        ? {
-            fx_rates: ratesFor(input.fx.sarPer, [
-              input.currency,
-              ...(input.pricing_items ?? []).flatMap((p) => [p.buy_currency, p.sell_currency]),
-              ...(input.hotels ?? []).flatMap((h) => [h.buy_currency, h.sell_currency]),
-            ]),
-            fx_source: input.fx.source,
-            fx_date: input.fx.updatedAt,
-          }
-        : {}),
-    });
-    await supabase.from("offer_revisions").insert({ offer_id: offerId, revision: 1, note: "created via builder" });
-
-    return { ok: true, serial, id: offerId };
-  } catch {
-    return { ok: false, error: "err.db" };
-  }
+  if (!(await getServerUser())) return { ok: false, error: "err.session" };
+  if (!(await currentCan("offers.write"))) return { ok: false, error: "err.forbidden" };
+  return insertOffer({
+    customer_id: input.customer_id,
+    employee_id: input.employee_id,
+    destination: input.destination,
+    duration: input.duration,
+    offer_date: input.offer_date,
+    adults: input.adults,
+    children: input.children,
+    infants: input.infants,
+    total: input.total,
+    buy_total: (await currentCan("pricing.internal")) ? input.buy_total : null,
+    currency: input.currency,
+    cities: input.cities,
+    flights: input.flights,
+    services: input.services,
+    terms: input.terms,
+  });
 }
 
 /** Public client view of an offer by serial — never reads pricings (buy/profit). */
@@ -636,48 +444,6 @@ export async function updateOfferStage(id: string, stage: string): Promise<{ ok:
   }
 }
 
-// ---------- render snapshots ----------
-export type SaveRenderResult = { ok: true; id: string; version: number } | { ok: false; error: TranslationKey };
-
-/** Persist an immutable snapshot of exactly what was rendered/sent. Requires auth. */
-export async function saveOfferRender(input: {
-  offer_id: string;
-  variant: RenderVariant;
-  snapshot: Record<string, unknown>;
-  file_path?: string | null;
-}): Promise<SaveRenderResult> {
-  try {
-    const user = await getServerUser();
-    if (!user) return { ok: false, error: "err.session" };
-    const supabase = await db();
-    const { data: last } = await supabase
-      .from("offer_renders")
-      .select("version")
-      .eq("offer_id", input.offer_id)
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const version = ((last as { version: number } | null)?.version ?? 0) + 1;
-    const { data, error } = await supabase
-      .from("offer_renders")
-      .insert({
-        offer_id: input.offer_id,
-        version,
-        variant: input.variant,
-        snapshot_json: input.snapshot,
-        file_path: input.file_path ?? null,
-        rendered_by: null,
-        rendered_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single();
-    if (error || !data) return { ok: false, error: "err.createFailed" };
-    return { ok: true, id: data.id, version };
-  } catch {
-    return { ok: false, error: "err.db" };
-  }
-}
-
 // ---------- internal offer DTO (permission-gated: has buy price + profit) ----------
 type HotelRow = {
   hotel_id: string | null;
@@ -789,7 +555,12 @@ export async function getInternalOffer(serial: string): Promise<InternalOfferDTO
   // STATED here rather than inferred from a policy. 0039 withheld those columns
   // from `authenticated`, so this reads with the service client — which makes
   // this line the only thing between a salesperson and our buy price.
-  if (!(await currentPermissions()).includes("pricing.internal")) return null;
+  if (!(await currentCan("pricing.internal"))) return null;
+  return loadInternalOffer(serial);
+}
+
+/** The internal offer, unchecked — not exported: its callers state their own gate. */
+async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | null> {
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data: offer } = await supabase
@@ -1045,8 +816,16 @@ export async function publishOffer(serial: string): Promise<PublishResult> {
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
+    // Whoever issues the offer sends it — the producer (offers.write) or the
+    // repackage wizard (repackage.write) — not only pricing.internal: a
+    // salesperson's produced offer otherwise had no client link and no PDF. The
+    // cost is read only to be frozen into the internal snapshot below, through
+    // the service role, and no figure goes back to the caller.
+    if (!(await currentCan("offers.write")) && !(await currentCan("repackage.write"))) {
+      return { ok: false, error: "err.forbidden" };
+    }
 
-    const internal = await getInternalOffer(serial);
+    const internal = await loadInternalOffer(serial);
     if (!internal) return { ok: false, error: "err.loadFailed" };
     const client = toClientOfferDTO(internal);
 
@@ -1055,8 +834,13 @@ export async function publishOffer(serial: string): Promise<PublishResult> {
     if (!offerRow) return { ok: false, error: "err.loadFailed" };
     const offerId = (offerRow as { id: string }).id;
 
+    // SERVICE client for the snapshots: the internal one IS the cost sheet, so
+    // 0047 closed offer_renders to every session. The permission check above is
+    // the gate — nobody reaches these inserts without it.
+    const renders = createSupabaseServiceClient() as unknown as SupabaseClient;
+
     // next shared version across both variants (published together)
-    const { data: last } = await supabase
+    const { data: last } = await renders
       .from("offer_renders")
       .select("version")
       .eq("offer_id", offerId)
@@ -1066,7 +850,7 @@ export async function publishOffer(serial: string): Promise<PublishResult> {
     const version = ((last as { version: number } | null)?.version ?? 0) + 1;
     const filePath = `/client-offer/${serial}/pdf?v=${version}`;
 
-    const { error: clientErr } = await supabase.from("offer_renders").insert({
+    const { error: clientErr } = await renders.from("offer_renders").insert({
       offer_id: offerId,
       version,
       variant: "client",
@@ -1076,7 +860,7 @@ export async function publishOffer(serial: string): Promise<PublishResult> {
     });
     if (clientErr) return { ok: false, error: "err.createFailed" };
 
-    await supabase.from("offer_renders").insert({
+    await renders.from("offer_renders").insert({
       offer_id: offerId,
       version,
       variant: "internal",
@@ -1098,8 +882,9 @@ export type PublishedRender = { version: number; offer: ClientOfferDTO; file_pat
 
 /**
  * Latest PUBLISHED client snapshot for a serial — the frozen document the public
- * link and the sent PDF render. Anon-safe: offer_renders grants anon SELECT for
- * variant='client' (migration 0010), and the snapshot is already redacted.
+ * link and the sent PDF render. Anon-safe: no session can read offer_renders
+ * (0047), so this reads through the service role and returns only the client
+ * variant, which is already redacted.
  */
 export async function getPublishedClientOffer(serial: string): Promise<PublishedRender | null> {
   try {

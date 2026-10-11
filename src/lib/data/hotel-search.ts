@@ -3,7 +3,8 @@
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { getRates } from "./rates-actions";
 import { getActiveMarkupRules } from "./markup-rules";
-import { getDraft, getGeneratorLookups, saveDraftStages } from "./drafts";
+import { getGeneratorLookups } from "./drafts";
+import { loadDraft, writeDraftStages } from "./draft-store";
 import { ensureHotelContentCached } from "./hotel-content";
 import { getEnabledHotelSuppliers, getSupplierAdapter } from "@/lib/providers/hotel-registry";
 import type { HotelSearchQuery, SupplierCallRecord } from "@/lib/providers/hotel-supplier";
@@ -160,7 +161,7 @@ export async function searchInternalHotels(
   if (!user) return { ok: false, error: "err.session" };
 
   try {
-    const record = await getDraft(draftId);
+    const record = await loadDraft(draftId);
     if (!record) return { ok: false, error: "err.loadFailed" };
     // Same nights the supplier search would quote, so the two tabs' totals are
     // comparable rather than each meaning something slightly different.
@@ -292,7 +293,7 @@ type Stay = { check_in: string; check_out: string; rooms: number; nights: number
  * the city's first stay is used, which for a single-hotel city is the city.
  */
 async function resolveStay(draftId: string, cityName: string, stayId?: string | null) {
-  const record = await getDraft(draftId);
+  const record = await loadDraft(draftId);
   if (!record) return null;
   const data = record.data;
   const cities = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
@@ -650,6 +651,6 @@ export async function selectHotelRate(
   else items.push(item);
 
   // the quote currency is the agent's choice; the totals convert this SAR line into it
-  await saveDraftStages(draftId, { hotels, pricing: { ...data.pricing, items } });
+  await writeDraftStages(draftId, { hotels, pricing: { ...data.pricing, items } });
   return { ok: true, blocked: sourcing.blocked };
 }

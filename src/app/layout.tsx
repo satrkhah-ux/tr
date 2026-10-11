@@ -8,6 +8,7 @@ import { RoleProvider } from "@/lib/roles/RoleContext";
 import { PartnerProvider } from "@/lib/partners/PartnerContext";
 import { getPartnerBrand } from "@/lib/partners/session";
 import { getCurrentRole } from "@/lib/data/metrics";
+import { currentPermissions } from "@/lib/roles/current";
 import { getPublicSupabaseConfig } from "@/lib/supabase/constants";
 
 const inter = Inter({
@@ -88,6 +89,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const realRole = await getCurrentRole();
+  const permissions = await currentPermissions();
   // A partner wears their own colours. Resolved here, on the server, so the very
   // first paint is already theirs — a client-side swap would flash ours first.
   const partnerBrand = await getPartnerBrand();
@@ -115,7 +117,7 @@ export default async function RootLayout({
         />
         <StoreProvider>
           <LanguageProvider>
-            <RoleProvider realRole={realRole}>
+            <RoleProvider realRole={realRole} permissions={permissions}>
               <PartnerProvider brand={partnerBrand}>
                 <TraveliunUIProvider>{children}</TraveliunUIProvider>
               </PartnerProvider>

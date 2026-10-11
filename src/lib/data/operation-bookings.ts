@@ -3,7 +3,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { listTravelers } from "@/lib/data/operation-travelers";
@@ -136,7 +136,9 @@ export type OperationBooking = {
 export async function listBookings(operationId: string): Promise<OperationBooking[]> {
   if (await requireOps()) return [];
   try {
-    const supabase = await db();
+    // Service client: operations books suppliers at their net (owner's call), and
+    // 0047 withholds the net columns from sessions — requireOps is the gate.
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data } = await supabase
       .from("operation_bookings")
       .select(

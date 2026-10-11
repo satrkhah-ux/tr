@@ -214,12 +214,19 @@ export async function deletePartnerCompany(id: string): Promise<{ ok: true } | F
       .from("operation_bookings")
       .select("id", { count: "exact", head: true })
       .eq("assignee_partner_id", id);
-    if ((used.count ?? 0) > 0) {
+    // A real delete also takes the company's partner LOGINS with it (the
+    // partner_users cascade), which is settings.manage's call, not data.write's:
+    // without it the company is deactivated, as above. 0047 took DELETE from
+    // sessions, so the delete itself runs as the service role behind that check.
+    if ((used.count ?? 0) > 0 || !(await currentCan("settings.manage"))) {
       await supabase.from("booking_partners").update({ active: false }).eq("id", id);
       await logAudit({ action: "partner.updated", entity: "booking_partners", entity_id: id, meta: { deactivated: true } });
       return { ok: true };
     }
-    const { error } = await supabase.from("booking_partners").delete().eq("id", id);
+    const { error } = await (createSupabaseServiceClient() as unknown as SupabaseClient)
+      .from("booking_partners")
+      .delete()
+      .eq("id", id);
     return error ? { ok: false, error: "err.deleteFailed" } : { ok: true };
   } catch {
     return { ok: false, error: "err.db" };

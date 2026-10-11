@@ -24,7 +24,16 @@ const STORAGE_KEY = "traveliun-view-as";
 // Inlined at build time; false in a production build → view-as fully disabled.
 const DEV_MODE = process.env.NODE_ENV !== "production";
 
-export function RoleProvider({ realRole, children }: { realRole: Role; children: ReactNode }) {
+export function RoleProvider({
+  realRole,
+  permissions,
+  children,
+}: {
+  realRole: Role;
+  /** what the user's role row actually grants (current.ts) — not the label's default set. */
+  permissions: readonly Permission[];
+  children: ReactNode;
+}) {
   const [viewAs, setViewAsState] = useState<Role | null>(null);
 
   useEffect(() => {
@@ -67,7 +76,11 @@ export function RoleProvider({ realRole, children }: { realRole: Role; children:
     setViewAs,
     resetViewAs,
     devMode: DEV_MODE,
-    can: (permission: Permission) => can(effectiveRole, permission),
+    // The real grant, not the label's: «التأشيرات» is an "employee" too and holds
+    // no offers.write, so the label's set drew menus whose screens then came up
+    // empty. View-as previews a label's set, as before.
+    can: (permission: Permission) =>
+      DEV_MODE && viewAs ? can(viewAs, permission) : permissions.includes(permission),
     dashboardView: dashboardViewFor(effectiveRole),
   };
 

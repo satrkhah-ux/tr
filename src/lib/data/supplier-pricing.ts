@@ -4,7 +4,7 @@ import { getServerUser } from "@/lib/supabase/server";
 import { getHotelProvider } from "@/lib/providers/hotel";
 import { getRates } from "./rates-actions";
 import { getActiveMarkupRules } from "./markup-rules";
-import { getDraft, saveDraftStages } from "./drafts";
+import { loadDraft, writeDraftStages } from "./draft-store";
 import {
   deriveCityDates,
   type DraftHotel,
@@ -35,7 +35,7 @@ export async function priceDraftHotelsFromSupplier(draftId: string): Promise<Pri
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
-    const record = await getDraft(draftId);
+    const record = await loadDraft(draftId);
     if (!record) return { ok: false, error: "err.loadFailed" };
     const data = record.data;
     if (data.hotels.length === 0) return { ok: false, error: "pg.hotelsNeedCities" };
@@ -160,7 +160,7 @@ export async function priceDraftHotelsFromSupplier(draftId: string): Promise<Pri
 
     if (priced === 0) return { ok: false, error: "pg.supplier.noRates" };
 
-    await saveDraftStages(draftId, {
+    await writeDraftStages(draftId, {
       hotels,
       // the quote currency stays the agent's; the totals convert these SAR lines
       pricing: { ...data.pricing, items: pricingItems },

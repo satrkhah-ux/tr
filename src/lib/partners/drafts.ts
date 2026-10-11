@@ -1,28 +1,22 @@
 "use server";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizeDraftData } from "@/lib/offer/draft-types";
 import { createDraft } from "@/lib/data/drafts";
+import { listDraftRows } from "@/lib/data/draft-store";
 import { getPartnerSession } from "./session";
 
 /**
  * A partner's own files.
  *
  * Every draft is stamped with their company on creation, which is what makes
- * two things true at once: the database only ever shows them their own rows
- * (0035), and the document comes out under their name without anyone choosing
- * a brand — `resolveDocBrand` already reads that same column.
+ * two things true at once: draft-store.ts only ever hands them their own rows,
+ * and the document comes out under their name without anyone choosing a brand —
+ * `resolveDocBrand` already reads that same column.
  *
- * The USER client throughout, deliberately. A partner's own policies are the
- * check; reaching for the service role here would mean writing the ownership
- * rule a second time in TypeScript, and the two would eventually disagree.
+ * No query of our own here: a draft holds our cost, so 0047 closed the table to
+ * every session, and the ownership rule lives once, in draft-store.ts.
  */
-
-function db(): Promise<SupabaseClient> {
-  return createSupabaseServerClient() as unknown as Promise<SupabaseClient>;
-}
 
 export type PartnerFile = {
   id: string;
@@ -39,15 +33,7 @@ export async function listPartnerFiles(): Promise<PartnerFile[]> {
   const partner = await getPartnerSession();
   if (!partner) return [];
   try {
-    const supabase = await db();
-    const { data } = await supabase
-      .from("offer_drafts")
-      .select("id, title, data, updated_at")
-      .eq("partner_company_id", partner.partner_id)
-      .order("updated_at", { ascending: false })
-      .limit(100);
-
-    return ((data ?? []) as { id: string; title: string | null; data: Record<string, unknown>; updated_at: string }[]).map(
+    return (await listDraftRows()).map(
       (row) => {
         const draft = normalizeDraftData(row.data);
         return {

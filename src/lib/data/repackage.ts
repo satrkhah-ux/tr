@@ -3,7 +3,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import type { BoardType } from "@/lib/types";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { currentCan } from "@/lib/roles/current";
 import { deriveCityDates } from "@/lib/offer/draft-types";
 import { getActiveMarkupRules } from "@/lib/data/markup-rules";
 import { computeSell, selectRule } from "@/lib/pricing/markup";
@@ -14,21 +15,22 @@ import {
 } from "@/lib/repackage/repackage-types";
 import { validateRepackage } from "@/lib/repackage/repackage-validation";
 import { runExtraction, type ExtractionHow, type ExtractionSource } from "@/lib/repackage/extract/extract";
-import {
-  createOffer,
-  publishOffer,
-  type OfferHotelInput,
-} from "./offers";
+import { publishOffer, type OfferHotelInput } from "./offers";
+import { insertOffer } from "./offer-insert";
 
 /**
  * Repackage server actions — import a supplier PDF, review/edit, re-issue as a
  * Traveliun offer. Mirrors src/lib/data/drafts.ts (jsonb draft + shallow merge),
- * reusing createOffer/publishOffer for the branded, client-safe re-issue.
- * Internal-only: holds supplier cost → all reads/writes require getServerUser.
+ * reusing insertOffer/publishOffer for the branded, client-safe re-issue.
+ * Internal-only: an import IS the supplier's price, so 0047 closed the table and
+ * its bucket to every session. Every read and write goes through db(), and db()
+ * is the gate: repackage.write, then the service role. Every caller sits inside
+ * a try, so a refusal reads as the action's ordinary failure.
  */
 
 async function db(): Promise<SupabaseClient> {
-  return (await createSupabaseServerClient()) as unknown as SupabaseClient;
+  if (!(await currentCan("repackage.write"))) throw new Error("repackage.write required");
+  return createSupabaseServiceClient() as unknown as SupabaseClient;
 }
 
 const BUCKET = "repackage";
@@ -481,7 +483,7 @@ export async function produceRepackageOffer(id: string): Promise<ProduceResult> 
     const transferIncludes = pkg.transfers.map((t) => `المواصلات: ${t}`);
     const visaIncludes = pkg.visas.map((v) => `تأشيرة: ${v}`);
 
-    const result = await createOffer({
+    const result = await insertOffer({
       customer_id: null,
       employee_id: null,
       destination: pkg.destination || pkg.country,

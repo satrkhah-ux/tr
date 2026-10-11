@@ -9,10 +9,10 @@ import type { PartnerTerms } from "./pricing";
  * Who is signed in on the partner side.
  *
  * The database already refuses a partner everything that is not theirs (0034's
- * is_staff() and 0035's partner policies), so this is not the security boundary
- * — it is how the app knows which screens to draw and whose company to stamp on
- * a draft. Both layers agree on the same rule, and the one that cannot be
- * bypassed is the one in the database.
+ * is_staff() and 0035's partner policies), so for most tables this is not the
+ * security boundary — it is how the app knows which screens to draw. Drafts are
+ * the exception: they hold our cost, so 0047 closed them to every session and
+ * draft-store.ts scopes a partner to their own company by THIS answer.
  */
 
 export type PartnerSession = {
