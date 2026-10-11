@@ -1,0 +1,14 @@
+{
+  "_about": "Round 3, 2026-10-12: the owner confirmed the three same-name hotel pairs held back in round 1 are duplicates; Natya Ubud came back as a spelling twin. The near pairs (Amara/Amari, Thantara/Anantara, Holiday Inn/Holiday Ao Nang, the «كوخ ترافليون» letters) are different hotels and stay.",
+  "cities": {},
+  "hotels": {
+    "keep": ["0714a8", "92f3cd", "10cb49", "92f5dc"],
+    "names": {
+      "_why": "Applied to whichever row of the group survives.",
+      "0714a8": { "english_name": "The Marmara Antalya" },
+      "92f3cd": { "arabic_name": "منتجع أفاني أو نانج كليف كرابي", "english_name": "Avani Ao Nang Cliff Krabi Resort" },
+      "10cb49": { "arabic_name": "منتجع ناتيا أوبود", "english_name": "Natya Resort Ubud" },
+      "92f5dc": { "arabic_name": "فندق دبل تري باي هيلتون جاكرتا كمايوران", "english_name": "DoubleTree by Hilton Jakarta Kemayoran" }
+    }
+  }
+}
