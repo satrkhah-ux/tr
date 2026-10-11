@@ -28,6 +28,21 @@ const SCOPE_ICON: Record<keyof DraftScope, typeof Plane> = {
   visas: StickyNote,
 };
 
+/**
+ * The order the agency sells in — the flight first, then where they sleep, then
+ * how they move between and around, then the extras and the visa. «الجولات» sits
+ * with the vehicles it belongs to, not tacked on at the end.
+ */
+const TILE_ORDER: (keyof DraftScope | "tours")[] = [
+  "flights_intl",
+  "hotels",
+  "flights_domestic",
+  "transport",
+  "tours",
+  "services",
+  "visas",
+];
+
 export function ScopeTiles({
   data,
   patch,
@@ -43,28 +58,32 @@ export function ScopeTiles({
   return (
     <div>
       <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-        {SCOPE_KEYS.map((key) => (
-          <ScopeTile
-            key={key}
-            icon={SCOPE_ICON[key]}
-            label={t(SCOPE_LABEL_KEYS[key])}
-            active={scope[key]}
-            onToggle={() => patch({ scope: { ...scope, [key]: !scope[key] } })}
-          />
-        ))}
-        <ScopeTile
-          icon={Camera}
-          label={t("pg.scope.tours")}
-          active={tours}
-          onToggle={() =>
-            patch({
-              transport_plan: {
-                ...data.transport_plan,
-                tours: { ...data.transport_plan.tours, enabled: !tours },
-              },
-            })
-          }
-        />
+        {TILE_ORDER.map((key) =>
+          key === "tours" ? (
+            <ScopeTile
+              key={key}
+              icon={Camera}
+              label={t("pg.scope.tours")}
+              active={tours}
+              onToggle={() =>
+                patch({
+                  transport_plan: {
+                    ...data.transport_plan,
+                    tours: { ...data.transport_plan.tours, enabled: !tours },
+                  },
+                })
+              }
+            />
+          ) : (
+            <ScopeTile
+              key={key}
+              icon={SCOPE_ICON[key]}
+              label={t(SCOPE_LABEL_KEYS[key])}
+              active={scope[key]}
+              onToggle={() => patch({ scope: { ...scope, [key]: !scope[key] } })}
+            />
+          ),
+        )}
       </div>
 
       {/* Turning everything off leaves a wizard with nothing in it. Said here

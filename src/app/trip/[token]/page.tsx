@@ -16,7 +16,7 @@ const KIND_LABEL: Record<string, string> = {
   hotel: "الفندق",
   flight: "الطيران",
   visa: "التأشيرة",
-  transport: "المواصلات",
+  transport: "التنقلات",
   service: "خدمة",
 };
 

@@ -112,6 +112,8 @@ export function GeneratorFlow({
   );
 
   const [active, setActive] = useState<StageKey>(() => resumeStage(cards, validation.stages));
+  /** Every card opened this visit — so going back to fix one keeps the later ones on screen. */
+  const [seen, setSeen] = useState<Set<StageKey>>(() => new Set([resumeStage(cards, validation.stages)]));
 
   /**
    * Reopening the scope card and switching a service off can remove the card
@@ -121,6 +123,33 @@ export function GeneratorFlow({
 
   const index = cards.findIndex((s) => s.key === current);
   const next = index >= 0 && index < cards.length - 1 ? cards[index + 1] : null;
+
+  /**
+   * Only what the agent has reached is on the page.
+   *
+   * A file is twenty minutes of work, and a column of eight «لم يبدأ» cards
+   * under the first one reads as eight more forms to fill. So the cards after
+   * the one being worked on do not exist yet: each appears when the agent
+   * gets to it, and a finished one folds into its answer above. «Reached» is
+   * derived — the first card not started or still blocked — plus whatever was
+   * opened this visit, so a reload lands exactly where the work stopped.
+   */
+  const reach = (() => {
+    const i = cards.findIndex((s) => validation.stages[s.key] === "empty" || validation.stages[s.key] === "error");
+    return i < 0 ? cards.length - 1 : i;
+  })();
+  const furthest = Math.max(reach, index, ...cards.map((s, i) => (seen.has(s.key) ? i : -1)));
+  const shown = cards.slice(0, furthest + 1);
+
+  /**
+   * What stands between this card and the next. The trip card carries the
+   * scope switches and the cities card carries the stays, so their issues
+   * count here too.
+   */
+  const OWNS: Partial<Record<StageKey, StageKey[]>> = { trip: ["scope"], cities: ["hotels"] };
+  const blockers = validation.blocking.filter(
+    (issue) => issue.stage === current || (OWNS[current] ?? []).includes(issue.stage),
+  );
 
   const activeRef = useRef<HTMLDivElement | null>(null);
   const firstPaint = useRef(true);
@@ -158,6 +187,7 @@ export function GeneratorFlow({
     (stage: StageKey) => {
       void flush();
       setActive(stage);
+      setSeen((prev) => (prev.has(stage) ? prev : new Set(prev).add(stage)));
     },
     [flush],
   );
@@ -179,11 +209,9 @@ export function GeneratorFlow({
    * every combination of switches: with hotels off, the card before the
    * itinerary is «الشروط» or «التأشيرات», and the label still changes there.
    */
-  const nextLabel = !next
-    ? null
-    : next.key === "itinerary"
-      ? t("pg.flow.buildItinerary")
-      : t("pg.flow.next", { stage: t(next.labelKey) });
+  // Never names the next card: the agent works on this one, and the shape of
+  // what follows is the system's business until they get there.
+  const nextLabel = next ? t("pg.flow.nextPlain") : null;
 
   return (
     <TraveliunShell title="nav.packageGenerator" focus={focus}>
@@ -253,14 +281,7 @@ export function GeneratorFlow({
               {focus ? <Minimize2 className="size-4" /> : <Focus className="size-4" />}
               {focus ? t("pg.flow.focusOff") : t("pg.flow.focusOn")}
             </button>
-            {focus ? null : (
-              <Link
-                href={stageHref(draftId, current === "hotels" ? "cities" : current)}
-                className="inline-flex h-9 items-center gap-2 rounded-[9px] px-2 text-[11.5px] font-bold text-[#93aaa3] transition-colors hover:text-[#557d78]"
-              >
-                {t("pg.flow.classic")}
-              </Link>
-            )}
+
           </div>
         </div>
 
@@ -270,7 +291,7 @@ export function GeneratorFlow({
           }`}
         >
           <div className="order-1 min-w-0 space-y-3">
-            {cards.map((meta) => {
+            {shown.map((meta) => {
               const isActive = meta.key === current;
               const status = validation.stages[meta.key];
 
@@ -326,11 +347,28 @@ export function GeneratorFlow({
                   ) : null}
 
                   {nextLabel ? (
-                    <div className="flex justify-end px-1">
+                    <div className="flex flex-col items-end gap-2 px-1">
+                      {/* Nothing moves on while this card has an error or an empty
+                          required field: said here, next to the button it disables,
+                          and each line is also marked on its own field above. */}
+                      {blockers.length > 0 ? (
+                        <div
+                          role="alert"
+                          className="w-full rounded-[11px] border border-[#f2d0d7] bg-[#fdf5f7] px-3.5 py-2.5 text-[12px] font-bold text-[#c22850]"
+                        >
+                          <p className="mb-1">{t("pg.flow.blocked")}</p>
+                          <ul className="list-disc space-y-0.5 ps-5 font-semibold">
+                            {blockers.map((issue, i) => (
+                              <li key={`${issue.field ?? issue.stage}-${i}`}>{issueText(issue)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
                       <button
                         type="button"
-                        onClick={() => next && open(next.key)}
-                        className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439]"
+                        onClick={() => next && blockers.length === 0 && open(next.key)}
+                        disabled={blockers.length > 0}
+                        className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {nextLabel}
                         <ChevronLeft className="size-4 ltr:rotate-180 rtl:rotate-0" />

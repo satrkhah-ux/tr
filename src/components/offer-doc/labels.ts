@@ -83,7 +83,7 @@ export const AR = {
   cancellation: "سياسة الإلغاء",
   payAtHotel: "يُدفع في الفندق مباشرة",
   facilities: "أمور ترفيهية ومرافق",
-  transport: "المواصلات والتنقلات",
+  transport: "التنقلات",
   tours: "التنقلات والجولات والطقس",
   toursWeatherYes: "تظهر بيانات الطقس حسب المدينة والتاريخ.",
   toursWeatherNo: "بيانات الطقس غير مرفقة في هذا العرض.",
@@ -171,7 +171,7 @@ export const ITEM_TYPE_AR: Record<string, string> = {
   flight: "طيران",
   visa: "تأشيرة",
   service: "خدمة",
-  transport: "مواصلات",
+  transport: "تنقلات",
   other: "أخرى",
 };
 

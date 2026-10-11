@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BedDouble, Check, Copy, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { BedDouble, Check, CheckCircle2, Copy, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { copyProgramIntoDraft, findReusablePrograms, getDraft } from "@/lib/data/drafts";
@@ -12,6 +12,7 @@ import {
   hotelCoverage,
   normalizeDraftHotel,
   resizeRooms,
+  stayTotal,
   totalCityNights,
   withRooms,
   type DraftCity,
@@ -96,6 +97,8 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
   const [extraCities, setExtraCities] = useState<string[]>([]);
   const [choosing, setChoosing] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  /** The city reopened by hand with «تعديل»; null = the first one not finished. */
+  const [expanded, setExpanded] = useState<number | null>(null);
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<HotelOption[] | null>(null);
   const [notes, setNotes] = useState<SupplierNote[]>([]);
@@ -156,6 +159,36 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
     setEditing(null);
     resetPicker();
   }
+
+  /**
+   * A city is finished when it has a name and nights and — when hotels are part
+   * of the sale — its nights are covered by stays that each name a hotel, a room
+   * and a board, and carry a price.
+   */
+  function cityDone(index: number): boolean {
+    const city = data.cities[index];
+    if (!city?.city_name.trim() || city.nights <= 0) return false;
+    if (!showHotels || data.cities.findIndex((c) => c.city_name === city.city_name) !== index) return true;
+    const cov = coverage.find((c) => c.city_name === city.city_name);
+    return Boolean(
+      cov &&
+        cov.covered === cov.needed &&
+        cov.stays.every(
+          ({ line }) =>
+            line.hotel_name.trim() &&
+            line.rooms.every((room) => room.room_type_name.trim() && room.board_type) &&
+            (line.sourcing || stayTotal(line) != null),
+        ),
+    );
+  }
+
+  /**
+   * ONE city open at a time. A finished city folds into a single line — its
+   * name, nights, hotels and price — and the next unfinished one opens below
+   * it, so a four-city trip is never four forms on screen at once.
+   */
+  const firstOpen = data.cities.findIndex((_, i) => !cityDone(i));
+  const openCity = expanded ?? (firstOpen >= 0 ? firstOpen : -1);
 
   // reuse eligibility is DERIVED (no synchronous setState); the async load only
   // runs when eligible, and stale results are ignored via the `active` flag.
@@ -520,9 +553,45 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
               const lookupCity = country?.cities.find((c) => c.name === city.city_name);
               const hotelOptions = lookupCity?.hotels ?? [];
               const short = cov ? cov.covered !== cov.needed : false;
+              const done = cityDone(cityIndex);
+
+              if (cityIndex !== openCity) {
+                const price = cov?.stays.reduce((sum, { line }) => sum + (stayTotal(line) ?? 0), 0) ?? 0;
+                return (
+                  <button
+                    key={cityIndex}
+                    type="button"
+                    onClick={() => setExpanded(cityIndex)}
+                    className="flex w-full flex-wrap items-center gap-2.5 rounded-[12px] border border-[#e2ebe7] bg-white px-3.5 py-2.5 text-start transition-colors hover:bg-[#f8fbfa]"
+                  >
+                    {done ? (
+                      <CheckCircle2 className="size-4 shrink-0 text-[#2aa87a]" />
+                    ) : (
+                      <span className="size-2.5 shrink-0 rounded-full bg-[#e0a92a]" />
+                    )}
+                    <span className="text-[13px] font-extrabold text-[#185045]">{city.city_name || t("pg.chooseCity")}</span>
+                    <span className="tv-tnum rounded-full bg-[#f2f7f5] px-2.5 py-1 text-[11.5px] font-bold text-[#557d78]">
+                      <DirText dir="ltr">{String(city.nights)}</DirText> {t("pg.nightsShort")}
+                    </span>
+                    {showHotels && cov ? (
+                      <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-[#557d78]">
+                        {cov.stays.map((st) => st.line.hotel_name).filter((n) => n.trim()).join(" · ") || t("pg.cityNoHotelYet")}
+                      </span>
+                    ) : (
+                      <span className="flex-1" />
+                    )}
+                    {showHotels && price > 0 ? (
+                      <span className="tv-tnum text-[11.5px] font-extrabold text-[#185045]">
+                        <DirText dir="ltr">{new Intl.NumberFormat("en-US").format(price)}</DirText>
+                      </span>
+                    ) : null}
+                    <span className="shrink-0 text-[11.5px] font-bold text-[#93aaa3]">{t("pg.flow.edit")}</span>
+                  </button>
+                );
+              }
 
               return (
-                <div key={cityIndex} className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
+                <div key={cityIndex} className="rounded-[12px] border border-[#cfe0d9] bg-[#f8fbf9] p-3">
                   {/* The city, its nights and its dates — the facts the stays
                       below are measured against, so they sit above them. */}
                   <div className="grid items-end gap-3 md:grid-cols-[1fr_100px_1fr_auto]">
@@ -671,6 +740,19 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                       ) : (
                         <span className="text-[11.5px] font-bold text-[#93aaa3]">{t("pg.chooseCityFirst")}</span>
                       )}
+                    </div>
+                  ) : null}
+
+                  {done ? (
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setExpanded(null)}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#bfe5d4] bg-[#e9f7f0] px-3.5 text-[12px] font-bold text-[#0f7a52] transition-colors hover:bg-[#dff3ea]"
+                      >
+                        <CheckCircle2 className="size-3.5" />
+                        {t("pg.cityDone")}
+                      </button>
                     </div>
                   ) : null}
                 </div>
