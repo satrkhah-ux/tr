@@ -550,6 +550,16 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
                                 },
                                 sources,
                                 source: sourceFor(line),
+                                countryName: data.trip.country,
+                                // Added here, chosen here — the agent never
+                                // leaves the programme to fetch a row.
+                                onHotelCreated: (hotel) =>
+                                  void select(
+                                    cov.city_name,
+                                    line,
+                                    { source: "internal", id: hotel.id, name: hotel.name, name_en: hotel.name_en, stars: hotel.stars, image: null, rates: [] },
+                                    null,
+                                  ),
                                 onSource: (code) => {
                                   setSource((s) => ({ ...s, [line.id]: code }));
                                   setLastSource(code);

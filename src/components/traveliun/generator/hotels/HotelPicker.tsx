@@ -8,6 +8,7 @@ import { BOARD_LABEL_KEYS, BOARD_TYPES } from "@/lib/offer/draft-types";
 import type { HotelOption, HotelRateOption, SupplierNote } from "@/lib/data/hotel-search";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass } from "../stage-props";
+import { AddHotelInline } from "./AddHotelInline";
 import { HotelResultRow } from "./HotelResultRow";
 import { HotelSearchBar, type SearchBarGuests } from "./HotelSearchBar";
 
@@ -66,10 +67,15 @@ export function HotelPicker({
   onSelect,
   manual,
   stay,
+  countryName,
+  onHotelCreated,
 }: {
   sources: PickerSource[];
   source: string;
   onSource: (code: string) => void;
+  /** Resolves the city when a hotel is added from here. */
+  countryName: string;
+  onHotelCreated: (hotel: { id: string; name: string; name_en: string | null; stars: number | null }) => void;
   filters: PickerFilters;
   onFilters: (next: PickerFilters) => void;
   onSearch: () => void;
@@ -271,10 +277,18 @@ export function HotelPicker({
                     عرض المزيد ({visible.length - shown})
                   </button>
                 ) : null}
+                {/* Our catalogue only. A supplier's inventory is theirs, and a
+                    row we invent in it would be a hotel nobody can book. */}
+                {source === "internal" ? (
+                  <AddHotelInline countryName={countryName} cityName={stay.cityName} onCreated={onHotelCreated} />
+                ) : null}
               </div>
             ) : (
               <div className="py-2 text-[12.5px] text-[#93aaa3]">
                 <p>{t("pg.supplier.noResults")}</p>
+                {source === "internal" ? (
+                  <AddHotelInline countryName={countryName} cityName={stay.cityName} onCreated={onHotelCreated} />
+                ) : null}
                 {/* An empty list looked identical whether the supplier refused
                     us, could not be reached, or the city is genuinely full. */}
                 {notes.map((n) => (

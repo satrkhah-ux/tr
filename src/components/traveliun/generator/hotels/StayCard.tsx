@@ -16,7 +16,11 @@ import {
 import type { HotelOption, HotelRateOption, SupplierNote } from "@/lib/data/hotel-search";
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
+import { createRoomTypeOption } from "@/lib/data/catalog-actions";
 import { ManualPriceRow } from "./ManualPriceRow";
+
+/** Sentinel option value — never a real room-type name. */
+const ADD_ROOM_TYPE = "__add_room_type__";
 import { fieldClass } from "../stage-props";
 import { HotelPicker, type PickerFilters, type PickerSource } from "./HotelPicker";
 import type { SearchBarGuests } from "./HotelSearchBar";
@@ -71,6 +75,8 @@ export function StayCard({
     sources: PickerSource[];
     source: string;
     onSource: (code: string) => void;
+    countryName: string;
+    onHotelCreated: (hotel: { id: string; name: string; name_en: string | null; stars: number | null }) => void;
     filters: PickerFilters;
     onFilters: (f: PickerFilters) => void;
     onSearch: () => void;
@@ -327,6 +333,21 @@ function RoomRow({
   const { t } = useTraveliunUI();
   const names = roomTypeNames(roomTypeOptions);
 
+  /**
+   * Name a room type the catalogue does not have, without leaving the package.
+   *
+   * It goes into the agency's list, global, so the next programme finds it —
+   * a one-off typed into this draft would be invisible to everyone else and
+   * spelled differently the next time.
+   */
+  async function addRoomType() {
+    const typed = window.prompt(t("pg.addRoomType"))?.trim();
+    if (!typed) return;
+    const result = await createRoomTypeOption(typed);
+    if (!result.ok) return;
+    onChange({ room_type_id: null, room_type_name: result.name });
+  }
+
   return (
     <div className="grid gap-3 rounded-[10px] border border-[#e7f0ec] bg-white p-2.5 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_130px] sm:items-end">
       <span className="self-center rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11.5px] font-extrabold text-[#185045]">
@@ -341,6 +362,10 @@ function RoomRow({
           value={room.room_type_name}
           onChange={(e) => {
             const name = e.target.value;
+            if (name === ADD_ROOM_TYPE) {
+              void addRoomType();
+              return;
+            }
             const rt = roomTypeOptions.find((o) => o.name === name) ?? null;
             const slice: Partial<DraftRoomSpec> = { room_type_id: rt?.id ?? null, room_type_name: name };
             if (room.board_type === null && rt?.default_board) slice.board_type = rt.default_board;
@@ -355,6 +380,10 @@ function RoomRow({
           {room.room_type_name && !names.includes(room.room_type_name) ? (
             <option value={room.room_type_name}>{room.room_type_name}</option>
           ) : null}
+          {/* Chosen like any other option, because that is how an agent reaches
+              for it — a «+» button beside the select is a second control for
+              the same decision. */}
+          <option value={ADD_ROOM_TYPE}>+ {t("pg.addRoomType")}</option>
         </select>
       </label>
       <label className={rowLabelClass}>
