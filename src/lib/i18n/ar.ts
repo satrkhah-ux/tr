@@ -1023,6 +1023,7 @@ export const ar: Dictionary = {
   "pg.checkOut": "الخروج",
   "pg.datesAuto": "تُشتق التواريخ تلقائياً من تاريخ الوصول وترتيب الليالي.",
   "pg.removeRow": "إزالة",
+  "pg.addLine": "إضافة",
   // reuse
   "pg.reuseTitle": "ابدأ من برنامج سابق",
   "pg.reuseHint": "برامج بنفس الدولة وعدد الأيام. التطابق التام لعدد المسافرين يظهر أولاً.",

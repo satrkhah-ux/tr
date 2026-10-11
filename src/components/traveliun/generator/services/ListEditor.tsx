@@ -6,7 +6,7 @@ import { DirText } from "@/components/DirText";
 import type { TermLibraryItem } from "@/lib/offer/draft-types";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
-import { addButtonClass, fieldClass, removeButtonClass } from "../stage-props";
+import { addButtonClass, fieldClass } from "../stage-props";
 
 /**
  * One editable string list — «يشمل», «لا يشمل» and «الشروط» are the same
@@ -52,9 +52,33 @@ function Bullet({ variant, index }: { variant: ListVariant; index: number }) {
   );
 }
 
-/** A collapsible list of ready lines; picking one appends it. Hidden when empty. */
+/**
+ * The two marks the agent works with: ✓ puts a line in, ✗ takes it out.
+ * Squares of one size and place, so a list reads as a checklist rather than
+ * a row of words to aim at.
+ */
+function MarkButton({ kind, label, onClick }: { kind: "add" | "remove"; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`flex size-8 shrink-0 items-center justify-center rounded-[7px] border-2 transition-colors ${
+        kind === "add"
+          ? "border-[#2aa87a] bg-white text-[#0f7a52] hover:bg-[#e9f7f0]"
+          : "border-[#e6a3a3] bg-white text-[#c43d3d] hover:bg-[#fdeeee]"
+      }`}
+    >
+      {kind === "add" ? <Check className="size-4" strokeWidth={3} /> : <X className="size-4" strokeWidth={3} />}
+    </button>
+  );
+}
+
+/** The ready lines not used yet, each with its ✓. Open by default — they are the fast path. */
 function Picker({ label, entries, onPick }: { label: string; entries: string[]; onPick: (text: string) => void }) {
-  const [open, setOpen] = useState(false);
+  const { t } = useTraveliunUI();
+  const [open, setOpen] = useState(true);
   if (entries.length === 0) return null;
   return (
     <div className="mb-3">
@@ -69,15 +93,9 @@ function Picker({ label, entries, onPick }: { label: string; entries: string[]; 
       {open ? (
         <ul className="mt-2 max-h-[180px] space-y-1 overflow-y-auto rounded-[10px] border border-[#e2ebe7] bg-white p-2">
           {entries.map((text) => (
-            <li key={text}>
-              <button
-                type="button"
-                onClick={() => onPick(text)}
-                className="w-full rounded-[8px] px-2 py-1.5 text-start text-[12.5px] text-[#41615b] hover:bg-[#f4f8f6]"
-              >
-                <Plus className="me-1 inline size-3.5 text-[#0f7a52]" />
-                {text}
-              </button>
+            <li key={text} className="flex items-center gap-2.5 rounded-[8px] px-1.5 py-1 hover:bg-[#f4f8f6]">
+              <MarkButton kind="add" label={t("pg.addLine")} onClick={() => onPick(text)} />
+              <span className="min-w-0 flex-1 text-[12.5px] text-[#41615b]">{text}</span>
             </li>
           ))}
         </ul>
@@ -130,9 +148,7 @@ export function ListEditor({ titleKey, variant, items, library, countryServices,
             >
               <Bullet variant={variant} index={index} />
               <span className="min-w-0 flex-1 break-words text-sm text-[#185045]">{item}</span>
-              <button type="button" onClick={() => removeItem(index)} className={removeButtonClass}>
-                {t("pg.removeRow")}
-              </button>
+              <MarkButton kind="remove" label={t("pg.removeRow")} onClick={() => removeItem(index)} />
             </li>
           ))}
         </ul>

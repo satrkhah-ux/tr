@@ -1025,6 +1025,7 @@ export const en = {
   "pg.checkOut": "Check-out",
   "pg.datesAuto": "Dates are derived automatically from the arrival date and the nights order.",
   "pg.removeRow": "Remove",
+  "pg.addLine": "Add",
   // reuse
   "pg.reuseTitle": "Start from a previous program",
   "pg.reuseHint": "Programs with the same country and day count. Exact traveler matches first.",
