@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { BedDouble, Copy, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { copyProgramIntoDraft, findReusablePrograms, getDraft } from "@/lib/data/drafts";
 import {
   deriveCityDates,
@@ -78,6 +79,10 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
   const [copied, setCopied] = useState(false);
 
   /** the stay whose picker is open — one at a time, deliberately. */
+  // Which city has its hotels popup open. Hotels moved OUT of the inline
+  // card into a modal, so the agent enters cities first and only then opens
+  // one city at a time to pick its hotels.
+  const [hotelsFor, setHotelsFor] = useState<number | null>(null);
   const [choosing, setChoosing] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
@@ -104,6 +109,10 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
 
   /** Lines to render: the draft's, plus a starter for any city that has none. */
   const lines: DraftHotel[] = derivedCities.flatMap((c) => {
+    // An unnamed city owns no hotels. Without this, every city still on «اختر
+    // مدينة» shares the same empty name, so each one claimed ALL the empty-named
+    // hotels and rendered them again — the runaway duplication the agent saw.
+    if (!c.city_name.trim()) return [];
     const mine = data.hotels.filter((h) => h.city_name === c.city_name);
     return mine.length > 0 ? mine : [defaultLine(c.city_name, data.trip)];
   });
@@ -186,7 +195,7 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
     // the list meant two presses produced two cities with the same name — and
     // because hotels are keyed by city NAME, both cities then claimed the same
     // stays, rendered them twice and double-counted their nights.
-    const taken = new Set(data.cities.map((c) => c.city_name));
+    const taken = new Set(data.cities.map((c) => c.city_name).filter(Boolean));
     const name = (cityOptions.find((o) => !taken.has(o.name)) ?? cityOptions[0])?.name ?? "";
     const left = Math.max(0, data.trip.nights - used);
     patch({
@@ -194,7 +203,9 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
         ...data.cities,
         { city_name: name, nights: left > 0 ? left : 1, check_in: null, check_out: null },
       ]),
-      hotels: [...data.hotels, { ...defaultLine(name, data.trip), nights: 0 }],
+      // Only a NAMED city gets a starter hotel line — an unnamed one would share
+      // the empty name with every other unnamed city and multiply.
+      hotels: name ? [...data.hotels, { ...defaultLine(name, data.trip), nights: 0 }] : data.hotels,
     });
   }
 
@@ -490,114 +501,48 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
                     </button>
                   </div>
 
-                  {showHotels && cov && ownsStays ? (
-                    <div className="mt-3 border-t border-[#e7f0ec] pt-3">
-                      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-                        {/* Coverage, not «a row exists»: a city split between
-                            two hotels with a night missing used to read as
-                            complete. */}
-                        <span
-                          className={`tv-tnum rounded-full px-2.5 py-1 text-[11px] font-extrabold ${
-                            short ? "bg-[#fff8e8] text-[#a86a10]" : "bg-[#e9f7f0] text-[#0f7a52]"
-                          }`}
-                        >
-                          <DirText dir="ltr">{`${cov.covered}/${cov.needed}`}</DirText> ليالٍ مغطّاة
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => addStay(cov.city_name)}
-                          className="inline-flex h-8 items-center gap-1 rounded-[9px] border border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
-                        >
-                          <Plus className="size-3.5" />
-                          فندق آخر
-                        </button>
-                      </div>
-
-                      <div className="space-y-3">
-                        {cov.stays.map((stay, stayIndex) => {
-                          const line = stay.line;
-                          const roomTypeOptions = lookups.roomTypes.filter(
-                            (rt) => rt.hotel_id === line.hotel_id || rt.hotel_id === null,
-                          );
-                          const isChoosing = openLine === line.id;
-
-                          return (
-                            <StayCard
-                              key={`${cityIndex}-${line.id}`}
-                              line={line}
-                              index={stayIndex}
-                              count={cov.stays.length}
-                              nights={stay.nights}
-                              checkIn={stay.check_in}
-                              checkOut={stay.check_out}
-                              choosing={isChoosing}
-                              onChoosing={(open) => {
-                                setChoosing(open ? line.id : null);
-                                resetPicker();
-                              }}
-                              editing={editing === line.id}
-                              onEditing={(open) => setEditing(open ? line.id : null)}
-                              sourceLabel={sourceLabel(sourceFor(line))}
-                              hotelOptions={hotelOptions}
-                              roomTypeOptions={roomTypeOptions}
-                              canInternal={canInternal}
-                              picker={{
-                                stay: {
-                                  cityName: cov.city_name,
-                                  checkIn: stay.check_in,
-                                  checkOut: stay.check_out,
-                                  nights: stay.nights,
-                                  guests: {
-                                    adults: data.trip.adults,
-                                    children: data.trip.children,
-                                    rooms: line.rooms_count,
-                                  },
-                                  // Moving the check-out IS changing how many
-                                  // nights this hotel covers — one truth, not
-                                  // a private copy.
-                                  onNights: (n) => setHotel(line.id, { nights: n }),
-                                  onGuests: (g) => setGuests(line, g),
-                                  hotelNames: hotelOptions.map((h) => h.name),
-                                },
-                                sources,
-                                source: sourceFor(line),
-                                countryName: data.trip.country,
-                                // Added here, chosen here — the agent never
-                                // leaves the programme to fetch a row.
-                                onHotelCreated: (hotel) =>
-                                  void select(
-                                    cov.city_name,
-                                    line,
-                                    { source: "internal", id: hotel.id, name: hotel.name, name_en: hotel.name_en, stars: hotel.stars, image: null, rates: [] },
-                                    null,
-                                  ),
-                                onSource: (code) => {
-                                  setSource((s) => ({ ...s, [line.id]: code }));
-                                  setLastSource(code);
-                                  resetPicker();
-                                },
-                                filters,
-                                onFilters: setFilters,
-                                onSearch: () => void runSearch(cov.city_name, line),
-                                searching: searching && choosing === line.id,
-                                error: choosing === line.id || isChoosing ? error : null,
-                                results: isChoosing ? results : null,
-                                notes,
-                                busyKey,
-                                onSelect: (hotel, rate) => void select(cov.city_name, line, hotel, rate),
-                              }}
-                              onSetLine={(next) => setLine(line.id, next)}
-                              onSetHotel={(slice) => setHotel(line.id, slice)}
-                              onRemove={() => removeStay(line.id)}
-                              onDone={() => handOver(line.id)}
-                              onRefresh={() => {
-                                setChoosing(line.id);
-                                resetPicker();
-                              }}
-                            />
-                          );
-                        })}
-                      </div>
+                  {/* Hotels live in a POPUP, not inline. The agent enters the
+                      cities first; the chosen hotels show here beside the name,
+                      small, and «الفنادق» opens the popup to add or edit them. */}
+                  {showHotels && ownsStays ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#e7f0ec] pt-3">
+                      {city.city_name.trim() ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setHotelsFor(cityIndex);
+                              setChoosing(null);
+                              resetPicker();
+                            }}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white transition-colors hover:bg-[#0f4439]"
+                          >
+                            <BedDouble className="size-3.5" />
+                            {t("pg.cityHotels")}
+                          </button>
+                          {cov ? (
+                            <span
+                              className={`tv-tnum rounded-full px-2.5 py-1 text-[11px] font-extrabold ${
+                                short ? "bg-[#fff8e8] text-[#a86a10]" : "bg-[#e9f7f0] text-[#0f7a52]"
+                              }`}
+                            >
+                              <DirText dir="ltr">{`${cov.covered}/${cov.needed}`}</DirText> ليالٍ مغطّاة
+                            </span>
+                          ) : null}
+                          {cov && cov.stays.some((s) => s.line.hotel_name.trim()) ? (
+                            <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-[#557d78]">
+                              {cov.stays
+                                .map((s) => s.line.hotel_name)
+                                .filter((n) => n.trim())
+                                .join(" · ")}
+                            </span>
+                          ) : (
+                            <span className="text-[11.5px] font-semibold text-[#a86a10]">{t("pg.cityNoHotelYet")}</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-[11.5px] font-bold text-[#93aaa3]">{t("pg.chooseCityFirst")}</span>
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -605,6 +550,132 @@ export function CitiesStage({ draftId, data, patch, replace, lookups }: StageFor
             })}
           </div>
         )}
+
+        {/* The hotels of ONE city, opened from its row. State (which card is
+            choosing, the picker) is component-level, so it behaves the same in
+            here as it did inline — only the city on screen is scoped down. */}
+        <Dialog
+          open={hotelsFor !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setHotelsFor(null);
+              setChoosing(null);
+              resetPicker();
+            }
+          }}
+        >
+          <DialogContent className="w-[min(680px,calc(100vw-24px))]" dir="rtl">
+            {(() => {
+              if (hotelsFor === null) return null;
+              const city = data.cities[hotelsFor];
+              if (!city) return null;
+              const cov = coverage.find((c) => c.city_name === city.city_name);
+              const hotelOptions = country?.cities.find((c) => c.name === city.city_name)?.hotels ?? [];
+              // No coverage means the city has no name or no nights yet — nothing
+              // to pick a hotel for. (Also narrows `cov` for the block below.)
+              if (!cov) {
+                return <p className="text-[12.5px] font-semibold text-[#93aaa3]">{t("pg.chooseCityFirst")}</p>;
+              }
+              return (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-extrabold text-[#003c3a]">
+                      {t("pg.cityHotels")} — {city.city_name}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => addStay(cov.city_name)}
+                      className="inline-flex h-8 items-center gap-1 rounded-[9px] border border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                    >
+                      <Plus className="size-3.5" />
+                      فندق آخر
+                    </button>
+                  </div>
+                  <div className="max-h-[68vh] space-y-3 overflow-y-auto pe-1">
+                    {cov.stays.map((stay, stayIndex) => {
+                      const line = stay.line;
+                      const roomTypeOptions = lookups.roomTypes.filter(
+                        (rt) => rt.hotel_id === line.hotel_id || rt.hotel_id === null,
+                      );
+                      const isChoosing = openLine === line.id;
+
+                      return (
+                        <StayCard
+                          key={`${hotelsFor}-${line.id}`}
+                          line={line}
+                          index={stayIndex}
+                          count={cov.stays.length}
+                          nights={stay.nights}
+                          checkIn={stay.check_in}
+                          checkOut={stay.check_out}
+                          choosing={isChoosing}
+                          onChoosing={(open) => {
+                            setChoosing(open ? line.id : null);
+                            resetPicker();
+                          }}
+                          editing={editing === line.id}
+                          onEditing={(open) => setEditing(open ? line.id : null)}
+                          sourceLabel={sourceLabel(sourceFor(line))}
+                          hotelOptions={hotelOptions}
+                          roomTypeOptions={roomTypeOptions}
+                          canInternal={canInternal}
+                          picker={{
+                            stay: {
+                              cityName: cov.city_name,
+                              checkIn: stay.check_in,
+                              checkOut: stay.check_out,
+                              nights: stay.nights,
+                              guests: {
+                                adults: data.trip.adults,
+                                children: data.trip.children,
+                                rooms: line.rooms_count,
+                              },
+                              onNights: (n) => setHotel(line.id, { nights: n }),
+                              onGuests: (g) => setGuests(line, g),
+                              hotelNames: hotelOptions.map((h) => h.name),
+                            },
+                            sources,
+                            source: sourceFor(line),
+                            countryName: data.trip.country,
+                            onHotelCreated: (hotel) =>
+                              void select(
+                                cov.city_name,
+                                line,
+                                { source: "internal", id: hotel.id, name: hotel.name, name_en: hotel.name_en, stars: hotel.stars, image: null, rates: [] },
+                                null,
+                              ),
+                            onSource: (code) => {
+                              setSource((s) => ({ ...s, [line.id]: code }));
+                              setLastSource(code);
+                              resetPicker();
+                            },
+                            filters,
+                            onFilters: setFilters,
+                            onSearch: () => void runSearch(cov.city_name, line),
+                            searching: searching && choosing === line.id,
+                            error: choosing === line.id || isChoosing ? error : null,
+                            results: isChoosing ? results : null,
+                            notes,
+                            busyKey,
+                            onSelect: (hotel, rate) => void select(cov.city_name, line, hotel, rate),
+                          }}
+                          onSetLine={(next) => setLine(line.id, next)}
+                          onSetHotel={(slice) => setHotel(line.id, slice)}
+                          onRemove={() => removeStay(line.id)}
+                          onDone={() => handOver(line.id)}
+                          onRefresh={() => {
+                            setChoosing(line.id);
+                            resetPicker();
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
 
         <button type="button" onClick={addCity} className={addButtonClass}>
           <Plus className="size-4" />

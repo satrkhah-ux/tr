@@ -132,6 +132,20 @@
     background-color: #ffffff;
     color: #003c3a;
   }
+  /*
+    Management asked for a larger interface. The sizes across the app are
+    written in absolute px (text-[12px] and the like), so a root font-size has
+    nothing to pull on — `zoom` scales the whole coordinate system at once, the
+    way the browser's own zoom does, so every size and the layout that depends
+    on it grow together and in proportion. Kept on a token so one number moves
+    it everywhere.
+  */
+  :root {
+    --tv-zoom: 1.12;
+  }
+  body {
+    zoom: var(--tv-zoom);
+  }
   html {
     @apply font-sans;
     scroll-behavior: smooth;
