@@ -7,17 +7,21 @@
 #
 #   bash scripts/vps-deploy.sh
 #
-# Requires: the `vps-deploy` ssh host, and a .env on the server at
-# ~/apps/traveliun-app/.env (created once; this script never overwrites it).
+# Requires: the `vps-new` ssh host (used as `deploy`), and a .env on the server
+# at ~/apps/traveliun-app/.env (created once; this script never overwrites it).
 set -euo pipefail
 
 # CORRECTED 2026-10-11: the domain pkg.traveliun.com resolves to 186.241.16.106
 # (SSH alias `vps-new`). The old `vps-deploy` alias points at 187.124.112.104,
 # which stopped serving this domain after the migration (it 503s for it now) —
 # deploying there built and swapped containers nobody could see. If SSH to the
-# new server times out, it is the firewall/fail2ban: the deploying IP must be
-# allowed on 186.241.16.106:22, OR deploy from a machine that already is.
-HOST=vps-new
+# new server times out, run `systemctl is-active ssh` from hPanel's Web console
+# first: on 2026-10-11 ssh.socket had failed on a duplicated listen address
+# ([::]:52222 twice), so nothing listened on 22 at all — not a firewall.
+#
+# As `deploy`, not root: the app and its .env live in /home/deploy, and root's
+# ~ has neither, so a root deploy builds a tree with no .env and the run fails.
+HOST=deploy@vps-new
 DIR=apps/traveliun-app
 DOMAIN=pkg.traveliun.com
 
