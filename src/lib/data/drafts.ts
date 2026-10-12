@@ -236,15 +236,22 @@ async function allRows(
   page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>,
 ): Promise<{ data: unknown[] }> {
   const size = 1000;
+  // Each page is a full round trip (~1 s from the server for 1,000 hotels), and
+  // asked one after another they were most of the wait to open a file — so a
+  // few are asked at once. The ones past the end come back empty.
+  const batch = 3;
   const out: unknown[] = [];
-  for (let from = 0; ; from += size) {
-    const { data, error } = await page(from, from + size - 1);
-    if (error) break;
-    const rows = data ?? [];
-    out.push(...rows);
-    if (rows.length < size) break;
+  for (let from = 0; ; from += size * batch) {
+    const results = await Promise.all(
+      Array.from({ length: batch }, (_, i) => page(from + i * size, from + (i + 1) * size - 1)),
+    );
+    for (const { data, error } of results) {
+      if (error) return { data: out };
+      const rows = data ?? [];
+      out.push(...rows);
+      if (rows.length < size) return { data: out };
+    }
   }
-  return { data: out };
 }
 
 export async function getGeneratorLookups(): Promise<GeneratorLookups> {
