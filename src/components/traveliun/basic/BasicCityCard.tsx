@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { BedDouble, Camera, ChevronDown, Plane, Plus, Trash2, UserRound, X } from "lucide-react";
+import { BedDouble, Camera, CheckCircle2, ChevronDown, Pencil, Plane, Plus, Trash2, UserRound, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import {
   BOARD_LABEL_KEYS,
@@ -40,7 +40,7 @@ import { programDayText, type TourProgram } from "@/lib/offer/itinerary";
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { suppliersFor } from "../generator/SupplierPrice";
-import { basicField } from "./styles";
+import { basicField, typedNumber } from "./styles";
 import { nightsText, useBasicLabels } from "./labels";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -89,6 +89,9 @@ export function BasicCityCard({
   onCar,
   onFlights,
   onRemove,
+  collapsed,
+  onDone,
+  onExpand,
 }: {
   index: number;
   city: BasicCity;
@@ -118,6 +121,10 @@ export function BasicCityCard({
   /** open the flights step — the domestic legs are entered there. */
   onFlights: () => void;
   onRemove: () => void;
+  /** «تمت» pressed: the card folds to its summary line. */
+  collapsed: boolean;
+  onDone: () => void;
+  onExpand: () => void;
 }) {
   const tx = useBasicLabels();
   const lines = cityLines(data.hotels, city.city_name);
@@ -136,15 +143,42 @@ export function BasicCityCard({
   const [tab, setTab] = useState<Tab>("hotel");
   const open = tabs.some((x) => x.key === tab) ? tab : tabs[0]?.key;
 
+  // what the city still lacks before «تمت»: the stay, the tours, the airport cars
+  const plan = data.transport_plan;
+  const picks = toursOn ? withTours(city, city.tours ?? 0) : [];
+  const tripCar = plan.tours.car_type.trim();
+  const rooms = lines.flatMap((l) => l.rooms);
+  const missing = [
+    hotelsOn && main && !main.hotel_name.trim() && tx("hotel"),
+    hotelsOn && rooms.some((r) => !(r.room_type_id || r.room_type_name.trim())) && tx("roomType"),
+    hotelsOn && rooms.some((r) => !r.board_type) && tx("board"),
+    hotelsOn && rooms.some((r) => r.price == null) && tx("price"),
+    picks.some((p) => !p.free && !p.title.trim()) && tx("tourService"),
+    picks.some((p) => !p.free && !(p.car_type?.trim() || tripCar)) && tx("carType"),
+    picks.some((p) => !p.free && p.price == null) && tx("tourPrice"),
+    transportOn && isFirst && !plan.airport.car_type.trim() && tx("reception"),
+    transportOn && isLast && !(plan.farewell ?? plan.airport).car_type.trim() && tx("farewell"),
+  ].filter((x): x is string => Boolean(x));
+  const stayPrice = rooms.reduce((sum, r) => sum + (r.price ?? 0), 0);
+  const tours = picks.filter((p) => !p.free);
+  const summary = [
+    main?.hotel_name,
+    main && main.rooms.length > 0 ? `${main.rooms.length} × ${baseRoomName(main.rooms[0].room_type_name) || "—"}` : "",
+    hotelsOn && stayPrice > 0 ? `${stayPrice.toLocaleString("en-US")} ${main?.manual_currency ?? ""}`.trim() : "",
+    toursOn ? tx("toursSummary", { n: tours.length, total: tours.reduce((s, p) => s + (p.price ?? 0), 0).toLocaleString("en-US") }) : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <article className="overflow-hidden rounded-[14px] border border-[#d8e6e0] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <article id={`basic-city-${index}`} className="scroll-mt-20 overflow-hidden rounded-[14px] border border-[#d8e6e0] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
       {/* the city, its tabs and its nights — one line */}
       <header className="flex flex-wrap items-center gap-2 bg-[#eef5f2] px-3 py-2">
         <span className="flex size-6 items-center justify-center rounded-full bg-[#185045] text-[11px] font-extrabold text-white">{index + 1}</span>
         <h3 className="text-[13.5px] font-extrabold text-[#0f3d38]">{city.city_name}</h3>
         {city.country ? <span className="rounded-full bg-white px-2 py-0.5 text-[10.5px] font-bold text-[#557d78]">{city.country}</span> : null}
         {hop}
-        {tabs.length > 0 ? (
+        {tabs.length > 0 && !collapsed ? (
           <div role="tablist" className="flex flex-wrap gap-1 sm:ms-3">
             {tabs.map(({ key, label, icon: Icon }) => (
               <button
@@ -178,7 +212,23 @@ export function BasicCityCard({
         </div>
       </header>
 
-      {open ? (
+      {collapsed ? (
+        // done: one line — what the city holds, and a press reopens it
+        <button
+          type="button"
+          onClick={onExpand}
+          className="flex w-full items-center gap-2 px-3 py-2 text-start hover:bg-[#f7fbf9]"
+        >
+          <CheckCircle2 className={`size-4 shrink-0 ${missing.length > 0 ? "text-[#a86a10]" : "text-[#0f7a52]"}`} />
+          <span className="tv-tnum min-w-0 flex-1 truncate text-[12px] font-semibold text-[#557d78]">
+            {missing.length > 0 ? tx("needFirst", { list: missing.join("، ") }) : summary || city.city_name}
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-1 text-[11.5px] font-bold text-[#185045]">
+            <Pencil className="size-3.5" />
+            {tx("edit")}
+          </span>
+        </button>
+      ) : open ? (
         <div className="p-3">
           {open === "hotel" && main ? (
             <HotelPanel index={index} city={city} dayFrom={dayFrom} data={data} lookups={lookups} main={main} change={change} lines={lines} onLines={onLines} onSlice={onSlice} />
@@ -203,6 +253,19 @@ export function BasicCityCard({
           {open === "domestic" ? (
             <DomesticPanel index={index} legs={domestic} data={data} lookups={lookups} onSlice={onSlice} onFlights={onFlights} />
           ) : null}
+          {/* «تمت <city>»: open only when the city has all it needs, and says what is missing until then */}
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-dashed border-[#DCE9E5] pt-2.5">
+            {missing.length > 0 ? <span className="text-[11.5px] font-bold text-[#a86a10]">{tx("needFirst", { list: missing.join("، ") })}</span> : null}
+            <button
+              type="button"
+              onClick={onDone}
+              disabled={missing.length > 0}
+              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#185045] px-4 text-[12px] font-extrabold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <CheckCircle2 className="size-3.5" />
+              {tx("cityDone", { city: city.city_name })}
+            </button>
+          </div>
         </div>
       ) : null}
     </article>
@@ -265,7 +328,7 @@ function HotelPanel({
         title={label}
         value={value ?? ""}
         placeholder={tx("price")}
-        onChange={(e) => onValue(e.target.value === "" ? null : Number(e.target.value))}
+        onChange={(e) => onValue(typedNumber(e.target))}
         className={`${basicField} tv-tnum text-center`}
       />
       {value != null ? (
@@ -651,7 +714,7 @@ function ToursPanel({
                 onChange={(e) => {
                   const s = serviceOf(e.target.value);
                   // a tour from the price list arrives priced; a typed one keeps what was there
-                  setPick(k, { ...s, price: s.free ? 0 : (listedPrice(e.target.value) ?? pick.price) });
+                  setPick(k, { ...s, price: s.free ? 0 : (listedPrice(e.target.value) ?? (pick.free ? null : pick.price)) });
                 }}
                 className={`${basicField} ${pick.free ? "text-[#7a948f]" : ""}`}
               />
@@ -676,7 +739,7 @@ function ToursPanel({
                 disabled={pick.free}
                 value={pick.free ? 0 : (pick.price ?? "")}
                 placeholder="0"
-                onChange={(e) => setPick(k, { price: e.target.value === "" ? null : Number(e.target.value) })}
+                onChange={(e) => setPick(k, { price: typedNumber(e.target) })}
                 className={`${basicField} tv-tnum text-center disabled:bg-[#f4f7f6]`}
               />
             </div>
@@ -799,7 +862,7 @@ function DomesticPanel({
               value={booking.dom_price ?? ""}
               placeholder="0"
               onChange={(e) =>
-                onSlice({ flight_booking: { ...booking, dom_price: e.target.value === "" ? null : Number(e.target.value), dom_currency: booking.dom_currency || "SAR" } })
+                onSlice({ flight_booking: { ...booking, dom_price: typedNumber(e.target), dom_currency: booking.dom_currency || "SAR" } })
               }
               className={`${basicField} tv-tnum w-32 text-center ${booking.dom_price == null ? "border-[#f0b4c2] bg-[#fff5f7]" : ""}`}
             />

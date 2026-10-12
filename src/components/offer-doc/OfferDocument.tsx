@@ -560,9 +560,10 @@ function Cover({
       </div>
 
       <div className="od-metrics">
+        {/* a nought says nothing to the client: no «طفل 0» box */}
         <Metric label={AR.adults} value={String(offer.adults)} />
-        <Metric label={AR.children} value={String(offer.children)} />
-        <Metric label={AR.infants} value={String(offer.infants)} />
+        {offer.children > 0 ? <Metric label={AR.children} value={String(offer.children)} /> : null}
+        {offer.infants > 0 ? <Metric label={AR.infants} value={String(offer.infants)} /> : null}
         <Metric label={AR.offerDate} value={fmtDate(offer.issue_date ?? offer.offer_date)} ltr />
       </div>
 
@@ -590,8 +591,21 @@ function Cover({
               <td><Ltr>{offer.serial}</Ltr></td>
               <th>{AR.travelers}</th>
               <td>
-                <Ltr>{`${offer.adults}`}</Ltr> {AR.adults} | <Ltr>{`${offer.children}`}</Ltr> {AR.children} |{" "}
-                <Ltr>{`${offer.infants}`}</Ltr> {AR.infants}
+                {/* «2 بالغ» — the noughts left out */}
+                {(
+                  [
+                    [offer.adults, AR.adults],
+                    [offer.children, AR.children],
+                    [offer.infants, AR.infants],
+                  ] as const
+                )
+                  .filter(([n], i) => i === 0 || n > 0)
+                  .map(([n, label], i) => (
+                    <span key={label}>
+                      {i > 0 ? " | " : ""}
+                      <Ltr>{String(n)}</Ltr> {label}
+                    </span>
+                  ))}
               </td>
             </tr>
             {/* the programme window — this used to be a second «ملخص سريع» panel

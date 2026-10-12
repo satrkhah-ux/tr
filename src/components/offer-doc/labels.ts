@@ -21,7 +21,8 @@ export const AR = {
   contact: "المدينة المنورة · اتصال وواتساب 0569222111",
   // ---- cover ----
   coverLabel: "تفاصيل البرنامج السياحي",
-  offerTitleFor: (destination: string) => `عرض رحلة ${destination}`,
+  // «عرض جورجيا» — the owner's form (2026-10-13): no «رحلة»
+  offerTitleFor: (destination: string) => `عرض ${destination}`,
   callLabel: "إتصال",
   whatsappLabel: "واتساب",
   webLabel: "الويب",
