@@ -61,6 +61,11 @@ ssh "$HOST" "cd ~/$DIR && docker rm -f traveliun-app 2>/dev/null || true; docker
   --label traefik.http.services.tv-svc.loadbalancer.server.port=3000 \
   traveliun-app:latest"
 
+# --no-cache means the build cache is never reused, yet BuildKit keeps every
+# layer (~2.5 GB per deploy, 37 GB after one day). Drop it once the new
+# container is running — images, containers and volumes are untouched.
+ssh "$HOST" "docker builder prune -af >/dev/null 2>&1 || true"
+
 echo "==> waiting for https://$DOMAIN"
 up=""
 for _ in $(seq 1 10); do
