@@ -123,6 +123,18 @@ describe("النظام بيسك", () => {
     expect(cityLines(next.hotels, "كوالالمبور").map((h) => h.rooms[0].price)).toEqual([1500]);
   });
 
+  it("adds a city with the hotel, room and room count picked on the bar", () => {
+    const data = malaysia();
+    const next = addCity(data, { name: "بينانج", nights: 2, tours: 0, hotel: { id: "h-1", name: "شانغريلا بينانج" }, room: "ديلوكس", rooms: 2 }, "SAR");
+    const [line] = cityLines(next.hotels, "بينانج");
+    expect([line.hotel_id, line.hotel_name, line.rooms.length, line.rooms.map((r) => r.room_type_name)]).toEqual([
+      "h-1",
+      "شانغريلا بينانج",
+      2,
+      ["ديلوكس", "ديلوكس"],
+    ]);
+  });
+
   it("leaves every day free when tours are switched off", () => {
     const data = malaysia();
     data.transport_plan = { ...data.transport_plan, tours: { ...data.transport_plan.tours, enabled: false } };

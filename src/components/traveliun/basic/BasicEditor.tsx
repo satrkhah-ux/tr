@@ -333,16 +333,47 @@ export function BasicEditor({
   const [newCity, setNewCity] = useState("");
   const [newNights, setNewNights] = useState(0);
   const [newTours, setNewTours] = useState(0);
+  // the stay, picked on the bar too — one «إضافة» books the city and its hotel
+  const [newHotel, setNewHotel] = useState("");
+  const [newRoom, setNewRoom] = useState("");
+  const [newRooms, setNewRooms] = useState(0);
   const nightsChoice = newNights || Math.max(left, 1);
+  const roomsChoice = newRooms || Math.max(trip.rooms, 1);
   // the trip's country unless the group crosses into a neighbour
   const barCountry = findLookupCountry(lookups.countries, newCountry || trip.country);
+  const barHotels = barCountry?.cities.find((c) => c.name === newCity)?.hotels ?? [];
+  const barRoomNames = [
+    ...new Set(lookups.roomTypes.filter((r) => r.hotel_id === null || r.hotel_id === newHotel).map((r) => r.name.trim())),
+  ].filter(Boolean);
+
+  function pickCity(name: string) {
+    setNewCity(name);
+    setNewHotel("");
+    setNewRoom("");
+  }
 
   function onAdd() {
     if (!newCity) return;
-    commit(addCity(data, { name: newCity, nights: nightsChoice, tours: toursOn ? newTours : 0, country: barCountry?.name }, BASE_CURRENCY));
-    setNewCity("");
+    const hotel = barHotels.find((h) => h.id === newHotel);
+    commit(
+      addCity(
+        data,
+        {
+          name: newCity,
+          nights: nightsChoice,
+          tours: toursOn ? newTours : 0,
+          country: barCountry?.name,
+          hotel: hotel ? { id: hotel.id, name: hotel.name } : null,
+          room: newRoom,
+          rooms: roomsChoice,
+        },
+        BASE_CURRENCY,
+      ),
+    );
+    pickCity("");
     setNewNights(0);
     setNewTours(0);
+    setNewRooms(0);
   }
 
   const used = data.cities.reduce((sum, c) => sum + c.nights, 0);
@@ -706,29 +737,67 @@ export function BasicEditor({
 
           {/* the add bar — always at hand, like the company's system */}
           <div className="sticky bottom-3 z-20 rounded-[14px] border border-[#cfe0d9] bg-[#e9f3ef]/95 px-2 py-1.5 shadow-[0_8px_24px_rgba(0,60,58,0.12)] backdrop-blur max-lg:bottom-[80px] sm:px-2.5">
-            <div className="flex items-end gap-1.5">
+            <div className="flex flex-wrap items-end gap-1.5">
               {/* a group may cross into a neighbouring country */}
               <label className={`${basicLabel} w-24 shrink-0 sm:w-32`}>
                 {tx("country")}
-                <select value={barCountry?.name ?? ""} onChange={(e) => {
+                <select
+                  value={barCountry?.name ?? ""}
+                  onChange={(e) => {
                     setNewCountry(e.target.value);
-                    setNewCity("");
-                  }} className={`${basicField} px-1.5`}>
+                    pickCity("");
+                  }}
+                  className={`${basicField} px-1.5`}
+                >
                   <option value="">{tx("choose")}</option>
                   {lookups.countries.map((c) => (
                     <option key={c.id} value={c.name}>{c.name}</option>
                   ))}
                 </select>
               </label>
-              <label className={`${basicLabel} min-w-0 flex-1`}>
+              <label className={`${basicLabel} min-w-28 flex-1`}>
                 {tx("city")}
-                <select value={newCity} onChange={(e) => setNewCity(e.target.value)} disabled={!barCountry} className={basicField}>
+                <select value={newCity} onChange={(e) => pickCity(e.target.value)} disabled={!barCountry} className={basicField}>
                   <option value="">{tx("choose")}</option>
                   {(barCountry?.cities ?? []).map((c) => (
                     <option key={c.id} value={c.name}>{c.name}</option>
                   ))}
                 </select>
               </label>
+              {/* the city chosen: its hotels, the room and how many — shown only now */}
+              {newCity && scope.hotels ? (
+                <>
+                  <label className={`${basicLabel} min-w-36 flex-[1.5]`}>
+                    {tx("hotel")}
+                    <select value={newHotel} onChange={(e) => setNewHotel(e.target.value)} className={basicField}>
+                      <option value="">{tx("choose")}</option>
+                      {barHotels.map((h) => (
+                        <option key={h.id} value={h.id}>
+                          {h.name}
+                          {h.stars ? ` ${"★".repeat(h.stars)}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={`${basicLabel} w-32 shrink-0 sm:w-40`}>
+                    {tx("roomType")}
+                    <input list="basic-bar-rooms" value={newRoom} onChange={(e) => setNewRoom(e.target.value)} className={basicField} />
+                    <datalist id="basic-bar-rooms">
+                      {barRoomNames.map((n) => (
+                        <option key={n} value={n} />
+                      ))}
+                    </datalist>
+                  </label>
+                  <label className={`${basicLabel} w-14 shrink-0`}>
+                    {tx("rooms")}
+                    <select value={roomsChoice} onChange={(e) => setNewRooms(Number(e.target.value))} className={`${basicField} px-1.5`}>
+                      {range(1, 10).map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              ) : null}
               <label className={`${basicLabel} w-14 shrink-0`}>
                 {tx("nights")}
                 <select value={nightsChoice} onChange={(e) => setNewNights(Number(e.target.value))} className={`${basicField} px-1.5`}>

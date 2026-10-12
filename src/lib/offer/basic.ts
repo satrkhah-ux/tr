@@ -17,6 +17,7 @@ import {
   FREE_DAY_TITLE,
   MEAL_PLAN_BOARD,
   newStayId,
+  resizeRooms,
   withRooms,
   type DraftCity,
   type DraftData,
@@ -74,10 +75,23 @@ export function hotelForCity(data: Pick<DraftData, "trip">, city: string, curren
   );
 }
 
-/** Add a city at the end, with its hotel line. `country` only when it is not the trip's — a neighbour. */
+/** What the add bar may already know about the city's stay: the hotel, the room, how many. */
+export type StayPick = { hotel?: { id: string; name: string } | null; room?: string; rooms?: number };
+
+function withStayPick(line: DraftHotel, pick: StayPick): DraftHotel {
+  let next = pick.rooms && pick.rooms !== line.rooms.length ? resizeRooms(line, pick.rooms) : line;
+  if (pick.hotel) next = { ...next, hotel_id: pick.hotel.id, hotel_name: pick.hotel.name, hotel_name_en: "" };
+  if (pick.room?.trim()) next = renameRooms(next, pick.room.trim());
+  return next;
+}
+
+/**
+ * Add a city at the end, with its hotel line — and the hotel itself when the bar
+ * already picked it. `country` only when it is not the trip's — a neighbour.
+ */
 export function addCity(
   data: DraftData,
-  city: { name: string; nights: number; tours: number; country?: string },
+  city: { name: string; nights: number; tours: number; country?: string } & StayPick,
   currency: string,
 ): Pick<DraftData, "cities" | "hotels"> {
   // The same city again, right after itself, is more nights there — not a second
@@ -86,11 +100,13 @@ export function addCity(
   const last = data.cities[at] as BasicCity | undefined;
   if (last && last.city_name === city.name) {
     const longer = setCityNights(data, at, last.nights + city.nights);
+    // a hotel picked now fills the city's line only if it has none yet
+    const [main] = cityLines(longer.hotels, city.name);
     return {
-      ...longer,
       cities: longer.cities.map((c, i) =>
         i === at ? { ...c, tours: Math.min(((c as BasicCity).tours ?? 0) + city.tours, c.nights) } : c,
       ),
+      hotels: main && !main.hotel_name.trim() ? longer.hotels.map((h) => (h.id === main.id ? withStayPick(h, city) : h)) : longer.hotels,
     };
   }
   const next: BasicCity = {
@@ -104,7 +120,7 @@ export function addCity(
   const hasHotel = data.hotels.some((h) => h.city_name === city.name);
   return {
     cities: chainCities(data, [...data.cities, next]),
-    hotels: hasHotel ? data.hotels : [...data.hotels, hotelForCity(data, city.name, currency)],
+    hotels: hasHotel ? data.hotels : [...data.hotels, withStayPick(hotelForCity(data, city.name, currency), city)],
   };
 }
 
