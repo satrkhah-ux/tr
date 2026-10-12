@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { emptyDraftData, emptyFlight, withRooms, type DraftData, type LookupAirport } from "./draft-types";
+import { deriveTransportRows, emptyDraftData, emptyFlight, withRooms, type DraftData, type LookupAirport } from "./draft-types";
+import { findTourPrice } from "./pricing-suggest";
 import { domesticMismatches } from "./flight-cities";
 import {
   addCity,
@@ -11,7 +12,10 @@ import {
   EXTRA_BED,
   extraBeds,
   priceAtSource,
+  carForGroup,
   packageProfitFor,
+  resizeGroupCars,
+  withGroupCars,
   rankAirports,
   roomSuggestions,
   STANDARD_ROOMS,
@@ -357,5 +361,44 @@ describe("النظام بيسك", () => {
     // a line priced with its own profit (the full generator) is not overridden
     expect(packageProfitFor({ items: [{ ...item, profit_pct: 5 }] }, 12)).toBeUndefined();
     expect(packageProfitFor({ items: [item] }, null)).toBeUndefined();
+  });
+
+  const FLEET = [
+    { name: "سيارة صغيرة", pax: 2 },
+    { name: "ليموزين / VIP", pax: 3 },
+    { name: "سيارة متوسطة", pax: 4 },
+    { name: "ميني فان", pax: 5 },
+    { name: "فان مرسيدس", pax: 8 },
+  ];
+
+  it("seats the group in the smallest ordinary car — a seat to spare from three people, never a limousine", () => {
+    expect(carForGroup(FLEET, 2)).toEqual({ car_type: "سيارة صغيرة", cars: 1 });
+    expect(carForGroup(FLEET, 3)).toEqual({ car_type: "سيارة متوسطة", cars: 1 });
+    expect(carForGroup(FLEET, 4)).toEqual({ car_type: "ميني فان", cars: 1 });
+    expect(carForGroup(FLEET, 12)).toEqual({ car_type: "فان مرسيدس", cars: 2 });
+  });
+
+  it("fills only the cars still empty, and moves only the ones that were the group's size", () => {
+    const plan = malaysia().transport_plan;
+    const chosen = { ...plan, tours: { ...plan.tours, car_type: "فان مرسيدس", cars: 1 } };
+    const filled = withGroupCars(chosen, { car_type: "ميني فان", cars: 1 });
+    expect([filled.airport.car_type, filled.tours.car_type]).toEqual(["ميني فان", "فان مرسيدس"]);
+    const grown = resizeGroupCars(filled, { car_type: "ميني فان", cars: 1 }, { car_type: "فان مرسيدس", cars: 1 });
+    expect(grown.airport.car_type).toBe("فان مرسيدس");
+  });
+
+  it("finds a tour on the price list however its name was spelled", () => {
+    const list = [{ name: "جولة جزيرة الحامل", price: 180, currency: "SAR" }];
+    expect(findTourPrice(list, "جوله جزيره الحامل")?.price).toBe(180);
+    expect(findTourPrice(list, "جولة أخرى")).toBeNull();
+  });
+
+  it("prices the transfers either side of a domestic flight, not the flight as a road", () => {
+    const data = malaysia();
+    const plan = { ...data.transport_plan, airport: { ...data.transport_plan.airport, car_type: "ميني فان" }, intercity: { ...data.transport_plan.intercity, enabled: true, modes: ["car", "flight"] as ("car" | "flight")[], hop_modes: { "لنكاوي>كوالالمبور": "flight" as const } } };
+    const rows = deriveTransportRows(plan, data.cities).map((r) => `${r.from_place} ← ${r.to_place}`);
+    expect(rows).toContain("فندق لنكاوي ← المطار");
+    expect(rows).toContain("المطار ← فندق كوالالمبور");
+    expect(rows).not.toContain("لنكاوي ← كوالالمبور");
   });
 });

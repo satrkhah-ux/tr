@@ -204,14 +204,19 @@ export async function createDraft(seed?: Partial<DraftData>): Promise<CreateDraf
  * overwrite the serial it remembers, so the same programme for the next client
  * starts as its own draft instead — the issued offer stays exactly as it was sent.
  */
-export async function duplicateDraft(draftId: string): Promise<CreateDraftResult> {
+export async function duplicateDraft(draftId: string, options: { freshClient?: boolean } = {}): Promise<CreateDraftResult> {
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
     const record = await loadDraft(draftId);
     if (!record) return { ok: false, error: "err.loadFailed" };
 
-    const copy: DraftData = { ...record.data, produced_serial: null };
+    const copy: DraftData = {
+      ...record.data,
+      produced_serial: null,
+      // «نسخ» in Basic: the same programme for the next client — whose name and phone are still to be asked
+      ...(options.freshClient ? { customer: { ...record.data.customer, customer_name: "", customer_phone: "" } } : {}),
+    };
     const result = await insertDraft(
       copy,
       copy.customer.customer_name || copy.trip.destination || copy.trip.country || null,

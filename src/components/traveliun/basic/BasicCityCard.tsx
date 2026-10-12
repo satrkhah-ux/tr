@@ -26,8 +26,12 @@ import {
   clearRoomChange,
   EXTRA_BED,
   renameRooms,
+  airportDisplay,
   cityDates,
+  findAirport,
+  rankAirports,
   roomSuggestions,
+  tripCountries,
   WELCOME,
   withTours,
   type BasicCity,
@@ -46,9 +50,6 @@ const DAY = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { weekday: "lo
 const dayLabel = (iso: string) => DAY.format(new Date(`${iso}T00:00:00Z`));
 
 type Tab = "hotel" | "tours" | "domestic";
-
-/** «name (CODE)» → CODE, else the name. */
-const airportShort = (airport: string) => airport.match(/\(([A-Za-z0-9]{3,5})\)/)?.[1] ?? airport;
 
 /**
  * The card's tables share one look: a row of small headings once, then rows of
@@ -74,6 +75,7 @@ export function BasicCityCard({
   data,
   lookups,
   programs,
+  tourPrices,
   hotelsOn,
   toursOn,
   transportOn,
@@ -95,6 +97,8 @@ export function BasicCityCard({
   lookups: GeneratorLookups;
   /** the ready-made tours of this city (tour_programs). */
   programs: TourProgram[];
+  /** the company's tours price list for the trip's countries — a pick fills its price. */
+  tourPrices: { name: string; price: number; currency: string }[];
   hotelsOn: boolean;
   toursOn: boolean;
   transportOn: boolean;
@@ -184,6 +188,8 @@ export function BasicCityCard({
               index={index}
               city={city}
               programs={programs}
+              tourPrices={tourPrices}
+              sarPer={lookups.sarPer ?? { SAR: 1 }}
               data={data}
               carTypes={lookups.carTypes}
               isFirst={isFirst}
@@ -195,30 +201,7 @@ export function BasicCityCard({
             />
           ) : null}
           {open === "domestic" ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {domestic.length === 0 ? (
-                <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noDomestic")}</p>
-              ) : (
-                domestic.map((f, k) => (
-                  <p key={k} className="tv-tnum inline-flex flex-wrap items-center gap-2 rounded-[9px] bg-[#f8fbf9] px-3 py-1.5 text-[12px] font-bold text-[#185045]">
-                    <Plane className="size-3.5" />
-                    <DirText dir="ltr">{`${f.flight_no ? `${f.flight_no} ` : ""}${airportShort(f.from_airport)} → ${airportShort(f.to_airport)}`}</DirText>
-                    {/* a planned leg has its day, not a time yet */}
-                    {f.departure_at ? <DirText dir="ltr">{f.departure_at.endsWith("T00:00") && !f.flight_no ? f.departure_at.slice(0, 10) : f.departure_at.replace("T", " ")}</DirText> : null}
-                    {!f.flight_no ? <span className="rounded-full bg-[#fff6e4] px-2 py-0.5 text-[10.5px] font-bold text-[#8a5a0c]">{tx("plannedLeg")}</span> : null}
-                    {f.airline ? <span className="text-[#557d78]">{f.airline}</span> : null}
-                  </p>
-                ))
-              )}
-              <button
-                type="button"
-                onClick={onFlights}
-                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
-              >
-                <Plane className="size-3.5" />
-                {tx("editFlights")}
-              </button>
-            </div>
+            <DomesticPanel index={index} legs={domestic} data={data} lookups={lookups} onSlice={onSlice} onFlights={onFlights} />
           ) : null}
         </div>
       ) : null}
@@ -505,6 +488,8 @@ function ToursPanel({
   index,
   city,
   programs,
+  tourPrices,
+  sarPer,
   data,
   carTypes,
   isFirst,
@@ -517,6 +502,8 @@ function ToursPanel({
   index: number;
   city: BasicCity;
   programs: TourProgram[];
+  tourPrices: { name: string; price: number; currency: string }[];
+  sarPer: Record<string, number>;
   data: DraftData;
   carTypes: GeneratorLookups["carTypes"];
   isFirst: boolean;
@@ -542,6 +529,14 @@ function ToursPanel({
     return hit ? { program_id: hit.program.id, title: hit.title, text: hit.activities[0] ?? "", free: false } : { program_id: null, title, text: "", free: false };
   };
   const setPick = (k: number, slice: Partial<TourPick>) => onPicks(picks.map((p, i) => (i === k ? { ...p, ...slice } : p)));
+  /** A tour on the company's price list, in riyals (the tours are priced in riyals). */
+  const listedPrice = (title: string): number | null => {
+    const key = title.trim();
+    const hit = key ? tourPrices.find((t) => t.name === key) : undefined;
+    if (!hit) return null;
+    const rate = hit.currency === "SAR" ? 1 : sarPer[hit.currency];
+    return rate ? Math.round(hit.price * rate) : null;
+  };
 
   const tours = picks.filter((p) => !p.free);
   const total = tours.reduce((sum, p) => sum + (p.price ?? 0), 0);
@@ -637,6 +632,9 @@ function ToursPanel({
             {offered.map((o) => (
               <option key={o.program.id} value={o.title} />
             ))}
+            {tourPrices.map((t) => (
+              <option key={`p-${t.name}`} value={t.name} label={`${t.price} ${t.currency}`} />
+            ))}
           </datalist>
           {picks.map((pick, k) => (
             <div key={k} className={`${rowGap} ${TOUR_COLS}`}>
@@ -652,7 +650,8 @@ function ToursPanel({
                 placeholder={offered.length > 0 ? tx("tourPickHint") : `${FREE_DAY_TITLE} / جولة سياحية في ${city.city_name}`}
                 onChange={(e) => {
                   const s = serviceOf(e.target.value);
-                  setPick(k, { ...s, price: s.free ? 0 : pick.price });
+                  // a tour from the price list arrives priced; a typed one keeps what was there
+                  setPick(k, { ...s, price: s.free ? 0 : (listedPrice(e.target.value) ?? pick.price) });
                 }}
                 className={`${basicField} ${pick.free ? "text-[#7a948f]" : ""}`}
               />
@@ -686,6 +685,136 @@ function ToursPanel({
       ) : null}
 
       {isLast && transportOn ? airportRow("farewell", tx("farewell"), leavesHere?.from_airport || "—") : null}
+    </div>
+  );
+}
+
+/**
+ * The city's domestic flights, edited where the city is: the airports (the
+ * package's own first), the day, and — once the tickets are in — the flight
+ * number and the times. The legs come from the cities; nothing here has to be
+ * typed for a planned flight but its price.
+ */
+function DomesticPanel({
+  index,
+  legs,
+  data,
+  lookups,
+  onSlice,
+  onFlights,
+}: {
+  index: number;
+  legs: DraftData["flights"];
+  data: DraftData;
+  lookups: GeneratorLookups;
+  onSlice: (slice: Partial<DraftData>) => void;
+  onFlights: () => void;
+}) {
+  const tx = useBasicLabels();
+  const booking = data.flight_booking;
+  const listId = `basic-dom-airports-${index}`;
+  const ranked = rankAirports(lookups.airports, tripCountries(data), data.cities.map((c) => c.city_name));
+  const setLeg = (leg: DraftData["flights"][number], slice: Partial<DraftData["flights"][number]>) =>
+    onSlice({ flights: data.flights.map((f) => (f === leg ? { ...f, ...slice } : f)) });
+  const airport = (leg: DraftData["flights"][number], side: "from" | "to", value: string) => {
+    const a = findAirport(value, lookups.airports);
+    setLeg(leg, side === "from" ? { from_airport: value, from_tz: a?.timezone ?? null, from_city: a?.city ?? "" } : { to_airport: value, to_tz: a?.timezone ?? null, to_city: a?.city ?? "" });
+  };
+  // «MH1430» names its carrier: the first two letters are the airline's code
+  const flightNo = (leg: DraftData["flights"][number], value: string) => {
+    const no = value.toUpperCase().replace(/\s+/g, "");
+    const carrier = lookups.airlines.find((a) => a.iata && no.startsWith(a.iata.toUpperCase()));
+    setLeg(leg, { flight_no: no, ...(carrier ? { airline: carrier.name, airline_iata: carrier.iata } : {}) });
+  };
+  const day = (iso: string | null) => (iso ?? "").slice(0, 10);
+  const time = (iso: string | null) => {
+    const t = (iso ?? "").slice(11, 16);
+    return t === "00:00" ? "" : t;
+  };
+  const cols = "xl:grid-cols-[minmax(11rem,1.4fr)_minmax(11rem,1.4fr)_9.5rem_7rem_6.5rem_6.5rem]";
+
+  return (
+    <div className="space-y-1.5">
+      {legs.length === 0 ? (
+        <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noDomestic")}</p>
+      ) : (
+        <>
+          <div className={`hidden gap-2 px-0.5 text-[10.5px] font-bold text-[#7a948f] xl:grid ${cols}`}>
+            <span>{tx("domFrom")}</span>
+            <span>{tx("domTo")}</span>
+            <span>{tx("domDate")}</span>
+            <span>{tx("domFlightNo")}</span>
+            <span>{tx("domDep")}</span>
+            <span>{tx("domArr")}</span>
+          </div>
+          {legs.map((leg, k) => (
+            <div key={k} className={`grid grid-cols-2 items-center gap-2 ${cols}`}>
+              <input aria-label={tx("domFrom")} list={listId} value={leg.from_airport} onChange={(e) => airport(leg, "from", e.target.value)} className={basicField} />
+              <input aria-label={tx("domTo")} list={listId} value={leg.to_airport} onChange={(e) => airport(leg, "to", e.target.value)} className={basicField} />
+              <input
+                type="date"
+                dir="ltr"
+                aria-label={tx("domDate")}
+                value={day(leg.departure_at)}
+                onChange={(e) =>
+                  setLeg(leg, {
+                    departure_at: e.target.value ? `${e.target.value}T${time(leg.departure_at) || "00:00"}` : null,
+                    arrival_at: leg.arrival_at && e.target.value ? `${e.target.value}T${leg.arrival_at.slice(11, 16)}` : leg.arrival_at,
+                    date_user_set: true,
+                  })
+                }
+                className={`${basicField} tv-tnum px-2`}
+              />
+              <input dir="ltr" aria-label={tx("domFlightNo")} value={leg.flight_no} placeholder="MH1432" onChange={(e) => flightNo(leg, e.target.value)} className={`${basicField} tv-tnum text-center`} />
+              <input
+                type="time"
+                dir="ltr"
+                aria-label={tx("domDep")}
+                value={time(leg.departure_at)}
+                onChange={(e) => setLeg(leg, { departure_at: `${day(leg.departure_at) || (data.trip.arrival_date ?? "")}T${e.target.value || "00:00"}` })}
+                className={`${basicField} tv-tnum px-2`}
+              />
+              <input
+                type="time"
+                dir="ltr"
+                aria-label={tx("domArr")}
+                value={time(leg.arrival_at)}
+                onChange={(e) => setLeg(leg, { arrival_at: e.target.value ? `${day(leg.departure_at)}T${e.target.value}` : null })}
+                className={`${basicField} tv-tnum px-2`}
+              />
+            </div>
+          ))}
+          <datalist id={listId}>
+            {ranked.map((a) => (
+              <option key={a.id} value={airportDisplay(a)} label={a.city ?? a.country ?? undefined} />
+            ))}
+          </datalist>
+          {/* the domestic booking's one price — the same field as in the flights step and the pricing card */}
+          <label className="mt-1 inline-flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#185045]">
+            {tx("domPrice")}
+            <input
+              type="number"
+              min={0}
+              dir="ltr"
+              value={booking.dom_price ?? ""}
+              placeholder="0"
+              onChange={(e) =>
+                onSlice({ flight_booking: { ...booking, dom_price: e.target.value === "" ? null : Number(e.target.value), dom_currency: booking.dom_currency || "SAR" } })
+              }
+              className={`${basicField} tv-tnum w-32 text-center ${booking.dom_price == null ? "border-[#f0b4c2] bg-[#fff5f7]" : ""}`}
+            />
+            <span className="text-[#557d78]">{booking.dom_currency || "SAR"}</span>
+          </label>
+        </>
+      )}
+      <button
+        type="button"
+        onClick={onFlights}
+        className="inline-flex h-7 items-center gap-1 text-[11.5px] font-bold text-[#557d78] hover:text-[#185045]"
+      >
+        <Plane className="size-3.5" />
+        {tx("editFlights")}
+      </button>
     </div>
   );
 }

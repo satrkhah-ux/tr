@@ -174,7 +174,16 @@ export async function suggestPricingForDraft(
       return [{ ...r, buy_currency: buy, sell_currency: sell, legacy_id: legacyId.get(r.id) ?? null }];
     });
 
+    const toursRes = country
+      ? await supabase.from("tours").select("arabic_name, price, currency").eq("country_id", country.id).not("price", "is", null)
+      : { data: [] };
+    const tours = ((toursRes.data ?? []) as { arabic_name: string | null; price: number | string; currency: string | null }[]).flatMap((t) => {
+      const currency = knownCurrency(t.currency);
+      return t.arabic_name?.trim() && currency ? [{ name: t.arabic_name.trim(), price: Number(t.price), currency }] : [];
+    });
+
     const reference: PricingReference = {
+      tours,
       transfers,
       services,
       rooms,

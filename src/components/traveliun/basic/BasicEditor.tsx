@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { getCountryHotels, getRoomTypeLookups, produceOfferFromDraft } from "@/lib/data/drafts";
-import { getTourPrograms } from "@/lib/data/tour-programs";
+import { getTourPrices, getTourPrograms } from "@/lib/data/tour-programs";
 import type { TourProgram } from "@/lib/offer/itinerary";
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
 import type { ProfitSettings } from "@/lib/data/app-settings";
@@ -69,13 +69,17 @@ import {
   airportDisplay,
   arrivalAirport,
   basicDays,
+  carForGroup,
   cityAirport,
   HOME_AIRPORT,
   planInternational,
   packageProfitFor,
   priceAtSource,
+  resizeGroupCars,
   roomSuggestions,
+  tripCountries,
   withDomesticFlights,
+  withGroupCars,
   withPackageProfit,
   withScopeLines,
   type FlightPlan,
@@ -287,7 +291,10 @@ export function BasicEditor({
     const flights = syncDepartureDates(merged.trip, merged.flights);
     const chained = chainCities({ trip: merged.trip, flights }, merged.cities);
     const p = merged.transport_plan;
-    const transport_plan = { ...p, intercity: { ...p.intercity, enabled: chained.length > 1 } };
+    const transport_plan = withGroupCars(
+      { ...p, intercity: { ...p.intercity, enabled: chained.length > 1 } },
+      carForGroup(lookups.carTypes, merged.trip.adults + merged.trip.children),
+    );
     // a domestic flight is one of the ways between cities — the two switches are one fact
     const nextScope = { ...merged.scope, flights_domestic: intercityModes(transport_plan).includes("flight") };
     // a move by air becomes its planned domestic leg — the agent never types a route the cities already say
@@ -303,7 +310,11 @@ export function BasicEditor({
     const next = withTripDates(trip, slice);
     const pax = (t: DraftTrip) => t.adults + t.children + t.infants;
     const visas = data.visas.map((v) => (v.count === pax(trip) ? { ...v, count: pax(next) } : v));
-    commit({ trip: next, ...(pax(next) !== pax(trip) ? { visas } : {}) });
+    const seated = (t: DraftTrip) => carForGroup(lookups.carTypes, t.adults + t.children);
+    commit({
+      trip: next,
+      ...(pax(next) !== pax(trip) ? { visas, transport_plan: resizeGroupCars(plan, seated(trip), seated(next)) } : {}),
+    });
   }
 
   /** A new country: a flight still only planned (no ticket yet) now lands in it. */
@@ -433,6 +444,20 @@ export function BasicEditor({
     }),
     [lookups, roomTypes, hotelsByCountry],
   );
+
+  // ---------- the tours price list of the trip's countries ----------
+  const [tourPrices, setTourPrices] = useState<{ name: string; price: number; currency: string }[]>([]);
+  const countryKey = tripCountries(data).sort().join("|");
+  useEffect(() => {
+    if (!countryKey) return;
+    let live = true;
+    void getTourPrices(countryKey.split("|")).then((list) => {
+      if (live) setTourPrices(list);
+    });
+    return () => {
+      live = false;
+    };
+  }, [countryKey]);
 
   // ---------- the ready programmes (tour_programs) of the file's cities ----------
   const [programs, setPrograms] = useState<TourProgram[]>([]);
@@ -1051,6 +1076,7 @@ export function BasicEditor({
                 data={data}
                 lookups={lk}
                 programs={programs.filter((p) => p.city_name === city.city_name)}
+                tourPrices={tourPrices}
                 hotelsOn={scope.hotels}
                 toursOn={toursOn}
                 transportOn={scope.transport}

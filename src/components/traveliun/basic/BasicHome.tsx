@@ -3,20 +3,41 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2, Plus, Zap } from "lucide-react";
+import { Copy, Loader2, Package, Plus, Zap } from "lucide-react";
 import { DirText } from "@/components/DirText";
-import { createDraft, type DraftSummary } from "@/lib/data/drafts";
+import { createDraft, duplicateDraft, type DraftSummary } from "@/lib/data/drafts";
+import { startDraftFromReadyOffer } from "@/lib/data/ready-offers";
+import type { ReadyOfferRecord } from "@/lib/ready-offers/types";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useBasicLabels } from "./labels";
 
 /** «النظام بيسك» home: start a file, or reopen one — every draft opens here as well as in the generator. */
-export function BasicHome({ drafts }: { drafts: DraftSummary[] }) {
+export function BasicHome({ drafts, readyOffers }: { drafts: DraftSummary[]; readyOffers: ReadyOfferRecord[] }) {
   const tx = useBasicLabels();
   const { t } = useTraveliunUI();
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [showReady, setShowReady] = useState(false);
+
+  /** A new file from another: «نسخ» on a file, or a ready offer — opened here when made. */
+  async function openNew(key: string, make: () => Promise<{ ok: true; id: string } | { ok: false; error: string }>) {
+    setBusy(key);
+    setError(null);
+    try {
+      const result = await make();
+      if (!result.ok) {
+        setError(t(result.error as Parameters<typeof t>[0]));
+        return setBusy(null);
+      }
+      router.push(`/basic/${result.id}`);
+    } catch {
+      setError(tx("serverLost"));
+      setBusy(null);
+    }
+  }
 
   async function onCreate() {
     setCreating(true);
@@ -51,6 +72,45 @@ export function BasicHome({ drafts }: { drafts: DraftSummary[] }) {
             {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
             {tx("newFile")}
           </button>
+          {readyOffers.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowReady((v) => !v)}
+              aria-expanded={showReady}
+              className="ms-2 inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#185045] px-5 text-[13.5px] font-extrabold text-[#185045] hover:bg-[#f0f7f4]"
+            >
+              <Package className="size-4" />
+              {tx("fromReady")}
+            </button>
+          ) : null}
+          {showReady ? (
+            <div className="mt-3 rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
+              <p className="mb-2 text-[11.5px] font-semibold text-[#78948f]">{tx("readyHint")}</p>
+              <ul className="grid gap-1.5 sm:grid-cols-2">
+                {readyOffers.map((o) => (
+                  <li key={o.id} className="flex items-center gap-2 rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] font-bold text-[#185045]">{o.title}</span>
+                      <span className="tv-tnum block text-[11px] font-semibold text-[#78948f]">
+                        {[o.country, o.nights ? `${o.nights} ${t("pg.nightsShort")}` : "", o.price ? `${Number(o.price).toLocaleString("en-US")} ${o.currency ?? ""}` : ""]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => void openNew(`r-${o.id}`, () => startDraftFromReadyOffer(o.id))}
+                      className="inline-flex h-8 items-center gap-1 rounded-[8px] bg-[#185045] px-3 text-[12px] font-bold text-white disabled:opacity-60"
+                    >
+                      {busy === `r-${o.id}` ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                      {tx("startReady")}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {error ? <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">{error}</p> : null}
         </section>
 
@@ -61,8 +121,8 @@ export function BasicHome({ drafts }: { drafts: DraftSummary[] }) {
           ) : (
             <ul className="divide-y divide-[#edf3f0]">
               {drafts.slice(0, 30).map((d) => (
-                <li key={d.id}>
-                  <Link href={`/basic/${d.id}`} className="flex flex-wrap items-center gap-3 py-2.5 hover:bg-[#f7fbf9]">
+                <li key={d.id} className="flex items-center gap-2">
+                  <Link href={`/basic/${d.id}`} className="flex min-w-0 flex-1 flex-wrap items-center gap-3 py-2.5 hover:bg-[#f7fbf9]">
                     <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-[#185045]">
                       {d.title || d.destination || "—"}
                       {d.customer_name ? <span className="text-[#93aaa3]"> · {d.customer_name}</span> : null}
@@ -78,6 +138,17 @@ export function BasicHome({ drafts }: { drafts: DraftSummary[] }) {
                     ) : null}
                     <span className="text-[11.5px] font-bold text-[#2aa87a]">{tx("open")}</span>
                   </Link>
+                  {/* the same programme for the next client */}
+                  <button
+                    type="button"
+                    title={tx("copyHint")}
+                    disabled={busy !== null}
+                    onClick={() => void openNew(`c-${d.id}`, () => duplicateDraft(d.id, { freshClient: true }))}
+                    className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[8px] border border-[#cfe0d9] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
+                  >
+                    {busy === `c-${d.id}` ? <Loader2 className="size-3.5 animate-spin" /> : <Copy className="size-3.5" />}
+                    {tx("copy")}
+                  </button>
                 </li>
               ))}
             </ul>

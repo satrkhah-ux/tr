@@ -23,9 +23,14 @@ describe("intercity — several modes, one per hop", () => {
     const rows = deriveTransportRows(plan(), cities).filter((r) => r.from_place !== "المطار" && r.to_place !== "المطار" && r.from_place !== "الجولات السياحية");
     expect(rows.map((r) => [r.from_place, r.to_place, r.car_type])).toEqual([
       ["سيلانجور", "كوالالمبور", "فان"],
-      ["كوالالمبور", "لنكاوي", "طيران داخلي"],
       ["لنكاوي", "بينانج", "قطار"],
     ]);
+  });
+
+  it("turns a hop by air into the transfers either side of the flight", () => {
+    const rows = deriveTransportRows(plan(), cities).map((r) => `${r.from_place} ← ${r.to_place}`);
+    expect(rows).toEqual(expect.arrayContaining(["فندق كوالالمبور ← المطار", "المطار ← فندق لنكاوي"]));
+    expect(rows).not.toContain("كوالالمبور ← لنكاوي");
   });
 
   it("falls back to the first mode when a hop's pick is no longer chosen", () => {

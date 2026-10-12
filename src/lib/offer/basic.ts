@@ -820,3 +820,54 @@ export function withPackageProfit(
   }
   return shared;
 }
+
+// ---------- the car the group rides in ----------
+
+/** Not chosen for a group by size alone: a limousine, an accessible vehicle. */
+const SPECIAL_CAR = /vip|ليموزين|ذوي الاحتياجات|مجهزة/i;
+
+/**
+ * The car a group of `people` rides in: the smallest ordinary car that seats it
+ * — with a seat to spare from three people up, for the luggage — else enough of
+ * the largest. Null when the list has no sizes.
+ */
+export function carForGroup(carTypes: { name: string; pax: number | null }[], people: number): { car_type: string; cars: number } | null {
+  const seats = carTypes.filter((c) => (c.pax ?? 0) > 0 && !SPECIAL_CAR.test(c.name)).sort((a, b) => (a.pax ?? 0) - (b.pax ?? 0));
+  if (seats.length === 0 || people <= 0) return null;
+  const need = people >= 3 ? people + 1 : people;
+  const fits = seats.find((c) => (c.pax ?? 0) >= need);
+  if (fits) return { car_type: fits.name, cars: 1 };
+  const big = seats[seats.length - 1];
+  return { car_type: big.name, cars: Math.ceil(need / (big.pax ?? 1)) };
+}
+
+/** Every car the trip still lacks — reception, tours, between cities, farewell — takes the one that seats the group. */
+export function withGroupCars(plan: DraftData["transport_plan"], car: { car_type: string; cars: number } | null): DraftData["transport_plan"] {
+  if (!car) return plan;
+  const fill = <T extends { car_type: string; cars: number }>(leg: T): T => (leg.car_type.trim() ? leg : { ...leg, ...car });
+  return {
+    ...plan,
+    airport: fill(plan.airport),
+    tours: fill(plan.tours),
+    intercity: fill(plan.intercity),
+    ...(plan.farewell ? { farewell: fill(plan.farewell) } : {}),
+  };
+}
+
+/** The group grew or shrank: a car that was the group's size follows; one the agent chose stays. */
+export function resizeGroupCars(
+  plan: DraftData["transport_plan"],
+  before: { car_type: string; cars: number } | null,
+  after: { car_type: string; cars: number } | null,
+): DraftData["transport_plan"] {
+  if (!before || !after) return plan;
+  const follow = <T extends { car_type: string; cars: number }>(leg: T): T =>
+    leg.car_type === before.car_type && leg.cars === before.cars ? { ...leg, ...after } : leg;
+  return {
+    ...plan,
+    airport: follow(plan.airport),
+    tours: follow(plan.tours),
+    intercity: follow(plan.intercity),
+    ...(plan.farewell ? { farewell: follow(plan.farewell) } : {}),
+  };
+}

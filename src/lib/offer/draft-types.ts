@@ -951,6 +951,17 @@ export function deriveTransportRows(plan: TransportPlan, cities: { city_name: st
       const from = cities[i - 1]?.city_name?.trim();
       const to = cities[i]?.city_name?.trim();
       if (!from || !to) continue;
+      // By air, the road is the transfers either side of the flight: the hotel
+      // to its airport, the next airport to the next hotel — in the transfer
+      // car. The flight itself is priced by the domestic booking.
+      if (hopMode(plan, from, to) === "flight") {
+        if (!plan.airport.enabled) continue;
+        const car = vehicleText(plan.airport);
+        const date = cities[i]?.check_in ?? null;
+        rows.push({ from_place: `${TRANSPORT_HOTEL_PREFIX}${from}`, to_place: TRANSPORT_AIRPORT, car_type: car, date, note: plan.airport.note });
+        rows.push({ from_place: TRANSPORT_AIRPORT, to_place: `${TRANSPORT_HOTEL_PREFIX}${to}`, car_type: car, date, note: plan.airport.note });
+        continue;
+      }
       rows.push({
         from_place: from,
         to_place: to,

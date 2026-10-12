@@ -78,7 +78,18 @@ export type PricingReference = {
   services: ServicePrice[];
   rooms: RoomPrice[];
   fleet: FleetVehicle[];
+  /** the company's tours price list for the trip's country (/cars/tours). */
+  tours?: TourPrice[];
 };
+
+/** A tour on the company's price list. */
+export type TourPrice = { name: string; price: number; currency: string };
+
+/** The listed tour a typed title names — the same name, however it was spelled. */
+export function findTourPrice(list: TourPrice[] | undefined, title: string): TourPrice | null {
+  const key = normalizeName(title);
+  return key ? (list ?? []).find((t) => normalizeName(t.name) === key) ?? null : null;
+}
 
 /**
  * Arabic typed by different people is different text: «إسطنبول» and
@@ -436,16 +447,18 @@ export function suggestPricing(
     (city.tour_picks ?? []).slice(0, city.tours ?? 0).forEach((pick, i) => {
       // a free day is never a line on the bill
       if (pick.free || pick.title.trim() === FREE_DAY_TITLE || (!pick.title.trim() && pick.price == null)) return;
+      // a tour typed without a price takes the list's, when the list knows it
+      const listed = pick.price == null ? findTourPrice(reference.tours, pick.title) : null;
       items.push({
         item_type: "service",
         description: pick.title.trim() || `جولة سياحية في ${city.city_name}`,
         ref: `tour:${city.city_name}:${i}`,
         quantity: 1,
-        buy_price: pick.price,
-        buy_currency: "SAR",
-        sell_price: pick.price,
-        sell_currency: "SAR",
-        source: pick.price != null ? "typed" : "none",
+        buy_price: listed ? listed.price : pick.price,
+        buy_currency: listed ? listed.currency : "SAR",
+        sell_price: listed ? listed.price : pick.price,
+        sell_currency: listed ? listed.currency : "SAR",
+        source: listed ? "list" : pick.price != null ? "typed" : "none",
       });
     });
   }
