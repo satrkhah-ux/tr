@@ -21,11 +21,7 @@ export function PreviewStage({ draftId, data, patch, lookups }: StageFormProps) 
   const [producing, setProducing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // a partner session reads no supplier list (staff-only), so it is not asked for one
-  const validation = useMemo(
-    () => validateDraft(data, { requireSupplier: (lookups.companySuppliers?.length ?? 0) > 0 }),
-    [data, lookups.companySuppliers],
-  );
+  const validation = useMemo(() => validateDraft(data), [data]);
   const produced = data.produced_serial;
 
   async function produce() {

@@ -24,9 +24,7 @@ export function withRequiredAnswers(data: DraftData): DraftData {
     flight_booking: {
       ...data.flight_booking,
       intl_price: data.flight_booking.intl_price ?? 2000,
-      intl_supplier: data.flight_booking.intl_supplier || "TBO Holidays",
       dom_price: data.flight_booking.dom_price ?? 500,
-      dom_supplier: data.flight_booking.dom_supplier || "TBO Holidays",
     },
     services: data.services.includes.length > 0 ? data.services : { ...data.services, includes: ["الإقامة"] },
     visas: data.visas.length > 0 ? data.visas : [{ country: data.trip.country, visa_type: "سياحية", count: 1, note: "" }],

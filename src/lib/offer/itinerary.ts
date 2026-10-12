@@ -12,7 +12,8 @@
 
 import {
   deriveCityDates,
-  TRANSPORT_MODE_AR,
+  hopMode,
+  hopVehicle,
   vehicleText,
   type DraftCity,
   type DraftData,
@@ -256,7 +257,7 @@ export function transportNoteForDay(
     const no = hop.flight_no.trim();
     parts.push("الانتقال إلى " + day.city_name + " — طيران داخلي" + (no ? " (" + no + ")" : ""));
   } else if (plan.intercity.enabled && cityChanged) {
-    const how = vehicleText(plan.intercity, TRANSPORT_MODE_AR[plan.intercity.mode]);
+    const how = hopVehicle(plan, hopMode(plan, days[index - 1]?.city_name ?? "", day.city_name));
     parts.push(`الانتقال إلى ${day.city_name} — ${how}`);
   } else if (plan.tours.enabled && !first && !last) {
     const label = "سيارة الجولات";

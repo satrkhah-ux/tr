@@ -1,6 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { emptyDraftData, type DraftData } from "./draft-types";
-import { addCity, basicDays, remainingNights, setCityNights, type BasicCity } from "./basic";
+import { emptyDraftData, withRooms, type DraftData } from "./draft-types";
+import {
+  addCity,
+  baseRoomName,
+  basicDays,
+  changeRoom,
+  cityLines,
+  clearRoomChange,
+  EXTRA_BED,
+  extraBeds,
+  remainingNights,
+  renameRooms,
+  setCityNights,
+  withExtraBeds,
+  withHotelLines,
+  withTripDates,
+  type BasicCity,
+} from "./basic";
 
 /** The video's file: Malaysia from 11 Nov, 8 nights, three cities. */
 function malaysia(): DraftData {
@@ -61,5 +77,50 @@ describe("النظام بيسك", () => {
     expect(next.hotels[0].rooms[0].price).toBe(1125);
     expect(next.cities[1].check_in).toBe("2026-11-14");
     expect((next.cities[0] as BasicCity).tours).toBe(1);
+  });
+
+  it("splits a stay for a room change, each half at the same nightly rate, and joins it back", () => {
+    const data = malaysia();
+    // لنكاوي: 3 nights, 900 for the stay = 300 a night
+    data.hotels = data.hotels.map((h) => (h.city_name === "لنكاوي" ? { ...h, rooms: h.rooms.map((r) => ({ ...r, price: 900 })) } : h));
+    const split = { ...data, ...changeRoom(data, "لنكاوي", 1, "جناح") };
+    const [first, second] = cityLines(split.hotels, "لنكاوي");
+    expect([first.nights, first.rooms[0].price]).toEqual([1, 300]);
+    expect([second.nights, second.rooms[0].room_type_name, second.rooms[0].price]).toEqual([0, "جناح", null]);
+    expect(split.hotels.map((h) => h.city_name)).toEqual(["سيلانغور", "لنكاوي", "لنكاوي", "كوالالمبور"]);
+
+    const joined = clearRoomChange(split, "لنكاوي").hotels;
+    expect(cityLines(joined, "لنكاوي").map((h) => [h.nights, h.rooms[0].price])).toEqual([[0, 900]]);
+
+    // a city cut to one night has no room left to change into
+    expect(cityLines(setCityNights(split, 1, 1).hotels, "لنكاوي")).toHaveLength(1);
+  });
+
+  it("puts the extra bed on the first rooms and keeps it through a rename", () => {
+    let line = malaysia().hotels[0];
+    line = withRooms(line, [...line.rooms, { ...line.rooms[0] }]);
+    line = renameRooms(withExtraBeds(line, 1), "ديلوكس");
+    expect(line.rooms.map((r) => r.room_type_name)).toEqual([`ديلوكس${EXTRA_BED}`, "ديلوكس"]);
+    expect([extraBeds(line), baseRoomName(line.rooms[0].room_type_name)]).toEqual([1, "ديلوكس"]);
+  });
+
+  it("reads the nights from a departure date, and moves the departure with the nights", () => {
+    const trip = malaysia().trip;
+    expect(withTripDates(trip, { departure_date: "2026-11-21" })).toMatchObject({ nights: 10, days: 11 });
+    expect(withTripDates(trip, { nights: 5 })).toMatchObject({ departure_date: "2026-11-16", days: 6 });
+  });
+
+  it("leaves every day free when tours are switched off", () => {
+    const data = malaysia();
+    data.transport_plan = { ...data.transport_plan, tours: { ...data.transport_plan.tours, enabled: false } };
+    expect(basicDays(data).filter((d) => d.title.startsWith("جولة"))).toHaveLength(0);
+  });
+
+  it("keeps a neighbour's country on its city, and gives a flown-in city its hotel line", () => {
+    const data = malaysia();
+    const next = { ...data, ...addCity(data, { name: "سنغافورة", nights: 2, tours: 0, country: "سنغافورة" }, "SAR") };
+    expect([next.cities[3].country, next.cities[0].country]).toEqual(["سنغافورة", undefined]);
+    const flown = { ...data, cities: [...data.cities, { city_name: "جوهور", nights: 1, check_in: null, check_out: null }] };
+    expect(withHotelLines(flown, "SAR").map((h) => h.city_name)).toContain("جوهور");
   });
 });

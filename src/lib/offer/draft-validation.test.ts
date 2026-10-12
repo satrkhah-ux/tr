@@ -159,22 +159,12 @@ describe("validateDraft", () => {
     expect(result.warnings.map((w) => w.key)).toContain("pg.warn.noPricing");
   });
 
-  it("does not ask a partner session for a supplier it cannot read", () => {
-    const data = completeDraft();
-    data.flight_booking = { ...data.flight_booking, intl_supplier: "" };
-    data.hotels = data.hotels.map((h) => ({ ...h, supplier: "" }));
-    const keys = validateDraft(data, { requireSupplier: false }).blocking.map((i) => i.key);
-    expect(keys).not.toContain("pg.err.flightSupplier");
-    expect(keys).not.toContain("pg.err.staySupplier");
-    expect(validateDraft(data).blocking.map((i) => i.key)).toContain("pg.err.staySupplier");
-  });
-
-  it("asks for one booking price and its supplier per flight booking", () => {
+  it("asks for one booking price per flight booking, and never for the supplier", () => {
     const data = completeDraft();
     data.flight_booking = { ...data.flight_booking, intl_price: null, intl_supplier: "" };
-    const keys = validateDraft(data).blocking.map((i) => i.key);
-    expect(keys).toContain("pg.err.flightUnpriced");
-    expect(keys).toContain("pg.err.flightSupplier");
+    data.hotels = data.hotels.map((h) => ({ ...h, supplier: "" }));
+    const result = validateDraft(data);
+    expect(result.blocking.map((i) => i.key)).toEqual(["pg.err.flightUnpriced"]);
   });
 
   it("BLOCKS when a supplier-priced hotel's sell is edited below the supplier floor after pricing", () => {

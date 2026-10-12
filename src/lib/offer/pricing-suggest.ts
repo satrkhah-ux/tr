@@ -283,19 +283,22 @@ export function suggestPricing(
     );
 
     const typed = stayTotal(line);
+    const recalled = remembered
+      ? remembered.price * Math.max(line.rooms.length, 1) * (remembered.per_night ? Math.max(stay.nights, 1) : 1)
+      : null;
 
-    // The order of trust, most binding first.
+    // The order of trust, most binding first. A typed or remembered price is
+    // what the room COSTS us — it was bought from a supplier — so it fills the
+    // buy side too, exactly like a list price: «إجمالي الشراء» used to count
+    // the transfers alone and call everything else profit.
+    // ponytail: sell starts AT cost (0 profit); the agent adds the margin on the
+    // pricing card. Apply markup_rules here if management wants it automatic.
     const [sell, buy, cur, source]: [number | null, number | null, string, PriceSource] = line.sourcing
       ? [line.sourcing.sell_base, line.sourcing.net_base, "SAR", "supplier"]
       : typed != null
-        ? [typed, null, line.manual_currency || currency, "typed"]
+        ? [typed, typed, line.manual_currency || currency, "typed"]
         : remembered
-          ? [
-              remembered.price * Math.max(line.rooms.length, 1) * (remembered.per_night ? Math.max(stay.nights, 1) : 1),
-              null,
-              remembered.currency,
-              "remembered",
-            ]
+          ? [recalled, recalled, remembered.currency, "remembered"]
           : [null, null, currency, "none"];
 
     items.push({
@@ -343,9 +346,9 @@ export function suggestPricing(
       item_type: "flight",
       description: numbers ? `${b.label} — ${numbers}` : b.label,
       ref: b.ref,
-      // the figure is already the whole booking
+      // the figure is already the whole booking — and what we paid for it
       quantity: 1,
-      buy_price: null,
+      buy_price: b.price,
       buy_currency: b.currency,
       sell_price: b.price,
       sell_currency: b.currency,

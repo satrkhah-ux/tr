@@ -245,6 +245,8 @@ describe("suggestPricing — the order of trust", () => {
     const rooms = [{ hotel_id: "h1", hotel_name: "", room_type_name: "استاندر", board_type: "BB", price: 500, currency: "SAR" }];
     const [hotel] = suggestPricing(data, { ...EMPTY, rooms }, LABELS);
     expect(hotel.sell_price).toBe(777 * 2);
+    // a typed price is what the room cost us: it counts in «إجمالي الشراء»
+    expect(hotel.buy_price).toBe(777 * 2);
     expect(hotel.quantity).toBe(1);
     expect(hotel.source).toBe("typed");
   });
@@ -276,6 +278,7 @@ describe("suggestPricing — the order of trust", () => {
     const [hotel] = suggestPricing(draftWithOneStay(), { ...EMPTY, rooms }, LABELS);
     // remembered is ONE room's price, and the stay has two
     expect(hotel.sell_price).toBe(1000);
+    expect(hotel.buy_price).toBe(1000);
     expect(hotel.source).toBe("remembered");
   });
 
@@ -299,7 +302,7 @@ describe("suggestPricing — the order of trust", () => {
     const items = suggestPricing(data, EMPTY, LABELS);
     expect(items.find((i) => i.item_type === "hotel")?.quantity).toBe(1); // the rooms are summed
     // the booking price already covers every traveller and every leg
-    expect(items.find((i) => i.item_type === "flight")).toMatchObject({ quantity: 1, sell_price: 4200, ref: "flight:intl", source: "typed" });
+    expect(items.find((i) => i.item_type === "flight")).toMatchObject({ quantity: 1, buy_price: 4200, sell_price: 4200, ref: "flight:intl", source: "typed" });
   });
 });
 

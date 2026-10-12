@@ -9,6 +9,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { validateInvariants, type InvariantViolation } from "./invariants";
 import {
   deriveCityDates,
+  hopMode,
   deriveHotelStays,
   hotelCoverage,
   pricingRefFor,
@@ -111,18 +112,10 @@ function statedBoard(h: DraftData["hotels"][number]): string | null {
   return rooms.every((r) => Boolean(r.board_type)) ? (h.board_type ?? "stated") : null;
 }
 
-export type ValidateOptions = {
-  /**
-   * Ask for the supplier a flight booking or a typed hotel price was bought
-   * through. Off for a PARTNER session: our supplier list is staff-only (a
-   * partner must not learn who we buy from), so a partner could never fill it
-   * and would be blocked forever.
-   */
-  requireSupplier?: boolean;
-};
-
-export function validateDraft(data: DraftData, options: ValidateOptions = {}): DraftValidation {
-  const requireSupplier = options.requireSupplier ?? true;
+// Who a flight or a hotel was booked through is recorded when the agent knows
+// it, never demanded: management asked that a missing supplier name not hold a
+// file back (and a partner could never fill it — our list is staff-only).
+export function validateDraft(data: DraftData): DraftValidation {
   const blocking: DraftIssue[] = [];
   const warnings: DraftIssue[] = [];
 
@@ -154,8 +147,9 @@ export function validateDraft(data: DraftData, options: ValidateOptions = {}): D
   if (!anyScope) need("scope", "scope", "pg.scope.noneOn");
   if (data.scope.transport) {
     const plan = data.transport_plan;
-    // an intercity leg that is flown or taken by train needs no vehicle
-    const byCar = [plan.airport, plan.tours, ...(plan.intercity.mode === "car" ? [plan.intercity] : [])];
+    // only a hop made by road needs a vehicle — a flown one or a train does not
+    const roadHop = cities.slice(1).some((c, i) => hopMode(plan, cities[i].city_name, c.city_name) === "car");
+    const byCar = [plan.airport, plan.tours, ...(roadHop ? [plan.intercity] : [])];
     if (byCar.some((leg) => leg.enabled && (!leg.car_type.trim() || leg.cars <= 0))) {
       need("transport", "transport", "pg.err.transportVehicle");
     }
@@ -164,7 +158,7 @@ export function validateDraft(data: DraftData, options: ValidateOptions = {}): D
   if (data.scope.visas && (data.visas.length === 0 || data.visas.some((v) => !v.visa_type.trim()))) {
     need("visas", "visas", "pg.err.visaType");
   }
-  // ---- flights: complete legs, one priced booking each, through a supplier ----
+  // ---- flights: complete legs, one priced booking each ----
   // A ready-made package's locked total already holds the tickets.
   const legDone = (f: DraftData["flights"][number]) =>
     Boolean(f.from_airport.trim() && f.to_airport.trim() && f.flight_no.trim() && f.departure_at && f.arrival_at);
@@ -176,14 +170,12 @@ export function validateDraft(data: DraftData, options: ValidateOptions = {}): D
     else if (intl.some((f) => !legDone(f))) need("flights", "flights", "pg.err.flightIncomplete");
     if (intl.length > 0 && !isFixedPrice(data)) {
       if (booking.intl_price == null || booking.intl_price <= 0) need("flights", "flights", "pg.err.flightUnpriced");
-      if (requireSupplier && !booking.intl_supplier.trim()) need("flights", "flights", "pg.err.flightSupplier");
     }
   }
   if (data.scope.flights_domestic && dom.length > 0) {
     if (dom.some((f) => !legDone(f))) need("flights", "flights", "pg.err.flightIncomplete");
     if (!isFixedPrice(data)) {
       if (booking.dom_price == null || booking.dom_price <= 0) need("flights", "flights", "pg.err.domFlightUnpriced");
-      if (requireSupplier && !booking.dom_supplier.trim()) need("flights", "flights", "pg.err.domFlightSupplier");
     }
   }
   // The booking and the programme must agree on where the group sleeps.
@@ -253,14 +245,6 @@ export function validateDraft(data: DraftData, options: ValidateOptions = {}): D
     stays.some((s) => s.line.hotel_name.trim() && !s.line.sourcing && stayTotal(s.line) == null)
   ) {
     blocking.push({ severity: "blocking", stage: "hotels", field: "hotels", key: "pg.err.stayUnpriced" });
-  }
-  if (
-    requireSupplier &&
-    data.scope.hotels &&
-    !isFixedPrice(data) &&
-    stays.some((s) => s.line.hotel_name.trim() && !s.line.sourcing && !s.line.supplier?.trim())
-  ) {
-    blocking.push({ severity: "blocking", stage: "hotels", field: "hotels", key: "pg.err.staySupplier" });
   }
 
   // A supplier-priced line whose ACTUAL published SELL is below the supplier floor,

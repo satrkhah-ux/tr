@@ -359,6 +359,12 @@ export type DraftCity = {
   nights: number;
   /** true when the flights put this city here (and decide its nights). */
   from_flight?: boolean;
+  /**
+   * Set only when the city lies outside `trip.country` — a neighbour the group
+   * crosses into. Hotel search, supplier rates and markup rules read it through
+   * `cityCountry`; everything else keys on the city's name.
+   */
+  country?: string;
   /** derived from trip.arrival_date + the nights chain (deriveCityDates). */
   check_in: string | null;
   check_out: string | null;
@@ -745,7 +751,7 @@ export type DraftTransport = {
   note: string;
 };
 
-export type TransportMode = "car" | "flight" | "train";
+export type TransportMode = "car" | "flight" | "train" | "ship";
 
 /**
  * How this group actually moves — the three questions an agent is really asked,
@@ -777,15 +783,46 @@ export type TransportPlan = {
   airport: TransportLeg;
   /** the day tours. */
   tours: TransportLeg;
-  /** moving from one city to the next. */
-  intercity: TransportLeg & { mode: TransportMode };
+  /**
+   * moving from one city to the next. `modes` is every way the group moves
+   * between cities on this trip — one country can use car, domestic flight and
+   * train in the same programme — and `hop_modes` says which one each hop takes
+   * (keyed by hopKey). `mode` mirrors the first of `modes` for older readers.
+   */
+  intercity: TransportLeg & { mode: TransportMode; modes?: TransportMode[]; hop_modes?: Record<string, TransportMode> };
 };
 
 export const TRANSPORT_MODE_AR: Record<TransportMode, string> = {
   car: "سيارة",
   flight: "طيران داخلي",
   train: "قطار",
+  ship: "سفينة",
 };
+
+/** The country a city is in: its own when the group crossed a border, else the trip's. */
+export function cityCountry(data: Pick<DraftData, "trip" | "cities">, cityName: string): string {
+  return data.cities.find((c) => c.city_name === cityName)?.country?.trim() || data.trip.country;
+}
+
+/** The ways the group moves between cities — the agent's choice, or the single legacy `mode`. */
+export function intercityModes(plan: Pick<TransportPlan, "intercity">): TransportMode[] {
+  const chosen = (plan.intercity.modes ?? []).filter((m) => m in TRANSPORT_MODE_AR);
+  return chosen.length > 0 ? chosen : [plan.intercity.mode];
+}
+
+export const hopKey = (from: string, to: string) => `${from.trim()}>${to.trim()}`;
+
+/** How ONE hop is made: the agent's pick for it while that mode is still chosen, else the first mode. */
+export function hopMode(plan: Pick<TransportPlan, "intercity">, from: string, to: string): TransportMode {
+  const modes = intercityModes(plan);
+  const picked = plan.intercity.hop_modes?.[hopKey(from, to)];
+  return picked && modes.includes(picked) ? picked : modes[0];
+}
+
+/** What a hop prints as: the vehicle for a road hop, the mode itself for a flight or a train. */
+export function hopVehicle(plan: Pick<TransportPlan, "intercity">, mode: TransportMode): string {
+  return mode === "car" ? vehicleText(plan.intercity, TRANSPORT_MODE_AR.car) : TRANSPORT_MODE_AR[mode];
+}
 
 /**
  * The vehicle as every reader prints it.
@@ -863,7 +900,7 @@ export function deriveTransportRows(plan: TransportPlan, cities: { city_name: st
       rows.push({
         from_place: from,
         to_place: to,
-        car_type: vehicleText(plan.intercity, TRANSPORT_MODE_AR[plan.intercity.mode]),
+        car_type: hopVehicle(plan, hopMode(plan, from, to)),
         date: cities[i]?.check_in ?? null,
         note: plan.intercity.note,
       });
@@ -1153,7 +1190,7 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
   const transportPlan: TransportPlan = {
     airport: mergeLeg(empty.transport_plan.airport, plan.airport),
     tours: mergeLeg(empty.transport_plan.tours, plan.tours),
-    intercity: mergeLeg(empty.transport_plan.intercity, plan.intercity),
+    intercity: normalizeIntercity(mergeLeg(empty.transport_plan.intercity, plan.intercity)),
   };
   const scope = normalizeScope(source.scope);
 
@@ -1203,6 +1240,14 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     produced_serial: typeof source.produced_serial === "string" ? source.produced_serial : null,
     source: normalizeDraftSource(source.source),
   };
+}
+
+/** A hand-edited or older intercity leg comes back with only real modes in it. */
+function normalizeIntercity(leg: TransportPlan["intercity"]): TransportPlan["intercity"] {
+  const modes = intercityModes({ intercity: leg });
+  const raw = leg.hop_modes && typeof leg.hop_modes === "object" ? leg.hop_modes : {};
+  const hop_modes = Object.fromEntries(Object.entries(raw).filter(([, m]) => typeof m === "string" && m in TRANSPORT_MODE_AR));
+  return { ...leg, mode: modes[0], modes, hop_modes };
 }
 
 /**

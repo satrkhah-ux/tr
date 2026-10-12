@@ -1,7 +1,10 @@
 "use client";
 
-import { Bus, Car, PlaneTakeoff, TrainFront, Check, Minus } from "lucide-react";
+import { Bus, Car, PlaneTakeoff, Ship, TrainFront, Check, Minus } from "lucide-react";
 import {
+  hopKey,
+  hopMode,
+  intercityModes,
   TRANSPORT_MODE_AR,
   type LookupCarType,
   type TransportLeg,
@@ -29,6 +32,7 @@ const MODE_ICON: Record<TransportMode, typeof Car> = {
   car: Car,
   flight: PlaneTakeoff,
   train: TrainFront,
+  ship: Ship,
 };
 
 const MODES: TransportMode[] = ["car", "flight", "train"];
@@ -41,6 +45,7 @@ function LegCard({
   carTypes,
   onChange,
   children,
+  vehicle = true,
 }: {
   title: string;
   hint: string;
@@ -49,6 +54,8 @@ function LegCard({
   carTypes: LookupCarType[];
   onChange: (next: Partial<TransportLeg>) => void;
   children?: React.ReactNode;
+  /** false when the leg is never driven (every hop flown or by train) — no car to ask for. */
+  vehicle?: boolean;
 }) {
   const { t } = useTraveliunUI();
   return (
@@ -81,6 +88,7 @@ function LegCard({
       {leg.enabled ? (
         <div className="mt-3 grid gap-2.5">
           {children}
+          {vehicle ? (
           <div className="grid grid-cols-[1fr_5.5rem] gap-2">
             {/*
               The vehicle is CHOSEN, not typed. It used to be a free-text box,
@@ -124,6 +132,7 @@ function LegCard({
               />
             </label>
           </div>
+          ) : null}
           <label className="grid gap-1 text-[11.5px] font-bold text-[#557d78]">
             {t("pg.transport.note")}
             <input
@@ -141,16 +150,32 @@ function LegCard({
 export function TransportBlock({
   plan,
   carTypes,
-  cityCount,
+  cities,
   onChange,
 }: {
   plan: TransportPlan;
   carTypes: LookupCarType[];
-  /** How many cities the programme has — the intercity leg is derived from them. */
-  cityCount: number;
+  /** The programme's cities in order — the intercity hops are derived from them. */
+  cities: string[];
   onChange: (next: TransportPlan) => void;
 }) {
   const { t } = useTraveliunUI();
+  const cityCount = cities.length;
+  const modes = intercityModes(plan);
+  const hops = cities.slice(1).map((to, i) => ({ from: cities[i], to }));
+
+  /** Several modes may be on at once — a country can use all three — but never none. */
+  function toggleMode(mode: TransportMode) {
+    const on = modes.includes(mode) ? modes.filter((m) => m !== mode) : [...modes, mode];
+    if (on.length === 0) return;
+    const next = MODES.filter((m) => on.includes(m));
+    onChange({ ...plan, intercity: { ...plan.intercity, modes: next, mode: next[0] } });
+  }
+
+  function setHop(from: string, to: string, mode: TransportMode) {
+    const hop_modes = { ...plan.intercity.hop_modes, [hopKey(from, to)]: mode };
+    onChange({ ...plan, intercity: { ...plan.intercity, hop_modes } });
+  }
 
   return (
     <div className="rounded-2xl border border-[#e2ebe7] bg-[#fbfdfc] p-5">
@@ -180,9 +205,10 @@ export function TransportBlock({
         <LegCard
           title={t("pg.transport.intercity")}
           hint={t("pg.transport.intercityHint")}
-          icon={MODE_ICON[plan.intercity.mode]}
+          icon={MODE_ICON[modes[0]]}
           leg={plan.intercity}
           carTypes={carTypes}
+          vehicle={hops.length === 0 ? modes.includes("car") : hops.some((h) => hopMode(plan, h.from, h.to) === "car")}
           onChange={(next) => onChange({ ...plan, intercity: { ...plan.intercity, ...next } })}
         >
           {/*
@@ -199,19 +225,21 @@ export function TransportBlock({
             </p>
           ) : null}
 
-          {/* Between cities the answer may not be a vehicle at all — a domestic
-              flight or a train is the normal choice in Turkey, Japan, Europe. */}
+          {/* Between cities the answer may not be a vehicle at all — and in
+              Malaysia or Turkey one programme drives one hop, flies the next
+              and takes the train after. So several modes, then one per hop. */}
           <div className="grid gap-1 text-[11.5px] font-bold text-[#557d78]">
             {t("pg.transport.mode")}
+            <span className="text-[10.5px] font-semibold text-[#93aaa3]">{t("pg.transport.modesHint")}</span>
             <div className="flex gap-1.5">
               {MODES.map((mode) => {
                 const ModeIcon = MODE_ICON[mode];
-                const active = plan.intercity.mode === mode;
+                const active = modes.includes(mode);
                 return (
                   <button
                     key={mode}
                     type="button"
-                    onClick={() => onChange({ ...plan, intercity: { ...plan.intercity, mode } })}
+                    onClick={() => toggleMode(mode)}
                     aria-pressed={active}
                     className={`inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[9px] border text-[12px] font-bold transition-colors ${
                       active
@@ -219,13 +247,52 @@ export function TransportBlock({
                         : "border-[#dbe6e1] bg-white text-[#557d78] hover:bg-[#f4f8f6]"
                     }`}
                   >
-                    <ModeIcon className="size-3.5" />
+                    {active ? <Check className="size-3.5" /> : <ModeIcon className="size-3.5" />}
                     {TRANSPORT_MODE_AR[mode]}
                   </button>
                 );
               })}
             </div>
           </div>
+
+          {/* With more than one mode, each hop says which it takes. */}
+          {modes.length > 1 && hops.length > 0 ? (
+            <div className="grid gap-1.5 rounded-[10px] border border-[#e2ebe7] bg-[#fbfdfc] p-2.5">
+              <p className="text-[11px] font-bold text-[#557d78]">{t("pg.transport.perHop")}</p>
+              {hops.map(({ from, to }) => {
+                const current = hopMode(plan, from, to);
+                return (
+                  <div key={`${from}>${to}`} className="flex flex-wrap items-center justify-between gap-1.5">
+                    <span className="text-[12px] font-bold text-[#185045]">
+                      {from} ← {to}
+                    </span>
+                    <div className="flex gap-1">
+                      {modes.map((mode) => {
+                        const ModeIcon = MODE_ICON[mode];
+                        return (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setHop(from, to, mode)}
+                            aria-pressed={current === mode}
+                            title={TRANSPORT_MODE_AR[mode]}
+                            className={`inline-flex h-8 items-center gap-1 rounded-[8px] border px-2 text-[11px] font-bold ${
+                              current === mode
+                                ? "border-[#185045] bg-[#185045] text-white"
+                                : "border-[#dbe6e1] bg-white text-[#557d78] hover:bg-[#f4f8f6]"
+                            }`}
+                          >
+                            <ModeIcon className="size-3.5" />
+                            {TRANSPORT_MODE_AR[mode]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </LegCard>
       </div>
     </div>

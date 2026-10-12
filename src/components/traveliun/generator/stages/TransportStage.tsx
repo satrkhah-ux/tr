@@ -21,7 +21,7 @@ export function TransportStage({ data, patch, lookups }: StageFormProps) {
       <TransportBlock
         plan={data.transport_plan}
         carTypes={lookups.carTypes}
-        cityCount={data.cities.length}
+        cities={data.cities.map((c) => c.city_name)}
         onChange={(transport_plan) => patch({ transport_plan })}
       />
     </section>

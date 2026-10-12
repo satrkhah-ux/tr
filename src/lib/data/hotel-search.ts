@@ -11,6 +11,7 @@ import type { HotelSearchQuery, SupplierCallRecord } from "@/lib/providers/hotel
 import { priceSupplierRate } from "@/lib/pricing/price-line";
 import type { MarkupContext } from "@/lib/pricing/markup";
 import {
+  cityCountry,
   findLookupCountry,
   deriveCityDates,
   deriveHotelStays,
@@ -182,7 +183,7 @@ export async function searchInternalHotels(
         iso2: null,
         cities: [],
       })),
-      record.data.trip.country,
+      cityCountry(record.data, cityName),
     );
     if (!country) return { ok: true, hotels: [] };
 
@@ -348,7 +349,7 @@ export async function searchHotelsForCity(
   // THE field this call used to omit. A real supplier resolves a city inside a
   // country, so TBO returned an empty list for every search from this screen —
   // which read as "no hotels in Baku" rather than "we never told it which Baku".
-  const countryCode = await resolveCountryCode(data.trip.country);
+  const countryCode = await resolveCountryCode(cityCountry(data, cityName));
 
   const query: HotelSearchQuery = {
     city: cityName,
@@ -385,7 +386,7 @@ export async function searchHotelsForCity(
     for (const h of results) {
       const rates: SearchRate[] = [];
       for (const rate of h.rates) {
-        const ctx = contextFor(data.trip.country, cityName, rate.supplier_id, data.trip.arrival_date);
+        const ctx = contextFor(cityCountry(data, cityName), cityName, rate.supplier_id, data.trip.arrival_date);
         const priced = priceSupplierRate(rate, rules, ctx, sarPer, BASE, fxDate);
         if (!priced.ok) continue; // can't price (no fx / no rule) — omit rather than mislead
         rates.push({
@@ -536,7 +537,7 @@ export async function selectHotelRate(
       supplier_hotel_id: supplierHotelId,
       // Same omission as the search had: without these the re-fetch comes back
       // empty and the agent is told the rate expired, seconds after seeing it.
-      country_code: await resolveCountryCode(data.trip.country),
+      country_code: await resolveCountryCode(cityCountry(data, cityName)),
       nationality: "SA",
     });
   } catch {
@@ -554,7 +555,7 @@ export async function selectHotelRate(
   // (3) price + floor
   const [{ sarPer }, rules] = await Promise.all([getRates(), getActiveMarkupRules()]);
   const fxDate = new Date().toISOString().slice(0, 10);
-  const ctx = contextFor(data.trip.country, cityName, rate.supplier_id, data.trip.arrival_date);
+  const ctx = contextFor(cityCountry(data, cityName), cityName, rate.supplier_id, data.trip.arrival_date);
   const priced = priceSupplierRate(rate, rules, ctx, sarPer, BASE, fxDate);
   if (!priced.ok) return { ok: false, error: "pg.supplier.noRates" };
   const line = priced.line;

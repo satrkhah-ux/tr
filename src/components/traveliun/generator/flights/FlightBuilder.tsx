@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownUp, CalendarDays, MapPin, Plane, Plus, Trash2, UsersRound } from "lucide-react";
+import { ArrowDownUp, ArrowLeft, ArrowLeftRight, CalendarDays, MapPin, Plane, Plus, Route, Trash2, UsersRound } from "lucide-react";
 import type { FlightBookingMode } from "@/lib/offer/draft-types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 
@@ -18,11 +18,47 @@ export type BuilderSegment = { from: string; to: string; date: string };
 
 export const CABINS = ["اقتصادية", "أعمال", "أولى"] as const;
 
-const MODES: { mode: FlightBookingMode; key: "pg.fb.round" | "pg.fb.oneway" | "pg.fb.multi" }[] = [
-  { mode: "round", key: "pg.fb.round" },
-  { mode: "oneway", key: "pg.fb.oneway" },
-  { mode: "multi", key: "pg.fb.multi" },
-];
+// In the order an agent is asked: one way, there and back, several cities.
+const MODES = [
+  { mode: "oneway", key: "pg.fb.oneway", hint: "pg.fb.onewayHint", icon: ArrowLeft },
+  { mode: "round", key: "pg.fb.round", hint: "pg.fb.roundHint", icon: ArrowLeftRight },
+  { mode: "multi", key: "pg.fb.multi", hint: "pg.fb.multiHint", icon: Route },
+] as const satisfies readonly { mode: FlightBookingMode; key: string; hint: string; icon: unknown }[];
+
+/**
+ * The first question on the flights card, asked before any field: what kind of
+ * trip is it. Always on top — on an empty file it opens the builder in that
+ * shape, on a file with flights it rebuilds the route in the shape picked.
+ */
+export function TripTypeCards({ mode, onPick }: { mode: FlightBookingMode; onPick: (mode: FlightBookingMode) => void }) {
+  const { t } = useTraveliunUI();
+  return (
+    <div role="radiogroup" aria-label={t("pg.fb.tripType")} className="grid grid-cols-3 gap-2 sm:gap-3">
+      {MODES.map((m) => {
+        const active = mode === m.mode;
+        const Icon = m.icon;
+        return (
+          <button
+            key={m.mode}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onPick(m.mode)}
+            className={`flex flex-col items-center gap-1 rounded-[16px] border-2 px-2 py-3 text-center transition-colors sm:py-4 ${
+              active
+                ? "border-[#185045] bg-[#185045] text-white shadow-[0_8px_18px_rgba(24,80,69,0.22)]"
+                : "border-[#dbe6e1] bg-white text-[#185045] hover:border-[#9cc3b4] hover:bg-[#f4f8f6]"
+            }`}
+          >
+            <Icon className="size-6" />
+            <span className="text-[13.5px] font-extrabold sm:text-[15px]">{t(m.key)}</span>
+            <span className={`hidden text-[11px] font-semibold sm:block ${active ? "text-white/80" : "text-[#78948f]"}`}>{t(m.hint)}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 const cell =
   "relative flex min-h-[64px] min-w-0 items-center gap-2.5 rounded-[13px] border border-[#e0ebe7] bg-white px-3.5 py-2 focus-within:border-[#2aa87a] focus-within:bg-[#f7fbf9]";
@@ -32,7 +68,6 @@ const cellInput =
 
 export function FlightBuilder({
   mode,
-  onMode,
   cabin,
   onCabin,
   defaultDeparture,
@@ -40,8 +75,8 @@ export function FlightBuilder({
   passengers,
   onBuild,
 }: {
+  /** chosen on the TripTypeCards above the builder. */
   mode: FlightBookingMode;
-  onMode: (mode: FlightBookingMode) => void;
   cabin: string;
   onCabin: (cabin: string) => void;
   defaultDeparture: string | null;
@@ -81,23 +116,6 @@ export function FlightBuilder({
 
   return (
     <div className="overflow-hidden rounded-[18px] border-2 border-[#185045] bg-white">
-      <div role="tablist" className="flex bg-[#eef4f1]">
-        {MODES.map((m) => (
-          <button
-            key={m.mode}
-            type="button"
-            role="tab"
-            aria-selected={mode === m.mode}
-            onClick={() => onMode(m.mode)}
-            className={`flex-1 rounded-t-[14px] px-3 py-2.5 text-[13px] font-extrabold transition-colors ${
-              mode === m.mode ? "bg-[#185045] text-white" : "text-[#185045] hover:bg-[#e2ede8]"
-            }`}
-          >
-            {t(m.key)}
-          </button>
-        ))}
-      </div>
-
       <div className="space-y-2.5 p-3">
         {mode === "multi" ? (
           <div className="space-y-2">

@@ -16,7 +16,7 @@ import {
   type LookupAirport,
 } from "@/lib/offer/draft-types";
 import { citiesFromFlights } from "@/lib/offer/flight-cities";
-import { FlightBuilder, type BuilderSegment } from "../flights/FlightBuilder";
+import { FlightBuilder, TripTypeCards, type BuilderSegment } from "../flights/FlightBuilder";
 import { SupplierPrice } from "../SupplierPrice";
 import { buildJourneys, formatWaitAr, type JourneyLeg } from "@/lib/offer/journey";
 import {
@@ -332,6 +332,18 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
       <h2 className="mb-4 text-base font-extrabold text-[#003c3a]">{t("pg.flightsTitle")}</h2>
       <FieldIssue field="flights" className="mb-3" />
 
+      {/* the trip's shape first — one way, there and back, or several cities */}
+      <div className="mb-5">
+        <TripTypeCards
+          mode={booking.mode}
+          onPick={(mode) => {
+            setBooking({ mode });
+            // with flights already in, a card is how the route is redrawn
+            if (international.length > 0) setRebuilding(true);
+          }}
+        />
+      </div>
+
       <datalist id="pg-airports">
         {airports.map((airport) => (
           <option key={airport.id} value={airportDisplay(airport)} />
@@ -353,7 +365,6 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
         <div className="mb-3">
           <FlightBuilder
             mode={booking.mode}
-            onMode={(mode) => setBooking({ mode })}
             cabin={booking.cabin}
             onCabin={(cabin) => setBooking({ cabin })}
             defaultDeparture={data.trip.arrival_date}
@@ -408,10 +419,6 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
       {international.length > 0 ? (
         <>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setRebuilding(true)} className={addButtonClass}>
-              <Plane className="size-4" />
-              {t("pg.fb.rebuild")}
-            </button>
             <button type="button" onClick={addInternational} className={addButtonClass}>
               <Plus className="size-4" />
               {t("pg.addFlightIntl")}
