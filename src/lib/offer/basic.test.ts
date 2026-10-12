@@ -163,13 +163,14 @@ describe("النظام بيسك", () => {
     expect(basicDays({ ...data, days: edited })[3].title).toBe("يوم على الشاطئ");
   });
 
-  it("lets a city take more tours than it has days — they share the days in turn", () => {
+  it("lets a city take more tours than it has days — the arrival day next, then they share", () => {
     const data = malaysia();
-    // كوالالمبور: 3 nights, 2 free days (the third is the way home), 4 tours asked
+    // كوالالمبور: 16–18 Nov, 4 tours asked: the 17th and 18th, then the 16th (the move day), then the 17th again
     data.cities = data.cities.map((c, i) => (i === 2 ? { ...c, tours: 4, tour_picks: withTourCount([], 4) } : c));
     const days = basicDays(data);
+    expect(days[5].activities.at(-1)).toBe("جولة سياحية في كوالالمبور");
     expect([days[6].title, days[6].activities]).toEqual(["جولة سياحية في كوالالمبور", ["جولة سياحية في كوالالمبور"]]);
-    expect(days[7].activities).toHaveLength(1);
+    expect(days[7].title).toBe("جولة سياحية في كوالالمبور");
     expect(days[8].title).toBe("المغادرة");
   });
 
@@ -247,9 +248,10 @@ describe("النظام بيسك", () => {
   });
 
   it("writes each tour's day: after the arrival first, a day the city lost handed out again", () => {
-    // لنكاوي: 13–16 Nov — tours go on the 14th and 15th, a third shares the 14th
+    // لنكاوي: 13–16 Nov — tours go on the 14th and 15th, a third on the arrival day, a fourth shares the 14th — in date order
     const lnk = malaysia().cities[1];
-    expect(withTours(lnk, 3).map((p) => p.date)).toEqual(["2026-11-14", "2026-11-15", "2026-11-14"]);
+    expect(withTours(lnk, 2).map((p) => p.date)).toEqual(["2026-11-14", "2026-11-15"]);
+    expect(withTours(lnk, 4).map((p) => p.date)).toEqual(["2026-11-13", "2026-11-14", "2026-11-14", "2026-11-15"]);
     const moved = { ...lnk, tour_picks: [{ program_id: null, title: "x", text: "", price: null, date: "2026-12-01" }] };
     expect(withTours(moved, 1)[0].date).toBe("2026-11-14");
   });

@@ -307,12 +307,12 @@ export function withTourCount(picks: TourPick[] | undefined, count: number): Tou
 
 /**
  * The days a city's tours go on, in the order they are handed out: the days
- * after the group arrives (the arrival day is spent arriving); a one-night city
- * has only its arrival day.
+ * after the group arrives first (the arrival day is spent arriving), then the
+ * arrival day itself — only once those are taken does a day get a second tour.
  */
 export function tourDays(city: Pick<DraftCity, "check_in" | "nights">): string[] {
   const all = cityDates(city);
-  return all.length > 1 ? all.slice(1) : all;
+  return [...all.slice(1), ...all.slice(0, 1)];
 }
 
 /** Every date the group sleeps in the city — the days a tour may be put on. */
@@ -339,13 +339,13 @@ export function fillTourDates(picks: TourPick[], days: string[]): TourPick[] {
 }
 
 /**
- * The city's tours at a count, each with its day. A day the city no longer has
- * (its dates moved) is let go and the tour takes the next free one.
+ * The city's tours at a count, each with its day, in date order. A day the city
+ * no longer has (its dates moved) is let go and the tour takes the next free one.
  */
 export function withTours(city: Pick<DraftCity, "check_in" | "nights" | "tour_picks">, count: number): TourPick[] {
   const own = cityDates(city);
   const kept = withTourCount(city.tour_picks, count).map((p) => (p.date && own.length > 0 && !own.includes(p.date) ? { ...p, date: null } : p));
-  return fillTourDates(kept, tourDays(city));
+  return fillTourDates(kept, tourDays(city)).sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999"));
 }
 
 /**

@@ -609,8 +609,13 @@ function ToursPanel({
         </div>
       ) : null}
 
-      {/* the company's own welcome, then the car that meets the group */}
-      {isFirst ? <p className="text-[11.5px] font-bold text-[#0F4339]">✓ {WELCOME}</p> : null}
+      {/* the day the group arrives — the welcome, or the move from the city before — then the car that meets it */}
+      {isFirst || city.check_in ? (
+        <p className="tv-tnum text-[11.5px] font-bold text-[#0F4339]">
+          ✓ {city.check_in ? `${dayLabel(city.check_in)} — ` : ""}
+          {isFirst ? WELCOME : tx("moveTo", { from: data.cities[index - 1]?.city_name ?? "", city: city.city_name })}
+        </p>
+      ) : null}
       {isFirst && transportOn ? airportRow("airport", tx("reception"), outbound[outbound.length - 1]?.to_airport || "—") : null}
 
       {toursOn && picks.length > 0 ? (
