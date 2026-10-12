@@ -131,6 +131,11 @@ export const OFFER_DOC_CSS = `
 .od-hotel-top{display:flex;align-items:baseline;flex-wrap:wrap;gap:1mm 3mm;}
 .od-hotel-place{color:var(--od-muted)!important;font-size:9.8pt!important;margin:.6mm 0 2.6mm!important;}
 .od-tags{display:flex;flex-wrap:wrap;gap:1.6mm;}
+.od-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.6mm;margin:1.2mm 0 0;}
+.od-fact{border:1px solid var(--od-line-2);background:var(--od-tint);border-radius:2.4mm;padding:1.1mm 2.8mm 1.3mm;min-width:0;}
+.od-fact-wide{grid-column:1/-1;}
+.od-fact dt{font-size:8pt;color:var(--od-muted);line-height:1.4;}
+.od-fact dd{margin:0;font-size:9.8pt;font-weight:700;color:var(--od-ink);line-height:1.45;overflow-wrap:anywhere;}
 .od-tags span{border:1px solid var(--od-line-2);background:var(--od-tint);border-radius:99px;padding:.8mm 3mm;font-size:9.2pt;color:var(--od-ink);line-height:1.4;}
 .od-hotel p{margin:0;line-height:1.55;font-size:10.2pt;color:var(--od-ink);}
 .od-stars{color:var(--od-gold);direction:ltr;font-size:11.5pt;letter-spacing:.5px;}

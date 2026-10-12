@@ -667,14 +667,33 @@ function StayCard({
           {starText ? <span className="od-stars">{starText}</span> : null}
         </div>
         {place ? <p className="od-hotel-place">{place}</p> : null}
-        <div className="od-tags">
-          <span>
-            {AR.roomsCount}: <Ltr>{String(roomCount)}</Ltr>
-          </span>
-          {stay.room_type ? <span>{stay.room_type}</span> : null}
-          {stay.board_type ? <span>{BOARD_AR[stay.board_type]}</span> : null}
-          <span>{guests}</span>
-        </div>
+        {/* each answer under its name: a client read «Bedroom Jacuzzi Villa 1» alone and did not know it was the room */}
+        <dl className="od-facts">
+          {stay.room_type ? (
+            <div className="od-fact od-fact-wide">
+              <dt>{AR.roomType}</dt>
+              <dd>
+                <bdi>{stay.room_type}</bdi>
+              </dd>
+            </div>
+          ) : null}
+          <div className="od-fact">
+            <dt>{AR.roomsCount}</dt>
+            <dd>
+              <Ltr>{String(roomCount)}</Ltr>
+            </dd>
+          </div>
+          {stay.board_type ? (
+            <div className="od-fact">
+              <dt>{AR.board}</dt>
+              <dd>{BOARD_AR[stay.board_type]}</dd>
+            </div>
+          ) : null}
+          <div className="od-fact">
+            <dt>{AR.travelers}</dt>
+            <dd>{guests}</dd>
+          </div>
+        </dl>
         {stay.cancellation_policy ? (
           <div className="od-notice">{AR.cancellation}: {stay.cancellation_policy}</div>
         ) : null}
