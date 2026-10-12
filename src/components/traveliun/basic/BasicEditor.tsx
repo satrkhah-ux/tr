@@ -34,6 +34,7 @@ import { getCountryHotels, getRoomTypeLookups, produceOfferFromDraft } from "@/l
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
 import {
   AGE_BANDS,
+  clampAge,
   currencyOptions,
   findLookupCountry,
   hopKey,
@@ -665,6 +666,35 @@ export function BasicEditor({
             </select>
           </label>
         </div>
+
+        {/* a child's age changes the hotel and the ticket price — asked as soon as there is a child */}
+        {trip.children_ages.length > 0 || trip.infant_ages.length > 0 ? (
+          <div className="mt-2 rounded-[10px] border border-[#e2ebe7] bg-[#f8fbf9] px-2.5 py-2">
+            <p className="mb-1.5 text-[10.5px] font-bold text-[#557d78]">{t("pg.agesHint")}</p>
+            <div className="flex flex-wrap gap-2">
+              {(["children_ages", "infant_ages"] as const).flatMap((field) => {
+                const kind = field === "children_ages" ? "children" : "infants";
+                const band = AGE_BANDS[kind];
+                return trip[field].map((age, i) => (
+                  <label key={`${field}${i}`} className={`${basicLabel} w-24`}>
+                    {t(kind === "children" ? "pg.childAgeN" : "pg.infantAgeN", { n: i + 1 })}
+                    <select
+                      value={age}
+                      onChange={(e) =>
+                        setTrip({ [field]: trip[field].map((a, k) => (k === i ? clampAge(kind, Number(e.target.value)) : a)) })
+                      }
+                      className={`${basicField} tv-tnum px-1.5`}
+                    >
+                      {range(band.min, band.max).map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </label>
+                ));
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {/* «البرنامج يشمل» — small chips, after the program-includes spec; the details come in their own steps */}
         <div className="mt-3 border-t border-dashed border-[#DCE9E5] pt-2.5">
