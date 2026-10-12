@@ -65,8 +65,15 @@ import {
 } from "@/lib/offer/draft-types";
 import {
   addCity,
+  airportDisplay,
+  arrivalAirport,
   basicDays,
+  cityAirport,
+  HOME_AIRPORT,
+  planInternational,
   priceAtSource,
+  withDomesticFlights,
+  type FlightPlan,
   chainCities,
   remainingNights,
   removeCity,
@@ -272,17 +279,41 @@ export function BasicEditor({
     const transport_plan = { ...p, intercity: { ...p.intercity, enabled: chained.length > 1 } };
     // a domestic flight is one of the ways between cities — the two switches are one fact
     const nextScope = { ...merged.scope, flights_domestic: intercityModes(transport_plan).includes("flight") };
-    const shaped = { ...merged, flights, cities: chained, transport_plan, scope: nextScope };
+    // a move by air becomes its planned domestic leg — the agent never types a route the cities already say
+    const shaped = { ...merged, cities: chained, scope: nextScope, ...withDomesticFlights({ ...merged, flights, cities: chained, transport_plan }, lookups.airports) };
     const hotels = withHotelLines(shaped, BASE_CURRENCY);
     const next = { ...shaped, hotels, days: basicDays({ ...shaped, hotels }) };
     latest.current = next;
-    patch({ ...slice, flights, cities: chained, transport_plan, scope: nextScope, hotels, days: next.days });
+    patch({ ...slice, flights: shaped.flights, cities: chained, transport_plan: shaped.transport_plan, scope: nextScope, hotels, days: next.days });
   }
 
-  const setTrip = (slice: Partial<DraftTrip>) => commit({ trip: withTripDates(trip, slice) });
+  /** The trip's answers; a visa line still counting every traveller keeps counting them. */
+  function setTrip(slice: Partial<DraftTrip>) {
+    const next = withTripDates(trip, slice);
+    const pax = (t: DraftTrip) => t.adults + t.children + t.infants;
+    const visas = data.visas.map((v) => (v.count === pax(trip) ? { ...v, count: pax(next) } : v));
+    commit({ trip: next, ...(pax(next) !== pax(trip) ? { visas } : {}) });
+  }
 
+  /** A new country: a flight still only planned (no ticket yet) now lands in it. */
   function setCountry(name: string) {
-    commit(moveTripCountry(data, lookups, { ...trip, country: name, destination: name }));
+    const moved = moveTripCountry(data, lookups, { ...trip, country: name, destination: name });
+    const out = data.flights.filter((f) => f.leg_order === "outbound");
+    const planned = out.length > 0 && data.flights.every((f) => f.leg_order === "internal" || !f.flight_no.trim());
+    if (!planned) return commit(moved);
+    const next = { ...data, ...moved };
+    const back = data.flights.find((f) => f.leg_order === "inbound");
+    const to = arrivalAirport(next, lookups.airports, findLookupCountry(lookups.countries, name)?.iso2);
+    commit({
+      ...moved,
+      ...planInternational(next, lookups.airports, {
+        from: out[0].from_airport,
+        to,
+        go: (out[0].departure_at ?? "").slice(0, 10),
+        back: (back?.departure_at ?? "").slice(0, 10),
+        round: Boolean(back),
+      }),
+    });
   }
 
   function setRoomsCount(rooms: number) {
@@ -298,11 +329,23 @@ export function BasicEditor({
     commit({ trip: { ...trip, meal_plan, default_board: board }, hotels });
   }
 
+  /** The first car chosen anywhere is the trip's car: every car still without one takes it. */
+  const withCar = (p: DraftData["transport_plan"], car: string | undefined): DraftData["transport_plan"] =>
+    !car
+      ? p
+      : {
+          ...p,
+          airport: p.airport.car_type.trim() ? p.airport : { ...p.airport, car_type: car },
+          tours: p.tours.car_type.trim() ? p.tours : { ...p.tours, car_type: car },
+          intercity: p.intercity.car_type.trim() ? p.intercity : { ...p.intercity, car_type: car },
+          ...(p.farewell && !p.farewell.car_type.trim() ? { farewell: { ...p.farewell, car_type: car } } : {}),
+        };
+
   function setLeg(leg: "airport" | "tours", slice: { car_type?: string; cars?: number }) {
     const next = { ...plan, [leg]: { ...plan[leg], ...slice } };
     // between cities rides the transfer car unless it is a flight, a train or a ship
     if (leg === "airport") next.intercity = { ...next.intercity, ...slice };
-    commit({ transport_plan: next });
+    commit({ transport_plan: withCar(next, slice.car_type) });
   }
 
   function setTourCar(slice: { car_type?: string; cars?: number }) {
@@ -310,7 +353,7 @@ export function BasicEditor({
     const follow = slice.car_type !== undefined && old
       ? { cities: cities.map((c) => (c.tour_picks ? { ...c, tour_picks: c.tour_picks.map((p) => (p.car_type === old ? { ...p, car_type: undefined } : p)) } : c)) }
       : {};
-    commit({ transport_plan: { ...plan, tours: { ...plan.tours, ...slice } }, ...follow });
+    commit({ transport_plan: withCar({ ...plan, tours: { ...plan.tours, ...slice } }, slice.car_type), ...follow });
   }
 
   function toggleMode(mode: TransportMode) {
@@ -454,6 +497,26 @@ export function BasicEditor({
     used > trip.nights ? tx("over", { n: used - trip.nights }) : trip.nights > 0 && left === 0 ? tx("complete") : tx("remaining", { n: left });
   const nightsTone = trip.nights > 0 && used === trip.nights ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-white text-[#a86a10]";
 
+  // where the international flights land and leave from — the two ends of the domestic moves
+  const intlLegs = data.flights.filter((f) => f.leg_order !== "internal").sort((a, b) => (a.departure_at ?? "").localeCompare(b.departure_at ?? ""));
+  const landingCity = intlLegs.filter((f) => f.leg_order === "outbound").at(-1)?.to_city?.trim() ?? "";
+  const homeCity = intlLegs.find((f) => f.leg_order === "inbound")?.from_city?.trim() ?? "";
+  const flies = (a: string, b: string) => Boolean(cityAirport(a, lookups.airports, data.flights) && cityAirport(b, lookups.airports, data.flights));
+  const hopSelect = (a: string, b: string, label: string) => (
+    <label key={`${a}>${b}`} className="inline-flex items-center gap-1 text-[11px] font-bold text-[#557d78]">
+      {label}
+      <select
+        value={hopMode(plan, a, b)}
+        onChange={(e) => setHop(a, b, e.target.value as TransportMode)}
+        className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold text-[#185045]"
+      >
+        {MODE_CHIPS.filter((m) => modes.includes(m.mode)).map((m) => (
+          <option key={m.mode} value={m.mode}>{tx(m.label)}</option>
+        ))}
+      </select>
+    </label>
+  );
+
   // day numbers on each card: after any travel day, one city after another
   const travelDays = data.days.filter((d) => d.kind === "travel").length;
   let dayCursor = travelDays + 1;
@@ -508,6 +571,7 @@ export function BasicEditor({
   function setItem(index: number, slice: { sell_price?: number | null; sell_currency?: string }) {
     const item = data.pricing.items[index];
     setOpenGroups((o) => ({ ...o, [priceGroupOf(item)]: true }));
+    setSavedGroup(null);
     const at = priceAtSource(latest.current, item, { price: slice.sell_price, currency: slice.sell_currency });
     // the source's figure is what we pay and what we sell at, as the sheet writes it
     const both = at
@@ -539,10 +603,18 @@ export function BasicEditor({
       rebase(lookups.sarPer ?? { SAR: 1 }, display) ?? {},
       display,
     ).total_sell;
-    return { ...g, rows, subtotal, missing: rows.filter(({ item }) => !item.sell_price).length };
+    return { ...g, rows, subtotal, missing: rows.filter(({ item }) => item.sell_price == null).length };
   }).filter((g) => g.rows.length > 0);
   // a card with a price missing opens by itself; a complete one waits to be opened for a review
   const [openGroups, setOpenGroups] = useState<Partial<Record<PriceGroup, boolean>>>({});
+  const [savedGroup, setSavedGroup] = useState<PriceGroup | null>(null);
+
+  /** «حفظ» on a card: the sheet is written now, and a complete card folds — the agent sees it is done. */
+  async function saveGroup(key: PriceGroup, complete: boolean) {
+    await flush();
+    setSavedGroup(key);
+    if (complete) setOpenGroups((o) => ({ ...o, [key]: false }));
+  }
 
   // ---------- what is still missing, and issuing ----------
   const validation = useMemo(() => validateDraft(data), [data]);
@@ -578,6 +650,14 @@ export function BasicEditor({
   }
 
   // ---------- the flights: planned first, ticketed later ----------
+  const homeAirport = lookups.airports.find((a) => a.code === HOME_AIRPORT);
+  const planDefaults: FlightPlan = {
+    from: homeAirport ? airportDisplay(homeAirport) : "",
+    to: arrivalAirport(data, lookups.airports, country?.iso2),
+    go: trip.arrival_date ?? "",
+    back: trip.departure_date ?? "",
+    round: data.flight_booking.mode !== "oneway",
+  };
   const hasTickets = data.flights.some((f) => f.leg_order !== "internal" && f.flight_no.trim());
   const [flightView, setFlightView] = useState<"plan" | "final">(() => (hasTickets ? "final" : "plan"));
 
@@ -629,6 +709,10 @@ export function BasicEditor({
 
   function show(step: Step) {
     setOpen(step);
+    // the flights step opens already planned: no empty box for what the file already says
+    if (step === "flights" && scope.flights_intl && !latest.current.flights.some((f) => f.leg_order !== "internal")) {
+      commit(planInternational(latest.current, lookups.airports, planDefaults));
+    }
     if (step !== "cities") setFocus(null);
     // the prices are worked out as the step opens — no button to remember
     if (step === "pricing" && canPricing) void calculate();
@@ -884,7 +968,7 @@ export function BasicEditor({
         </div>
       ) : (
         <div className="space-y-3">
-          <BasicFlightPlan data={data} lookups={lk} onChange={commit} onFinal={() => setFlightView("final")} />
+          <BasicFlightPlan data={data} lookups={lk} defaults={planDefaults} onChange={commit} onFinal={() => setFlightView("final")} />
           {/* the domestic hops are entered as they always were */}
           {scope.flights_domestic ? (
             <div className="-mx-3 -mb-1 border-t border-dashed border-[#DCE9E5] [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
@@ -922,22 +1006,16 @@ export function BasicEditor({
             const dayFrom = dayCursor;
             dayCursor += city.nights;
             if (focus && !focus.includes(city.city_name)) return null;
-            const prev = cities[i - 1]?.city_name;
-            // several ways between cities: each arrival says which one it took
+            // the group may land in another city and fly on — or fly from the last city to the flight home
+            const from = cities[i - 1]?.city_name ?? (landingCity && landingCity !== city.city_name && flies(landingCity, city.city_name) ? landingCity : "");
+            const out = i === cities.length - 1 && homeCity && homeCity !== city.city_name && flies(city.city_name, homeCity) ? homeCity : "";
+            // several ways between cities: each move says which one it takes
             const hop =
-              prev && modes.length > 1 ? (
-                <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#557d78]">
-                  {tx("hop", { city: prev })}
-                  <select
-                    value={hopMode(plan, prev, city.city_name)}
-                    onChange={(e) => setHop(prev, city.city_name, e.target.value as TransportMode)}
-                    className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold text-[#185045]"
-                  >
-                    {MODE_CHIPS.filter((m) => modes.includes(m.mode)).map((m) => (
-                      <option key={m.mode} value={m.mode}>{tx(m.label)}</option>
-                    ))}
-                  </select>
-                </label>
+              modes.length > 1 && (from || out) ? (
+                <>
+                  {from ? hopSelect(from, city.city_name, tx("hop", { city: from })) : null}
+                  {out ? hopSelect(city.city_name, out, tx("hopOut", { city: out })) : null}
+                </>
               ) : undefined;
             return (
               <BasicCityCard
@@ -963,7 +1041,7 @@ export function BasicEditor({
                     ? setLeg("airport", slice)
                     : leg === "tours"
                       ? setTourCar(slice)
-                      : commit({ transport_plan: { ...plan, farewell: { ...(plan.farewell ?? plan.airport), ...slice, enabled: true } } })
+                      : commit({ transport_plan: withCar({ ...plan, farewell: { ...(plan.farewell ?? plan.airport), ...slice, enabled: true } }, slice.car_type) })
                 }
                 onFlights={() => (steps.includes("flights") ? show("flights") : undefined)}
                 onRemove={() => {
@@ -1194,7 +1272,7 @@ export function BasicEditor({
                             value={item.sell_price ?? ""}
                             placeholder="—"
                             onChange={(e) => setItem(i, { sell_price: e.target.value === "" ? null : Number(e.target.value) })}
-                            className={`${basicField} tv-tnum text-center ${!item.sell_price ? "border-[#f0b4c2] bg-[#fff5f7]" : ""}`}
+                            className={`${basicField} tv-tnum text-center ${item.sell_price == null ? "border-[#f0b4c2] bg-[#fff5f7]" : ""}`}
                           />
                           <select value={item.sell_currency || display} onChange={(e) => setItem(i, { sell_currency: e.target.value })} className={`${basicField} px-1.5`}>
                             {currencyOptions(lookups.countries, item.sell_currency || display).map((c) => (
@@ -1203,6 +1281,24 @@ export function BasicEditor({
                           </select>
                         </div>
                       ))}
+                      <div className="flex items-center justify-end gap-2 py-2">
+                        {bad ? <span className="text-[11px] font-bold text-[#c22850]">{tx("priceMissing", { n: g.missing })}</span> : null}
+                        {savedGroup === g.key && saveState !== "saving" && saveState !== "error" ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0f7a52]">
+                            <Check className="size-3.5" />
+                            {tx("savedCard")}
+                          </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => void saveGroup(g.key, !bad)}
+                          disabled={saveState === "saving"}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#185045] px-4 text-[12px] font-extrabold text-white hover:bg-[#0f4439] disabled:opacity-60"
+                        >
+                          {saveState === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                          {tx("saveCard")}
+                        </button>
+                      </div>
                     </div>
                     ) : null}
                   </div>

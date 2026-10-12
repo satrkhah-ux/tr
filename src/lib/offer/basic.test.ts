@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { emptyDraftData, emptyFlight, withRooms, type DraftData } from "./draft-types";
+import { emptyDraftData, emptyFlight, withRooms, type DraftData, type LookupAirport } from "./draft-types";
+import { domesticMismatches } from "./flight-cities";
 import {
   addCity,
   baseRoomName,
@@ -10,6 +11,8 @@ import {
   EXTRA_BED,
   extraBeds,
   priceAtSource,
+  rankAirports,
+  withDomesticFlights,
   priceGroupOf,
   planInternational,
   remainingNights,
@@ -269,5 +272,45 @@ describe("النظام بيسك", () => {
     expect(priceAtSource(data, { item_type: "flight", ref: "flight:intl" }, { price: 5200 })!.flight_booking!.intl_price).toBe(5200);
     // a transfer priced from the list has no place to go back to
     expect(priceAtSource(data, { item_type: "transport", ref: "transport:a>b>van" }, { price: 90 })).toBeNull();
+  });
+
+  const AIRPORTS: LookupAirport[] = [
+    { id: "1", name: "مطار كوالالمبور الدولي", code: "KUL", timezone: "Asia/Kuala_Lumpur", city: "كوالالمبور", country: "ماليزيا" },
+    { id: "2", name: "مطار لنكاوي الدولي", code: "LGK", timezone: "Asia/Kuala_Lumpur", city: "لنكاوي", country: "ماليزيا" },
+    { id: "3", name: "مطار الأمير محمد بن عبدالعزيز", code: "MED", timezone: "Asia/Riyadh", city: "المدينة المنورة", country: "السعوديه" },
+    { id: "4", name: "مطار الملك خالد الدولي", code: "RUH", timezone: "Asia/Riyadh", city: "الرياض", country: "السعوديه" },
+    { id: "5", name: "مطار دبي الدولي", code: "DXB", timezone: "Asia/Dubai", city: "دبي", country: "الإمارات" },
+  ];
+
+  it("lists Madinah then the Kingdom first for a departure, the package's country first for an arrival", () => {
+    expect(rankAirports(AIRPORTS, "home").map((a) => a.code)).toEqual(["MED", "RUH", "KUL", "LGK", "DXB"]);
+    expect(rankAirports(AIRPORTS, ["ماليزيا"]).map((a) => a.code)).toEqual(["KUL", "LGK", "MED", "RUH", "DXB"]);
+    // the package's own cities before the rest of its country
+    expect(rankAirports(AIRPORTS, ["ماليزيا"], ["لنكاوي"]).map((a) => a.code)).toEqual(["LGK", "KUL", "MED", "RUH", "DXB"]);
+  });
+
+  it("writes the domestic flights the cities call for — out to Langkawi and back the other way", () => {
+    let data = emptyDraftData();
+    data.trip = { ...data.trip, country: "ماليزيا", arrival_date: "2026-11-11", nights: 5, meal_plan: "breakfast" };
+    data.transport_plan = { ...data.transport_plan, intercity: { ...data.transport_plan.intercity, modes: ["car", "flight"], mode: "car" } };
+    data = {
+      ...data,
+      ...planInternational(data, AIRPORTS, { from: "مطار الأمير محمد بن عبدالعزيز (MED)", to: "مطار كوالالمبور الدولي (KUL)", go: "2026-11-11", back: "2026-11-16", round: true }),
+    };
+    data = { ...data, ...addCity(data, { name: "لنكاوي", nights: 5, tours: 0 }, "SAR") };
+    const next = { ...data, ...withDomesticFlights(data, AIRPORTS) };
+    const dom = next.flights.filter((f) => f.leg_order === "internal");
+    expect(dom.map((f) => [f.from_airport, f.to_airport, f.departure_at, f.auto])).toEqual([
+      ["مطار كوالالمبور الدولي (KUL)", "مطار لنكاوي الدولي (LGK)", "2026-11-11T00:00", true],
+      ["مطار لنكاوي الدولي (LGK)", "مطار كوالالمبور الدولي (KUL)", "2026-11-16T00:00", true],
+    ]);
+    // the programme agrees with the booking
+    expect(domesticMismatches(next.flights, next.cities)).toEqual([]);
+    // by road into Langkawi: that leg goes, the way back stays
+    const road = { ...next, transport_plan: { ...next.transport_plan, intercity: { ...next.transport_plan.intercity, hop_modes: { ...next.transport_plan.intercity.hop_modes, "كوالالمبور>لنكاوي": "car" as const } } } };
+    expect(withDomesticFlights(road, AIRPORTS).flights.filter((f) => f.leg_order === "internal").map((f) => f.to_city)).toEqual(["كوالالمبور"]);
+    // a leg the agent ticketed is kept even when its move is gone
+    const ticketed = { ...next, flights: next.flights.map((f) => (f.to_city === "لنكاوي" ? { ...f, flight_no: "MH1432" } : f)), cities: [] };
+    expect(withDomesticFlights({ ...ticketed, cities: next.cities.map((c) => ({ ...c, city_name: "بينانج" })) }, AIRPORTS).flights.some((f) => f.flight_no === "MH1432")).toBe(true);
   });
 });

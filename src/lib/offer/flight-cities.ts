@@ -69,6 +69,12 @@ export function citiesMatchFlights(cities: DraftCity[], derived: DraftCity[]): b
  * anything unknown is not called a mismatch.
  */
 export function domesticMismatches(flights: DraftFlight[], cities: DraftCity[]): DraftFlight[] {
+  // the group may land in a city it does not stay in and fly on to the first one
+  // the same day — and fly from the last city to where the flight home leaves
+  const landing = flights.filter((f) => f.leg_order === "outbound").sort(byDeparture).at(-1)?.to_city?.trim();
+  const home = flights.filter((f) => f.leg_order === "inbound").sort(byDeparture)[0]?.from_city?.trim();
+  const first = cities[0];
+  const last = cities[cities.length - 1];
   // A connection the same day (KUL → PEN → LGK) leaves no night in the middle
   // city, so the two legs are ONE move: from the first leg's city to the last
   // leg's, on the first leg's day.
@@ -97,6 +103,8 @@ export function domesticMismatches(flights: DraftFlight[], cities: DraftCity[]):
   return moves
     .filter((m) => {
       if (!m.from || !m.to || !m.day) return false;
+      if (first && m.from === landing && m.to === first.city_name) return Boolean(first.check_in && first.check_in !== m.day);
+      if (last && m.to === home && m.from === last.city_name) return Boolean(last.check_out && last.check_out !== m.day);
       const i = cities.findIndex((c, k) => c.city_name === m.from && cities[k + 1]?.city_name === m.to);
       if (i < 0) return true;
       const change = cities[i].check_out;

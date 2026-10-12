@@ -342,7 +342,7 @@ export async function getGeneratorLookups(options: { catalog?: boolean } = {}): 
         : Promise.resolve({ data: [] }),
       withCatalog ? roomTypeRows(supabase) : Promise.resolve({ data: [] }),
       // the city an airport serves turns «landed at LGK» into «the next city is لنكاوي»
-      supabase.from("airports").select("id, arabic_name, code, iana_timezone, status, cities(arabic_name)").order("code"),
+      supabase.from("airports").select("id, arabic_name, code, iana_timezone, status, cities(arabic_name), countries(arabic_name)").order("code"),
       supabase
         .from("transportation_types")
         .select("arabic_name, english_name, category, vehicle_class, pax_capacity, luggage_capacity, status")
@@ -435,9 +435,17 @@ export async function getGeneratorLookups(options: { catalog?: boolean } = {}): 
         iana_timezone: string | null;
         status: string | null;
         cities: { arabic_name: string } | null;
+        countries: { arabic_name: string } | null;
       }[])
         .filter((a) => active(a.status))
-        .map((a) => ({ id: a.id, name: a.arabic_name, code: a.code, timezone: a.iana_timezone, city: a.cities?.arabic_name ?? null })),
+        .map((a) => ({
+          id: a.id,
+          name: a.arabic_name,
+          code: a.code,
+          timezone: a.iana_timezone,
+          city: a.cities?.arabic_name ?? null,
+          country: a.countries?.arabic_name ?? null,
+        })),
       companySuppliers: ((suppliersRes.data ?? []) as { id: string; arabic_name: string; categories: string | null; status: string | null }[])
         .filter((s) => active(s.status))
         .map((s) => ({ id: s.id, name: s.arabic_name, categories: s.categories ?? "" })),

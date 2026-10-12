@@ -2,7 +2,7 @@
 
 import { ArrowLeftRight, Ticket } from "lucide-react";
 import type { DraftData, GeneratorLookups } from "@/lib/offer/draft-types";
-import { airportDisplay, planInternational, type FlightPlan } from "@/lib/offer/basic";
+import { airportDisplay, planInternational, rankAirports, tripCountries, type FlightPlan } from "@/lib/offer/basic";
 import { basicField } from "./styles";
 import { useBasicLabels } from "./labels";
 
@@ -20,11 +20,14 @@ const COLS = "xl:grid-cols-[minmax(13rem,1.5fr)_2.25rem_minmax(13rem,1.5fr)_minm
 export function BasicFlightPlan({
   data,
   lookups,
+  defaults,
   onChange,
   onFinal,
 }: {
   data: DraftData;
   lookups: GeneratorLookups;
+  /** what the flight usually is (out of Madinah, into the package's country) — shown until legs exist. */
+  defaults: FlightPlan;
   onChange: (slice: Partial<DraftData>) => void;
   /** open the ticket details. */
   onFinal: () => void;
@@ -34,18 +37,22 @@ export function BasicFlightPlan({
   const outbound = data.flights.filter((f) => f.leg_order === "outbound");
   const inbound = data.flights.filter((f) => f.leg_order === "inbound");
   const round = booking.mode !== "oneway";
+  const planned = outbound.length > 0;
   const now: FlightPlan = {
-    from: outbound[0]?.from_airport ?? "",
-    to: outbound[outbound.length - 1]?.to_airport ?? "",
+    from: planned ? outbound[0].from_airport : defaults.from,
+    to: planned ? outbound[outbound.length - 1].to_airport : defaults.to,
     go: (outbound[0]?.departure_at ?? "").slice(0, 10) || data.trip.arrival_date || "",
     back: (inbound[0]?.departure_at ?? "").slice(0, 10) || data.trip.departure_date || "",
     round,
   };
+  // the departure side lists Madinah and the Kingdom first; the arrival side, the package's country
+  const homeFirst = rankAirports(lookups.airports, "home");
+  const destFirst = rankAirports(lookups.airports, tripCountries(data), data.cities.map((c) => c.city_name));
 
   const write = (change: Partial<FlightPlan>) => onChange(planInternational(data, lookups.airports, { ...now, ...change }));
 
-  const airportInput = (value: string, onValue: (v: string) => void, label: string) => (
-    <input aria-label={label} placeholder={label} list="basic-plan-airports" value={value} onChange={(e) => onValue(e.target.value)} className={basicField} />
+  const airportInput = (value: string, onValue: (v: string) => void, label: string, list: string) => (
+    <input aria-label={label} placeholder={label} list={list} value={value} onChange={(e) => onValue(e.target.value)} className={basicField} />
   );
 
   return (
@@ -78,7 +85,7 @@ export function BasicFlightPlan({
         <span>{tx("planPrice")}</span>
       </div>
       <div className={`grid grid-cols-2 items-center gap-2 ${COLS}`}>
-        {airportInput(now.from, (v) => write({ from: v }), tx("planFrom"))}
+        {airportInput(now.from, (v) => write({ from: v }), tx("planFrom"), "basic-plan-home")}
         <button
           type="button"
           onClick={() => write({ from: now.to, to: now.from })}
@@ -88,7 +95,7 @@ export function BasicFlightPlan({
         >
           <ArrowLeftRight className="size-4" />
         </button>
-        {airportInput(now.to, (v) => write({ to: v }), tx("planTo"))}
+        {airportInput(now.to, (v) => write({ to: v }), tx("planTo"), "basic-plan-dest")}
         <input type="date" dir="ltr" aria-label={tx("planGo")} value={now.go} onChange={(e) => write({ go: e.target.value })} className={`${basicField} tv-tnum px-2`} />
         {round ? (
           <input
@@ -111,15 +118,21 @@ export function BasicFlightPlan({
           aria-label={tx("planPrice")}
           placeholder={tx("planPrice")}
           value={booking.intl_price ?? ""}
-          onChange={(e) =>
-            onChange({ flight_booking: { ...booking, intl_price: e.target.value === "" ? null : Number(e.target.value), intl_currency: booking.intl_currency || "SAR" } })
-          }
+          onChange={(e) => {
+            const flight_booking = { ...booking, intl_price: e.target.value === "" ? null : Number(e.target.value), intl_currency: booking.intl_currency || "SAR" };
+            onChange(planned ? { flight_booking } : planInternational({ ...data, flight_booking }, lookups.airports, now));
+          }}
           className={`${basicField} tv-tnum text-center`}
         />
       </div>
-      <datalist id="basic-plan-airports">
-        {lookups.airports.map((a) => (
-          <option key={a.id} value={airportDisplay(a)} label={a.city ?? undefined} />
+      <datalist id="basic-plan-home">
+        {homeFirst.map((a) => (
+          <option key={a.id} value={airportDisplay(a)} label={a.city ?? a.country ?? undefined} />
+        ))}
+      </datalist>
+      <datalist id="basic-plan-dest">
+        {destFirst.map((a) => (
+          <option key={a.id} value={airportDisplay(a)} label={a.city ?? a.country ?? undefined} />
         ))}
       </datalist>
 

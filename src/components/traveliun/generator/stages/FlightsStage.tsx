@@ -16,6 +16,7 @@ import {
   type FlightBooking,
   type LookupAirport,
 } from "@/lib/offer/draft-types";
+import { rankAirports, tripCountries } from "@/lib/offer/basic";
 import { citiesFromFlights, routeLegOrders } from "@/lib/offer/flight-cities";
 import { FlightBuilder, TripTypeCards, type BuilderSegment } from "../flights/FlightBuilder";
 import { SupplierPrice } from "../SupplierPrice";
@@ -378,9 +379,15 @@ export function FlightsStage({
       </div>
       ) : null}
 
-      <datalist id="pg-airports">
-        {airports.map((airport) => (
-          <option key={airport.id} value={airportDisplay(airport)} />
+      {/* home side: Madinah and the Kingdom first; the destination side: the package's countries first */}
+      <datalist id="pg-airports-home">
+        {rankAirports(airports, "home").map((airport) => (
+          <option key={airport.id} value={airportDisplay(airport)} label={airport.city ?? airport.country ?? undefined} />
+        ))}
+      </datalist>
+      <datalist id="pg-airports-dest">
+        {rankAirports(airports, tripCountries(data), data.cities.map((c) => c.city_name)).map((airport) => (
+          <option key={airport.id} value={airportDisplay(airport)} label={airport.city ?? airport.country ?? undefined} />
         ))}
       </datalist>
 
@@ -779,7 +786,7 @@ function FlightRow({
             <label className={rowLabelClass}>
               {t("pg.fromAirport")}
               <input
-                list="pg-airports"
+                list={flight.leg_order === "outbound" ? "pg-airports-home" : "pg-airports-dest"}
                 value={flight.from_airport}
                 onChange={(e) => setAirport(index, "from_airport", e.target.value)}
                 className={fieldClass}
@@ -788,7 +795,7 @@ function FlightRow({
             <label className={rowLabelClass}>
               {t("pg.toAirport")}
               <input
-                list="pg-airports"
+                list={flight.leg_order === "inbound" ? "pg-airports-home" : "pg-airports-dest"}
                 value={flight.to_airport}
                 onChange={(e) => setAirport(index, "to_airport", e.target.value)}
                 className={fieldClass}

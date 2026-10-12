@@ -686,6 +686,8 @@ export type DraftFlight = {
   baggage_pieces: number | null;
   cabin_baggage_kg: number | null;
   leg_order: FlightLegOrder;
+  /** a domestic leg the cities wrote (a hop made by air) — rewritten or dropped with them. */
+  auto?: boolean;
 };
 
 /**
@@ -1208,6 +1210,7 @@ function normalizeDraftFlight(raw: unknown): DraftFlight {
     baggage_pieces: typeof f.baggage_pieces === "number" ? f.baggage_pieces : null,
     cabin_baggage_kg: typeof f.cabin_baggage_kg === "number" ? f.cabin_baggage_kg : null,
     leg_order: f.leg_order === "inbound" || f.leg_order === "internal" ? f.leg_order : "outbound",
+    ...(f.auto === true ? { auto: true } : {}),
   };
 }
 
@@ -1524,7 +1527,7 @@ export type LookupCountry = {
 };
 export type LookupRoomType = { id: string; name: string; hotel_id: string | null; default_board: BoardType | null };
 /** `city` — the catalogue city the airport serves (airports.city_id), or null. */
-export type LookupAirport = { id: string; name: string; code: string | null; timezone: string | null; city: string | null };
+export type LookupAirport = { id: string; name: string; code: string | null; timezone: string | null; city: string | null; country?: string | null };
 
 /**
  * One approved line from the `terms` table — the company's master lists behind

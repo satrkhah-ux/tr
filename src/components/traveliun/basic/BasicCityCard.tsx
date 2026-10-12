@@ -201,8 +201,10 @@ export function BasicCityCard({
                 domestic.map((f, k) => (
                   <p key={k} className="tv-tnum inline-flex flex-wrap items-center gap-2 rounded-[9px] bg-[#f8fbf9] px-3 py-1.5 text-[12px] font-bold text-[#185045]">
                     <Plane className="size-3.5" />
-                    <DirText dir="ltr">{`${f.flight_no || "—"} ${airportShort(f.from_airport)} → ${airportShort(f.to_airport)}`}</DirText>
-                    {f.departure_at ? <DirText dir="ltr">{f.departure_at.replace("T", " ")}</DirText> : null}
+                    <DirText dir="ltr">{`${f.flight_no ? `${f.flight_no} ` : ""}${airportShort(f.from_airport)} → ${airportShort(f.to_airport)}`}</DirText>
+                    {/* a planned leg has its day, not a time yet */}
+                    {f.departure_at ? <DirText dir="ltr">{f.departure_at.endsWith("T00:00") && !f.flight_no ? f.departure_at.slice(0, 10) : f.departure_at.replace("T", " ")}</DirText> : null}
+                    {!f.flight_no ? <span className="rounded-full bg-[#fff6e4] px-2 py-0.5 text-[10.5px] font-bold text-[#8a5a0c]">{tx("plannedLeg")}</span> : null}
                     {f.airline ? <span className="text-[#557d78]">{f.airline}</span> : null}
                   </p>
                 ))

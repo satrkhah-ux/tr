@@ -16,7 +16,9 @@ import {
   emptyFlight,
   emptyRoomSpec,
   FREE_DAY_TITLE,
+  hopKey,
   hopMode,
+  intercityModes,
   MEAL_PLAN_BOARD,
   newStayId,
   resizeRooms,
@@ -35,7 +37,7 @@ import {
   type TransportMode,
 } from "./draft-types";
 import { draftDaySkeleton } from "./itinerary";
-import { autoDepartureDate, itineraryStartDate } from "./schedule";
+import { autoDepartureDate, finalOutbound, itineraryStartDate } from "./schedule";
 
 /**
  * A city as this screen holds it. The extra answer rides on the draft's own
@@ -525,6 +527,71 @@ export function findAirport(value: string, airports: LookupAirport[]): LookupAir
   return airports.find((a) => airportDisplay(a) === v) ?? (code ? (airports.find((a) => a.code?.toUpperCase() === code) ?? null) : null);
 }
 
+// ---------- which airports come first ----------
+
+/** The company is in Madinah: its groups fly out of Prince Mohammad bin Abdulaziz first. */
+export const HOME_AIRPORT = "MED";
+const isHomeCountry = (country: string | null | undefined) => (country ?? "").includes("السعود");
+
+/**
+ * The airport list in the order an agent looks for it: for a departure from
+ * home, Madinah then the Kingdom's other airports; for the destination side,
+ * the package's own cities' airports, then its countries' — then everything
+ * else, as before.
+ */
+export function rankAirports(airports: LookupAirport[], first: "home" | string[], cities: string[] = []): LookupAirport[] {
+  const want = first === "home" ? [] : first.map((c) => c.trim()).filter(Boolean);
+  const stay = cities.map((c) => c.trim()).filter(Boolean);
+  const rank = (a: LookupAirport) =>
+    first === "home"
+      ? a.code === HOME_AIRPORT ? 0 : isHomeCountry(a.country) ? 1 : 2
+      : stay.includes((a.city ?? "").trim()) ? 0 : want.includes((a.country ?? "").trim()) ? 1 : 2;
+  return airports
+    .map((a, i) => ({ a, i, r: rank(a) }))
+    .sort((x, y) => x.r - y.r || x.i - y.i)
+    .map((x) => x.a);
+}
+
+/** The countries a trip goes to: its own and any neighbour a city crosses into. */
+export const tripCountries = (data: Pick<DraftData, "trip" | "cities">) => [
+  ...new Set([data.trip.country, ...data.cities.map((c) => c.country ?? "")].map((c) => c.trim()).filter(Boolean)),
+];
+
+/** The airport a city is flown to: the one the trip already uses there, else the first the list links to it. */
+export function cityAirport(city: string, airports: LookupAirport[], flights: DraftFlight[] = []): string {
+  const name = city.trim();
+  if (!name) return "";
+  for (const f of flights) {
+    if (f.to_city?.trim() === name && f.to_airport.trim()) return f.to_airport;
+    if (f.from_city?.trim() === name && f.from_airport.trim()) return f.from_airport;
+  }
+  const hit = airports.find((a) => a.city?.trim() === name);
+  return hit ? airportDisplay(hit) : "";
+}
+
+/**
+ * Where the group flies in: the first city's own airport, else the country's
+ * main gateway, else its first airport. ponytail: the gateways are a short map
+ * of the company's destinations; a «main airport» column on countries would
+ * replace it if the list grows.
+ */
+const GATEWAY: Record<string, string> = {
+  MY: "KUL", ID: "CGK", TH: "BKK", TR: "IST", GE: "TBS", AZ: "GYD", BA: "SJJ", EG: "CAI", VN: "HAN", RU: "SVO",
+  LK: "CMB", KR: "ICN", JP: "NRT", AE: "DXB", MV: "MLE", SG: "SIN", PH: "MNL", MA: "CMN", MU: "MRU", ZA: "JNB", GR: "ATH",
+};
+export function arrivalAirport(
+  data: Pick<DraftData, "trip" | "cities" | "flights">,
+  airports: LookupAirport[],
+  iso2: string | null | undefined,
+): string {
+  const first = data.cities[0]?.city_name;
+  const own = first ? cityAirport(first, airports) : "";
+  if (own) return own;
+  const country = (data.cities[0]?.country || data.trip.country).trim();
+  const gate = airports.find((a) => a.code === GATEWAY[(iso2 ?? "").toUpperCase()]) ?? airports.find((a) => (a.country ?? "").trim() === country);
+  return gate ? airportDisplay(gate) : "";
+}
+
 export type FlightPlan = { from: string; to: string; go: string; back: string; round: boolean };
 
 /**
@@ -563,4 +630,82 @@ export function planInternational(
     flights: [...legs, ...data.flights.filter((f) => f.leg_order === "internal")],
     flight_booking: { ...data.flight_booking, estimate: true, mode: plan.round ? "round" : "oneway" },
   };
+}
+
+// ---------- the domestic flights the cities call for ----------
+
+/**
+ * Every move the group makes by air, written as a planned domestic leg so the
+ * agent never types a route the cities already say: from where the
+ * international flight lands to the first city, between cities, and from the
+ * last city to where the flight home leaves — on the day of the move.
+ *
+ * A move is by air when the agent picked «طيران» for it; with domestic flights
+ * on, a move between two cities that both have an airport starts as a flight
+ * (written into `hop_modes`, so the programme and the pricing agree) — the
+ * agent switches it to road on the city card.
+ *
+ * A leg the agent ticketed (its flight number in) is kept as it is; a leg these
+ * rules wrote (`auto`) follows the cities, and goes when its move does. A leg
+ * the agent added by hand is never touched.
+ */
+export function withDomesticFlights(data: DraftData, airports: LookupAirport[]): Pick<DraftData, "flights" | "transport_plan"> {
+  const plan = data.transport_plan;
+  const cities = data.cities;
+  if (cities.length === 0) return { flights: data.flights, transport_plan: plan };
+  const intl = data.flights.filter((f) => f.leg_order !== "internal");
+  const old = data.flights.filter((f) => f.leg_order === "internal");
+  const landing = finalOutbound(intl);
+  const home = intl.filter((f) => f.leg_order === "inbound").sort((a, b) => (a.departure_at ?? "").localeCompare(b.departure_at ?? ""))[0];
+
+  type Stop = { city: string; airport: string };
+  const stop = (city: string, airport?: string): Stop => ({ city: city.trim(), airport: airport?.trim() || cityAirport(city, airports, intl) });
+  const moves: { from: Stop; to: Stop; day: string | null }[] = [];
+  if (landing?.to_city?.trim()) moves.push({ from: stop(landing.to_city, landing.to_airport), to: stop(cities[0].city_name), day: cities[0].check_in });
+  cities.slice(1).forEach((c, i) => moves.push({ from: stop(cities[i].city_name), to: stop(c.city_name), day: c.check_in }));
+  const last = cities[cities.length - 1];
+  if (home?.from_city?.trim()) moves.push({ from: stop(last.city_name), to: stop(home.from_city, home.from_airport), day: last.check_out });
+  const real = moves.filter((m) => m.from.city && m.to.city && m.from.city !== m.to.city);
+
+  // a move with no pick of its own, between two airports, flies once flights are on
+  const modes = intercityModes(plan);
+  const hop_modes = { ...plan.intercity.hop_modes };
+  for (const m of real) {
+    const key = hopKey(m.from.city, m.to.city);
+    const picked = hop_modes[key];
+    if (picked && modes.includes(picked)) continue;
+    if (modes.includes("flight") && m.from.airport && m.to.airport) hop_modes[key] = "flight";
+  }
+  const transport_plan = { ...plan, intercity: { ...plan.intercity, hop_modes } };
+
+  const ticketed = (f: DraftFlight) => Boolean(f.flight_no.trim());
+  const taken = new Set<DraftFlight>();
+  const legs = real
+    .filter((m) => hopMode(transport_plan, m.from.city, m.to.city) === "flight" && m.from.airport && m.to.airport)
+    .map((m): DraftFlight => {
+      const mine = old.find((f) => !taken.has(f) && f.from_city?.trim() === m.from.city && f.to_city?.trim() === m.to.city);
+      if (mine) taken.add(mine);
+      if (mine && (ticketed(mine) || !mine.auto)) return mine;
+      // an airport or a day the agent changed on the leg stays theirs
+      const from = mine?.from_airport.trim() || m.from.airport;
+      const to = mine?.to_airport.trim() || m.to.airport;
+      const a = findAirport(from, airports);
+      const b = findAirport(to, airports);
+      const time = mine?.departure_at?.slice(11, 16) || "00:00";
+      return {
+        ...(mine ?? emptyFlight("internal", data.trip)),
+        from_airport: from,
+        to_airport: to,
+        from_tz: a?.timezone ?? mine?.from_tz ?? null,
+        to_tz: b?.timezone ?? mine?.to_tz ?? null,
+        from_city: m.from.city,
+        to_city: m.to.city,
+        departure_at: mine?.date_user_set ? mine.departure_at : m.day ? `${m.day}T${time}` : null,
+        cabin_class: mine?.cabin_class || data.flight_booking.cabin,
+        auto: true,
+      };
+    });
+  // the agent's own legs stay; the ones these rules wrote go with their move
+  const kept = old.filter((f) => !taken.has(f) && (!f.auto || ticketed(f)));
+  return { flights: [...intl, ...legs, ...kept], transport_plan };
 }

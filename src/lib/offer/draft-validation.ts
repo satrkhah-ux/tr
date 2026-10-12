@@ -179,7 +179,7 @@ export function validateDraft(data: DraftData): DraftValidation {
     }
   }
   if (data.scope.flights_domestic && dom.length > 0) {
-    if (dom.some((f) => !legDone(f))) need("flights", "flights", "pg.err.flightIncomplete");
+    if (dom.some((f) => !intlDone(f))) need("flights", "flights", "pg.err.flightIncomplete");
     if (!isFixedPrice(data)) {
       if (booking.dom_price == null || booking.dom_price <= 0) need("flights", "flights", "pg.err.domFlightUnpriced");
     }
