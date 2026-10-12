@@ -81,3 +81,8 @@ if ssh "$HOST" "docker exec traveliun-app sh -c 'test -f /app/.next/BUILD_ID'"; 
   echo "    build id: $built"
 fi
 echo "    shipped:  ${want:0:7}${got:+  (server tree: ${got:0:7})}"
+# With a deploymentId the BUILD_ID no longer changes between builds; the page
+# itself names the deploy it came from (data-dpl-id) — that is the proof.
+live=$(curl -s "https://$DOMAIN/sign-in" | grep -o 'data-dpl-id="[^"]*"' | head -1 | cut -d'"' -f2)
+echo "    live dpl: ${live:-none}"
+[ "$live" = "${want:0:12}" ] || { echo "the live page is not this deploy (dpl ${live:-none}, want ${want:0:12})" >&2; exit 1; }
