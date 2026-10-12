@@ -727,7 +727,7 @@ export function BasicEditor({
     // ---- 2. the flights — the generator's own card, with the trip's dates already in it ----
     flights: (
       <div className="-mx-3 -mb-1 [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
-        <FlightsStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} />
+        <FlightsStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} compact />
       </div>
     ),
 

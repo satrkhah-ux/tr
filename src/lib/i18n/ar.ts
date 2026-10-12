@@ -945,6 +945,7 @@ export const ar: Dictionary = {
   "pg.fb.returnDate": "تاريخ العودة",
   "pg.fb.swap": "تبديل المغادرة والوصول",
   "pg.fb.addSegment": "إضافة مقطع",
+  "pg.fb.moreDetails": "معلومات إضافية",
   "pg.fb.adults": "بالغ",
   "pg.fb.children": "طفل",
   "pg.fb.infants": "رضيع",

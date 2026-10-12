@@ -9,13 +9,14 @@ import type { FlightLookupHit } from "@/lib/providers/flight-lookup";
 import {
   deriveCityDates,
   emptyFlight,
+  findLookupCountry,
   type DraftCity,
   type DraftData,
   type DraftFlight,
   type FlightBooking,
   type LookupAirport,
 } from "@/lib/offer/draft-types";
-import { citiesFromFlights } from "@/lib/offer/flight-cities";
+import { citiesFromFlights, routeLegOrders } from "@/lib/offer/flight-cities";
 import { FlightBuilder, TripTypeCards, type BuilderSegment } from "../flights/FlightBuilder";
 import { SupplierPrice } from "../SupplierPrice";
 import { buildJourneys, formatWaitAr, type JourneyLeg } from "@/lib/offer/journey";
@@ -141,7 +142,12 @@ function airportValueFor(iata: string, providerName: string, airports: LookupAir
  * day-offset come from the airports' IANA zones. Any flight change re-derives
  * the hotel check-in chain, all in ONE patch.
  */
-export function FlightsStage({ data, patch, lookups }: StageFormProps) {
+/**
+ * `compact` (the basic screen): a built flight shows only what is still to be
+ * typed — its number and its two times. The route, the direction, the cabin and
+ * the baggage are already answered and wait under «معلومات إضافية».
+ */
+export function FlightsStage({ data, patch, lookups, compact = false }: StageFormProps & { compact?: boolean }) {
   const { t } = useTraveliunUI();
   const flights = data.flights;
   const airports = lookups.airports;
@@ -179,8 +185,17 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
    * the international legs only — the domestic hops are kept.
    */
   function buildLegs(segments: BuilderSegment[]) {
+    // the country each airport is in, through the city it serves
+    const countryOf = (airport: string) => {
+      const city = resolveCity(airport, airports);
+      return city ? (lookups.countries.find((c) => c.cities.some((x) => x.name === city))?.name ?? null) : null;
+    };
+    const orders = routeLegOrders(
+      segments.map((seg) => ({ from: countryOf(seg.from), to: countryOf(seg.to) })),
+      findLookupCountry(lookups.countries, data.trip.country)?.name ?? null,
+    );
     const legs = segments.map((seg, i) => {
-      const order: FlightLegOrder = i === segments.length - 1 && i > 0 ? "inbound" : "outbound";
+      const order: FlightLegOrder = orders[i];
       const auto = autoDepartureDate(data.trip, order);
       return {
         ...emptyFlight(order, data.trip),
@@ -197,7 +212,13 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
       };
     });
     setRebuilding(false);
-    commit([...legs, ...flights.filter((f) => f.leg_order === "internal")]);
+    // A route with its domestic hops in it replaces those too, and sells them;
+    // one without keeps the domestic legs entered on their own.
+    const domestic = orders.includes("internal");
+    commit(
+      [...legs, ...(domestic ? [] : flights.filter((f) => f.leg_order === "internal"))],
+      domestic ? { scope: { ...data.scope, flights_domestic: true } } : {},
+    );
   }
   const [rebuilding, setRebuilding] = useState(false);
 
@@ -405,6 +426,7 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
                         index={index}
                         segment={journey.isTransit ? jl.segment : undefined}
                         showLegSelect
+                        compact={compact}
                         handlers={handlers}
                       />
                     </div>
@@ -473,6 +495,7 @@ export function FlightsStage({ data, patch, lookups }: StageFormProps) {
                     flight={jl.flight}
                     index={index}
                     segment={domesticJourney.isTransit ? jl.segment : undefined}
+                    compact={compact}
                     handlers={handlers}
                   />
                 </div>
@@ -655,6 +678,7 @@ function FlightRow({
   index,
   segment,
   showLegSelect = false,
+  compact = false,
   handlers,
 }: {
   flight: DraftFlight;
@@ -662,9 +686,14 @@ function FlightRow({
   /** 1-based position in its chain; undefined for a direct journey. */
   segment?: number;
   showLegSelect?: boolean;
+  compact?: boolean;
   handlers: RowHandlers;
 }) {
   const { t } = useTraveliunUI();
+  const [more, setMore] = useState(false);
+  // everything but the number and the times, in compact mode only on request
+  const full = !compact || more;
+  const code = (airport: string, city: string | undefined) => airport.match(/\(([A-Za-z0-9]{3,4})\)/)?.[1] ?? (city || airport || "—");
   const { updateRow, resolveCarrier, setAirport, setDeparture, restoreAuto, removeRow, applyLookup } = handlers;
   const timing = flightTiming(flight);
   const duration = formatDurationAr(timing.durationMinutes);
@@ -678,8 +707,15 @@ function FlightRow({
           {t("pg.segmentN", { n: segment })}
         </p>
       ) : null}
+      {compact ? (
+        <p className="tv-tnum mb-2 flex flex-wrap items-center gap-2 text-[12.5px] font-extrabold text-[#0f3d38]">
+          <span className="rounded-full bg-[#eef4f1] px-2.5 py-0.5 text-[11px] text-[#185045]">{t(LEG_LABEL_KEYS[flight.leg_order])}</span>
+          <DirText dir="ltr">{`${code(flight.from_airport, flight.from_city)} → ${code(flight.to_airport, flight.to_city)}`}</DirText>
+          {flight.airline ? <span className="text-[11.5px] font-bold text-[#557d78]">{flight.airline}</span> : null}
+        </p>
+      ) : null}
       <div className="grid items-start gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {showLegSelect ? (
+        {showLegSelect && full ? (
           <label className={rowLabelClass}>
             {t("pg.legOrder")}
             <select
@@ -695,14 +731,16 @@ function FlightRow({
             </select>
           </label>
         ) : null}
-        <label className={rowLabelClass}>
-          {t("pg.airline")}
-          <input
-            value={flight.airline}
-            onChange={(e) => updateRow(index, { airline: e.target.value })}
-            className={fieldClass}
-          />
-        </label>
+        {full ? (
+          <label className={rowLabelClass}>
+            {t("pg.airline")}
+            <input
+              value={flight.airline}
+              onChange={(e) => updateRow(index, { airline: e.target.value })}
+              className={fieldClass}
+            />
+          </label>
+        ) : null}
         <div className={rowLabelClass}>
           <label className="grid gap-1.5">
             {t("pg.flightNo")}
@@ -719,24 +757,28 @@ function FlightRow({
             onPick={(hit) => applyLookup(index, hit)}
           />
         </div>
-        <label className={rowLabelClass}>
-          {t("pg.fromAirport")}
-          <input
-            list="pg-airports"
-            value={flight.from_airport}
-            onChange={(e) => setAirport(index, "from_airport", e.target.value)}
-            className={fieldClass}
-          />
-        </label>
-        <label className={rowLabelClass}>
-          {t("pg.toAirport")}
-          <input
-            list="pg-airports"
-            value={flight.to_airport}
-            onChange={(e) => setAirport(index, "to_airport", e.target.value)}
-            className={fieldClass}
-          />
-        </label>
+        {full ? (
+          <>
+            <label className={rowLabelClass}>
+              {t("pg.fromAirport")}
+              <input
+                list="pg-airports"
+                value={flight.from_airport}
+                onChange={(e) => setAirport(index, "from_airport", e.target.value)}
+                className={fieldClass}
+              />
+            </label>
+            <label className={rowLabelClass}>
+              {t("pg.toAirport")}
+              <input
+                list="pg-airports"
+                value={flight.to_airport}
+                onChange={(e) => setAirport(index, "to_airport", e.target.value)}
+                className={fieldClass}
+              />
+            </label>
+          </>
+        ) : null}
 
         <label className={rowLabelClass}>
           {t("pg.departureAt")}
@@ -778,17 +820,19 @@ function FlightRow({
           </span>
         </label>
 
-        <label className={rowLabelClass}>
-          {t("pg.cabin")}
-          <input
-            value={flight.cabin_class}
-            onChange={(e) => updateRow(index, { cabin_class: e.target.value })}
-            className={fieldClass}
-          />
-        </label>
+        {full ? (
+          <label className={rowLabelClass}>
+            {t("pg.cabin")}
+            <input
+              value={flight.cabin_class}
+              onChange={(e) => updateRow(index, { cabin_class: e.target.value })}
+              className={fieldClass}
+            />
+          </label>
+        ) : null}
         {/* two numbers, not one string: an airline enforces the weight AND the
             piece count, and "30 kg" alone leaves the agent guessing which. */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className={full ? "grid grid-cols-3 gap-2" : "hidden"}>
           <label className={rowLabelClass}>
             {t("pg.baggageKg")}
             <input
@@ -821,6 +865,16 @@ function FlightRow({
 
       {/* timing footer — duration, +N day badge, arrival-before-departure guard */}
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#e7f0ec] pt-3">
+        {compact ? (
+          <button
+            type="button"
+            onClick={() => setMore((v) => !v)}
+            aria-expanded={more}
+            className="inline-flex h-7 items-center rounded-[8px] border border-[#cfe0d9] px-2.5 text-[11px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+          >
+            {t("pg.fb.moreDetails")}
+          </button>
+        ) : null}
         {timing.arrivalBeforeDeparture ? (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fdeef2] px-2.5 py-1 text-[11.5px] font-bold text-[#c22850]">
             <AlertTriangle className="size-3.5" />

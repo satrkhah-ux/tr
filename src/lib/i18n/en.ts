@@ -947,6 +947,7 @@ export const en = {
   "pg.fb.returnDate": "Return date",
   "pg.fb.swap": "Swap from and to",
   "pg.fb.addSegment": "Add a segment",
+  "pg.fb.moreDetails": "More details",
   "pg.fb.adults": "adult(s)",
   "pg.fb.children": "child(ren)",
   "pg.fb.infants": "infant(s)",

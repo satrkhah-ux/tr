@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deriveCityDates, emptyFlight, type DraftFlight } from "./draft-types";
-import { citiesFromFlights, citiesMatchFlights, domesticMismatches } from "./flight-cities";
+import { citiesFromFlights, citiesMatchFlights, domesticMismatches, routeLegOrders } from "./flight-cities";
 
 function leg(order: DraftFlight["leg_order"], from: string, to: string, dep: string, arr: string): DraftFlight {
   return { ...emptyFlight(order), from_city: from, to_city: to, departure_at: dep, arrival_at: arr };
@@ -64,5 +64,28 @@ describe("domesticMismatches", () => {
   it("flags a hop between cities that do not follow each other", () => {
     const wrong = flights.map((f) => (f.leg_order === "internal" ? { ...f, to_city: "بينانج" } : f));
     expect(domesticMismatches(wrong, cities)).toHaveLength(1);
+  });
+});
+
+describe("routeLegOrders", () => {
+  it("reads one multi-city route as out, domestic hops, and home", () => {
+    // JED → DXB → KUL, KUL → LGK, LGK → DXB → JED
+    const route = [
+      { from: "السعودية", to: "الإمارات" },
+      { from: "الإمارات", to: "ماليزيا" },
+      { from: "ماليزيا", to: "ماليزيا" },
+      { from: "ماليزيا", to: "الإمارات" },
+      { from: "الإمارات", to: "السعودية" },
+    ];
+    expect(routeLegOrders(route, "ماليزيا")).toEqual(["outbound", "outbound", "internal", "inbound", "inbound"]);
+  });
+
+  it("keeps the old reading when the airports' countries are unknown", () => {
+    const route = [
+      { from: null, to: null },
+      { from: null, to: null },
+    ];
+    expect(routeLegOrders(route, "ماليزيا")).toEqual(["outbound", "inbound"]);
+    expect(routeLegOrders([{ from: "السعودية", to: "ماليزيا" }], "ماليزيا")).toEqual(["outbound"]);
   });
 });

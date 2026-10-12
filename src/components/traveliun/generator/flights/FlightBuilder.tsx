@@ -95,6 +95,22 @@ export function FlightBuilder({
     { from: "", to: "", date: defaultReturn ?? "" },
   ]);
 
+  /**
+   * One field typed, the obvious ones follow: the next segment leaves from where
+   * this one lands, and the last one comes home to where the first one left —
+   * each only while it is empty or still the value it was given that way.
+   */
+  function setSegment(i: number, key: keyof BuilderSegment, value: string) {
+    setMulti((list) =>
+      list.map((s, k) => {
+        if (k === i) return { ...s, [key]: value };
+        if (key === "to" && k === i + 1 && (!s.from || s.from === list[i].to)) return { ...s, from: value };
+        if (key === "from" && i === 0 && k === list.length - 1 && k > 0 && (!s.to || s.to === list[0].from)) return { ...s, to: value };
+        return s;
+      }),
+    );
+  }
+
   const segments: BuilderSegment[] =
     mode === "multi"
       ? multi
@@ -121,9 +137,9 @@ export function FlightBuilder({
           <div className="space-y-2">
             {multi.map((seg, i) => (
               <div key={i} className="grid gap-2 rounded-[13px] bg-[#f8fbf9] p-2 sm:grid-cols-[1fr_1fr_170px_auto]">
-                <AirportCell label={`${t("pg.fb.from")} ${i + 1}`} value={seg.from} onChange={(v) => setMulti(multi.map((s, k) => (k === i ? { ...s, from: v } : s)))} />
-                <AirportCell label={t("pg.fb.to")} value={seg.to} onChange={(v) => setMulti(multi.map((s, k) => (k === i ? { ...s, to: v } : s)))} />
-                <DateCell label={t("pg.fb.date")} value={seg.date} onChange={(v) => setMulti(multi.map((s, k) => (k === i ? { ...s, date: v } : s)))} />
+                <AirportCell label={`${t("pg.fb.from")} ${i + 1}`} value={seg.from} onChange={(v) => setSegment(i, "from", v)} />
+                <AirportCell label={t("pg.fb.to")} value={seg.to} onChange={(v) => setSegment(i, "to", v)} />
+                <DateCell label={t("pg.fb.date")} value={seg.date} onChange={(v) => setSegment(i, "date", v)} />
                 {multi.length > 2 ? (
                   <button
                     type="button"

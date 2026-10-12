@@ -104,3 +104,32 @@ export function domesticMismatches(flights: DraftFlight[], cities: DraftCity[]):
     })
     .flatMap((m) => m.legs);
 }
+
+/**
+ * What each segment of a built route is, from the countries its airports are in.
+ *
+ * One multi-city route holds the whole trip — out, around, home — so the agent
+ * does not split it into an international and a domestic booking by hand: a
+ * segment with both ends in the trip's country is domestic, the ones before the
+ * group first lands there are outbound (a transit through Dubai included), and
+ * the ones after it are the way home. When the airports' countries are not
+ * known (an airport not linked to a city), the old reading stands: the first
+ * segment out, the last one home.
+ */
+export function routeLegOrders(
+  segments: { from: string | null; to: string | null }[],
+  tripCountry: string | null,
+): ("outbound" | "internal" | "inbound")[] {
+  const fallback = segments.map((_, i) => (i === segments.length - 1 && i > 0 ? "inbound" : "outbound") as "outbound" | "inbound");
+  if (!tripCountry || !segments.some((s) => s.to === tripCountry)) return fallback;
+  let arrived = false;
+  return segments.map((s) => {
+    if (s.from === tripCountry && s.to === tripCountry) {
+      arrived = true;
+      return "internal";
+    }
+    const order = arrived ? "inbound" : "outbound";
+    if (s.to === tripCountry) arrived = true;
+    return order;
+  });
+}
