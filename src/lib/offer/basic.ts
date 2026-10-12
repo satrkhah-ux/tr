@@ -773,6 +773,14 @@ export function roomSuggestions(roomTypes: LookupRoomType[], hotelId: string | n
 
 // ---------- the package's profit ----------
 
+/** The profit a file carries: the one stated on it, else the default margin — when no line has a profit of its own. */
+export function packageProfitFor(pricing: Pick<DraftData["pricing"], "profit" | "items">, defaultPct: number | null): PackageProfit | undefined {
+  if (pricing.profit) return pricing.profit;
+  if (!defaultPct) return undefined;
+  const own = pricing.items.some((i) => i.profit_pct != null || i.profit_amount != null);
+  return own ? undefined : { mode: "pct", value: defaultPct };
+}
+
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 /**

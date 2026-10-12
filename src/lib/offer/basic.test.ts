@@ -11,6 +11,7 @@ import {
   EXTRA_BED,
   extraBeds,
   priceAtSource,
+  packageProfitFor,
   rankAirports,
   roomSuggestions,
   STANDARD_ROOMS,
@@ -347,5 +348,14 @@ describe("النظام بيسك", () => {
     ];
     expect(roomSuggestions(types, "h1")).toEqual([...STANDARD_ROOMS, "ديلوكس"]);
     expect(roomSuggestions(types, null)).toEqual(STANDARD_ROOMS);
+  });
+
+  it("starts a file on the default margin only when nobody stated a profit", () => {
+    const item = { item_type: "hotel" as const, description: "", quantity: 1, buy_price: 100, buy_currency: "SAR", sell_price: 100, sell_currency: "SAR" };
+    expect(packageProfitFor({ items: [item] }, 12)).toEqual({ mode: "pct", value: 12 });
+    expect(packageProfitFor({ items: [item], profit: { mode: "amount", value: 500 } }, 12)).toEqual({ mode: "amount", value: 500 });
+    // a line priced with its own profit (the full generator) is not overridden
+    expect(packageProfitFor({ items: [{ ...item, profit_pct: 5 }] }, 12)).toBeUndefined();
+    expect(packageProfitFor({ items: [item] }, null)).toBeUndefined();
   });
 });

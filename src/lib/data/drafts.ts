@@ -33,7 +33,9 @@ import {
 } from "@/lib/offer/draft-types";
 import { getEnabledHotelSuppliers } from "@/lib/providers/hotel-registry";
 import { draftSellTotal } from "@/lib/offer/preview-dto";
-import { applyManualProfit, offerTotals } from "@/lib/offer/pricing";
+import { applyManualProfit, offerTotals, rebase } from "@/lib/offer/pricing";
+import { getProfitSettings } from "./app-settings";
+import { packageProfitFor, withPackageProfit } from "@/lib/offer/basic";
 import { getRates } from "./rates-actions";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
@@ -224,7 +226,12 @@ export async function duplicateDraft(draftId: string): Promise<CreateDraftResult
 export async function getDraft(draftId: string): Promise<DraftRecord | null> {
   const record = await loadDraft(draftId);
   if (!record || (await currentCan("pricing.internal"))) return record;
-  return { ...record, data: redactDraftCost(record.data) };
+  const redacted = redactDraftCost(record.data);
+  // the package margin is the agent's to set when the administration says so
+  if ((await getProfitSettings()).by === "staff" && (await currentCan("pricing.view")) && record.data.pricing.profit) {
+    redacted.pricing = { ...redacted.pricing, profit: record.data.pricing.profit };
+  }
+  return { ...record, data: redacted };
 }
 
 /**
@@ -235,7 +242,17 @@ export async function getDraft(draftId: string): Promise<DraftRecord | null> {
 export async function saveDraftStages(draftId: string, slices: Partial<DraftData>): Promise<SaveDraftResult> {
   const user = await getServerUser();
   if (!user) return { ok: false, error: "err.session" };
-  return writeDraftStages(draftId, slices, (await currentCan("pricing.internal")) ? undefined : keepDraftCost);
+  if (await currentCan("pricing.internal")) return writeDraftStages(draftId, slices);
+  // without the internal view the cost comes back from what is stored; the
+  // package margin is taken from this agent only when the administration lets agents set it
+  const agentsSetProfit = (await getProfitSettings()).by === "staff" && (await currentCan("pricing.view"));
+  return writeDraftStages(draftId, slices, (sent, stored) => {
+    const kept = keepDraftCost(sent, stored);
+    if (agentsSetProfit && sent.pricing && kept.pricing && "profit" in sent.pricing) {
+      kept.pricing = { ...kept.pricing, profit: sent.pricing.profit };
+    }
+    return kept;
+  });
 }
 
 export async function deleteDraft(draftId: string): Promise<SaveDraftResult> {
@@ -750,8 +767,16 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // «المدينة — الفندق» description otherwise — an item written before cities
     // could hold two hotels must not be reconciled away as a phantom.
     const validHotelRefs = new Set(stays.flatMap((s) => [pricingRefFor(s), `${s.city_name} — ${s.line.hotel_name}`]));
-    const reconciledItems = data.pricing.items.filter(
-      (it) => it.item_type !== "hotel" || validHotelRefs.has(it.ref ?? it.description ?? ""),
+    const rates = await getRates();
+    // The package's profit (stated on the file, or the administration's default
+    // margin for a file that states none) laid onto the lines here, from the
+    // saved cost — an agent without the internal view sets it without seeing it.
+    const quote = data.pricing.display_currency || "SAR";
+    const reconciledItems = withPackageProfit(
+      data.pricing.items.filter((it) => it.item_type !== "hotel" || validHotelRefs.has(it.ref ?? it.description ?? "")),
+      packageProfitFor(data.pricing, (await getProfitSettings()).default_pct),
+      rebase(rates.sarPer, quote) ?? {},
+      quote,
     );
 
     // The sell the agent is actually looking at. A line priced with a manual
@@ -775,7 +800,6 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // Into the quote currency line by line — never a raw sum of mixed
     // currencies (see offerTotals). A currency with no rate blocks issuing:
     // a total that silently skipped a line is worse than no total.
-    const rates = await getRates();
     const totals = offerTotals(
       reconciledItems.map((item) => ({
         quantity: item.quantity,

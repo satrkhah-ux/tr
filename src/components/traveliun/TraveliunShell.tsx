@@ -232,6 +232,7 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.customerCare", href: "/customers_care" },
       { labelKey: "nav.careServiceType", href: "/customers_care/services" },
       { labelKey: "nav.profits", href: "/setting/profits", captionKey: "nav.settings" },
+      { labelKey: "nav.profitPolicy", href: "/settings/pricing" },
       { labelKey: "nav.statusGroups", href: "/setting/statuses-groups" },
       { labelKey: "nav.statuses", href: "/setting/statuses" },
       { labelKey: "nav.currencies", href: "/setting/currencies" },

@@ -35,6 +35,7 @@ import { getCountryHotels, getRoomTypeLookups, produceOfferFromDraft } from "@/l
 import { getTourPrograms } from "@/lib/data/tour-programs";
 import type { TourProgram } from "@/lib/offer/itinerary";
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
+import type { ProfitSettings } from "@/lib/data/app-settings";
 import {
   AGE_BANDS,
   clampAge,
@@ -71,6 +72,7 @@ import {
   cityAirport,
   HOME_AIRPORT,
   planInternational,
+  packageProfitFor,
   priceAtSource,
   roomSuggestions,
   withDomesticFlights,
@@ -246,12 +248,15 @@ export function BasicEditor({
   initialData,
   savedAt,
   lookups,
+  profitSettings,
 }: {
   draftId: string;
   initialData: DraftData;
   /** the draft's last server save — unsaved edits kept in the browser come back onto an older one. */
   savedAt: string;
   lookups: GeneratorLookups;
+  /** who may set the package profit, and the margin a file starts with (settings, by the administration). */
+  profitSettings: ProfitSettings;
 }) {
   const tx = useBasicLabels();
   const { t, language } = useTraveliunUI();
@@ -528,12 +533,21 @@ export function BasicEditor({
   // ---------- pricing (sell side only) ----------
   const canPricing = can("pricing.view");
   const canInternal = can("pricing.internal");
+  // the agent sets the profit unless the administration keeps it for the managers
+  const canSetProfit = canInternal || (profitSettings.by === "staff" && can("pricing.view"));
   const display = data.pricing.display_currency || "SAR";
   const [pricingBusy, setPricingBusy] = useState(false);
+  // the profit is applied here for the eye and at issuing on the server — never written onto the lines,
+  // so an agent without the cost (its lines arrive as sells) reads the same total the offer will carry
+  const shownItems = useMemo(() => {
+    const quote = data.pricing.display_currency || "SAR";
+    const asCost = data.pricing.items.map((i) => (i.buy_price == null ? { ...i, buy_price: i.sell_price, buy_currency: i.sell_currency } : i));
+    return withPackageProfit(asCost, packageProfitFor(data.pricing, profitSettings.default_pct), rebase(lookups.sarPer ?? { SAR: 1 }, quote) ?? {}, quote);
+  }, [data.pricing, profitSettings.default_pct, lookups.sarPer]);
   const summary = useMemo(
     () =>
       computeOfferPricing(
-        data.pricing.items.map((i) => ({
+        shownItems.map((i) => ({
           quantity: i.quantity,
           buy_price: i.buy_price,
           buy_currency: i.buy_currency || display,
@@ -545,7 +559,7 @@ export function BasicEditor({
         rebase(lookups.sarPer ?? { SAR: 1 }, display) ?? {},
         display,
       ),
-    [data.pricing.items, display, lookups.sarPer],
+    [shownItems, display, lookups.sarPer],
   );
 
   const [pricingError, setPricingError] = useState<string | null>(null);
@@ -558,7 +572,7 @@ export function BasicEditor({
       const res = await suggestPricingForDraft(draftId, { hotel: t("pg.hotel"), airline: t("pg.airline") });
       if (!res.ok) return setPricingError(t(res.error));
       const pricing = latest.current.pricing;
-      patch({ pricing: { ...pricing, items: withProfit(syncSuggestions(pricing.items, res.items), pricing.profit, pricing.display_currency || "SAR") } });
+      patch({ pricing: { ...pricing, items: syncSuggestions(pricing.items, res.items) } });
     } catch {
       // offline, or a tab from before a deploy: say so instead of spinning
       setPricingError(tx("serverLost"));
@@ -587,23 +601,16 @@ export function BasicEditor({
           overridden: false,
         }
       : { ...slice, overridden: true };
-    const items = withProfit(
-      data.pricing.items.map((it, i) => (i === index ? { ...it, ...both } : it)),
-      data.pricing.profit,
-      display,
-    );
+    const items = data.pricing.items.map((it, i) => (i === index ? { ...it, ...both } : it));
     if (at) commit({ ...at, pricing: { ...data.pricing, items } });
     else patch({ pricing: { ...data.pricing, items } });
   }
 
-  /** The package's profit, over the lines in the quote currency's rates. */
-  function withProfit(items: DraftData["pricing"]["items"], profit: DraftData["pricing"]["profit"], quote: string) {
-    return withPackageProfit(items, profit, rebase(lookups.sarPer ?? { SAR: 1 }, quote) ?? {}, quote);
-  }
   function setProfit(profit: NonNullable<DraftData["pricing"]["profit"]>) {
-    patch({ pricing: { ...data.pricing, profit, items: withProfit(data.pricing.items, profit, display) } });
+    patch({ pricing: { ...data.pricing, profit } });
   }
-  const profit = data.pricing.profit ?? { mode: "pct" as const, value: null };
+  // what the box shows: the file's own profit, else the administration's default margin
+  const profit = packageProfitFor(data.pricing, profitSettings.default_pct) ?? { mode: "pct" as const, value: null };
 
   // the sheet in groups, each with what it comes to — a flat list of fifteen lines said nothing
   const groups = PRICE_GROUPS.map((g) => {
@@ -1217,7 +1224,7 @@ export function BasicEditor({
                 <select
                   value={display}
                   onChange={(e) =>
-                    patch({ pricing: { ...data.pricing, display_currency: e.target.value, items: withProfit(data.pricing.items, data.pricing.profit, e.target.value) } })
+                    patch({ pricing: { ...data.pricing, display_currency: e.target.value } })
                   }
                   className="h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-1.5 text-[12px] font-bold"
                 >
@@ -1326,7 +1333,7 @@ export function BasicEditor({
                 })}
                 </div>
                 {/* the profit, once for the package: a margin or a whole amount — cost and profit are the internal view */}
-                {canInternal ? (
+                {canSetProfit ? (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[11px] border border-[#d8e6e0] bg-[#f8fbf9] px-3 py-2">
                   <span className="text-[12.5px] font-extrabold text-[#0f3d38]">{tx("profit")}</span>
                   <div role="radiogroup" className="inline-flex rounded-[8px] border border-[#cfe0d9] bg-white p-0.5">
