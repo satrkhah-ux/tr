@@ -12,7 +12,11 @@ import {
   extraBeds,
   priceAtSource,
   rankAirports,
+  roomSuggestions,
+  STANDARD_ROOMS,
   withDomesticFlights,
+  withPackageProfit,
+  withScopeLines,
   priceGroupOf,
   planInternational,
   remainingNights,
@@ -312,5 +316,33 @@ describe("النظام بيسك", () => {
     // a leg the agent ticketed is kept even when its move is gone
     const ticketed = { ...next, flights: next.flights.map((f) => (f.to_city === "لنكاوي" ? { ...f, flight_no: "MH1432" } : f)), cities: [] };
     expect(withDomesticFlights({ ...ticketed, cities: next.cities.map((c) => ({ ...c, city_name: "بينانج" })) }, AIRPORTS).flights.some((f) => f.flight_no === "MH1432")).toBe(true);
+  });
+
+  it("keeps «يشمل» in step with the file: the flight booked is included, the meal said once", () => {
+    const data = malaysia();
+    data.scope = { ...data.scope, flights_intl: true, transport: true };
+    data.services = { ...data.services, includes: ["الفنادق", "وجبة الإفطار", "الطيران الداخلي", "خدمة عملاء 24 ساعة بالعربي"], excludes: ["الطيران الدولي", "وجبة الغداء والعشاء"] };
+    const s = withScopeLines(data);
+    expect(s.includes).toEqual(["الفنادق", "خدمة عملاء 24 ساعة بالعربي", "الطيران الدولي", "الجولات السياحية", "الإستقبال والتوديع من المطار إلى الفندق والعكس"]);
+    expect(s.excludes).toEqual(["وجبة الغداء والعشاء"]);
+  });
+
+  it("lays the package profit over the lines: a margin on each, an amount shared by cost", () => {
+    const line = (buy: number, currency: string) => ({ item_type: "hotel" as const, description: "", quantity: 1, buy_price: buy, buy_currency: currency, sell_price: buy, sell_currency: currency });
+    const items = [line(3000, "SAR"), line(1000, "MYR")];
+    const rates = { SAR: 1, MYR: 1 };
+    expect(withPackageProfit(items, { mode: "pct", value: 10 }, rates, "SAR").map((i) => i.profit_pct)).toEqual([10, 10]);
+    // 1000 SAR over 3000 + 1000 of cost: 750 and 250
+    expect(withPackageProfit(items, { mode: "amount", value: 1000 }, rates, "SAR").map((i) => i.profit_amount)).toEqual([750, 250]);
+    expect(withPackageProfit(items, undefined, rates, "SAR")).toBe(items);
+  });
+
+  it("suggests the clear room names first, then only the chosen hotel's own", () => {
+    const types = [
+      { id: "a", name: "ديلوكس", hotel_id: "h1", default_board: null },
+      { id: "b", name: "سويت المحيط", hotel_id: "h2", default_board: null },
+    ];
+    expect(roomSuggestions(types, "h1")).toEqual([...STANDARD_ROOMS, "ديلوكس"]);
+    expect(roomSuggestions(types, null)).toEqual(STANDARD_ROOMS);
   });
 });

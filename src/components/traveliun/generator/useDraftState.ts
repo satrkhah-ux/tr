@@ -7,6 +7,34 @@ import type { DraftData } from "@/lib/offer/draft-types";
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
 /**
+ * What has not reached the server yet, kept in the browser too: a deploy
+ * mid-shift turned the save into a 404 and the reload that followed lost the
+ * prices just typed. ponytail: twelve hours, then dropped — an older slice
+ * could overwrite what another screen saved since; a server version check
+ * would make this exact.
+ */
+const PENDING_KEY = (draftId: string) => `tv-draft-pending:${draftId}`;
+const PENDING_MAX_AGE = 12 * 3_600_000;
+function keepPending(draftId: string, slice: Partial<DraftData>) {
+  try {
+    if (Object.keys(slice).length === 0) window.localStorage.removeItem(PENDING_KEY(draftId));
+    else window.localStorage.setItem(PENDING_KEY(draftId), JSON.stringify({ at: Date.now(), slice }));
+  } catch {
+    // private window, storage full — the server save still runs
+  }
+}
+function readPending(draftId: string): Partial<DraftData> | null {
+  try {
+    const raw = window.localStorage.getItem(PENDING_KEY(draftId));
+    if (!raw) return null;
+    const { at, slice } = JSON.parse(raw) as { at: number; slice: Partial<DraftData> };
+    return Date.now() - at < PENDING_MAX_AGE && slice && typeof slice === "object" ? slice : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The live draft and its auto-save — the one copy of this machinery.
  *
  * Patches accumulate into a pending slice and go up 700 ms after the last
@@ -42,6 +70,8 @@ export function useDraftState(
     setSaveState("saving");
     try {
       const result = await saveDraftStages(draftId, slice);
+      if (!result.ok) pendingRef.current = { ...slice, ...pendingRef.current };
+      keepPending(draftId, pendingRef.current);
       setSaveState(result.ok ? "saved" : "error");
     } catch {
       // The call itself failed — offline, or this tab is from before a deploy
@@ -49,6 +79,7 @@ export function useDraftState(
       // so «جارٍ الحفظ» spun forever; now it says so, and the work is kept to
       // go up with the next save.
       pendingRef.current = { ...slice, ...pendingRef.current };
+      keepPending(draftId, pendingRef.current);
       setSaveState("error");
     }
   }, [draftId]);
@@ -57,17 +88,35 @@ export function useDraftState(
     (slice: Partial<DraftData>) => {
       setData((current) => ({ ...current, ...slice }));
       pendingRef.current = { ...pendingRef.current, ...slice };
+      keepPending(draftId, pendingRef.current);
       if (timerRef.current) window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(() => void flush(), 700);
     },
-    [flush],
+    [draftId, flush],
   );
 
+  // A save the last visit could not make comes back here, on top of the saved
+  // draft, and goes up — after mount, so the server render stays the same.
+  useEffect(() => {
+    const restore = window.setTimeout(() => {
+      const slice = readPending(draftId);
+      if (!slice) return;
+      setData((current) => ({ ...current, ...slice }));
+      pendingRef.current = { ...slice, ...pendingRef.current };
+      void flush();
+    }, 0);
+    return () => window.clearTimeout(restore);
+  }, [draftId, flush]);
+
   /** Adopt a draft the server already saved — WITHOUT scheduling a save back. */
-  const replace = useCallback((next: DraftData) => {
-    pendingRef.current = {};
-    setData(next);
-  }, []);
+  const replace = useCallback(
+    (next: DraftData) => {
+      pendingRef.current = {};
+      keepPending(draftId, {});
+      setData(next);
+    },
+    [draftId],
+  );
 
   // never lose pending work on unmount / stage navigation
   useEffect(() => {

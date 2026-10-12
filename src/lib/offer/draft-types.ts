@@ -1063,7 +1063,16 @@ export type DraftPricing = {
   display_currency: string;
   /** rounded client-facing total (sell); editable override. */
   final_total: number | null;
+  /**
+   * The package's profit, as the agent states it once: a margin on every line,
+   * or a whole amount in the quote currency shared over the lines. Laid onto the
+   * lines' own profit fields (withPackageProfit), so the issued offer, the
+   * reports and the client total all read it the way they already read a profit.
+   */
+  profit?: PackageProfit;
 };
+
+export type PackageProfit = { mode: "pct" | "amount"; value: number | null };
 
 /**
  * Provenance when the draft was seeded from a ready-made company package

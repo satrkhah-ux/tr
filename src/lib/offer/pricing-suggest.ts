@@ -25,6 +25,7 @@ import {
   stayTotal,
   TRANSPORT_AIRPORT,
   TRANSPORT_HOTEL_PREFIX,
+  TRANSPORT_MODE_AR,
   TRANSPORT_TOURS,
   type DraftData,
 } from "./draft-types";
@@ -371,6 +372,9 @@ export function suggestPricing(
   const transfers = reference.transfers.filter((row) => row.price > 0);
 
   for (const tr of data.transport) {
+    // the domestic flight booking already prices a move made by air, and a
+    // tour's own price includes its car (the owner, 2026-10-13)
+    if (tr.car_type === TRANSPORT_MODE_AR.flight || tr.from_place === TRANSPORT_TOURS) continue;
     const arriving = tr.from_place === TRANSPORT_AIRPORT;
     const leaving = tr.to_place === TRANSPORT_AIRPORT;
     const hit =
@@ -407,6 +411,23 @@ export function suggestPricing(
       sell_price: hit?.price ?? null,
       sell_currency: hit?.currency || currency,
       source: hit ? "list" : "none",
+    });
+  }
+
+  // «شريحة اتصال × 2» in «يشمل» is bought too: one line, its price asked
+  for (const line of data.services.includes) {
+    const sims = line.match(/^شريحة اتصال × (\d+)$/);
+    if (!sims) continue;
+    items.push({
+      item_type: "service",
+      description: "شريحة اتصال",
+      ref: "sim",
+      quantity: Number(sims[1]),
+      buy_price: null,
+      buy_currency: currency,
+      sell_price: null,
+      sell_currency: currency,
+      source: "none",
     });
   }
 

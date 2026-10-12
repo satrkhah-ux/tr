@@ -14,6 +14,7 @@ import {
   deriveCityDates,
   hopMode,
   hopVehicle,
+  isFreeDay,
   vehicleText,
   type DraftCity,
   type DraftData,
@@ -259,7 +260,7 @@ export function transportNoteForDay(
   } else if (plan.intercity.enabled && cityChanged) {
     const how = hopVehicle(plan, hopMode(plan, days[index - 1]?.city_name ?? "", day.city_name));
     parts.push(`الانتقال إلى ${day.city_name} — ${how}`);
-  } else if (plan.tours.enabled && !first && !last) {
+  } else if (plan.tours.enabled && !first && !last && !isFreeDay(day)) {
     const label = "سيارة الجولات";
     const car = vehicleText(plan.tours);
     parts.push(car ? `${label} — ${car}` : label);

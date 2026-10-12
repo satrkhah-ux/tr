@@ -157,7 +157,7 @@ describe("summarizeAr", () => {
 
   it("labels normals as historical wet days — never as a forecast", () => {
     const text = summarizeAr({ ...base, code: null, source: "normals", rainChance: 40 });
-    expect(text).toContain("40% أيام ممطرة");
+    expect(text).toContain("أمطار متفرقة محتملة في هذا الموسم");
     expect(text).not.toContain("احتمال مطر");
   });
 

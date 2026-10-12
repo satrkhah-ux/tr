@@ -1067,6 +1067,7 @@ export const ar: Dictionary = {
   "pg.err.visaType": "حدّد نوع التأشيرة.",
   "pg.err.dayUntitled": "اكتب عنواناً لكل يوم، أو اجعله «يوم حر».",
   "pg.err.stayUnpriced": "أدخل سعر كل فندق مختار.",
+  "pg.err.priceMissing": "بنود في التسعير بلا سعر — أدخل سعرها (الصفر مقبول).",
   "pg.roomTotal": "إجمالي سعر الغرفة لـ {nights} ليالٍ ({currency})",
   "pg.perNight": "سعر الليلة:",
   "pg.lastSavedNight": "آخر سعر محفوظ لليلة:",

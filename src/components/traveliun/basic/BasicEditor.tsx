@@ -72,7 +72,10 @@ import {
   HOME_AIRPORT,
   planInternational,
   priceAtSource,
+  roomSuggestions,
   withDomesticFlights,
+  withPackageProfit,
+  withScopeLines,
   type FlightPlan,
   chainCities,
   remainingNights,
@@ -455,9 +458,7 @@ export function BasicEditor({
   // the trip's country unless the group crosses into a neighbour
   const barCountry = findLookupCountry(lk.countries, newCountry || trip.country);
   const barHotels = barCountry?.cities.find((c) => c.name === newCity)?.hotels ?? [];
-  const barRoomNames = [
-    ...new Set(lk.roomTypes.filter((r) => r.hotel_id === null || r.hotel_id === newHotel).map((r) => r.name.trim())),
-  ].filter(Boolean);
+  const barRoomNames = roomSuggestions(lk.roomTypes, newHotel);
 
   function pickCity(name: string) {
     setNewCity(name);
@@ -553,7 +554,7 @@ export function BasicEditor({
       const res = await suggestPricingForDraft(draftId, { hotel: t("pg.hotel"), airline: t("pg.airline") });
       if (!res.ok) return setPricingError(t(res.error));
       const pricing = latest.current.pricing;
-      patch({ pricing: { ...pricing, items: syncSuggestions(pricing.items, res.items) } });
+      patch({ pricing: { ...pricing, items: withProfit(syncSuggestions(pricing.items, res.items), pricing.profit, pricing.display_currency || "SAR") } });
     } catch {
       // offline, or a tab from before a deploy: say so instead of spinning
       setPricingError(tx("serverLost"));
@@ -582,10 +583,23 @@ export function BasicEditor({
           overridden: false,
         }
       : { ...slice, overridden: true };
-    const items = data.pricing.items.map((it, i) => (i === index ? { ...it, ...both } : it));
+    const items = withProfit(
+      data.pricing.items.map((it, i) => (i === index ? { ...it, ...both } : it)),
+      data.pricing.profit,
+      display,
+    );
     if (at) commit({ ...at, pricing: { ...data.pricing, items } });
     else patch({ pricing: { ...data.pricing, items } });
   }
+
+  /** The package's profit, over the lines in the quote currency's rates. */
+  function withProfit(items: DraftData["pricing"]["items"], profit: DraftData["pricing"]["profit"], quote: string) {
+    return withPackageProfit(items, profit, rebase(lookups.sarPer ?? { SAR: 1 }, quote) ?? {}, quote);
+  }
+  function setProfit(profit: NonNullable<DraftData["pricing"]["profit"]>) {
+    patch({ pricing: { ...data.pricing, profit, items: withProfit(data.pricing.items, profit, display) } });
+  }
+  const profit = data.pricing.profit ?? { mode: "pct" as const, value: null };
 
   // the sheet in groups, each with what it comes to — a flat list of fifteen lines said nothing
   const groups = PRICE_GROUPS.map((g) => {
@@ -597,8 +611,6 @@ export function BasicEditor({
         buy_currency: item.buy_currency || display,
         sell_price: item.sell_price,
         sell_currency: item.sell_currency || display,
-        profit_pct: item.profit_pct,
-        profit_amount: item.profit_amount,
       })),
       rebase(lookups.sarPer ?? { SAR: 1 }, display) ?? {},
       display,
@@ -716,6 +728,7 @@ export function BasicEditor({
     if (step !== "cities") setFocus(null);
     // the prices are worked out as the step opens — no button to remember
     if (step === "pricing" && canPricing) void calculate();
+    if (step === "services") commit({ services: withScopeLines(latest.current) });
     window.setTimeout(() => document.getElementById(`basic-${step}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   }
 
@@ -1198,7 +1211,9 @@ export function BasicEditor({
                 {tx("quote")}
                 <select
                   value={display}
-                  onChange={(e) => patch({ pricing: { ...data.pricing, display_currency: e.target.value } })}
+                  onChange={(e) =>
+                    patch({ pricing: { ...data.pricing, display_currency: e.target.value, items: withProfit(data.pricing.items, data.pricing.profit, e.target.value) } })
+                  }
                   className="h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-1.5 text-[12px] font-bold"
                 >
                   {currencyOptions(lookups.countries, display).map((c) => (
@@ -1305,8 +1320,46 @@ export function BasicEditor({
                   );
                 })}
                 </div>
+                {/* the profit, once for the package: a margin or a whole amount — the staff see cost and profit, the client the total */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[11px] border border-[#d8e6e0] bg-[#f8fbf9] px-3 py-2">
+                  <span className="text-[12.5px] font-extrabold text-[#0f3d38]">{tx("profit")}</span>
+                  <div role="radiogroup" className="inline-flex rounded-[8px] border border-[#cfe0d9] bg-white p-0.5">
+                    {(["pct", "amount"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        role="radio"
+                        aria-checked={profit.mode === mode}
+                        onClick={() => setProfit({ mode, value: profit.value })}
+                        className={`h-7 rounded-[6px] px-3 text-[11.5px] font-bold ${profit.mode === mode ? "bg-[#185045] text-white" : "text-[#557d78]"}`}
+                      >
+                        {tx(mode === "pct" ? "profitPct" : "profitAmount")}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="inline-flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={0}
+                      dir="ltr"
+                      aria-label={tx("profit")}
+                      value={profit.value ?? ""}
+                      placeholder="0"
+                      onChange={(e) => setProfit({ mode: profit.mode, value: e.target.value === "" ? null : Number(e.target.value) })}
+                      className={`${basicField} tv-tnum w-28 text-center`}
+                    />
+                    <span className="text-[11.5px] font-bold text-[#557d78]">{profit.mode === "pct" ? "%" : display}</span>
+                  </label>
+                  <span className="tv-tnum ms-auto text-[12px] font-bold text-[#557d78]">
+                    {tx("cost")}: <DirText>{`${summary.total_buy.toLocaleString("en-US")} ${display}`}</DirText>
+                  </span>
+                  <span className="tv-tnum text-[12px] font-extrabold text-[#0f7a52]">
+                    {tx("profit")}: <DirText>{`${summary.profit.toLocaleString("en-US")} ${display}`}</DirText>
+                    {summary.margin_pct != null ? ` (${summary.margin_pct}%)` : ""}
+                  </span>
+                </div>
                 <div className="flex items-center justify-between rounded-[11px] bg-[#185045] px-3 py-2.5 text-white">
-                  <span className="text-[13px] font-extrabold">{tx("total")}</span>
+                  <span className="text-[13px] font-extrabold">{tx("clientTotal")}</span>
                   <span className="tv-tnum text-[16px] font-extrabold">
                     <DirText>{`${summary.total_sell.toLocaleString("en-US")} ${display}`}</DirText>
                   </span>

@@ -99,8 +99,8 @@ describe("OfferDocument — daily program", () => {
   it("labels a climate average as an average — never as a forecast", () => {
     const line = weatherLine(renderClient([day({ day_number: 1, weather_source: "normals", weather_code: null })]));
     expect(line).toContain("معدّل مناخي");
-    // "أيام ممطرة" (historically wet days), not "احتمال مطر" (a probability)
-    expect(line).toContain("أيام ممطرة");
+    // the season in words, not "احتمال مطر" (a probability)
+    expect(line).toContain("في هذا الموسم");
     expect(line).not.toContain("احتمال مطر");
   });
 

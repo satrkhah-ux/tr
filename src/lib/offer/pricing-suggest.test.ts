@@ -351,10 +351,8 @@ describe("suggestPricing — transport", () => {
     expect(arrive?.buy_price).toBeNull();
   });
 
-  it("never prices the tours line through transfers, even with a same-city row", () => {
-    const tours = transport().find((i) => i.description.startsWith("الجولات السياحية"));
-    expect(tours?.sell_price).toBeNull();
-    expect(tours?.source).toBe("none");
+  it("has no tours line at all — a tour's own price includes its car", () => {
+    expect(transport().find((i) => i.description.startsWith("الجولات السياحية"))).toBeUndefined();
   });
 
   it("never quotes a 0 — the old system's blank — as a price", () => {
@@ -412,7 +410,7 @@ describe("mergeSuggestions", () => {
     expect(merged.filled).toBe(1);
     expect(merged.items[0]).toMatchObject({ buy_price: 130, sell_price: 130, sell_currency: "MYR" });
     expect(merged.items[1].sell_price).toBe(500);
-    expect(merged.added).toBe(1); // the tours line, still unpriced
+    expect(merged.added).toBe(0); // no tours line: a tour's price includes its car
     expect(merged.priced).toBe(1);
   });
 

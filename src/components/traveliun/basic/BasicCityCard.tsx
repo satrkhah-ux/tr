@@ -27,6 +27,7 @@ import {
   EXTRA_BED,
   renameRooms,
   cityDates,
+  roomSuggestions,
   WELCOME,
   withTours,
   type BasicCity,
@@ -258,9 +259,8 @@ function HotelPanel({
   const changeNights = Math.max(stays[1]?.nights ?? 0, 1);
   const hotels =
     findLookupCountry(lookups.countries, city.country || data.trip.country)?.cities.find((c) => c.name === city.city_name)?.hotels ?? [];
-  const roomNames = [
-    ...new Set(lookups.roomTypes.filter((r) => !main.hotel_id || r.hotel_id === main.hotel_id || r.hotel_id === null).map((r) => r.name.trim())),
-  ].filter(Boolean);
+  // the clear names first, then this hotel's own — never every hotel's
+  const roomNames = roomSuggestions(lookups.roomTypes, main.hotel_id);
   // a hotel the list does not hold (an older file) still shows its name
   const outside = main.hotel_name && !hotels.some((h) => h.id === main.hotel_id) ? (main.hotel_id ?? "__current") : null;
   const priceTitle = tx("stayPrice", { n: nightsText(mainNights, language) });
@@ -393,7 +393,8 @@ function HotelPanel({
         {/* a new room is a room of its own: its type and price are asked, the board follows */}
         <button
           type="button"
-          onClick={() => allLines((line) => withRooms(line, [...line.rooms, { ...emptyRoomSpec(), board_type: line.rooms[0]?.board_type ?? null }]))}
+          // a new room starts as the one before it — type, board and price — and is changed if it differs
+          onClick={() => allLines((line) => withRooms(line, [...line.rooms, { ...(line.rooms[line.rooms.length - 1] ?? emptyRoomSpec()) }]))}
           className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
         >
           <Plus className="size-3.5" />
@@ -544,8 +545,11 @@ function ToursPanel({
 
   const tours = picks.filter((p) => !p.free);
   const total = tours.reduce((sum, p) => sum + (p.price ?? 0), 0);
-  const outbound = data.flights.filter((f) => f.leg_order === "outbound");
-  const inbound = data.flights.filter((f) => f.leg_order === "inbound");
+  // met at the airport the group lands at for this city (a domestic flight in, else the international one);
+  // seen off at the one it leaves from (a domestic flight out, else the flight home)
+  const byDeparture = [...data.flights].sort((a, b) => (a.departure_at ?? "").localeCompare(b.departure_at ?? ""));
+  const landsHere = byDeparture.filter((f) => f.leg_order !== "inbound" && f.to_city?.trim() === city.city_name).at(-1) ?? byDeparture.filter((f) => f.leg_order === "outbound").at(-1);
+  const leavesHere = byDeparture.find((f) => f.leg_order !== "outbound" && f.from_city?.trim() === city.city_name) ?? byDeparture.find((f) => f.leg_order === "inbound");
 
   const carOptions = (placeholder: string) => (
     <>
@@ -618,7 +622,7 @@ function ToursPanel({
           {isFirst ? WELCOME : tx("moveTo", { from: data.cities[index - 1]?.city_name ?? "", city: city.city_name })}
         </p>
       ) : null}
-      {isFirst && transportOn ? airportRow("airport", tx("reception"), outbound[outbound.length - 1]?.to_airport || "—") : null}
+      {isFirst && transportOn ? airportRow("airport", tx("reception"), landsHere?.to_airport || "—") : null}
 
       {toursOn && picks.length > 0 ? (
         <>
@@ -681,7 +685,7 @@ function ToursPanel({
         </>
       ) : null}
 
-      {isLast && transportOn ? airportRow("farewell", tx("farewell"), inbound[0]?.from_airport || "—") : null}
+      {isLast && transportOn ? airportRow("farewell", tx("farewell"), leavesHere?.from_airport || "—") : null}
     </div>
   );
 }

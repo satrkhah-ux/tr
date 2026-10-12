@@ -63,6 +63,29 @@ import {
  */
 
 /** The user client — reference lookups and offers only, never `offer_drafts`. */
+/**
+ * The customers row an issued offer points at — the client link reads the name
+ * and phone from it. Found by the same name and phone, else created. Null when
+ * the file names nobody (a partner's sale) or the row cannot be written: the
+ * offer still goes out, without the name, as before.
+ */
+async function customerFor(customer: { customer_name: string; customer_phone: string }): Promise<string | null> {
+  const name = customer.customer_name.trim();
+  const phone = customer.customer_phone.trim();
+  if (!name && !phone) return null;
+  try {
+    const supabase = await db();
+    let found = supabase.from("customers").select("id").eq("arabic_name", name || phone);
+    found = phone ? found.eq("mobile", phone) : found.is("mobile", null);
+    const { data: hit } = await found.limit(1).maybeSingle();
+    if (hit) return (hit as { id: string }).id;
+    const { data: row } = await supabase.from("customers").insert({ arabic_name: name || phone, mobile: phone || null }).select("id").single();
+    return (row as { id: string } | null)?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function db(): Promise<SupabaseClient> {
   return (await createSupabaseServerClient()) as unknown as SupabaseClient;
 }
@@ -791,7 +814,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     }
 
     const result = await insertOffer({
-      customer_id: null,
+      customer_id: await customerFor(data.customer),
       employee_id: null,
       // From here the preview, the PDF and the client link all resolve their
       // branding from this one column.

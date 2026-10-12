@@ -11,8 +11,8 @@ async function db(): Promise<SupabaseClient> {
 }
 
 function generateSerial(): string {
-  const now = new Date();
-  const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  // the company's day — the server runs on UTC, and an offer issued after midnight in Madinah carried yesterday
+  const stamp = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }).replaceAll("-", "");
   const employeeNo = Math.floor(Math.random() * 9) + 1;
   const seq = Math.floor(Math.random() * 9000) + 1000;
   return `AD-${employeeNo}-${seq}-${stamp}`;

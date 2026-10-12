@@ -41,10 +41,18 @@ export function formatTempsAr(w: Pick<DayWeatherSnapshot, "temp_max" | "temp_min
   return "";
 }
 
-/** "86% احتمال مطر" for a forecast, "40% أيام ممطرة" for an average. */
+/**
+ * "86% احتمال مطر" for a forecast. An average is said in words: «100% أيام
+ * ممطرة» (a tropical November, where a shower falls most days) read to clients
+ * as rain all day, every day.
+ */
 export function formatRainAr(w: Pick<DayWeatherSnapshot, "rain_chance" | "source">): string {
   if (w.rain_chance == null) return "";
-  return `${w.rain_chance}% ${w.source === "forecast" ? "احتمال مطر" : "أيام ممطرة"}`;
+  if (w.source === "forecast") return `${w.rain_chance}% احتمال مطر`;
+  if (w.rain_chance >= 70) return "زخّات مطر معتادة في هذا الموسم";
+  if (w.rain_chance >= 40) return "أمطار متفرقة محتملة في هذا الموسم";
+  if (w.rain_chance >= 15) return "أمطار قليلة في هذا الموسم";
+  return "";
 }
 
 /** Full one-line summary: "32° / 24° · زخّات مطر · 86% احتمال مطر". */

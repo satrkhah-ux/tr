@@ -30,6 +30,9 @@ import {
   type DraftHotel,
   type DraftPricingItem,
   type DraftRoomSpec,
+  type DraftServices,
+  type LookupRoomType,
+  type PackageProfit,
   type DraftTrip,
   type HotelStay,
   type LookupAirport,
@@ -708,4 +711,95 @@ export function withDomesticFlights(data: DraftData, airports: LookupAirport[]):
   // the agent's own legs stay; the ones these rules wrote go with their move
   const kept = old.filter((f) => !taken.has(f) && (!f.auto || ticketed(f)));
   return { flights: [...intl, ...legs, ...kept], transport_plan };
+}
+
+// ---------- «يشمل» that follows the file ----------
+
+/** The company's own «يشمل» lines that say what the file holds — kept in step with it. */
+const SCOPE_LINES: { text: string; on: (d: DraftData) => boolean; otherwiseExcluded?: boolean }[] = [
+  { text: "الطيران الدولي", on: (d) => d.scope.flights_intl, otherwiseExcluded: true },
+  { text: "الطيران الداخلي", on: (d) => d.flights.some((f) => f.leg_order === "internal") },
+  { text: "الفنادق", on: (d) => d.scope.hotels },
+  { text: "الجولات السياحية", on: (d) => d.transport_plan.tours.enabled },
+  { text: "الإستقبال والتوديع من المطار إلى الفندق والعكس", on: (d) => d.scope.transport },
+];
+
+/**
+ * «يشمل / لا يشمل» as the file actually is: a flight booked is included (and no
+ * longer «لا يشمل»), a domestic flight only when there is one, hotels, tours
+ * and transfers only when sold. The meals are said once — by the meal plan's
+ * own line — so the list's «وجبة الإفطار» goes, and «وجبة الغداء والعشاء» is
+ * not excluded from a plan that serves them. Lines the agent wrote stay.
+ */
+export function withScopeLines(data: DraftData): DraftServices {
+  let includes = [...data.services.includes];
+  let excludes = [...data.services.excludes];
+  for (const line of SCOPE_LINES) {
+    if (line.on(data)) {
+      if (!includes.includes(line.text)) includes.push(line.text);
+      excludes = excludes.filter((x) => x !== line.text);
+    } else {
+      includes = includes.filter((x) => x !== line.text);
+      if (line.otherwiseExcluded && !excludes.includes(line.text)) excludes.push(line.text);
+    }
+  }
+  const meal = data.trip.meal_plan;
+  if (meal) includes = includes.filter((x) => x.trim() !== "وجبة الإفطار");
+  if (meal === "lunch" || meal === "dinner" || meal === "all") excludes = excludes.filter((x) => x.trim() !== "وجبة الغداء والعشاء");
+  return { ...data.services, includes, excludes };
+}
+
+// ---------- room types, the clear ones first ----------
+
+/** The room types every client understands — offered first, before any hotel's own names. */
+export const STANDARD_ROOMS = [
+  "غرفة مفردة",
+  "غرفة مزدوجة",
+  "غرفة مزدوجة بسريرين منفصلين",
+  "غرفة ثلاثية",
+  "غرفة رباعية",
+  "غرفة عائلية",
+  "غرفتان متصلتان",
+  "جناح",
+  "جناح عائلي",
+  "فيلا",
+];
+
+/** What the room field suggests: the clear names, then the chosen hotel's own — never every hotel's. */
+export function roomSuggestions(roomTypes: LookupRoomType[], hotelId: string | null | undefined): string[] {
+  const own = hotelId ? roomTypes.filter((r) => r.hotel_id === hotelId).map((r) => r.name.trim()) : [];
+  return [...new Set([...STANDARD_ROOMS, ...own])].filter(Boolean);
+}
+
+// ---------- the package's profit ----------
+
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+/**
+ * The package's profit laid onto its lines, the way the sheet already prices a
+ * profit: a margin is every line's own «٪»; a whole amount is shared over the
+ * lines in proportion to what each costs in the quote currency, each share in
+ * the line's own currency (per unit). The lines' typed figures stay the cost.
+ * No profit stated leaves the lines as they are.
+ *
+ * `rates`: quote-currency units per one unit of each currency (rebase()).
+ */
+export function withPackageProfit(
+  items: DraftPricingItem[],
+  profit: PackageProfit | undefined,
+  rates: Record<string, number>,
+  quote: string,
+): DraftPricingItem[] {
+  if (!profit) return items;
+  const bare = (i: DraftPricingItem) => ({ ...i, profit_pct: null, profit_amount: null });
+  if (profit.value == null || !Number.isFinite(profit.value) || profit.value === 0) return items.map(bare);
+  if (profit.mode === "pct") return items.map((i) => ({ ...i, profit_pct: profit.value, profit_amount: null }));
+  const qty = (i: DraftPricingItem) => (i.quantity > 0 ? i.quantity : 1);
+  const rate = (i: DraftPricingItem) => (i.buy_currency || quote) === quote ? 1 : (rates[i.buy_currency || quote] ?? 0);
+  const cost = items.map((i) => (i.buy_price == null ? 0 : i.buy_price * qty(i) * rate(i)));
+  const total = cost.reduce((a, b) => a + b, 0);
+  if (total <= 0) return items.map(bare);
+  return items.map((i, k) =>
+    cost[k] > 0 ? { ...i, profit_pct: null, profit_amount: round2((profit.value! * cost[k]) / total / rate(i) / qty(i)) } : bare(i),
+  );
 }

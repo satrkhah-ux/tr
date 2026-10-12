@@ -69,6 +69,8 @@ export function citiesMatchFlights(cities: DraftCity[], derived: DraftCity[]): b
  * anything unknown is not called a mismatch.
  */
 export function domesticMismatches(flights: DraftFlight[], cities: DraftCity[]): DraftFlight[] {
+  // no cities yet: nothing to disagree with (the flights may come first)
+  if (cities.length === 0) return [];
   // the group may land in a city it does not stay in and fly on to the first one
   // the same day — and fly from the last city to where the flight home leaves
   const landing = flights.filter((f) => f.leg_order === "outbound").sort(byDeparture).at(-1)?.to_city?.trim();

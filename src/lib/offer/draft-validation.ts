@@ -231,6 +231,12 @@ export function validateDraft(data: DraftData): DraftValidation {
     });
   }
 
+  // An empty price is «not priced yet», never «free»: the offer would go out
+  // short by that line. Nought is a price (a free day, a transfer included).
+  if (!isFixedPrice(data) && data.pricing.items.some((i) => i.sell_price == null)) {
+    blocking.push({ severity: "blocking", stage: "pricing", field: "pricing", key: "pg.err.priceMissing" });
+  }
+
   // No «every night has a hotel» block: the owner removed it (2026-10-12). The
   // cities card still shows each city's coverage (مكتمل / متبقٍ / زائد).
   // The hotel's price is typed on its stay — it changes daily, so it is never

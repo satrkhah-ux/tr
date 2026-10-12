@@ -759,7 +759,8 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
     const checkOuts = hotels.map((h) => h.check_out).filter((d): d is string => Boolean(d)).sort();
     const arrival_date = offer.offer_date ?? checkIns[0] ?? null;
     const departure_date = checkOuts.length > 0 ? checkOuts[checkOuts.length - 1] : null;
-    const issue_date = offer.created_at ? offer.created_at.slice(0, 10) : null;
+    // the day it was issued in Saudi Arabia, not in UTC
+    const issue_date = offer.created_at ? new Date(offer.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }) : null;
     const validity_date = issue_date ? addDaysIso(issue_date, 14) : null;
 
     return {
