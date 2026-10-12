@@ -381,6 +381,12 @@ export type TourPick = {
   /** the programme's description — the day's activity on the document. */
   text: string;
   price: number | null;
+  /** the day it is on (one of the city's dates); absent — the next free day takes it. */
+  date?: string | null;
+  /** the car it goes in, when it is not the trip's tour car. */
+  car_type?: string;
+  /** «يوم حر» — a day the agent keeps open on purpose; never priced, never counted as a tour. */
+  free?: boolean;
 };
 
 /**

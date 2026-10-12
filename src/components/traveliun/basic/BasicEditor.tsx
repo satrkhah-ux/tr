@@ -70,13 +70,14 @@ import {
   removeCity,
   setCityNights,
   withHotelLines,
-  withTourCount,
   withTripDates,
+  priceGroupOf,
   type BasicCity,
+  type PriceGroup,
 } from "@/lib/offer/basic";
 import { validateDraft, type DraftIssue } from "@/lib/offer/draft-validation";
 import { computeOfferPricing, rebase } from "@/lib/offer/pricing";
-import { mergeSuggestions } from "@/lib/offer/pricing-suggest";
+import { syncSuggestions } from "@/lib/offer/pricing-suggest";
 import { syncDepartureDates } from "@/lib/offer/schedule";
 import { useRole } from "@/lib/roles/RoleContext";
 import { TraveliunShell } from "../TraveliunShell";
@@ -99,6 +100,17 @@ const MODE_CHIPS: { mode: TransportMode; label: BasicLabel; icon: typeof Car }[]
   { mode: "train", label: "byTrain", icon: TrainFront },
   { mode: "ship", label: "byShip", icon: Ship },
 ];
+/** The pricing sheet's groups, in the order the agency sells in. */
+const PRICE_GROUPS: { key: PriceGroup; label: BasicLabel; icon: typeof Car }[] = [
+  { key: "flights", label: "groupFlights", icon: Plane },
+  { key: "hotels", label: "groupHotels", icon: Building2 },
+  { key: "transport", label: "groupTransport", icon: BusFront },
+  { key: "tours", label: "groupTours", icon: Camera },
+  { key: "services", label: "groupServices", icon: ConciergeBell },
+  { key: "visas", label: "groupVisas", icon: Stamp },
+  { key: "other", label: "groupOther", icon: Plus },
+];
+
 /** The page's steps, in order; one is open at a time. */
 type Step = "client" | "flights" | "cities" | "transport" | "services" | "pricing" | "finish";
 const STEP_ORDER: Step[] = ["client", "flights", "cities", "transport", "services", "pricing", "finish"];
@@ -460,7 +472,7 @@ export function BasicEditor({
       await flush();
       const res = await suggestPricingForDraft(draftId, { hotel: t("pg.hotel"), airline: t("pg.airline") });
       if (!res.ok) return setPricingError(t(res.error));
-      patch({ pricing: { ...data.pricing, items: mergeSuggestions(data.pricing.items, res.items).items } });
+      patch({ pricing: { ...data.pricing, items: syncSuggestions(data.pricing.items, res.items) } });
     } catch {
       // offline, or a tab from before a deploy: say so instead of spinning
       setPricingError(tx("serverLost"));
@@ -469,9 +481,29 @@ export function BasicEditor({
     }
   }
 
+  /** A price set here by hand is the agent's: «احسب الأسعار» keeps it (`overridden`). */
   function setItem(index: number, slice: Partial<DraftData["pricing"]["items"][number]>) {
-    patch({ pricing: { ...data.pricing, items: data.pricing.items.map((it, i) => (i === index ? { ...it, ...slice } : it)) } });
+    patch({ pricing: { ...data.pricing, items: data.pricing.items.map((it, i) => (i === index ? { ...it, ...slice, overridden: true } : it)) } });
   }
+
+  // the sheet in groups, each with what it comes to — a flat list of fifteen lines said nothing
+  const groups = PRICE_GROUPS.map((g) => {
+    const rows = data.pricing.items.map((item, i) => ({ item, i })).filter(({ item }) => priceGroupOf(item) === g.key);
+    const subtotal = computeOfferPricing(
+      rows.map(({ item }) => ({
+        quantity: item.quantity,
+        buy_price: item.buy_price,
+        buy_currency: item.buy_currency || display,
+        sell_price: item.sell_price,
+        sell_currency: item.sell_currency || display,
+        profit_pct: item.profit_pct,
+        profit_amount: item.profit_amount,
+      })),
+      rebase(lookups.sarPer ?? { SAR: 1 }, display) ?? {},
+      display,
+    ).total_sell;
+    return { ...g, rows, subtotal };
+  }).filter((g) => g.rows.length > 0);
 
   // ---------- what is still missing, and issuing ----------
   const validation = useMemo(() => validateDraft(data), [data]);
@@ -828,10 +860,7 @@ export function BasicEditor({
                 isLast={i === cities.length - 1}
                 hop={hop}
                 onNights={(n) => commit(setCityNights(data, i, n))}
-                onTours={(n) =>
-                  commit({ cities: cities.map((c, k) => (k === i ? { ...c, tours: n, tour_picks: withTourCount(c.tour_picks, n) } : c)) })
-                }
-                onPicks={(tour_picks) => commit({ cities: cities.map((c, k) => (k === i ? { ...c, tour_picks } : c)) })}
+                onPicks={(tour_picks) => commit({ cities: cities.map((c, k) => (k === i ? { ...c, tour_picks, tours: tour_picks.length } : c)) })}
                 onLines={setLines}
                 onSlice={commit}
                 onCar={(leg, slice) =>
@@ -1038,30 +1067,47 @@ export function BasicEditor({
             {data.pricing.items.length === 0 ? (
               <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noLines")}</p>
             ) : (
-              <div className="divide-y divide-[#edf3f0]">
-                {data.pricing.items.map((item, i) => (
-                  <div key={i} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 py-1.5 sm:grid-cols-[1fr_60px_120px_84px]">
-                    <span className="min-w-0 truncate text-[12px] font-bold text-[#185045]">{item.description}</span>
-                    <span className="tv-tnum hidden text-center text-[11.5px] font-bold text-[#557d78] sm:block">× {item.quantity}</span>
-                    <input
-                      type="number"
-                      min={0}
-                      dir="ltr"
-                      aria-label={tx("sell")}
-                      value={item.sell_price ?? ""}
-                      onChange={(e) => setItem(i, { sell_price: e.target.value === "" ? null : Number(e.target.value) })}
-                      className={`${basicField} tv-tnum text-center`}
-                    />
-                    <select value={item.sell_currency || display} onChange={(e) => setItem(i, { sell_currency: e.target.value })} className={`${basicField} px-1.5`}>
-                      {currencyOptions(lookups.countries, item.sell_currency || display).map((c) => (
-                        <option key={c} value={c}>{c}</option>
+              <div className="space-y-2.5">
+                {groups.map((g) => (
+                  <div key={g.key} className="overflow-hidden rounded-[11px] border border-[#e2ebe7]">
+                    <div className="flex items-center gap-2 bg-[#eef5f2] px-3 py-1.5">
+                      <g.icon className="size-4 text-[#185045]" />
+                      <span className="text-[12.5px] font-extrabold text-[#0f3d38]">{tx(g.label)}</span>
+                      <span className="rounded-full bg-white px-2 text-[10.5px] font-bold text-[#557d78]">{g.rows.length}</span>
+                      <span className="tv-tnum ms-auto text-[12.5px] font-extrabold text-[#185045]">
+                        <DirText>{`${g.subtotal.toLocaleString("en-US")} ${display}`}</DirText>
+                      </span>
+                    </div>
+                    <div className="divide-y divide-[#f0f5f3] px-3">
+                      {g.rows.map(({ item, i }) => (
+                        <div key={i} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 py-1.5 sm:grid-cols-[1fr_52px_8rem_5.5rem]">
+                          <span className="min-w-0 truncate text-[12px] font-bold text-[#185045]" title={item.description}>
+                            {item.description}
+                          </span>
+                          <span className="tv-tnum hidden text-center text-[11px] font-bold text-[#7a948f] sm:block">× {item.quantity}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            dir="ltr"
+                            aria-label={tx("sell")}
+                            value={item.sell_price ?? ""}
+                            placeholder="—"
+                            onChange={(e) => setItem(i, { sell_price: e.target.value === "" ? null : Number(e.target.value) })}
+                            className={`${basicField} tv-tnum text-center ${item.sell_price == null ? "border-[#f2d39a] bg-[#fffaf0]" : ""}`}
+                          />
+                          <select value={item.sell_currency || display} onChange={(e) => setItem(i, { sell_currency: e.target.value })} className={`${basicField} px-1.5`}>
+                            {currencyOptions(lookups.countries, item.sell_currency || display).map((c) => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        </div>
                       ))}
-                    </select>
+                    </div>
                   </div>
                 ))}
-                <div className="flex items-center justify-between pt-2.5">
-                  <span className="text-[13px] font-extrabold text-[#003c3a]">{tx("total")}</span>
-                  <span className="tv-tnum text-[15px] font-extrabold text-[#0f7a52]">
+                <div className="flex items-center justify-between rounded-[11px] bg-[#185045] px-3 py-2.5 text-white">
+                  <span className="text-[13px] font-extrabold">{tx("total")}</span>
+                  <span className="tv-tnum text-[16px] font-extrabold">
                     <DirText>{`${summary.total_sell.toLocaleString("en-US")} ${display}`}</DirText>
                   </span>
                 </div>

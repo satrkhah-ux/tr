@@ -24,6 +24,7 @@ import {
   type DraftData,
   type DraftDay,
   type DraftHotel,
+  type DraftPricingItem,
   type DraftTrip,
   type HotelStay,
   type TourPick,
@@ -335,22 +336,29 @@ export function basicDays(data: DraftData): DraftDay[] {
     kindOf.push(i === lastDay ? "last" : i === firstStay ? "arrive" : moved ? "move" : "stay");
   });
 
-  // 2. each city's tours over its free days. A client may want more tours than
-  // the city has days: they share a day, in turn, rather than being refused.
-  // A city with no free day at all takes them on the day the group arrives.
+  // 2. each city's tours: a tour with a date goes on that day; the rest take the
+  // city's free days in turn. A client may want more tours than the city has
+  // days — they share a day rather than being refused — and a city with no free
+  // day at all takes them on the day the group arrives.
   const toursOn = plan.tours.enabled;
   const toursOf = new Map<number, TourPick[]>();
+  const put = (day: number, pick: TourPick) => toursOf.set(day, [...(toursOf.get(day) ?? []), pick]);
   cities.forEach((city, c) => {
     const count = toursOn ? (city.tours ?? 0) : 0;
     if (count === 0) return;
-    const free = days.map((_, i) => i).filter((i) => cityOf[i] === c && kindOf[i] === "stay");
-    const first = cityOf.indexOf(c);
-    const slots = free.length > 0 ? free : first >= 0 ? [first] : [];
-    if (slots.length === 0) return;
-    withTourCount(city.tour_picks, count).forEach((pick, k) => {
-      const title = pick.title.trim() || `جولة سياحية في ${city.city_name}`;
-      const day = slots[k % slots.length];
-      toursOf.set(day, [...(toursOf.get(day) ?? []), { ...pick, title }]);
+    const cityDays = days.map((_, i) => i).filter((i) => cityOf[i] === c);
+    const free = cityDays.filter((i) => kindOf[i] === "stay");
+    const undated: TourPick[] = [];
+    for (const pick of withTourCount(city.tour_picks, count)) {
+      const named = { ...pick, title: pick.free ? FREE_DAY_TITLE : pick.title.trim() || `جولة سياحية في ${city.city_name}` };
+      const day = pick.date ? cityDays.find((i) => days[i].date === pick.date) : undefined;
+      if (day !== undefined) put(day, named);
+      else undated.push(named);
+    }
+    const open = free.filter((i) => !toursOf.has(i));
+    const slots = open.length > 0 ? open : free.length > 0 ? free : cityDays.slice(0, 1);
+    undated.forEach((pick, k) => {
+      if (slots.length > 0) put(slots[k % slots.length], pick);
     });
   });
 
@@ -374,7 +382,8 @@ export function basicDays(data: DraftData): DraftDay[] {
       activities = moveLines(mode, day.city_name, leg?.flight_no.trim() ?? "");
     } else title = FREE_DAY_TITLE;
 
-    const tours = toursOf.get(i) ?? [];
+    // «يوم حر» picked on purpose keeps the day free; it is not a tour
+    const tours = (toursOf.get(i) ?? []).filter((t) => !t.free);
     if (tours.length > 0) {
       const line = (t: TourPick) => (t.text.trim() ? `${t.title}: ${t.text.trim()}` : t.title);
       if (kind === "stay") {
@@ -382,9 +391,23 @@ export function basicDays(data: DraftData): DraftDay[] {
         title = tours[0].title;
         activities = [...(tours[0].text.trim() ? [tours[0].text.trim()] : []), ...tours.slice(1).map(line)];
       } else activities = [...activities, ...tours.map(line)];
+      // the car each tour goes in, said once
+      const cars = [...new Set(tours.map((t) => t.car_type?.trim()).filter(Boolean))];
+      if (cars.length > 0) activities = [...activities, `التنقل بـ${cars.join(" و")}`];
     }
 
     const owned = day.auto_title !== undefined ? day.title === day.auto_title : isAutoTitle(day.title);
     return owned ? { ...day, title, activities, auto_title: title } : day;
   });
+}
+
+/** Where a pricing line sits on the sheet: tours are services the city card wrote (ref «tour:…»). */
+export type PriceGroup = "flights" | "hotels" | "transport" | "tours" | "services" | "visas" | "other";
+export function priceGroupOf(item: Pick<DraftPricingItem, "item_type" | "ref">): PriceGroup {
+  if (item.item_type === "hotel") return "hotels";
+  if (item.item_type === "flight") return "flights";
+  if (item.item_type === "transport") return "transport";
+  if (item.item_type === "visa") return "visas";
+  if (item.item_type === "service") return item.ref?.startsWith("tour:") ? "tours" : "services";
+  return "other";
 }

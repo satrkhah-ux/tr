@@ -9,6 +9,7 @@ import {
   clearRoomChange,
   EXTRA_BED,
   extraBeds,
+  priceGroupOf,
   remainingNights,
   renameRooms,
   setCityNights,
@@ -167,6 +168,41 @@ describe("النظام بيسك", () => {
     expect([days[6].title, days[6].activities]).toEqual(["جولة سياحية في كوالالمبور", ["جولة سياحية في كوالالمبور"]]);
     expect(days[7].activities).toHaveLength(1);
     expect(days[8].title).toBe("المغادرة");
+  });
+
+  it("puts a dated tour on its own day, keeps «يوم حر» free, and names the car", () => {
+    const data = malaysia();
+    // لنكاوي: 13–16 Nov — the tour asked for the 15th, a free day on the 14th
+    data.cities = data.cities.map((c, i) =>
+      i === 1
+        ? {
+            ...c,
+            tours: 2,
+            tour_picks: [
+              { program_id: null, title: "يوم حر", text: "", price: 0, date: "2026-11-14", free: true },
+              { program_id: "p1", title: "جزيرة الحامل", text: "رحلة بحرية", price: 400, date: "2026-11-15", car_type: "فان" },
+            ],
+          }
+        : c,
+    );
+    const days = basicDays(data);
+    const on = (date: string) => days.find((d) => d.date === date)!;
+    expect(on("2026-11-14").title).toBe("يوم حر");
+    expect([on("2026-11-15").title, on("2026-11-15").activities]).toEqual(["جزيرة الحامل", ["رحلة بحرية", "التنقل بـفان"]]);
+  });
+
+  it("sorts the pricing lines into their groups — a tour is a service the city card wrote", () => {
+    expect(
+      [
+        { item_type: "hotel" as const },
+        { item_type: "flight" as const },
+        { item_type: "transport" as const },
+        { item_type: "service" as const, ref: "tour:لنكاوي:0" },
+        { item_type: "service" as const, ref: "service:شريحة" },
+        { item_type: "visa" as const },
+        { item_type: "other" as const },
+      ].map(priceGroupOf),
+    ).toEqual(["hotels", "flights", "transport", "tours", "services", "visas", "other"]);
   });
 
   it("books the bar's price on every room of the new city", () => {

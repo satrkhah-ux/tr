@@ -10,6 +10,7 @@ import {
   deriveHotelStays,
   emptyRoomSpec,
   findLookupCountry,
+  FREE_DAY_TITLE,
   withRooms,
   type DraftData,
   type DraftHotel,
@@ -33,11 +34,15 @@ import { programDayText, type TourProgram } from "@/lib/offer/itinerary";
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { suppliersFor } from "../generator/SupplierPrice";
-import { basicField, basicLabel } from "./styles";
+import { basicField } from "./styles";
 import { nightsText, useBasicLabels } from "./labels";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 const money = (n: number) => Math.round(n * 100) / 100;
+const addDays = (iso: string, days: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+const DAY = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+/** «الأربعاء، 11 نوفمبر» */
+const dayLabel = (iso: string) => DAY.format(new Date(`${iso}T00:00:00Z`));
 
 type Tab = "hotel" | "tours" | "transfers" | "domestic";
 
@@ -48,10 +53,21 @@ const VIEWS = ["إطلالة على المدينة", "إطلالة على الب
 const airportShort = (airport: string) => airport.match(/\(([A-Za-z0-9]{3,5})\)/)?.[1] ?? airport;
 
 /**
- * One city: its nights in the header, then four small tabs — the hotel, the
- * tours, the airport reception / farewell, the domestic flights — one open at a
- * time. Everything the trip already said (dates, rooms, meals, currency) is
- * filled in for the agent and kept under «معلومات إضافية».
+ * The card's tables share one look: a row of small headings once, then rows of
+ * bare fields aligned under them — rather than a label over every field, which
+ * spread a city over half a screen. Below xl the rows wrap two to a line.
+ */
+const head = "hidden px-0.5 text-[10.5px] font-bold text-[#7a948f] xl:grid";
+const rowGap = "grid grid-cols-2 items-start gap-2";
+const HOTEL_COLS = "xl:grid-cols-[minmax(12rem,1.5fr)_minmax(10rem,1.3fr)_minmax(9rem,1.1fr)_minmax(7.5rem,0.9fr)_7rem_minmax(7rem,0.8fr)_2rem]";
+const TOUR_COLS = "xl:grid-cols-[minmax(10rem,1fr)_minmax(14rem,2fr)_minmax(10rem,1.1fr)_minmax(7rem,0.7fr)_6rem]";
+const CAR_COLS = "xl:grid-cols-[minmax(12rem,1.6fr)_minmax(10rem,1.2fr)_5.5rem_7rem]";
+
+/**
+ * One city: its tabs in the header beside its name — the hotel, the tours, the
+ * airport reception / farewell, the domestic flights — one open at a time.
+ * Everything the trip already said (dates, meals, currency) is filled in for
+ * the agent and kept under «معلومات إضافية».
  */
 export function BasicCityCard({
   index,
@@ -67,7 +83,6 @@ export function BasicCityCard({
   isLast,
   hop,
   onNights,
-  onTours,
   onPicks,
   onLines,
   onSlice,
@@ -92,7 +107,7 @@ export function BasicCityCard({
   /** how the group gets here from the previous city, when the trip moves more than one way. */
   hop?: ReactNode;
   onNights: (nights: number) => void;
-  onTours: (tours: number) => void;
+  /** the city's tours, in date order — their count is the city's tour count. */
   onPicks: (picks: TourPick[]) => void;
   /** replace these hotel lines (matched by id) — several at once, from one change. */
   onLines: (lines: DraftHotel[]) => void;
@@ -121,11 +136,31 @@ export function BasicCityCard({
 
   return (
     <article className="overflow-hidden rounded-[14px] border border-[#d8e6e0] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+      {/* the city, its tabs and its nights — one line */}
       <header className="flex flex-wrap items-center gap-2 bg-[#eef5f2] px-3 py-2">
         <span className="flex size-6 items-center justify-center rounded-full bg-[#185045] text-[11px] font-extrabold text-white">{index + 1}</span>
         <h3 className="text-[13.5px] font-extrabold text-[#0f3d38]">{city.city_name}</h3>
         {city.country ? <span className="rounded-full bg-white px-2 py-0.5 text-[10.5px] font-bold text-[#557d78]">{city.country}</span> : null}
         {hop}
+        {tabs.length > 0 ? (
+          <div role="tablist" className="flex flex-wrap gap-1 sm:ms-3">
+            {tabs.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={open === key}
+                onClick={() => setTab(key)}
+                className={`inline-flex h-7 items-center gap-1 rounded-[7px] border px-2.5 text-[11.5px] font-bold transition-colors ${
+                  open === key ? "border-[#185045] bg-[#185045] text-white" : "border-[#d3e2dc] bg-white text-[#557d78] hover:border-[#165749]"
+                }`}
+              >
+                <Icon className="size-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="ms-auto flex items-center gap-2">
           <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#185045]">
             {tx("nights")}
@@ -141,41 +176,30 @@ export function BasicCityCard({
         </div>
       </header>
 
-      {tabs.length > 0 ? (
+      {open ? (
         <div className="p-3">
-          {/* the city's parts, one open at a time */}
-          <div role="tablist" className="mb-3 flex flex-wrap gap-1.5">
-            {tabs.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={open === key}
-                onClick={() => setTab(key)}
-                className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-3 text-[12px] font-bold transition-colors ${
-                  open === key ? "border-[#185045] bg-[#185045] text-white" : "border-[#DBE4E2] bg-white text-[#557d78] hover:border-[#165749]"
-                }`}
-              >
-                <Icon className="size-3.5" />
-                {label}
-              </button>
-            ))}
-          </div>
-
           {open === "hotel" && main ? (
             <HotelPanel index={index} city={city} dayFrom={dayFrom} data={data} lookups={lookups} main={main} change={change} lines={lines} onLines={onLines} onSlice={onSlice} />
           ) : null}
           {open === "tours" ? (
-            <ToursPanel index={index} city={city} programs={programs} isFirst={isFirst} onTours={onTours} onPicks={onPicks} />
+            <ToursPanel
+              index={index}
+              city={city}
+              programs={programs}
+              isFirst={isFirst}
+              carTypes={lookups.carTypes}
+              defaultCar={data.transport_plan.tours.car_type}
+              onPicks={onPicks}
+            />
           ) : null}
           {open === "transfers" ? <TransfersPanel data={data} lookups={lookups} isFirst={isFirst} isLast={isLast} onCar={onCar} onSims={onSims} /> : null}
           {open === "domestic" ? (
-            <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
               {domestic.length === 0 ? (
                 <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noDomestic")}</p>
               ) : (
                 domestic.map((f, k) => (
-                  <p key={k} className="tv-tnum flex flex-wrap items-center gap-2 rounded-[10px] bg-[#f8fbf9] px-3 py-2 text-[12px] font-bold text-[#185045]">
+                  <p key={k} className="tv-tnum inline-flex flex-wrap items-center gap-2 rounded-[9px] bg-[#f8fbf9] px-3 py-1.5 text-[12px] font-bold text-[#185045]">
                     <Plane className="size-3.5" />
                     <DirText dir="ltr">{`${f.flight_no || "—"} ${airportShort(f.from_airport)} → ${airportShort(f.to_airport)}`}</DirText>
                     {f.departure_at ? <DirText dir="ltr">{f.departure_at.replace("T", " ")}</DirText> : null}
@@ -197,11 +221,9 @@ export function BasicCityCard({
       ) : null}
     </article>
   );
-
 }
 
 // ---------- the panels ----------
-
 
 function HotelPanel({
   index,
@@ -239,6 +261,7 @@ function HotelPanel({
   ].filter(Boolean);
   // a hotel the list does not hold (an older file) still shows its name
   const outside = main.hotel_name && !hotels.some((h) => h.id === main.hotel_id) ? (main.hotel_id ?? "__current") : null;
+  const priceTitle = tx("stayPrice", { n: nightsText(mainNights, language) });
 
   /** The same answer for every stay of this city — one hotel, the room changes inside it. */
   const allLines = (fn: (line: DraftHotel) => DraftHotel) => onLines(lines.map(fn));
@@ -254,13 +277,14 @@ function HotelPanel({
         min={0}
         dir="ltr"
         aria-label={label}
+        title={label}
         value={value ?? ""}
-        placeholder="0"
+        placeholder={tx("price")}
         onChange={(e) => onValue(e.target.value === "" ? null : Number(e.target.value))}
         className={`${basicField} tv-tnum text-center`}
       />
       {value != null ? (
-        <span className="tv-tnum text-[10.5px] font-bold text-[#0f7a52]">
+        <span className="tv-tnum text-[10px] font-bold text-[#0f7a52]">
           {tx("perNightIs", { price: `${money(value / nights).toLocaleString("en-US")} ${currency}` })}
         </span>
       ) : null}
@@ -268,204 +292,201 @@ function HotelPanel({
   );
 
   return (
-    <div className="space-y-2.5">
-      <label className={`${basicLabel} max-w-xl`}>
-        {tx("hotel")}
-        <select
-          value={outside ?? main.hotel_id ?? ""}
-          onChange={(e) => {
-            const h = hotels.find((x) => x.id === e.target.value);
-            allLines((line) =>
-              withRooms(
-                { ...line, hotel_id: h?.id ?? null, hotel_name: h?.name ?? "", hotel_name_en: "", sourcing: null },
-                // a room type belongs to its hotel: the old hotel's id must not follow
-                line.rooms.map((r) => ({ ...r, room_type_id: null })),
-              ),
-            );
-          }}
-          className={basicField}
-        >
-          <option value="">{tx("choose")}</option>
-          {outside ? <option value={outside}>{main.hotel_name}</option> : null}
-          {hotels.map((h) => (
-            <option key={h.id} value={h.id}>
-              {h.name}
-              {h.stars ? ` ${"★".repeat(h.stars)}` : ""}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {/* each room is a room of its own: its type, its view, its board, an extra bed, its price */}
-      <div className="space-y-1.5">
-        {main.rooms.map((r, j) => {
-          const extra = r.room_type_name.endsWith(EXTRA_BED);
-          return (
-            <div key={j} className="flex flex-wrap items-start gap-2 rounded-[10px] bg-[#f8fbf9] p-2">
-              <span className="mt-6 inline-flex h-6 items-center rounded-full bg-[#eef4f1] px-2 text-[10.5px] font-extrabold text-[#185045]">
-                {tx("roomN", { n: j + 1 })}
-              </span>
-              <label className={`${basicLabel} w-56`}>
-                {tx("roomType")}
-                <input
-                  list={`basic-rooms-${index}`}
-                  value={baseRoomName(r.room_type_name)}
-                  onChange={(e) => onLines([setRoom(main, j, { room_type_id: null, room_type_name: e.target.value + (extra ? EXTRA_BED : "") })])}
-                  className={basicField}
-                />
-              </label>
-              <label className={`${basicLabel} w-44`}>
-                {tx("view")}
-                <input list="basic-views" value={r.view ?? ""} onChange={(e) => onLines([setRoom(main, j, { view: e.target.value })])} className={basicField} />
-              </label>
-              <label className={`${basicLabel} w-36`}>
-                {tx("board")}
-                <select
-                  value={r.board_type ?? ""}
-                  onChange={(e) => onLines([setRoom(main, j, { board_type: (e.target.value || null) as BoardType | null })])}
-                  className={basicField}
-                >
-                  <option value="">{tx("choose")}</option>
-                  {BOARD_TYPES.map((b) => (
-                    <option key={b} value={b}>{t(BOARD_LABEL_KEYS[b])}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="mt-6 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[11.5px] font-bold text-[#185045]">
-                <input
-                  type="checkbox"
-                  checked={extra}
-                  onChange={(e) =>
-                    onLines([setRoom(main, j, { room_type_name: baseRoomName(r.room_type_name) + (e.target.checked ? EXTRA_BED : "") })])
-                  }
-                  className="size-3.5 accent-[#185045]"
-                />
-                {tx("extraBed")}
-              </label>
-              <label className={`${basicLabel} w-32`}>
-                {tx("stayPrice", { n: nightsText(mainNights, language) })}
-                {priceField(r.price, mainNights, main.manual_currency, (price) => onLines([setRoom(main, j, { price })]), tx("stayPrice", { n: nightsText(mainNights, language) }))}
-              </label>
-              {main.rooms.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => allLines((line) => withRooms(line, line.rooms.filter((_, k) => k !== j)))}
-                  aria-label={tx("removeRoom")}
-                  className="mt-6 rounded-[7px] p-1.5 text-[#c43d3d] hover:bg-[#fff1f1]"
-                >
-                  <X className="size-4" />
-                </button>
-              ) : null}
-            </div>
-          );
-        })}
-        <datalist id={`basic-rooms-${index}`}>
-          {roomNames.map((n) => (
-            <option key={n} value={n} />
-          ))}
-        </datalist>
-        <datalist id="basic-views">
-          {VIEWS.map((v) => (
-            <option key={v} value={v} />
-          ))}
-        </datalist>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* a new room is a room of its own: its type and price are asked, the board follows */}
-          <button
-            type="button"
-            onClick={() => allLines((line) => withRooms(line, [...line.rooms, { ...emptyRoomSpec(), board_type: line.rooms[0]?.board_type ?? null }]))}
-            className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
-          >
-            <Plus className="size-3.5" />
-            {tx("addRoom")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMore((v) => !v)}
-            aria-expanded={more}
-            className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#cfe0d9] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
-          >
-            {tx("moreInfo")}
-            <ChevronDown className={`size-3.5 transition-transform ${more ? "rotate-180" : ""}`} />
-          </button>
-        </div>
+    <div className="space-y-1.5">
+      <div className={`${head} ${HOTEL_COLS} gap-2`}>
+        <span>{tx("hotel")}</span>
+        <span>{tx("roomType")}</span>
+        <span>{tx("view")}</span>
+        <span>{tx("board")}</span>
+        <span>{tx("extraBed")}</span>
+        <span>{priceTitle}</span>
+        <span />
       </div>
 
-      {more ? (
-        <div className="space-y-2.5 rounded-[11px] border border-dashed border-[#d6e6ef] bg-[#f8fbfc] p-2.5">
-          {/* what the trip already decided — shown, never asked again */}
-          <p className="tv-tnum flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-bold text-[#557d78]">
-            <span>{tx("dayRange", { from: dayFrom, to: dayFrom + city.nights })}</span>
-            {stays.map((s) =>
-              s.check_in ? <DirText key={s.line.id}>{tx("stayDates", { in: s.check_in, out: s.check_out ?? "" })}</DirText> : null,
+      {/* the hotel on the first room's row; each further room under it, field for field */}
+      {main.rooms.map((r, j) => {
+        const extra = r.room_type_name.endsWith(EXTRA_BED);
+        return (
+          <div key={j} className={`${rowGap} ${HOTEL_COLS}`}>
+            {j === 0 ? (
+              <select
+                aria-label={tx("hotel")}
+                value={outside ?? main.hotel_id ?? ""}
+                onChange={(e) => {
+                  const h = hotels.find((x) => x.id === e.target.value);
+                  allLines((line) =>
+                    withRooms(
+                      { ...line, hotel_id: h?.id ?? null, hotel_name: h?.name ?? "", hotel_name_en: "", sourcing: null },
+                      // a room type belongs to its hotel: the old hotel's id must not follow
+                      line.rooms.map((room) => ({ ...room, room_type_id: null })),
+                    ),
+                  );
+                }}
+                className={`${basicField} col-span-2 xl:col-span-1`}
+              >
+                <option value="">{tx("hotel")} — {tx("choose")}</option>
+                {outside ? <option value={outside}>{main.hotel_name}</option> : null}
+                {hotels.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.name}
+                    {h.stars ? ` ${"★".repeat(h.stars)}` : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="col-span-2 inline-flex h-9 items-center text-[11.5px] font-extrabold text-[#185045] xl:col-span-1 xl:justify-end xl:pe-2">
+                {tx("roomN", { n: j + 1 })}
+              </span>
             )}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <label className={`${basicLabel} w-28`}>
-              {tx("currency")}
-              <select value={main.manual_currency} onChange={(e) => allLines((line) => ({ ...line, manual_currency: e.target.value }))} className={basicField}>
-                {currencyOptions(lookups.countries, main.manual_currency).map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+            <input
+              aria-label={tx("roomType")}
+              placeholder={tx("roomType")}
+              list={`basic-rooms-${index}`}
+              value={baseRoomName(r.room_type_name)}
+              onChange={(e) => onLines([setRoom(main, j, { room_type_id: null, room_type_name: e.target.value + (extra ? EXTRA_BED : "") })])}
+              className={basicField}
+            />
+            <input
+              aria-label={tx("view")}
+              placeholder={tx("view")}
+              list="basic-views"
+              value={r.view ?? ""}
+              onChange={(e) => onLines([setRoom(main, j, { view: e.target.value })])}
+              className={basicField}
+            />
+            <select
+              aria-label={tx("board")}
+              value={r.board_type ?? ""}
+              onChange={(e) => onLines([setRoom(main, j, { board_type: (e.target.value || null) as BoardType | null })])}
+              className={basicField}
+            >
+              <option value="">{tx("board")}</option>
+              {BOARD_TYPES.map((b) => (
+                <option key={b} value={b}>{t(BOARD_LABEL_KEYS[b])}</option>
+              ))}
+            </select>
+            <label className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-[11.5px] font-bold text-[#185045]">
+              <input
+                type="checkbox"
+                checked={extra}
+                onChange={(e) => onLines([setRoom(main, j, { room_type_name: baseRoomName(r.room_type_name) + (e.target.checked ? EXTRA_BED : "") })])}
+                className="size-3.5 accent-[#185045]"
+              />
+              {tx("extraBed")}
             </label>
-            {/* who the room was bought from — internal, never on the client document */}
-            <label className={`${basicLabel} w-48`}>
-              {t("pg.supplierLabel")}
-              <select value={main.supplier ?? ""} onChange={(e) => allLines((line) => ({ ...line, supplier: e.target.value }))} className={basicField}>
-                <option value="">{tx("choose")}</option>
-                {suppliersFor(lookups, "فنادق").map((s) => (
-                  <option key={s.id} value={s.name}>{s.name}</option>
-                ))}
-              </select>
-            </label>
+            {priceField(r.price, mainNights, main.manual_currency, (price) => onLines([setRoom(main, j, { price })]), priceTitle)}
+            {main.rooms.length > 1 ? (
+              <button
+                type="button"
+                onClick={() => allLines((line) => withRooms(line, line.rooms.filter((_, k) => k !== j)))}
+                aria-label={tx("removeRoom")}
+                className="inline-flex size-9 items-center justify-center rounded-[8px] text-[#c43d3d] hover:bg-[#fff1f1]"
+              >
+                <X className="size-4" />
+              </button>
+            ) : (
+              <span className="max-xl:hidden" />
+            )}
           </div>
+        );
+      })}
+      <datalist id={`basic-rooms-${index}`}>
+        {roomNames.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+      <datalist id="basic-views">
+        {VIEWS.map((v) => (
+          <option key={v} value={v} />
+        ))}
+      </datalist>
 
+      <div className="flex flex-wrap items-center gap-3 pt-0.5">
+        {/* a new room is a room of its own: its type and price are asked, the board follows */}
+        <button
+          type="button"
+          onClick={() => allLines((line) => withRooms(line, [...line.rooms, { ...emptyRoomSpec(), board_type: line.rooms[0]?.board_type ?? null }]))}
+          className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+        >
+          <Plus className="size-3.5" />
+          {tx("addRoom")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setMore((v) => !v)}
+          aria-expanded={more}
+          className="inline-flex h-7 items-center gap-1 text-[11.5px] font-bold text-[#557d78] hover:text-[#185045]"
+        >
+          {tx("moreInfo")}
+          <ChevronDown className={`size-3.5 transition-transform ${more ? "rotate-180" : ""}`} />
+        </button>
+        {more ? (
+          <span className="tv-tnum text-[11px] font-bold text-[#7a948f]">
+            {tx("dayRange", { from: dayFrom, to: dayFrom + city.nights })}
+            {stays.map((s) => (s.check_in ? ` · ${tx("stayDates", { in: s.check_in, out: s.check_out ?? "" })}` : ""))}
+          </span>
+        ) : null}
+      </div>
+
+      {/* the rarely-changed answers, on one short line */}
+      {more ? (
+        <div className="flex flex-wrap items-end gap-2 rounded-[10px] bg-[#f8fbf9] p-2">
+          <Field label={tx("currency")} className="w-24">
+            <select value={main.manual_currency} onChange={(e) => allLines((line) => ({ ...line, manual_currency: e.target.value }))} className={basicField}>
+              {currencyOptions(lookups.countries, main.manual_currency).map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </Field>
+          {/* who the room was bought from — internal, never on the client document */}
+          <Field label={t("pg.supplierLabel")} className="w-48">
+            <select value={main.supplier ?? ""} onChange={(e) => allLines((line) => ({ ...line, supplier: e.target.value }))} className={basicField}>
+              <option value="">{tx("choose")}</option>
+              {suppliersFor(lookups, "فنادق").map((s) => (
+                <option key={s.id} value={s.name}>{s.name}</option>
+              ))}
+            </select>
+          </Field>
           {city.nights > 1 ? (
-            <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-[1fr_1.4fr_1fr]">
-              <label className={basicLabel}>
-                {tx("roomChange")}
-                <select
-                  value={change ? mainNights : ""}
-                  onChange={(e) =>
-                    onSlice(
-                      e.target.value === ""
-                        ? clearRoomChange(data, city.city_name)
-                        : changeRoom(data, city.city_name, Number(e.target.value), change ? baseRoomName(change.rooms[0]?.room_type_name ?? "") : ""),
-                    )
-                  }
+            <Field label={tx("roomChange")} className="w-36">
+              <select
+                value={change ? mainNights : ""}
+                onChange={(e) =>
+                  onSlice(
+                    e.target.value === ""
+                      ? clearRoomChange(data, city.city_name)
+                      : changeRoom(data, city.city_name, Number(e.target.value), change ? baseRoomName(change.rooms[0]?.room_type_name ?? "") : ""),
+                  )
+                }
+                className={basicField}
+              >
+                <option value="">{tx("none")}</option>
+                {range(1, city.nights - 1).map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+          {change ? (
+            <>
+              <Field label={tx("newRoom")} className="w-52">
+                <input
+                  list={`basic-rooms-${index}`}
+                  value={baseRoomName(change.rooms[0]?.room_type_name ?? "")}
+                  onChange={(e) => onLines([renameRooms(change, e.target.value)])}
                   className={basicField}
-                >
-                  <option value="">{tx("none")}</option>
-                  {range(1, city.nights - 1).map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </label>
-              {change ? (
-                <>
-                  <label className={basicLabel}>
-                    {tx("newRoom")}
-                    <input
-                      list={`basic-rooms-${index}`}
-                      value={baseRoomName(change.rooms[0]?.room_type_name ?? "")}
-                      onChange={(e) => onLines([renameRooms(change, e.target.value)])}
-                      className={basicField}
-                    />
-                  </label>
-                  <label className={basicLabel}>
-                    {tx("stayPrice", { n: nightsText(changeNights, language) })}
-                    {priceField(
-                      change.rooms[0]?.price ?? null,
-                      changeNights,
-                      change.manual_currency,
-                      (price) => onLines([setAllRooms(change, { price })]),
-                      tx("stayPrice", { n: nightsText(changeNights, language) }),
-                    )}
-                  </label>
-                </>
-              ) : null}
-            </div>
+                />
+              </Field>
+              <Field label={tx("stayPrice", { n: nightsText(changeNights, language) })} className="w-36">
+                {priceField(
+                  change.rooms[0]?.price ?? null,
+                  changeNights,
+                  change.manual_currency,
+                  (price) => onLines([setAllRooms(change, { price })]),
+                  tx("stayPrice", { n: nightsText(changeNights, language) }),
+                )}
+              </Field>
+            </>
           ) : null}
         </div>
       ) : null}
@@ -473,78 +494,189 @@ function HotelPanel({
   );
 }
 
+/** A small labelled field for the short lines. */
+function Field({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
+  return (
+    <label className={`grid gap-1 text-[10.5px] font-bold text-[#7a948f] ${className ?? ""}`}>
+      {label}
+      {children}
+    </label>
+  );
+}
+
+/**
+ * The city's tours as a list with an add bar under it, like the cities' own:
+ * the day (one of the city's dates, the next free one offered), the car, the
+ * service — a ready programme, a typed tour, or «يوم حر» (never priced) — and
+ * its price. The count and the total sit above.
+ */
 function ToursPanel({
   index,
   city,
   programs,
   isFirst,
-  onTours,
+  carTypes,
+  defaultCar,
   onPicks,
 }: {
   index: number;
   city: BasicCity;
   programs: TourProgram[];
   isFirst: boolean;
-  onTours: (tours: number) => void;
+  carTypes: GeneratorLookups["carTypes"];
+  defaultCar: string;
   onPicks: (picks: TourPick[]) => void;
 }) {
   const tx = useBasicLabels();
-  const count = city.tours ?? 0;
-  const picks = withTourCount(city.tour_picks, count);
+  const picks = withTourCount(city.tour_picks, city.tours ?? 0);
   const offered = programs.filter((p) => !p.is_free_day).map((p) => ({ program: p, ...programDayText(p) }));
-  const setPick = (k: number, slice: Partial<TourPick>) => onPicks(picks.map((p, i) => (i === k ? { ...p, ...slice } : p)));
+  // the city's days: the arrival day is busy, so the next free one is offered first
+  const dates = city.check_in ? range(0, Math.max(city.nights - 1, 0)).map((k) => addDays(city.check_in!, k)) : [];
+  const taken = new Set(picks.map((p) => p.date).filter(Boolean));
+  const nextDate = dates.find((d, k) => k > 0 && !taken.has(d)) ?? dates.find((d) => !taken.has(d)) ?? dates[0] ?? "";
+
+  const [date, setDate] = useState("");
+  const [car, setCar] = useState("");
+  const [service, setService] = useState("");
+  const [price, setPrice] = useState<number | null>(null);
+  const isFree = (title: string) => title.trim() === FREE_DAY_TITLE;
+
+  /** What a typed service is: «يوم حر», one of the ready programmes, or a tour of the agent's own. */
+  const serviceOf = (title: string): Pick<TourPick, "program_id" | "title" | "text" | "free"> => {
+    if (isFree(title)) return { program_id: null, title: FREE_DAY_TITLE, text: "", free: true };
+    const hit = offered.find((o) => o.title === title);
+    return hit ? { program_id: hit.program.id, title: hit.title, text: hit.activities[0] ?? "", free: false } : { program_id: null, title, text: "", free: false };
+  };
+  const byDate = (a: TourPick, b: TourPick) => (a.date ?? "9999").localeCompare(b.date ?? "9999");
+  const save = (next: TourPick[]) => onPicks([...next].sort(byDate));
+  const setPick = (k: number, slice: Partial<TourPick>) => save(picks.map((p, i) => (i === k ? { ...p, ...slice } : p)));
+
+  function add() {
+    if (!service.trim()) return;
+    const s = serviceOf(service);
+    save([...picks, { ...s, date: date || nextDate || null, car_type: car || defaultCar || undefined, price: s.free ? 0 : price }]);
+    setDate("");
+    setService("");
+    setPrice(null);
+  }
+
+  const tours = picks.filter((p) => !p.free);
+  const total = tours.reduce((sum, p) => sum + (p.price ?? 0), 0);
+
+  const dateSelect = (value: string, onValue: (v: string) => void) => (
+    <select aria-label={tx("tourDate")} value={value} onChange={(e) => onValue(e.target.value)} className={basicField}>
+      <option value="">{tx("autoDay")}</option>
+      {dates.map((d) => (
+        <option key={d} value={d}>{dayLabel(d)}</option>
+      ))}
+    </select>
+  );
+  const carSelect = (value: string, onValue: (v: string) => void) => (
+    <select aria-label={tx("carType")} value={value} onChange={(e) => onValue(e.target.value)} className={basicField}>
+      <option value="">{tx("carType")}</option>
+      {carTypes.map((c) => (
+        <option key={c.name} value={c.name}>
+          {c.name}
+          {c.pax ? ` (${c.pax})` : ""}
+        </option>
+      ))}
+    </select>
+  );
 
   return (
-    <div className="space-y-2">
-      <label className={`${basicLabel} w-28`}>
-        {tx("toursCount")}
-        <select value={count} onChange={(e) => onTours(Number(e.target.value))} className={basicField}>
-          {range(0, 15).map((n) => (
-            <option key={n} value={n}>{n}</option>
-          ))}
-        </select>
-      </label>
-      {/* the company's own welcome comes first, on every file */}
-      {isFirst ? (
-        <p className="rounded-[10px] bg-[#EAF8F2] px-3 py-2 text-[12px] font-bold text-[#0F4339]">✓ {WELCOME}</p>
-      ) : null}
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-2 text-[11.5px] font-bold">
+        <span className="tv-tnum rounded-full bg-[#eef4f1] px-2.5 py-1 text-[#185045]">
+          {tx("toursSummary", { n: tours.length, total: total.toLocaleString("en-US") })}
+        </span>
+        {/* the company's own welcome comes first, on every file */}
+        {isFirst ? <span className="rounded-full bg-[#EAF8F2] px-2.5 py-1 text-[#0F4339]">✓ {WELCOME}</span> : null}
+      </div>
+
+      <div className={`${head} ${TOUR_COLS} gap-2`}>
+        <span>{tx("tourDate")}</span>
+        <span>{tx("tourService")}</span>
+        <span>{tx("carType")}</span>
+        <span>{tx("tourPrice")}</span>
+        <span />
+      </div>
+
       <datalist id={`basic-tours-${index}`}>
+        <option value={FREE_DAY_TITLE} />
         {offered.map((o) => (
           <option key={o.program.id} value={o.title} />
         ))}
       </datalist>
+
       {picks.map((pick, k) => (
-        <div key={k} className="grid grid-cols-[auto_1fr_8rem] items-end gap-2">
-          <span className="mb-1.5 inline-flex h-6 items-center rounded-full bg-[#eef4f1] px-2 text-[10.5px] font-extrabold text-[#185045]">
-            {tx("tourN", { n: k + 1 })}
-          </span>
-          <label className={basicLabel}>
-            {tx("tourPick")}
-            <input
-              list={`basic-tours-${index}`}
-              value={pick.title}
-              placeholder={offered.length > 0 ? tx("tourPickHint") : `جولة سياحية في ${city.city_name}`}
-              onChange={(e) => {
-                const hit = offered.find((o) => o.title === e.target.value);
-                setPick(k, hit ? { program_id: hit.program.id, title: hit.title, text: hit.activities[0] ?? "" } : { program_id: null, title: e.target.value, text: "" });
-              }}
-              className={basicField}
-            />
-          </label>
-          <label className={basicLabel}>
-            {tx("tourPrice")}
-            <input
-              type="number"
-              min={0}
-              dir="ltr"
-              value={pick.price ?? ""}
-              placeholder="0"
-              onChange={(e) => setPick(k, { price: e.target.value === "" ? null : Number(e.target.value) })}
-              className={`${basicField} tv-tnum text-center`}
-            />
-          </label>
+        <div key={k} className={`${rowGap} ${TOUR_COLS}`}>
+          {dateSelect(pick.date ?? "", (d) => setPick(k, { date: d || null }))}
+          <input
+            aria-label={tx("tourService")}
+            list={`basic-tours-${index}`}
+            value={pick.free ? FREE_DAY_TITLE : pick.title}
+            onChange={(e) => {
+              const s = serviceOf(e.target.value);
+              setPick(k, { ...s, price: s.free ? 0 : pick.price });
+            }}
+            className={`${basicField} ${pick.free ? "text-[#7a948f]" : ""}`}
+          />
+          {carSelect(pick.car_type ?? "", (c) => setPick(k, { car_type: c || undefined }))}
+          <input
+            type="number"
+            min={0}
+            dir="ltr"
+            aria-label={tx("tourPrice")}
+            disabled={pick.free}
+            value={pick.free ? 0 : (pick.price ?? "")}
+            placeholder="0"
+            onChange={(e) => setPick(k, { price: e.target.value === "" ? null : Number(e.target.value) })}
+            className={`${basicField} tv-tnum text-center disabled:bg-[#f4f7f6]`}
+          />
+          <button
+            type="button"
+            onClick={() => save(picks.filter((_, i) => i !== k))}
+            aria-label={tx("removeTour")}
+            className="inline-flex size-9 items-center justify-center rounded-[8px] text-[#c43d3d] hover:bg-[#fff1f1]"
+          >
+            <X className="size-4" />
+          </button>
         </div>
       ))}
+
+      {/* the add bar — the same fields, the next free day already chosen */}
+      <div className={`${rowGap} ${TOUR_COLS} rounded-[10px] bg-[#e9f3ef] p-1.5`}>
+        {dateSelect(date || nextDate, setDate)}
+        <input
+          aria-label={tx("tourService")}
+          list={`basic-tours-${index}`}
+          value={service}
+          placeholder={offered.length > 0 ? tx("tourPickHint") : `${FREE_DAY_TITLE} / جولة سياحية في ${city.city_name}`}
+          onChange={(e) => setService(e.target.value)}
+          className={basicField}
+        />
+        {carSelect(car || defaultCar, setCar)}
+        <input
+          type="number"
+          min={0}
+          dir="ltr"
+          aria-label={tx("tourPrice")}
+          disabled={isFree(service)}
+          value={isFree(service) ? 0 : (price ?? "")}
+          placeholder={tx("tourPrice")}
+          onChange={(e) => setPrice(e.target.value === "" ? null : Number(e.target.value))}
+          className={`${basicField} tv-tnum text-center disabled:bg-[#f4f7f6]`}
+        />
+        <button
+          type="button"
+          onClick={add}
+          disabled={!service.trim()}
+          className="inline-flex h-9 items-center justify-center gap-1 rounded-[8px] bg-[#185045] px-3 text-[12px] font-extrabold text-white disabled:opacity-50"
+        >
+          <Plus className="size-4" />
+          {tx("add")}
+        </button>
+      </div>
     </div>
   );
 }
@@ -573,61 +705,53 @@ function TransfersPanel({
   const departureAirport = inbound[0]?.from_airport || "—";
   const sims = Number(data.services.includes.find((l) => l.startsWith(SIM_LINE))?.match(/\d+/)?.[0] ?? 0);
 
-  const carFields = (leg: "airport" | "farewell", value: TransportLeg) => (
-    <>
-      <label className={`${basicLabel} w-44`}>
-        {tx("carType")}
-        <select value={value.car_type} onChange={(e) => onCar(leg, { car_type: e.target.value })} className={basicField}>
-          <option value="">{tx("choose")}</option>
-          {lookups.carTypes.map((c) => (
-            <option key={c.name} value={c.name}>
-              {c.name}
-              {c.pax ? ` (${c.pax})` : ""}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className={`${basicLabel} w-16`}>
-        {tx("cars")}
-        <select value={value.cars} onChange={(e) => onCar(leg, { cars: Number(e.target.value) })} className={`${basicField} px-1.5`}>
-          {range(1, 10).map((n) => (
+  const row = (leg: "airport" | "farewell", label: string, airport: string, value: TransportLeg, withSims: boolean) => (
+    <div className={`${rowGap} ${CAR_COLS}`}>
+      <span className="col-span-2 inline-flex min-h-9 flex-wrap items-center gap-1.5 text-[12px] font-extrabold text-[#185045] xl:col-span-1">
+        {label}
+        <span className="font-bold text-[#557d78]">
+          <DirText>{airport}</DirText>
+        </span>
+      </span>
+      <select aria-label={tx("carType")} value={value.car_type} onChange={(e) => onCar(leg, { car_type: e.target.value })} className={basicField}>
+        <option value="">{tx("carType")}</option>
+        {lookups.carTypes.map((c) => (
+          <option key={c.name} value={c.name}>
+            {c.name}
+            {c.pax ? ` (${c.pax})` : ""}
+          </option>
+        ))}
+      </select>
+      <select aria-label={tx("cars")} value={value.cars} onChange={(e) => onCar(leg, { cars: Number(e.target.value) })} className={`${basicField} px-1.5`}>
+        {range(1, 10).map((n) => (
+          <option key={n} value={n}>{n}</option>
+        ))}
+      </select>
+      {withSims ? (
+        <select aria-label={tx("simLines")} value={sims} onChange={(e) => onSims(Number(e.target.value))} className={`${basicField} px-1.5`}>
+          {range(0, 10).map((n) => (
             <option key={n} value={n}>{n}</option>
           ))}
         </select>
-      </label>
-    </>
+      ) : (
+        <span className="max-xl:hidden" />
+      )}
+    </div>
   );
 
   return (
-    <div className="space-y-3">
-      {isFirst ? (
-        <div>
-          <p className="mb-1.5 text-[12px] font-extrabold text-[#185045]">
-            {tx("reception")} — <DirText>{arrivalAirport}</DirText>
-          </p>
-          <div className="flex flex-wrap items-end gap-2">
-            {carFields("airport", plan.airport)}
-            <label className={`${basicLabel} w-28`}>
-              {tx("simLines")}
-              <select value={sims} onChange={(e) => onSims(Number(e.target.value))} className={`${basicField} px-1.5`}>
-                {range(0, 10).map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </div>
-      ) : null}
-      {isLast ? (
-        <div>
-          <p className="mb-1.5 text-[12px] font-extrabold text-[#185045]">
-            {tx("farewell")} — <DirText>{departureAirport}</DirText>
-          </p>
-          <div className="flex flex-wrap items-end gap-2">{carFields("farewell", plan.farewell ?? plan.airport)}</div>
-        </div>
-      ) : null}
+    <div className="space-y-1.5">
+      <div className={`${head} ${CAR_COLS} gap-2`}>
+        <span>{tx("airport")}</span>
+        <span>{tx("carType")}</span>
+        <span>{tx("cars")}</span>
+        <span>{isFirst ? tx("simLines") : ""}</span>
+      </div>
+      {isFirst ? row("airport", tx("reception"), arrivalAirport, plan.airport, true) : null}
+      {isLast ? row("farewell", tx("farewell"), departureAirport, plan.farewell ?? plan.airport, false) : null}
     </div>
   );
 }
 
-/** The «يشمل» line the reception's SIM count writes. */export const SIM_LINE = "شريحة اتصال";
+/** The «يشمل» line the reception's SIM count writes. */
+export const SIM_LINE = "شريحة اتصال";

@@ -19,6 +19,7 @@
 
 import {
   deriveCityDates,
+  FREE_DAY_TITLE,
   deriveHotelStays,
   pricingRefFor,
   stayTotal,
@@ -412,7 +413,8 @@ export function suggestPricing(
   // The tours the basic screen picked, each at the price typed beside it.
   for (const city of data.cities) {
     (city.tour_picks ?? []).slice(0, city.tours ?? 0).forEach((pick, i) => {
-      if (!pick.title.trim() && pick.price == null) return;
+      // a free day is never a line on the bill
+      if (pick.free || pick.title.trim() === FREE_DAY_TITLE || (!pick.title.trim() && pick.price == null)) return;
       items.push({
         item_type: "service",
         description: pick.title.trim() || `جولة سياحية في ${city.city_name}`,
