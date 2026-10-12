@@ -63,19 +63,18 @@ describe("a city split across two hotels", () => {
     expect(result.stages.hotels).toBe("complete");
   });
 
-  it("blocks when a night has no bed — the failure the old per-city rule allowed", () => {
-    // Both cities have a hotel row, so the previous rule called this complete
-    // while the guest had nowhere to sleep on the third night.
+  // The owner removed the «every night has a hotel» block (2026-10-12): a gap or
+  // an overlap no longer stops the file, but the hotels card never reads complete.
+  it("does not block a night without a bed, but leaves the hotels card incomplete", () => {
     const result = validateDraft(splitDraft(1, 1));
-    expect(result.ok).toBe(false);
-    expect(result.blocking.some((b) => b.stage === "hotels")).toBe(true);
+    expect(result.blocking.some((b) => b.stage === "hotels")).toBe(false);
     expect(result.stages.hotels).not.toBe("complete");
   });
 
-  it("blocks over-allocation too — a night we pay for and the itinerary does not have", () => {
+  it("does not block over-allocation either, and still leaves the card incomplete", () => {
     const result = validateDraft(splitDraft(2, 2));
-    expect(result.ok).toBe(false);
-    expect(result.blocking.some((b) => b.stage === "hotels")).toBe(true);
+    expect(result.blocking.some((b) => b.stage === "hotels")).toBe(false);
+    expect(result.stages.hotels).not.toBe("complete");
   });
 
   it("still accepts a single hotel with no nights of its own (every old draft)", () => {
@@ -131,13 +130,6 @@ describe("validateDraft", () => {
     const violation = result.blocking.find((i) => i.invariant?.code === "hotel_missing_room_or_board");
     expect(violation?.stage).toBe("hotels");
     expect(result.stages.hotels).toBe("error");
-  });
-
-  it("BLOCKS when a city has no hotel line", () => {
-    const data = completeDraft();
-    data.hotels = data.hotels.slice(0, 1);
-    const result = validateDraft(data);
-    expect(result.blocking.some((i) => i.key === "pg.err.missingHotels")).toBe(true);
   });
 
   it("BLOCKS on missing arrival date / country / adults (trip stage)", () => {

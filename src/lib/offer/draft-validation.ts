@@ -189,7 +189,6 @@ export function validateDraft(data: DraftData): DraftValidation {
   // A city's nights are covered by one or more stays in sequence; each stay
   // carries its own span, and every stay must state a room + board (invariant #3).
   const stays = deriveHotelStays(cities, data.hotels);
-  const coverage = hotelCoverage(cities, data.hotels);
   const invariantResult = validateInvariants({
     trip_nights: total,
     cities: cities.map((c) => ({
@@ -226,17 +225,8 @@ export function validateDraft(data: DraftData): DraftValidation {
     });
   }
 
-  // Nights, not rows.
-  //
-  // The old rule was "every city has a hotel line", which a city split across
-  // two hotels satisfies while still leaving the guest without a room for two
-  // of its nights — the exact failure this stage exists to prevent. Under and
-  // over are both blocking: over means we are paying for a night the itinerary
-  // does not have.
-  const uncovered = coverage.filter((c) => c.covered !== c.needed);
-  if (data.scope.hotels && data.cities.length > 0 && uncovered.length > 0) {
-    blocking.push({ severity: "blocking", stage: "hotels", field: "hotels", key: "pg.err.missingHotels" });
-  }
+  // No «every night has a hotel» block: the owner removed it (2026-10-12). The
+  // cities card still shows each city's coverage (مكتمل / متبقٍ / زائد).
   // The hotel's price is typed on its stay — it changes daily, so it is never
   // taken from a list. A ready-made package carries its own locked total.
   if (

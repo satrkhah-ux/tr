@@ -93,10 +93,10 @@ describe("visibleStagesFor", () => {
 });
 
 describe("validateDraft with an out-of-scope service", () => {
-  it("blocks on missing hotels while hotels are in scope", () => {
+  it("does not block on a city without a hotel (removed 2026-10-12), but the hotels card is not complete", () => {
     const result = validateDraft(draftWithCitiesButNoHotels());
-    expect(result.blocking.some((i) => i.stage === "hotels")).toBe(true);
-    expect(result.ok).toBe(false);
+    expect(result.blocking.some((i) => i.stage === "hotels")).toBe(false);
+    expect(result.stages.hotels).not.toBe("complete");
   });
 
   it("raises NO hotel issue once hotels are switched off", () => {

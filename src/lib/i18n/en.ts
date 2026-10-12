@@ -1012,7 +1012,6 @@ export const en = {
   "pg.err.noArrival": "Set the arrival date.",
   "pg.err.noAdults": "Set the number of adult travelers.",
   "pg.err.noCities": "Add at least one city.",
-  "pg.err.missingHotels": "Every city needs a hotel line.",
   "pg.err.blockingLeft": "Fix the blocking errors before producing the offer.",
   "pg.warn.noName": "Customer name is empty.",
   "pg.warn.noPhone": "Customer phone is empty.",

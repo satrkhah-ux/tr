@@ -80,6 +80,19 @@ export function addCity(
   city: { name: string; nights: number; tours: number; country?: string },
   currency: string,
 ): Pick<DraftData, "cities" | "hotels"> {
+  // The same city again, right after itself, is more nights there — not a second
+  // row the group «moves» into from itself (with a transfer priced for the move).
+  const at = data.cities.length - 1;
+  const last = data.cities[at] as BasicCity | undefined;
+  if (last && last.city_name === city.name) {
+    const longer = setCityNights(data, at, last.nights + city.nights);
+    return {
+      ...longer,
+      cities: longer.cities.map((c, i) =>
+        i === at ? { ...c, tours: Math.min(((c as BasicCity).tours ?? 0) + city.tours, c.nights) } : c,
+      ),
+    };
+  }
   const next: BasicCity = {
     city_name: city.name,
     nights: city.nights,

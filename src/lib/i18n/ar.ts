@@ -1010,7 +1010,6 @@ export const ar: Dictionary = {
   "pg.err.noArrival": "حدّد تاريخ الوصول.",
   "pg.err.noAdults": "حدّد عدد المسافرين البالغين.",
   "pg.err.noCities": "أضف مدينة واحدة على الأقل.",
-  "pg.err.missingHotels": "كل مدينة تحتاج سطر فندق.",
   "pg.err.blockingLeft": "أصلح الأخطاء المانعة قبل إنتاج العرض.",
   "pg.warn.noName": "اسم العميل فارغ.",
   "pg.warn.noPhone": "هاتف العميل فارغ.",

@@ -110,6 +110,19 @@ describe("النظام بيسك", () => {
     expect(withTripDates(trip, { nights: 5 })).toMatchObject({ departure_date: "2026-11-16", days: 6 });
   });
 
+  it("adds nights to the last city when the same city is added again, instead of a row moving into itself", () => {
+    const data = malaysia();
+    data.hotels = data.hotels.map((h) => (h.city_name === "كوالالمبور" ? { ...h, rooms: h.rooms.map((r) => ({ ...r, price: 900 })) } : h));
+    const next = { ...data, ...addCity(data, { name: "كوالالمبور", nights: 2, tours: 1 }, "SAR") };
+    expect(next.cities.map((c) => [c.city_name, c.nights, (c as BasicCity).tours])).toEqual([
+      ["سيلانغور", 2, 1],
+      ["لنكاوي", 3, 2],
+      ["كوالالمبور", 5, 2],
+    ]);
+    // one hotel line, its 3-night total grown to 5 nights at the same rate
+    expect(cityLines(next.hotels, "كوالالمبور").map((h) => h.rooms[0].price)).toEqual([1500]);
+  });
+
   it("leaves every day free when tours are switched off", () => {
     const data = malaysia();
     data.transport_plan = { ...data.transport_plan, tours: { ...data.transport_plan.tours, enabled: false } };
