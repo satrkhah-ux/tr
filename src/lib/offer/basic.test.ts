@@ -9,6 +9,7 @@ import {
   clearRoomChange,
   EXTRA_BED,
   extraBeds,
+  priceAtSource,
   priceGroupOf,
   planInternational,
   remainingNights,
@@ -19,6 +20,7 @@ import {
   withTripDates,
   WELCOME,
   withTourCount,
+  withTours,
   type BasicCity,
 } from "./basic";
 
@@ -242,5 +244,28 @@ describe("النظام بيسك", () => {
     expect([next.flights[0].to_tz, next.flight_booking.estimate, next.flight_booking.mode]).toEqual(["Asia/Kuala_Lumpur", true, "round"]);
     // one way: no way home
     expect(planInternational(data, airports, { ...plan, round: false }).flights.map((f) => f.leg_order)).toEqual(["outbound", "internal"]);
+  });
+
+  it("writes each tour's day: after the arrival first, a day the city lost handed out again", () => {
+    // لنكاوي: 13–16 Nov — tours go on the 14th and 15th, a third shares the 14th
+    const lnk = malaysia().cities[1];
+    expect(withTours(lnk, 3).map((p) => p.date)).toEqual(["2026-11-14", "2026-11-15", "2026-11-14"]);
+    const moved = { ...lnk, tour_picks: [{ program_id: null, title: "x", text: "", price: null, date: "2026-12-01" }] };
+    expect(withTours(moved, 1)[0].date).toBe("2026-11-14");
+  });
+
+  it("puts a price changed on the sheet back where it was typed", () => {
+    const data = malaysia();
+    data.hotels = data.hotels.map((h, i) => (i === 0 ? withRooms(h, [{ ...h.rooms[0], price: 300 }, { ...h.rooms[0], price: 100 }]) : h));
+    const line = data.hotels[0];
+    // the rooms keep their shares of the new total
+    const hotels = priceAtSource(data, { item_type: "hotel", ref: line.id }, { price: 800, currency: "USD" })!.hotels!;
+    expect([hotels[0].rooms.map((r) => r.price), hotels[0].manual_currency]).toEqual([[600, 200], "USD"]);
+    data.cities = data.cities.map((c, i) => (i === 1 ? { ...c, tour_picks: withTours(c, 2) } : c));
+    const cities = priceAtSource(data, { item_type: "service", ref: "tour:لنكاوي:1" }, { price: 450 })!.cities!;
+    expect(cities[1].tour_picks?.map((p) => p.price)).toEqual([null, 450]);
+    expect(priceAtSource(data, { item_type: "flight", ref: "flight:intl" }, { price: 5200 })!.flight_booking!.intl_price).toBe(5200);
+    // a transfer priced from the list has no place to go back to
+    expect(priceAtSource(data, { item_type: "transport", ref: "transport:a>b>van" }, { price: 90 })).toBeNull();
   });
 });

@@ -27,6 +27,7 @@ import {
   type DraftFlight,
   type DraftHotel,
   type DraftPricingItem,
+  type DraftRoomSpec,
   type DraftTrip,
   type HotelStay,
   type LookupAirport,
@@ -183,7 +184,7 @@ export function setCityNights(data: DraftData, index: number, nights: number): P
   const prev = deriveHotelStays(data.cities, data.hotels);
   const cities = chainCities(
     data,
-    data.cities.map((c, i) => (i === index ? { ...c, nights, tours: Math.min((c as BasicCity).tours ?? 0, nights) } : c)),
+    data.cities.map((c, i) => (i === index ? { ...c, nights } : c)),
   );
   let hotels = data.hotels.map((h) =>
     h.city_name === before.city_name && h.nights > 0 ? { ...h, nights: Math.min(h.nights, Math.max(nights - 1, 0)) } : h,
@@ -305,6 +306,49 @@ export function withTourCount(picks: TourPick[] | undefined, count: number): Tou
 }
 
 /**
+ * The days a city's tours go on, in the order they are handed out: the days
+ * after the group arrives (the arrival day is spent arriving); a one-night city
+ * has only its arrival day.
+ */
+export function tourDays(city: Pick<DraftCity, "check_in" | "nights">): string[] {
+  const all = cityDates(city);
+  return all.length > 1 ? all.slice(1) : all;
+}
+
+/** Every date the group sleeps in the city — the days a tour may be put on. */
+export function cityDates(city: Pick<DraftCity, "check_in" | "nights">): string[] {
+  if (!city.check_in) return [];
+  return Array.from({ length: Math.max(city.nights, 1) }, (_, k) => addDaysIso(city.check_in!, k));
+}
+
+/**
+ * Every tour gets its day written down — the first of `days` no tour has yet;
+ * once they are all taken, the days are shared in turn. A tour that already
+ * has a day keeps it.
+ */
+export function fillTourDates(picks: TourPick[], days: string[]): TourPick[] {
+  if (days.length === 0) return picks;
+  const used = new Set(picks.map((p) => p.date).filter(Boolean));
+  let turn = 0;
+  return picks.map((p) => {
+    if (p.date) return p;
+    const date = days.find((d) => !used.has(d)) ?? days[turn++ % days.length];
+    used.add(date);
+    return { ...p, date };
+  });
+}
+
+/**
+ * The city's tours at a count, each with its day. A day the city no longer has
+ * (its dates moved) is let go and the tour takes the next free one.
+ */
+export function withTours(city: Pick<DraftCity, "check_in" | "nights" | "tour_picks">, count: number): TourPick[] {
+  const own = cityDates(city);
+  const kept = withTourCount(city.tour_picks, count).map((p) => (p.date && own.length > 0 && !own.includes(p.date) ? { ...p, date: null } : p));
+  return fillTourDates(kept, tourDays(city));
+}
+
+/**
  * The programme, written from the cities and how the group moves between them:
  * the arrival with the company's welcome, the day of each move (a domestic
  * flight reads «to the airport — the flight — met at the next airport»), each
@@ -352,7 +396,8 @@ export function basicDays(data: DraftData): DraftDay[] {
     const cityDays = days.map((_, i) => i).filter((i) => cityOf[i] === c);
     const free = cityDays.filter((i) => kindOf[i] === "stay");
     const undated: TourPick[] = [];
-    for (const pick of withTourCount(city.tour_picks, count)) {
+    // the same days the city card shows
+    for (const pick of withTours(city, count)) {
       const named = { ...pick, title: pick.free ? FREE_DAY_TITLE : pick.title.trim() || `جولة سياحية في ${city.city_name}` };
       const day = pick.date ? cityDays.find((i) => days[i].date === pick.date) : undefined;
       if (day !== undefined) put(day, named);
@@ -394,14 +439,66 @@ export function basicDays(data: DraftData): DraftDay[] {
         title = tours[0].title;
         activities = [...(tours[0].text.trim() ? [tours[0].text.trim()] : []), ...tours.slice(1).map(line)];
       } else activities = [...activities, ...tours.map(line)];
-      // the car each tour goes in, said once
-      const cars = [...new Set(tours.map((t) => t.car_type?.trim()).filter(Boolean))];
+      // the car each tour goes in — the trip's tour car unless the tour has its own — said once
+      const cars = [...new Set(tours.map((t) => t.car_type?.trim() || plan.tours.car_type.trim()).filter(Boolean))];
       if (cars.length > 0) activities = [...activities, `التنقل بـ${cars.join(" و")}`];
     }
 
     const owned = day.auto_title !== undefined ? day.title === day.auto_title : isAutoTitle(day.title);
     return owned ? { ...day, title, activities, auto_title: title } : day;
   });
+}
+
+/** A stay's new total over its rooms: in the shares they had, or evenly when some had none. */
+function splitTotal(rooms: DraftRoomSpec[], total: number | null): DraftRoomSpec[] {
+  if (total == null) return rooms.map((r) => ({ ...r, price: null }));
+  const before = rooms.reduce((sum, r) => sum + (r.price ?? 0), 0);
+  const shares = before > 0 && rooms.every((r) => r.price != null);
+  let left = total;
+  return rooms.map((r, k) => {
+    // the last room takes what is left, so the rooms always add up to the total
+    const price = k === rooms.length - 1 ? left : Math.round((shares ? ((r.price ?? 0) * total) / before : total / rooms.length) * 100) / 100;
+    left = Math.round((left - price) * 100) / 100;
+    return { ...r, price };
+  });
+}
+
+/**
+ * A price changed on the pricing sheet is changed where it was typed — the
+ * stay's rooms, the tour, the flight booking — so the two never disagree.
+ * Null when the line has no such place (a transfer from the list, a visa, a
+ * line added by hand, a supplier rate): the sheet keeps it as the agent's own.
+ */
+export function priceAtSource(
+  data: DraftData,
+  item: Pick<DraftPricingItem, "item_type" | "ref">,
+  change: { price?: number | null; currency?: string },
+): Partial<Pick<DraftData, "hotels" | "cities" | "flight_booking">> | null {
+  const ref = item.ref ?? "";
+  if (item.item_type === "flight" && (ref === "flight:intl" || ref === "flight:dom")) {
+    const b = data.flight_booking;
+    if (ref === "flight:intl") return { flight_booking: { ...b, intl_price: change.price !== undefined ? change.price : b.intl_price, intl_currency: change.currency ?? b.intl_currency } };
+    return { flight_booking: { ...b, dom_price: change.price !== undefined ? change.price : b.dom_price, dom_currency: change.currency ?? b.dom_currency } };
+  }
+  const tour = ref.match(/^tour:(.+):(\d+)$/);
+  // a tour is typed in riyals — only its figure goes back
+  if (tour && change.price !== undefined) {
+    const at = Number(tour[2]);
+    const c = data.cities.findIndex((x) => x.city_name === tour[1] && (x.tour_picks?.length ?? 0) > at);
+    if (c < 0) return null;
+    const price = change.price;
+    return {
+      cities: data.cities.map((x, i) => (i === c ? { ...x, tour_picks: (x.tour_picks ?? []).map((p, j) => (j === at ? { ...p, price } : p)) } : x)),
+    };
+  }
+  if (item.item_type === "hotel") {
+    const line = data.hotels.find((h) => h.id === ref);
+    if (!line || line.sourcing) return null;
+    const cur = change.currency ? { ...line, manual_currency: change.currency } : line;
+    const next = change.price !== undefined ? withRooms(cur, splitTotal(cur.rooms, change.price)) : cur;
+    return { hotels: data.hotels.map((h) => (h.id === line.id ? next : h)) };
+  }
+  return null;
 }
 
 /** Where a pricing line sits on the sheet: tours are services the city card wrote (ref «tour:…»). */

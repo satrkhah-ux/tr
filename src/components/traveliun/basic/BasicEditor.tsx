@@ -22,11 +22,11 @@ import {
   Plane,
   PlaneTakeoff,
   Plus,
+  RefreshCw,
   Rocket,
   Ship,
   Stamp,
   TrainFront,
-  Wand2,
   XCircle,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
@@ -52,6 +52,7 @@ import {
   SCOPE_LABEL_KEYS,
   stageHref,
   STAGES,
+  stayTotal,
   type DraftData,
   type DraftHotel,
   type DraftScope,
@@ -60,11 +61,11 @@ import {
   type LookupHotel,
   type MealPlan,
   type TransportMode,
-  vehicleText,
 } from "@/lib/offer/draft-types";
 import {
   addCity,
   basicDays,
+  priceAtSource,
   chainCities,
   remainingNights,
   removeCity,
@@ -86,7 +87,7 @@ import { FieldIssueProvider } from "../generator/FieldIssue";
 import { FlightsStage } from "../generator/stages/FlightsStage";
 import { ServicesStage } from "../generator/stages/ServicesStage";
 import { useDraftState } from "../generator/useDraftState";
-import { BasicCityCard, SIM_LINE } from "./BasicCityCard";
+import { BasicCityCard } from "./BasicCityCard";
 import { BasicFlightPlan } from "./BasicFlightPlan";
 import { BasicPhoneLookup } from "./BasicPhoneLookup";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
@@ -95,6 +96,8 @@ import { basicCard, basicField, basicLabel } from "./styles";
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 /** Hotels are entered in riyals unless the agent says otherwise. */
 const BASE_CURRENCY = "SAR";
+/** The «يشمل» line the SIM count writes. */
+const SIM_LINE = "شريحة اتصال";
 const MODE_CHIPS: { mode: TransportMode; label: BasicLabel; icon: typeof Car }[] = [
   { mode: "car", label: "byCar", icon: Car },
   { mode: "flight", label: "byFlight", icon: PlaneTakeoff },
@@ -113,8 +116,8 @@ const PRICE_GROUPS: { key: PriceGroup; label: BasicLabel; icon: typeof Car }[] =
 ];
 
 /** The page's steps, in order; one is open at a time. */
-type Step = "client" | "flights" | "cities" | "transport" | "services" | "pricing" | "finish";
-const STEP_ORDER: Step[] = ["client", "flights", "cities", "transport", "services", "pricing", "finish"];
+type Step = "client" | "flights" | "cities" | "services" | "pricing" | "finish";
+const STEP_ORDER: Step[] = ["client", "flights", "cities", "services", "pricing", "finish"];
 /** Which step of this page answers a stage's blocking issue. */
 const STEP_OF: Partial<Record<string, Step>> = {
   customer: "client",
@@ -123,7 +126,7 @@ const STEP_OF: Partial<Record<string, Step>> = {
   flights: "flights",
   cities: "cities",
   hotels: "cities",
-  transport: "transport",
+  transport: "cities",
   services: "services",
   pricing: "pricing",
 };
@@ -301,6 +304,14 @@ export function BasicEditor({
     commit({ transport_plan: next });
   }
 
+  function setTourCar(slice: { car_type?: string; cars?: number }) {
+    const old = plan.tours.car_type;
+    const follow = slice.car_type !== undefined && old
+      ? { cities: cities.map((c) => (c.tour_picks ? { ...c, tour_picks: c.tour_picks.map((p) => (p.car_type === old ? { ...p, car_type: undefined } : p)) } : c)) }
+      : {};
+    commit({ transport_plan: { ...plan, tours: { ...plan.tours, ...slice } }, ...follow });
+  }
+
   function toggleMode(mode: TransportMode) {
     const chosen = modes.includes(mode) ? modes.filter((m) => m !== mode) : [...modes, mode];
     const list = chosen.length > 0 ? chosen : (["car"] as TransportMode[]);
@@ -323,7 +334,7 @@ export function BasicEditor({
     commit({ scope: { ...scope, [key]: on } });
   }
 
-  /** The reception's SIM cards: one «يشمل» line, rewritten or dropped with the count. */
+  /** The SIM cards: one «يشمل» line, rewritten or dropped with the count. */
   function setSims(count: number) {
     const includes = data.services.includes.filter((l) => !l.startsWith(SIM_LINE));
     patch({ services: { ...data.services, includes: count > 0 ? [...includes, `${SIM_LINE} × ${count}`] : includes } });
@@ -393,6 +404,9 @@ export function BasicEditor({
   const [newRooms, setNewRooms] = useState(0);
   const [newPrice, setNewPrice] = useState<number | null>(null);
   const nightsChoice = newNights || Math.max(left, 1);
+  // the arrival day is spent arriving: four nights hold up to three tours (the city card allows more)
+  const maxTours = Math.max(nightsChoice - 1, 0);
+  const toursChoice = Math.min(newTours, maxTours);
   const roomsChoice = newRooms || Math.max(trip.rooms, 1);
   // the trip's country unless the group crosses into a neighbour
   const barCountry = findLookupCountry(lk.countries, newCountry || trip.country);
@@ -416,7 +430,7 @@ export function BasicEditor({
         {
           name: newCity,
           nights: nightsChoice,
-          tours: toursOn ? newTours : 0,
+          tours: toursOn ? toursChoice : 0,
           country: barCountry?.name,
           hotel: hotel ? { id: hotel.id, name: hotel.name } : null,
           room: newRoom,
@@ -474,7 +488,8 @@ export function BasicEditor({
       await flush();
       const res = await suggestPricingForDraft(draftId, { hotel: t("pg.hotel"), airline: t("pg.airline") });
       if (!res.ok) return setPricingError(t(res.error));
-      patch({ pricing: { ...data.pricing, items: syncSuggestions(data.pricing.items, res.items) } });
+      const pricing = latest.current.pricing;
+      patch({ pricing: { ...pricing, items: syncSuggestions(pricing.items, res.items) } });
     } catch {
       // offline, or a tab from before a deploy: say so instead of spinning
       setPricingError(tx("serverLost"));
@@ -483,9 +498,27 @@ export function BasicEditor({
     }
   }
 
-  /** A price set here by hand is the agent's: «احسب الأسعار» keeps it (`overridden`). */
-  function setItem(index: number, slice: Partial<DraftData["pricing"]["items"][number]>) {
-    patch({ pricing: { ...data.pricing, items: data.pricing.items.map((it, i) => (i === index ? { ...it, ...slice, overridden: true } : it)) } });
+  /**
+   * A price changed here is changed where it was typed — the hotel's rooms, the
+   * tour, the flight booking — so the city card says the same. A line with no
+   * such place (a transfer from the list, a visa) is the agent's: kept as
+   * `overridden` when the prices are worked out again.
+   */
+  function setItem(index: number, slice: { sell_price?: number | null; sell_currency?: string }) {
+    const item = data.pricing.items[index];
+    const at = priceAtSource(latest.current, item, { price: slice.sell_price, currency: slice.sell_currency });
+    // the source's figure is what we pay and what we sell at, as the sheet writes it
+    const both = at
+      ? {
+          ...slice,
+          ...("sell_price" in slice ? { buy_price: slice.sell_price ?? null } : {}),
+          ...(slice.sell_currency ? { buy_currency: slice.sell_currency } : {}),
+          overridden: false,
+        }
+      : { ...slice, overridden: true };
+    const items = data.pricing.items.map((it, i) => (i === index ? { ...it, ...both } : it));
+    if (at) commit({ ...at, pricing: { ...data.pricing, items } });
+    else patch({ pricing: { ...data.pricing, items } });
   }
 
   // the sheet in groups, each with what it comes to — a flat list of fifteen lines said nothing
@@ -545,6 +578,17 @@ export function BasicEditor({
   const [flightView, setFlightView] = useState<"plan" | "final">(() => (hasTickets ? "final" : "plan"));
 
   // ---------- the steps: one open at a time ----------
+  // the cities whose stay still lacks a room type, a board or a price — «إكمال» opens only these
+  const hotelGaps = scope.hotels
+    ? [...new Set(cities.map((c) => c.city_name))].filter((name) =>
+        data.hotels.some(
+          (h) =>
+            h.city_name === name &&
+            (h.rooms.some((r) => !(r.room_type_id || r.room_type_name.trim()) || !r.board_type) || (h.hotel_name.trim() && !h.sourcing && stayTotal(h) == null)),
+        ),
+      )
+    : [];
+  const [focus, setFocus] = useState<string[] | null>(null);
   const partner = data.customer.partner_company_id;
   const flightsOn = scope.flights_intl || scope.flights_domestic;
   const missingOf: Record<Step, string[]> = {
@@ -560,16 +604,18 @@ export function BasicEditor({
     cities: [
       cities.length === 0 && tx("city"),
       cities.length > 0 && used !== trip.nights && nightsNote,
-      // the reception car, on the first city's «الاستقبال والتوديع» tab
+      // the reception car and the tours car, on the first city's tours tab
       scope.transport && cities.length > 0 && !plan.airport.car_type.trim() && tx("transferCar"),
+      scope.transport && toursOn && cities.length > 0 && !plan.tours.car_type.trim() && tx("tourCar"),
+      // a stay with no room type, board or price stops here, not at the end
+      ...blocking.filter((i) => i.stage === "hotels").map(issueText),
     ].filter((x): x is string => Boolean(x)),
-    transport: [toursOn && !plan.tours.car_type.trim() && tx("tourCar")].filter((x): x is string => Boolean(x)),
     services: blocking.some((i) => i.stage === "services") ? [tx("servicesStep")] : [],
     pricing: blocking.some((i) => i.stage === "pricing") ? [tx("pricing")] : [],
     finish: [],
   };
   const steps = STEP_ORDER.filter(
-    (s) => (s !== "flights" || flightsOn) && (s !== "transport" || scope.transport) && (s !== "pricing" || canPricing),
+    (s) => (s !== "flights" || flightsOn) && (s !== "pricing" || canPricing),
   );
   // a new file opens on its first step; a file coming back, on the first one not done
   const firstTodo = steps.find((s) => missingOf[s].length > 0) ?? "finish";
@@ -579,6 +625,9 @@ export function BasicEditor({
 
   function show(step: Step) {
     setOpen(step);
+    if (step !== "cities") setFocus(null);
+    // the prices are worked out as the step opens — no button to remember
+    if (step === "pricing" && canPricing) void calculate();
     window.setTimeout(() => document.getElementById(`basic-${step}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   }
 
@@ -612,12 +661,6 @@ export function BasicEditor({
         return `${c.city_name} (${nightsText(c.nights, language)})${hotel ? ` — ${hotel}` : ""}`;
       })
       .join(" · "),
-    transport: [
-      toursOn ? `${tx("tourCar")}: ${vehicleText(plan.tours) || "—"}` : "",
-      `${tx("between")}: ${MODE_CHIPS.filter((m) => modes.includes(m.mode)).map((m) => tx(m.label)).join("، ")}`,
-    ]
-      .filter(Boolean)
-      .join(" · "),
     services: tx("servicesSummary", { a: data.services.includes.length, b: data.services.excludes.length }),
     pricing: data.pricing.items.length > 0 ? `${tx("total")}: ${summary.total_sell.toLocaleString("en-US")} ${display}` : tx("noLines"),
     finish: produced ?? (blocking.length > 0 ? tx("missing") : tx("allGood")),
@@ -626,7 +669,6 @@ export function BasicEditor({
     client: tx("booking"),
     flights: t("pg.flightsTitle"),
     cities: tx("citiesStep"),
-    transport: tx("transport"),
     services: tx("servicesStep"),
     pricing: tx("pricing"),
     finish: tx("finish"),
@@ -851,12 +893,31 @@ export function BasicEditor({
     // ---- 3. the cities, each with its hotel, and the bar that adds them ----
     cities: (
       <div className="space-y-3">
+        {/* how the group moves between cities — the transport step's only question left */}
+        {cities.length > 1 && !focus ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={basicLabel}>{tx("between")}</span>
+            {MODE_CHIPS.map(({ mode, label, icon }) => (
+              <Chip key={mode} on={modes.includes(mode)} icon={icon} label={tx(label)} onClick={() => toggleMode(mode)} />
+            ))}
+          </div>
+        ) : null}
+        {focus ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-[10px] bg-[#fff8e8] px-3 py-1.5 text-[12px] font-bold text-[#a86a10]">
+            <AlertTriangle className="size-4" />
+            {tx("focusNote")}
+            <button type="button" onClick={() => setFocus(null)} className="ms-auto text-[11.5px] font-bold text-[#185045] underline">
+              {tx("showAll")}
+            </button>
+          </div>
+        ) : null}
         {cities.length === 0 ? (
           <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[12.5px] font-semibold text-[#93aaa3]">{tx("noCities")}</p>
         ) : (
           cities.map((city, i) => {
             const dayFrom = dayCursor;
             dayCursor += city.nights;
+            if (focus && !focus.includes(city.city_name)) return null;
             const prev = cities[i - 1]?.city_name;
             // several ways between cities: each arrival says which one it took
             const hop =
@@ -896,9 +957,10 @@ export function BasicEditor({
                 onCar={(leg, slice) =>
                   leg === "airport"
                     ? setLeg("airport", slice)
-                    : commit({ transport_plan: { ...plan, farewell: { ...(plan.farewell ?? plan.airport), ...slice, enabled: true } } })
+                    : leg === "tours"
+                      ? setTourCar(slice)
+                      : commit({ transport_plan: { ...plan, farewell: { ...(plan.farewell ?? plan.airport), ...slice, enabled: true } } })
                 }
-                onSims={setSims}
                 onFlights={() => (steps.includes("flights") ? show("flights") : undefined)}
                 onRemove={() => {
                   if (window.confirm(tx("confirmRemove", { city: city.city_name }))) commit(removeCity(data, i));
@@ -909,6 +971,7 @@ export function BasicEditor({
         )}
 
         {/* the add bar, like the company's system */}
+        {focus ? null : (
         <div className="sticky bottom-3 z-20 rounded-[14px] border border-[#cfe0d9] bg-[#e9f3ef]/95 px-2 py-1.5 shadow-[0_8px_24px_rgba(0,60,58,0.12)] backdrop-blur max-lg:bottom-[80px] sm:px-2.5">
           <div className="flex flex-wrap items-end gap-1.5">
             {/* a group may cross into a neighbouring country */}
@@ -995,8 +1058,8 @@ export function BasicEditor({
             {toursOn ? (
               <label className={`${basicLabel} w-14 shrink-0`}>
                 {tx("tours")}
-                <select value={newTours} onChange={(e) => setNewTours(Number(e.target.value))} className={`${basicField} px-1.5`}>
-                  {range(0, 15).map((n) => (
+                <select value={toursChoice} onChange={(e) => setNewTours(Number(e.target.value))} className={`${basicField} px-1.5`}>
+                  {range(0, maxTours).map((n) => (
                     <option key={n} value={n}>{n}</option>
                   ))}
                 </select>
@@ -1019,55 +1082,33 @@ export function BasicEditor({
           </div>
           <p className={`tv-tnum mt-1 rounded-[7px] px-2 py-0.5 text-[10.5px] font-bold md:hidden ${nightsTone}`}>{nightsNote}</p>
         </div>
+        )}
       </div>
     ),
 
-    // ---- 4. how the group moves ----
-    transport: (
-      <div className="flex flex-wrap items-end gap-2">
-        {(toursOn ? ["tours" as const] : []).map((leg) => (
-          <div key={leg} className="flex items-end gap-1">
-            <label className={`${basicLabel} w-40`}>
-              {tx("tourCar")}
-              <select value={plan[leg].car_type} onChange={(e) => setLeg(leg, { car_type: e.target.value })} className={basicField}>
-                <option value="">{tx("choose")}</option>
-                {lookups.carTypes.map((c) => (
-                  <option key={c.name} value={c.name}>
-                    {c.name}
-                    {c.pax ? ` (${c.pax})` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={`${basicLabel} w-14`}>
-              {tx("cars")}
-              <select value={plan[leg].cars} onChange={(e) => setLeg(leg, { cars: Number(e.target.value) })} className={`${basicField} px-1.5`}>
-                {range(1, 10).map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-        ))}
-        <div className="grid gap-1">
-          <span className={basicLabel}>{tx("between")}</span>
-          <div className="flex flex-wrap gap-1.5">
-            {MODE_CHIPS.map(({ mode, label, icon }) => (
-              <Chip key={mode} on={modes.includes(mode)} icon={icon} label={tx(label)} onClick={() => toggleMode(mode)} />
-            ))}
-          </div>
-        </div>
-      </div>
-    ),
-
-    // ---- 5. what the programme includes and does not — the generator's own lists, ✓ / ✗ ----
+    // ---- 4. what the programme includes and does not — the generator's own lists, ✓ / ✗ ----
     services: (
-      <div className="-mx-3 -mb-1 [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
-        <ServicesStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} />
-      </div>
+      <>
+        {/* the SIM lines: a count, written as one «يشمل» line */}
+        <label className={`${basicLabel} w-32`}>
+          {tx("simLines")}
+          <select
+            value={Number(data.services.includes.find((l) => l.startsWith(SIM_LINE))?.match(/\d+/)?.[0] ?? 0)}
+            onChange={(e) => setSims(Number(e.target.value))}
+            className={`${basicField} px-1.5`}
+          >
+            {range(0, 10).map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </label>
+        <div className="-mx-3 -mb-1 [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
+          <ServicesStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} />
+        </div>
+      </>
     ),
 
-    // ---- 6. the price (sell side only, for whoever may see prices) ----
+    // ---- 5. the price (sell side only, for whoever may see prices) ----
     pricing: (
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -1087,10 +1128,10 @@ export function BasicEditor({
                 type="button"
                 onClick={() => void calculate()}
                 disabled={pricingBusy}
-                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#185045] px-3 text-[12px] font-bold text-white disabled:opacity-60"
+                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
               >
-                {pricingBusy ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
-                {tx("calc")}
+                {pricingBusy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+                {pricingBusy ? tx("calcBusy") : tx("calc")}
               </button>
             </div>
             {pricingError ? <p role="alert" className="mb-2 text-[12px] font-bold text-[#c22850]">{pricingError}</p> : null}
@@ -1146,7 +1187,7 @@ export function BasicEditor({
           </div>
     ),
 
-    // ---- 7. what is missing, and issuing — here ----
+    // ---- 6. what is missing, and issuing — here ----
     finish: (
         <div>
           {produced ? (
@@ -1186,7 +1227,14 @@ export function BasicEditor({
                         <span className="rounded-full bg-[#fff3d6] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">{stageLabel(issue.stage)}</span>
                         <span className="min-w-0 flex-1">{issueText(issue)}</span>
                         {target && steps.includes(target) ? (
-                          <button type="button" onClick={() => show(target)} className="text-[11.5px] font-bold text-[#185045] underline">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              show(target);
+                              if (issue.stage === "hotels" && hotelGaps.length > 0) setFocus(hotelGaps);
+                            }}
+                            className="text-[11.5px] font-bold text-[#185045] underline"
+                          >
                             {tx("fix")}
                           </button>
                         ) : (
