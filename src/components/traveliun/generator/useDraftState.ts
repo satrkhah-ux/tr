@@ -9,11 +9,12 @@ export type SaveState = "idle" | "saving" | "saved" | "error";
 /**
  * What has not reached the server yet, kept in the browser too: a deploy
  * mid-shift turned the save into a 404 and the reload that followed lost the
- * prices just typed. ponytail: twelve hours, then dropped — an older slice
- * could overwrite what another screen saved since; a server version check
- * would make this exact.
+ * prices just typed. It comes back only onto a draft saved BEFORE it was
+ * typed — never over a newer save from another screen — and only within
+ * twelve hours. Signing out clears it (clearPendingDrafts).
  */
-const PENDING_KEY = (draftId: string) => `tv-draft-pending:${draftId}`;
+export const PENDING_PREFIX = "tv-draft-pending:";
+const PENDING_KEY = (draftId: string) => `${PENDING_PREFIX}${draftId}`;
 const PENDING_MAX_AGE = 12 * 3_600_000;
 function keepPending(draftId: string, slice: Partial<DraftData>) {
   try {
@@ -23,14 +24,25 @@ function keepPending(draftId: string, slice: Partial<DraftData>) {
     // private window, storage full — the server save still runs
   }
 }
-function readPending(draftId: string): Partial<DraftData> | null {
+function readPending(draftId: string, savedAt: string): Partial<DraftData> | null {
   try {
     const raw = window.localStorage.getItem(PENDING_KEY(draftId));
     if (!raw) return null;
     const { at, slice } = JSON.parse(raw) as { at: number; slice: Partial<DraftData> };
-    return Date.now() - at < PENDING_MAX_AGE && slice && typeof slice === "object" ? slice : null;
+    const fresh = Date.now() - at < PENDING_MAX_AGE && at > Date.parse(savedAt);
+    if (!fresh) window.localStorage.removeItem(PENDING_KEY(draftId));
+    return fresh && slice && typeof slice === "object" ? slice : null;
   } catch {
     return null;
+  }
+}
+
+/** On sign-out: no client's name or phone stays on a shared office computer. */
+export function clearPendingDrafts() {
+  try {
+    for (const key of Object.keys(window.localStorage)) if (key.startsWith(PENDING_PREFIX)) window.localStorage.removeItem(key);
+  } catch {
+    // storage unavailable — nothing was kept
   }
 }
 
@@ -51,6 +63,8 @@ function readPending(draftId: string): Partial<DraftData> | null {
 export function useDraftState(
   draftId: string,
   initialData: DraftData,
+  /** when the server last saved this draft — given, unsaved edits are kept in the browser and restored onto an older save. */
+  savedAt?: string,
 ): {
   data: DraftData;
   patch: (slice: Partial<DraftData>) => void;
@@ -71,7 +85,7 @@ export function useDraftState(
     try {
       const result = await saveDraftStages(draftId, slice);
       if (!result.ok) pendingRef.current = { ...slice, ...pendingRef.current };
-      keepPending(draftId, pendingRef.current);
+      if (savedAt) keepPending(draftId, pendingRef.current);
       setSaveState(result.ok ? "saved" : "error");
     } catch {
       // The call itself failed — offline, or this tab is from before a deploy
@@ -79,43 +93,43 @@ export function useDraftState(
       // so «جارٍ الحفظ» spun forever; now it says so, and the work is kept to
       // go up with the next save.
       pendingRef.current = { ...slice, ...pendingRef.current };
-      keepPending(draftId, pendingRef.current);
+      if (savedAt) keepPending(draftId, pendingRef.current);
       setSaveState("error");
     }
-  }, [draftId]);
+  }, [draftId, savedAt]);
 
   const patch = useCallback(
     (slice: Partial<DraftData>) => {
       setData((current) => ({ ...current, ...slice }));
       pendingRef.current = { ...pendingRef.current, ...slice };
-      keepPending(draftId, pendingRef.current);
+      if (savedAt) keepPending(draftId, pendingRef.current);
       if (timerRef.current) window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(() => void flush(), 700);
     },
-    [draftId, flush],
+    [draftId, flush, savedAt],
   );
 
   // A save the last visit could not make comes back here, on top of the saved
   // draft, and goes up — after mount, so the server render stays the same.
   useEffect(() => {
     const restore = window.setTimeout(() => {
-      const slice = readPending(draftId);
+      const slice = savedAt ? readPending(draftId, savedAt) : null;
       if (!slice) return;
       setData((current) => ({ ...current, ...slice }));
       pendingRef.current = { ...slice, ...pendingRef.current };
       void flush();
     }, 0);
     return () => window.clearTimeout(restore);
-  }, [draftId, flush]);
+  }, [draftId, flush, savedAt]);
 
   /** Adopt a draft the server already saved — WITHOUT scheduling a save back. */
   const replace = useCallback(
     (next: DraftData) => {
       pendingRef.current = {};
-      keepPending(draftId, {});
+      if (savedAt) keepPending(draftId, {});
       setData(next);
     },
-    [draftId],
+    [draftId, savedAt],
   );
 
   // never lose pending work on unmount / stage navigation

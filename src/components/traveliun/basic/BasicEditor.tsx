@@ -244,16 +244,19 @@ function legText(f: DraftData["flights"][number]): string {
 export function BasicEditor({
   draftId,
   initialData,
+  savedAt,
   lookups,
 }: {
   draftId: string;
   initialData: DraftData;
+  /** the draft's last server save — unsaved edits kept in the browser come back onto an older one. */
+  savedAt: string;
   lookups: GeneratorLookups;
 }) {
   const tx = useBasicLabels();
   const { t, language } = useTraveliunUI();
   const { can } = useRole();
-  const { data, patch, replace, flush, saveState } = useDraftState(draftId, initialData);
+  const { data, patch, replace, flush, saveState } = useDraftState(draftId, initialData, savedAt);
   const trip = data.trip;
   const country = findLookupCountry(lookups.countries, trip.country);
   const cities = data.cities as BasicCity[];
@@ -524,6 +527,7 @@ export function BasicEditor({
 
   // ---------- pricing (sell side only) ----------
   const canPricing = can("pricing.view");
+  const canInternal = can("pricing.internal");
   const display = data.pricing.display_currency || "SAR";
   const [pricingBusy, setPricingBusy] = useState(false);
   const summary = useMemo(
@@ -1321,7 +1325,8 @@ export function BasicEditor({
                   );
                 })}
                 </div>
-                {/* the profit, once for the package: a margin or a whole amount — the staff see cost and profit, the client the total */}
+                {/* the profit, once for the package: a margin or a whole amount — cost and profit are the internal view */}
+                {canInternal ? (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[11px] border border-[#d8e6e0] bg-[#f8fbf9] px-3 py-2">
                   <span className="text-[12.5px] font-extrabold text-[#0f3d38]">{tx("profit")}</span>
                   <div role="radiogroup" className="inline-flex rounded-[8px] border border-[#cfe0d9] bg-white p-0.5">
@@ -1360,6 +1365,7 @@ export function BasicEditor({
                     {summary.total_buy > 0 ? ` (${Math.round((summary.profit / summary.total_buy) * 10000) / 100}%)` : ""}
                   </span>
                 </div>
+                ) : null}
                 <div className="flex items-center justify-between rounded-[11px] bg-[#185045] px-3 py-2.5 text-white">
                   <span className="text-[13px] font-extrabold">{tx("clientTotal")}</span>
                   <span className="tv-tnum text-[16px] font-extrabold">

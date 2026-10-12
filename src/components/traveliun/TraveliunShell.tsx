@@ -53,6 +53,7 @@ import { ROLE_LABEL_KEYS, ROLES, type Permission } from "@/lib/roles/roles";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { MobileTabBar } from "./MobileTabBar";
 import { TraveliunLogo } from "./TraveliunLogo";
+import { clearPendingDrafts } from "./generator/useDraftState";
 
 type TraveliunShellProps = {
   /** i18n key for the page title. */
@@ -1113,6 +1114,7 @@ function ProfilePanel({ close, onChangePassword }: { close: () => void; onChange
     if (signingOut) return;
     setSigningOut(true);
     try {
+      clearPendingDrafts();
       await createSupabaseBrowserClient().auth.signOut();
     } catch {
       /* ignore — clear client state regardless */
