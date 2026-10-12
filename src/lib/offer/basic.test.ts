@@ -159,6 +159,21 @@ describe("النظام بيسك", () => {
     expect(basicDays({ ...data, days: edited })[3].title).toBe("يوم على الشاطئ");
   });
 
+  it("lets a city take more tours than it has days — they share the days in turn", () => {
+    const data = malaysia();
+    // كوالالمبور: 3 nights, 2 free days (the third is the way home), 4 tours asked
+    data.cities = data.cities.map((c, i) => (i === 2 ? { ...c, tours: 4, tour_picks: withTourCount([], 4) } : c));
+    const days = basicDays(data);
+    expect([days[6].title, days[6].activities]).toEqual(["جولة سياحية في كوالالمبور", ["جولة سياحية في كوالالمبور"]]);
+    expect(days[7].activities).toHaveLength(1);
+    expect(days[8].title).toBe("المغادرة");
+  });
+
+  it("books the bar's price on every room of the new city", () => {
+    const next = addCity(malaysia(), { name: "بينانج", nights: 2, tours: 0, room: "ديلوكس", rooms: 2, price: 900 }, "SAR");
+    expect(cityLines(next.hotels, "بينانج")[0].rooms.map((r) => r.price)).toEqual([900, 900]);
+  });
+
   it("leaves every day free when tours are switched off", () => {
     const data = malaysia();
     data.transport_plan = { ...data.transport_plan, tours: { ...data.transport_plan.tours, enabled: false } };

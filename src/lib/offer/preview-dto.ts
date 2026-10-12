@@ -14,6 +14,7 @@
  */
 
 import { partnerBrand, type DocBrand } from "@/components/offer-doc/brand";
+import { BOARD_AR } from "@/components/offer-doc/labels";
 import type { BoardType } from "@/lib/types";
 import type { ClientOfferDTO } from "./dto";
 import {
@@ -119,7 +120,7 @@ export function draftToPreviewOffer(
         city_name: h.city_name || null,
         hotel_name: h.hotel_name || null,
         stars: h.sourcing?.star_rating ?? null,
-        room_type: roomTypesText(h.rooms) || h.room_type_name || h.sourcing?.room_name || null,
+        room_type: roomTypesText(h.rooms, (b) => BOARD_AR[b]) || h.room_type_name || h.sourcing?.room_name || null,
         board_type: h.board_type,
         rooms_count: h.rooms_count,
         nights: stayNights,

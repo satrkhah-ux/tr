@@ -23,11 +23,9 @@ import {
   changeRoom,
   cityLines,
   clearRoomChange,
-  extraBeds,
   EXTRA_BED,
   renameRooms,
   WELCOME,
-  withExtraBeds,
   withTourCount,
   type BasicCity,
 } from "@/lib/offer/basic";
@@ -42,6 +40,9 @@ const range = (from: number, to: number) => Array.from({ length: to - from + 1 }
 const money = (n: number) => Math.round(n * 100) / 100;
 
 type Tab = "hotel" | "tours" | "transfers" | "domestic";
+
+/** What a room looks out on — offered, and any other can be typed. */
+const VIEWS = ["إطلالة على المدينة", "إطلالة على البحر", "إطلالة جزئية على البحر", "إطلالة على الحديقة", "إطلالة على الجبل", "إطلالة على المسبح", "إطلالة على البحيرة", "إطلالة على النهر"];
 
 /** «name (CODE)» → CODE, else the name. */
 const airportShort = (airport: string) => airport.match(/\(([A-Za-z0-9]{3,5})\)/)?.[1] ?? airport;
@@ -238,7 +239,6 @@ function HotelPanel({
   ].filter(Boolean);
   // a hotel the list does not hold (an older file) still shows its name
   const outside = main.hotel_name && !hotels.some((h) => h.id === main.hotel_id) ? (main.hotel_id ?? "__current") : null;
-  const room = main.rooms[0];
 
   /** The same answer for every stay of this city — one hotel, the room changes inside it. */
   const allLines = (fn: (line: DraftHotel) => DraftHotel) => onLines(lines.map(fn));
@@ -269,7 +269,7 @@ function HotelPanel({
 
   return (
     <div className="space-y-2.5">
-      <label className={basicLabel}>
+      <label className={`${basicLabel} max-w-xl`}>
         {tx("hotel")}
         <select
           value={outside ?? main.hotel_id ?? ""}
@@ -296,45 +296,77 @@ function HotelPanel({
         </select>
       </label>
 
-      {/* each room its own type and its own price */}
+      {/* each room is a room of its own: its type, its view, its board, an extra bed, its price */}
       <div className="space-y-1.5">
-        {main.rooms.map((r, j) => (
-          <div key={j} className="grid grid-cols-[auto_1fr_8rem_auto] items-start gap-2">
-            <span className="mt-6 inline-flex h-6 items-center rounded-full bg-[#eef4f1] px-2 text-[10.5px] font-extrabold text-[#185045]">
-              {tx("roomN", { n: j + 1 })}
-            </span>
-            <label className={basicLabel}>
-              {tx("roomType")}
-              <input
-                list={`basic-rooms-${index}`}
-                value={baseRoomName(r.room_type_name)}
-                onChange={(e) =>
-                  onLines([setRoom(main, j, { room_type_id: null, room_type_name: e.target.value + (r.room_type_name.endsWith(EXTRA_BED) ? EXTRA_BED : "") })])
-                }
-                className={basicField}
-              />
-            </label>
-            <label className={basicLabel}>
-              {tx("stayPrice", { n: nightsText(mainNights, language) })}
-              {priceField(r.price, mainNights, main.manual_currency, (price) => onLines([setRoom(main, j, { price })]), tx("stayPrice", { n: nightsText(mainNights, language) }))}
-            </label>
-            {main.rooms.length > 1 ? (
-              <button
-                type="button"
-                onClick={() => allLines((line) => withRooms(line, line.rooms.filter((_, k) => k !== j)))}
-                aria-label={tx("removeRoom")}
-                className="mt-6 rounded-[7px] p-1.5 text-[#c43d3d] hover:bg-[#fff1f1]"
-              >
-                <X className="size-4" />
-              </button>
-            ) : (
-              <span />
-            )}
-          </div>
-        ))}
+        {main.rooms.map((r, j) => {
+          const extra = r.room_type_name.endsWith(EXTRA_BED);
+          return (
+            <div key={j} className="flex flex-wrap items-start gap-2 rounded-[10px] bg-[#f8fbf9] p-2">
+              <span className="mt-6 inline-flex h-6 items-center rounded-full bg-[#eef4f1] px-2 text-[10.5px] font-extrabold text-[#185045]">
+                {tx("roomN", { n: j + 1 })}
+              </span>
+              <label className={`${basicLabel} w-56`}>
+                {tx("roomType")}
+                <input
+                  list={`basic-rooms-${index}`}
+                  value={baseRoomName(r.room_type_name)}
+                  onChange={(e) => onLines([setRoom(main, j, { room_type_id: null, room_type_name: e.target.value + (extra ? EXTRA_BED : "") })])}
+                  className={basicField}
+                />
+              </label>
+              <label className={`${basicLabel} w-44`}>
+                {tx("view")}
+                <input list="basic-views" value={r.view ?? ""} onChange={(e) => onLines([setRoom(main, j, { view: e.target.value })])} className={basicField} />
+              </label>
+              <label className={`${basicLabel} w-36`}>
+                {tx("board")}
+                <select
+                  value={r.board_type ?? ""}
+                  onChange={(e) => onLines([setRoom(main, j, { board_type: (e.target.value || null) as BoardType | null })])}
+                  className={basicField}
+                >
+                  <option value="">{tx("choose")}</option>
+                  {BOARD_TYPES.map((b) => (
+                    <option key={b} value={b}>{t(BOARD_LABEL_KEYS[b])}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="mt-6 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[11.5px] font-bold text-[#185045]">
+                <input
+                  type="checkbox"
+                  checked={extra}
+                  onChange={(e) =>
+                    onLines([setRoom(main, j, { room_type_name: baseRoomName(r.room_type_name) + (e.target.checked ? EXTRA_BED : "") })])
+                  }
+                  className="size-3.5 accent-[#185045]"
+                />
+                {tx("extraBed")}
+              </label>
+              <label className={`${basicLabel} w-32`}>
+                {tx("stayPrice", { n: nightsText(mainNights, language) })}
+                {priceField(r.price, mainNights, main.manual_currency, (price) => onLines([setRoom(main, j, { price })]), tx("stayPrice", { n: nightsText(mainNights, language) }))}
+              </label>
+              {main.rooms.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => allLines((line) => withRooms(line, line.rooms.filter((_, k) => k !== j)))}
+                  aria-label={tx("removeRoom")}
+                  className="mt-6 rounded-[7px] p-1.5 text-[#c43d3d] hover:bg-[#fff1f1]"
+                >
+                  <X className="size-4" />
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
         <datalist id={`basic-rooms-${index}`}>
           {roomNames.map((n) => (
             <option key={n} value={n} />
+          ))}
+        </datalist>
+        <datalist id="basic-views">
+          {VIEWS.map((v) => (
+            <option key={v} value={v} />
           ))}
         </datalist>
         <div className="flex flex-wrap items-center gap-2">
@@ -368,30 +400,8 @@ function HotelPanel({
               s.check_in ? <DirText key={s.line.id}>{tx("stayDates", { in: s.check_in, out: s.check_out ?? "" })}</DirText> : null,
             )}
           </p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <label className={basicLabel}>
-              {tx("board")}
-              <select
-                value={room?.board_type ?? ""}
-                onChange={(e) => allLines((line) => setAllRooms(line, { board_type: (e.target.value || null) as BoardType | null }))}
-                className={basicField}
-              >
-                <option value="">{tx("choose")}</option>
-                {BOARD_TYPES.map((b) => (
-                  <option key={b} value={b}>{t(BOARD_LABEL_KEYS[b])}</option>
-                ))}
-              </select>
-            </label>
-            <label className={basicLabel}>
-              {tx("extraBed")}
-              <select value={extraBeds(main)} onChange={(e) => allLines((line) => withExtraBeds(line, Number(e.target.value)))} className={basicField}>
-                <option value={0}>{tx("none")}</option>
-                {range(1, main.rooms.length).map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-            </label>
-            <label className={basicLabel}>
+          <div className="flex flex-wrap gap-2">
+            <label className={`${basicLabel} w-28`}>
               {tx("currency")}
               <select value={main.manual_currency} onChange={(e) => allLines((line) => ({ ...line, manual_currency: e.target.value }))} className={basicField}>
                 {currencyOptions(lookups.countries, main.manual_currency).map((c) => (
@@ -400,7 +410,7 @@ function HotelPanel({
               </select>
             </label>
             {/* who the room was bought from — internal, never on the client document */}
-            <label className={basicLabel}>
+            <label className={`${basicLabel} w-48`}>
               {t("pg.supplierLabel")}
               <select value={main.supplier ?? ""} onChange={(e) => allLines((line) => ({ ...line, supplier: e.target.value }))} className={basicField}>
                 <option value="">{tx("choose")}</option>
@@ -489,7 +499,7 @@ function ToursPanel({
       <label className={`${basicLabel} w-28`}>
         {tx("toursCount")}
         <select value={count} onChange={(e) => onTours(Number(e.target.value))} className={basicField}>
-          {range(0, Math.max(city.nights - 1, 0)).map((n) => (
+          {range(0, 15).map((n) => (
             <option key={n} value={n}>{n}</option>
           ))}
         </select>

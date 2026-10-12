@@ -5,6 +5,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
 import { airlineLogoUrl, publicBrandLogoUrl } from "@/components/offer-doc/brand";
+import { BOARD_AR } from "@/components/offer-doc/labels";
 import { getPartnerSession } from "@/lib/partners/session";
 import {
   baggageLabel,
@@ -706,7 +707,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         image_url: s?.image_url ?? null,
         facilities: s?.facilities ?? [],
         content_star_rating: s?.star_rating ?? null,
-        room_type_name: s?.room_name ?? (roomTypesText(h.rooms) || h.room_type_name) ?? null,
+        room_type_name: s?.room_name ?? (roomTypesText(h.rooms, (b) => BOARD_AR[b]) || h.room_type_name) ?? null,
       };
     });
 
@@ -813,7 +814,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         return {
           city_name: c.city_name,
           hotel_name: h?.hotel_name ? `${h.hotel_name}${extra}` : null,
-          room_type: (h && roomTypesText(h.rooms)) || h?.room_type_name || null,
+          room_type: (h && roomTypesText(h.rooms, (b) => BOARD_AR[b])) || h?.room_type_name || null,
           nights: c.nights,
           check_in: c.check_in,
           check_out: c.check_out,

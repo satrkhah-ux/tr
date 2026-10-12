@@ -79,12 +79,19 @@ export function hotelForCity(data: Pick<DraftData, "trip">, city: string, curren
 }
 
 /** What the add bar may already know about the city's stay: the hotel, the room, how many. */
-export type StayPick = { hotel?: { id: string; name: string } | null; room?: string; rooms?: number };
+export type StayPick = {
+  hotel?: { id: string; name: string } | null;
+  room?: string;
+  rooms?: number;
+  /** what each room costs for the city's nights — typed on the bar with the rest. */
+  price?: number | null;
+};
 
 function withStayPick(line: DraftHotel, pick: StayPick): DraftHotel {
   let next = pick.rooms && pick.rooms !== line.rooms.length ? resizeRooms(line, pick.rooms) : line;
   if (pick.hotel) next = { ...next, hotel_id: pick.hotel.id, hotel_name: pick.hotel.name, hotel_name_en: "" };
   if (pick.room?.trim()) next = renameRooms(next, pick.room.trim());
+  if (pick.price != null) next = withRooms(next, next.rooms.map((r) => ({ ...r, price: pick.price ?? null })));
   return next;
 }
 
@@ -311,39 +318,71 @@ export function basicDays(data: DraftData): DraftDay[] {
   const firstStay = stay[0] ?? -1;
   const lastDay = days.length - 1;
 
-  // tours switched off in «البرنامج يشمل»: every day that is not a move is free
+  // 1. which city each day is in, and what kind of day it is
+  type Kind = "travel" | "arrive" | "move" | "last" | "stay";
+  const cityOf: number[] = [];
+  const kindOf: Kind[] = [];
+  let at = -1;
+  days.forEach((day, i) => {
+    if (day.kind === "travel") {
+      cityOf.push(-1);
+      kindOf.push("travel");
+      return;
+    }
+    const moved = i === firstStay || days[i - 1]?.city_name !== day.city_name;
+    if (moved && i !== lastDay) at += 1;
+    cityOf.push(at);
+    kindOf.push(i === lastDay ? "last" : i === firstStay ? "arrive" : moved ? "move" : "stay");
+  });
+
+  // 2. each city's tours over its free days. A client may want more tours than
+  // the city has days: they share a day, in turn, rather than being refused.
+  // A city with no free day at all takes them on the day the group arrives.
   const toursOn = plan.tours.enabled;
-  let cityIndex = -1;
-  let tourIndex = 0;
+  const toursOf = new Map<number, TourPick[]>();
+  cities.forEach((city, c) => {
+    const count = toursOn ? (city.tours ?? 0) : 0;
+    if (count === 0) return;
+    const free = days.map((_, i) => i).filter((i) => cityOf[i] === c && kindOf[i] === "stay");
+    const first = cityOf.indexOf(c);
+    const slots = free.length > 0 ? free : first >= 0 ? [first] : [];
+    if (slots.length === 0) return;
+    withTourCount(city.tour_picks, count).forEach((pick, k) => {
+      const title = pick.title.trim() || `جولة سياحية في ${city.city_name}`;
+      const day = slots[k % slots.length];
+      toursOf.set(day, [...(toursOf.get(day) ?? []), { ...pick, title }]);
+    });
+  });
+
+  // 3. the days
   return days.map((day, i) => {
     if (day.kind === "travel") return day;
-    const moved = i === firstStay || days[i - 1]?.city_name !== day.city_name;
-    if (moved && i !== lastDay) {
-      cityIndex += 1;
-      tourIndex = 0;
-    }
-    const city = cities[cityIndex];
-    const tours = toursOn ? (city?.tours ?? 0) : 0;
+    const kind = kindOf[i];
     let title: string;
     let activities: string[] = [];
-    if (i === lastDay) {
+    if (kind === "last") {
       title = "المغادرة";
       activities = ["تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة"];
-    } else if (i === firstStay) {
+    } else if (kind === "arrive") {
       title = `الوصول إلى ${day.city_name}`;
       activities = [WELCOME];
-    } else if (moved) {
+    } else if (kind === "move") {
       const from = days[i - 1]?.city_name ?? "";
       const mode = hopMode(plan, from, day.city_name);
       const leg = data.flights.find((f) => f.leg_order === "internal" && f.to_city?.trim() === day.city_name);
       title = mode === "flight" ? `السفر إلى ${day.city_name}` : `الانتقال إلى ${day.city_name}`;
       activities = moveLines(mode, day.city_name, leg?.flight_no.trim() ?? "");
-    } else if (tourIndex < tours) {
-      const pick = city?.tour_picks?.[tourIndex];
-      tourIndex += 1;
-      title = pick?.title.trim() || `جولة سياحية في ${day.city_name}`;
-      activities = pick?.text.trim() ? [pick.text.trim()] : [];
     } else title = FREE_DAY_TITLE;
+
+    const tours = toursOf.get(i) ?? [];
+    if (tours.length > 0) {
+      const line = (t: TourPick) => (t.text.trim() ? `${t.title}: ${t.text.trim()}` : t.title);
+      if (kind === "stay") {
+        // the day is named after its first tour; any more the client asked for follow it
+        title = tours[0].title;
+        activities = [...(tours[0].text.trim() ? [tours[0].text.trim()] : []), ...tours.slice(1).map(line)];
+      } else activities = [...activities, ...tours.map(line)];
+    }
 
     const owned = day.auto_title !== undefined ? day.title === day.auto_title : isAutoTitle(day.title);
     return owned ? { ...day, title, activities, auto_title: title } : day;

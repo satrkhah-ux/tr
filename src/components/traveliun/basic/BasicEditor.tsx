@@ -377,6 +377,7 @@ export function BasicEditor({
   const [newHotel, setNewHotel] = useState("");
   const [newRoom, setNewRoom] = useState("");
   const [newRooms, setNewRooms] = useState(0);
+  const [newPrice, setNewPrice] = useState<number | null>(null);
   const nightsChoice = newNights || Math.max(left, 1);
   const roomsChoice = newRooms || Math.max(trip.rooms, 1);
   // the trip's country unless the group crosses into a neighbour
@@ -406,6 +407,7 @@ export function BasicEditor({
           hotel: hotel ? { id: hotel.id, name: hotel.name } : null,
           room: newRoom,
           rooms: roomsChoice,
+          price: newPrice,
         },
         BASE_CURRENCY,
       ),
@@ -414,6 +416,7 @@ export function BasicEditor({
     setNewNights(0);
     setNewTours(0);
     setNewRooms(0);
+    setNewPrice(null);
   }
 
   const used = data.cities.reduce((sum, c) => sum + c.nights, 0);
@@ -907,6 +910,19 @@ export function BasicEditor({
                     ))}
                   </select>
                 </label>
+                {/* the price, typed here with the rest: the card arrives priced */}
+                <label className={`${basicLabel} w-32 shrink-0`}>
+                  {tx("barPrice")}
+                  <input
+                    type="number"
+                    min={0}
+                    dir="ltr"
+                    value={newPrice ?? ""}
+                    placeholder="0"
+                    onChange={(e) => setNewPrice(e.target.value === "" ? null : Number(e.target.value))}
+                    className={`${basicField} tv-tnum text-center`}
+                  />
+                </label>
               </>
             ) : null}
             <label className={`${basicLabel} w-14 shrink-0`}>
@@ -920,8 +936,8 @@ export function BasicEditor({
             {toursOn ? (
               <label className={`${basicLabel} w-14 shrink-0`}>
                 {tx("tours")}
-                <select value={Math.min(newTours, nightsChoice - 1)} onChange={(e) => setNewTours(Number(e.target.value))} className={`${basicField} px-1.5`}>
-                  {range(0, Math.max(nightsChoice - 1, 0)).map((n) => (
+                <select value={newTours} onChange={(e) => setNewTours(Number(e.target.value))} className={`${basicField} px-1.5`}>
+                  {range(0, 15).map((n) => (
                     <option key={n} value={n}>{n}</option>
                   ))}
                 </select>

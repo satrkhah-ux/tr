@@ -440,6 +440,8 @@ export type DraftRoomSpec = {
    * means «not priced yet», which is not the same as free.
    */
   price: number | null;
+  /** «إطلالة على البحر» — what this room looks out on, when the booking says. */
+  view?: string;
 };
 
 export function emptyRoomSpec(): DraftRoomSpec {
@@ -450,11 +452,20 @@ export function emptyRoomSpec(): DraftRoomSpec {
  * The rooms' types as one line — «ديلوكس × 2 + جناح». A stay booking two
  * different rooms printed only the first one's type.
  */
-export function roomTypesText(rooms: Pick<DraftRoomSpec, "room_type_name">[]): string {
+export function roomTypesText(
+  rooms: Pick<DraftRoomSpec, "room_type_name" | "board_type" | "view">[],
+  /** the board's printed name — given, so rooms on different boards say which is which. */
+  boardLabel?: (board: BoardType) => string,
+): string {
+  const boards = new Set(rooms.map((r) => r.board_type ?? ""));
   const counts = new Map<string, number>();
   for (const r of rooms) {
     const name = r.room_type_name.trim();
-    if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+    if (!name) continue;
+    const view = r.view?.trim() ? ` — ${r.view.trim()}` : "";
+    const board = boards.size > 1 && r.board_type && boardLabel ? ` (${boardLabel(r.board_type)})` : "";
+    const key = `${name}${view}${board}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return [...counts].map(([name, n]) => (n > 1 ? `${name} × ${n}` : name)).join(" + ");
 }
