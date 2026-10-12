@@ -83,6 +83,7 @@ import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { FieldIssueProvider } from "../generator/FieldIssue";
 import { FlightsStage } from "../generator/stages/FlightsStage";
+import { ServicesStage } from "../generator/stages/ServicesStage";
 import { useDraftState } from "../generator/useDraftState";
 import { BasicCityCard, SIM_LINE } from "./BasicCityCard";
 import { BasicPhoneLookup } from "./BasicPhoneLookup";
@@ -99,8 +100,8 @@ const MODE_CHIPS: { mode: TransportMode; label: BasicLabel; icon: typeof Car }[]
   { mode: "ship", label: "byShip", icon: Ship },
 ];
 /** The page's steps, in order; one is open at a time. */
-type Step = "client" | "flights" | "cities" | "transport" | "pricing" | "finish";
-const STEP_ORDER: Step[] = ["client", "flights", "cities", "transport", "pricing", "finish"];
+type Step = "client" | "flights" | "cities" | "transport" | "services" | "pricing" | "finish";
+const STEP_ORDER: Step[] = ["client", "flights", "cities", "transport", "services", "pricing", "finish"];
 /** Which step of this page answers a stage's blocking issue. */
 const STEP_OF: Partial<Record<string, Step>> = {
   customer: "client",
@@ -110,6 +111,7 @@ const STEP_OF: Partial<Record<string, Step>> = {
   cities: "cities",
   hotels: "cities",
   transport: "transport",
+  services: "services",
   pricing: "pricing",
 };
 
@@ -521,6 +523,7 @@ export function BasicEditor({
       scope.transport && cities.length > 0 && !plan.airport.car_type.trim() && tx("transferCar"),
     ].filter((x): x is string => Boolean(x)),
     transport: [toursOn && !plan.tours.car_type.trim() && tx("tourCar")].filter((x): x is string => Boolean(x)),
+    services: blocking.some((i) => i.stage === "services") ? [tx("servicesStep")] : [],
     pricing: blocking.some((i) => i.stage === "pricing") ? [tx("pricing")] : [],
     finish: [],
   };
@@ -574,6 +577,7 @@ export function BasicEditor({
     ]
       .filter(Boolean)
       .join(" · "),
+    services: tx("servicesSummary", { a: data.services.includes.length, b: data.services.excludes.length }),
     pricing: data.pricing.items.length > 0 ? `${tx("total")}: ${summary.total_sell.toLocaleString("en-US")} ${display}` : tx("noLines"),
     finish: produced ?? (blocking.length > 0 ? tx("missing") : tx("allGood")),
   };
@@ -582,6 +586,7 @@ export function BasicEditor({
     flights: t("pg.flightsTitle"),
     cities: tx("citiesStep"),
     transport: tx("transport"),
+    services: tx("servicesStep"),
     pricing: tx("pricing"),
     finish: tx("finish"),
   };
@@ -980,7 +985,14 @@ export function BasicEditor({
       </div>
     ),
 
-    // ---- 5. the price (sell side only, for whoever may see prices) ----
+    // ---- 5. what the programme includes and does not — the generator's own lists, ✓ / ✗ ----
+    services: (
+      <div className="-mx-3 -mb-1 [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
+        <ServicesStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} />
+      </div>
+    ),
+
+    // ---- 6. the price (sell side only, for whoever may see prices) ----
     pricing: (
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -1042,7 +1054,7 @@ export function BasicEditor({
           </div>
     ),
 
-    // ---- 6. what is missing, and issuing — here ----
+    // ---- 7. what is missing, and issuing — here ----
     finish: (
         <div>
           {produced ? (

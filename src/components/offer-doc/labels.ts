@@ -52,7 +52,7 @@ export const AR = {
   daysNights: (d: number, n: number) => `${n} ليالي - ${d} أيام`,
   tripSummary: "مسار الرحلة",
   nights: "ليالٍ",
-  nightsCount: (n: number) => `${n} ليالي`,
+  nightsCount: (n: number) => (n === 1 ? "ليلة واحدة" : n === 2 ? "ليلتان" : n <= 10 ? `${n} ليالٍ` : `${n} ليلة`),
   flights: "الطيران",
   flightsIntl: "الطيران الدولي",
   flightsDomestic: "الطيران الداخلي",
@@ -183,6 +183,28 @@ export function fmtNum(value: number | null | undefined, digits = 0): string {
 export function stars(count: number | null): string {
   if (!count || count < 1) return "";
   return "★".repeat(Math.min(Math.round(count), 5));
+}
+
+/** «الثلاثاء 10 نوفمبر 2026» — the day as a traveller says it; Latin digits like the rest of the page. */
+const DAY_MONTH = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+/** «11 نوفمبر 2026» — the short form, for a narrow box. */
+const DAY_MONTH_SHORT = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+export function fmtShortDate(value: string | null): string {
+  if (!value) return "—";
+  const date = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? value.slice(0, 10) : DAY_MONTH_SHORT.format(date);
+}
+
+export function fmtDayMonth(value: string | null): string {
+  if (!value) return "—";
+  const date = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? value.slice(0, 10) : DAY_MONTH.format(date);
 }
 
 /** "2026-06-01T14:30" or "2026-06-01" → "2026-06-01 14:30" (LTR-isolated by caller). */

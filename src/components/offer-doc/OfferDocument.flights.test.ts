@@ -77,8 +77,9 @@ describe("OfferDocument — flight sections", () => {
     ]);
     expect(html).toContain(AR.flightsIntl);
     expect(html).toContain(AR.flightsDomestic);
-    // the domestic route still renders inside its own section
-    expect(html).toContain("لنكاوي (LGK)");
+    // the domestic route still renders inside its own section: the code large, the name under it
+    expect(html).toContain("LGK");
+    expect(html).toContain("لنكاوي");
   });
 
   it("omits the domestic section entirely when there are no internal legs", () => {

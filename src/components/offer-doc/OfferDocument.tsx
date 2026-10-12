@@ -7,7 +7,8 @@ import {
   ITEM_TYPE_AR,
   LEG_AR,
   fmtDate,
-  fmtDateTime,
+  fmtDayMonth,
+  fmtShortDate,
   fmtNum,
   stars,
 } from "./labels";
@@ -179,6 +180,8 @@ function packBlocks(blocks: DocBlock[]): DocBlock[][] {
 
 /** Rows of a `.od-table`: the header band plus one row per line of content. */
 const tableMm = (rows: number, rowMm = 16) => 14 + rows * rowMm;
+/** One flight card (head strip + the route) — measured ~31mm, kept with a little air. */
+const flightCardsMm = (rows: number) => rows * 34;
 
 /**
  * Estimated printed height of one stay card.
@@ -272,13 +275,12 @@ export function OfferDocument(props: OfferDocumentProps) {
     blocks.push({
       group: "flights",
       title: AR.flights,
-      note: AR.flightsIntlNote,
-      heightMm: SUBHEADING_MM + tableMm(intlRows),
+      heightMm: SUBHEADING_MM + flightCardsMm(intlRows),
       kind: "node",
       node: (
         <>
           <h3 className="od-subhead">{AR.flightsIntl}</h3>
-          <FlightTable flights={intl} />
+          <FlightCards flights={intl} />
         </>
       ),
     });
@@ -287,13 +289,12 @@ export function OfferDocument(props: OfferDocumentProps) {
     blocks.push({
       group: "flights",
       title: AR.flights,
-      note: AR.flightsIntlNote,
-      heightMm: SUBHEADING_MM + tableMm(domesticRows),
+      heightMm: SUBHEADING_MM + flightCardsMm(domesticRows),
       kind: "node",
       node: (
         <>
           <h3 className="od-subhead">{AR.flightsDomestic}</h3>
-          <FlightTable flights={domestic} />
+          <FlightCards flights={domestic} />
         </>
       ),
     });
@@ -343,7 +344,6 @@ export function OfferDocument(props: OfferDocumentProps) {
     blocks.push({
       group: "stays",
       title: AR.accommodation,
-      note: intl.length === 0 ? AR.accommodationNoIntlNote : AR.accommodationNote,
       heightMm: stayHeightMm(stay, isFlagged(stay)) + 4,
       kind: "stay",
       stay,
@@ -642,36 +642,39 @@ function StayCard({
 }) {
   const roomCount = Math.max(stay.rooms_count || 0, 1);
   const starText = stars(stay.stars);
-  const heading = [country, stay.city_name].filter(Boolean).join(" - ");
+  const place = [country, stay.city_name].filter(Boolean).join(" — ");
+  // a zero says nothing — «2 بالغ» rather than «بالغ 2 · طفل 0 · رضيع 0»
+  const guests = [
+    `${travelers.adults} ${AR.adults}`,
+    travelers.children > 0 ? `${travelers.children} ${AR.children}` : "",
+    travelers.infants > 0 ? `${travelers.infants} ${AR.infants}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <div className="od-stay">
       <div className="od-datebox">
         <span>{AR.checkIn}</span>
-        <strong><Ltr>{fmtDate(stay.check_in)}</Ltr></strong>
+        <strong>{fmtShortDate(stay.check_in)}</strong>
         <span>{AR.checkOut}</span>
-        <strong><Ltr>{fmtDate(stay.check_out)}</Ltr></strong>
+        <strong>{fmtShortDate(stay.check_out)}</strong>
         <span>{stay.nights != null ? AR.nightsCount(stay.nights) : "—"}</span>
       </div>
 
       <div className="od-hotel">
-        <h3>
-          {heading || "—"}
-          <br />
-          {stay.hotel_name || "—"}
-        </h3>
-        <p>
-          {AR.roomsCount}: <Ltr>{String(roomCount)}</Ltr>
-          {stay.board_type ? ` | ${BOARD_AR[stay.board_type]}` : ""}
-        </p>
-        {/* with a single room the occupancy is already printed in the room box */}
-        {roomCount > 1 ? (
-          <p>
-            {AR.travelers}: <Ltr>{String(travelers.adults)}</Ltr> {AR.adults} ·{" "}
-            <Ltr>{String(travelers.children)}</Ltr> {AR.children} ·{" "}
-            <Ltr>{String(travelers.infants)}</Ltr> {AR.infants}
-          </p>
-        ) : null}
-        {starText ? <div className="od-stars">{starText}</div> : null}
+        <div className="od-hotel-top">
+          <h3>{stay.hotel_name || "—"}</h3>
+          {starText ? <span className="od-stars">{starText}</span> : null}
+        </div>
+        {place ? <p className="od-hotel-place">{place}</p> : null}
+        <div className="od-tags">
+          <span>
+            {AR.roomsCount}: <Ltr>{String(roomCount)}</Ltr>
+          </span>
+          {stay.room_type ? <span>{stay.room_type}</span> : null}
+          {stay.board_type ? <span>{BOARD_AR[stay.board_type]}</span> : null}
+          <span>{guests}</span>
+        </div>
         {stay.cancellation_policy ? (
           <div className="od-notice">{AR.cancellation}: {stay.cancellation_policy}</div>
         ) : null}
@@ -688,53 +691,32 @@ function StayCard({
         ) : null}
         {flagDomestic ? <div className="od-notice">{AR.domesticFlightAfterStay}</div> : null}
       </div>
-
-      <div className="od-rooms">
-        {Array.from({ length: roomCount }, (_, i) => (
-          <div key={i} className="od-room">
-            <strong>
-              {AR.room(i + 1)}
-              {stay.room_type ? ` - ${stay.room_type}` : ""}
-            </strong>
-            {roomCount === 1 ? (
-              <div className="od-counts">
-                <span>{AR.adults} <Ltr>{String(travelers.adults)}</Ltr></span>
-                <span>{AR.children} <Ltr>{String(travelers.children)}</Ltr></span>
-                <span>{AR.infants} <Ltr>{String(travelers.infants)}</Ltr></span>
-              </div>
-            ) : null}
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
 
 // ---------------- flights ----------------
-function FlightTable({ flights }: { flights: ClientOfferDTO["flights"] }) {
+/** «مطار الملك خالد الدولي (RUH)» → RUH, else the name. */
+const airportCode = (airport: string | null) => airport?.match(/\(([A-Za-z0-9]{3,5})\)/)?.[1] ?? null;
+/** The name without its (CODE). */
+const airportName = (airport: string | null) => (airport ?? "").replace(/\s*\([A-Za-z0-9]{3,5}\)\s*$/, "").trim();
+
+/**
+ * Each flight as a boarding pass: who and which flight on a strip, then the two
+ * ends — the airport code large, the time, the day — with the line between
+ * them. A table of eight columns broke every airport name over three lines.
+ */
+function FlightCards({ flights }: { flights: ClientOfferDTO["flights"] }) {
   return (
-    <table className="od-table">
-      <thead>
-        <tr>
-          <th>{AR.flightLeg}</th>
-          <th>{AR.airline}</th>
-          <th>{AR.flightNo}</th>
-          <th>{AR.route}</th>
-          <th>{AR.departure}</th>
-          <th>{AR.arrival}</th>
-          <th>{AR.cabin}</th>
-          <th>{AR.baggage}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {flights.map((f, i) => (
-          <tr key={i}>
-            <td>{f.leg_order ? LEG_AR[f.leg_order] : "—"}</td>
-            {/* The carrier's mark beside its name: a client scanning the page
-                recognises the logo before they read the Arabic, and management
-                asked for it. No logo on file → the name alone, never a
-                placeholder box. */}
-            <td>
+    <div>
+      {flights.map((f, i) => {
+        const dayShift = dayOffset(f.departure_at, f.arrival_at);
+        return (
+          <div key={i} className="od-fl">
+            <div className="od-fl-head">
+              {f.leg_order ? <span className="od-fl-leg">{LEG_AR[f.leg_order]}</span> : null}
+              {/* The carrier's mark beside its name: a client scanning the page
+                  recognises the logo before they read the Arabic. */}
               <span className="od-carrier">
                 {f.airline_logo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -742,18 +724,53 @@ function FlightTable({ flights }: { flights: ClientOfferDTO["flights"] }) {
                 ) : null}
                 <span>{f.airline || "—"}</span>
               </span>
-            </td>
-            <td>{f.flight_no ? <Ltr>{f.flight_no}</Ltr> : "—"}</td>
-            <td><Ltr>{`${f.from_airport || "—"} → ${f.to_airport || "—"}`}</Ltr></td>
-            <td className="od-tnum"><Ltr>{fmtDateTime(f.departure_at)}</Ltr></td>
-            <td className="od-tnum"><Ltr>{fmtDateTime(f.arrival_at)}</Ltr></td>
-            <td>{f.cabin_class || "—"}</td>
-            <td>{f.baggage_allowance || "—"}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+              {f.flight_no ? (
+                <span className="od-fl-no">
+                  <Ltr>{f.flight_no}</Ltr>
+                </span>
+              ) : null}
+              <span className="od-fl-meta">{[f.cabin_class, f.baggage_allowance].filter(Boolean).join(" · ")}</span>
+            </div>
+            <div className="od-fl-route">
+              <FlightEnd airport={f.from_airport} at={f.departure_at} />
+              <div className="od-fl-line">
+                <span>✈</span>
+              </div>
+              <FlightEnd airport={f.to_airport} at={f.arrival_at} shift={dayShift} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
+}
+
+function FlightEnd({ airport, at, shift = 0 }: { airport: string | null; at: string | null; shift?: number }) {
+  const code = airportCode(airport);
+  return (
+    <div className="od-fl-end">
+      <strong>
+        <Ltr>{code ?? (airportName(airport) || "—")}</Ltr>
+      </strong>
+      <b className="od-tnum">
+        <Ltr>{at && at.length > 10 ? at.slice(11, 16) : "—"}</Ltr>
+        {shift > 0 ? (
+          <span className="od-fl-plus" dir="ltr">
+            +{shift}
+          </span>
+        ) : null}
+      </b>
+      <span>{fmtDayMonth(at)}</span>
+      {code ? <small>{airportName(airport)}</small> : null}
+    </div>
+  );
+}
+
+/** Whole days between two local wall-clock times — «+1» on a flight landing the next day. */
+function dayOffset(from: string | null, to: string | null): number {
+  if (!from || !to) return 0;
+  const ms = Date.parse(`${to.slice(0, 10)}T00:00:00Z`) - Date.parse(`${from.slice(0, 10)}T00:00:00Z`);
+  return Number.isFinite(ms) ? Math.round(ms / 86_400_000) : 0;
 }
 
 // ---------------- transfers / tours / weather ----------------

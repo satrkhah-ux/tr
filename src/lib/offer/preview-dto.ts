@@ -19,8 +19,10 @@ import type { ClientOfferDTO } from "./dto";
 import {
   baggageLabel,
   deriveCityDates,
+  deriveHotelStays,
   matchPartner,
   mealPlanIncludeLine,
+  roomTypesText,
   type DraftData,
   type GeneratorLookups,
 } from "./draft-types";
@@ -93,7 +95,6 @@ export function draftToPreviewOffer(
 ): ClientOfferDTO {
   const start = itineraryStartDate(data.trip, data.flights);
   const cities = deriveCityDates(start, data.cities);
-  const cityByName = new Map(cities.map((c) => [c.city_name, c]));
   const nights = data.trip.nights || cities.reduce((sum, c) => sum + c.nights, 0);
   const days = data.trip.days || (nights > 0 ? nights + 1 : 0);
 
@@ -113,18 +114,17 @@ export function draftToPreviewOffer(
     total: draftSellTotal(data, sarPer),
     currency: data.pricing.display_currency,
     pricing: emptyPricing(data.pricing.display_currency),
-    hotels: data.hotels.map((h) => {
-      const city = cityByName.get(h.city_name);
+    hotels: deriveHotelStays(cities, data.hotels).map(({ line: h, nights: stayNights, check_in, check_out }) => {
       return {
         city_name: h.city_name || null,
         hotel_name: h.hotel_name || null,
         stars: h.sourcing?.star_rating ?? null,
-        room_type: h.room_type_name || h.sourcing?.room_name || null,
+        room_type: roomTypesText(h.rooms) || h.room_type_name || h.sourcing?.room_name || null,
         board_type: h.board_type,
         rooms_count: h.rooms_count,
-        nights: city?.nights ?? null,
-        check_in: city?.check_in ?? null,
-        check_out: city?.check_out ?? null,
+        nights: stayNights,
+        check_in,
+        check_out,
         sell_price: null,
         sell_currency: null,
         cancellation_policy: h.sourcing?.cancellation_policy ?? null,

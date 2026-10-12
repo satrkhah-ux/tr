@@ -447,6 +447,19 @@ export function emptyRoomSpec(): DraftRoomSpec {
 }
 
 /**
+ * The rooms' types as one line — «ديلوكس × 2 + جناح». A stay booking two
+ * different rooms printed only the first one's type.
+ */
+export function roomTypesText(rooms: Pick<DraftRoomSpec, "room_type_name">[]): string {
+  const counts = new Map<string, number>();
+  for (const r of rooms) {
+    const name = r.room_type_name.trim();
+    if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts].map(([name, n]) => (n > 1 ? `${name} × ${n}` : name)).join(" + ");
+}
+
+/**
  * What the whole stay costs — every room added up.
  *
  * Null when no room carries a price at all, so «unpriced» stays

@@ -124,16 +124,34 @@ export const OFFER_DOC_CSS = `
 .od-run + .od-run{margin-top:0;}
 
 /* ── stays ────────────────────────────────────────────────────────────────── */
-.od-stay{display:grid;grid-template-columns:34mm 1fr 43mm;gap:5mm;border:1px solid var(--od-line-2);border-radius:5mm;padding:4mm;margin-bottom:4mm;background:rgba(255,255,255,.96);box-shadow:0 5px 14px var(--od-shadow-2);min-height:37mm;break-inside:avoid;}
+.od-stay{display:grid;grid-template-columns:34mm 1fr;gap:5mm;border:1px solid var(--od-line-2);border-radius:5mm;padding:4mm;margin-bottom:4mm;background:rgba(255,255,255,.96);box-shadow:0 5px 14px var(--od-shadow-2);min-height:37mm;break-inside:avoid;}
 .od-datebox{border-radius:4mm;background:var(--od-soft);border:1px solid var(--od-line-2);padding:3mm;text-align:center;color:var(--od-green);font-size:9.2pt;}
 .od-datebox strong{display:block;margin:.7mm 0 1.5mm;font-size:10.8pt;font-weight:800;}
-.od-hotel h3{margin:0 0 2mm;color:var(--od-green);font-size:13.3pt;line-height:1.35;font-weight:800;}
+.od-hotel h3{margin:0;color:var(--od-green);font-size:13.8pt;line-height:1.35;font-weight:800;}
+.od-hotel-top{display:flex;align-items:baseline;flex-wrap:wrap;gap:1mm 3mm;}
+.od-hotel-place{color:var(--od-muted)!important;font-size:9.8pt!important;margin:.6mm 0 2.6mm!important;}
+.od-tags{display:flex;flex-wrap:wrap;gap:1.6mm;}
+.od-tags span{border:1px solid var(--od-line-2);background:var(--od-tint);border-radius:99px;padding:.8mm 3mm;font-size:9.2pt;color:var(--od-ink);line-height:1.4;}
 .od-hotel p{margin:0;line-height:1.55;font-size:10.2pt;color:var(--od-ink);}
-.od-stars{color:var(--od-gold);margin-top:1mm;direction:ltr;font-size:12pt;}
-.od-rooms{display:grid;gap:2mm;align-content:start;}
-.od-room{border:1px solid var(--od-line-2);border-radius:3mm;padding:2.4mm;background:var(--od-tint);font-size:8.6pt;line-height:1.45;}
-.od-room strong{color:var(--od-green);display:block;margin-bottom:1mm;font-weight:700;}
-.od-counts{display:flex;justify-content:space-between;gap:1.5mm;color:var(--od-muted);white-space:nowrap;}
+.od-stars{color:var(--od-gold);direction:ltr;font-size:11.5pt;letter-spacing:.5px;}
+
+/* ── flights: one boarding pass per leg ──────────────────────────────────── */
+.od-fl{border:1px solid var(--od-line-2);border-radius:4mm;background:rgba(255,255,255,.96);margin-bottom:3mm;overflow:hidden;break-inside:avoid;box-shadow:0 4px 12px var(--od-shadow-2);}
+.od-fl-head{display:flex;align-items:center;gap:3mm;padding:2.2mm 4mm;background:var(--od-soft);border-bottom:1px solid var(--od-line-2);font-size:10pt;}
+.od-fl-leg{background:var(--od-green);color:#fff;border-radius:99px;padding:.5mm 3.2mm;font-weight:700;font-size:9pt;}
+.od-fl-no{font-weight:800;color:var(--od-green);letter-spacing:.3px;}
+.od-fl-meta{margin-inline-start:auto;color:var(--od-muted);font-size:9pt;}
+.od-fl-route{display:grid;grid-template-columns:1fr 44mm 1fr;align-items:center;gap:3mm;padding:3mm 5mm 3.4mm;}
+.od-fl-end{display:grid;gap:.3mm;}
+.od-fl-end:last-child{text-align:end;}
+.od-fl-end strong{font-size:18pt;font-weight:800;color:var(--od-green);line-height:1.05;}
+.od-fl-end b{font-size:12.5pt;font-weight:800;color:var(--od-ink);}
+.od-fl-end span{font-size:9.2pt;color:var(--od-ink);}
+.od-fl-end small{font-size:8.3pt;color:var(--od-muted);line-height:1.3;}
+.od-fl-plus{display:inline-block;margin-inline-start:1.5mm;background:#eaf1ff;color:#2b57c4;border-radius:99px;padding:0 1.6mm;font-size:8pt;font-weight:800;vertical-align:middle;}
+.od-fl-line{position:relative;height:7mm;display:flex;align-items:center;justify-content:center;}
+.od-fl-line::before{content:"";position:absolute;inset-inline:1mm;top:50%;border-top:1.5px dashed var(--od-line);}
+.od-fl-line span{position:relative;background:#fff;padding:0 2mm;color:var(--od-green);font-size:13pt;transform:scaleX(-1);}
 .od-notice{margin-top:2mm;border-right:3px solid var(--od-notice);background:var(--od-notice-soft);color:var(--od-notice-ink);padding:2mm 3mm;border-radius:2mm;font-size:9.5pt;}
 
 /* ── data tables (flights, tours, tickets, visas) ─────────────────────────── */

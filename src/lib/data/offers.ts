@@ -584,7 +584,7 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
     const customer = customerRes.data as { arabic_name: string | null; mobile: string | null } | null;
     const employee = employeeRes.data as { arabic_name: string | null } | null;
 
-    const [hotelsRes, flightsRes, servicesRes, termsRes, itemsRes, daysRes, fxRes] = await Promise.all([
+    const [hotelsRes, flightsRes, servicesRes, termsRes, itemsRes, daysRes, fxRes, offerCitiesRes] = await Promise.all([
       supabase.from("offer_hotels").select("hotel_id, hotel_name, room_type_id, board_type, rooms_count, nights, check_in, check_out, buy_price, buy_currency, sell_price, sell_currency, cancellation_policy, excluded_surcharges, valid_until, supplier_id, supplier_name, rate_key, net_base, net_source_currency, fx_rate, fx_date, ref_sell_base, markup_amount, markup_pct, image_url, facilities, content_star_rating, room_type_name").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_flights").select("airline, carrier, flight_no, from_airport, to_airport, departure_at, arrival_at, cabin_class, cabin, baggage_allowance, baggage, leg_order, airline_iata, airlines:airline_iata(logo_path)").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_services").select("label, kind").eq("offer_id", offer.id).order("sort"),
@@ -592,9 +592,11 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
       supabase.from("offer_pricing_items").select("item_type, description, quantity, buy_price, buy_currency, sell_price, sell_currency").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_days").select("day_number, day_date, city_name, title, activities, temp_max, temp_min, rain_chance, weather_code, weather_source, transport_note").eq("offer_id", offer.id).order("day_number"),
       supabase.from("pricings").select("fx_rates").eq("offer_id", offer.id).limit(1).maybeSingle(),
+      supabase.from("offer_cities").select("city_name, hotel_name").eq("offer_id", offer.id).order("sort"),
     ]);
 
     const hotelRows = (hotelsRes.data ?? []) as HotelRow[];
+    const offerCities = (offerCitiesRes.data ?? []) as { city_name: string | null; hotel_name: string | null }[];
     const flightRows = (flightsRes.data ?? []) as FlightRow[];
     const serviceRows = (servicesRes.data ?? []) as { label: string; kind: string }[];
     const termRows = (termsRes.data ?? []) as { text: string }[];
@@ -632,7 +634,8 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
     };
 
     const hotels: InternalHotelLine[] = hotelRows.map((h) => ({
-      city_name: hotelCityName(h.hotel_id),
+      // a hotel taken from a supplier is not in the catalogue: the offer's own city row names it
+      city_name: hotelCityName(h.hotel_id) ?? offerCities.find((c) => c.hotel_name && c.hotel_name === h.hotel_name)?.city_name ?? null,
       hotel_name: h.hotel_name,
       // prefer the cached content star rating (supplier-sourced) over the internal hotel's
       stars: h.content_star_rating ?? (h.hotel_id ? (hotelStars.get(h.hotel_id) ?? null) : null),

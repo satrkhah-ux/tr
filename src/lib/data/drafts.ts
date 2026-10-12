@@ -12,6 +12,7 @@ import {
   deriveCityDates,
   deriveHotelStays,
   emptyDraftData,
+  roomTypesText,
   emptyTermLibrary,
   findLookupCountry,
   libraryForCountry,
@@ -705,7 +706,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         image_url: s?.image_url ?? null,
         facilities: s?.facilities ?? [],
         content_star_rating: s?.star_rating ?? null,
-        room_type_name: s?.room_name ?? h.room_type_name ?? null,
+        room_type_name: s?.room_name ?? (roomTypesText(h.rooms) || h.room_type_name) ?? null,
       };
     });
 
@@ -812,7 +813,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         return {
           city_name: c.city_name,
           hotel_name: h?.hotel_name ? `${h.hotel_name}${extra}` : null,
-          room_type: h?.room_type_name || null,
+          room_type: (h && roomTypesText(h.rooms)) || h?.room_type_name || null,
           nights: c.nights,
           check_in: c.check_in,
           check_out: c.check_out,
