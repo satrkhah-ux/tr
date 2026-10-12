@@ -13,6 +13,7 @@ import {
   deriveHotelStays,
   emptyDraftData,
   emptyTermLibrary,
+  findLookupCountry,
   libraryForCountry,
   mealPlanIncludeLine,
   MEAL_PLAN_AR,
@@ -23,6 +24,7 @@ import {
   normalizeDraftHotel,
   type DraftData,
   type GeneratorLookups,
+  type LookupHotel,
   type ReusableProgram,
   type TermLibrary,
   type TermLibraryItem,
@@ -232,6 +234,59 @@ export async function deleteDraft(draftId: string): Promise<SaveDraftResult> {
  * the first thousand. The query must be ordered on something unique, or pages
  * can overlap and skip rows.
  */
+/** Every room type, in the order the pickers list them. */
+function roomTypeRows(supabase: Awaited<ReturnType<typeof db>>) {
+  return allRows((from, to) =>
+    supabase.from("room_types").select("id, arabic_name, hotel_id, default_board").order("arabic_name").order("id").range(from, to),
+  );
+}
+
+/**
+ * One country's hotels, by city id — what /basic asks for once a country is
+ * chosen, instead of loading every hotel of every country before the page opens.
+ * Null when the session is gone or the read failed (the caller asks again later).
+ */
+export async function getCountryHotels(countryName: string): Promise<Record<string, LookupHotel[]> | null> {
+  try {
+    const user = await getServerUser();
+    if (!user) return null;
+    const supabase = await db();
+    const { data: countryRows } = await supabase.from("countries").select("id, arabic_name");
+    const country = findLookupCountry(
+      ((countryRows ?? []) as { id: string; arabic_name: string }[]).map((c) => ({ id: c.id, name: c.arabic_name })),
+      countryName,
+    );
+    if (!country) return {};
+    const { data: cityRows } = await supabase.from("cities").select("id").eq("country_id", country.id);
+    const ids = ((cityRows ?? []) as { id: string }[]).map((c) => c.id);
+    if (ids.length === 0) return {};
+    const { data } = await allRows((from, to) =>
+      supabase.from("hotels").select("id, arabic_name, stars, city_id").in("city_id", ids).order("id").range(from, to),
+    );
+    const byCity: Record<string, LookupHotel[]> = {};
+    for (const h of data as { id: string; arabic_name: string; stars: number | null; city_id: string }[]) {
+      (byCity[h.city_id] ??= []).push({ id: h.id, name: h.arabic_name, stars: h.stars });
+    }
+    return byCity;
+  } catch {
+    return null;
+  }
+}
+
+/** The room types, for a screen that opened without them. Empty when the session is gone. */
+export async function getRoomTypeLookups(): Promise<GeneratorLookups["roomTypes"]> {
+  try {
+    const user = await getServerUser();
+    if (!user) return [];
+    const { data } = await roomTypeRows(await db());
+    return (data as { id: string; arabic_name: string; hotel_id: string | null; default_board: GeneratorLookups["roomTypes"][number]["default_board"] }[]).map(
+      (r) => ({ id: r.id, name: r.arabic_name, hotel_id: r.hotel_id, default_board: r.default_board }),
+    );
+  } catch {
+    return [];
+  }
+}
+
 async function allRows(
   page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>,
 ): Promise<{ data: unknown[] }> {
@@ -254,7 +309,14 @@ async function allRows(
   }
 }
 
-export async function getGeneratorLookups(): Promise<GeneratorLookups> {
+/**
+ * `catalog: false` leaves out the two big lists — every hotel (2,300+, three
+ * pages) and every room type — for a screen that fetches them itself when it
+ * needs them (/basic: getCountryHotels, getRoomTypeLookups). The city lists
+ * still come, so the pickers work at once.
+ */
+export async function getGeneratorLookups(options: { catalog?: boolean } = {}): Promise<GeneratorLookups> {
+  const withCatalog = options.catalog ?? true;
   const empty: GeneratorLookups = {
     countries: [], roomTypes: [], airports: [], carTypes: [], termLibrary: emptyTermLibrary(), partners: [], airlines: [],
     hotelSources: [], countryServices: [],
@@ -273,15 +335,10 @@ export async function getGeneratorLookups(): Promise<GeneratorLookups> {
         .select("id, arabic_name, country_id")
         .order("sort_order", { ascending: true, nullsFirst: false })
         .order("arabic_name"),
-      allRows((from, to) => supabase.from("hotels").select("id, arabic_name, stars, city_id").order("id").range(from, to)),
-      allRows((from, to) =>
-        supabase
-          .from("room_types")
-          .select("id, arabic_name, hotel_id, default_board")
-          .order("arabic_name")
-          .order("id")
-          .range(from, to),
-      ),
+      withCatalog
+        ? allRows((from, to) => supabase.from("hotels").select("id, arabic_name, stars, city_id").order("id").range(from, to))
+        : Promise.resolve({ data: [] }),
+      withCatalog ? roomTypeRows(supabase) : Promise.resolve({ data: [] }),
       // the city an airport serves turns «landed at LGK» into «the next city is لنكاوي»
       supabase.from("airports").select("id, arabic_name, code, iana_timezone, status, cities(arabic_name)").order("code"),
       supabase

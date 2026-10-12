@@ -30,7 +30,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
-import { produceOfferFromDraft } from "@/lib/data/drafts";
+import { getCountryHotels, getRoomTypeLookups, produceOfferFromDraft } from "@/lib/data/drafts";
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
 import {
   AGE_BANDS,
@@ -54,8 +54,10 @@ import {
   type DraftScope,
   type DraftTrip,
   type GeneratorLookups,
+  type LookupHotel,
   type MealPlan,
   type TransportMode,
+  vehicleText,
 } from "@/lib/offer/draft-types";
 import { addCity, basicDays, chainCities, remainingNights, removeCity, setCityNights, withHotelLines, withTripDates, type BasicCity } from "@/lib/offer/basic";
 import { validateDraft, type DraftIssue } from "@/lib/offer/draft-validation";
@@ -82,16 +84,19 @@ const MODE_CHIPS: { mode: TransportMode; label: BasicLabel; icon: typeof Car }[]
   { mode: "train", label: "byTrain", icon: TrainFront },
   { mode: "ship", label: "byShip", icon: Ship },
 ];
-/** Which section of this page answers a stage's blocking issue. */
-const SECTION_OF: Record<string, string> = {
-  customer: "basic-client",
-  trip: "basic-client",
-  transport: "basic-client",
-  visas: "basic-client",
-  flights: "basic-flights",
-  cities: "basic-cities",
-  hotels: "basic-cities",
-  pricing: "basic-pricing",
+/** The page's steps, in order; one is open at a time. */
+type Step = "client" | "flights" | "cities" | "transport" | "finish";
+const STEP_ORDER: Step[] = ["client", "flights", "cities", "transport", "finish"];
+/** Which step of this page answers a stage's blocking issue. */
+const STEP_OF: Partial<Record<string, Step>> = {
+  customer: "client",
+  trip: "client",
+  visas: "client",
+  flights: "flights",
+  cities: "cities",
+  hotels: "cities",
+  transport: "transport",
+  pricing: "finish",
 };
 
 /** «Booking engine» chip from the program-includes spec: whole chip clickable, state not by colour alone. */
@@ -290,46 +295,45 @@ export function BasicEditor({
 
   const setLines = (lines: DraftHotel[]) => commit({ hotels: data.hotels.map((h) => lines.find((l) => l.id === h.id) ?? h) });
 
-  // ---------- the folds ----------
-  const partner = data.customer.partner_company_id;
-  const clientMissing = [
-    !country && tx("country"),
-    !partner && !data.customer.customer_name.trim() && tx("customer"),
-    !partner && !data.customer.customer_phone.trim() && tx("phone"),
-    !trip.arrival_date && tx("start"),
-    trip.nights <= 0 && tx("nights"),
-    !trip.meal_plan && tx("meals"),
-  ].filter((x): x is string => Boolean(x));
-  const flightsOn = scope.flights_intl || scope.flights_domestic;
-  const [clientOpen, setClientOpen] = useState(() => clientMissing.length > 0);
-  const [flightsOpen, setFlightsOpen] = useState(() => !data.flights.some((f) => f.leg_order !== "internal"));
-
-  function goTo(id: string) {
-    if (id === "basic-client") setClientOpen(true);
-    if (id === "basic-flights") setFlightsOpen(true);
-    window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-  }
-
-  const pax = [
-    `${trip.adults} ${tx("adults")}`,
-    trip.children > 0 ? `${trip.children} ${tx("children")}` : "",
-    trip.infants > 0 ? `${trip.infants} ${tx("infants")}` : "",
-  ].filter(Boolean);
-  const clientSummary = [
-    trip.country,
-    partner ? data.customer.company : data.customer.customer_name,
-    trip.arrival_date && trip.departure_date ? `${trip.arrival_date} → ${trip.departure_date}` : "",
-    nightsText(trip.nights, language),
-    ...pax,
-    tx("roomsN", { n: trip.rooms }),
-    trip.meal_plan ? t(MEAL_PLAN_LABEL_KEYS[trip.meal_plan]) : "",
-  ]
+  // ---------- the catalogue, fetched per country ----------
+  // The page opens without the 2,300 hotels and 1,300 room types of every
+  // country; the hotels of a country arrive when the file first names it, the
+  // room types once, in the background.
+  const [newCountry, setNewCountry] = useState("");
+  const [hotelsByCountry, setHotelsByCountry] = useState<Record<string, Record<string, LookupHotel[]>>>({});
+  const [roomTypes, setRoomTypes] = useState(lookups.roomTypes);
+  const asked = useRef(new Set<string>());
+  const wantedCountries = [...new Set([trip.country, newCountry, ...cities.map((c) => c.country ?? "")])]
+    .map((name) => findLookupCountry(lookups.countries, name)?.name ?? "")
     .filter(Boolean)
-    .join(" · ");
+    .join("|");
+  useEffect(() => {
+    for (const name of wantedCountries.split("|").filter(Boolean)) {
+      if (asked.current.has(name)) continue;
+      asked.current.add(name);
+      void getCountryHotels(name).then((byCity) => {
+        if (byCity) setHotelsByCountry((known) => ({ ...known, [name]: byCity }));
+        else asked.current.delete(name);
+      });
+    }
+  }, [wantedCountries]);
+  useEffect(() => {
+    if (lookups.roomTypes.length === 0) void getRoomTypeLookups().then(setRoomTypes);
+  }, [lookups.roomTypes.length]);
+  const lk = useMemo<GeneratorLookups>(
+    () => ({
+      ...lookups,
+      roomTypes,
+      countries: lookups.countries.map((c) => {
+        const byCity = hotelsByCountry[c.name];
+        return byCity ? { ...c, cities: c.cities.map((city) => ({ ...city, hotels: byCity[city.id] ?? [] })) } : c;
+      }),
+    }),
+    [lookups, roomTypes, hotelsByCountry],
+  );
 
   // ---------- the add bar ----------
   const left = remainingNights(data);
-  const [newCountry, setNewCountry] = useState("");
   const [newCity, setNewCity] = useState("");
   const [newNights, setNewNights] = useState(0);
   const [newTours, setNewTours] = useState(0);
@@ -340,10 +344,10 @@ export function BasicEditor({
   const nightsChoice = newNights || Math.max(left, 1);
   const roomsChoice = newRooms || Math.max(trip.rooms, 1);
   // the trip's country unless the group crosses into a neighbour
-  const barCountry = findLookupCountry(lookups.countries, newCountry || trip.country);
+  const barCountry = findLookupCountry(lk.countries, newCountry || trip.country);
   const barHotels = barCountry?.cities.find((c) => c.name === newCity)?.hotels ?? [];
   const barRoomNames = [
-    ...new Set(lookups.roomTypes.filter((r) => r.hotel_id === null || r.hotel_id === newHotel).map((r) => r.name.trim())),
+    ...new Set(lk.roomTypes.filter((r) => r.hotel_id === null || r.hotel_id === newHotel).map((r) => r.name.trim())),
   ].filter(Boolean);
 
   function pickCity(name: string) {
@@ -450,6 +454,92 @@ export function BasicEditor({
     patch({ produced_serial: result.serial });
   }
 
+  // ---------- the steps: one open at a time ----------
+  const partner = data.customer.partner_company_id;
+  const flightsOn = scope.flights_intl || scope.flights_domestic;
+  const missingOf: Record<Step, string[]> = {
+    client: [
+      !country && tx("country"),
+      !partner && !data.customer.customer_name.trim() && tx("customer"),
+      !partner && !data.customer.customer_phone.trim() && tx("phone"),
+      !trip.arrival_date && tx("start"),
+      trip.nights <= 0 && tx("nights"),
+      !trip.meal_plan && tx("meals"),
+    ].filter((x): x is string => Boolean(x)),
+    flights: blocking.some((i) => i.stage === "flights") ? [t("pg.flightsTitle")] : [],
+    cities: cities.length === 0 ? [tx("city")] : used !== trip.nights ? [nightsNote] : [],
+    transport: [
+      !plan.airport.car_type.trim() && tx("transferCar"),
+      toursOn && !plan.tours.car_type.trim() && tx("tourCar"),
+    ].filter((x): x is string => Boolean(x)),
+    finish: [],
+  };
+  const steps = STEP_ORDER.filter((s) => (s !== "flights" || flightsOn) && (s !== "transport" || scope.transport));
+  // a new file opens on its first step; a file coming back, on the first one not done
+  const firstTodo = steps.find((s) => missingOf[s].length > 0) ?? "finish";
+  const [open, setOpen] = useState<Step>(firstTodo);
+  const [reached, setReached] = useState<Step>(firstTodo);
+  const shown = (s: Step) => steps.includes(s) && STEP_ORDER.indexOf(s) <= STEP_ORDER.indexOf(reached);
+
+  function show(step: Step) {
+    setOpen(step);
+    window.setTimeout(() => document.getElementById(`basic-${step}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  }
+
+  function next(from: Step) {
+    const to = steps[steps.indexOf(from) + 1] ?? "finish";
+    if (STEP_ORDER.indexOf(to) > STEP_ORDER.indexOf(reached)) setReached(to);
+    show(to);
+  }
+
+  const pax = [
+    `${trip.adults} ${tx("adults")}`,
+    trip.children > 0 ? `${trip.children} ${tx("children")}` : "",
+    trip.infants > 0 ? `${trip.infants} ${tx("infants")}` : "",
+  ].filter(Boolean);
+  const summaryOf: Record<Step, string> = {
+    client: [
+      trip.country,
+      partner ? data.customer.company : data.customer.customer_name,
+      trip.arrival_date && trip.departure_date ? `${trip.arrival_date} → ${trip.departure_date}` : "",
+      nightsText(trip.nights, language),
+      ...pax,
+      tx("roomsN", { n: trip.rooms }),
+      trip.meal_plan ? t(MEAL_PLAN_LABEL_KEYS[trip.meal_plan]) : "",
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    flights: data.flights.map(legText).join(" · "),
+    cities: cities
+      .map((c) => {
+        const hotel = data.hotels.find((h) => h.city_name === c.city_name)?.hotel_name;
+        return `${c.city_name} (${nightsText(c.nights, language)})${hotel ? ` — ${hotel}` : ""}`;
+      })
+      .join(" · "),
+    transport: [
+      `${tx("transferCar")}: ${vehicleText(plan.airport) || "—"}`,
+      toursOn ? `${tx("tourCar")}: ${vehicleText(plan.tours) || "—"}` : "",
+      `${tx("between")}: ${MODE_CHIPS.filter((m) => modes.includes(m.mode)).map((m) => tx(m.label)).join("، ")}`,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    finish: produced ?? (blocking.length > 0 ? tx("missing") : tx("allGood")),
+  };
+  const titleOf: Record<Step, string> = {
+    client: tx("booking"),
+    flights: t("pg.flightsTitle"),
+    cities: tx("citiesStep"),
+    transport: tx("transport"),
+    finish: tx("finish"),
+  };
+  const fold = (step: Step, body: ReactNode) =>
+    shown(step) ? (
+      <Fold key={step} id={`basic-${step}`} title={titleOf[step]} open={open === step} onOpen={() => show(step)} summary={summaryOf[step]}>
+        {body}
+        {step === "finish" ? null : <NextButton missing={missingOf[step]} onNext={() => next(step)} />}
+      </Fold>
+    ) : null;
+
   const includes: { key: keyof DraftScope | "tours"; icon: typeof Car }[] = [
     { key: "hotels", icon: Building2 },
     { key: "flights_intl", icon: Plane },
@@ -459,6 +549,480 @@ export function BasicEditor({
     { key: "services", icon: ConciergeBell },
     { key: "visas", icon: Stamp },
   ];
+
+  const body: Record<Step, ReactNode> = {
+    // ---- 1. the customer and the trip, and what the programme includes ----
+    client: (
+      <>
+        {/* who: four equal columns */}
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <label className={basicLabel}>
+            {tx("country")}
+            <select value={country?.name ?? trip.country} onChange={(e) => setCountry(e.target.value)} className={basicField}>
+              <option value="">{tx("choose")}</option>
+              {lookups.countries.map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className={basicLabel}>
+            {tx("agent")}
+            <select
+              value={partner ?? ""}
+              onChange={(e) => {
+                const p = lookups.partners.find((x) => x.id === e.target.value);
+                patch({ customer: { ...data.customer, partner_company_id: p?.id ?? null, company: p?.name ?? "" } });
+              }}
+              className={basicField}
+            >
+              <option value="">{tx("direct")}</option>
+              {lookups.partners.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </label>
+          {/* the phone first: a few digits find the customer in Teletel and fill the name */}
+          <BasicPhoneLookup
+            label={tx("phone")}
+            phone={data.customer.customer_phone}
+            onPhone={(customer_phone) => patch({ customer: { ...data.customer, customer_phone } })}
+            onPick={(hit) => patch({ customer: { ...data.customer, customer_name: hit.name, customer_phone: hit.phone } })}
+          />
+          <label className={basicLabel}>
+            {tx("customer")}
+            <input value={data.customer.customer_name} onChange={(e) => patch({ customer: { ...data.customer, customer_name: e.target.value } })} className={basicField} />
+          </label>
+        </div>
+
+        {/* when and how many: the nights sit between the two dates they join */}
+        <div className="mt-2 grid grid-cols-3 gap-2 lg:grid-cols-[1.3fr_0.8fr_1.3fr_0.7fr_0.7fr_0.7fr_0.7fr_1.3fr]">
+          <label className={basicLabel}>
+            {tx("start")}
+            <input type="date" dir="ltr" value={trip.arrival_date ?? ""} onChange={(e) => setTrip({ arrival_date: e.target.value || null })} className={`${basicField} tv-tnum px-2`} />
+          </label>
+          <label className={basicLabel}>
+            {tx("nights")}
+            <select value={trip.nights} onChange={(e) => setTrip({ nights: Number(e.target.value) })} className={basicField}>
+              {range(0, 45).map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </label>
+          <label className={basicLabel}>
+            {tx("returnDate")}
+            <input
+              type="date"
+              dir="ltr"
+              value={trip.departure_date ?? ""}
+              min={trip.arrival_date ?? undefined}
+              onChange={(e) => setTrip({ departure_date: e.target.value || null })}
+              className={`${basicField} tv-tnum px-2`}
+            />
+          </label>
+          {(["adults", "children", "infants"] as const).map((k) => (
+            <label key={k} className={basicLabel}>
+              {tx(k)}
+              <select
+                value={trip[k]}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  const ages =
+                    k === "children"
+                      ? { children_ages: resizeAges(trip.children_ages, n, AGE_BANDS.children.fallback) }
+                      : k === "infants"
+                        ? { infant_ages: resizeAges(trip.infant_ages, n, AGE_BANDS.infants.fallback) }
+                        : {};
+                  setTrip({ [k]: n, ...ages } as Partial<DraftTrip>);
+                }}
+                className={basicField}
+              >
+                {range(k === "adults" ? 1 : 0, 20).map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+          ))}
+          <label className={basicLabel}>
+            {tx("rooms")}
+            <select value={trip.rooms} onChange={(e) => setRoomsCount(Number(e.target.value))} className={basicField}>
+              {range(1, 10).map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </label>
+          <label className={`${basicLabel} col-span-2 lg:col-span-1`}>
+            {tx("meals")}
+            <select value={trip.meal_plan ?? ""} onChange={(e) => setMeals(e.target.value as MealPlan | "")} className={basicField}>
+              <option value="">{tx("choose")}</option>
+              {MEAL_PLANS.map((m) => (
+                <option key={m} value={m}>{t(MEAL_PLAN_LABEL_KEYS[m])}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {/* «البرنامج يشمل» — small chips, after the program-includes spec; the details come in their own steps */}
+        <div className="mt-3 border-t border-dashed border-[#DCE9E5] pt-2.5">
+          <h3 className="mb-2 text-[13px] font-bold text-[#15483F]">{tx("includes")}</h3>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {includes.map(({ key, icon }) =>
+              key === "tours" ? (
+                <Chip
+                  key={key}
+                  on={toursOn}
+                  icon={icon}
+                  label={t("pg.scope.tours")}
+                  onClick={() => commit({ transport_plan: { ...plan, tours: { ...plan.tours, enabled: !toursOn } } })}
+                />
+              ) : (
+                <Chip
+                  key={key}
+                  on={key === "flights_domestic" ? modes.includes("flight") : scope[key]}
+                  icon={icon}
+                  label={key === "visas" ? tx("visa") : t(SCOPE_LABEL_KEYS[key])}
+                  onClick={() => toggleScope(key)}
+                />
+              ),
+            )}
+          </div>
+        </div>
+      </>
+    ),
+
+    // ---- 2. the flights — the generator's own card, with the trip's dates already in it ----
+    flights: (
+      <div className="-mx-3 -mb-1 [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
+        <FlightsStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} />
+      </div>
+    ),
+
+    // ---- 3. the cities, each with its hotel, and the bar that adds them ----
+    cities: (
+      <div className="space-y-3">
+        {cities.length === 0 ? (
+          <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[12.5px] font-semibold text-[#93aaa3]">{tx("noCities")}</p>
+        ) : (
+          cities.map((city, i) => {
+            const dayFrom = dayCursor;
+            dayCursor += city.nights;
+            const prev = cities[i - 1]?.city_name;
+            // several ways between cities: each arrival says which one it took
+            const hop =
+              prev && modes.length > 1 ? (
+                <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#557d78]">
+                  {tx("hop", { city: prev })}
+                  <select
+                    value={hopMode(plan, prev, city.city_name)}
+                    onChange={(e) => setHop(prev, city.city_name, e.target.value as TransportMode)}
+                    className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold text-[#185045]"
+                  >
+                    {MODE_CHIPS.filter((m) => modes.includes(m.mode)).map((m) => (
+                      <option key={m.mode} value={m.mode}>{tx(m.label)}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : undefined;
+            return (
+              <BasicCityCard
+                key={`${i}-${city.city_name}`}
+                index={i}
+                city={city}
+                dayFrom={dayFrom}
+                draftId={draftId}
+                data={data}
+                lookups={lk}
+                hotelsOn={scope.hotels}
+                toursOn={toursOn}
+                hop={hop}
+                flush={flush}
+                replace={replace}
+                onNights={(n) => commit(setCityNights(data, i, n))}
+                onTours={(n) => commit({ cities: cities.map((c, k) => (k === i ? { ...c, tours: n } : c)) })}
+                onLines={setLines}
+                onSlice={commit}
+                onRemove={() => {
+                  if (window.confirm(tx("confirmRemove", { city: city.city_name }))) commit(removeCity(data, i));
+                }}
+              />
+            );
+          })
+        )}
+
+        {/* the add bar, like the company's system */}
+        <div className="sticky bottom-3 z-20 rounded-[14px] border border-[#cfe0d9] bg-[#e9f3ef]/95 px-2 py-1.5 shadow-[0_8px_24px_rgba(0,60,58,0.12)] backdrop-blur max-lg:bottom-[80px] sm:px-2.5">
+          <div className="flex flex-wrap items-end gap-1.5">
+            {/* a group may cross into a neighbouring country */}
+            <label className={`${basicLabel} w-24 shrink-0 sm:w-32`}>
+              {tx("country")}
+              <select
+                value={barCountry?.name ?? ""}
+                onChange={(e) => {
+                  setNewCountry(e.target.value);
+                  pickCity("");
+                }}
+                className={`${basicField} px-1.5`}
+              >
+                <option value="">{tx("choose")}</option>
+                {lookups.countries.map((c) => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className={`${basicLabel} min-w-28 flex-1`}>
+              {tx("city")}
+              <select value={newCity} onChange={(e) => pickCity(e.target.value)} disabled={!barCountry} className={basicField}>
+                <option value="">{tx("choose")}</option>
+                {(barCountry?.cities ?? []).map((c) => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            </label>
+            {/* the city chosen: its hotels, the room and how many — shown only now */}
+            {newCity && scope.hotels ? (
+              <>
+                <label className={`${basicLabel} min-w-36 flex-[1.5]`}>
+                  {tx("hotel")}
+                  <select value={newHotel} onChange={(e) => setNewHotel(e.target.value)} className={basicField}>
+                    <option value="">{tx("choose")}</option>
+                    {barHotels.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.name}
+                        {h.stars ? ` ${"★".repeat(h.stars)}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={`${basicLabel} w-32 shrink-0 sm:w-40`}>
+                  {tx("roomType")}
+                  <input list="basic-bar-rooms" value={newRoom} onChange={(e) => setNewRoom(e.target.value)} className={basicField} />
+                  <datalist id="basic-bar-rooms">
+                    {barRoomNames.map((n) => (
+                      <option key={n} value={n} />
+                    ))}
+                  </datalist>
+                </label>
+                <label className={`${basicLabel} w-14 shrink-0`}>
+                  {tx("rooms")}
+                  <select value={roomsChoice} onChange={(e) => setNewRooms(Number(e.target.value))} className={`${basicField} px-1.5`}>
+                    {range(1, 10).map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            ) : null}
+            <label className={`${basicLabel} w-14 shrink-0`}>
+              {tx("nights")}
+              <select value={nightsChoice} onChange={(e) => setNewNights(Number(e.target.value))} className={`${basicField} px-1.5`}>
+                {range(1, 30).map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+            {toursOn ? (
+              <label className={`${basicLabel} w-14 shrink-0`}>
+                {tx("tours")}
+                <select value={Math.min(newTours, nightsChoice - 1)} onChange={(e) => setNewTours(Number(e.target.value))} className={`${basicField} px-1.5`}>
+                  {range(0, Math.max(nightsChoice - 1, 0)).map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <button
+              type="button"
+              onClick={onAdd}
+              disabled={!newCity}
+              aria-label={tx("add")}
+              className="inline-flex h-9 shrink-0 items-center gap-1 rounded-[8px] bg-[#185045] px-2.5 text-[12.5px] font-extrabold text-white disabled:opacity-50 sm:px-3.5"
+            >
+              <Plus className="size-4" />
+              <span className="max-sm:hidden">{tx("add")}</span>
+            </button>
+            <span className={`tv-tnum hidden h-9 shrink-0 items-center gap-1 rounded-[8px] px-2.5 text-[11.5px] font-bold md:inline-flex ${nightsTone}`}>
+              <MapPin className="size-3.5" />
+              {nightsNote}
+            </span>
+          </div>
+          <p className={`tv-tnum mt-1 rounded-[7px] px-2 py-0.5 text-[10.5px] font-bold md:hidden ${nightsTone}`}>{nightsNote}</p>
+        </div>
+      </div>
+    ),
+
+    // ---- 4. how the group moves ----
+    transport: (
+      <div className="flex flex-wrap items-end gap-2">
+        {(["airport", ...(toursOn ? ["tours" as const] : [])] as ("airport" | "tours")[]).map((leg) => (
+          <div key={leg} className="flex items-end gap-1">
+            <label className={`${basicLabel} w-40`}>
+              {tx(leg === "airport" ? "transferCar" : "tourCar")}
+              <select value={plan[leg].car_type} onChange={(e) => setLeg(leg, { car_type: e.target.value })} className={basicField}>
+                <option value="">{tx("choose")}</option>
+                {lookups.carTypes.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.name}
+                    {c.pax ? ` (${c.pax})` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={`${basicLabel} w-14`}>
+              {tx("cars")}
+              <select value={plan[leg].cars} onChange={(e) => setLeg(leg, { cars: Number(e.target.value) })} className={`${basicField} px-1.5`}>
+                {range(1, 10).map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        ))}
+        <div className="grid gap-1">
+          <span className={basicLabel}>{tx("between")}</span>
+          <div className="flex flex-wrap gap-1.5">
+            {MODE_CHIPS.map(({ mode, label, icon }) => (
+              <Chip key={mode} on={modes.includes(mode)} icon={icon} label={tx(label)} onClick={() => toggleMode(mode)} />
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+
+    // ---- 5. the price, what is missing, and issuing — here ----
+    finish: (
+      <div className="space-y-3">
+        {canPricing ? (
+          <div>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <h3 className="text-[13px] font-extrabold text-[#003c3a]">{tx("pricing")}</h3>
+              <label className="ms-auto inline-flex items-center gap-1.5 text-[11px] font-bold text-[#557d78]">
+                {tx("quote")}
+                <select
+                  value={display}
+                  onChange={(e) => patch({ pricing: { ...data.pricing, display_currency: e.target.value } })}
+                  className="h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-1.5 text-[12px] font-bold"
+                >
+                  {currencyOptions(lookups.countries, display).map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => void calculate()}
+                disabled={pricingBusy}
+                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#185045] px-3 text-[12px] font-bold text-white disabled:opacity-60"
+              >
+                {pricingBusy ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
+                {tx("calc")}
+              </button>
+            </div>
+            {data.pricing.items.length === 0 ? (
+              <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noLines")}</p>
+            ) : (
+              <div className="divide-y divide-[#edf3f0]">
+                {data.pricing.items.map((item, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 py-1.5 sm:grid-cols-[1fr_60px_120px_84px]">
+                    <span className="min-w-0 truncate text-[12px] font-bold text-[#185045]">{item.description}</span>
+                    <span className="tv-tnum hidden text-center text-[11.5px] font-bold text-[#557d78] sm:block">× {item.quantity}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      dir="ltr"
+                      aria-label={tx("sell")}
+                      value={item.sell_price ?? ""}
+                      onChange={(e) => setItem(i, { sell_price: e.target.value === "" ? null : Number(e.target.value) })}
+                      className={`${basicField} tv-tnum text-center`}
+                    />
+                    <select value={item.sell_currency || display} onChange={(e) => setItem(i, { sell_currency: e.target.value })} className={`${basicField} px-1.5`}>
+                      {currencyOptions(lookups.countries, item.sell_currency || display).map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between pt-2.5">
+                  <span className="text-[13px] font-extrabold text-[#003c3a]">{tx("total")}</span>
+                  <span className="tv-tnum text-[15px] font-extrabold text-[#0f7a52]">
+                    <DirText>{`${summary.total_sell.toLocaleString("en-US")} ${display}`}</DirText>
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        <div className="border-t border-dashed border-[#DCE9E5] pt-2.5">
+          {produced ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full bg-[#e9f7f0] px-3 py-1.5 text-[12.5px] font-extrabold text-[#0f7a52]">
+                <CheckCircle2 className="size-4" />
+                {t("pg.producedSerial")}
+                <DirText dir="ltr" className="tv-tnum">{produced}</DirText>
+              </span>
+              <Link href={`/client-offer/${produced}`} target="_blank" className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12.5px] font-bold text-white hover:bg-[#0f4439]">
+                <Link2 className="size-4" />
+                {t("pg.openClientLink")}
+              </Link>
+              <a href={`/offer/${produced}/pdf`} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#d8e3de] px-3 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]">
+                <FileText className="size-4" />
+                {t("pg.viewPdf")}
+              </a>
+            </div>
+          ) : (
+            <>
+              {blocking.length === 0 ? (
+                <p className="inline-flex items-center gap-2 text-[13px] font-bold text-[#0f7a52]">
+                  <CheckCircle2 className="size-4" />
+                  {tx("allGood")}
+                </p>
+              ) : (
+                <>
+                  <h3 className="mb-2 inline-flex items-center gap-2 text-[13px] font-extrabold text-[#a86a10]">
+                    <AlertTriangle className="size-4" />
+                    {tx("missing")}
+                  </h3>
+                  <ul className="space-y-1">
+                    {blocking.map((issue, i) => {
+                      const target = STEP_OF[issue.stage];
+                      return (
+                      <li key={i} className="flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[#5b4a2a]">
+                        <span className="rounded-full bg-[#fff3d6] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">{stageLabel(issue.stage)}</span>
+                        <span className="min-w-0 flex-1">{issueText(issue)}</span>
+                        {target && steps.includes(target) ? (
+                          <button type="button" onClick={() => show(target)} className="text-[11.5px] font-bold text-[#185045] underline">
+                            {tx("fix")}
+                          </button>
+                        ) : (
+                          // services lists, terms: only the full generator edits those
+                          <Link href={stageHref(draftId, issue.stage)} onClick={() => void flush()} className="text-[11.5px] font-bold text-[#185045] underline">
+                            {tx("fix")}
+                          </Link>
+                        )}
+                      </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              )}
+              {produceError ? <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">{produceError}</p> : null}
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => void produce()}
+                  disabled={producing || blocking.length > 0}
+                  title={blocking.length > 0 ? t("pg.err.blockingLeft") : undefined}
+                  className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-[13px] font-extrabold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {producing ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
+                  {tx("issue")}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    ),
+  };
 
   return (
     <TraveliunShell title="nav.basic">
@@ -488,481 +1052,8 @@ export function BasicEditor({
             </Link>
           </div>
 
-          {/* the customer and the trip — asked once */}
-          <Fold id="basic-client" title={tx("booking")} open={clientOpen} onOpen={() => setClientOpen(true)} summary={clientSummary}>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12">
-              <label className={`${basicLabel} xl:col-span-2`}>
-                {tx("country")}
-                <select value={country?.name ?? trip.country} onChange={(e) => setCountry(e.target.value)} className={basicField}>
-                  <option value="">{tx("choose")}</option>
-                  {lookups.countries.map((c) => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className={`${basicLabel} xl:col-span-2`}>
-                {tx("agent")}
-                <select
-                  value={partner ?? ""}
-                  onChange={(e) => {
-                    const p = lookups.partners.find((x) => x.id === e.target.value);
-                    patch({ customer: { ...data.customer, partner_company_id: p?.id ?? null, company: p?.name ?? "" } });
-                  }}
-                  className={basicField}
-                >
-                  <option value="">{tx("direct")}</option>
-                  {lookups.partners.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </label>
-              {/* the phone first: a few digits find the customer in Teletel and fill the name */}
-              <div className="xl:col-span-2">
-                <BasicPhoneLookup
-                  label={tx("phone")}
-                  phone={data.customer.customer_phone}
-                  onPhone={(customer_phone) => patch({ customer: { ...data.customer, customer_phone } })}
-                  onPick={(hit) => patch({ customer: { ...data.customer, customer_name: hit.name, customer_phone: hit.phone } })}
-                />
-              </div>
-              <label className={`${basicLabel} xl:col-span-2`}>
-                {tx("customer")}
-                <input value={data.customer.customer_name} onChange={(e) => patch({ customer: { ...data.customer, customer_name: e.target.value } })} className={basicField} />
-              </label>
-              <label className={`${basicLabel} xl:col-span-2`}>
-                {tx("start")}
-                <input type="date" dir="ltr" value={trip.arrival_date ?? ""} onChange={(e) => setTrip({ arrival_date: e.target.value || null })} className={`${basicField} tv-tnum px-2`} />
-              </label>
-              <label className={`${basicLabel} xl:col-span-2`}>
-                {tx("returnDate")}
-                <input
-                  type="date"
-                  dir="ltr"
-                  value={trip.departure_date ?? ""}
-                  min={trip.arrival_date ?? undefined}
-                  onChange={(e) => setTrip({ departure_date: e.target.value || null })}
-                  className={`${basicField} tv-tnum px-2`}
-                />
-              </label>
-              <label className={basicLabel}>
-                {tx("nights")}
-                <select value={trip.nights} onChange={(e) => setTrip({ nights: Number(e.target.value) })} className={basicField}>
-                  {range(0, 45).map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </label>
-              {(["adults", "children", "infants"] as const).map((k) => (
-                <label key={k} className={basicLabel}>
-                  {tx(k)}
-                  <select
-                    value={trip[k]}
-                    onChange={(e) => {
-                      const n = Number(e.target.value);
-                      const ages =
-                        k === "children"
-                          ? { children_ages: resizeAges(trip.children_ages, n, AGE_BANDS.children.fallback) }
-                          : k === "infants"
-                            ? { infant_ages: resizeAges(trip.infant_ages, n, AGE_BANDS.infants.fallback) }
-                            : {};
-                      setTrip({ [k]: n, ...ages } as Partial<DraftTrip>);
-                    }}
-                    className={basicField}
-                  >
-                    {range(k === "adults" ? 1 : 0, 20).map((n) => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </label>
-              ))}
-              <label className={basicLabel}>
-                {tx("rooms")}
-                <select value={trip.rooms} onChange={(e) => setRoomsCount(Number(e.target.value))} className={basicField}>
-                  {range(1, 10).map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </label>
-              <label className={`${basicLabel} xl:col-span-2`}>
-                {tx("meals")}
-                <select value={trip.meal_plan ?? ""} onChange={(e) => setMeals(e.target.value as MealPlan | "")} className={basicField}>
-                  <option value="">{tx("choose")}</option>
-                  {MEAL_PLANS.map((m) => (
-                    <option key={m} value={m}>{t(MEAL_PLAN_LABEL_KEYS[m])}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            {/* «البرنامج يشمل» — small chips, after the program-includes spec */}
-            <div className="mt-3 border-t border-dashed border-[#DCE9E5] pt-2.5">
-              <h3 className="mb-2 text-[13px] font-bold text-[#15483F]">{tx("includes")}</h3>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {includes.map(({ key, icon }) =>
-                  key === "tours" ? (
-                    <Chip
-                      key={key}
-                      on={toursOn}
-                      icon={icon}
-                      label={t("pg.scope.tours")}
-                      onClick={() => commit({ transport_plan: { ...plan, tours: { ...plan.tours, enabled: !toursOn } } })}
-                    />
-                  ) : (
-                    <Chip
-                      key={key}
-                      on={key === "flights_domestic" ? modes.includes("flight") : scope[key]}
-                      icon={icon}
-                      label={key === "visas" ? tx("visa") : t(SCOPE_LABEL_KEYS[key])}
-                      onClick={() => toggleScope(key)}
-                    />
-                  ),
-                )}
-              </div>
-            </div>
-
-            {/* how the group moves — only when transport is sold */}
-            {scope.transport ? (
-              <div className="mt-3 border-t border-dashed border-[#DCE9E5] pt-2.5">
-                <h3 className="mb-2 text-[13px] font-bold text-[#15483F]">{tx("transport")}</h3>
-                <div className="flex flex-wrap items-end gap-2">
-                  {(["airport", ...(toursOn ? ["tours" as const] : [])] as ("airport" | "tours")[]).map((leg) => (
-                    <div key={leg} className="flex items-end gap-1">
-                      <label className={`${basicLabel} w-40`}>
-                        {tx(leg === "airport" ? "transferCar" : "tourCar")}
-                        <select value={plan[leg].car_type} onChange={(e) => setLeg(leg, { car_type: e.target.value })} className={basicField}>
-                          <option value="">{tx("choose")}</option>
-                          {lookups.carTypes.map((c) => (
-                            <option key={c.name} value={c.name}>
-                              {c.name}
-                              {c.pax ? ` (${c.pax})` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className={`${basicLabel} w-14`}>
-                        {tx("cars")}
-                        <select value={plan[leg].cars} onChange={(e) => setLeg(leg, { cars: Number(e.target.value) })} className={`${basicField} px-1.5`}>
-                          {range(1, 10).map((n) => (
-                            <option key={n} value={n}>{n}</option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                  ))}
-                  <div className="grid gap-1">
-                    <span className={basicLabel}>{tx("between")}</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {MODE_CHIPS.map(({ mode, label, icon }) => (
-                        <Chip key={mode} on={modes.includes(mode)} icon={icon} label={tx(label)} onClick={() => toggleMode(mode)} />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            <NextButton missing={clientMissing} onNext={() => setClientOpen(false)} />
-          </Fold>
-
-          {/* the flights — the generator's own card, here, with the trip's dates already in it */}
-          {flightsOn ? (
-            <Fold
-              id="basic-flights"
-              title={t("pg.flightsTitle")}
-              open={flightsOpen}
-              onOpen={() => setFlightsOpen(true)}
-              summary={data.flights.map(legText).join(" · ")}
-            >
-              <div className="-mx-3 -mb-1 [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
-                <FlightsStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lookups} />
-              </div>
-              <NextButton
-                missing={blocking.some((i) => i.stage === "flights") ? [t("pg.flightsTitle")] : []}
-                onNext={() => setFlightsOpen(false)}
-              />
-            </Fold>
-          ) : null}
-
-          {/* the cities */}
-          <div id="basic-cities" className="scroll-mt-20 space-y-3">
-            {cities.length === 0 ? (
-              <p className="rounded-[14px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[12.5px] font-semibold text-[#93aaa3]">{tx("noCities")}</p>
-            ) : (
-              cities.map((city, i) => {
-                const dayFrom = dayCursor;
-                dayCursor += city.nights;
-                const prev = cities[i - 1]?.city_name;
-                // several ways between cities: each arrival says which one it took
-                const hop =
-                  prev && modes.length > 1 ? (
-                    <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#557d78]">
-                      {tx("hop", { city: prev })}
-                      <select
-                        value={hopMode(plan, prev, city.city_name)}
-                        onChange={(e) => setHop(prev, city.city_name, e.target.value as TransportMode)}
-                        className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold text-[#185045]"
-                      >
-                        {MODE_CHIPS.filter((m) => modes.includes(m.mode)).map((m) => (
-                          <option key={m.mode} value={m.mode}>{tx(m.label)}</option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : undefined;
-                return (
-                  <BasicCityCard
-                    key={`${i}-${city.city_name}`}
-                    index={i}
-                    city={city}
-                    dayFrom={dayFrom}
-                    draftId={draftId}
-                    data={data}
-                    lookups={lookups}
-                    hotelsOn={scope.hotels}
-                    toursOn={toursOn}
-                    hop={hop}
-                    flush={flush}
-                    replace={replace}
-                    onNights={(n) => commit(setCityNights(data, i, n))}
-                    onTours={(n) => commit({ cities: cities.map((c, k) => (k === i ? { ...c, tours: n } : c)) })}
-                    onLines={setLines}
-                    onSlice={commit}
-                    onRemove={() => {
-                      if (window.confirm(tx("confirmRemove", { city: city.city_name }))) commit(removeCity(data, i));
-                    }}
-                  />
-                );
-              })
-            )}
-          </div>
-
-          {/* the add bar — always at hand, like the company's system */}
-          <div className="sticky bottom-3 z-20 rounded-[14px] border border-[#cfe0d9] bg-[#e9f3ef]/95 px-2 py-1.5 shadow-[0_8px_24px_rgba(0,60,58,0.12)] backdrop-blur max-lg:bottom-[80px] sm:px-2.5">
-            <div className="flex flex-wrap items-end gap-1.5">
-              {/* a group may cross into a neighbouring country */}
-              <label className={`${basicLabel} w-24 shrink-0 sm:w-32`}>
-                {tx("country")}
-                <select
-                  value={barCountry?.name ?? ""}
-                  onChange={(e) => {
-                    setNewCountry(e.target.value);
-                    pickCity("");
-                  }}
-                  className={`${basicField} px-1.5`}
-                >
-                  <option value="">{tx("choose")}</option>
-                  {lookups.countries.map((c) => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className={`${basicLabel} min-w-28 flex-1`}>
-                {tx("city")}
-                <select value={newCity} onChange={(e) => pickCity(e.target.value)} disabled={!barCountry} className={basicField}>
-                  <option value="">{tx("choose")}</option>
-                  {(barCountry?.cities ?? []).map((c) => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
-              </label>
-              {/* the city chosen: its hotels, the room and how many — shown only now */}
-              {newCity && scope.hotels ? (
-                <>
-                  <label className={`${basicLabel} min-w-36 flex-[1.5]`}>
-                    {tx("hotel")}
-                    <select value={newHotel} onChange={(e) => setNewHotel(e.target.value)} className={basicField}>
-                      <option value="">{tx("choose")}</option>
-                      {barHotels.map((h) => (
-                        <option key={h.id} value={h.id}>
-                          {h.name}
-                          {h.stars ? ` ${"★".repeat(h.stars)}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className={`${basicLabel} w-32 shrink-0 sm:w-40`}>
-                    {tx("roomType")}
-                    <input list="basic-bar-rooms" value={newRoom} onChange={(e) => setNewRoom(e.target.value)} className={basicField} />
-                    <datalist id="basic-bar-rooms">
-                      {barRoomNames.map((n) => (
-                        <option key={n} value={n} />
-                      ))}
-                    </datalist>
-                  </label>
-                  <label className={`${basicLabel} w-14 shrink-0`}>
-                    {tx("rooms")}
-                    <select value={roomsChoice} onChange={(e) => setNewRooms(Number(e.target.value))} className={`${basicField} px-1.5`}>
-                      {range(1, 10).map((n) => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                    </select>
-                  </label>
-                </>
-              ) : null}
-              <label className={`${basicLabel} w-14 shrink-0`}>
-                {tx("nights")}
-                <select value={nightsChoice} onChange={(e) => setNewNights(Number(e.target.value))} className={`${basicField} px-1.5`}>
-                  {range(1, 30).map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </label>
-              {toursOn ? (
-                <label className={`${basicLabel} w-14 shrink-0`}>
-                  {tx("tours")}
-                  <select value={Math.min(newTours, nightsChoice - 1)} onChange={(e) => setNewTours(Number(e.target.value))} className={`${basicField} px-1.5`}>
-                    {range(0, Math.max(nightsChoice - 1, 0)).map((n) => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-              <button
-                type="button"
-                onClick={onAdd}
-                disabled={!newCity}
-                aria-label={tx("add")}
-                className="inline-flex h-9 shrink-0 items-center gap-1 rounded-[8px] bg-[#185045] px-2.5 text-[12.5px] font-extrabold text-white disabled:opacity-50 sm:px-3.5"
-              >
-                <Plus className="size-4" />
-                <span className="max-sm:hidden">{tx("add")}</span>
-              </button>
-              <span className={`tv-tnum hidden h-9 shrink-0 items-center gap-1 rounded-[8px] px-2.5 text-[11.5px] font-bold md:inline-flex ${nightsTone}`}>
-                <MapPin className="size-3.5" />
-                {nightsNote}
-              </span>
-            </div>
-            <p className={`tv-tnum mt-1 rounded-[7px] px-2 py-0.5 text-[10.5px] font-bold md:hidden ${nightsTone}`}>{nightsNote}</p>
-          </div>
-
-          {/* pricing — the sell side only, for whoever may see prices */}
-          {canPricing ? (
-            <section id="basic-pricing" className={`${basicCard} scroll-mt-20`}>
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <h2 className="text-[14px] font-extrabold text-[#003c3a]">{tx("pricing")}</h2>
-                <label className="ms-auto inline-flex items-center gap-1.5 text-[11px] font-bold text-[#557d78]">
-                  {tx("quote")}
-                  <select
-                    value={display}
-                    onChange={(e) => patch({ pricing: { ...data.pricing, display_currency: e.target.value } })}
-                    className="h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-1.5 text-[12px] font-bold"
-                  >
-                    {currencyOptions(lookups.countries, display).map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => void calculate()}
-                  disabled={pricingBusy}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#185045] px-3 text-[12px] font-bold text-white disabled:opacity-60"
-                >
-                  {pricingBusy ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
-                  {tx("calc")}
-                </button>
-              </div>
-              {data.pricing.items.length === 0 ? (
-                <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noLines")}</p>
-              ) : (
-                <div className="divide-y divide-[#edf3f0]">
-                  {data.pricing.items.map((item, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 py-1.5 sm:grid-cols-[1fr_60px_120px_84px]">
-                      <span className="min-w-0 truncate text-[12px] font-bold text-[#185045]">{item.description}</span>
-                      <span className="tv-tnum hidden text-center text-[11.5px] font-bold text-[#557d78] sm:block">× {item.quantity}</span>
-                      <input
-                        type="number"
-                        min={0}
-                        dir="ltr"
-                        aria-label={tx("sell")}
-                        value={item.sell_price ?? ""}
-                        onChange={(e) => setItem(i, { sell_price: e.target.value === "" ? null : Number(e.target.value) })}
-                        className={`${basicField} tv-tnum text-center`}
-                      />
-                      <select value={item.sell_currency || display} onChange={(e) => setItem(i, { sell_currency: e.target.value })} className={`${basicField} px-1.5`}>
-                        {currencyOptions(lookups.countries, item.sell_currency || display).map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-between pt-2.5">
-                    <span className="text-[13px] font-extrabold text-[#003c3a]">{tx("total")}</span>
-                    <span className="tv-tnum text-[15px] font-extrabold text-[#0f7a52]">
-                      <DirText>{`${summary.total_sell.toLocaleString("en-US")} ${display}`}</DirText>
-                    </span>
-                  </div>
-                </div>
-              )}
-            </section>
-          ) : null}
-
-          {/* what stands between this file and the client — and issuing it, here */}
-          <section className={basicCard}>
-            {produced ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full bg-[#e9f7f0] px-3 py-1.5 text-[12.5px] font-extrabold text-[#0f7a52]">
-                  <CheckCircle2 className="size-4" />
-                  {t("pg.producedSerial")}
-                  <DirText dir="ltr" className="tv-tnum">{produced}</DirText>
-                </span>
-                <Link href={`/client-offer/${produced}`} target="_blank" className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12.5px] font-bold text-white hover:bg-[#0f4439]">
-                  <Link2 className="size-4" />
-                  {t("pg.openClientLink")}
-                </Link>
-                <a href={`/offer/${produced}/pdf`} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#d8e3de] px-3 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]">
-                  <FileText className="size-4" />
-                  {t("pg.viewPdf")}
-                </a>
-              </div>
-            ) : (
-              <>
-                {blocking.length === 0 ? (
-                  <p className="inline-flex items-center gap-2 text-[13px] font-bold text-[#0f7a52]">
-                    <CheckCircle2 className="size-4" />
-                    {tx("allGood")}
-                  </p>
-                ) : (
-                  <>
-                    <h2 className="mb-2 inline-flex items-center gap-2 text-[13.5px] font-extrabold text-[#a86a10]">
-                      <AlertTriangle className="size-4" />
-                      {tx("missing")}
-                    </h2>
-                    <ul className="space-y-1">
-                      {blocking.map((issue, i) => (
-                        <li key={i} className="flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[#5b4a2a]">
-                          <span className="rounded-full bg-[#fff3d6] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">{stageLabel(issue.stage)}</span>
-                          <span className="min-w-0 flex-1">{issueText(issue)}</span>
-                          {SECTION_OF[issue.stage] ? (
-                            <button type="button" onClick={() => goTo(SECTION_OF[issue.stage])} className="text-[11.5px] font-bold text-[#185045] underline">
-                              {tx("fix")}
-                            </button>
-                          ) : (
-                            // services lists, terms: only the full generator edits those
-                            <Link href={stageHref(draftId, issue.stage)} onClick={() => void flush()} className="text-[11.5px] font-bold text-[#185045] underline">
-                              {tx("fix")}
-                            </Link>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-                {produceError ? <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">{produceError}</p> : null}
-                <div className="mt-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => void produce()}
-                    disabled={producing || blocking.length > 0}
-                    title={blocking.length > 0 ? t("pg.err.blockingLeft") : undefined}
-                    className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-[13px] font-extrabold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {producing ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
-                    {tx("issue")}
-                  </button>
-                </div>
-              </>
-            )}
-          </section>
+          {/* one step open at a time; the done ones fold to a line, the next ones wait */}
+          {steps.map((step) => fold(step, body[step]))}
         </div>
       </FieldIssueProvider>
     </TraveliunShell>
