@@ -147,7 +147,18 @@ function airportValueFor(iata: string, providerName: string, airports: LookupAir
  * typed — its number and its two times. The route, the direction, the cabin and
  * the baggage are already answered and wait under «معلومات إضافية».
  */
-export function FlightsStage({ data, patch, lookups, compact = false }: StageFormProps & { compact?: boolean }) {
+export function FlightsStage({
+  data,
+  patch,
+  lookups,
+  compact = false,
+  only,
+}: StageFormProps & {
+  compact?: boolean;
+  /** "domestic": the domestic hops alone — the basic screen asks the international route its own way first. */
+  only?: "domestic";
+}) {
+  const showIntl = only !== "domestic";
   const { t } = useTraveliunUI();
   const flights = data.flights;
   const airports = lookups.airports;
@@ -354,6 +365,7 @@ export function FlightsStage({ data, patch, lookups, compact = false }: StageFor
       <FieldIssue field="flights" className="mb-3" />
 
       {/* the trip's shape first — one way, there and back, or several cities */}
+      {showIntl ? (
       <div className="mb-5">
         <TripTypeCards
           mode={booking.mode}
@@ -364,6 +376,7 @@ export function FlightsStage({ data, patch, lookups, compact = false }: StageFor
           }}
         />
       </div>
+      ) : null}
 
       <datalist id="pg-airports">
         {airports.map((airport) => (
@@ -372,6 +385,8 @@ export function FlightsStage({ data, patch, lookups, compact = false }: StageFor
       </datalist>
 
       {/* ── international (outbound / inbound) ──────────────────────────────── */}
+      {showIntl ? (
+      <>
       <div className="mb-2.5 flex flex-wrap items-center gap-2">
         <h3 className="flex items-center gap-2 text-[13.5px] font-extrabold text-[#0f3d38]">
           <Globe2 className="size-4 text-[#185045]" />
@@ -467,9 +482,11 @@ export function FlightsStage({ data, patch, lookups, compact = false }: StageFor
           </div>
         </>
       ) : null}
+      </>
+      ) : null}
 
       {/* ── domestic (internal hops) — optional, destination-dependent ──────── */}
-      <div className="mt-6 border-t border-[#e7f0ec] pt-5">
+      <div className={showIntl ? "mt-6 border-t border-[#e7f0ec] pt-5" : ""}>
         <div className="mb-2.5 flex flex-wrap items-center gap-2">
           <h3 className="flex items-center gap-2 text-[13.5px] font-extrabold text-[#0f3d38]">
             <Plane className="size-4 text-[#0e9bb5]" />

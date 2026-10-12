@@ -230,3 +230,31 @@ describe("normalizeDraftData", () => {
     expect(normalized.pricing.display_currency).toBe("SAR");
   });
 });
+
+describe("a planned international flight (flight_booking.estimate)", () => {
+  function planned(over: Partial<DraftData["flights"][number]> = {}): DraftData {
+    const data = completeDraft();
+    data.flights = [{ ...data.flights[0], flight_no: "", airline: "", arrival_at: null, departure_at: "2026-06-01T00:00", ...over }];
+    data.flight_booking = { ...data.flight_booking, estimate: true, intl_price: 3200 };
+    return data;
+  }
+  const incomplete = (data: DraftData) => validateDraft(data).blocking.some((i) => i.key === "pg.err.flightIncomplete");
+
+  it("is complete with its airports and its day — the tickets come later", () => {
+    expect(incomplete(planned())).toBe(false);
+  });
+
+  it("still needs the day", () => {
+    expect(incomplete(planned({ departure_at: null }))).toBe(true);
+  });
+
+  it("asks a leg whose number is in for the rest of the ticket", () => {
+    expect(incomplete(planned({ flight_no: "SV832" }))).toBe(true);
+  });
+
+  it("is the old rule without the flag", () => {
+    const data = planned();
+    data.flight_booking = { ...data.flight_booking, estimate: undefined };
+    expect(incomplete(data)).toBe(true);
+  });
+});

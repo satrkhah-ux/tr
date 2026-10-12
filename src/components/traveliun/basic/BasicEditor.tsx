@@ -87,6 +87,7 @@ import { FlightsStage } from "../generator/stages/FlightsStage";
 import { ServicesStage } from "../generator/stages/ServicesStage";
 import { useDraftState } from "../generator/useDraftState";
 import { BasicCityCard, SIM_LINE } from "./BasicCityCard";
+import { BasicFlightPlan } from "./BasicFlightPlan";
 import { BasicPhoneLookup } from "./BasicPhoneLookup";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
 import { basicCard, basicField, basicLabel } from "./styles";
@@ -211,7 +212,8 @@ function NextButton({ missing, onNext }: { missing: string[]; onNext: () => void
 /** «SV123 RUH → KUL» — a leg as the folded flights line reads it; the city when the airport has no code. */
 function legText(f: DraftData["flights"][number]): string {
   const code = (airport: string, city: string | undefined) => airport.match(/\(([A-Za-z0-9]{3,4})\)/)?.[1] ?? (city || airport);
-  return `${f.flight_no || "—"} ${code(f.from_airport, f.from_city)} → ${code(f.to_airport, f.to_city)}`;
+  const route = `${code(f.from_airport, f.from_city)} → ${code(f.to_airport, f.to_city)}`;
+  return f.flight_no ? `${f.flight_no} ${route}` : `${route} ${(f.departure_at ?? "").slice(0, 10)}`.trim();
 }
 
 /**
@@ -538,6 +540,10 @@ export function BasicEditor({
     }
   }
 
+  // ---------- the flights: planned first, ticketed later ----------
+  const hasTickets = data.flights.some((f) => f.leg_order !== "internal" && f.flight_no.trim());
+  const [flightView, setFlightView] = useState<"plan" | "final">(() => (hasTickets ? "final" : "plan"));
+
   // ---------- the steps: one open at a time ----------
   const partner = data.customer.partner_company_id;
   const flightsOn = scope.flights_intl || scope.flights_domestic;
@@ -812,11 +818,35 @@ export function BasicEditor({
     ),
 
     // ---- 2. the flights — the generator's own card, with the trip's dates already in it ----
-    flights: (
-      <div className="-mx-3 -mb-1 [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
-        <FlightsStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} compact />
-      </div>
-    ),
+    // first the route as planned (cities, days, a rough price); the tickets later, under «الرحلة النهائية»
+    flights:
+      flightView === "final" || !scope.flights_intl ? (
+        <div className="space-y-2">
+          {scope.flights_intl && !hasTickets ? (
+            <button
+              type="button"
+              onClick={() => setFlightView("plan")}
+              className="inline-flex h-7 items-center gap-1 text-[11.5px] font-bold text-[#557d78] hover:text-[#185045]"
+            >
+              <ArrowRight className="size-3.5 ltr:rotate-180" />
+              {tx("backToPlan")}
+            </button>
+          ) : null}
+          <div className="-mx-3 -mb-1 [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
+            <FlightsStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} compact />
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <BasicFlightPlan data={data} lookups={lk} onChange={commit} onFinal={() => setFlightView("final")} />
+          {/* the domestic hops are entered as they always were */}
+          {scope.flights_domestic ? (
+            <div className="-mx-3 -mb-1 border-t border-dashed border-[#DCE9E5] [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
+              <FlightsStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} compact only="domestic" />
+            </div>
+          ) : null}
+        </div>
+      ),
 
     // ---- 3. the cities, each with its hotel, and the bar that adds them ----
     cities: (

@@ -10,6 +10,7 @@ import {
   EXTRA_BED,
   extraBeds,
   priceGroupOf,
+  planInternational,
   remainingNights,
   renameRooms,
   setCityNights,
@@ -222,5 +223,24 @@ describe("النظام بيسك", () => {
     expect([next.cities[3].country, next.cities[0].country]).toEqual(["سنغافورة", undefined]);
     const flown = { ...data, cities: [...data.cities, { city_name: "جوهور", nights: 1, check_in: null, check_out: null }] };
     expect(withHotelLines(flown, "SAR").map((h) => h.city_name)).toContain("جوهور");
+  });
+
+  it("plans the international flight as legs: out, home the other way, the domestic kept", () => {
+    const data = malaysia();
+    data.flights = [{ ...emptyFlight("internal"), from_city: "كوالالمبور", to_city: "لنكاوي", flight_no: "AK6302" }];
+    const airports = [
+      { id: "1", name: "مطار الملك خالد الدولي", code: "RUH", timezone: "Asia/Riyadh", city: "الرياض", status: null },
+      { id: "2", name: "مطار كوالالمبور الدولي", code: "KUL", timezone: "Asia/Kuala_Lumpur", city: "كوالالمبور", status: null },
+    ] as unknown as Parameters<typeof planInternational>[1];
+    const plan = { from: "مطار الملك خالد الدولي (RUH)", to: "مطار كوالالمبور الدولي (KUL)", go: "2026-11-11", back: "2026-11-21", round: true };
+    const next = planInternational(data, airports, plan);
+    expect(next.flights.map((f) => [f.leg_order, f.from_city, f.to_city, f.departure_at, f.date_user_set])).toEqual([
+      ["outbound", "الرياض", "كوالالمبور", "2026-11-11T00:00", false],
+      ["inbound", "كوالالمبور", "الرياض", "2026-11-21T00:00", true],
+      ["internal", "كوالالمبور", "لنكاوي", null, false],
+    ]);
+    expect([next.flights[0].to_tz, next.flight_booking.estimate, next.flight_booking.mode]).toEqual(["Asia/Kuala_Lumpur", true, "round"]);
+    // one way: no way home
+    expect(planInternational(data, airports, { ...plan, round: false }).flights.map((f) => f.leg_order)).toEqual(["outbound", "internal"]);
   });
 });

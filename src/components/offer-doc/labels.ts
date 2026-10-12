@@ -55,6 +55,7 @@ export const AR = {
   nightsCount: (n: number) => (n === 1 ? "ليلة واحدة" : n === 2 ? "ليلتان" : n <= 10 ? `${n} ليالٍ` : `${n} ليلة`),
   flights: "الطيران",
   flightsIntl: "الطيران الدولي",
+  flightPlanned: "حجز مبدئي — تُثبَّت الرحلة عند إصدار التذاكر",
   flightsDomestic: "الطيران الداخلي",
   flightsAndVisas: "الطيران والتأشيرات",
   flightLeg: "الاتجاه",

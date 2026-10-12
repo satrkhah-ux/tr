@@ -13,6 +13,7 @@
 import {
   deriveCityDates,
   deriveHotelStays,
+  emptyFlight,
   emptyRoomSpec,
   FREE_DAY_TITLE,
   hopMode,
@@ -23,15 +24,17 @@ import {
   type DraftCity,
   type DraftData,
   type DraftDay,
+  type DraftFlight,
   type DraftHotel,
   type DraftPricingItem,
   type DraftTrip,
   type HotelStay,
+  type LookupAirport,
   type TourPick,
   type TransportMode,
 } from "./draft-types";
 import { draftDaySkeleton } from "./itinerary";
-import { itineraryStartDate } from "./schedule";
+import { autoDepartureDate, itineraryStartDate } from "./schedule";
 
 /**
  * A city as this screen holds it. The extra answer rides on the draft's own
@@ -410,4 +413,57 @@ export function priceGroupOf(item: Pick<DraftPricingItem, "item_type" | "ref">):
   if (item.item_type === "visa") return "visas";
   if (item.item_type === "service") return item.ref?.startsWith("tour:") ? "tours" : "services";
   return "other";
+}
+
+// ---------- the international flight, as first planned ----------
+
+/** «name (CODE)» — what the airport list shows and what a leg stores. */
+export const airportDisplay = (a: LookupAirport) => (a.code ? `${a.name} (${a.code})` : a.name);
+
+/** The airport a typed value names — the list's own text first, then its (CODE). */
+export function findAirport(value: string, airports: LookupAirport[]): LookupAirport | null {
+  const v = value.trim();
+  if (!v) return null;
+  const code = v.match(/\(([A-Za-z0-9]{3,4})\)/)?.[1]?.toUpperCase();
+  return airports.find((a) => airportDisplay(a) === v) ?? (code ? (airports.find((a) => a.code?.toUpperCase() === code) ?? null) : null);
+}
+
+export type FlightPlan = { from: string; to: string; go: string; back: string; round: boolean };
+
+/**
+ * The planned route as flight legs: out on `go`, home on `back` the other way
+ * (unless one-way), each with its airports' zone and city resolved. They replace
+ * the international legs, keep the domestic ones, and mark the booking
+ * `estimate` — a leg with no ticket yet is complete with its airports and day.
+ * A day equal to the trip's own keeps following the trip; any other stays put.
+ */
+export function planInternational(
+  data: Pick<DraftData, "trip" | "flights" | "flight_booking">,
+  airports: LookupAirport[],
+  plan: FlightPlan,
+): Pick<DraftData, "flights" | "flight_booking"> {
+  const leg = (order: "outbound" | "inbound", from: string, to: string, date: string): DraftFlight => {
+    const a = findAirport(from, airports);
+    const b = findAirport(to, airports);
+    return {
+      ...emptyFlight(order, data.trip),
+      from_airport: from,
+      to_airport: to,
+      from_tz: a?.timezone ?? null,
+      to_tz: b?.timezone ?? null,
+      from_city: a?.city ?? "",
+      to_city: b?.city ?? "",
+      departure_at: date ? `${date}T00:00` : null,
+      date_user_set: Boolean(date) && date !== autoDepartureDate(data.trip, order),
+      cabin_class: data.flight_booking.cabin,
+    };
+  };
+  const legs =
+    plan.from || plan.to
+      ? [leg("outbound", plan.from, plan.to, plan.go), ...(plan.round ? [leg("inbound", plan.to, plan.from, plan.back)] : [])]
+      : [];
+  return {
+    flights: [...legs, ...data.flights.filter((f) => f.leg_order === "internal")],
+    flight_booking: { ...data.flight_booking, estimate: true, mode: plan.round ? "round" : "oneway" },
+  };
 }

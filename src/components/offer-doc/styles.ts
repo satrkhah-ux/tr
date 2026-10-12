@@ -140,6 +140,7 @@ export const OFFER_DOC_CSS = `
 .od-fl-head{display:flex;align-items:center;gap:3mm;padding:2.4mm 4.5mm;background:linear-gradient(135deg,var(--od-green),var(--od-green-2));color:#fff;font-size:10pt;}
 .od-fl-head .od-carrier{font-weight:700;}
 .od-fl-head .od-carrier-logo{background:#fff;border-radius:1.6mm;padding:.5mm 1mm;width:13mm;height:5.6mm;}
+.od-fl-planned{background:#fff6e4;color:#8a5a0c;border-radius:99px;padding:.3mm 3mm;font-weight:700;font-size:8.6pt;}
 .od-fl-leg{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:99px;padding:.3mm 3.2mm;font-weight:700;font-size:9pt;}
 .od-fl-route{display:grid;grid-template-columns:1fr 38mm 1fr;align-items:center;gap:3mm;padding:3.6mm 5mm 3.8mm;}
 .od-fl-stub{position:relative;display:grid;align-content:center;gap:2.4mm;padding:3mm 3.5mm;background:var(--od-soft);border-inline-start:1.6px dashed var(--od-line);text-align:center;}

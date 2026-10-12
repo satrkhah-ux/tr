@@ -750,6 +750,12 @@ export type FlightBooking = {
   dom_price: number | null;
   dom_currency: string;
   dom_supplier: string;
+  /**
+   * The international route is only planned yet — the cities, the dates and an
+   * approximate price. A leg without a flight number then needs only its two
+   * airports and its date; the tickets («الرحلة النهائية») come later.
+   */
+  estimate?: boolean;
 };
 
 export function emptyFlightBooking(): FlightBooking {
@@ -779,6 +785,7 @@ function normalizeFlightBooking(raw: unknown): FlightBooking {
     dom_price: num(b.dom_price),
     dom_currency: str(b.dom_currency, "SAR") || "SAR",
     dom_supplier: str(b.dom_supplier, ""),
+    ...(b.estimate === true ? { estimate: true } : {}),
   };
 }
 

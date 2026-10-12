@@ -716,6 +716,7 @@ function FlightCards({ flights }: { flights: ClientOfferDTO["flights"] }) {
             <div className="od-fl-main">
               <div className="od-fl-head">
                 {f.leg_order ? <span className="od-fl-leg">{LEG_AR[f.leg_order]}</span> : null}
+                {!f.flight_no ? <span className="od-fl-planned">{AR.flightPlanned}</span> : null}
                 {/* The carrier's mark beside its name: a client scanning the page
                     recognises the logo before they read the Arabic. */}
                 <span className="od-carrier">
@@ -727,11 +728,11 @@ function FlightCards({ flights }: { flights: ClientOfferDTO["flights"] }) {
                 </span>
               </div>
               <div className="od-fl-route">
-                <FlightEnd airport={f.from_airport} at={f.departure_at} />
+                <FlightEnd airport={f.from_airport} at={f.departure_at} planned={!f.flight_no} />
                 <div className="od-fl-line">
                   <span>✈</span>
                 </div>
-                <FlightEnd airport={f.to_airport} at={f.arrival_at} shift={dayShift} />
+                <FlightEnd airport={f.to_airport} at={f.arrival_at} shift={dayShift} planned={!f.flight_no} />
               </div>
             </div>
             {/* the stub, as on a boarding pass: what the traveller is asked at the counter */}
@@ -758,15 +759,17 @@ function FlightCards({ flights }: { flights: ClientOfferDTO["flights"] }) {
   );
 }
 
-function FlightEnd({ airport, at, shift = 0 }: { airport: string | null; at: string | null; shift?: number }) {
+function FlightEnd({ airport, at, shift = 0, planned = false }: { airport: string | null; at: string | null; shift?: number; planned?: boolean }) {
   const code = airportCode(airport);
+  // a planned leg carries a day, not a time: «00:00» would be read as midnight
+  const time = at && at.length > 10 && !(planned && at.slice(11, 16) === "00:00") ? at.slice(11, 16) : null;
   return (
     <div className="od-fl-end">
       <strong>
         <Ltr>{code ?? (airportName(airport) || "—")}</Ltr>
       </strong>
       <b className="od-tnum">
-        <Ltr>{at && at.length > 10 ? at.slice(11, 16) : "—"}</Ltr>
+        <Ltr>{time ?? "—"}</Ltr>
         {shift > 0 ? (
           <span className="od-fl-plus" dir="ltr">
             +{shift}

@@ -162,12 +162,18 @@ export function validateDraft(data: DraftData): DraftValidation {
   // A ready-made package's locked total already holds the tickets.
   const legDone = (f: DraftData["flights"][number]) =>
     Boolean(f.from_airport.trim() && f.to_airport.trim() && f.flight_no.trim() && f.departure_at && f.arrival_at);
+  // A planned route (`flight_booking.estimate`) asks a leg with no ticket yet for
+  // its airports and its day only; a leg whose number is in must be whole.
+  const intlDone = (f: DraftData["flights"][number]) =>
+    data.flight_booking.estimate && !f.flight_no.trim()
+      ? Boolean(f.from_airport.trim() && f.to_airport.trim() && f.departure_at)
+      : legDone(f);
   const intl = data.flights.filter((f) => f.leg_order !== "internal");
   const dom = data.flights.filter((f) => f.leg_order === "internal");
   const booking = data.flight_booking;
   if (data.scope.flights_intl) {
     if (intl.length === 0) need("flights", "flights", "pg.err.noIntlFlights");
-    else if (intl.some((f) => !legDone(f))) need("flights", "flights", "pg.err.flightIncomplete");
+    else if (intl.some((f) => !intlDone(f))) need("flights", "flights", "pg.err.flightIncomplete");
     if (intl.length > 0 && !isFixedPrice(data)) {
       if (booking.intl_price == null || booking.intl_price <= 0) need("flights", "flights", "pg.err.flightUnpriced");
     }

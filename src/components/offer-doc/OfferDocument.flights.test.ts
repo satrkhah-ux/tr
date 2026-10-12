@@ -100,4 +100,10 @@ describe("OfferDocument — flight sections", () => {
     expect(html).not.toContain(AR.flightsDomestic);
     expect(html).not.toContain(AR.flightLeg);
   });
+
+  it("prints a planned leg as planned — its day, no invented time", () => {
+    const html = renderClient([flight({ flight_no: "", departure_at: "2026-08-01T00:00", arrival_at: null })]);
+    expect(html).toContain(AR.flightPlanned);
+    expect(html).not.toContain(">00:00<");
+  });
 });
