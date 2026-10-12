@@ -31,6 +31,8 @@ import {
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { getCountryHotels, getRoomTypeLookups, produceOfferFromDraft } from "@/lib/data/drafts";
+import { getTourPrograms } from "@/lib/data/tour-programs";
+import type { TourProgram } from "@/lib/offer/itinerary";
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
 import {
   AGE_BANDS,
@@ -60,7 +62,18 @@ import {
   type TransportMode,
   vehicleText,
 } from "@/lib/offer/draft-types";
-import { addCity, basicDays, chainCities, remainingNights, removeCity, setCityNights, withHotelLines, withTripDates, type BasicCity } from "@/lib/offer/basic";
+import {
+  addCity,
+  basicDays,
+  chainCities,
+  remainingNights,
+  removeCity,
+  setCityNights,
+  withHotelLines,
+  withTourCount,
+  withTripDates,
+  type BasicCity,
+} from "@/lib/offer/basic";
 import { validateDraft, type DraftIssue } from "@/lib/offer/draft-validation";
 import { computeOfferPricing, rebase } from "@/lib/offer/pricing";
 import { mergeSuggestions } from "@/lib/offer/pricing-suggest";
@@ -71,7 +84,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { FieldIssueProvider } from "../generator/FieldIssue";
 import { FlightsStage } from "../generator/stages/FlightsStage";
 import { useDraftState } from "../generator/useDraftState";
-import { BasicCityCard } from "./BasicCityCard";
+import { BasicCityCard, SIM_LINE } from "./BasicCityCard";
 import { BasicPhoneLookup } from "./BasicPhoneLookup";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
 import { basicCard, basicField, basicLabel } from "./styles";
@@ -294,6 +307,12 @@ export function BasicEditor({
     commit({ scope: { ...scope, [key]: on } });
   }
 
+  /** The reception's SIM cards: one «يشمل» line, rewritten or dropped with the count. */
+  function setSims(count: number) {
+    const includes = data.services.includes.filter((l) => !l.startsWith(SIM_LINE));
+    patch({ services: { ...data.services, includes: count > 0 ? [...includes, `${SIM_LINE} × ${count}`] : includes } });
+  }
+
   const setLines = (lines: DraftHotel[]) => commit({ hotels: data.hotels.map((h) => lines.find((l) => l.id === h.id) ?? h) });
 
   // ---------- the catalogue, fetched per country ----------
@@ -332,6 +351,20 @@ export function BasicEditor({
     }),
     [lookups, roomTypes, hotelsByCountry],
   );
+
+  // ---------- the ready programmes (tour_programs) of the file's cities ----------
+  const [programs, setPrograms] = useState<TourProgram[]>([]);
+  const cityKey = [...new Set(cities.map((c) => c.city_name))].sort().join("|");
+  useEffect(() => {
+    if (!cityKey) return;
+    let live = true;
+    void getTourPrograms(cityKey.split("|")).then((list) => {
+      if (live) setPrograms(list);
+    });
+    return () => {
+      live = false;
+    };
+  }, [cityKey]);
 
   // ---------- the add bar ----------
   const left = remainingNights(data);
@@ -481,11 +514,13 @@ export function BasicEditor({
       !trip.meal_plan && tx("meals"),
     ].filter((x): x is string => Boolean(x)),
     flights: blocking.some((i) => i.stage === "flights") ? [t("pg.flightsTitle")] : [],
-    cities: cities.length === 0 ? [tx("city")] : used !== trip.nights ? [nightsNote] : [],
-    transport: [
-      !plan.airport.car_type.trim() && tx("transferCar"),
-      toursOn && !plan.tours.car_type.trim() && tx("tourCar"),
+    cities: [
+      cities.length === 0 && tx("city"),
+      cities.length > 0 && used !== trip.nights && nightsNote,
+      // the reception car, on the first city's «الاستقبال والتوديع» tab
+      scope.transport && cities.length > 0 && !plan.airport.car_type.trim() && tx("transferCar"),
     ].filter((x): x is string => Boolean(x)),
+    transport: [toursOn && !plan.tours.car_type.trim() && tx("tourCar")].filter((x): x is string => Boolean(x)),
     pricing: blocking.some((i) => i.stage === "pricing") ? [tx("pricing")] : [],
     finish: [],
   };
@@ -534,7 +569,6 @@ export function BasicEditor({
       })
       .join(" · "),
     transport: [
-      `${tx("transferCar")}: ${vehicleText(plan.airport) || "—"}`,
       toursOn ? `${tx("tourCar")}: ${vehicleText(plan.tours) || "—"}` : "",
       `${tx("between")}: ${MODE_CHIPS.filter((m) => modes.includes(m.mode)).map((m) => tx(m.label)).join("، ")}`,
     ]
@@ -776,18 +810,29 @@ export function BasicEditor({
                 index={i}
                 city={city}
                 dayFrom={dayFrom}
-                draftId={draftId}
                 data={data}
                 lookups={lk}
+                programs={programs.filter((p) => p.city_name === city.city_name)}
                 hotelsOn={scope.hotels}
                 toursOn={toursOn}
+                transportOn={scope.transport}
+                isFirst={i === 0}
+                isLast={i === cities.length - 1}
                 hop={hop}
-                flush={flush}
-                replace={replace}
                 onNights={(n) => commit(setCityNights(data, i, n))}
-                onTours={(n) => commit({ cities: cities.map((c, k) => (k === i ? { ...c, tours: n } : c)) })}
+                onTours={(n) =>
+                  commit({ cities: cities.map((c, k) => (k === i ? { ...c, tours: n, tour_picks: withTourCount(c.tour_picks, n) } : c)) })
+                }
+                onPicks={(tour_picks) => commit({ cities: cities.map((c, k) => (k === i ? { ...c, tour_picks } : c)) })}
                 onLines={setLines}
                 onSlice={commit}
+                onCar={(leg, slice) =>
+                  leg === "airport"
+                    ? setLeg("airport", slice)
+                    : commit({ transport_plan: { ...plan, farewell: { ...(plan.farewell ?? plan.airport), ...slice, enabled: true } } })
+                }
+                onSims={setSims}
+                onFlights={() => (steps.includes("flights") ? show("flights") : undefined)}
                 onRemove={() => {
                   if (window.confirm(tx("confirmRemove", { city: city.city_name }))) commit(removeCity(data, i));
                 }}
@@ -900,10 +945,10 @@ export function BasicEditor({
     // ---- 4. how the group moves ----
     transport: (
       <div className="flex flex-wrap items-end gap-2">
-        {(["airport", ...(toursOn ? ["tours" as const] : [])] as ("airport" | "tours")[]).map((leg) => (
+        {(toursOn ? ["tours" as const] : []).map((leg) => (
           <div key={leg} className="flex items-end gap-1">
             <label className={`${basicLabel} w-40`}>
-              {tx(leg === "airport" ? "transferCar" : "tourCar")}
+              {tx("tourCar")}
               <select value={plan[leg].car_type} onChange={(e) => setLeg(leg, { car_type: e.target.value })} className={basicField}>
                 <option value="">{tx("choose")}</option>
                 {lookups.carTypes.map((c) => (

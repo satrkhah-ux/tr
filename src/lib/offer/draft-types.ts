@@ -365,9 +365,22 @@ export type DraftCity = {
    * `cityCountry`; everything else keys on the city's name.
    */
   country?: string;
+  /** How many of the city's days are tour days (the basic screen asks it per city). */
+  tours?: number;
+  /** The tours chosen for those days, in order — a ready programme or a typed title, each with its price. */
+  tour_picks?: TourPick[];
   /** derived from trip.arrival_date + the nights chain (deriveCityDates). */
   check_in: string | null;
   check_out: string | null;
+};
+
+/** One tour day of a city: what it is (a tour_programs row, or typed) and what it costs the group. */
+export type TourPick = {
+  program_id: string | null;
+  title: string;
+  /** the programme's description — the day's activity on the document. */
+  text: string;
+  price: number | null;
 };
 
 /**
@@ -790,6 +803,11 @@ export type TransportPlan = {
    * (keyed by hopKey). `mode` mirrors the first of `modes` for older readers.
    */
   intercity: TransportLeg & { mode: TransportMode; modes?: TransportMode[]; hop_modes?: Record<string, TransportMode> };
+  /**
+   * hotel → airport on the last day, when it is not the arrival's car — the
+   * group leaves with more luggage, or fewer people. Absent: `airport` does both.
+   */
+  farewell?: TransportLeg;
 };
 
 export const TRANSPORT_MODE_AR: Record<TransportMode, string> = {
@@ -876,7 +894,7 @@ export function deriveTransportRows(plan: TransportPlan, cities: { city_name: st
     rows.push({
       from_place: last ? `${TRANSPORT_HOTEL_PREFIX}${last}` : "الفندق",
       to_place: TRANSPORT_AIRPORT,
-      car_type: vehicleText(plan.airport),
+      car_type: vehicleText(plan.farewell ?? plan.airport),
       date: null,
       note: plan.airport.note,
     });
@@ -996,6 +1014,12 @@ export type DraftDay = {
    * programme starts when the plane leaves, the hotels when it lands.
    */
   kind?: "travel";
+  /**
+   * The title the basic screen last wrote on this day. While the title still
+   * equals it, the day is the screen's to rewrite; once a person changes it,
+   * the day is theirs.
+   */
+  auto_title?: string;
 };
 
 export type DraftPricing = {
@@ -1124,6 +1148,7 @@ function normalizeDraftDay(raw: unknown, index: number): DraftDay {
         : null,
     ai_generated: d.ai_generated === true,
     ...(d.kind === "travel" ? { kind: "travel" as const } : {}),
+    ...(typeof d.auto_title === "string" ? { auto_title: d.auto_title } : {}),
   };
 }
 
@@ -1191,6 +1216,7 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     airport: mergeLeg(empty.transport_plan.airport, plan.airport),
     tours: mergeLeg(empty.transport_plan.tours, plan.tours),
     intercity: normalizeIntercity(mergeLeg(empty.transport_plan.intercity, plan.intercity)),
+    ...(plan.farewell ? { farewell: mergeLeg(empty.transport_plan.airport, plan.farewell) } : {}),
   };
   const scope = normalizeScope(source.scope);
 

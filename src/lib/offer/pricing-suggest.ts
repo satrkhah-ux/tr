@@ -409,6 +409,24 @@ export function suggestPricing(
     });
   }
 
+  // The tours the basic screen picked, each at the price typed beside it.
+  for (const city of data.cities) {
+    (city.tour_picks ?? []).slice(0, city.tours ?? 0).forEach((pick, i) => {
+      if (!pick.title.trim() && pick.price == null) return;
+      items.push({
+        item_type: "service",
+        description: pick.title.trim() || `جولة سياحية في ${city.city_name}`,
+        ref: `tour:${city.city_name}:${i}`,
+        quantity: 1,
+        buy_price: pick.price,
+        buy_currency: "SAR",
+        sell_price: pick.price,
+        sell_currency: "SAR",
+        source: pick.price != null ? "typed" : "none",
+      });
+    });
+  }
+
   for (const v of data.visas) {
     const description = v.visa_type || v.country;
     if (!description.trim()) continue;

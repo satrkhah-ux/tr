@@ -15,6 +15,7 @@ import {
   deriveHotelStays,
   emptyRoomSpec,
   FREE_DAY_TITLE,
+  hopMode,
   MEAL_PLAN_BOARD,
   newStayId,
   resizeRooms,
@@ -25,6 +26,8 @@ import {
   type DraftHotel,
   type DraftTrip,
   type HotelStay,
+  type TourPick,
+  type TransportMode,
 } from "./draft-types";
 import { draftDaySkeleton } from "./itinerary";
 import { itineraryStartDate } from "./schedule";
@@ -34,10 +37,10 @@ import { itineraryStartDate } from "./schedule";
  * city row (normalize passes city rows through untouched), so no column and no
  * migration: `tours` decides how many of the city's days are tour days.
  */
-export type BasicCity = DraftCity & { tours?: number };
+export type BasicCity = DraftCity;
 
 /** The day titles this screen writes — and therefore may rewrite. A title the agent typed is never touched. */
-const AUTO_TITLE = /^(الوصول إلى |الانتقال إلى |جولة سياحية في |السفر إلى |المغادرة$)/;
+const AUTO_TITLE = /^(الوصول إلى |الانتقال إلى |جولة سياحية في |السفر إلى |المغادرة$|العودة إلى )/;
 const isAutoTitle = (title: string) => !title.trim() || title === FREE_DAY_TITLE || AUTO_TITLE.test(title);
 
 /** The cities with their dates chained from where the itinerary starts. */
@@ -267,39 +270,82 @@ export function withTripDates(trip: DraftTrip, slice: Partial<DraftTrip>): Draft
   return { ...next, days: next.nights > 0 ? next.nights + 1 : next.days };
 }
 
+/** The first thing that happens on arrival — the company's own welcome, on every file. */
+export const WELCOME = "الاستقبال من المطار من قبل موظف ترافليون والتوجه إلى الفندق";
+
+/** How the group reaches a city it moves to, as the day's activities say it. */
+function moveLines(mode: TransportMode, city: string, flightNo: string): string[] {
+  if (mode === "flight") {
+    return [
+      "تسجيل الخروج من الفندق والتوجه إلى المطار",
+      `السفر إلى ${city} على الطيران الداخلي${flightNo ? ` (${flightNo})` : ""}`,
+      `الاستقبال من مطار ${city} والتوجه إلى الفندق`,
+    ];
+  }
+  const how = mode === "train" ? "بالقطار" : mode === "ship" ? "بالعبّارة" : "براً";
+  return ["تسجيل الخروج من الفندق", `الانتقال ${how} إلى ${city} والتوجه إلى الفندق`];
+}
+
+/** Resize a city's tour picks to its tour count, keeping what was chosen. */
+export function withTourCount(picks: TourPick[] | undefined, count: number): TourPick[] {
+  const list = (picks ?? []).slice(0, count);
+  while (list.length < count) list.push({ program_id: null, title: "", text: "", price: null });
+  return list;
+}
+
 /**
- * The programme, written from the cities: the day the group lands, the days it
- * moves, its tour days in each city, free days, and the day it flies home.
+ * The programme, written from the cities and how the group moves between them:
+ * the arrival with the company's welcome, the day of each move (a domestic
+ * flight reads «to the airport — the flight — met at the next airport»), each
+ * city's tour days with the tour the agent picked, free days, and the way home.
  *
- * Only titles this screen wrote (or empty ones) are rewritten, so anything the
- * agent typed — here or in the full generator — survives every change.
+ * A day is the screen's while its title is still the one the screen wrote
+ * (`auto_title`, or an old auto title); the first hand edit makes it the
+ * agent's, and it is never rewritten again.
  */
 export function basicDays(data: DraftData): DraftDay[] {
   const days = draftDaySkeleton(data);
   const cities = data.cities as BasicCity[];
+  const plan = data.transport_plan;
   const stay = days.map((d, i) => (d.kind === "travel" ? -1 : i)).filter((i) => i >= 0);
   const firstStay = stay[0] ?? -1;
   const lastDay = days.length - 1;
 
   // tours switched off in «البرنامج يشمل»: every day that is not a move is free
-  const toursOn = data.transport_plan.tours.enabled;
+  const toursOn = plan.tours.enabled;
   let cityIndex = -1;
-  let toursLeft = 0;
+  let tourIndex = 0;
   return days.map((day, i) => {
     if (day.kind === "travel") return day;
     const moved = i === firstStay || days[i - 1]?.city_name !== day.city_name;
     if (moved && i !== lastDay) {
       cityIndex += 1;
-      toursLeft = toursOn ? (cities[cityIndex]?.tours ?? 0) : 0;
+      tourIndex = 0;
     }
+    const city = cities[cityIndex];
+    const tours = toursOn ? (city?.tours ?? 0) : 0;
     let title: string;
-    if (i === lastDay) title = "المغادرة";
-    else if (i === firstStay) title = `الوصول إلى ${day.city_name}`;
-    else if (moved) title = `الانتقال إلى ${day.city_name}`;
-    else if (toursLeft > 0) {
-      toursLeft -= 1;
-      title = `جولة سياحية في ${day.city_name}`;
+    let activities: string[] = [];
+    if (i === lastDay) {
+      title = "المغادرة";
+      activities = ["تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة"];
+    } else if (i === firstStay) {
+      title = `الوصول إلى ${day.city_name}`;
+      activities = [WELCOME];
+    } else if (moved) {
+      const from = days[i - 1]?.city_name ?? "";
+      const mode = hopMode(plan, from, day.city_name);
+      const leg = data.flights.find((f) => f.leg_order === "internal" && f.to_city?.trim() === day.city_name);
+      title = mode === "flight" ? `السفر إلى ${day.city_name}` : `الانتقال إلى ${day.city_name}`;
+      activities = moveLines(mode, day.city_name, leg?.flight_no.trim() ?? "");
+    } else if (tourIndex < tours) {
+      const pick = city?.tour_picks?.[tourIndex];
+      tourIndex += 1;
+      title = pick?.title.trim() || `جولة سياحية في ${day.city_name}`;
+      activities = pick?.text.trim() ? [pick.text.trim()] : [];
     } else title = FREE_DAY_TITLE;
-    return isAutoTitle(day.title) ? { ...day, title } : day;
+
+    const owned = day.auto_title !== undefined ? day.title === day.auto_title : isAutoTitle(day.title);
+    return owned ? { ...day, title, activities, auto_title: title } : day;
   });
 }

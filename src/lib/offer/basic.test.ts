@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyDraftData, withRooms, type DraftData } from "./draft-types";
+import { emptyDraftData, emptyFlight, withRooms, type DraftData } from "./draft-types";
 import {
   addCity,
   baseRoomName,
@@ -15,6 +15,8 @@ import {
   withExtraBeds,
   withHotelLines,
   withTripDates,
+  WELCOME,
+  withTourCount,
   type BasicCity,
 } from "./basic";
 
@@ -133,6 +135,28 @@ describe("النظام بيسك", () => {
       2,
       ["ديلوكس", "ديلوكس"],
     ]);
+  });
+
+  it("writes the welcome, a domestic flight's day, and the picked tours", () => {
+    const data = malaysia();
+    const plan = data.transport_plan;
+    data.transport_plan = { ...plan, intercity: { ...plan.intercity, enabled: true, modes: ["car", "flight"], hop_modes: { "سيلانغور>لنكاوي": "flight" } } };
+    data.flights = [{ ...emptyFlight("internal"), to_city: "لنكاوي", flight_no: "AK6302" }];
+    data.cities = data.cities.map((c, i) =>
+      i === 1 ? { ...c, tour_picks: withTourCount([{ program_id: "p1", title: "جزيرة الحامل", text: "رحلة بحرية", price: 400 }], 2) } : c,
+    );
+    const days = basicDays(data);
+    expect(days[0].activities).toEqual([WELCOME]);
+    expect(days[2].title).toBe("السفر إلى لنكاوي");
+    expect(days[2].activities[1]).toBe("السفر إلى لنكاوي على الطيران الداخلي (AK6302)");
+    expect([days[3].title, days[3].activities]).toEqual(["جزيرة الحامل", ["رحلة بحرية"]]);
+    expect(days[4].title).toBe("جولة سياحية في لنكاوي");
+    // the road hop to KL keeps its own wording
+    expect(days[5].activities[1]).toBe("الانتقال براً إلى كوالالمبور والتوجه إلى الفندق");
+
+    // a title changed by hand is the agent's from then on
+    const edited = days.map((d, i) => (i === 3 ? { ...d, title: "يوم على الشاطئ" } : d));
+    expect(basicDays({ ...data, days: edited })[3].title).toBe("يوم على الشاطئ");
   });
 
   it("leaves every day free when tours are switched off", () => {

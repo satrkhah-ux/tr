@@ -247,7 +247,7 @@ export function transportNoteForDay(
 
   if (plan.airport.enabled && (first || last)) {
     const label = first ? "استقبال من المطار إلى الفندق" : "توديع من الفندق إلى المطار";
-    const car = vehicleText(plan.airport);
+    const car = vehicleText(first ? plan.airport : (plan.farewell ?? plan.airport));
     parts.push(car ? `${label} — ${car}` : label);
   }
 
