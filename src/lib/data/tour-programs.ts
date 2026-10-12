@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { normAr } from "@/lib/catalog/norm";
+import { currentCan } from "@/lib/roles/current";
 import type { TourProgram } from "@/lib/offer/itinerary";
 
 /**
@@ -50,7 +51,8 @@ export async function getTourPrograms(cityNames: string[]): Promise<TourProgram[
  * city card offers beside the programmes, a pick filling its price.
  */
 export async function getTourPrices(countryNames: string[]): Promise<{ name: string; price: number; currency: string; country: string }[]> {
-  if (!(await getServerUser())) return [];
+  // the agency's own price list: staff who build offers, never a partner login
+  if (!(await currentCan("offers.write"))) return [];
   const wanted = new Set(countryNames.map(normAr).filter(Boolean));
   if (wanted.size === 0) return [];
   try {

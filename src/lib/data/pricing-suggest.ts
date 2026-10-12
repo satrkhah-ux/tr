@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
+import { getPartnerSession } from "@/lib/partners/session";
 import { loadDraft } from "./draft-store";
 import { findLookupCountry } from "@/lib/offer/draft-types";
 import {
@@ -174,7 +175,8 @@ export async function suggestPricingForDraft(
       return [{ ...r, buy_currency: buy, sell_currency: sell, legacy_id: legacyId.get(r.id) ?? null }];
     });
 
-    const toursRes = country
+    // our tours list is our cost: a partner's draft never gets it as its price
+    const toursRes = country && !(await getPartnerSession())
       ? await supabase.from("tours").select("arabic_name, price, currency").eq("country_id", country.id).not("price", "is", null)
       : { data: [] };
     const tours = ((toursRes.data ?? []) as { arabic_name: string | null; price: number | string; currency: string | null }[]).flatMap((t) => {
