@@ -696,7 +696,8 @@ export function BasicEditor({
       trip.nights <= 0 && tx("nights"),
       !trip.meal_plan && tx("meals"),
     ].filter((x): x is string => Boolean(x)),
-    flights: blocking.some((i) => i.stage === "flights") ? [t("pg.flightsTitle")] : [],
+    // what stops the flights, in words — «سعر الطيران الداخلي», not just «الطيران»
+    flights: [...new Set(blocking.filter((i) => i.stage === "flights").map(issueText))],
     cities: [
       cities.length === 0 && tx("city"),
       cities.length > 0 && used !== trip.nights && nightsNote,
@@ -706,8 +707,8 @@ export function BasicEditor({
       // a stay with no room type, board or price stops here, not at the end
       ...blocking.filter((i) => i.stage === "hotels").map(issueText),
     ].filter((x): x is string => Boolean(x)),
-    services: blocking.some((i) => i.stage === "services") ? [tx("servicesStep")] : [],
-    pricing: blocking.some((i) => i.stage === "pricing") ? [tx("pricing")] : [],
+    services: [...new Set(blocking.filter((i) => i.stage === "services").map(issueText))],
+    pricing: [...new Set(blocking.filter((i) => i.stage === "pricing").map(issueText))],
     finish: [],
   };
   const steps = STEP_ORDER.filter(
@@ -1355,7 +1356,8 @@ export function BasicEditor({
                   </span>
                   <span className="tv-tnum text-[12px] font-extrabold text-[#0f7a52]">
                     {tx("profit")}: <DirText>{`${summary.profit.toLocaleString("en-US")} ${display}`}</DirText>
-                    {summary.margin_pct != null ? ` (${summary.margin_pct}%)` : ""}
+                    {/* as the margin was asked: on the cost */}
+                    {summary.total_buy > 0 ? ` (${Math.round((summary.profit / summary.total_buy) * 10000) / 100}%)` : ""}
                   </span>
                 </div>
                 <div className="flex items-center justify-between rounded-[11px] bg-[#185045] px-3 py-2.5 text-white">

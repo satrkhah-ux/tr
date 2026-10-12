@@ -799,7 +799,16 @@ export function withPackageProfit(
   const cost = items.map((i) => (i.buy_price == null ? 0 : i.buy_price * qty(i) * rate(i)));
   const total = cost.reduce((a, b) => a + b, 0);
   if (total <= 0) return items.map(bare);
-  return items.map((i, k) =>
+  const shared = items.map((i, k) =>
     cost[k] > 0 ? { ...i, profit_pct: null, profit_amount: round2((profit.value! * cost[k]) / total / rate(i) / qty(i)) } : bare(i),
   );
+  // the cents rounding took or gave go to the costliest line, so the amount is the amount
+  const given = shared.reduce((sum, i) => sum + (i.profit_amount ?? 0) * qty(i) * rate(i), 0);
+  const big = cost.indexOf(Math.max(...cost));
+  const fix = profit.value - given;
+  if (Math.abs(fix) >= 0.005) {
+    const b = shared[big];
+    shared[big] = { ...b, profit_amount: round2((b.profit_amount ?? 0) + fix / rate(b) / qty(b)) };
+  }
+  return shared;
 }

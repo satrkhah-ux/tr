@@ -164,8 +164,9 @@ export function validateDraft(data: DraftData): DraftValidation {
     Boolean(f.from_airport.trim() && f.to_airport.trim() && f.flight_no.trim() && f.departure_at && f.arrival_at);
   // A planned route (`flight_booking.estimate`) asks a leg with no ticket yet for
   // its airports and its day only; a leg whose number is in must be whole.
+  // A domestic leg the cities wrote (`auto`) is planned the same way until its ticket is in.
   const intlDone = (f: DraftData["flights"][number]) =>
-    data.flight_booking.estimate && !f.flight_no.trim()
+    (data.flight_booking.estimate || f.auto) && !f.flight_no.trim()
       ? Boolean(f.from_airport.trim() && f.to_airport.trim() && f.departure_at)
       : legDone(f);
   const intl = data.flights.filter((f) => f.leg_order !== "internal");

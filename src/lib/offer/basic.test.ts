@@ -335,6 +335,9 @@ describe("النظام بيسك", () => {
     // 1000 SAR over 3000 + 1000 of cost: 750 and 250
     expect(withPackageProfit(items, { mode: "amount", value: 1000 }, rates, "SAR").map((i) => i.profit_amount)).toEqual([750, 250]);
     expect(withPackageProfit(items, undefined, rates, "SAR")).toBe(items);
+    // three equal lines: the cent the rounding lost goes back — the amount is the amount
+    const three = withPackageProfit([line(100, "SAR"), line(100, "SAR"), line(100, "SAR")], { mode: "amount", value: 1000 }, rates, "SAR");
+    expect(three.reduce((sum, i) => sum + (i.profit_amount ?? 0), 0)).toBeCloseTo(1000, 6);
   });
 
   it("suggests the clear room names first, then only the chosen hotel's own", () => {
