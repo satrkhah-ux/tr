@@ -43,7 +43,7 @@ echo "==> building"
 # downloading the chunk and reading it said the deploy had succeeded. A deploy
 # that can lie about what it shipped is worth more than the three minutes the
 # cache saves.
-ssh "$HOST" "cd ~/$DIR && mkdir -p .dockercfg && DOCKER_CONFIG=\$PWD/.dockercfg docker build --no-cache -q -t traveliun-app:latest ."
+ssh "$HOST" "cd ~/$DIR && mkdir -p .dockercfg && DOCKER_CONFIG=\$PWD/.dockercfg docker build --no-cache -q --build-arg NEXT_DEPLOYMENT_ID=${SHIPPED:0:12} -t traveliun-app:latest ."
 
 echo "==> restarting"
 ssh "$HOST" "cd ~/$DIR && docker rm -f traveliun-app 2>/dev/null || true; docker run -d --name traveliun-app --restart unless-stopped \

@@ -87,6 +87,8 @@ const AR = {
   allGood: "الملف مكتمل — جاهز للإصدار.",
   fix: "إكمال",
   issue: "إصدار البكج",
+  reload: "أعد تحميل الصفحة",
+  serverLost: "تعذّر الاتصال بالخادم — ربما تحدّث النظام. أعد تحميل الصفحة ثم حاول مرة أخرى.",
   removeCity: "حذف المدينة",
   confirmRemove: "حذف {city} وفندقها من الملف؟",
 } as const;
@@ -171,6 +173,8 @@ const EN: Record<keyof typeof AR, string> = {
   allGood: "The file is complete — ready to issue.",
   fix: "Fix",
   issue: "Issue the package",
+  reload: "Reload the page",
+  serverLost: "Could not reach the server — the system may have been updated. Reload the page and try again.",
   removeCity: "Remove city",
   confirmRemove: "Remove {city} and its hotel from the file?",
 };

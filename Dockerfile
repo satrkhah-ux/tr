@@ -48,6 +48,13 @@ COPY . .
 
 ENV NODE_ENV=production
 
+# Each deploy's own id (the shipped commit). Server Function ids change with
+# every build, so a tab left open across a deploy had its saves rejected
+# («Failed to find Server Action») and spun forever; with a deploymentId the
+# client sees the mismatch and reloads instead.
+ARG NEXT_DEPLOYMENT_ID
+ENV NEXT_DEPLOYMENT_ID=${NEXT_DEPLOYMENT_ID}
+
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
 # Uncomment the following line in case you want to disable telemetry during the build.

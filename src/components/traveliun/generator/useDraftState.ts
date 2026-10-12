@@ -40,8 +40,17 @@ export function useDraftState(
     pendingRef.current = {};
     if (Object.keys(slice).length === 0) return;
     setSaveState("saving");
-    const result = await saveDraftStages(draftId, slice);
-    setSaveState(result.ok ? "saved" : "error");
+    try {
+      const result = await saveDraftStages(draftId, slice);
+      setSaveState(result.ok ? "saved" : "error");
+    } catch {
+      // The call itself failed — offline, or this tab is from before a deploy
+      // and the server no longer knows its action. It never resolved before,
+      // so «جارٍ الحفظ» spun forever; now it says so, and the work is kept to
+      // go up with the next save.
+      pendingRef.current = { ...slice, ...pendingRef.current };
+      setSaveState("error");
+    }
   }, [draftId]);
 
   const patch = useCallback(

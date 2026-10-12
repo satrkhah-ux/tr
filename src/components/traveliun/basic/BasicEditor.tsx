@@ -413,14 +413,22 @@ export function BasicEditor({
     [data.pricing.items, display, lookups.sarPer],
   );
 
+  const [pricingError, setPricingError] = useState<string | null>(null);
   async function calculate() {
     setPricingBusy(true);
-    // the server prices the SAVED draft
-    await flush();
-    const res = await suggestPricingForDraft(draftId, { hotel: t("pg.hotel"), airline: t("pg.airline") });
-    setPricingBusy(false);
-    if (!res.ok) return;
-    patch({ pricing: { ...data.pricing, items: mergeSuggestions(data.pricing.items, res.items).items } });
+    setPricingError(null);
+    try {
+      // the server prices the SAVED draft
+      await flush();
+      const res = await suggestPricingForDraft(draftId, { hotel: t("pg.hotel"), airline: t("pg.airline") });
+      if (!res.ok) return setPricingError(t(res.error));
+      patch({ pricing: { ...data.pricing, items: mergeSuggestions(data.pricing.items, res.items).items } });
+    } catch {
+      // offline, or a tab from before a deploy: say so instead of spinning
+      setPricingError(tx("serverLost"));
+    } finally {
+      setPricingBusy(false);
+    }
   }
 
   function setItem(index: number, slice: Partial<DraftData["pricing"]["items"][number]>) {
@@ -447,12 +455,17 @@ export function BasicEditor({
     if (producing || blocking.length > 0) return;
     setProducing(true);
     setProduceError(null);
-    // the server issues the SAVED draft
-    await flush();
-    const result = await produceOfferFromDraft(draftId);
-    setProducing(false);
-    if (!result.ok) return setProduceError(t(result.error));
-    patch({ produced_serial: result.serial });
+    try {
+      // the server issues the SAVED draft
+      await flush();
+      const result = await produceOfferFromDraft(draftId);
+      if (!result.ok) return setProduceError(t(result.error));
+      patch({ produced_serial: result.serial });
+    } catch {
+      setProduceError(tx("serverLost"));
+    } finally {
+      setProducing(false);
+    }
   }
 
   // ---------- the steps: one open at a time ----------
@@ -948,6 +961,7 @@ export function BasicEditor({
                 {tx("calc")}
               </button>
             </div>
+            {pricingError ? <p role="alert" className="mb-2 text-[12px] font-bold text-[#c22850]">{pricingError}</p> : null}
             {data.pricing.items.length === 0 ? (
               <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noLines")}</p>
             ) : (
@@ -1076,6 +1090,15 @@ export function BasicEditor({
               {saveState === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : saveState === "error" ? <XCircle className="size-3.5" /> : <Check className="size-3.5" />}
               {saveState === "saving" ? t("pg.saving") : saveState === "error" ? t("pg.saveFailed") : t("pg.saved")}
             </span>
+            {saveState === "error" ? (
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="inline-flex h-8 items-center rounded-[8px] bg-[#c22850] px-2.5 text-[11.5px] font-bold text-white"
+              >
+                {tx("reload")}
+              </button>
+            ) : null}
             <Link
               href={stageHref(draftId, "trip")}
               onClick={() => void flush()}
