@@ -11,6 +11,7 @@ import {
   Car,
   Check,
   CheckCircle2,
+  ChevronDown,
   Circle,
   CircleCheck,
   ConciergeBell,
@@ -506,6 +507,7 @@ export function BasicEditor({
    */
   function setItem(index: number, slice: { sell_price?: number | null; sell_currency?: string }) {
     const item = data.pricing.items[index];
+    setOpenGroups((o) => ({ ...o, [priceGroupOf(item)]: true }));
     const at = priceAtSource(latest.current, item, { price: slice.sell_price, currency: slice.sell_currency });
     // the source's figure is what we pay and what we sell at, as the sheet writes it
     const both = at
@@ -537,8 +539,10 @@ export function BasicEditor({
       rebase(lookups.sarPer ?? { SAR: 1 }, display) ?? {},
       display,
     ).total_sell;
-    return { ...g, rows, subtotal };
+    return { ...g, rows, subtotal, missing: rows.filter(({ item }) => !item.sell_price).length };
   }).filter((g) => g.rows.length > 0);
+  // a card with a price missing opens by itself; a complete one waits to be opened for a review
+  const [openGroups, setOpenGroups] = useState<Partial<Record<PriceGroup, boolean>>>({});
 
   // ---------- what is still missing, and issuing ----------
   const validation = useMemo(() => validateDraft(data), [data]);
@@ -1139,16 +1143,42 @@ export function BasicEditor({
               <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noLines")}</p>
             ) : (
               <div className="space-y-2.5">
-                {groups.map((g) => (
-                  <div key={g.key} className="overflow-hidden rounded-[11px] border border-[#e2ebe7]">
-                    <div className="flex items-center gap-2 bg-[#eef5f2] px-3 py-1.5">
-                      <g.icon className="size-4 text-[#185045]" />
-                      <span className="text-[12.5px] font-extrabold text-[#0f3d38]">{tx(g.label)}</span>
+                {/* one card per section: red while a price is missing, folded once it is complete */}
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {groups.map((g) => {
+                  const bad = g.missing > 0;
+                  const isOpen = openGroups[g.key] ?? bad;
+                  return (
+                  <div
+                    key={g.key}
+                    className={`overflow-hidden rounded-[11px] border ${isOpen ? "sm:col-span-2 xl:col-span-3" : ""} ${bad ? "border-[#f0b4c2]" : "border-[#d8e6e0]"}`}
+                  >
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      onClick={() => setOpenGroups((o) => ({ ...o, [g.key]: !isOpen }))}
+                      className={`flex w-full items-center gap-2 px-3 py-2 text-start ${bad ? "bg-[#fdeef2] hover:bg-[#fbe3e9]" : "bg-[#eef5f2] hover:bg-[#e6f0ec]"}`}
+                    >
+                      <g.icon className={`size-4 shrink-0 ${bad ? "text-[#c22850]" : "text-[#185045]"}`} />
+                      <span className={`text-[12.5px] font-extrabold ${bad ? "text-[#9c1f40]" : "text-[#0f3d38]"}`}>{tx(g.label)}</span>
                       <span className="rounded-full bg-white px-2 text-[10.5px] font-bold text-[#557d78]">{g.rows.length}</span>
-                      <span className="tv-tnum ms-auto text-[12.5px] font-extrabold text-[#185045]">
+                      {bad ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#c22850] px-2 py-0.5 text-[10.5px] font-bold text-white">
+                          <AlertTriangle className="size-3" />
+                          {tx("priceMissing", { n: g.missing })}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#e3f4ec] px-2 py-0.5 text-[10.5px] font-bold text-[#0f7a52]">
+                          <Check className="size-3" />
+                          {tx("priceDone")}
+                        </span>
+                      )}
+                      <span className={`tv-tnum ms-auto text-[12.5px] font-extrabold ${bad ? "text-[#9c1f40]" : "text-[#185045]"}`}>
                         <DirText>{`${g.subtotal.toLocaleString("en-US")} ${display}`}</DirText>
                       </span>
-                    </div>
+                      <ChevronDown className={`size-4 shrink-0 text-[#557d78] transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {isOpen ? (
                     <div className="divide-y divide-[#f0f5f3] px-3">
                       {g.rows.map(({ item, i }) => (
                         <div key={i} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 py-1.5 sm:grid-cols-[1fr_52px_8rem_5.5rem]">
@@ -1164,7 +1194,7 @@ export function BasicEditor({
                             value={item.sell_price ?? ""}
                             placeholder="—"
                             onChange={(e) => setItem(i, { sell_price: e.target.value === "" ? null : Number(e.target.value) })}
-                            className={`${basicField} tv-tnum text-center ${item.sell_price == null ? "border-[#f2d39a] bg-[#fffaf0]" : ""}`}
+                            className={`${basicField} tv-tnum text-center ${!item.sell_price ? "border-[#f0b4c2] bg-[#fff5f7]" : ""}`}
                           />
                           <select value={item.sell_currency || display} onChange={(e) => setItem(i, { sell_currency: e.target.value })} className={`${basicField} px-1.5`}>
                             {currencyOptions(lookups.countries, item.sell_currency || display).map((c) => (
@@ -1174,8 +1204,11 @@ export function BasicEditor({
                         </div>
                       ))}
                     </div>
+                    ) : null}
                   </div>
-                ))}
+                  );
+                })}
+                </div>
                 <div className="flex items-center justify-between rounded-[11px] bg-[#185045] px-3 py-2.5 text-white">
                   <span className="text-[13px] font-extrabold">{tx("total")}</span>
                   <span className="tv-tnum text-[16px] font-extrabold">
