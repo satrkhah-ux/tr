@@ -121,3 +121,29 @@ describe("keepDraftCost", () => {
     expect(keepDraftCost({ produced_serial: "AD-1" }, stored())).toEqual({ produced_serial: "AD-1" });
   });
 });
+
+describe("package margin (DraftPricing.profit)", () => {
+  const withMargin = (): DraftData => {
+    const d = emptyDraftData();
+    d.pricing = { ...d.pricing, profit: { mode: "pct", value: 18 } };
+    return d;
+  };
+
+  it("is hidden from a viewer without pricing.internal", () => {
+    expect(redactDraftCost(withMargin()).pricing.profit).toBeUndefined();
+  });
+
+  it("survives a non-internal save that never saw it", () => {
+    const stored = withMargin();
+    const sent = redactDraftCost(stored).pricing;
+    expect(keepDraftCost({ pricing: sent }, stored).pricing?.profit).toEqual({ mode: "pct", value: 18 });
+  });
+
+  it("cannot be set or changed by a non-internal save", () => {
+    const stored = withMargin();
+    const forged = { ...stored.pricing, profit: { mode: "pct" as const, value: 90 } };
+    expect(keepDraftCost({ pricing: forged }, stored).pricing?.profit).toEqual({ mode: "pct", value: 18 });
+    const none = emptyDraftData();
+    expect(keepDraftCost({ pricing: forged }, none).pricing?.profit).toBeUndefined();
+  });
+});

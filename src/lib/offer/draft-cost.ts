@@ -61,10 +61,13 @@ function withoutItemCost(item: DraftPricingItem): DraftPricingItem {
 
 /** What a viewer without pricing.internal receives. */
 export function redactDraftCost(data: DraftData): DraftData {
+  // The package-level margin is cost too — the same figure as a line's manual
+  // profit, set once for the whole file.
+  const { profit: _packageProfit, ...pricing } = data.pricing;
   return {
     ...data,
     hotels: data.hotels.map((h) => (h.sourcing ? { ...h, sourcing: withoutSourcingCost(h.sourcing) } : h)),
-    pricing: { ...data.pricing, items: data.pricing.items.map(withoutItemCost) },
+    pricing: { ...pricing, items: data.pricing.items.map(withoutItemCost) },
   };
 }
 
@@ -143,7 +146,15 @@ export function keepDraftCost(slices: Partial<DraftData>, stored: DraftData): Pa
   if (slices.hotels) out.hotels = slices.hotels.map((line) => keepHotelCost(line, stored.hotels));
   if (slices.pricing) {
     const was = pairItems(slices.pricing.items, stored.pricing.items);
-    out.pricing = { ...slices.pricing, items: slices.pricing.items.map((item, i) => keepItemCost(item, was[i])) };
+    // The package margin comes from what is stored, never from this browser:
+    // it was hidden on read, so a save that omits it must not wipe it, and one
+    // that sends it must not set it.
+    const { profit: _sentProfit, ...sent } = slices.pricing;
+    out.pricing = {
+      ...sent,
+      items: slices.pricing.items.map((item, i) => keepItemCost(item, was[i])),
+      ...(stored.pricing.profit !== undefined ? { profit: stored.pricing.profit } : {}),
+    };
   }
   return out;
 }
