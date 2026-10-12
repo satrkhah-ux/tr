@@ -85,8 +85,8 @@ const MODE_CHIPS: { mode: TransportMode; label: BasicLabel; icon: typeof Car }[]
   { mode: "ship", label: "byShip", icon: Ship },
 ];
 /** The page's steps, in order; one is open at a time. */
-type Step = "client" | "flights" | "cities" | "transport" | "finish";
-const STEP_ORDER: Step[] = ["client", "flights", "cities", "transport", "finish"];
+type Step = "client" | "flights" | "cities" | "transport" | "pricing" | "finish";
+const STEP_ORDER: Step[] = ["client", "flights", "cities", "transport", "pricing", "finish"];
 /** Which step of this page answers a stage's blocking issue. */
 const STEP_OF: Partial<Record<string, Step>> = {
   customer: "client",
@@ -96,7 +96,7 @@ const STEP_OF: Partial<Record<string, Step>> = {
   cities: "cities",
   hotels: "cities",
   transport: "transport",
-  pricing: "finish",
+  pricing: "pricing",
 };
 
 /** «Booking engine» chip from the program-includes spec: whole chip clickable, state not by colour alone. */
@@ -472,9 +472,12 @@ export function BasicEditor({
       !plan.airport.car_type.trim() && tx("transferCar"),
       toursOn && !plan.tours.car_type.trim() && tx("tourCar"),
     ].filter((x): x is string => Boolean(x)),
+    pricing: blocking.some((i) => i.stage === "pricing") ? [tx("pricing")] : [],
     finish: [],
   };
-  const steps = STEP_ORDER.filter((s) => (s !== "flights" || flightsOn) && (s !== "transport" || scope.transport));
+  const steps = STEP_ORDER.filter(
+    (s) => (s !== "flights" || flightsOn) && (s !== "transport" || scope.transport) && (s !== "pricing" || canPricing),
+  );
   // a new file opens on its first step; a file coming back, on the first one not done
   const firstTodo = steps.find((s) => missingOf[s].length > 0) ?? "finish";
   const [open, setOpen] = useState<Step>(firstTodo);
@@ -523,6 +526,7 @@ export function BasicEditor({
     ]
       .filter(Boolean)
       .join(" · "),
+    pricing: data.pricing.items.length > 0 ? `${tx("total")}: ${summary.total_sell.toLocaleString("en-US")} ${display}` : tx("noLines"),
     finish: produced ?? (blocking.length > 0 ? tx("missing") : tx("allGood")),
   };
   const titleOf: Record<Step, string> = {
@@ -530,6 +534,7 @@ export function BasicEditor({
     flights: t("pg.flightsTitle"),
     cities: tx("citiesStep"),
     transport: tx("transport"),
+    pricing: tx("pricing"),
     finish: tx("finish"),
   };
   const fold = (step: Step, body: ReactNode) =>
@@ -887,13 +892,10 @@ export function BasicEditor({
       </div>
     ),
 
-    // ---- 5. the price, what is missing, and issuing — here ----
-    finish: (
-      <div className="space-y-3">
-        {canPricing ? (
+    // ---- 5. the price (sell side only, for whoever may see prices) ----
+    pricing: (
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <h3 className="text-[13px] font-extrabold text-[#003c3a]">{tx("pricing")}</h3>
               <label className="ms-auto inline-flex items-center gap-1.5 text-[11px] font-bold text-[#557d78]">
                 {tx("quote")}
                 <select
@@ -949,9 +951,11 @@ export function BasicEditor({
               </div>
             )}
           </div>
-        ) : null}
+    ),
 
-        <div className="border-t border-dashed border-[#DCE9E5] pt-2.5">
+    // ---- 6. what is missing, and issuing — here ----
+    finish: (
+        <div>
           {produced ? (
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-full bg-[#e9f7f0] px-3 py-1.5 text-[12.5px] font-extrabold text-[#0f7a52]">
@@ -1020,7 +1024,6 @@ export function BasicEditor({
             </>
           )}
         </div>
-      </div>
     ),
   };
 
