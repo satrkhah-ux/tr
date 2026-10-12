@@ -136,12 +136,18 @@ export const OFFER_DOC_CSS = `
 .od-stars{color:var(--od-gold);direction:ltr;font-size:11.5pt;letter-spacing:.5px;}
 
 /* ── flights: one boarding pass per leg ──────────────────────────────────── */
-.od-fl{border:1px solid var(--od-line-2);border-radius:4mm;background:rgba(255,255,255,.96);margin-bottom:3mm;overflow:hidden;break-inside:avoid;box-shadow:0 4px 12px var(--od-shadow-2);}
-.od-fl-head{display:flex;align-items:center;gap:3mm;padding:2.2mm 4mm;background:var(--od-soft);border-bottom:1px solid var(--od-line-2);font-size:10pt;}
-.od-fl-leg{background:var(--od-green);color:#fff;border-radius:99px;padding:.5mm 3.2mm;font-weight:700;font-size:9pt;}
-.od-fl-no{font-weight:800;color:var(--od-green);letter-spacing:.3px;}
-.od-fl-meta{margin-inline-start:auto;color:var(--od-muted);font-size:9pt;}
-.od-fl-route{display:grid;grid-template-columns:1fr 44mm 1fr;align-items:center;gap:3mm;padding:3mm 5mm 3.4mm;}
+.od-fl{display:grid;grid-template-columns:1fr 40mm;border:1px solid var(--od-line-2);border-radius:4.5mm;background:#fff;margin-bottom:3.5mm;overflow:hidden;break-inside:avoid;box-shadow:0 6px 16px var(--od-shadow-2);}
+.od-fl-head{display:flex;align-items:center;gap:3mm;padding:2.4mm 4.5mm;background:linear-gradient(135deg,var(--od-green),var(--od-green-2));color:#fff;font-size:10pt;}
+.od-fl-head .od-carrier{font-weight:700;}
+.od-fl-head .od-carrier-logo{background:#fff;border-radius:1.6mm;padding:.5mm 1mm;width:13mm;height:5.6mm;}
+.od-fl-leg{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:99px;padding:.3mm 3.2mm;font-weight:700;font-size:9pt;}
+.od-fl-route{display:grid;grid-template-columns:1fr 38mm 1fr;align-items:center;gap:3mm;padding:3.6mm 5mm 3.8mm;}
+.od-fl-stub{position:relative;display:grid;align-content:center;gap:2.4mm;padding:3mm 3.5mm;background:var(--od-soft);border-inline-start:1.6px dashed var(--od-line);text-align:center;}
+.od-fl-stub::before,.od-fl-stub::after{content:"";position:absolute;inset-inline-start:-2.8mm;width:5mm;height:5mm;border-radius:50%;background:#fff;border:1px solid var(--od-line-2);}
+.od-fl-stub::before{top:-2.7mm;}
+.od-fl-stub::after{bottom:-2.7mm;}
+.od-fl-stub span{display:block;font-size:8pt;color:var(--od-muted);}
+.od-fl-stub strong{display:block;font-size:10pt;font-weight:800;color:var(--od-green);line-height:1.35;}
 .od-fl-end{display:grid;gap:.3mm;}
 .od-fl-end:last-child{text-align:end;}
 .od-fl-end strong{font-size:18pt;font-weight:800;color:var(--od-green);line-height:1.05;}
@@ -149,9 +155,10 @@ export const OFFER_DOC_CSS = `
 .od-fl-end span{font-size:9.2pt;color:var(--od-ink);}
 .od-fl-end small{font-size:8.3pt;color:var(--od-muted);line-height:1.3;}
 .od-fl-plus{display:inline-block;margin-inline-start:1.5mm;background:#eaf1ff;color:#2b57c4;border-radius:99px;padding:0 1.6mm;font-size:8pt;font-weight:800;vertical-align:middle;}
-.od-fl-line{position:relative;height:7mm;display:flex;align-items:center;justify-content:center;}
-.od-fl-line::before{content:"";position:absolute;inset-inline:1mm;top:50%;border-top:1.5px dashed var(--od-line);}
-.od-fl-line span{position:relative;background:#fff;padding:0 2mm;color:var(--od-green);font-size:13pt;transform:scaleX(-1);}
+.od-fl-line{position:relative;height:8mm;display:flex;align-items:center;justify-content:center;}
+.od-fl-line::before{content:"";position:absolute;inset-inline:1.4mm;top:50%;border-top:1.6px dashed var(--od-green-2);opacity:.55;}
+.od-fl-line::after{content:"";position:absolute;inset-inline:0;top:50%;height:2.6mm;margin-top:-1.3mm;background:radial-gradient(circle,var(--od-green) 45%,transparent 52%) 0 50%/2.6mm 2.6mm no-repeat,radial-gradient(circle,var(--od-green) 45%,transparent 52%) 100% 50%/2.6mm 2.6mm no-repeat;}
+.od-fl-line span{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center;width:8mm;height:8mm;border-radius:50%;background:var(--od-soft);border:1px solid var(--od-line-2);color:var(--od-green);font-size:12pt;transform:scaleX(-1);}
 .od-notice{margin-top:2mm;border-right:3px solid var(--od-notice);background:var(--od-notice-soft);color:var(--od-notice-ink);padding:2mm 3mm;border-radius:2mm;font-size:9.5pt;}
 
 /* ── data tables (flights, tours, tickets, visas) ─────────────────────────── */

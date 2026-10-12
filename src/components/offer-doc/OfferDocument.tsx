@@ -180,8 +180,8 @@ function packBlocks(blocks: DocBlock[]): DocBlock[][] {
 
 /** Rows of a `.od-table`: the header band plus one row per line of content. */
 const tableMm = (rows: number, rowMm = 16) => 14 + rows * rowMm;
-/** One flight card (head strip + the route) — measured ~31mm, kept with a little air. */
-const flightCardsMm = (rows: number) => rows * 34;
+/** One ticket (band + route, stub beside) — ~37mm, kept with a little air. */
+const flightCardsMm = (rows: number) => rows * 41;
 
 /**
  * Estimated printed height of one stay card.
@@ -713,30 +713,43 @@ function FlightCards({ flights }: { flights: ClientOfferDTO["flights"] }) {
         const dayShift = dayOffset(f.departure_at, f.arrival_at);
         return (
           <div key={i} className="od-fl">
-            <div className="od-fl-head">
-              {f.leg_order ? <span className="od-fl-leg">{LEG_AR[f.leg_order]}</span> : null}
-              {/* The carrier's mark beside its name: a client scanning the page
-                  recognises the logo before they read the Arabic. */}
-              <span className="od-carrier">
-                {f.airline_logo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className="od-carrier-logo" src={f.airline_logo_url} alt={f.airline_iata ?? ""} />
-                ) : null}
-                <span>{f.airline || "—"}</span>
-              </span>
-              {f.flight_no ? (
-                <span className="od-fl-no">
-                  <Ltr>{f.flight_no}</Ltr>
+            <div className="od-fl-main">
+              <div className="od-fl-head">
+                {f.leg_order ? <span className="od-fl-leg">{LEG_AR[f.leg_order]}</span> : null}
+                {/* The carrier's mark beside its name: a client scanning the page
+                    recognises the logo before they read the Arabic. */}
+                <span className="od-carrier">
+                  {f.airline_logo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="od-carrier-logo" src={f.airline_logo_url} alt={f.airline_iata ?? ""} />
+                  ) : null}
+                  <span>{f.airline || "—"}</span>
                 </span>
-              ) : null}
-              <span className="od-fl-meta">{[f.cabin_class, f.baggage_allowance].filter(Boolean).join(" · ")}</span>
-            </div>
-            <div className="od-fl-route">
-              <FlightEnd airport={f.from_airport} at={f.departure_at} />
-              <div className="od-fl-line">
-                <span>✈</span>
               </div>
-              <FlightEnd airport={f.to_airport} at={f.arrival_at} shift={dayShift} />
+              <div className="od-fl-route">
+                <FlightEnd airport={f.from_airport} at={f.departure_at} />
+                <div className="od-fl-line">
+                  <span>✈</span>
+                </div>
+                <FlightEnd airport={f.to_airport} at={f.arrival_at} shift={dayShift} />
+              </div>
+            </div>
+            {/* the stub, as on a boarding pass: what the traveller is asked at the counter */}
+            <div className="od-fl-stub">
+              <div>
+                <span>{AR.flightNo}</span>
+                <strong>
+                  <Ltr>{f.flight_no || "—"}</Ltr>
+                </strong>
+              </div>
+              <div>
+                <span>{AR.cabin}</span>
+                <strong>{f.cabin_class || "—"}</strong>
+              </div>
+              <div>
+                <span>{AR.baggage}</span>
+                <strong>{f.baggage_allowance || "—"}</strong>
+              </div>
             </div>
           </div>
         );
