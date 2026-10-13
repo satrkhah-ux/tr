@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import type { ScheduleRow } from "@/lib/data/operation-drivers";
 import type { TranslationKey } from "@/lib/i18n";
 import { DriverSend } from "./DriversPanel";
+import { OpsLinkButton } from "./OpsLinkButton";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
@@ -178,6 +179,7 @@ export function DriverSchedule({ date, city: initialCity, rows }: { date: string
                           <td className="drv-noprint px-2 py-2">
                             <div className="flex max-w-[360px] flex-wrap gap-1.5">
                               <DriverSend bookingId={r.id} />
+                              {r.phone ? <OpsLinkButton kind="driver" bookingId={r.id} /> : null}
                             </div>
                           </td>
                         </tr>
