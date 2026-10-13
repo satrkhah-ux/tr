@@ -7,6 +7,7 @@ import { DirText } from "@/components/DirText";
 import { produceOfferFromDraft } from "@/lib/data/drafts";
 import { validateDraft } from "@/lib/offer/draft-validation";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
+import { IssueGuardNotice } from "../../IssueGuardNotice";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
 import { draftBrand, draftToPreviewOffer } from "@/lib/offer/preview-dto";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
@@ -22,12 +23,13 @@ export function PreviewStage({ draftId, data, patch, lookups }: StageFormProps) 
   const { t, language } = useTraveliunUI();
   const [producing, setProducing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [guardBlocked, setGuardBlocked] = useState(false);
 
   const validation = useMemo(() => validateDraft(data), [data]);
   const produced = data.produced_serial;
 
   async function produce() {
-    if (producing || !validation.ok) return;
+    if (producing || !validation.ok || guardBlocked) return;
     setProducing(true);
     setError(null);
     const result = await produceOfferFromDraft(draftId);
@@ -75,7 +77,7 @@ export function PreviewStage({ draftId, data, patch, lookups }: StageFormProps) 
           <button
             type="button"
             onClick={() => void produce()}
-            disabled={producing || !validation.ok}
+            disabled={producing || !validation.ok || guardBlocked}
             title={!validation.ok ? t("pg.err.blockingLeft") : undefined}
             className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -97,6 +99,8 @@ export function PreviewStage({ draftId, data, patch, lookups }: StageFormProps) 
           </ul>
         </section>
       ) : null}
+
+      {!produced ? <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} /> : null}
 
       {error ? (
         <p role="alert" className="rounded-[10px] border border-[#f4c9d4] bg-[#fdeef2] px-4 py-3 text-[13px] font-semibold text-[#c22850]">

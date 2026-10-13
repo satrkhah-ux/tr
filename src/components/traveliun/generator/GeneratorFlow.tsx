@@ -35,6 +35,7 @@ import { STAGE_FORMS } from "./stage-forms";
 import { useDraftState } from "./useDraftState";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
+import { IssueGuardNotice } from "../IssueGuardNotice";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
 import { draftBrand, draftToPreviewOffer } from "@/lib/offer/preview-dto";
 
@@ -75,7 +76,8 @@ export function GeneratorFlow({
   const { t, language } = useTraveliunUI();
   const { can } = useRole();
   // a partner sees prices, always at their own terms (the server quotes them so)
-  const canPricing = can("pricing.view") || usePartnerBrand() !== null;
+  const partner = usePartnerBrand();
+  const canPricing = can("pricing.view") || partner !== null;
 
   const { data, patch, replace, flush, saveState } = useDraftState(draftId, initialData);
   const [previewOpen, setPreviewOpen] = useState(true);
@@ -477,10 +479,11 @@ function ProduceBar({
   const { t } = useTraveliunUI();
   const [producing, setProducing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [guardBlocked, setGuardBlocked] = useState(false);
   const produced = data.produced_serial;
 
   async function produce() {
-    if (producing || !ok) return;
+    if (producing || !ok || guardBlocked) return;
     setProducing(true);
     setError(null);
     const result = await produceOfferFromDraft(draftId);
@@ -518,7 +521,7 @@ function ProduceBar({
         <button
           type="button"
           onClick={() => void produce()}
-          disabled={producing || !ok}
+          disabled={producing || !ok || guardBlocked}
           title={!ok ? t("pg.err.blockingLeft") : undefined}
           className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -526,6 +529,7 @@ function ProduceBar({
           {producing ? t("pg.producing") : t("pg.produce")}
         </button>
       </div>
+      <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} className="mt-2" />
       {error ? (
         <p role="alert" className="mt-2 text-[12.5px] font-semibold text-[#c22850]">
           {error}

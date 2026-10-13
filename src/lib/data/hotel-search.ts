@@ -210,6 +210,11 @@ export async function searchInternalHotels(
     const rows = (data ?? []) as { id: string; arabic_name: string; english_name: string | null; stars: number | null }[];
     if (rows.length === 0) return { ok: true, hotels: [] };
 
+    // «الفندق المعتمد» (0071) first. Asked on its own, so a database without the
+    // column still lists every hotel — just unranked.
+    const { data: verifiedRows } = await supabase.from("hotels").select("id").eq("verified", true).in("id", rows.map((r) => r.id));
+    const verified = new Set(((verifiedRows ?? []) as { id: string }[]).map((r) => r.id));
+
     // The price history, newest first, for exactly these hotels. One query, not
     // one per hotel — this list runs to 155 rows in a busy city. Our own offers
     // only: a partner's is issued at their terms, not at our sell.
@@ -276,10 +281,13 @@ export async function searchInternalHotels(
           : [],
       };
     });
-    // Priced first: a hotel we have never quoted is one the agent has to price
-    // from scratch, which is the slower job.
+    // Verified first, then priced: a hotel we have never quoted is one the agent
+    // has to price from scratch, which is the slower job.
     hotels.sort(
-      (a, b) => Number(b.rates.length > 0) - Number(a.rates.length > 0) || (b.stars ?? 0) - (a.stars ?? 0),
+      (a, b) =>
+        Number(verified.has(b.id)) - Number(verified.has(a.id)) ||
+        Number(b.rates.length > 0) - Number(a.rates.length > 0) ||
+        (b.stars ?? 0) - (a.stars ?? 0),
     );
     return { ok: true, hotels };
   } catch {

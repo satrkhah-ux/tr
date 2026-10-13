@@ -7,6 +7,8 @@ import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser 
 import { currentCan } from "@/lib/roles/current";
 import { editedTotalSar, offerSarTotal } from "@/lib/offer/pricing";
 import { getRates } from "./rates-actions";
+import { logAudit } from "./audit";
+import { diffRecord, issueRowsFunction } from "./quality";
 import { GRANTED_COLUMNS, INTERNAL_TABLES, isCostColumn } from "./table-config";
 import type {
   DataRow,
@@ -91,6 +93,16 @@ function writable(table: AllowedTable, values: DataRow, internal: boolean): Data
   return Object.fromEntries(Object.entries(values).filter(([column]) => !isCostColumn(table, column)));
 }
 
+/**
+ * Every create / update / delete is written to audit_logs (entity = the table,
+ * entity_id = the row) — the change log in a record's details (data order 11.3).
+ * Values a details screen must not read back — a cost, the margin policy, a
+ * client's personal data — are logged by column name only.
+ */
+function auditMask(table: AllowedTable): (column: string) => boolean {
+  return (column) => table === "customers" || INTERNAL_TABLES.includes(table) || isCostColumn(table, column);
+}
+
 function sanitizeSearch(value: string): string {
   // strip characters that would break PostgREST .or() syntax
   return value.replace(/[%,()*]/g, " ").trim();
@@ -122,6 +134,16 @@ export async function listRows(input: ListInput): Promise<ListResult> {
     const to = from + input.pageSize - 1;
 
     let query = supabase.from(input.table).select(columns, { count: "exact" });
+    // A data-quality card's rows (/hotels?issue=…): the table's own row type out
+    // of 0071's function, so the filters, search, paging and count below apply
+    // unchanged — and the card's number is this list's count.
+    if (input.issue) {
+      const fn = issueRowsFunction(input.table, input.issue);
+      if (!fn) return { ok: false, error: "err.forbidden" };
+      query = (supabase as unknown as SupabaseClient)
+        .rpc(fn, { p_issue: input.issue }, { count: "exact" })
+        .select(columns) as unknown as typeof query;
+    }
     query = applyFilters(query, input.filters);
 
     const search = input.search ? sanitizeSearch(input.search) : "";
@@ -130,7 +152,8 @@ export async function listRows(input: ListInput): Promise<ListResult> {
       query = query.or(or);
     }
 
-    if (input.sort) query = query.order(input.sort.column, { ascending: input.sort.ascending });
+    // an issue list comes ranked by the function (hotels: most used first)
+    if (input.sort && !input.issue) query = query.order(input.sort.column, { ascending: input.sort.ascending });
     query = query.range(from, to);
 
     const { data, count, error } = await query;
@@ -146,13 +169,16 @@ export async function createRow(table: AllowedTable, values: DataRow): Promise<M
     const granted = await writeAccess(table);
     if (typeof granted === "string") return { ok: false, error: granted };
     const { supabase, columns, internal } = granted;
+    const written = writable(table, values, internal);
     const { data, error } = await supabase
       .from(table)
-      .insert(writable(table, values, internal) as never)
+      .insert(written as never)
       .select(columns)
       .single();
     if (error) return { ok: false, error: "err.createFailed" };
-    return { ok: true, row: data as unknown as DataRow };
+    const row = data as unknown as DataRow;
+    await logAudit({ action: "data.created", entity: table, entity_id: String(row.id), meta: { changes: diffRecord({}, written, auditMask(table)) } });
+    return { ok: true, row };
   } catch {
     return { ok: false, error: "err.db" };
   }
@@ -175,6 +201,11 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
         values = { ...values, total_sar: editedTotalSar(row, total, today) };
       }
     }
+    // what the row held, for the change log
+    const fields = Object.keys(values).filter((column) => /^[a-z_][a-z0-9_]*$/.test(column));
+    const { data: before } = fields.length
+      ? await supabase.from(table).select(fields.join(", ")).eq("id", id).maybeSingle()
+      : { data: null };
     const { data, error } = await supabase
       .from(table)
       .update(values as never)
@@ -182,6 +213,10 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
       .select(columns)
       .single();
     if (error) return { ok: false, error: "err.updateFailed" };
+    const changes = diffRecord((before ?? {}) as unknown as DataRow, values, auditMask(table));
+    if (Object.keys(changes).length > 0) {
+      await logAudit({ action: "data.updated", entity: table, entity_id: id, meta: { changes } });
+    }
     return { ok: true, row: data as unknown as DataRow };
   } catch {
     return { ok: false, error: "err.db" };
@@ -194,6 +229,7 @@ export async function deleteRow(table: AllowedTable, id: string): Promise<Delete
     if (typeof granted === "string") return { ok: false, error: granted };
     const { error } = await granted.supabase.from(table).delete().eq("id", id);
     if (error) return { ok: false, error: "err.deleteFailed" };
+    await logAudit({ action: "data.deleted", entity: table, entity_id: id });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
