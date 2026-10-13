@@ -9,6 +9,7 @@ import { validateDraft } from "@/lib/offer/draft-validation";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
 import { draftBrand, draftToPreviewOffer } from "@/lib/offer/preview-dto";
+import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { sectionClass, type StageFormProps } from "../stage-props";
 
 /**
@@ -17,6 +18,7 @@ import { sectionClass, type StageFormProps } from "../stage-props";
  * remain; the button then lists what to fix.
  */
 export function PreviewStage({ draftId, data, patch, lookups }: StageFormProps) {
+  const ownFile = usePartnerBrand() !== null;
   const { t, language } = useTraveliunUI();
   const [producing, setProducing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +104,7 @@ export function PreviewStage({ draftId, data, patch, lookups }: StageFormProps) 
         </p>
       ) : null}
 
-      <OfferDocument variant="client" offer={draftToPreviewOffer(data, lookups.airlines, lookups.sarPer)} {...draftBrand(data, lookups.partners)} />
+      <OfferDocument variant="client" offer={draftToPreviewOffer(data, lookups.airlines, lookups.sarPer)} {...draftBrand(data, lookups.partners, ownFile)} />
     </div>
   );
 }

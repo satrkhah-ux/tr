@@ -1266,7 +1266,7 @@ export const ar: Dictionary = {
   "pg.marginCol": "الهامش %",
   "pg.displayCurrency": "عملة العرض",
   "pg.finalTotal": "الإجمالي النهائي للعميل",
-  "pg.partnerCost": "تكلفتك من ترافليون",
+  "pg.partnerCost": "إجمالي التكلفة",
   "pg.partnerSell": "سعر بيعك لعميلك — يظهر في عرضك",
   "pg.pricingSeeded": "أُضيف {added} بنداً جديداً، وسُعِّر {priced} بنداً من قوائمكم. الباقي يحتاج رقماً.",
   "pg.unpricedCount": "{count} بنود بلا سعر",
