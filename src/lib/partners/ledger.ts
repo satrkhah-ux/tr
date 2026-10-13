@@ -34,7 +34,8 @@ const statementOf = ({ lines, limit }: Awaited<ReturnType<typeof readLedger>>): 
 /** The signed-in partner's own account (RLS: partner_id = current_partner_id()). */
 export async function getMyStatement(): Promise<PartnerStatement | null> {
   const partner = await getPartnerSession();
-  if (!partner) return null;
+  // the company's account is its manager's to see, not every salesperson's
+  if (!partner || partner.role !== "owner") return null;
   try {
     return statementOf(await readLedger(await db(), partner.partner_id));
   } catch {

@@ -7,6 +7,7 @@ import { currentCan } from "@/lib/roles/current";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { notifyPartnerRegistration } from "@/lib/data/ops-notify";
 import { PARTNER_TERMS_VERSION, newReferenceNo, readRegistration } from "./registration-form";
+import { getPartnerSession } from "./session";
 
 /**
  * A company asking to work with us, and what happens to that request.
@@ -208,34 +209,8 @@ export async function issuePartnerAccount(input: {
     // portal with no terms behind it.
     if (row.status !== "approved") return { ok: false, message: "اعتمد الشركة أولاً ثم أصدر الحساب." };
 
-    // An employee's address must never become a partner login — that account
-    // would pass is_staff() and the partner policies at the same time.
-    const { data: staff } = await supabase.from("employees").select("id").ilike("email", email).maybeSingle();
-    if (staff) return { ok: false, message: "هذا البريد يخصّ موظفاً — استخدم بريداً آخر للشركة." };
-
-    const { data: taken } = await supabase.from("partner_users").select("id").ilike("email", email).maybeSingle();
-    if (taken) return { ok: false, message: "هذا البريد مُصدر له حساب بالفعل." };
-
-    // WITHOUT redirectTo the invitation lands on the site root, which does
-    // nothing at all: the account exists and there is no way to give it a
-    // password. /b2b/welcome is the other half of this button.
-    const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
-    const { data: invite, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
-      data: { partner_id: row.id, partner_name: row.name },
-      redirectTo: `${site}/b2b/welcome`,
-    });
-    if (inviteError || !invite?.user) {
-      return { ok: false, message: "تعذّر إنشاء الحساب — تأكد من إعدادات البريد لدى Supabase." };
-    }
-
-    const { error } = await supabase.from("partner_users").insert({
-      partner_id: row.id,
-      auth_user_id: invite.user.id,
-      email,
-      name: input.name?.trim() || null,
-      created_by: await getCurrentEmployeeId(),
-    });
-    if (error) return { ok: false, message: "أُنشئ الحساب ولم يُربط بالشركة — راجع السجل." };
+    const made = await inviteToCompany(supabase, row, email, input.name ?? null, "owner", await getCurrentEmployeeId());
+    if (!made.ok) return made;
 
     await logAudit({
       action: "partner.account_issued",
@@ -340,5 +315,110 @@ export async function partnerDocumentUrl(partnerId: string, path: string): Promi
     return error || !signed ? { ok: false, message: "تعذّر فتح المستند." } : { ok: true, url: signed.signedUrl };
   } catch {
     return { ok: false, message: "تعذّر فتح المستند." };
+  }
+}
+
+/**
+ * A login for a company — the one path, for our «إصدار حساب» and for the
+ * company's own owner inviting a colleague. Supabase sends a set-your-password
+ * link; no password is ever generated, stored or sent here.
+ */
+async function inviteToCompany(
+  supabase: SupabaseClient,
+  company: { id: string; name: string },
+  email: string,
+  name: string | null,
+  role: "owner" | "sales",
+  createdBy: string | null,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  // An employee's address must never become a partner login — that account
+  // would pass is_staff() and the partner policies at the same time.
+  const { data: staff } = await supabase.from("employees").select("id").ilike("email", email).maybeSingle();
+  if (staff) return { ok: false, message: "هذا البريد يخصّ موظفاً — استخدم بريداً آخر للشركة." };
+
+  const { data: taken } = await supabase.from("partner_users").select("id").ilike("email", email).maybeSingle();
+  if (taken) return { ok: false, message: "هذا البريد مُصدر له حساب بالفعل." };
+
+  // WITHOUT redirectTo the invitation lands on the site root, which does
+  // nothing at all: the account exists and there is no way to give it a
+  // password. /b2b/welcome is the other half of this button.
+  const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
+  const { data: invite, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+    data: { partner_id: company.id, partner_name: company.name },
+    redirectTo: `${site}/b2b/welcome`,
+  });
+  if (inviteError || !invite?.user) {
+    return { ok: false, message: "تعذّر إنشاء الحساب — تأكد من إعدادات البريد لدى Supabase." };
+  }
+
+  const { error } = await supabase.from("partner_users").insert({
+    partner_id: company.id,
+    auth_user_id: invite.user.id,
+    email,
+    name: name?.trim() || null,
+    role,
+    created_by: createdBy,
+  });
+  return error ? { ok: false, message: "أُنشئ الحساب ولم يُربط بالشركة — راجع السجل." } : { ok: true };
+}
+
+export type TeamMember = { id: string; email: string; name: string | null; role: "owner" | "sales"; status: string; me: boolean };
+
+/** The company's logins — its owner's to see (partner_users shows a partner only its own row, so the service role reads them by the session's company). */
+export async function listMyTeam(): Promise<TeamMember[]> {
+  const partner = await getPartnerSession();
+  if (!partner || partner.role !== "owner") return [];
+  try {
+    const { data } = await db()
+      .from("partner_users")
+      .select("id, email, name, role, status, auth_user_id")
+      .eq("partner_id", partner.partner_id)
+      .order("created_at");
+    return ((data ?? []) as { id: string; email: string; name: string | null; role: string; status: string; auth_user_id: string }[]).map((u) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      role: u.role === "sales" ? "sales" : "owner",
+      status: u.status,
+      me: u.auth_user_id === partner.user_id,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** The owner invites a colleague to its own company — never another's. */
+export async function invitePartnerUser(input: { email: string; name?: string; role: "owner" | "sales" }): Promise<{ ok: true } | { ok: false; message: string }> {
+  const partner = await getPartnerSession();
+  if (!partner || partner.role !== "owner") return { ok: false, message: "إضافة المستخدمين لمدير حساب الشركة." };
+  const email = input.email.trim().toLowerCase();
+  if (!EMAIL.test(email)) return { ok: false, message: "البريد الإلكتروني غير صحيح." };
+  try {
+    const made = await inviteToCompany(db(), { id: partner.partner_id, name: partner.partner_name }, email, input.name ?? null, input.role === "owner" ? "owner" : "sales", null);
+    if (!made.ok) return made;
+    await logAudit({ action: "partner.account_issued", entity: "booking_partners", entity_id: partner.partner_id, meta: { email, role: input.role, by: partner.email } });
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "تعذّر إرسال الدعوة." };
+  }
+}
+
+/** The owner stops or restores a colleague's login (never its own); the company stays open. */
+export async function setPartnerUserActive(userId: string, active: boolean): Promise<{ ok: true } | { ok: false; message: string }> {
+  const partner = await getPartnerSession();
+  if (!partner || partner.role !== "owner") return { ok: false, message: "لمدير حساب الشركة فقط." };
+  try {
+    const { data, error } = await db()
+      .from("partner_users")
+      .update({ status: active ? "active" : "suspended" })
+      .eq("id", userId)
+      .eq("partner_id", partner.partner_id)
+      .neq("auth_user_id", partner.user_id)
+      .select("id");
+    if (error || !data || data.length === 0) return { ok: false, message: "تعذّر الحفظ." };
+    await logAudit({ action: "partner.updated", entity: "booking_partners", entity_id: partner.partner_id, meta: { user: userId, user_active: active, by: partner.email } });
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "تعذّر الحفظ." };
   }
 }
