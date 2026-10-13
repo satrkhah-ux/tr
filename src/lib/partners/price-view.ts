@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
-import { getPartnerSession, type PartnerSession } from "./session";
+import { getPartnerSession, partnerTermsById, type PartnerSession } from "./session";
 import type { PartnerTerms } from "./pricing";
 
 /**
@@ -34,14 +34,10 @@ export async function partnerCaller(): Promise<PartnerSession | null> {
  */
 export async function viewerTerms(draftOwner?: string | null): Promise<PartnerTerms | null> {
   if (!draftOwner) return (await getPartnerSession())?.terms ?? null;
-  const { data, error } = await db()
-    .from("booking_partners")
-    .select("price_adjust_kind, price_adjust_pct")
-    .eq("id", draftOwner)
-    .maybeSingle();
-  const row = data as { price_adjust_kind: string; price_adjust_pct: number } | null;
-  if (error || !row) throw new Error("partner terms unavailable");
-  return { kind: row.price_adjust_kind === "commission" ? "commission" : "markup", pct: Number(row.price_adjust_pct) || 0 };
+  // the terms in force — the commission ladder's step this quarter, as the partner's own session sees them
+  const terms = await partnerTermsById(draftOwner);
+  if (!terms) throw new Error("partner terms unavailable");
+  return terms;
 }
 
 /** The administration's default package margin (app_settings, 0054) — our sell's basis on a partner's file. */

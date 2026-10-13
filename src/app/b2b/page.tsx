@@ -31,7 +31,7 @@ export default async function B2BPage() {
   if (partner) {
     const [data, statement] = await Promise.all([getPartnerHome(), getMyStatement()]);
     return (
-      <PartnerHome partnerName={partner.partner_name} terms={describeTerms(partner.terms)} data={data} statement={statement} />
+      <PartnerHome partnerName={partner.partner_name} terms={describeTerms(partner.terms)} data={data} statement={statement} tier={partner.tier} />
     );
   }
 

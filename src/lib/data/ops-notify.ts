@@ -275,3 +275,18 @@ export async function notifyPartnerCase(notice: { offerId: string; what: string 
     return false;
   }
 }
+
+/**
+ * A plain note to the operations team (the daily alerts): everyone with a
+ * linked Telegram, with a button opening the case when there is one.
+ */
+export async function notifyOps(text: string, path?: string): Promise<number> {
+  try {
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const chats = await opsRecipients(supabase);
+    const results = await Promise.all(chats.map((chat) => send(chat, escapeHtml(text), path)));
+    return results.filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+}

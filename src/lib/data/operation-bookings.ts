@@ -8,6 +8,7 @@ import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { listTravelers } from "@/lib/data/operation-travelers";
 import { notifyBookingChanged, notifyPartnerCase } from "@/lib/data/ops-notify";
+import { syncOperation, syncOperationOfBooking } from "@/lib/data/operation-sync";
 import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, type VoucherBooking, type VoucherDTO, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { currentCan } from "@/lib/roles/current";
 
@@ -261,6 +262,7 @@ export async function confirmBookingManually(input: {
       meta: { confirmation_number: input.confirmation_number.trim(), source: "manual" },
     });
     await announce(input.booking_id, `تأكيد الحجز برقم ${input.confirmation_number.trim()}`);
+    await syncOperationOfBooking(input.booking_id);
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -370,6 +372,8 @@ export async function cancelBooking(bookingId: string, reason: string): Promise<
     if (error) return { ok: false, error: "err.updateFailed" };
     await logAudit({ action: "booking.cancelled", entity: "operation_bookings", entity_id: bookingId, meta: { reason } });
     await announce(bookingId, `إلغاء الحجز — ${reason || "بلا سبب مذكور"}`);
+    // a cancelled booking no longer holds the case back
+    await syncOperationOfBooking(bookingId);
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -381,8 +385,12 @@ export async function deleteBooking(bookingId: string): Promise<{ ok: true } | F
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
+    const { data: owner } = await supabase.from("operation_bookings").select("operation_id").eq("id", bookingId).maybeSingle();
     const { error } = await supabase.from("operation_bookings").delete().eq("id", bookingId);
-    return error ? { ok: false, error: "err.deleteFailed" } : { ok: true };
+    if (error) return { ok: false, error: "err.deleteFailed" };
+    const operationId = (owner as { operation_id: string } | null)?.operation_id;
+    if (operationId) await syncOperation(operationId);
+    return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
   }
@@ -605,6 +613,7 @@ export async function issueDocument(input: {
     // a partner's client gets this document from the partner — tell them it is out
     if (CLIENT_DOCUMENT_KINDS.includes(input.kind)) {
       await notifyPartnerCase({ offerId: op.offer_id, what: `صدر مستند: ${DOCUMENT_LABEL[input.kind]}` });
+      await syncOperation(input.operation_id);
     }
     return { ok: true, id, token };
   } catch {

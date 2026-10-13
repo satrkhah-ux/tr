@@ -16,6 +16,8 @@ import { confirmPartnerOffer } from "@/lib/data/operations";
 import { partnerClientLink } from "@/lib/data/operation-hub";
 import { DOCUMENT_LABEL } from "@/lib/operations/voucher-dto";
 import { useSafeTransition } from "../useSafeTransition";
+import { renewPartnerOffer } from "@/lib/partners/renew";
+import type { PartnerSession } from "@/lib/partners/session";
 
 /**
  * The partner's home: their numbers, not ours.
@@ -82,11 +84,13 @@ export function PartnerHome({
   terms,
   data,
   statement,
+  tier,
 }: {
   partnerName: string;
   terms: string;
   data: PartnerHomeData;
   statement: PartnerStatement | null;
+  tier: PartnerSession["tier"];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -101,6 +105,11 @@ export function PartnerHome({
           <div>
             <h1 className="text-xl font-extrabold text-[var(--tv-brand)]">{partnerName}</h1>
             <p className="mt-1 text-[12.5px] font-semibold text-[#557d78]">شروط التعامل: {terms}</p>
+            {tier.next ? (
+              <p className="mt-0.5 text-[12px] font-bold text-[#0f7a52]">
+                أكّدتم هذا الربع {tier.confirmed} — باقٍ لكم {tier.next.needed} لتصبح نسبتكم {tier.next.pct}%.
+              </p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -150,6 +159,8 @@ export function PartnerHome({
             </ul>
           </section>
         ) : null}
+
+        {data.reports.length > 0 ? <MonthlyReports reports={data.reports} /> : null}
 
         <div className="grid gap-4 lg:grid-cols-2">
           <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
@@ -300,6 +311,8 @@ function AwaitingRow({ item }: { item: PartnerAwaiting }) {
             ? "لم نجد هذا العرض ضمن عروض شركتكم."
             : res.error === "ops.err.invalidTransition"
               ? "هذا العرض ملغى ولا يمكن تأكيده."
+              : res.error === "ops.err.offerExpired"
+              ? "انتهت صلاحية أسعار هذا العرض — جدّدوا التسعير ثم أكّدوا."
               : res.error === "ops.err.creditLimit"
                 ? "تجاوز الحد الائتماني لشركتكم. سدّدوا المستحق أو تواصلوا معنا لتأكيد هذا الملف."
                 : "تعذّر التسجيل. حاول مرة أخرى.",
@@ -314,6 +327,17 @@ function AwaitingRow({ item }: { item: PartnerAwaiting }) {
           <DirText dir="ltr">{item.serial}</DirText>
         </span>
         {item.destination ? <span className="text-[12px] font-bold text-[#557d78]">{item.destination}</span> : null}
+        {item.valid_until ? (
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${item.expired ? "bg-[#fdeef2] text-[#c22850]" : "bg-[#eef4f1] text-[#557d78]"}`}>
+            {item.expired ? (item.renewed ? "منتهٍ — جُدّد" : "انتهت صلاحية الأسعار") : <>صالح حتى <DirText dir="ltr">{item.valid_until}</DirText></>}
+          </span>
+        ) : null}
+        {item.was && item.total != null && item.was.total != null ? (
+          <span className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+            كان <DirText dir="ltr">{`${item.was.total.toLocaleString("en-US")} ${item.was.currency ?? ""}`}</DirText> · الآن{" "}
+            <DirText dir="ltr">{`${item.total.toLocaleString("en-US")} ${item.currency ?? ""}`}</DirText>
+          </span>
+        ) : null}
         <span className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
           <DirText dir="ltr">{String(item.travelers)}</DirText> مسافر
           {item.travel_date ? (
@@ -337,7 +361,9 @@ function AwaitingRow({ item }: { item: PartnerAwaiting }) {
           >
             واتساب
           </button>
-          {asking ? (
+          {item.expired ? (
+            item.renewed ? null : <RenewButton item={item} />
+          ) : asking ? (
             <>
               <span className="text-[11.5px] font-bold text-[#557d78]">تأكيد العميل لهذا العرض؟</span>
               <button
@@ -440,5 +466,70 @@ function RequestDocuments({ request }: { request: PartnerRequest }) {
       )}
       {note ? <span className="text-[11.5px] font-semibold text-[#557d78] [overflow-wrap:anywhere]">{note}</span> : null}
     </div>
+  );
+}
+
+/** «جدّد التسعير»: a copy of the file at today's prices — opened at once so the partner reissues it. */
+function RenewButton({ item }: { item: PartnerAwaiting }) {
+  const router = useRouter();
+  const [pending, run] = useSafeTransition();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() =>
+          run(async () => {
+            setError(null);
+            const res = await renewPartnerOffer(item.serial, item.draft_id);
+            if (res.ok) router.push(draftHref(res.id));
+            else setError(res.message);
+          })
+        }
+        className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[var(--tv-brand)] px-3 text-[12px] font-bold text-white disabled:opacity-60"
+      >
+        {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+        جدّد التسعير
+      </button>
+      {error ? <span className="basis-full text-[11.5px] font-bold text-[#c22850]">{error}</span> : null}
+    </>
+  );
+}
+
+/** «تقريركم الشهري»: this month beside the last one. */
+function MonthlyReports({ reports }: { reports: PartnerHomeData["reports"] }) {
+  return (
+    <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+      <h2 className="mb-3 text-[14px] font-extrabold text-[var(--tv-brand)]">تقريركم الشهري</h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {reports.map((r, i) => (
+          <div key={r.month} className="rounded-[12px] bg-[#f4f8f6] p-3 dark:bg-[#17302a]">
+            <div className="mb-2 flex items-center justify-between text-[12px] font-bold text-[#557d78]">
+              <span>{i === 0 ? "هذا الشهر" : "الشهر الماضي"}</span>
+              <DirText dir="ltr">{r.month}</DirText>
+            </div>
+            <dl className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <dt className="text-[11px] font-bold text-[#93aaa3]">عروض</dt>
+                <dd className="tv-tnum text-[18px] font-extrabold text-[var(--tv-brand)]">{r.issued}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-bold text-[#93aaa3]">أكّدها العملاء</dt>
+                <dd className="tv-tnum text-[18px] font-extrabold text-[var(--tv-brand)]">{r.confirmed}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] font-bold text-[#93aaa3]">نسبة التحويل</dt>
+                <dd className="tv-tnum text-[18px] font-extrabold text-[var(--tv-brand)]">{r.conversion == null ? "—" : `${r.conversion}%`}</dd>
+              </div>
+            </dl>
+            <p className="mt-2 text-[11.5px] font-semibold text-[#557d78]">
+              {r.value.length ? <>قيمة المؤكَّد: <DirText dir="ltr">{r.value.map((v) => `${v.total.toLocaleString("en-US")} ${v.currency}`).join(" · ")}</DirText></> : "لا مؤكَّد بعد"}
+              {r.top.length ? ` — الأكثر طلباً: ${r.top.map((t) => `${t.name} (${t.count})`).join("، ")}` : ""}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

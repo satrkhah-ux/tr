@@ -39,7 +39,14 @@ vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => state.db(state.rows),
 }));
 vi.mock("@/lib/roles/current", () => ({ currentCan: async () => state.internal }));
-vi.mock("@/lib/partners/session", () => ({ getPartnerSession: async () => state.partner }));
+vi.mock("@/lib/partners/session", () => ({
+  getPartnerSession: async () => state.partner,
+  // the company's terms as booking_partners holds them (no commission ladder in these cases)
+  partnerTermsById: async () => {
+    const row = (state.rows["booking_partners"] ?? [])[0] as { price_adjust_kind: string; price_adjust_pct: number } | undefined;
+    return row ? { kind: row.price_adjust_kind === "commission" ? "commission" : "markup", pct: Number(row.price_adjust_pct) } : null;
+  },
+}));
 vi.mock("./draft-store", () => ({ loadDraft: async () => state.record }));
 vi.mock("./rates-actions", () => ({ getRates: async () => ({ sarPer: { SAR: 1 } }) }));
 

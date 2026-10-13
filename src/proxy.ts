@@ -91,7 +91,7 @@ async function refreshSession(refreshToken: string): Promise<RefreshedSession> {
 // send every update into a 307 and the bot would answer nothing. Each webhook
 // route authenticates its own caller instead (shared secret + resolving the
 // Telegram account to an employee).
-// `/api/eye` is the same case with a different caller: a crontab on the VPS,
+// `/api/eye` (and `/api/ops`, the operations morning) is the same case with a different caller: a crontab on the VPS,
 // which carries no cookie either. It proves itself with ADMIN_API_SECRET in a
 // header — leaving it behind this gate would turn the nightly briefing into a
 // silent 307 that nobody notices until management asks why it stopped.
@@ -110,6 +110,7 @@ const PUBLIC_PREFIXES = [
   "/tg",
   "/api/telegram",
   "/api/eye",
+  "/api/ops",
   "/b2b",
 ];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
@@ -138,7 +139,7 @@ export async function proxy(request: NextRequest) {
       session.expiresAt - now <= REFRESH_MARGIN_SECONDS;
 
     let refreshedCookie: string | null = null;
-    let isAuthed = session !== null;
+    const isAuthed = session !== null;
 
     if (expiring && session?.refreshToken) {
       const next = await refreshSession(session.refreshToken);

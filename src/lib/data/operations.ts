@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/data/audit";
 import { notifyOperationConfirmed, notifyPartnerCase } from "@/lib/data/ops-notify";
 import { getPartnerSession } from "@/lib/partners/session";
 import { creditRefusal, raisePartnerInvoice } from "@/lib/partners/ledger-server";
+import { readinessFor, syncOperation } from "@/lib/data/operation-sync";
 import { setOfferStatus } from "@/lib/data/offer-status";
 import {
   canAdvanceClient,
@@ -105,13 +106,17 @@ export async function confirmPartnerOffer(serial: string): Promise<OkId | Fail> 
     const service = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data } = await service
       .from("offers")
-      .select("id, status, partner_company_id")
+      .select("id, status, partner_company_id, valid_until")
       .eq("serial", serial.trim())
       .maybeSingle();
-    const offer = data as { id: string; status: string | null; partner_company_id: string | null } | null;
+    const offer = data as { id: string; status: string | null; partner_company_id: string | null; valid_until: string | null } | null;
     // not theirs and not there read the same — no probing other companies' serials
     if (!offer || offer.partner_company_id !== partner.partner_id) return { ok: false, error: "ops.err.notFound" };
     if (offer.status === "cancelled") return { ok: false, error: "ops.err.invalidTransition" };
+    // its prices held until valid_until — after that the partner renews them (operations can still confirm)
+    if (offer.valid_until && offer.valid_until < new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" })) {
+      return { ok: false, error: "ops.err.offerExpired" };
+    }
     // past its credit limit the partner cannot confirm alone — we can, from operations
     if (await creditRefusal(service, offer.id)) return { ok: false, error: "ops.err.creditLimit" };
     return recordConfirmation(service, {
@@ -287,6 +292,11 @@ export async function setExecutionStatus(
     const current = await loadStatuses(supabase, operationId);
     if (!current) return { ok: false, error: "err.loadFailed" };
     if (!canAdvanceExecution(current.execution_status, to)) return { ok: false, error: "ops.err.invalidTransition" };
+    // «جاهز للسفر» is a promise to the client — only on a green checklist (operations order 6)
+    if (to === "ready_to_travel") {
+      const items = await readinessFor(operationId);
+      if (!items || items.some((i) => !i.ok)) return { ok: false, error: "ops.err.notReady" };
+    }
 
     await supabase
       .from("operations")
@@ -357,6 +367,8 @@ export async function recordPayment(input: {
       entity_id: input.operation_id,
       meta: { amount: input.amount, currency: input.currency ?? "SAR", kind: input.kind ?? "deposit" },
     });
+    // the money moves the client track (paid_partial / paid_full)
+    await syncOperation(input.operation_id);
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
