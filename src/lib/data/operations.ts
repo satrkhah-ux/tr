@@ -7,6 +7,7 @@ import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { notifyOperationConfirmed, notifyPartnerCase } from "@/lib/data/ops-notify";
 import { getPartnerSession } from "@/lib/partners/session";
+import { creditRefusal, raisePartnerInvoice } from "@/lib/partners/ledger-server";
 import { setOfferStatus } from "@/lib/data/offer-status";
 import {
   canAdvanceClient,
@@ -111,6 +112,8 @@ export async function confirmPartnerOffer(serial: string): Promise<OkId | Fail> 
     // not theirs and not there read the same — no probing other companies' serials
     if (!offer || offer.partner_company_id !== partner.partner_id) return { ok: false, error: "ops.err.notFound" };
     if (offer.status === "cancelled") return { ok: false, error: "ops.err.invalidTransition" };
+    // past its credit limit the partner cannot confirm alone — we can, from operations
+    if (await creditRefusal(service, offer.id)) return { ok: false, error: "ops.err.creditLimit" };
     return recordConfirmation(service, {
       offer_id: offer.id,
       channel: "other",
@@ -170,6 +173,12 @@ async function recordConfirmation(
     }
 
     const id = (data as { id: string }).id;
+    // a partner's file raises its invoice now, at the cost fixed when it was issued
+    try {
+      await raisePartnerInvoice(createSupabaseServiceClient() as unknown as SupabaseClient, input.offer_id);
+    } catch {
+      /* the company page lists a confirmed file without an invoice — it is not lost */
+    }
     // the board says what operations says: a confirmed card leaves «نشط غير مؤكد» / «تمت المتابعة»
     await supabase
       .from("offers")

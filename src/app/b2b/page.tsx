@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PartnerSignIn } from "@/components/traveliun/partners/PartnerSignIn";
 import { PartnerHome } from "@/components/traveliun/partners/PartnerHome";
 import { getPartnerHome } from "@/lib/partners/home";
+import { getMyStatement } from "@/lib/partners/ledger";
 import { getPartnerSession, isStaffSession } from "@/lib/partners/session";
 import { describeTerms } from "@/lib/partners/pricing";
 
@@ -28,9 +29,9 @@ export default async function B2BPage() {
   const partner = await getPartnerSession();
 
   if (partner) {
-    const data = await getPartnerHome();
+    const [data, statement] = await Promise.all([getPartnerHome(), getMyStatement()]);
     return (
-      <PartnerHome partnerName={partner.partner_name} terms={describeTerms(partner.terms)} data={data} />
+      <PartnerHome partnerName={partner.partner_name} terms={describeTerms(partner.terms)} data={data} statement={statement} />
     );
   }
 

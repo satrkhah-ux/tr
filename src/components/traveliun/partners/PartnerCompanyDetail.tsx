@@ -12,6 +12,8 @@ import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 import { IssueAccount } from "./PendingRegistrations";
+import type { PartnerStatement } from "@/lib/partners/ledger";
+import { StatementView, LedgerControls } from "./StatementView";
 
 /**
  * One partner company, from our side: who logs in for it, what it has started
@@ -30,7 +32,7 @@ const STATUS_LABEL: Record<string, string> = {
 const OFFER_STATUS: Record<string, string> = { sent: "مُرسل", confirmed: "مؤكّد", cancelled: "ملغى", draft: "مسودة" };
 const money = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
-export function PartnerCompanyDetailView({ detail }: { detail: PartnerCompanyDetail }) {
+export function PartnerCompanyDetailView({ detail, statement }: { detail: PartnerCompanyDetail; statement: PartnerStatement | null }) {
   const { t } = useTraveliunUI();
   const { company } = detail;
   const confirmed = detail.offers.filter((o) => o.client_status).length;
@@ -74,6 +76,13 @@ export function PartnerCompanyDetailView({ detail }: { detail: PartnerCompanyDet
           <Tile label="قيمة المؤكَّد" value={detail.sales.map((s) => `${money(s.total)} ${s.currency}`).join(" · ") || "—"} />
           <Tile label="المسدَّد" value={detail.paid.map((p) => `${money(p.net)} ${p.currency}`).join(" · ") || "—"} />
         </section>
+
+        {statement ? (
+          <>
+            <StatementView statement={statement} title="الحساب" />
+            <LedgerControls partnerId={company.id} limit={statement.limit} />
+          </>
+        ) : null}
 
         <section className={card}>
           <h2 className="mb-3 text-[14px] font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">العروض</h2>
@@ -163,6 +172,8 @@ function describeActivity(a: PartnerCompanyDetail["activity"][number]): string {
   if (meta["suspended"] === true) return `أوقفت${meta["reason"] ? ` — ${String(meta["reason"])}` : ""}`;
   if (meta["suspended"] === false) return `أُعيد تفعيلها${meta["reason"] ? ` — ${String(meta["reason"])}` : ""}`;
   if (meta["deactivated"] === true) return "أُلغي تفعيلها";
+  if (meta["payment"] === true) return `سُجّلت دفعة ${String(meta["amount"] ?? "")} ${String(meta["currency"] ?? "")} — ${String(meta["receipt"] ?? "")}`;
+  if ("credit_limit" in meta) return meta["credit_limit"] == null ? "أُلغي الحد الائتماني" : `الحد الائتماني ${String(meta["credit_limit"])} ${String(meta["credit_currency"] ?? "")}`;
   if (a.action === "partner.updated") return "عُدّلت بياناتها";
   return a.action;
 }

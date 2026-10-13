@@ -10,6 +10,8 @@ import { createPartnerFile } from "@/lib/partners/drafts";
 import { draftHref } from "@/lib/offer/draft-types";
 import { WelcomeBoardButton } from "../WelcomeBoardButton";
 import type { PartnerAwaiting, PartnerHomeData, PartnerRequest } from "@/lib/partners/home";
+import type { PartnerStatement } from "@/lib/partners/ledger";
+import { StatementView } from "./StatementView";
 import { confirmPartnerOffer } from "@/lib/data/operations";
 import { partnerClientLink } from "@/lib/data/operation-hub";
 import { DOCUMENT_LABEL } from "@/lib/operations/voucher-dto";
@@ -79,10 +81,12 @@ export function PartnerHome({
   partnerName,
   terms,
   data,
+  statement,
 }: {
   partnerName: string;
   terms: string;
   data: PartnerHomeData;
+  statement: PartnerStatement | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -216,6 +220,8 @@ export function PartnerHome({
           </section>
         </div>
 
+        {statement ? <StatementView statement={statement} title="كشف حسابكم معنا" /> : null}
+
         <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
           <h2 className="mb-3 text-[14px] font-extrabold text-[var(--tv-brand)]">سجل الحسابات المالية</h2>
           {data.ledger.length === 0 ? (
@@ -294,7 +300,9 @@ function AwaitingRow({ item }: { item: PartnerAwaiting }) {
             ? "لم نجد هذا العرض ضمن عروض شركتكم."
             : res.error === "ops.err.invalidTransition"
               ? "هذا العرض ملغى ولا يمكن تأكيده."
-              : "تعذّر التسجيل. حاول مرة أخرى.",
+              : res.error === "ops.err.creditLimit"
+                ? "تجاوز الحد الائتماني لشركتكم. سدّدوا المستحق أو تواصلوا معنا لتأكيد هذا الملف."
+                : "تعذّر التسجيل. حاول مرة أخرى.",
         );
       }
     });
