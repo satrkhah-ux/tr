@@ -33,14 +33,19 @@ function generateSerial(): string {
  * executive dashboard — so they go through the service role, and only for the
  * offer the caller's own session has just created: that insert is RLS-checked,
  * so is_staff() still decides who gets this far.
+ *
+ * `asPartner` — a partner company issuing ITS OWN file (the owner, 2026-10-13:
+ * the partner produces its offers itself). RLS lets no partner insert an offer,
+ * so the whole offer goes through the service role, filed under that company
+ * whatever the input says. The caller has checked the draft is theirs.
  */
-export async function insertOffer(input: CreateOfferInput): Promise<CreateOfferResult> {
+export async function insertOffer(input: CreateOfferInput, asPartner?: string): Promise<CreateOfferResult> {
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
     if (!input.destination.trim()) return { ok: false, error: "err.destinationRequired" };
 
-    const supabase = await db();
+    const supabase = asPartner ? (createSupabaseServiceClient() as unknown as SupabaseClient) : await db();
     const serial = generateSerial();
 
     // «الموظف المختص» on the printed document. The builder picks an employee
@@ -76,7 +81,7 @@ export async function insertOffer(input: CreateOfferInput): Promise<CreateOfferR
         source_kind: input.source_kind ?? "direct",
         source_supplier_id: input.source_supplier_id ?? null,
         source_import_id: input.source_import_id ?? null,
-        partner_company_id: input.partner_company_id ?? null,
+        partner_company_id: asPartner ?? input.partner_company_id ?? null,
         show_prices: input.show_prices ?? true,
       })
       .select("id")

@@ -1268,6 +1268,8 @@ export const en = {
   "pg.marginCol": "Margin %",
   "pg.displayCurrency": "Offer currency",
   "pg.finalTotal": "Final client total",
+  "pg.partnerCost": "Your cost from Traveliun",
+  "pg.partnerSell": "Your price to your client — printed on your offer",
   "pg.pricingSeeded": "{added} new lines added, {priced} lines priced from your own lists. The rest need a number.",
   "pg.unpricedCount": "{count} lines without a price",
   "pg.suggestItems": "Suggest items from the stages",

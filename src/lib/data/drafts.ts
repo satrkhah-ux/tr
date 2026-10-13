@@ -880,6 +880,10 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       partnerCompanyId = matchPartner(data.customer, (rows ?? []) as { id: string; name: string }[])?.id ?? null;
     }
 
+    // A partner issues their own file only (loadDraft hands them nothing else).
+    const issuer = await partnerCaller();
+    if (issuer && record.partner_company_id !== issuer.partner_id) return { ok: false, error: "err.forbidden" };
+
     const result = await insertOffer({
       customer_id: await customerFor(data.customer, await isStaffSession()),
       employee_id: null,
@@ -889,7 +893,9 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       // A reseller's file starts WITHOUT our price on it — they set their own.
       // Not a company setting: an initial value, flipped per file from the
       // export screen.
-      show_prices: !partnerCompanyId,
+      // A partner's OWN file prints its price — the one they typed for their
+      // client, else their cost (the owner: «يجب ان يظهر بسعر»).
+      show_prices: record.partner_company_id ? true : !partnerCompanyId,
       destination: data.trip.destination || data.trip.country,
       duration: `${data.trip.days} أيام / ${data.trip.nights} ليالي`,
       offer_date: data.trip.arrival_date,
@@ -977,7 +983,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
           weather_source: d.weather?.source ?? null,
           weather_fetched_at: d.weather?.fetched_at || null,
         })),
-    });
+    }, issuer?.partner_id);
 
     if (!result.ok) return { ok: false, error: result.error };
     await writeDraftStages(draftId, { produced_serial: result.serial });

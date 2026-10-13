@@ -51,7 +51,7 @@ function PendingRow({ company }: { company: PartnerCompany }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [kind, setKind] = useState<"markup" | "commission">("markup");
-  const [pct, setPct] = useState("35");
+  const [pct, setPct] = useState("15");
 
   return (
     <div className="rounded-[12px] border border-[#e2ebe7] bg-white p-3">

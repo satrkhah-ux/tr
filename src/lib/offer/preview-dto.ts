@@ -283,10 +283,12 @@ export function repackageToPreviewOffer(data: RepackageData): ClientOfferDTO | n
 export function draftBrand(
   data: DraftData,
   partners: GeneratorLookups["partners"],
+  /** the viewer is the partner whose file this is — it prints its price */
+  ownFile = false,
 ): { brand: DocBrand | undefined; showPrices: boolean } {
   const partner = matchPartner(data.customer, partners);
   if (!partner) return { brand: undefined, showPrices: true };
   // Matches what produceOfferFromDraft will write, so the preview here is what
   // comes out — and the export screen can still flip it per file afterwards.
-  return { brand: partnerBrand(partner, partner.logo_url), showPrices: false };
+  return { brand: partnerBrand(partner, partner.logo_url), showPrices: ownFile };
 }

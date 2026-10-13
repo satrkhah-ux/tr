@@ -21,6 +21,7 @@ import {
 } from "@/lib/offer/dto";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
+import { getPartnerSession } from "@/lib/partners/session";
 import { getClimateNote } from "./climate-actions";
 import { insertOffer } from "./offer-insert";
 import { setOfferStatus } from "./offer-status";
@@ -829,15 +830,25 @@ export async function publishOffer(serial: string): Promise<PublishResult> {
     // salesperson's produced offer otherwise had no client link and no PDF. The
     // cost is read only to be frozen into the internal snapshot below, through
     // the service role, and no figure goes back to the caller.
-    if (!(await currentCan("offers.write")) && !(await currentCan("repackage.write"))) {
-      return { ok: false, error: "err.forbidden" };
+    // …or the partner company that issued it (their own offer only). RLS gives
+    // a partner no write on offers, so their send runs through the service role.
+    let supabase: SupabaseClient;
+    if ((await currentCan("offers.write")) || (await currentCan("repackage.write"))) {
+      supabase = await db();
+    } else {
+      const partner = await getPartnerSession();
+      if (!partner) return { ok: false, error: "err.forbidden" };
+      supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+      const { data: owned } = await supabase.from("offers").select("partner_company_id").eq("serial", serial).maybeSingle();
+      if ((owned as { partner_company_id: string | null } | null)?.partner_company_id !== partner.partner_id) {
+        return { ok: false, error: "err.forbidden" };
+      }
     }
 
     const internal = await loadInternalOffer(serial);
     if (!internal) return { ok: false, error: "err.loadFailed" };
     const client = toClientOfferDTO(internal);
 
-    const supabase = await db();
     const { data: offerRow } = await supabase.from("offers").select("id").eq("serial", serial).maybeSingle();
     if (!offerRow) return { ok: false, error: "err.loadFailed" };
     const offerId = (offerRow as { id: string }).id;

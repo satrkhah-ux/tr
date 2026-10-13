@@ -351,7 +351,7 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
           {canInternal ? (
             <Total label={t("pg.totalBuy")} value={`${formatMoney(summary.total_buy)} ${display}`} tone="muted" />
           ) : null}
-          <Total label={t("pg.totalSell")} value={`${formatMoney(summary.total_sell)} ${display}`} tone="brand" />
+          <Total label={t(partner ? "pg.partnerCost" : "pg.totalSell")} value={`${formatMoney(summary.total_sell)} ${display}`} tone="brand" />
           {canInternal ? <Total label={t("pg.profitCol")} value={`${formatMoney(summary.profit)} ${display}`} tone="good" /> : null}
           {canInternal ? (
             <Total label={t("pg.marginCol")} value={summary.margin_pct != null ? `${summary.margin_pct}%` : "—"} tone="good" />
@@ -384,7 +384,7 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
             </select>
           </label>
           <label className={labelClass}>
-            {t("pg.finalTotal")}
+            {t(partner ? "pg.partnerSell" : "pg.finalTotal")}
             <input
               type="number"
               min={0}

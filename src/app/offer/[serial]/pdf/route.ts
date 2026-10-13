@@ -47,13 +47,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ seri
 
   // `brand=ours` forces our identity even when the offer is tied to a partner;
   // no param at all falls back to whatever the offer was branded for.
-  // A partner never gets money from this route: the snapshot holds OUR sell, and
-  // `?prices=on` would print it. Their price is quoted at their terms elsewhere.
+  // A partner cannot switch prices on: the file's own flag decides — on for
+  // their own file (their price), off for one we built for them (our sell).
   const partner = await getPartnerSession();
   const { brand, showPrices } = await resolveDocBrand({
     serial,
     partnerId: brandParam === "ours" ? null : brandParam,
-    showPrices: partner ? false : pricesParam == null ? undefined : pricesParam !== "off",
+    showPrices: partner ? undefined : pricesParam == null ? undefined : pricesParam !== "off",
   });
 
   const html = await renderOfferDocumentHtml({ ...props, brand, showPrices });

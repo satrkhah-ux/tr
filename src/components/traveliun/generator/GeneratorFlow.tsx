@@ -390,7 +390,7 @@ export function GeneratorFlow({
                   <OfferDocument
                     variant="client"
                     offer={draftToPreviewOffer(data, lookups.airlines, lookups.sarPer)}
-                    {...draftBrand(data, lookups.partners)}
+                    {...draftBrand(data, lookups.partners, canPricing && !can("pricing.view"))}
                   />
                 </div>
               </div>
