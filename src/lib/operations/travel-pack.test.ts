@@ -98,6 +98,7 @@ function pack(withDriver: boolean): TravelPack {
           car: "فان",
           flight: "SV834 RUH → KUL",
           program: "",
+          progress: null,
           driver: withDriver ? { name: "أمين", phone: "+60 12 345 6789", plate: "WXY 1234" } : null,
         },
       ],
