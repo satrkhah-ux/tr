@@ -224,6 +224,7 @@ export const en = {
   "nav.settings": "Settings",
   "nav.profits": "Profits",
   "nav.profitPolicy": "Profit policy",
+  "nav.clientComms": "Client messages & emergency guide",
   "shell.serverLost": "The server could not be reached — most likely a new version was deployed. What you typed is kept: reload the page, then try again.",
   "shell.reload": "Reload",
   "nav.statusGroups": "Status Groups",

@@ -40,6 +40,7 @@ import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition, useSessionField } from "../useSafeTransition";
 import { ReadinessPanel } from "./ReadinessPanel";
+import { CasePresence } from "./CasePresence";
 import { IssuesPanel } from "./IssuesPanel";
 
 const CLIENT_KEY = (s: string) => `ops.client.${s}` as TranslationKey;
@@ -149,6 +150,7 @@ export function OperationCase({
           </div>
         </section>
 
+        <CasePresence operationId={operation.id} />
         <ReadinessPanel operationId={operation.id} execution={operation.execution_status} />
 
         <DocumentsPanel

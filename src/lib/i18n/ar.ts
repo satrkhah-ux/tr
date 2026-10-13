@@ -222,6 +222,7 @@ export const ar: Dictionary = {
   "nav.settings": "الإعدادات",
   "nav.profits": "الأرباح",
   "nav.profitPolicy": "سياسة الربح",
+  "nav.clientComms": "رسائل العميل ودليل الطوارئ",
   "shell.serverLost": "تعذّر الوصول إلى الخادم — غالباً نُشرت نسخة جديدة من النظام. ما كتبته باقٍ في الحقول: أعد تحميل الصفحة ثم أعد المحاولة.",
   "shell.reload": "إعادة التحميل",
   "nav.statusGroups": "مجموعات الحالات",

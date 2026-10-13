@@ -7,6 +7,8 @@ import { translate, type TranslationKey } from "@/lib/i18n";
 import { aheadOfClient, aheadOfExecution, derivedClient, derivedExecution, readiness, type ReadinessItem } from "@/lib/operations/progress";
 import { kanbanStageFor, type ClientStatus, type ExecutionStatus } from "@/lib/operations/state";
 import { CLIENT_DOCUMENT_KINDS } from "@/lib/operations/voucher-dto";
+import { MESSAGE_ON_STATE } from "@/lib/operations/client-messages";
+import { sendClientMessage } from "@/lib/data/client-messages";
 
 /**
  * The ONE place a case's statuses move by themselves (operations order 6):
@@ -49,6 +51,8 @@ export async function syncOperation(operationId: string): Promise<void> {
       if (stage) await supabase.from("offers").update({ pipeline_stage: stage }).eq("id", row.offer_id);
       await logAudit({ action: "operation.execution_status", entity: "operations", entity_id: operationId, meta: { from: row.execution_status, to: execTo, auto: true } });
       await notifyPartnerCase({ offerId: row.offer_id, what: translate("ar", `ops.exec.${execTo}` as TranslationKey) });
+      const message = MESSAGE_ON_STATE[execTo];
+      if (message) await sendClientMessage(operationId, message);
     }
 
     const paid = ((payments.data ?? []) as { amount: number | string; kind: string }[]).reduce(

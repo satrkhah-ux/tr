@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { notifyOps, notifyPartnerCase } from "@/lib/data/ops-notify";
 import { readinessFor } from "@/lib/data/operation-sync";
+import { sendClientMessage } from "@/lib/data/client-messages";
 import { passportValidFor } from "./progress";
 import { canAdvanceClient, canAdvanceExecution, type ClientStatus, type ExecutionStatus } from "./state";
 
@@ -66,6 +67,7 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
       await supabase.from("offers").update({ pipeline_stage: "completed" }).eq("id", op.offer_id);
       await logAudit({ action: "operation.execution_status", entity: "operations", entity_id: op.id, meta: { from: op.execution_status, to: "travelled", auto: true }, actor: { id: null, label: "ops-daily" } });
       await notifyPartnerCase({ offerId: op.offer_id, what: "سافر" });
+      await sendClientMessage(op.id, "rate_trip");
       op.execution_status = "travelled";
       result.travelled += 1;
     }
@@ -90,6 +92,10 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
       return (Array.isArray(c) ? c[0]?.arabic_name : c?.arabic_name) ?? "";
     })();
     const head = `${serialOf(op)}${name ? ` — ${name}` : ""}`;
+
+    // the client: the day before, and on arrival (each once — sendClientMessage keeps count)
+    if (days === 1) await sendClientMessage(op.id, "day_before");
+    if (days === 0) await sendClientMessage(op.id, "welcome");
 
     if ([7, 3, 1].includes(days)) {
       const items = (await readinessFor(op.id)) ?? [];

@@ -88,6 +88,8 @@ export type AuditAction =
   | "staff_registration.approved"
   | "staff_registration.rejected"
   // the reference catalogue was exported/imported as a whole
+  // managers changing what the system says or shows (guides, message templates)
+  | "settings.updated"
   | "catalog.imported";
 
 export type AuditInput = {
