@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { VoucherDocument } from "./VoucherDocument";
+import { partnerBrand } from "./brand";
+import { COMPANY } from "./labels";
 import type { VoucherBooking, VoucherDTO } from "@/lib/operations/voucher-dto";
 
 function voucher(kind: VoucherDTO["kind"], bookings: VoucherBooking[]): VoucherDTO {
@@ -61,5 +63,19 @@ describe("the operational documents", () => {
     expect(out).toContain("مورّد داخلي");
     expect(out).toContain("داخلي — لا يُسلَّم للعميل");
     expect(out).not.toContain(">—</td></tr>");
+  });
+
+  it("prints a partner's client's voucher under the partner's name and number, not ours", () => {
+    const brand = partnerBrand(
+      { name: "سفريات الواحة", name_latin: "Oasis Travel", address: "جدة", phone: "0120000000", whatsapp: null, website: null, email: null, brand_color: "#123456", accent_color: "#abcdef", doc_font: null } as Parameters<typeof partnerBrand>[0],
+      null,
+    );
+    const out = renderToStaticMarkup(createElement(VoucherDocument, { voucher: voucher("hotel_voucher", [booking({})]), brand }));
+    expect(out).toContain("سفريات الواحة");
+    expect(out).toContain("0120000000");
+    // the test client is «ترافليون التقني» — so our company NAME and NUMBER, not the word
+    expect(out).not.toContain(COMPANY.nameAr);
+    expect(out).not.toContain(COMPANY.phone);
+    expect(out).toContain("#123456");
   });
 });

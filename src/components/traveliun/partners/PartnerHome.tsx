@@ -3,13 +3,17 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { FilePlus2, Loader2, Wallet, Globe2, FileText, PackageCheck } from "lucide-react";
+import { FilePlus2, Loader2, Wallet, Globe2, FileText, PackageCheck, CheckCircle2, Link2, Copy } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { TraveliunShell } from "../TraveliunShell";
 import { createPartnerFile } from "@/lib/partners/drafts";
 import { draftHref } from "@/lib/offer/draft-types";
 import { WelcomeBoardButton } from "../WelcomeBoardButton";
-import type { PartnerHomeData } from "@/lib/partners/home";
+import type { PartnerAwaiting, PartnerHomeData, PartnerRequest } from "@/lib/partners/home";
+import { confirmPartnerOffer } from "@/lib/data/operations";
+import { partnerClientLink } from "@/lib/data/operation-hub";
+import { DOCUMENT_LABEL } from "@/lib/operations/voucher-dto";
+import { useSafeTransition } from "../useSafeTransition";
 
 /**
  * The partner's home: their numbers, not ours.
@@ -129,6 +133,20 @@ export function PartnerHome({
           />
         </section>
 
+        {data.awaiting.length > 0 ? (
+          <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+            <h2 className="text-[14px] font-extrabold text-[var(--tv-brand)]">بانتظار تأكيد العميل</h2>
+            <p className="mb-3 mt-0.5 text-[12px] font-semibold text-[#78948f]">
+              حين يوافق عميلكم سجّلوا ذلك هنا — يصل الطلب لقسم العمليات عندنا فوراً ويبدأ الحجز.
+            </p>
+            <ul className="space-y-1.5">
+              {data.awaiting.map((a) => (
+                <AwaitingRow key={a.serial} item={a} />
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         <div className="grid gap-4 lg:grid-cols-2">
           <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
             <h2 className="mb-3 text-[14px] font-extrabold text-[var(--tv-brand)]">
@@ -190,6 +208,7 @@ export function PartnerHome({
                         </span>
                       ) : null}
                     </div>
+                    <RequestDocuments request={r} />
                   </li>
                 ))}
               </ul>
@@ -252,5 +271,153 @@ export function PartnerHome({
         </p>
       </div>
     </TraveliunShell>
+  );
+}
+
+/** One issued offer whose client has not answered yet — «العميل أكّد», asked twice so a stray tap does not start bookings. */
+function AwaitingRow({ item }: { item: PartnerAwaiting }) {
+  const router = useRouter();
+  const [pending, run] = useSafeTransition();
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const confirm = () =>
+    run(async () => {
+      setError(null);
+      const res = await confirmPartnerOffer(item.serial);
+      if (res.ok) {
+        setAsking(false);
+        router.refresh();
+      } else {
+        setError(
+          res.error === "ops.err.notFound"
+            ? "لم نجد هذا العرض ضمن عروض شركتكم."
+            : res.error === "ops.err.invalidTransition"
+              ? "هذا العرض ملغى ولا يمكن تأكيده."
+              : "تعذّر التسجيل. حاول مرة أخرى.",
+        );
+      }
+    });
+
+  return (
+    <li className="rounded-[10px] border border-[#e9f0ed] p-2.5 dark:border-[#22443b]">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="tv-tnum text-[12.5px] font-extrabold text-[#0f3d38] dark:text-[#d6e5df]">
+          <DirText dir="ltr">{item.serial}</DirText>
+        </span>
+        {item.destination ? <span className="text-[12px] font-bold text-[#557d78]">{item.destination}</span> : null}
+        <span className="tv-tnum text-[11px] font-bold text-[#93aaa3]">
+          <DirText dir="ltr">{String(item.travelers)}</DirText> مسافر
+          {item.travel_date ? (
+            <>
+              {" · "}
+              <DirText dir="ltr">{item.travel_date}</DirText>
+            </>
+          ) : null}
+        </span>
+        <span className="ms-auto flex flex-wrap items-center gap-1.5">
+          {asking ? (
+            <>
+              <span className="text-[11.5px] font-bold text-[#557d78]">تأكيد العميل لهذا العرض؟</span>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={confirm}
+                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#0f7a52] px-3 text-[12px] font-bold text-white disabled:opacity-60"
+              >
+                {pending ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
+                نعم، أكّد
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => setAsking(false)}
+                className="inline-flex h-8 items-center rounded-[8px] border border-[#d8e4df] px-3 text-[12px] font-bold text-[#557d78]"
+              >
+                تراجع
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAsking(true)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[var(--tv-brand)] px-3 text-[12px] font-bold text-white hover:opacity-90"
+            >
+              <CheckCircle2 className="size-3.5" />
+              العميل أكّد
+            </button>
+          )}
+        </span>
+      </div>
+      {error ? <p className="mt-1.5 text-[12px] font-bold text-[#c22850]">{error}</p> : null}
+    </li>
+  );
+}
+
+/** What the partner hands its traveller: the documents issued so far, and the one link that always has the latest. */
+function RequestDocuments({ request }: { request: PartnerRequest }) {
+  const [pending, run] = useSafeTransition();
+  const [token, setToken] = useState(request.client_token);
+  const [note, setNote] = useState<string | null>(null);
+
+  const copy = async (path: string) => {
+    const url = `${window.location.origin}${path}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setNote("نُسخ الرابط.");
+    } catch {
+      // no clipboard (an older app view): show it to copy by hand
+      setNote(url);
+    }
+  };
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {request.documents.map((d) => (
+        <a
+          key={d.kind}
+          href={`/voucher/${d.token}/pdf`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-7 items-center gap-1 rounded-[8px] border border-[#d8e4df] px-2.5 text-[11.5px] font-bold text-[#0f3d38] hover:bg-[#f4f8f6] dark:border-[#22443b] dark:text-[#d6e5df]"
+        >
+          <FileText className="size-3.5" />
+          {DOCUMENT_LABEL[d.kind]}
+        </a>
+      ))}
+      {token ? (
+        <button
+          type="button"
+          onClick={() => copy(`/trip/${token}`)}
+          className="inline-flex h-7 items-center gap-1 rounded-[8px] bg-[#eef4f1] px-2.5 text-[11.5px] font-bold text-[var(--tv-brand)] dark:bg-[#17302a]"
+        >
+          <Copy className="size-3.5" />
+          نسخ رابط العميل
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            run(async () => {
+              setNote(null);
+              const res = await partnerClientLink(request.operation_id);
+              if (res.ok) setToken(res.token);
+              else
+                setNote(
+                  res.error === "ops.err.forbidden"
+                    ? "أوقفنا رابط هذا العميل — تواصلوا معنا لرابط جديد."
+                    : "تعذّر إنشاء الرابط. حاول مرة أخرى.",
+                );
+            })
+          }
+          className="inline-flex h-7 items-center gap-1 rounded-[8px] bg-[#eef4f1] px-2.5 text-[11.5px] font-bold text-[var(--tv-brand)] disabled:opacity-60 dark:bg-[#17302a]"
+        >
+          {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Link2 className="size-3.5" />}
+          رابط العميل
+        </button>
+      )}
+      {note ? <span className="text-[11.5px] font-semibold text-[#557d78] [overflow-wrap:anywhere]">{note}</span> : null}
+    </div>
   );
 }

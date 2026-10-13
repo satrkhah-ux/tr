@@ -1557,6 +1557,7 @@ export const ar: Dictionary = {
   "ops.clientTrack": "العميل",
   "ops.executionTrack": "التنفيذ",
   "ops.travelWindow": "السفر",
+  "ops.partnerTag": "شريك: {name}",
   "ops.travelers": "المسافرون",
   "ops.payments": "الدفعات",
   "ops.paidOf": "{paid} من {total}",

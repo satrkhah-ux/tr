@@ -1559,6 +1559,7 @@ export const en = {
   "ops.clientTrack": "Client",
   "ops.executionTrack": "Execution",
   "ops.travelWindow": "Travel",
+  "ops.partnerTag": "Partner: {name}",
   "ops.travelers": "Travelers",
   "ops.payments": "Payments",
   "ops.paidOf": "{paid} of {total}",

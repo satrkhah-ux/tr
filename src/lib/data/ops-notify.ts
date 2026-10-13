@@ -228,3 +228,50 @@ export async function notifyBookingChanged(notice: BookingChangeNotice): Promise
   }
   return { whatsapp, telegram: 0 };
 }
+
+/**
+ * Tell a PARTNER company that its client's case moved — a status, a document.
+ *
+ * Their client phones them, not us, so they hear it first. WhatsApp through
+ * Teletel to the company's own number, and only into a thread that already
+ * exists (as notifyBookingChanged): no thread, no message — the portal shows the
+ * same state either way. Says nothing internal: no supplier, no cost, no note.
+ * A file that is ours (no partner) sends nothing. Best-effort, never throws.
+ */
+export async function notifyPartnerCase(notice: { offerId: string; what: string }): Promise<boolean> {
+  try {
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { data } = await supabase
+      .from("offers")
+      .select("serial, customers(arabic_name), booking_partners(whatsapp, phone)")
+      .eq("id", notice.offerId)
+      .maybeSingle();
+    const row = data as unknown as {
+      serial: string;
+      customers: { arabic_name: string | null } | { arabic_name: string | null }[] | null;
+      booking_partners: { whatsapp: string | null; phone: string | null } | { whatsapp: string | null; phone: string | null }[] | null;
+    } | null;
+    const partner = Array.isArray(row?.booking_partners) ? row?.booking_partners[0] : row?.booking_partners;
+    const number = (partner?.whatsapp || partner?.phone || "").trim();
+    if (!row || !number) return false;
+    const customer = Array.isArray(row.customers) ? row.customers[0] : row.customers;
+
+    const base = readEnv("NEXT_PUBLIC_SITE_URL") ?? "https://pkg.traveliun.com";
+    const text = [
+      "تحديث على طلبكم",
+      "",
+      `العرض: ${row.serial}`,
+      customer?.arabic_name ? `العميل: ${customer.arabic_name}` : null,
+      `الحالة: ${notice.what}`,
+      "",
+      `${base}/b2b`,
+    ]
+      .filter((l): l is string => l !== null)
+      .join("\n");
+
+    const conversationId = await conversationForPhone(number);
+    return conversationId ? (await sendTeletelMessage(conversationId, text)) !== null : false;
+  } catch {
+    return false;
+  }
+}

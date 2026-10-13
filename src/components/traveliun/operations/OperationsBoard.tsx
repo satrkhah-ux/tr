@@ -52,7 +52,7 @@ export function OperationsBoard({
         if (filter === "unpaid" && !op.signals.some((s) => s.code === "unpaid_confirmed")) return false;
         if (filter === "travelling_soon" && !op.signals.some((s) => s.code === "travel_approaching_incomplete")) return false;
         if (!q) return true;
-        return [op.serial, op.destination, op.customer_name, op.customer_phone]
+        return [op.serial, op.destination, op.customer_name, op.customer_phone, op.partner_name]
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(q));
       })
@@ -157,6 +157,11 @@ function CaseCard({ op }: { op: OperationCard & { signals: OperationSignal[] } }
           <p className="tv-tnum mt-0.5 text-[11.5px] font-bold text-[#93aaa3]">
             <DirText dir="ltr">{op.serial}</DirText>
             {op.destination ? <span className="ms-2 font-semibold">{op.destination}</span> : null}
+            {op.partner_name ? (
+              <span className="ms-2 rounded-full bg-[#f0e9f9] px-2 py-0.5 text-[10.5px] font-bold text-[#6a3fa0]">
+                {t("ops.partnerTag", { name: op.partner_name })}
+              </span>
+            ) : null}
           </p>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#eef4f1] px-2 py-1 text-[11px] font-bold text-[#557d78]">

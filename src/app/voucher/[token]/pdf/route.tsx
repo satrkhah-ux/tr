@@ -3,6 +3,9 @@ import { VoucherDocument } from "@/components/offer-doc/VoucherDocument";
 import { WelcomeBoardDocument } from "@/components/offer-doc/WelcomeBoardDocument";
 import { getWelcomeBoard } from "@/lib/data/welcome-board";
 import { renderDocHtml } from "@/lib/offer-doc/html";
+import { inlineImage } from "@/lib/offer-doc/assets";
+import { resolveDocBrand } from "@/lib/data/partner-companies";
+import { TRAVELIUN_BRAND } from "@/components/offer-doc/brand";
 import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { VoucherDTO } from "@/lib/operations/voucher-dto";
@@ -60,7 +63,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
     });
   }
 
-  const html = await renderDocHtml((assets) => <VoucherDocument voucher={voucher} assets={assets} />);
+  // A partner's client carries the partner's documents — its logo, name, colours
+  // and font. The booking summary is ours (internal), so it keeps our brand.
+  const resolved = voucher.kind === "booking_summary" ? TRAVELIUN_BRAND : (await resolveDocBrand({ serial: voucher.serial })).brand;
+  // Chromium prints offline: a storage logo URL must be inlined or it prints a broken box
+  const brand = resolved.logoUrl ? { ...resolved, logoUrl: (await inlineImage(resolved.logoUrl)) ?? null } : resolved;
+  const html = await renderDocHtml((assets) => <VoucherDocument voucher={voucher} assets={assets} brand={brand} />, brand.font);
   const pdf = await offerDocumentToPdf(html);
 
   return new NextResponse(new Uint8Array(pdf), {

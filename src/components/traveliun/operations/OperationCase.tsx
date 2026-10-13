@@ -109,6 +109,11 @@ export function OperationCase({
                     <DirText dir="ltr">{operation.customer_phone}</DirText>
                   </span>
                 ) : null}
+                {operation.partner_name ? (
+              <span className="ms-2 rounded-full bg-[#f0e9f9] px-2 py-0.5 text-[10.5px] font-bold text-[#6a3fa0]">
+                {t("ops.partnerTag", { name: operation.partner_name })}
+              </span>
+            ) : null}
               </p>
             </div>
             <div className="text-end">

@@ -7,6 +7,8 @@ import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser 
 import { logAudit } from "@/lib/data/audit";
 import { CLIENT_DOCUMENT_KINDS, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { currentCan } from "@/lib/roles/current";
+import { resolveDocBrand } from "@/lib/data/partner-companies";
+import { getPartnerSession } from "@/lib/partners/session";
 
 /**
  * ONE link for the client.
@@ -33,8 +35,34 @@ async function requireOps(): Promise<TranslationKey | null> {
 export async function ensureClientLink(operationId: string): Promise<{ ok: true; token: string } | Fail> {
   const denied = await requireOps();
   if (denied) return { ok: false, error: denied };
+  return mintClientLink((await createSupabaseServerClient()) as unknown as SupabaseClient, operationId);
+}
+
+/**
+ * The same link, asked for by the partner whose client it is — they send it to
+ * their traveller. The partner may READ its own operations (0037) but not write
+ * them, so: visible through the partner's own session first, then minted with
+ * the service role.
+ */
+export async function partnerClientLink(operationId: string): Promise<{ ok: true; token: string } | Fail> {
+  if (!(await getPartnerSession())) return { ok: false, error: "err.session" };
   try {
-    const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
+    const own = await ((await createSupabaseServerClient()) as unknown as SupabaseClient)
+      .from("operations")
+      .select("id, client_token_revoked_at")
+      .eq("id", operationId)
+      .maybeSingle();
+    if (!own.data) return { ok: false, error: "ops.err.notFound" };
+    // a link we stopped stays stopped — a new one is ours to give
+    if ((own.data as { client_token_revoked_at: string | null }).client_token_revoked_at) return { ok: false, error: "ops.err.forbidden" };
+    return mintClientLink(createSupabaseServiceClient() as unknown as SupabaseClient, operationId);
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+async function mintClientLink(supabase: SupabaseClient, operationId: string): Promise<{ ok: true; token: string } | Fail> {
+  try {
     const { data } = await supabase
       .from("operations")
       .select("client_token, client_token_revoked_at")
@@ -86,6 +114,8 @@ export type ClientHub = {
   documents: ClientHubDoc[];
   /** what is still being worked on, in words the client can read. */
   pending: { kind: string; title: string }[];
+  /** whose trip it is — a partner's client sees the partner's name, number and colour, not ours. */
+  brand: { name: string; phone: string; website: string; color: string | null };
 };
 
 /**
@@ -142,6 +172,8 @@ export async function getClientHub(token: string): Promise<ClientHub | null> {
       .filter((b) => b.status !== "confirmed")
       .map((b) => ({ kind: b.kind, title: b.title }));
 
+    const { brand } = await resolveDocBrand({ serial: offer?.serial ?? "" });
+
     return {
       serial: offer?.serial ?? "",
       destination: offer?.destination ?? null,
@@ -150,6 +182,7 @@ export async function getClientHub(token: string): Promise<ClientHub | null> {
       travel_end: op.travel_end,
       documents,
       pending,
+      brand: { name: brand.nameAr, phone: brand.phone, website: brand.website, color: brand.vars?.["--od-green"] ?? null },
     };
   } catch {
     return null;

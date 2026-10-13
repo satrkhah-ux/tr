@@ -1,11 +1,12 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { TranslationKey } from "@/lib/i18n";
+import { translate, type TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
-import { notifyOperationConfirmed } from "@/lib/data/ops-notify";
+import { notifyOperationConfirmed, notifyPartnerCase } from "@/lib/data/ops-notify";
+import { getPartnerSession } from "@/lib/partners/session";
 import { setOfferStatus } from "@/lib/data/offer-status";
 import {
   canAdvanceClient,
@@ -61,6 +62,8 @@ export type OperationCard = OperationRow & {
   currency: string | null;
   paid: number;
   travelers_count: number;
+  /** the partner company that sold this file, or null for our own sale. */
+  partner_name: string | null;
 };
 
 type OkId = { ok: true; id: string };
@@ -83,10 +86,46 @@ export async function confirmOffer(input: {
 }): Promise<OkId | Fail> {
   const denied = await requireOps();
   if (denied) return { ok: false, error: denied };
+  return recordConfirmation(await db(), input);
+}
 
+/**
+ * A partner company records that ITS client confirmed — from its portal.
+ *
+ * Partners cannot write operations (RLS is staff-only), so this runs through the
+ * service role, and only after checking on the server that the offer is this
+ * partner's own and still live. Then it is the same confirmation as an agent's:
+ * same operation row, same offer status, same ops notice.
+ */
+export async function confirmPartnerOffer(serial: string): Promise<OkId | Fail> {
+  const partner = await getPartnerSession();
+  if (!partner) return { ok: false, error: "err.session" };
   try {
-    const supabase = await db();
+    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { data } = await service
+      .from("offers")
+      .select("id, status, partner_company_id")
+      .eq("serial", serial.trim())
+      .maybeSingle();
+    const offer = data as { id: string; status: string | null; partner_company_id: string | null } | null;
+    // not theirs and not there read the same — no probing other companies' serials
+    if (!offer || offer.partner_company_id !== partner.partner_id) return { ok: false, error: "ops.err.notFound" };
+    if (offer.status === "cancelled") return { ok: false, error: "ops.err.invalidTransition" };
+    return recordConfirmation(service, {
+      offer_id: offer.id,
+      channel: "other",
+      note: `أكّدته الشركة الشريكة «${partner.partner_name}» من بوابتها`,
+    });
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
 
+async function recordConfirmation(
+  supabase: SupabaseClient,
+  input: { offer_id: string; channel?: ConfirmChannel; note?: string | null },
+): Promise<OkId | Fail> {
+  try {
     const existing = await supabase.from("operations").select("id").eq("offer_id", input.offer_id).maybeSingle();
     if (existing.data) return { ok: true, id: (existing.data as { id: string }).id };
 
@@ -213,6 +252,7 @@ export async function setClientStatus(
       entity_id: operationId,
       meta: { from: current.client_status, to, note: note ?? null },
     });
+    await notifyPartnerCase({ offerId: current.offer_id, what: translate("ar", `ops.client.${to}` as TranslationKey) });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -253,6 +293,7 @@ export async function setExecutionStatus(
       entity_id: operationId,
       meta: { from: current.execution_status, to, note: note ?? null },
     });
+    await notifyPartnerCase({ offerId: current.offer_id, what: translate("ar", `ops.exec.${to}` as TranslationKey) });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -338,6 +379,7 @@ type OfferJoin = {
   children: number | null;
   infants: number | null;
   customers: { arabic_name: string | null; mobile: string | null } | null;
+  booking_partners: { name: string | null } | { name: string | null }[] | null;
 };
 
 /**
@@ -361,7 +403,7 @@ export async function listOperations(): Promise<OperationCard[]> {
     const { data } = await supabase
       .from("operations")
       .select(
-        "id, offer_id, render_id, client_status, execution_status, travel_start, travel_end, confirm_channel, confirmed_at, note, offers(serial, destination, total, currency, adults, children, infants, customers(arabic_name, mobile))",
+        "id, offer_id, render_id, client_status, execution_status, travel_start, travel_end, confirm_channel, confirmed_at, note, offers(serial, destination, total, currency, adults, children, infants, customers(arabic_name, mobile), booking_partners(name))",
       )
       .order("travel_start", { ascending: true, nullsFirst: false });
 
@@ -407,6 +449,7 @@ export async function listOperations(): Promise<OperationCard[]> {
         paid: paid.get(r.id) ?? 0,
         // the travellers entered, else the ones the offer was sold for — a new case is not «0»
         travelers_count: travelers.get(r.id) ?? (offer?.adults ?? 0) + (offer?.children ?? 0) + (offer?.infants ?? 0),
+        partner_name: one(offer?.booking_partners)?.name ?? null,
       };
     });
   } catch {

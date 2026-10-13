@@ -1,17 +1,11 @@
 import { notFound } from "next/navigation";
-import { COMPANY } from "@/components/offer-doc/labels";
 import { getClientHub } from "@/lib/data/operation-hub";
+import { DOCUMENT_LABEL } from "@/lib/operations/voucher-dto";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false, follow: false } };
 
-const DOC_LABEL: Record<string, string> = {
-  hotel_voucher: "قسيمة إقامة فندقية",
-  flight_ticket: "تذكرة الطيران",
-  itinerary: "الجدول السياحي",
-  booking_summary: "ملخص الحجوزات",
-  welcome_board: "لوحة الاستقبال",
-};
+const DOC_LABEL: Record<string, string> = DOCUMENT_LABEL;
 
 const KIND_LABEL: Record<string, string> = {
   hotel: "الفندق",
@@ -36,8 +30,12 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
   return (
     <main dir="rtl" className="min-h-screen bg-[#f4f8f6] px-4 py-10 text-[#0f3d38]">
       <div className="mx-auto w-full max-w-[680px]">
-        <header className="rounded-2xl bg-[#135549] px-6 py-7 text-white shadow-[0_10px_30px_rgba(19,85,73,0.25)]">
-          <p className="text-[13px] font-bold opacity-80">{COMPANY.nameAr}</p>
+        {/* a partner's colour when it is their client — a validated hex from brandVars, else ours */}
+        <header
+          className="rounded-2xl bg-[#135549] px-6 py-7 text-white shadow-[0_10px_30px_rgba(19,85,73,0.25)]"
+          style={hub.brand.color ? { backgroundColor: hub.brand.color } : undefined}
+        >
+          <p className="text-[13px] font-bold opacity-80">{hub.brand.name}</p>
           <h1 className="mt-1 text-[24px] font-extrabold">{hub.destination || "رحلتك"}</h1>
           <p className="mt-2 text-[13.5px] font-semibold opacity-90">
             {hub.customer_name ? `${hub.customer_name} · ` : ""}
@@ -99,7 +97,9 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
         ) : null}
 
         <footer className="mt-5 text-center text-[12px] font-semibold text-[#93aaa3]">
-          {COMPANY.nameAr} · <bdi dir="ltr">{COMPANY.phone}</bdi> · <bdi dir="ltr">{COMPANY.website}</bdi>
+          {hub.brand.name}
+          {hub.brand.phone ? <> · <bdi dir="ltr">{hub.brand.phone}</bdi></> : null}
+          {hub.brand.website ? <> · <bdi dir="ltr">{hub.brand.website}</bdi></> : null}
         </footer>
       </div>
     </main>

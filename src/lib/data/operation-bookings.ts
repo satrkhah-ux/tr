@@ -7,8 +7,8 @@ import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser 
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { listTravelers } from "@/lib/data/operation-travelers";
-import { notifyBookingChanged } from "@/lib/data/ops-notify";
-import type { VoucherBooking, VoucherDTO, VoucherKind } from "@/lib/operations/voucher-dto";
+import { notifyBookingChanged, notifyPartnerCase } from "@/lib/data/ops-notify";
+import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, type VoucherBooking, type VoucherDTO, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { currentCan } from "@/lib/roles/current";
 
 /**
@@ -602,6 +602,10 @@ export async function issueDocument(input: {
       entity_id: id,
       meta: { operation_id: input.operation_id, kind: input.kind, version },
     });
+    // a partner's client gets this document from the partner — tell them it is out
+    if (CLIENT_DOCUMENT_KINDS.includes(input.kind)) {
+      await notifyPartnerCase({ offerId: op.offer_id, what: `صدر مستند: ${DOCUMENT_LABEL[input.kind]}` });
+    }
     return { ok: true, id, token };
   } catch {
     return { ok: false, error: "err.db" };

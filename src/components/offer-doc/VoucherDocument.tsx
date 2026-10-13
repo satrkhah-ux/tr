@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { AR, COMPANY, fmtDate } from "./labels";
+import { AR, fmtDate } from "./labels";
+import { TRAVELIUN_BRAND, type DocBrand } from "./brand";
 import { OFFER_DOC_CSS } from "./styles";
 import { DEFAULT_OFFER_DOC_ASSETS, type OfferDocAssets } from "./assets";
 import type { VoucherBooking, VoucherDTO, VoucherKind } from "@/lib/operations/voucher-dto";
@@ -8,7 +9,7 @@ import type { VoucherBooking, VoucherDTO, VoucherKind } from "@/lib/operations/v
  * The operational documents — hotel voucher, flight ticket, itinerary, booking
  * summary — in the Traveliun identity.
  *
- * It reuses OFFER_DOC_CSS, COMPANY and the label formatters rather than styling
+ * It reuses OFFER_DOC_CSS, the document brand and the label formatters rather than styling
  * itself, which is what makes a voucher look like it came from the same company
  * as the offer. It does NOT reuse OfferDocument's block packer: that machinery
  * exists to fill A4 sheets with eight heterogeneous sections, and a voucher has
@@ -113,9 +114,12 @@ const chunks = <T,>(list: T[], first: number, rest: number): T[][] => {
 export function VoucherDocument({
   voucher,
   assets = DEFAULT_OFFER_DOC_ASSETS,
+  brand = TRAVELIUN_BRAND,
 }: {
   voucher: VoucherDTO;
   assets?: OfferDocAssets;
+  /** whose file it is: a partner's client carries the partner's documents, not ours. */
+  brand?: DocBrand;
 }) {
   const pages: ReactNode[] = [];
   const summary = voucher.kind === "booking_summary";
@@ -129,7 +133,7 @@ export function VoucherDocument({
 
   pages.push(
     <Page key="main" cover>
-      <Header voucher={voucher} assets={assets} />
+      <Header voucher={voucher} assets={assets} brand={brand} />
       <Parties voucher={voucher} />
       {bookingSheets[0].length > 0 ? (summary ? <SummaryTable bookings={bookingSheets[0]} first /> : <Bookings voucher={voucher} bookings={bookingSheets[0]} first />) : null}
       {daySheets[0]?.length ? (
@@ -139,7 +143,7 @@ export function VoucherDocument({
         </div>
       ) : null}
       {lastBookings === 0 && daySheets.length <= 1 && travelersFit ? <Travelers travelers={voucher.travelers} /> : null}
-      {lastBookings === 0 && daySheets.length <= 1 ? <Notes voucher={voucher} /> : null}
+      {lastBookings === 0 && daySheets.length <= 1 ? <Notes voucher={voucher} brand={brand} /> : null}
     </Page>,
   );
   bookingSheets.slice(1).forEach((sheet, i) =>
@@ -147,7 +151,7 @@ export function VoucherDocument({
       <Page key={`b${i}`}>
         {summary ? <SummaryTable bookings={sheet} /> : <Bookings voucher={voucher} bookings={sheet} />}
         {i + 1 === lastBookings && daySheets.length <= 1 && travelersFit ? <Travelers travelers={voucher.travelers} /> : null}
-        {i + 1 === lastBookings && daySheets.length <= 1 ? <Notes voucher={voucher} /> : null}
+        {i + 1 === lastBookings && daySheets.length <= 1 ? <Notes voucher={voucher} brand={brand} /> : null}
       </Page>,
     ),
   );
@@ -156,7 +160,7 @@ export function VoucherDocument({
       <Page key={`d${i}`}>
         <SectionTitle title={KIND_TITLE.itinerary} />
         <Days days={sheet} />
-        {i + 2 === daySheets.length ? <Notes voucher={voucher} /> : null}
+        {i + 2 === daySheets.length ? <Notes voucher={voucher} brand={brand} /> : null}
       </Page>,
     ),
   );
@@ -176,7 +180,8 @@ export function VoucherDocument({
   return (
     // the map variable lives on the root, exactly as OfferDocument sets it —
     // every .od-page::before reads it from here
-    <div className="od-root" dir="rtl" style={{ ["--od-map" as string]: `url("${assets.mapUrl}")` }}>
+    // brand.vars is null for our own palette, as in OfferDocument
+    <div className="od-root" dir="rtl" style={{ ["--od-map" as string]: `url("${assets.mapUrl}")`, ...(brand.vars ?? {}) }}>
       <style dangerouslySetInnerHTML={{ __html: OFFER_DOC_CSS }} />
       {pages}
     </div>
@@ -191,29 +196,39 @@ function Ltr({ children }: { children: ReactNode }) {
   return <bdi dir="ltr">{children}</bdi>;
 }
 
-function Header({ voucher, assets }: { voucher: VoucherDTO; assets: OfferDocAssets }) {
+function Header({ voucher, assets, brand }: { voucher: VoucherDTO; assets: OfferDocAssets; brand: DocBrand }) {
+  // the house logo is the fallback for OUR brand only — a partner without a logo prints its name
+  const logoUrl = brand.vars ? brand.logoUrl : (brand.logoUrl ?? assets.logoUrl);
   return (
     <>
       <div className="od-top">
         <div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="od-logo" src={assets.logoUrl} alt={AR.brandLatin} />
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="od-logo" src={logoUrl} alt={brand.nameLatin} />
+          ) : (
+            <div className="od-wordmark">{brand.nameAr}</div>
+          )}
         </div>
         <div className="od-company">
-          <h2>{COMPANY.nameAr}</h2>
-          <div>{COMPANY.address}</div>
-          <div>
-            {AR.callLabel}: <Ltr>{COMPANY.phone}</Ltr>
-          </div>
-          <div>
-            {AR.webLabel}: <Ltr>{COMPANY.website}</Ltr>
-          </div>
+          <h2>{brand.nameAr}</h2>
+          {brand.address ? <div>{brand.address}</div> : null}
+          {brand.phone ? (
+            <div>
+              {AR.callLabel}: <Ltr>{brand.phone}</Ltr>
+            </div>
+          ) : null}
+          {brand.website ? (
+            <div>
+              {AR.webLabel}: <Ltr>{brand.website}</Ltr>
+            </div>
+          ) : null}
         </div>
       </div>
 
       <div className="od-hero" style={{ marginTop: "12mm" }}>
         <div className="od-hero-label">{both(BILINGUAL.has(voucher.kind), KIND_TITLE[voucher.kind], KIND_TITLE_EN[voucher.kind])}</div>
-        <h1 style={{ fontSize: "24pt" }}>{voucher.destination || COMPANY.nameAr}</h1>
+        <h1 style={{ fontSize: "24pt" }}>{voucher.destination || brand.nameAr}</h1>
         <div className="od-hero-meta">
           {AR.serial} <Ltr>{voucher.serial}</Ltr> | {AR.issueDate} <Ltr>{fmtDate(voucher.issued_at)}</Ltr>
         </div>
@@ -479,7 +494,7 @@ function Days({ days }: { days: VoucherDay[] }) {
 
 type VoucherDay = VoucherDTO["days"][number];
 
-function Notes({ voucher }: { voucher: VoucherDTO }) {
+function Notes({ voucher, brand }: { voucher: VoucherDTO; brand: DocBrand }) {
   const notes = [KIND_NOTE[voucher.kind], ...voucher.notes];
   return (
     <div style={{ marginTop: "8mm" }}>
@@ -489,7 +504,12 @@ function Notes({ voucher }: { voucher: VoucherDTO }) {
         </p>
       ))}
       <p className="od-note" style={{ marginTop: "5mm" }}>
-        {COMPANY.nameAr} · <Ltr>{COMPANY.phone}</Ltr> · <Ltr>{COMPANY.email}</Ltr>
+        {[brand.nameAr, brand.phone, brand.email].filter(Boolean).map((part, i) => (
+          <span key={i}>
+            {i > 0 ? " · " : null}
+            {i > 0 ? <Ltr>{part}</Ltr> : part}
+          </span>
+        ))}
       </p>
     </div>
   );

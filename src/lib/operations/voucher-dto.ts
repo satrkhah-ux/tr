@@ -38,6 +38,15 @@ export type VoucherBooking = {
 /** The documents the client is given; the booking summary (suppliers, payment state) and the welcome board are ours. */
 export const CLIENT_DOCUMENT_KINDS: VoucherKind[] = ["hotel_voucher", "flight_ticket", "itinerary"];
 
+/** What each document is called where a client or a partner sees it (the link, the portal, a notice). */
+export const DOCUMENT_LABEL: Record<VoucherKind, string> = {
+  hotel_voucher: "قسيمة إقامة فندقية",
+  flight_ticket: "تذكرة الطيران",
+  itinerary: "الجدول السياحي",
+  booking_summary: "ملخص الحجوزات",
+  welcome_board: "لوحة الاستقبال",
+};
+
 export type VoucherDay = {
   day_number: number;
   date: string | null;
