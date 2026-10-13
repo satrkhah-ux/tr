@@ -9,6 +9,10 @@ const isNetlify = process.env.NETLIFY === "true";
 const nextConfig: NextConfig = {
   ...(isNetlify ? {} : { output: "standalone" }),
   devIndicators: false,
+  // Uploads go through server actions (passport scans, a supplier's confirmation,
+  // a payment receipt), each capped at 8 MB in code; the 1 MB default refused a
+  // phone photo before that check could say why.
+  experimental: { serverActions: { bodySizeLimit: "9mb" } },
   // Must run in Node and never be bundled: puppeteer-core has dynamic requires;
   // @sparticuz/chromium ships a native Chromium binary used on serverless hosts.
   serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium"],

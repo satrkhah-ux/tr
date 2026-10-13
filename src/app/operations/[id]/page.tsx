@@ -6,6 +6,7 @@ import { listTravelers } from "@/lib/data/operation-travelers";
 import { listAssignees, listSentRequests } from "@/lib/data/operation-assign";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
+import { getSupplierWork } from "@/lib/data/supplier-work";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,8 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
   const operation = operations.find((o) => o.id === id);
   if (!operation) notFound();
 
+  // started first, awaited last — it does not hold up the rest
+  const supplierWorkP = getSupplierWork(id);
   const [travelers, payments, bookings, documents, assignees, sentRequests, canBook] = await Promise.all([
     listTravelers(id),
     listOperationPayments(id),
@@ -56,6 +59,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
       assignees={assignees}
       sentRequests={sentRequests}
       canBook={canBook}
+      supplierWork={await supplierWorkP}
     />
   );
 }

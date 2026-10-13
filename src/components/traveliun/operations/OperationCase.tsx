@@ -36,6 +36,8 @@ import type { TranslationKey } from "@/lib/i18n";
 import type { OperationBooking, OperationDocument } from "@/lib/data/operation-bookings";
 import type { AssigneeOption, SentRequest } from "@/lib/data/operation-assign";
 import { DocumentsPanel } from "./DocumentsPanel";
+import { SupplierPanel } from "./SupplierPanel";
+import type { SupplierWork } from "@/lib/data/supplier-work";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition, useSessionField } from "../useSafeTransition";
@@ -59,6 +61,7 @@ export function OperationCase({
   assignees,
   sentRequests,
   canBook,
+  supplierWork,
 }: {
   operation: OperationCard;
   travelers: TravelerListItem[];
@@ -71,6 +74,8 @@ export function OperationCase({
   sentRequests: SentRequest[];
   /** may commit a reservation at the supplier — `operations.book`. */
   canBook: boolean;
+  /** the supplier side of the bookings (order 8); null when it could not load. */
+  supplierWork?: SupplierWork | null;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -157,6 +162,8 @@ export function OperationCase({
           sentRequests={sentRequests}
           canBook={canBook}
         />
+
+        {supplierWork ? <SupplierPanel operationId={operation.id} bookings={bookings} work={supplierWork} /> : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <TravelersPanel operationId={operation.id} travelers={travelers} />

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Building2, Check, Copy, Loader2, Send, UserRound, Users } from "lucide-react";
+import { Building2, Check, Copy, Loader2, Mail, Send, Store, UserRound, Users } from "lucide-react";
 import {
   assignBooking,
   draftBookingRequest,
@@ -12,6 +12,7 @@ import {
   type RequestDraft,
 } from "@/lib/data/operation-assign";
 import type { OperationBooking } from "@/lib/data/operation-bookings";
+import { suppliersFor } from "@/lib/operations/supplier-request";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
@@ -52,8 +53,11 @@ export function AssignBooking({
   const [body, setBody] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const currentId = booking.assignee_employee_id ?? booking.assignee_partner_id ?? null;
+  const currentId = booking.assignee_employee_id ?? booking.assignee_partner_id ?? booking.assignee_supplier_id ?? null;
   const value = `${booking.assignee_kind ?? "ops"}:${currentId ?? ""}`;
+  // our suppliers that sell this kind of booking — and whoever already has it
+  const matching = new Set(suppliersFor(assignees.filter((a) => a.kind === "supplier"), booking.kind).map((a) => a.id));
+  const options = assignees.filter((a) => a.kind !== "supplier" || matching.has(a.id) || a.id === currentId);
 
   function assign(raw: string) {
     const [kind, id] = raw.split(":") as [AssigneeKind, string];
@@ -113,9 +117,9 @@ export function AssignBooking({
         <label className="grid gap-1.5 text-[11.5px] font-bold text-[#185045]">
           {t("ops.assignee")}
           <select value={value} onChange={(e) => assign(e.target.value)} disabled={pending} className={field}>
-            {assignees.map((a) => (
+            {options.map((a) => (
               <option key={`${a.kind}:${a.id ?? ""}`} value={`${a.kind}:${a.id ?? ""}`}>
-                {a.kind === "partner" ? `🏢 ${a.label}` : a.kind === "employee" ? `👤 ${a.label}` : a.label}
+                {a.kind === "partner" ? `🏢 ${a.label}` : a.kind === "employee" ? `👤 ${a.label}` : a.kind === "supplier" ? `🧾 ${a.label}` : a.label}
               </option>
             ))}
           </select>
@@ -176,6 +180,15 @@ export function AssignBooking({
               <Copy className="size-3.5" />
               {copied ? t("copied") : t("ops.dispatch.copy")}
             </button>
+            {draft.to_email ? (
+              <a
+                href={`mailto:${draft.to_email}?subject=${encodeURIComponent(draft.subject ?? "")}&body=${encodeURIComponent(body)}`}
+                className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+              >
+                <Mail className="size-3.5" />
+                {t("ops.sup.email")}
+              </a>
+            ) : null}
             {draft.to_phone ? (
               <a
                 href={`https://wa.me/${draft.to_phone.replace(/\D/g, "")}?text=${encodeURIComponent(body)}`}
@@ -221,8 +234,8 @@ export function AssigneeChip({
   }
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-[#eaf1ff] px-2 py-0.5 text-[10.5px] font-bold text-[#2b57c4]">
-      {kind === "partner" ? <Building2 className="size-3" /> : <UserRound className="size-3" />}
-      {label ?? t(`ops.assignee.${kind}`)}
+      {kind === "partner" ? <Building2 className="size-3" /> : kind === "supplier" ? <Store className="size-3" /> : <UserRound className="size-3" />}
+      {label ?? (kind === "supplier" ? t("ops.sup.supplier") : t(`ops.assignee.${kind}`))}
     </span>
   );
 }

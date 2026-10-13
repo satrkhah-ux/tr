@@ -624,6 +624,10 @@ export interface CompanySupplier {
   contact_name: string | null;
   mobile: string | null;
   email: string | null;
+  /** where operations sends a booking request (0063); falls back to mobile. */
+  whatsapp: string | null;
+  /** the language that request is written in (0063). */
+  request_lang: "ar" | "en";
   status: string;
   created_at: IsoTimestamp;
 }
