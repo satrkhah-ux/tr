@@ -70,7 +70,7 @@ export function PaymentsPanel({
   const [notice, setNotice] = useState<string | null>(null);
 
   return (
-    <section className={card}>
+    <section id="payments" className={`${card} scroll-mt-24`}>
       <h2 className="text-sm font-extrabold text-[#185045]">{t("ops.payments")}</h2>
 
       <div
