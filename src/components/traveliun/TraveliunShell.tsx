@@ -38,6 +38,7 @@ import {
   NotebookText,
   Search,
   Settings,
+  Users,
   Settings2,
   Table2,
   UserCircle,
@@ -268,9 +269,11 @@ export const partnerNavGroups: NavGroup[] = [
     icon: FileText,
     children: [
       { labelKey: "nav.myFiles", href: "/package-generator" },
+      { labelKey: "nav.basic", href: "/basic" },
       { labelKey: "nav.readyOffers", href: "/ready-offers" },
     ],
   },
+  { labelKey: "nav.myCustomers", href: "/b2b/customers", icon: Users },
   { labelKey: "nav.myProfile", href: "/b2b/profile", icon: Building2 },
 ];
 

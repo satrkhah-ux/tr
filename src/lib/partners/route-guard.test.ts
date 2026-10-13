@@ -16,10 +16,10 @@ describe("the partner's way through the proxy", () => {
   });
 
   it("lets a partner into its portal and its files, and nowhere of ours", () => {
-    for (const ok of ["/b2b", "/b2b/profile", "/package-generator/abc/trip", "/offer/AD-1/preview", "/ready-offers", "/welcome-board/AD-1"]) {
+    for (const ok of ["/b2b", "/b2b/profile", "/package-generator/abc/trip", "/offer/AD-1/preview", "/ready-offers", "/welcome-board/AD-1", "/basic", "/basic/abc"]) {
       expect(underAny(ok, PARTNER_PREFIXES)).toBe(true);
     }
-    for (const no of ["/dashboard", "/kanban-board", "/operations/1", "/customers", "/settings", "/partner-companies", "/b2bx", "/basic"]) {
+    for (const no of ["/dashboard", "/kanban-board", "/operations/1", "/customers", "/settings", "/partner-companies", "/b2bx", "/basics"]) {
       expect(underAny(no, PARTNER_PREFIXES)).toBe(false);
     }
   });

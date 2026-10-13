@@ -4,12 +4,13 @@
  */
 
 /**
- * Where a partner may go: its portal, its own files and their documents, the
- * ready offers it resells, its welcome boards (plus the public pages). Every
+ * Where a partner may go: its portal, its own files (the generator and «بيسك»)
+ * and their documents, the ready offers it resells, its welcome boards (plus the
+ * public pages). Every
  * other path — our dashboard, kanban, operations, customers, settings — sends it
  * to /b2b. Keep in step with partnerNavGroups in TraveliunShell.
  */
-export const PARTNER_PREFIXES = ["/b2b", "/package-generator", "/offer", "/ready-offers", "/welcome-board"];
+export const PARTNER_PREFIXES = ["/b2b", "/package-generator", "/basic", "/offer", "/ready-offers", "/welcome-board"];
 
 export function underAny(pathname: string, prefixes: string[]): boolean {
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
