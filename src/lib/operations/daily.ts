@@ -6,6 +6,7 @@ import { notifyOps, notifyPartnerCase } from "@/lib/data/ops-notify";
 import { readinessFor } from "@/lib/data/operation-sync";
 import { sendClientMessage } from "@/lib/data/client-messages";
 import { passportValidFor } from "./progress";
+import { defaultSchedule, installmentStates, paidTotal } from "./payments";
 import { canAdvanceClient, canAdvanceExecution, type ClientStatus, type ExecutionStatus } from "./state";
 
 /**
@@ -102,6 +103,24 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
       const missing = items.filter((i) => !i.ok);
       if (missing.length && (await alertOnce(supabase, op.id, "before_travel", String(days), [`⏰ السفر بعد ${days === 1 ? "يوم" : `${days} أيام`}: ${head}`, "", ...missing.map((i) => `• ${i.detail}`)].join("\n")))) {
         result.alerts += 1;
+      }
+    }
+
+    // a late installment — the agreed schedule, or the house default (operations order 7)
+    {
+      const [{ data: rows }, { data: pays }, { data: meta }] = await Promise.all([
+        supabase.from("operation_installments").select("due_date, amount").eq("operation_id", op.id),
+        supabase.from("operation_payments").select("amount, kind").eq("operation_id", op.id),
+        supabase.from("operations").select("confirmed_at, offers(total)").eq("id", op.id).maybeSingle(),
+      ]);
+      const m = meta as unknown as { confirmed_at: string; offers: { total: number | string | null } | { total: number | string | null }[] | null } | null;
+      const total = (() => { const o = Array.isArray(m?.offers) ? m?.offers[0] : m?.offers; return o?.total != null ? Number(o.total) : null; })();
+      const schedule = (rows ?? []).length
+        ? ((rows ?? []) as { due_date: string | null; amount: number | string }[]).map((r) => ({ due_date: r.due_date, amount: Number(r.amount) }))
+        : defaultSchedule({ total, confirmed_on: (m?.confirmed_at ?? today).slice(0, 10), travel_start: op.travel_start });
+      const paid = paidTotal(((pays ?? []) as { amount: number | string; kind: string }[]).map((p) => ({ amount: Number(p.amount), kind: p.kind })));
+      for (const row of installmentStates(schedule, paid, today)) {
+        if (row.state === "overdue" && row.due_date && (await alertOnce(supabase, op.id, "installment_overdue", row.due_date, `💳 قسط متأخر منذ ${row.due_date}: ${(row.amount - row.covered).toLocaleString("en-US")} — ${head}`))) result.alerts += 1;
       }
     }
 

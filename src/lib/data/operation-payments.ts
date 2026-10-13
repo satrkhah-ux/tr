@@ -6,6 +6,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
+import { syncOperation } from "@/lib/data/operation-sync";
 import { mintReceipt } from "@/lib/data/payment-receipt";
 import type { PaymentKind, PaymentMethod } from "@/lib/data/operations";
 import { PAYMENT_KINDS, PAYMENT_METHODS, isIsoDate } from "@/lib/operations/payments";
@@ -113,6 +114,7 @@ export async function updatePayment(id: string, input: PaymentInput): Promise<{ 
         after: { amount: input.amount, kind: input.kind, method: input.method, paid_at: input.paid_at },
       },
     });
+    await syncOperation(before.operation_id);
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };

@@ -100,7 +100,7 @@ export async function readinessFor(operationId: string): Promise<ReadinessItem[]
       supabase.from("operation_bookings").select("kind, status").eq("operation_id", operationId),
       supabase.from("operation_documents").select("kind").eq("operation_id", operationId).is("revoked_at", null).in("kind", CLIENT_DOCUMENT_KINDS),
       supabase.from("operation_payments").select("amount, kind").eq("operation_id", operationId),
-      supabase.from("operation_travelers").select("display_name, passport_expiry").eq("operation_id", operationId).order("sort"),
+      supabase.from("operation_travelers").select("display_name, passport_expiry, visa_status").eq("operation_id", operationId).order("sort"),
     ]);
     const paid = ((payments.data ?? []) as { amount: number | string; kind: string }[]).reduce((s, p) => s + (p.kind === "refund" ? -1 : 1) * (Number(p.amount) || 0), 0);
     return readiness({
@@ -108,7 +108,11 @@ export async function readinessFor(operationId: string): Promise<ReadinessItem[]
       documents: (documents.data ?? []) as { kind: string }[],
       paid,
       total: offer?.total != null ? Number(offer.total) : null,
-      travelers: ((travelers.data ?? []) as { display_name: string; passport_expiry: string | null }[]).map((t) => ({ name: t.display_name || "—", passport_expiry: t.passport_expiry })),
+      travelers: ((travelers.data ?? []) as { display_name: string; passport_expiry: string | null; visa_status: string | null }[]).map((t) => ({
+        name: t.display_name || "—",
+        passport_expiry: t.passport_expiry,
+        visa_status: t.visa_status,
+      })),
       travelEnd: row.travel_end,
     });
   } catch {

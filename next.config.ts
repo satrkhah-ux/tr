@@ -9,6 +9,13 @@ const isNetlify = process.env.NETLIFY === "true";
 const nextConfig: NextConfig = {
   ...(isNetlify ? {} : { output: "standalone" }),
   devIndicators: false,
+  // Uploads go through server actions: a partner's registration carries up to
+  // three 5MB documents, a payment its proof, a traveller a passport or visa
+  // scan. Next's 1MB action default (and the proxy's 10MB buffer) cut them off.
+  experimental: {
+    serverActions: { bodySizeLimit: "16mb" },
+    proxyClientMaxBodySize: "16mb",
+  },
   // Must run in Node and never be bundled: puppeteer-core has dynamic requires;
   // @sparticuz/chromium ships a native Chromium binary used on serverless hosts.
   serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium"],
