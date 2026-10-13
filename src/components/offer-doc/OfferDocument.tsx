@@ -905,16 +905,28 @@ function DayWeather({ day }: { day: ClientOfferDTO["days"][number] }) {
 }
 
 // ---------------- services / price ----------------
-/** The block is tall and near-fixed: two list cards, the total, and the summary. */
+/**
+ * Measured in Chromium (Tajawal, 2026-10-13): a card's head is 16.4mm and its
+ * list padding 8mm; a one-line item 10.5mm, each further line 6.5mm, at 43–55
+ * characters a line in the ~88mm column. The old «8mm a row» was 30mm short on
+ * eight one-line items, so the payment note spilled onto a sheet of its own (a
+ * partner's PDF, page 3). Characters per line taken low: long words wrap early.
+ *
+ * ponytail: still an estimate — a services block taller than a whole sheet
+ * cannot be split (it is one node); split the lists into blocks if one ever is.
+ */
+const LIST_CHARS_PER_LINE = 38;
+const listCardMm = (items: string[]) =>
+  16.4 + 8 + items.reduce((sum, item, i) => sum + 4 + 6.5 * Math.max(1, Math.ceil((item.length + String(i + 1).length + 2) / LIST_CHARS_PER_LINE)), 0);
+
+/** The block is tall and near-fixed: two list cards, the total, and the payment note. */
 function servicesHeightMm(offer: ClientOfferDTO, showPrices: boolean): number {
-  const rows = Math.max(offer.includes.length, offer.excludes.length);
-  const cards = offer.includes.length + offer.excludes.length > 0 ? Math.max(70, 16 + rows * 8) : 0;
-  // cards + price band + payment note. The «ملخص سريع» panel that used to add
-  // ~48mm here now lives on the cover, so this section is that much shorter —
-  // leaving the estimate high would waste most of a sheet. A price-less file
-  // loses both the band and the note, so the estimate has to lose them too or
-  // the packer reserves 54mm of nothing.
-  return cards + (showPrices ? 34 + 20 : 0);
+  const cards =
+    offer.includes.length + offer.excludes.length > 0 ? 7 + Math.max(70, listCardMm(offer.includes), listCardMm(offer.excludes)) : 0;
+  // price band (9 + 26.2) and the payment note (6 + 18.6), measured. A price-less
+  // file loses both, so the estimate loses them too or the packer reserves
+  // 60mm of nothing.
+  return cards + (showPrices ? 9 + 26.5 + 6 + 19 : 0);
 }
 
 function ServicesAndPrice({

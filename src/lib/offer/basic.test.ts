@@ -332,6 +332,18 @@ describe("النظام بيسك", () => {
     expect(s.excludes).toEqual(["وجبة الغداء والعشاء"]);
   });
 
+  it("promises nothing the scope switched off: no reception, no tours, no domestic flight (the partner trial)", () => {
+    const data = malaysia();
+    data.scope = { ...data.scope, transport: false, flights_domestic: false };
+    data.transport_plan = { ...data.transport_plan, tours: { ...data.transport_plan.tours, enabled: false } };
+    data.services = { ...data.services, includes: ["الفنادق", "الإستقبال والتوديع من المطار إلى الفندق والعكس", "الجولات السياحية", "الطيران الداخلي"], excludes: [] };
+    const s = withScopeLines(data);
+    expect(s.includes).not.toContain("الإستقبال والتوديع من المطار إلى الفندق والعكس");
+    expect(s.includes).not.toContain("الجولات السياحية");
+    expect(s.includes).not.toContain("الطيران الداخلي");
+    expect(s.includes).toContain("الفنادق");
+  });
+
   it("lays the package profit over the lines: a margin on each, an amount shared by cost", () => {
     const line = (buy: number, currency: string) => ({ item_type: "hotel" as const, description: "", quantity: 1, buy_price: buy, buy_currency: currency, sell_price: buy, sell_currency: currency });
     const items = [line(3000, "SAR"), line(1000, "MYR")];

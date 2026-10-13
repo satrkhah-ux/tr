@@ -5,6 +5,7 @@ import { FieldIssue } from "../FieldIssue";
 import { ListEditor } from "../services/ListEditor";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { sectionClass, type StageFormProps } from "../stage-props";
+import { withScopeLines } from "@/lib/offer/basic";
 
 /**
  * «يشمل / لا يشمل» — what the sale covers and what it does not.
@@ -22,7 +23,8 @@ import { sectionClass, type StageFormProps } from "../stage-props";
  */
 export function ServicesStage({ data, patch, lookups }: StageFormProps) {
   const { t } = useTraveliunUI();
-  const services = data.services;
+  // the lists as they will print — what the scope switched off is already gone
+  const services = withScopeLines(data);
   const countryId = findLookupCountry(lookups.countries, data.trip.country)?.id ?? null;
   const library = libraryForCountry(lookups.termLibrary, countryId);
   const countryServices = lookups.countryServices.filter((s) => s.country_id === countryId).map((s) => s.name);

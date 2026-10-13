@@ -718,7 +718,7 @@ export function withDomesticFlights(data: DraftData, airports: LookupAirport[]):
 /** The company's own «يشمل» lines that say what the file holds — kept in step with it. */
 const SCOPE_LINES: { text: string; on: (d: DraftData) => boolean; otherwiseExcluded?: boolean }[] = [
   { text: "الطيران الدولي", on: (d) => d.scope.flights_intl, otherwiseExcluded: true },
-  { text: "الطيران الداخلي", on: (d) => d.flights.some((f) => f.leg_order === "internal") },
+  { text: "الطيران الداخلي", on: (d) => d.scope.flights_domestic && d.flights.some((f) => f.leg_order === "internal") },
   { text: "الفنادق", on: (d) => d.scope.hotels },
   { text: "الجولات السياحية", on: (d) => d.transport_plan.tours.enabled },
   { text: "الإستقبال والتوديع من المطار إلى الفندق والعكس", on: (d) => d.scope.transport },

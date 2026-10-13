@@ -37,7 +37,7 @@ import { getEnabledHotelSuppliers } from "@/lib/providers/hotel-registry";
 import { draftSellTotal } from "@/lib/offer/preview-dto";
 import { applyManualProfit, offerTotals, rebase } from "@/lib/offer/pricing";
 import { getProfitSettings } from "./app-settings";
-import { packageProfitFor, withPackageProfit } from "@/lib/offer/basic";
+import { packageProfitFor, withPackageProfit, withScopeLines } from "@/lib/offer/basic";
 import { getRates } from "./rates-actions";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
@@ -868,6 +868,11 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       `التوصيلات: ${t.from_place} ← ${t.to_place}${t.car_type ? ` (${t.car_type})` : ""}`,
     );
     const visaIncludes = data.visas.map((v) => `تأشيرة ${v.country || v.visa_type} × ${v.count}`);
+    // «يشمل / لا يشمل» as the file is — what the scope switched off is not
+    // promised. /basic did this on its services step; the full generator (and
+    // so every partner) did not, and printed reception, tours and a domestic
+    // flight that had been switched off. Here, once, for both.
+    const scoped = withScopeLines(data);
 
     // Chosen in the customer stage. A draft that predates the picker carries only
     // the typed company NAME, so resolve that too rather than losing the branding.
@@ -951,11 +956,11 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         leg_order: f.leg_order,
       })),
       services: [
-        ...data.services.includes.map((label) => ({ label, kind: "include" as const })),
+        ...scoped.includes.map((label) => ({ label, kind: "include" as const })),
         ...(mealsLine ? [{ label: mealsLine, kind: "include" as const }] : []),
-        ...transportIncludes.map((label) => ({ label, kind: "include" as const })),
-        ...visaIncludes.map((label) => ({ label, kind: "include" as const })),
-        ...data.services.excludes.map((label) => ({ label, kind: "exclude" as const })),
+        ...(data.scope.transport ? transportIncludes : []).map((label) => ({ label, kind: "include" as const })),
+        ...(data.scope.visas ? visaIncludes : []).map((label) => ({ label, kind: "include" as const })),
+        ...scoped.excludes.map((label) => ({ label, kind: "exclude" as const })),
       ],
       terms: data.services.terms,
       hotels,
