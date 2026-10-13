@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { OperationCase } from "@/components/traveliun/operations/OperationCase";
 import { listOperationPayments, listOperations } from "@/lib/data/operations";
+import { listInstallments } from "@/lib/data/operation-payments";
 import { listBookings, listDocuments } from "@/lib/data/operation-bookings";
 import { listOrSeedTravelers } from "@/lib/data/operation-travelers";
 import { isOpenAIConfigured } from "@/lib/providers/openai";
@@ -16,10 +17,11 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
   const operation = operations.find((o) => o.id === id);
   if (!operation) notFound();
 
-  const [travelers, payments, bookings, documents, assignees, sentRequests, canBook] = await Promise.all([
+  const [travelers, payments, installments, bookings, documents, assignees, sentRequests, canBook] = await Promise.all([
     // a new case starts with the travelers the offer was sold for
     listOrSeedTravelers(id),
     listOperationPayments(id),
+    listInstallments(id),
     listBookings(id),
     listDocuments(id),
     listAssignees(),
@@ -51,6 +53,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
       operation={operation}
       travelers={travelers}
       payments={payments}
+      installments={installments}
       bookings={bookings}
       documents={documents}
       hasDays={(count ?? 0) > 0}

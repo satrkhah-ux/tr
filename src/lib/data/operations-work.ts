@@ -8,6 +8,7 @@ import { operationSignals, severityRank, type OperationSignal, type OperationSna
 import { isLiveCase, summarizeOperations, type OpsCase, type OpsCounts } from "@/lib/operations/summary";
 import type { ExecutionStatus } from "@/lib/operations/state";
 import { currentCan } from "@/lib/roles/current";
+import { defaultSchedule, riyadhDate } from "@/lib/operations/payments";
 
 /**
  * One loader behind both operations views: the board and the dashboard panel.
@@ -52,7 +53,7 @@ async function load(): Promise<Loaded> {
   // The clock is read ONCE, on the server. Deriving "travel is approaching" in
   // the browser would make urgency depend on the visitor's device time, and two
   // agents on the same case would disagree about it.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = riyadhDate();
   const closed: Loaded = { ok: false, items: [], cases: [], today };
 
   try {
@@ -66,7 +67,7 @@ async function load(): Promise<Loaded> {
     const ids = operations.map((o) => o.id);
     const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
 
-    const [bookingsRes, docsRes, travelers] = await Promise.all([
+    const [bookingsRes, docsRes, travelers, installmentsRes] = await Promise.all([
       supabase
         .from("operation_bookings")
         .select("id, operation_id, kind, title, status, cancellation_deadline, confirmed_at")
@@ -80,10 +81,12 @@ async function load(): Promise<Loaded> {
         .is("revoked_at", null)
         .in("operation_id", ids),
       listTravelersByOperation(ids),
+      supabase.from("operation_installments").select("operation_id, due_date, amount").in("operation_id", ids),
     ]);
 
     const bookings = byOperation((bookingsRes.data ?? []) as BookingRow[]);
     const documents = byOperation((docsRes.data ?? []) as DocRow[]);
+    const installments = byOperation((installmentsRes.data ?? []) as { operation_id: string; due_date: string; amount: number }[]);
 
     const items: OperationWork[] = [];
     const cases: OpsCase[] = [];
@@ -109,6 +112,10 @@ async function load(): Promise<Loaded> {
         })),
         documents: ds.map((d) => ({ kind: d.kind, booking_id: d.booking_id, created_at: d.created_at })),
         travelers: ts.map((t) => ({ display_name: t.display_name, passport_expiry: t.passport_expiry })),
+        // the schedule staff set, else the house terms — so «قسط متأخر» works on every case
+        installments: installments.has(op.id)
+          ? (installments.get(op.id) ?? []).map((i) => ({ due_date: i.due_date, amount: Number(i.amount) }))
+          : defaultSchedule({ total: op.total, confirmed_on: riyadhDate(op.confirmed_at), travel_start: op.travel_start }),
       };
 
       const signals = operationSignals(snapshot, today);

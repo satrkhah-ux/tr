@@ -20,6 +20,8 @@ import {
   type ExecutionStatus,
 } from "@/lib/operations/state";
 import { currentCan } from "@/lib/roles/current";
+import { mintReceipt } from "@/lib/data/payment-receipt";
+import { isIsoDate, riyadhDate } from "@/lib/operations/payments";
 
 /**
  * «العمليات» — the execution hub. This module is the ONLY writer of
@@ -331,6 +333,11 @@ export type OperationPayment = {
   reference: string | null;
   paid_at: string;
   note: string | null;
+  /** «سند القبض» — null on a refund, and on an old row until its receipt is first opened. */
+  receipt_no: string | null;
+  receipt_token: string | null;
+  /** the client's slip is on file; its path never leaves the server. */
+  has_proof: boolean;
 };
 
 export async function recordPayment(input: {
@@ -342,34 +349,48 @@ export async function recordPayment(input: {
   reference?: string | null;
   paid_at?: string;
   note?: string | null;
-}): Promise<{ ok: true } | Fail> {
+}): Promise<{ ok: true; id: string } | Fail> {
   const denied = await requireOps();
   if (denied) return { ok: false, error: denied };
   if (!(input.amount > 0)) return { ok: false, error: "ops.err.amountPositive" };
   try {
     const supabase = await db();
-    const { error } = await supabase.from("operation_payments").insert({
-      operation_id: input.operation_id,
-      amount: input.amount,
-      currency: input.currency ?? "SAR",
-      kind: input.kind ?? "deposit",
-      method: input.method ?? null,
-      reference: input.reference ?? null,
-      paid_at: input.paid_at ?? new Date().toISOString().slice(0, 10),
-      recorded_by: await getCurrentEmployeeId(),
-      note: input.note ?? null,
-    });
-    if (error) return { ok: false, error: "err.createFailed" };
+    const kind = input.kind ?? "deposit";
+    const recordedBy = await getCurrentEmployeeId();
+    let id = "";
+    // the receipt number is a Riyadh day + 4 random characters: a clash is rare, not impossible
+    for (let attempt = 0; !id; attempt++) {
+      const { data, error } = await supabase
+        .from("operation_payments")
+        .insert({
+          operation_id: input.operation_id,
+          amount: Math.round(input.amount * 100) / 100,
+          currency: input.currency ?? "SAR",
+          kind,
+          method: input.method ?? null,
+          reference: input.reference?.trim() || null,
+          // the office's day, not UTC's — a payment taken at 1am Riyadh is today's
+          paid_at: isIsoDate(input.paid_at) ? input.paid_at : riyadhDate(),
+          recorded_by: recordedBy,
+          note: input.note?.trim() || null,
+          // a refund is money going out — it gets no «سند قبض»
+          ...(kind === "refund" ? {} : mintReceipt()),
+        })
+        .select("id")
+        .single();
+      if (data) id = (data as { id: string }).id;
+      else if (error?.code !== "23505" || attempt >= 2) return { ok: false, error: "err.createFailed" };
+    }
 
     await logAudit({
       action: "payment.recorded",
       entity: "operations",
       entity_id: input.operation_id,
-      meta: { amount: input.amount, currency: input.currency ?? "SAR", kind: input.kind ?? "deposit" },
+      meta: { amount: input.amount, currency: input.currency ?? "SAR", kind, payment_id: id },
     });
     // the money moves the client track (paid_partial / paid_full)
     await syncOperation(input.operation_id);
-    return { ok: true };
+    return { ok: true, id };
   } catch {
     return { ok: false, error: "err.db" };
   }
@@ -377,15 +398,17 @@ export async function recordPayment(input: {
 
 export async function listOperationPayments(operationId: string): Promise<OperationPayment[]> {
   try {
-    const user = await getServerUser();
-    if (!user) return [];
+    if (await requireOps()) return [];
     const supabase = await db();
     const { data } = await supabase
       .from("operation_payments")
-      .select("id, amount, currency, kind, method, reference, paid_at, note")
+      .select("id, amount, currency, kind, method, reference, paid_at, note, receipt_no, receipt_token, proof_path")
       .eq("operation_id", operationId)
-      .order("paid_at", { ascending: false });
-    return ((data ?? []) as OperationPayment[]).map((p) => ({ ...p, amount: Number(p.amount) }));
+      .order("paid_at", { ascending: false })
+      .order("created_at", { ascending: false });
+    return ((data ?? []) as (Omit<OperationPayment, "has_proof"> & { proof_path: string | null })[]).map(
+      ({ proof_path, ...p }) => ({ ...p, amount: Number(p.amount), has_proof: Boolean(proof_path) }),
+    );
   } catch {
     return [];
   }
