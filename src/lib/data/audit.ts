@@ -50,6 +50,9 @@ export type AuditAction =
   | "passport.scan_viewed"
   | "passport.decrypt_failed"
   | "passport.mrz_read"
+  // the client's own uploads from the trip link, and staff's decision on each
+  | "passport.client_uploaded"
+  | "passport.client_reviewed"
   // travelers and their visas (0061)
   | "traveler.created"
   | "traveler.deleted"

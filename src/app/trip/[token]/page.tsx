@@ -4,6 +4,7 @@ import { getClientHub } from "@/lib/data/operation-hub";
 import { getClientTrip, type TripFlight } from "@/lib/data/client-trip";
 import { DOCUMENT_LABEL } from "@/lib/operations/voucher-dto";
 import { TripReceipts } from "@/components/traveliun/operations/TripReceipts";
+import { TripPassports } from "@/components/traveliun/operations/TripPassports";
 import { getTripGuide } from "@/lib/data/destination-guides";
 import { waNumber, type ClientService, type ServiceKind } from "@/lib/operations/drivers";
 
@@ -289,6 +290,8 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
           </section>
         ) : null}
 
+        <TripPassports token={token} />
+
         <Card title="مستنداتك">
           {hub.documents.length === 0 ? (
             <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-[13.5px] text-[#93aaa3]">
@@ -316,6 +319,15 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
               ))}
             </ul>
           )}
+          {/* «حقيبة السفر» — every document, the receipts, today's driver and the emergency numbers in one PDF */}
+          <a
+            href={`/trip/${token}/pack/pdf`}
+            target="_blank"
+            rel="noopener"
+            className="mt-3 flex h-12 w-full items-center justify-center rounded-[12px] bg-[var(--trip)] text-[14px] font-extrabold text-white"
+          >
+            حقيبة السفر — كل المستندات في ملف واحد
+          </a>
         </Card>
 
         <TripReceipts token={token} />
