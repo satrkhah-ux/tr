@@ -11,6 +11,7 @@ import { DriversPanel } from "@/components/traveliun/operations/DriversPanel";
 import { CaseManagement } from "@/components/traveliun/operations/CaseManagement";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
+import { getSupplierWork } from "@/lib/data/supplier-work";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,8 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
   const operation = operations.find((o) => o.id === id);
   if (!operation) notFound();
 
+  // started first, awaited last — it does not hold up the rest
+  const supplierWorkP = getSupplierWork(id);
   const [travelers, payments, installments, bookings, documents, assignees, sentRequests, canBook, extras, activity] = await Promise.all([
     // a new case starts with the travelers the offer was sold for
     listOrSeedTravelers(id),
@@ -77,6 +80,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
           activity={activity}
         />
       }
+      supplierWork={await supplierWorkP}
     />
   );
 }

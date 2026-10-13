@@ -312,7 +312,17 @@ const CONFIGS: TableConfig[] = [
       { key: "categories", labelKey: "col.categories", minWidth: "200px" },
       { key: "contact_name", labelKey: "col.contactName" },
       { key: "mobile", labelKey: "col.mobile", type: "phone" },
+      // where operations sends a booking request, and the language it is written in (0063)
+      { key: "whatsapp", labelKey: "ops.sup.col.whatsapp", type: "phone" },
       { key: "email", labelKey: "col.email" },
+      {
+        key: "request_lang",
+        labelKey: "ops.sup.col.requestLang",
+        options: [
+          { value: "ar", label: "ar — عربي" },
+          { value: "en", label: "en — English" },
+        ],
+      },
       { key: "status", labelKey: "col.status", type: "status" },
     ],
     searchable: ["arabic_name", "english_name", "categories", "contact_name"],

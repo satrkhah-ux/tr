@@ -7,6 +7,7 @@ import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
 import { currentCan } from "@/lib/roles/current";
+import { composeRequest } from "@/lib/data/supplier-work";
 
 /**
  * Who is doing this booking.
@@ -34,7 +35,7 @@ async function requireOps(): Promise<TranslationKey | null> {
   return await currentCan("operations.write") ? null : "ops.err.forbidden";
 }
 
-export type AssigneeKind = "ops" | "employee" | "partner";
+export type AssigneeKind = "ops" | "employee" | "partner" | "supplier";
 
 export type BookingPartner = {
   id: string;
@@ -46,16 +47,24 @@ export type BookingPartner = {
   active: boolean;
 };
 
-export type AssigneeOption = { kind: AssigneeKind; id: string | null; label: string; phone: string | null };
+export type AssigneeOption = {
+  kind: AssigneeKind;
+  id: string | null;
+  label: string;
+  phone: string | null;
+  /** a supplier's «فنادق، طيران، تنقلات، خدمات» — the picker offers it for those kinds only. */
+  categories?: string | null;
+};
 
-/** Everyone a booking can be handed to: the team, colleagues, partner companies. */
+/** Everyone a booking can be handed to: the team, colleagues, partner companies, our suppliers. */
 export async function listAssignees(): Promise<AssigneeOption[]> {
   if (await requireOps()) return [];
   try {
     const supabase = await db();
-    const [emps, partners] = await Promise.all([
+    const [emps, partners, suppliers] = await Promise.all([
       supabase.from("employees").select("id, arabic_name, mobile").order("arabic_name").limit(200),
       supabase.from("booking_partners").select("id, name, phone").eq("active", true).order("name"),
+      supabase.from("company_suppliers").select("id, arabic_name, mobile, whatsapp, categories").neq("status", "Disabled").order("arabic_name"),
     ]);
 
     return [
@@ -71,6 +80,13 @@ export async function listAssignees(): Promise<AssigneeOption[]> {
         id: p.id,
         label: p.name,
         phone: p.phone,
+      })),
+      ...((suppliers.data ?? []) as { id: string; arabic_name: string; mobile: string | null; whatsapp: string | null; categories: string | null }[]).map((s) => ({
+        kind: "supplier" as const,
+        id: s.id,
+        label: s.arabic_name,
+        phone: s.whatsapp || s.mobile,
+        categories: s.categories,
       })),
     ];
   } catch {
@@ -143,17 +159,18 @@ export async function assignBooking(input: {
 
   try {
     const supabase = await db();
-    const { error } = await supabase
-      .from("operation_bookings")
-      .update({
-        assignee_kind: input.kind,
-        assignee_employee_id: input.kind === "employee" ? input.assignee_id : null,
-        assignee_partner_id: input.kind === "partner" ? input.assignee_id : null,
-        assigned_at: new Date().toISOString(),
-        assigned_by: await getCurrentEmployeeId(),
-        handoff_note: input.handoff_note ?? null,
-      })
-      .eq("id", input.booking_id);
+    const patch = {
+      assignee_kind: input.kind,
+      assignee_employee_id: input.kind === "employee" ? input.assignee_id : null,
+      assignee_partner_id: input.kind === "partner" ? input.assignee_id : null,
+      assigned_at: new Date().toISOString(),
+      assigned_by: await getCurrentEmployeeId(),
+      handoff_note: input.handoff_note ?? null,
+    };
+    const write = (values: Record<string, unknown>) => supabase.from("operation_bookings").update(values).eq("id", input.booking_id);
+    let { error } = await write({ ...patch, assignee_supplier_id: input.kind === "supplier" ? input.assignee_id : null });
+    // until 0063 is applied there is no supplier column — nobody but a supplier needs it
+    if (error && input.kind !== "supplier") ({ error } = await write(patch));
     if (error) return { ok: false, error: "err.updateFailed" };
 
     await logAudit({
@@ -171,6 +188,9 @@ export async function assignBooking(input: {
 export type RequestDraft = {
   to_label: string;
   to_phone: string | null;
+  /** a supplier's email — the UI offers a mailto beside WhatsApp. */
+  to_email?: string | null;
+  subject?: string;
   body: string;
   /** false when there is no WhatsApp thread — the UI drops to copy / wa.me. */
   canSendWhatsapp: boolean;
@@ -179,71 +199,12 @@ export type RequestDraft = {
 /**
  * Compose the booking request for whoever the booking was handed to.
  *
- * Returned for REVIEW, never sent here. Everything on it comes from the
- * operation, so the assignee gets the dates and the room the client agreed to
- * rather than a paraphrase typed at speed.
+ * Returned for REVIEW, never sent here. One composer for every assignee
+ * (supplier-work.ts): a supplier gets it in its own language, everyone gets the
+ * names as in the passport, the rooms, the flight times and the meeting point.
  */
 export async function draftBookingRequest(bookingId: string): Promise<{ ok: true; draft: RequestDraft } | Fail> {
-  const denied = await requireOps();
-  if (denied) return { ok: false, error: denied };
-
-  try {
-    const supabase = await db();
-    const { data } = await supabase
-      .from("operation_bookings")
-      .select(
-        "id, kind, title, city_name, start_date, end_date, detail, handoff_note, assignee_kind, employees:assignee_employee_id(arabic_name, mobile), booking_partners:assignee_partner_id(name, phone, contact_name), operations(offers(serial, customers(arabic_name)))",
-      )
-      .eq("id", bookingId)
-      .maybeSingle();
-    if (!data) return { ok: false, error: "ops.err.notFound" };
-
-    const row = data as unknown as {
-      kind: string;
-      title: string;
-      city_name: string;
-      start_date: string | null;
-      end_date: string | null;
-      detail: Record<string, string> | null;
-      handoff_note: string | null;
-      assignee_kind: AssigneeKind;
-      employees: { arabic_name: string | null; mobile: string | null } | { arabic_name: string | null; mobile: string | null }[] | null;
-      booking_partners: { name: string; phone: string | null; contact_name: string | null } | { name: string; phone: string | null; contact_name: string | null }[] | null;
-      operations: unknown;
-    };
-
-    const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
-    const emp = one(row.employees);
-    const partner = one(row.booking_partners);
-    const op = one(row.operations as { offers: unknown } | { offers: unknown }[] | null);
-    const offer = one((op as { offers?: unknown } | null)?.offers as { serial: string; customers: unknown } | { serial: string; customers: unknown }[] | null);
-    const cust = one(offer?.customers as { arabic_name: string | null } | { arabic_name: string | null }[] | null);
-
-    const to_label = row.assignee_kind === "partner" ? (partner?.name ?? "—") : row.assignee_kind === "employee" ? (emp?.arabic_name ?? "—") : "قسم العمليات";
-    const to_phone = row.assignee_kind === "partner" ? (partner?.phone ?? null) : row.assignee_kind === "employee" ? (emp?.mobile ?? null) : null;
-
-    const details = Object.entries(row.detail ?? {}).map(([k, v]) => `• ${k}: ${v}`);
-    const body = [
-      "طلب حجز — ترافليون للسفر والسياحة",
-      "",
-      `العميل: ${cust?.arabic_name ?? "—"}`,
-      `رقم العرض: ${offer?.serial ?? "—"}`,
-      "",
-      `المطلوب: ${row.title}${row.city_name ? ` — ${row.city_name}` : ""}`,
-      row.start_date ? `من: ${row.start_date}${row.end_date ? `  إلى: ${row.end_date}` : ""}` : null,
-      ...details,
-      row.handoff_note ? `\nملاحظة: ${row.handoff_note}` : null,
-      "",
-      "يُرجى التأكيد مع رقم الحجز وسياسة الإلغاء.",
-    ]
-      .filter((l): l is string => l !== null)
-      .join("\n");
-
-    const conversationId = to_phone ? await conversationForPhone(to_phone) : null;
-    return { ok: true, draft: { to_label, to_phone, body, canSendWhatsapp: conversationId !== null } };
-  } catch {
-    return { ok: false, error: "err.db" };
-  }
+  return composeRequest(bookingId);
 }
 
 /**
@@ -299,6 +260,13 @@ export async function sendBookingRequest(input: {
       .update({ status: "pending" })
       .eq("id", input.booking_id)
       .in("status", ["pending", "prebooked", "in_flight", "failed"]);
+
+    // the request's own clock — «بلا رد» is counted from here (0063)
+    await supabase
+      .from("operation_bookings")
+      .update({ request_status: "sent", request_sent_at: new Date().toISOString(), request_answered_at: null })
+      .eq("id", input.booking_id)
+      .neq("status", "cancelled");
 
     await logAudit({
       action: "dispatch.sent",

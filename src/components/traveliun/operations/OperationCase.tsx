@@ -24,6 +24,8 @@ import { DocumentsPanel } from "./DocumentsPanel";
 import { TravelersPanel } from "./TravelersPanel";
 import { PaymentsPanel } from "./PaymentsPanel";
 import type { InstallmentRow } from "@/lib/data/operation-payments";
+import { SupplierPanel } from "./SupplierPanel";
+import type { SupplierWork } from "@/lib/data/supplier-work";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
@@ -54,6 +56,7 @@ export function OperationCase({
   installments,
   drivers,
   management,
+  supplierWork,
 }: {
   operation: OperationCard;
   travelers: TravelerListItem[];
@@ -72,6 +75,8 @@ export function OperationCase({
   /** orders 9/10, built by the page: the driver cards, and owner/notes/activity. */
   drivers?: ReactNode;
   management?: ReactNode;
+  /** the supplier side of the bookings (order 8); null when it could not load. */
+  supplierWork?: SupplierWork | null;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -162,6 +167,7 @@ export function OperationCase({
         />
 
         {drivers}
+        {supplierWork ? <SupplierPanel operationId={operation.id} bookings={bookings} work={supplierWork} /> : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <TravelersPanel operationId={operation.id} trip={operation} travelers={travelers} canReadMrz={canReadMrz} />
