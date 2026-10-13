@@ -192,6 +192,7 @@ export const en = {
   "nav.readyOffers": "Ready Offers",
   "nav.myFiles": "My Packages",
   "nav.myProfile": "Company Profile",
+  "nav.myCustomers": "My clients",
   "nav.packageGenerator": "Package Generator",
   "nav.issuePackage": "Issue a Package",
   "nav.issuedOffers": "Issued Offers",

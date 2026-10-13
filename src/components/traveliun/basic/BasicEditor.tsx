@@ -107,6 +107,7 @@ import { useDraftState } from "../generator/useDraftState";
 import { BasicCityCard } from "./BasicCityCard";
 import { BasicFlightPlan } from "./BasicFlightPlan";
 import { BasicPhoneLookup } from "./BasicPhoneLookup";
+import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
 import { basicCard, basicField, basicLabel, typedNumber } from "./styles";
 
@@ -565,7 +566,9 @@ export function BasicEditor({
   let dayCursor = travelDays + 1;
 
   // ---------- pricing (sell side only) ----------
-  const canPricing = can("pricing.view");
+  // a partner company prices its own file: the server hands it our prices at its terms
+  const partnerSession = usePartnerBrand();
+  const canPricing = can("pricing.view") || partnerSession !== null;
   const canInternal = can("pricing.internal");
   // the agent sets the profit unless the administration keeps it for the managers
   const canSetProfit = canInternal || (profitSettings.by === "staff" && can("pricing.view"));
@@ -868,6 +871,8 @@ export function BasicEditor({
               ))}
             </select>
           </label>
+          {/* who sells it is ours to choose — a partner's own file is already its own */}
+          {partnerSession ? null : (
           <label className={basicLabel}>
             {tx("agent")}
             <select
@@ -884,13 +889,27 @@ export function BasicEditor({
               ))}
             </select>
           </label>
-          {/* the phone first: a few digits find the customer in Teletel and fill the name */}
-          <BasicPhoneLookup
-            label={tx("phone")}
-            phone={data.customer.customer_phone}
-            onPhone={(customer_phone) => patch({ customer: { ...data.customer, customer_phone } })}
-            onPick={(hit) => patch({ customer: { ...data.customer, customer_name: hit.name, customer_phone: hit.phone } })}
-          />
+          )}
+          {/* the phone first: a few digits find the customer in Teletel and fill the name —
+              our contacts, so a partner types its client's phone plainly */}
+          {partnerSession ? (
+            <label className={basicLabel}>
+              {tx("phone")}
+              <input
+                dir="ltr"
+                value={data.customer.customer_phone}
+                onChange={(e) => patch({ customer: { ...data.customer, customer_phone: e.target.value } })}
+                className={`${basicField} text-start`}
+              />
+            </label>
+          ) : (
+            <BasicPhoneLookup
+              label={tx("phone")}
+              phone={data.customer.customer_phone}
+              onPhone={(customer_phone) => patch({ customer: { ...data.customer, customer_phone } })}
+              onPick={(hit) => patch({ customer: { ...data.customer, customer_name: hit.name, customer_phone: hit.phone } })}
+            />
+          )}
           <label className={basicLabel}>
             {tx("customer")}
             <input value={data.customer.customer_name} onChange={(e) => patch({ customer: { ...data.customer, customer_name: e.target.value } })} className={basicField} />
@@ -1431,11 +1450,26 @@ export function BasicEditor({
                 </div>
                 ) : null}
                 <div className="flex items-center justify-between rounded-[11px] bg-[#185045] px-3 py-2.5 text-white">
-                  <span className="text-[13px] font-extrabold">{tx("clientTotal")}</span>
+                  {/* for a partner this total is what the package costs IT — our prices at its terms */}
+                  <span className="text-[13px] font-extrabold">{partnerSession ? t("pg.partnerCost") : tx("clientTotal")}</span>
                   <span className="tv-tnum text-[16px] font-extrabold">
                     <DirText>{`${summary.total_sell.toLocaleString("en-US")} ${display}`}</DirText>
                   </span>
                 </div>
+                {partnerSession ? (
+                  <label className="flex flex-wrap items-center justify-between gap-2 rounded-[11px] border border-[#d8e6e0] bg-[#f8fbf9] px-3 py-2">
+                    <span className="text-[12.5px] font-extrabold text-[#0f3d38]">{t("pg.partnerSell")}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      dir="ltr"
+                      value={data.pricing.final_total ?? ""}
+                      placeholder={summary.total_sell.toLocaleString("en-US")}
+                      onChange={(e) => patch({ pricing: { ...data.pricing, final_total: typedNumber(e.target) } })}
+                      className={`${basicField} tv-tnum w-36 text-center`}
+                    />
+                  </label>
+                ) : null}
               </div>
             )}
           </div>
