@@ -21,11 +21,14 @@ import {
   findAirportTransfer,
   findRoomPrice,
   findServicePrice,
+  findTourPrice,
   findTransferPrice,
   mergeSuggestions,
+  resolveAirportCity,
   syncSuggestions,
   normalizeName,
   suggestPricing,
+  type PointTransfer,
   type PricingReference,
 } from "./pricing-suggest";
 
@@ -492,5 +495,57 @@ describe("syncSuggestions", () => {
       [],
     );
     expect(out.map((i) => i.description)).toEqual(["إكرامية"]);
+  });
+});
+
+describe("data model 0072 — airport → city rows and per-car tours", () => {
+  const point = (from: [PointTransfer["from_kind"], string, string | null], to: [PointTransfer["to_kind"], string, string | null], car: string, price: number): PointTransfer => ({
+    from_kind: from[0], from_name: from[1], from_code: from[2], to_kind: to[0], to_name: to[1], to_code: to[2], car_type: car, price, currency: "MYR",
+  });
+  const KUL: [PointTransfer["from_kind"], string, string] = ["airport", "مطار كوالالمبور الدولي", "KUL"];
+  const SZB: [PointTransfer["from_kind"], string, string] = ["airport", "مطار سوبانج", "SZB"];
+  const KL: [PointTransfer["to_kind"], string, null] = ["city", "كوالالمبور", null];
+  const POINTS = [
+    point(KUL, KL, "سيارة صغيرة", 120),
+    point(KUL, KL, "فان", 180),
+    point(SZB, KL, "سيارة صغيرة", 90),
+    point(["city", "لنكاوي", null], ["city", "لنكاوي", null], "سيارة صغيرة", 60),
+  ];
+  const fleet = [{ name: "سيارة صغيرة", pax: 3 }, { name: "فان", pax: 8 }];
+
+  it("prices reception and farewell from the airport the flights name, for the car", () => {
+    expect(resolveAirportCity(POINTS, "كوالالمبور", false, ["مطار كوالالمبور الدولي (KUL)"], "فان")?.price).toBe(180);
+    // the farewell is the same road the other way
+    expect(resolveAirportCity(POINTS, "كوالالمبور", true, ["مطار سوبانج (SZB)"], "سيارة صغيرة")?.price).toBe(90);
+    // no car chosen: the smallest that seats the group
+    expect(resolveAirportCity(POINTS, "كوالالمبور", false, ["KUL"], null, 5, fleet)?.price).toBe(180);
+  });
+
+  it("does not guess between two airports, and falls back to the city's own row", () => {
+    expect(resolveAirportCity(POINTS, "كوالالمبور", false, [], "سيارة صغيرة")).toBeNull();
+    expect(resolveAirportCity(POINTS, "لنكاوي", false, ["مطار لنكاوي الدولي (LGK)"], "سيارة صغيرة")?.price).toBe(60);
+  });
+
+  it("reaches the pricing sheet before the text rows", () => {
+    const data = malaysiaDraft();
+    data.cities = [{ city_name: "كوالالمبور", nights: 3, check_in: null, check_out: null }];
+    data.transport = deriveTransportRows(emptyTransportPlan(), data.cities);
+    data.flights = [flight("مطار الملك خالد الدولي (RUH)", "مطار كوالالمبور الدولي (KUL)")];
+    const items = suggestPricing(data, { ...EMPTY, transfers: MY, fleet, points: POINTS }, LABELS);
+    expect(items.find((i) => i.description.startsWith("المطار"))).toMatchObject({ sell_price: 120, source: "list" });
+  });
+
+  it("prices a tour for the car it goes in — never another car's price", () => {
+    const tours = [
+      { name: "جولة كوالالمبور", price: 300, currency: "SAR" },
+      { name: "جولة كوالالمبور", price: 300, currency: "SAR", car_type: "سيدان", program_id: "p1" },
+      { name: "جولة كوالالمبور", price: 450, currency: "SAR", car_type: "فان", program_id: "p1" },
+    ];
+    expect(findTourPrice(tours, "جولة كوالالمبور", "فان")?.price).toBe(450);
+    expect(findTourPrice(tours, "الجولة الأولى", "فان", "p1")?.price).toBe(450);
+    expect(findTourPrice(tours, "جولة كوالالمبور", "باص")).toBeNull();
+    expect(findTourPrice(tours, "جولة كوالالمبور")?.price).toBe(300);
+    // the old per-car name still finds the grouped tour, at that car's price
+    expect(findTourPrice(tours, "جولة كوالالمبور (فان)")?.price).toBe(450);
   });
 });

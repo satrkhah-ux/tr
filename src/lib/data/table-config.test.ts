@@ -10,10 +10,10 @@ import { GRANTED_COLUMNS, isCostColumn } from "./table-config";
  * column nobody without pricing.internal can ever see. Writes are granted on the
  * same list (writable() strips the rest), so all three are held to it.
  */
-const MIGRATION = readFileSync(
-  fileURLToPath(new URL("../../../supabase/migrations/0047_cost_data_lockdown.sql", import.meta.url)),
-  "utf8",
-);
+// 0047 granted services / transportation_types; 0072 the visas, the same way
+const MIGRATION = ["0047_cost_data_lockdown.sql", "0072_data_model.sql"]
+  .map((file) => readFileSync(fileURLToPath(new URL(`../../../supabase/migrations/${file}`, import.meta.url)), "utf8"))
+  .join("\n");
 
 function grantedIn(table: string): { select: string[]; insert: string[]; update: string[] } {
   const match = MIGRATION.match(
@@ -36,6 +36,8 @@ describe("GRANTED_COLUMNS", () => {
   it("withholds the buy side and nothing else", () => {
     expect(isCostColumn("services", "buy_price")).toBe(true);
     expect(isCostColumn("transportation_types", "buy_currency")).toBe(true);
+    expect(isCostColumn("visas", "buy_price")).toBe(true);
+    expect(isCostColumn("visas", "sell_price")).toBe(false);
     expect(isCostColumn("services", "sell_price")).toBe(false);
     expect(isCostColumn("hotels", "anything")).toBe(false);
   });

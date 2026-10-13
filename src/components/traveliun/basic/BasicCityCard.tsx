@@ -37,6 +37,7 @@ import {
   type BasicCity,
 } from "@/lib/offer/basic";
 import { programDayText, type TourProgram } from "@/lib/offer/itinerary";
+import { findTourPrice, type TourPrice } from "@/lib/offer/pricing-suggest";
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { suppliersFor } from "../generator/SupplierPrice";
@@ -101,7 +102,7 @@ export function BasicCityCard({
   /** the ready-made tours of this city (tour_programs). */
   programs: TourProgram[];
   /** the company's tours price list for the trip's countries — a pick fills its price. */
-  tourPrices: { name: string; price: number; currency: string }[];
+  tourPrices: TourPrice[];
   hotelsOn: boolean;
   toursOn: boolean;
   transportOn: boolean;
@@ -565,7 +566,7 @@ function ToursPanel({
   index: number;
   city: BasicCity;
   programs: TourProgram[];
-  tourPrices: { name: string; price: number; currency: string }[];
+  tourPrices: TourPrice[];
   sarPer: Record<string, number>;
   data: DraftData;
   carTypes: GeneratorLookups["carTypes"];
@@ -592,10 +593,9 @@ function ToursPanel({
     return hit ? { program_id: hit.program.id, title: hit.title, text: hit.activities[0] ?? "", free: false } : { program_id: null, title, text: "", free: false };
   };
   const setPick = (k: number, slice: Partial<TourPick>) => onPicks(picks.map((p, i) => (i === k ? { ...p, ...slice } : p)));
-  /** A tour on the company's price list, in riyals (the tours are priced in riyals). */
-  const listedPrice = (title: string): number | null => {
-    const key = title.trim();
-    const hit = key ? tourPrices.find((t) => t.name === key) : undefined;
+  /** A tour on the company's price list for the car it goes in, in riyals (the tours are priced in riyals). */
+  const listedPrice = (title: string, car: string, programId?: string | null): number | null => {
+    const hit = findTourPrice(tourPrices, title, car, programId);
     if (!hit) return null;
     const rate = hit.currency === "SAR" ? 1 : sarPer[hit.currency];
     return rate ? Math.round(hit.price * rate) : null;
@@ -695,9 +695,11 @@ function ToursPanel({
             {offered.map((o) => (
               <option key={o.program.id} value={o.title} />
             ))}
-            {tourPrices.map((t) => (
-              <option key={`p-${t.name}`} value={t.name} label={`${t.price} ${t.currency}`} />
-            ))}
+            {/* one entry per tour: a tour priced per car is listed once, its price shown for the trip's car */}
+            {[...new Set(tourPrices.map((t) => t.name))].map((name) => {
+              const hit = findTourPrice(tourPrices, name, tripCar);
+              return <option key={`p-${name}`} value={name} label={hit ? `${hit.price} ${hit.currency}` : undefined} />;
+            })}
           </datalist>
           {picks.map((pick, k) => (
             <div key={k} className={`${rowGap} ${TOUR_COLS}`}>
@@ -713,8 +715,8 @@ function ToursPanel({
                 placeholder={offered.length > 0 ? tx("tourPickHint") : `${FREE_DAY_TITLE} / جولة سياحية في ${city.city_name}`}
                 onChange={(e) => {
                   const s = serviceOf(e.target.value);
-                  // a tour from the price list arrives priced; a typed one keeps what was there
-                  setPick(k, { ...s, price: s.free ? 0 : (listedPrice(e.target.value) ?? (pick.free ? null : pick.price)) });
+                  // a tour from the price list arrives priced for its car; a typed one keeps what was there
+                  setPick(k, { ...s, price: s.free ? 0 : (listedPrice(e.target.value, pick.car_type || tripCar, s.program_id) ?? (pick.free ? null : pick.price)) });
                 }}
                 className={`${basicField} ${pick.free ? "text-[#7a948f]" : ""}`}
               />
@@ -724,8 +726,10 @@ function ToursPanel({
                 value={pick.car_type || tripCar}
                 onChange={(e) => {
                   const car = e.target.value;
+                  // another car is another price, when the list has the tour for it
+                  const listed = !pick.free && pick.title.trim() ? listedPrice(pick.title, car, pick.program_id) : null;
                   if (!tripCar) onCar("tours", { car_type: car });
-                  else setPick(k, { car_type: car && car !== tripCar ? car : undefined });
+                  else setPick(k, { car_type: car && car !== tripCar ? car : undefined, ...(listed != null ? { price: listed } : {}) });
                 }}
                 className={basicField}
               >

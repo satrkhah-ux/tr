@@ -77,6 +77,8 @@ export interface RoomType {
   hotel_id: Uuid | null;
   capacity: number | null;
   default_board: BoardType | null;
+  /** single … villa (0072, src/lib/catalog/model.ts ROOM_CATEGORIES); null = not yet decided. */
+  category: string | null;
   created_at: IsoTimestamp;
 }
 
@@ -407,6 +409,8 @@ export interface Airport {
   lat: number | null;
   lng: number | null;
   status: string;
+  /** airport | train_station | bus_station | port (0072) — only an airport has an IATA code. */
+  kind: string;
   created_at: IsoTimestamp;
 }
 
@@ -522,6 +526,10 @@ export interface Driver {
   mobile: string | null;
   country_id: Uuid | null;
   car_type: string | null;
+  /** where the driver works and whose man he is (0072). */
+  city_id: Uuid | null;
+  supplier_id: Uuid | null;
+  status: string;
   created_at: IsoTimestamp;
 }
 
@@ -530,10 +538,28 @@ export interface Tour {
   arabic_name: string;
   english_name: string | null;
   country_id: Uuid | null;
+  /** the tour's single price — since 0072 its price per vehicle is in tour_prices. */
   price: number | null;
   currency: string | null;
+  city_id: Uuid | null;
+  /** the ready programme (tour_programs) this tour is. */
+  program_id: Uuid | null;
+  duration_hours: number | null;
   created_at: IsoTimestamp;
 }
+
+/** A tour's price for one vehicle (0072). Staff only — what we pay. */
+export interface TourPriceRow {
+  id: Uuid;
+  tour_id: Uuid;
+  car_type: string;
+  price: number;
+  currency: string;
+  created_at: IsoTimestamp;
+}
+
+/** What a transfer starts or ends at (0072): a row of /airports by its kind, or a city. */
+export type TransferPointKind = "airport" | "station" | "port" | "city";
 
 export interface Transfer {
   id: Uuid;
@@ -543,6 +569,28 @@ export interface Transfer {
   price: number | null;
   currency: string | null;
   country_id: Uuid | null;
+  /** the two ends as ids (0072); null on the old text-only rows. */
+  from_kind: TransferPointKind | null;
+  from_id: Uuid | null;
+  to_kind: TransferPointKind | null;
+  to_id: Uuid | null;
+  created_at: IsoTimestamp;
+}
+
+/** A visa the agency arranges (0072), its country one of /countries. */
+export interface Visa {
+  id: Uuid;
+  /** the old free text, kept until every row has its country_id. */
+  country: string | null;
+  country_id: Uuid | null;
+  visa_type: string | null;
+  buy_price: number | null;
+  buy_currency: string | null;
+  sell_price: number | null;
+  sell_currency: string | null;
+  arabic_requirements: string | null;
+  english_requirements: string | null;
+  status: string;
   created_at: IsoTimestamp;
 }
 
@@ -724,6 +772,8 @@ export interface Database {
       care_tickets: TableShape<CareTicket>;
       company_suppliers: TableShape<CompanySupplier>;
       tour_programs: TableShape<TourProgram>;
+      tour_prices: TableShape<TourPriceRow>;
+      visas: TableShape<Visa>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

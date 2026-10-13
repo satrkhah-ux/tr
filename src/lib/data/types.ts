@@ -19,7 +19,12 @@ export type ColumnDef = {
   /** editable in the add/edit form (default true). */
   editable?: boolean;
   /** fixed options for a select input in the form. */
-  options?: { value: string; label: string }[];
+  options?: FilterOption[];
+  /**
+   * An id column shown by its name and edited as a select of that list
+   * (cities.country_id → «ماليزيا»), from the same options the filters use.
+   */
+  source?: Exclude<FilterSource, "static">;
 };
 
 export type FilterOp = "eq" | "gte" | "lte" | "in" | "ilike";
@@ -30,7 +35,7 @@ export type Filter = {
   value: DataValue | DataValue[];
 };
 
-export type FilterSource = "countries" | "cities" | "employees" | "static";
+export type FilterSource = "countries" | "cities" | "employees" | "suppliers" | "static";
 
 export type FilterDef = {
   key: string;
@@ -38,8 +43,8 @@ export type FilterDef = {
   kind: "select" | "date";
   /** where the select options come from. */
   source?: FilterSource;
-  /** static options when source is "static". */
-  options?: { value: string; label: string }[];
+  /** static options when source is "static". A value of FILTER_NULL / FILTER_NOT_NULL tests for an empty column. */
+  options?: FilterOption[];
   /** column(s) the filter applies to; defaults to `key`. */
   column?: string;
 };
@@ -59,6 +64,12 @@ export type TableConfig = {
   isOffers?: boolean;
   /** values forced on every list query + insert (e.g. terms.kind = "include"). */
   fixedValues?: DataRow;
+  /**
+   * Related rows embedded in the list query (PostgREST), read by dotted column
+   * keys: `hotels(arabic_name)` → column `hotels.arabic_name`. Such columns are
+   * display-only (`editable: false`).
+   */
+  select?: string;
 };
 
 export type ListInput = {
@@ -69,7 +80,13 @@ export type ListInput = {
   searchColumns?: string[];
   filters?: Filter[];
   sort?: Sort;
+  /** TableConfig.select — embedded related rows. */
+  select?: string;
 };
+
+/** Static filter values that test a column for empty / not empty (room types: «عامة» / «لفندق»). */
+export const FILTER_NULL = "__null__";
+export const FILTER_NOT_NULL = "__not_null__";
 
 export type ListResult =
   | { ok: true; rows: DataRow[]; count: number }
@@ -81,5 +98,6 @@ export type MutateResult =
 
 export type DeleteResult = { ok: true } | { ok: false; error: TranslationKey };
 
-export type FilterOption = { value: string; label: string };
+/** `labelKey`, when set, is translated in place of `label`. */
+export type FilterOption = { value: string; label: string; labelKey?: TranslationKey };
 export type FilterOptions = Record<FilterSource, FilterOption[]>;

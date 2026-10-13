@@ -31,6 +31,7 @@ import {
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
 import type { DraftPricingItem } from "./draft-types";
+import { splitTourName } from "@/lib/catalog/model";
 
 /** A transfer price from the reference list. */
 export type TransferPrice = {
@@ -80,15 +81,43 @@ export type PricingReference = {
   fleet: FleetVehicle[];
   /** the company's tours price list for the trip's country (/cars/tours). */
   tours?: TourPrice[];
+  /** transfers priced from a point to an area (0072 from/to kind + id) — read before the text rows. */
+  points?: PointTransfer[];
 };
 
-/** A tour on the company's price list. */
-export type TourPrice = { name: string; price: number; currency: string };
+/**
+ * A tour on the company's price list. Since 0072 a tour is one record priced per
+ * vehicle (tour_prices): `car_type` names the vehicle; an entry without one is
+ * the tour's own single price. `program_id` is the ready programme it is.
+ */
+export type TourPrice = { name: string; price: number; currency: string; car_type?: string | null; program_id?: string | null };
 
-/** The listed tour a typed title names — the same name, however it was spelled. */
-export function findTourPrice(list: TourPrice[] | undefined, title: string): TourPrice | null {
+/**
+ * The listed price of a tour — the programme it was picked from, else the same
+ * name however it was spelled — for the car it goes in. A tour priced per car
+ * is only priced for a car it lists: a sedan's price is not the bus's. The old
+ * per-car names («جولة X (فان)») still find the grouped tour.
+ */
+export function findTourPrice(
+  list: TourPrice[] | undefined,
+  title: string,
+  carType?: string | null,
+  programId?: string | null,
+): TourPrice | null {
+  const rows = list ?? [];
   const key = normalizeName(title);
-  return key ? (list ?? []).find((t) => normalizeName(t.name) === key) ?? null : null;
+  let hits = programId ? rows.filter((t) => t.program_id === programId) : [];
+  if (hits.length === 0 && key) hits = rows.filter((t) => normalizeName(t.name) === key);
+  let car = baseVehicle(carType);
+  if (hits.length === 0) {
+    const split = splitTourName(title);
+    if (!split) return null;
+    hits = rows.filter((t) => normalizeName(t.name) === normalizeName(split.base));
+    car = car || baseVehicle(split.car);
+  }
+  const perCar = hits.filter((t) => t.car_type?.trim());
+  if (car && perCar.length > 0) return perCar.find((t) => baseVehicle(t.car_type) === car) ?? null;
+  return hits.find((t) => !t.car_type?.trim()) ?? (perCar.length === 1 ? perCar[0] : null);
 }
 
 /**
@@ -228,6 +257,82 @@ export function findAirportTransfer(
   return leaving
     ? findTransferPrice(rows, c, pool[0], carType, pax, fleet)
     : findTransferPrice(rows, pool[0], c, carType, pax, fleet);
+}
+
+// ---------- transfers priced from a point to an area (data model 0072) ----------
+
+/** What a transfer starts or ends at: an airport, station or port (rows of /airports), or a city. */
+export type PointKind = "airport" | "station" | "port" | "city";
+
+/** A transfer row with its two ends resolved: what each end is, its name, and an airport's code. */
+export type PointTransfer = {
+  from_kind: PointKind;
+  from_name: string;
+  from_code: string | null;
+  to_kind: PointKind;
+  to_name: string;
+  to_code: string | null;
+  car_type: string | null;
+  price: number;
+  currency: string | null;
+  created_at?: string | null;
+};
+
+/**
+ * Reception or farewell: the price from the airport the group uses to the city
+ * it stays in, for its car — then, when no airport row has it, the city's own
+ * in-city row (city → same city). The car is the leg's own, else the smallest
+ * of the fleet that seats the group (findTransferPrice), as for any road.
+ *
+ * Which airport: the one the flights name (by IATA code, else by name); with no
+ * flight, the only one listed for the city. Two candidates and no flight to
+ * decide between them → no price; the agent decides, as findAirportTransfer does.
+ */
+export function resolveAirportCity(
+  rows: PointTransfer[],
+  city: string,
+  leaving: boolean,
+  flown: string[],
+  carType: string | null,
+  pax = 1,
+  fleet: FleetVehicle[] = [],
+): TransferPrice | null {
+  const c = normalizeName(city);
+  if (!c) return null;
+  const isPoint = (kind: PointKind) => kind !== "city";
+  const isCity = (kind: PointKind, name: string) => kind === "city" && normalizeName(name) === c;
+  const end = (r: PointTransfer, side: "from" | "to") =>
+    side === "from" ? { code: r.from_code?.toUpperCase() ?? null, name: normalizeName(r.from_name) } : { code: r.to_code?.toUpperCase() ?? null, name: normalizeName(r.to_name) };
+  const pointOf = (r: PointTransfer) => (isPoint(r.from_kind) ? end(r, "from") : end(r, "to"));
+  const keyOf = (p: { code: string | null; name: string }) => p.code || p.name;
+
+  const touching = rows.filter(
+    (r) => (isPoint(r.from_kind) && isCity(r.to_kind, r.to_name)) || (isPoint(r.to_kind) && isCity(r.from_kind, r.from_name)),
+  );
+  // «مطار كوالالمبور الدولي (KUL)» is how a flight stores an airport
+  const codes = flown.map((f) => f.match(/\(([A-Z]{3})\)\s*$/)?.[1] ?? (/^[A-Z]{3}$/.test(f.trim()) ? f.trim() : null)).filter(Boolean);
+  const names = flown.map((f) => normalizeName(f.replace(/\s*\([A-Z0-9]{3,5}\)\s*$/, ""))).filter(Boolean);
+  const points = [...new Map(touching.map((r) => [keyOf(pointOf(r)), pointOf(r)])).values()];
+  const byFlight = points.filter(
+    (p) => (p.code && codes.includes(p.code)) || (p.name !== "" && names.some((n) => p.name.includes(n) || n.includes(p.name))),
+  );
+  const pool = byFlight.length > 0 ? byFlight : points;
+
+  const POINT = "@point";
+  const asRoad = (list: PointTransfer[], pointKey: string | null): TransferPrice[] =>
+    list.map((r) => {
+      const label = (kind: PointKind, side: "from" | "to") => (isPoint(kind) && keyOf(end(r, side)) === pointKey ? POINT : c);
+      return { from_city: label(r.from_kind, "from"), to_city: label(r.to_kind, "to"), car_type: r.car_type, price: r.price, currency: r.currency, created_at: r.created_at };
+    });
+
+  if (pool.length === 1) {
+    const key = keyOf(pool[0]);
+    const road = asRoad(touching.filter((r) => keyOf(pointOf(r)) === key), key).filter((r) => r.price > 0);
+    const hit = leaving ? findTransferPrice(road, c, POINT, carType, pax, fleet) : findTransferPrice(road, POINT, c, carType, pax, fleet);
+    if (hit) return hit;
+  }
+  const inCity = asRoad(rows.filter((r) => isCity(r.from_kind, r.from_name) && isCity(r.to_kind, r.to_name)), null).filter((r) => r.price > 0);
+  return findTransferPrice(inCity, c, c, carType, pax, fleet);
 }
 
 /** The agency's price for a named service in this country. */
@@ -395,7 +500,17 @@ export function suggestPricing(
       tr.from_place === TRANSPORT_TOURS
         ? null
         : arriving || leaving
-          ? findAirportTransfer(
+          ? // a row priced from the airport to the city (0072) first, then the text rows
+            (resolveAirportCity(
+              reference.points ?? [],
+              hotelCity(arriving ? tr.to_place : tr.from_place),
+              leaving,
+              leaving ? departed : landed,
+              tr.car_type,
+              pax,
+              reference.fleet,
+            ) ??
+            findAirportTransfer(
               transfers,
               hotelCity(arriving ? tr.to_place : tr.from_place),
               leaving,
@@ -403,7 +518,7 @@ export function suggestPricing(
               tr.car_type,
               pax,
               reference.fleet,
-            )
+            ))
           : findTransferPrice(transfers, tr.from_place, tr.to_place, tr.car_type, pax, reference.fleet);
     items.push({
       item_type: "transport",
@@ -448,7 +563,9 @@ export function suggestPricing(
       // a free day is never a line on the bill
       if (pick.free || pick.title.trim() === FREE_DAY_TITLE || (!pick.title.trim() && pick.price == null)) return;
       // a tour typed without a price takes the list's, when the list knows it
-      const listed = pick.price == null ? findTourPrice(reference.tours, pick.title) : null;
+      // for the car the tour goes in — its own, else the trip's tours car
+      const car = pick.car_type?.trim() || data.transport_plan.tours.car_type;
+      const listed = pick.price == null ? findTourPrice(reference.tours, pick.title, car, pick.program_id) : null;
       items.push({
         item_type: "service",
         description: pick.title.trim() || `جولة سياحية في ${city.city_name}`,

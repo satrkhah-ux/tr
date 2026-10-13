@@ -196,6 +196,7 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.cars", href: "/cars" },
       { labelKey: "nav.transfers", href: "/cars/transfers" },
       { labelKey: "nav.tours", href: "/cars/tours" },
+      { labelKey: "data.model.grid.title", href: "/price-grid" },
       { labelKey: "nav.tourPrograms", href: "/tour-programs" },
       { labelKey: "nav.drivers", href: "/drivers" },
       { labelKey: "nav.serviceTypes", href: "/services-types", captionKey: "nav.services" },

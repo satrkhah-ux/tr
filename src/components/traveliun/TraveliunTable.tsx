@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -41,6 +41,17 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
 const PAGE_SIZES = [10, 25, 50, 100];
 const BOOLEAN_KEYS = new Set(["checked", "is_default", "visa_required", "with_driver"]);
 const LTR_TYPES = new Set(["serial", "number", "currency", "date", "phone", "url"]);
+
+/** The id → name lists a `source` column is shown and edited by (the filters' own options). */
+const LookupOptions = createContext<FilterOptions | null>(null);
+
+/** A cell's value — a dotted key («hotels.arabic_name») reads a row embedded by the config's `select`. */
+function cellValue(row: DataRow, key: string): DataValue {
+  if (!key.includes(".")) return row[key];
+  let value: unknown = row;
+  for (const part of key.split(".")) value = value && typeof value === "object" ? (value as Record<string, unknown>)[part] : null;
+  return (value ?? null) as DataValue;
+}
 
 type OffersMode = "confirmed" | "unconfirmed";
 
@@ -105,6 +116,7 @@ export function TraveliunTable({
       pageSize,
       search: debounced || undefined,
       searchColumns: config.searchable,
+      select: config.select,
       filters: buildFilters(),
       sort: config.defaultSort,
     });
@@ -167,6 +179,7 @@ export function TraveliunTable({
   }
 
   return (
+    <LookupOptions.Provider value={filterOptions}>
     <TraveliunShell title={config.titleKey}>
       <div className="tv-fade-up">
         {config.isOffers ? (
@@ -294,7 +307,7 @@ export function TraveliunTable({
                           </td>
                           {config.columns.map((column) => (
                             <td key={column.key} className="px-[14px] py-[17px] align-middle leading-6">
-                              <Cell column={column} value={row[column.key]} />
+                              <Cell column={column} value={cellValue(row, column.key)} />
                             </td>
                           ))}
                         </tr>
@@ -330,7 +343,8 @@ export function TraveliunTable({
             // A row added while a country is filtered belongs to that country
             // (a Thailand-only term, a city in it); no filter → a global row.
             const country = filterValues["country_id"];
-            const payload = { ...(country ? { country_id: country } : {}), ...values, ...(config.fixedValues ?? {}) };
+            // a country chosen in the form itself wins over the filter's
+            const payload = { ...values, ...(country && values.country_id == null ? { country_id: country } : {}), ...(config.fixedValues ?? {}) };
             const result = await createRow(config.table, payload);
             if (!result.ok) return t(result.error);
             await fetchRows();
@@ -365,6 +379,7 @@ export function TraveliunTable({
         />
       ) : null}
     </TraveliunShell>
+    </LookupOptions.Provider>
   );
 }
 
@@ -407,7 +422,7 @@ function CardsView({
         <article key={String(row.id)} className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
           <div className="mb-3 flex items-start justify-between gap-2">
             <div className="min-w-0 text-[15px] font-extrabold text-[#003c3a]">
-              {primary ? <Cell column={primary} value={row[primary.key]} /> : null}
+              {primary ? <Cell column={primary} value={cellValue(row, primary.key)} /> : null}
             </div>
             <button
               type="button"
@@ -422,7 +437,7 @@ function CardsView({
             {rest.map((column) => (
               <div key={column.key} className="flex items-start justify-between gap-3 text-[13px]">
                 <dt className="shrink-0 font-semibold text-[#93aaa3]">{t(column.labelKey)}</dt>
-                <dd className="min-w-0 text-end font-medium text-[#0f3d38]"><Cell column={column} value={row[column.key]} /></dd>
+                <dd className="min-w-0 text-end font-medium text-[#0f3d38]"><Cell column={column} value={cellValue(row, column.key)} /></dd>
               </div>
             ))}
           </dl>
@@ -434,7 +449,12 @@ function CardsView({
 
 function Cell({ column, value }: { column: ColumnDef; value: DataValue }) {
   const { t } = useTraveliunUI();
+  const lookups = useContext(LookupOptions);
   if (value === null || value === undefined || value === "") return <span className="text-[#c2cfca]">—</span>;
+  // an id shown by its name; a fixed option by its label
+  if (column.source) return <span>{lookups?.[column.source].find((o) => o.value === value)?.label ?? String(value)}</span>;
+  const option = column.options?.find((o) => o.value === value);
+  if (option?.labelKey) return <span>{t(option.labelKey)}</span>;
   if (column.type === "status") return <StatusBadge tone={statusTone(String(value))} />;
   // A carrier's mark, from its path in the public bucket. Drawn small and
   // contained: the row height must not follow the image.
@@ -502,7 +522,7 @@ function FilterBar({
               >
                 <option value="">{t("all")}</option>
                 {options.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <option key={opt.value} value={opt.value}>{opt.labelKey ? t(opt.labelKey) : opt.label}</option>
                 ))}
               </select>
             </label>
@@ -666,6 +686,7 @@ function RecordForm({
 
 function FieldInput({ column, value, onChange }: { column: ColumnDef; value: string; onChange: (value: string) => void }) {
   const { t } = useTraveliunUI();
+  const lookups = useContext(LookupOptions);
   if (BOOLEAN_KEYS.has(column.key)) {
     return (
       <select value={value} onChange={(e) => onChange(e.target.value)} className={formField}>
@@ -674,11 +695,12 @@ function FieldInput({ column, value, onChange }: { column: ColumnDef; value: str
       </select>
     );
   }
-  if (column.options) {
+  const choices = column.source ? (lookups?.[column.source] ?? []) : column.options;
+  if (choices) {
     return (
       <select value={value} onChange={(e) => onChange(e.target.value)} className={formField}>
         <option value="">{t("chooseOption")}</option>
-        {column.options.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+        {choices.map((opt) => (<option key={opt.value} value={opt.value}>{opt.labelKey ? t(opt.labelKey) : opt.label}</option>))}
       </select>
     );
   }
@@ -724,7 +746,7 @@ function RowActionModal({
           {config.columns.map((column) => (
             <div key={column.key} className="rounded-[10px] bg-[#f4f8f6] p-3">
               <p className="mb-1 text-xs font-bold text-[#93aaa3]">{t(column.labelKey)}</p>
-              <div className="text-sm"><Cell column={column} value={row[column.key]} /></div>
+              <div className="text-sm"><Cell column={column} value={cellValue(row, column.key)} /></div>
             </div>
           ))}
         </div>

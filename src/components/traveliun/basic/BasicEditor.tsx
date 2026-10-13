@@ -95,7 +95,7 @@ import {
 } from "@/lib/offer/basic";
 import { validateDraft, type DraftIssue } from "@/lib/offer/draft-validation";
 import { computeOfferPricing, rebase } from "@/lib/offer/pricing";
-import { syncSuggestions } from "@/lib/offer/pricing-suggest";
+import { syncSuggestions, type TourPrice } from "@/lib/offer/pricing-suggest";
 import { syncDepartureDates } from "@/lib/offer/schedule";
 import { useRole } from "@/lib/roles/RoleContext";
 import { TraveliunShell } from "../TraveliunShell";
@@ -456,7 +456,7 @@ export function BasicEditor({
   );
 
   // ---------- the tours price list of the trip's countries ----------
-  const [tourPrices, setTourPrices] = useState<{ name: string; price: number; currency: string }[]>([]);
+  const [tourPrices, setTourPrices] = useState<TourPrice[]>([]);
   const countryKey = tripCountries(data).sort().join("|");
   useEffect(() => {
     if (!countryKey) return;

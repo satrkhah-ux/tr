@@ -6,6 +6,7 @@ import { currentCan } from "@/lib/roles/current";
 import { ourDefaultMarginPct, partnerCaller, viewerTerms } from "@/lib/partners/price-view";
 import { partnerSheet } from "@/lib/partners/pricing";
 import { loadDraft } from "./draft-store";
+import { addModelPrices } from "./model-prices";
 import { getRates } from "./rates-actions";
 import { findLookupCountry } from "@/lib/offer/draft-types";
 import { packageProfitFor } from "@/lib/offer/basic";
@@ -200,6 +201,8 @@ export async function suggestPricingForDraft(
         v.arabic_name?.trim() && v.pax_capacity != null ? [{ name: v.arabic_name.trim(), pax: v.pax_capacity }] : [],
       ),
     };
+    // data model 0072: airport → city transfers and per-car tour prices (src/lib/data/model-prices.ts)
+    await addModelPrices(reference, supabase, country?.id ?? null);
 
     const items = suggestPricing(data, reference, labels);
     // A partner's file — whoever is pricing it — is quoted at that partner's

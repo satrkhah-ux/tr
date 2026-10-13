@@ -5,7 +5,7 @@ import type { FilterOptions } from "@/lib/data/types";
 import { TraveliunNotReady } from "./TraveliunNotReady";
 import { TraveliunTable } from "./TraveliunTable";
 
-const EMPTY_OPTIONS: FilterOptions = { countries: [], cities: [], employees: [], static: [] };
+const EMPTY_OPTIONS: FilterOptions = { countries: [], cities: [], employees: [], suppliers: [], static: [] };
 
 /** Server wrapper: resolves the DB-backed config for a route, loads filter
  *  options, and renders the persistent client table. */
@@ -17,7 +17,7 @@ export async function TraveliunTablePage({ route }: { route: string }) {
     ? resolved
     : { ...resolved, columns: resolved.columns.filter((c) => !isCostColumn(resolved.table, c.key)) };
 
-  const needsOptions = Boolean(config.filters?.length) || Boolean(config.isOffers);
+  const needsOptions = Boolean(config.filters?.length) || Boolean(config.isOffers) || config.columns.some((c) => c.source);
   const filterOptions = needsOptions ? await getFilterOptions() : EMPTY_OPTIONS;
 
   return <TraveliunTable config={config} filterOptions={filterOptions} />;

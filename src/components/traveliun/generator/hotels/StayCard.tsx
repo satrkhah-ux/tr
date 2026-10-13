@@ -6,7 +6,6 @@ import {
   BOARD_LABEL_KEYS,
   BOARD_TYPES,
   resizeRooms,
-  roomTypeNames,
   withRooms,
   type DraftHotel,
   type DraftRoomSpec,
@@ -18,6 +17,7 @@ import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { createRoomTypeOption } from "@/lib/data/catalog-actions";
 import { RoomPrice } from "./RoomPrice";
+import { roomSuggestions } from "@/lib/offer/basic";
 import { currencyOptions } from "@/lib/offer/draft-types";
 
 /** Sentinel option value — never a real room-type name. */
@@ -306,7 +306,8 @@ function RoomRow({
   onChange: (slice: Partial<DraftRoomSpec>) => void;
 }) {
   const { t } = useTraveliunUI();
-  const names = roomTypeNames(roomTypeOptions);
+  // the hotel's own rooms (the options carry them beside the shared list) first
+  const names = roomSuggestions(roomTypeOptions, roomTypeOptions.find((r) => r.hotel_id)?.hotel_id, true);
 
   /**
    * Name a room type the catalogue does not have, without leaving the package.
