@@ -93,7 +93,7 @@ export const OFFER_DOC_CSS = `
 .od-hero .od-hero-label{color:var(--od-muted);font-size:13pt;margin-bottom:3mm;}
 .od-hero h1{margin:0;font-size:31pt;font-weight:800;line-height:1.15;}
 .od-hero .od-hero-meta{margin-top:4mm;color:var(--od-ink);font-size:14pt;font-weight:500;}
-.od-metrics{margin-top:17mm;display:grid;grid-template-columns:repeat(4,1fr);gap:4mm;}
+.od-metrics{margin-top:17mm;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4mm;}
 .od-metric{background:var(--od-fill);border:1px solid var(--od-line-2);border-radius:5mm;padding:5mm 3mm;text-align:center;min-height:25mm;break-inside:avoid;}
 .od-metric span{display:block;color:var(--od-muted);font-size:9.5pt;margin-bottom:2mm;}
 .od-metric strong{display:block;color:var(--od-green);font-size:17pt;font-weight:800;}

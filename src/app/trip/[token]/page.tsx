@@ -10,6 +10,7 @@ const DOC_LABEL: Record<string, string> = {
   flight_ticket: "تذكرة الطيران",
   itinerary: "الجدول السياحي",
   booking_summary: "ملخص الحجوزات",
+  welcome_board: "لوحة الاستقبال",
 };
 
 const KIND_LABEL: Record<string, string> = {

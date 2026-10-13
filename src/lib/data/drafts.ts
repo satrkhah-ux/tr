@@ -6,7 +6,7 @@ import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser 
 import { currentCan } from "@/lib/roles/current";
 import { airlineLogoUrl, publicBrandLogoUrl } from "@/components/offer-doc/brand";
 import { BOARD_AR } from "@/components/offer-doc/labels";
-import { getPartnerSession } from "@/lib/partners/session";
+import { getPartnerSession, isStaffSession } from "@/lib/partners/session";
 import { keepOurStays, keepTheirPrices, partnerStays, priceForViewer } from "@/lib/partners/pricing";
 import { partnerCaller, viewerTerms } from "@/lib/partners/price-view";
 import {
@@ -66,22 +66,28 @@ import {
  * company), and the cost leaves here only for pricing.internal.
  */
 
-/** The user client — reference lookups and offers only, never `offer_drafts`. */
 /**
  * The customers row an issued offer points at — the client link reads the name
  * and phone from it. Found by the same name and phone, else created. Null when
  * the file names nobody (a partner's sale) or the row cannot be written: the
  * offer still goes out, without the name, as before.
+ *
+ * Service role: only staff may write customers (RLS), and a partner issuing its
+ * own offer must still have its client named on the link. The caller —
+ * produceOfferFromDraft — has already checked who may issue this draft.
+ *
+ * Only staff reuse an existing row: a partner always gets a new one, so a
+ * partner's offer is never tied to one of our customers who shares the phone.
  */
-async function customerFor(customer: { customer_name: string; customer_phone: string }): Promise<string | null> {
+async function customerFor(customer: { customer_name: string; customer_phone: string }, reuse: boolean): Promise<string | null> {
   const name = customer.customer_name.trim();
   const phone = customer.customer_phone.trim();
   if (!name && !phone) return null;
   try {
-    const supabase = await db();
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     let found = supabase.from("customers").select("id").eq("arabic_name", name || phone);
     found = phone ? found.eq("mobile", phone) : found.is("mobile", null);
-    const { data: hit } = await found.limit(1).maybeSingle();
+    const { data: hit } = reuse ? await found.limit(1).maybeSingle() : { data: null };
     if (hit) return (hit as { id: string }).id;
     const { data: row } = await supabase.from("customers").insert({ arabic_name: name || phone, mobile: phone || null }).select("id").single();
     return (row as { id: string } | null)?.id ?? null;
@@ -90,6 +96,7 @@ async function customerFor(customer: { customer_name: string; customer_phone: st
   }
 }
 
+/** The user client — reference lookups and offers only, never `offer_drafts`. */
 async function db(): Promise<SupabaseClient> {
   return (await createSupabaseServerClient()) as unknown as SupabaseClient;
 }
@@ -870,7 +877,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     }
 
     const result = await insertOffer({
-      customer_id: await customerFor(data.customer),
+      customer_id: await customerFor(data.customer, await isStaffSession()),
       employee_id: null,
       // From here the preview, the PDF and the client link all resolve their
       // branding from this one column.

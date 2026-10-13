@@ -3,7 +3,7 @@
 import { ArrowLeftRight, Ticket } from "lucide-react";
 import type { DraftData, GeneratorLookups } from "@/lib/offer/draft-types";
 import { airportDisplay, planInternational, rankAirports, tripCountries, type FlightPlan } from "@/lib/offer/basic";
-import { basicField } from "./styles";
+import { basicField, typedNumber } from "./styles";
 import { useBasicLabels } from "./labels";
 
 const COLS = "xl:grid-cols-[minmax(13rem,1.5fr)_2.25rem_minmax(13rem,1.5fr)_minmax(9rem,1fr)_minmax(9rem,1fr)_minmax(9rem,1fr)]";
@@ -119,7 +119,7 @@ export function BasicFlightPlan({
           placeholder={tx("planPrice")}
           value={booking.intl_price ?? ""}
           onChange={(e) => {
-            const flight_booking = { ...booking, intl_price: e.target.value === "" ? null : Number(e.target.value), intl_currency: booking.intl_currency || "SAR" };
+            const flight_booking = { ...booking, intl_price: typedNumber(e.target), intl_currency: booking.intl_currency || "SAR" };
             onChange(planned ? { flight_booking } : planInternational({ ...data, flight_booking }, lookups.airports, now));
           }}
           className={`${basicField} tv-tnum text-center`}

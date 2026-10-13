@@ -29,7 +29,14 @@ export type VoucherBooking = {
   cancellation_policy: string | null;
   /** false = the supplier acknowledged it but it is not ticketed/paid yet. */
   is_paid: boolean;
+  /** a hotel: what the front desk reads — its English name, address and phone (from /hotels). */
+  name_en?: string | null;
+  address?: string | null;
+  phone?: string | null;
 };
+
+/** The documents the client is given; the booking summary (suppliers, payment state) and the welcome board are ours. */
+export const CLIENT_DOCUMENT_KINDS: VoucherKind[] = ["hotel_voucher", "flight_ticket", "itinerary"];
 
 export type VoucherDay = {
   day_number: number;

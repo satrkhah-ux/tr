@@ -108,7 +108,7 @@ import { BasicCityCard } from "./BasicCityCard";
 import { BasicFlightPlan } from "./BasicFlightPlan";
 import { BasicPhoneLookup } from "./BasicPhoneLookup";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
-import { basicCard, basicField, basicLabel } from "./styles";
+import { basicCard, basicField, basicLabel, typedNumber } from "./styles";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 /** Hotels are entered in riyals unless the agent says otherwise. */
@@ -211,11 +211,20 @@ function Fold({
   );
 }
 
-/** «التالي» with what still stops it, in words. */
-function NextButton({ missing, onNext }: { missing: string[]; onNext: () => void }) {
+/** «التالي» with what still stops it, in words — and «السابق» back to the step before (nothing entered is lost). */
+function NextButton({ missing, onNext, onPrev }: { missing: string[]; onNext: () => void; onPrev?: () => void }) {
   const tx = useBasicLabels();
   return (
     <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-dashed border-[#DCE9E5] pt-2.5">
+      {onPrev ? (
+        <button
+          type="button"
+          onClick={onPrev}
+          className="me-auto inline-flex h-9 items-center rounded-[9px] border border-[#cfe0d9] px-4 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+        >
+          {tx("prev")}
+        </button>
+      ) : null}
       {missing.length > 0 ? <span className="text-[11.5px] font-bold text-[#a86a10]">{tx("needFirst", { list: missing.join("، ") })}</span> : null}
       <button
         type="button"
@@ -721,6 +730,8 @@ export function BasicEditor({
       )
     : [];
   const [focus, setFocus] = useState<string[] | null>(null);
+  // the cities the agent marked «تمت» — folded to their summary line
+  const [doneCities, setDoneCities] = useState<string[]>([]);
   const partner = data.customer.partner_company_id;
   const flightsOn = scope.flights_intl || scope.flights_domestic;
   const missingOf: Record<Step, string[]> = {
@@ -815,7 +826,20 @@ export function BasicEditor({
     shown(step) ? (
       <Fold key={step} id={`basic-${step}`} title={titleOf[step]} open={open === step} onOpen={() => show(step)} summary={summaryOf[step]}>
         {body}
-        {step === "finish" ? null : <NextButton missing={missingOf[step]} onNext={() => next(step)} />}
+        {step === "finish" ? (
+          // the last step has nothing after it — only the way back
+          <div className="mt-3 border-t border-dashed border-[#DCE9E5] pt-2.5">
+            <button
+              type="button"
+              onClick={() => show(steps[steps.indexOf(step) - 1])}
+              className="inline-flex h-9 items-center rounded-[9px] border border-[#cfe0d9] px-4 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+            >
+              {tx("prev")}
+            </button>
+          </div>
+        ) : (
+          <NextButton missing={missingOf[step]} onNext={() => next(step)} onPrev={steps.indexOf(step) > 0 ? () => show(steps[steps.indexOf(step) - 1]) : undefined} />
+        )}
       </Fold>
     ) : null;
 
@@ -1098,13 +1122,20 @@ export function BasicEditor({
                 onRemove={() => {
                   if (window.confirm(tx("confirmRemove", { city: city.city_name }))) commit(removeCity(data, i));
                 }}
+                collapsed={doneCities.includes(`${i}-${city.city_name}`)}
+                onDone={() => {
+                  setDoneCities((d) => [...d, `${i}-${city.city_name}`]);
+                  // on to the next city
+                  window.setTimeout(() => document.getElementById(`basic-city-${i + 1}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+                }}
+                onExpand={() => setDoneCities((d) => d.filter((k) => k !== `${i}-${city.city_name}`))}
               />
             );
           })
         )}
 
-        {/* the add bar, like the company's system */}
-        {focus ? null : (
+        {/* the add bar, like the company's system — gone once every night has its city */}
+        {focus || (trip.nights > 0 && used === trip.nights) ? null : (
         <div className="sticky bottom-3 z-20 rounded-[14px] border border-[#cfe0d9] bg-[#e9f3ef]/95 px-2 py-1.5 shadow-[0_8px_24px_rgba(0,60,58,0.12)] backdrop-blur max-lg:bottom-[80px] sm:px-2.5">
           <div className="flex flex-wrap items-end gap-1.5">
             {/* a group may cross into a neighbouring country */}
@@ -1174,7 +1205,7 @@ export function BasicEditor({
                     dir="ltr"
                     value={newPrice ?? ""}
                     placeholder="0"
-                    onChange={(e) => setNewPrice(e.target.value === "" ? null : Number(e.target.value))}
+                    onChange={(e) => setNewPrice(typedNumber(e.target))}
                     className={`${basicField} tv-tnum text-center`}
                   />
                 </label>
@@ -1324,7 +1355,7 @@ export function BasicEditor({
                             aria-label={tx("sell")}
                             value={item.sell_price ?? ""}
                             placeholder="—"
-                            onChange={(e) => setItem(i, { sell_price: e.target.value === "" ? null : Number(e.target.value) })}
+                            onChange={(e) => setItem(i, { sell_price: typedNumber(e.target) })}
                             className={`${basicField} tv-tnum text-center ${item.sell_price == null ? "border-[#f0b4c2] bg-[#fff5f7]" : ""}`}
                           />
                           <select value={item.sell_currency || display} onChange={(e) => setItem(i, { sell_currency: e.target.value })} className={`${basicField} px-1.5`}>
@@ -1384,7 +1415,7 @@ export function BasicEditor({
                       aria-label={tx("profit")}
                       value={profit.value ?? ""}
                       placeholder="0"
-                      onChange={(e) => setProfit({ mode: profit.mode, value: e.target.value === "" ? null : Number(e.target.value) })}
+                      onChange={(e) => setProfit({ mode: profit.mode, value: typedNumber(e.target) })}
                       className={`${basicField} tv-tnum w-28 text-center`}
                     />
                     <span className="text-[11.5px] font-bold text-[#557d78]">{profit.mode === "pct" ? "%" : display}</span>

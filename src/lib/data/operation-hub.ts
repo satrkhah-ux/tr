@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
-import type { VoucherKind } from "@/lib/operations/voucher-dto";
+import { CLIENT_DOCUMENT_KINDS, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { currentCan } from "@/lib/roles/current";
 
 /**
@@ -122,6 +122,8 @@ export async function getClientHub(token: string): Promise<ClientHub | null> {
         .from("operation_documents")
         .select("kind, version, token, created_at")
         .eq("operation_id", op.id)
+        // the booking summary (suppliers, what is unpaid) and the welcome board are ours, never the client's
+        .in("kind", CLIENT_DOCUMENT_KINDS)
         .is("revoked_at", null)
         .order("created_at", { ascending: false }),
       supabase

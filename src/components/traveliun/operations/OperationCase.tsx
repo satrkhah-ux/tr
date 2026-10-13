@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import {
   ArrowRight,
   Eye,
@@ -38,6 +38,7 @@ import type { AssigneeOption, SentRequest } from "@/lib/data/operation-assign";
 import { DocumentsPanel } from "./DocumentsPanel";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
+import { useSafeTransition, useSessionField } from "../useSafeTransition";
 
 const CLIENT_KEY = (s: string) => `ops.client.${s}` as TranslationKey;
 const EXEC_KEY = (s: string) => `ops.exec.${s}` as TranslationKey;
@@ -186,7 +187,7 @@ function TrackControl({
   onDone: () => void;
 }) {
   const { t } = useTraveliunUI();
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
   const next = states.filter(canAdvance);
 
@@ -230,7 +231,7 @@ function TravelersPanel({ operationId, travelers }: { operationId: string; trave
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
 
   return (
     <section className={card}>
@@ -299,7 +300,7 @@ function TravelerRow({ traveler }: { traveler: TravelerListItem }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ full_name: "", number: "", nationality: "", expiry: traveler.passport_expiry ?? "" });
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
 
   function savePassport() {
     startTransition(async () => {
@@ -428,7 +429,7 @@ function TravelerRow({ traveler }: { traveler: TravelerListItem }) {
               value={form.full_name}
               onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
               className={`${field} text-start`}
-              placeholder="IBTIHAL BUKHARI"
+              placeholder="AHMED ALI"
             />
           </label>
           <label className={label}>
@@ -513,10 +514,11 @@ function PaymentsPanel({
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
-  const [amount, setAmount] = useState("");
+  // kept in this tab until recorded — a reload after a deploy used to lose it
+  const [amount, setAmount] = useSessionField(`pay:${operationId}`, "");
   const [kind, setKind] = useState<PaymentKind>("deposit");
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
 
   return (
     <section className={card}>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import {
   CheckCircle2,
   Copy,
@@ -38,6 +38,7 @@ import type { AssigneeOption, SentRequest } from "@/lib/data/operation-assign";
 import { AssignBooking, AssigneeChip } from "./AssignBooking";
 import { SupplierBooking } from "./SupplierBooking";
 import { useTraveliunUI } from "../TraveliunUIProvider";
+import { useSafeTransition, useSessionField } from "../useSafeTransition";
 
 const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
@@ -77,7 +78,7 @@ export function DocumentsPanel({
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [perHotel, setPerHotel] = useState(false);
@@ -262,7 +263,7 @@ export function DocumentsPanel({
             <input
               value={welcomeName}
               onChange={(e) => setWelcomeName(e.target.value)}
-              placeholder="Mr. Ahmad Al-Rifaie"
+              placeholder="Mr. Ahmed Ali"
               className={field}
             />
           </label>
@@ -357,7 +358,7 @@ export function DocumentsPanel({
 function ClientLinkBlock({ operationId, token }: { operationId: string; token: string | null }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
   const [copied, setCopied] = useState(false);
   const url = token ? `${typeof window === "undefined" ? "" : window.location.origin}/trip/${token}` : "";
 
@@ -431,7 +432,7 @@ function AddBooking({ operationId, onDone }: { operationId: string; onDone: () =
   const [city, setCity] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
 
   return (
@@ -494,6 +495,19 @@ function AddBooking({ operationId, onDone }: { operationId: string; onDone: () =
   );
 }
 
+/**
+ * What a booking of each kind is run with, beyond its title and dates: a
+ * transfer needs its time, flight, meeting point and driver; a tour its start
+ * time and car. Shown as fields in the edit form even before they are filled.
+ */
+const KIND_FIELDS: Partial<Record<OperationBooking["kind"], string[]>> = {
+  transport: ["الوقت", "الرحلة", "نقطة الالتقاء", "السيارة", "رقم السيارة", "السائق", "جوال السائق"],
+  service: ["وقت الانطلاق", "السيارة", "رقم السيارة", "السائق", "جوال السائق"],
+};
+
+/** A single-day booking (a transfer, a tour, a visa) has a date, not a range. */
+const singleDay = (kind: OperationBooking["kind"]) => kind === "transport" || kind === "service" || kind === "visa";
+
 function BookingRow({
   booking,
   operationId,
@@ -510,14 +524,17 @@ function BookingRow({
   const { t } = useTraveliunUI();
   const [confirming, setConfirming] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [ref, setRef] = useState(booking.confirmation_number ?? "");
+  // kept in this tab until sent — a reload after a deploy used to lose it
+  const [ref, setRef, forgetRef] = useSessionField(`ref:${booking.id}`, booking.confirmation_number ?? "");
   const [form, setForm] = useState({
     title: booking.title,
     city_name: booking.city_name,
     start_date: booking.start_date ?? "",
     end_date: booking.end_date ?? "",
+    detail: Object.fromEntries([...new Set([...Object.keys(booking.detail ?? {}), ...(KIND_FIELDS[booking.kind] ?? [])])].map((k) => [k, booking.detail?.[k] ?? ""])),
   });
-  const [pending, startTransition] = useTransition();
+  const when = booking.detail?.["الوقت"] || booking.detail?.["وقت الانطلاق"] || "";
+  const [pending, startTransition] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
 
   const done = booking.status === "confirmed";
@@ -533,7 +550,9 @@ function BookingRow({
           <p className="tv-tnum mt-0.5 flex flex-wrap items-center gap-2 text-[11px] font-bold text-[#93aaa3]">
             <span>{t(`ops.booking.${booking.kind}` as TranslationKey)}</span>
             {booking.start_date ? (
-              <DirText dir="ltr">{`${booking.start_date} → ${booking.end_date ?? "—"}`}</DirText>
+              <DirText dir="ltr">
+                {singleDay(booking.kind) || !booking.end_date ? `${booking.start_date}${when ? ` · ${when}` : ""}` : `${booking.start_date} → ${booking.end_date}`}
+              </DirText>
             ) : null}
             {booking.confirmation_number ? (
               <span className="text-[#0f7a52]">
@@ -620,11 +639,11 @@ function BookingRow({
             <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} className={field} />
           </label>
           <label className={label}>
-            {t("pg.city")}
+            {booking.kind === "flight" ? t("ops.booking.route") : t("pg.city")}
             <input value={form.city_name} onChange={(e) => setForm((f) => ({ ...f, city_name: e.target.value }))} className={field} />
           </label>
           <label className={label}>
-            {t("pg.checkIn")}
+            {booking.kind === "hotel" ? t("pg.checkIn") : booking.kind === "flight" ? t("ops.booking.goDate") : t("ops.booking.date")}
             <input
               type="date"
               dir="ltr"
@@ -633,16 +652,34 @@ function BookingRow({
               className={`${field} tv-tnum`}
             />
           </label>
-          <label className={label}>
-            {t("pg.checkOut")}
-            <input
-              type="date"
-              dir="ltr"
-              value={form.end_date}
-              onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
-              className={`${field} tv-tnum`}
-            />
-          </label>
+          {singleDay(booking.kind) ? null : (
+            <label className={label}>
+              {booking.kind === "hotel" ? t("pg.checkOut") : t("ops.booking.backDate")}
+              <input
+                type="date"
+                dir="ltr"
+                value={form.end_date}
+                onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
+                className={`${field} tv-tnum`}
+              />
+            </label>
+          )}
+          {/* the booking's own details — the time, the flight, the driver … — each editable */}
+          {Object.keys(form.detail).length > 0 ? (
+            <div className="grid gap-2 sm:col-span-2 sm:grid-cols-2">
+              <span className="text-[11.5px] font-extrabold text-[#185045] sm:col-span-2">{t("ops.booking.details")}</span>
+              {Object.entries(form.detail).map(([key, value]) => (
+                <label key={key} className={label}>
+                  {key}
+                  <input
+                    value={value}
+                    onChange={(e) => setForm((f) => ({ ...f, detail: { ...f.detail, [key]: e.target.value } }))}
+                    className={field}
+                  />
+                </label>
+              ))}
+            </div>
+          ) : null}
           <div className="sm:col-span-2">
             <button
               type="button"
@@ -655,7 +692,9 @@ function BookingRow({
                     title: form.title,
                     city_name: form.city_name,
                     start_date: form.start_date || null,
-                    end_date: form.end_date || null,
+                    end_date: singleDay(booking.kind) ? null : form.end_date || null,
+                    // empty fields are left out — a blank «السائق» is not a driver
+                    detail: Object.fromEntries(Object.entries(form.detail).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()])),
                   });
                   if (!res.ok) setError(t(res.error));
                   else {
@@ -687,7 +726,10 @@ function BookingRow({
                 setError(null);
                 const res = await confirmBookingManually({ booking_id: booking.id, confirmation_number: ref.trim() });
                 if (!res.ok) setError(t(res.error));
-                else onDone();
+                else {
+                  forgetRef();
+                  onDone();
+                }
               })
             }
             className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
