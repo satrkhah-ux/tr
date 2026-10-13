@@ -1273,6 +1273,7 @@ export const en = {
   "pg.finalTotal": "Final client total",
   "pg.partnerCost": "Total cost",
   "pg.partnerSell": "Your price to your client — printed on your offer",
+  "pg.partnerBelowCost": "Your price is {amount} below your cost with us — check before issuing.",
   "pg.pricingSeeded": "{added} new lines added, {priced} lines priced from your own lists. The rest need a number.",
   "pg.unpricedCount": "{count} lines without a price",
   "pg.suggestItems": "Suggest items from the stages",
