@@ -20,7 +20,9 @@ const read = (name) => {
   const doc = JSON.parse(readFileSync(f, "utf8"));
   return (doc.data ?? doc).items ?? {};
 };
-const decisions = { merges: read("merges"), renames: read("renames"), questions: read("questions") };
+const decisions = { merges: read("merges"), renames: read("renames"), questions: read("questions"), wrong: read("wrong"), dups: read("dups"), wrongNames: read("wrongNames") };
+// the review page's own items (with the wrong-name and duplicate sections built from the live data)
+const reviewItems = JSON.parse(readFileSync("data-import/catalog-review-items.json", "utf8"));
 const yes = (section, key) => decisions[section][key] === "yes";
 
 const proposal = JSON.parse(readFileSync("data-import/catalog-cleanup-2026-10-13-proposal.json", "utf8"));
@@ -31,6 +33,22 @@ const hotel_renames = proposal.hotel_renames
   .filter((r) => r.kind === "latin_to_arabic" && yes("renames", `r-${r.id}`))
   .map((r) => ({ ...r, english_to: undefined }));
 const deletions = { hotels: [], room_types: [] };
+
+// a row carrying another hotel's name: merged into its twin, or given the Arabic name typed
+for (const w of reviewItems.wrong ?? []) {
+  if (!yes("wrong", w.key)) continue;
+  if (w.twin) {
+    hotel_merges.push({ keep_id: w.twin.id, drop_ids: [w.row.id], final_arabic: w.twin.ar, final_english: w.twin.en, rows: [w.twin, w.row], note: "owner: wrong-name row into its twin" });
+  } else if ((decisions.wrongNames[w.key] ?? "").trim()) {
+    hotel_renames.push({ id: w.row.id, from: w.row.ar, to: decisions.wrongNames[w.key].trim(), kind: "owner", english_to: undefined });
+  }
+}
+// a duplicate group: every row into the first (Arabic-named, most used)
+for (const d of reviewItems.dups ?? []) {
+  if (!yes("dups", d.key)) continue;
+  const [keep, ...rest] = d.rows;
+  hotel_merges.push({ keep_id: keep.id, drop_ids: rest.map((r) => r.id), final_arabic: keep.ar, final_english: keep.en, rows: d.rows, note: "owner: duplicate group" });
+}
 const manual = [];
 
 proposal.uncertain.forEach((u, i) => {
