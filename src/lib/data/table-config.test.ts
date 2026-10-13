@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { GRANTED_COLUMNS, isCostColumn } from "./table-config";
+import { GRANTED_COLUMNS, SEARCH_KEY_TABLES, isCostColumn } from "./table-config";
 
 /**
  * The engine names the granted columns itself, so its list and 0047's GRANT
@@ -40,5 +40,19 @@ describe("GRANTED_COLUMNS", () => {
     expect(isCostColumn("visas", "sell_price")).toBe(false);
     expect(isCostColumn("services", "sell_price")).toBe(false);
     expect(isCostColumn("hotels", "anything")).toBe(false);
+  });
+});
+
+describe("SEARCH_KEY_TABLES", () => {
+  it("is the list 0070 gives a search_key computed field", () => {
+    const sql = readFileSync(
+      fileURLToPath(new URL("../../../supabase/migrations/0070_data_tools.sql", import.meta.url)),
+      "utf8",
+    );
+    const list = sql.match(/foreach t in array array\[([^\]]*)\]/)?.[1] ?? "";
+    const tables = [...list.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort();
+    expect(tables).toEqual([...SEARCH_KEY_TABLES].sort());
+    // a whole-row reference needs every column — not on the column-granted tables
+    for (const table of Object.keys(GRANTED_COLUMNS)) expect(tables).not.toContain(table);
   });
 });

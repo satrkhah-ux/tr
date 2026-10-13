@@ -22,7 +22,21 @@ export const DRV = {
   plate: "رقم السيارة",
   driver: "السائق",
   phone: "جوال السائق",
+  // operations order 11: what the driver's link and the flight tracker write
+  status: "حالة السائق",
+  handedAt: "وقت الاستقبال",
+  landing: "الهبوط المحدّث",
 } as const;
+
+/** The two steps a driver marks on his day's page — the words stored in DRV.status. */
+export const DRIVER_STEP = { on_way: "في الطريق", done: "تم الاستقبال" } as const;
+export type DriverStep = keyof typeof DRIVER_STEP;
+
+/** The step a booking's detail says the driver reached, or null. */
+export function driverStep(detail: Record<string, string> | null): DriverStep | null {
+  const v = detail?.[DRV.status];
+  return v === DRIVER_STEP.done ? "done" : v === DRIVER_STEP.on_way ? "on_way" : null;
+}
 
 type BookingLike = { kind: string; title: string; start_date: string | null; detail: Record<string, string> | null };
 
@@ -95,7 +109,7 @@ export function flightLegs(detail: Record<string, string>): { key: string; leg: 
 }
 
 /** «SV834 RUH → KUL» — how a transfer names the flight it meets. */
-function linkOf(text: string | undefined): { flight_no: string; from: string; to: string } | null {
+export function linkOf(text: string | undefined): { flight_no: string; from: string; to: string } | null {
   const m = text?.trim().match(/^(\S+)\s+(\S+)\s*→\s*(\S+)$/);
   return m ? { flight_no: m[1] === "—" ? "" : m[1], from: m[2], to: m[3] } : null;
 }
@@ -170,6 +184,8 @@ export type ClientService = {
   program: string;
   /** only on the day of the service — never earlier. */
   driver: { name: string; phone: string; plate: string } | null;
+  /** what the driver marked on his link: on his way, or the guests are with him. */
+  progress: DriverStep | null;
 };
 
 /**
@@ -193,6 +209,7 @@ export function clientService(b: BookingLike, today: string): ClientService | nu
     flight: d[DRV.flight] ?? "",
     program: d["البرنامج"] ?? "",
     driver: b.start_date === today && named ? { name: d[DRV.driver] ?? "", phone: d[DRV.phone] ?? "", plate: d[DRV.plate] ?? "" } : null,
+    progress: driverStep(d),
   };
 }
 

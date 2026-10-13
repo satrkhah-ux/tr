@@ -7,8 +7,13 @@ import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser 
 import { currentCan } from "@/lib/roles/current";
 import { editedTotalSar, offerSarTotal } from "@/lib/offer/pricing";
 import { getRates } from "./rates-actions";
-import { allTableConfigs, GRANTED_COLUMNS, INTERNAL_TABLES, isCostColumn } from "./table-config";
+import { allTableConfigs, DATA_TABLES, GRANTED_COLUMNS, INTERNAL_TABLES, SEARCH_KEY_TABLES, isCostColumn } from "./table-config";
 import { FILTER_NOT_NULL, FILTER_NULL } from "./types";
+import { catalogSkel, normAr } from "@/lib/catalog/norm";
+import { hotelRuleError } from "@/lib/catalog/hotel-rules";
+import { getHotelUsage } from "./hotel-tools";
+import { logAudit } from "./audit";
+import { diffRecord, issueRowsFunction } from "./quality";
 import type {
   DataRow,
   DataValue,
@@ -92,6 +97,16 @@ function writable(table: AllowedTable, values: DataRow, internal: boolean): Data
   return Object.fromEntries(Object.entries(values).filter(([column]) => !isCostColumn(table, column)));
 }
 
+/**
+ * Every create / update / delete is written to audit_logs (entity = the table,
+ * entity_id = the row) — the change log in a record's details (data order 11.3).
+ * Values a details screen must not read back — a cost, the margin policy, a
+ * client's personal data — are logged by column name only.
+ */
+function auditMask(table: AllowedTable): (column: string) => boolean {
+  return (column) => table === "customers" || INTERNAL_TABLES.includes(table) || isCostColumn(table, column);
+}
+
 function sanitizeSearch(value: string): string {
   // strip characters that would break PostgREST .or() syntax
   return value.replace(/[%,()*]/g, " ").trim();
@@ -114,6 +129,23 @@ function applyFilters<T>(query: T, filters: Filter[] | undefined): T {
   return q as T;
 }
 
+/** How the search box matches: on the folded `search_key` (0070), or ilike on the columns. */
+type SearchPlan = { key: string } | { columns: string[]; term: string } | null;
+
+/**
+ * On a SEARCH_KEY_TABLES table the box first matches the folded term (ة/ه، ى/ي،
+ * أ/إ/آ/ا، diacritics); only when that finds nothing, its skeleton («ملينيوم» →
+ * «ميلينيوم»). Plain ilike on `searchable` everywhere else — and wherever the
+ * computed field errors, i.e. a database 0070 has not reached.
+ */
+function searchPlans(input: ListInput): { folded: SearchPlan; skeleton: SearchPlan; plain: SearchPlan } {
+  const term = input.search ? sanitizeSearch(input.search) : "";
+  const plain: SearchPlan = term && input.searchColumns?.length ? { columns: input.searchColumns, term } : null;
+  if (!term || !SEARCH_KEY_TABLES.includes(input.table)) return { folded: plain, skeleton: null, plain };
+  const skeleton = catalogSkel(term);
+  return { folded: { key: sanitizeSearch(normAr(term)) }, skeleton: skeleton.length >= 3 ? { key: skeleton } : null, plain };
+}
+
 /** Paginated, filtered, searchable list for any allowed table. */
 export async function listRows(input: ListInput): Promise<ListResult> {
   try {
@@ -124,26 +156,130 @@ export async function listRows(input: ListInput): Promise<ListResult> {
     const from = Math.max(input.page - 1, 0) * input.pageSize;
     const to = from + input.pageSize - 1;
 
+    // A data-quality card's rows (/hotels?issue=…): the table's own row type out
+    // of 0071's function, so the filters, search, paging and count apply
+    // unchanged — and the card's number is this list's count.
+    const issueFn = input.issue ? issueRowsFunction(input.table, input.issue) : null;
+    if (input.issue && !issueFn) return { ok: false, error: "err.forbidden" };
     // an embed only as a screen's config names it — never a relation the browser chose
     const embed = input.select && allTableConfigs().some((c) => c.table === input.table && c.select === input.select) ? input.select : null;
-    let query = supabase.from(input.table).select(embed ? `${columns}, ${embed}` : columns, { count: "exact" });
-    query = applyFilters(query, input.filters);
+    const selection = embed ? `${columns}, ${embed}` : columns;
 
-    const search = input.search ? sanitizeSearch(input.search) : "";
-    if (search && input.searchColumns && input.searchColumns.length > 0) {
-      const or = input.searchColumns.map((col) => `${col}.ilike.%${search}%`).join(",");
-      query = query.or(or);
+    const run = (plan: SearchPlan) => {
+      let query = supabase.from(input.table).select(selection, { count: "exact" });
+      if (issueFn) {
+        query = (supabase as unknown as SupabaseClient)
+          .rpc(issueFn, { p_issue: input.issue }, { count: "exact" })
+          .select(selection) as unknown as typeof query;
+      }
+      query = applyFilters(query, input.filters);
+      if (plan && "key" in plan) query = query.ilike("search_key" as never, `%${plan.key}%`);
+      else if (plan) query = query.or(plan.columns.map((col) => `${col}.ilike.%${plan.term}%`).join(","));
+      // an issue list comes ranked by the function (hotels: most used first)
+      if (input.sort && !issueFn) query = query.order(input.sort.column, { ascending: input.sort.ascending });
+      return query.range(from, to);
+    };
+
+    const plans = searchPlans(input);
+    let result = await run(plans.folded);
+    if (plans.folded && "key" in plans.folded) {
+      if (result.error) result = await run(plans.plain);
+      else if (result.count === 0 && plans.skeleton) result = await run(plans.skeleton);
     }
-
-    if (input.sort) query = query.order(input.sort.column, { ascending: input.sort.ascending });
-    query = query.range(from, to);
-
-    const { data, count, error } = await query;
-    if (error) return { ok: false, error: "err.loadFailed" };
-    return { ok: true, rows: (data ?? []) as unknown as DataRow[], count: count ?? 0 };
+    if (result.error) return { ok: false, error: "err.loadFailed" };
+    return { ok: true, rows: (result.data ?? []) as unknown as DataRow[], count: result.count ?? 0 };
   } catch {
     return { ok: false, error: "err.db" };
   }
+}
+
+/** Every row the screen's search and filters select — for «تصدير Excel». Capped at 20,000. */
+export async function exportRows(input: Omit<ListInput, "page" | "pageSize">): Promise<ListResult> {
+  if (!DATA_TABLES.includes(input.table)) return { ok: false, error: "err.forbidden" };
+  const rows: DataRow[] = [];
+  for (let page = 1; page <= 20; page++) {
+    const result = await listRows({ ...input, page, pageSize: 1000 });
+    if (!result.ok) return result;
+    rows.push(...result.rows);
+    if (rows.length >= result.count || result.rows.length < 1000) break;
+  }
+  return { ok: true, rows, count: rows.length };
+}
+
+/** The rows an import names by id — what its diff is taken against. */
+export async function getRowsByIds(table: AllowedTable, ids: string[], fixedValues?: DataRow): Promise<ListResult> {
+  try {
+    assertTable(table);
+    const granted = await access(table);
+    if (!granted) return { ok: false, error: "err.forbidden" };
+    const fixed: Filter[] = Object.entries(fixedValues ?? {}).map(([column, value]) => ({ column, op: "eq", value }));
+    const rows: DataRow[] = [];
+    for (let i = 0; i < ids.length; i += 150) {
+      const query = applyFilters(granted.supabase.from(table).select(granted.columns).in("id", ids.slice(i, i + 150)), fixed);
+      const { data, error } = await query;
+      if (error) return { ok: false, error: "err.loadFailed" };
+      rows.push(...((data ?? []) as unknown as DataRow[]));
+    }
+    return { ok: true, rows, count: rows.length };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+export type ImportRowsResult =
+  | { ok: true; created: number; updated: number; failed: { index: number; kind: "create" | "update"; error: TranslationKey }[] }
+  | { ok: false; error: TranslationKey };
+
+/**
+ * Save a previewed import: new rows added, changed fields written — nothing
+ * deleted. Row by row through createRow / updateRow, so every rule (data.write,
+ * the cost columns, the hotel rules) holds exactly as for the form. Not one
+ * transaction: a row that fails is reported and the others stand.
+ */
+export async function importRows(
+  table: AllowedTable,
+  creates: DataRow[],
+  updates: { id: string; changes: DataRow }[],
+): Promise<ImportRowsResult> {
+  if (!DATA_TABLES.includes(table)) return { ok: false, error: "err.forbidden" };
+  try {
+    const granted = await writeAccess(table);
+    if (typeof granted === "string") return { ok: false, error: granted };
+  } catch {
+    return { ok: false, error: "err.forbidden" };
+  }
+  if (creates.length + updates.length > 5000) return { ok: false, error: "data.tools.import.tooMany" };
+  const failed: { index: number; kind: "create" | "update"; error: TranslationKey }[] = [];
+  const jobs = [
+    ...creates.map((values, index) => async () => {
+      const r = await createRow(table, values);
+      if (!r.ok) failed.push({ index, kind: "create", error: r.error });
+    }),
+    ...updates.map((u, index) => async () => {
+      const r = await updateRow(table, u.id, u.changes);
+      if (!r.ok) failed.push({ index, kind: "update", error: r.error });
+    }),
+  ];
+  // eight at a time: a few hundred rows in seconds, without flooding PostgREST
+  for (let i = 0; i < jobs.length; i += 8) await Promise.all(jobs.slice(i, i + 8).map((job) => job()));
+  const created = creates.length - failed.filter((f) => f.kind === "create").length;
+  const updated = updates.length - failed.filter((f) => f.kind === "update").length;
+  await logAudit({ action: "catalog.imported", entity: table, entity_id: "table-import", meta: { created, updated, failed: failed.length } });
+  return { ok: true, created, updated, failed };
+}
+
+/** The /hotels rules (hotel-rules.ts), and the country taken from the city. */
+async function hotelWrite(
+  supabase: SupabaseClient<Database>,
+  values: DataRow,
+  creating: boolean,
+): Promise<DataRow | TranslationKey> {
+  const broken = hotelRuleError(values, creating);
+  if (broken) return broken;
+  if (!values.city_id) return values;
+  const { data } = await supabase.from("cities").select("country_id").eq("id", String(values.city_id)).maybeSingle();
+  if (!data) return "data.tools.err.cityRequired";
+  return { ...values, country_id: (data as { country_id: string | null }).country_id };
 }
 
 export async function createRow(table: AllowedTable, values: DataRow): Promise<MutateResult> {
@@ -151,13 +287,21 @@ export async function createRow(table: AllowedTable, values: DataRow): Promise<M
     const granted = await writeAccess(table);
     if (typeof granted === "string") return { ok: false, error: granted };
     const { supabase, columns, internal } = granted;
+    if (table === "hotels") {
+      const checked = await hotelWrite(supabase, values, true);
+      if (typeof checked === "string") return { ok: false, error: checked };
+      values = checked;
+    }
+    const written = writable(table, values, internal);
     const { data, error } = await supabase
       .from(table)
-      .insert(writable(table, values, internal) as never)
+      .insert(written as never)
       .select(columns)
       .single();
     if (error) return { ok: false, error: "err.createFailed" };
-    return { ok: true, row: data as unknown as DataRow };
+    const row = data as unknown as DataRow;
+    await logAudit({ action: "data.created", entity: table, entity_id: String(row.id), meta: { changes: diffRecord({}, written, auditMask(table)) } });
+    return { ok: true, row };
   } catch {
     return { ok: false, error: "err.db" };
   }
@@ -169,6 +313,11 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
     if (typeof granted === "string") return { ok: false, error: granted };
     const { supabase, columns, internal } = granted;
     values = writable(table, values, internal);
+    if (table === "hotels") {
+      const checked = await hotelWrite(supabase, values, false);
+      if (typeof checked === "string") return { ok: false, error: checked };
+      values = checked;
+    }
     // An offer total edited on /offers takes its riyal figure along, or the
     // KPIs (offerSarTotal) keep counting the one it was issued at.
     if (table === "offers" && "total" in values) {
@@ -180,6 +329,11 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
         values = { ...values, total_sar: editedTotalSar(row, total, today) };
       }
     }
+    // what the row held, for the change log
+    const fields = Object.keys(values).filter((column) => /^[a-z_][a-z0-9_]*$/.test(column));
+    const { data: before } = fields.length
+      ? await supabase.from(table).select(fields.join(", ")).eq("id", id).maybeSingle()
+      : { data: null };
     const { data, error } = await supabase
       .from(table)
       .update(values as never)
@@ -187,6 +341,10 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
       .select(columns)
       .single();
     if (error) return { ok: false, error: "err.updateFailed" };
+    const changes = diffRecord((before ?? {}) as unknown as DataRow, values, auditMask(table));
+    if (Object.keys(changes).length > 0) {
+      await logAudit({ action: "data.updated", entity: table, entity_id: id, meta: { changes } });
+    }
     return { ok: true, row: data as unknown as DataRow };
   } catch {
     return { ok: false, error: "err.db" };
@@ -197,8 +355,16 @@ export async function deleteRow(table: AllowedTable, id: string): Promise<Delete
   try {
     const granted = await writeAccess(table);
     if (typeof granted === "string") return { ok: false, error: granted };
+    // A hotel an offer, a draft, a remembered price or a booking uses is merged or
+    // stopped, never deleted: the FKs would quietly null the offers' hotel.
+    if (table === "hotels") {
+      const used = await getHotelUsage(id);
+      if (!used.ok) return { ok: false, error: used.error };
+      if (Object.values(used.usage).some((n) => n > 0)) return { ok: false, error: "data.tools.err.hotelInUse" };
+    }
     const { error } = await granted.supabase.from(table).delete().eq("id", id);
     if (error) return { ok: false, error: "err.deleteFailed" };
+    await logAudit({ action: "data.deleted", entity: table, entity_id: id });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -231,7 +397,7 @@ export async function getFilterOptions(): Promise<FilterOptions> {
     const supabase = await createSupabaseServerClient();
     const [countries, cities, employees, suppliers] = await Promise.all([
       supabase.from("countries").select("id, arabic_name").order("arabic_name"),
-      supabase.from("cities").select("id, arabic_name").order("arabic_name"),
+      supabase.from("cities").select("id, arabic_name, country_id").order("arabic_name"),
       supabase.from("employees").select("id, arabic_name").order("arabic_name"),
       supabase.from("company_suppliers").select("id, arabic_name").order("arabic_name"),
     ]);
@@ -240,7 +406,12 @@ export async function getFilterOptions(): Promise<FilterOptions> {
       ((rows ?? []) as NamedRow[]).map((r) => ({ value: r.id, label: r.arabic_name }));
     return {
       countries: toOptions(countries.data),
-      cities: toOptions(cities.data),
+      // a city carries its country: the hotel form shows it, the country filter goes through it
+      cities: ((cities.data ?? []) as (NamedRow & { country_id: string | null })[]).map((r) => ({
+        value: r.id,
+        label: r.arabic_name,
+        parent: r.country_id,
+      })),
       employees: toOptions(employees.data),
       suppliers: toOptions(suppliers.data),
       static: [],

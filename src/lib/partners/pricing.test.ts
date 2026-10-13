@@ -7,9 +7,11 @@ import {
   type DraftPricingItem,
   type DraftRoomSpec,
 } from "@/lib/offer/draft-types";
-import type { PriceSource } from "@/lib/offer/pricing-suggest";
+import { offerTotals } from "@/lib/offer/pricing";
+import type { PriceSource, SuggestedItem } from "@/lib/offer/pricing-suggest";
 import {
   describeTerms,
+  issuedPartnerSheet,
   keepOurStays,
   keepTheirPrices,
   partnerMargin,
@@ -248,5 +250,62 @@ describe("partnerSeed", () => {
   it("starts a partner's file from a ready offer at their price", () => {
     const seed = partnerSeed({ pricing: { items: [], display_currency: "SAR", final_total: 4000 } }, { kind: "markup", pct: 10 });
     expect(seed?.pricing?.final_total).toBe(4400);
+  });
+});
+
+describe("issuedPartnerSheet — what offers.partner_cost totals", () => {
+  const item = (over: Partial<DraftPricingItem>): DraftPricingItem => ({
+    item_type: "transport",
+    description: "",
+    quantity: 1,
+    buy_price: null,
+    buy_currency: "",
+    sell_price: null,
+    sell_currency: "SAR",
+    ...over,
+  });
+  // the server's sheet at their terms: our transfer, the stay they typed, a visa nobody prices
+  const transfer = item({ ref: "transport:a>b>فان", sell_price: 648 });
+  const stay = item({ item_type: "hotel", ref: "stay-1", sell_price: 2400 });
+  const visa = item({ item_type: "visa", description: "تأشيرة", quantity: 2 });
+  const FRESH: SuggestedItem[] = [
+    { ...transfer, source: "list" },
+    { ...stay, source: "typed" },
+    { ...visa, source: "none" },
+  ];
+  const owed = (sheet: DraftPricingItem[]) => offerTotals(sheet, { SAR: 1, IDR: 0.00024 }, "SAR", null).total;
+
+  it("owes our lines at our price whatever their browser saved, and their own lines as they priced them", () => {
+    // AD-6-5866-20261013: one stay they typed at 2,400 — what they owe, not the 3,000 they quote their client
+    expect(owed(issuedPartnerSheet([stay], [{ ...stay, source: "typed" }]))).toBe(2400);
+
+    const tampered = issuedPartnerSheet(
+      [
+        { ...transfer, sell_price: 1, sell_currency: "IDR", quantity: 0.01, overridden: true }, // ours, lowered
+        { ...transfer, sell_price: 0, manual: true }, // ours again, posing as their own line
+        stay,
+        { ...visa, sell_price: 150 },
+      ],
+      FRESH,
+    );
+    expect(tampered).toHaveLength(3);
+    expect(owed(tampered)).toBe(648 + 2400 + 300);
+
+    // dropped or negated: theirs comes back unpriced (the producer refuses), ours as ours
+    const emptied = issuedPartnerSheet([item({ item_type: "other", description: "خصم", sell_price: -5000, manual: true })], FRESH);
+    expect(emptied.map((i) => i.sell_price)).toEqual([648, null, null, null]);
+  });
+
+  it("keeps our price on our line when one of theirs claims its key", () => {
+    // a stay id is free text: they name one of theirs after our supplier stay and save it at 0
+    const sup = item({ item_type: "hotel", ref: "stay-x", sell_price: 8800 });
+    const sheet = issuedPartnerSheet(
+      [item({ item_type: "other", ref: "stay-x", sell_price: 0 }), { ...sup, sell_price: 0, overridden: true }],
+      [{ ...sup, source: "supplier" }, { ...sup, sell_price: 0, source: "typed" }],
+    );
+    expect(owed(sheet)).toBe(8800);
+    // …or negates their twin to cancel ours: it comes back unpriced (the producer refuses)
+    const negated = issuedPartnerSheet([sup], [{ ...sup, source: "supplier" }, { ...sup, sell_price: -8800, source: "typed" }]);
+    expect(negated.map((i) => i.sell_price)).toEqual([8800, null]);
   });
 });

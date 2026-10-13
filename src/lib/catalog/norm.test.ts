@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { closestName, looksLikeHotel, normAr, normEn, similarity } from "./norm";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { catalogSkel, closestName, looksLikeHotel, normAr, normEn, similarity } from "./norm";
 
 describe("catalog name folding", () => {
   it("folds alef forms, ta marbuta, alef maqsura, diacritics and spaces", () => {
@@ -24,6 +26,28 @@ describe("catalog name folding", () => {
     expect(closestName("كوالالامبور", cities, (c) => c)).toEqual({ row: "كوالالمبور", exact: false });
     expect(closestName("لنكاوى", cities, (c) => c)).toEqual({ row: "لنكاوي", exact: true });
     expect(closestName("بينانج", cities, (c) => c)).toBeNull();
+  });
+
+  it("reduces a name to the skeleton the fuzzy search matches", () => {
+    expect(catalogSkel("ملينيوم")).toBe(catalogSkel("ميلينيوم"));
+    expect(catalogSkel("فندق ميلينيوم")).toContain(catalogSkel("ملينيوم"));
+    expect(catalogSkel("Millennium Hotel")).toContain(catalogSkel("Milenium"));
+    expect(catalogSkel("كوالالامبور")).toBe(catalogSkel("كوالالمبور"));
+    expect(catalogSkel("فندق  (الماسة)")).toBe("فندقلمسه");
+    expect(catalogSkel("")).toBe("");
+  });
+
+  it("keeps catalogSkel's letters in step with catalog_skel in 0070", () => {
+    const sql = readFileSync(
+      fileURLToPath(new URL("../../../supabase/migrations/0070_data_tools.sql", import.meta.url)),
+      "utf8",
+    );
+    const source = readFileSync(fileURLToPath(new URL("./norm.ts", import.meta.url)), "utf8");
+    expect(sql).toContain("'اويءئؤaeiouy'");
+    expect(source).toContain("/[اويءئؤaeiouy]/g");
+    expect(sql).toContain(`'[ _.,''"()&/*+:;!?#@،-]'`);
+    expect(source).toContain(`/[ _.,'"()&/*+:;!?#@،-]/g`);
+    expect(sql).toContain("'(.)\\1+', '\\1'");
   });
 
   it("flags hotel-shaped names, not real places", () => {

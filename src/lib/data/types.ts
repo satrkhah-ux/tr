@@ -25,6 +25,8 @@ export type ColumnDef = {
    * (cities.country_id → «ماليزيا»), from the same options the filters use.
    */
   source?: Exclude<FilterSource, "static">;
+  /** the value is a city's / country's id: shown by name, picked from a searchable list. */
+  ref?: "cities" | "countries";
 };
 
 export type FilterOp = "eq" | "gte" | "lte" | "in" | "ilike";
@@ -47,6 +49,8 @@ export type FilterDef = {
   options?: FilterOption[];
   /** column(s) the filter applies to; defaults to `key`. */
   column?: string;
+  /** a country filter applied through the row's city (city_id in that country's cities). */
+  viaCity?: boolean;
 };
 
 export type Sort = { column: string; ascending: boolean };
@@ -82,6 +86,8 @@ export type ListInput = {
   sort?: Sort;
   /** TableConfig.select — embedded related rows. */
   select?: string;
+  /** a data-quality issue (lib/data/quality.ts): list only the rows that have it, as 0071 ranks them */
+  issue?: string;
 };
 
 /** Static filter values that test a column for empty / not empty (room types: «عامة» / «لفندق»). */
@@ -98,6 +104,6 @@ export type MutateResult =
 
 export type DeleteResult = { ok: true } | { ok: false; error: TranslationKey };
 
-/** `labelKey`, when set, is translated in place of `label`. */
-export type FilterOption = { value: string; label: string; labelKey?: TranslationKey };
+/** `labelKey`, when set, is translated in place of `label`; `parent`: a city's country id. */
+export type FilterOption = { value: string; label: string; labelKey?: TranslationKey; parent?: string | null };
 export type FilterOptions = Record<FilterSource, FilterOption[]>;

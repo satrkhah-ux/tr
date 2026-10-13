@@ -1,4 +1,7 @@
-"use server";
+// NOT "use server": as a server-actions module every export was callable from any
+// signed-in browser — a partner could write a forged audit row, or read the log
+// (who changed what, before and after). Server code imports it; nothing else can.
+import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
@@ -26,6 +29,12 @@ export type AuditAction =
   | "supplier.credentials_changed"
   | "supplier.updated"
   | "supplier.test_connection"
+  // the generic data screens (actions.ts) and «الفندق المعتمد» — a record's change log
+  | "data.created"
+  | "data.updated"
+  | "data.deleted"
+  | "data.verified"
+  | "data.unverified"
   // operations
   | "operation.confirmed"
   | "operation.client_status"
@@ -50,6 +59,9 @@ export type AuditAction =
   | "passport.scan_viewed"
   | "passport.decrypt_failed"
   | "passport.mrz_read"
+  // the client's own uploads from the trip link, and staff's decision on each
+  | "passport.client_uploaded"
+  | "passport.client_reviewed"
   // travelers and their visas (0061)
   | "traveler.created"
   | "traveler.deleted"

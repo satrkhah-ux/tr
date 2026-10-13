@@ -107,6 +107,9 @@ const PUBLIC_PREFIXES = [
   "/client-offer",
   "/voucher",
   "/trip",
+  // operations order 11: the supplier's and the driver's token pages
+  "/supplier-link",
+  "/driver-day",
   "/tg",
   "/api/telegram",
   "/api/eye",

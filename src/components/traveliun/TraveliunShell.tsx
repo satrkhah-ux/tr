@@ -166,6 +166,8 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.readyOffers", href: "/ready-offers", perm: "offers.write" },
       // Issued only. Drafts stay where they are made.
       { labelKey: "nav.issuedOffers", href: "/offers", perm: "offers.write" },
+      // the offers by stage — sales work, not a reference table (moved out of «قسم البيانات»)
+      { labelKey: "nav.kanban", href: "/kanban-board" },
       { labelKey: "nav.repackage", href: "/repackage", perm: "repackage.write" },
     ],
   },
@@ -185,6 +187,8 @@ export const navGroups: NavGroup[] = [
     href: "/hotels",
     icon: Database,
     children: [
+      // what the tables below still lack, counted by the database (data order 3)
+      { labelKey: "data.quality.title", href: "/data-quality", perm: "data.write" },
       { labelKey: "nav.hotels", href: "/hotels", captionKey: "nav.hotels" },
       { labelKey: "nav.roomTypes", href: "/rooms-types" },
       { labelKey: "nav.countries", href: "/countries", captionKey: "nav.countries" },
@@ -203,7 +207,6 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.servicesByCountry", href: "/services" },
       { labelKey: "nav.visaTypes", href: "/visas-types", captionKey: "nav.visas" },
       { labelKey: "nav.visas", href: "/visas" },
-      { labelKey: "nav.kanban", href: "/kanban-board", captionKey: "nav.kanban" },
       // Moved out of «البكجات السياحية»: the generator READS these, it does not
       // live in them. They are maintained here with the other reference tables.
       { labelKey: "nav.hotelSuppliers", href: "/settings/suppliers", captionKey: "nav.hotelSuppliers" },

@@ -162,6 +162,8 @@ export type CreateOfferInput = {
   partner_company_id?: string | null;
   /** does this file print its price? Flipped later from the export screen. */
   show_prices?: boolean;
+  /** what the partner owes us for this file, in `currency` (0058). The producer's only; null raises no invoice. */
+  partner_cost?: number | null;
 };
 
 /** One printed day. Text + a weather reading; carries no money by design. */

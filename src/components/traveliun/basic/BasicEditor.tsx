@@ -110,6 +110,7 @@ import { BasicPhoneLookup } from "./BasicPhoneLookup";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
 import { basicCard, basicField, basicLabel, typedNumber } from "./styles";
+import { IssueGuardNotice } from "../IssueGuardNotice";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 /** Hotels are entered in riyals unless the agent says otherwise. */
@@ -690,10 +691,11 @@ export function BasicEditor({
 
   const [producing, setProducing] = useState(false);
   const [produceError, setProduceError] = useState<string | null>(null);
+  const [guardBlocked, setGuardBlocked] = useState(false);
   const produced = data.produced_serial;
 
   async function produce() {
-    if (producing || blocking.length > 0) return;
+    if (producing || blocking.length > 0 || guardBlocked) return;
     setProducing(true);
     setProduceError(null);
     try {
@@ -1542,12 +1544,13 @@ export function BasicEditor({
                   </ul>
                 </>
               )}
+              <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} className="mt-2" />
               {produceError ? <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">{produceError}</p> : null}
               <div className="mt-3 flex justify-end">
                 <button
                   type="button"
                   onClick={() => void produce()}
-                  disabled={producing || blocking.length > 0}
+                  disabled={producing || blocking.length > 0 || guardBlocked}
                   title={blocking.length > 0 ? t("pg.err.blockingLeft") : undefined}
                   className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-[13px] font-extrabold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-50"
                 >

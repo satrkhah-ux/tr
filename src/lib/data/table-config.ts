@@ -79,17 +79,23 @@ const CONFIGS: TableConfig[] = [
     defaultSort: { column: "arabic_name", ascending: true },
   },
   {
+    // A hotel is found in the generator through its city, so the city is required
+    // and the country is the city's (actions.ts derives it on every write).
+    // Merge, usage-checked delete and «إيقاف» live in HotelTools.tsx; 0070.
     route: "/hotels", table: "hotels", titleKey: "nav.hotels",
     columns: [
       { key: "arabic_name", labelKey: "col.arabicName" },
       { key: "english_name", labelKey: "col.englishName" },
+      { key: "city_id", labelKey: "filter.city", ref: "cities" },
+      { key: "country_id", labelKey: "filter.country", ref: "countries", editable: false },
       { key: "stars", labelKey: "col.stars", type: "number" },
       { key: "address", labelKey: "col.address", minWidth: "200px" },
       { key: "contact_number", labelKey: "col.contactNumber", type: "phone" },
       { key: "website", labelKey: "col.website", type: "url", minWidth: "180px" },
+      { key: "status", labelKey: "col.status", type: "status" },
     ],
     searchable: ["arabic_name", "english_name", "address"],
-    filters: [CITY_FILTER],
+    filters: [{ ...COUNTRY_FILTER, viaCity: true }, CITY_FILTER],
     defaultSort: { column: "arabic_name", ascending: true },
   },
   {
@@ -498,6 +504,22 @@ export const GRANTED_COLUMNS: Partial<Record<AllowedTable, readonly string[]>> =
     "english_requirements", "status", "created_at",
   ],
 };
+
+/**
+ * Tables 0070 gives a `search_key` computed field (every text column folded by
+ * catalog_norm, plus its catalog_skel skeleton): the search box matches on it,
+ * so «فندق» finds «فندقة» and «ملينيوم» finds «ميلينيوم». Any other table — or
+ * a database 0070 has not reached — keeps the plain ilike on `searchable`.
+ * Not services / transportation_types: their cost columns are column-granted
+ * and a whole-row reference needs them all. table-config.test.ts holds this to 0070.
+ */
+export const SEARCH_KEY_TABLES: readonly AllowedTable[] = [
+  "countries", "cities", "hotels", "room_types", "service_types", "terms", "airlines", "airports",
+  "markup_rules", "ports", "drivers", "tour_programs", "company_suppliers", "tours", "transfers",
+];
+
+/** «قسم البيانات»: the reference tables «تصدير / استيراد Excel» is offered on — not people, offers or settings. */
+export const DATA_TABLES: readonly AllowedTable[] = [...SEARCH_KEY_TABLES, "services", "transportation_types"];
 
 /** The margin policy itself — served to pricing.internal only, through the service role. */
 export const INTERNAL_TABLES: readonly AllowedTable[] = ["markup_rules", "profits"];

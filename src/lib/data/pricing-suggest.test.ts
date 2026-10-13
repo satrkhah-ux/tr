@@ -118,21 +118,22 @@ describe("suggestPricingForDraft — a partner's file", () => {
     expect(hotel?.sell_price).toBe(1000);
   });
 
-  it("is quoted at the partner's terms when staff price the partner's file — a figure staff typed included", async () => {
+  it("is quoted at the partner's terms when staff price the partner's file — their typed figure stays theirs", async () => {
     state.partner = null;
     state.internal = true;
     state.rows = { ...LISTS, app_settings: [{ value: "20" }] };
     const { transfer, hotel } = await suggest("partner-1");
     expect(transfer).toMatchObject({ sell_price: 648, buy_price: null });
-    // typed by staff, so ours: 1000 → 1200 → +35%
-    expect(hotel).toMatchObject({ sell_price: 1620, buy_price: null });
+    // a card figure on a partner's file is the partner's (keepTheirPrices): what they owe is the same whoever prices it
+    expect(hotel).toMatchObject({ sell_price: 1000, buy_price: null });
   });
 
-  it("leaves a staff-typed figure on a partner's file unpriced when there is no margin", async () => {
+  it("keeps a partner's typed figure when staff price their file with no margin set", async () => {
     state.partner = null;
     state.internal = true;
-    const { hotel } = await suggest("partner-1");
-    expect(hotel?.sell_price).toBeNull();
+    const { transfer, hotel } = await suggest("partner-1");
+    expect(transfer?.sell_price).toBeNull(); // ours at cost: never quoted
+    expect(hotel?.sell_price).toBe(1000);
   });
 
   it("leaves our own files exactly as they were", async () => {
