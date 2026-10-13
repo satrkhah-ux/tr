@@ -6,6 +6,7 @@ import { logAudit } from "@/lib/data/audit";
 import { currentCan } from "@/lib/roles/current";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { notifyPartnerRegistration } from "@/lib/data/ops-notify";
+import { PARTNER_TERMS_VERSION, newReferenceNo, readRegistration } from "./registration-form";
 
 /**
  * A company asking to work with us, and what happens to that request.
@@ -22,26 +23,22 @@ function db(): SupabaseClient {
   return createSupabaseServiceClient() as unknown as SupabaseClient;
 }
 
-export type RegistrationResult = { ok: true } | { ok: false; message: string };
+export type RegistrationResult = { ok: true; reference: string } | { ok: false; message: string };
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const BUCKET = "partner-documents";
 
-export async function registerPartnerCompany(input: {
-  name: string;
-  name_latin?: string;
-  email: string;
-  phone: string;
-  website?: string;
-  address?: string;
-  contact_name?: string;
-  note?: string;
-}): Promise<RegistrationResult> {
-  const name = input.name.trim();
-  const email = input.email.trim().toLowerCase();
-
-  if (name.length < 3) return { ok: false, message: "اسم الشركة مطلوب." };
-  if (!EMAIL.test(email)) return { ok: false, message: "البريد الإلكتروني غير صحيح." };
-  if (input.phone.replace(/\D/g, "").length < 8) return { ok: false, message: "رقم التواصل غير صحيح." };
+/**
+ * The public form, as FormData — it carries the company's documents. Read and
+ * checked by readRegistration (pure, tested); the documents go to the PRIVATE
+ * bucket under the request's reference number, then the pending row is written
+ * pointing at them. A failed insert takes its uploads back out.
+ */
+export async function registerPartnerCompany(form: FormData): Promise<RegistrationResult> {
+  const read = readRegistration(form);
+  if (!read.ok) return read;
+  const input = read.value;
+  const { name, email } = input;
 
   try {
     const supabase = db();
@@ -65,16 +62,39 @@ export async function registerPartnerCompany(input: {
       };
     }
 
+    const reference = newReferenceNo(new Date());
+    const documents: { kind: string; path: string; name: string; size: number; type: string }[] = [];
+    for (const doc of input.documents) {
+      const path = `${reference}/${doc.kind}.${doc.ext}`;
+      const { error: upErr } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, doc.file, { contentType: doc.file.type, upsert: false });
+      if (upErr) {
+        if (documents.length) await supabase.storage.from(BUCKET).remove(documents.map((d) => d.path));
+        return { ok: false, message: "تعذّر رفع المستندات. حاول مرة أخرى." };
+      }
+      documents.push({ kind: doc.kind, path, name: doc.file.name, size: doc.file.size, type: doc.file.type });
+    }
+
     const { error } = await supabase.from("booking_partners").insert({
       name,
-      name_latin: input.name_latin?.trim() || null,
+      name_latin: input.name_latin,
       contact_email: email,
       email,
-      phone: input.phone.trim(),
-      contact_name: input.contact_name?.trim() || null,
-      website: input.website?.trim() || null,
-      address: input.address?.trim() || null,
-      registration_note: input.note?.trim() || null,
+      phone: input.phone,
+      contact_name: input.contact_name,
+      website: input.website,
+      address: input.address,
+      registration_note: input.note,
+      commercial_register: input.commercial_register,
+      tourism_license: input.tourism_license,
+      vat_number: input.vat_number,
+      city: input.city,
+      country: input.country,
+      terms_accepted_at: new Date().toISOString(),
+      terms_version: PARTNER_TERMS_VERSION,
+      reference_no: reference,
+      documents,
       // Everything commercial stays at its default until an employee decides it.
       status: "pending",
       // A pending company is not a supplier we assign work to, and not a
@@ -83,11 +103,14 @@ export async function registerPartnerCompany(input: {
       resells: false,
       kinds: ["reseller"],
     });
-    if (error) return { ok: false, message: "تعذّر إرسال الطلب. حاول مرة أخرى." };
+    if (error) {
+      if (documents.length) await supabase.storage.from(BUCKET).remove(documents.map((d) => d.path));
+      return { ok: false, message: "تعذّر إرسال الطلب. حاول مرة أخرى." };
+    }
 
     // Nobody watches a table. Tell the office a request arrived.
-    await notifyPartnerRegistration({ name, email, phone: input.phone.trim() });
-    return { ok: true };
+    await notifyPartnerRegistration({ name, email, phone: input.phone });
+    return { ok: true, reference };
   } catch {
     return { ok: false, message: "تعذّر إرسال الطلب. حاول مرة أخرى." };
   }
@@ -298,5 +321,24 @@ export async function resendPartnerPasswordLink(input: {
     return { ok: true };
   } catch {
     return { ok: false, message: "تعذّر إرسال الرابط." };
+  }
+}
+
+/**
+ * Open one of an applicant's documents — staff only, a five-minute signed URL
+ * from the private bucket, and only a path that row actually lists (a crafted
+ * path cannot reach another company's file).
+ */
+export async function partnerDocumentUrl(partnerId: string, path: string): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
+  if (!(await currentCan("data.write"))) return { ok: false, message: "لا تملك صلاحية." };
+  try {
+    const supabase = db();
+    const { data } = await supabase.from("booking_partners").select("documents").eq("id", partnerId).maybeSingle();
+    const listed = ((data as { documents: { path: string }[] } | null)?.documents ?? []).some((d) => d.path === path);
+    if (!listed) return { ok: false, message: "المستند غير موجود." };
+    const { data: signed, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 300);
+    return error || !signed ? { ok: false, message: "تعذّر فتح المستند." } : { ok: true, url: signed.signedUrl };
+  } catch {
+    return { ok: false, message: "تعذّر فتح المستند." };
   }
 }

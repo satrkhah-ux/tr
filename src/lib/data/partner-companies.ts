@@ -65,12 +65,21 @@ export type PartnerCompany = {
   approved_at: string | null;
   registration_note: string | null;
   contact_email: string | null;
+  commercial_register: string | null;
+  tourism_license: string | null;
+  vat_number: string | null;
+  city: string | null;
+  country: string | null;
+  terms_accepted_at: string | null;
+  terms_version: string | null;
+  reference_no: string | null;
+  documents: { kind: string; path: string; name: string; size: number; type: string }[];
   /** a login was issued — «إصدار حساب» then, «إعادة إرسال» after. */
   has_account: boolean;
 };
 
 const COLUMNS =
-  "id, name, name_latin, logo_path, brand_color, accent_color, address, phone, whatsapp, website, email, contact_name, resells, active, note, status, price_adjust_kind, price_adjust_pct, approved_at, registration_note, contact_email, doc_font";
+  "id, name, name_latin, logo_path, brand_color, accent_color, address, phone, whatsapp, website, email, contact_name, resells, active, note, status, price_adjust_kind, price_adjust_pct, approved_at, registration_note, contact_email, doc_font, commercial_register, tourism_license, vat_number, city, country, terms_accepted_at, terms_version, reference_no, documents";
 
 /**
  * The logo's public URL.
