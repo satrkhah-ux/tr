@@ -58,6 +58,7 @@ export function OperationCase({
   drivers,
   management,
   supplierWork,
+  money,
 }: {
   operation: OperationCard;
   travelers: TravelerListItem[];
@@ -78,6 +79,8 @@ export function OperationCase({
   management?: ReactNode;
   /** the supplier side of the bookings (order 8); null when it could not load. */
   supplierWork?: SupplierWork | null;
+  /** order 11: «ربحية الحالة», built by the page for pricing.internal only. */
+  money?: ReactNode;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -178,6 +181,7 @@ export function OperationCase({
 
         {drivers}
         {supplierWork ? <SupplierPanel operationId={operation.id} bookings={bookings} work={supplierWork} /> : null}
+        {money}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <TravelersPanel operationId={operation.id} trip={operation} travelers={travelers} canReadMrz={canReadMrz} />
