@@ -535,6 +535,9 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
             </kbd>
           </button>
 
+          {/* the guide, the calculator and the table view are our tools — a partner keeps settings and account */}
+          {partner ? null : (
+          <>
           <div className="hidden sm:block">
             <Popover open={panel === "guide"} onOpenChange={(o) => setPanel(o ? "guide" : null)}>
               <PopoverTrigger render={<HeaderIcon label={t("header.guide")} icon={NotebookText} active={panel === "guide"} />} />
@@ -561,6 +564,8 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
               </PopoverContent>
             </Popover>
           </div>
+          </>
+          )}
 
           <Popover open={panel === "settings"} onOpenChange={(o) => setPanel(o ? "settings" : null)}>
             <PopoverTrigger render={<HeaderIcon label={t("settings")} icon={Settings} active={panel === "settings"} />} />

@@ -22,6 +22,7 @@ import { useRole } from "@/lib/roles/RoleContext";
 import type { Permission } from "@/lib/roles/roles";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "./TraveliunUIProvider";
+import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 
 /**
  * Mobile bottom tab bar (app idiom) — 4 USER-PICKED shortcuts + a "more" button
@@ -45,6 +46,14 @@ const DESTINATIONS: TabDest[] = [
 ];
 
 const STORAGE_KEY = "traveliun-mobile-tabs";
+/** A partner's bar — the same places as its side menu (partnerNavGroups). */
+const PARTNER_TABS: TabDest[] = [
+  { id: "portal", labelKey: "nav.dashboard", href: "/b2b", icon: BarChart3 },
+  { id: "files", labelKey: "nav.myFiles", href: "/package-generator", icon: FilePlus2 },
+  { id: "ready", labelKey: "nav.readyOffers", href: "/ready-offers", icon: FileText },
+  { id: "profile", labelKey: "nav.myProfile", href: "/b2b/profile", icon: Contact },
+];
+
 const DEFAULT_TABS = ["dashboard", "kanban", "generator", "repackage"];
 const MAX_TABS = 4;
 
@@ -64,7 +73,8 @@ function loadTabs(): string[] {
 }
 
 function isActive(pathname: string, href: string): boolean {
-  if (href === "/dashboard") return pathname === "/dashboard";
+  // a home tab is active on itself only — /b2b/profile is the profile tab, not the portal
+  if (href === "/dashboard" || href === "/b2b") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -81,7 +91,10 @@ export function MobileTabBar({ pathname }: { pathname: string }) {
 
   const allowed = useMemo(() => DESTINATIONS.filter((d) => !d.perm || can(d.perm)), [can]);
   const allowedById = useMemo(() => new Map(allowed.map((d) => [d.id, d])), [allowed]);
-  const shown = tabs.map((id) => allowedById.get(id)).filter((d): d is TabDest => Boolean(d)).slice(0, MAX_TABS);
+  const partner = usePartnerBrand();
+  const shown = partner
+    ? PARTNER_TABS
+    : tabs.map((id) => allowedById.get(id)).filter((d): d is TabDest => Boolean(d)).slice(0, MAX_TABS);
 
   function persist(next: string[]) {
     setTabs(next);
@@ -108,7 +121,7 @@ export function MobileTabBar({ pathname }: { pathname: string }) {
         aria-label={t("tabbar.aria")}
         className="fixed inset-x-0 bottom-0 z-40 border-t border-[#dbe6e1] bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_12px_rgba(0,60,58,0.07)] backdrop-blur lg:hidden dark:border-[#294039] dark:bg-[#0f1f1b]/95"
       >
-        <div className="grid h-[62px] grid-cols-5">
+        <div className={`grid h-[62px] ${partner ? "grid-cols-4" : "grid-cols-5"}`}>
           {shown.map((d) => {
             const active = isActive(pathname, d.href);
             return (
@@ -131,14 +144,16 @@ export function MobileTabBar({ pathname }: { pathname: string }) {
               </Link>
             );
           })}
-          <button
-            type="button"
-            onClick={() => setCustomizing(true)}
-            className="flex flex-col items-center justify-center gap-1 text-[#7d968f]"
-          >
-            <LayoutGrid className="size-[22px]" />
-            <span className="text-[10px] font-semibold leading-none">{t("tabbar.more")}</span>
-          </button>
+          {partner ? null : (
+            <button
+              type="button"
+              onClick={() => setCustomizing(true)}
+              className="flex flex-col items-center justify-center gap-1 text-[#7d968f]"
+            >
+              <LayoutGrid className="size-[22px]" />
+              <span className="text-[10px] font-semibold leading-none">{t("tabbar.more")}</span>
+            </button>
+          )}
         </div>
       </nav>
 

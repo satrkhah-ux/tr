@@ -5,6 +5,7 @@ import {
   getPublicSupabaseConfig,
   parseSessionCookie,
 } from "@/lib/supabase/constants";
+import { PARTNER_PREFIXES, partnerIdFromToken, underAny } from "@/lib/partners/route-guard";
 
 /**
  * Auth gate (Next 16 `proxy` convention — successor to `middleware`), and the
@@ -115,7 +116,7 @@ const LOGIN_PATHS = new Set(["/", "/sign-in"]);
 
 function isPublic(pathname: string): boolean {
   if (LOGIN_PATHS.has(pathname)) return true;
-  return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  return underAny(pathname, PUBLIC_PREFIXES);
 }
 
 export async function proxy(request: NextRequest) {
@@ -169,10 +170,20 @@ export async function proxy(request: NextRequest) {
       return response;
     };
 
+    const partner = session ? partnerIdFromToken(session.accessToken) !== null : false;
+
     // Logged-in users shouldn't see the login screens. The main dashboard now
-    // embeds the executive overview for roles that hold pricing.internal.
+    // embeds the executive overview for roles that hold pricing.internal; a
+    // partner's home is its portal.
     if (isAuthed && LOGIN_PATHS.has(pathname)) {
-      return withCookie(NextResponse.redirect(new URL("/dashboard", request.url)));
+      return withCookie(NextResponse.redirect(new URL(partner ? "/b2b" : "/dashboard", request.url)));
+    }
+
+    // A partner on one of OUR pages goes to its portal — a typed URL, an old
+    // bookmark, or the sign-in's default /dashboard alike. (See route-guard.ts:
+    // a redirect, not the permission — RLS is.)
+    if (partner && !isPublic(pathname) && !underAny(pathname, PARTNER_PREFIXES)) {
+      return withCookie(NextResponse.redirect(new URL("/b2b", request.url)));
     }
 
     // Everything that isn't public requires a session.

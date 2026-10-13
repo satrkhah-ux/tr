@@ -49,7 +49,8 @@ export function TraveliunSignIn() {
 
       const params = new URLSearchParams(window.location.search);
       const redirect = params.get("redirect");
-      const target = redirect && redirect.startsWith("/") ? redirect : "/dashboard";
+      // «//host» is another site, not a path; a partner landing on /dashboard is sent on to /b2b by the proxy
+      const target = redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/dashboard";
       router.replace(target);
       router.refresh();
     } catch {
