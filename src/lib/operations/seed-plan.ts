@@ -41,14 +41,16 @@ export type PlannedBooking = {
 /** The prefixes this plan writes — an older seed's refs (hotel:<id>, flight:<id>, transport:<id>) are not these. */
 export const PLANNED_PREFIXES = ["flight:intl", "flight:dom", "stay:", "transfer:", "tour:", "sim"];
 
-const LATER = "يُحدَّد لاحقاً";
+export const LATER = "يُحدَّد لاحقاً";
 /** Minutes between a landing and the driver at the arrivals hall; a hotel pick-up before a flight. */
-const MEET_AFTER_LANDING = 45;
-const BEFORE_INTL = 180;
-const BEFORE_DOMESTIC = 120;
+export const MEET_AFTER_LANDING = 45;
+export const BEFORE_INTL = 180;
+export const BEFORE_DOMESTIC = 120;
+/** The word a leg line puts before its landing — drivers.ts reads it back. */
+export const LANDS = "الوصول";
 
 /** «YYYY-MM-DDTHH:mm» shifted by minutes, as the wall clock of the same place. */
-function shift(at: string, minutes: number): { date: string; time: string } {
+export function shift(at: string, minutes: number): { date: string; time: string } {
   const t = new Date(`${at.slice(0, 16)}:00Z`).getTime() + minutes * 60_000;
   const iso = new Date(t).toISOString();
   return { date: iso.slice(0, 10), time: iso.slice(11, 16) };
@@ -60,7 +62,9 @@ const code = (airport: string) => airport.match(/\(([A-Za-z0-9]{3,5})\)\s*$/)?.[
 
 function legText(f: DraftFlight): string {
   const when = f.departure_at ? `${f.departure_at.slice(0, 10)} ${timed(f, f.departure_at) ? f.departure_at.slice(11, 16) : LATER}` : LATER;
-  return `${f.flight_no.trim() || "—"} · ${code(f.from_airport)} → ${code(f.to_airport)} · ${when}`;
+  // the landing too: the reception is timed from it, and follows it when the airline moves the flight
+  const lands = f.arrival_at && timed(f, f.arrival_at) ? ` · ${LANDS} ${f.arrival_at.slice(0, 10)} ${f.arrival_at.slice(11, 16)}` : "";
+  return `${f.flight_no.trim() || "—"} · ${code(f.from_airport)} → ${code(f.to_airport)} · ${when}${lands}`;
 }
 
 function travellers(trip: DraftData["trip"]): string {

@@ -48,6 +48,8 @@ describe("the pull from the offer", () => {
     expect(flights.map((r) => r.origin_ref)).toEqual(["flight:intl", "flight:dom"]);
     expect(Object.keys(by("flight:intl")!.detail)).toEqual(expect.arrayContaining(["الذهاب", "العودة"]));
     expect(Object.keys(by("flight:dom")!.detail)).toEqual(expect.arrayContaining(["رحلة 1", "رحلة 2"]));
+    // the landing rides on the line, so the reception can follow it (drivers.ts)
+    expect(by("flight:intl")!.detail["الذهاب"]).toBe("SV834 · RUH → KUL · 2026-11-20 01:00 · الوصول 2026-11-20 14:30");
   });
 
   it("times every transfer from the flight it meets, the day-of-move ones included", () => {

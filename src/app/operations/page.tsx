@@ -1,5 +1,6 @@
 import { OperationsBoard } from "@/components/traveliun/operations/OperationsBoard";
 import { listOperationWork } from "@/lib/data/operations-work";
+import { listCaseOwners } from "@/lib/data/operation-case";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,6 @@ export const dynamic = "force-dynamic";
  * which case is urgent.
  */
 export default async function OperationsPage() {
-  const { items, today } = await listOperationWork();
-  return <OperationsBoard operations={items} today={today} />;
+  const [{ items, today }, { owners, staff }] = await Promise.all([listOperationWork(), listCaseOwners()]);
+  return <OperationsBoard operations={items} today={today} owners={owners} staff={staff} />;
 }

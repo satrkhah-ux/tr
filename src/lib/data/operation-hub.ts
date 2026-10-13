@@ -115,7 +115,7 @@ export type ClientHub = {
   /** what is still being worked on, in words the client can read. */
   pending: { kind: string; title: string }[];
   /** whose trip it is — a partner's client sees the partner's name, number and colour, not ours. */
-  brand: { name: string; phone: string; website: string; color: string | null };
+  brand: { name: string; phone: string; website: string; color: string | null; whatsapp: string };
 };
 
 /**
@@ -182,7 +182,7 @@ export async function getClientHub(token: string): Promise<ClientHub | null> {
       travel_end: op.travel_end,
       documents,
       pending,
-      brand: { name: brand.nameAr, phone: brand.phone, website: brand.website, color: brand.vars?.["--od-green"] ?? null },
+      brand: { name: brand.nameAr, phone: brand.phone, website: brand.website, color: brand.vars?.["--od-green"] ?? null, whatsapp: brand.whatsapp },
     };
   } catch {
     return null;

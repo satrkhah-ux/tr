@@ -6,6 +6,9 @@ import { listBookings, listDocuments } from "@/lib/data/operation-bookings";
 import { listOrSeedTravelers } from "@/lib/data/operation-travelers";
 import { isOpenAIConfigured } from "@/lib/providers/openai";
 import { listAssignees, listSentRequests } from "@/lib/data/operation-assign";
+import { getCaseExtras, listCaseActivity } from "@/lib/data/operation-case";
+import { DriversPanel } from "@/components/traveliun/operations/DriversPanel";
+import { CaseManagement } from "@/components/traveliun/operations/CaseManagement";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
 
@@ -17,7 +20,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
   const operation = operations.find((o) => o.id === id);
   if (!operation) notFound();
 
-  const [travelers, payments, installments, bookings, documents, assignees, sentRequests, canBook] = await Promise.all([
+  const [travelers, payments, installments, bookings, documents, assignees, sentRequests, canBook, extras, activity] = await Promise.all([
     // a new case starts with the travelers the offer was sold for
     listOrSeedTravelers(id),
     listOperationPayments(id),
@@ -29,6 +32,8 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
     // Only decides whether the button is DRAWN. The server action checks the
     // same permission again — this is courtesy, not security.
     currentCan("operations.book"),
+    getCaseExtras(id),
+    listCaseActivity(id),
   ]);
 
   // The itinerary voucher needs the day-by-day program that was authored in the
@@ -62,6 +67,16 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
       sentRequests={sentRequests}
       canBook={canBook}
       canReadMrz={isOpenAIConfigured()}
+      drivers={<DriversPanel serial={operation.serial} customerName={operation.customer_name} bookings={bookings} />}
+      management={
+        <CaseManagement
+          operationId={id}
+          assigneeId={extras.assignee_id}
+          staff={assignees.filter((a) => a.kind === "employee" && a.id).map((a) => ({ id: a.id as string, label: a.label }))}
+          clientInfo={extras.client_info}
+          activity={activity}
+        />
+      }
     />
   );
 }

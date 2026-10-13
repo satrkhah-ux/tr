@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ArrowRight,
   ExternalLink,
@@ -52,6 +52,8 @@ export function OperationCase({
   canBook,
   canReadMrz,
   installments,
+  drivers,
+  management,
 }: {
   operation: OperationCard;
   travelers: TravelerListItem[];
@@ -67,6 +69,9 @@ export function OperationCase({
   /** the OpenAI key is set: passports can be read from their photo. */
   canReadMrz: boolean;
   installments: InstallmentRow[];
+  /** orders 9/10, built by the page: the driver cards, and owner/notes/activity. */
+  drivers?: ReactNode;
+  management?: ReactNode;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -156,12 +161,15 @@ export function OperationCase({
           canBook={canBook}
         />
 
+        {drivers}
+
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <TravelersPanel operationId={operation.id} trip={operation} travelers={travelers} canReadMrz={canReadMrz} />
           <PaymentsPanel operation={operation} payments={payments} installments={installments} />
         </div>
 
         <IssuesPanel operationId={operation.id} />
+        {management}
       </div>
     </TraveliunShell>
   );

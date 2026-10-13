@@ -38,6 +38,12 @@ export type AuditAction =
   | "payment.deleted"
   | "payment.proof_viewed"
   | "payment.schedule_set"
+  // the case itself: its owner, what the client page says, and the team's notes
+  // (a note IS an audit row — locked to the service role, shown in the activity log)
+  | "operation.assigned"
+  | "operation.client_info"
+  | "operation.note"
+  | "booking.retimed"
   // passports — every one of these is a read of identity data
   | "passport.saved"
   | "passport.viewed"
