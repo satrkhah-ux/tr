@@ -23,6 +23,7 @@ import { hoursSince, type Money } from "@/lib/operations/supplier-request";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
+import { OpsLinkButton } from "./OpsLinkButton";
 
 const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
@@ -342,6 +343,7 @@ function SupplierBookingRow({ booking, info, work }: { booking: OperationBooking
               {t("ops.sup.decline")}
             </button>
           ) : null}
+          {booking.status !== "confirmed" ? <OpsLinkButton kind="supplier" bookingId={booking.id} /> : null}
           {info?.has_confirmation ? (
             <button type="button" disabled={paper.pending} onClick={() => paper.open(() => getSupplierConfirmationUrl(booking.id))} className={chipBtn}>
               <ExternalLink className="size-3.5" />

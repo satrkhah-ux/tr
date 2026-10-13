@@ -7,11 +7,12 @@ import { CalendarDays, Car, Check, Copy, Loader2, Pencil, Plane, Send, UserRound
 import { DirText } from "@/components/DirText";
 import { updateBooking, type OperationBooking } from "@/lib/data/operation-bookings";
 import { draftDriverMessage, sendDriverMessage, type DriverDraft } from "@/lib/data/operation-drivers";
-import { DRV, driverServiceKind, meetTime, timeKey, waNumber, type ServiceKind } from "@/lib/operations/drivers";
+import { DRV, driverServiceKind, driverStep, meetTime, timeKey, waNumber, type ServiceKind } from "@/lib/operations/drivers";
 import type { TranslationKey } from "@/lib/i18n";
 import { WelcomeBoardButton } from "../WelcomeBoardButton";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition, useSessionField } from "../useSafeTransition";
+import { OpsLinkButton } from "./OpsLinkButton";
 
 const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
@@ -164,6 +165,8 @@ function DriverCard({
         <Fact icon={<UserRound className="size-3" />} label={t("ops.drv.driver")} value={d[DRV.driver] || t("ops.drv.noDriver")} muted={!d[DRV.driver]} />
         {d[DRV.phone] ? <Fact label={t("ops.drv.phone")} value={d[DRV.phone]} ltr /> : null}
         {d[DRV.car] || d[DRV.plate] ? <Fact icon={<Car className="size-3" />} label={t("ops.drv.car")} value={[d[DRV.car], d[DRV.plate]].filter(Boolean).join(" · ")} /> : null}
+        {driverStep(d) ? <Fact label={t("ops.link.step")} value={[d[DRV.status], d[DRV.handedAt]].filter(Boolean).join(" · ")} /> : null}
+        {d[DRV.landing] ? <Fact icon={<Plane className="size-3" />} label={t("ops.link.landing")} value={d[DRV.landing]} ltr /> : null}
       </dl>
 
       {open ? (
@@ -204,6 +207,7 @@ function DriverCard({
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <DriverSend bookingId={booking.id} onSent={() => router.refresh()} />
+        {d[DRV.phone] && booking.start_date ? <OpsLinkButton kind="driver" bookingId={booking.id} /> : null}
         {booking.start_date ? (
           <Link
             href={`/operations/drivers?date=${booking.start_date}${booking.city_name ? `&city=${encodeURIComponent(booking.city_name.trim())}` : ""}`}

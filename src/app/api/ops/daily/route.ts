@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { runOpsDaily } from "@/lib/operations/daily";
+import { trackFlights } from "@/lib/data/flight-tracking";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -24,5 +25,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!authorised(req)) return NextResponse.json({ ok: false }, { status: 401 });
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
   const result = await runOpsDaily(today);
-  return NextResponse.json({ ok: true, day: today, ...result });
+  // the morning's first look at today's arrivals (operations order 11)
+  const flights = await trackFlights();
+  return NextResponse.json({ ok: true, day: today, ...result, flights });
 }
