@@ -105,13 +105,17 @@ export async function confirmPartnerOffer(serial: string): Promise<OkId | Fail> 
     const service = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data } = await service
       .from("offers")
-      .select("id, status, partner_company_id")
+      .select("id, status, partner_company_id, valid_until")
       .eq("serial", serial.trim())
       .maybeSingle();
-    const offer = data as { id: string; status: string | null; partner_company_id: string | null } | null;
+    const offer = data as { id: string; status: string | null; partner_company_id: string | null; valid_until: string | null } | null;
     // not theirs and not there read the same — no probing other companies' serials
     if (!offer || offer.partner_company_id !== partner.partner_id) return { ok: false, error: "ops.err.notFound" };
     if (offer.status === "cancelled") return { ok: false, error: "ops.err.invalidTransition" };
+    // its prices held until valid_until — after that the partner renews them (operations can still confirm)
+    if (offer.valid_until && offer.valid_until < new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" })) {
+      return { ok: false, error: "ops.err.offerExpired" };
+    }
     // past its credit limit the partner cannot confirm alone — we can, from operations
     if (await creditRefusal(service, offer.id)) return { ok: false, error: "ops.err.creditLimit" };
     return recordConfirmation(service, {

@@ -1561,6 +1561,7 @@ export const ar: Dictionary = {
   "ops.clientTrack": "العميل",
   "ops.executionTrack": "التنفيذ",
   "ops.travelWindow": "السفر",
+  "ops.err.offerExpired": "انتهت صلاحية أسعار هذا العرض — جدّدوا التسعير ثم أكّدوا.",
   "ops.err.creditLimit": "تجاوز الحد الائتماني لشركتكم. سدّدوا المستحق أو تواصلوا معنا لتأكيد هذا الملف.",
   "ops.partnerTag": "شريك: {name}",
   "ops.travelers": "المسافرون",

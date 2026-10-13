@@ -15,6 +15,8 @@ import {
 import { describeTerms } from "@/lib/partners/pricing";
 import { IssueAccount, PendingRegistrations } from "./partners/PendingRegistrations";
 import { TraveliunShell } from "./TraveliunShell";
+import { TiersEditor } from "./partners/TiersEditor";
+import type { Tier } from "@/lib/partners/tiers";
 import { docFontOptions, DEFAULT_DOC_FONT } from "@/lib/offer-doc/font-families";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
@@ -71,7 +73,7 @@ function toDraft(c?: PartnerCompany): Draft {
   };
 }
 
-export function PartnerCompanies({ companies }: { companies: PartnerCompany[] }) {
+export function PartnerCompanies({ companies, defaultTiers }: { companies: PartnerCompany[]; defaultTiers: Tier[] }) {
   // a request waits in «بانتظار القرار» above — listing it here too showed it twice, as «deactivated»
   const listed = companies.filter((c) => c.status !== "pending");
   const { t } = useTraveliunUI();
@@ -135,6 +137,13 @@ export function PartnerCompanies({ companies }: { companies: PartnerCompany[] })
         {/* Requests from the public B2B form, above everything — a company that
             filled in a form and heard nothing has already gone elsewhere. */}
         <PendingRegistrations companies={companies} />
+
+        <TiersEditor
+          partnerId={null}
+          initial={defaultTiers}
+          title="سلّم العمولة العام"
+          hint="يُطبَّق على كل شركة ليس لها سلّم خاص: بعد عدد الملفات المؤكدة في الربع تصبح نسبتها هذه."
+        />
 
         {draft ? (
           <section className={card}>

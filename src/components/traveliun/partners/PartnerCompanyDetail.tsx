@@ -14,6 +14,8 @@ import { useSafeTransition } from "../useSafeTransition";
 import { IssueAccount } from "./PendingRegistrations";
 import type { PartnerStatement } from "@/lib/partners/ledger";
 import { StatementView, LedgerControls } from "./StatementView";
+import { TiersEditor } from "./TiersEditor";
+import type { Tier } from "@/lib/partners/tiers";
 
 /**
  * One partner company, from our side: who logs in for it, what it has started
@@ -32,7 +34,7 @@ const STATUS_LABEL: Record<string, string> = {
 const OFFER_STATUS: Record<string, string> = { sent: "مُرسل", confirmed: "مؤكّد", cancelled: "ملغى", draft: "مسودة" };
 const money = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
-export function PartnerCompanyDetailView({ detail, statement }: { detail: PartnerCompanyDetail; statement: PartnerStatement | null }) {
+export function PartnerCompanyDetailView({ detail, statement, tiers }: { detail: PartnerCompanyDetail; statement: PartnerStatement | null; tiers: Tier[] }) {
   const { t } = useTraveliunUI();
   const { company } = detail;
   const confirmed = detail.offers.filter((o) => o.client_status).length;
@@ -83,6 +85,13 @@ export function PartnerCompanyDetailView({ detail, statement }: { detail: Partne
             <LedgerControls partnerId={company.id} limit={statement.limit} />
           </>
         ) : null}
+
+        <TiersEditor
+          partnerId={company.id}
+          initial={tiers}
+          title="سلّم العمولة لهذه الشركة"
+          hint="بعد عدد من الملفات المؤكدة في الربع تتغيّر نسبتها. بلا درجات هنا يُطبَّق السلّم العام (في صفحة الشركات)."
+        />
 
         <section className={card}>
           <h2 className="mb-3 text-[14px] font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">العروض</h2>

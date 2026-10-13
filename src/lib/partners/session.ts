@@ -4,6 +4,8 @@ import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/serve
 import { publicBrandLogoUrl } from "@/components/offer-doc/brand";
 import type { PartnerBrand } from "./PartnerContext";
 import type { PartnerTerms } from "./pricing";
+import { cache } from "react";
+import { effectiveTerms, quarterStart, type Tier, type TierState } from "./tiers";
 
 /**
  * Who is signed in on the partner side.
@@ -24,7 +26,10 @@ export type PartnerSession = {
   email: string;
   /** owner: the account and the team; sales: offers and confirmations only (0059). */
   role: "owner" | "sales";
+  /** the terms in force — the approved percentage, or the ladder's step this quarter (0060). */
   terms: PartnerTerms;
+  /** the approved percentage, the files confirmed this quarter and the next step. */
+  tier: { base_pct: number; confirmed: number; next: TierState["next"] };
   brand_color: string;
   accent_color: string;
   logo_path: string | null;
@@ -88,10 +93,12 @@ export async function getPartnerSession(): Promise<PartnerSession | null> {
       address: company.address,
       email: row.email,
       role: row.role === "sales" ? "sales" : "owner",
-      terms: {
-        kind: company.price_adjust_kind === "commission" ? "commission" : "markup",
-        pct: Number(company.price_adjust_pct) || 0,
-      },
+      ...(await (async () => {
+        const kind = company.price_adjust_kind === "commission" ? "commission" : "markup";
+        const base = Number(company.price_adjust_pct) || 0;
+        const state = await tierState(company.id, kind, base);
+        return { terms: state.terms, tier: { base_pct: base, confirmed: state.confirmed, next: state.next } };
+      })()),
       brand_color: company.brand_color,
       accent_color: company.accent_color,
       logo_path: company.logo_path,
@@ -128,5 +135,46 @@ export async function isStaffSession(): Promise<boolean> {
     return Boolean(row && (row.status ?? "Active") === "Active");
   } catch {
     return false;
+  }
+}
+
+/**
+ * The ladder's step for a company this quarter — once per request (React
+ * cache: the session is read by the layout, the page and every action). A
+ * company with no ladder keeps its approved percentage; a failed read does too.
+ */
+const tierState = cache(async (partnerId: string, kind: PartnerTerms["kind"], pct: number): Promise<TierState> => {
+  const base: PartnerTerms = { kind, pct };
+  try {
+    const supabase = db();
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+    const [tiers, confirmed] = await Promise.all([
+      supabase.from("partner_commission_tiers").select("partner_id, min_confirmed, pct").or(`partner_id.is.null,partner_id.eq.${partnerId}`),
+      supabase
+        .from("operations")
+        .select("id, offers!inner(partner_company_id)", { count: "exact", head: true })
+        .eq("offers.partner_company_id", partnerId)
+        .neq("client_status", "cancelled")
+        .gte("confirmed_at", quarterStart(today)),
+    ]);
+    return effectiveTerms(base, (tiers.data ?? []) as Tier[], partnerId, confirmed.count ?? 0);
+  } catch {
+    return { terms: base, confirmed: 0, next: null };
+  }
+});
+
+/**
+ * A company's terms in force, for a file someone ELSE issues on its behalf
+ * (an employee choosing the company): the same ladder the partner's own session
+ * sees, so both ways of issuing price it alike.
+ */
+export async function partnerTermsById(partnerId: string): Promise<PartnerTerms | null> {
+  try {
+    const { data } = await db().from("booking_partners").select("price_adjust_kind, price_adjust_pct").eq("id", partnerId).maybeSingle();
+    const row = data as { price_adjust_kind: string; price_adjust_pct: number | string } | null;
+    if (!row) return null;
+    return (await tierState(partnerId, row.price_adjust_kind === "commission" ? "commission" : "markup", Number(row.price_adjust_pct) || 0)).terms;
+  } catch {
+    return null;
   }
 }

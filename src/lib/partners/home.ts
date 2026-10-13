@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import { CLIENT_DOCUMENT_KINDS, type VoucherKind } from "@/lib/operations/voucher-dto";
+import { lastTwoMonths, monthReport, type MonthReport } from "./report";
 import { listPartnerFiles } from "./drafts";
 import { getPartnerSession } from "./session";
 
@@ -36,6 +37,17 @@ export type PartnerAwaiting = {
   destination: string | null;
   travelers: number;
   travel_date: string | null;
+  /** the file it was issued from — «جدّد التسعير» copies it. */
+  draft_id: string;
+  /** the last day its prices hold (0060); null for offers issued before validity existed. */
+  valid_until: string | null;
+  expired: boolean;
+  total: number | null;
+  currency: string | null;
+  /** renewed from an expired offer: what that one cost, to show the difference. */
+  was: { serial: string; total: number | null; currency: string | null } | null;
+  /** this expired offer was already renewed into a new file. */
+  renewed: boolean;
 };
 
 export type LedgerEntry = {
@@ -51,6 +63,8 @@ export type PartnerHomeData = {
   issued: number;
   requests: PartnerRequest[];
   awaiting: PartnerAwaiting[];
+  /** «تقريركم الشهري»: this month and the one before. */
+  reports: MonthReport[];
   destinations: DestinationUse[];
   ledger: LedgerEntry[];
   /** Payments minus refunds, per currency — a single total would add riyals to dollars. */
@@ -62,6 +76,7 @@ const EMPTY: PartnerHomeData = {
   issued: 0,
   requests: [],
   awaiting: [],
+  reports: [],
   destinations: [],
   ledger: [],
   balances: [],
@@ -177,6 +192,30 @@ export async function getPartnerHome(): Promise<PartnerHomeData> {
   }
 
   const confirmed = new Set(requests.map((r) => r.serial));
+
+  // the offers themselves (0035 lets a partner read its own): validity, totals, the monthly report
+  type OfferRow = { id: string; serial: string; destination: string | null; total: number | string | null; currency: string | null; created_at: string; valid_until: string | null };
+  let offers: OfferRow[] = [];
+  const renewedFrom = new Map<string, OfferRow>();
+  const renewedOld = new Set<string>();
+  try {
+    const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
+    const res = await supabase.from("offers").select("id, serial, destination, total, currency, created_at, valid_until").order("created_at", { ascending: false }).limit(500);
+    offers = (res.data ?? []) as OfferRow[];
+    const ren = await supabase.from("offer_renewals").select("old_offer_id, new_draft_id");
+    const byId = new Map(offers.map((o) => [o.id, o]));
+    for (const r of (ren.data ?? []) as { old_offer_id: string; new_draft_id: string }[]) {
+      const old = byId.get(r.old_offer_id);
+      if (old) renewedFrom.set(r.new_draft_id, old);
+      renewedOld.add(r.old_offer_id);
+    }
+  } catch {
+    // the lists below simply go without validity and the report stays empty
+  }
+  const offerBySerial = new Map(offers.map((o) => [o.serial, o]));
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+  const num = (v: number | string | null) => (v == null ? null : Number(v));
+
   return {
     // a file opened and left empty is not a request
     files: files.filter((file) => file.serial || file.destination || file.title).length,
@@ -184,7 +223,29 @@ export async function getPartnerHome(): Promise<PartnerHomeData> {
     requests,
     awaiting: files
       .filter((file): file is typeof file & { serial: string } => Boolean(file.serial) && !confirmed.has(file.serial))
-      .map((file) => ({ serial: file.serial, destination: file.destination, travelers: file.travelers, travel_date: file.travel_date })),
+      .map((file) => {
+        const offer = offerBySerial.get(file.serial);
+        const was = renewedFrom.get(file.id);
+        return {
+          serial: file.serial,
+          destination: file.destination,
+          travelers: file.travelers,
+          travel_date: file.travel_date,
+          draft_id: file.id,
+          valid_until: offer?.valid_until ?? null,
+          expired: Boolean(offer?.valid_until && offer.valid_until < today),
+          total: num(offer?.total ?? null),
+          currency: offer?.currency ?? null,
+          was: was ? { serial: was.serial, total: num(was.total), currency: was.currency } : null,
+          renewed: Boolean(offer && renewedOld.has(offer.id)),
+        };
+      }),
+    reports: lastTwoMonths(today).map((month) =>
+      monthReport(
+        offers.map((o) => ({ issued_on: o.created_at.slice(0, 10), destination: o.destination, total: num(o.total), currency: o.currency, confirmed: confirmed.has(o.serial) })),
+        month,
+      ),
+    ),
     destinations,
     ledger,
     balances: [...nets.entries()].map(([currency, net]) => ({ currency, net })),

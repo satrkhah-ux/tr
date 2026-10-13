@@ -1563,6 +1563,7 @@ export const en = {
   "ops.clientTrack": "Client",
   "ops.executionTrack": "Execution",
   "ops.travelWindow": "Travel",
+  "ops.err.offerExpired": "This offer's prices have expired — renew the pricing, then confirm.",
   "ops.err.creditLimit": "This would pass your company's credit limit. Settle the balance or contact us to confirm this file.",
   "ops.partnerTag": "Partner: {name}",
   "ops.travelers": "Travelers",
