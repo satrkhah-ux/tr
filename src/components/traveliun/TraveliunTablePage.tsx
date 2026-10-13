@@ -9,7 +9,7 @@ const EMPTY_OPTIONS: FilterOptions = { countries: [], cities: [], employees: [],
 
 /** Server wrapper: resolves the DB-backed config for a route, loads filter
  *  options, and renders the persistent client table. */
-export async function TraveliunTablePage({ route }: { route: string }) {
+export async function TraveliunTablePage({ route, initialSearch }: { route: string; initialSearch?: string }) {
   const resolved = resolveTableConfig(route);
   if (!resolved) return <TraveliunNotReady title={route.replace(/^\//, "").replace(/-/g, " ") || "Page"} />;
   // A buy-price column is not drawn for someone the engine will not send it to.
@@ -20,5 +20,5 @@ export async function TraveliunTablePage({ route }: { route: string }) {
   const needsOptions = Boolean(config.filters?.length) || Boolean(config.isOffers);
   const filterOptions = needsOptions ? await getFilterOptions() : EMPTY_OPTIONS;
 
-  return <TraveliunTable config={config} filterOptions={filterOptions} />;
+  return <TraveliunTable config={config} filterOptions={filterOptions} initialSearch={initialSearch} />;
 }

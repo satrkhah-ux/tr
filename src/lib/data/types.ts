@@ -20,6 +20,8 @@ export type ColumnDef = {
   editable?: boolean;
   /** fixed options for a select input in the form. */
   options?: { value: string; label: string }[];
+  /** the value is a city's / country's id: shown by name, picked from a searchable list. */
+  ref?: "cities" | "countries";
 };
 
 export type FilterOp = "eq" | "gte" | "lte" | "in" | "ilike";
@@ -42,6 +44,8 @@ export type FilterDef = {
   options?: { value: string; label: string }[];
   /** column(s) the filter applies to; defaults to `key`. */
   column?: string;
+  /** a country filter applied through the row's city (city_id in that country's cities). */
+  viaCity?: boolean;
 };
 
 export type Sort = { column: string; ascending: boolean };
@@ -83,5 +87,6 @@ export type MutateResult =
 
 export type DeleteResult = { ok: true } | { ok: false; error: TranslationKey };
 
-export type FilterOption = { value: string; label: string };
+/** `parent`: a city's country id. */
+export type FilterOption = { value: string; label: string; parent?: string | null };
 export type FilterOptions = Record<FilterSource, FilterOption[]>;

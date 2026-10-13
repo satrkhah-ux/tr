@@ -66,6 +66,8 @@ export interface Hotel {
   contact_number: string | null;
   website: string | null;
   is_default: boolean;
+  /** 'Active' | 'Inactive' (0070) — a hotel still in use is stopped, never deleted. */
+  status: string;
   created_at: IsoTimestamp;
 }
 
