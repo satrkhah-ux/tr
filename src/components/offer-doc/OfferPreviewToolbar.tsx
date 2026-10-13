@@ -58,8 +58,14 @@ export function OfferPreviewToolbar({
   /** Switching identity also records it on the offer, so the client link agrees. */
   async function pickBrand(next: string) {
     setPending(true);
-    await setOfferPartner(serial, next === "ours" ? null : next);
+    setMessage(null);
+    const res = await setOfferPartner(serial, next === "ours" ? null : next);
     setPending(false);
+    // an invoiced offer, or a partner's own file, keeps its company — say so instead of switching
+    if (!res.ok) {
+      setMessage(res.error === "partner.err.invoiced" ? "صدرت لهذا العرض فاتورة على الشركة — لا تُغيَّر شركته." : res.error === "partner.err.partnerFile" ? "هذا ملف أنشأته شركة شريكة بنفسها — يبقى باسمها." : "تعذّر تغيير الشركة.");
+      return;
+    }
     // push ONLY — a refresh() chased straight after a push cancels it, which is
     // why the selection used to snap back to what it was.
     router.push(`/offer/${serial}/preview${query({ brand: next })}`);

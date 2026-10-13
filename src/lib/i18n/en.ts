@@ -557,6 +557,8 @@ export const en = {
   "partner.brandPreview": "Document identity",
   "partner.err.houseColor": "This is Traveliun's own green — the document would look like ours under their name. Pick their colour.",
   "partner.err.nameRequired": "Enter the company name.",
+  "partner.err.invoiced": "This offer is already invoiced to the company — its company cannot change.",
+  "partner.err.partnerFile": "A partner company built this file itself — it stays under its name.",
   "partner.err.duplicate": "A company with this name already exists.",
   "partner.err.logoTooLarge": "The logo is too large (max 2 MB).",
   "partner.err.logoType": "Unsupported image type. Use PNG, JPG, WEBP or SVG.",

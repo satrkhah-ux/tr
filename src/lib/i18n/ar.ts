@@ -556,6 +556,8 @@ export const ar: Dictionary = {
   "partner.err.houseColor": "هذا أخضر ترافليون نفسه — سيصدر المستند بمظهرنا تحت اسمهم. اختر لونهم.",
   "partner.err.nameRequired": "أدخل اسم الشركة.",
   "partner.err.duplicate": "توجد شركة بهذا الاسم.",
+  "partner.err.invoiced": "صدرت لهذا العرض فاتورة على الشركة — لا تُغيَّر شركته.",
+  "partner.err.partnerFile": "هذا ملف أنشأته شركة شريكة بنفسها — يبقى باسمها.",
   "partner.err.logoTooLarge": "الشعار كبير جداً (الحد ٢ ميجابايت).",
   "partner.err.logoType": "نوع الصورة غير مدعوم. استخدم PNG أو JPG أو WEBP أو SVG.",
   "doc.brand": "الإصدار باسم",

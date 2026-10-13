@@ -247,14 +247,36 @@ export async function deletePartnerCompany(id: string): Promise<{ ok: true } | F
   }
 }
 
-/** Which company an offer is branded for, or null for our own identity. */
+/**
+ * Which company an offer is branded for, or null for our own identity.
+ *
+ * The company is also who we BILL (partner_cost, 0058): changing it clears the
+ * cost so the new company is never invoiced at the old one's terms (it is priced
+ * again by hand — ledger-server.ts). Refused once the offer is invoiced, and on a
+ * partner's own file: that one belongs to the company that built it.
+ */
 export async function setOfferPartner(serial: string, partnerId: string | null): Promise<{ ok: true } | Fail> {
   const denied = await requireWrite();
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
-    const { error } = await supabase.from("offers").update({ partner_company_id: partnerId }).eq("serial", serial);
-    return error ? { ok: false, error: "err.updateFailed" } : { ok: true };
+    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { data } = await supabase.from("offers").select("id, partner_company_id").eq("serial", serial).maybeSingle();
+    const offer = data as { id: string; partner_company_id: string | null } | null;
+    if (!offer) return { ok: false, error: "err.loadFailed" };
+    if ((offer.partner_company_id ?? null) === (partnerId ?? null)) return { ok: true };
+
+    const [invoice, draft] = await Promise.all([
+      service.from("partner_invoices").select("id").eq("offer_id", offer.id).limit(1).maybeSingle(),
+      service.from("offer_drafts").select("partner_company_id").eq("data->>produced_serial", serial).not("partner_company_id", "is", null).limit(1).maybeSingle(),
+    ]);
+    if (invoice.data) return { ok: false, error: "partner.err.invoiced" };
+    if (draft.data) return { ok: false, error: "partner.err.partnerFile" };
+
+    const { error } = await supabase.from("offers").update({ partner_company_id: partnerId, partner_cost: null }).eq("id", offer.id);
+    if (error) return { ok: false, error: "err.updateFailed" };
+    await logAudit({ action: "partner.updated", entity: "offers", entity_id: offer.id, meta: { serial, from: offer.partner_company_id, to: partnerId, partner_cost_cleared: true } });
+    return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
   }
