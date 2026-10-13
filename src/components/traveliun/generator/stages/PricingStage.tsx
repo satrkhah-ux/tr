@@ -19,6 +19,7 @@ import { itineraryStartDate } from "@/lib/offer/schedule";
 import type { PricingItemType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
+import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { FieldIssue } from "../FieldIssue";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import {
@@ -61,7 +62,8 @@ function formatMoney(value: number): string {
 export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) {
   const { t } = useTraveliunUI();
   const { can } = useRole();
-  const canView = can("pricing.view");
+  // a partner sees prices, always at their own terms (the server quotes them so)
+  const canView = can("pricing.view") || usePartnerBrand() !== null;
   const canInternal = can("pricing.internal");
 
   const pricing = data.pricing;

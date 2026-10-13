@@ -278,6 +278,10 @@ export async function saveDraftStages(draftId: string, slices: Partial<DraftData
     if (internal) return own;
     const kept = keepDraftCost(own, stored);
     if (partner && kept.hotels) kept.hotels = keepOurStays(kept.hotels, stored.hotels);
+    // a partner's file stays under their company, whatever the customer stage sends
+    if (partner && kept.customer) {
+      kept.customer = { ...kept.customer, company: partner.partner_name, partner_company_id: owner ?? partner.partner_id };
+    }
     if (agentsSetProfit && sent.pricing && kept.pricing && "profit" in sent.pricing) {
       kept.pricing = { ...kept.pricing, profit: sent.pricing.profit };
     }

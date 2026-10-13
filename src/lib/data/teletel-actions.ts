@@ -1,6 +1,7 @@
 "use server";
 
 import { getServerUser } from "@/lib/supabase/server";
+import { isStaffSession } from "@/lib/partners/session";
 import {
   diagnoseTeletel,
   getTeletelConfig,
@@ -40,7 +41,8 @@ export async function searchCustomersFromTeletel(query: string): Promise<Teletel
   const user = await getServerUser();
   if (!user) return { ok: false, error: "err.session" };
 
-  if (!getTeletelConfig()) return { ok: true, configured: false, reachable: false, hits: [] };
+  // Teletel holds OUR customers: a partner login answers as if it were not set up.
+  if (!getTeletelConfig() || !(await isStaffSession())) return { ok: true, configured: false, reachable: false, hits: [] };
   const trimmed = query.trim();
   if (trimmed.length < 2) return { ok: true, configured: true, reachable: true, hits: [] };
 

@@ -29,6 +29,7 @@ import {
 import { resumeStage, stageSummary } from "@/lib/offer/draft-flow";
 import { validateDraft, type DraftIssue, type StageStatus } from "@/lib/offer/draft-validation";
 import { useRole } from "@/lib/roles/RoleContext";
+import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { FieldIssueProvider } from "./FieldIssue";
 import { STAGE_FORMS } from "./stage-forms";
 import { useDraftState } from "./useDraftState";
@@ -73,7 +74,8 @@ export function GeneratorFlow({
 }) {
   const { t, language } = useTraveliunUI();
   const { can } = useRole();
-  const canPricing = can("pricing.view");
+  // a partner sees prices, always at their own terms (the server quotes them so)
+  const canPricing = can("pricing.view") || usePartnerBrand() !== null;
 
   const { data, patch, replace, flush, saveState } = useDraftState(draftId, initialData);
   const [previewOpen, setPreviewOpen] = useState(true);
