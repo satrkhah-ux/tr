@@ -178,7 +178,8 @@ export async function getPartnerHome(): Promise<PartnerHomeData> {
 
   const confirmed = new Set(requests.map((r) => r.serial));
   return {
-    files: files.length,
+    // a file opened and left empty is not a request
+    files: files.filter((file) => file.serial || file.destination || file.title).length,
     issued: files.filter((file) => file.serial).length,
     requests,
     awaiting: files

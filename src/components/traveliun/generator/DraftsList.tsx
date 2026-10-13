@@ -24,6 +24,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { TraveliunShell } from "../TraveliunShell";
 import { WelcomeBoardButton } from "../WelcomeBoardButton";
 import { useTraveliunUI } from "../TraveliunUIProvider";
+import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 
 /**
  * /package-generator — where a package starts.
@@ -66,6 +67,7 @@ export function DraftsList({
   const issuedOnly = variant === "issued";
   const router = useRouter();
   const { t } = useTraveliunUI();
+  const partner = usePartnerBrand();
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rows, setRows] = useState(drafts);
@@ -130,7 +132,7 @@ export function DraftsList({
 
         {/* the three doors — the generator only */}
         {issuedOnly ? null : (
-        <section className="grid gap-3 md:grid-cols-3">
+        <section className={`grid gap-3 ${partner ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
           <StartCard titleKey="pg.startReady" hintKey="pg.startReadyHint" icon={Sparkles} color="#8b5cf6" href="/ready-offers" />
           <StartCard
             titleKey="pg.startNew"
@@ -140,7 +142,9 @@ export function DraftsList({
             onClick={() => void onCreate()}
             busy={creating}
           />
-          <StartCard titleKey="pg.startRepackage" hintKey="pg.startRepackageHint" icon={FileUp} color="#0e9bb5" href="/repackage" />
+          {partner ? null : (
+            <StartCard titleKey="pg.startRepackage" hintKey="pg.startRepackageHint" icon={FileUp} color="#0e9bb5" href="/repackage" />
+          )}
         </section>
         )}
 

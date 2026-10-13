@@ -102,10 +102,10 @@ export function PartnerRegisterForm() {
         />
       </label>
 
-      {/* The logo is uploaded after approval, from the partner's own portal —
-          an unapproved company's file has nowhere to live and nothing to brand. */}
+      {/* The same story the profile page tells: the identity is set with us after
+          approval — an unapproved company has nothing to brand yet. */}
       <p className="text-[11.5px] font-semibold text-[#93aaa3]">
-        شعار الشركة يُرفع بعد الاعتماد من داخل البوابة، ويُعتمد مع الألوان.
+        بعد الاعتماد ترسلون لنا شعار الشركة وألوانها، ونعتمدها لتظهر على عروضكم.
       </p>
 
       {error ? <p className="text-[12.5px] font-bold text-[#c22850]">{error}</p> : null}

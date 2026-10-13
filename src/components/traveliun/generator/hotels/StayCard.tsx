@@ -26,6 +26,7 @@ import { fieldClass } from "../stage-props";
 import { HotelPicker, type PickerFilters, type PickerSource } from "./HotelPicker";
 import type { SearchBarGuests } from "./HotelSearchBar";
 import { StaySummary } from "./StaySummary";
+import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 
 const rowLabelClass = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
 
@@ -111,6 +112,7 @@ export function StayCard({
   onRefresh: () => void;
 }) {
   const { t } = useTraveliunUI();
+  const partner = usePartnerBrand();
   const chosen = Boolean(line.hotel_name.trim());
 
   return (
@@ -184,7 +186,7 @@ export function StayCard({
                 value={line.hotel_name_en}
                 onChange={(e) => onSetHotel({ hotel_name_en: e.target.value })}
                 className={`${fieldClass} text-start`}
-                placeholder="Baku Center Hotel"
+                placeholder="Hotel name in English"
               />
             </label>
             <label className={rowLabelClass}>
@@ -236,6 +238,8 @@ export function StayCard({
                   ))}
                 </select>
               </label>
+              {/* our suppliers are not a partner's to see or pick */}
+              {partner ? null : (
               <label className={rowLabelClass}>
                 {t("pg.supplierLabel")}
                 <select
@@ -252,6 +256,7 @@ export function StayCard({
                   ) : null}
                 </select>
               </label>
+              )}
             </div>
           ) : null}
           {onDone ? (

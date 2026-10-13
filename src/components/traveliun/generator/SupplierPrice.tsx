@@ -3,6 +3,7 @@
 import { currencyOptions, type GeneratorLookups, type LookupCountry } from "@/lib/offer/draft-types";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { fieldClass } from "./stage-props";
+import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 
 /**
  * One price and who it was booked through — the pair every bought thing on a
@@ -40,6 +41,7 @@ export function SupplierPrice({
   onChange: (slice: { price?: number | null; currency?: string; supplier?: string }) => void;
 }) {
   const { t } = useTraveliunUI();
+  const partner = usePartnerBrand();
   const options = suppliersFor(lookups, category);
   return (
     <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_110px_minmax(0,1fr)]">
@@ -63,6 +65,8 @@ export function SupplierPrice({
           ))}
         </select>
       </label>
+      {/* our suppliers are not a partner's to see or pick */}
+      {partner ? null : (
       <label className="grid gap-1.5 text-[12px] font-bold text-[#185045]">
         {t("pg.supplierLabel")}
         <select value={supplier} onChange={(e) => onChange({ supplier: e.target.value })} className={fieldClass}>
@@ -73,6 +77,7 @@ export function SupplierPrice({
           {supplier && !options.some((s) => s.name === supplier) ? <option value={supplier}>{supplier}</option> : null}
         </select>
       </label>
+      )}
     </div>
   );
 }
