@@ -549,6 +549,8 @@ export const en = {
   "partner.none": "No partner companies yet",
   "partner.noneHint": "Add the agency that resells your files, then pick it when you export a document.",
   "partner.deactivated": "Deactivated (it has bookings on record)",
+  "partner.suspended": "Suspended",
+  "partner.rejected": "Rejected",
   "partner.deleteConfirm": "Delete this company?",
   "partner.brandPreview": "Document identity",
   "partner.err.houseColor": "This is Traveliun's own green — the document would look like ours under their name. Pick their colour.",

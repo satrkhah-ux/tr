@@ -155,6 +155,7 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
         بريد الدخول للشركة
         <input dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} className={`${field} text-start`} />
       </label>
+      {company.has_account ? null : (
       <button
         type="button"
         disabled={pending || done}
@@ -172,9 +173,11 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
         {done ? "تم الإرسال" : "إصدار حساب"}
       </button>
+      )}
 
       {/* An invitation is single-use, so a company that lost the first link had
           no way back in — «مُصدر له حساب بالفعل» was a dead end. This is it. */}
+      {company.has_account ? (
       <button
         type="button"
         disabled={pending}
@@ -193,6 +196,7 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
         إعادة إرسال كلمة المرور
       </button>
+      ) : null}
 
       {message ? (
         <p className={`basis-full text-[11.5px] font-bold ${done ? "text-[#0f7a52]" : "text-[#c22850]"}`}>{message}</p>

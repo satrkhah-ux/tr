@@ -547,6 +547,8 @@ export const ar: Dictionary = {
   "partner.none": "لا توجد شركات متعاونة بعد",
   "partner.noneHint": "أضف الشركة التي تعيد بيع ملفاتك، ثم اخترها عند إصدار المستند.",
   "partner.deactivated": "أُلغي تفعيلها (عليها حجوزات مسجّلة)",
+  "partner.suspended": "موقوفة",
+  "partner.rejected": "مرفوضة",
   "partner.deleteConfirm": "حذف هذه الشركة؟",
   "partner.brandPreview": "هوية المستند",
   "partner.err.houseColor": "هذا أخضر ترافليون نفسه — سيصدر المستند بمظهرنا تحت اسمهم. اختر لونهم.",

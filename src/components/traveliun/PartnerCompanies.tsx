@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { AlertTriangle, Building2, Check, ImageUp, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
@@ -71,6 +72,8 @@ function toDraft(c?: PartnerCompany): Draft {
 }
 
 export function PartnerCompanies({ companies }: { companies: PartnerCompany[] }) {
+  // a request waits in «بانتظار القرار» above — listing it here too showed it twice, as «deactivated»
+  const listed = companies.filter((c) => c.status !== "pending");
   const { t } = useTraveliunUI();
   const router = useRouter();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -289,13 +292,13 @@ export function PartnerCompanies({ companies }: { companies: PartnerCompany[] })
           </section>
         ) : null}
 
-        {companies.length === 0 ? (
+        {listed.length === 0 ? (
           <section className={card}>
             <EmptyState icon={Building2} title={t("partner.none")} description={t("partner.noneHint")} />
           </section>
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
-            {companies.map((c) => (
+            {listed.map((c) => (
               <CompanyRow key={c.id} company={c} onEdit={() => { setError(null); setDraft(toDraft(c)); }} />
             ))}
           </div>
@@ -417,7 +420,9 @@ function CompanyRow({ company, onEdit }: { company: PartnerCompany; onEdit: () =
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-extrabold text-[#003c3a]">{company.name}</p>
+          <Link href={`/partner-companies/${company.id}`} className="block truncate text-[14px] font-extrabold text-[#003c3a] hover:underline">
+            {company.name}
+          </Link>
           <p className="truncate text-[11.5px] font-semibold text-[#93aaa3]">
             {[company.name_latin, company.phone, company.website].filter(Boolean).join(" · ") || "—"}
           </p>
@@ -425,7 +430,13 @@ function CompanyRow({ company, onEdit }: { company: PartnerCompany; onEdit: () =
             {company.resells ? (
               <span className="rounded-full bg-[#e9f7f0] px-2.5 py-1 text-[#0f7a52]">{t("partner.resells")}</span>
             ) : null}
-            {!company.active ? <span className="rounded-full bg-[#fdeef2] px-2.5 py-1 text-[#c22850]">{t("partner.deactivated")}</span> : null}
+            {company.status === "suspended" ? (
+              <span className="rounded-full bg-[#fdeef2] px-2.5 py-1 text-[#c22850]">{t("partner.suspended")}</span>
+            ) : company.status === "rejected" ? (
+              <span className="rounded-full bg-[#f1f3f2] px-2.5 py-1 text-[#557d78]">{t("partner.rejected")}</span>
+            ) : !company.active ? (
+              <span className="rounded-full bg-[#fdeef2] px-2.5 py-1 text-[#c22850]">{t("partner.deactivated")}</span>
+            ) : null}
           </div>
         </div>
 

@@ -7,6 +7,7 @@ import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser 
 import { logAudit } from "@/lib/data/audit";
 import { TRAVELIUN_BRAND, partnerBrand, publicBrandLogoUrl, type DocBrand } from "@/components/offer-doc/brand";
 import { currentCan } from "@/lib/roles/current";
+import { isStaffSession } from "@/lib/partners/session";
 
 /**
  * «الشركات المتعاونة» — the companies we work with, and how their documents look.
@@ -64,6 +65,8 @@ export type PartnerCompany = {
   approved_at: string | null;
   registration_note: string | null;
   contact_email: string | null;
+  /** a login was issued — «إصدار حساب» then, «إعادة إرسال» after. */
+  has_account: boolean;
 };
 
 const COLUMNS =
@@ -90,11 +93,13 @@ export async function listPartnerCompanies(onlyResellers = false): Promise<Partn
     const supabase = await db();
     let query = supabase.from("booking_partners").select(COLUMNS).order("name", { ascending: true });
     if (onlyResellers) query = query.eq("resells", true).eq("active", true);
-    const { data } = await query;
+    const [{ data }, { data: users }] = await Promise.all([query, supabase.from("partner_users").select("partner_id")]);
+    const withAccount = new Set(((users ?? []) as { partner_id: string }[]).map((u) => u.partner_id));
     const url = baseUrl();
-    return ((data ?? []) as Omit<PartnerCompany, "logo_url">[]).map((row) => ({
+    return ((data ?? []) as Omit<PartnerCompany, "logo_url" | "has_account">[]).map((row) => ({
       ...row,
       logo_url: publicLogoUrl(url, row.logo_path),
+      has_account: withAccount.has(row.id),
     }));
   } catch {
     return [];
@@ -297,7 +302,7 @@ export async function resolveDocBrand(input: {
     if (!id) return { ...fallback, showPrices: input.showPrices ?? storedPrices };
 
     const { data } = await supabase.from("booking_partners").select(COLUMNS).eq("id", id).maybeSingle();
-    const row = data as Omit<PartnerCompany, "logo_url"> | null;
+    const row = data as Omit<PartnerCompany, "logo_url" | "has_account"> | null;
     if (!row) return fallback;
 
     return {
@@ -309,5 +314,135 @@ export async function resolveDocBrand(input: {
     };
   } catch {
     return fallback;
+  }
+}
+
+/**
+ * Suspend a company, or let it back in. «موقوف» shuts the portal and every read
+ * at once — current_partner_id() and getPartnerSession() admit «approved» only —
+ * while its files, offers and history stay. The reason goes to the audit log.
+ */
+export async function setPartnerSuspended(id: string, suspended: boolean, reason: string): Promise<{ ok: true } | Fail> {
+  const denied = await requireWrite();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const supabase = await db();
+    const { data, error } = await supabase
+      .from("booking_partners")
+      .update({ status: suspended ? "suspended" : "approved" })
+      .eq("id", id)
+      // only an approved company is suspended, only a suspended one comes back — never a pending or rejected one
+      .eq("status", suspended ? "approved" : "suspended")
+      .select("id");
+    if (error || !data || data.length === 0) return { ok: false, error: "err.updateFailed" };
+    await logAudit({
+      action: "partner.updated",
+      entity: "booking_partners",
+      entity_id: id,
+      meta: { suspended, reason: reason.trim() || null },
+    });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+export type PartnerCompanyDetail = {
+  company: PartnerCompany;
+  users: { email: string; name: string | null; status: string; created_at: string }[];
+  /** files started (with something in them or not — this is our view). */
+  files: number;
+  offers: {
+    serial: string;
+    destination: string | null;
+    total: number | null;
+    currency: string | null;
+    status: string | null;
+    created_at: string;
+    client_status: string | null;
+    execution_status: string | null;
+  }[];
+  /** confirmed offers' value, per currency — never added across currencies. */
+  sales: { currency: string; total: number }[];
+  /** recorded payments minus refunds on its confirmed cases, per currency. */
+  paid: { currency: string; net: number }[];
+  activity: { action: string; actor_email: string | null; created_at: string; meta: Record<string, unknown> }[];
+};
+
+/** One company, for us: its people, files, offers, confirmations, money and history. Staff only (RLS is_staff). */
+export async function getPartnerCompanyDetail(id: string): Promise<PartnerCompanyDetail | null> {
+  try {
+    // ours only: a partner session reads its own company row, and this page is not for it
+    if (!(await isStaffSession())) return null;
+    const supabase = await db();
+    const companies = await listPartnerCompanies();
+    const company = companies.find((c) => c.id === id);
+    if (!company) return null;
+
+    const [usersRes, offersRes, auditRes] = await Promise.all([
+      supabase.from("partner_users").select("email, name, status, created_at").eq("partner_id", id).order("created_at"),
+      supabase
+        .from("offers")
+        .select("id, serial, destination, total, currency, status, created_at")
+        .eq("partner_company_id", id)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("audit_logs")
+        .select("action, actor_email, created_at, meta")
+        .eq("entity", "booking_partners")
+        .eq("entity_id", id)
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ]);
+    // drafts are closed to sessions (0047) — a count only, through the service role, behind the staff read above
+    const { count: files } = await (createSupabaseServiceClient() as unknown as SupabaseClient)
+      .from("offer_drafts")
+      .select("id", { count: "exact", head: true })
+      .eq("partner_company_id", id);
+
+    type OfferRow = { id: string; serial: string; destination: string | null; total: number | null; currency: string | null; status: string | null; created_at: string };
+    const offerRows = (offersRes.data ?? []) as OfferRow[];
+    const opsRes = offerRows.length
+      ? await supabase.from("operations").select("id, offer_id, client_status, execution_status").in("offer_id", offerRows.map((o) => o.id))
+      : { data: [] };
+    const ops = (opsRes.data ?? []) as { id: string; offer_id: string; client_status: string; execution_status: string }[];
+    const opByOffer = new Map(ops.map((o) => [o.offer_id, o]));
+    const payRes = ops.length
+      ? await supabase.from("operation_payments").select("amount, currency, kind").in("operation_id", ops.map((o) => o.id))
+      : { data: [] };
+
+    const sales = new Map<string, number>();
+    for (const o of offerRows) {
+      if (!opByOffer.has(o.id) || o.total == null) continue;
+      const cur = o.currency || "SAR";
+      sales.set(cur, (sales.get(cur) ?? 0) + Number(o.total));
+    }
+    const paid = new Map<string, number>();
+    for (const p of (payRes.data ?? []) as { amount: number | string; currency: string | null; kind: string }[]) {
+      const cur = p.currency || "SAR";
+      paid.set(cur, (paid.get(cur) ?? 0) + (p.kind === "refund" ? -1 : 1) * (Number(p.amount) || 0));
+    }
+
+    return {
+      company,
+      users: (usersRes.data ?? []) as PartnerCompanyDetail["users"],
+      files: files ?? 0,
+      offers: offerRows.map((o) => ({
+        serial: o.serial,
+        destination: o.destination,
+        total: o.total != null ? Number(o.total) : null,
+        currency: o.currency,
+        status: o.status,
+        created_at: o.created_at,
+        client_status: opByOffer.get(o.id)?.client_status ?? null,
+        execution_status: opByOffer.get(o.id)?.execution_status ?? null,
+      })),
+      sales: [...sales.entries()].map(([currency, total]) => ({ currency, total })),
+      paid: [...paid.entries()].map(([currency, net]) => ({ currency, net })),
+      activity: (auditRes.data ?? []) as PartnerCompanyDetail["activity"],
+    };
+  } catch {
+    return null;
   }
 }
