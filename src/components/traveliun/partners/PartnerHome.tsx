@@ -316,6 +316,19 @@ function AwaitingRow({ item }: { item: PartnerAwaiting }) {
           ) : null}
         </span>
         <span className="ms-auto flex flex-wrap items-center gap-1.5">
+          {/* the client link prints the partner's brand — WhatsApp opens with it typed, the partner picks the contact */}
+          <button
+            type="button"
+            onClick={() => {
+              // built at the click: the server render has no origin to put in the link
+              const link = `${window.location.origin}/client-offer/${item.serial}`;
+              const text = `عرض رحلتكم${item.destination ? ` إلى ${item.destination}` : ""}: ${link}`;
+              window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+            }}
+            className="inline-flex h-8 items-center rounded-[8px] border border-[#cfe9db] px-3 text-[12px] font-bold text-[#0f7a52] hover:bg-[#f2fbf6]"
+          >
+            واتساب
+          </button>
           {asking ? (
             <>
               <span className="text-[11.5px] font-bold text-[#557d78]">تأكيد العميل لهذا العرض؟</span>

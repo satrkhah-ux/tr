@@ -1468,6 +1468,11 @@ export function BasicEditor({
                       onChange={(e) => patch({ pricing: { ...data.pricing, final_total: typedNumber(e.target) } })}
                       className={`${basicField} tv-tnum w-36 text-center`}
                     />
+                    {data.pricing.final_total != null && data.pricing.final_total < summary.total_sell ? (
+                      <span role="alert" className="basis-full text-[11.5px] font-bold text-[#c22850]">
+                        سعرك أقل من تكلفتك علينا بـ {(summary.total_sell - data.pricing.final_total).toLocaleString("en-US")} {display} — تأكد قبل الإصدار.
+                      </span>
+                    ) : null}
                   </label>
                 ) : null}
               </div>
