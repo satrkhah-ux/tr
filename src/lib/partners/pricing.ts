@@ -15,7 +15,7 @@
 
 import { withPackageProfit } from "@/lib/offer/basic";
 import { applyManualProfit } from "@/lib/offer/pricing";
-import type { PriceSource } from "@/lib/offer/pricing-suggest";
+import { syncSuggestions, type PriceSource, type SuggestedItem } from "@/lib/offer/pricing-suggest";
 import type { DraftData, DraftHotel, DraftPricingItem, PackageProfit } from "@/lib/offer/draft-types";
 
 export type PriceAdjustKind = "markup" | "commission";
@@ -99,6 +99,37 @@ export function partnerSheet<T extends DraftPricingItem & { source?: PriceSource
 }
 
 /**
+ * A partner's own file, as issued — the sheet offers.partner_cost totals (0058).
+ *
+ * Their browser saves the sheet and can lower, drop, re-currency or negate any
+ * line on it. So every line WE price (a supplier rate, our lists, a remembered
+ * room) comes from `fresh`, the server's suggestion at their terms; only a line
+ * we hold no price for (a figure they typed on a card, a visa, a line they
+ * added) keeps the figure on their sheet, as they priced it — never negative,
+ * never under one unit. One of theirs missing from the sheet comes back
+ * unpriced, and the producer refuses it.
+ */
+export function issuedPartnerSheet(saved: DraftPricingItem[], fresh: SuggestedItem[]): DraftPricingItem[] {
+  const key = (i: DraftPricingItem) => (i.ref ? `ref:${i.ref}` : `${i.item_type}:${i.description.trim()}`);
+  const mine = (s: SuggestedItem) => s.source === "typed" || s.source === "none";
+  // a stay id is free text from their browser: a key one of OUR lines holds stays ours
+  const ours = new Set(fresh.filter((s) => !mine(s)).map(key));
+  const theirs = new Set(fresh.filter((s) => mine(s) && !ours.has(key(s))).map(key));
+  const price = (n: unknown) => (typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : null);
+  return syncSuggestions(
+    saved.map((i) => ({
+      ...i,
+      overridden: theirs.has(key(i)),
+      buy_price: null,
+      buy_currency: "",
+      sell_price: price(i.sell_price),
+      quantity: Math.max(1, Number(i.quantity) || 1),
+    })),
+    fresh.map((s) => ({ ...s, sell_price: theirs.has(key(s)) ? null : price(s.sell_price) })),
+  );
+}
+
+/**
  * A supplier-priced stay as a partner sees it. The draft keeps OUR sell on the
  * sourcing (the server's record of the rate); the stay card shows theirs.
  */
@@ -115,8 +146,8 @@ export function partnerStays(hotels: DraftHotel[], terms: PartnerTerms): DraftHo
 export function keepOurStays(hotels: DraftHotel[], stored: DraftHotel[]): DraftHotel[] {
   return hotels.map((h) => {
     if (!h.sourcing) return h;
-    const was = stored.find((s) => s.id === h.id)?.sourcing;
-    return { ...h, sourcing: was ? { ...h.sourcing, sell_base: was.sell_base } : null };
+    // the server wrote the rate (selectHotelRate): none of it comes from their browser
+    return { ...h, sourcing: stored.find((s) => s.id === h.id)?.sourcing ?? null };
   });
 }
 

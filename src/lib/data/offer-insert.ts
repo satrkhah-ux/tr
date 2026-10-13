@@ -83,6 +83,7 @@ export async function insertOffer(input: CreateOfferInput, asPartner?: string): 
         source_import_id: input.source_import_id ?? null,
         partner_company_id: asPartner ?? input.partner_company_id ?? null,
         show_prices: input.show_prices ?? true,
+        partner_cost: input.partner_cost ?? null,
       })
       .select("id")
       .single();

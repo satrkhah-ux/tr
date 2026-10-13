@@ -7,7 +7,7 @@ import { currentCan } from "@/lib/roles/current";
 import { airlineLogoUrl, publicBrandLogoUrl } from "@/components/offer-doc/brand";
 import { BOARD_AR } from "@/components/offer-doc/labels";
 import { getPartnerSession, isStaffSession } from "@/lib/partners/session";
-import { keepOurStays, keepTheirPrices, partnerStays, priceForViewer } from "@/lib/partners/pricing";
+import { issuedPartnerSheet, keepOurStays, keepTheirPrices, partnerPrice, partnerStays, priceForViewer } from "@/lib/partners/pricing";
 import { partnerCaller, viewerTerms } from "@/lib/partners/price-view";
 import {
   baggageLabel,
@@ -35,10 +35,11 @@ import {
 } from "@/lib/offer/draft-types";
 import { getEnabledHotelSuppliers } from "@/lib/providers/hotel-registry";
 import { draftSellTotal } from "@/lib/offer/preview-dto";
-import { applyManualProfit, offerTotals, rebase } from "@/lib/offer/pricing";
+import { applyManualProfit, offerTotals, rebase, type PricingLineInput } from "@/lib/offer/pricing";
 import { getProfitSettings } from "./app-settings";
 import { packageProfitFor, withPackageProfit, withScopeLines } from "@/lib/offer/basic";
 import { getRates } from "./rates-actions";
+import { suggestPricingFor } from "./pricing-suggest-core";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
 import { itineraryStartDate } from "@/lib/offer/schedule";
@@ -813,8 +814,52 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // margin for a file that states none) laid onto the lines here, from the
     // saved cost — an agent without the internal view sets it without seeing it.
     const quote = data.pricing.display_currency || "SAR";
+    // A partner's own file goes out on the sheet as the SERVER prices it — our
+    // lines at their terms, their own figures as they typed them — never on the
+    // sheet their browser saved, which can lower, drop or re-currency any line.
+    // Its total is what they owe us (partner_cost, below).
+    let sheet = data.pricing.items;
+    // A file started from one of our ready packages owes at least that package
+    // at their terms. Its price is read here by id — never the final_total their
+    // browser can edit — and only ever raises what the sheet says, so pointing
+    // `source` at a cheaper package buys nothing.
+    let packageLine: PricingLineInput | null = null;
+    if (record.partner_company_id) {
+      // what they owe is rounded to 2 decimals per line in the quote currency:
+      // a quote in BTC or gold (the feed has both) would round it to nothing
+      const perQuote = rates.sarPer[quote] ?? 0;
+      if (!(perQuote > 0 && perQuote <= 100)) return { ok: false, error: "pg.err.missingRates" };
+      const fresh = await suggestPricingFor(record, { hotel: "الفندق", airline: "شركة الطيران" });
+      if (!fresh.ok) throw new Error(fresh.error);
+      // one of OUR lines with no price (no margin to lay on) is never theirs to skip
+      if (fresh.items.some((s) => s.source !== "typed" && s.source !== "none" && s.sell_price == null)) {
+        return { ok: false, error: "pg.err.priceMissing" };
+      }
+      sheet = issuedPartnerSheet(sheet, fresh.items);
+      const readyId = data.source?.ready_offer_id;
+      if (readyId) {
+        const { data: ro } = await (createSupabaseServiceClient() as unknown as SupabaseClient)
+          .from("ready_offers")
+          .select("price, currency")
+          .eq("id", readyId)
+          .maybeSingle();
+        const row = ro as { price: number | string | null; currency: string | null } | null;
+        // the package lost its price since (back to «قريباً»): nothing the partner can type fixes that
+        if (!row || row.price == null) return { ok: false, error: "ro.err.notFound" };
+        if (!terms) return { ok: false, error: "pg.err.priceMissing" };
+        packageLine = {
+          quantity: 1,
+          buy_price: null,
+          buy_currency: null,
+          sell_price: partnerPrice(Number(row.price), terms),
+          sell_currency: row.currency || "SAR",
+        };
+      } else if (sheet.some((i) => i.sell_price == null)) {
+        return { ok: false, error: "pg.err.priceMissing" };
+      }
+    }
     const reconciledItems = withPackageProfit(
-      data.pricing.items.filter((it) => it.item_type !== "hotel" || validHotelRefs.has(it.ref ?? it.description ?? "")),
+      sheet.filter((it) => it.item_type !== "hotel" || validHotelRefs.has(it.ref ?? it.description ?? "")),
       packageProfitFor(data.pricing, (await getProfitSettings()).default_pct),
       rebase(rates.sarPer, quote) ?? {},
       quote,
@@ -841,18 +886,14 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // Into the quote currency line by line — never a raw sum of mixed
     // currencies (see offerTotals). A currency with no rate blocks issuing:
     // a total that silently skipped a line is worse than no total.
-    const totals = offerTotals(
-      reconciledItems.map((item) => ({
-        quantity: item.quantity,
-        buy_price: item.buy_price,
-        buy_currency: item.buy_currency,
-        sell_price: effectiveSell(item),
-        sell_currency: item.sell_currency,
-      })),
-      rates.sarPer,
-      data.pricing.display_currency,
-      data.pricing.final_total,
-    );
+    const lines = reconciledItems.map((item) => ({
+      quantity: item.quantity,
+      buy_price: item.buy_price,
+      buy_currency: item.buy_currency,
+      sell_price: effectiveSell(item),
+      sell_currency: item.sell_currency,
+    }));
+    const totals = offerTotals(lines, rates.sarPer, data.pricing.display_currency, data.pricing.final_total);
     if (totals.missing_rates.length > 0) return { ok: false, error: "pg.err.missingRates" };
     const sellTotal = totals.total;
     const buyTotal = totals.buy_total;
@@ -889,12 +930,28 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     const issuer = await partnerCaller();
     if (issuer && record.partner_company_id !== issuer.partner_id) return { ok: false, error: "err.forbidden" };
 
+    // What the partner owes us for this file (0058), in its quote currency, fixed
+    // now — confirming it raises that invoice (ledger-server.ts). Their own file:
+    // its sheet as issued, never the final_total they quote their client. A file
+    // we issue FOR them: our sell total at their terms (throws if unreadable).
+    const pkg = packageLine ? offerTotals([packageLine], rates.sarPer, data.pricing.display_currency, null) : null;
+    if (pkg && pkg.missing_rates.length > 0) return { ok: false, error: "pg.err.missingRates" };
+    const sheetOwed = offerTotals(lines, rates.sarPer, data.pricing.display_currency, null).total;
+    const partnerCost = record.partner_company_id
+      ? pkg
+        ? Math.max(sheetOwed ?? 0, pkg.total ?? 0)
+        : sheetOwed
+      : partnerCompanyId && sellTotal != null
+        ? partnerPrice(sellTotal, await viewerTerms(partnerCompanyId))
+        : null;
+
     const result = await insertOffer({
       customer_id: await customerFor(data.customer, await isStaffSession()),
       employee_id: null,
       // From here the preview, the PDF and the client link all resolve their
       // branding from this one column.
       partner_company_id: partnerCompanyId,
+      partner_cost: partnerCost,
       // A reseller's file starts WITHOUT our price on it — they set their own.
       // Not a company setting: an initial value, flipped per file from the
       // export screen.
