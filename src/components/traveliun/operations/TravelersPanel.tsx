@@ -22,6 +22,8 @@ import type { MrzCheckedField, MrzPassport } from "@/lib/operations/mrz";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition, useSessionField } from "../useSafeTransition";
+import { acceptClientPassport, type PendingClientPassport } from "@/lib/data/client-passports";
+import { ClientPassportReview, useClientPassports } from "./ClientPassportReview";
 
 const card = "rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
@@ -67,6 +69,7 @@ export function TravelersPanel({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useSafeTransition();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+  const clientPassports = useClientPassports(operationId, travelers);
 
   // «بالغ 2» for a row nobody has named yet — shown, never stored (it would print on a voucher)
   const seen: Partial<Record<TravelerKind, number>> = {};
@@ -156,7 +159,7 @@ export function TravelersPanel({
       ) : (
         <ul className="space-y-2">
           {travelers.map((tr, i) => (
-            <TravelerRow key={tr.id} traveler={tr} placeholder={placeholders[i]} trip={trip} today={today} canReadMrz={canReadMrz} />
+            <TravelerRow key={tr.id} traveler={tr} placeholder={placeholders[i]} trip={trip} today={today} canReadMrz={canReadMrz} clientPassport={clientPassports[tr.id]} />
           ))}
         </ul>
       )}
@@ -172,6 +175,8 @@ type Form = {
   full_name: string;
   number: string;
   expiry: string;
+  /** a client upload under review — Save then accepts it */
+  cpass?: string;
 };
 
 function TravelerRow({
@@ -180,12 +185,14 @@ function TravelerRow({
   trip,
   today,
   canReadMrz,
+  clientPassport,
 }: {
   traveler: TravelerListItem;
   placeholder: string;
   trip: Trip;
   today: string;
   canReadMrz: boolean;
+  clientPassport?: PendingClientPassport;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -229,22 +236,18 @@ function TravelerRow({
   function save() {
     if (!form) return;
     const number = form.number.trim();
+    const input = {
+      // an unnamed companion takes the passport name — written once
+      display_name: form.display_name.trim() || form.full_name.trim(),
+      traveler_kind: form.traveler_kind,
+      birth_date: form.birth_date || null,
+      nationality: form.nationality.trim() || null,
+      passport_expiry: form.expiry || null,
+      // the blob is replaced only when a number is given; fixing a birth date leaves it as it is
+      ...(number ? { passport: { full_name: form.full_name.trim(), number, nationality: form.nationality.trim() } } : {}),
+    };
     call(
-      () =>
-        upsertTraveler({
-          id: traveler.id,
-          operation_id: "",
-          // an unnamed companion takes the passport name — written once
-          display_name: form.display_name.trim() || form.full_name.trim(),
-          traveler_kind: form.traveler_kind,
-          birth_date: form.birth_date || null,
-          nationality: form.nationality.trim() || null,
-          passport_expiry: form.expiry || null,
-          // the blob is replaced only when a number is given; fixing a birth date leaves it as it is
-          ...(number
-            ? { passport: { full_name: form.full_name.trim(), number, nationality: form.nationality.trim() } }
-            : {}),
-        }),
+      () => (form.cpass ? acceptClientPassport(form.cpass, input) : upsertTraveler({ ...input, id: traveler.id, operation_id: "" })),
       () => {
         setForm(null);
         setMrz(null);
@@ -388,6 +391,17 @@ function TravelerRow({
           </button>
         </div>
       </div>
+
+      {clientPassport ? (
+        <ClientPassportReview
+          submission={clientPassport}
+          displayName={traveler.display_name}
+          onReview={(prefill, read) => {
+            setMrz(read);
+            openEdit(prefill);
+          }}
+        />
+      ) : null}
 
       {/* what this traveler still lacks for travel — the per-person half of «جاهز للسفر» */}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
