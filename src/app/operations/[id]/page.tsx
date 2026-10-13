@@ -12,6 +12,8 @@ import { CaseManagement } from "@/components/traveliun/operations/CaseManagement
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
 import { getSupplierWork } from "@/lib/data/supplier-work";
+import { getCaseProfit } from "@/lib/data/operation-money";
+import { CaseProfitCard } from "@/components/traveliun/operations/CaseProfitCard";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +25,8 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
 
   // started first, awaited last — it does not hold up the rest
   const supplierWorkP = getSupplierWork(id);
+  // null without pricing.internal — the card is then not drawn at all
+  const profitP = getCaseProfit(id);
   const [travelers, payments, installments, bookings, documents, assignees, sentRequests, canBook, extras, activity] = await Promise.all([
     // a new case starts with the travelers the offer was sold for
     listOrSeedTravelers(id),
@@ -81,6 +85,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
         />
       }
       supplierWork={await supplierWorkP}
+      money={await profitP.then((p) => (p ? <CaseProfitCard profit={p} /> : null))}
     />
   );
 }

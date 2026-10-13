@@ -10,6 +10,7 @@ import { severityRank, type OperationSignal } from "@/lib/operations/signals";
 import { matchesFilters, matchesQuery, NO_FILTERS, type ListFilters } from "@/lib/operations/case-list";
 import type { StaffOption } from "@/lib/data/operation-case";
 import { ArrivalsCalendar, OperationsFilters } from "./OperationsListControls";
+import { MoneyLinks } from "./MoneyReports";
 import type { TranslationKey } from "@/lib/i18n";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
@@ -35,6 +36,7 @@ export function OperationsBoard({
   today,
   owners,
   staff,
+  canSeeMoney,
 }: {
   /**
    * ONLY confirmed cases. The board deliberately does not list unconfirmed
@@ -47,6 +49,8 @@ export function OperationsBoard({
   /** operation id → its owner's employee id (0064). */
   owners?: Record<string, string>;
   staff?: StaffOption[];
+  /** pricing.internal: links to the money pages (order 11). Courtesy — each page checks again. */
+  canSeeMoney?: boolean;
 }) {
   const { t } = useTraveliunUI();
   const [query, setQuery] = useState("");
@@ -100,6 +104,7 @@ export function OperationsBoard({
         <section className="rounded-2xl border border-[#e2ebe7] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
           <h1 className="text-lg font-extrabold text-[#003c3a]">{t("ops.title")}</h1>
           <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("ops.subtitle")}</p>
+          {canSeeMoney ? <MoneyLinks /> : null}
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {FILTERS.map((f) => (
