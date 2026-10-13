@@ -17,6 +17,7 @@ import {
   type GuardRecord,
   type IssueKey,
 } from "./quality";
+import { getPartnerSession } from "@/lib/partners/session";
 
 async function db(): Promise<SupabaseClient> {
   return (await createSupabaseServerClient()) as unknown as SupabaseClient;
@@ -101,7 +102,10 @@ export async function checkHotelIssueGuard(
       .from("hotels")
       .select("id, arabic_name, city_id, address, contact_number")
       .in("id", ids);
-    const issues = guardHotels(lines, (data ?? []) as GuardRecord[]);
+    const found = guardHotels(lines, (data ?? []) as GuardRecord[]);
+    // a partner cannot fix our catalogue — it is warned, never stopped from selling;
+    // the data team hears about the record through the weekly quality summary
+    const issues = (await getPartnerSession()) ? found.map((i) => ({ ...i, blocking: false })) : found;
     return { issues, canFix: issues.length > 0 && (await currentCan("data.write")) };
   } catch {
     return none;

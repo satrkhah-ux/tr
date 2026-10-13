@@ -1,4 +1,7 @@
-"use server";
+// NOT "use server": as a server-actions module every export was callable from any
+// signed-in browser — a partner could write a forged audit row, or read the log
+// (who changed what, before and after). Server code imports it; nothing else can.
+import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
