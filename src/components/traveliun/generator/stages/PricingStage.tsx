@@ -63,7 +63,8 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
   const { t } = useTraveliunUI();
   const { can } = useRole();
   // a partner sees prices, always at their own terms (the server quotes them so)
-  const canView = can("pricing.view") || usePartnerBrand() !== null;
+  const partner = usePartnerBrand() !== null;
+  const canView = can("pricing.view") || partner;
   const canInternal = can("pricing.internal");
 
   const pricing = data.pricing;
@@ -201,7 +202,7 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
     <div className="space-y-4">
       <section className={sectionClass}>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-extrabold text-[#003c3a]">{t("pg.pricingTitle")}</h2>
+          <h2 className="text-base font-extrabold text-[#003c3a]">{t(partner ? "pg.stage.pricing" : "pg.pricingTitle")}</h2>
       <FieldIssue field="pricing" className="mb-3" />
           <div className="flex gap-2">
             <button type="button" onClick={() => void syncFromLists()} disabled={syncing} className={addButtonClass}>

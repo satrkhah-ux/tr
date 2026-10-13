@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BedDouble, Building2, Loader2, MapPin, Search, Tag, UserRound, Users } from "lucide-react";
 import { DirText } from "@/components/DirText";
+import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { searchCustomersFromTeletel, type TeletelCustomerHit } from "@/lib/data/teletel-actions";
 import {
   AGE_BANDS,
@@ -30,6 +31,7 @@ import { fieldClass, labelClass, sectionClass, type StageFormProps } from "../st
  * that fill the trip destination. Manual fields stay as the fallback.
  */
 export function CustomerStage({ data, patch, lookups }: StageFormProps) {
+  const partner = usePartnerBrand();
   const nameRing = useFieldRing("customer.customer_name");
   const phoneRing = useFieldRing("customer.customer_phone");
   const { t } = useTraveliunUI();
@@ -93,7 +95,8 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
     <section className={sectionClass}>
       <h2 className="mb-4 text-base font-extrabold text-[#003c3a]">{t("pg.customerTitle")}</h2>
 
-      {/* Teletel lookup */}
+      {/* Teletel lookup — our customers, so never on a partner's screen */}
+      {partner ? null : (
       <div className="relative mb-4">
         <span className="mb-1.5 block text-[12px] font-bold text-[#557d78]">{t("tl.search")}</span>
         <div className="relative">
@@ -158,6 +161,7 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
           </div>
         ) : null}
       </div>
+      )}
 
       {/* destination suggestions pulled from the picked contact */}
       {destinations.length > 0 ? (
@@ -179,7 +183,7 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
       {/* The company comes FIRST: choosing one says this file is not being sold
           to a walk-in client at all, which changes what the rest of the stage
           needs. */}
-      <CompanyPicker data={data} patch={patch} lookups={lookups} />
+      {partner ? null : <CompanyPicker data={data} patch={patch} lookups={lookups} />}
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className={labelClass}>
