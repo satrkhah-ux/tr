@@ -85,7 +85,7 @@ export function TravelersPanel({
   }
 
   return (
-    <section className={card}>
+    <section id="travelers" className={`${card} scroll-mt-24`}>
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-extrabold text-[#185045]">{t("ops.travelers")}</h2>
         <button

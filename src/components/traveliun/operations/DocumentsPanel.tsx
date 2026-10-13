@@ -135,7 +135,7 @@ export function DocumentsPanel({
   return (
     <div className="space-y-4">
       {/* ---- bookings ---- */}
-      <section className={card}>
+      <section id="bookings" className={`${card} scroll-mt-24`}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-extrabold text-[#185045]">{t("ops.bookings")}</h2>
           <div className="flex flex-wrap gap-2">

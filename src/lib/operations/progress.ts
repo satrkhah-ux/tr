@@ -99,7 +99,7 @@ export function readiness(input: {
   return [
     { key: "bookings", ok: liveBookings.length > 0 && open === 0, detail: liveBookings.length === 0 ? "لا حجوزات بعد" : open ? `${open} حجز غير مؤكد` : "كل الحجوزات مؤكدة", anchor: "bookings" },
     { key: "payment", ok: owed === 0, detail: owed == null ? "الإجمالي غير معروف" : owed ? `متبقٍ ${owed.toLocaleString("en-US")}` : "مسدّد بالكامل", anchor: "payments" },
-    { key: "documents", ok: docsReached, detail: docsReached ? "مستندات العميل صادرة" : "مستندات العميل لم تصدر كلها", anchor: "documents" },
+    { key: "documents", ok: docsReached, detail: docsReached ? "مستندات العميل صادرة" : "مستندات العميل لم تصدر كلها", anchor: "bookings" },
     {
       key: "passports",
       ok: input.travelers.length > 0 && expiring.length === 0,

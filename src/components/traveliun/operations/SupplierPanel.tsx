@@ -83,7 +83,7 @@ export function SupplierPanel({
   const unassigned = live.filter((b) => !byId.get(b.id)?.supplier_id);
 
   return (
-    <section className={card}>
+    <section id="suppliers" className={`${card} scroll-mt-24`}>
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-extrabold text-[#185045]">
           <Store className="size-4" />

@@ -31,6 +31,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 import { ReadinessPanel } from "./ReadinessPanel";
 import { CasePresence } from "./CasePresence";
+import { CaseWizard } from "./CaseWizard";
 import { IssuesPanel } from "./IssuesPanel";
 
 const CLIENT_KEY = (s: string) => `ops.client.${s}` as TranslationKey;
@@ -152,6 +153,15 @@ export function OperationCase({
           </div>
         </section>
 
+        <CaseWizard
+          operationId={operation.id}
+          bookings={bookings}
+          travelers={travelers.length}
+          documents={documents}
+          clientToken={clientToken}
+          supplierWork={supplierWork}
+          hasDays={hasDays}
+        />
         <CasePresence operationId={operation.id} />
         <ReadinessPanel operationId={operation.id} execution={operation.execution_status} />
 
