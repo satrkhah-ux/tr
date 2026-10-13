@@ -6,6 +6,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
+import { syncOperationOfBooking } from "@/lib/data/operation-sync";
 import { listTravelers } from "@/lib/data/operation-travelers";
 import { currentCan } from "@/lib/roles/current";
 import { getSupplierAdapterLogged } from "@/lib/providers/hotel-registry";
@@ -371,6 +372,8 @@ export async function bookHotel(input: {
     entity_id: row.id,
     meta: { outcome: "confirmed", confirmation_number: out.data.confirmation_number, total: input.approved_total },
   });
+  // booked by the supplier's own system — the case moves as if an agent had confirmed it
+  await syncOperationOfBooking(row.id);
   return { ok: true, confirmation_number: out.data.confirmation_number, total: input.approved_total, currency: row.currency };
 }
 

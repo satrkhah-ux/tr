@@ -39,6 +39,8 @@ import { DocumentsPanel } from "./DocumentsPanel";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition, useSessionField } from "../useSafeTransition";
+import { ReadinessPanel } from "./ReadinessPanel";
+import { IssuesPanel } from "./IssuesPanel";
 
 const CLIENT_KEY = (s: string) => `ops.client.${s}` as TranslationKey;
 const EXEC_KEY = (s: string) => `ops.exec.${s}` as TranslationKey;
@@ -147,6 +149,8 @@ export function OperationCase({
           </div>
         </section>
 
+        <ReadinessPanel operationId={operation.id} execution={operation.execution_status} />
+
         <DocumentsPanel
           operationId={operation.id}
           bookings={bookings}
@@ -168,6 +172,8 @@ export function OperationCase({
             currency={operation.currency ?? "SAR"}
           />
         </div>
+
+        <IssuesPanel operationId={operation.id} />
       </div>
     </TraveliunShell>
   );

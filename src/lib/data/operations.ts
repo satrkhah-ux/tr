@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/data/audit";
 import { notifyOperationConfirmed, notifyPartnerCase } from "@/lib/data/ops-notify";
 import { getPartnerSession } from "@/lib/partners/session";
 import { creditRefusal, raisePartnerInvoice } from "@/lib/partners/ledger-server";
+import { readinessFor, syncOperation } from "@/lib/data/operation-sync";
 import { setOfferStatus } from "@/lib/data/offer-status";
 import {
   canAdvanceClient,
@@ -291,6 +292,11 @@ export async function setExecutionStatus(
     const current = await loadStatuses(supabase, operationId);
     if (!current) return { ok: false, error: "err.loadFailed" };
     if (!canAdvanceExecution(current.execution_status, to)) return { ok: false, error: "ops.err.invalidTransition" };
+    // «جاهز للسفر» is a promise to the client — only on a green checklist (operations order 6)
+    if (to === "ready_to_travel") {
+      const items = await readinessFor(operationId);
+      if (!items || items.some((i) => !i.ok)) return { ok: false, error: "ops.err.notReady" };
+    }
 
     await supabase
       .from("operations")
@@ -361,6 +367,8 @@ export async function recordPayment(input: {
       entity_id: input.operation_id,
       meta: { amount: input.amount, currency: input.currency ?? "SAR", kind: input.kind ?? "deposit" },
     });
+    // the money moves the client track (paid_partial / paid_full)
+    await syncOperation(input.operation_id);
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
