@@ -185,6 +185,8 @@ export const navGroups: NavGroup[] = [
     href: "/hotels",
     icon: Database,
     children: [
+      // what the tables below still lack, counted by the database (data order 3)
+      { labelKey: "data.quality.title", href: "/data-quality", perm: "data.write" },
       { labelKey: "nav.hotels", href: "/hotels", captionKey: "nav.hotels" },
       { labelKey: "nav.roomTypes", href: "/rooms-types" },
       { labelKey: "nav.countries", href: "/countries", captionKey: "nav.countries" },

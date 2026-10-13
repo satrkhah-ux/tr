@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { closestName, normEn } from "@/lib/catalog/norm";
+import { logAudit } from "./audit";
 
 /**
  * Add a hotel or a room type WITHOUT leaving the package.
@@ -120,6 +121,8 @@ export async function createHotelForCity(input: {
       .single();
 
     if (hotelError || !created) return { ok: false, error: "err.db" };
+    // the hotel's change log starts here, as it does for one added on /hotels
+    await logAudit({ action: "data.created", entity: "hotels", entity_id: (created as CreatedHotelRow).id, meta: { from: "generator" } });
     return { ok: true, hotel: toHotel(created as CreatedHotelRow), cityCreated };
   } catch {
     return { ok: false, error: "err.db" };

@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -27,6 +29,7 @@ import {
   listRows,
   updateRow,
 } from "@/lib/data/actions";
+import { qualityIssue } from "@/lib/data/quality";
 import type {
   ColumnDef,
   DataRow,
@@ -35,6 +38,7 @@ import type {
   FilterOptions,
   TableConfig,
 } from "@/lib/data/types";
+import { DataRecordExtras } from "./DataRecordExtras";
 import { TraveliunShell } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
@@ -69,6 +73,15 @@ export function TraveliunTable({
   const [editing, setEditing] = useState<DataRow | null>(null);
   const [viewing, setViewing] = useState<DataRow | null>(null);
 
+  // A data-quality card (/hotels?issue=…) lists the rows that have the issue; a
+  // fix link (/hotels?id=…) opens one record's details straight away.
+  const params = useSearchParams();
+  const issueParam = qualityIssue(params.get("issue"));
+  const issue = issueParam && issueParam.table === config.table ? issueParam : null;
+  const onlyId = params.get("id") ?? "";
+  /** the ?id= whose details already opened once — closing them must not reopen them */
+  const autoOpened = useRef("");
+
   const hasFilters = Boolean(config.filters?.length) || config.isOffers;
 
   const buildFilters = useCallback((): Filter[] => {
@@ -80,6 +93,7 @@ export function TraveliunTable({
       const value = filterValues[def.key];
       if (value) list.push({ column: def.column ?? def.key, op: "eq", value });
     }
+    if (onlyId) list.push({ column: "id", op: "eq", value: onlyId });
     if (config.isOffers) {
       // ISSUED offers only. A `draft` row was created and never published — it is
       // work in progress, and it belongs in the generator's drafts list, not in a
@@ -94,7 +108,7 @@ export function TraveliunTable({
       if (dateTo) list.push({ column: "offer_date", op: "lte", value: dateTo });
     }
     return list;
-  }, [config, filterValues, offersMode, dateFrom, dateTo]);
+  }, [config, filterValues, offersMode, dateFrom, dateTo, onlyId]);
 
   const fetchRows = useCallback(async () => {
     setLoading(true);
@@ -107,17 +121,22 @@ export function TraveliunTable({
       searchColumns: config.searchable,
       filters: buildFilters(),
       sort: config.defaultSort,
+      issue: issue?.key,
     });
     if (result.ok) {
       setRows(result.rows);
       setCount(result.count);
+      if (onlyId && result.rows.length === 1 && autoOpened.current !== onlyId) {
+        autoOpened.current = onlyId;
+        setViewing(result.rows[0]);
+      }
     } else {
       setError(t(result.error));
       setRows([]);
       setCount(0);
     }
     setLoading(false);
-  }, [config, page, pageSize, debounced, buildFilters]);
+  }, [config, page, pageSize, debounced, buildFilters, issue, onlyId, t]);
 
   // debounce the search box
   useEffect(() => {
@@ -127,10 +146,12 @@ export function TraveliunTable({
 
   // reset to first page whenever a query input changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one extra render when a query input changes
     setPage(1);
-  }, [debounced, pageSize, filterValues, offersMode, dateFrom, dateTo]);
+  }, [debounced, pageSize, filterValues, offersMode, dateFrom, dateTo, issue, onlyId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the fetch itself: loading on, rows when they arrive
     void fetchRows();
   }, [fetchRows]);
 
@@ -199,6 +220,13 @@ export function TraveliunTable({
             setDateFrom={setDateFrom}
             setDateTo={setDateTo}
           />
+        ) : null}
+
+        {issue || onlyId ? (
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#f3dfb0] bg-[#fff8e6] px-4 py-2.5 text-[13px] font-bold text-[#8a5a00]">
+            <span>{issue ? t("data.quality.filtered", { label: t(issue.labelKey) }) : t("data.quality.oneRecord")}</span>
+            <Link href={config.route} className="ms-auto text-[#185045] underline">{t("data.quality.showAll")}</Link>
+          </div>
         ) : null}
 
         <section className="rounded-2xl border border-[#e2ebe7] bg-white p-[15px] shadow-[0_1px_2px_rgba(0,60,58,0.04),0_8px_24px_rgba(0,60,58,0.05)]">
@@ -714,7 +742,7 @@ function RowActionModal({
 
   return (
     <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/20 p-4" role="dialog" aria-modal="true" dir={dir}>
-      <div className="w-full max-w-[620px] rounded-2xl border border-[#e2ebe7] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
+      <div className="max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-[#e2ebe7] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
         <div className="mb-4 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
           <h2 className="text-lg font-extrabold">{t("details")}</h2>
           <button type="button" onClick={onClose} className="rounded-md p-2 text-[#557d78] hover:bg-[#edf3f0]" aria-label={t("close")}><X className="size-5" /></button>
@@ -728,6 +756,8 @@ function RowActionModal({
             </div>
           ))}
         </div>
+
+        <DataRecordExtras config={config} row={row} />
 
         {confirming ? (
           <div className="rounded-[10px] border border-[#f2d0d7] bg-[#fdeef2] p-4">

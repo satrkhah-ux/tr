@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { notifyOps, notifyPartnerCase } from "@/lib/data/ops-notify";
+import { sendWeeklyDataQuality } from "@/lib/data/quality-weekly";
 import { readinessFor } from "@/lib/data/operation-sync";
 import { sendClientMessage } from "@/lib/data/client-messages";
 import { passportValidFor } from "./progress";
@@ -48,6 +49,8 @@ async function alertOnce(supabase: SupabaseClient, operationId: string, kind: st
 }
 
 export async function runOpsDaily(today: string): Promise<DailyResult> {
+  // Sundays: the data-quality counts and their week's change (data order 11.4)
+  await sendWeeklyDataQuality(today);
   const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
   const result: DailyResult = { travelled: 0, completed: 0, alerts: 0 };
   const { data } = await supabase

@@ -26,6 +26,12 @@ export type AuditAction =
   | "supplier.credentials_changed"
   | "supplier.updated"
   | "supplier.test_connection"
+  // the generic data screens (actions.ts) and «الفندق المعتمد» — a record's change log
+  | "data.created"
+  | "data.updated"
+  | "data.deleted"
+  | "data.verified"
+  | "data.unverified"
   // operations
   | "operation.confirmed"
   | "operation.client_status"

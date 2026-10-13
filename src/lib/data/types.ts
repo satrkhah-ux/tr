@@ -69,6 +69,8 @@ export type ListInput = {
   searchColumns?: string[];
   filters?: Filter[];
   sort?: Sort;
+  /** a data-quality issue (lib/data/quality.ts): list only the rows that have it, as 0071 ranks them */
+  issue?: string;
 };
 
 export type ListResult =
