@@ -22,6 +22,8 @@ export type PartnerSession = {
   partner_name_latin: string | null;
   address: string | null;
   email: string;
+  /** owner: the account and the team; sales: offers and confirmations only (0059). */
+  role: "owner" | "sales";
   terms: PartnerTerms;
   brand_color: string;
   accent_color: string;
@@ -49,7 +51,7 @@ export async function getPartnerSession(): Promise<PartnerSession | null> {
     const { data } = await db()
       .from("partner_users")
       .select(
-        "email, status, booking_partners!inner(id, name, name_latin, address, status, price_adjust_kind, price_adjust_pct, brand_color, accent_color, logo_path)",
+        "email, status, role, booking_partners!inner(id, name, name_latin, address, status, price_adjust_kind, price_adjust_pct, brand_color, accent_color, logo_path)",
       )
       .eq("auth_user_id", user.id)
       .maybeSingle();
@@ -57,6 +59,7 @@ export async function getPartnerSession(): Promise<PartnerSession | null> {
     const row = data as unknown as {
       email: string;
       status: string;
+      role: string | null;
       booking_partners:
         | {
             id: string;
@@ -84,6 +87,7 @@ export async function getPartnerSession(): Promise<PartnerSession | null> {
       partner_name_latin: company.name_latin,
       address: company.address,
       email: row.email,
+      role: row.role === "sales" ? "sales" : "owner",
       terms: {
         kind: company.price_adjust_kind === "commission" ? "commission" : "markup",
         pct: Number(company.price_adjust_pct) || 0,

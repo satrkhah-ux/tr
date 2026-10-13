@@ -6,6 +6,8 @@ import { logAudit } from "@/lib/data/audit";
 import { currentCan } from "@/lib/roles/current";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { notifyPartnerRegistration } from "@/lib/data/ops-notify";
+import { PARTNER_TERMS_VERSION, newReferenceNo, readRegistration } from "./registration-form";
+import { getPartnerSession } from "./session";
 
 /**
  * A company asking to work with us, and what happens to that request.
@@ -22,26 +24,22 @@ function db(): SupabaseClient {
   return createSupabaseServiceClient() as unknown as SupabaseClient;
 }
 
-export type RegistrationResult = { ok: true } | { ok: false; message: string };
+export type RegistrationResult = { ok: true; reference: string } | { ok: false; message: string };
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const BUCKET = "partner-documents";
 
-export async function registerPartnerCompany(input: {
-  name: string;
-  name_latin?: string;
-  email: string;
-  phone: string;
-  website?: string;
-  address?: string;
-  contact_name?: string;
-  note?: string;
-}): Promise<RegistrationResult> {
-  const name = input.name.trim();
-  const email = input.email.trim().toLowerCase();
-
-  if (name.length < 3) return { ok: false, message: "اسم الشركة مطلوب." };
-  if (!EMAIL.test(email)) return { ok: false, message: "البريد الإلكتروني غير صحيح." };
-  if (input.phone.replace(/\D/g, "").length < 8) return { ok: false, message: "رقم التواصل غير صحيح." };
+/**
+ * The public form, as FormData — it carries the company's documents. Read and
+ * checked by readRegistration (pure, tested); the documents go to the PRIVATE
+ * bucket under the request's reference number, then the pending row is written
+ * pointing at them. A failed insert takes its uploads back out.
+ */
+export async function registerPartnerCompany(form: FormData): Promise<RegistrationResult> {
+  const read = readRegistration(form);
+  if (!read.ok) return read;
+  const input = read.value;
+  const { name, email } = input;
 
   try {
     const supabase = db();
@@ -65,16 +63,39 @@ export async function registerPartnerCompany(input: {
       };
     }
 
+    const reference = newReferenceNo(new Date());
+    const documents: { kind: string; path: string; name: string; size: number; type: string }[] = [];
+    for (const doc of input.documents) {
+      const path = `${reference}/${doc.kind}.${doc.ext}`;
+      const { error: upErr } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, doc.file, { contentType: doc.file.type, upsert: false });
+      if (upErr) {
+        if (documents.length) await supabase.storage.from(BUCKET).remove(documents.map((d) => d.path));
+        return { ok: false, message: "تعذّر رفع المستندات. حاول مرة أخرى." };
+      }
+      documents.push({ kind: doc.kind, path, name: doc.file.name, size: doc.file.size, type: doc.file.type });
+    }
+
     const { error } = await supabase.from("booking_partners").insert({
       name,
-      name_latin: input.name_latin?.trim() || null,
+      name_latin: input.name_latin,
       contact_email: email,
       email,
-      phone: input.phone.trim(),
-      contact_name: input.contact_name?.trim() || null,
-      website: input.website?.trim() || null,
-      address: input.address?.trim() || null,
-      registration_note: input.note?.trim() || null,
+      phone: input.phone,
+      contact_name: input.contact_name,
+      website: input.website,
+      address: input.address,
+      registration_note: input.note,
+      commercial_register: input.commercial_register,
+      tourism_license: input.tourism_license,
+      vat_number: input.vat_number,
+      city: input.city,
+      country: input.country,
+      terms_accepted_at: new Date().toISOString(),
+      terms_version: PARTNER_TERMS_VERSION,
+      reference_no: reference,
+      documents,
       // Everything commercial stays at its default until an employee decides it.
       status: "pending",
       // A pending company is not a supplier we assign work to, and not a
@@ -83,11 +104,14 @@ export async function registerPartnerCompany(input: {
       resells: false,
       kinds: ["reseller"],
     });
-    if (error) return { ok: false, message: "تعذّر إرسال الطلب. حاول مرة أخرى." };
+    if (error) {
+      if (documents.length) await supabase.storage.from(BUCKET).remove(documents.map((d) => d.path));
+      return { ok: false, message: "تعذّر إرسال الطلب. حاول مرة أخرى." };
+    }
 
     // Nobody watches a table. Tell the office a request arrived.
-    await notifyPartnerRegistration({ name, email, phone: input.phone.trim() });
-    return { ok: true };
+    await notifyPartnerRegistration({ name, email, phone: input.phone });
+    return { ok: true, reference };
   } catch {
     return { ok: false, message: "تعذّر إرسال الطلب. حاول مرة أخرى." };
   }
@@ -185,34 +209,8 @@ export async function issuePartnerAccount(input: {
     // portal with no terms behind it.
     if (row.status !== "approved") return { ok: false, message: "اعتمد الشركة أولاً ثم أصدر الحساب." };
 
-    // An employee's address must never become a partner login — that account
-    // would pass is_staff() and the partner policies at the same time.
-    const { data: staff } = await supabase.from("employees").select("id").ilike("email", email).maybeSingle();
-    if (staff) return { ok: false, message: "هذا البريد يخصّ موظفاً — استخدم بريداً آخر للشركة." };
-
-    const { data: taken } = await supabase.from("partner_users").select("id").ilike("email", email).maybeSingle();
-    if (taken) return { ok: false, message: "هذا البريد مُصدر له حساب بالفعل." };
-
-    // WITHOUT redirectTo the invitation lands on the site root, which does
-    // nothing at all: the account exists and there is no way to give it a
-    // password. /b2b/welcome is the other half of this button.
-    const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
-    const { data: invite, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
-      data: { partner_id: row.id, partner_name: row.name },
-      redirectTo: `${site}/b2b/welcome`,
-    });
-    if (inviteError || !invite?.user) {
-      return { ok: false, message: "تعذّر إنشاء الحساب — تأكد من إعدادات البريد لدى Supabase." };
-    }
-
-    const { error } = await supabase.from("partner_users").insert({
-      partner_id: row.id,
-      auth_user_id: invite.user.id,
-      email,
-      name: input.name?.trim() || null,
-      created_by: await getCurrentEmployeeId(),
-    });
-    if (error) return { ok: false, message: "أُنشئ الحساب ولم يُربط بالشركة — راجع السجل." };
+    const made = await inviteToCompany(supabase, row, email, input.name ?? null, "owner", await getCurrentEmployeeId());
+    if (!made.ok) return made;
 
     await logAudit({
       action: "partner.account_issued",
@@ -298,5 +296,129 @@ export async function resendPartnerPasswordLink(input: {
     return { ok: true };
   } catch {
     return { ok: false, message: "تعذّر إرسال الرابط." };
+  }
+}
+
+/**
+ * Open one of an applicant's documents — staff only, a five-minute signed URL
+ * from the private bucket, and only a path that row actually lists (a crafted
+ * path cannot reach another company's file).
+ */
+export async function partnerDocumentUrl(partnerId: string, path: string): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
+  if (!(await currentCan("data.write"))) return { ok: false, message: "لا تملك صلاحية." };
+  try {
+    const supabase = db();
+    const { data } = await supabase.from("booking_partners").select("documents").eq("id", partnerId).maybeSingle();
+    const listed = ((data as { documents: { path: string }[] } | null)?.documents ?? []).some((d) => d.path === path);
+    if (!listed) return { ok: false, message: "المستند غير موجود." };
+    const { data: signed, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 300);
+    return error || !signed ? { ok: false, message: "تعذّر فتح المستند." } : { ok: true, url: signed.signedUrl };
+  } catch {
+    return { ok: false, message: "تعذّر فتح المستند." };
+  }
+}
+
+/**
+ * A login for a company — the one path, for our «إصدار حساب» and for the
+ * company's own owner inviting a colleague. Supabase sends a set-your-password
+ * link; no password is ever generated, stored or sent here.
+ */
+async function inviteToCompany(
+  supabase: SupabaseClient,
+  company: { id: string; name: string },
+  email: string,
+  name: string | null,
+  role: "owner" | "sales",
+  createdBy: string | null,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  // An employee's address must never become a partner login — that account
+  // would pass is_staff() and the partner policies at the same time.
+  const { data: staff } = await supabase.from("employees").select("id").ilike("email", email).maybeSingle();
+  if (staff) return { ok: false, message: "هذا البريد يخصّ موظفاً — استخدم بريداً آخر للشركة." };
+
+  const { data: taken } = await supabase.from("partner_users").select("id").ilike("email", email).maybeSingle();
+  if (taken) return { ok: false, message: "هذا البريد مُصدر له حساب بالفعل." };
+
+  // WITHOUT redirectTo the invitation lands on the site root, which does
+  // nothing at all: the account exists and there is no way to give it a
+  // password. /b2b/welcome is the other half of this button.
+  const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
+  const { data: invite, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+    data: { partner_id: company.id, partner_name: company.name },
+    redirectTo: `${site}/b2b/welcome`,
+  });
+  if (inviteError || !invite?.user) {
+    return { ok: false, message: "تعذّر إنشاء الحساب — تأكد من إعدادات البريد لدى Supabase." };
+  }
+
+  const { error } = await supabase.from("partner_users").insert({
+    partner_id: company.id,
+    auth_user_id: invite.user.id,
+    email,
+    name: name?.trim() || null,
+    role,
+    created_by: createdBy,
+  });
+  return error ? { ok: false, message: "أُنشئ الحساب ولم يُربط بالشركة — راجع السجل." } : { ok: true };
+}
+
+export type TeamMember = { id: string; email: string; name: string | null; role: "owner" | "sales"; status: string; me: boolean };
+
+/** The company's logins — its owner's to see (partner_users shows a partner only its own row, so the service role reads them by the session's company). */
+export async function listMyTeam(): Promise<TeamMember[]> {
+  const partner = await getPartnerSession();
+  if (!partner || partner.role !== "owner") return [];
+  try {
+    const { data } = await db()
+      .from("partner_users")
+      .select("id, email, name, role, status, auth_user_id")
+      .eq("partner_id", partner.partner_id)
+      .order("created_at");
+    return ((data ?? []) as { id: string; email: string; name: string | null; role: string; status: string; auth_user_id: string }[]).map((u) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      role: u.role === "sales" ? "sales" : "owner",
+      status: u.status,
+      me: u.auth_user_id === partner.user_id,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** The owner invites a colleague to its own company — never another's. */
+export async function invitePartnerUser(input: { email: string; name?: string; role: "owner" | "sales" }): Promise<{ ok: true } | { ok: false; message: string }> {
+  const partner = await getPartnerSession();
+  if (!partner || partner.role !== "owner") return { ok: false, message: "إضافة المستخدمين لمدير حساب الشركة." };
+  const email = input.email.trim().toLowerCase();
+  if (!EMAIL.test(email)) return { ok: false, message: "البريد الإلكتروني غير صحيح." };
+  try {
+    const made = await inviteToCompany(db(), { id: partner.partner_id, name: partner.partner_name }, email, input.name ?? null, input.role === "owner" ? "owner" : "sales", null);
+    if (!made.ok) return made;
+    await logAudit({ action: "partner.account_issued", entity: "booking_partners", entity_id: partner.partner_id, meta: { email, role: input.role, by: partner.email } });
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "تعذّر إرسال الدعوة." };
+  }
+}
+
+/** The owner stops or restores a colleague's login (never its own); the company stays open. */
+export async function setPartnerUserActive(userId: string, active: boolean): Promise<{ ok: true } | { ok: false; message: string }> {
+  const partner = await getPartnerSession();
+  if (!partner || partner.role !== "owner") return { ok: false, message: "لمدير حساب الشركة فقط." };
+  try {
+    const { data, error } = await db()
+      .from("partner_users")
+      .update({ status: active ? "active" : "suspended" })
+      .eq("id", userId)
+      .eq("partner_id", partner.partner_id)
+      .neq("auth_user_id", partner.user_id)
+      .select("id");
+    if (error || !data || data.length === 0) return { ok: false, message: "تعذّر الحفظ." };
+    await logAudit({ action: "partner.updated", entity: "booking_partners", entity_id: partner.partner_id, meta: { user: userId, user_active: active, by: partner.email } });
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "تعذّر الحفظ." };
   }
 }

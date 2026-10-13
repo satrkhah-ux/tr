@@ -3,6 +3,8 @@
 import { MapPin, Building2, Percent, Mail } from "lucide-react";
 import { TraveliunShell } from "../TraveliunShell";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
+import type { TeamMember } from "@/lib/partners/registration";
+import { PartnerTeam } from "./PartnerTeam";
 
 /**
  * «الملف الشخصي» — the identity printed on everything they issue.
@@ -12,7 +14,7 @@ import { usePartnerBrand } from "@/lib/partners/PartnerContext";
  * — letting a partner rewrite them here would mean a file could go out under a
  * name nobody approved. Changes go through us, and the screen says so.
  */
-export function PartnerProfile({ email, terms }: { email: string; terms: string }) {
+export function PartnerProfile({ email, terms, team }: { email: string; terms: string; team: TeamMember[] | null }) {
   const partner = usePartnerBrand();
   if (!partner) return null;
 
@@ -91,6 +93,8 @@ export function PartnerProfile({ email, terms }: { email: string; terms: string 
             ))}
           </div>
         </section>
+
+        {team ? <PartnerTeam team={team} /> : null}
 
         <p className="rounded-[10px] border border-[#f2e2b4] bg-[#fffdf7] px-4 py-3 text-[12px] font-semibold text-[#a86a10]">
           لتعديل الاسم أو العنوان أو الشعار أو الألوان، راسلوا ترافليون — تُعتمد التغييرات من طرفنا

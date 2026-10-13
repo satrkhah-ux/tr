@@ -8,9 +8,11 @@ import type { PartnerCompany } from "@/lib/data/partner-companies";
 import {
   approvePartnerCompany,
   issuePartnerAccount,
+  partnerDocumentUrl,
   resendPartnerPasswordLink,
   setPartnerStatus,
 } from "@/lib/partners/registration";
+import { DOCUMENT_LABEL, type PartnerDocumentKind } from "@/lib/partners/registration-form";
 import { describeTerms } from "@/lib/partners/pricing";
 
 /**
@@ -67,6 +69,7 @@ function PendingRow({ company }: { company: PartnerCompany }) {
           {company.registration_note ? (
             <p className="mt-1 text-[11.5px] text-[#93aaa3]">{company.registration_note}</p>
           ) : null}
+          <RequestDetails company={company} />
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
@@ -201,6 +204,60 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
       {message ? (
         <p className={`basis-full text-[11.5px] font-bold ${done ? "text-[#0f7a52]" : "text-[#c22850]"}`}>{message}</p>
       ) : null}
+    </div>
+  );
+}
+
+/** The licence, where it works, the terms it accepted, and its documents (opened by a short signed link). */
+function RequestDetails({ company }: { company: PartnerCompany }) {
+  const [opening, setOpening] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const facts = [
+    company.reference_no ? `الطلب ${company.reference_no}` : null,
+    company.commercial_register ? `السجل ${company.commercial_register}` : null,
+    company.tourism_license ? `الرخصة ${company.tourism_license}` : null,
+    company.vat_number ? `الضريبي ${company.vat_number}` : null,
+    [company.city, company.country].filter(Boolean).join("، ") || null,
+  ].filter(Boolean);
+  if (facts.length === 0 && company.documents.length === 0 && !company.terms_accepted_at) return null;
+
+  return (
+    <div className="mt-1.5 space-y-1">
+      {facts.length ? <p className="text-[11.5px] font-bold text-[#557d78]">{facts.join(" · ")}</p> : null}
+      <p className="text-[11px] font-semibold text-[#93aaa3]">
+        {company.terms_accepted_at
+          ? `وافقت على شروط التعاون (${company.terms_version ?? "—"}) في ${company.terms_accepted_at.slice(0, 10)}`
+          : "لا موافقة مسجّلة على شروط التعاون"}
+      </p>
+      {company.documents.length ? (
+        <div className="flex flex-wrap gap-1.5">
+          {company.documents.map((d) => (
+            <button
+              key={d.path}
+              type="button"
+              disabled={opening === d.path}
+              onClick={async () => {
+                setError(null);
+                setOpening(d.path);
+                // opened before the await so the browser treats it as the click's own window
+                const tab = window.open("", "_blank");
+                const res = await partnerDocumentUrl(company.id, d.path);
+                setOpening(null);
+                if (res.ok && tab) tab.location.href = res.url;
+                else {
+                  tab?.close();
+                  setError(res.ok ? "اسمح بفتح النوافذ لهذا الموقع." : res.message);
+                }
+              }}
+              className="inline-flex h-7 items-center gap-1 rounded-[8px] border border-[#d8e4df] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] disabled:opacity-60"
+            >
+              {opening === d.path ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              {DOCUMENT_LABEL[d.kind as PartnerDocumentKind] ?? d.kind}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {error ? <p className="text-[11px] font-bold text-[#c22850]">{error}</p> : null}
     </div>
   );
 }
