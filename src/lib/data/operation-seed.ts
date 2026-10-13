@@ -9,6 +9,8 @@ import { logAudit } from "@/lib/data/audit";
 import { BOARD_AR } from "@/components/offer-doc/labels";
 import type { BoardType } from "@/lib/types";
 import { currentCan } from "@/lib/roles/current";
+import { normalizeDraftData } from "@/lib/offer/draft-types";
+import { planBookingsFromDraft } from "@/lib/operations/seed-plan";
 
 /**
  * Pull the bookings straight out of the offer the client agreed to.
@@ -47,7 +49,7 @@ const COMPANY_CANCELLATION =
 
 type SeedRow = {
   origin_ref: string;
-  kind: "hotel" | "flight" | "visa" | "transport";
+  kind: "hotel" | "flight" | "visa" | "transport" | "service";
   title: string;
   city_name: string;
   start_date: string | null;
@@ -68,9 +70,25 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
   try {
     const supabase = await db();
 
-    const opRes = await supabase.from("operations").select("id, offer_id").eq("id", operationId).maybeSingle();
-    const op = opRes.data as { id: string; offer_id: string } | null;
+    const opRes = await supabase.from("operations").select("id, offer_id, offers(serial)").eq("id", operationId).maybeSingle();
+    const op = opRes.data as { id: string; offer_id: string; offers: { serial: string } | { serial: string }[] | null } | null;
     if (!op) return { ok: false, error: "ops.err.notFound" };
+    const serial = (Array.isArray(op.offers) ? op.offers[0] : op.offers)?.serial ?? "";
+
+    // The draft that issued the offer holds every city, flight, tour and transfer
+    // with its date — read it first (service: drafts are the generator's, and
+    // requireOps above is the gate). An offer with no draft (imported, repackaged)
+    // falls back to the offer's own tables below.
+    const draftRes = serial
+      ? await (createSupabaseServiceClient() as unknown as SupabaseClient)
+          .from("offer_drafts")
+          .select("data")
+          .eq("data->>produced_serial", serial)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : { data: null };
+    const draft = (draftRes.data as { data: Record<string, unknown> } | null)?.data ?? null;
 
     const [hotelsRes, flightsRes, itemsRes, existingRes] = await Promise.all([
       // Service client: the buy price seeds quoted_net, and 0047 withholds it
@@ -100,8 +118,24 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
     );
 
     const rows: SeedRow[] = [];
+    const refs = [...taken] as string[];
+    // a case seeded by the old pull keeps its rows; the plan adds only the kinds it never had
+    const seededBefore = {
+      hotel: refs.some((r) => r.startsWith("hotel:")),
+      flight: refs.some((r) => r.startsWith("flight:") && r !== "flight:intl" && r !== "flight:dom"),
+      transport: refs.some((r) => r.startsWith("transport:")),
+    };
 
-    for (const h of (hotelsRes.data ?? []) as {
+    if (draft) {
+      for (const p of planBookingsFromDraft(normalizeDraftData(draft), COMPANY_CANCELLATION)) {
+        if (p.kind === "hotel" && seededBefore.hotel) continue;
+        if (p.kind === "flight" && seededBefore.flight) continue;
+        if (p.kind === "transport" && seededBefore.transport) continue;
+        rows.push(p);
+      }
+    }
+
+    for (const h of (draft ? [] : (hotelsRes.data ?? [])) as {
       id: string;
       hotel_name: string | null;
       room_type_name: string | null;
@@ -138,7 +172,7 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
       });
     }
 
-    for (const f of (flightsRes.data ?? []) as {
+    for (const f of (draft ? [] : (flightsRes.data ?? [])) as {
       id: string;
       airline: string | null;
       flight_no: string | null;
@@ -183,6 +217,9 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
       description: string | null;
       quantity: number | null;
     }[]) {
+      // with the draft, the transfers come from its plan; without it, a flight hop
+      // priced as a «transfer» (offers before 2026-10-13) is the domestic flight again
+      if (item.item_type === "transport" && (draft || (item.description ?? "").includes("طيران داخلي"))) continue;
       rows.push({
         origin_ref: `${item.item_type}:${item.id}`,
         kind: item.item_type === "visa" ? "visa" : "transport",

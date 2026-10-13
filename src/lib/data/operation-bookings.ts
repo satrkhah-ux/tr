@@ -521,15 +521,39 @@ export async function issueDocument(input: {
       return { ok: false, error: "ops.err.nothingToIssue" };
     }
 
+    // the hotel desk reads the hotel's English name, address and phone — from /hotels, by its name
+    const hotelNames = [...new Set(scoped.filter((b) => b.kind === "hotel").map((b) => b.title.trim()).filter(Boolean))];
+    const hotelInfo = new Map<string, { english_name: string | null; address: string | null; contact_number: string | null }>();
+    if (hotelNames.length > 0) {
+      const { data: rows } = await supabase.from("hotels").select("arabic_name, english_name, address, contact_number").in("arabic_name", hotelNames);
+      for (const h of (rows ?? []) as { arabic_name: string; english_name: string | null; address: string | null; contact_number: string | null }[]) {
+        if (!hotelInfo.has(h.arabic_name.trim())) hotelInfo.set(h.arabic_name.trim(), h);
+      }
+    }
+    const withHotel = (b: VoucherBooking): VoucherBooking => {
+      const h = b.kind === "hotel" ? hotelInfo.get(b.title.trim()) : undefined;
+      return h ? { ...b, name_en: h.english_name, address: h.address, phone: h.contact_number } : b;
+    };
+
+    // each day of the itinerary says when its drives and tours start
+    const timedOn = (date: string | null) =>
+      allBookings
+        .filter((b) => b.status !== "cancelled" && (b.kind === "transport" || b.kind === "service") && b.start_date && b.start_date === date)
+        .map((b) => {
+          const at = b.detail?.["الوقت"] || b.detail?.["وقت الانطلاق"] || "";
+          return `${at && at !== "يُحدَّد لاحقاً" ? `${at} — ` : ""}${b.title}`;
+        });
+
     const snapshot: VoucherDTO = {
       kind: input.kind,
       serial: offer?.serial ?? "",
-      issued_at: new Date().toISOString().slice(0, 10),
+      // the company's day, not the server's UTC one
+      issued_at: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }),
       destination: offer?.destination ?? null,
       customer: { name: customer?.arabic_name ?? "", phone: customer?.mobile ?? null },
       travelers: travelers.map((t) => ({ name: t.display_name, nationality: null })),
-      bookings: scoped.map(toVoucherBooking),
-      days: input.kind === "itinerary" ? days : [],
+      bookings: scoped.map(toVoucherBooking).map(withHotel),
+      days: input.kind === "itinerary" ? days.map((d) => ({ ...d, activities: [...timedOn(d.date), ...d.activities] })) : [],
       notes: [],
       // Falls back to the lead traveller, then the booking name — a sign that
       // says nothing is worse than one with the wrong spelling.

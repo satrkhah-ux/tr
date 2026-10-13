@@ -54,6 +54,7 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
 import { MobileTabBar } from "./MobileTabBar";
 import { TraveliunLogo } from "./TraveliunLogo";
 import { clearPendingDrafts } from "./generator/useDraftState";
+import { SERVER_LOST_EVENT } from "./useSafeTransition";
 
 type TraveliunShellProps = {
   /** i18n key for the page title. */
@@ -611,6 +612,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
               </button>
             </div>
           ) : null}
+          <ServerLostBanner />
           {children}
         </div>
       </main>
@@ -1331,4 +1333,27 @@ function panelButton(active: boolean) {
   return `rounded-md border px-3 py-2 text-sm font-semibold ${
     active ? "border-[var(--tv-brand)] bg-[var(--tv-brand)] text-white" : "border-[#dfe8e4] text-[#557d78]"
   }`;
+}
+
+/**
+ * A call to the server failed — almost always a new version deployed while this
+ * page was open. Said once, plainly: nothing typed is lost, reload and send again.
+ */
+function ServerLostBanner() {
+  const { t } = useTraveliunUI();
+  const [lost, setLost] = useState(false);
+  useEffect(() => {
+    const on = () => setLost(true);
+    window.addEventListener(SERVER_LOST_EVENT, on);
+    return () => window.removeEventListener(SERVER_LOST_EVENT, on);
+  }, []);
+  if (!lost) return null;
+  return (
+    <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-[12px] border border-[#f2d39a] bg-[#fff8e8] px-3 py-2 text-[12.5px] font-bold text-[#8a5a0c]">
+      <span className="min-w-0 flex-1">{t("shell.serverLost")}</span>
+      <button type="button" onClick={() => window.location.reload()} className="inline-flex h-8 items-center rounded-[8px] bg-[#8a5a0c] px-3 text-[12px] font-bold text-white">
+        {t("shell.reload")}
+      </button>
+    </div>
+  );
 }

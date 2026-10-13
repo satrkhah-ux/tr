@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { AlertTriangle, BadgeCheck, RefreshCw, Search, XCircle } from "lucide-react";
 import type { OperationBooking } from "@/lib/data/operation-bookings";
 import {
@@ -11,6 +11,7 @@ import {
   type PriceCheck,
 } from "@/lib/data/supplier-booking";
 import { DirText } from "@/components/DirText";
+import { useSafeTransition } from "../useSafeTransition";
 
 /**
  * Booking a hotel through the supplier's API, from the operations screen.
@@ -44,7 +45,7 @@ export function SupplierBooking({
   canBook: boolean;
   onDone: () => void;
 }) {
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
   const [price, setPrice] = useState<PriceCheck | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [unknown, setUnknown] = useState<string | null>(null);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Building2, Check, Copy, Loader2, Send, UserRound, Users } from "lucide-react";
 import {
   assignBooking,
@@ -13,6 +13,7 @@ import {
 } from "@/lib/data/operation-assign";
 import type { OperationBooking } from "@/lib/data/operation-bookings";
 import { useTraveliunUI } from "../TraveliunUIProvider";
+import { useSafeTransition } from "../useSafeTransition";
 
 const field =
   "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]";
@@ -44,7 +45,7 @@ export function AssignBooking({
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [pending, startTransition] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState(booking.handoff_note ?? "");
   const [draft, setDraft] = useState<RequestDraft | null>(null);

@@ -878,7 +878,12 @@ export async function publishOffer(serial: string): Promise<PublishResult> {
     });
 
     await supabase.from("offers").update({ pdf_url: filePath }).eq("id", offerId);
-    await setOfferStatus(supabase, offerId, "sent", `published v${version}`);
+    // «sent» is the first send. Re-issuing a confirmed (or cancelled) offer keeps
+    // its status — AD-6-3427 went back to «مُرسل» on the board while operations
+    // was already working it.
+    const { data: now } = await supabase.from("offers").select("status").eq("id", offerId).maybeSingle();
+    const current = (now as { status: string } | null)?.status;
+    if (current !== "confirmed" && current !== "cancelled") await setOfferStatus(supabase, offerId, "sent", `published v${version}`);
 
     return { ok: true, serial, version };
   } catch {

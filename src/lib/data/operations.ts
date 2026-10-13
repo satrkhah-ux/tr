@@ -131,6 +131,12 @@ export async function confirmOffer(input: {
     }
 
     const id = (data as { id: string }).id;
+    // the board says what operations says: a confirmed card leaves «نشط غير مؤكد» / «تمت المتابعة»
+    await supabase
+      .from("offers")
+      .update({ pipeline_stage: "confirmed_hotels" })
+      .eq("id", input.offer_id)
+      .in("pipeline_stage", ["active_not_confirmed", "followed_up"]);
     await logAudit({
       action: "operation.confirmed",
       entity: "operations",
@@ -328,6 +334,9 @@ type OfferJoin = {
   destination: string | null;
   total: number | null;
   currency: string | null;
+  adults: number | null;
+  children: number | null;
+  infants: number | null;
   customers: { arabic_name: string | null; mobile: string | null } | null;
 };
 
@@ -352,7 +361,7 @@ export async function listOperations(): Promise<OperationCard[]> {
     const { data } = await supabase
       .from("operations")
       .select(
-        "id, offer_id, render_id, client_status, execution_status, travel_start, travel_end, confirm_channel, confirmed_at, note, offers(serial, destination, total, currency, customers(arabic_name, mobile))",
+        "id, offer_id, render_id, client_status, execution_status, travel_start, travel_end, confirm_channel, confirmed_at, note, offers(serial, destination, total, currency, adults, children, infants, customers(arabic_name, mobile))",
       )
       .order("travel_start", { ascending: true, nullsFirst: false });
 
@@ -396,7 +405,8 @@ export async function listOperations(): Promise<OperationCard[]> {
         total: offer?.total != null ? Number(offer.total) : null,
         currency: offer?.currency ?? null,
         paid: paid.get(r.id) ?? 0,
-        travelers_count: travelers.get(r.id) ?? 0,
+        // the travellers entered, else the ones the offer was sold for — a new case is not «0»
+        travelers_count: travelers.get(r.id) ?? (offer?.adults ?? 0) + (offer?.children ?? 0) + (offer?.infants ?? 0),
       };
     });
   } catch {

@@ -25,6 +25,15 @@ HOST=deploy@vps-new
 DIR=apps/traveliun-app
 DOMAIN=pkg.traveliun.com
 
+# Not during the working day (08:00–23:00 Riyadh): a deploy mid-shift turned the
+# agents' saves into 404s and lost what they had typed (2026-10-13, twice).
+# FORCE=1 for an emergency fix.
+HOUR=$(TZ=UTC-3 date +%H)  # Riyadh is UTC+3 all year (no DST); POSIX writes it «UTC-3»
+if [ "${FORCE:-0}" != "1" ] && [ "$((10#$HOUR))" -ge 8 ] && [ "$((10#$HOUR))" -lt 23 ]; then
+  echo "refusing: it is ${HOUR}:00 in Riyadh — deploy after 23:00 or before 08:00, or FORCE=1 for an emergency" >&2
+  exit 1
+fi
+
 # The commit is pinned ONCE, here. Reading HEAD again at the end reported the
 # wrong commit when another one landed while this deploy was still building.
 SHIPPED=$(git rev-parse HEAD)

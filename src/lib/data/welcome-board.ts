@@ -53,7 +53,7 @@ export async function getWelcomeBoard(
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data } = await supabase
       .from("offers")
-      .select("id, serial, destination, partner_company_id, customers(name)")
+      .select("id, serial, destination, partner_company_id, customers(arabic_name)")
       .eq("serial", serial)
       .maybeSingle();
 
@@ -62,12 +62,12 @@ export async function getWelcomeBoard(
       serial: string;
       destination: string | null;
       partner_company_id: string | null;
-      customers: { name: string | null } | { name: string | null }[] | null;
+      customers: { arabic_name: string | null } | { arabic_name: string | null }[] | null;
     } | null;
     if (!row) return null;
 
     const customer = Array.isArray(row.customers) ? row.customers[0] : row.customers;
-    const defaultName = (customer?.name ?? "").trim();
+    const defaultName = (customer?.arabic_name ?? "").trim();
 
     const { brand } = await resolveDocBrand({ serial, partnerId: row.partner_company_id });
 
