@@ -551,7 +551,7 @@ export async function issueDocument(input: {
       issued_at: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }),
       destination: offer?.destination ?? null,
       customer: { name: customer?.arabic_name ?? "", phone: customer?.mobile ?? null },
-      travelers: travelers.map((t) => ({ name: t.display_name, nationality: null })),
+      travelers: travelers.map((t) => ({ name: t.display_name, nationality: t.nationality })),
       bookings: scoped.map(toVoucherBooking).map(withHotel),
       days: input.kind === "itinerary" ? days.map((d) => ({ ...d, activities: [...timedOn(d.date), ...d.activities] })) : [],
       notes: [],

@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { OperationCase } from "@/components/traveliun/operations/OperationCase";
 import { listOperationPayments, listOperations } from "@/lib/data/operations";
 import { listBookings, listDocuments } from "@/lib/data/operation-bookings";
-import { listTravelers } from "@/lib/data/operation-travelers";
+import { listOrSeedTravelers } from "@/lib/data/operation-travelers";
+import { isOpenAIConfigured } from "@/lib/providers/openai";
 import { listAssignees, listSentRequests } from "@/lib/data/operation-assign";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
@@ -16,7 +17,8 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
   if (!operation) notFound();
 
   const [travelers, payments, bookings, documents, assignees, sentRequests, canBook] = await Promise.all([
-    listTravelers(id),
+    // a new case starts with the travelers the offer was sold for
+    listOrSeedTravelers(id),
     listOperationPayments(id),
     listBookings(id),
     listDocuments(id),
@@ -56,6 +58,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
       assignees={assignees}
       sentRequests={sentRequests}
       canBook={canBook}
+      canReadMrz={isOpenAIConfigured()}
     />
   );
 }

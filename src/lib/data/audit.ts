@@ -37,6 +37,12 @@ export type AuditAction =
   | "passport.viewed"
   | "passport.scan_viewed"
   | "passport.decrypt_failed"
+  | "passport.mrz_read"
+  // travelers and their visas (0061)
+  | "traveler.created"
+  | "traveler.deleted"
+  | "visa.updated"
+  | "visa.file_viewed"
   // execution
   | "booking.created"
   | "booking.confirmed"

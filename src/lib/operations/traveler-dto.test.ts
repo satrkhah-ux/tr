@@ -19,6 +19,11 @@ function row(over: Partial<TravelerRow> = {}): TravelerRow {
     passport_encrypted: "CIPHERTEXT-DO-NOT-LEAK-a7f3b9",
     passport_expiry: "2027-04-18",
     passport_image_path: "op-1/t-1/9f2c-scan.jpg",
+    birth_date: "1990-01-01",
+    age: null,
+    nationality: "SAU",
+    visa_status: "issued",
+    visa_file_path: "op-1/t-1/77ab-visa.pdf",
     created_at: "2026-07-29T00:00:00Z",
     updated_at: "2026-07-29T00:00:00Z",
     ...over,
@@ -31,6 +36,7 @@ describe("toTravelerListItem", () => {
 
     expect(json).not.toContain("CIPHERTEXT-DO-NOT-LEAK");
     expect(json).not.toContain("9f2c-scan.jpg");
+    expect(json).not.toContain("77ab-visa.pdf");
     expect(json).not.toContain("passport_encrypted");
     expect(json).not.toContain("passport_image_path");
   });
@@ -42,6 +48,8 @@ describe("toTravelerListItem", () => {
     expect(item.passport_expiry).toBe("2027-04-18");
     expect(item.has_passport).toBe(true);
     expect(item.has_scan).toBe(true);
+    expect(item.has_visa_file).toBe(true);
+    expect(item.nationality).toBe("SAU");
   });
 
   it("reports absence without revealing anything", () => {
