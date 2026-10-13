@@ -18,6 +18,10 @@
 
 export type TravelerKind = "adult" | "child" | "infant";
 
+/** «جاهز للسفر» needs `not_required` or `issued`; the two between are work in progress. */
+export type VisaStatus = "not_required" | "required" | "submitted" | "issued";
+export const VISA_STATUSES: VisaStatus[] = ["not_required", "required", "submitted", "issued"];
+
 /** The DB row. SERVER ONLY — never returned from a server action. */
 export type TravelerRow = {
   id: string;
@@ -30,6 +34,14 @@ export type TravelerRow = {
   passport_expiry: string | null;
   /** object path in the private `passports` bucket. */
   passport_image_path: string | null;
+  /** 0061 — clear: the age check and the hotel voucher need them without a decrypt. */
+  birth_date: string | null;
+  /** the age the offer was SOLD with (children/infants), to check against birth_date. */
+  age: number | null;
+  nationality: string | null;
+  visa_status: VisaStatus;
+  /** object path in the private `visas` bucket. */
+  visa_file_path: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -39,15 +51,20 @@ export type TravelerRow = {
  *
  * `passport_expiry` is deliberately included: the «جواز على وشك الانتهاء» signal
  * is the reason ops staff open this screen, and a bare date carrying no name and
- * no number identifies nobody. The two booleans replace the sensitive fields
- * with the only fact the UI needs about them — whether they exist.
+ * no number identifies nobody. The booleans replace the sensitive fields with
+ * the only fact the UI needs about them — whether they exist.
+ *
+ * Birth date, sold age, nationality and visa status joined in 0061: the age
+ * check and «جاهز للسفر» run on them, and the hotel voucher prints the
+ * nationality. None of them is the passport number, name or a file path.
  */
 export type TravelerListItem = Pick<
   TravelerRow,
-  "id" | "traveler_kind" | "sort" | "display_name" | "passport_expiry"
+  "id" | "traveler_kind" | "sort" | "display_name" | "passport_expiry" | "birth_date" | "age" | "nationality" | "visa_status"
 > & {
   has_passport: boolean;
   has_scan: boolean;
+  has_visa_file: boolean;
 };
 
 /** The decrypted identity. Returned by ONE server action, never in a list. */
@@ -78,8 +95,14 @@ export function toTravelerListItem(row: TravelerRow): TravelerListItem {
     sort: row.sort,
     display_name: row.display_name,
     passport_expiry: row.passport_expiry,
+    birth_date: row.birth_date ?? null,
+    age: row.age ?? null,
+    nationality: row.nationality ?? null,
+    // a row read before 0061 is applied has no status — the column default
+    visa_status: row.visa_status ?? "not_required",
     has_passport: Boolean(row.passport_encrypted),
     has_scan: Boolean(row.passport_image_path),
+    has_visa_file: Boolean(row.visa_file_path),
   };
 }
 
@@ -114,7 +137,7 @@ type _NoCipher = ExpectFalse<Has<TravelerListItem, "passport_encrypted">>;
 type _NoScanPath = ExpectFalse<Has<TravelerListItem, "passport_image_path">>;
 type _NoNumber = ExpectFalse<Has<TravelerListItem, "number">>;
 type _NoFullName = ExpectFalse<Has<TravelerListItem, "full_name">>;
-type _NoNationality = ExpectFalse<Has<TravelerListItem, "nationality">>;
+type _NoVisaPath = ExpectFalse<Has<TravelerListItem, "visa_file_path">>;
 // …and the expiry MUST stay, because the expiring-soon signal depends on it.
 type _HasExpiry = ExpectTrue<Has<TravelerListItem, "passport_expiry">>;
 
@@ -124,6 +147,6 @@ export type _TravelerLeakProof = [
   _NoScanPath,
   _NoNumber,
   _NoFullName,
-  _NoNationality,
+  _NoVisaPath,
   _HasExpiry,
 ];
