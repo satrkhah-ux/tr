@@ -13,17 +13,15 @@ import {
   Plus,
   ShieldAlert,
   Upload,
-  Wallet,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import {
-  recordPayment,
   setClientStatus,
   setExecutionStatus,
   type OperationCard,
   type OperationPayment,
-  type PaymentKind,
 } from "@/lib/data/operations";
+import type { InstallmentRow } from "@/lib/data/operation-payments";
 import {
   getPassportScanUrl,
   getTravelerPassport,
@@ -36,9 +34,10 @@ import type { TranslationKey } from "@/lib/i18n";
 import type { OperationBooking, OperationDocument } from "@/lib/data/operation-bookings";
 import type { AssigneeOption, SentRequest } from "@/lib/data/operation-assign";
 import { DocumentsPanel } from "./DocumentsPanel";
+import { PaymentsPanel } from "./PaymentsPanel";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
-import { useSafeTransition, useSessionField } from "../useSafeTransition";
+import { useSafeTransition } from "../useSafeTransition";
 
 const CLIENT_KEY = (s: string) => `ops.client.${s}` as TranslationKey;
 const EXEC_KEY = (s: string) => `ops.exec.${s}` as TranslationKey;
@@ -52,6 +51,7 @@ export function OperationCase({
   operation,
   travelers,
   payments,
+  installments,
   bookings,
   documents,
   hasDays,
@@ -63,6 +63,7 @@ export function OperationCase({
   operation: OperationCard;
   travelers: TravelerListItem[];
   payments: OperationPayment[];
+  installments: InstallmentRow[];
   bookings: OperationBooking[];
   documents: OperationDocument[];
   hasDays: boolean;
@@ -74,7 +75,6 @@ export function OperationCase({
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
-  const paid = payments.reduce((s, p) => s + (p.kind === "refund" ? -p.amount : p.amount), 0);
 
   return (
     <TraveliunShell title="nav.operations">
@@ -160,13 +160,7 @@ export function OperationCase({
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <TravelersPanel operationId={operation.id} travelers={travelers} />
-          <PaymentsPanel
-            operationId={operation.id}
-            payments={payments}
-            paid={paid}
-            total={operation.total}
-            currency={operation.currency ?? "SAR"}
-          />
+          <PaymentsPanel operation={operation} payments={payments} installments={installments} />
         </div>
       </div>
     </TraveliunShell>
@@ -499,108 +493,5 @@ function TravelerRow({ traveler }: { traveler: TravelerListItem }) {
         )
       ) : null}
     </li>
-  );
-}
-
-const PAYMENT_KINDS: PaymentKind[] = ["deposit", "installment", "final", "refund"];
-
-function PaymentsPanel({
-  operationId,
-  payments,
-  paid,
-  total,
-  currency,
-}: {
-  operationId: string;
-  payments: OperationPayment[];
-  paid: number;
-  total: number | null;
-  currency: string;
-}) {
-  const { t } = useTraveliunUI();
-  const router = useRouter();
-  // kept in this tab until recorded — a reload after a deploy used to lose it
-  const [amount, setAmount] = useSessionField(`pay:${operationId}`, "");
-  const [kind, setKind] = useState<PaymentKind>("deposit");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useSafeTransition();
-
-  return (
-    <section className={card}>
-      <h2 className="text-sm font-extrabold text-[#185045]">{t("ops.payments")}</h2>
-
-      <div
-        className={`mt-3 rounded-[11px] px-4 py-3 ${
-          total != null && paid >= total ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#fff8e8] text-[#a86a10]"
-        }`}
-      >
-        <p className="text-[11.5px] font-bold opacity-70">{t("ops.payments")}</p>
-        <p className="tv-tnum mt-0.5 text-[17px] font-extrabold">
-          <DirText dir="ltr">{`${paid} / ${total ?? "—"} ${currency}`}</DirText>
-        </p>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        <label className={`${label} flex-1`}>
-          {t("ops.payment.amount")}
-          <input
-            type="number"
-            min={0}
-            dir="ltr"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className={`${field} tv-tnum text-center`}
-          />
-        </label>
-        <label className={`${label} flex-1`}>
-          {t("ops.payment.kind")}
-          <select value={kind} onChange={(e) => setKind(e.target.value as PaymentKind)} className={field}>
-            {PAYMENT_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {t(`ops.payment.${k}` as TranslationKey)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          disabled={pending || !(Number(amount) > 0)}
-          onClick={() =>
-            startTransition(async () => {
-              setError(null);
-              const res = await recordPayment({ operation_id: operationId, amount: Number(amount), kind, currency });
-              if (!res.ok) setError(t(res.error));
-              else {
-                setAmount("");
-                router.refresh();
-              }
-            })
-          }
-          className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
-        >
-          {pending ? <Loader2 className="size-4 animate-spin" /> : <Wallet className="size-4" />}
-          {t("ops.payment.add")}
-        </button>
-      </div>
-      {error ? <p className="mt-2 text-[12px] font-bold text-[#c22850]">{error}</p> : null}
-
-      {payments.length > 0 ? (
-        <ul className="mt-3 space-y-1.5 border-t border-[#f0f4f2] pt-3">
-          {payments.map((p) => (
-            <li key={p.id} className="flex items-center justify-between text-[12px] font-bold">
-              <span className="text-[#557d78]">
-                {t(`ops.payment.${p.kind}` as TranslationKey)}
-                <span className="ms-2 font-semibold text-[#93aaa3]">
-                  <DirText dir="ltr">{p.paid_at}</DirText>
-                </span>
-              </span>
-              <span className={`tv-tnum ${p.kind === "refund" ? "text-[#c22850]" : "text-[#0f3d38]"}`}>
-                <DirText dir="ltr">{`${p.kind === "refund" ? "-" : ""}${p.amount} ${p.currency}`}</DirText>
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </section>
   );
 }

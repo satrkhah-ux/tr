@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getClientHub } from "@/lib/data/operation-hub";
 import { DOCUMENT_LABEL } from "@/lib/operations/voucher-dto";
+import { TripReceipts } from "@/components/traveliun/operations/TripReceipts";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false, follow: false } };
@@ -79,6 +80,8 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
             </ul>
           )}
         </section>
+
+        <TripReceipts token={token} />
 
         {hub.pending.length > 0 ? (
           <section className="mt-4 rounded-2xl border border-[#f2e2b4] bg-[#fff8e8] p-6">

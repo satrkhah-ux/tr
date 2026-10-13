@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { OperationCase } from "@/components/traveliun/operations/OperationCase";
 import { listOperationPayments, listOperations } from "@/lib/data/operations";
+import { listInstallments } from "@/lib/data/operation-payments";
 import { listBookings, listDocuments } from "@/lib/data/operation-bookings";
 import { listTravelers } from "@/lib/data/operation-travelers";
 import { listAssignees, listSentRequests } from "@/lib/data/operation-assign";
@@ -15,9 +16,10 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
   const operation = operations.find((o) => o.id === id);
   if (!operation) notFound();
 
-  const [travelers, payments, bookings, documents, assignees, sentRequests, canBook] = await Promise.all([
+  const [travelers, payments, installments, bookings, documents, assignees, sentRequests, canBook] = await Promise.all([
     listTravelers(id),
     listOperationPayments(id),
+    listInstallments(id),
     listBookings(id),
     listDocuments(id),
     listAssignees(),
@@ -49,6 +51,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
       operation={operation}
       travelers={travelers}
       payments={payments}
+      installments={installments}
       bookings={bookings}
       documents={documents}
       hasDays={(count ?? 0) > 0}

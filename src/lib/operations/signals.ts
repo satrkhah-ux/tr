@@ -13,6 +13,7 @@
  */
 
 import { passportExpiringWithin } from "./traveler-dto";
+import { installmentStates, type Installment } from "./payments";
 import type { ClientStatus, ExecutionStatus } from "./state";
 
 export const TRAVEL_SOON_DAYS = 7;
@@ -25,7 +26,8 @@ export type OperationSignalCode =
   | "vouchers_pending"
   | "travel_approaching_incomplete"
   | "passport_expiring"
-  | "cancellation_deadline_near";
+  | "cancellation_deadline_near"
+  | "installment_overdue";
 
 export type SignalSeverity = "critical" | "warn" | "info";
 
@@ -54,6 +56,8 @@ export type OperationSnapshot = {
   }[];
   documents: { kind: string; booking_id: string | null; created_at?: string | null }[];
   travelers: { display_name: string; passport_expiry: string | null }[];
+  /** the payment schedule in force — stored, else the default (payments.ts). Absent = not checked. */
+  installments?: Installment[];
 };
 
 /** ISO date + N days, in UTC so a DST change never shifts the calendar day. */
@@ -156,7 +160,16 @@ export function cancellationDeadlineNear(op: OperationSnapshot, today: string): 
     .map((b) => b.title);
 }
 
+/** Installments past their due date that the money in so far does not cover — «date · amount still owed». */
+export function installmentOverdue(op: OperationSnapshot, today: string): string[] {
+  return installmentStates(op.installments ?? [], op.paid, today)
+    .filter((r) => r.state === "overdue")
+    .map((r) => `${r.due_date} · ${Math.round((r.amount - r.covered) * 100) / 100}`);
+}
+
 const SEVERITY: Record<OperationSignalCode, SignalSeverity> = {
+  // red on the board: money the client promised by a date that has passed
+  installment_overdue: "critical",
   travel_approaching_incomplete: "critical",
   cancellation_deadline_near: "critical",
   passport_expiring: "critical",
@@ -166,6 +179,7 @@ const SEVERITY: Record<OperationSignalCode, SignalSeverity> = {
 };
 
 const ORDER: OperationSignalCode[] = [
+  "installment_overdue",
   "travel_approaching_incomplete",
   "cancellation_deadline_near",
   "passport_expiring",
@@ -187,6 +201,7 @@ export function operationSignals(op: OperationSnapshot, today: string): Operatio
     ["travel_approaching_incomplete", travelApproachingIncomplete(op, today)],
     ["passport_expiring", passportExpiring(op, today)],
     ["cancellation_deadline_near", cancellationDeadlineNear(op, today)],
+    ["installment_overdue", installmentOverdue(op, today)],
   ];
   for (const [code, subjects] of pairs) if (subjects.length > 0) found.set(code, subjects);
 

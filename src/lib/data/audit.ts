@@ -32,6 +32,10 @@ export type AuditAction =
   | "operation.execution_status"
   | "operation.cancelled"
   | "payment.recorded"
+  | "payment.updated"
+  | "payment.deleted"
+  | "payment.proof_viewed"
+  | "payment.schedule_set"
   // passports — every one of these is a read of identity data
   | "passport.saved"
   | "passport.viewed"
