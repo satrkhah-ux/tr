@@ -7,6 +7,7 @@ import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser 
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { listTravelers } from "@/lib/data/operation-travelers";
+import { followFlight } from "@/lib/data/flight-follow";
 import { notifyBookingChanged, notifyPartnerCase } from "@/lib/data/ops-notify";
 import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, type VoucherBooking, type VoucherDTO, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { currentCan } from "@/lib/roles/current";
@@ -343,8 +344,20 @@ export async function updateBooking(input: {
     if (Object.keys(patch).length === 0) return { ok: true };
 
     const supabase = await db();
+    // a flight's legs time the receptions and drop-offs — keep the lines as they were before the edit
+    const before = input.detail
+      ? ((await supabase.from("operation_bookings").select("kind, title, operation_id, detail").eq("id", input.id).maybeSingle()).data as {
+          kind: string;
+          title: string;
+          operation_id: string;
+          detail: Record<string, string> | null;
+        } | null)
+      : null;
     const { error } = await supabase.from("operation_bookings").update(patch).eq("id", input.id);
     if (error) return { ok: false, error: "err.updateFailed" };
+    if (before?.kind === "flight" && input.detail) {
+      await followFlight(supabase, { id: input.id, operation_id: before.operation_id, title: input.title ?? before.title, detail: input.detail }, before.detail);
+    }
     await logAudit({
       action: "booking.created",
       entity: "operation_bookings",

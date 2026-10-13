@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ArrowRight,
   Eye,
@@ -59,6 +59,8 @@ export function OperationCase({
   assignees,
   sentRequests,
   canBook,
+  drivers,
+  management,
 }: {
   operation: OperationCard;
   travelers: TravelerListItem[];
@@ -71,6 +73,9 @@ export function OperationCase({
   sentRequests: SentRequest[];
   /** may commit a reservation at the supplier — `operations.book`. */
   canBook: boolean;
+  /** orders 9/10, built by the page: the driver cards, and owner/notes/activity. */
+  drivers?: ReactNode;
+  management?: ReactNode;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -158,6 +163,8 @@ export function OperationCase({
           canBook={canBook}
         />
 
+        {drivers}
+
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <TravelersPanel operationId={operation.id} travelers={travelers} />
           <PaymentsPanel
@@ -168,6 +175,8 @@ export function OperationCase({
             currency={operation.currency ?? "SAR"}
           />
         </div>
+
+        {management}
       </div>
     </TraveliunShell>
   );

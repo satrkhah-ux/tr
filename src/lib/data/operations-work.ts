@@ -52,7 +52,8 @@ async function load(): Promise<Loaded> {
   // The clock is read ONCE, on the server. Deriving "travel is approaching" in
   // the browser would make urgency depend on the visitor's device time, and two
   // agents on the same case would disagree about it.
-  const today = new Date().toISOString().slice(0, 10);
+  // the company's day (Riyadh), not the server's UTC one — the calendar's «today» is this too
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
   const closed: Loaded = { ok: false, items: [], cases: [], today };
 
   try {

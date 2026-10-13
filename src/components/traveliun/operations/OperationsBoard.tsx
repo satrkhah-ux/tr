@@ -7,6 +7,9 @@ import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { OperationCard } from "@/lib/data/operations";
 import { severityRank, type OperationSignal } from "@/lib/operations/signals";
+import { matchesFilters, matchesQuery, NO_FILTERS, type ListFilters } from "@/lib/operations/case-list";
+import type { StaffOption } from "@/lib/data/operation-case";
+import { ArrivalsCalendar, OperationsFilters } from "./OperationsListControls";
 import type { TranslationKey } from "@/lib/i18n";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
@@ -30,6 +33,8 @@ type Filter = "needs_action" | "all" | "unpaid" | "travelling_soon";
 export function OperationsBoard({
   operations,
   today,
+  owners,
+  staff,
 }: {
   /**
    * ONLY confirmed cases. The board deliberately does not list unconfirmed
@@ -39,39 +44,48 @@ export function OperationsBoard({
   operations: (OperationCard & { signals: OperationSignal[] })[];
   /** injected by the server page so the board and the signals agree on "now". */
   today: string;
+  /** operation id → its owner's employee id (0064). */
+  owners?: Record<string, string>;
+  staff?: StaffOption[];
 }) {
   const { t } = useTraveliunUI();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("needs_action");
+  const [filters, setFilters] = useState<ListFilters>(NO_FILTERS);
+
+  const listed = useMemo(() => operations.map((op) => ({ ...op, assignee_id: owners?.[op.id] ?? null })), [operations, owners]);
+  // the default list: live cases only — cancelled and travelled ones do not crowd it
+  const base = useMemo(() => listed.filter((op) => matchesFilters(op, filters)), [listed, filters]);
+  const staffName = useMemo(() => new Map((staff ?? []).map((s) => [s.id, s.label])), [staff]);
 
   const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return operations
-      .filter((op) => {
-        if (filter === "needs_action" && op.signals.length === 0) return false;
-        if (filter === "unpaid" && !op.signals.some((s) => s.code === "unpaid_confirmed")) return false;
-        if (filter === "travelling_soon" && !op.signals.some((s) => s.code === "travel_approaching_incomplete")) return false;
-        if (!q) return true;
-        return [op.serial, op.destination, op.customer_name, op.customer_phone, op.partner_name]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(q));
-      })
-      .sort((a, b) => {
-        const rank = severityRank(a.signals) - severityRank(b.signals);
-        if (rank !== 0) return rank;
-        return (a.travel_start ?? "9999").localeCompare(b.travel_start ?? "9999");
-      });
-  }, [operations, query, filter]);
+    const q = query.trim();
+    // a search reaches every case, closed ones too — the client on the phone may have travelled already
+    const pool = q
+      ? listed.filter((op) => matchesQuery(op, q) && matchesFilters(op, filters, true))
+      : base.filter((op) => {
+          if (filter === "needs_action" && op.signals.length === 0) return false;
+          if (filter === "unpaid" && !op.signals.some((s) => s.code === "unpaid_confirmed")) return false;
+          if (filter === "travelling_soon" && !op.signals.some((s) => s.code === "travel_approaching_incomplete")) return false;
+          return true;
+        });
+    return pool.sort((a, b) => {
+      const rank = severityRank(a.signals) - severityRank(b.signals);
+      if (rank !== 0) return rank;
+      return (a.travel_start ?? "9999").localeCompare(b.travel_start ?? "9999");
+    });
+  }, [listed, base, filters, query, filter]);
 
   const counts = useMemo(
     () => ({
-      needs_action: operations.filter((o) => o.signals.length > 0).length,
-      all: operations.length,
-      unpaid: operations.filter((o) => o.signals.some((s) => s.code === "unpaid_confirmed")).length,
-      travelling_soon: operations.filter((o) => o.signals.some((s) => s.code === "travel_approaching_incomplete")).length,
+      needs_action: base.filter((o) => o.signals.length > 0).length,
+      all: base.length,
+      unpaid: base.filter((o) => o.signals.some((s) => s.code === "unpaid_confirmed")).length,
+      travelling_soon: base.filter((o) => o.signals.some((s) => s.code === "travel_approaching_incomplete")).length,
     }),
-    [operations],
+    [base],
   );
+  const destinations = useMemo(() => [...new Set(operations.map((o) => o.destination).filter((d): d is string => Boolean(d)))].sort(), [operations]);
 
   const FILTERS: { key: Filter; labelKey: TranslationKey }[] = [
     { key: "needs_action", labelKey: "ops.needsAction" },
@@ -110,12 +124,15 @@ export function OperationsBoard({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={t("searchPlaceholder")}
-                className="h-10 w-56 rounded-[10px] border border-[#dbe6e1] bg-white px-3 pe-9 text-sm text-[#185045] outline-none focus:border-[#2aa87a]"
+                placeholder={t("ops.list.searchHint")}
+                className="h-10 w-64 max-w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 pe-9 text-sm text-[#185045] outline-none focus:border-[#2aa87a]"
               />
             </div>
           </div>
+          <OperationsFilters filters={filters} onChange={setFilters} destinations={destinations} staff={staff ?? []} />
         </section>
+
+        <ArrivalsCalendar operations={listed} today={today} />
 
         {rows.length === 0 ? (
           <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
@@ -128,7 +145,7 @@ export function OperationsBoard({
         ) : (
           <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
             {rows.map((op) => (
-              <CaseCard key={op.id} op={op} />
+              <CaseCard key={op.id} op={op} owner={op.assignee_id ? (staffName.get(op.assignee_id) ?? null) : null} />
             ))}
           </div>
         )}
@@ -140,7 +157,7 @@ export function OperationsBoard({
   );
 }
 
-function CaseCard({ op }: { op: OperationCard & { signals: OperationSignal[] } }) {
+function CaseCard({ op, owner }: { op: OperationCard & { signals: OperationSignal[] }; owner: string | null }) {
   const { t } = useTraveliunUI();
   const critical = op.signals.some((s) => s.severity === "critical");
 
@@ -162,6 +179,7 @@ function CaseCard({ op }: { op: OperationCard & { signals: OperationSignal[] } }
                 {t("ops.partnerTag", { name: op.partner_name })}
               </span>
             ) : null}
+            {owner ? <span className="ms-2 rounded-full bg-[#eaf1ff] px-2 py-0.5 text-[10.5px] font-bold text-[#2b57c4]">{owner}</span> : null}
           </p>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#eef4f1] px-2 py-1 text-[11px] font-bold text-[#557d78]">
