@@ -6,6 +6,7 @@ import { toClientOfferDTO } from "@/lib/offer/dto";
 import { renderOfferDocumentHtml } from "@/lib/offer-doc/html";
 import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
 import { currentCan } from "@/lib/roles/current";
+import { getPartnerSession } from "@/lib/partners/session";
 
 export const runtime = "nodejs";
 // Headless-Chromium cold start + render can exceed the default 10s; give it room.
@@ -46,10 +47,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ seri
 
   // `brand=ours` forces our identity even when the offer is tied to a partner;
   // no param at all falls back to whatever the offer was branded for.
+  // A partner never gets money from this route: the snapshot holds OUR sell, and
+  // `?prices=on` would print it. Their price is quoted at their terms elsewhere.
+  const partner = await getPartnerSession();
   const { brand, showPrices } = await resolveDocBrand({
     serial,
     partnerId: brandParam === "ours" ? null : brandParam,
-    showPrices: pricesParam == null ? undefined : pricesParam !== "off",
+    showPrices: partner ? false : pricesParam == null ? undefined : pricesParam !== "off",
   });
 
   const html = await renderOfferDocumentHtml({ ...props, brand, showPrices });

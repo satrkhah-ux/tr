@@ -2,11 +2,13 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
 import { airlineLogoUrl, publicBrandLogoUrl } from "@/components/offer-doc/brand";
 import { BOARD_AR } from "@/components/offer-doc/labels";
 import { getPartnerSession } from "@/lib/partners/session";
+import { keepOurStays, keepTheirPrices, partnerStays, priceForViewer } from "@/lib/partners/pricing";
+import { partnerCaller, viewerTerms } from "@/lib/partners/price-view";
 import {
   baggageLabel,
   defaultServicesFromLibrary,
@@ -176,14 +178,18 @@ export async function createDraft(seed?: Partial<DraftData>): Promise<CreateDraf
         .order("sort", { ascending: true });
       base.services = defaultServicesFromLibrary(libraryForCountry(buildTermLibrary(terms), null));
     }
-    const initial = seed
-      ? normalizeDraftData({ ...base, ...seed } as unknown as Record<string, unknown>)
+    // A partner's seed is held to the rules of their save: no buy, no margin of
+    // their choosing (a stated 0% would quote them our cost), no supplier rate.
+    const partner = await getPartnerSession();
+    const own = seed && partner ? keepDraftCost(seed, base) : seed;
+    if (own?.hotels && partner) own.hotels = keepOurStays(own.hotels, []);
+    const initial = own
+      ? normalizeDraftData({ ...base, ...own } as unknown as Record<string, unknown>)
       : base;
 
     // A partner's file names their company HERE, at the one place every draft is
     // born — the generator's new-file button, a ready offer, the portal. The row
     // itself is stamped by insertDraft, which is what makes it theirs.
-    const partner = await getPartnerSession();
     if (partner) {
       initial.customer = { ...initial.customer, company: partner.partner_name };
     }
@@ -227,11 +233,17 @@ export async function duplicateDraft(draftId: string, options: { freshClient?: b
   }
 }
 
-/** The draft for the generator's screens — without the cost unless the viewer holds pricing.internal. */
+/**
+ * The draft for the generator's screens — without the cost unless the viewer
+ * holds pricing.internal, and to a partner with a supplier stay's sell at their
+ * terms (the sheet's lines are already theirs: see partnerSheet).
+ */
 export async function getDraft(draftId: string): Promise<DraftRecord | null> {
   const record = await loadDraft(draftId);
   if (!record || (await currentCan("pricing.internal"))) return record;
   const redacted = redactDraftCost(record.data);
+  const partner = await partnerCaller();
+  if (partner) return { ...record, data: { ...redacted, hotels: partnerStays(redacted.hotels, partner.terms) } };
   // the package margin is the agent's to set when the administration says so
   if ((await getProfitSettings()).by === "staff" && (await currentCan("pricing.view")) && record.data.pricing.profit) {
     redacted.pricing = { ...redacted.pricing, profit: record.data.pricing.profit };
@@ -247,12 +259,18 @@ export async function getDraft(draftId: string): Promise<DraftRecord | null> {
 export async function saveDraftStages(draftId: string, slices: Partial<DraftData>): Promise<SaveDraftResult> {
   const user = await getServerUser();
   if (!user) return { ok: false, error: "err.session" };
-  if (await currentCan("pricing.internal")) return writeDraftStages(draftId, slices);
+  const internal = await currentCan("pricing.internal");
   // without the internal view the cost comes back from what is stored; the
   // package margin is taken from this agent only when the administration lets agents set it
-  const agentsSetProfit = (await getProfitSettings()).by === "staff" && (await currentCan("pricing.view"));
-  return writeDraftStages(draftId, slices, (sent, stored) => {
-    const kept = keepDraftCost(sent, stored);
+  const agentsSetProfit = !internal && (await getProfitSettings()).by === "staff" && (await currentCan("pricing.view"));
+  // a partner was shown a supplier stay at their terms: our sell comes back from storage
+  const partner = await partnerCaller();
+  return writeDraftStages(draftId, slices, (sent, stored, owner) => {
+    // staff on a partner's file: the prices it shows the partner stay theirs
+    const own = owner && !partner ? keepTheirPrices(sent, stored) : sent;
+    if (internal) return own;
+    const kept = keepDraftCost(own, stored);
+    if (partner && kept.hotels) kept.hotels = keepOurStays(kept.hotels, stored.hotels);
     if (agentsSetProfit && sent.pricing && kept.pricing && "profit" in sent.pricing) {
       kept.pricing = { ...kept.pricing, profit: sent.pricing.profit };
     }
@@ -369,7 +387,11 @@ export async function getGeneratorLookups(options: { catalog?: boolean } = {}): 
     hotelSources: [], countryServices: [],
   };
   try {
+    // the service read below must not answer a caller with no session at all
+    if (!(await getServerUser())) return empty;
     const supabase = await db();
+    // names only, from two tables 0055 closed to partners (their rows carry our prices)
+    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
     const ratesPromise = getRates();
     const [countriesRes, citiesRes, hotelsRes, roomTypesRes, airportsRes, transportRes, termsRes, airlinesRes, partnersRes, servicesRes, suppliersRes] = await Promise.all([
       // iso2 is not decoration: a real hotel supplier looks a city up WITHIN a
@@ -388,7 +410,7 @@ export async function getGeneratorLookups(options: { catalog?: boolean } = {}): 
       withCatalog ? roomTypeRows(supabase) : Promise.resolve({ data: [] }),
       // the city an airport serves turns «landed at LGK» into «the next city is لنكاوي»
       supabase.from("airports").select("id, arabic_name, code, iana_timezone, status, cities(arabic_name), countries(arabic_name)").order("code"),
-      supabase
+      service
         .from("transportation_types")
         .select("arabic_name, english_name, category, vehicle_class, pax_capacity, luggage_capacity, status")
         .order("pax_capacity", { ascending: true, nullsFirst: false }),
@@ -408,7 +430,7 @@ export async function getGeneratorLookups(options: { catalog?: boolean } = {}): 
         .order("name"),
       // names only — partners use the generator, and a service's buy/sell price
       // is for «اقتراح التسعير» on the server, never the browser
-      supabase.from("services").select("country_id, arabic_name").not("country_id", "is", null).order("arabic_name"),
+      service.from("services").select("country_id, arabic_name").not("country_id", "is", null).order("arabic_name"),
       // who a flight or hotel price was booked through — names and what they sell, no contacts
       supabase.from("company_suppliers").select("id, arabic_name, categories, status").order("arabic_name"),
     ]);
@@ -722,6 +744,9 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // kept only the last hotel when a city held two — the offer would print one
     // hotel and operations would book one, for a trip that needed both.
     const stays = deriveHotelStays(cities, data.hotels);
+    // A partner's file is issued at their terms: the stay's sell is a column
+    // their token reads (offer_hotels_partner_read), and the sheet already is.
+    const terms = await viewerTerms(record.partner_company_id);
     const boardLabel: Record<string, string> = { RO: "غرفة فقط", BB: "شامل الإفطار", HB: "نصف إقامة", FB: "إقامة كاملة", AI: "شامل كليًا" };
 
     const hotels: OfferHotelInput[] = stays.map((stay) => {
@@ -741,7 +766,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         // manually-priced lines keep money only in the pricing items.
         buy_price: s ? s.net_base : null,
         buy_currency: s ? "SAR" : null,
-        sell_price: s ? s.sell_base : null,
+        sell_price: s ? priceForViewer(s.sell_base, terms) : null,
         sell_currency: s ? "SAR" : null,
         // supplier sourcing → frozen into the render snapshot (offer_renders)
         cancellation_policy: s?.cancellation_policy ?? null,
@@ -835,7 +860,9 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
 
     // Chosen in the customer stage. A draft that predates the picker carries only
     // the typed company NAME, so resolve that too rather than losing the branding.
-    let partnerCompanyId = data.customer.partner_company_id;
+    // A partner's own file is theirs whatever its customer stage says: they can
+    // write that field, and it would file the offer under another company.
+    let partnerCompanyId = record.partner_company_id ?? data.customer.partner_company_id;
     if (!partnerCompanyId && data.customer.company.trim()) {
       const supabase = await db();
       const { data: rows } = await supabase.from("booking_partners").select("id, name").eq("resells", true);

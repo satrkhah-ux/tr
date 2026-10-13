@@ -33,7 +33,8 @@ async function access(): Promise<Access | null> {
   return { db: createSupabaseServiceClient() as unknown as SupabaseClient, partnerId };
 }
 
-export type DraftRecord = { id: string; data: DraftData; updated_at: string };
+/** `partner_company_id`: the partner company the draft belongs to — its prices are quoted at their terms. */
+export type DraftRecord = { id: string; data: DraftData; updated_at: string; partner_company_id: string | null };
 export type DraftRow = { id: string; title: string | null; data: Record<string, unknown>; updated_at: string };
 export type SaveDraftResult = { ok: boolean; error?: TranslationKey };
 export type InsertDraftResult = { ok: true; id: string } | { ok: false; error: TranslationKey };
@@ -78,12 +79,17 @@ export async function loadDraft(draftId: string): Promise<DraftRecord | null> {
   try {
     const a = await access();
     if (!a) return null;
-    let query = a.db.from("offer_drafts").select("id, data, updated_at").eq("id", draftId);
+    let query = a.db.from("offer_drafts").select("id, data, updated_at, partner_company_id").eq("id", draftId);
     if (a.partnerId) query = query.eq("partner_company_id", a.partnerId);
     const { data } = await query.maybeSingle();
     if (!data) return null;
-    const row = data as { id: string; data: Record<string, unknown>; updated_at: string };
-    return { id: row.id, data: normalizeDraftData(row.data), updated_at: row.updated_at };
+    const row = data as { id: string; data: Record<string, unknown>; updated_at: string; partner_company_id: string | null };
+    return {
+      id: row.id,
+      data: normalizeDraftData(row.data),
+      updated_at: row.updated_at,
+      partner_company_id: row.partner_company_id ?? null,
+    };
   } catch {
     return null;
   }
@@ -92,19 +98,20 @@ export async function loadDraft(draftId: string): Promise<DraftRecord | null> {
 /**
  * Merge slices into the stored draft (shallow, top-level keys). `restore`
  * rewrites the slices against what is stored before the merge — drafts.ts uses
- * it to put back the cost a redacted browser could not send.
+ * it to put back the cost a redacted browser could not send, and a partner's
+ * prices a staff browser must not overwrite (`owner`: the draft's partner company).
  */
 export async function writeDraftStages(
   draftId: string,
   slices: Partial<DraftData>,
-  restore?: (slices: Partial<DraftData>, stored: DraftData) => Partial<DraftData>,
+  restore?: (slices: Partial<DraftData>, stored: DraftData, owner: string | null) => Partial<DraftData>,
 ): Promise<SaveDraftResult> {
   try {
     const a = await access();
     if (!a) return { ok: false, error: "err.forbidden" };
     const record = await loadDraft(draftId);
     if (!record) return { ok: false, error: "err.loadFailed" };
-    const merged: DraftData = { ...record.data, ...(restore ? restore(slices, record.data) : slices) };
+    const merged: DraftData = { ...record.data, ...(restore ? restore(slices, record.data, record.partner_company_id) : slices) };
     const title = merged.customer.customer_name || merged.trip.destination || merged.trip.country || null;
     let query = a.db
       .from("offer_drafts")

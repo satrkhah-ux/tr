@@ -23,6 +23,8 @@ import {
   type DraftPricingItem,
 } from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
+import { viewerTerms } from "@/lib/partners/price-view";
+import { partnerPrice, priceForViewer, type PartnerTerms } from "@/lib/partners/pricing";
 import type { BoardType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -164,6 +166,8 @@ export async function searchInternalHotels(
   try {
     const record = await loadDraft(draftId);
     if (!record) return { ok: false, error: "err.loadFailed" };
+    // a partner's file sees what we last charged at that partner's terms
+    const terms = await viewerTerms(record.partner_company_id);
     // Same nights the supplier search would quote, so the two tabs' totals are
     // comparable rather than each meaning something slightly different.
     const resolved = await resolveStay(draftId, cityName, stayId);
@@ -207,10 +211,12 @@ export async function searchInternalHotels(
     if (rows.length === 0) return { ok: true, hotels: [] };
 
     // The price history, newest first, for exactly these hotels. One query, not
-    // one per hotel — this list runs to 155 rows in a busy city.
+    // one per hotel — this list runs to 155 rows in a busy city. Our own offers
+    // only: a partner's is issued at their terms, not at our sell.
     const { data: priced } = await supabase
       .from("offer_hotels")
-      .select("hotel_id, nights, board_type, room_type_name, sell_price, sell_currency, check_in")
+      .select("hotel_id, nights, board_type, room_type_name, sell_price, sell_currency, check_in, offers!inner(partner_company_id)")
+      .is("offers.partner_company_id", null)
       .in("hotel_id", rows.map((r) => r.id))
       .not("sell_price", "is", null)
       .order("check_in", { ascending: false, nullsFirst: false })
@@ -231,7 +237,7 @@ export async function searchInternalHotels(
       lastFor.set(h.hotel_id, {
         // Stored per night, because the past stay's length is rarely this one's
         // — quoting its total would price a different trip.
-        per_night: Math.round((Number(h.sell_price) / nights) * 100) / 100,
+        per_night: priceForViewer(Math.round((Number(h.sell_price) / nights) * 100) / 100, terms),
         currency: h.sell_currency ?? BASE,
         board_type: (h.board_type as BoardType | null) ?? null,
         room_type_name: h.room_type_name,
@@ -308,7 +314,7 @@ async function resolveStay(draftId: string, cityName: string, stayId?: string | 
   const rooms = stay && stay.line.rooms_count > 0 ? stay.line.rooms_count : 1;
   const nights = stay?.nights ?? city?.nights ?? 0;
   if (!check_in || !check_out) return null;
-  return { data, stay: { check_in, check_out, rooms, nights } as Stay };
+  return { data, owner: record.partner_company_id, stay: { check_in, check_out, rooms, nights } as Stay };
 }
 
 function contextFor(country: string | null, city: string, supplierId: string, date: string | null): MarkupContext {
@@ -334,6 +340,13 @@ export async function searchHotelsForCity(
   const resolved = await resolveStay(draftId, cityName, stayId);
   if (!resolved) return { ok: false, error: "pg.supplier.noDates" };
   const { data, stay } = resolved;
+  let terms: PartnerTerms | null;
+  try {
+    // a partner's file sees our sell at that partner's terms
+    terms = await viewerTerms(resolved.owner);
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
 
   // Read, never stored: the sink is how we find out whether an empty result was
   // an empty city or a refusal. See getEnabledHotelSuppliers.
@@ -389,16 +402,17 @@ export async function searchHotelsForCity(
         const ctx = contextFor(cityCountry(data, cityName), cityName, rate.supplier_id, data.trip.arrival_date);
         const priced = priceSupplierRate(rate, rules, ctx, sarPer, BASE, fxDate);
         if (!priced.ok) continue; // can't price (no fx / no rule) — omit rather than mislead
+        const sell = priceForViewer(priced.line.sell, terms);
         rates.push({
           rate_key: rate.rate_key,
           room_name: rate.room_category_raw,
           board_type: rate.board_type,
           refundable: rate.refundable,
           cancellation_policy: rate.cancellation_policy,
-          sell: priced.line.sell,
+          sell,
           // Computed once here rather than in every card, so the number the
           // agent compares by is the same one everywhere it appears.
-          per_night: stay.nights > 0 ? Math.round((priced.line.sell / stay.nights) * 100) / 100 : priced.line.sell,
+          per_night: stay.nights > 0 ? Math.round((sell / stay.nights) * 100) / 100 : sell,
           currency: BASE,
           valid_until: rate.valid_until,
           blocked: priced.line.blocks.length > 0,
@@ -520,6 +534,12 @@ export async function selectHotelRate(
   const resolved = await resolveStay(draftId, cityName, stayId);
   if (!resolved) return { ok: false, error: "pg.supplier.noDates" };
   const { data, stay } = resolved;
+  let terms: PartnerTerms | null;
+  try {
+    terms = await viewerTerms(resolved.owner);
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
 
   const adapter = await getSupplierAdapter(supplierCode);
   if (!adapter) return { ok: false, error: "pg.supplier.noRates" };
@@ -631,7 +651,7 @@ export async function selectHotelRate(
   const hotelName = content?.name_ar || rate.hotel_name;
   const target = hotels.find((h) => (targetId ? h.id === targetId : h.city_name === cityName));
   const ref = target ? pricingRefFor({ line: target, city_name: cityName }) : `${cityName} — ${hotelName}`;
-  const item: DraftPricingItem = {
+  const ours: DraftPricingItem = {
     item_type: "hotel",
     description: `${cityName} — ${hotelName}`,
     ref,
@@ -641,6 +661,10 @@ export async function selectHotelRate(
     sell_price: line.sell,
     sell_currency: BASE,
   };
+  // A partner's file carries their price on the sheet, never our net or sell:
+  // the supplier's sell moved by their terms — the figure the stay card shows
+  // them (partnerStays). The sourcing keeps ours, the server's record of the rate.
+  const item: DraftPricingItem = terms ? { ...ours, buy_price: null, buy_currency: "", sell_price: partnerPrice(line.sell, terms) } : ours;
   const items = [...data.pricing.items];
   const idx = items.findIndex(
     (p) =>

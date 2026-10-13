@@ -2,12 +2,14 @@
 
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { createDraft } from "./drafts";
 import type { DraftData } from "@/lib/offer/draft-types";
 import { parseSheet } from "@/lib/ready-offers/parse";
 import { buildSeed, type ParsedOffer, type ReadyOfferRecord, type SyncDiff, type Tier } from "@/lib/ready-offers/types";
 import { currentCan } from "@/lib/roles/current";
+import { getPartnerSession, type PartnerSession } from "@/lib/partners/session";
+import { partnerPrice, partnerSeed } from "@/lib/partners/pricing";
 
 /**
  * «العروض الجاهزة» — the company's prepared seasonal packages.
@@ -37,8 +39,36 @@ async function requireManage(): Promise<string | null> {
   return await currentCan("settings.manage") ? null : "ro.err.forbidden";
 }
 
+/**
+ * A partner's read: 0055 closed ready_offers to their token (each row carries
+ * our package price), so the rows come through the service role with the
+ * dropped policy's own filter — active, and marked for resale.
+ */
+function forPartner() {
+  return (createSupabaseServiceClient() as unknown as SupabaseClient)
+    .from("ready_offers")
+    .select(SELECT)
+    .eq("active", true)
+    .eq("partner_resell", true);
+}
+
+/** A ready offer as a partner sees it: the price at their terms, and no design (it prints ours). */
+function partnerView(row: ReadyOfferRecord, partner: PartnerSession): ReadyOfferRecord {
+  return {
+    ...row,
+    price: row.price == null ? null : partnerPrice(Number(row.price), partner.terms),
+    design_url: null,
+    seed: partnerSeed(row.seed, partner.terms),
+  };
+}
+
 export async function listReadyOffers(includeInactive = false): Promise<ReadyOfferRecord[]> {
   try {
+    const partner = await getPartnerSession();
+    if (partner) {
+      const { data } = await forPartner().order("tier").order("price", { ascending: true });
+      return ((data ?? []) as unknown as ReadyOfferRecord[]).map((row) => partnerView(row, partner));
+    }
     const supabase = await db();
     let query = supabase.from("ready_offers").select(SELECT).order("tier").order("price", { ascending: true });
     if (!includeInactive) query = query.eq("active", true);
@@ -248,17 +278,16 @@ export async function startDraftFromReadyOffer(id: string): Promise<StartDraftRe
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
-    const supabase = await db();
-    const { data } = await supabase
-      .from("ready_offers")
-      .select("id, seed, status, active")
-      .eq("id", id)
-      .maybeSingle();
-    const row = data as { id: string; seed: Record<string, unknown> | null; status: string | null; active: boolean } | null;
+    // a partner's file starts at their price, never ours
+    const partner = await getPartnerSession();
+    const { data } = partner
+      ? await forPartner().eq("id", id).maybeSingle()
+      : await (await db()).from("ready_offers").select("id, seed, status, active").eq("id", id).maybeSingle();
+    const row = data as { id: string; seed: Partial<DraftData> | null; status: string | null; active: boolean } | null;
     if (!row || !row.active) return { ok: false, error: "ro.err.notFound" };
     if (row.status === "coming_soon") return { ok: false, error: "ro.err.comingSoon" };
     if (!row.seed) return { ok: false, error: "ro.err.noSeed" };
-    return createDraft(row.seed as Partial<DraftData>);
+    return createDraft((partner ? partnerSeed(row.seed, partner.terms) : row.seed) ?? undefined);
   } catch {
     return { ok: false, error: "err.db" };
   }

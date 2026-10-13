@@ -1,11 +1,15 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
-import { getPartnerSession } from "@/lib/partners/session";
+import { ourDefaultMarginPct, partnerCaller, viewerTerms } from "@/lib/partners/price-view";
+import { partnerSheet } from "@/lib/partners/pricing";
 import { loadDraft } from "./draft-store";
+import { getRates } from "./rates-actions";
 import { findLookupCountry } from "@/lib/offer/draft-types";
+import { packageProfitFor } from "@/lib/offer/basic";
+import { rebase } from "@/lib/offer/pricing";
 import {
   suggestPricing,
   type PricingReference,
@@ -21,12 +25,13 @@ import {
  * Server-side because the lists are large and internal: 879 transfer prices
  * and the buy side of every service. None of it belongs in a browser bundle,
  * and only the handful of figures this draft actually needs comes back — the
- * buy side of those only to someone holding pricing.internal.
+ * buy side of those only to someone holding pricing.internal, and a partner's
+ * file only at that partner's terms (partnerSheet).
+ *
+ * The lists are read with the service role: 0055 closed them to partners, whose
+ * own token would otherwise read our prices raw, and staff read every row anyway.
+ * What leaves is decided below, not by the session the rows were read with.
  */
-
-async function db(): Promise<SupabaseClient> {
-  return (await createSupabaseServerClient()) as unknown as SupabaseClient;
-}
 
 export type SuggestPricingResult =
   | { ok: true; items: SuggestedItem[] }
@@ -43,7 +48,7 @@ export async function suggestPricingForDraft(
   const data = record.data;
 
   try {
-    const supabase = await db();
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
 
     // The country scopes the price lists — a transfer in Tbilisi is not a
     // transfer in Istanbul, and the same service costs differently per market.
@@ -64,10 +69,10 @@ export async function suggestPricingForDraft(
             .eq("country_id", country.id)
             .not("price", "is", null)
         : Promise.resolve({ data: [] }),
-      // Service role: 0047 withholds services.buy_price from every session. The
-      // buy side leaves this function only for pricing.internal (below).
+      // 0047 withholds services.buy_price from every session. The buy side
+      // leaves this function only for pricing.internal (below).
       country
-        ? (createSupabaseServiceClient() as unknown as SupabaseClient)
+        ? supabase
             .from("services")
             .select("id, service_type, arabic_name, buy_price, buy_currency, sell_price, sell_currency, created_at")
             .eq("country_id", country.id)
@@ -81,11 +86,13 @@ export async function suggestPricingForDraft(
             .eq("per_night", true)
         : Promise.resolve({ data: [] }),
       // The last price actually quoted for these hotels, as a final fallback —
-      // the same history the hotel search already shows as «آخر عرض».
+      // the same history the hotel search already shows as «آخر عرض». Our own
+      // offers only: a partner's is issued at their terms, not at our sell.
       hotelIds.length > 0
         ? supabase
             .from("offer_hotels")
-            .select("hotel_id, hotel_name, room_type_name, board_type, sell_price, sell_currency, check_in")
+            .select("hotel_id, hotel_name, room_type_name, board_type, sell_price, sell_currency, check_in, offers!inner(partner_company_id)")
+            .is("offers.partner_company_id", null)
             .in("hotel_id", hotelIds)
             .not("sell_price", "is", null)
             .order("check_in", { ascending: false, nullsFirst: false })
@@ -175,8 +182,8 @@ export async function suggestPricingForDraft(
       return [{ ...r, buy_currency: buy, sell_currency: sell, legacy_id: legacyId.get(r.id) ?? null }];
     });
 
-    // our tours list is our cost: a partner's draft never gets it as its price
-    const toursRes = country && !(await getPartnerSession())
+    // our tours list is our cost: a partner's file gets it only through partnerSheet
+    const toursRes = country
       ? await supabase.from("tours").select("arabic_name, price, currency").eq("country_id", country.id).not("price", "is", null)
       : { data: [] };
     const tours = ((toursRes.data ?? []) as { arabic_name: string | null; price: number | string; currency: string | null }[]).flatMap((t) => {
@@ -195,6 +202,23 @@ export async function suggestPricingForDraft(
     };
 
     const items = suggestPricing(data, reference, labels);
+    // A partner's file — whoever is pricing it — is quoted at that partner's
+    // terms, with no buy on any line; the margin on our lines is the one issuing
+    // would apply, read here because a partner cannot read the settings.
+    const terms = await viewerTerms(record.partner_company_id);
+    if (terms) {
+      const quote = data.pricing.display_currency || "SAR";
+      const [{ sarPer }, defaultPct, partner] = await Promise.all([getRates(), ourDefaultMarginPct(), partnerCaller()]);
+      return {
+        ok: true,
+        items: partnerSheet(items, terms, {
+          profit: packageProfitFor(data.pricing, defaultPct),
+          rates: rebase(sarPer, quote) ?? {},
+          quote,
+          byPartner: partner != null,
+        }),
+      };
+    }
     if (await currentCan("pricing.internal")) return { ok: true, items };
     // Whoever cannot see a buy price is not sent one. Saving keeps the stored
     // buy of a line that already had one (keepDraftCost); a line they add from
