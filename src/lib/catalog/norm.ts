@@ -36,6 +36,19 @@ export function normEn(value: string | null | undefined): string {
   return /[a-z]/.test(folded) ? folded : "";
 }
 
+/**
+ * The consonant skeleton of a folded name: long vowels, hamza seats and Latin
+ * vowels dropped, spaces and punctuation removed, doubled letters collapsed —
+ * «ملينيوم» and «ميلينيوم» are both «ملنم». Mirrors `public.catalog_skel` (0070);
+ * the search box falls back to it when the folded name finds nothing.
+ */
+export function catalogSkel(value: string | null | undefined): string {
+  return normAr(value)
+    .replace(/[اويءئؤaeiouy]/g, "")
+    .replace(/[ _.,'"()&/*+:;!?#@،-]/g, "")
+    .replace(/(.)\1+/gu, "$1");
+}
+
 /** Edit distance, two-row. */
 function levenshtein(a: string, b: string): number {
   if (a === b) return 0;
