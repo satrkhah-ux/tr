@@ -1271,6 +1271,7 @@ export const ar: Dictionary = {
   "pg.finalTotal": "الإجمالي النهائي للعميل",
   "pg.partnerCost": "إجمالي التكلفة",
   "pg.partnerSell": "سعر بيعك لعميلك — يظهر في عرضك",
+  "pg.partnerBelowCost": "سعرك أقل من تكلفتك علينا بـ {amount} — تأكد قبل الإصدار.",
   "pg.pricingSeeded": "أُضيف {added} بنداً جديداً، وسُعِّر {priced} بنداً من قوائمكم. الباقي يحتاج رقماً.",
   "pg.unpricedCount": "{count} بنود بلا سعر",
   "pg.suggestItems": "اقتراح بنود من المراحل",

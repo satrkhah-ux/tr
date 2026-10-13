@@ -394,6 +394,11 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
               className={`${fieldClass} tv-tnum text-center`}
               placeholder={formatMoney(summary.total_sell)}
             />
+            {partner && pricing.final_total != null && pricing.final_total < summary.total_sell ? (
+              <span className="text-[11.5px] font-bold text-[#c22850]">
+                {t("pg.partnerBelowCost", { amount: `${formatMoney(summary.total_sell - pricing.final_total)} ${display}` })}
+              </span>
+            ) : null}
           </label>
         </div>
       </section>
