@@ -20,7 +20,8 @@
  */
 
 import { deriveCityDates, hopKey, type DraftData, type DraftTransport } from "./draft-types";
-import { itineraryStartDate } from "./schedule";
+import { itineraryStartDate, toInstant } from "./schedule";
+import { offsetFromHome } from "./timezones";
 
 export type ArriveBy = "" | "flight" | "land" | "rail_sea" | "already";
 export type PointKind = "" | "airport" | "hotel" | "border" | "self";
@@ -134,14 +135,18 @@ export function fillAdvanced(adv: DraftAdvanced, d: AdvancedDefaults): DraftAdva
     arrive_date: d.arrive_date ?? "",
     arrive_time: d.arrive_time ?? "",
     checkin_date: d.checkin_date ?? "",
-    reception_date: d.checkin_date || d.arrive_date || "",
+    reception_date: d.arrive_date || d.checkin_date || "",
     farewell_date: d.leave_date ?? "",
     leave_date: d.leave_date ?? "",
     leave_time: d.leave_time ?? "",
   };
   let out = adv;
   const auto = new Set(adv.auto);
-  for (const k of Object.keys(want) as AdvancedDateKey[]) {
+  // own dates first, then the ones that follow them: we meet the group the day it arrives, leave it the day it leaves
+  const order: AdvancedDateKey[] = ["arrive_date", "arrive_time", "checkin_date", "leave_date", "leave_time", "reception_date", "farewell_date"];
+  for (const k of order) {
+    if (k === "reception_date") want[k] = out.arrive_date || want[k];
+    if (k === "farewell_date") want[k] = out.leave_date || want[k];
     const now = getDate(out, k);
     if ((now === "" || auto.has(k)) && want[k] && want[k] !== now) {
       out = putDate(out, k, want[k]);
@@ -286,39 +291,145 @@ function wrongPlace(by: ArriveBy, place: string): string | null {
   return null;
 }
 
-/** What is still open or does not add up — said to the agent, never invented. */
-export function advancedGaps(adv: DraftAdvanced | undefined): string[] {
-  if (!adv?.on) return [];
-  const gaps: string[] = [];
-  if (!adv.arrive_country) gaps.push("اختر دولة وصول العميل");
-  if (!adv.arrive_by) gaps.push("اختر كيف يصل العميل");
-  if (!adv.leave_country) gaps.push("اختر دولة مغادرة العميل");
-  if (!adv.leave_by) gaps.push("اختر كيف يغادر العميل");
-  for (const w of [wrongPlace(adv.arrive_by, adv.arrive_at), wrongPlace(adv.leave_by, adv.leave_from)]) if (w) gaps.push(w);
-  for (const [label, p] of [["الاستقبال", adv.reception], ["التوديع", adv.farewell]] as const) {
-    if (!p.kind) {
-      gaps.push(`اختر نقطة ${label}`);
-      continue;
-    }
-    if (p.kind === "self") continue;
-    if (p.kind !== "airport" && !p.place.trim()) gaps.push(`${label}: اختر ${p.kind === "hotel" ? "الفندق" : "المعبر"}`);
-    if (p.kind === "border" && !p.side.trim()) gaps.push(`${label}: حدد أي جانب من الحدود`);
-    if (!p.date) gaps.push(`${label}: التاريخ غير محدد`);
-    if (p.kind !== "airport" && !p.time.trim()) gaps.push(`${label}: موعد اللقاء ينتظر التأكيد`);
-  }
-  if (adv.arrive_by && adv.arrive_by !== "already" && (adv.reception.kind === "hotel" || adv.reception.kind === "border") && !adv.arrive_at.trim())
-    gaps.push("من أين يأتي العميل إلى نقطة الاستقبال؟ اختر مكان وصوله");
-  // the dates against each other — reported, never corrected
+export type StepKey = "arrive" | "reception" | "checkin" | "farewell" | "leave";
+export type AdvancedStep = {
+  key: StepKey;
+  title: string;
+  /** the step told as one sentence, from the answers. */
+  sentence: string;
+  /** contradictions — the trip cannot happen this way. */
+  errors: string[];
+  /** not answered yet, or worth a second look. */
+  missing: string[];
+};
+
+/** an IANA zone for a country name, or null when the catalogue has none. */
+export type TzOf = (country: string) => string | null;
+
+/**
+ * Every clock on the card is LOCAL to its own place — as tickets print them.
+ * Two clocks are compared as real instants once their zones are known; a 22:40
+ * landing in Kuala Lumpur and a 22:00 pickup on the Thai side are 20 minutes apart,
+ * not 40 the wrong way. Without a zone, the wall clocks are compared as written.
+ */
+function instantOf(date: string, time: string, tz: string | null): number {
+  const local = `${date}T${time || "00:00"}`;
+  return toInstant(local, tz)?.getTime() ?? Date.parse(`${local}:00Z`);
+}
+
+/** «بتوقيت ماليزيا، +5 س عن السعودية» — said whenever a time is shown in a zone that is not home. */
+function zoneNote(country: string, tz: string | null, date: string): string {
+  if (!country || !tz) return "";
+  const diff = offsetFromHome(tz, date || null);
+  if (diff === null || diff === 0) return ` بتوقيت ${country}`;
+  const h = Math.abs(diff);
+  return ` بتوقيت ${country} (${diff > 0 ? "+" : "−"}${Number.isInteger(h) ? h : h.toFixed(1)} س عن السعودية)`;
+}
+const day = (date: string, time = "", zone = "") => (date ? `يوم ${date}${time ? ` الساعة ${time}${zone}` : ""}` : "— التاريخ غير محدد");
+const hasSelf = (adv: DraftAdvanced) => adv.self_items.some((x) => x.trim());
+
+/**
+ * The trip in its own order — arrive, met, first night, left, leave — each step
+ * a sentence the agent can read back, with what contradicts and what is missing
+ * right under it. Nothing is corrected: the agent decides.
+ */
+export function advancedSteps(adv: DraftAdvanced, tzOf: TzOf = () => null): AdvancedStep[] {
   const rx = adv.reception;
-  if (adv.arrive_date && rx.kind && rx.kind !== "self" && rx.date && rx.date < adv.arrive_date) gaps.push(`الاستقبال (${rx.date}) قبل وصول العميل (${adv.arrive_date})`);
-  if (adv.arrive_date && adv.checkin_date && adv.checkin_date > adv.arrive_date && !adv.self_items.some((x) => x.trim()))
-    gaps.push(`بين الوصول (${adv.arrive_date}) والدخول للفندق (${adv.checkin_date}) ليلة غير محجوزة — أضفها لما يرتّبه العميل أو احجزها`);
-  if (adv.arrive_date && adv.checkin_date === adv.arrive_date && adv.arrive_time && adv.arrive_time < "06:00")
-    gaps.push(`الوصول ${adv.arrive_time} بعد منتصف الليل والدخول ${adv.checkin_date} — هل يلزم حجز الليلة السابقة؟`);
-  if (adv.leave_date && adv.farewell.kind && adv.farewell.kind !== "self" && adv.farewell.date && adv.farewell.date > adv.leave_date)
-    gaps.push(`التوديع (${adv.farewell.date}) بعد مغادرة العميل (${adv.leave_date})`);
-  for (const [key, hop] of Object.entries(adv.borders)) if (!hop.crossing.trim()) gaps.push(`${key.replace(">", " ← ")}: اكتب اسم المعبر`);
-  return gaps;
+  const fw = adv.farewell;
+  // where each clock is read: a border side is its own country; the rest is where they land / leave
+  const rxCountry = rx.kind === "border" && rx.side ? rx.side : adv.arrive_country;
+  const fwCountry = fw.kind === "border" && fw.side ? fw.side : adv.leave_country;
+  const tzA = tzOf(adv.arrive_country);
+  const tzR = tzOf(rxCountry);
+  const tzF = tzOf(fwCountry);
+  const tzL = tzOf(adv.leave_country);
+  const step = (key: StepKey, title: string): AdvancedStep => ({ key, title, sentence: "", errors: [], missing: [] });
+
+  const arrive = step("arrive", "الوصول");
+  const arriveWhere = adv.arrive_at.trim() || adv.arrive_country || "؟";
+  arrive.sentence =
+    adv.arrive_by === "already"
+      ? `العميل موجود مسبقاً في ${adv.arrive_country || "البلد"}`
+      : `يصل العميل إلى ${arriveWhere}${adv.arrive_country && adv.arrive_at.trim() ? ` (${adv.arrive_country})` : ""}${adv.arrive_by ? ` — ${ARRIVE_BY_AR[adv.arrive_by]}` : ""} ${day(adv.arrive_date, adv.arrive_time, zoneNote(adv.arrive_country, tzA, adv.arrive_date))}`;
+  if (!adv.arrive_country) arrive.missing.push("اختر دولة الوصول");
+  if (!adv.arrive_by) arrive.missing.push("اختر وسيلة الوصول");
+  else if (adv.arrive_by !== "already" && !adv.arrive_at.trim()) arrive.missing.push("اختر مكان الوصول");
+  const wa = wrongPlace(adv.arrive_by, adv.arrive_at);
+  if (wa) arrive.errors.push(wa);
+  if (adv.arrive_by && adv.arrive_by !== "already" && !adv.arrive_date) arrive.missing.push("تاريخ الوصول غير محدد");
+
+  const reception = step("reception", "الاستقبال");
+  if (!rx.kind) {
+    reception.sentence = "لم يُحدد من أين نستقبله";
+    reception.missing.push("اختر نقطة الاستقبال");
+  } else if (rx.kind === "self") reception.sentence = "لا استقبال — يصل إلى الفندق بنفسه";
+  else {
+    const where = rx.kind === "airport" ? airportOf(adv.arrive_by, adv.arrive_at, "المطار") : pointText(rx);
+    reception.sentence = `نستقبله من ${where} ${day(rx.date, rx.time, zoneNote(rxCountry, tzR, rx.date))}`;
+    if (rx.kind !== "airport" && !rx.place.trim()) reception.missing.push(`اختر ${rx.kind === "hotel" ? "الفندق" : "المعبر"}`);
+    if (rx.kind === "border" && !rx.side) reception.missing.push("حدد أي جانب من الحدود");
+    if (!rx.date) reception.missing.push("يوم الاستقبال غير محدد");
+    if (rx.kind !== "airport" && !rx.time) reception.missing.push("موعد اللقاء ينتظر التأكيد");
+    if (rx.kind === "airport" && adv.arrive_by && adv.arrive_by !== "flight") reception.errors.push(`العميل يصل ${ARRIVE_BY_AR[adv.arrive_by]} — لا يوجد مطار نستقبله منه`);
+    if (rx.date && adv.arrive_date && adv.arrive_by !== "already" && instantOf(rx.date, rx.time, tzR) < instantOf(adv.arrive_date, adv.arrive_time, tzA))
+      reception.errors.push(`الاستقبال (${rx.date}${rx.time ? ` ${rx.time}` : ""}) قبل وصول العميل (${adv.arrive_date}${adv.arrive_time ? ` ${adv.arrive_time}` : ""})`);
+    // met in another country than the one they land in: how do they get there?
+    if (rx.kind === "border" && rx.side && adv.arrive_country && rx.side !== adv.arrive_country && !hasSelf(adv))
+      reception.missing.push(`يصل إلى ${adv.arrive_country} ونستقبله في جانب ${rx.side} — كيف ينتقل بينهما؟ أضفه في «ما يرتّبه بنفسه»`);
+    if ((rx.kind === "hotel" || rx.kind === "border") && adv.arrive_by && adv.arrive_by !== "already" && !adv.arrive_at.trim())
+      reception.missing.push("من أين يأتي إلى نقطة الاستقبال؟ اختر مكان وصوله");
+  }
+
+  const checkin = step("checkin", "أول ليلة نحجزها");
+  checkin.sentence = adv.checkin_date ? `الدخول لأول فندق ${day(adv.checkin_date)}` : "تاريخ الدخول لأول فندق غير محدد";
+  if (adv.checkin_date && adv.arrive_date && adv.arrive_by !== "already") {
+    if (adv.checkin_date < adv.arrive_date) checkin.errors.push(`الدخول للفندق (${adv.checkin_date}) قبل وصول العميل (${adv.arrive_date}) — ليلة محجوزة بلا نزيل`);
+    else if (adv.checkin_date > adv.arrive_date && !hasSelf(adv))
+      checkin.missing.push(`ليلة ${adv.arrive_date} لا يوجد لها فندق — أين يبيت؟ أضفها في «ما يرتّبه بنفسه» أو احجزها`);
+    else if (adv.checkin_date === adv.arrive_date && adv.arrive_time && adv.arrive_time < "06:00")
+      checkin.missing.push(`الوصول ${adv.arrive_time} بعد منتصف الليل والدخول ${adv.checkin_date} — هل يلزم حجز الليلة السابقة؟`);
+  }
+  if (adv.checkin_date && rx.date && rx.kind && rx.kind !== "self" && adv.checkin_date < rx.date) checkin.errors.push(`الدخول للفندق (${adv.checkin_date}) قبل استقباله (${rx.date})`);
+
+  const farewell = step("farewell", "التوديع");
+  if (!fw.kind) {
+    farewell.sentence = "لم يُحدد أين نودّعه";
+    farewell.missing.push("اختر نقطة التوديع");
+  } else if (fw.kind === "self") farewell.sentence = "لا توديع — يغادر بنفسه";
+  else {
+    const where = fw.kind === "airport" ? airportOf(adv.leave_by, adv.leave_from, "المطار") : pointText(fw);
+    farewell.sentence = `نوصله إلى ${where} ${day(fw.date, fw.time, zoneNote(fwCountry, tzF, fw.date))}`;
+    if (fw.kind !== "airport" && !fw.place.trim()) farewell.missing.push(`اختر ${fw.kind === "hotel" ? "الفندق" : "المعبر"}`);
+    if (fw.kind === "border" && !fw.side) farewell.missing.push("حدد أي جانب من الحدود");
+    if (!fw.date) farewell.missing.push("يوم التوديع غير محدد");
+    if (fw.kind === "airport" && adv.leave_by && adv.leave_by !== "flight") farewell.errors.push(`العميل يغادر ${ARRIVE_BY_AR[adv.leave_by]} — لا يوجد مطار نوصله إليه`);
+    if (fw.date && adv.leave_date && fw.date > adv.leave_date) farewell.errors.push(`التوديع (${fw.date}) بعد مغادرة العميل (${adv.leave_date})`);
+    if (fw.date && rx.date && rx.kind && rx.kind !== "self" && fw.date < rx.date) farewell.errors.push(`التوديع (${fw.date}) قبل الاستقبال (${rx.date})`);
+  }
+
+  const leave = step("leave", "المغادرة");
+  const leaveWhere = adv.leave_from.trim() || adv.leave_country || "؟";
+  leave.sentence =
+    adv.leave_by === "already"
+      ? `يبقى العميل في ${adv.leave_country || "البلد"} بعد البرنامج`
+      : `يغادر من ${leaveWhere}${adv.leave_country && adv.leave_from.trim() ? ` (${adv.leave_country})` : ""}${adv.leave_by ? ` — ${ARRIVE_BY_AR[adv.leave_by]}` : ""} ${day(adv.leave_date, adv.leave_time, zoneNote(adv.leave_country, tzL, adv.leave_date))}`;
+  if (!adv.leave_country) leave.missing.push("اختر دولة المغادرة");
+  if (!adv.leave_by) leave.missing.push("اختر وسيلة المغادرة");
+  else if (adv.leave_by !== "already" && !adv.leave_from.trim()) leave.missing.push("اختر مكان المغادرة");
+  const wl = wrongPlace(adv.leave_by, adv.leave_from);
+  if (wl) leave.errors.push(wl);
+  if (adv.leave_date && adv.arrive_date && instantOf(adv.leave_date, adv.leave_time, tzL) < instantOf(adv.arrive_date, adv.arrive_time, tzA))
+    leave.errors.push(`المغادرة (${adv.leave_date}) قبل الوصول (${adv.arrive_date})`);
+
+  return [arrive, reception, checkin, farewell, leave];
+}
+
+/** Everything still open or contradictory, in the trip's order — the steps' and the border hops'. */
+export function advancedGaps(adv: DraftAdvanced | undefined, tzOf?: TzOf): string[] {
+  if (!adv?.on) return [];
+  const out = advancedSteps(adv, tzOf).flatMap((s) => [...s.errors, ...s.missing]);
+  for (const [key, hop] of Object.entries(adv.borders)) if (!hop.crossing.trim()) out.push(`${key.replace(">", " ← ")}: اكتب اسم المعبر`);
+  return out;
 }
 
 /**

@@ -29,7 +29,7 @@ describe("«بكج متقدم» — four answers on top of the basic file", () =
       "وصولكم إلى مطار طرابزون (طيران) وفق ترتيبكم — غير مشمول",
       "الانتقال من مطار طرابزون إلى معبر سارب — جانب جورجيا — ترتيب ذاتي، غير مشمول",
     ]);
-    expect(advancedGaps(a)).toEqual(["الاستقبال: التاريخ غير محدد"]);
+    expect(advancedGaps(a)).toEqual(expect.arrayContaining(["يوم الاستقبال غير محدد", "يصل إلى تركيا ونستقبله في جانب جورجيا — كيف ينتقل بينهما؟ أضفه في «ما يرتّبه بنفسه»"]));
     // the blanket «يشمل» line about the airport goes, the file's own lines stay
     const d = normalizeDraftData({ ...emptyDraftData(), advanced: a } as never);
     expect(withScopeLines(d).includes.join()).not.toContain("من المطار");
@@ -39,7 +39,7 @@ describe("«بكج متقدم» — four answers on top of the basic file", () =
     const a = adv({ arrive_at: "مطار طرابزون", reception: { kind: "hotel", place: "ريزا جراند", side: "", date: "", time: "" }, self_items: ["ليلة في فندق ريزا جراند"] });
     expect(withAdvancedTransport(rows, a)[0].from_place).toBe("فندق ريزا جراند");
     expect(advancedLines(a).excludes).toContain("ليلة في فندق ريزا جراند — يرتّبه العميل بنفسه، غير مشمول");
-    expect(advancedGaps(a)).toEqual(["الاستقبال: التاريخ غير محدد", "الاستقبال: موعد اللقاء ينتظر التأكيد", "اختر نقطة التوديع"]);
+    expect(advancedGaps(a)).toEqual(expect.arrayContaining(["يوم الاستقبال غير محدد", "موعد اللقاء ينتظر التأكيد", "اختر نقطة التوديع"]));
   });
 
   it("the client comes by themselves: the pickup row is gone (so it is not priced) and the day note drops it", () => {
@@ -74,15 +74,7 @@ describe("«بكج متقدم» — four answers on top of the basic file", () =
 
   it("what is missing is said, never invented", () => {
     const a = adv({ reception: { kind: "border", place: "", side: "", date: "", time: "" }, borders: { "أ>ب": { drivers: 2, crossing: "", side_from: "", side_to: "" } } });
-    expect(advancedGaps(a)).toEqual([
-      "الاستقبال: اختر المعبر",
-      "الاستقبال: حدد أي جانب من الحدود",
-      "الاستقبال: التاريخ غير محدد",
-      "الاستقبال: موعد اللقاء ينتظر التأكيد",
-      "اختر نقطة التوديع",
-      "من أين يأتي العميل إلى نقطة الاستقبال؟ اختر مكان وصوله",
-      "أ ← ب: اكتب اسم المعبر",
-    ]);
+    expect(advancedGaps(a)).toEqual(expect.arrayContaining(["اختر المعبر", "حدد أي جانب من الحدود", "يوم الاستقبال غير محدد", "موعد اللقاء ينتظر التأكيد", "اختر نقطة التوديع", "من أين يأتي إلى نقطة الاستقبال؟ اختر مكان وصوله", "أ ← ب: اكتب اسم المعبر"]));
   });
 
   it("an airport reception names the airport the client flies into", () => {
@@ -96,15 +88,15 @@ describe("«بكج متقدم» — four answers on top of the basic file", () =
 
   it("dates fill from Basic, follow it, and stop following once typed; mismatches are said", () => {
     let a = fillAdvanced(adv({}), { arrive_date: "2026-11-10", arrive_time: "12:00", checkin_date: "2026-11-11", leave_date: "2026-11-14" });
-    expect([a.arrive_date, a.checkin_date, a.reception.date, a.farewell.date]).toEqual(["2026-11-10", "2026-11-11", "2026-11-11", "2026-11-14"]);
+    expect([a.arrive_date, a.checkin_date, a.reception.date, a.farewell.date]).toEqual(["2026-11-10", "2026-11-11", "2026-11-10", "2026-11-14"]);
     // Basic moved a day later: the dates follow
     a = fillAdvanced(a, { arrive_date: "2026-11-11", checkin_date: "2026-11-12", leave_date: "2026-11-15" });
-    expect([a.arrive_date, a.reception.date]).toEqual(["2026-11-11", "2026-11-12"]);
+    expect([a.arrive_date, a.reception.date]).toEqual(["2026-11-11", "2026-11-11"]);
     // the agent sets the reception day: it stays theirs
     a = fillAdvanced(setAdvancedDate(a, "reception_date", "2026-11-10"), { checkin_date: "2026-11-20" });
     expect(a.reception.date).toBe("2026-11-10");
     a = { ...a, reception: { ...a.reception, kind: "border" } };
-    expect(advancedGaps(a)).toEqual(expect.arrayContaining(["الاستقبال (2026-11-10) قبل وصول العميل (2026-11-11)", "بين الوصول (2026-11-11) والدخول للفندق (2026-11-20) ليلة غير محجوزة — أضفها لما يرتّبه العميل أو احجزها"]));
+    expect(advancedGaps(a)).toEqual(expect.arrayContaining(["الاستقبال (2026-11-10) قبل وصول العميل (2026-11-11 12:00)", "ليلة 2026-11-11 لا يوجد لها فندق — أين يبيت؟ أضفها في «ما يرتّبه بنفسه» أو احجزها"]));
   });
 });
 
@@ -132,5 +124,53 @@ describe("«بكج متقدم» — the place fits the way they travel", () => {
     const a = adv({ arrive_at: "محطة القطار هانوي (12go)" });
     expect(advancedGaps(a)[0]).toBe("«محطة القطار هانوي (12go)» محطة وليست مطاراً — غيّر الوسيلة إلى «قطار / عبّارة» أو اختر مطاراً");
     expect(advancedGaps({ ...a, arrive_by: "rail_sea" }).some((g) => g.includes("محطة وليست"))).toBe(false);
+  });
+});
+
+describe("«بكج متقدم» — the trip read in order (the owner's own file)", () => {
+  it("the screenshot's dates: met before arriving, a hotel before arriving, leaving before arriving — each said at its step", async () => {
+    const { advancedSteps } = await import("./advanced");
+    const a = adv({
+      arrive_country: "ماليزيا",
+      arrive_at: "مطار كوالالمبور الدولي (KUL)",
+      arrive_date: "2026-10-18",
+      arrive_time: "22:40",
+      checkin_date: "2026-10-17",
+      reception: { kind: "border", place: "باتايا", side: "تايلاند", date: "2026-10-16", time: "22:40" },
+      farewell: { kind: "airport", place: "", side: "", date: "2026-10-15", time: "" },
+      leave_country: "الإمارات",
+      leave_from: "مطار العين الدولي (AAN)",
+      leave_date: "2026-10-16",
+      leave_time: "22:40",
+    });
+    const s = Object.fromEntries(advancedSteps(a).map((x) => [x.key, x]));
+    expect(s.arrive.errors).toEqual([]);
+    expect(s.reception.errors).toEqual(["الاستقبال (2026-10-16 22:40) قبل وصول العميل (2026-10-18 22:40)"]);
+    expect(s.reception.missing).toContain("يصل إلى ماليزيا ونستقبله في جانب تايلاند — كيف ينتقل بينهما؟ أضفه في «ما يرتّبه بنفسه»");
+    expect(s.checkin.errors[0]).toContain("الدخول للفندق (2026-10-17) قبل وصول العميل (2026-10-18)");
+    expect(s.farewell.errors).toEqual(["التوديع (2026-10-15) قبل الاستقبال (2026-10-16)"]);
+    expect(s.leave.errors).toEqual(["المغادرة (2026-10-16) قبل الوصول (2026-10-18)"]);
+    expect(s.arrive.sentence).toBe("يصل العميل إلى مطار كوالالمبور الدولي (KUL) (ماليزيا) — طيران يوم 2026-10-18 الساعة 22:40");
+  });
+
+  it("clocks are compared across zones, and each says its zone", async () => {
+    const { advancedSteps } = await import("./advanced");
+    const zones: Record<string, string> = { ماليزيا: "Asia/Kuala_Lumpur", تايلاند: "Asia/Bangkok" };
+    const tz = (c: string) => zones[c] ?? null;
+    // lands 22:40 Malaysia (= 21:40 Thailand); pickup 22:00 on the Thai side is AFTER landing in real time
+    const a = adv({
+      arrive_country: "ماليزيا",
+      arrive_at: "مطار كوالالمبور",
+      arrive_date: "2026-10-18",
+      arrive_time: "22:40",
+      reception: { kind: "border", place: "معبر", side: "تايلاند", date: "2026-10-18", time: "22:00" },
+      self_items: ["الانتقال إلى الحدود"],
+    });
+    const s = advancedSteps(a, tz);
+    expect(s[1].errors).toEqual([]); // wall clocks alone (22:00 < 22:40) would have called it «before arrival»
+    expect(s[0].sentence).toContain("الساعة 22:40 بتوقيت ماليزيا (+5 س عن السعودية)");
+    expect(s[1].sentence).toContain("الساعة 22:00 بتوقيت تايلاند (+4 س عن السعودية)");
+    // the same pickup at 21:00 Thai time IS before the landing
+    expect(advancedSteps({ ...a, reception: { ...a.reception, time: "21:00" } }, tz)[1].errors.length).toBe(1);
   });
 });

@@ -485,6 +485,7 @@ export function BasicEditor({
       hotels: [...new Set(lk.countries.filter((c) => wanted.has(c.name)).flatMap((c) => c.cities.flatMap((x) => x.hotels.map((h) => h.name))))],
       // the package's own countries first — the usual answer, one tap away
       countries: [...new Set([...wanted, ...lk.countries.map((c) => c.name)])],
+      zones: Object.fromEntries(lk.countries.filter((c) => c.timezone).map((c) => [c.name, c.timezone!])),
     };
   }, [lk, trip.country, data.cities]);
 
