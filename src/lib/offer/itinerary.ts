@@ -359,10 +359,13 @@ function moveLines(mode: TransportMode, city: string, flightNo: string): string[
   return ["تسجيل الخروج من الفندق", `الانتقال ${how} إلى ${city} والتوجه إلى الفندق`];
 }
 
-/** Resize a city's tour picks to its tour count, keeping what was chosen. */
-export function withTourCount(picks: TourPick[] | undefined, count: number): TourPick[] {
+/**
+ * Resize a city's tour picks to its tour count, keeping what was chosen. A new
+ * pick goes in `cars` cars when given (the trip's tour cars); without it, one.
+ */
+export function withTourCount(picks: TourPick[] | undefined, count: number, cars?: number): TourPick[] {
   const list = (picks ?? []).slice(0, count);
-  while (list.length < count) list.push({ program_id: null, title: "", text: "", price: null });
+  while (list.length < count) list.push({ program_id: null, title: "", text: "", price: null, ...(cars ? { cars } : {}) });
   return list;
 }
 
@@ -403,9 +406,9 @@ export function fillTourDates(picks: TourPick[], days: string[]): TourPick[] {
  * The city's tours at a count, each with its day, in date order. A day the city
  * no longer has (its dates moved) is let go and the tour takes the next free one.
  */
-export function withTours(city: Pick<DraftCity, "check_in" | "nights" | "tour_picks">, count: number): TourPick[] {
+export function withTours(city: Pick<DraftCity, "check_in" | "nights" | "tour_picks">, count: number, cars?: number): TourPick[] {
   const own = cityDates(city);
-  const kept = withTourCount(city.tour_picks, count).map((p) => (p.date && own.length > 0 && !own.includes(p.date) ? { ...p, date: null } : p));
+  const kept = withTourCount(city.tour_picks, count, cars).map((p) => (p.date && own.length > 0 && !own.includes(p.date) ? { ...p, date: null } : p));
   return fillTourDates(kept, tourDays(city)).sort(byDate);
 }
 
@@ -519,7 +522,10 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
       if (cars.length > 0) activities = [...activities, `التنقل بـ${cars.join(" و")}`];
     }
 
-    const owned = day.auto_title !== undefined ? day.title === day.auto_title : legacyTitles && isAutoTitle(day.title);
+    // an empty day holding a tour is the tour's: the programme opens already written from it
+    const empty = !day.title.trim() && day.activities.every((a) => !a.trim());
+    const owned =
+      day.auto_title !== undefined ? day.title === day.auto_title : (legacyTitles && isAutoTitle(day.title)) || (empty && tours.length > 0);
     if (!owned) return day;
     // the AI's wording of the same day stays; another day's text does not
     if (day.ai_generated && day.title === title) return { ...day, auto_title: title };
@@ -537,14 +543,12 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
  * or the sale has no tours: such a day only takes the programme's text.
  */
 export function withDayTour(data: DraftData, index: number, program: TourProgram | null): Pick<DraftData, "cities" | "days"> | null {
+  const on = dayTours(data, index);
+  if (!on) return null;
+  const { at, date } = on;
   const day = data.days[index];
-  if (!day?.date || day.kind === "travel" || !data.transport_plan.tours.enabled) return null;
-  const date = day.date;
-  const dated = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
-  const at = dated.findIndex((c) => c.city_name === day.city_name && cityDates(c).includes(date));
-  if (at < 0) return null;
 
-  const others = withTours(dated[at], dated[at].tours ?? 0).filter((p) => p.date !== date);
+  const others = on.all.filter((p) => p.date !== date);
   const text = program?.description.trim() ?? "";
   const pick: TourPick | null = !program
     ? null
@@ -557,4 +561,99 @@ export function withDayTour(data: DraftData, index: number, program: TourProgram
   // the agent chose this day's tour: the day is the screen's to write — or, with none, theirs again, empty
   const cleared: DraftDay = { ...day, title: "", activities: [], ai_generated: false, auto_title: pick ? "" : undefined };
   return { cities, days: daysFromTours({ ...data, cities, days: data.days.map((d, i) => (i === index ? cleared : d)) }) };
+}
+
+/**
+ * The city stop a programme day sleeps in, and the tours on it (that stop's
+ * picks dated on the day). Null for a day no tour can go on: a travel day, the
+ * day home, or a sale without tours.
+ */
+export function dayTours(data: DraftData, index: number): { at: number; date: string; all: TourPick[]; picks: TourPick[] } | null {
+  const day = data.days[index];
+  if (!day?.date || day.kind === "travel" || !data.transport_plan.tours.enabled) return null;
+  const date = day.date;
+  const dated = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
+  const at = dated.findIndex((c) => c.city_name === day.city_name && cityDates(c).includes(date));
+  if (at < 0) return null;
+  const all = withTours(dated[at], dated[at].tours ?? 0);
+  return { at, date, all, picks: all.filter((p) => p.date === date) };
+}
+
+/**
+ * One tour of a programme day changed in place — the generator's open day:
+ * its service, car, count, price or wording. The day's k-th tour takes the
+ * slice (a day with none gets one, in the trip's tour cars), so swapping a tour
+ * never adds a second; null takes it away. A new service writes the day from it
+ * again (as «اختر جولة»); a car, a count or a price reaches the day only while
+ * the day is the screen's. Null when no tour can go on the day.
+ */
+export function withDayPick(data: DraftData, index: number, k: number, slice: Partial<TourPick> | null): Pick<DraftData, "cities" | "days"> | null {
+  const on = dayTours(data, index);
+  if (!on) return null;
+  const { at, date, all } = on;
+  const old = on.picks[k];
+  if (!old && !slice) return null;
+  const picks = !slice
+    ? all.filter((p) => p !== old)
+    : old
+      ? all.map((p) => (p === old ? { ...p, ...slice, date } : p))
+      : [...all, { program_id: null, title: "", text: "", price: null, cars: data.transport_plan.tours.cars, ...slice, date }].sort(byDate);
+  const cities = data.cities.map((c, i) => (i === at ? { ...c, tours: picks.length, tour_picks: picks } : c));
+  const service = !slice || "title" in slice || "program_id" in slice || "free" in slice;
+  if (!service) return { cities, days: daysFromTours({ ...data, cities }) };
+  const left = picks.some((p) => p.date === date);
+  const cleared = (d: DraftDay): DraftDay => ({ ...d, title: "", activities: [], ai_generated: false, auto_title: left ? "" : undefined });
+  return { cities, days: daysFromTours({ ...data, cities, days: data.days.map((d, i) => (i === index ? cleared(d) : d)) }) };
+}
+
+/**
+ * What a typed or chosen service is: «يوم حر», one of the city's ready
+ * programmes (its wording comes with it), or a tour of the agent's own.
+ */
+export function tourService(title: string, programs: TourProgram[]): Pick<TourPick, "program_id" | "title" | "text" | "free"> {
+  if (title.trim() === FREE_DAY_TITLE) return { program_id: null, title: FREE_DAY_TITLE, text: "", free: true };
+  const hit = programs.find((p) => !p.is_free_day && programDayText(p).title === title);
+  return hit
+    ? { program_id: hit.id, title, text: hit.description.trim(), free: false }
+    : { program_id: null, title, text: "", free: false };
+}
+
+/**
+ * «تعبئة أيام المدينة من البرامج الجاهزة» (and, without a city, every city's):
+ * the rule of fillDaysFromPrograms — each city's programmes in order onto its
+ * empty touring days, none twice — but each one a real tour of its day, in the
+ * trip's tour cars and priced from the lists, so it reaches the pricing sheet
+ * and the basic screen like one chosen by hand. A sale without tours takes the
+ * text. A day already holding a tour keeps it.
+ */
+export function fillCityTours(data: DraftData, programs: TourProgram[], city?: string): Pick<DraftData, "cities" | "days"> & { filled: number } {
+  const own = city === undefined ? programs : programs.filter((p) => p.city_name === city);
+  const text = fillDaysFromPrograms(data.days, own);
+  let next: Pick<DraftData, "cities" | "days"> = { cities: data.cities, days: data.days };
+  let filled = 0;
+  text.days.forEach((d, i) => {
+    if (d === data.days[i]) return;
+    const live = { ...data, ...next };
+    if (dayTours(live, i)?.picks.some((p) => p.free || p.title.trim())) return;
+    const program = own.find((p) => p.city_name === d.city_name && programDayText(p).title === d.title);
+    const service = program ? { program_id: program.id, title: d.title, text: program.description.trim(), free: false } : null;
+    next = (service && withDayPick(live, i, 0, service)) || { ...next, days: next.days.map((x, j) => (j === i ? d : x)) };
+    filled += 1;
+  });
+  return { ...next, filled };
+}
+
+/**
+ * The AI's wording of one day. It writes activities only: a day holding a tour
+ * keeps the title the tour gives it and its car line, and the tour, its price
+ * and its car are never its to change — they live on the city's picks, which
+ * this never touches. A day without a tour takes the AI's title too.
+ */
+export function withAiText(data: DraftData, index: number, text: Pick<DraftDay, "title" | "activities">): DraftDay {
+  const day = data.days[index];
+  if (!dayTours(data, index)?.picks.some((p) => !p.free)) return { ...day, ...text, ai_generated: true };
+  const cleared = data.days.map((d, i) => (i === index ? { ...d, title: "", activities: [], ai_generated: false, auto_title: "" } : d));
+  const screen = daysFromTours({ ...data, days: cleared })[index];
+  const car = screen.activities.filter((a) => a.startsWith("التنقل بـ"));
+  return { ...day, title: screen.title, activities: [...text.activities, ...car], ai_generated: true, auto_title: screen.title };
 }

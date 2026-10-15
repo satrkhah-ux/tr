@@ -303,3 +303,30 @@ describe("two hotels in one city on dates of their own (order 1)", () => {
     expect(validateDraft(unpriced).blocking.some((b) => b.key === "pg.err.stayUnpriced")).toBe(true);
   });
 });
+
+describe("a tour day with no car (order 4)", () => {
+  const withTour = (car: string, own?: string) => {
+    const data = completeDraft();
+    data.transport_plan = { ...data.transport_plan, tours: { ...data.transport_plan.tours, enabled: true, car_type: car } };
+    data.cities = data.cities.map((c, i) =>
+      i === 0 ? { ...c, tours: 1, tour_picks: [{ program_id: null, title: "جولة المدينة", text: "", price: 400, date: "2026-06-02", ...(own ? { car_type: own } : {}) }] } : c,
+    );
+    return validateDraft(data);
+  };
+  const warned = (r: ReturnType<typeof validateDraft>) => r.warnings.some((w) => w.key === "pg.warn.tourNoCar");
+
+  it("warns, without blocking, while the tours have their transport", () => {
+    const result = withTour("");
+    expect(warned(result)).toBe(true);
+    expect(result.blocking.some((b) => b.key === "pg.warn.tourNoCar")).toBe(false);
+  });
+
+  it("is quiet once the tour has a car — its own or the trip's — or the tours have no transport", () => {
+    expect(warned(withTour("فان"))).toBe(false);
+    expect(warned(withTour("", "سيدان"))).toBe(false);
+    const off = completeDraft();
+    off.transport_plan = { ...off.transport_plan, tours: { ...off.transport_plan.tours, enabled: false, car_type: "" } };
+    off.cities = off.cities.map((c, i) => (i === 0 ? { ...c, tours: 1, tour_picks: [{ program_id: null, title: "جولة", text: "", price: 1 }] } : c));
+    expect(warned(validateDraft(off))).toBe(false);
+  });
+});

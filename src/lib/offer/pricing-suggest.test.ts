@@ -25,6 +25,10 @@ import {
   findServicePrice,
   findTourPrice,
   findTransferPrice,
+  listedTourPrice,
+  tourCarPrice,
+  tourPriced,
+  toursTotal,
   mergeSuggestions,
   resolveAirportCity,
   syncSuggestions,
@@ -711,5 +715,34 @@ describe("suggestPricing — a tour is its car's price × the cars it goes in (�
     expect([theirs.quantity, theirs.sell_price]).toEqual([2, 648]);
     // their browser saved one van: the issued sheet owes two
     expect(issuedPartnerSheet([{ ...theirs, quantity: 1 }], [theirs])[0].quantity).toBe(2);
+  });
+});
+
+describe("a tour's price on the screens: typed, else the list's for its car (الأمر 4)", () => {
+  const LIST = [
+    { name: "جولة المدينة", price: 400, currency: "SAR", car_type: "فان", program_id: "p-kl" },
+    { name: "جولة الجزر", price: 500, currency: "MYR", car_type: "فان" },
+  ];
+  const pick = (p: Partial<TourPick>): TourPick => ({ program_id: null, title: "جولة المدينة", text: "", price: null, ...p });
+
+  it("reads the list for the tour's own car, else the trip's, in riyals", () => {
+    expect(listedTourPrice(LIST, { MYR: 0.8 }, "جولة الجزر", "فان")).toBe(400);
+    expect(listedTourPrice(LIST, {}, "جولة الجزر", "فان")).toBeNull();
+    expect(tourCarPrice(pick({}), "فان", LIST, {})).toBe(400);
+    expect(tourCarPrice(pick({ price: 350 }), "فان", LIST, {})).toBe(350);
+    expect(tourCarPrice(pick({ car_type: "باص" }), "فان", LIST, {})).toBeNull();
+    expect(tourCarPrice(pick({ free: true }), "فان", LIST, {})).toBe(0);
+  });
+
+  it("counts a tour the list prices as priced — even with no typed figure, and with no rate to show it in riyals", () => {
+    expect(tourPriced(pick({}), "فان", LIST)).toBe(true);
+    expect(tourPriced(pick({ title: "جولة الجزر" }), "فان", LIST)).toBe(true);
+    expect(tourPriced(pick({ title: "جولة خاصة" }), "فان", LIST)).toBe(false);
+    expect(tourPriced(pick({ title: "جولة خاصة", price: 0 }), "فان", LIST)).toBe(true);
+  });
+
+  it("adds a city's tours up as each car's price × its cars", () => {
+    // 400 × 2 from the list + 300 typed × 1 (a pick from before the count) + a free day
+    expect(toursTotal([pick({ cars: 2 }), pick({ title: "جولة خاصة", price: 300 }), pick({ free: true })], "فان", LIST, {})).toBe(1100);
   });
 });

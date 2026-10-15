@@ -3,7 +3,7 @@
 import type { TranslationKey } from "@/lib/i18n";
 import { getServerUser } from "@/lib/supabase/server";
 import { normalizeDraftDays, type DraftData, type DraftDay } from "@/lib/offer/draft-types";
-import { draftDaySkeleton, itineraryCities } from "@/lib/offer/itinerary";
+import { draftDaySkeleton, itineraryCities, withAiText } from "@/lib/offer/itinerary";
 import { attachWeather } from "@/lib/offer/weather-attach";
 import { generateItineraryText, isOpenAIConfigured, type ItineraryPromptDay } from "@/lib/providers/openai";
 import { isFlightLookupConfigured, lookupFlight, type FlightLookupHit } from "@/lib/providers/flight-lookup";
@@ -119,11 +119,14 @@ export async function generateItineraryDays(
     };
   }
 
+  // The AI words the days; a day holding a tour keeps the tour's title and car
+  // line (withAiText), and the tours themselves — their price, their car — sit
+  // on the cities, which this action never writes.
   const generated = new Map(result.days.map((d) => [d.day_number, d]));
-  const next = days.map((d) => {
+  const live = { ...record.data, days };
+  const next = days.map((d, i) => {
     const hit = generated.get(d.day_number);
-    if (!hit) return d;
-    return { ...d, title: hit.title, activities: hit.activities, ai_generated: true };
+    return hit ? withAiText(live, i, { title: hit.title, activities: hit.activities }) : d;
   });
 
   const saved = await saveDraftStages(draftId, { days: next });
