@@ -76,6 +76,8 @@ import {
   cityAirport,
   HOME_AIRPORT,
   planInternational,
+  withAdvancedAirports,
+  findAirport,
   packageProfitFor,
   priceAtSource,
   resizeGroupCars,
@@ -338,7 +340,10 @@ export function BasicEditor({
     if (d.arrival_date && d.arrival_date !== trip.arrival_date) slice.arrival_date = d.arrival_date;
     if (d.departure_date && d.departure_date !== trip.departure_date) slice.departure_date = d.departure_date;
     if (!trip.country && d.country) setCountry(d.country);
-    commit({ advanced, ...(Object.keys(slice).length ? { trip: withTripDates(latest.current.trip, { ...slice, departure_date: slice.departure_date ?? latest.current.trip.departure_date }) } : {}) });
+    const nextTrip = Object.keys(slice).length ? withTripDates(latest.current.trip, { ...slice, departure_date: slice.departure_date ?? latest.current.trip.departure_date }) : latest.current.trip;
+    // the airports chosen here are the planned flights' too
+    const flights = withAdvancedAirports({ ...latest.current, trip: nextTrip, advanced }, lookups.airports);
+    commit({ advanced, ...(nextTrip !== latest.current.trip ? { trip: nextTrip } : {}), ...(flights ?? {}) });
   }
 
   /** The trip's answers; a visa line still counting every traveller keeps counting them. */
@@ -486,6 +491,21 @@ export function BasicEditor({
     if (adv?.on && fillAdvanced(adv, advancedDefaults(latest.current)) !== adv) commit({ advanced: adv });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on open
   }, []);
+
+  // «بكج متقدم» against a ticket already entered: never rewritten, said
+  const ticketMismatch = (() => {
+    const adv = data.advanced;
+    if (!adv?.on || !data.flights.some((f) => f.leg_order !== "internal" && f.flight_no.trim())) return [];
+    const code = (v: string) => findAirport(v, lookups.airports)?.code ?? "";
+    const out = data.flights.filter((f) => f.leg_order === "outbound").at(-1);
+    const back = data.flights.find((f) => f.leg_order === "inbound");
+    const notes: string[] = [];
+    if (adv.parts.arrival && adv.arrive_by === "flight" && adv.arrive_at && out && code(adv.arrive_at) !== code(out.to_airport))
+      notes.push(`تذكرة الذهاب تهبط في ${out.to_airport}، وفي «بكج متقدم» الوصول إلى ${adv.arrive_at} — صحّح أحدهما`);
+    if (adv.parts.departure && adv.leave_by === "flight" && adv.leave_from && back && code(adv.leave_from) !== code(back.from_airport))
+      notes.push(`تذكرة العودة تُقلع من ${back.from_airport}، وفي «بكج متقدم» المغادرة من ${adv.leave_from} — صحّح أحدهما`);
+    return notes;
+  })();
 
   // «بكج متقدم» step ③: the first hotel Basic books, by name, city and country
   const firstStayText = (() => {
@@ -844,7 +864,9 @@ export function BasicEditor({
     setOpen(step);
     // the flights step opens already planned: no empty box for what the file already says
     if (step === "flights" && scope.flights_intl && !latest.current.flights.some((f) => f.leg_order !== "internal")) {
-      commit(planInternational(latest.current, lookups.airports, planDefaults));
+      const planned = planInternational(latest.current, lookups.airports, planDefaults);
+      // «بكج متقدم» already said where they land and leave from
+      commit({ ...planned, ...(withAdvancedAirports({ ...latest.current, ...planned }, lookups.airports) ?? {}) });
     }
     if (step !== "cities") setFocus(null);
     // the prices are worked out as the step opens — no button to remember
@@ -1702,6 +1724,7 @@ export function BasicEditor({
               tripCountry={trip.country}
               lists={advancedLists}
               firstStay={firstStayText}
+              notes={ticketMismatch}
               onChange={setAdvanced}
             />
           ) : null}

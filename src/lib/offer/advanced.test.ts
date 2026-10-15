@@ -243,3 +243,35 @@ describe("«بكج متقدم» — only the unusual end, typed once, the car be
     expect(advancedTripDates({ ...a, auto: ["checkin_date", "leave_date"] }).arrival_date).toBeUndefined();
   });
 });
+
+describe("«بكج متقدم» → the planned flights", () => {
+  it("lands where the card says and flies home from where it says; a ticket is never rewritten", async () => {
+    const { withAdvancedAirports } = await import("./basic");
+    const { emptyDraftData, emptyFlight } = await import("./draft-types");
+    const airports = [
+      { id: "1", name: "مطار الأمير محمد بن عبدالعزيز", code: "MED", timezone: "Asia/Riyadh", city: "المدينة المنورة", country: "السعودية" },
+      { id: "2", name: "مطار إسطنبول", code: "IST", timezone: "Europe/Istanbul", city: "إسطنبول", country: "تركيا" },
+      { id: "3", name: "مطار طرابزون", code: "TZX", timezone: "Europe/Istanbul", city: "طرابزون", country: "تركيا" },
+      { id: "4", name: "مطار تبليسي الدولي", code: "TBS", timezone: "Asia/Tbilisi", city: "تبليسي", country: "جورجيا" },
+    ];
+    const d = emptyDraftData();
+    d.flights = [
+      { ...emptyFlight("outbound"), from_airport: "مطار الأمير محمد بن عبدالعزيز (MED)", to_airport: "مطار إسطنبول (IST)", departure_at: "2026-10-22T00:00" },
+      { ...emptyFlight("inbound"), from_airport: "مطار إسطنبول (IST)", to_airport: "مطار الأمير محمد بن عبدالعزيز (MED)", departure_at: "2026-10-27T00:00" },
+    ];
+    d.advanced = adv({ arrive_at: "مطار طرابزون (TZX)", leave_from: "مطار تبليسي الدولي (TBS)" });
+    const out = withAdvancedAirports(d, airports)!;
+    const legs = out.flights.map((f) => [f.leg_order, f.from_airport, f.to_airport, f.departure_at]);
+    expect(legs).toEqual([
+      ["outbound", "مطار الأمير محمد بن عبدالعزيز (MED)", "مطار طرابزون (TZX)", "2026-10-22T00:00"],
+      ["inbound", "مطار تبليسي الدولي (TBS)", "مطار الأمير محمد بن عبدالعزيز (MED)", "2026-10-27T00:00"],
+    ]);
+    expect(out.flights[1].from_tz).toBe("Asia/Tbilisi");
+    // only the arrival is unusual: the flight home keeps leaving from where it lands
+    const arrivalOnly = withAdvancedAirports({ ...d, advanced: { ...d.advanced!, parts: { arrival: true, departure: false } } }, airports)!;
+    expect(arrivalOnly.flights[1].from_airport).toBe("مطار طرابزون (TZX)");
+    // a ticket in: nothing is rewritten
+    d.flights[0] = { ...d.flights[0], flight_no: "TK 123" };
+    expect(withAdvancedAirports(d, airports)).toBeNull();
+  });
+});

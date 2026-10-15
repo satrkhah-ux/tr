@@ -780,3 +780,50 @@ export function resizeGroupCars(
     ...(plan.farewell ? { farewell: follow(plan.farewell) } : {}),
   };
 }
+
+// ---------- «بكج متقدم» → the flight plan ----------
+
+/**
+ * The airports chosen in «بكج متقدم» written into the PLANNED international
+ * flights: the outbound lands where the client arrives, the flight home leaves
+ * from where they leave — another airport, another country if so. Null when
+ * there is nothing to change. A ticketed booking (a flight number in) is never
+ * rewritten: the card says the two disagree and the agent decides.
+ */
+export function withAdvancedAirports(
+  data: Pick<DraftData, "trip" | "flights" | "flight_booking" | "advanced">,
+  airports: LookupAirport[],
+): Pick<DraftData, "flights" | "flight_booking"> | null {
+  const adv = data.advanced;
+  if (!adv?.on) return null;
+  if (data.flights.some((f) => f.leg_order !== "internal" && f.flight_no.trim())) return null;
+  const pick = (on: boolean, by: string, label: string) => (on && by === "flight" ? findAirport(label, airports) : null);
+  const land = pick(adv.parts.arrival, adv.arrive_by, adv.arrive_at);
+  const leave = pick(adv.parts.departure, adv.leave_by, adv.leave_from);
+  if (!land && !leave) return null;
+  const out = data.flights.filter((f) => f.leg_order === "outbound");
+  const back = data.flights.find((f) => f.leg_order === "inbound");
+  const oldTo = out.at(-1)?.to_airport ?? "";
+  const to = land ? airportDisplay(land) : oldTo;
+  // a flight home that left from where they landed keeps doing so after the landing moves
+  const leaveFrom = leave ? airportDisplay(leave) : !back || back.from_airport === oldTo ? to : back.from_airport;
+  if (to === oldTo && leaveFrom === (back?.from_airport ?? "")) return null;
+  const home = airports.find((a) => a.code === HOME_AIRPORT);
+  const planned = planInternational(data, airports, {
+    from: out[0]?.from_airport || (home ? airportDisplay(home) : ""),
+    to,
+    go: (out[0]?.departure_at ?? data.trip.arrival_date ?? "").slice(0, 10),
+    back: (back?.departure_at ?? data.trip.departure_date ?? "").slice(0, 10),
+    // leaving from somewhere is a flight home
+    round: Boolean(back) || Boolean(leave),
+  });
+  const leaveAt = leave ?? findAirport(leaveFrom, airports);
+  return {
+    ...planned,
+    flights: planned.flights.map((f) =>
+      f.leg_order === "inbound" && leaveFrom !== to
+        ? { ...f, from_airport: leaveFrom, from_tz: leaveAt?.timezone ?? null, from_city: leaveAt?.city ?? "" }
+        : f,
+    ),
+  };
+}

@@ -63,6 +63,7 @@ export function AdvancedQuestions({
   tripCountry,
   lists,
   firstStay = "",
+  notes = [],
   onChange,
 }: {
   value: DraftAdvanced | undefined;
@@ -73,6 +74,8 @@ export function AdvancedQuestions({
   lists: AdvancedPickLists;
   /** «فندق X — مدينة، دولة»: the first hotel Basic books, said in step ③. */
   firstStay?: string;
+  /** what the rest of the file says against these answers (a ticket that lands elsewhere). */
+  notes?: string[];
   onChange: (next: DraftAdvanced) => void;
 }) {
   const id = useId();
@@ -276,6 +279,11 @@ export function AdvancedQuestions({
         <span className="text-[11.5px] text-[#557d78]">الرحلة بترتيبها الفعلي. كل وقت يُكتب بتوقيت مكانه كما في التذكرة، والنظام يقارن الأوقات بعد احتساب فرق التوقيت.</span>
       </div>
 
+      {notes.map((n) => (
+        <p key={n} className="flex items-start gap-1 rounded-[10px] border border-[#f2b8c6] bg-[#fdeef2] p-2 text-[12px] font-bold text-[#c22850]">
+          <CircleAlert className="mt-0.5 size-4 shrink-0" /> {n}
+        </p>
+      ))}
       <div className="flex flex-wrap items-center gap-1.5 rounded-[12px] border border-[#e6efeb] p-2.5">
         <span className="text-[12.5px] font-extrabold text-[#185045]">ما المختلف في هذه الرحلة؟</span>
         {(
