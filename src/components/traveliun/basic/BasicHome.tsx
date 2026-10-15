@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Copy, Loader2, Package, Plus, Zap } from "lucide-react";
+import { Loader2, Package, Plus, Zap } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { createDraft, duplicateDraft, type DraftSummary } from "@/lib/data/drafts";
 import { startDraftFromReadyOffer } from "@/lib/data/ready-offers";
@@ -11,9 +11,19 @@ import type { ReadyOfferRecord } from "@/lib/ready-offers/types";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useBasicLabels } from "./labels";
+import { RecentFiles } from "./RecentFiles";
 
 /** «النظام بيسك» home: start a file, or reopen one — every draft opens here as well as in the generator. */
-export function BasicHome({ drafts, readyOffers }: { drafts: DraftSummary[]; readyOffers: ReadyOfferRecord[] }) {
+export function BasicHome({
+  drafts,
+  meId,
+  readyOffers,
+}: {
+  drafts: DraftSummary[];
+  /** the signed-in employee — «ملفاتي» (null for a partner) */
+  meId: string | null;
+  readyOffers: ReadyOfferRecord[];
+}) {
   const tx = useBasicLabels();
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -116,43 +126,12 @@ export function BasicHome({ drafts, readyOffers }: { drafts: DraftSummary[]; rea
 
         <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-5">
           <h2 className="mb-3 text-[14px] font-extrabold text-[#003c3a]">{tx("recent")}</h2>
-          {drafts.length === 0 ? (
-            <p className="text-[12.5px] font-semibold text-[#93aaa3]">{tx("emptyList")}</p>
-          ) : (
-            <ul className="divide-y divide-[#edf3f0]">
-              {drafts.slice(0, 30).map((d) => (
-                <li key={d.id} className="flex items-center gap-2">
-                  <Link href={`/basic/${d.id}`} className="flex min-w-0 flex-1 flex-wrap items-center gap-3 py-2.5 hover:bg-[#f7fbf9]">
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-[#185045]">
-                      {d.title || d.destination || "—"}
-                      {d.customer_name ? <span className="text-[#93aaa3]"> · {d.customer_name}</span> : null}
-                    </span>
-                    <span className="tv-tnum text-[11.5px] font-bold text-[#78948f]">
-                      {d.travel_date ? <DirText>{d.travel_date}</DirText> : null}
-                      {d.nights ? ` · ${d.nights} ${t("pg.nightsShort")}` : ""}
-                    </span>
-                    {d.produced_serial ? (
-                      <span className="rounded-full bg-[#e9f7f0] px-2 py-0.5 text-[10.5px] font-bold text-[#0f7a52]">
-                        <DirText>{d.produced_serial}</DirText>
-                      </span>
-                    ) : null}
-                    <span className="text-[11.5px] font-bold text-[#2aa87a]">{tx("open")}</span>
-                  </Link>
-                  {/* the same programme for the next client */}
-                  <button
-                    type="button"
-                    title={tx("copyHint")}
-                    disabled={busy !== null}
-                    onClick={() => void openNew(`c-${d.id}`, () => duplicateDraft(d.id, { freshClient: true }))}
-                    className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[8px] border border-[#cfe0d9] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
-                  >
-                    {busy === `c-${d.id}` ? <Loader2 className="size-3.5 animate-spin" /> : <Copy className="size-3.5" />}
-                    {tx("copy")}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <RecentFiles
+            drafts={drafts}
+            meId={meId}
+            busy={busy}
+            onCopy={(id) => void openNew(`c-${id}`, () => duplicateDraft(id, { freshClient: true }))}
+          />
         </section>
       </div>
     </TraveliunShell>

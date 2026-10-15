@@ -128,6 +128,13 @@ export type DraftSummary = {
   /** the issued programme's number, e.g. AD-6-3427-20260729. */
   produced_serial: string | null;
   updated_at: string;
+  created_at: string;
+  /** the employee who started the file, and their name (null: unknown or a partner's). */
+  created_by: string | null;
+  created_by_name: string | null;
+  country: string | null;
+  /** what the file covers — the scope switches that are on */
+  services: ("hotels" | "flights_intl" | "flights_domestic" | "transport" | "visas")[];
 };
 
 export async function listDrafts(): Promise<DraftSummary[]> {
@@ -153,6 +160,11 @@ export async function listDrafts(): Promise<DraftSummary[]> {
           currency: draft.pricing.display_currency,
           produced_serial: draft.produced_serial,
           updated_at: row.updated_at,
+          created_at: row.created_at,
+          created_by: row.created_by,
+          created_by_name: row.maker?.arabic_name ?? null,
+          country: draft.trip.country || null,
+          services: (["hotels", "flights_intl", "flights_domestic", "transport", "visas"] as const).filter((k) => draft.scope[k]),
         };
       },
     );

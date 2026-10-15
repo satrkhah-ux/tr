@@ -4,6 +4,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getPartnerSession } from "@/lib/partners/session";
 import { currentCan } from "@/lib/roles/current";
+import { getCurrentEmployeeId } from "./metrics";
 import { normalizeDraftData, type DraftData } from "@/lib/offer/draft-types";
 
 /**
@@ -35,7 +36,16 @@ async function access(): Promise<Access | null> {
 
 /** `partner_company_id`: the partner company the draft belongs to — its prices are quoted at their terms. */
 export type DraftRecord = { id: string; data: DraftData; updated_at: string; partner_company_id: string | null };
-export type DraftRow = { id: string; title: string | null; data: Record<string, unknown>; updated_at: string };
+export type DraftRow = {
+  id: string;
+  title: string | null;
+  data: Record<string, unknown>;
+  updated_at: string;
+  created_at: string;
+  /** the employee who started the file (null: a partner's, or one made before it was recorded) */
+  created_by: string | null;
+  maker: { arabic_name: string | null } | null;
+};
 export type SaveDraftResult = { ok: boolean; error?: TranslationKey };
 export type InsertDraftResult = { ok: true; id: string } | { ok: false; error: TranslationKey };
 
@@ -43,10 +53,11 @@ export type InsertDraftResult = { ok: true; id: string } | { ok: false; error: T
 export async function listDraftRows(): Promise<DraftRow[]> {
   const a = await access();
   if (!a) return [];
-  let query = a.db.from("offer_drafts").select("id, title, data, updated_at");
+  let query = a.db.from("offer_drafts").select("id, title, data, updated_at, created_at, created_by, maker:employees!created_by(arabic_name)");
   if (a.partnerId) query = query.eq("partner_company_id", a.partnerId);
   const { data } = await query.order("updated_at", { ascending: false }).limit(100);
-  return (data ?? []) as DraftRow[];
+  // the embed is typed as an array; a many-to-one key yields one row or null
+  return (data ?? []) as unknown as DraftRow[];
 }
 
 /** A new draft. A partner's is stamped with their company — that stamp is what makes it theirs. */
@@ -58,7 +69,8 @@ export async function insertDraft(data: DraftData, title?: string | null): Promi
     .insert({
       data: data as unknown as Record<string, unknown>,
       ...(title !== undefined ? { title } : {}),
-      ...(a.partnerId ? { partner_company_id: a.partnerId } : {}),
+      // who started it — «ملفاتي» on Basic's home (a partner's file is its company's)
+      ...(a.partnerId ? { partner_company_id: a.partnerId } : { created_by: await getCurrentEmployeeId() }),
     })
     .select("id")
     .single();
