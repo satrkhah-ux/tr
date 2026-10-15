@@ -419,9 +419,9 @@ function moveLines(mode: TransportMode, city: string, leg: DraftFlight | undefin
       return [`الوصول إلى ${leg?.to_airport.trim() || `مطار ${city}`}${lands ? ` الساعة ${lands}` : ""}`, "الاستقبال من قبل موظف ترافليون والتوجه إلى الفندق"];
     }
     return [
-      "تسجيل الخروج من الفندق والتوجه إلى المطار",
+      `تسجيل الخروج من الفندق والتوجه إلى ${leg?.from_airport.trim() || "المطار"}`,
       `السفر إلى ${city} على الطيران الداخلي${no ? ` (${no})` : ""}${leaves ? ` — الإقلاع ${leaves}` : ""}${lands ? ` والوصول ${lands}` : ""}`,
-      `الاستقبال من مطار ${city} والتوجه إلى الفندق`,
+      `الاستقبال في ${leg?.to_airport.trim() || `مطار ${city}`} والتوجه إلى الفندق`,
     ];
   }
   const how = mode === "train" ? "بالقطار" : mode === "ship" ? "بالعبّارة" : "براً";
@@ -440,7 +440,7 @@ function leaveLines(city: string, leg: DraftFlight | undefined): string[] {
 }
 
 /** The domestic leg into `city` on `date`: landing that day, else leaving it, else any into the city. */
-function legInto(flights: DraftFlight[], city: string, date: string | null): DraftFlight | undefined {
+export function legInto(flights: DraftFlight[], city: string, date: string | null): DraftFlight | undefined {
   const into = flights.filter((f) => f.leg_order === "internal" && f.to_city?.trim() === city);
   return into.find((f) => localDatePart(f.arrival_at) === date) ?? into.find((f) => localDatePart(f.departure_at) === date) ?? into[0];
 }

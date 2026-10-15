@@ -9,6 +9,8 @@ import {
   BOARD_TYPES,
   cityHotelLines,
   currencyOptions,
+  hopMode,
+  vehicleText,
   deriveHotelStays,
   emptyRoomSpec,
   findLookupCountry,
@@ -37,7 +39,8 @@ import {
   withTours,
   type BasicCity,
 } from "@/lib/offer/basic";
-import { arrivalLines, departureDay, departureLines, type TourProgram } from "@/lib/offer/itinerary";
+import { arrivalLines, departureDay, departureLines, legInto, type TourProgram } from "@/lib/offer/itinerary";
+import { localDatePart } from "@/lib/offer/schedule";
 import { BasicCityProgram } from "./BasicCityProgram";
 import { SuggestInput } from "../SuggestInput";
 import { useRole } from "@/lib/roles/RoleContext";
@@ -684,6 +687,24 @@ function ToursPanel({
   const landsHere = byDeparture.filter((f) => f.leg_order !== "inbound" && f.to_city?.trim() === city.city_name).at(-1) ?? byDeparture.filter((f) => f.leg_order === "outbound").at(-1);
   const leavesHere = byDeparture.find((f) => f.leg_order !== "outbound" && f.from_city?.trim() === city.city_name) ?? byDeparture.find((f) => f.leg_order === "inbound");
 
+  // the move in by air (the domestic leg into this city), and the car that takes the group to and from the airports
+  const prev = index > 0 ? data.cities[index - 1] : undefined;
+  const hopLeg = prev ? legInto(data.flights, city.city_name, city.check_in) : undefined;
+  const clock = (iso: string | null | undefined) => {
+    const t = (iso ?? "").slice(11, 16);
+    return t && t !== "00:00" ? t : "";
+  };
+  const transferCar = transportOn && plan.airport.enabled ? vehicleText(plan.airport) : "";
+  const transferRow = (date: string | null, text: string, time: string | false) => (
+    <p className="tv-tnum flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-[9px] bg-[#f4f9f7] px-2 py-1.5 text-[11.5px] font-bold text-[#0F4339]">
+      <Plane className="size-3.5 text-[#185045]" />
+      {date ? <span className="text-[#185045]">{dayLabel(date)}</span> : null}
+      <DirText>{text}</DirText>
+      {time ? <span className="text-[#557d78]">· {time}</span> : null}
+      {transferCar ? <span className="text-[#557d78]">· {transferCar}</span> : null}
+    </p>
+  );
+
   // the airport legs, as rows of the same table: who meets the group, in what
   const airportRow = (leg: "airport" | "farewell", label: string, airport: string) => {
     const value = leg === "farewell" ? (plan.farewell ?? plan.airport) : plan.airport;
@@ -760,6 +781,20 @@ function ToursPanel({
       {/* the day the group arrives — the welcome (this file's words), or the move from the city before — then the car that meets it */}
       {isFirst ? (
         <DayLines label={tx("welcomeText")} date={city.check_in} lines={data.arrival_lines} fallback={arrivalLines(data)} onChange={(arrival_lines) => onSlice({ arrival_lines })} />
+      ) : prev && hopMode(plan, prev.city_name, city.city_name) === "flight" ? (
+        // by air: the transfer to the airport it leaves from, and the welcome at the one it lands at — each on its day
+        <>
+          {transferRow(
+            localDatePart(hopLeg?.departure_at) ?? prev.check_out ?? city.check_in,
+            tx("toAirport", { airport: hopLeg?.from_airport.trim() || `مطار ${prev.city_name}` }),
+            clock(hopLeg?.departure_at) && tx("takeOffAt", { time: clock(hopLeg?.departure_at) }),
+          )}
+          {transferRow(
+            localDatePart(hopLeg?.arrival_at) ?? city.check_in,
+            tx("atAirport", { airport: hopLeg?.to_airport.trim() || `مطار ${city.city_name}` }),
+            clock(hopLeg?.arrival_at) && tx("landsAt", { time: clock(hopLeg?.arrival_at) }),
+          )}
+        </>
       ) : city.check_in ? (
         <p className="tv-tnum text-[11.5px] font-bold text-[#0F4339]">
           ✓ {`${dayLabel(city.check_in)} — `}
