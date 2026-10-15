@@ -46,7 +46,7 @@ describe("the programme starts when the plane leaves, the hotels when it lands",
     const days = draftDaySkeleton(data);
     const hop = days.findIndex((d) => d.date === "2026-10-19");
     expect(days[hop].city_name).toBe("لنكاوي");
-    expect(transportNoteForDay(data.transport_plan, days, hop, data.flights)).toContain("الانتقال إلى لنكاوي — طيران داخلي (AK6300)");
+    expect(transportNoteForDay(data.transport_plan, days, hop, data.flights)).toContain("الانتقال إلى لنكاوي — طيران داخلي (AK6300، الإقلاع 09:00، الوصول 10:05)");
   });
 
   it("keeps the arrival day's text on the arrival date when a travel day is added in front", () => {

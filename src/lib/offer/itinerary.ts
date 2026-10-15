@@ -59,6 +59,9 @@ export function cityForDate(date: string | null, cities: DraftCity[]): string {
       return city.city_name;
     }
   }
+  // the night between two cities spent travelling (arrives_next_day): the day still starts in the one it leaves
+  const leaving = cities.find((c) => c.check_out === date);
+  if (leaving) return leaving.city_name;
   const last = cities[cities.length - 1];
   if (last?.check_out && date >= last.check_out) return last.city_name;
   return cities[0]?.city_name ?? "";
@@ -251,6 +254,8 @@ export function transportNoteForDay(
         (f) => f.leg_order === "internal" && localDatePart(f.arrival_at) === day.date && f.to_city?.trim() === day.city_name,
       )
     : undefined;
+  // the evening the group flies on and lands after midnight: it leaves from here today
+  const overnight = !cityChanged && !last ? overnightLeg(flights, day) : undefined;
 
   const parts: string[] = [];
 
@@ -263,8 +268,9 @@ export function transportNoteForDay(
   // A day the group changes city is a travel day, not a touring day; saying
   // both would put two vehicles on one line and invite the question.
   if (hop) {
-    const no = hop.flight_no.trim();
-    parts.push("الانتقال إلى " + day.city_name + " — طيران داخلي" + (no ? " (" + no + ")" : ""));
+    parts.push(`الانتقال إلى ${day.city_name} — طيران داخلي${legNote(hop)}`);
+  } else if (overnight) {
+    parts.push(`التوجه إلى المطار للسفر إلى ${overnight.to_city?.trim() ?? ""} — طيران داخلي${legNote(overnight)}`);
   } else if (plan.intercity.enabled && cityChanged) {
     const how = hopVehicle(plan, hopMode(plan, days[index - 1]?.city_name ?? "", day.city_name));
     parts.push(`الانتقال إلى ${day.city_name} — ${how}`);
@@ -276,6 +282,36 @@ export function transportNoteForDay(
   }
 
   return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/** A clock on a leg, or "" — midnight is how a leg with no time yet is stored. */
+const clock = (iso: string | null | undefined) => {
+  const t = (iso ?? "").slice(11, 16);
+  return t && t !== "00:00" ? t : "";
+};
+
+/** The domestic leg that leaves from the day's city that evening and lands on a later day. */
+function overnightLeg(flights: DraftFlight[], day: DraftDay): DraftFlight | undefined {
+  return flights.find(
+    (f) =>
+      f.leg_order === "internal" &&
+      f.from_city?.trim() === day.city_name &&
+      localDatePart(f.departure_at) === day.date &&
+      (localDatePart(f.arrival_at) ?? "") > (day.date ?? ""),
+  );
+}
+
+/** « (MH1432، الإقلاع 22:30، الوصول 01:10 +1)» — what is known of the leg, or "". */
+function legNote(f: DraftFlight): string {
+  const leaves = localDatePart(f.departure_at);
+  const lands = localDatePart(f.arrival_at);
+  const next = Boolean(leaves && lands && lands > leaves);
+  const parts = [
+    f.flight_no.trim(),
+    clock(f.departure_at) && `الإقلاع ${clock(f.departure_at)}`,
+    clock(f.arrival_at) && `الوصول ${clock(f.arrival_at)}${next ? " +1" : ""}`,
+  ].filter(Boolean);
+  return parts.length > 0 ? ` (${parts.join("، ")})` : "";
 }
 
 /** A ready-made day from the old system (tour_programs, 0052) — text only. */
@@ -346,22 +382,61 @@ export const TOUR_CAR_LINE = "التنقل بـ";
 
 /** The first thing that happens on arrival — the company's own welcome, on every file. */
 export const WELCOME = "الاستقبال من المطار من قبل موظف ترافليون والتوجه إلى الفندق";
+/** The day home, as the company says it. */
+export const FAREWELL = "تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة";
+
+/** The arrival day's lines: this file's own (arrival_lines), else «بكج متقدم»'s, else the welcome. */
+export function arrivalLines(data: Pick<DraftData, "arrival_lines" | "advanced">): string[] {
+  return data.arrival_lines ?? [advancedDayLines(data.advanced).arrive ?? WELCOME];
+}
+
+/** The day home's lines: this file's own (departure_lines), else «بكج متقدم»'s, else the farewell. */
+export function departureLines(data: Pick<DraftData, "departure_lines" | "advanced">): string[] {
+  return data.departure_lines ?? [advancedDayLines(data.advanced).leave ?? FAREWELL];
+}
 
 /** The day titles the basic screen wrote before days carried `auto_title` — its to rewrite. */
 const AUTO_TITLE = /^(الوصول إلى |الانتقال إلى |جولة سياحية في |السفر إلى |المغادرة$|العودة إلى )/;
 const isAutoTitle = (title: string) => !title.trim() || title === FREE_DAY_TITLE || AUTO_TITLE.test(title);
 
-/** How the group reaches a city it moves to, as the day's activities say it. */
-function moveLines(mode: TransportMode, city: string, flightNo: string): string[] {
+/**
+ * How the group reaches a city it moves to, as the day's activities say it —
+ * with the flight's number and clocks once they are known. After a night spent
+ * flying (`overnight`) the day starts at the airport it lands at.
+ */
+function moveLines(mode: TransportMode, city: string, leg: DraftFlight | undefined, overnight = false): string[] {
   if (mode === "flight") {
+    const no = leg?.flight_no.trim() ?? "";
+    const leaves = clock(leg?.departure_at);
+    const lands = clock(leg?.arrival_at);
+    if (overnight) {
+      return [`الوصول إلى ${leg?.to_airport.trim() || `مطار ${city}`}${lands ? ` الساعة ${lands}` : ""}`, "الاستقبال من قبل موظف ترافليون والتوجه إلى الفندق"];
+    }
     return [
       "تسجيل الخروج من الفندق والتوجه إلى المطار",
-      `السفر إلى ${city} على الطيران الداخلي${flightNo ? ` (${flightNo})` : ""}`,
+      `السفر إلى ${city} على الطيران الداخلي${no ? ` (${no})` : ""}${leaves ? ` — الإقلاع ${leaves}` : ""}${lands ? ` والوصول ${lands}` : ""}`,
       `الاستقبال من مطار ${city} والتوجه إلى الفندق`,
     ];
   }
   const how = mode === "train" ? "بالقطار" : mode === "ship" ? "بالعبّارة" : "براً";
   return ["تسجيل الخروج من الفندق", `الانتقال ${how} إلى ${city} والتوجه إلى الفندق`];
+}
+
+/** The evening the group leaves a city on a flight that lands after midnight (the next city arrives_next_day). */
+function leaveLines(city: string, leg: DraftFlight | undefined): string[] {
+  const no = leg?.flight_no.trim() ?? "";
+  const leaves = clock(leg?.departure_at);
+  const from = leg?.from_airport.trim() ?? "";
+  return [
+    "تسجيل الخروج من الفندق",
+    `التوجه إلى المطار والسفر إلى ${city} على الطيران الداخلي${no ? ` (${no})` : ""}${leaves ? ` — الإقلاع الساعة ${leaves}` : ""}${from ? ` من ${from}` : ""}`,
+  ];
+}
+
+/** The domestic leg into `city` on `date`: landing that day, else leaving it, else any into the city. */
+function legInto(flights: DraftFlight[], city: string, date: string | null): DraftFlight | undefined {
+  const into = flights.filter((f) => f.leg_order === "internal" && f.to_city?.trim() === city);
+  return into.find((f) => localDatePart(f.arrival_at) === date) ?? into.find((f) => localDatePart(f.departure_at) === date) ?? into[0];
 }
 
 /**
@@ -461,8 +536,15 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
   const firstStay = stay[0] ?? -1;
   const lastDay = days.length - 1;
 
+  // the evenings the group flies on overnight (the next city arrives_next_day): date → that city
+  const flyOn = new Map<string, string>();
+  cities.forEach((c, k) => {
+    const out = cities[k - 1]?.check_out;
+    if (k > 0 && c.arrives_next_day && out) flyOn.set(out, c.city_name);
+  });
+
   // 1. which city each day is in, and what kind of day it is
-  type Kind = "travel" | "arrive" | "move" | "last" | "stay";
+  type Kind = "travel" | "arrive" | "move" | "leave" | "last" | "stay";
   const cityOf: number[] = [];
   const kindOf: Kind[] = [];
   let at = -1;
@@ -475,7 +557,7 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
     const moved = i === firstStay || days[i - 1]?.city_name !== day.city_name;
     if (moved && i !== lastDay) at += 1;
     cityOf.push(at);
-    kindOf.push(i === lastDay ? "last" : i === firstStay ? "arrive" : moved ? "move" : "stay");
+    kindOf.push(i === lastDay ? "last" : i === firstStay ? "arrive" : moved ? "move" : day.date && flyOn.has(day.date) ? "leave" : "stay");
   });
 
   // 2. each city's tours: a tour with a date goes on that day; the rest take the
@@ -515,16 +597,23 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
     let activities: string[] = [];
     if (kind === "last") {
       title = "المغادرة";
-      activities = [advancedDayLines(data.advanced).leave ?? "تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة"];
+      activities = departureLines(data);
     } else if (kind === "arrive") {
       title = `الوصول إلى ${day.city_name}`;
-      activities = [advancedDayLines(data.advanced).arrive ?? WELCOME];
+      activities = arrivalLines(data);
+    } else if (kind === "leave") {
+      const to = flyOn.get(day.date ?? "") ?? "";
+      const leg = data.flights.find(
+        (f) => f.leg_order === "internal" && f.to_city?.trim() === to && localDatePart(f.departure_at) === day.date,
+      );
+      title = `السفر إلى ${to}`;
+      activities = leaveLines(to, leg);
     } else if (kind === "move") {
       const from = days[i - 1]?.city_name ?? "";
       const mode = hopMode(plan, from, day.city_name);
-      const leg = data.flights.find((f) => f.leg_order === "internal" && f.to_city?.trim() === day.city_name);
-      title = mode === "flight" ? `السفر إلى ${day.city_name}` : `الانتقال إلى ${day.city_name}`;
-      activities = moveLines(mode, day.city_name, leg?.flight_no.trim() ?? "");
+      const overnight = Boolean(cities[cityOf[i]]?.arrives_next_day);
+      title = mode === "flight" ? (overnight ? `الوصول إلى ${day.city_name}` : `السفر إلى ${day.city_name}`) : `الانتقال إلى ${day.city_name}`;
+      activities = moveLines(mode, day.city_name, legInto(data.flights, day.city_name, day.date), overnight);
     } else title = FREE_DAY_TITLE;
 
     // «يوم حر» picked on purpose keeps the day free; it is not a tour

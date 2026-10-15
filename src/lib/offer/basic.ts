@@ -25,6 +25,7 @@ import {
   newStayId,
   resizeRooms,
   roomTypeNames,
+  totalCityNights,
   withCityKeys,
   withRooms,
   type DraftCity,
@@ -63,7 +64,7 @@ export function chainCities(data: Pick<DraftData, "trip" | "flights">, cities: B
 
 /** Nights the trip still has to give a city — what the add bar offers first. */
 export function remainingNights(data: Pick<DraftData, "trip" | "cities">): number {
-  return Math.max(data.trip.nights - data.cities.reduce((sum, c) => sum + c.nights, 0), 0);
+  return Math.max(data.trip.nights - totalCityNights(data.cities), 0);
 }
 
 /** A city's hotel line, born with the trip's rooms and meals so the agent only picks the hotel. */
@@ -549,9 +550,14 @@ export function withDomesticFlights(data: DraftData, airports: LookupAirport[]):
 
   type Stop = { city: string; airport: string };
   const stop = (city: string, airport?: string): Stop => ({ city: city.trim(), airport: airport?.trim() || cityAirport(city, airports, intl) });
-  const moves: { from: Stop; to: Stop; day: string | null }[] = [];
+  // `overnight`: it leaves the evening the city before checks out and lands the next day (arrives_next_day)
+  const moves: { from: Stop; to: Stop; day: string | null; overnight?: boolean }[] = [];
   if (landing?.to_city?.trim()) moves.push({ from: stop(landing.to_city, landing.to_airport), to: stop(cities[0].city_name), day: cities[0].check_in });
-  cities.slice(1).forEach((c, i) => moves.push({ from: stop(cities[i].city_name), to: stop(c.city_name), day: c.check_in }));
+  cities
+    .slice(1)
+    .forEach((c, i) =>
+      moves.push({ from: stop(cities[i].city_name), to: stop(c.city_name), day: c.arrives_next_day ? cities[i].check_out : c.check_in, overnight: c.arrives_next_day }),
+    );
   const last = cities[cities.length - 1];
   if (home?.from_city?.trim()) moves.push({ from: stop(last.city_name), to: stop(home.from_city, home.from_airport), day: last.check_out });
   const real = moves.filter((m) => m.from.city && m.to.city && m.from.city !== m.to.city);
@@ -581,6 +587,10 @@ export function withDomesticFlights(data: DraftData, airports: LookupAirport[]):
       const a = findAirport(from, airports);
       const b = findAirport(to, airports);
       const time = mine?.departure_at?.slice(11, 16) || "00:00";
+      const departure_at = mine?.date_user_set ? mine.departure_at : m.day ? `${m.day}T${time}` : null;
+      // the landing time typed on it stays, on the day it lands — the next one over an overnight move
+      const lands = mine?.arrival_at?.slice(11, 16);
+      const arrival_at = lands && departure_at ? `${addDaysIso(departure_at.slice(0, 10), m.overnight ? 1 : 0)}T${lands}` : (mine?.arrival_at ?? null);
       return {
         ...(mine ?? emptyFlight("internal", data.trip)),
         from_airport: from,
@@ -589,7 +599,8 @@ export function withDomesticFlights(data: DraftData, airports: LookupAirport[]):
         to_tz: b?.timezone ?? mine?.to_tz ?? null,
         from_city: m.from.city,
         to_city: m.to.city,
-        departure_at: mine?.date_user_set ? mine.departure_at : m.day ? `${m.day}T${time}` : null,
+        departure_at,
+        arrival_at,
         cabin_class: mine?.cabin_class || data.flight_booking.cabin,
         auto: true,
       };

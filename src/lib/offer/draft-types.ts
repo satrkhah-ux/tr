@@ -377,6 +377,13 @@ export type DraftCity = {
   tours?: number;
   /** The tours chosen for those days, in order — a ready programme or a typed title, each with its price. */
   tour_picks?: TourPick[];
+  /**
+   * The group gets here the day AFTER it leaves the city before — an evening
+   * domestic flight that lands past midnight. That night is spent travelling, in
+   * no hotel: it is one of the trip's nights but no city's (travelNights).
+   * Never on the first city.
+   */
+  arrives_next_day?: boolean;
   /** derived from trip.arrival_date + the nights chain (deriveCityDates). */
   check_in: string | null;
   check_out: string | null;
@@ -1241,6 +1248,13 @@ export type DraftData = {
    * the «يشمل / لا يشمل» lines for composite trips. Absent on every other file.
    */
   advanced?: DraftAdvanced;
+  /**
+   * This file's own words for the arrival day / the day home, line by line —
+   * the welcome and the farewell as management wants them said for this client.
+   * Absent: the company's default (itinerary.arrivalLines / departureLines).
+   */
+  arrival_lines?: string[];
+  departure_lines?: string[];
 };
 
 export function emptyDraftData(): DraftData {
@@ -1444,7 +1458,15 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     produced_serial: typeof source.produced_serial === "string" ? source.produced_serial : null,
     source: normalizeDraftSource(source.source),
     ...(advanced ? { advanced } : {}),
+    ...dayLines("arrival_lines", source.arrival_lines),
+    ...dayLines("departure_lines", source.departure_lines),
   };
+}
+
+/** Typed day lines, blanks dropped; none left reads as «the default» (the key is absent). */
+function dayLines<K extends "arrival_lines" | "departure_lines">(key: K, raw: unknown): Partial<Record<K, string[]>> {
+  const lines = Array.isArray(raw) ? raw.filter((l): l is string => typeof l === "string" && l.trim() !== "") : [];
+  return lines.length > 0 ? ({ [key]: lines } as Partial<Record<K, string[]>>) : {};
 }
 
 /** A hand-edited or older intercity leg comes back with only real modes in it. */
@@ -1502,14 +1524,15 @@ function addDays(iso: string, days: number): string {
 /**
  * Chain check-in/check-out through the cities from the trip arrival date:
  * city[0].check_in = arrival; each city checks out after its nights; the next
- * city checks in the same day. Returns a NEW array (input untouched).
+ * city checks in the same day — or the day after, across a night spent
+ * travelling (`arrives_next_day`). Returns a NEW array (input untouched).
  */
 export function deriveCityDates(arrivalDate: string | null, cities: DraftCity[]): DraftCity[] {
   if (!arrivalDate) return cities.map((c) => ({ ...c, check_in: null, check_out: null }));
   let cursor = arrivalDate;
-  return cities.map((c) => {
-    const check_in = cursor;
-    const check_out = addDays(cursor, Math.max(c.nights, 0));
+  return cities.map((c, i) => {
+    const check_in = i > 0 && c.arrives_next_day ? addDays(cursor, 1) : cursor;
+    const check_out = addDays(check_in, Math.max(c.nights, 0));
     cursor = check_out;
     return { ...c, check_in, check_out };
   });
@@ -1778,9 +1801,18 @@ export function isFreeDay(day: Pick<DraftDay, "title">): boolean {
   return day.title.trim() === FREE_DAY_TITLE;
 }
 
-/** Sum of allocated city nights. */
+/** The nights spent on an overnight move between two cities, in no hotel (DraftCity.arrives_next_day). */
+export function travelNights(cities: DraftCity[]): number {
+  return cities.filter((c, i) => i > 0 && c.arrives_next_day).length;
+}
+
+/**
+ * The trip nights the cities account for: their own, and the nights spent
+ * travelling between them — what is compared with trip.nights. A city's hotels
+ * cover its own nights only.
+ */
 export function totalCityNights(cities: DraftCity[]): number {
-  return cities.reduce((sum, c) => sum + (Number.isFinite(c.nights) ? c.nights : 0), 0);
+  return cities.reduce((sum, c) => sum + (Number.isFinite(c.nights) ? c.nights : 0), 0) + travelNights(cities);
 }
 
 export const BOARD_TYPES: BoardType[] = ["RO", "BB", "HB", "FB", "AI"];

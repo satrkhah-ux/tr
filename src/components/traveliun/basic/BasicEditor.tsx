@@ -57,6 +57,7 @@ import {
   stageHref,
   STAGES,
   stayTotal,
+  totalCityNights,
   type DraftData,
   type DraftHotel,
   type DraftScope,
@@ -592,7 +593,7 @@ export function BasicEditor({
     setNewPrice(null);
   }
 
-  const used = data.cities.reduce((sum, c) => sum + c.nights, 0);
+  const used = totalCityNights(data.cities);
   // over first: `left` is clamped at 0, so a file one night too long also has none left
   const nightsNote =
     used > trip.nights ? tx("over", { n: used - trip.nights }) : trip.nights > 0 && left === 0 ? tx("complete") : tx("remaining", { n: left });
