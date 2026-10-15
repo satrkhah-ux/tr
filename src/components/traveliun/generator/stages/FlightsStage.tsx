@@ -159,8 +159,11 @@ export function FlightsStage({
   only,
 }: StageFormProps & {
   compact?: boolean;
-  /** "domestic": the domestic hops alone — the basic screen asks the international route its own way first. */
-  only?: "domestic";
+  /**
+   * "domestic": the domestic hops alone — the basic screen asks the international route its own way first;
+   * "intl": the international legs alone — the basic screen keeps the domestic hops on each city's card.
+   */
+  only?: "domestic" | "intl";
 }) {
   const showIntl = only !== "domestic";
   const { t } = useTraveliunUI();
@@ -502,6 +505,7 @@ export function FlightsStage({
       ) : null}
 
       {/* ── domestic (internal hops) — optional, destination-dependent ──────── */}
+      {only !== "intl" ? (
       <div className={showIntl ? "mt-6 border-t border-[#e7f0ec] pt-5" : ""}>
         <div className="mb-2.5 flex flex-wrap items-center gap-2">
           <h3 className="flex items-center gap-2 text-[13.5px] font-extrabold text-[#0f3d38]">
@@ -563,6 +567,7 @@ export function FlightsStage({
           </div>
         ) : null}
       </div>
+      ) : null}
     </section>
   );
 }

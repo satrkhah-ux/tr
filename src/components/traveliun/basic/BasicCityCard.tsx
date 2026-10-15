@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState, type ReactNode } from "react";
-import { BedDouble, Camera, CheckCircle2, ChevronDown, Pencil, Plane, Plus, Trash2, UserRound, X } from "lucide-react";
+import { BedDouble, Camera, CheckCircle2, ChevronDown, ListChecks, Pencil, Plane, Plus, RotateCcw, Trash2, UserRound, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import {
   addStay,
@@ -32,12 +32,13 @@ import {
   findAirport,
   rankAirports,
   roomSuggestions,
+  setCityNights,
   tripCountries,
-  WELCOME,
   withTours,
   type BasicCity,
 } from "@/lib/offer/basic";
-import { departureDay, type TourProgram } from "@/lib/offer/itinerary";
+import { arrivalLines, departureDay, departureLines, type TourProgram } from "@/lib/offer/itinerary";
+import { BasicCityProgram } from "./BasicCityProgram";
 import { useRole } from "@/lib/roles/RoleContext";
 import { tourPriced, toursTotal, type TourPrice } from "@/lib/offer/pricing-suggest";
 import type { BoardType } from "@/lib/types";
@@ -58,7 +59,7 @@ const DAY = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { weekday: "lo
 /** «الأربعاء، 11 نوفمبر» */
 const dayLabel = (iso: string) => DAY.format(new Date(`${iso}T00:00:00Z`));
 
-type Tab = "hotel" | "tours" | "domestic";
+type Tab = "hotel" | "tours" | "domestic" | "program";
 
 /**
  * The card's tables share one look: a row of small headings once, then rows of
@@ -102,7 +103,6 @@ export function BasicCityCard({
   onLines,
   onSlice,
   onCar,
-  onFlights,
   onRemove,
   collapsed,
   onDone,
@@ -133,8 +133,6 @@ export function BasicCityCard({
   onSlice: (slice: Partial<DraftData>) => void;
   /** the reception (airport), farewell or the trip's tours car changed. */
   onCar: (leg: "airport" | "farewell" | "tours", slice: Partial<TransportLeg>) => void;
-  /** open the flights step — the domestic legs are entered there. */
-  onFlights: () => void;
   onRemove: () => void;
   /** «تمت» pressed: the card folds to its summary line. */
   collapsed: boolean;
@@ -148,20 +146,23 @@ export function BasicCityCard({
   const domestic = data.flights.filter(
     (f) => f.leg_order === "internal" && (f.to_city?.trim() === city.city_name || f.from_city?.trim() === city.city_name),
   );
-  const tabs: { key: Tab; label: string; icon: typeof Plane }[] = [
+  // «البرنامج السياحي» opens once every tour of the city says what it is
+  const picks = toursOn ? withTours(city, city.tours ?? 0, undefined, isLast) : [];
+  const programLocked = picks.some((p) => !p.free && !p.title.trim());
+  const tabs: { key: Tab; label: string; icon: typeof Plane; locked?: boolean }[] = [
     ...(hotelsOn && main ? [{ key: "hotel" as const, label: tx("hotel"), icon: BedDouble }] : []),
     // the tours, and the reception / farewell cars beside them on the first and last city
     ...(toursOn || (transportOn && (isFirst || isLast))
       ? [{ key: "tours" as const, label: toursOn ? tx("tours") : tx("transfersTab"), icon: toursOn ? Camera : UserRound }]
       : []),
     ...(domestic.length > 0 || (data.scope.flights_domestic && index > 0) ? [{ key: "domestic" as const, label: tx("domesticTab"), icon: Plane }] : []),
+    { key: "program" as const, label: tx("programTab"), icon: ListChecks, locked: programLocked },
   ];
   const [tab, setTab] = useState<Tab>("hotel");
-  const open = tabs.some((x) => x.key === tab) ? tab : tabs[0]?.key;
+  const open = tabs.some((x) => x.key === tab && !x.locked) ? tab : tabs[0]?.key;
 
   // what the city still lacks before «تمت»: the stay, the tours, the airport cars
   const plan = data.transport_plan;
-  const picks = toursOn ? withTours(city, city.tours ?? 0, undefined, isLast) : [];
   const tripCar = plan.tours.car_type.trim();
   // the tours' prices, as the generator shows them: pricing.view only (a hidden price is kept, never cleared)
   const showPrice = useRole().can("pricing.view");
@@ -199,14 +200,16 @@ export function BasicCityCard({
         {hop}
         {tabs.length > 0 && !collapsed ? (
           <div role="tablist" className="flex flex-wrap gap-1 sm:ms-3">
-            {tabs.map(({ key, label, icon: Icon }) => (
+            {tabs.map(({ key, label, icon: Icon, locked }) => (
               <button
                 key={key}
                 type="button"
                 role="tab"
                 aria-selected={open === key}
+                disabled={locked}
+                title={locked ? tx("programLocked") : undefined}
                 onClick={() => setTab(key)}
-                className={`inline-flex h-7 items-center gap-1 rounded-[7px] border px-2.5 text-[11.5px] font-bold transition-colors ${
+                className={`inline-flex h-7 items-center gap-1 rounded-[7px] border px-2.5 text-[11.5px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                   open === key ? "border-[#185045] bg-[#185045] text-white" : "border-[#d3e2dc] bg-white text-[#557d78] hover:border-[#165749]"
                 }`}
               >
@@ -268,10 +271,14 @@ export function BasicCityCard({
               showPrice={showPrice}
               onPicks={onPicks}
               onCar={onCar}
+              onSlice={onSlice}
             />
           ) : null}
+          {open === "program" ? (
+            <BasicCityProgram city={city} data={data} dayLabel={dayLabel} onSlice={onSlice} onTours={() => setTab("tours")} />
+          ) : null}
           {open === "domestic" ? (
-            <DomesticPanel index={index} legs={domestic} data={data} lookups={lookups} onSlice={onSlice} onFlights={onFlights} />
+            <DomesticPanel index={index} legs={domestic} data={data} lookups={lookups} onSlice={onSlice} />
           ) : null}
           {/* «تمت <city>»: open only when the city has all it needs, and says what is missing until then */}
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-dashed border-[#DCE9E5] pt-2.5">
@@ -605,6 +612,7 @@ function ToursPanel({
   showPrice,
   onPicks,
   onCar,
+  onSlice,
 }: {
   index: number;
   city: BasicCity;
@@ -621,6 +629,7 @@ function ToursPanel({
   showPrice: boolean;
   onPicks: (picks: TourPick[]) => void;
   onCar: (leg: "airport" | "farewell" | "tours", slice: Partial<TransportLeg>) => void;
+  onSlice: (slice: Partial<DraftData>) => void;
 }) {
   const tx = useBasicLabels();
   const { t } = useTraveliunUI();
@@ -718,11 +727,13 @@ function ToursPanel({
         </div>
       ) : null}
 
-      {/* the day the group arrives — the welcome, or the move from the city before — then the car that meets it */}
-      {isFirst || city.check_in ? (
+      {/* the day the group arrives — the welcome (this file's words), or the move from the city before — then the car that meets it */}
+      {isFirst ? (
+        <DayLines label={tx("welcomeText")} date={city.check_in} lines={data.arrival_lines} fallback={arrivalLines(data)} onChange={(arrival_lines) => onSlice({ arrival_lines })} />
+      ) : city.check_in ? (
         <p className="tv-tnum text-[11.5px] font-bold text-[#0F4339]">
-          ✓ {city.check_in ? `${dayLabel(city.check_in)} — ` : ""}
-          {isFirst ? WELCOME : tx("moveTo", { from: data.cities[index - 1]?.city_name ?? "", city: city.city_name })}
+          ✓ {`${dayLabel(city.check_in)} — `}
+          {tx("moveTo", { from: data.cities[index - 1]?.city_name ?? "", city: city.city_name })}
         </p>
       ) : null}
       {isFirst && transportOn ? airportRow("airport", tx("reception"), landsHere?.to_airport || "—") : null}
@@ -767,16 +778,81 @@ function ToursPanel({
         </>
       ) : null}
 
+      {isLast ? (
+        <DayLines label={tx("farewellText")} date={leaving} lines={data.departure_lines} fallback={departureLines(data)} onChange={(departure_lines) => onSlice({ departure_lines })} />
+      ) : null}
       {isLast && transportOn ? airportRow("farewell", tx("farewell"), leavesHere?.from_airport || "—") : null}
     </div>
   );
 }
 
 /**
- * The city's domestic flights, edited where the city is: the airports (the
- * package's own first), the day, and — once the tickets are in — the flight
- * number and the times. The legs come from the cities; nothing here has to be
- * typed for a planned flight but its price.
+ * The welcome / the farewell as this file says them, beside their date: the
+ * company's words until the agent changes one, a line more if they want it, and
+ * back to the default with one press (the key is then dropped — lines undefined).
+ */
+function DayLines({
+  label,
+  date,
+  lines,
+  fallback,
+  onChange,
+}: {
+  label: string;
+  date: string | null;
+  lines: string[] | undefined;
+  /** what the day says without lines of its own. */
+  fallback: string[];
+  onChange: (lines: string[] | undefined) => void;
+}) {
+  const tx = useBasicLabels();
+  const shown = lines ?? fallback;
+  return (
+    <div className="space-y-1 rounded-[9px] border border-[#DCE9E5] bg-[#fbfdfc] p-2">
+      <div className="flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#0F4339]">
+        <span>✓ {label}</span>
+        {date ? <span className="tv-tnum text-[#557d78]">{dayLabel(date)}</span> : null}
+        <span className="ms-auto flex flex-wrap gap-1">
+          <button
+            type="button"
+            onClick={() => onChange([...shown, ""])}
+            className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2 text-[11px] text-[#185045] hover:bg-[#f0f7f4]"
+          >
+            <Plus className="size-3.5" />
+            {tx("addLine")}
+          </button>
+          {lines ? (
+            <button
+              type="button"
+              onClick={() => onChange(undefined)}
+              className="inline-flex h-7 items-center gap-1 rounded-[7px] px-2 text-[11px] text-[#557d78] hover:text-[#185045]"
+            >
+              <RotateCcw className="size-3.5" />
+              {tx("defaultText")}
+            </button>
+          ) : null}
+        </span>
+      </div>
+      {shown.map((line, k) => (
+        <div key={k} className="flex items-center gap-1">
+          <input aria-label={label} value={line} onChange={(e) => onChange(shown.map((l, j) => (j === k ? e.target.value : l)))} className={basicField} />
+          {shown.length > 1 ? (
+            <button type="button" aria-label={tx("removeLine")} onClick={() => onChange(shown.filter((_, j) => j !== k))} className="rounded-[7px] p-1 text-[#c43d3d] hover:bg-[#fff1f1]">
+              <X className="size-3.5" />
+            </button>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The city's domestic flights — the one place they are entered: the airports
+ * (from the cities, the package's own first), the day (the move's), and once
+ * the tickets are in the flight number and the two clocks. A landing earlier
+ * than the take-off is the next day («+1»): the city it lands in then starts a
+ * day later and gives back the night spent flying (arrives_next_day).
  */
 function DomesticPanel({
   index,
@@ -784,14 +860,12 @@ function DomesticPanel({
   data,
   lookups,
   onSlice,
-  onFlights,
 }: {
   index: number;
   legs: DraftData["flights"];
   data: DraftData;
   lookups: GeneratorLookups;
   onSlice: (slice: Partial<DraftData>) => void;
-  onFlights: () => void;
 }) {
   const tx = useBasicLabels();
   const booking = data.flight_booking;
@@ -814,7 +888,25 @@ function DomesticPanel({
     const t = (iso ?? "").slice(11, 16);
     return t === "00:00" ? "" : t;
   };
-  const cols = "xl:grid-cols-[minmax(11rem,1.4fr)_minmax(11rem,1.4fr)_9.5rem_7rem_6.5rem_6.5rem]";
+  const cols = "xl:grid-cols-[minmax(11rem,1.4fr)_minmax(11rem,1.4fr)_9.5rem_7rem_6.5rem_8.5rem]";
+  const addDay = (iso: string) => new Date(Date.parse(`${iso}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  const nextDay = (leg: DraftData["flights"][number]) => Boolean(leg.arrival_at && leg.departure_at && day(leg.arrival_at) > day(leg.departure_at));
+  // the stop the leg lands in — the one that starts a day later after a night in the air
+  const stopOf = (leg: DraftData["flights"][number]) =>
+    data.cities.findIndex((c, k) => k > 0 && c.city_name === leg.to_city?.trim() && data.cities[k - 1]?.city_name === leg.from_city?.trim());
+  const setTimes = (leg: DraftData["flights"][number], dep: string, arr: string) => {
+    const date = day(leg.departure_at) || data.trip.arrival_date || "";
+    const next = Boolean(dep && arr && arr < dep);
+    const flights = data.flights.map((f) =>
+      f === leg ? { ...f, departure_at: `${date}T${dep || "00:00"}`, arrival_at: arr ? `${next ? addDay(date) : date}T${arr}` : null } : f,
+    );
+    const at = stopOf(leg);
+    const city = data.cities[at];
+    if (!city || Boolean(city.arrives_next_day) === next) return onSlice({ flights });
+    // the night now spent flying comes off the city it lands in — and goes back when it no longer is
+    const resized = setCityNights({ ...data, flights }, at, Math.max(city.nights + (next ? -1 : 1), 1));
+    onSlice({ flights, hotels: resized.hotels, cities: resized.cities.map((c, k) => (k === at ? { ...c, arrives_next_day: next || undefined } : c)) });
+  };
 
   return (
     <div className="space-y-1.5">
@@ -842,7 +934,7 @@ function DomesticPanel({
                 onChange={(e) =>
                   setLeg(leg, {
                     departure_at: e.target.value ? `${e.target.value}T${time(leg.departure_at) || "00:00"}` : null,
-                    arrival_at: leg.arrival_at && e.target.value ? `${e.target.value}T${leg.arrival_at.slice(11, 16)}` : leg.arrival_at,
+                    arrival_at: leg.arrival_at && e.target.value ? `${nextDay(leg) ? addDay(e.target.value) : e.target.value}T${leg.arrival_at.slice(11, 16)}` : leg.arrival_at,
                     date_user_set: true,
                   })
                 }
@@ -854,17 +946,24 @@ function DomesticPanel({
                 dir="ltr"
                 aria-label={tx("domDep")}
                 value={time(leg.departure_at)}
-                onChange={(e) => setLeg(leg, { departure_at: `${day(leg.departure_at) || (data.trip.arrival_date ?? "")}T${e.target.value || "00:00"}` })}
+                onChange={(e) => setTimes(leg, e.target.value, time(leg.arrival_at))}
                 className={`${basicField} tv-tnum px-2`}
               />
-              <input
-                type="time"
-                dir="ltr"
-                aria-label={tx("domArr")}
-                value={time(leg.arrival_at)}
-                onChange={(e) => setLeg(leg, { arrival_at: e.target.value ? `${day(leg.departure_at)}T${e.target.value}` : null })}
-                className={`${basicField} tv-tnum px-2`}
-              />
+              <span className="flex items-center gap-1">
+                <input
+                  type="time"
+                  dir="ltr"
+                  aria-label={tx("domArr")}
+                  value={time(leg.arrival_at)}
+                  onChange={(e) => setTimes(leg, time(leg.departure_at), e.target.value)}
+                  className={`${basicField} tv-tnum px-2`}
+                />
+                {nextDay(leg) ? (
+                  <span title={tx("nextDayHint", { city: leg.to_city ?? "" })} className="tv-tnum shrink-0 rounded-full bg-[#fff4dc] px-1.5 py-0.5 text-[10.5px] font-extrabold text-[#a86a10]">
+                    {tx("nextDay")}
+                  </span>
+                ) : null}
+              </span>
             </div>
           ))}
           <datalist id={listId}>
@@ -891,14 +990,6 @@ function DomesticPanel({
           <FlightFare booking={booking} kind="dom" trip={data.trip} field={basicField} onChange={(flight_booking) => onSlice({ flight_booking })} />
         </>
       )}
-      <button
-        type="button"
-        onClick={onFlights}
-        className="inline-flex h-7 items-center gap-1 text-[11.5px] font-bold text-[#557d78] hover:text-[#185045]"
-      >
-        <Plane className="size-3.5" />
-        {tx("editFlights")}
-      </button>
     </div>
   );
 }

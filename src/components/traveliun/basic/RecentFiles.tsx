@@ -87,8 +87,9 @@ export function RecentFiles({
     return [...groups.entries()];
   }, [shown]);
 
-  const today = dayKey(new Date());
-  const yesterday = dayKey(new Date(Date.now() - 86_400_000));
+  const now = new Date();
+  const today = dayKey(now);
+  const yesterday = dayKey(new Date(now.getTime() - 86_400_000));
   const dayTitle = (key: string) =>
     key === today
       ? tx("today")

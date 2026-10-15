@@ -40,7 +40,6 @@ const render = () => {
       onLines={() => {}}
       onSlice={() => {}}
       onCar={() => {}}
-      onFlights={() => {}}
       onRemove={() => {}}
       collapsed={false}
       onDone={() => {}}

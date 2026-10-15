@@ -387,12 +387,18 @@ export const FAREWELL = "تسجيل الخروج من الفندق والتوج�
 
 /** The arrival day's lines: this file's own (arrival_lines), else «بكج متقدم»'s, else the welcome. */
 export function arrivalLines(data: Pick<DraftData, "arrival_lines" | "advanced">): string[] {
-  return data.arrival_lines ?? [advancedDayLines(data.advanced).arrive ?? WELCOME];
+  return typed(data.arrival_lines) ?? [advancedDayLines(data.advanced).arrive ?? WELCOME];
 }
 
 /** The day home's lines: this file's own (departure_lines), else «بكج متقدم»'s, else the farewell. */
 export function departureLines(data: Pick<DraftData, "departure_lines" | "advanced">): string[] {
-  return data.departure_lines ?? [advancedDayLines(data.advanced).leave ?? FAREWELL];
+  return typed(data.departure_lines) ?? [advancedDayLines(data.advanced).leave ?? FAREWELL];
+}
+
+/** The lines typed, without a blank one just added on the screen; none left is «the default». */
+function typed(lines: string[] | undefined): string[] | null {
+  const kept = lines?.map((l) => l.trim()).filter(Boolean);
+  return kept && kept.length > 0 ? kept : null;
 }
 
 /** The day titles the basic screen wrote before days carried `auto_title` — its to rewrite. */

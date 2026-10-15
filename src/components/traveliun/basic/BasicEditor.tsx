@@ -594,6 +594,16 @@ export function BasicEditor({
   }
 
   const used = totalCityNights(data.cities);
+  // the domestic flights live on each city's card (its «الرحلات الداخلية» tab) — one place for them
+  const domesticNote = scope.flights_domestic ? (
+    <p className="flex flex-wrap items-center gap-2 border-t border-dashed border-[#DCE9E5] pt-2 text-[11.5px] font-bold text-[#557d78]">
+      <Plane className="size-3.5" />
+      {tx("domesticInCities")}
+      <button type="button" onClick={() => show("cities")} className="text-[#185045] underline-offset-2 hover:underline">
+        {tx("goCities")}
+      </button>
+    </p>
+  ) : null;
   // over first: `left` is clamped at 0, so a file one night too long also has none left
   const nightsNote =
     used > trip.nights ? tx("over", { n: used - trip.nights }) : trip.nights > 0 && left === 0 ? tx("complete") : tx("remaining", { n: left });
@@ -1131,19 +1141,17 @@ export function BasicEditor({
               {tx("backToPlan")}
             </button>
           ) : null}
-          <div className="-mx-3 -mb-1 [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
-            <FlightsStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} compact />
-          </div>
+          {scope.flights_intl ? (
+            <div className="-mx-3 -mb-1 [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
+              <FlightsStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} compact only="intl" />
+            </div>
+          ) : null}
+          {domesticNote}
         </div>
       ) : (
         <div className="space-y-3">
           <BasicFlightPlan data={data} lookups={lk} defaults={planDefaults} onChange={commit} onFinal={() => setFlightView("final")} />
-          {/* the domestic hops are entered as they always were */}
-          {scope.flights_domestic ? (
-            <div className="-mx-3 -mb-1 border-t border-dashed border-[#DCE9E5] [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
-              <FlightsStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} compact only="domestic" />
-            </div>
-          ) : null}
+          {domesticNote}
         </div>
       ),
 
@@ -1213,7 +1221,6 @@ export function BasicEditor({
                       ? setTourCar(slice)
                       : commit({ transport_plan: withCar({ ...plan, farewell: { ...(plan.farewell ?? plan.airport), ...slice, enabled: true } }, slice.car_type) })
                 }
-                onFlights={() => (steps.includes("flights") ? show("flights") : undefined)}
                 onRemove={() => {
                   if (window.confirm(tx("confirmRemove", { city: city.city_name }))) commit(removeCity(data, i));
                 }}
