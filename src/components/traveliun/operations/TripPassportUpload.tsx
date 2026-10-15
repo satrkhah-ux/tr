@@ -9,6 +9,7 @@ const CHIP: Record<ClientPassportState, { text: string; cls: string } | null> = 
   received: { text: "تم الاستلام — قيد المراجعة", cls: "bg-[#e9f7f0] text-[#0f7a52]" },
   on_file: { text: "تم الاستلام ✓", cls: "bg-[#e9f7f0] text-[#0f7a52]" },
   retake: { text: "الصورة غير واضحة — ارفع صورة أخرى", cls: "bg-[#fff8e8] text-[#a86a10]" },
+  update: { text: "يحتاج تحديث — ارفع صورة جواز ساري", cls: "bg-[#fff8e8] text-[#a86a10]" },
 };
 
 /** One traveller's passport photo, from the client's phone. The answer is only «تم الاستلام» — nothing read is sent back. */
@@ -43,7 +44,7 @@ export function TripPassportUpload({ token, travelerId, label, state: initial }:
         <label
           className={`mt-2.5 flex h-11 w-full cursor-pointer items-center justify-center rounded-[11px] border-2 border-dashed border-[var(--trip)] text-[13px] font-extrabold text-[var(--trip)] ${pending ? "opacity-60" : ""}`}
         >
-          {pending ? "جارٍ الرفع…" : state === "needed" ? "رفع صورة الجواز" : "رفع صورة أخرى"}
+          {pending ? "جارٍ الرفع…" : state === "needed" ? "رفع صورة الجواز" : state === "update" ? "رفع صورة الجواز الساري" : "رفع صورة أخرى"}
           <input
             type="file"
             accept="image/*,application/pdf"

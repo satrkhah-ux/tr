@@ -7,6 +7,7 @@ import { translate, type TranslationKey } from "@/lib/i18n";
 import { aheadOfClient, aheadOfExecution, derivedClient, derivedExecution, readiness, type ReadinessItem } from "@/lib/operations/progress";
 import { kanbanStageFor, type ClientStatus, type ExecutionStatus } from "@/lib/operations/state";
 import { CLIENT_DOCUMENT_KINDS } from "@/lib/operations/voucher-dto";
+import type { TravelerRow } from "@/lib/operations/traveler-dto";
 import { MESSAGE_ON_STATE } from "@/lib/operations/client-messages";
 import { sendClientMessage } from "@/lib/data/client-messages";
 
@@ -92,15 +93,15 @@ export async function syncOperationOfBooking(bookingId: string): Promise<void> {
 export async function readinessFor(operationId: string): Promise<ReadinessItem[] | null> {
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
-    const { data: op } = await supabase.from("operations").select("travel_end, offers(total)").eq("id", operationId).maybeSingle();
-    const row = op as unknown as { travel_end: string | null; offers: { total: number | string | null } | { total: number | string | null }[] | null } | null;
+    const { data: op } = await supabase.from("operations").select("travel_start, travel_end, offers(total)").eq("id", operationId).maybeSingle();
+    const row = op as unknown as { travel_start: string | null; travel_end: string | null; offers: { total: number | string | null } | { total: number | string | null }[] | null } | null;
     if (!row) return null;
     const offer = Array.isArray(row.offers) ? row.offers[0] : row.offers;
     const [bookings, documents, payments, travelers] = await Promise.all([
       supabase.from("operation_bookings").select("kind, status").eq("operation_id", operationId),
       supabase.from("operation_documents").select("kind").eq("operation_id", operationId).is("revoked_at", null).in("kind", CLIENT_DOCUMENT_KINDS),
       supabase.from("operation_payments").select("amount, kind").eq("operation_id", operationId),
-      supabase.from("operation_travelers").select("display_name, passport_expiry, visa_status").eq("operation_id", operationId).order("sort"),
+      supabase.from("operation_travelers").select("display_name, traveler_kind, passport_encrypted, passport_expiry, birth_date, age, nationality, visa_status").eq("operation_id", operationId).order("sort"),
     ]);
     const paid = ((payments.data ?? []) as { amount: number | string; kind: string }[]).reduce((s, p) => s + (p.kind === "refund" ? -1 : 1) * (Number(p.amount) || 0), 0);
     return readiness({
@@ -108,12 +109,20 @@ export async function readinessFor(operationId: string): Promise<ReadinessItem[]
       documents: (documents.data ?? []) as { kind: string }[],
       paid,
       total: offer?.total != null ? Number(offer.total) : null,
-      travelers: ((travelers.data ?? []) as { display_name: string; passport_expiry: string | null; visa_status: string | null }[]).map((t) => ({
+      // the ciphertext is read only to become a yes/no, here, server-side
+      travelers: ((travelers.data ?? []) as Pick<TravelerRow, "display_name" | "traveler_kind" | "passport_encrypted" | "passport_expiry" | "birth_date" | "age" | "nationality" | "visa_status">[]).map((t) => ({
         name: t.display_name || "—",
+        has_passport: Boolean(t.passport_encrypted),
         passport_expiry: t.passport_expiry,
-        visa_status: t.visa_status,
+        birth_date: t.birth_date ?? null,
+        age: t.age ?? null,
+        traveler_kind: t.traveler_kind,
+        nationality: t.nationality ?? null,
+        visa_status: t.visa_status ?? "not_required",
       })),
+      travelStart: row.travel_start,
       travelEnd: row.travel_end,
+      today: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }),
     });
   } catch {
     return null;

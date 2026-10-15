@@ -18,9 +18,13 @@
 
 export type TravelerKind = "adult" | "child" | "infant";
 
-/** «جاهز للسفر» needs `not_required` or `issued`; the two between are work in progress. */
-export type VisaStatus = "not_required" | "required" | "submitted" | "issued";
-export const VISA_STATUSES: VisaStatus[] = ["not_required", "required", "submitted", "issued"];
+/**
+ * «جاهز للسفر» needs `not_required` or `issued`; the two between are work in
+ * progress. `check` (0077) — nobody has looked yet whether THIS nationality needs
+ * a visa for the destination (travelers.ts visaFor); it holds readiness too.
+ */
+export type VisaStatus = "check" | "not_required" | "required" | "submitted" | "issued";
+export const VISA_STATUSES: VisaStatus[] = ["check", "not_required", "required", "submitted", "issued"];
 
 /** The DB row. SERVER ONLY — never returned from a server action. */
 export type TravelerRow = {

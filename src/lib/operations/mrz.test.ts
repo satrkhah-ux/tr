@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mrzCheckDigit, parseTd3 } from "./mrz";
+import { mrzCheckDigit, parseTd3, trustedFields, type MrzPassport } from "./mrz";
 
 // The ICAO 9303 specimen passport — every check digit in it is known-good.
 const L1 = "P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<";
@@ -75,5 +75,51 @@ describe("parseTd3", () => {
   it("returns a null date rather than an impossible one", () => {
     const res = parseTd3(`${L1}\n${line2("A1234567", "SAU", "851399", "M", "300101")}`, TODAY);
     expect(res.ok && res.passport.birth_date).toBeNull();
+  });
+});
+
+describe("trustedFields — a failed read never invents data", () => {
+  const read = (patch: Partial<MrzPassport>): MrzPassport => ({
+    surname: "SAMER",
+    given_names: "ALI",
+    full_name: "ALI SAMER",
+    number: "N01234567",
+    nationality: "SYR",
+    issuing_state: "SYR",
+    birth_date: "1990-05-01",
+    sex: "M",
+    expiry: "2030-01-01",
+    failed: [],
+    ...patch,
+  });
+
+  it("passes a clean read through whole", () => {
+    expect(trustedFields(read({}), TODAY)).toEqual({
+      values: { full_name: "ALI SAMER", number: "N01234567", nationality: "SYR", birth_date: "1990-05-01", expiry: "2030-01-01" },
+      missing: [],
+    });
+  });
+
+  it("leaves the Syrian traveller's 1 January of this year empty instead of writing it", () => {
+    // what the live case got: the number failed its digit and the birth date read as 2026-01-01
+    const res = trustedFields(read({ birth_date: "2026-01-01", failed: ["number", "personal", "composite"] }), TODAY);
+    expect(res.values.birth_date).toBe("");
+    expect(res.values.number).toBe("");
+    expect(res.missing).toEqual(["number", "birth_date"]);
+  });
+
+  it("never pre-fills today, a future birthday, or a field whose own check digit failed", () => {
+    expect(trustedFields(read({ birth_date: TODAY }), TODAY).missing).toEqual(["birth_date"]);
+    expect(trustedFields(read({ birth_date: "2026-12-01" }), TODAY).missing).toEqual(["birth_date"]);
+    expect(trustedFields(read({ failed: ["expiry"] }), TODAY).missing).toEqual(["expiry"]);
+    expect(trustedFields(read({ failed: ["birth_date"] }), TODAY).missing).toEqual(["birth_date"]);
+    // an old 1 January is a real birthday on many passports
+    expect(trustedFields(read({ birth_date: "1980-01-01" }), TODAY).missing).toEqual([]);
+  });
+
+  it("names every field the read did not give", () => {
+    const res = trustedFields(read({ full_name: "", nationality: "", birth_date: null, expiry: null, number: "" }), TODAY);
+    expect(res.missing).toEqual(["full_name", "number", "nationality", "birth_date", "expiry"]);
+    expect(Object.values(res.values).every((v) => v === "")).toBe(true);
   });
 });

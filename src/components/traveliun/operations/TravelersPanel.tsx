@@ -18,7 +18,7 @@ import {
 } from "@/lib/data/operation-travelers";
 import { VISA_STATUSES, type PassportRead, type TravelerKind, type TravelerListItem, type VisaStatus } from "@/lib/operations/traveler-dto";
 import { ageOn, isLatinName, travelerReadiness } from "@/lib/operations/travelers";
-import type { MrzCheckedField, MrzPassport } from "@/lib/operations/mrz";
+import { trustedFields, type MrzCheckedField, type MrzFormField, type MrzPassport } from "@/lib/operations/mrz";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition, useSessionField } from "../useSafeTransition";
@@ -37,10 +37,8 @@ const dashedBtn =
 const KINDS: TravelerKind[] = ["adult", "child", "infant"];
 const KIND_KEY = (k: TravelerKind) => `ops.traveler.${k}` as TranslationKey;
 const VISA_KEY = (s: VisaStatus) => `ops.trav.visa.${s}` as TranslationKey;
-const MRZ_FIELD_KEY: Record<MrzCheckedField, TranslationKey> = {
-  number: "ops.passport.number",
-  birth_date: "ops.trav.birthDate",
-  expiry: "ops.passport.expiry",
+// the checks with no form field of their own — a failed field's value is left empty instead (trustedFields)
+const MRZ_CHECK_KEY: Partial<Record<MrzCheckedField, TranslationKey>> = {
   personal: "ops.trav.mrz.personal",
   composite: "ops.trav.mrz.composite",
 };
@@ -207,7 +205,15 @@ function TravelerRow({
   const gaps = travelerReadiness(traveler, trip, today);
   const travelAge = ageOn(traveler.birth_date, trip.travel_start ?? today);
   const set = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f));
-  const bad = (f: MrzCheckedField) => (mrz?.failed.includes(f) ? "border-[#c22850]" : "");
+  // what the read did NOT give — empty, never guessed (owner order 10)
+  const missing = mrz ? trustedFields(mrz, today).missing : [];
+  const manual = (f: MrzFormField) => (missing.includes(f) && form && !form[f] ? "border-[#e0a33a] bg-[#fffaf0]" : "");
+  const fillTag = (f: MrzFormField) =>
+    manual(f) ? <span className="text-[10.5px] font-bold text-[#a86a10]">{t("ops.trav.fillManually")}</span> : null;
+  const checkFails = (mrz?.failed ?? []).flatMap((f) => {
+    const key = MRZ_CHECK_KEY[f];
+    return key ? [t(key)] : [];
+  });
 
   function openEdit(prefill: Partial<Form> = {}) {
     const known = passport?.state === "ok" ? passport.passport : null;
@@ -264,15 +270,9 @@ function TravelerRow({
       () => readPassportMrz(traveler.id, fd),
       (res) => {
         const p = res.passport;
+        const { values } = trustedFields(p, today);
         setMrz(p);
-        openEdit({
-          display_name: traveler.display_name || p.full_name,
-          full_name: p.full_name,
-          number: p.number,
-          nationality: p.nationality,
-          birth_date: p.birth_date ?? "",
-          expiry: p.expiry ?? "",
-        });
+        openEdit({ display_name: traveler.display_name || values.full_name, ...values });
         // the photo may have become the scan
         router.refresh();
       },
@@ -410,7 +410,7 @@ function TravelerRow({
         ) : (
           gaps.map((g) => (
             <span key={g} className="rounded-full bg-[#fdecef] px-2 py-0.5 text-[10.5px] font-bold text-[#c22850]">
-              {t(`ops.trav.gap.${g}` as TranslationKey, { n: travelAge ?? "" })}
+              {t(`ops.trav.gap.${g}` as TranslationKey, { n: travelAge ?? "", nat: traveler.nationality || "—" })}
             </span>
           ))
         )}
@@ -482,11 +482,8 @@ function TravelerRow({
           {mrz ? (
             <div className="grid gap-1 rounded-[8px] bg-[#fff8e8] px-3 py-2 text-[11.5px] font-bold text-[#a86a10] sm:col-span-2">
               <span>{t("ops.trav.mrzReview")}</span>
-              {mrz.failed.length > 0 ? (
-                <span className="text-[#c22850]">
-                  {t("ops.trav.mrzCheck", { fields: mrz.failed.map((f) => t(MRZ_FIELD_KEY[f])).join(" · ") })}
-                </span>
-              ) : null}
+              {missing.length > 0 ? <span>{t("ops.trav.mrzMissing")}</span> : null}
+              {checkFails.length > 0 ? <span className="text-[#c22850]">{t("ops.trav.mrzCheck", { fields: checkFails.join(" · ") })}</span> : null}
             </div>
           ) : null}
           <label className={label}>
@@ -504,46 +501,61 @@ function TravelerRow({
             </select>
           </label>
           <label className={label}>
-            {t("ops.passport.fullName")}
+            <span className="flex flex-wrap items-center gap-1.5">
+              {t("ops.passport.fullName")}
+              {fillTag("full_name")}
+            </span>
             <input
               dir="ltr"
               value={form.full_name}
               onChange={(e) => set({ full_name: e.target.value })}
-              className={`${field} text-start`}
+              className={`${field} text-start ${manual("full_name")}`}
               placeholder="AHMED ALI"
             />
           </label>
           <label className={label}>
-            {t("ops.passport.number")}
+            <span className="flex flex-wrap items-center gap-1.5">
+              {t("ops.passport.number")}
+              {fillTag("number")}
+            </span>
             <input
               dir="ltr"
               value={form.number}
               onChange={(e) => set({ number: e.target.value })}
-              className={`${field} tv-tnum text-start ${bad("number")}`}
+              className={`${field} tv-tnum text-start ${manual("number")}`}
             />
           </label>
           <label className={label}>
-            {t("ops.passport.nationality")}
-            <input value={form.nationality} onChange={(e) => set({ nationality: e.target.value })} className={field} />
+            <span className="flex flex-wrap items-center gap-1.5">
+              {t("ops.passport.nationality")}
+              {fillTag("nationality")}
+            </span>
+            <input value={form.nationality} onChange={(e) => set({ nationality: e.target.value })} className={`${field} ${manual("nationality")}`} />
           </label>
           <label className={label}>
-            {t("ops.trav.birthDate")}
+            <span className="flex flex-wrap items-center gap-1.5">
+              {t("ops.trav.birthDate")}
+              {fillTag("birth_date")}
+            </span>
             <input
               type="date"
               dir="ltr"
               value={form.birth_date}
               onChange={(e) => set({ birth_date: e.target.value })}
-              className={`${field} tv-tnum ${bad("birth_date")}`}
+              className={`${field} tv-tnum ${manual("birth_date")}`}
             />
           </label>
           <label className={label}>
-            {t("ops.passport.expiry")}
+            <span className="flex flex-wrap items-center gap-1.5">
+              {t("ops.passport.expiry")}
+              {fillTag("expiry")}
+            </span>
             <input
               type="date"
               dir="ltr"
               value={form.expiry}
               onChange={(e) => set({ expiry: e.target.value })}
-              className={`${field} tv-tnum ${bad("expiry")}`}
+              className={`${field} tv-tnum ${manual("expiry")}`}
             />
           </label>
           <div className="flex flex-wrap items-end gap-2 sm:col-span-2">

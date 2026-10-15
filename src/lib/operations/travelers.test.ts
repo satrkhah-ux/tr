@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ageOn, isLatinName, planTravelers, travelerReadiness } from "./travelers";
+import { ageOn, isLatinName, passportIssues, passportNeedsUpdate, planTravelers, travelerReadiness, visaFor } from "./travelers";
 
 const MALAYSIA = { travel_start: "2026-11-01", travel_end: "2026-11-08" };
 const TODAY = "2026-10-13";
@@ -78,6 +78,62 @@ describe("travelerReadiness", () => {
     expect(travelerReadiness({ ...child, age: null, birth_date: "2014-10-20" }, MALAYSIA, TODAY)).toEqual(["age_mismatch"]);
     // no birth date yet: nothing to compare, not a mismatch
     expect(travelerReadiness({ ...child, birth_date: null }, MALAYSIA, TODAY)).toEqual([]);
+  });
+});
+
+describe("passportIssues — one decision for the case, «جاهز للسفر» and /trip", () => {
+  const ok = { has_passport: true, passport_expiry: "2029-01-01", birth_date: "1985-03-01", age: null, traveler_kind: "adult" as const };
+
+  it("calls a passport expired on the travel day, not merely short", () => {
+    expect(passportIssues({ ...ok, passport_expiry: "2011-11-09" }, MALAYSIA, TODAY)).toEqual(["passport_expired"]);
+    // valid on the day it leaves, but not for six months after the return
+    expect(passportIssues({ ...ok, passport_expiry: "2026-12-01" }, MALAYSIA, TODAY)).toEqual(["passport_short"]);
+    expect(passportIssues(ok, MALAYSIA, TODAY)).toEqual([]);
+  });
+
+  it("flags for the client only what a new passport can fix — expired, short, or the wrong age", () => {
+    expect(passportNeedsUpdate(passportIssues({ ...ok, passport_expiry: "2011-11-09" }, MALAYSIA, TODAY))).toBe(true);
+    expect(passportNeedsUpdate(passportIssues({ ...ok, passport_expiry: "2027-04-20" }, MALAYSIA, TODAY))).toBe(true);
+    // the Syrian traveller: birth date 2026-01-01 on an adult booking
+    expect(passportNeedsUpdate(passportIssues({ ...ok, birth_date: "2026-01-01" }, MALAYSIA, TODAY))).toBe(true);
+    // an expiry nobody typed yet is our gap, not the client's
+    expect(passportNeedsUpdate(passportIssues({ ...ok, passport_expiry: null }, MALAYSIA, TODAY))).toBe(false);
+    expect(passportNeedsUpdate(passportIssues(ok, MALAYSIA, TODAY))).toBe(false);
+  });
+
+  it("holds readiness while a visa needs checking", () => {
+    expect(travelerReadiness({ ...ok, visa_status: "check" }, MALAYSIA, TODAY)).toEqual(["visa_check"]);
+  });
+});
+
+describe("visaFor — nationality x destination", () => {
+  const INDONESIA = { iso2: "ID", visa_required: false };
+  const AZERBAIJAN = { iso2: "AZ", visa_required: true };
+
+  it("lets a Saudi (or a case with no passport read yet) follow the destination's own setting, as before", () => {
+    expect(visaFor("SAU", INDONESIA, false)).toBe("not_required");
+    expect(visaFor("SAU", AZERBAIJAN, false)).toBe("required");
+    expect(visaFor(null, INDONESIA, false)).toBe("not_required");
+    expect(visaFor(" sau ", AZERBAIJAN, false)).toBe("required");
+    expect(visaFor("SAU", null, false)).toBe("not_required");
+  });
+
+  it("never says «غير مطلوبة» for any other nationality — Iraqi and Syrian to Indonesia need checking", () => {
+    expect(visaFor("IRQ", INDONESIA, false)).toBe("check");
+    expect(visaFor("SYR", INDONESIA, false)).toBe("check");
+    expect(visaFor("EGY", null, false)).toBe("check");
+  });
+
+  it("knows the starting exemption list: GCC citizens inside the GCC", () => {
+    expect(visaFor("KWT", { iso2: "AE", visa_required: false }, false)).toBe("not_required");
+    expect(visaFor("SAU", { iso2: "BH", visa_required: true }, false)).toBe("not_required");
+    // a GCC citizen OUTSIDE the GCC is not on the list
+    expect(visaFor("KWT", INDONESIA, false)).toBe("check");
+  });
+
+  it("keeps a visa the offer sold required, whoever travels", () => {
+    expect(visaFor("SAU", INDONESIA, true)).toBe("required");
+    expect(visaFor("IRQ", INDONESIA, true)).toBe("required");
   });
 });
 

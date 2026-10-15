@@ -16,9 +16,9 @@ import {
   type TravelerRow,
   type VisaStatus,
 } from "@/lib/operations/traveler-dto";
-import { planTravelers } from "@/lib/operations/travelers";
+import { planTravelers, visaFor, type DestinationVisa } from "@/lib/operations/travelers";
 import { parseTd3, type MrzPassport } from "@/lib/operations/mrz";
-import { normalizeDraftData } from "@/lib/offer/draft-types";
+import { findLookupCountry, normalizeDraftData, type DraftData } from "@/lib/offer/draft-types";
 import { issuedDraftData } from "@/lib/data/issued-draft";
 import { isOpenAIConfigured } from "@/lib/providers/openai";
 import { readMrzFromImage } from "@/lib/providers/mrz-vision";
@@ -147,6 +147,13 @@ export async function upsertTraveler(input: {
   }
 
   try {
+    // the nationality BEFORE this save — a changed one is a new visa question (revisitVisa)
+    let before: Pick<TravelerRow, "nationality" | "visa_status"> | null = null;
+    if (input.id && input.nationality !== undefined) {
+      const { data: prev } = await db().from("operation_travelers").select("nationality, visa_status").eq("id", input.id).maybeSingle();
+      before = (prev as Pick<TravelerRow, "nationality" | "visa_status"> | null) ?? null;
+    }
+
     const patch: Record<string, unknown> = {
       display_name: input.display_name,
       updated_at: new Date().toISOString(),
@@ -173,6 +180,7 @@ export async function upsertTraveler(input: {
     if (!input.id) {
       await logAudit({ action: "traveler.created", entity: "operation_travelers", entity_id: id, meta: { operation_id } });
     }
+    if (input.nationality !== undefined) await revisitVisa(id, operation_id, before, (patch.nationality as string | null) ?? null);
     if (cipher !== undefined) {
       await logAudit({
         action: "passport.saved",
@@ -389,6 +397,7 @@ type OfferPax = {
   adults: number | null;
   children: number | null;
   infants: number | null;
+  destination: string | null;
   customers: { arabic_name: string | null } | { arabic_name: string | null }[] | null;
 };
 
@@ -414,7 +423,7 @@ async function seedFromOffer(operationId: string, auto: boolean): Promise<{ ok: 
     let claim = supabase.from("operations").update({ travelers_seeded_at: new Date().toISOString() }).eq("id", operationId);
     if (auto) claim = claim.is("travelers_seeded_at", null);
     const { data: claimed } = await claim
-      .select("offer_id, offers(serial, partner_company_id, adults, children, infants, customers(arabic_name))")
+      .select("offer_id, offers(serial, partner_company_id, adults, children, infants, destination, customers(arabic_name))")
       .maybeSingle();
     const op = claimed as { offer_id: string; offers: OfferPax | OfferPax[] | null } | null;
     if (!op) return auto ? { ok: true, added: 0 } : { ok: false, error: "ops.err.notFound" };
@@ -428,6 +437,8 @@ async function seedFromOffer(operationId: string, auto: boolean): Promise<{ ok: 
       ? await issuedDraftData(supabase, { id: op.offer_id, serial: offer.serial, partner_company_id: offer.partner_company_id })
       : null;
     const draft = raw ? normalizeDraftData(raw) : null;
+    // no passport is read yet, so no nationality: the destination's own setting, as before (visaFor)
+    const visa = await destinationOf(supabase, draft, offer?.destination ?? null);
 
     const plan = planTravelers({
       adults: draft?.trip.adults ?? offer?.adults ?? 1,
@@ -437,7 +448,7 @@ async function seedFromOffer(operationId: string, auto: boolean): Promise<{ ok: 
       infant_ages: draft?.trip.infant_ages ?? [],
       // the customer record is the name on the case header; the draft's typed name otherwise
       lead_name: customer?.arabic_name?.trim() || draft?.customer.customer_name || "",
-      visa_required: Boolean(draft?.scope.visas && draft.visas.some((v) => Number(v.count) > 0)),
+      visa_required: visaFor(null, visa.destination, visa.sold) === "required",
     });
 
     const { error } = await supabase
@@ -547,6 +558,63 @@ export async function readPassportMrz(
 }
 
 // ---------- visas ----------
+
+/** The trip's country (countries.iso2 + visa_required) and whether the offer SOLD visas — what visaFor decides with. */
+async function destinationOf(
+  supabase: SupabaseClient,
+  draft: DraftData | null,
+  offerDestination: string | null,
+): Promise<{ destination: DestinationVisa; sold: boolean }> {
+  const sold = Boolean(draft?.scope.visas && draft.visas.some((v) => Number(v.count) > 0));
+  const name = draft?.trip.country?.trim() || offerDestination?.trim() || "";
+  if (!name) return { destination: null, sold };
+  const { data } = await supabase.from("countries").select("arabic_name, english_name, iso2, visa_required");
+  type Row = { arabic_name: string | null; english_name: string | null; iso2: string | null; visa_required: boolean | null };
+  const rows = (data ?? []) as Row[];
+  const hit =
+    findLookupCountry(rows.map((r) => ({ ...r, name: r.arabic_name ?? "" })), name) ??
+    findLookupCountry(rows.map((r) => ({ ...r, name: r.english_name ?? "" })), name);
+  return { destination: hit ? { iso2: hit.iso2, visa_required: hit.visa_required } : null, sold };
+}
+
+/**
+ * A nationality just read or typed is a new visa question (owner order 8): the
+ * status is decided again by visaFor — unless the visa is already under way or
+ * in hand. An unchanged nationality leaves the employee's own choice alone.
+ * Best-effort, after the save: «يحتاج تحقق» needs 0077, and a database without
+ * it keeps the old status rather than failing the passport save.
+ */
+async function revisitVisa(
+  travelerId: string,
+  operationId: string,
+  before: Pick<TravelerRow, "nationality" | "visa_status"> | null,
+  nationality: string | null,
+): Promise<void> {
+  const norm = (v: string | null | undefined) => (v ?? "").trim().toUpperCase();
+  if (norm(before?.nationality) === norm(nationality)) return;
+  if (before?.visa_status === "submitted" || before?.visa_status === "issued") return;
+  try {
+    const supabase = db();
+    const { data } = await supabase
+      .from("operations")
+      .select("offer_id, offers(serial, partner_company_id, destination)")
+      .eq("id", operationId)
+      .maybeSingle();
+    type Offer = { serial: string; partner_company_id: string | null; destination: string | null };
+    const op = data as { offer_id: string; offers: Offer | Offer[] | null } | null;
+    const offer = Array.isArray(op?.offers) ? (op.offers[0] ?? null) : (op?.offers ?? null);
+    const raw = op && offer ? await issuedDraftData(supabase, { id: op.offer_id, serial: offer.serial, partner_company_id: offer.partner_company_id }) : null;
+    const visa = await destinationOf(supabase, raw ? normalizeDraftData(raw) : null, offer?.destination ?? null);
+    const status = visaFor(nationality, visa.destination, visa.sold);
+    if (status === (before?.visa_status ?? "not_required")) return;
+    const { error } = await supabase.from("operation_travelers").update({ visa_status: status }).eq("id", travelerId);
+    if (!error) {
+      await logAudit({ action: "visa.updated", entity: "operation_travelers", entity_id: travelerId, meta: { operation_id: operationId, status, auto: "nationality" } });
+    }
+  } catch {
+    /* best-effort — the passport itself is saved */
+  }
+}
 
 export async function setTravelerVisa(travelerId: string, status: VisaStatus): Promise<{ ok: true } | Fail> {
   const denied = await requireOps();

@@ -32,6 +32,15 @@ describe("the client's passport upload", () => {
     expect(clientPassportState(false, "superseded")).toBe("needed");
   });
 
+  it("asks for a valid passport instead of «تم الاستلام» when operations flagged the one on file", () => {
+    expect(clientPassportState(true, null, true)).toBe("update");
+    expect(clientPassportState(true, "accepted", true)).toBe("update");
+    // the new photo is already with us — the client is not asked twice
+    expect(clientPassportState(true, "pending", true)).toBe("received");
+    // nothing on file: it is simply needed, flagged or not
+    expect(clientPassportState(false, null, true)).toBe("needed");
+  });
+
   it("puts the newest pending upload of each traveller in front of staff", () => {
     const rows = [
       { id: "a1", traveler_id: "t1", status: "pending" as const, created_at: "2026-10-13T09:00:00Z" },
