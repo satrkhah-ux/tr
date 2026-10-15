@@ -13,7 +13,9 @@
  */
 
 import {
+  deriveCityDates,
   deriveHotelStays,
+  FREE_DAY_TITLE,
   stayTotal,
   TRANSPORT_AIRPORT,
   TRANSPORT_HOTEL_PREFIX,
@@ -21,11 +23,15 @@ import {
   splitVehicle,
   tourCars,
   tourVehicle,
+  type DraftCity,
   type DraftData,
   type DraftFlight,
+  type TourPick,
 } from "@/lib/offer/draft-types";
-import { withTours } from "@/lib/offer/basic";
+import { cityDates, withTours } from "@/lib/offer/basic";
+import { itineraryStartDate } from "@/lib/offer/schedule";
 import { BOARD_AR } from "@/components/offer-doc/labels";
+import { normalizeName } from "@/lib/offer/pricing-suggest";
 
 export type PlannedBooking = {
   origin_ref: string;
@@ -93,8 +99,25 @@ function putCar(detail: Record<string, string>, vehicle: string) {
 
 const byDeparture = (a: DraftFlight, b: DraftFlight) => (a.departure_at ?? "").localeCompare(b.departure_at ?? "");
 
+/**
+ * The full generator asks no tour count per city: its tours are the programme's
+ * days in the city after the one it arrives on — what operations booked by hand
+ * for AD-4-8573 — never a day the programme calls «يوم حر».
+ */
+function programmeTours(data: DraftData, city: DraftCity): TourPick[] {
+  return cityDates(city)
+    .slice(1)
+    .flatMap((date) => {
+      const day = data.days.find((d) => d.date === date);
+      if (day?.title.trim() === FREE_DAY_TITLE) return [];
+      return [{ program_id: null, title: day?.title.trim() ?? "", text: (day?.activities ?? []).join(" "), price: null, date, cars: data.transport_plan.tours.cars }];
+    });
+}
+
 export function planBookingsFromDraft(data: DraftData, companyCancellation: string): PlannedBooking[] {
   const rows: PlannedBooking[] = [];
+  // the cities as issued; a file saved before its dates were chained gets them from the arrival
+  const cities = data.cities.every((c) => c.check_in) ? data.cities : deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
   const pax = travellers(data.trip);
   const people = data.trip.adults + data.trip.children + data.trip.infants;
   const flights = [...data.flights].sort(byDeparture);
@@ -141,9 +164,14 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
 
   // ---- the stays: a booking per hotel, its rooms and its guests ----
   if (data.scope.hotels) {
-    for (const stay of deriveHotelStays(data.cities, data.hotels)) {
+    const stays = deriveHotelStays(cities, data.hotels);
+    // a named hotel no stop holds any more (its city renamed) is still a hotel the client was sold
+    const placed = new Set(stays.map((s) => s.line.id));
+    const orphans = data.hotels
+      .filter((h) => !placed.has(h.id) && h.hotel_name.trim())
+      .map((line) => ({ line, city_name: line.city_name, nights: line.nights, check_in: null, check_out: null }));
+    for (const stay of [...stays, ...orphans]) {
       const line = stay.line;
-      if (!line.hotel_name.trim()) continue;
       const detail: Record<string, string> = { المدينة: stay.city_name };
       line.rooms.forEach((r, k) => {
         const board = r.board_type ? BOARD_AR[r.board_type] : "";
@@ -155,7 +183,8 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       rows.push({
         origin_ref: `stay:${line.id}`,
         kind: "hotel",
-        title: line.hotel_name,
+        // issued before the hotel was chosen: booked all the same, named by operations
+        title: line.hotel_name.trim() || `فندق ${stay.city_name} — ${LATER}`,
         city_name: stay.city_name,
         start_date: stay.check_in,
         end_date: stay.check_out,
@@ -183,6 +212,14 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       nearest(flights.filter((f) => f.leg_order !== "inbound" && f.to_city?.trim() === city), "arrival", date, "first") ?? intl.filter((f) => f.leg_order === "outbound").at(-1);
     const firstOut = (city: string, date: string | null) =>
       nearest(flights.filter((f) => f.leg_order !== "outbound" && f.from_city?.trim() === city), "departure", date, "last") ?? intl.find((f) => f.leg_order === "inbound");
+    // with no flight to read it from, a drive is on the day the group reaches the city or leaves it —
+    // the farewell on the trip's last day
+    const named = (place: string) => cities.filter((c) => c.city_name.trim() === place.replace(TRANSPORT_HOTEL_PREFIX, "").trim());
+    const dayOf = (from: string, to: string): string | null => {
+      if (to === TRANSPORT_AIRPORT) return named(from).at(-1)?.check_out ?? data.trip.departure_date ?? null;
+      if (from === TRANSPORT_AIRPORT) return named(to)[0]?.check_in ?? data.trip.arrival_date ?? null;
+      return cities.find((c, i) => i > 0 && c.city_name.trim() === to.trim() && cities[i - 1].city_name.trim() === from.trim())?.check_in ?? null;
+    };
     for (const tr of data.transport) {
       if (tr.from_place === TRANSPORT_TOURS) continue; // a tour's price includes its car
       const detail: Record<string, string> = {};
@@ -210,6 +247,7 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
         time = "12:00";
         meet = "بهو الفندق";
       }
+      date ??= dayOf(tr.from_place, tr.to_place);
       detail["الوقت"] = time || LATER;
       if (flight) detail["الرحلة"] = `${flight.flight_no.trim() || "—"} ${code(flight.from_airport)} → ${code(flight.to_airport)}`;
       detail["نقطة الالتقاء"] = meet;
@@ -234,9 +272,10 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
 
   // ---- the tours: each on its day, in its car ----
   if (data.transport_plan.tours.enabled) {
-    data.cities.forEach((city, c) => {
+    cities.forEach((city, c) => {
       // the last city's «جولة قبل المغادرة» is booked on the day home
-      withTours(city, city.tours ?? 0, undefined, c === data.cities.length - 1).forEach((pick, i) => {
+      const picks = city.tours === undefined ? programmeTours(data, city) : withTours(city, city.tours, undefined, c === cities.length - 1);
+      picks.forEach((pick, i) => {
         if (pick.free) return;
         const title = pick.title.trim() || `جولة سياحية في ${city.city_name}`;
         const detail: Record<string, string> = { المدينة: city.city_name, "وقت الانطلاق": "09:00" };
@@ -271,7 +310,7 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       kind: "service",
       title: sims,
       city_name: data.cities[0]?.city_name ?? "",
-      start_date: data.cities[0]?.check_in ?? data.trip.arrival_date,
+      start_date: cities[0]?.check_in ?? data.trip.arrival_date,
       end_date: null,
       detail: { العدد: sims.match(/\d+/)?.[0] ?? "" },
       supplier_name: "",
@@ -281,4 +320,105 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
     });
   }
   return rows;
+}
+
+/** A booking already on the case, as the pull compares it. */
+export type ExistingBooking = {
+  /** to link a booking typed by hand to the planned one it is (its origin_ref set). */
+  id?: string;
+  origin_ref: string | null;
+  kind: string;
+  title?: string;
+  city_name: string;
+  start_date: string | null;
+  end_date: string | null;
+  status: string;
+};
+
+/** A transfer's ref without its date — the pull wrote the farewell undated before it knew the day. */
+const undated = (ref: string) => (ref.startsWith("transfer:") ? ref.replace(/>[^>]*$/, ">") : ref);
+const dayPart = (d: string | null) => d?.slice(0, 10) ?? null;
+/** «نوفوتيل بالي» in «نوفوتيل بالي - غرفة مزدوجة شامل الإفطار» — the name the agent typed, with or without the room after it. */
+const sameName = (a: string | undefined, b: string) => {
+  const x = normalizeName(a);
+  const y = normalizeName(b);
+  return Boolean(x && y && (x.includes(y) || y.includes(x)));
+};
+const sameCity = (a: string, b: string) => !a.trim() || !b.trim() || normalizeName(a) === normalizeName(b);
+
+export type SeedMatch<T> = {
+  /** what the pull inserts. */
+  fresh: T[];
+  /** bookings already on the case that ARE a planned one — given its origin_ref, so the next pull matches them outright. */
+  links: { id: string; origin_ref: string }[];
+};
+
+/**
+ * What a pull adds to a case: never a twin of what it already holds.
+ *
+ * Its own refs first — pressed again, the same plan adds nothing. Then the
+ * rows the plan does not name (typed by hand before the pull brought them, or
+ * pulled under an older ref) each stand in for what they cover: first the
+ * surest pairs — the old ref (the farewell pulled undated), or the same kind,
+ * day and city under the same name — then a hotel or a transfer of the same
+ * kind, city and day under another name; the tours on the days of a car booked
+ * for them («سيارة الجولات ٠١–٠٢»). Each row covers one booking (a tour car:
+ * one tour a day), so two hotels on the same dates still need two. A row that
+ * stands for one booking is linked to it.
+ */
+export function newBookings<T extends Pick<PlannedBooking, "origin_ref" | "city_name" | "start_date" | "title"> & { kind: string }>(
+  plan: T[],
+  existing: ExistingBooking[],
+): SeedMatch<T> {
+  const refs = new Set(existing.map((e) => e.origin_ref).filter(Boolean));
+  const planned = new Set(plan.map((p) => p.origin_ref));
+  const pool = existing
+    .filter((e) => e.status !== "cancelled" && !(e.origin_ref && planned.has(e.origin_ref)))
+    .map((e) => ({ ...e, start: dayPart(e.start_date), end: dayPart(e.end_date), used: new Set<string>() }));
+  const pending = plan.filter((p) => !refs.has(p.origin_ref));
+  const covered = new Set<T>();
+  const links: SeedMatch<T>["links"] = [];
+  const isTour = (p: T) => p.origin_ref.startsWith("tour:");
+  const sameDay = (e: (typeof pool)[number], p: T) => Boolean(e.start && e.start === dayPart(p.start_date) && sameCity(e.city_name, p.city_name));
+  const take = (p: T, hit: (typeof pool)[number] | undefined) => {
+    if (!hit) return;
+    const date = dayPart(p.start_date);
+    hit.used.add(isTour(p) && date ? date : "*");
+    covered.add(p);
+    if (!isTour(p) && hit.id && hit.origin_ref !== p.origin_ref) links.push({ id: hit.id, origin_ref: p.origin_ref });
+  };
+
+  // 1. the surest pairs: the same drive under its old ref, or the same booking under the same name
+  for (const p of pending) {
+    if (isTour(p)) continue;
+    take(
+      p,
+      pool.find(
+        (e) =>
+          e.used.size === 0 &&
+          ((e.origin_ref && undated(e.origin_ref) === undated(p.origin_ref)) || (e.kind === p.kind && sameDay(e, p) && sameName(e.title, p.title))),
+      ),
+    );
+  }
+  // 2. what is left: the same kind, city and day under another name; a tour inside a tour car's days
+  for (const p of pending) {
+    if (covered.has(p)) continue;
+    const date = dayPart(p.start_date);
+    if (!date) continue;
+    take(
+      p,
+      pool.find((e) =>
+        isTour(p)
+          ? (e.kind === "service" || e.kind === "transport") &&
+            Boolean(e.start) &&
+            sameCity(e.city_name, p.city_name) &&
+            e.start! <= date &&
+            date <= (e.end ?? e.start!) &&
+            !e.used.has(date) &&
+            !e.used.has("*")
+          : e.kind === p.kind && e.used.size === 0 && sameDay(e, p),
+      ),
+    );
+  }
+  return { fresh: pending.filter((p) => !covered.has(p)), links };
 }

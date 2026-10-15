@@ -10,7 +10,7 @@ import { BOARD_AR } from "@/components/offer-doc/labels";
 import type { BoardType } from "@/lib/types";
 import { currentCan } from "@/lib/roles/current";
 import { normalizeDraftData } from "@/lib/offer/draft-types";
-import { planBookingsFromDraft } from "@/lib/operations/seed-plan";
+import { LATER, newBookings, planBookingsFromDraft, type ExistingBooking } from "@/lib/operations/seed-plan";
 import { issuedDraftData } from "@/lib/data/issued-draft";
 
 /**
@@ -25,7 +25,8 @@ import { issuedDraftData } from "@/lib/data/issued-draft";
  *
  * Safe to run more than once: each seeded row carries `origin_ref` under a
  * unique index, so a second press skips what is already there instead of
- * creating a second hotel nobody booked.
+ * creating a second hotel nobody booked — and a booking typed by hand before
+ * the pull covers the one it stands for (newBookings in seed-plan.ts).
  */
 
 function db(): Promise<SupabaseClient> {
@@ -62,7 +63,7 @@ type SeedRow = {
   currency: string;
 };
 
-export type SeedResult = { ok: true; added: number; skipped: number } | Fail;
+export type SeedResult = { ok: true; added: number; linked: number; skipped: number } | Fail;
 
 export async function seedBookingsFromOffer(operationId: string): Promise<SeedResult> {
   const denied = await requireOps();
@@ -111,15 +112,14 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
         .select("id, item_type, description, quantity")
         .eq("offer_id", op.offer_id)
         .in("item_type", ["visa", "transport"]),
-      supabase.from("operation_bookings").select("origin_ref").eq("operation_id", operationId),
+      supabase.from("operation_bookings").select("id, origin_ref, kind, title, city_name, start_date, end_date, status").eq("operation_id", operationId),
     ]);
-
-    const taken = new Set(
-      ((existingRes.data ?? []) as { origin_ref: string | null }[]).map((r) => r.origin_ref).filter(Boolean),
-    );
+    // not knowing what the case holds is no licence to add it all again
+    if (existingRes.error) return { ok: false, error: "err.loadFailed" };
+    const existing = (existingRes.data ?? []) as ExistingBooking[];
 
     const rows: SeedRow[] = [];
-    const refs = [...taken] as string[];
+    const refs = existing.map((r) => r.origin_ref).filter((r): r is string => Boolean(r));
     // a case seeded by the old pull keeps its rows; the plan adds only the kinds it never had
     const seededBefore = {
       hotel: refs.some((r) => r.startsWith("hotel:")),
@@ -160,7 +160,7 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
       rows.push({
         origin_ref: `hotel:${h.id}`,
         kind: "hotel",
-        title: h.hotel_name ?? "—",
+        title: h.hotel_name?.trim() || `فندق — ${LATER}`,
         city_name: "",
         start_date: h.check_in,
         end_date: h.check_out,
@@ -236,8 +236,17 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
       });
     }
 
-    const fresh = rows.filter((r) => !taken.has(r.origin_ref));
-    if (fresh.length === 0) return { ok: true, added: 0, skipped: rows.length };
+    const { fresh, links } = newBookings(rows, existing);
+    // a booking typed by hand that IS a planned one takes its ref — the next pull matches it outright
+    let linked = 0;
+    for (const link of links) {
+      const { error } = await supabase.from("operation_bookings").update({ origin_ref: link.origin_ref }).eq("id", link.id).eq("operation_id", operationId);
+      if (!error) linked += 1;
+    }
+    if (fresh.length === 0) {
+      if (linked > 0) await logAudit({ action: "booking.created", entity: "operations", entity_id: operationId, meta: { seeded: 0, linked, from: "offer" } });
+      return { ok: true, added: 0, linked, skipped: rows.length };
+    }
 
     const employeeId = await getCurrentEmployeeId();
     const { error } = await supabase.from("operation_bookings").insert(
@@ -267,9 +276,9 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
       action: "booking.created",
       entity: "operations",
       entity_id: operationId,
-      meta: { seeded: fresh.length, from: "offer" },
+      meta: { seeded: fresh.length, linked, from: "offer" },
     });
-    return { ok: true, added: fresh.length, skipped: rows.length - fresh.length };
+    return { ok: true, added: fresh.length, linked, skipped: rows.length - fresh.length };
   } catch {
     return { ok: false, error: "err.db" };
   }

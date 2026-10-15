@@ -13,6 +13,10 @@ import { syncOperation, syncOperationOfBooking } from "@/lib/data/operation-sync
 import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, type VoucherBooking, type VoucherDTO, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { currentCan } from "@/lib/roles/current";
 import { carCount, DRV } from "@/lib/operations/drivers";
+import { entriesToSave, type ConfirmEntry } from "@/lib/operations/confirm-all";
+import { findLookupCountry, type LookupRoomType } from "@/lib/offer/draft-types";
+import { normalizeName } from "@/lib/offer/pricing-suggest";
+import type { BoardType } from "@/lib/types";
 
 /**
  * Bookings and the documents issued from them.
@@ -45,7 +49,7 @@ async function requireOps(): Promise<TranslationKey | null> {
  * side effect — a notification that fails must never roll back the edit it
  * describes.
  */
-async function announce(bookingId: string, what: string): Promise<void> {
+async function announce(bookingId: string, what: string, title?: string): Promise<void> {
   try {
     const supabase = await db();
     const { data } = await supabase
@@ -73,7 +77,7 @@ async function announce(bookingId: string, what: string): Promise<void> {
       operationId: row.operation_id,
       serial: offer?.serial ?? "",
       customer: cust?.arabic_name ?? null,
-      bookingTitle: row.title,
+      bookingTitle: title || row.title,
       what,
       by: user?.email ?? null,
     });
@@ -178,6 +182,65 @@ export async function listBookings(operationId: string): Promise<OperationBookin
   }
 }
 
+export type CatalogHotel = { id: string; name: string; stars: number | null; city: string };
+export type CaseHotelCatalog = { hotels: CatalogHotel[]; roomTypes: LookupRoomType[] };
+
+/**
+ * The hotels «إضافة حجز» picks from (operations order 4) — the catalogue Basic
+ * picks from, each hotel with its city, and the room types the catalogue holds
+ * for them. The case's own country first: its destination, or the cities its
+ * bookings name; the whole catalogue when neither says. Names only.
+ */
+export async function caseHotelCatalog(operationId: string): Promise<CaseHotelCatalog> {
+  const none: CaseHotelCatalog = { hotels: [], roomTypes: [] };
+  if (await requireOps()) return none;
+  try {
+    const supabase = await db();
+    const [opRes, bookingsRes, countriesRes, citiesRes] = await Promise.all([
+      supabase.from("operations").select("offers(destination)").eq("id", operationId).maybeSingle(),
+      supabase.from("operation_bookings").select("city_name").eq("operation_id", operationId),
+      supabase.from("countries").select("id, arabic_name"),
+      supabase.from("cities").select("id, arabic_name, country_id"),
+    ]);
+    type Dest = { destination: string | null };
+    const offer = (opRes.data as { offers: Dest | Dest[] | null } | null)?.offers;
+    const destination = (Array.isArray(offer) ? offer[0] : offer)?.destination ?? "";
+    const cities = (citiesRes.data ?? []) as { id: string; arabic_name: string; country_id: string | null }[];
+    const named = new Set(((bookingsRes.data ?? []) as { city_name: string }[]).map((b) => normalizeName(b.city_name)).filter(Boolean));
+    const dest = normalizeName(destination);
+
+    // «اندونيسيا», «بالي 7», «تبليسي +باكورياني+باتومي» — a country, or a city of it
+    const countryIds = new Set<string>();
+    const countries = ((countriesRes.data ?? []) as { id: string; arabic_name: string }[]).map((c) => ({ id: c.id, name: c.arabic_name }));
+    const country = destination ? findLookupCountry(countries, destination) : undefined;
+    if (country) countryIds.add(country.id);
+    for (const c of cities) {
+      const n = normalizeName(c.arabic_name);
+      if (c.country_id && n && (named.has(n) || (n.length > 2 && dest.includes(n)))) countryIds.add(c.country_id);
+    }
+    const inCountry = cities.filter((c) => c.country_id && countryIds.has(c.country_id)).map((c) => c.id);
+    const cityName = new Map(cities.map((c) => [c.id, c.arabic_name]));
+
+    const hotels: CatalogHotel[] = [];
+    for (let from = 0; ; from += 1000) {
+      const base = supabase.from("hotels").select("id, arabic_name, stars, city_id");
+      const { data, error } = await (inCountry.length > 0 ? base.in("city_id", inCountry) : base).order("id").range(from, from + 999);
+      if (error) break;
+      const rows = (data ?? []) as { id: string; arabic_name: string; stars: number | null; city_id: string | null }[];
+      hotels.push(...rows.map((h) => ({ id: h.id, name: h.arabic_name, stars: h.stars, city: (h.city_id && cityName.get(h.city_id)) || "" })));
+      if (rows.length < 1000) break;
+    }
+    const ids = new Set(hotels.map((h) => h.id));
+    const { data: rt } = await supabase.from("room_types").select("id, arabic_name, hotel_id, default_board").not("hotel_id", "is", null);
+    const roomTypes = ((rt ?? []) as { id: string; arabic_name: string; hotel_id: string; default_board: BoardType | null }[])
+      .filter((r) => ids.has(r.hotel_id))
+      .map((r) => ({ id: r.id, name: r.arabic_name, hotel_id: r.hotel_id, default_board: r.default_board }));
+    return { hotels: hotels.sort((a, b) => a.name.localeCompare(b.name, "ar")), roomTypes };
+  } catch {
+    return none;
+  }
+}
+
 export async function addBooking(input: {
   operation_id: string;
   kind: BookingKind;
@@ -233,48 +296,94 @@ export async function addBooking(input: {
   }
 }
 
+type Confirmation = {
+  booking_id: string;
+  confirmation_number: string;
+  supplier_name?: string;
+  net_charged?: number | null;
+  cancellation_policy?: string | null;
+  cancellation_deadline?: string | null;
+};
+
+/**
+ * The one write behind every manual confirmation — a booking at a time, or
+ * «تأكيد الكل». What is not given is left as it was: the pull's cancellation
+ * terms stay on the voucher when the agent only types the number.
+ */
+async function writeConfirmation(supabase: SupabaseClient, input: Confirmation, by: string | null, bulk = false): Promise<boolean> {
+  const patch: Record<string, unknown> = {
+    status: "confirmed",
+    confirmation_number: input.confirmation_number.trim(),
+    confirmed_at: new Date().toISOString(),
+    confirmed_by: by,
+  };
+  if (input.supplier_name !== undefined) patch.supplier_name = input.supplier_name;
+  if (input.net_charged !== undefined) patch.net_charged = input.net_charged;
+  if (input.cancellation_policy !== undefined) patch.cancellation_policy = input.cancellation_policy;
+  if (input.cancellation_deadline !== undefined) patch.cancellation_deadline = input.cancellation_deadline;
+  const { error } = await supabase.from("operation_bookings").update(patch).eq("id", input.booking_id);
+  if (error) return false;
+  await logAudit({
+    action: "booking.confirmed",
+    entity: "operation_bookings",
+    entity_id: input.booking_id,
+    meta: { confirmation_number: input.confirmation_number.trim(), source: "manual", ...(bulk ? { bulk: true } : {}) },
+  });
+  return true;
+}
+
 /**
  * Record a confirmation the agent read off a supplier email or portal.
  *
  * There is no silent path to 'confirmed': the confirmation number is required,
  * because "confirmed" without one is a claim nobody can check at the hotel desk.
  */
-export async function confirmBookingManually(input: {
-  booking_id: string;
-  confirmation_number: string;
-  net_charged?: number | null;
-  cancellation_policy?: string | null;
-  cancellation_deadline?: string | null;
-}): Promise<{ ok: true } | Fail> {
+export async function confirmBookingManually(input: Confirmation): Promise<{ ok: true } | Fail> {
   const denied = await requireOps();
   if (denied) return { ok: false, error: denied };
   if (!input.confirmation_number.trim()) return { ok: false, error: "ops.err.confirmationRequired" };
 
   try {
-    const supabase = await db();
-    const { error } = await supabase
-      .from("operation_bookings")
-      .update({
-        status: "confirmed",
-        confirmation_number: input.confirmation_number.trim(),
-        net_charged: input.net_charged ?? null,
-        cancellation_policy: input.cancellation_policy ?? null,
-        cancellation_deadline: input.cancellation_deadline ?? null,
-        confirmed_at: new Date().toISOString(),
-        confirmed_by: await getCurrentEmployeeId(),
-      })
-      .eq("id", input.booking_id);
-    if (error) return { ok: false, error: "err.updateFailed" };
-
-    await logAudit({
-      action: "booking.confirmed",
-      entity: "operation_bookings",
-      entity_id: input.booking_id,
-      meta: { confirmation_number: input.confirmation_number.trim(), source: "manual" },
-    });
+    if (!(await writeConfirmation(await db(), input, await getCurrentEmployeeId()))) return { ok: false, error: "err.updateFailed" };
     await announce(input.booking_id, `تأكيد الحجز برقم ${input.confirmation_number.trim()}`);
     await syncOperationOfBooking(input.booking_id);
     return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/**
+ * «تأكيد الكل» (operations order 5): the numbers of several bookings at once —
+ * one supplier's reference pasted onto all its bookings, or a quick table of
+ * them. Each goes through the same write and lands in the audit log on its
+ * own; the case's statuses then move once, through operation-sync.
+ */
+export async function confirmBookings(input: { operation_id: string; entries: ConfirmEntry[] }): Promise<{ ok: true; confirmed: number } | Fail> {
+  const denied = await requireOps();
+  if (denied) return { ok: false, error: denied };
+  try {
+    const supabase = await db();
+    // this case's bookings only — an id from the browser never confirms another case's
+    const { data, error } = await supabase
+      .from("operation_bookings")
+      .select("id, status, title")
+      .eq("operation_id", input.operation_id)
+      .in("id", input.entries.map((e) => e.booking_id));
+    if (error) return { ok: false, error: "err.loadFailed" };
+    const held = (data ?? []) as { id: string; status: string; title: string }[];
+    const rows = entriesToSave(input.entries, held);
+    if (rows.length === 0) return { ok: false, error: "ops.err.confirmationRequired" };
+
+    const by = await getCurrentEmployeeId();
+    const done: Confirmation[] = [];
+    for (const row of rows) if (await writeConfirmation(supabase, row, by, true)) done.push(row);
+    if (done.length > 0) {
+      const titles = done.map((r) => held.find((b) => b.id === r.booking_id)?.title ?? "").filter(Boolean);
+      await announce(done[0].booking_id, `تأكيد ${done.length} حجوزات: ${[...new Set(done.map((r) => r.confirmation_number.trim()))].join("، ")}`, titles.join("، "));
+      await syncOperation(input.operation_id);
+    }
+    return done.length === rows.length ? { ok: true, confirmed: done.length } : { ok: false, error: "err.updateFailed" };
   } catch {
     return { ok: false, error: "err.db" };
   }
