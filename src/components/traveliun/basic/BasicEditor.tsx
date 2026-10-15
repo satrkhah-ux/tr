@@ -117,7 +117,7 @@ import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
 import { basicCard, basicField, basicLabel, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
 import { AdvancedQuestions } from "./AdvancedQuestions";
-import { advancedDefaults, emptyAdvanced, fillAdvanced, isStation } from "@/lib/offer/advanced";
+import { advancedDefaults, advancedTripDates, emptyAdvanced, fillAdvanced, isStation, type DraftAdvanced } from "@/lib/offer/advanced";
 import { IssueGuardNotice } from "../IssueGuardNotice";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -324,6 +324,20 @@ export function BasicEditor({
     const next = { ...shaped, hotels, advanced, days: basicDays({ ...shaped, hotels, advanced }) };
     latest.current = next;
     patch({ ...slice, flights: shaped.flights, cities: chained, transport_plan: shaped.transport_plan, scope: nextScope, hotels, days: next.days, ...(advanced && advanced !== merged.advanced ? { advanced } : {}) });
+  }
+
+  /**
+   * «بكج متقدم» answers, and the dates the agent typed there carried into Basic's
+   * trip — the same day is never asked twice. An empty package country takes the
+   * country they are met in.
+   */
+  function setAdvanced(advanced: DraftAdvanced) {
+    const d = advancedTripDates(advanced);
+    const slice: Partial<DraftTrip> = {};
+    if (d.arrival_date && d.arrival_date !== trip.arrival_date) slice.arrival_date = d.arrival_date;
+    if (d.departure_date && d.departure_date !== trip.departure_date) slice.departure_date = d.departure_date;
+    if (!trip.country && d.country) setCountry(d.country);
+    commit({ advanced, ...(Object.keys(slice).length ? { trip: withTripDates(latest.current.trip, { ...slice, departure_date: slice.departure_date ?? latest.current.trip.departure_date }) } : {}) });
   }
 
   /** The trip's answers; a visa line still counting every traveller keeps counting them. */
@@ -1680,7 +1694,7 @@ export function BasicEditor({
               tripCountry={trip.country}
               lists={advancedLists}
               firstStay={firstStayText}
-              onChange={(advanced) => commit({ advanced })}
+              onChange={setAdvanced}
             />
           ) : null}
 

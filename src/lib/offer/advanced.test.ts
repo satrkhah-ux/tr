@@ -9,7 +9,7 @@ const rows = [
   { from_place: "فندق تبليسي", to_place: TRANSPORT_AIRPORT, car_type: "سيدان", date: null, note: "" },
   { from_place: "باتومي", to_place: "تبليسي", car_type: "سيدان", date: "2026-11-13", note: "" },
 ];
-const adv = (patch: Partial<DraftAdvanced>): DraftAdvanced => ({ ...emptyAdvanced(), on: true, arrive_country: "تركيا", arrive_by: "flight", leave_country: "جورجيا", leave_by: "flight", ...patch });
+const adv = (patch: Partial<DraftAdvanced>): DraftAdvanced => ({ ...emptyAdvanced(), on: true, parts: { arrival: true, departure: true }, arrive_country: "تركيا", arrive_by: "flight", leave_country: "جورجيا", leave_by: "flight", ...patch });
 
 describe("«بكج متقدم» — four answers on top of the basic file", () => {
   it("off (or absent) changes nothing: the basic file stays the basic file", () => {
@@ -202,4 +202,44 @@ it("a pickup with no time yet, on the landing day, is not «before arrival»", a
   const a = adv({ arrive_country: "تركيا", arrive_at: "مطار", arrive_date: "2026-11-11", arrive_time: "11:30", reception: { kind: "airport", place: "", side: "", country: "تركيا", date: "2026-11-11", time: "" } });
   expect(advancedSteps(a)[1].errors).toEqual([]);
   expect(advancedSteps({ ...a, reception: { ...a.reception, date: "2026-11-10" } })[1].errors.length).toBe(1);
+});
+
+describe("«بكج متقدم» — only the unusual end, typed once, the car before the plane", () => {
+  it("departure only: the arrival stays Basic's airport pickup and asks nothing", async () => {
+    const { advancedSteps, advancedGaps } = await import("./advanced");
+    const a = adv({
+      parts: { arrival: false, departure: true },
+      reception: { kind: "border", place: "سارب", side: "جورجيا", country: "جورجيا", date: "", time: "" },
+      farewell: { kind: "airport", place: "", side: "", country: "جورجيا", date: "2026-10-30", time: "18:00" },
+      leave_country: "جورجيا",
+      leave_from: "مطار تبليسي الدولي (TBS)",
+      leave_date: "2026-10-30",
+      leave_time: "22:45",
+    });
+    expect(advancedSteps(a).map((s) => s.key)).toEqual(["farewell", "leave"]);
+    expect(withAdvancedTransport(rows, a)[0]).toEqual(rows[0]); // the pickup typed earlier no longer counts
+    expect(advancedGaps(a)).toEqual([]);
+    expect(advancedGaps({ ...a, parts: { arrival: false, departure: false } })).toEqual(["اختر ما المختلف في هذه الرحلة: الوصول، أو المغادرة، أو كلاهما"]);
+  });
+
+  it("a car to the airport at take-off time is flagged with the latest time it may leave", async () => {
+    const { advancedSteps } = await import("./advanced");
+    const a = adv({
+      parts: { arrival: false, departure: true },
+      farewell: { kind: "airport", place: "", side: "", country: "جورجيا", date: "2026-10-30", time: "22:45" },
+      leave_date: "2026-10-30",
+      leave_time: "22:45",
+      leave_from: "مطار تبليسي",
+      leave_country: "جورجيا",
+    });
+    expect(advancedSteps(a)[0].errors).toEqual(["الانطلاق إلى المطار 22:45 والإقلاع 22:45 — يجب أن ينطلق قبل الإقلاع بثلاث ساعات على الأقل (19:45 أو قبل)"]);
+    expect(advancedSteps({ ...a, farewell: { ...a.farewell, time: "19:30" } })[0].errors).toEqual([]);
+  });
+
+  it("dates typed here go to Basic; dates that came from Basic do not go back", async () => {
+    const { advancedTripDates } = await import("./advanced");
+    const a = adv({ checkin_date: "2026-10-20", leave_date: "2026-10-30", reception: { kind: "border", place: "", side: "جورجيا", country: "جورجيا", date: "", time: "" } });
+    expect(advancedTripDates(a)).toEqual({ arrival_date: "2026-10-20", departure_date: "2026-10-30", country: "جورجيا" });
+    expect(advancedTripDates({ ...a, auto: ["checkin_date", "leave_date"] }).arrival_date).toBeUndefined();
+  });
 });

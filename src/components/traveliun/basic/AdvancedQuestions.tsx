@@ -83,10 +83,11 @@ export function AdvancedQuestions({
   // the first night's country — where a pickup in another country has to cross to
   const firstCountry = cities[0]?.country || tripCountry;
   const steps = advancedSteps(adv, tzOf, firstCountry, firstStay);
-  const stepOf = (k: StepKey) => steps.find((s) => s.key === k)!;
+  const stepOf = (k: StepKey) => steps.find((s) => s.key === k);
   const hopGaps = Object.values(adv.borders).filter((h) => !h.crossing.trim()).length;
   const errors = steps.reduce((n, s) => n + s.errors.length, 0);
-  const missing = steps.reduce((n, s) => n + s.missing.length, 0) + hopGaps;
+  const noPart = !adv.parts.arrival && !adv.parts.departure;
+  const missing = steps.reduce((n, s) => n + s.missing.length, 0) + hopGaps + (noPart ? 1 : 0);
   const [editing, setEditing] = useState(errors + missing > 0);
   // the hops that change country — the only ones a border question belongs to
   const hops = cities
@@ -169,7 +170,8 @@ export function AdvancedQuestions({
     ) : null;
 
   /** one step of the trip: its number, its sentence, its state, then its fields and what is wrong with them. */
-  const stepCard = (s: AdvancedStep, body: ReactNode) => {
+  const stepCard = (s: AdvancedStep | undefined, body: ReactNode) => {
+    if (!s) return null;
     const state = s.errors.length ? "error" : s.missing.length ? "missing" : "ok";
     return (
       <li key={s.key} className={`grid gap-2 rounded-[12px] border p-2.5 ${state === "error" ? "border-[#f2b8c6] bg-[#fffafb]" : state === "missing" ? "border-[#f4d9a6]" : "border-[#cfe8dc]"}`}>
@@ -272,6 +274,24 @@ export function AdvancedQuestions({
       <div className="grid gap-0.5">
         <h2 className="text-[14px] font-extrabold text-[#003c3a]">بكج متقدم</h2>
         <span className="text-[11.5px] text-[#557d78]">الرحلة بترتيبها الفعلي. كل وقت يُكتب بتوقيت مكانه كما في التذكرة، والنظام يقارن الأوقات بعد احتساب فرق التوقيت.</span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5 rounded-[12px] border border-[#e6efeb] p-2.5">
+        <span className="text-[12.5px] font-extrabold text-[#185045]">ما المختلف في هذه الرحلة؟</span>
+        {(
+          [
+            ["arrival", "الوصول والاستقبال"],
+            ["departure", "المغادرة والتوديع"],
+          ] as const
+        ).map(([k, label]) => (
+          <button key={k} type="button" className={chip(adv.parts[k])} onClick={() => set({ parts: { ...adv.parts, [k]: !adv.parts[k] } })}>
+            {adv.parts[k] ? "✓ " : ""}
+            {label}
+          </button>
+        ))}
+        <span className="text-[11px] text-[#557d78]">
+          {noPart ? "اختر واحداً أو الاثنين — الجهة غير المختارة تبقى كما في البيسك (المطار)." : !adv.parts.arrival ? "الوصول كما في البيسك: استقبال من المطار." : !adv.parts.departure ? "المغادرة كما في البيسك: توديع إلى المطار." : ""}
+        </span>
       </div>
 
       <ol className="grid gap-2">

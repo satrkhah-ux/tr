@@ -74,6 +74,11 @@ export type DraftAdvanced = {
   reception_cross?: BorderHop;
   /** date fields still following Basic; a field the agent edits leaves this list. */
   auto: AdvancedDateKey[];
+  /**
+   * Which end of the trip is unusual — the agent picks one or both. The other
+   * end stays exactly Basic's (an airport pickup / drop-off), asked nothing.
+   */
+  parts: { arrival: boolean; departure: boolean };
 };
 
 export const ARRIVE_BY_AR: Record<Exclude<ArriveBy, "">, string> = { flight: "طيران", land: "برّاً", rail_sea: "قطار / عبّارة", already: "موجود مسبقاً في البلد" };
@@ -89,6 +94,16 @@ export function pointCountry(p: ServicePoint, fallback: string): string {
 /** an airport point with its own airport picked names it; otherwise it is the airport they fly into / out of. */
 function airportPoint(p: ServicePoint, by: ArriveBy, flown: string, fallback: string): string {
   return p.place.trim() ? pointText(p) : airportOf(by, flown, fallback);
+}
+
+/** The answers that count: an end the agent did not open is Basic's own, whatever was typed into it before. */
+export function activeAdvanced(adv: DraftAdvanced): DraftAdvanced {
+  const blank = point();
+  let out = adv;
+  if (!adv.parts.arrival)
+    out = { ...out, arrive_country: "", arrive_by: "", arrive_at: "", arrive_date: "", arrive_time: "", checkin_date: "", reception: blank, reception_cross: undefined };
+  if (!adv.parts.departure) out = { ...out, leave_country: "", leave_by: "", leave_from: "", leave_date: "", leave_time: "", farewell: blank };
+  return out;
 }
 
 export function emptyAdvanced(): DraftAdvanced {
@@ -110,6 +125,7 @@ export function emptyAdvanced(): DraftAdvanced {
     self_items: [],
     borders: {},
     auto: [],
+    parts: { arrival: false, departure: false },
   };
 }
 
@@ -126,6 +142,8 @@ export function normalizeAdvanced(raw: unknown): DraftAdvanced | undefined {
     self_items: Array.isArray(r.self_items) ? r.self_items.filter((x) => typeof x === "string") : [],
     borders: r.borders && typeof r.borders === "object" ? r.borders : {},
     auto: Array.isArray(r.auto) ? r.auto : [],
+    // a file answered before the choice existed had both ends open
+    parts: r.parts && typeof r.parts === "object" ? { arrival: r.parts.arrival === true, departure: r.parts.departure === true } : { arrival: r.on === true, departure: r.on === true },
   };
 }
 
@@ -221,6 +239,7 @@ export { hopKey };
  */
 export function withAdvancedTransport(rows: DraftTransport[], adv: DraftAdvanced | undefined, airport = "المطار"): DraftTransport[] {
   if (!adv?.on) return rows;
+  adv = activeAdvanced(adv);
   // the arrival pickup is the first row from the airport, the farewell the last row to it
   const first = rows.findIndex((r) => r.from_place === airport);
   const last = rows.map((r) => r.to_place).lastIndexOf(airport);
@@ -264,12 +283,15 @@ export const AIRPORT_TRANSFER_LINE = "الإستقبال والتوديع من �
 
 export function meetsElsewhere(adv: DraftAdvanced | undefined): boolean {
   const off = (k: PointKind) => k !== "" && k !== "airport";
-  return !!adv?.on && (off(adv.reception.kind) || off(adv.farewell.kind));
+  if (!adv?.on) return false;
+  const a = activeAdvanced(adv);
+  return off(a.reception.kind) || off(a.farewell.kind);
 }
 
 /** The words the client reads: where and when our service starts and ends, and what is theirs. */
 export function advancedLines(adv: DraftAdvanced | undefined): { includes: string[]; excludes: string[] } {
   if (!adv?.on) return { includes: [], excludes: [] };
+  adv = activeAdvanced(adv);
   const includes: string[] = [];
   const excludes: string[] = [];
   const arrive = adv.arrive_at.trim();
@@ -318,6 +340,13 @@ function wrongPlace(by: ArriveBy, place: string): string | null {
   if (by === "rail_sea" && looksAirport(p)) return `«${p}» مطار — غيّر الوسيلة إلى «${ARRIVE_BY_AR.flight}» أو اختر محطة / ميناء`;
   return null;
 }
+
+/** an international departure: at the airport three hours before take-off. */
+export const AIRPORT_LEAD_MINUTES = 180;
+const minsText = (m: number) => {
+  const d = ((m % 1440) + 1440) % 1440;
+  return `${String(Math.floor(d / 60)).padStart(2, "0")}:${String(d % 60).padStart(2, "0")}`;
+};
 
 export type StepKey = "arrive" | "reception" | "checkin" | "farewell" | "leave";
 export type AdvancedStep = {
@@ -368,6 +397,8 @@ const hasSelf = (adv: DraftAdvanced) => adv.self_items.some((x) => x.trim());
  * right under it. Nothing is corrected: the agent decides.
  */
 export function advancedSteps(adv: DraftAdvanced, tzOf: TzOf = () => null, firstCountry = "", firstStay = ""): AdvancedStep[] {
+  const parts = adv.parts;
+  adv = activeAdvanced(adv);
   const rx = adv.reception;
   const fw = adv.farewell;
   // where each clock is read: a border side is its own country; the rest is where they land / leave
@@ -449,6 +480,11 @@ export function advancedSteps(adv: DraftAdvanced, tzOf: TzOf = () => null, first
     if (fw.kind === "border" && !fw.side) farewell.missing.push("حدد أي جانب من الحدود");
     if (!fw.date) farewell.missing.push("يوم التوديع غير محدد");
     if (fw.kind === "airport" && adv.leave_by && adv.leave_by !== "flight") farewell.errors.push(`العميل يغادر ${ARRIVE_BY_AR[adv.leave_by]} — لا يوجد مطار نوصله إليه`);
+    if (fw.kind === "airport" && fw.time && adv.leave_time && fw.date && fw.date === adv.leave_date) {
+      const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+      if (mins(adv.leave_time) - mins(fw.time) < AIRPORT_LEAD_MINUTES)
+        farewell.errors.push(`الانطلاق إلى المطار ${fw.time} والإقلاع ${adv.leave_time} — يجب أن ينطلق قبل الإقلاع بثلاث ساعات على الأقل (${minsText(mins(adv.leave_time) - AIRPORT_LEAD_MINUTES)} أو قبل)`);
+    }
     if (fw.date && adv.leave_date && fw.date > adv.leave_date) farewell.errors.push(`التوديع (${fw.date}) بعد مغادرة العميل (${adv.leave_date})`);
     if (fw.date && rx.date && rx.kind && rx.kind !== "self" && fw.date < rx.date) farewell.errors.push(`التوديع (${fw.date}) قبل الاستقبال (${rx.date})`);
   }
@@ -467,12 +503,13 @@ export function advancedSteps(adv: DraftAdvanced, tzOf: TzOf = () => null, first
   if (adv.leave_date && adv.arrive_date && earlier(adv.leave_date, adv.leave_time, tzL, adv.arrive_date, adv.arrive_time, tzA))
     leave.errors.push(`المغادرة (${adv.leave_date}) قبل الوصول (${adv.arrive_date})`);
 
-  return [arrive, reception, checkin, farewell, leave];
+  return [...(parts.arrival ? [arrive, reception, checkin] : []), ...(parts.departure ? [farewell, leave] : [])];
 }
 
 /** Everything still open or contradictory, in the trip's order — the steps' and the border hops'. */
 export function advancedGaps(adv: DraftAdvanced | undefined, tzOf?: TzOf, firstCountry?: string, firstStay?: string): string[] {
   if (!adv?.on) return [];
+  if (!adv.parts.arrival && !adv.parts.departure) return ["اختر ما المختلف في هذه الرحلة: الوصول، أو المغادرة، أو كلاهما"];
   const out = advancedSteps(adv, tzOf, firstCountry, firstStay).flatMap((s) => [...s.errors, ...s.missing]);
   for (const [key, hop] of Object.entries(adv.borders)) if (!hop.crossing.trim()) out.push(`${key.replace(">", " ← ")}: اكتب اسم المعبر`);
   return out;
@@ -485,6 +522,7 @@ export function advancedGaps(adv: DraftAdvanced | undefined, tzOf?: TzOf, firstC
  */
 export function advancedDayNote(note: string | null, adv: DraftAdvanced | undefined): string | null {
   if (!note || !adv?.on) return note;
+  adv = activeAdvanced(adv);
   const swap = (text: string, from: string, p: ServicePoint, line: string) => {
     if (!p.kind || p.kind === "airport" || !text.includes(from)) return text;
     // the note joins its parts with « · »: drop the whole part
@@ -503,6 +541,7 @@ export function advancedDayNote(note: string | null, adv: DraftAdvanced | undefi
 /** The programme's first / last day lines when we do not meet or leave them at the airport; null = Basic's own words. */
 export function advancedDayLines(adv: DraftAdvanced | undefined): { arrive: string | null; leave: string | null } {
   if (!adv?.on) return { arrive: null, leave: null };
+  adv = activeAdvanced(adv);
   const rx = adv.reception;
   const fw = adv.farewell;
   return {
@@ -513,5 +552,22 @@ export function advancedDayLines(adv: DraftAdvanced | undefined): { arrive: stri
           ? "الوصول إلى الفندق بترتيبكم الخاص"
           : `الاستقبال من ${pointText(rx)}${rx.time ? ` الساعة ${rx.time}` : ""} من قبل موظف ترافليون والتوجه إلى الفندق`,
     leave: !fw.kind || fw.kind === "airport" ? null : fw.kind === "self" ? "تسجيل الخروج من الفندق" : `تسجيل الخروج من الفندق والتوجه إلى ${pointText(fw)}`,
+  };
+}
+
+/**
+ * The dates the agent typed HERE, for Basic — so nothing is typed twice. Basic's
+ * programme starts with the first night we book (else the landing day) and ends
+ * the day the client leaves. Only typed answers travel: a date that came from
+ * Basic going back to Basic would be a loop. The package country is offered when
+ * Basic has none: where we meet them (else where they land).
+ */
+export function advancedTripDates(adv: DraftAdvanced): { arrival_date?: string; departure_date?: string; country?: string } {
+  const a = activeAdvanced(adv);
+  const typed = (k: AdvancedDateKey, v: string) => (v && !adv.auto.includes(k) ? v : undefined);
+  return {
+    arrival_date: typed("checkin_date", a.checkin_date) ?? typed("arrive_date", a.arrive_date),
+    departure_date: typed("leave_date", a.leave_date),
+    country: pointCountry(a.reception, a.arrive_country) || pointCountry(a.farewell, a.leave_country) || undefined,
   };
 }
