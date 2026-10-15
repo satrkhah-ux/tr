@@ -1,7 +1,38 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { emptyLeg, enrichTicket, mergeTicket, parseTicketText, sanitizeTicket, ticketGaps } from "./ticket-parse";
+import { emptyLeg, enrichTicket, mergeTicket, parseTicketText, refundIn, sanitizeTicket, ticketGaps } from "./ticket-parse";
+
+describe("refund status on the card («مسترد / مسترد جزئياً / غير مسترد»)", () => {
+  it("reads the ticket's refund wording, narrowest phrase first", () => {
+    expect(refundIn("Fare basis: YOWSA  NON-REFUNDABLE")).toBe("non_refundable");
+    expect(refundIn("Tickets are Non Refundable after departure")).toBe("non_refundable");
+    expect(refundIn("التذكرة غير قابلة للاسترداد")).toBe("non_refundable");
+    expect(refundIn("نوع التذكرة: غير مسترد")).toBe("non_refundable");
+    expect(refundIn("Refundable with penalty SAR 200")).toBe("partial");
+    expect(refundIn("Partially refundable")).toBe("partial");
+    expect(refundIn("التذكرة مستردة جزئياً")).toBe("partial");
+    expect(refundIn("قابلة للاسترداد مع خصم رسوم الإلغاء")).toBe("partial");
+    expect(refundIn("Fare: Flex — REFUNDABLE")).toBe("refundable");
+    expect(refundIn("التذكرة مسترد")).toBe("refundable");
+    expect(refundIn("Economy SV1020 RUH-KUL")).toBe("");
+    // a word that only contains the letters is not the word
+    expect(refundIn("المستردين")).toBe("");
+  });
+
+  it("keeps the employee's choice and note through the server's cleaning, and nothing else", () => {
+    const t = sanitizeTicket({ pnr: "abc123", passengers: [], legs: [], refund: "partial", refund_note: "  رسوم الإلغاء 200 ريال  " });
+    expect(t).toMatchObject({ refund: "partial", refund_note: "رسوم الإلغاء 200 ريال" });
+    expect(sanitizeTicket({ refund: "maybe" }).refund).toBe("");
+  });
+
+  it("a status the reader found is not overwritten by the model's", () => {
+    const base = { pnr: "", passengers: [], legs: [], refund: "non_refundable" as const };
+    const fill = { pnr: "X1Y2Z3", passengers: [], legs: [], refund: "refundable" as const };
+    expect(mergeTicket(base, fill).refund).toBe("non_refundable");
+    expect(mergeTicket({ ...base, refund: "" }, fill).refund).toBe("refundable");
+  });
+});
 
 /** Every name and reference in the fixtures is invented. */
 const fixture = (name: string) => readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), "utf8");
@@ -104,7 +135,7 @@ describe("parseTicketText — edges", () => {
   });
   it("leaves what it cannot read empty rather than guessing", () => {
     const t = parseTicketText("Thank you for flying with us.", NOW);
-    expect(t).toEqual({ pnr: "", passengers: [], legs: [] });
+    expect(t).toEqual({ pnr: "", passengers: [], legs: [], refund: "" });
     expect(ticketGaps(t)).toEqual(["pnr", "passengers", "legs"]);
   });
   it("does not read a terminal and a day as a flight number", () => {

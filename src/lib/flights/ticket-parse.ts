@@ -40,7 +40,44 @@ export type TicketLeg = {
   leg_order: LegOrder | null;
 };
 
-export type ParsedTicket = { pnr: string; passengers: string[]; legs: TicketLeg[] };
+/** Whether the fare can be refunded — printed on the card so the client knows before asking. */
+export type RefundStatus = "refundable" | "partial" | "non_refundable";
+export const REFUND_STATUSES: readonly RefundStatus[] = ["refundable", "partial", "non_refundable"];
+
+export type ParsedTicket = {
+  pnr: string;
+  passengers: string[];
+  legs: TicketLeg[];
+  /** empty = not stated on the ticket (the employee picks it) */
+  refund?: RefundStatus | "";
+  /** the conditions of a partial refund, e.g. «رسوم الإلغاء 200 ريال» */
+  refund_note?: string;
+};
+
+/**
+ * The refund wording a ticket prints, in English or Arabic. «Non-refundable»
+ * contains «refundable», so the narrower phrases are tried first.
+ */
+export function refundIn(text: string): RefundStatus | "" {
+  const t = normalizeTicketText(text);
+  // \b does not treat Arabic letters as word characters, so the Arabic word is fenced by explicit lookarounds
+  if (
+    /non[\s-]*refund(able)?|\bnon\s*ref\b|\bno\s+refund/i.test(t) ||
+    /غير\s*(قابل[ةه]?\s*لل?ا?سترداد|مسترد[ةه]?)|لا\s*(يمكن|يتم)\s*(ال)?استرداد/.test(t)
+  ) {
+    return "non_refundable";
+  }
+  if (
+    /partial(ly)?\s*refund|refundable\s+(with|subject\s+to)\s+(a\s+)?(penalty|fee|charge)/i.test(t) ||
+    /مسترد[ةه]?\s*جزئي|استرداد\s*جزئي|قابل[ةه]?\s*لل?ا?سترداد\s*(مع|بعد)\s*(خصم|رسوم|غرام)/.test(t)
+  ) {
+    return "partial";
+  }
+  if (/\brefundable\b/i.test(t) || /قابل[ةه]?\s*لل?ا?سترداد/.test(t) || /(?<![ء-ي])مسترد[ةه]?(?![ء-ي])/.test(t)) {
+    return "refundable";
+  }
+  return "";
+}
 
 /** The upload limit, checked in the browser for the message and on the server for real. */
 export const MAX_TICKET_BYTES = 10 * 1024 * 1024;
@@ -553,6 +590,7 @@ export function parseTicketText(input: string, now: Date = new Date()): ParsedTi
     pnr: findPnr(lines, [...new Set(legs.map((l) => l.airline_iata).filter(Boolean))]),
     passengers: findPassengers(lines),
     legs,
+    refund: refundIn(lines.join(" ")),
   };
 }
 
@@ -595,6 +633,8 @@ export function mergeTicket(base: ParsedTicket, fill: ParsedTicket): ParsedTicke
     pnr: base.pnr || fill.pnr,
     passengers: base.passengers.length ? base.passengers : fill.passengers,
     legs: merged.map((l, i) => ({ ...l, leg_order: l.leg_order ?? orders[i] })),
+    refund: base.refund || fill.refund || "",
+    refund_note: base.refund_note || fill.refund_note || "",
   };
 }
 
@@ -640,6 +680,8 @@ export function sanitizeTicket(raw: unknown): ParsedTicket {
       .filter(Boolean)
       .slice(0, LIMITS.passengers),
     legs,
+    refund: REFUND_STATUSES.includes(r.refund as RefundStatus) ? (r.refund as RefundStatus) : "",
+    refund_note: text(r.refund_note, 120),
   };
 }
 

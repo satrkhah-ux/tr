@@ -20,10 +20,12 @@ import type { TranslationKey } from "@/lib/i18n";
 import { readFlightTicket, type FlightCardLookups, type TicketReadHow } from "@/lib/data/flight-card";
 import {
   MAX_TICKET_BYTES,
+  REFUND_STATUSES,
   emptyLeg,
   enrichTicket,
   type LegOrder,
   type ParsedTicket,
+  type RefundStatus,
   type TicketLeg,
 } from "@/lib/flights/ticket-parse";
 import { parseFlightNumber } from "@/lib/offer/flight-number";
@@ -268,6 +270,34 @@ export function FlightCardTool({ lookups }: { lookups: FlightCardLookups }) {
                     onChange={(e) => setTicket({ ...ticket, pnr: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) })}
                   />
                 </label>
+
+                <label className={labelClass}>
+                  {t("fc.refund")}
+                  <select
+                    className={fieldClass}
+                    value={ticket.refund ?? ""}
+                    onChange={(e) => setTicket({ ...ticket, refund: e.target.value as RefundStatus | "" })}
+                  >
+                    <option value="">{t("fc.refund.unset")}</option>
+                    {REFUND_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {t(`fc.refund.${s}`)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {ticket.refund === "partial" || ticket.refund_note ? (
+                  <label className={labelClass}>
+                    {t("fc.refundNote")}
+                    <input
+                      className={fieldClass}
+                      dir="auto"
+                      placeholder={t("fc.refundNote.hint")}
+                      value={ticket.refund_note ?? ""}
+                      onChange={(e) => setTicket({ ...ticket, refund_note: e.target.value.slice(0, 120) })}
+                    />
+                  </label>
+                ) : null}
 
                 <fieldset className="space-y-2">
                   <legend className="mb-2 text-[13px] font-bold text-[#185045]">{t("fc.passengers")}</legend>

@@ -74,6 +74,8 @@ export const AR = {
   flightCard: "بطاقة الطيران",
   bookingDetails: "بيانات الحجز",
   pnr: "رقم الحجز (PNR)",
+  refund: "الاسترداد",
+  refundStatus: { refundable: "مسترد", partial: "مسترد جزئياً", non_refundable: "غير مسترد" },
   passengers: "المسافرون",
   passengerCount: (n: number) => (n === 1 ? "مسافر واحد" : n === 2 ? "مسافران" : n <= 10 ? `${n} مسافرين` : `${n} مسافرًا`),
   flightCardNote: "جميع المواعيد بالتوقيت المحلي لكل مطار.",

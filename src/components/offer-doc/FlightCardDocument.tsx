@@ -23,6 +23,11 @@ const CARD_CSS = `
 .fc-title{margin-top:11mm;}
 .od-page.fc-fit{min-height:0;padding-bottom:24mm;}
 .fc-names{display:flex;flex-wrap:wrap;gap:1.5mm 5mm;font-weight:700;}
+.fc-refund{display:inline-block;padding:0.6mm 3mm;border-radius:2mm;font-weight:700;}
+.fc-refund-refundable{background:#e3efe9;color:#185045;}
+.fc-refund-partial{background:#fbf1dd;color:#8a5a0b;}
+.fc-refund-non_refundable{background:#fbe9ed;color:#a3263f;}
+.fc-refund-note{display:block;margin-top:1mm;font-size:0.92em;color:#5c726c;}
 `;
 
 const at = (date: string, time: string) => (date ? (time ? `${date}T${time}` : date) : null);
@@ -91,6 +96,15 @@ export function FlightCardDocument({
                   <DirText>{ticket.pnr || "—"}</DirText>
                 </td>
               </tr>
+              {ticket.refund ? (
+                <tr>
+                  <th>{AR.refund}</th>
+                  <td>
+                    <span className={`fc-refund fc-refund-${ticket.refund}`}>{AR.refundStatus[ticket.refund]}</span>
+                    {ticket.refund_note ? <bdi className="fc-refund-note">{ticket.refund_note}</bdi> : null}
+                  </td>
+                </tr>
+              ) : null}
               <tr>
                 <th>{AR.passengers}</th>
                 <td>
