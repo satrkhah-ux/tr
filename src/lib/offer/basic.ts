@@ -26,6 +26,7 @@ import {
   newCityKey,
   newStayId,
   resizeRooms,
+  roomFromName,
   roomTypeNames,
   totalCityNights,
   transportRef,
@@ -78,7 +79,7 @@ export function remainingNights(data: Pick<DraftData, "trip" | "cities">): numbe
 /** A city's hotel line, born with the trip's rooms and meals so the agent only picks the hotel. */
 export function hotelForCity(data: Pick<DraftData, "trip">, city: string, currency: string, cityKey?: string): DraftHotel {
   const board = data.trip.meal_plan ? MEAL_PLAN_BOARD[data.trip.meal_plan] : data.trip.default_board;
-  const room = { ...emptyRoomSpec(), room_type_name: data.trip.default_room_type_name, board_type: board };
+  const room = { ...emptyRoomSpec(), ...roomFromName(data.trip.default_room_type_name), board_type: board };
   return withRooms(
     {
       id: newStayId(),
@@ -357,11 +358,11 @@ export function withExtraBeds(line: DraftHotel, count: number): DraftHotel {
   );
 }
 
-/** A new room type for every room of the line; a room's extra bed stays with it. */
+/** A new room type for every room of the line (its catalogue codes with it); a room's extra bed stays with it. */
 export function renameRooms(line: DraftHotel, name: string): DraftHotel {
   return withRooms(
     line,
-    line.rooms.map((r) => ({ ...r, room_type_id: null, room_type_name: name + (r.room_type_name.endsWith(EXTRA_BED) ? EXTRA_BED : "") })),
+    line.rooms.map((r) => ({ ...r, ...roomFromName(name), room_type_name: name + (r.room_type_name.endsWith(EXTRA_BED) ? EXTRA_BED : "") })),
   );
 }
 

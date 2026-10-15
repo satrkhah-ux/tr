@@ -135,46 +135,6 @@ function toHotel(row: CreatedHotelRow): CreatedHotel {
   return { id: row.id, name: row.arabic_name, name_en: row.english_name, stars: row.stars };
 }
 
-export type CreateRoomTypeResult =
-  | { ok: true; name: string }
-  | { ok: false; error: "err.session" | "err.db" | "pg.err.roomNameRequired" }
-  | { ok: false; error: "pg.err.didYouMean"; suggestion: string };
-
-/**
- * A room type the catalogue does not have yet.
- *
- * Created GLOBAL (hotel_id null), which is what the generator's dropdown
- * reads: one «جناح ملكي» offered everywhere beats the same name repeated once
- * per hotel, and the agent naming it here means the agency sells it.
- */
-export async function createRoomTypeOption(
-  arabicName: string,
-  englishName?: string,
-  force = false,
-): Promise<CreateRoomTypeResult> {
-  if (!(await getServerUser())) return { ok: false, error: "err.session" };
-  const name = arabicName.trim();
-  if (!name) return { ok: false, error: "pg.err.roomNameRequired" };
-
-  try {
-    const supabase = await db();
-    const { data: existing } = await supabase.from("room_types").select("arabic_name").is("hotel_id", null);
-    const rows = (existing ?? []) as { arabic_name: string }[];
-    const same = rows.find((r) => normalizeName(r.arabic_name) === normalizeName(name));
-    // the catalogue's spelling, so the dropdown shows one «غرفة عائلية», not two
-    if (same) return { ok: true, name: same.arabic_name };
-    const near = force ? null : closestName(name, rows, (r) => r.arabic_name, 0.85);
-    if (near) return { ok: false, error: "pg.err.didYouMean", suggestion: near.row.arabic_name };
-
-    const { error } = await supabase
-      .from("room_types")
-      .insert({ arabic_name: name, english_name: englishName?.trim() || null });
-    return error ? { ok: false, error: "err.db" } : { ok: true, name };
-  } catch {
-    return { ok: false, error: "err.db" };
-  }
-}
-
 export type CreateCityResult =
   | { ok: true; name: string; created: boolean }
   | { ok: false; error: "err.session" | "err.db" | "pg.err.cityNameRequired" | "pg.err.countryFirst" }
