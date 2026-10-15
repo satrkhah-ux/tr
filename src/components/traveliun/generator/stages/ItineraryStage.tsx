@@ -23,9 +23,9 @@ import {
   dayTours,
   daysFromTours,
   draftDaysNeedRebuild,
+  draftTransportNote,
   fillCityTours,
   isTouringDay,
-  transportNoteForDay,
   withDayPick,
   withDayTour,
   type TourProgram,
@@ -251,7 +251,7 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
   const blank: TourPick = { program_id: null, title: "", text: "", price: null, cars: plan.tours.cars };
   const tourRows = !onDay ? [] : dayPicks.length > 0 ? dayPicks : isTouringDay(days, current) || asked === current ? [blank] : [];
   const showPrice = can("pricing.view");
-  const transportNote = day && data.scope.transport ? transportNoteForDay(data.transport_plan, days, current, data.flights) : null;
+  const transportNote = day && data.scope.transport ? draftTransportNote(data, days, current) : null;
   // the landing note goes on the day the group lands, after any travel day
   const arrivalIndex = days.findIndex((d) => d.kind !== "travel");
 

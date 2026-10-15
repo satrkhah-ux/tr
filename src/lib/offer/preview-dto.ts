@@ -28,7 +28,7 @@ import {
   type GeneratorLookups,
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
-import { transportNoteForDay } from "./itinerary";
+import { draftTransportNote } from "./itinerary";
 import { AIRPORT_TRANSFER_LINE, advancedDayNote, advancedLines, meetsElsewhere } from "./advanced";
 import { offerTotals, type CurrencyRates } from "./pricing";
 import { packageNights, packageStays, type ExtractedPackage, type RepackageData } from "@/lib/repackage/repackage-types";
@@ -138,7 +138,7 @@ export function draftToPreviewOffer(
       sell_currency: null,
     })),
     transport: data.transport
-      .map((t) => [t.from_place, t.to_place].filter(Boolean).join(" → ") + (t.car_type ? ` — ${t.car_type}` : ""))
+      .map((t) => (t.text || [t.from_place, t.to_place].filter(Boolean).join(" → ")) + (t.car_type ? ` — ${t.car_type}` : ""))
       .filter((line) => line.trim().length > 1),
     visas: data.visas.map((v) => [v.country, v.visa_type].filter(Boolean).join(" — ")).filter(Boolean),
     // The meal plan is stated the same way the produced offer states it, so
@@ -153,7 +153,7 @@ export function draftToPreviewOffer(
     terms: data.services.terms,
     days: data.days
       // index on the FULL list: the transport line depends on a day's neighbours
-      .map((d, index) => ({ d, move: data.scope.transport ? advancedDayNote(transportNoteForDay(data.transport_plan, data.days, index, data.flights), data.advanced) : null }))
+      .map((d, index) => ({ d, move: data.scope.transport ? advancedDayNote(draftTransportNote(data, data.days, index), data.advanced) : null }))
       .filter(({ d, move }) => d.title.trim() || d.activities.length > 0 || move)
       .map(({ d, move }) => ({
         transport_note: move,

@@ -1472,6 +1472,11 @@ export const ar: Dictionary = {
   "pg.tour.description": "الوصف (من البرنامج — قابل للتعديل)",
   "pg.tour.add": "جولة في هذا اليوم",
   "pg.tour.remove": "إزالة الجولة من اليوم",
+  "pg.svc.kind": "نوع الخدمة",
+  "pg.svc.reception": "استقبال",
+  "pg.svc.farewell": "توديع",
+  "pg.svc.transfer": "توصيل",
+  "pg.svc.tour": "جولة",
   // ---- جلب بيانات الرحلة برقمها ----
   "pg.flightLookup.button": "جلب بيانات الرحلة",
   "pg.flightLookup.placeholder": "رقم الرحلة (مثال SV820)",

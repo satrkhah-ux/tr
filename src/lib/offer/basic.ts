@@ -19,15 +19,20 @@ import {
   emptyRoomSpec,
   hopKey,
   hopMode,
+  inCityTransferText,
   intercityModes,
+  isTripService,
   MEAL_PLAN_BOARD,
   newCityKey,
   newStayId,
   resizeRooms,
   roomTypeNames,
   totalCityNights,
+  transportRef,
+  transportServices,
   withCityKeys,
   withRooms,
+  type CityService,
   type DraftCity,
   type DraftData,
   type DraftDay,
@@ -41,9 +46,12 @@ import {
   type DraftTrip,
   type HotelStay,
   type LookupAirport,
+  type ServiceKind,
+  type TourPick,
+  type TransportLeg,
 } from "./draft-types";
 import { roomRank, seatsFromName } from "@/lib/catalog/model";
-import { daysFromTours } from "./itinerary";
+import { daysFromTours, departureDay, legInto } from "./itinerary";
 // the tours' days moved to lib/offer/itinerary with the programme; their importers still find them here
 export { cityDates, WELCOME, withTourCount, withTours } from "./itinerary";
 import { AIRPORT_TRANSFER_LINE, meetsElsewhere } from "./advanced";
@@ -221,8 +229,14 @@ export function moveCity(data: DraftData, from: number, to: number): Pick<DraftD
   list.splice(to, 0, city);
   if (repeatsNeighbour(keyed, list)) return same;
   const prevOf = new Map(keyed.map((c, i) => [c.key, keyed[i - 1]?.key]));
+  const nextOf = new Map(keyed.map((c, i) => [c.key, keyed[i + 1]?.key]));
   const backs = list.flatMap((c, i) => (c.arrives_next_day && prevOf.get(c.key) !== list[i - 1]?.key ? [i] : []));
-  let out: DraftData = { ...data, cities: chainCities(data, list.map((c, i) => (backs.includes(i) ? { ...c, arrives_next_day: undefined } : c))) };
+  // what the agent set on a way in or out (its car, its price) was for the old neighbour's road
+  const roads = list.map((c, i) => {
+    const gone = (s: CityService) => (s.id === "in" && prevOf.get(c.key) !== list[i - 1]?.key) || (s.id === "out" && nextOf.get(c.key) !== list[i + 1]?.key);
+    return c.services?.some(gone) ? { ...c, services: c.services.filter((s) => !gone(s)) } : c;
+  });
+  let out: DraftData = { ...data, cities: chainCities(data, roads.map((c, i) => (backs.includes(i) ? { ...c, arrives_next_day: undefined } : c))) };
   for (const i of backs) out = { ...out, ...setCityNights(out, i, out.cities[i].nights + 1) };
   const dated = chainCities(data, keyed);
   return { cities: out.cities, hotels: out.hotels, days: carryDays(dated, out.cities, data.days) };
@@ -247,6 +261,8 @@ export function replaceCity(data: DraftData, index: number, next: { name: string
     if (i !== index) return c;
     return {
       ...c,
+      // its transfers and their prices were the old city's: the trip writes the new one's
+      services: undefined,
       city_name: name,
       country,
       tour_picks: c.tour_picks?.map((p) => (p.free ? p : { ...p, program_id: null, title: "", text: "", price: null })),
@@ -463,9 +479,9 @@ export function typedSheetPrice(
 
 /**
  * A price changed on the pricing sheet is changed where it was typed — the
- * stay's rooms, the tour, the flight booking — so the two never disagree.
- * Null when the line has no such place (a transfer from the list, a visa, a
- * line added by hand, a supplier rate): the sheet keeps it as the agent's own.
+ * stay's rooms, the tour, the transfer's row, the flight booking — so the two
+ * never disagree. Null when the line has no such place (a visa, a line added by
+ * hand, a supplier rate): the sheet keeps it as the agent's own.
  */
 export function priceAtSource(
   data: DraftData,
@@ -482,6 +498,14 @@ export function priceAtSource(
     }
     const priced = change.price !== undefined ? withTypedTotal(b, "dom", change.price) : b;
     return { flight_booking: { ...priced, dom_currency: change.currency ?? b.dom_currency } };
+  }
+  // a transfer is typed on its row of the city card, per car in riyals like a tour — only its figure goes back.
+  // ponytail: a list line in another currency (MYR) typed over here is riyals on the next sync, as a tour's is;
+  // give CityService a currency if the lists' ringgit prices get typed over often.
+  if (item.item_type === "transport" && change.price !== undefined) {
+    const hit = transportServices(data.transport_plan, data.cities).find((s) => transportRef(s.row) === ref);
+    if (!hit || !data.cities[hit.city]) return null;
+    return { cities: setService(data.cities, hit.city, hit.id, { price: change.price }) };
   }
   const tour = ref.match(/^tour:(.+):(\d+)$/);
   // a tour is typed in riyals — only its figure goes back
@@ -514,6 +538,152 @@ export function priceGroupOf(item: Pick<DraftPricingItem, "item_type" | "ref">):
   if (item.item_type === "service") return item.ref?.startsWith("tour:") ? "tours" : "services";
   return "other";
 }
+
+// ---------- a city visit's services: reception, farewell, transfers ----------
+
+/** One non-tour row of a visit's services table, as the city card shows it. */
+export type ServiceRow = {
+  /** "in" / "out" — the trip's own way in and out; any other — a row the agent added. */
+  id: string;
+  kind: Exclude<ServiceKind, "tour">;
+  auto: boolean;
+  date: string | null;
+  /** what the row says: the agent's words, else the trip's (`auto_text`). */
+  text: string;
+  auto_text: string;
+  car_type: string;
+  cars: number;
+  /** one car's price as typed; null — the list's (on the pricing sheet). */
+  price: number | null;
+  /** its line on the pricing sheet. */
+  ref: string;
+  /** the plan's car it rides in unless it has its own. */
+  leg: Pick<TransportLeg, "car_type" | "cars">;
+  /** the flight's clock it meets: the landing for a reception, the take-off for a farewell — "" until the ticket says it. */
+  clock: string;
+};
+
+/** «مطار كوالالمبور الدولي» — a leg's airport without its code; «مطار X» for a city alone. */
+function airportWords(airport: string | undefined, city: string): string {
+  const name = (airport ?? "").replace(/\s*\([A-Za-z0-9]{3,4}\)\s*$/, "").trim();
+  return name ? (name.startsWith("مطار") ? name : `مطار ${name}`) : `مطار ${city}`;
+}
+
+/**
+ * The flight that brings the group to stop `index` and the one that takes it
+ * away: the first city is met off the flight that lands for it (else the
+ * international one), the last seen off to the flight home; between cities,
+ * the domestic leg into the city and the one into the next.
+ */
+function visitLegs(data: Pick<DraftData, "cities" | "flights">, index: number): { lands?: DraftFlight; leaves?: DraftFlight } {
+  const { cities, flights } = data;
+  const city = cities[index];
+  if (!city) return {};
+  const name = city.city_name.trim();
+  const byDeparture = [...flights].sort((a, b) => (a.departure_at ?? "").localeCompare(b.departure_at ?? ""));
+  // a ticket names the airport's city, which may not be the stop's (KUL for Selangor)
+  const into = (to: DraftCity, from: string) => legInto(flights, to.city_name.trim(), to.check_in, from) ?? legInto(flights, to.city_name.trim(), to.check_in);
+  const prev = cities[index - 1];
+  const next = cities[index + 1];
+  const lands = prev
+    ? into(city, prev.city_name.trim())
+    : (byDeparture.filter((f) => f.leg_order !== "inbound" && f.to_city?.trim() === name).at(-1) ?? finalOutbound(flights));
+  const leaves = next
+    ? into(next, name)
+    : (byDeparture.find((f) => f.leg_order !== "outbound" && f.from_city?.trim() === name) ?? byDeparture.find((f) => f.leg_order === "inbound"));
+  return { lands, leaves };
+}
+
+/**
+ * What a row says until the agent writes their own: met at the airport the
+ * group lands at and taken to the hotel — «… في سيلانجور» when that airport is
+ * another city's (KUL for Selangor) — seen off from the hotel to the airport it
+ * leaves from, or driven from the city before («براً» in the car, by train, by sea).
+ */
+export function serviceText(data: Pick<DraftData, "cities" | "flights" | "hotels" | "transport_plan">, index: number, kind: ServiceRow["kind"], id: string): string {
+  const city = data.cities[index];
+  if (!city) return "";
+  const name = city.city_name.trim();
+  const { lands, leaves } = visitLegs(data, index);
+  if (kind === "reception") {
+    const hotel = cityHotelLines(data.cities, data.hotels, index)[0]?.hotel_name.trim();
+    const away = Boolean(lands?.to_city?.trim()) && lands!.to_city!.trim() !== name;
+    const to = away ? `${hotel ? `فندق ${hotel}` : "الفندق"} في ${name}` : "الفندق";
+    return `الاستقبال من ${airportWords(lands?.to_airport, lands?.to_city?.trim() || name)} والتوصيل إلى ${to}`;
+  }
+  if (kind === "farewell") return `التوصيل من فندق ${name} إلى ${airportWords(leaves?.from_airport, leaves?.from_city?.trim() || name)}`;
+  const prev = data.cities[index - 1];
+  if (id !== "in" || !prev) return inCityTransferText(name);
+  const mode = hopMode(data.transport_plan, prev.city_name, name);
+  if (mode === "car") return `التوصيل من فندق ${prev.city_name.trim()} إلى فندق ${name}`;
+  return `الانتقال ${mode === "train" ? "بالقطار" : mode === "ship" ? "بالعبّارة" : "بالطيران"} من ${prev.city_name.trim()} إلى ${name}`;
+}
+
+/**
+ * The services of stop `index` other than its tours, in the trip's order: the
+ * way in (one reception at the airport, or one transfer from the city before),
+ * the way out to the airport, then the rows the agent added. They are the
+ * transport rows the pricing sheet prices (transportServices) — one each, never
+ * twice. Dates: the trip's; the farewell to the flight home on the day home.
+ */
+export function cityServices(data: DraftData, index: number): ServiceRow[] {
+  const city = data.cities[index];
+  if (!city || !data.scope.transport) return [];
+  const { lands, leaves } = visitLegs(data, index);
+  const at = (iso: string | null | undefined) => {
+    const t = (iso ?? "").slice(11, 16);
+    return t && t !== "00:00" ? t : "";
+  };
+  return transportServices(data.transport_plan, data.cities)
+    .filter((s) => s.city === index)
+    .map((s) => {
+      const auto_text = serviceText(data, index, s.kind, s.id);
+      return {
+        id: s.id,
+        kind: s.kind,
+        auto: isTripService(s.id),
+        date: s.row.date ?? (s.id === "out" ? departureDay(city) : null),
+        text: s.own?.text ?? auto_text,
+        auto_text,
+        car_type: s.own?.car_type?.trim() || s.leg.car_type.trim(),
+        cars: s.own?.cars ?? s.leg.cars,
+        price: s.own?.price ?? null,
+        ref: transportRef(s.row),
+        leg: s.leg,
+        clock: s.kind === "reception" ? at(lands?.arrival_at) : s.kind === "farewell" ? at(leaves?.departure_at) : "",
+      };
+    });
+}
+
+/** A service id for a row the agent adds. */
+export const newServiceId = () => `svc-${Math.random().toString(36).slice(2, 10)}`;
+
+/** One service of stop `index` changed — on "in" / "out", only what the agent changed is kept. */
+export function setService(cities: DraftCity[], index: number, id: string, slice: Partial<Omit<CityService, "id">>): DraftCity[] {
+  return cities.map((c, i) => {
+    if (i !== index) return c;
+    const list = c.services ?? [];
+    return {
+      ...c,
+      services: list.some((s) => s.id === id) ? list.map((s) => (s.id === id ? { ...s, ...slice } : s)) : [...list, { id, ...slice }],
+    };
+  });
+}
+
+/** «+ إضافة خدمة»: a row of `kind` on `date` of stop `index`. */
+export function addService(cities: DraftCity[], index: number, kind: ServiceRow["kind"], date: string | null): DraftCity[] {
+  return setService(cities, index, newServiceId(), { kind, date });
+}
+
+/** A row taken away: the trip's own stays taken away (it would be written again), an added one goes. */
+export function removeService(cities: DraftCity[], index: number, id: string): DraftCity[] {
+  if (isTripService(id)) return setService(cities, index, id, { removed: true });
+  return cities.map((c, i) => (i === index && c.services ? { ...c, services: c.services.filter((s) => s.id !== id) } : c));
+}
+
+/** The stop's tours, at their count — what the card's tours change writes. */
+export const withPicks = (cities: DraftCity[], index: number, picks: TourPick[]): DraftCity[] =>
+  cities.map((c, i) => (i === index ? { ...c, tour_picks: picks, tours: picks.length } : c));
 
 // ---------- the international flight, as first planned ----------
 

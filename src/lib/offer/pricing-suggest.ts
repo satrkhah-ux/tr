@@ -27,6 +27,7 @@ import {
   TRANSPORT_HOTEL_PREFIX,
   TRANSPORT_MODE_AR,
   TRANSPORT_TOURS,
+  transportRef,
   tourCars,
   tourVehicle,
   type DraftData,
@@ -557,11 +558,10 @@ export function suggestPricing(
     if (tr.car_type === TRANSPORT_MODE_AR.flight || tr.from_place === TRANSPORT_TOURS) continue;
     const arriving = tr.from_place === TRANSPORT_AIRPORT;
     const leaving = tr.to_place === TRANSPORT_AIRPORT;
+    // a car's price typed on the city card is the price, before any list (riyals, as a tour's)
+    const typed = tr.price ?? null;
     const hit =
-      // One line for every tour of the trip, and the list cannot say which
-      // tours the package holds. Never through transfers: a same-city row there
-      // is a move from one hotel to another, not a tour day.
-      tr.from_place === TRANSPORT_TOURS
+      typed != null
         ? null
         : arriving || leaving
           ? // a row priced from the airport to the city (0072) first, then the text rows
@@ -584,23 +584,26 @@ export function suggestPricing(
               reference.fleet,
             ))
           : findTransferPrice(transfers, tr.from_place, tr.to_place, tr.car_type, pax, reference.fleet);
+    const cur = typed != null ? "SAR" : hit?.currency || currency;
     items.push({
       item_type: "transport",
-      description: `${tr.from_place} ← ${tr.to_place}${tr.car_type ? ` (${tr.car_type})` : ""}`,
+      // the row's own words when the city card has them («الاستقبال من مطار …»)
+      description: `${tr.text || `${tr.from_place} ← ${tr.to_place}`}${tr.car_type ? ` (${tr.car_type})` : ""}`,
       // The vehicle is part of the ref: a leg re-planned from one car to two
       // vans is a different line, not the old one with a new price on it.
-      ref: `transport:${tr.from_place}>${tr.to_place}>${tr.car_type ?? ""}`,
+      ref: transportRef(tr),
       // «فان × 2» is two vehicles at the one-vehicle price.
       quantity: vehicleCount(tr.car_type),
       // The list price is what the agency PAYS — the legacy system put its
       // margin in the exchange rate. Both sides carry it: the profit controls
       // appear (they need a buy), and an agent without the internal view still
       // sees a figure rather than a total that silently left the car out.
-      buy_price: hit?.price ?? null,
-      buy_currency: hit?.currency || currency,
-      sell_price: hit?.price ?? null,
-      sell_currency: hit?.currency || currency,
-      source: hit ? "list" : "none",
+      // A typed one is what we pay too («typed = cost»).
+      buy_price: typed ?? hit?.price ?? null,
+      buy_currency: cur,
+      sell_price: typed ?? hit?.price ?? null,
+      sell_currency: cur,
+      source: typed != null ? "typed" : hit ? "list" : "none",
     });
   }
 

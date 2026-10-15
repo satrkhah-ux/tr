@@ -2,7 +2,8 @@
 
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
-import { FREE_DAY_TITLE, tourCars, type GeneratorLookups, type TourPick } from "@/lib/offer/draft-types";
+import { FREE_DAY_TITLE, tourCars, type GeneratorLookups, type ServiceKind, type TourPick } from "@/lib/offer/draft-types";
+import type { TranslationKey } from "@/lib/i18n";
 import { programDayText, tourService, type TourProgram } from "@/lib/offer/itinerary";
 import { findTourPrice, listedTourPrice, tourCarPrice, type TourPrice } from "@/lib/offer/pricing-suggest";
 import { useTraveliunUI } from "../TraveliunUIProvider";
@@ -96,6 +97,38 @@ export function CarCountSelect({
   );
 }
 
+const SERVICE_KIND_KEYS: Record<ServiceKind, TranslationKey> = {
+  reception: "pg.svc.reception",
+  farewell: "pg.svc.farewell",
+  transfer: "pg.svc.transfer",
+  tour: "pg.svc.tour",
+};
+
+/** «نوع الخدمة»: what a row of a city's services is — a tour, or one of the trip's drives. */
+export function ServiceKindSelect({
+  value,
+  kinds,
+  onChange,
+  className,
+}: {
+  value: ServiceKind;
+  /** what the row may become — the sale's tours and transfers. */
+  kinds: ServiceKind[];
+  onChange: (kind: ServiceKind) => void;
+  className: string;
+}) {
+  const { t } = useTraveliunUI();
+  return (
+    <select aria-label={t("pg.svc.kind")} value={value} onChange={(e) => onChange(e.target.value as ServiceKind)} className={`${className} px-1.5`}>
+      {(kinds.includes(value) ? kinds : [value, ...kinds]).map((k) => (
+        <option key={k} value={k}>
+          {t(SERVICE_KIND_KEYS[k])}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /**
  * One tour: its day (when it may move — the basic screen), its service, car,
  * cars, price per car and total, and its wording (the generator's open day).
@@ -114,6 +147,7 @@ export function TourRow({
   field,
   className,
   onRemove,
+  kind,
 }: {
   pick: TourPick;
   catalog: TourCatalog;
@@ -130,6 +164,8 @@ export function TourRow({
   field: string;
   className?: string;
   onRemove?: () => void;
+  /** «نوع الخدمة» before the service — the basic screen's services table (ServiceKindSelect). */
+  kind?: ReactNode;
 }) {
   const { t } = useTraveliunUI();
   const { tripCar, prices, sarPer, showPrice } = catalog;
@@ -157,6 +193,7 @@ export function TourRow({
             </select>,
           )
         : null}
+      {kind ? cell(t("pg.svc.kind"), kind) : null}
       {cell(
         t("pg.tour.service"),
         <SuggestInput

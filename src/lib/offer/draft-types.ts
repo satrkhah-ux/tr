@@ -384,10 +384,56 @@ export type DraftCity = {
    * Never on the first city.
    */
   arrives_next_day?: boolean;
+  /**
+   * The visit's services other than its tours — what the agent changed on the
+   * reception / farewell / transfer the trip writes, and the rows they added
+   * (CityService). Absent on every file from before: the trip's rows as they were.
+   */
+  services?: CityService[];
   /** derived from trip.arrival_date + the nights chain (deriveCityDates). */
   check_in: string | null;
   check_out: string | null;
 };
+
+/** What a row of a city visit's services table is. A tour is its TourPick; the others are transport rows. */
+export type ServiceKind = "reception" | "farewell" | "transfer" | "tour";
+export const SERVICE_KINDS: ServiceKind[] = ["reception", "farewell", "transfer", "tour"];
+
+/**
+ * One service of a city visit other than a tour. `id` "in" is the visit's way
+ * in (met at the airport, or driven from the city before) and "out" its way out
+ * to the airport — rows the trip writes itself (deriveTransportRows), so the
+ * entry holds only what the agent changed on them. Any other id is a row the
+ * agent added («+ إضافة خدمة»).
+ */
+export type CityService = {
+  id: string;
+  /** absent on "in" / "out": what the trip makes it. */
+  kind?: Exclude<ServiceKind, "tour">;
+  /** an added row's day — one of the visit's; "in" / "out" are dated by the trip. */
+  date?: string | null;
+  /** the row's own words; absent — what the trip says. */
+  text?: string;
+  /** its own car and how many; absent — the plan's leg. */
+  car_type?: string;
+  cars?: number;
+  /** one car's price, in riyals like a tour's; absent — the price list's. */
+  price?: number | null;
+  /** an "in" / "out" row the agent took away. */
+  removed?: boolean;
+};
+
+/** The ids of the rows the trip writes for a visit. */
+export const isTripService = (id: string) => id === "in" || id === "out";
+
+/** An added row's words until the agent types their own. */
+export const inCityTransferText = (city: string) => `التوصيل داخل ${city.trim()}`;
+
+/** An added row's day: its own while the visit still has it, else the visit's first. */
+export function serviceDate(city: Pick<DraftCity, "check_in" | "check_out">, s: Pick<CityService, "date">): string | null {
+  const inside = s.date && city.check_in && s.date >= city.check_in && s.date <= (city.check_out ?? s.date);
+  return inside ? s.date! : city.check_in;
+}
 
 /** One tour day of a city: what it is (a tour_programs row, or typed) and what it costs the group. */
 export type TourPick = {
@@ -912,7 +958,21 @@ export type DraftTransport = {
   car_type: string;
   date: string | null;
   note: string;
+  /** the agent's words for it, from the city card's services table. */
+  text?: string;
+  /** one car's price typed on the city card (riyals) — the sheet takes it before the list. */
+  price?: number | null;
+  /** an added row's pricing ref; the trip's rows are keyed by road and car (transportRef). */
+  ref?: string;
 };
+
+/** A transport row as the issued offer's «يشمل» says it: its own words, else its road — and its car. */
+export const transportIncludeLine = (t: Pick<DraftTransport, "from_place" | "to_place" | "car_type" | "text">) =>
+  `التوصيلات: ${t.text || `${t.from_place} ← ${t.to_place}`}${t.car_type ? ` (${t.car_type})` : ""}`;
+
+/** The pricing line a transport row is: its road and its car, or an added row's own ref. */
+export const transportRef = (tr: Pick<DraftTransport, "from_place" | "to_place" | "car_type" | "ref">) =>
+  tr.ref ?? `transport:${tr.from_place}>${tr.to_place}>${tr.car_type ?? ""}`;
 
 export type TransportMode = "car" | "flight" | "train" | "ship";
 
@@ -1034,38 +1094,78 @@ export const TRANSPORT_HOTEL_PREFIX = "فندق ";
  * طرابزون» is a thing that happens on a date and gets priced; "moving between
  * cities" is not.
  */
-export function deriveTransportRows(
-  plan: TransportPlan,
-  cities: { city_name: string; check_in: string | null; check_out?: string | null }[],
-): DraftTransport[] {
-  const rows: DraftTransport[] = [];
+export function deriveTransportRows(plan: TransportPlan, cities: TransportCity[]): DraftTransport[] {
+  return transportEntries(plan, cities).map((e) => e.row);
+}
+
+type TransportCity = Pick<DraftCity, "city_name" | "check_in"> & Partial<Pick<DraftCity, "check_out" | "services">>;
+
+/**
+ * A transport row as a city visit's service: the stop it belongs to, its id
+ * ("in", "out" or an added row's), what it is, the plan's leg it rides in
+ * unless it has its own car, and what the agent changed on it.
+ */
+export type TransportService = {
+  row: DraftTransport;
+  city: number;
+  id: string;
+  kind: Exclude<ServiceKind, "tour">;
+  leg: Pick<TransportLeg, "car_type" | "cars">;
+  own?: CityService;
+};
+
+/** The rows that are a visit's services — every row but the trip's tours line. */
+export function transportServices(plan: TransportPlan, cities: TransportCity[]): TransportService[] {
+  return transportEntries(plan, cities).flatMap((e) => (e.svc ? [{ row: e.row, ...e.svc }] : []));
+}
+
+function transportEntries(plan: TransportPlan, cities: TransportCity[]): { row: DraftTransport; svc?: Omit<TransportService, "row"> }[] {
+  const out: { row: DraftTransport; svc?: Omit<TransportService, "row"> }[] = [];
   const first = cities[0]?.city_name?.trim();
-  const last = cities[cities.length - 1]?.city_name?.trim();
+  const lastAt = cities.length - 1;
+  const last = cities[lastAt]?.city_name?.trim();
+  // a visit's row as the agent left it: taken away, or in its own car, with its own words and price
+  const put = (c: number, id: string, kind: TransportService["kind"], leg: TransportService["leg"], row: DraftTransport) => {
+    const own = cities[c]?.services?.find((s) => s.id === id);
+    if (own?.removed) return;
+    const text = own?.text?.trim();
+    out.push({
+      row: {
+        ...row,
+        car_type: vehicleText({ car_type: own?.car_type?.trim() || leg.car_type, cars: own?.cars ?? leg.cars }),
+        ...(text ? { text } : {}),
+        ...(own?.price != null ? { price: own.price } : {}),
+      },
+      svc: { city: c, id, kind: own?.kind ?? kind, leg, ...(own ? { own } : {}) },
+    });
+  };
 
   if (plan.airport.enabled) {
-    rows.push({
+    put(0, "in", "reception", plan.airport, {
       from_place: TRANSPORT_AIRPORT,
       to_place: first ? `${TRANSPORT_HOTEL_PREFIX}${first}` : "الفندق",
-      car_type: vehicleText(plan.airport),
+      car_type: "",
       date: cities[0]?.check_in ?? null,
       note: plan.airport.note,
     });
-    rows.push({
+    put(lastAt, "out", "farewell", plan.farewell ?? plan.airport, {
       from_place: last ? `${TRANSPORT_HOTEL_PREFIX}${last}` : "الفندق",
       to_place: TRANSPORT_AIRPORT,
-      car_type: vehicleText(plan.farewell ?? plan.airport),
+      car_type: "",
       date: null,
       note: plan.airport.note,
     });
   }
 
   if (plan.tours.enabled) {
-    rows.push({
-      from_place: TRANSPORT_TOURS,
-      to_place: first ?? "",
-      car_type: vehicleText(plan.tours),
-      date: null,
-      note: plan.tours.note,
+    out.push({
+      row: {
+        from_place: TRANSPORT_TOURS,
+        to_place: first ?? "",
+        car_type: vehicleText(plan.tours),
+        date: null,
+        note: plan.tours.note,
+      },
     });
   }
 
@@ -1074,30 +1174,47 @@ export function deriveTransportRows(
       const from = cities[i - 1]?.city_name?.trim();
       const to = cities[i]?.city_name?.trim();
       if (!from || !to) continue;
+      const mode = hopMode(plan, from, to);
       // By air, the road is the transfers either side of the flight: the hotel
       // to its airport, the next airport to the next hotel — in the transfer
       // car. The flight itself is priced by the domestic booking.
-      if (hopMode(plan, from, to) === "flight") {
+      if (mode === "flight") {
         if (!plan.airport.enabled) continue;
-        const car = vehicleText(plan.airport);
         const date = cities[i]?.check_in ?? null;
         // to the airport the day the flight leaves — the evening before, when it lands after midnight
         const leaves = cities[i - 1]?.check_out ?? date;
-        rows.push({ from_place: `${TRANSPORT_HOTEL_PREFIX}${from}`, to_place: TRANSPORT_AIRPORT, car_type: car, date: leaves, note: plan.airport.note });
-        rows.push({ from_place: TRANSPORT_AIRPORT, to_place: `${TRANSPORT_HOTEL_PREFIX}${to}`, car_type: car, date, note: plan.airport.note });
+        put(i - 1, "out", "farewell", plan.airport, { from_place: `${TRANSPORT_HOTEL_PREFIX}${from}`, to_place: TRANSPORT_AIRPORT, car_type: "", date: leaves, note: plan.airport.note });
+        put(i, "in", "reception", plan.airport, { from_place: TRANSPORT_AIRPORT, to_place: `${TRANSPORT_HOTEL_PREFIX}${to}`, car_type: "", date, note: plan.airport.note });
         continue;
       }
-      rows.push({
-        from_place: from,
-        to_place: to,
-        car_type: hopVehicle(plan, hopMode(plan, from, to)),
-        date: cities[i]?.check_in ?? null,
-        note: plan.intercity.note,
-      });
+      // what hopVehicle prints: the car for a road hop, the mode itself for a train or a ship
+      const leg = mode === "car" ? { car_type: plan.intercity.car_type.trim() || TRANSPORT_MODE_AR.car, cars: plan.intercity.cars } : { car_type: TRANSPORT_MODE_AR[mode], cars: 1 };
+      put(i, "in", "transfer", leg, { from_place: from, to_place: to, car_type: "", date: cities[i]?.check_in ?? null, note: plan.intercity.note });
     }
   }
 
-  return rows;
+  // the rows the agent added, after the trip's: met at the airport, seen off to it, or driven inside the city
+  cities.forEach((c, k) => {
+    const name = c.city_name.trim();
+    for (const s of c.services ?? []) {
+      if (isTripService(s.id)) continue;
+      const kind = s.kind ?? "transfer";
+      const [from_place, to_place] =
+        kind === "reception" ? [TRANSPORT_AIRPORT, `${TRANSPORT_HOTEL_PREFIX}${name}`] : kind === "farewell" ? [`${TRANSPORT_HOTEL_PREFIX}${name}`, TRANSPORT_AIRPORT] : [name, name];
+      const leg = kind === "farewell" ? (plan.farewell ?? plan.airport) : plan.airport;
+      put(k, s.id, kind, leg, {
+        from_place,
+        to_place,
+        car_type: "",
+        date: serviceDate({ check_in: c.check_in, check_out: c.check_out ?? null }, s),
+        note: "",
+        ref: `transport:svc:${s.id}`,
+        ...(kind === "transfer" ? { text: inCityTransferText(name) } : {}),
+      });
+    }
+  });
+
+  return out;
 }
 
 export function emptyTransportPlan(): TransportPlan {
@@ -1395,7 +1512,7 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
   const source = raw as Partial<DraftData>;
   const trip = { ...empty.trip, ...(source.trip ?? {}) };
   // every stop gets its key here, once — derived, so an unsaved draft read twice keys the same
-  const cities = withCityKeys(Array.isArray(source.cities) ? source.cities : []);
+  const cities = withCityKeys(Array.isArray(source.cities) ? source.cities.map(withCleanServices) : []);
 
   // A draft written before the plan existed has authored rows and no plan. Its
   // switches default to ON so the derived rows keep saying roughly what the old
@@ -1466,6 +1583,22 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     ...dayLines("arrival_lines", source.arrival_lines),
     ...dayLines("departure_lines", source.departure_lines),
   };
+}
+
+/**
+ * A stop's services as the screen may read them: rows with an id, a known kind
+ * and at least one car. A stop without any — every older file — is left as it was.
+ */
+function withCleanServices(city: DraftCity): DraftCity {
+  if (!city || !Array.isArray(city.services)) return city;
+  const services = city.services.flatMap((s): CityService[] => {
+    if (!s || typeof s !== "object" || typeof s.id !== "string" || !s.id) return [];
+    const kind = s.kind && (s.kind as ServiceKind) !== "tour" && SERVICE_KINDS.includes(s.kind) ? s.kind : undefined;
+    const cars = s.cars === undefined ? undefined : Math.max(Math.trunc(Number(s.cars)) || 1, 1);
+    const price = typeof s.price === "number" && Number.isFinite(s.price) ? s.price : undefined;
+    return [{ ...s, kind, cars, price }];
+  });
+  return { ...city, services };
 }
 
 /** Typed day lines, blanks dropped; none left reads as «the default» (the key is absent). */

@@ -26,6 +26,7 @@ import {
   matchPartner,
   normalizeDraftData,
   normalizeDraftHotel,
+  transportIncludeLine,
   type DraftData,
   type GeneratorLookups,
   type LookupHotel,
@@ -48,7 +49,7 @@ import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { byUsage } from "@/lib/offer/country-priority";
 import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
 import { itineraryStartDate } from "@/lib/offer/schedule";
-import { draftDaySkeleton, transportNoteForDay } from "@/lib/offer/itinerary";
+import { draftDaySkeleton, draftTransportNote } from "@/lib/offer/itinerary";
 import { validateDraft } from "@/lib/offer/draft-validation";
 import { getPublishedClientOffer, publishOffer, type CreateOfferInput, type OfferHotelInput, type OfferPricingItemInput } from "./offers";
 import { insertOffer, replaceOffer } from "./offer-insert";
@@ -950,9 +951,8 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     const mealsBoard = data.trip.meal_plan ? MEAL_PLAN_BOARD[data.trip.meal_plan] : null;
     const mealsLine = mealPlanIncludeLine(data.trip);
 
-    const transportIncludes = data.transport.map((t) =>
-      `التوصيلات: ${t.from_place} ← ${t.to_place}${t.car_type ? ` (${t.car_type})` : ""}`,
-    );
+    // a row with its own words (the city card's «الخدمة») is said by them — never «سيلانجور ← سيلانجور»
+    const transportIncludes = data.transport.map(transportIncludeLine);
     const visaIncludes = data.visas.map((v) => `تأشيرة ${v.country || v.visa_type} × ${v.count}`);
     // «يشمل / لا يشمل» as the file is — what the scope switched off is not
     // promised. /basic did this on its services step; the full generator (and
@@ -1077,7 +1077,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       days: draftDaySkeleton(data)
         .map((d, index, all) => ({
           d,
-          move: data.scope.transport ? advancedDayNote(transportNoteForDay(data.transport_plan, all, index, data.flights), data.advanced) : null,
+          move: data.scope.transport ? advancedDayNote(draftTransportNote(data, all, index), data.advanced) : null,
         }))
         .filter(({ d, move }) => d.title.trim() || d.activities.some((a) => a.trim()) || move)
         .map(({ d, move }) => ({

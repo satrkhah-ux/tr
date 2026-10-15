@@ -16,7 +16,10 @@ import {
   hopMode,
   hopVehicle,
   isFreeDay,
+  inCityTransferText,
+  isTripService,
   tourVehicle,
+  transportServices,
   vehicleText,
   type DraftCity,
   type DraftData,
@@ -231,6 +234,11 @@ export function itineraryCities(days: DraftDay[]): string[] {
  * it applies to: the van at the airport on day one, the sedan on tour days, the
  * train to the next city on the day the city changes.
  *
+ * Given the cities (dated — draftTransportNote), each reception, farewell and
+ * transfer of the city cards' services tables is said on its day in ITS car
+ * (one the agent took away is not said), and a tour day without its own car
+ * line names its tours' cars; without them, the trip's legs as before.
+ *
  * Returns null for a day with nothing to say, so callers can render it or not
  * without a second condition.
  */
@@ -240,6 +248,8 @@ export function transportNoteForDay(
   index: number,
   /** the draft's flights — a domestic hop that lands this day is how the group moves. */
   flights: DraftFlight[] = [],
+  /** the cities, dated: the services table's own rows and cars. */
+  cities?: DraftCity[],
 ): string | null {
   const day = days[index];
   if (!day || day.kind === "travel") return null;
@@ -256,32 +266,72 @@ export function transportNoteForDay(
     : undefined;
   // the evening the group flies on and lands after midnight: it leaves from here today
   const overnight = !cityChanged && !last ? overnightLeg(flights, day) : undefined;
+  const said = (label: string, car: string) => (car ? `${label} — ${car}` : label);
 
-  const parts: string[] = [];
-
-  if (plan.airport.enabled && (first || last)) {
+  // the services tables' rows of this day: seen off first, then the flight, then met — once the cities have dates
+  const rows = cities?.some((c) => c.check_in) && day.date ? servicesOn(plan, cities, day.date) : null;
+  const before: string[] = [];
+  const after: string[] = [];
+  if (rows) {
+    for (const r of rows) (r.kind === "farewell" ? before : after).push(said(r.label, r.car));
+  } else if (plan.airport.enabled && (first || last)) {
     const label = first ? "استقبال من المطار إلى الفندق" : "توديع من الفندق إلى المطار";
-    const car = vehicleText(first ? plan.airport : (plan.farewell ?? plan.airport));
-    parts.push(car ? `${label} — ${car}` : label);
+    (first ? after : before).push(said(label, vehicleText(first ? plan.airport : (plan.farewell ?? plan.airport))));
   }
 
   // A day the group changes city is a travel day, not a touring day; saying
   // both would put two vehicles on one line and invite the question.
+  const parts: string[] = [];
   if (hop) {
     parts.push(`الانتقال إلى ${day.city_name} — طيران داخلي${legNote(hop)}`);
   } else if (overnight) {
     parts.push(`التوجه إلى المطار للسفر إلى ${overnight.to_city?.trim() ?? ""} — طيران داخلي${legNote(overnight)}`);
   } else if (plan.intercity.enabled && cityChanged) {
-    const how = hopVehicle(plan, hopMode(plan, days[index - 1]?.city_name ?? "", day.city_name));
-    parts.push(`الانتقال إلى ${day.city_name} — ${how}`);
+    // with the services tables, the move is the city's own «in» row, said above in its car
+    if (!rows) parts.push(`الانتقال إلى ${day.city_name} — ${hopVehicle(plan, hopMode(plan, days[index - 1]?.city_name ?? "", day.city_name))}`);
   } else if (plan.tours.enabled && !first && !last && !isFreeDay(day) && !day.activities.some((a) => a.startsWith(TOUR_CAR_LINE))) {
-    // a day whose tour already says its car («التنقل بـفان × 2») does not repeat the trip's
-    const label = "سيارة الجولات";
-    const car = vehicleText(plan.tours);
-    parts.push(car ? `${label} — ${car}` : label);
+    // a day whose tour already says its car («التنقل بـفان × 2») does not repeat the trip's;
+    // a day the agent wrote still names the cars of the tours on it
+    const own = cities ? toursOn(plan, cities, day.date).map((p) => tourVehicle(p, plan.tours.car_type.trim())) : [];
+    parts.push(said("سيارة الجولات", own.length > 0 ? [...new Set(own.filter(Boolean))].join(" و") : vehicleText(plan.tours)));
   }
 
-  return parts.length > 0 ? parts.join(" · ") : null;
+  const all = [...before, ...parts, ...after];
+  return all.length > 0 ? all.join(" · ") : null;
+}
+
+/**
+ * The trip's own receptions, farewells and transfers on `date`, each in its own
+ * car: the first city's reception and the last city's farewell in the words the
+ * «بكج متقدم» note rewrites, the rest as what they are — or the agent's words.
+ * A row the agent added is the day's activity (daysFromTours), not said here.
+ */
+function servicesOn(plan: TransportPlan, cities: DraftCity[], date: string): { kind: string; label: string; car: string }[] {
+  const lastAt = cities.length - 1;
+  return transportServices(plan, cities)
+    .filter((s) => isTripService(s.id) && (s.row.date ?? (s.id === "out" ? cities[s.city]?.check_out : null)) === date)
+    .map((s) => {
+      const own = s.own?.text?.trim();
+      const label =
+        own ||
+        (s.kind === "reception"
+          ? s.city === 0 && s.id === "in" ? "استقبال من المطار إلى الفندق" : "الاستقبال في المطار والتوصيل إلى الفندق"
+          : s.kind === "farewell"
+            ? s.city === lastAt && s.id === "out" ? "توديع من الفندق إلى المطار" : "التوصيل من الفندق إلى المطار"
+            : `الانتقال إلى ${cities[s.city]?.city_name.trim() ?? ""}`);
+      return { kind: s.kind, label, car: s.row.car_type };
+    });
+}
+
+/** The tours (not free days) the cities put on `date`. */
+function toursOn(plan: TransportPlan, cities: DraftCity[], date: string | null): TourPick[] {
+  if (!date || !plan.tours.enabled) return [];
+  return cities.flatMap((c, k) => withTours(c, c.tours ?? 0, undefined, k === cities.length - 1)).filter((p) => p.date === date && !p.free);
+}
+
+/** transportNoteForDay for a draft: its cities dated from where the itinerary starts. */
+export function draftTransportNote(data: Pick<DraftData, "trip" | "flights" | "cities" | "transport_plan">, days: DraftDay[], index: number): string | null {
+  return transportNoteForDay(data.transport_plan, days, index, data.flights, deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities));
 }
 
 /** A clock on a leg, or "" — midnight is how a leg with no time yet is stored. */
@@ -599,6 +649,18 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
 
   const tripCar = plan.tours.car_type.trim();
 
+  // what the agent added on the city cards (a transfer, another reception) is said on its day, in its car
+  const added = new Map<string, string[]>();
+  if (data.scope.transport) {
+    for (const s of transportServices(plan, cities)) {
+      if (isTripService(s.id) || !s.row.date) continue;
+      const words =
+        s.row.text ||
+        (s.kind === "reception" ? "الاستقبال من المطار والتوصيل إلى الفندق" : s.kind === "farewell" ? "التوصيل من الفندق إلى المطار" : inCityTransferText(cities[s.city].city_name));
+      added.set(s.row.date, [...(added.get(s.row.date) ?? []), s.row.car_type ? `${words} — ${s.row.car_type}` : words]);
+    }
+  }
+
   // 3. the days
   return days.map((day, i) => {
     if (day.kind === "travel") return day;
@@ -645,6 +707,12 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
         // «جولة قبل المغادرة»: the tour and its car, then the way to the airport
         activities = [...tours.map(line), ...car, ...activities];
       } else activities = [...activities, ...tours.map(line), ...car];
+    }
+    const extra = day.date ? (added.get(day.date) ?? []) : [];
+    if (extra.length > 0) {
+      // on the day home, before the way to the airport
+      const home = kind === "last" ? departureLines(data).length : 0;
+      activities = [...activities.slice(0, activities.length - home), ...extra, ...activities.slice(activities.length - home)];
     }
 
     // an empty day holding a tour is the tour's: the programme opens already written from it
