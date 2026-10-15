@@ -1442,6 +1442,7 @@ export const en = {
   "pg.itin.tours.few": "{n} tours",
   "pg.itin.tours.many": "{n} tours",
   "pg.itin.tourAfterArrival": "Tour after arrival",
+  "pg.itin.tourBeforeDeparture": "Tour before departure",
   "pg.itin.fold": "Fold or open the city",
   "pg.tour.service": "Tour",
   "pg.tour.serviceHint": "From {city}'s programmes or the price list, or type",

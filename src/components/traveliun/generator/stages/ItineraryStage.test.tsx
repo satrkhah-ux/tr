@@ -31,11 +31,11 @@ function file(): DraftData {
   data.days[1] = { ...data.days[1], title: "" };
   return data;
 }
-const render = () =>
+const render = (data = file()) =>
   renderToStaticMarkup(
     <ItineraryStage
       draftId="d1"
-      data={file()}
+      data={data}
       patch={() => {}}
       replace={() => {}}
       flush={async () => {}}
@@ -63,5 +63,15 @@ describe("«البرنامج اليومي والجولات» (الأمر 4)", ()
     expect(html).toContain('value="جولة المدينة"');
     expect(html).not.toContain("SAR");
     expect(html).not.toContain('value="400"');
+  });
+
+  it("on the day home it offers «جولة قبل المغادرة»", () => {
+    pricing = true;
+    const data = file();
+    // every day written but the last, so the stage opens on the day home
+    data.days = data.days.map((d, i) => (i < data.days.length - 1 ? { ...d, title: d.title || "يوم" } : d));
+    const html = render(data);
+    expect(html).toContain("جولة قبل المغادرة");
+    expect(html).not.toContain("جولة بعد الوصول");
   });
 });

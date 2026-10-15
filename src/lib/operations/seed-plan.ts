@@ -234,8 +234,9 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
 
   // ---- the tours: each on its day, in its car ----
   if (data.transport_plan.tours.enabled) {
-    for (const city of data.cities) {
-      withTours(city, city.tours ?? 0).forEach((pick, i) => {
+    data.cities.forEach((city, c) => {
+      // the last city's «جولة قبل المغادرة» is booked on the day home
+      withTours(city, city.tours ?? 0, undefined, c === data.cities.length - 1).forEach((pick, i) => {
         if (pick.free) return;
         const title = pick.title.trim() || `جولة سياحية في ${city.city_name}`;
         const detail: Record<string, string> = { المدينة: city.city_name, "وقت الانطلاق": "09:00" };
@@ -258,7 +259,7 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
           currency: "SAR",
         });
       });
-    }
+    });
   }
 
   // ---- the SIM cards ----

@@ -20,6 +20,7 @@ import { rankAirports, tripCountries } from "@/lib/offer/basic";
 import { citiesFromFlights, routeLegOrders } from "@/lib/offer/flight-cities";
 import { CabinSelect, FlightBuilder, TripTypeCards, type BuilderSegment } from "../flights/FlightBuilder";
 import { FlightFare } from "../flights/FlightFare";
+import { FlightCardLink } from "../flights/FlightCardLink";
 import { withTypedTotal } from "@/lib/offer/flight-fare";
 import { SupplierPrice } from "../SupplierPrice";
 import { buildJourneys, formatWaitAr, type JourneyLeg } from "@/lib/offer/journey";
@@ -364,7 +365,11 @@ export function FlightsStage({
 
   return (
     <section className={sectionClass}>
-      <h2 className="mb-4 text-base font-extrabold text-[#003c3a]">{t("pg.flightsTitle")}</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-base font-extrabold text-[#003c3a]">{t("pg.flightsTitle")}</h2>
+        {/* a ticket already issued, set in our identity for the client — staff only */}
+        <FlightCardLink />
+      </div>
       <FieldIssue field="flights" className="mb-3" />
 
       {/* the trip's shape first — one way, there and back, or several cities */}

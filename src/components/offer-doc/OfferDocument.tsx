@@ -408,7 +408,15 @@ export function OfferDocument(props: OfferDocumentProps) {
         blocks.push(
           tours(
             head + days.reduce((sum, d) => sum + dayHeightMm(d), 0) + 4,
-            <VisitTable city={visit.city} from={visit.days[0].date} to={visit.days[visit.days.length - 1].date} hotels={hotels} days={days} />,
+            <VisitTable
+              city={visit.city}
+              from={visit.days[0].date}
+              to={visit.days[visit.days.length - 1].date}
+              hotels={hotels}
+              days={days}
+              // the day home — a one-day programme has none apart from its arrival
+              last={offer.days.length > 1 ? offer.days.at(-1)?.day_number : undefined}
+            />,
           ),
         );
       }
@@ -984,8 +992,22 @@ function chunkDays(days: Day[], headMm: number): Day[][] {
   return chunks;
 }
 
-/** One visit (or a sheet's share of it): the city heading in the table head, so a continuation repeats it. */
-function VisitTable({ city, from, to, hotels, days }: { city: string; from: string | null; to: string | null; hotels: string[]; days: Day[] }) {
+/** One visit (or a sheet's share of it): the city heading in the table head, so a continuation repeats it. `last` — the programme's last day number (the day home). */
+function VisitTable({
+  city,
+  from,
+  to,
+  hotels,
+  days,
+  last,
+}: {
+  city: string;
+  from: string | null;
+  to: string | null;
+  hotels: string[];
+  days: Day[];
+  last?: number;
+}) {
   return (
     <table className="od-table od-days">
       {city ? (
@@ -1011,7 +1033,7 @@ function VisitTable({ city, from, to, hotels, days }: { city: string; from: stri
       ) : null}
       <tbody>
         {days.map((day) => (
-          <DayRow key={day.day_number} day={day} />
+          <DayRow key={day.day_number} day={day} last={day.day_number === last} />
         ))}
       </tbody>
     </table>
@@ -1021,14 +1043,18 @@ function VisitTable({ city, from, to, hotels, days }: { city: string; from: stri
 /**
  * One day: the date, the title, then what happens in the order it happens. On
  * a day with a tour, the way the group arrives (or moves) comes first — the
- * reception, then the tour — and the tour's car, «التنقل بـفان × 2», last. A
- * free day is set apart. No price: a day carries none.
+ * reception, then the tour — and the tour's car, «التنقل بـفان × 2», last. The
+ * day home with a tour («جولة قبل المغادرة», `last`) is the other way round:
+ * the tour and its car, then the way to the airport and the farewell. A free
+ * day is set apart. No price: a day carries none.
  */
-function DayRow({ day }: { day: Day }) {
+function DayRow({ day, last = false }: { day: Day; last?: boolean }) {
   const cars = day.activities.filter((a) => a.startsWith(TOUR_CAR_LINE));
   const lines = day.activities.filter((a) => !a.startsWith(TOUR_CAR_LINE));
   // the vehicle goes on the day it is used — a client reads day by day
   const move = day.transport_note ? <span className="od-sub od-day-move">{day.transport_note}</span> : null;
+  // the day home with a tour: its lines as written (the tour, its car, the airport), the farewell last
+  const leaving = last && cars.length > 0;
   return (
     <tr className={isFreeDay(day) ? "od-day od-day-free" : "od-day"}>
       <td className="od-tnum od-day-date">
@@ -1036,18 +1062,20 @@ function DayRow({ day }: { day: Day }) {
       </td>
       <td>
         <span className="od-route">{day.title || day.city_name || "—"}</span>
-        {cars.length > 0 ? move : null}
-        {lines.map((a, i) => (
-          <span key={i} className="od-act">
+        {cars.length > 0 && !leaving ? move : null}
+        {(leaving ? day.activities : lines).map((a, i) => (
+          <span key={i} className={a.startsWith(TOUR_CAR_LINE) ? "od-sub od-day-move" : "od-act"}>
             {a}
           </span>
         ))}
-        {cars.map((c, i) => (
-          <span key={`c${i}`} className="od-sub od-day-move">
-            {c}
-          </span>
-        ))}
-        {cars.length > 0 ? null : move}
+        {leaving
+          ? null
+          : cars.map((c, i) => (
+              <span key={`c${i}`} className="od-sub od-day-move">
+                {c}
+              </span>
+            ))}
+        {cars.length > 0 && !leaving ? null : move}
         <DayWeather day={day} />
       </td>
     </tr>

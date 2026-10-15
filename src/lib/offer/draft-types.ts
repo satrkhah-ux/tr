@@ -401,6 +401,12 @@ export type TourPick = {
   cars?: number;
   /** «يوم حر» — a day the agent keeps open on purpose; never priced, never counted as a tour. */
   free?: boolean;
+  /**
+   * «جولة قبل المغادرة» — put by the agent on the day the group flies home (the
+   * last city only): its day is always that day. Without the mark a date on the
+   * departure day is a stale one and the tour takes a night of the city.
+   */
+  departure?: boolean;
 };
 
 /** How many cars a tour goes in — at least one, whatever the jsonb holds. */

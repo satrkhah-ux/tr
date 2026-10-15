@@ -236,8 +236,8 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
   });
   /** true = folded; a city not touched yet is open while it holds the open day. */
   const [folded, setFolded] = useState<Record<string, boolean>>({});
-  /** the arrival day whose «جولة بعد الوصول» was pressed — its tour row shows. */
-  const [afterArrival, setAfterArrival] = useState<number | null>(null);
+  /** the arrival (or departure) day whose «جولة بعد الوصول» / «جولة قبل المغادرة» was pressed — its tour row shows. */
+  const [asked, setAsked] = useState<number | null>(null);
   const current = Math.min(Math.max(open, 0), Math.max(days.length - 1, 0));
   const day = days[current];
   const groupOf = (i: number) => groups.find((g) => g.days.includes(i))?.key ?? "";
@@ -249,9 +249,9 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
 
   const onDay = day ? dayTours(data, current) : null;
   const dayPicks = onDay?.picks ?? [];
-  // the day's tour rows: its tours, else one to fill — an arrival day asks first («جولة بعد الوصول»)
+  // the day's tour rows: its tours, else one to fill — an arrival or departure day asks first
   const blank: TourPick = { program_id: null, title: "", text: "", price: null, cars: plan.tours.cars };
-  const tourRows = !onDay ? [] : dayPicks.length > 0 ? dayPicks : isTouringDay(days, current) || afterArrival === current ? [blank] : [];
+  const tourRows = !onDay ? [] : dayPicks.length > 0 ? dayPicks : isTouringDay(days, current) || asked === current ? [blank] : [];
   const showPrice = can("pricing.view");
   const transportNote = day && data.scope.transport ? transportNoteForDay(data.transport_plan, days, current, data.flights) : null;
   // the landing note goes on the day the group lands, after any travel day
@@ -333,15 +333,15 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
           <Coffee className="size-3.5" />
           {t("pg.freeDay")}
         </button>
-        {/* the group lands (or moves) and still tours: the reception stays, the tour follows it */}
+        {/* the group lands (or moves) and still tours: the reception stays, the tour follows it — or, on the day home, tours first and then leaves for the airport */}
         {onDay && tourRows.length === 0 ? (
           <button
             type="button"
-            onClick={() => setAfterArrival(current)}
+            onClick={() => setAsked(current)}
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-dashed border-[#b7d0c7] bg-white px-3 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
           >
             <Plus className="size-3.5" />
-            {t("pg.itin.tourAfterArrival")}
+            {t(onDay.departure ? "pg.itin.tourBeforeDeparture" : "pg.itin.tourAfterArrival")}
           </button>
         ) : null}
       </div>

@@ -274,4 +274,28 @@ describe("OfferDocument — a v4 draft's programme", () => {
     expect(programme).toContain("جزيرة الحامل");
     expect(programme).not.toMatch(/400|500|800|1000/);
   });
+
+  it("the day home with «جولة قبل المغادرة»: the tour and its car, then the airport and the farewell", () => {
+    const data = emptyDraftData();
+    data.trip = { ...data.trip, country: "ماليزيا", destination: "ماليزيا", arrival_date: "2026-10-20", nights: 2, days: 3, adults: 9 };
+    data.cities = deriveCityDates("2026-10-20", [{ city_name: "كوالالمبور", nights: 2, check_in: null, check_out: null }]);
+    data.transport_plan = {
+      ...data.transport_plan,
+      airport: { ...data.transport_plan.airport, car_type: "فان", cars: 2 },
+      tours: { ...data.transport_plan.tours, car_type: "فان", cars: 2 },
+    };
+    data.cities[0] = {
+      ...data.cities[0],
+      tours: 1,
+      tour_picks: [{ program_id: null, title: "جولة المدينة", text: "برجا بتروناس", price: 400, date: "2026-10-22", cars: 2, departure: true }],
+    };
+    data.days = daysFromTours({ ...data, days: draftDaySkeleton(data) }, true);
+
+    const html = renderToStaticMarkup(createElement(OfferDocument, { variant: "client", offer: draftToPreviewOffer(data) }));
+    const order = ["جولة المدينة: برجا بتروناس", "التنقل بـفان × 2", "تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة", "توديع من الفندق إلى المطار"].map((s) =>
+      html.indexOf(s),
+    );
+    expect(order.every((i) => i > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
 });
