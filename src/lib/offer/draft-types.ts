@@ -426,6 +426,21 @@ export type DraftHotelSourcing = {
   supplier_hotel_id: string | null;
   /** when the LIVE rate was fetched (ISO) — drives the "updated X min ago" hint. */
   rate_fetched_at: string | null;
+  /** the stay this rate was quoted for (server-written, see sourcingFits). */
+  quoted_for?: SourcingQuote | null;
+};
+
+/** A supplier quote is for ONE stay: these dates, this many rooms and guests, this hotel. */
+export type SourcingQuote = {
+  check_in: string;
+  check_out: string;
+  rooms: number;
+  adults: number;
+  children: number;
+  hotel_name: string;
+  /** the one room product the rate is for — a BB rate does not price an AI stay */
+  board_type: BoardType | null;
+  room_name: string;
 };
 
 /**
@@ -1454,6 +1469,26 @@ export function deriveHotelStays(cities: DraftCity[], hotels: DraftHotel[]): Hot
     });
   }
   return out;
+}
+
+/**
+ * Does a supplier rate still price this stay? The quote covered one stay —
+ * stretched since (more nights, rooms or guests, another hotel) it would keep
+ * pricing the original, and the offer would sell and book a bigger stay at the
+ * smaller one's price. A rate with no record of what it quoted never fits.
+ */
+export function sourcingFits(stay: HotelStay, trip: { adults: number; children: number }): boolean {
+  const q = stay.line.sourcing?.quoted_for;
+  return (
+    !!q &&
+    q.check_in === stay.check_in &&
+    q.check_out === stay.check_out &&
+    q.rooms === (stay.line.rooms_count > 0 ? stay.line.rooms_count : 1) &&
+    q.adults === trip.adults &&
+    q.children === trip.children &&
+    q.hotel_name === stay.line.hotel_name &&
+    stay.line.rooms.every((r) => r.board_type === q.board_type && r.room_type_name === q.room_name)
+  );
 }
 
 /** Per-city allocated-vs-owed, for the coverage bar and the blocking check. */

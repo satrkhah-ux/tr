@@ -203,7 +203,8 @@ export async function applySync(): Promise<ApplyResult> {
   try {
     const { offers } = await readSheet();
     if (!offers.length) return { ok: false, error: "err.db" };
-    const supabase = await db();
+    // written past RLS only after requireManage: the table's own policy lets any staff write
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data } = await supabase.from("ready_offers").select("id, code, design_url");
     const stored = (data ?? []) as { id: string; code: string | null; design_url: string | null }[];
     const byCode = new Map(stored.filter((r) => r.code).map((r) => [r.code as string, r]));
@@ -248,7 +249,7 @@ export async function setDesignUrl(id: string, url: string): Promise<SimpleResul
   const trimmed = url.trim();
   if (trimmed && !/^https?:\/\//i.test(trimmed)) return { ok: false, error: "ro.err.badUrl" };
   try {
-    const supabase = await db();
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { error } = await supabase
       .from("ready_offers")
       .update({ design_url: trimmed || null })
@@ -263,7 +264,7 @@ export async function setReadyOfferActive(id: string, active: boolean): Promise<
   const denied = await requireManage();
   if (denied) return { ok: false, error: denied };
   try {
-    const supabase = await db();
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { error } = await supabase.from("ready_offers").update({ active }).eq("id", id);
     return error ? { ok: false, error: "err.db" } : { ok: true };
   } catch {

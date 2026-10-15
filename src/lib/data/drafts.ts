@@ -189,9 +189,14 @@ export async function createDraft(seed?: Partial<DraftData>): Promise<CreateDraf
     }
     // A partner's seed is held to the rules of their save: no buy, no margin of
     // their choosing (a stated 0% would quote them our cost), no supplier rate.
+    // …and so is anyone's without the cost view: a seed is a save, and the cost
+    // fields are pricing.internal's to write (0047)
     const partner = await getPartnerSession();
-    const own = seed && partner ? keepDraftCost(seed, base) : seed;
-    if (own?.hotels && partner) own.hotels = keepOurStays(own.hotels, []);
+    const internal = await currentCan("pricing.internal");
+    const own = seed && !internal ? keepDraftCost(seed, base) : seed;
+    if (own?.hotels && !internal) own.hotels = keepOurStays(own.hotels, []);
+    // the serial an issue wrote is the server's — never a seed's
+    if (own) delete own.produced_serial;
     const initial = own
       ? normalizeDraftData({ ...base, ...own } as unknown as Record<string, unknown>)
       : base;
@@ -274,6 +279,15 @@ export async function saveDraftStages(draftId: string, slices: Partial<DraftData
   const agentsSetProfit = !internal && (await getProfitSettings()).by === "staff" && (await currentCan("pricing.view"));
   // a partner was shown a supplier stay at their terms: our sell comes back from storage
   const partner = await partnerCaller();
+  // …and once issued, their file is what operations books from: a change after
+  // issue goes through a copy (duplicateDraft), never into the issued draft
+  if (partner && (await loadDraft(draftId))?.data.produced_serial) return { ok: false, error: "pg.err.issuedLocked" };
+  // produceOfferFromDraft writes the issued serial itself; a browser naming one
+  // could tie its draft to an offer it never issued (operations seeds from it)
+  if ("produced_serial" in slices) {
+    slices = { ...slices };
+    delete slices.produced_serial;
+  }
   return writeDraftStages(draftId, slices, (sent, stored, owner) => {
     // staff on a partner's file: the prices it shows the partner stay theirs
     const own = owner && !partner ? keepTheirPrices(sent, stored) : sent;

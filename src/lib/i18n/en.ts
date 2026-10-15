@@ -1192,6 +1192,7 @@ export const en = {
   "pg.err.dayUntitled": "Give every day a title, or mark it a free day.",
   "pg.err.stayUnpriced": "Enter a price for every chosen hotel.",
   "pg.err.priceMissing": "Some pricing lines have no price — enter one (zero is fine).",
+  "pg.err.issuedLocked": "This file's offer is issued — copy it to make changes.",
   "pg.roomTotal": "Room total for {nights} nights ({currency})",
   "pg.perNight": "Per night:",
   "pg.lastSavedNight": "Last saved nightly rate:",
