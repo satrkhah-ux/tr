@@ -19,7 +19,7 @@
  * Pure: no React, no Supabase.
  */
 
-import { deriveCityDates, hopKey, type DraftData, type DraftTransport } from "./draft-types";
+import { deriveCityDates, hopKey, transportRef, type DraftData, type DraftTransport } from "./draft-types";
 import { itineraryStartDate, toInstant } from "./schedule";
 import { offsetFromHome } from "./timezones";
 
@@ -250,13 +250,14 @@ export function withAdvancedTransport(rows: DraftTransport[], adv: DraftAdvanced
       if (rx.kind === "self") return;
       // the city card's own words for this row said «from the airport»: a pickup moved elsewhere drops them
       const words = rx.kind === "airport" ? {} : { text: undefined };
-      const met = { ...row, ...words, from_place: rx.kind === "airport" ? airportPoint(rx, adv.arrive_by, adv.arrive_at, airport) : pointText(rx), date: rx.date || row.date, note: note(rx.time && `اللقاء ${rx.time}`, row.note) };
+      // the pricing sheet matches a row by its ref: a reworded row keeps the one it had
+      const met = { ...row, ...words, ref: transportRef(row), from_place: rx.kind === "airport" ? airportPoint(rx, adv.arrive_by, adv.arrive_at, airport) : pointText(rx), date: rx.date || row.date, note: note(rx.time && `اللقاء ${rx.time}`, row.note) };
       const cross = adv.reception_cross;
       if (cross?.crossing.trim() && cross.drivers === 2) {
         const side = (c: string) => `${cross.crossing}${c ? ` — جانب ${c}` : ""}`;
         out.push({ ...met, to_place: side(cross.side_from), note: note("السائق الأول", met.note) });
         // the price typed for the reception is the whole service's — on the first car only, never twice
-        out.push({ ...met, price: undefined, from_place: side(cross.side_to), note: note("السائق الثاني بعد عبور الحدود", row.note) });
+        out.push({ ...met, price: undefined, ref: `${transportRef(row)}:2`, from_place: side(cross.side_to), note: note("السائق الثاني بعد عبور الحدود", row.note) });
       } else if (cross?.crossing.trim()) out.push({ ...met, note: note(met.note, `عبر ${cross.crossing} — تحقق من سماح السيارة والسائق بالعبور`) });
       else out.push(met);
       return;
@@ -264,15 +265,15 @@ export function withAdvancedTransport(rows: DraftTransport[], adv: DraftAdvanced
     if (i === last && adv.farewell.kind) {
       const fw = adv.farewell;
       if (fw.kind !== "self")
-        out.push({ ...row, ...(fw.kind === "airport" ? {} : { text: undefined }), to_place: fw.kind === "airport" ? airportPoint(fw, adv.leave_by, adv.leave_from, airport) : pointText(fw), date: fw.date || row.date, note: note(fw.time && `الانطلاق ${fw.time}`, row.note) });
+        out.push({ ...row, ...(fw.kind === "airport" ? {} : { text: undefined }), ref: transportRef(row), to_place: fw.kind === "airport" ? airportPoint(fw, adv.leave_by, adv.leave_from, airport) : pointText(fw), date: fw.date || row.date, note: note(fw.time && `الانطلاق ${fw.time}`, row.note) });
       return;
     }
     const hop = adv.borders[hopKey(row.from_place, row.to_place)];
     if (hop?.crossing.trim()) {
       const side = (s: string) => `${hop.crossing}${s ? ` — جانب ${s}` : ""}`;
       if (hop.drivers === 2) {
-        out.push({ ...row, to_place: side(hop.side_from), note: note("السائق الأول", row.note) });
-        out.push({ ...row, price: undefined, from_place: side(hop.side_to), note: note("السائق الثاني بعد عبور الحدود", row.note) });
+        out.push({ ...row, ref: transportRef(row), to_place: side(hop.side_from), note: note("السائق الأول", row.note) });
+        out.push({ ...row, price: undefined, ref: `${transportRef(row)}:2`, from_place: side(hop.side_to), note: note("السائق الثاني بعد عبور الحدود", row.note) });
       } else out.push({ ...row, note: note(`عبر ${hop.crossing} — تحقق من سماح السيارة والسائق بالعبور`, row.note) });
       return;
     }
