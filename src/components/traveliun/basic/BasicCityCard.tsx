@@ -47,6 +47,7 @@ import { FlightFare } from "../generator/flights/FlightFare";
 import { withTypedTotal } from "@/lib/offer/flight-fare";
 import { basicField, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
+import { RefundControl } from "../generator/hotels/RefundControl";
 import { nightsText, useBasicLabels } from "./labels";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -449,6 +450,20 @@ function HotelPanel({
                 </div>
               );
             })}
+            {/* refundable — part of the price, so under the price column (a supplier rate states its own) */}
+            {!line.sourcing ? (
+              <div className={`${rowGap} ${HOTEL_COLS}`}>
+                <span className="max-xl:hidden xl:col-span-4" />
+                <div className="col-span-2">
+                  <RefundControl
+                    refundable={line.refundable}
+                    until={line.refundable_until}
+                    onChange={(v) => follow(line, (l) => ({ ...l, ...v }))}
+                    labels={{ yes: tx("refundable"), no: tx("nonRefundable"), until: tx("refundUntil") }}
+                  />
+                </div>
+              </div>
+            ) : null}
             <datalist id={rooms}>
               {roomSuggestions(lookups.roomTypes, line.hotel_id).map((n) => (
                 <option key={n} value={n} />
@@ -465,31 +480,6 @@ function HotelPanel({
                 <Plus className="size-3.5" />
                 {tx("addRoom")}
               </button>
-              {/* a stay we price ourselves: is it refundable? (a supplier rate states its own policy) */}
-              {!line.sourcing ? (
-                <span role="group" className="inline-flex overflow-hidden rounded-[7px] border border-[#cfe0d9] text-[11.5px] font-bold">
-                  {([true, false] as const).map((v) => (
-                    <button
-                      key={String(v)}
-                      type="button"
-                      aria-pressed={line.refundable === v}
-                      onClick={() => {
-                        const next = line.refundable === v ? null : v;
-                        follow(line, (l) => ({ ...l, refundable: next }));
-                      }}
-                      className={`h-7 px-2.5 transition-colors ${
-                        line.refundable === v
-                          ? v
-                            ? "bg-[#e4f6ef] text-[#0f7a52]"
-                            : "bg-[#fdeeee] text-[#c43d3d]"
-                          : "bg-white text-[#557d78] hover:bg-[#f4f8f6]"
-                      }`}
-                    >
-                      {tx(v ? "refundable" : "nonRefundable")}
-                    </button>
-                  ))}
-                </span>
-              ) : null}
             </div>
           </div>
         );

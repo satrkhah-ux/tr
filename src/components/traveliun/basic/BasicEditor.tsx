@@ -493,7 +493,8 @@ export function BasicEditor({
   const left = remainingNights(data);
   const [newCity, setNewCity] = useState("");
   const [newNights, setNewNights] = useState(0);
-  const [newTours, setNewTours] = useState(0);
+  // null = not touched: the bar proposes a tour a day but the arrival day
+  const [newTours, setNewTours] = useState<number | null>(null);
   // the stay, picked on the bar too — one «إضافة» books the city and its hotel
   const [newHotel, setNewHotel] = useState("");
   const [newRoom, setNewRoom] = useState("");
@@ -502,7 +503,7 @@ export function BasicEditor({
   const nightsChoice = newNights || Math.max(left, 1);
   // the arrival day is spent arriving: four nights hold up to three tours (the city card allows more)
   const maxTours = Math.max(nightsChoice - 1, 0);
-  const toursChoice = Math.min(newTours, maxTours);
+  const toursChoice = newTours == null ? maxTours : Math.min(newTours, maxTours);
   const roomsChoice = newRooms || Math.max(trip.rooms, 1);
   // the trip's country unless the group crosses into a neighbour
   const barCountry = findLookupCountry(lk.countries, newCountry || trip.country);
@@ -536,7 +537,7 @@ export function BasicEditor({
     );
     pickCity("");
     setNewNights(0);
-    setNewTours(0);
+    setNewTours(null);
     setNewRooms(0);
     setNewPrice(null);
   }

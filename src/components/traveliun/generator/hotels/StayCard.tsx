@@ -26,6 +26,7 @@ import { fieldClass } from "../stage-props";
 import { HotelPicker, type PickerFilters, type PickerSource } from "./HotelPicker";
 import type { SearchBarGuests } from "./HotelSearchBar";
 import { StaySummary } from "./StaySummary";
+import { RefundControl } from "./RefundControl";
 import { StayDatesLine } from "./StayDates";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 
@@ -230,24 +231,13 @@ export function StayCard({
               were given. Typed prices are per room for the whole stay (above);
               here is what they are in, and who the stay was booked through. */}
           {!line.sourcing ? (
-            <div role="group" className="mt-3 inline-flex overflow-hidden rounded-[8px] border border-[#cfe0d9] text-[12px] font-bold">
-              {([true, false] as const).map((v) => (
-                <button
-                  key={String(v)}
-                  type="button"
-                  aria-pressed={line.refundable === v}
-                  onClick={() => onSetHotel({ refundable: line.refundable === v ? null : v })}
-                  className={`h-8 px-3 transition-colors ${
-                    line.refundable === v
-                      ? v
-                        ? "bg-[#e4f6ef] text-[#0f7a52]"
-                        : "bg-[#fdeeee] text-[#c43d3d]"
-                      : "bg-white text-[#557d78] hover:bg-[#f4f8f6]"
-                  }`}
-                >
-                  {t(v ? "pg.refundable" : "pg.nonRefundable")}
-                </button>
-              ))}
+            <div className="mt-3">
+              <RefundControl
+                refundable={line.refundable}
+                until={line.refundable_until}
+                onChange={(v) => onSetHotel(v)}
+                labels={{ yes: t("pg.refundable"), no: t("pg.nonRefundable"), until: t("pg.refundUntil") }}
+              />
             </div>
           ) : null}
           {!line.sourcing ? (

@@ -588,6 +588,8 @@ export type DraftHotel = {
    * its own cancellation policy). Undefined/null = not said; nothing prints.
    */
   refundable?: boolean | null;
+  /** refundable until this date (YYYY-MM-DD); only with refundable === true. */
+  refundable_until?: string | null;
   /**
    * Who the stay was booked through (company_suppliers) when the agent typed
    * the price. Internal: never on the client document.
@@ -699,6 +701,9 @@ export function normalizeDraftHotel(raw: unknown): DraftHotel {
     ...(h.dates === "same" || h.dates === "custom" ? { dates: h.dates } : {}),
     ...(h.dates === "custom" && typeof h.check_in === "string" && /^\d{4}-\d{2}-\d{2}$/.test(h.check_in) ? { check_in: h.check_in } : {}),
     ...(typeof h.refundable === "boolean" ? { refundable: h.refundable } : {}),
+    ...(h.refundable === true && typeof h.refundable_until === "string" && /^\d{4}-\d{2}-\d{2}$/.test(h.refundable_until)
+      ? { refundable_until: h.refundable_until }
+      : {}),
     ...(typeof h.supplier === "string" && h.supplier ? { supplier: h.supplier } : {}),
     // deliberately NOT `sourcing: h.sourcing ?? null` — a seeded line must carry
     // no supplier key at all, and a null one still reads as "priced from a
@@ -1711,9 +1716,10 @@ export function sourcingFits(stay: HotelStay, trip: { adults: number; children: 
 }
 
 /** The cancellation line a stay prints: the supplier's own policy, else what the agent marked. */
-export function stayCancellation(h: Pick<DraftHotel, "sourcing" | "refundable">): string | null {
+export function stayCancellation(h: Pick<DraftHotel, "sourcing" | "refundable" | "refundable_until">): string | null {
   if (h.sourcing) return h.sourcing.cancellation_policy || null;
-  return h.refundable === true ? "قابل للاسترداد" : h.refundable === false ? "غير قابل للاسترداد" : null;
+  if (h.refundable === true) return h.refundable_until ? `قابل للاسترداد حتى ${h.refundable_until}` : "قابل للاسترداد";
+  return h.refundable === false ? "غير قابل للاسترداد" : null;
 }
 
 /**

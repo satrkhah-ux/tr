@@ -1401,6 +1401,7 @@ export const en = {
   "pg.termsHint": "What happens if the trip changes: cancellation, payment, what the client carries themselves.",
   "pg.refundable": "Refundable",
   "pg.nonRefundable": "Non-refundable",
+  "pg.refundUntil": "until",
   "pg.addItem": "Add",
   "pg.itemPlaceholder": "Write an item and press Add…",
   // visas stage

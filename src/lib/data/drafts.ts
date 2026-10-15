@@ -179,6 +179,9 @@ export async function createDraft(seed?: Partial<DraftData>): Promise<CreateDraf
     // Global lines only: a new draft has no country yet, and choosing one in
     // TripStage adds that country's lines (reseedForCountry).
     const base = emptyDraftData();
+    // a NEW file starts «مع الإفطار» (the owner, 2026-10-15) — here, not in emptyDraftData,
+    // whose defaults also fill old drafts and would turn a «غرفة فقط» file into breakfast
+    base.trip = { ...base.trip, meal_plan: "breakfast", default_board: "BB" };
     if (!seed?.services) {
       // Only the terms are needed here. Calling getGeneratorLookups() for them
       // fetched every hotel, room type, airport and the FX feed — ~4 s on the
@@ -1005,8 +1008,9 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       // The snapshot's city summary. With two hotels in a city it names the
       // first and says how many follow, rather than picking one arbitrarily and
       // printing it as though it were the whole stay.
-      cities: cities.map((c) => {
-        const mine = stays.filter((s) => s.city_name === c.city_name);
+      // per VISIT, not per name: a city the trip returns to lists only that visit's hotels
+      cities: cities.map((c, i) => {
+        const mine = stays.filter((s) => s.city_index === i);
         const h = mine[0]?.line;
         const extra = mine.length > 1 ? ` + ${mine.length - 1}` : "";
         return {
