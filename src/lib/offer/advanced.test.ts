@@ -174,3 +174,25 @@ describe("«بكج متقدم» — the trip read in order (the owner's own file
     expect(advancedSteps({ ...a, reception: { ...a.reception, time: "21:00" } }, tz)[1].errors.length).toBe(1);
   });
 });
+
+describe("«بكج متقدم» — lands in one country, first night in another", () => {
+  it("Trabzon airport → Batumi: asks how the transfer crosses, then splits it at the border for two drivers", async () => {
+    const { advancedSteps } = await import("./advanced");
+    const base = adv({ arrive_country: "تركيا", arrive_at: "مطار طرابزون (TZX)", reception: { kind: "airport", place: "", side: "", date: "2026-10-18", time: "23:30" } });
+    expect(advancedSteps(base, undefined, "جورجيا")[1].missing).toContain("نقطة الاستقبال في تركيا وأول فندق في جورجيا — اختر كيف يعبر الحدود");
+    const two = { ...base, reception_cross: { drivers: 2 as const, crossing: "معبر سارب", side_from: "تركيا", side_to: "جورجيا" } };
+    const s = advancedSteps(two, undefined, "جورجيا")[1];
+    expect(s.missing).toEqual([]);
+    expect(s.sentence).toContain("ثم ننقله إلى جورجيا عبر معبر سارب — سائقان، ويعبر الحدود بنفسه بينهما");
+    expect(withAdvancedTransport(rows, two).slice(0, 2).map((r) => [r.from_place, r.to_place])).toEqual([
+      ["مطار طرابزون (TZX)", "معبر سارب — جانب تركيا"],
+      ["معبر سارب — جانب جورجيا", "فندق باتومي"],
+    ]);
+    expect(advancedLines(two).excludes).toContain("عبور معبر سارب بين السائقين — يعبره المسافرون بأنفسهم");
+    // one car across: one row, the crossing a thing to check
+    const one = { ...two, reception_cross: { ...two.reception_cross, drivers: 1 as const } };
+    expect(withAdvancedTransport(rows, one)[0].note).toContain("عبر معبر سارب — تحقق من سماح السيارة");
+    // same country: nothing asked
+    expect(advancedSteps(base, undefined, "تركيا")[1].missing).toEqual([]);
+  });
+});

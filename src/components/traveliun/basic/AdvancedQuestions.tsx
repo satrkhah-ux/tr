@@ -75,7 +75,9 @@ export function AdvancedQuestions({
   const set = (patch: Partial<DraftAdvanced>) => onChange({ ...adv, ...patch });
   const setDate = (k: AdvancedDateKey, v: string) => onChange(setAdvancedDate(adv, k, v));
   const tzOf = (country: string) => lists.zones[country] ?? null;
-  const steps = advancedSteps(adv, tzOf);
+  // the first night's country — where a pickup in another country has to cross to
+  const firstCountry = cities[0]?.country || tripCountry;
+  const steps = advancedSteps(adv, tzOf, firstCountry);
   const stepOf = (k: StepKey) => steps.find((s) => s.key === k)!;
   const hopGaps = Object.values(adv.borders).filter((h) => !h.crossing.trim()).length;
   const errors = steps.reduce((n, s) => n + s.errors.length, 0);
@@ -299,6 +301,26 @@ export function AdvancedQuestions({
                   </>,
                 )
               : null}
+            {rx.kind && rx.kind !== "self" && rx.kind !== "border" && adv.arrive_country && firstCountry && adv.arrive_country !== firstCountry ? (
+              <div className="flex flex-wrap items-center gap-1.5 rounded-[10px] bg-[#f6f9f8] p-2">
+                <span className="text-[12px] font-bold text-[#185045]">
+                  من {adv.arrive_country} إلى أول فندق في {firstCountry} — كيف يعبر الحدود؟
+                </span>
+                {([1, 2] as const).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className={chip(adv.reception_cross?.drivers === d)}
+                    onClick={() => set({ reception_cross: { crossing: adv.reception_cross?.crossing ?? "", side_from: adv.arrive_country, side_to: firstCountry, drivers: d } })}
+                  >
+                    {d === 1 ? "سائق واحد يعبر" : "سائقان وعبور ذاتي بينهما"}
+                  </button>
+                ))}
+                {adv.reception_cross ? (
+                  <span className="w-48">{pick("crossings", adv.reception_cross.crossing, (crossing) => set({ reception_cross: { ...adv.reception_cross!, crossing } }), "اسم المعبر")}</span>
+                ) : null}
+              </div>
+            ) : null}
           </>,
         )}
 

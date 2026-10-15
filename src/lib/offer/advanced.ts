@@ -64,6 +64,12 @@ export type DraftAdvanced = {
   self_items: string[];
   /** keyed `${from}>${to}` (city names), only for hops that cross a border. */
   borders: Record<string, BorderHop>;
+  /**
+   * The pickup is in one country and the first hotel in another (lands in
+   * Trabzon, sleeps in Batumi): how the transfer crosses — one car across, or
+   * two cars with the group crossing on foot between them. Absent = not asked / not answered.
+   */
+  reception_cross?: BorderHop;
   /** date fields still following Basic; a field the agent edits leaves this list. */
   auto: AdvancedDateKey[];
 };
@@ -210,8 +216,15 @@ export function withAdvancedTransport(rows: DraftTransport[], adv: DraftAdvanced
   rows.forEach((row, i) => {
     if (i === first && adv.reception.kind) {
       const rx = adv.reception;
-      if (rx.kind !== "self")
-        out.push({ ...row, from_place: rx.kind === "airport" ? airportOf(adv.arrive_by, adv.arrive_at, airport) : pointText(rx), date: rx.date || row.date, note: note(rx.time && `اللقاء ${rx.time}`, row.note) });
+      if (rx.kind === "self") return;
+      const met = { ...row, from_place: rx.kind === "airport" ? airportOf(adv.arrive_by, adv.arrive_at, airport) : pointText(rx), date: rx.date || row.date, note: note(rx.time && `اللقاء ${rx.time}`, row.note) };
+      const cross = adv.reception_cross;
+      if (cross?.crossing.trim() && cross.drivers === 2) {
+        const side = (c: string) => `${cross.crossing}${c ? ` — جانب ${c}` : ""}`;
+        out.push({ ...met, to_place: side(cross.side_from), note: note("السائق الأول", met.note) });
+        out.push({ ...met, from_place: side(cross.side_to), note: note("السائق الثاني بعد عبور الحدود", row.note) });
+      } else if (cross?.crossing.trim()) out.push({ ...met, note: note(met.note, `عبر ${cross.crossing} — تحقق من سماح السيارة والسائق بالعبور`) });
+      else out.push(met);
       return;
     }
     if (i === last && adv.farewell.kind) {
@@ -263,12 +276,15 @@ export function advancedLines(adv: DraftAdvanced | undefined): { includes: strin
     if (arrive && adv.arrive_by !== "already") excludes.push(`الانتقال من ${arrive} إلى ${pointText(rx)} — ترتيب ذاتي، غير مشمول`);
     includes.push(`تبدأ خدماتنا باستقبالكم من ${pointText(rx)}${at(rx)}`);
   }
+  const cross = adv.reception_cross;
+  if (rx.kind && rx.kind !== "self" && cross?.drivers && cross.crossing.trim())
+    includes.push(`نقلكم من نقطة الاستقبال عبر ${cross.crossing.trim()} إلى فندقكم${cross.drivers === 2 ? " — بسيارتين، تعبرون الحدود بينهما بأنفسكم" : ""}`);
   if (fw.kind === "self") excludes.push("التوجه إلى نقطة المغادرة — ترتيب ذاتي، غير مشمول");
   else if (fw.kind === "airport") {
     if (leave && adv.leave_by === "flight") includes.push(`تنتهي خدماتنا بتوصيلكم إلى ${airportOf("flight", leave, "المطار")}${at(fw)}`);
   } else if (fw.kind) includes.push(`تنتهي خدماتنا بتوصيلكم إلى ${pointText(fw)}${at(fw)}`);
   if (leave && fw.kind && fw.kind !== "airport") excludes.push(`مغادرتكم من ${leave}${by(adv.leave_by)} — غير مشمولة`);
-  for (const hop of Object.values(adv.borders)) if (hop.crossing.trim() && hop.drivers === 2) excludes.push(`عبور ${hop.crossing} بين السائقين — يعبره المسافرون بأنفسهم`);
+  for (const hop of [...Object.values(adv.borders), ...(adv.reception_cross ? [adv.reception_cross] : [])]) if (hop.crossing.trim() && hop.drivers === 2) excludes.push(`عبور ${hop.crossing} بين السائقين — يعبره المسافرون بأنفسهم`);
   for (const item of adv.self_items) if (item.trim()) excludes.push(`${item.trim()} — يرتّبه العميل بنفسه، غير مشمول`);
   return { includes, excludes };
 }
@@ -333,7 +349,7 @@ const hasSelf = (adv: DraftAdvanced) => adv.self_items.some((x) => x.trim());
  * a sentence the agent can read back, with what contradicts and what is missing
  * right under it. Nothing is corrected: the agent decides.
  */
-export function advancedSteps(adv: DraftAdvanced, tzOf: TzOf = () => null): AdvancedStep[] {
+export function advancedSteps(adv: DraftAdvanced, tzOf: TzOf = () => null, firstCountry = ""): AdvancedStep[] {
   const rx = adv.reception;
   const fw = adv.farewell;
   // where each clock is read: a border side is its own country; the rest is where they land / leave
@@ -366,6 +382,16 @@ export function advancedSteps(adv: DraftAdvanced, tzOf: TzOf = () => null): Adva
   else {
     const where = rx.kind === "airport" ? airportOf(adv.arrive_by, adv.arrive_at, "المطار") : pointText(rx);
     reception.sentence = `نستقبله من ${where} ${day(rx.date, rx.time, zoneNote(rxCountry, tzR, rx.date))}`;
+    // picked up in one country, first night in another: the transfer crosses a border — say how
+    const pickupCountry = rx.kind === "border" ? rx.side : adv.arrive_country;
+    if (rx.kind !== "border" && pickupCountry && firstCountry && pickupCountry !== firstCountry) {
+      const cross = adv.reception_cross;
+      if (!cross?.drivers) reception.missing.push(`نقطة الاستقبال في ${pickupCountry} وأول فندق في ${firstCountry} — اختر كيف يعبر الحدود`);
+      else {
+        reception.sentence += ` ثم ننقله إلى ${firstCountry} عبر ${cross.crossing.trim() || "المعبر"} — ${cross.drivers === 2 ? "سائقان، ويعبر الحدود بنفسه بينهما" : "سائق واحد يعبر الحدود"}`;
+        if (!cross.crossing.trim()) reception.missing.push("اكتب اسم المعبر");
+      }
+    }
     if (rx.kind !== "airport" && !rx.place.trim()) reception.missing.push(`اختر ${rx.kind === "hotel" ? "الفندق" : "المعبر"}`);
     if (rx.kind === "border" && !rx.side) reception.missing.push("حدد أي جانب من الحدود");
     if (!rx.date) reception.missing.push("يوم الاستقبال غير محدد");
@@ -425,9 +451,9 @@ export function advancedSteps(adv: DraftAdvanced, tzOf: TzOf = () => null): Adva
 }
 
 /** Everything still open or contradictory, in the trip's order — the steps' and the border hops'. */
-export function advancedGaps(adv: DraftAdvanced | undefined, tzOf?: TzOf): string[] {
+export function advancedGaps(adv: DraftAdvanced | undefined, tzOf?: TzOf, firstCountry?: string): string[] {
   if (!adv?.on) return [];
-  const out = advancedSteps(adv, tzOf).flatMap((s) => [...s.errors, ...s.missing]);
+  const out = advancedSteps(adv, tzOf, firstCountry).flatMap((s) => [...s.errors, ...s.missing]);
   for (const [key, hop] of Object.entries(adv.borders)) if (!hop.crossing.trim()) out.push(`${key.replace(">", " ← ")}: اكتب اسم المعبر`);
   return out;
 }
