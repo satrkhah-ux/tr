@@ -28,8 +28,8 @@ export interface OcrProvider {
   readonly name: string;
   /** true only when the provider is fully configured (keys present). */
   isConfigured(): boolean;
-  /** OCR a PDF's bytes to text + confidence. Throws on a hard API failure. */
-  recognize(pdf: Buffer): Promise<OcrResult>;
+  /** OCR a PDF's (or, with its content type, an image's) bytes to text + confidence. Throws on a hard API failure. */
+  recognize(pdf: Buffer, contentType?: string): Promise<OcrResult>;
 }
 
 function readEnv(name: string): string | undefined {
@@ -46,13 +46,13 @@ class AzureReadProvider implements OcrProvider {
     return Boolean(this.endpoint && this.key);
   }
 
-  async recognize(pdf: Buffer): Promise<OcrResult> {
+  async recognize(pdf: Buffer, contentType = "application/pdf"): Promise<OcrResult> {
     if (!this.isConfigured()) throw new Error("Azure Document Intelligence is not configured");
     const analyzeUrl = `${this.endpoint}/documentintelligence/documentModels/prebuilt-read:analyze?api-version=${this.apiVersion}`;
 
     const start = await fetch(analyzeUrl, {
       method: "POST",
-      headers: { "Ocp-Apim-Subscription-Key": this.key, "Content-Type": "application/pdf" },
+      headers: { "Ocp-Apim-Subscription-Key": this.key, "Content-Type": contentType },
       body: new Uint8Array(pdf),
     });
     if (start.status !== 202) {

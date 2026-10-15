@@ -1,0 +1,21 @@
+flyadeal
+Your booking is confirmed!
+
+Booking reference
+FA9K2Q
+
+Guests
+Mr Test Guest
+Mrs Sample Guest
+
+Outbound · Fri 18 Dec 2026
+F3 141
+RUH 06:15  →  AHB 07:50
+Riyadh · King Khalid International  →  Abha · Abha International
+
+Return · Sat 26 Dec 2026
+F3 146
+AHB 20:40  →  RUH 22:10
+Abha · Abha International  →  Riyadh · King Khalid International
+
+1 x 20kg checked bag per guest

@@ -1,0 +1,13 @@
+SAUDIA
+Electronic Ticket Itinerary Receipt
+Booking Reference: M3TQ8Z
+Date of Issue: 14 Oct 2026
+Passenger Name: TESTUSER/FAHAD MR
+E-Ticket Number: 065 2400000003
+
+Flight     Departure                         Arrival                           Class     Baggage   Status
+SV 1471    Madinah (MED) 20 Nov 2026 14:20   Riyadh (RUH) 20 Nov 2026 15:55     Economy   23KG      Confirmed
+SV 1478    Riyadh (RUH) 27 Nov 2026 21:30    Madinah (MED) 27 Nov 2026 23:05    Economy   23KG      Confirmed
+
+Fare: SAR 1,240.00
+Check-in closes 60 minutes before departure.

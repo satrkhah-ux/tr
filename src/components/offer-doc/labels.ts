@@ -70,6 +70,13 @@ export const AR = {
   flightPriceNote:
     "أسعار الطيران تقديرية وقابلة للتغيّر حتى إصدار التذكرة، وتُثبَّت لحظة الحجز حسب توفّر المقاعد.",
   flightsIntlNote: "يعرض هذا القسم فقط عند وجود بيانات طيران في النظام.",
+  // ---- flight card («تصميم بطاقة الطيران») ----
+  flightCard: "بطاقة الطيران",
+  bookingDetails: "بيانات الحجز",
+  pnr: "رقم الحجز (PNR)",
+  passengers: "المسافرون",
+  passengerCount: (n: number) => (n === 1 ? "مسافر واحد" : n === 2 ? "مسافران" : n <= 10 ? `${n} مسافرين` : `${n} مسافرًا`),
+  flightCardNote: "جميع المواعيد بالتوقيت المحلي لكل مطار.",
   domesticFlightAfterStay: "يوجد طيران داخلي إلى المدينة التالية - التفاصيل في صفحة الطيران الداخلي.",
   accommodation: "الإقامة والفنادق",
   /** two hotels on the same dates in one city (ق5). */

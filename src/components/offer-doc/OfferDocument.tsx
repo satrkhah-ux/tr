@@ -567,30 +567,7 @@ function Cover({
 }) {
   return (
     <>
-      {/* Company first in the DOM, so it lands on the right in Arabic; the logo
-          second, on the left. Order in the markup is the order on the page here —
-          not a float — so the same source prints identically. */}
-      <div className="od-top">
-        {/* Each contact line renders only if the brand has it: a partner who gave
-            us no website gets a shorter block, never our address under their
-            logo. */}
-        <div className="od-company">
-          <h2>{brand.nameAr}</h2>
-          {brand.address ? <div>{brand.address}</div> : null}
-          {brand.phone ? <div>{AR.callLabel}: <Ltr>{brand.phone}</Ltr></div> : null}
-          {brand.whatsapp ? <div>{AR.whatsappLabel}: <Ltr>{brand.whatsapp}</Ltr></div> : null}
-          {brand.website ? <div>{AR.webLabel}: <Ltr>{brand.website}</Ltr></div> : null}
-          {brand.email ? <div>{AR.emailLabel}: <Ltr>{brand.email}</Ltr></div> : null}
-        </div>
-        <div>
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img className="od-logo" src={logoUrl} alt={brand.nameLatin} />
-          ) : (
-            <div className="od-wordmark">{brand.nameAr}</div>
-          )}
-        </div>
-      </div>
+      <CompanyHeader brand={brand} logoUrl={logoUrl} />
 
       <div className="od-hero">
         <div className="od-hero-label">{AR.coverLabel}</div>
@@ -662,6 +639,36 @@ function Cover({
         </table>
       </div>
     </>
+  );
+}
+
+/** The company block and logo that open a document — the cover's top, shared with the flight card. */
+export function CompanyHeader({ brand, logoUrl }: { brand: DocBrand; logoUrl: string | null }) {
+  // Company first in the DOM, so it lands on the right in Arabic; the logo
+  // second, on the left. Order in the markup is the order on the page here —
+  // not a float — so the same source prints identically.
+  return (
+    <div className="od-top">
+      {/* Each contact line renders only if the brand has it: a partner who gave
+          us no website gets a shorter block, never our address under their
+          logo. */}
+      <div className="od-company">
+        <h2>{brand.nameAr}</h2>
+        {brand.address ? <div>{brand.address}</div> : null}
+        {brand.phone ? <div>{AR.callLabel}: <Ltr>{brand.phone}</Ltr></div> : null}
+        {brand.whatsapp ? <div>{AR.whatsappLabel}: <Ltr>{brand.whatsapp}</Ltr></div> : null}
+        {brand.website ? <div>{AR.webLabel}: <Ltr>{brand.website}</Ltr></div> : null}
+        {brand.email ? <div>{AR.emailLabel}: <Ltr>{brand.email}</Ltr></div> : null}
+      </div>
+      <div>
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="od-logo" src={logoUrl} alt={brand.nameLatin} />
+        ) : (
+          <div className="od-wordmark">{brand.nameAr}</div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -780,7 +787,7 @@ const airportName = (airport: string | null) => (airport ?? "").replace(/\s*\([A
  * ends — the airport code large, the time, the day — with the line between
  * them. A table of eight columns broke every airport name over three lines.
  */
-function FlightCards({ flights }: { flights: ClientOfferDTO["flights"] }) {
+export function FlightCards({ flights }: { flights: ClientOfferDTO["flights"] }) {
   return (
     <div>
       {flights.map((f, i) => {
