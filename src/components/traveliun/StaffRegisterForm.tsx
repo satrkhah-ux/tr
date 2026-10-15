@@ -12,8 +12,9 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
  * «تسجيل موظف جديد» — the sign-in page's sibling, same frame.
  *
  * No section field, on purpose: what a colleague may do is decided by whoever
- * approves them, never by the person asking. The password is theirs from the
- * start; the account simply cannot sign in until the request is approved.
+ * approves them, never by the person asking. No password either: approval
+ * sends an invitation to the address, and whoever owns that mailbox sets one —
+ * so nobody can claim a new hire's email by registering it first.
  */
 
 const field =
@@ -25,8 +26,6 @@ type Form = {
   english_name: string;
   email: string;
   mobile: string;
-  password: string;
-  password_confirm: string;
   note: string;
   website: string;
 };
@@ -41,8 +40,6 @@ export function StaffRegisterForm() {
     english_name: "",
     email: "",
     mobile: "",
-    password: "",
-    password_confirm: "",
     note: "",
     website: "",
   });
@@ -92,22 +89,12 @@ export function StaffRegisterForm() {
               </label>
               <label className={label}>
                 <span className="mb-2 block"><span className="text-[#ff3d65]">* </span>{t("reg.email")}</span>
-                <input required type="email" dir="ltr" autoComplete="username" value={form.email} onChange={set("email")} className={`${field} text-start`} />
+                <input required type="email" dir="ltr" autoComplete="email" value={form.email} onChange={set("email")} className={`${field} text-start`} />
               </label>
               <label className={label}>
                 <span className="mb-2 block"><span className="text-[#ff3d65]">* </span>{t("reg.mobile")}</span>
                 <input required type="tel" dir="ltr" autoComplete="tel" value={form.mobile} onChange={set("mobile")} className={`${field} text-start`} />
               </label>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className={label}>
-                  <span className="mb-2 block"><span className="text-[#ff3d65]">* </span>{t("reg.password")}</span>
-                  <input required type="password" dir="ltr" minLength={8} autoComplete="new-password" value={form.password} onChange={set("password")} className={`${field} text-start`} />
-                </label>
-                <label className={label}>
-                  <span className="mb-2 block"><span className="text-[#ff3d65]">* </span>{t("reg.passwordConfirm")}</span>
-                  <input required type="password" dir="ltr" minLength={8} autoComplete="new-password" value={form.password_confirm} onChange={set("password_confirm")} className={`${field} text-start`} />
-                </label>
-              </div>
               <label className={label}>
                 <span className="mb-2 block">{t("reg.note")}</span>
                 <textarea

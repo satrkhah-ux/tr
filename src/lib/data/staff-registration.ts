@@ -8,7 +8,6 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { notifyEmployeeRegistration } from "@/lib/data/ops-notify";
 import {
-  PENDING_BAN,
   REJECT_COOLDOWN_DAYS,
   normalizeRegistration,
   rateDecision,
@@ -20,20 +19,16 @@ import {
  *
  * Runs with the SERVICE role and no session: staff_registrations has no policy
  * at all (0046), so this action is the one door, and every check below is the
- * door's lock. What it can produce is exactly one thing — a `pending` request
- * plus a BANNED auth account with the password the applicant chose. Nothing
- * here can make an employee or pick a role; approval does that (team.ts).
+ * door's lock. What it can produce is exactly one thing — a `pending` request.
+ * No auth account and no password: nothing here can make an employee, pick a
+ * role or claim an address. Approval does that (team.ts) by INVITING the
+ * address, so only whoever really owns the mailbox can ever sign in with it —
+ * an outsider can no longer pre-claim a new hire's email with a password of
+ * their own (security audit L8).
  *
  * Every "no" that would reveal whether an address is already staff answers
  * with the same success the real thing gets. The form must not be a way to
  * find out who works here.
- *
- * Known limit, accepted: one EXACT address can still be told apart afterwards —
- * signing in with the password just chosen says «قيد المراجعة» for a new
- * request and «بيانات غير صحيحة» for staff, and the new-account path is slower.
- * Each such probe of a non-staff address costs a pending request and a Telegram
- * message, so it stops at PENDING_CAP. Closing it means creating the account
- * only at approval, by invite (issueEmployeeAccount's path).
  */
 
 function db(): SupabaseClient {
@@ -82,7 +77,7 @@ export async function registerEmployee(
     const supabase = db();
     const ipHash = await originHash();
 
-    // Limits BEFORE any account exists, so a flood creates nothing.
+    // Limits BEFORE anything is stored, so a flood stores nothing.
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     const [fromOrigin, open] = await Promise.all([
       ipHash
@@ -114,23 +109,6 @@ export async function registerEmployee(
     if (staff.error || rejected.error) return FAILED;
     if ((staff.data ?? []).length > 0 || (rejected.data ?? []).length > 0) return NEUTRAL;
 
-    // Confirmed (no mail is sent, so no SMTP is involved) and banned: the
-    // account exists with their password and cannot sign in until approval.
-    const { data: created, error: createError } = await supabase.auth.admin.createUser({
-      email: v.email,
-      password: v.password,
-      email_confirm: true,
-      ban_duration: PENDING_BAN,
-      user_metadata: { self_registered: true },
-    });
-    if (createError || !created?.user) {
-      // A partner login, an existing staff login or a request already pending
-      // all own the address. Same answer as success.
-      if (createError?.code === "email_exists" || createError?.code === "user_already_exists") return NEUTRAL;
-      if (createError?.code === "weak_password") return { ok: false, error: "reg.err.password" };
-      return FAILED;
-    }
-
     const { data: row, error: insertError } = await supabase
       .from("staff_registrations")
       .insert({
@@ -139,18 +117,12 @@ export async function registerEmployee(
         email: v.email,
         mobile: v.mobile,
         note: v.note,
-        auth_user_id: created.user.id,
         ip_hash: ipHash,
       })
       .select("id")
       .single();
-    if (insertError || !row) {
-      // Never leave a banned account with no request behind it — nobody could
-      // ever approve or reject it.
-      await supabase.auth.admin.deleteUser(created.user.id);
-      // 23505: a second submit for the same address won the race.
-      return insertError?.code === "23505" ? NEUTRAL : FAILED;
-    }
+    // 23505: a request for this address is already pending. Same answer.
+    if (insertError || !row) return insertError?.code === "23505" ? NEUTRAL : FAILED;
 
     const id = (row as { id: string }).id;
     await logAudit({

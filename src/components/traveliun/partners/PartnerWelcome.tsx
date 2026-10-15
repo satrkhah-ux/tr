@@ -51,7 +51,11 @@ function passwordError(message: string): string {
   return `تعذّر حفظ كلمة المرور: ${message}`;
 }
 
-export function PartnerWelcome() {
+/**
+ * `home` is where a finished invite goes: the partner portal by default, the
+ * staff dashboard from /sign-in/welcome (the staff invite's landing).
+ */
+export function PartnerWelcome({ home = "/b2b", homeLabel = "العودة لبوابة الشركات" }: { home?: string; homeLabel?: string }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("checking");
   const [password, setPassword] = useState("");
@@ -128,10 +132,10 @@ export function PartnerWelcome() {
           لإرسال دعوة جديدة.
         </p>
         <Link
-          href="/b2b"
+          href={home}
           className="mt-5 inline-flex h-10 items-center rounded-[10px] border border-[#dbe6e1] px-4 text-[12.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6]"
         >
-          العودة لبوابة الشركات
+          {homeLabel}
         </Link>
       </div>
     );
@@ -173,7 +177,7 @@ export function PartnerWelcome() {
             return;
           }
           setPhase("done");
-          router.replace("/b2b");
+          router.replace(home);
           router.refresh();
         } finally {
           setSaving(false);

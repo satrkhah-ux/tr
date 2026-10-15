@@ -334,20 +334,28 @@ function approvalError(error: PostgrestError | null): TranslationKey {
 /**
  * Let an applicant in, into the section the approver chose.
  *
- * Order matters. The ban is lifted FIRST: for that moment the account has no
+ * Requests filed since 2026-10-13 carry no account (security audit L8): the
+ * address is INVITED here, so only whoever really owns the mailbox can set a
+ * password. The invite's account is written onto the request (only while it is
+ * still pending and unlinked — that write is the claim against a second
+ * approver), then one database call creates the Active employee from it. If
+ * that call fails while the request is still pending, the invited account is
+ * deleted; the FK clears the request's link, so approving again starts clean.
+ *
+ * Older requests already hold a BANNED account with the applicant's password.
+ * For those the ban is lifted first: for that moment the account has no
  * employees row, which in this app means no permission at all (current.ts,
- * is_staff()). Then one database call claims the request and creates the Active
- * employee together. The other order would leave an Active employee whose login
- * still refuses them, with the request already marked approved — nothing left to
- * press. If the database call fails, the ban goes back on, unless someone else's
- * approval got there first (then the account is theirs to keep).
+ * is_staff()). The other order would leave an Active employee whose login still
+ * refuses them, with the request already marked approved — nothing left to
+ * press. If the database call fails, the ban goes back on, unless someone
+ * else's approval got there first (then the account is theirs to keep).
  *
  * If the database cannot be reached at all, the call and the follow-up read both
- * come back as errors (postgrest-js returns them, it does not throw) and the ban
- * stays off: an account with no employees row and no permission (0045), its
+ * come back as errors (postgrest-js returns them, it does not throw) and the
+ * account is left as it is: no employees row and no permission (0045), its
  * request still pending, so pressing approve or reject again finishes it. Not
- * re-banned on an unknown outcome on purpose — if the call did commit, that
- * would lock out a just-approved employee with nothing left to press.
+ * undone on an unknown outcome on purpose — if the call did commit, that would
+ * lock out a just-approved employee with nothing left to press.
  */
 export async function approveRegistration(id: string, roleId: string): Promise<{ ok: true } | Fail> {
   const denied = await requireManage();
@@ -358,20 +366,47 @@ export async function approveRegistration(id: string, roleId: string): Promise<{
     const supabase = service();
     const { data } = await supabase
       .from("staff_registrations")
-      .select("status, auth_user_id")
+      .select("status, auth_user_id, email, arabic_name")
       .eq("id", id)
       .maybeSingle();
-    const request = data as { status: string; auth_user_id: string | null } | null;
-    if (!request || request.status !== "pending" || !request.auth_user_id) {
-      return { ok: false, error: "team.pending.handled" };
-    }
-    const authUserId = request.auth_user_id;
-    // Before the ban is lifted: nothing that can throw may sit between the lift
-    // and the call, or the catch below would leave the account open.
+    const request = data as { status: string; auth_user_id: string | null; email: string; arabic_name: string } | null;
+    if (!request || request.status !== "pending") return { ok: false, error: "team.pending.handled" };
+    // Before the account opens: nothing that can throw may sit between that
+    // and the call, or the catch below would leave it open.
     const reviewer = await getCurrentEmployeeId();
 
-    const lifted = await supabase.auth.admin.updateUserById(authUserId, { ban_duration: "none" });
-    if (lifted.error) return { ok: false, error: "err.updateFailed" };
+    const invited = !request.auth_user_id;
+    let authUserId = request.auth_user_id;
+    if (authUserId) {
+      const lifted = await supabase.auth.admin.updateUserById(authUserId, { ban_duration: "none" });
+      if (lifted.error) return { ok: false, error: "err.updateFailed" };
+    } else {
+      // Same landing as «إصدار حساب» (employee-accounts.ts): the welcome page
+      // turns the link into a session and asks for a password.
+      const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
+      const { data: invite, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(request.email, {
+        data: { employee_name: request.arabic_name },
+        redirectTo: `${site}/sign-in/welcome`,
+      });
+      if (inviteError || !invite?.user) {
+        // A partner login or an old account already owns the address.
+        const taken = inviteError?.code === "email_exists" || inviteError?.code === "user_already_exists";
+        return { ok: false, error: taken ? "team.err.accountExists" : "team.err.inviteFailed" };
+      }
+      authUserId = invite.user.id;
+      const { data: claimed, error: claimError } = await supabase
+        .from("staff_registrations")
+        .update({ auth_user_id: authUserId })
+        .eq("id", id)
+        .eq("status", "pending")
+        .is("auth_user_id", null)
+        .select("id")
+        .maybeSingle();
+      if (claimError || !claimed) {
+        await supabase.auth.admin.deleteUser(authUserId);
+        return { ok: false, error: claimError ? "err.updateFailed" : "team.pending.handled" };
+      }
+    }
 
     const { data: employeeId, error } = await supabase.rpc("approve_staff_registration", {
       p_id: id,
@@ -381,7 +416,8 @@ export async function approveRegistration(id: string, roleId: string): Promise<{
     if (error || !employeeId) {
       const after = await supabase.from("staff_registrations").select("status").eq("id", id).maybeSingle();
       if ((after.data as { status: string } | null)?.status === "pending") {
-        await supabase.auth.admin.updateUserById(authUserId, { ban_duration: PENDING_BAN });
+        if (invited) await supabase.auth.admin.deleteUser(authUserId);
+        else await supabase.auth.admin.updateUserById(authUserId, { ban_duration: PENDING_BAN });
       }
       return { ok: false, error: approvalError(error) };
     }
@@ -390,7 +426,7 @@ export async function approveRegistration(id: string, roleId: string): Promise<{
       action: "staff_registration.approved",
       entity: "staff_registrations",
       entity_id: id,
-      meta: { employee_id: employeeId as string, role_id: roleId },
+      meta: { employee_id: employeeId as string, role_id: roleId, invited },
     });
     revalidatePath("/employees");
     return { ok: true };
@@ -400,7 +436,8 @@ export async function approveRegistration(id: string, roleId: string): Promise<{
 }
 
 /**
- * Turn a request down: the request keeps the reason, the account is deleted.
+ * Turn a request down: the request keeps the reason, an old-style request's
+ * account is deleted.
  *
  * The conditional update is the claim — a request someone already approved
  * cannot be rejected out from under them. The same address cannot quietly
@@ -429,8 +466,9 @@ export async function rejectRegistration(id: string, reason: string): Promise<{ 
     if (error) return { ok: false, error: "err.updateFailed" };
     if (!data) return { ok: false, error: "team.pending.handled" };
 
-    // Still banned if this fails, so it cannot sign in either way; the audit
-    // row says which, and «إصدار حساب» for that address clears the leftover
+    // Requests filed since 2026-10-13 have no account. An older one's is still
+    // banned if this fails, so it cannot sign in either way; the audit row says
+    // which, and «إصدار حساب» for that address clears the leftover
     // (employee-accounts.ts).
     const authUserId = (data as { auth_user_id: string | null }).auth_user_id;
     const removed = authUserId ? !(await supabase.auth.admin.deleteUser(authUserId)).error : true;

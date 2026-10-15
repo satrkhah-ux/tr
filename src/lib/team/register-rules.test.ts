@@ -19,8 +19,6 @@ const good: RegistrationInput = {
   english_name: " Sara ",
   email: "  Sara.Otaibi@Example.COM ",
   mobile: "+966 50-123 4567",
-  password: "correct horse",
-  password_confirm: "correct horse",
   note: "  مبيعات — فرع الرياض ",
 };
 
@@ -40,7 +38,6 @@ describe("normalizeRegistration", () => {
         email: "sara.otaibi@example.com",
         mobile: "+966501234567",
         note: "مبيعات — فرع الرياض",
-        password: "correct horse",
       },
     });
   });
@@ -85,15 +82,9 @@ describe("normalizeRegistration", () => {
     expect(eastern.ok && eastern.value.mobile).toBe("+966501234567");
   });
 
-  it("requires a password of at least 8 characters and at most 72 bytes", () => {
-    expect(errorOf({ password: "short", password_confirm: "short" })).toBe("reg.err.password");
-    // 40 Arabic letters = 80 bytes: under 72 characters, over bcrypt's limit.
-    const arabic = "ك".repeat(40);
-    expect(errorOf({ password: arabic, password_confirm: arabic })).toBe("reg.err.password");
-  });
-
-  it("requires the confirmation to match", () => {
-    expect(errorOf({ password_confirm: "correct horsE" })).toBe("reg.err.mismatch");
+  it("takes no password — a smuggled one never reaches the stored request", () => {
+    const res = normalizeRegistration({ ...good, password: "chosen-by-outsider" } as RegistrationInput);
+    expect(res.ok && "password" in res.value).toBe(false);
   });
 
   it("cuts the note to 500 characters rather than failing the request", () => {
