@@ -50,8 +50,11 @@ import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { draftDaySkeleton, transportNoteForDay } from "@/lib/offer/itinerary";
 import { validateDraft } from "@/lib/offer/draft-validation";
-import { publishOffer, type OfferHotelInput, type OfferPricingItemInput } from "./offers";
-import { insertOffer } from "./offer-insert";
+import { getPublishedClientOffer, publishOffer, type CreateOfferInput, type OfferHotelInput, type OfferPricingItemInput } from "./offers";
+import { insertOffer, replaceOffer } from "./offer-insert";
+import { reissueLocked } from "./issued-draft";
+import { logAudit } from "./audit";
+import { offerChanges, type OfferChange } from "@/lib/offer/version-diff";
 import { typedAsCost, keepDraftCost, redactDraftCost } from "@/lib/offer/draft-cost";
 import {
   deleteDraftRow,
@@ -419,7 +422,7 @@ export async function getGeneratorLookups(options: { catalog?: boolean } = {}): 
       // cities), then alphabetical; the client-side filter by country keeps it
       supabase
         .from("cities")
-        .select("id, arabic_name, country_id")
+        .select("id, arabic_name, country_id, lat, lng")
         .order("sort_order", { ascending: true, nullsFirst: false })
         .order("arabic_name"),
       withCatalog
@@ -456,7 +459,7 @@ export async function getGeneratorLookups(options: { catalog?: boolean } = {}): 
     // a reference row is offered to the generator unless the admin disabled it
     const active = (status: string | null | undefined) => status !== "Disabled";
     const hotels = (hotelsRes.data ?? []) as { id: string; arabic_name: string; stars: number | null; city_id: string | null }[];
-    const cities = (citiesRes.data ?? []) as { id: string; arabic_name: string; country_id: string | null }[];
+    const cities = (citiesRes.data ?? []) as { id: string; arabic_name: string; country_id: string | null; lat: number | string | null; lng: number | string | null }[];
     const countries = ((countriesRes.data ?? []) as { id: string; arabic_name: string; iso2: string | null; timezone: string | null; default_currency: string | null; status: string | null }[]).filter((c) => active(c.status));
 
     const builtCountries = countries.map((country) => ({
@@ -470,6 +473,9 @@ export async function getGeneratorLookups(options: { catalog?: boolean } = {}): 
         .map((c) => ({
           id: c.id,
           name: c.arabic_name,
+          // the overland-hop warning's distance (offer/overland.ts)
+          lat: c.lat == null ? null : Number(c.lat),
+          lng: c.lng == null ? null : Number(c.lng),
           hotels: hotels
             .filter((h) => h.city_id === c.id)
             .map((h) => ({ id: h.id, name: h.arabic_name, stars: h.stars })),
@@ -715,10 +721,19 @@ export type ProduceResult =
       serial: string;
       /** what happened on the client's WhatsApp (client-whatsapp.ts) */
       whatsapp: ClientSendResult;
+      /** a re-issue only: the version it published and «ما تغيّر» against the one before. */
+      version?: number;
+      changes?: OfferChange[];
     }
   | { ok: false; error: TranslationKey };
 
-/** Validate → map the draft onto CreateOfferInput → create the real offer. */
+/**
+ * Validate → map the draft onto CreateOfferInput → create the real offer.
+ *
+ * On a draft that was already issued this is «إصدار نسخة محدّثة»: the SAME
+ * offer (serial) re-filled from the corrected draft (replaceOffer) and published
+ * as its next version, which freezes this draft for operations' seeds.
+ */
 export async function produceOfferFromDraft(draftId: string): Promise<ProduceResult> {
   try {
     const user = await getServerUser();
@@ -727,6 +742,18 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     const record = await loadDraft(draftId);
     if (!record) return { ok: false, error: "err.loadFailed" };
     const data = record.data;
+    // A partner's own file keeps its own rules (validateDraft's partnerFile).
+    const issuer = await partnerCaller();
+    // The re-issue's gates: a partner's file is locked once issued
+    // (saveDraftStages), staff need offers.write, and a confirmed / invoiced
+    // partner file stays as it was sent.
+    const reissue = data.produced_serial;
+    if (
+      reissue &&
+      (issuer || !(await currentCan("offers.write")) || (await reissueLocked(createSupabaseServiceClient() as unknown as SupabaseClient, reissue)))
+    ) {
+      return { ok: false, error: "pg.err.issuedLocked" };
+    }
 
     // Weather, attached here rather than left to a button.
     //
@@ -755,7 +782,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     }
 
     // A partner cannot read our supplier list, so it is not asked to name one.
-    const validation = validateDraft(data);
+    const validation = validateDraft(data, { partnerFile: issuer !== null });
     if (!validation.ok) return { ok: false, error: "pg.err.blockingLeft" };
     // a hotel printed with a Latin «Arabic» name or no city is not issued (data order 11.1; a partner is only warned)
     if ((await checkHotelIssueGuard(data.hotels)).issues.some((i) => i.blocking)) return { ok: false, error: "data.quality.guard.blocked" };
@@ -947,7 +974,6 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     }
 
     // A partner issues their own file only (loadDraft hands them nothing else).
-    const issuer = await partnerCaller();
     if (issuer && record.partner_company_id !== issuer.partner_id) return { ok: false, error: "err.forbidden" };
 
     // What the partner owes us for this file (0058), in its quote currency, fixed
@@ -965,7 +991,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         ? partnerPrice(sellTotal, await viewerTerms(partnerCompanyId))
         : null;
 
-    const result = await insertOffer({
+    const input: CreateOfferInput = {
       customer_id: await customerFor(data.customer, await isStaffSession()),
       employee_id: null,
       // From here the preview, the PDF and the client link all resolve their
@@ -1068,16 +1094,33 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
           weather_source: d.weather?.source ?? null,
           weather_fetched_at: d.weather?.fetched_at || null,
         })),
-    }, issuer?.partner_id);
+    };
+    // the version the client has now, for «ما تغيّر» after the re-issue
+    const before = reissue ? await getPublishedClientOffer(reissue) : null;
+    const result = reissue ? await replaceOffer(reissue, input) : await insertOffer(input, issuer?.partner_id);
 
     if (!result.ok) return { ok: false, error: result.error };
     await writeDraftStages(draftId, { produced_serial: result.serial });
     // Producing an offer IS sending it: publish v1 (freeze client snapshot +
-    // status draft→sent) so the client link + PDF work immediately.
-    await publishOffer(result.serial);
+    // status draft→sent) so the client link + PDF work immediately. A re-issue
+    // publishes version N+1 and freezes this draft beside it.
+    const published = await publishOffer(result.serial, Boolean(reissue));
+    let versionChanges: { version: number; changes: OfferChange[] } | null = null;
+    if (reissue) {
+      if (!published.ok) return { ok: false, error: published.error };
+      const after = await getPublishedClientOffer(result.serial);
+      const changes = before && after ? offerChanges(before.offer, after.offer) : [];
+      versionChanges = { version: published.version, changes };
+      await logAudit({
+        action: "offer.reissued",
+        entity: "offers",
+        entity_id: result.id,
+        meta: { serial: result.serial, version: published.version, draft_id: draftId, changes },
+      });
+    }
     // the client hears it on WhatsApp — gated (client-whatsapp.ts), never in the way of the issue
     const whatsapp = await sendOfferToClient(result.serial, Boolean(record.data.produced_serial));
-    return { ok: true, serial: result.serial, whatsapp };
+    return { ok: true, serial: result.serial, whatsapp, ...versionChanges };
   } catch {
     return { ok: false, error: "err.db" };
   }

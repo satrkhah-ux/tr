@@ -56,7 +56,8 @@ export function GeneratorShell({
   const { t, language } = useTraveliunUI();
   const { can } = useRole();
   // a partner sees prices, always at their own terms (the server quotes them so)
-  const canPricing = can("pricing.view") || usePartnerBrand() !== null;
+  const partnerFile = usePartnerBrand() !== null;
+  const canPricing = can("pricing.view") || partnerFile;
 
   const { data, patch, replace, flush, saveState } = useDraftState(draftId, initialData);
   const [previewOpen, setPreviewOpen] = useState(true);
@@ -65,7 +66,7 @@ export function GeneratorShell({
   // access — a visitor must see NO trace of the pricing stage anywhere.
   // (validateDraft already drops issues for out-of-scope stages.)
   const validation = useMemo(() => {
-    const raw = validateDraft(data);
+    const raw = validateDraft(data, { partnerFile });
     if (canPricing) return raw;
     const gatedStages = new Set(STAGES.filter((s) => s.gated).map((s) => s.key));
     return {
@@ -73,7 +74,7 @@ export function GeneratorShell({
       blocking: raw.blocking.filter((issue) => !gatedStages.has(issue.stage)),
       warnings: raw.warnings.filter((issue) => !gatedStages.has(issue.stage)),
     };
-  }, [data, canPricing]);
+  }, [data, canPricing, partnerFile]);
   const visibleStages = useMemo(() => visibleStagesFor(data.scope, canPricing), [data.scope, canPricing]);
   // «الفنادق» has no chip of its own any more — the stays live inside their
   // city. A /hotels deep link still renders, under the city card's chip.

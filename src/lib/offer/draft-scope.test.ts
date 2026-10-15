@@ -93,9 +93,11 @@ describe("visibleStagesFor", () => {
 });
 
 describe("validateDraft with an out-of-scope service", () => {
-  it("does not block on a city without a hotel (removed 2026-10-12), but the hotels card is not complete", () => {
+  // The nights-coverage rule stays gone (2026-10-12); a city with NO hotel at
+  // all is not issued (AD-4-8573 went out with «—» for both its cities).
+  it("blocks a city with nights and no hotel at all, and the hotels card is not complete", () => {
     const result = validateDraft(draftWithCitiesButNoHotels());
-    expect(result.blocking.some((i) => i.stage === "hotels")).toBe(false);
+    expect(result.blocking.some((i) => i.key === "pg.err.cityNoHotel")).toBe(true);
     expect(result.stages.hotels).not.toBe("complete");
   });
 

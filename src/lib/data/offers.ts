@@ -25,7 +25,7 @@ import { getPartnerSession } from "@/lib/partners/session";
 import { getClimateNote } from "./climate-actions";
 import { insertOffer } from "./offer-insert";
 import { setOfferStatus } from "./offer-status";
-import { draftToFreeze } from "./issued-draft";
+import { draftToFreeze, reissueLocked } from "./issued-draft";
 import { getRates, type RatesResult } from "./rates-actions";
 import { STAGE_KEYS } from "./pipeline";
 
@@ -825,7 +825,7 @@ export type PublishResult = { ok: true; serial: string; version: number } | { ok
  * and the sent PDF both read this exact snapshot, so they never drift when the
  * underlying hotel/price data changes later. Requires auth.
  */
-export async function publishOffer(serial: string): Promise<PublishResult> {
+export async function publishOffer(serial: string, reissued = false): Promise<PublishResult> {
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
@@ -861,6 +861,10 @@ export async function publishOffer(serial: string): Promise<PublishResult> {
     // 0047 closed offer_renders to every session. The permission check above is
     // the gate — nobody reaches these inserts without it.
     const renders = createSupabaseServiceClient() as unknown as SupabaseClient;
+    // a re-issue (see sourceDraft below): offers.write, and never a locked partner file
+    if (reissued && (!(await currentCan("offers.write")) || (await reissueLocked(renders, serial)))) {
+      return { ok: false, error: "pg.err.issuedLocked" };
+    }
 
     // next shared version across both variants (published together)
     const { data: last } = await renders
@@ -885,9 +889,14 @@ export async function publishOffer(serial: string): Promise<PublishResult> {
 
     // The first version also freezes the draft that issued it: operations seeds
     // its bookings and travelers from THIS copy (issued-draft.ts), never from a
-    // draft still editable after issue (audit M1).
+    // draft still editable after issue (audit M1). `reissued` — produceOfferFromDraft
+    // has just replaced the offer's rows from that draft («إصدار نسخة محدّثة»), so
+    // this version freezes it too. A plain «إعادة النشر» republishes the rows and
+    // freezes nothing: the seeds keep the newest copy that matches what was sent.
+    // Called with the flag from a browser it still needs offers.write and an
+    // unlocked file — the same gates as the re-issue itself (checked above).
     const sourceDraft =
-      version === 1
+      version === 1 || reissued
         ? await draftToFreeze(renders, serial, (offerRow as { partner_company_id: string | null }).partner_company_id)
         : null;
     await renders.from("offer_renders").insert({

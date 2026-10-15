@@ -114,10 +114,37 @@ function statedBoard(h: DraftData["hotels"][number]): string | null {
   return rooms.every((r) => Boolean(r.board_type)) ? (h.board_type ?? "stated") : null;
 }
 
+export type ValidateOptions = {
+  /**
+   * The caller is a partner company working its own file (partnerCaller() on
+   * the server, usePartnerBrand() in the browser). Its files keep their own
+   * rules: what this flag softens is advised to them, never blocked.
+   */
+  partnerFile?: boolean;
+};
+
+/**
+ * The stops the group sleeps in (nights > 0) with no stay, or a stay whose
+ * hotel is not named — the cities Basic's card says «ينقص: الفندق» for (the
+ * document would print «—» there). One function for Basic's focus, the «ما ينقص
+ * قبل الإصدار» list and the server's issue gate, so they cannot disagree. A
+ * ready-made package's locked price already holds its hotels.
+ */
+export function citiesWithoutHotel(data: DraftData): string[] {
+  if (!data.scope.hotels || isFixedPrice(data)) return [];
+  const stays = deriveHotelStays(data.cities, data.hotels);
+  return data.cities
+    .filter((c, i) => {
+      const mine = stays.filter((s) => s.city_index === i);
+      return c.nights > 0 && (mine.length === 0 || mine.some((s) => !s.line.hotel_name.trim()));
+    })
+    .map((c) => c.city_name);
+}
+
 // Who a flight or a hotel was booked through is recorded when the agent knows
 // it, never demanded: management asked that a missing supplier name not hold a
 // file back (and a partner could never fill it — our list is staff-only).
-export function validateDraft(data: DraftData): DraftValidation {
+export function validateDraft(data: DraftData, opts: ValidateOptions = {}): DraftValidation {
   const blocking: DraftIssue[] = [];
   const warnings: DraftIssue[] = [];
 
@@ -253,6 +280,13 @@ export function validateDraft(data: DraftData): DraftValidation {
 
   // No «every night has a hotel» block: the owner removed it (2026-10-12). The
   // cities card still shows each city's coverage (مكتمل / متبقٍ / زائد).
+  // But a city with nights and NO hotel at all is not a programme: AD-4-8573
+  // went out with «—» for both its cities while Basic said «ينقص: الفندق».
+  // Every stay names its hotel — not the nights coverage that was dropped.
+  if (citiesWithoutHotel(data).length > 0) {
+    const severity = opts.partnerFile ? "warning" : "blocking";
+    (opts.partnerFile ? warnings : blocking).push({ severity, stage: "hotels", field: "hotels", key: "pg.err.cityNoHotel" });
+  }
   // The hotel's price is typed on its stay — it changes daily, so it is never
   // taken from a list. A ready-made package carries its own locked total.
   if (

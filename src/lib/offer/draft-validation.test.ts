@@ -7,7 +7,7 @@ import {
   withRooms,
   type DraftData,
 } from "./draft-types";
-import { validateDraft } from "./draft-validation";
+import { citiesWithoutHotel, validateDraft } from "./draft-validation";
 import { withRequiredAnswers } from "./draft-test-helpers";
 
 function completeDraft(): DraftData {
@@ -328,5 +328,56 @@ describe("a tour day with no car (order 4)", () => {
     off.transport_plan = { ...off.transport_plan, tours: { ...off.transport_plan.tours, enabled: false, car_type: "" } };
     off.cities = off.cities.map((c, i) => (i === 0 ? { ...c, tours: 1, tour_picks: [{ program_id: null, title: "جولة", text: "", price: 1 }] } : c));
     expect(warned(validateDraft(off))).toBe(false);
+  });
+});
+
+describe("a city with nights and no hotel is never issued (AD-4-8573)", () => {
+  // the real file: rooms, boards and prices typed, the hotel's name never chosen
+  const hotelless = () => {
+    const data = completeDraft();
+    data.hotels = data.hotels.map((h) => ({ ...h, hotel_id: null, hotel_name: "" }));
+    return data;
+  };
+  const gate = (r: ReturnType<typeof validateDraft>) => r.blocking.some((b) => b.key === "pg.err.cityNoHotel");
+
+  it("blocks the issue and names both cities — the list Basic focuses is the server's", () => {
+    const data = hotelless();
+    expect(citiesWithoutHotel(data)).toEqual(["كوالالمبور", "لنكاوي"]);
+    const result = validateDraft(data);
+    expect(result.ok).toBe(false);
+    expect(gate(result)).toBe(true);
+  });
+
+  it("blocks one city left without a hotel even when the other has one", () => {
+    const data = completeDraft();
+    data.hotels = [data.hotels[0]];
+    expect(citiesWithoutHotel(data)).toEqual(["لنكاوي"]);
+    expect(gate(validateDraft(data))).toBe(true);
+  });
+
+  it("blocks a second stay left without its hotel's name — the document would print «—»", () => {
+    const data = completeDraft();
+    data.hotels = [...data.hotels, { ...data.hotels[1], id: "extra", hotel_id: null, hotel_name: "", dates: "same" }];
+    expect(citiesWithoutHotel(data)).toEqual(["لنكاوي"]);
+  });
+
+  it("only advises a partner's own file — its own rules", () => {
+    const result = validateDraft(hotelless(), { partnerFile: true });
+    expect(gate(result)).toBe(false);
+    expect(result.warnings.some((w) => w.key === "pg.err.cityNoHotel")).toBe(true);
+  });
+
+  it("never stops a ready-made package (locked price) or a sale without hotels", () => {
+    const fixed = hotelless();
+    fixed.source = { ready_offer_id: "ro1", code: "P1", tier: "", title: "باقة", valid_from: null, valid_to: null };
+    fixed.pricing = { ...fixed.pricing, final_total: 5000 };
+    expect(citiesWithoutHotel(fixed)).toEqual([]);
+    const noHotels = hotelless();
+    noHotels.scope = { ...noHotels.scope, hotels: false };
+    expect(gate(validateDraft(noHotels))).toBe(false);
+  });
+
+  it("passes once every city names a hotel", () => {
+    expect(gate(validateDraft(completeDraft()))).toBe(false);
   });
 });

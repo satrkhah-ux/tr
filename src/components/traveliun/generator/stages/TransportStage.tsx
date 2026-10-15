@@ -3,6 +3,7 @@
 import { FieldIssue } from "../FieldIssue";
 import { TransportBlock } from "../TransportBlock";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
+import { OverlandHopNotice } from "../../OverlandHopNotice";
 import { sectionClass, type StageFormProps } from "../stage-props";
 
 /**
@@ -24,6 +25,7 @@ export function TransportStage({ data, patch, lookups }: StageFormProps) {
         cities={data.cities.map((c) => c.city_name)}
         onChange={(transport_plan) => patch({ transport_plan })}
       />
+      <OverlandHopNotice data={data} countries={lookups.countries} className="mt-3" />
     </section>
   );
 }

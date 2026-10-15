@@ -120,7 +120,9 @@ export type AuditAction =
   // the reference catalogue was exported/imported as a whole
   // managers changing what the system says or shows (guides, message templates)
   | "settings.updated"
-  | "catalog.imported";
+  | "catalog.imported"
+  // «إصدار نسخة محدّثة»: an issued offer's next version, from its corrected draft
+  | "offer.reissued";
 
 export type AuditInput = {
   action: AuditAction;

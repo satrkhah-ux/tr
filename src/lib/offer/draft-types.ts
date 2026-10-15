@@ -1847,7 +1847,14 @@ export function currencyOptions(
 
 // ---------- lookups (loaded server-side, passed to stage pages) ----------
 export type LookupHotel = { id: string; name: string; stars: number | null };
-export type LookupCity = { id: string; name: string; hotels: LookupHotel[] };
+export type LookupCity = {
+  id: string;
+  name: string;
+  hotels: LookupHotel[];
+  /** cities.lat / lng — the intercity distance warning (offer/overland.ts). */
+  lat?: number | null;
+  lng?: number | null;
+};
 export type LookupCountry = {
   id: string;
   name: string;
