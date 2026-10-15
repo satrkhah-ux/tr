@@ -251,8 +251,11 @@ export type DriverPickup = {
   landing: string;
   hotel: { name: string; name_en: string | null; map: string } | null;
   pax: string;
+  /** the car and how many, as the sale wrote it — «فان × 2» — or the one operations typed. */
   car: string;
   plate: string;
+  /** a tour's programme: where the day goes. */
+  program: string;
   step: DriverStep | null;
 };
 
@@ -327,6 +330,7 @@ export async function getDriverDay(token: string): Promise<DriverDay | null> {
         pax: d["الركاب"] || (count > 0 ? String(count) : ""),
         car: d[DRV.car] ?? "",
         plate: d[DRV.plate] ?? "",
+        program: d["البرنامج"] ?? "",
         step: driverStep(d),
       };
     });

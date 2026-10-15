@@ -56,6 +56,8 @@ export default async function DriverDayPage({ params }: { params: Promise<{ toke
                 {p.lead || p.serial} <bdi dir="ltr" className="text-[12px] font-bold text-[#93aaa3]">{p.serial}</bdi>
               </p>
               {p.kind === "tour" || p.kind === "transfer" ? <p className="mt-0.5 break-words text-[13px] font-semibold">{p.title}</p> : null}
+              {/* the day's tour: where it goes */}
+              {p.kind === "tour" && p.program ? <p className="mt-0.5 break-words text-[12.5px] text-[#557d78]">{p.program}</p> : null}
 
               <dl className="mt-3 space-y-1.5 text-[13px] font-semibold">
                 {p.flight ? (

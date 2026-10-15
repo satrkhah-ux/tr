@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { OfferDocument } from "./OfferDocument";
 import { computeOfferPricing } from "@/lib/offer/pricing";
-import { toClientOfferDTO, type InternalOfferDTO } from "@/lib/offer/dto";
+import { toClientOfferDTO, type InternalOfferDTO, type ItineraryDayLine } from "@/lib/offer/dto";
 import { AR } from "./labels";
 
 /**
@@ -126,5 +126,54 @@ describe("sheet filling", () => {
     const html = render(offer({ hotels: [stay("باكو", false)], visas: ["تأشيرة"], terms: [CLAUSE, CLAUSE] }));
     // cover + (visas & stay) + services + terms
     expect(sheetCount(html)).toBeLessThanOrEqual(4);
+  });
+});
+
+/**
+ * The daily programme is cut city by city (v4 order 5). A city's heading
+ * travels with its days: it never ends a sheet on its own, and a city whose
+ * days continue overleaf is headed again there.
+ */
+describe("programme pagination", () => {
+  const ACT = "زيارة المعالم الرئيسية في المدينة مع مرشد سياحي ثم وقت حر للتسوق في الأسواق الشعبية";
+  const programme = (cities: string[], daysEach: number): ItineraryDayLine[] =>
+    cities.flatMap((city, c) =>
+      Array.from({ length: daysEach }, (_, k) => {
+        const n = c * daysEach + k;
+        return {
+          day_number: n + 1, date: `2026-07-${String(n + 1).padStart(2, "0")}`, city_name: city,
+          title: `جولة اليوم ${n + 1}`, activities: [ACT, "التنقل بـفان × 2"],
+          temp_max: 31, temp_min: 24, rain_chance: 40, weather_code: 2, weather_source: "forecast" as const,
+          transport_note: null,
+        };
+      }),
+    );
+  /** each sheet's markup, cover excluded */
+  const sheets = (html: string) => html.split('<section class="od-page').slice(2);
+
+  function expectHeadingsWithTheirDays(html: string) {
+    for (const sheet of sheets(html)) {
+      const firstDay = sheet.indexOf('class="od-day');
+      if (firstDay < 0) continue;
+      // a sheet carrying days opens them under a city heading
+      expect(sheet.lastIndexOf("od-city-head", firstDay)).toBeGreaterThan(-1);
+      // and no heading on it is left without a day after it
+      expect(sheet.lastIndexOf("od-city-head")).toBeLessThan(sheet.lastIndexOf('class="od-day'));
+    }
+  }
+
+  it("splits a long programme between cities, never leaving a heading alone", () => {
+    const html = render(offer({ days: programme(["كوالالمبور", "لنكاوي", "بينانج", "بانكوك", "باتايا"], 4) }));
+    expect(pagesOf(html, AR.tours)).toBeGreaterThan(1);
+    expect(html.match(/class="od-city-head"/g)).toHaveLength(5);
+    expectHeadingsWithTheirDays(html);
+  });
+
+  it("cuts a city longer than a sheet, heading each piece", () => {
+    const html = render(offer({ days: programme(["كوالالمبور"], 18) }));
+    const heads = html.match(/class="od-city-head"/g) ?? [];
+    expect(heads.length).toBeGreaterThan(1);
+    expect(pagesOf(html, AR.tours)).toBe(heads.length);
+    expectHeadingsWithTheirDays(html);
   });
 });

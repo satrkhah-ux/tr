@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  Car,
   CheckCircle2,
   Copy,
   Download,
@@ -34,6 +35,7 @@ import {
 import { seedBookingsFromOffer } from "@/lib/data/operation-seed";
 import { ensureClientLink, revokeClientLink } from "@/lib/data/operation-hub";
 import type { VoucherKind } from "@/lib/operations/voucher-dto";
+import { DRV } from "@/lib/operations/drivers";
 import type { TranslationKey } from "@/lib/i18n";
 import type { AssigneeOption, SentRequest } from "@/lib/data/operation-assign";
 import { AssignBooking, AssigneeChip } from "./AssignBooking";
@@ -557,6 +559,13 @@ function BookingRow({
               <DirText dir="ltr">
                 {singleDay(booking.kind) || !booking.end_date ? `${booking.start_date}${when ? ` · ${when}` : ""}` : `${booking.start_date} → ${booking.end_date}`}
               </DirText>
+            ) : null}
+            {/* a tour's car and how many — «فان × 2» — without opening the edit form */}
+            {booking.detail?.[DRV.car] ? (
+              <span className="inline-flex items-center gap-1 text-[#557d78]" title={t("ops.drv.car")}>
+                <Car className="size-3" />
+                {booking.detail[DRV.car]}
+              </span>
             ) : null}
             {booking.confirmation_number ? (
               <span className="text-[#0f7a52]">

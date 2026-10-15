@@ -98,6 +98,8 @@ export const AR = {
   tours: "التنقلات والجولات والطقس",
   toursWeatherYes: "تظهر بيانات الطقس حسب المدينة والتاريخ.",
   toursWeatherNo: "بيانات الطقس غير مرفقة في هذا العرض.",
+  /** the city heading of the daily programme: where the group sleeps on that visit. */
+  visitHotels: (n: number) => (n > 1 ? "الفنادق" : "الفندق"),
   colDate: "التاريخ",
   colService: "الخدمة",
   colCount: "العدد",
@@ -210,6 +212,12 @@ export function fmtShortDate(value: string | null): string {
   if (!value) return "—";
   const date = new Date(`${value.slice(0, 10)}T00:00:00Z`);
   return Number.isNaN(date.getTime()) ? value.slice(0, 10) : DAY_MONTH_SHORT.format(date);
+}
+
+/** «20 – 22 أكتوبر 2026»; both dates in full across a month; one date when they are the same day. */
+export function fmtRange(from: string | null, to: string | null): string {
+  if (!from || !to || from.slice(0, 10) === to.slice(0, 10)) return fmtShortDate(from ?? to);
+  return `${from.slice(0, 7) === to.slice(0, 7) ? Number(from.slice(8, 10)) : fmtShortDate(from)} – ${fmtShortDate(to)}`;
 }
 
 export function fmtDayMonth(value: string | null): string {
