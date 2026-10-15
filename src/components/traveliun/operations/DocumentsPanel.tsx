@@ -11,6 +11,7 @@ import {
   FileText,
   Layers,
   Link2,
+  ListChecks,
   Loader2,
   Pencil,
   Plus,
@@ -38,8 +39,15 @@ import type { VoucherKind } from "@/lib/operations/voucher-dto";
 import { carFields, carText, DRV } from "@/lib/operations/drivers";
 import type { TranslationKey } from "@/lib/i18n";
 import type { AssigneeOption, SentRequest } from "@/lib/data/operation-assign";
+import { BOARD_AR } from "@/components/offer-doc/labels";
+import { BOARD_LABEL_KEYS, BOARD_TYPES } from "@/lib/offer/draft-types";
+import { roomSuggestions } from "@/lib/offer/basic";
+import { awaitingConfirmation } from "@/lib/operations/confirm-all";
+import type { BoardType } from "@/lib/types";
 import { AssignBooking, AssigneeChip } from "./AssignBooking";
 import { SupplierBooking } from "./SupplierBooking";
+import { CatalogHotelPick, useCaseHotels } from "./CaseHotelPicker";
+import { ConfirmAllBookings } from "./ConfirmAllBookings";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition, useSessionField } from "../useSafeTransition";
 
@@ -84,11 +92,15 @@ export function DocumentsPanel({
   const [pending, startTransition] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [confirmingAll, setConfirmingAll] = useState(false);
+  // what the last pull added — 0 says the case already holds everything the offer has
+  const [seeded, setSeeded] = useState<number | null>(null);
   const [perHotel, setPerHotel] = useState(false);
   const [welcomeName, setWelcomeName] = useState("");
 
   const confirmed = bookings.filter((b) => b.status === "confirmed");
   const outstanding = bookings.filter((b) => b.status !== "confirmed" && b.status !== "cancelled");
+  const waiting = bookings.filter((b) => awaitingConfirmation(b.status));
 
   const live = documents.filter((d) => !d.revoked_at);
   const issuedKinds = new Set(live.map((d) => d.kind));
@@ -150,7 +162,10 @@ export function DocumentsPanel({
                   setError(null);
                   const res = await seedBookingsFromOffer(operationId);
                   if (!res.ok) setError(t(res.error));
-                  else router.refresh();
+                  else {
+                    setSeeded(res.added);
+                    router.refresh();
+                  }
                 })
               }
               className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
@@ -166,6 +181,17 @@ export function DocumentsPanel({
               <Plus className="size-3.5" />
               {t("ops.booking.add")}
             </button>
+            {waiting.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setConfirmingAll((v) => !v)}
+                aria-expanded={confirmingAll}
+                className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+              >
+                <ListChecks className="size-3.5" />
+                {t("ops.confirmAll")}
+              </button>
+            ) : null}
           </div>
         </div>
         <p className="mb-3 text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.seedHint")}</p>
@@ -181,9 +207,18 @@ export function DocumentsPanel({
               {t("ops.booking.status.pending")} <DirText dir="ltr">{String(outstanding.length)}</DirText>
             </span>
           ) : null}
+          {seeded != null ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#eef4f2] px-3 py-1 text-[#557d78]">
+              <Download className="size-3.5" />
+              {t("ops.seeded", { n: seeded })}
+            </span>
+          ) : null}
         </div>
 
         {adding ? <AddBooking operationId={operationId} onDone={() => { setAdding(false); router.refresh(); }} /> : null}
+        {confirmingAll && waiting.length > 0 ? (
+          <ConfirmAllBookings operationId={operationId} bookings={waiting} onDone={() => router.refresh()} />
+        ) : null}
 
         {bookings.length === 0 ? (
           <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">
@@ -428,6 +463,13 @@ function ClientLinkBlock({ operationId, token }: { operationId: string; token: s
   );
 }
 
+/** «غرفة مزدوجة — إفطار»: the room line the pull writes, so a typed hotel reads like a pulled one. */
+function roomLine(room: string, board: BoardType | ""): string {
+  return [room.trim(), board ? BOARD_AR[board] : ""].filter(Boolean).join(" — ");
+}
+
+const nightsBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+
 function AddBooking({ operationId, onDone }: { operationId: string; onDone: () => void }) {
   const { t } = useTraveliunUI();
   const [kind, setKind] = useState<BookingKind>("hotel");
@@ -435,8 +477,25 @@ function AddBooking({ operationId, onDone }: { operationId: string; onDone: () =
   const [city, setCity] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  // a hotel: picked from the catalogue (its city comes with it), its room, board and rooms
+  const [hotelId, setHotelId] = useState<string | null>(null);
+  const [room, setRoom] = useState("");
+  const [board, setBoard] = useState<BoardType | "">("");
+  const [rooms, setRooms] = useState(1);
   const [pending, startTransition] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
+  const hotel = kind === "hotel";
+  const catalog = useCaseHotels(operationId, hotel);
+  const roomList = `ops-rooms-${operationId}`;
+
+  function hotelDetail(): Record<string, string> {
+    const detail: Record<string, string> = {};
+    if (roomLine(room, board)) detail["الغرفة"] = roomLine(room, board);
+    detail["عدد الغرف"] = String(rooms);
+    const nights = from && to ? nightsBetween(from, to) : 0;
+    if (nights > 0) detail["عدد الليالي"] = String(nights);
+    return detail;
+  }
 
   return (
     <div className="mb-3 grid gap-2 rounded-[11px] border border-[#e2ebe7] bg-[#f8fbf9] p-3 sm:grid-cols-2">
@@ -450,14 +509,81 @@ function AddBooking({ operationId, onDone }: { operationId: string; onDone: () =
           ))}
         </select>
       </label>
+      {hotel ? (
+        <CatalogHotelPick
+          catalog={catalog}
+          valueId={hotelId}
+          onPick={(h) => {
+            setHotelId(h?.id ?? null);
+            if (!h) return;
+            setTitle(h.name);
+            if (h.city) setCity(h.city);
+          }}
+        />
+      ) : null}
       <label className={label}>
         {t("pg.desc")}
-        <input value={title} onChange={(e) => setTitle(e.target.value)} className={field} />
+        <input
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            // a typed name is the agent's own, not the catalogue's
+            setHotelId(null);
+          }}
+          className={field}
+        />
       </label>
       <label className={label}>
         {t("pg.city")}
         <input value={city} onChange={(e) => setCity(e.target.value)} className={field} />
       </label>
+      {hotel ? (
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_5rem] gap-2 sm:col-span-2">
+          <label className={label}>
+            {t("pg.roomType")}
+            <input
+              list={roomList}
+              value={room}
+              onChange={(e) => {
+                setRoom(e.target.value);
+                // a room the catalogue knows brings its board
+                const known = catalog?.roomTypes.find((r) => r.hotel_id === hotelId && r.name.trim() === e.target.value.trim());
+                if (known?.default_board) setBoard(known.default_board);
+              }}
+              className={field}
+            />
+            <datalist id={roomList}>
+              {roomSuggestions(catalog?.roomTypes ?? [], hotelId).map((n) => (
+                <option key={n} value={n} />
+              ))}
+            </datalist>
+          </label>
+          <label className={label}>
+            {t("pg.board")}
+            <select value={board} onChange={(e) => setBoard(e.target.value as BoardType | "")} className={field}>
+              <option value="">—</option>
+              {BOARD_TYPES.map((b) => (
+                <option key={b} value={b}>
+                  {t(BOARD_LABEL_KEYS[b])}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            {t("pg.roomsCount")}
+            <input
+              type="number"
+              min={1}
+              max={50}
+              dir="ltr"
+              inputMode="numeric"
+              value={rooms}
+              onChange={(e) => setRooms(Math.min(Math.max(Math.trunc(Number(e.target.value)) || 1, 1), 50))}
+              className={`${field} tv-tnum`}
+            />
+          </label>
+        </div>
+      ) : null}
       <div className="grid grid-cols-2 gap-2">
         <label className={label}>
           {t("pg.checkIn")}
@@ -483,6 +609,7 @@ function AddBooking({ operationId, onDone }: { operationId: string; onDone: () =
                 city_name: city.trim(),
                 start_date: from || null,
                 end_date: to || null,
+                ...(hotel ? { detail: hotelDetail() } : {}),
               });
               if (!res.ok) setError(t(res.error));
               else onDone();
@@ -550,6 +677,8 @@ function BookingRow({
     detail: detailForm(booking),
   });
   const when = booking.detail?.["الوقت"] || booking.detail?.["وقت الانطلاق"] || "";
+  // a hotel pulled before it was chosen («فندق بالي — يُحدَّد لاحقاً») is named from the catalogue here
+  const catalog = useCaseHotels(operationId, editing && booking.kind === "hotel");
   const [pending, startTransition] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -664,6 +793,15 @@ function BookingRow({
 
       {editing ? (
         <div className="mt-2 grid gap-2 rounded-[9px] border border-[#e2ebe7] bg-[#f8fbf9] p-3 sm:grid-cols-2">
+          {booking.kind === "hotel" ? (
+            <CatalogHotelPick
+              catalog={catalog}
+              valueId={catalog?.hotels.find((h) => h.name === form.title.trim())?.id ?? null}
+              onPick={(h) => {
+                if (h) setForm((f) => ({ ...f, title: h.name, city_name: h.city || f.city_name }));
+              }}
+            />
+          ) : null}
           <label className={label}>
             {t("pg.desc")}
             <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} className={field} />

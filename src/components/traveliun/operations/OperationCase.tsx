@@ -33,6 +33,7 @@ import { ReadinessPanel } from "./ReadinessPanel";
 import { CasePresence } from "./CasePresence";
 import { CaseWizard } from "./CaseWizard";
 import { IssuesPanel } from "./IssuesPanel";
+import { ClientSend } from "./ClientSend";
 
 const CLIENT_KEY = (s: string) => `ops.client.${s}` as TranslationKey;
 const EXEC_KEY = (s: string) => `ops.exec.${s}` as TranslationKey;
@@ -132,6 +133,13 @@ export function OperationCase({
               </p>
             </div>
           </div>
+
+          {/* a partner's client hears from the partner, never from us */}
+          {operation.partner_name ? null : (
+            <div className="mt-3">
+              <ClientSend operationId={operation.id} />
+            </div>
+          )}
 
           {/* the two tracks, advanced independently */}
           <div className="mt-4 grid gap-4 md:grid-cols-2">

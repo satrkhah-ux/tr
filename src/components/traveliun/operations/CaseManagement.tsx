@@ -33,6 +33,7 @@ const KNOWN = new Set([
   "booking.cancelled",
   "booking.retimed",
   "dispatch.sent",
+  "dispatch.held",
   "voucher.issued",
   "voucher.revoked",
   "supplier.prebooked",

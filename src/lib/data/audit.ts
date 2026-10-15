@@ -74,6 +74,8 @@ export type AuditAction =
   // logged BEFORE the row (and its cascaded vouchers) is gone
   | "booking.deleted"
   | "dispatch.sent"
+  // a message to the client that WhatsApp held back (24 hours since they last wrote) — left as a Teletel note
+  | "dispatch.held"
   | "voucher.issued"
   | "voucher.revoked"
   // partner companies (identity + branding)

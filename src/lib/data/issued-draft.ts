@@ -44,7 +44,11 @@ export async function draftToFreeze(service: SupabaseClient, serial: string, off
   return { id: row?.id ?? null, data: row?.data ?? null };
 }
 
-/** For the seeds: the draft as issued, or null — then the offer's own rows are the source. */
+/**
+ * For the seeds: the draft as issued, or null — then the offer's own rows are the source.
+ * The NEWEST version that froze one: a file issued again (its hotels chosen after
+ * the first issue) is booked as the client last received it.
+ */
 export async function issuedDraftData(
   service: SupabaseClient,
   offer: { id: string; serial: string; partner_company_id: string | null },
@@ -54,7 +58,8 @@ export async function issuedDraftData(
     .select("source:snapshot_json->source_draft")
     .eq("offer_id", offer.id)
     .eq("variant", "internal")
-    .order("version", { ascending: true })
+    .not("snapshot_json->source_draft", "is", null)
+    .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();
   const frozen = (data as { source: FrozenDraft | null } | null)?.source;
