@@ -117,7 +117,7 @@ import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
 import { basicCard, basicField, basicLabel, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
 import { AdvancedQuestions } from "./AdvancedQuestions";
-import { emptyAdvanced } from "@/lib/offer/advanced";
+import { advancedDefaults, emptyAdvanced, fillAdvanced } from "@/lib/offer/advanced";
 import { IssueGuardNotice } from "../IssueGuardNotice";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -319,9 +319,11 @@ export function BasicEditor({
     // a move by air becomes its planned domestic leg — the agent never types a route the cities already say
     const shaped = { ...merged, cities: chained, scope: nextScope, ...withDomesticFlights({ ...merged, flights, cities: chained, transport_plan }, lookups.airports) };
     const hotels = withHotelLines(shaped, BASE_CURRENCY);
-    const next = { ...shaped, hotels, days: basicDays({ ...shaped, hotels }) };
+    // «بكج متقدم»: its dates follow Basic's until the agent types their own
+    const advanced = merged.advanced?.on ? fillAdvanced(merged.advanced, advancedDefaults({ ...shaped, cities: chained })) : merged.advanced;
+    const next = { ...shaped, hotels, advanced, days: basicDays({ ...shaped, hotels, advanced }) };
     latest.current = next;
-    patch({ ...slice, flights: shaped.flights, cities: chained, transport_plan: shaped.transport_plan, scope: nextScope, hotels, days: next.days });
+    patch({ ...slice, flights: shaped.flights, cities: chained, transport_plan: shaped.transport_plan, scope: nextScope, hotels, days: next.days, ...(advanced && advanced !== merged.advanced ? { advanced } : {}) });
   }
 
   /** The trip's answers; a visa line still counting every traveller keeps counting them. */
@@ -463,6 +465,23 @@ export function BasicEditor({
     }),
     [lookups, roomTypes, hotelsByCountry],
   );
+  // «بكج متقدم» opened on a file whose dates it has not taken yet: take them now
+  useEffect(() => {
+    const adv = latest.current.advanced;
+    if (adv?.on && fillAdvanced(adv, advancedDefaults(latest.current)) !== adv) commit({ advanced: adv });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on open
+  }, []);
+
+  // «بكج متقدم» picks its places from the catalogue
+  const advancedLists = useMemo(() => {
+    const wanted = new Set([trip.country, ...data.cities.map((c) => c.country ?? "")].filter(Boolean));
+    return {
+      airports: lk.airports.map((a) => `${a.name}${a.code ? ` (${a.code})` : ""}`),
+      places: [...new Set(lk.countries.flatMap((c) => c.cities.map((x) => x.name)))],
+      hotels: [...new Set(lk.countries.filter((c) => wanted.has(c.name)).flatMap((c) => c.cities.flatMap((x) => x.hotels.map((h) => h.name))))],
+      countries: lk.countries.map((c) => c.name),
+    };
+  }, [lk, trip.country, data.cities]);
 
   // ---------- the tours price list of the trip's countries ----------
   const [tourPrices, setTourPrices] = useState<TourPrice[]>([]);
@@ -1642,8 +1661,10 @@ export function BasicEditor({
             <AdvancedQuestions
               value={data.advanced}
               cities={data.cities}
+              plan={data.transport_plan}
+              transportOn={data.scope.transport}
               tripCountry={trip.country}
-              countries={lk.countries.map((c) => c.name)}
+              lists={advancedLists}
               onChange={(advanced) => commit({ advanced })}
             />
           ) : null}
