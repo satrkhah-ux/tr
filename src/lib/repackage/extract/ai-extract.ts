@@ -81,6 +81,8 @@ const SYSTEM = `أنت مساعد متخصص في قراءة عروض شركات
 - transfers: التنقلات والجولات فقط. لا تضع فيها ما هو أصلاً في includes.
 - terms: الشروط والملاحظات المذكورة، سطر لكل بند.
 - summary: ٢-٣ جمل عربية تصف العرض (الوجهة، المدة، أبرز ما يشمله).
+- customer_name / customer_phone: اسم العميل المسافر ورقم جواله فقط إن كُتبا صراحةً على أنهما للعميل
+  (مثل «اسم العميل» أو «السيد/ة»). لا تضع أبداً اسم المورّد أو الشركة أو أرقام تواصلها؛ إن لم يُذكر العميل فاتركهما فارغين.
 
 - **إن لم تستطع قراءة رقم أو تاريخ بوضوح تام فاتركه فارغاً.** الحقل الفارغ يُراجَع يدوياً،
   أما الرقم المخمَّن فيصل إلى العميل خطأً. ولا تخمّن سنةً غير مكتوبة في المستند.
@@ -91,11 +93,13 @@ const SCHEMA = {
   type: "object",
   additionalProperties: false,
   required: [
-    "destination", "country", "cities", "trip_nights", "arrival_date", "departure_date",
+    "customer_name", "customer_phone", "destination", "country", "cities", "trip_nights", "arrival_date", "departure_date",
     "adults", "children", "infants", "hotels", "flights", "transfers", "includes",
     "excludes", "visas", "terms", "supplier_total", "supplier_currency", "summary", "found",
   ],
   properties: {
+    customer_name: { type: ["string", "null"] },
+    customer_phone: { type: ["string", "null"] },
     destination: { type: ["string", "null"] },
     country: { type: ["string", "null"] },
     cities: {
@@ -156,6 +160,7 @@ const SCHEMA = {
 } as const;
 
 type RawResult = {
+  customer_name: string | null; customer_phone: string | null;
   destination: string | null; country: string | null;
   cities: { city_name: string; nights: number | null }[];
   trip_nights: number | null; arrival_date: string | null; departure_date: string | null;
@@ -211,6 +216,8 @@ const isoDateTime = (v: unknown): string | null =>
 function toPackage(raw: RawResult): ExtractedPackage {
   const [arrival, departure] = plausibleRange(isoDate(raw.arrival_date), isoDate(raw.departure_date));
   return {
+    customer_name: str(raw.customer_name),
+    customer_phone: str(raw.customer_phone),
     destination: str(raw.destination),
     country: str(raw.country),
     cities: (Array.isArray(raw.cities) ? raw.cities : [])

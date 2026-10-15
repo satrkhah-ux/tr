@@ -15,7 +15,6 @@
 
 import { partnerBrand, type DocBrand } from "@/components/offer-doc/brand";
 import { BOARD_AR } from "@/components/offer-doc/labels";
-import type { BoardType } from "@/lib/types";
 import type { ClientOfferDTO } from "./dto";
 import {
   baggageLabel,
@@ -32,25 +31,10 @@ import { itineraryStartDate } from "./schedule";
 import { transportNoteForDay } from "./itinerary";
 import { clientLines } from "./advanced";
 import { offerTotals, type CurrencyRates } from "./pricing";
-import type { ExtractedPackage, RepackageData } from "@/lib/repackage/repackage-types";
+import { packageNights, packageStays, type ExtractedPackage, type RepackageData } from "@/lib/repackage/repackage-types";
 
 /** Placeholder serial shown while the offer has not been produced yet. */
 const PENDING_SERIAL = "—";
-
-const BOARDS: BoardType[] = ["RO", "BB", "HB", "FB", "AI"];
-
-/** Supplier PDFs write the board in any of a dozen ways; keep only what we know. */
-function normalizeBoard(raw: string | null | undefined): BoardType | null {
-  const value = (raw ?? "").trim().toUpperCase();
-  if (BOARDS.includes(value as BoardType)) return value as BoardType;
-  const text = (raw ?? "").trim();
-  if (/إفطار|افطار|breakfast/i.test(text)) return "BB";
-  if (/نصف|half/i.test(text)) return "HB";
-  if (/كامل|full/i.test(text)) return "FB";
-  if (/شامل|all\s*inclusive/i.test(text)) return "AI";
-  if (/غرفة فقط|room only/i.test(text)) return "RO";
-  return null;
-}
 
 /** Days/nights as the document's cover prints them. */
 function durationText(days: number, nights: number): string | null {
@@ -200,9 +184,9 @@ export function draftSellTotal(data: DraftData, sarPer: CurrencyRates = { SAR: 1
 }
 
 /**
- * The repackage wizard's preview. Mirrors produceRepackageOffer's mapping —
- * cities pair to hotels by name, else positionally — so the preview shows the
- * offer that button will actually create.
+ * The repackage wizard's preview. Built on packageStays — the very mapping
+ * produceRepackageOffer issues (each stop its own hotel, dates chained from the
+ * arrival) — so the preview shows the offer that button will actually create.
  *
  * `supplier_total` is deliberately NOT read: the client sees `final_total`, our
  * sell price, and the supplier's cost never enters this tree.
@@ -211,42 +195,19 @@ export function repackageToPreviewOffer(data: RepackageData): ClientOfferDTO | n
   const pkg: ExtractedPackage | null = data.extracted;
   if (!pkg) return null;
 
-  const nights = pkg.trip_nights ?? pkg.cities.reduce((sum, c) => sum + (c.nights ?? 0), 0);
+  const nights = packageNights(pkg);
   const days = nights > 0 ? nights + 1 : 0;
-  const hotelFor = (cityName: string, index: number) =>
-    pkg.hotels.find((h) => h.city_name && h.city_name === cityName) ?? pkg.hotels[index] ?? null;
-
-  const stays = (pkg.cities.length > 0 ? pkg.cities : pkg.hotels.map((h) => ({ city_name: h.city_name, nights: h.nights })))
-    .map((city, index) => {
-      const hotel = hotelFor(city.city_name, index);
-      return {
-        city_name: city.city_name || null,
-        hotel_name: hotel?.hotel_name || null,
-        stars: null,
-        room_type: hotel?.room_type || null,
-        board_type: normalizeBoard(hotel?.board),
-        rooms_count: 1,
-        nights: city.nights ?? hotel?.nights ?? null,
-        check_in: hotel?.check_in ?? null,
-        check_out: hotel?.check_out ?? null,
-        sell_price: null,
-        sell_currency: null,
-        cancellation_policy: null,
-        excluded_surcharges: [],
-        valid_until: null,
-        image_url: null,
-        facilities: [],
-      };
-    });
+  const stays = packageStays(pkg);
 
   return {
     ...emptyBase(),
     serial: data.produced_serial ?? PENDING_SERIAL,
     destination: pkg.destination || pkg.country || null,
-    customer_name: null,
-    customer_phone: null,
+    customer_name: pkg.customer_name.trim() || null,
+    customer_phone: pkg.customer_phone.trim() || null,
     arrival_date: pkg.arrival_date,
-    departure_date: pkg.departure_date,
+    // the issued document ends where its last stay checks out — so does this one
+    departure_date: stays.at(-1)?.check_out ?? pkg.departure_date,
     duration: durationText(days, nights),
     issue_date: null,
     adults: pkg.adults,
@@ -255,7 +216,24 @@ export function repackageToPreviewOffer(data: RepackageData): ClientOfferDTO | n
     total: data.final_total,
     currency: data.final_currency,
     pricing: emptyPricing(data.final_currency),
-    hotels: stays,
+    hotels: stays.map((s) => ({
+      city_name: s.city_name || null,
+      hotel_name: s.hotel?.hotel_name || null,
+      stars: null,
+      room_type: s.hotel?.room_type || null,
+      board_type: s.board_type,
+      rooms_count: 1,
+      nights: s.nights,
+      check_in: s.check_in,
+      check_out: s.check_out,
+      sell_price: null,
+      sell_currency: null,
+      cancellation_policy: null,
+      excluded_surcharges: [],
+      valid_until: null,
+      image_url: null,
+      facilities: [],
+    })),
     flights: pkg.flights.map((f) => ({
       airline: f.airline || null,
       flight_no: f.flight_no || null,

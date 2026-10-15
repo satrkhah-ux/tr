@@ -5,18 +5,21 @@ import type { TranslationKey } from "@/lib/i18n";
 import type { BoardType } from "@/lib/types";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
-import { deriveCityDates } from "@/lib/offer/draft-types";
 import { getActiveMarkupRules } from "@/lib/data/markup-rules";
 import { computeSell, selectRule } from "@/lib/pricing/markup";
 import {
   emptyRepackageData,
+  impliedDeparture,
   normalizeRepackageData,
+  packageNights,
+  packageStays,
   type RepackageData,
 } from "@/lib/repackage/repackage-types";
 import { validateRepackage } from "@/lib/repackage/repackage-validation";
 import { runExtraction, type ExtractionHow, type ExtractionSource } from "@/lib/repackage/extract/extract";
 import { publishOffer, type OfferHotelInput } from "./offers";
 import { insertOffer } from "./offer-insert";
+import { customerFor } from "./customer-row";
 import { fetchPublic } from "@/lib/repackage/fetch-public";
 
 /**
@@ -298,7 +301,16 @@ export async function importFromPdf(id: string, formData: FormData): Promise<Imp
 
     const record = await getRepackage(id);
     const base = record?.data ?? emptyRepackageData();
-    const pkg = extraction.extracted;
+    // The client is ours, not the supplier's: a re-import keeps whoever the
+    // employee already typed unless the new file names someone. A missing
+    // departure is the arrival + the nights, as the generator derives it.
+    const read = extraction.extracted;
+    const pkg = {
+      ...read,
+      customer_name: read.customer_name || base.extracted?.customer_name || "",
+      customer_phone: read.customer_phone || base.extracted?.customer_phone || "",
+      departure_date: impliedDeparture(read),
+    };
     const nextData: RepackageData = {
       ...base,
       source: {
@@ -405,10 +417,6 @@ const BOARD_LABEL: Record<BoardType, string> = {
   AI: "شامل كليًا",
 };
 
-function asBoard(raw: string): BoardType | null {
-  return raw === "RO" || raw === "BB" || raw === "HB" || raw === "FB" || raw === "AI" ? raw : null;
-}
-
 /** Validate → map RepackageData onto a Traveliun offer → create + publish it. */
 export async function produceRepackageOffer(id: string): Promise<ProduceResult> {
   try {
@@ -423,29 +431,25 @@ export async function produceRepackageOffer(id: string): Promise<ProduceResult> 
     const validation = validateRepackage(data);
     if (!validation.ok) return { ok: false, error: "rp.err.blockingLeft" };
 
-    const nights = pkg.trip_nights ?? pkg.cities.reduce((s, c) => s + (c.nights ?? 0), 0);
+    const nights = packageNights(pkg);
     const days = nights > 0 ? nights + 1 : 0;
 
-    const cities = deriveCityDates(
-      pkg.arrival_date,
-      pkg.cities.map((c) => ({ city_name: c.city_name, nights: c.nights ?? 1, check_in: null, check_out: null })),
-    );
-    // Pair hotels to cities: prefer city_name match, else positional.
-    const hotelFor = (cityName: string, index: number) =>
-      pkg.hotels.find((h) => h.city_name && h.city_name === cityName) ?? pkg.hotels[index] ?? null;
+    // One stay per stop, each with ITS OWN hotel (a city visited twice keeps
+    // two hotels) and dates chained from the arrival — what the preview showed.
+    const stays = packageStays(pkg);
 
-    const hotels: OfferHotelInput[] = cities.flatMap((c, i) => {
-      const h = hotelFor(c.city_name, i);
+    const hotels: OfferHotelInput[] = stays.flatMap((s) => {
+      const h = s.hotel;
       if (!h) return [];
       return [{
         hotel_id: null,
         hotel_name: h.hotel_name || null,
         room_type_id: null,
         rooms_count: 1,
-        board_type: asBoard(h.board),
-        check_in: c.check_in,
-        check_out: c.check_out,
-        nights: c.nights,
+        board_type: s.board_type,
+        check_in: s.check_in,
+        check_out: s.check_out,
+        nights: s.nights,
         // package priced as a whole (buy_total on pricings) → no per-line cost.
         buy_price: null,
         buy_currency: null,
@@ -477,7 +481,8 @@ export async function produceRepackageOffer(id: string): Promise<ProduceResult> 
     const visaIncludes = pkg.visas.map((v) => `تأشيرة: ${v}`);
 
     const result = await insertOffer({
-      customer_id: null,
+      // the client link and the PDF read the name and phone from this row
+      customer_id: await customerFor(pkg, true),
       employee_id: null,
       destination: pkg.destination || pkg.country,
       duration: nights > 0 ? `${days} أيام / ${nights} ليالي` : null,
@@ -488,18 +493,15 @@ export async function produceRepackageOffer(id: string): Promise<ProduceResult> 
       total: data.final_total,          // our SELL
       buy_total: pkg.supplier_total,    // supplier COST (internal — pricings only)
       currency: data.final_currency,
-      cities: cities.map((c, i) => {
-        const h = hotelFor(c.city_name, i);
-        return {
-          city_name: c.city_name,
-          hotel_name: h?.hotel_name || null,
-          room_type: h?.room_type || null,
-          nights: c.nights,
-          check_in: c.check_in,
-          check_out: c.check_out,
-          meals: h?.board ? (BOARD_LABEL[asBoard(h.board) ?? "RO"] ?? null) : null,
-        };
-      }),
+      cities: stays.map((s) => ({
+        city_name: s.city_name,
+        hotel_name: s.hotel?.hotel_name || null,
+        room_type: s.hotel?.room_type || null,
+        nights: s.nights,
+        check_in: s.check_in,
+        check_out: s.check_out,
+        meals: s.board_type ? BOARD_LABEL[s.board_type] : null,
+      })),
       flights: pkg.flights.map((f) => ({
         carrier: f.airline || null,
         from_airport: f.from_airport || null,

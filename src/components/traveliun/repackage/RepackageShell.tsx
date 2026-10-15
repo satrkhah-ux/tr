@@ -106,7 +106,7 @@ export function RepackageShell({
   const issueText = useCallback(
     (issue: RepackageIssue): string => {
       if (issue.invariant) return language === "ar" ? issue.invariant.message_ar : issue.invariant.message_en;
-      return issue.key ? t(issue.key) : "";
+      return issue.key ? t(issue.key, issue.params) : "";
     },
     [language, t],
   );

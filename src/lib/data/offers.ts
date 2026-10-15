@@ -596,11 +596,11 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
       supabase.from("offer_pricing_items").select("item_type, description, quantity, buy_price, buy_currency, sell_price, sell_currency").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_days").select("day_number, day_date, city_name, title, activities, temp_max, temp_min, rain_chance, weather_code, weather_source, transport_note").eq("offer_id", offer.id).order("day_number"),
       supabase.from("pricings").select("fx_rates").eq("offer_id", offer.id).limit(1).maybeSingle(),
-      supabase.from("offer_cities").select("city_name, hotel_name").eq("offer_id", offer.id).order("sort"),
+      supabase.from("offer_cities").select("city_name, hotel_name, check_out").eq("offer_id", offer.id).order("sort"),
     ]);
 
     const hotelRows = (hotelsRes.data ?? []) as HotelRow[];
-    const offerCities = (offerCitiesRes.data ?? []) as { city_name: string | null; hotel_name: string | null }[];
+    const offerCities = (offerCitiesRes.data ?? []) as { city_name: string | null; hotel_name: string | null; check_out: string | null }[];
     const flightRows = (flightsRes.data ?? []) as FlightRow[];
     const serviceRows = (servicesRes.data ?? []) as { label: string; kind: string }[];
     const termRows = (termsRes.data ?? []) as { text: string }[];
@@ -758,9 +758,10 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
     const includes = rawIncludes.filter((l) => !l.startsWith("التوصيلات") && !l.startsWith("تأشيرة"));
 
     // arrival = offer_date (falls back to earliest hotel check-in); departure =
-    // latest hotel check-out. issue = created_at; validity = issue + 14 days.
+    // latest check-out of a hotel or a city — a stop without a hotel (a package
+    // re-issued without one) still ends the trip. issue = created_at; validity = issue + 14 days.
     const checkIns = hotels.map((h) => h.check_in).filter((d): d is string => Boolean(d)).sort();
-    const checkOuts = hotels.map((h) => h.check_out).filter((d): d is string => Boolean(d)).sort();
+    const checkOuts = [...hotels, ...offerCities].map((h) => h.check_out).filter((d): d is string => Boolean(d)).sort();
     const arrival_date = offer.offer_date ?? checkIns[0] ?? null;
     const departure_date = checkOuts.length > 0 ? checkOuts[checkOuts.length - 1] : null;
     // the day it was issued in Saudi Arabia, not in UTC

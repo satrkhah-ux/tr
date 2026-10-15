@@ -1685,6 +1685,15 @@ export const en = {
   "rp.warn.noHotels": "No hotels were extracted.",
   "rp.warn.noServices": "No included services were extracted.",
   "rp.warn.ocrUnavailable": "This looks scanned but OCR is not configured — fields need manual review.",
+  "rp.err.noDeparture": "Set the departure date.",
+  "rp.err.departureBeforeArrival": "The departure date must be after the arrival date.",
+  "rp.err.datesNights": "The departure date does not match the package length ({nights} nights from arrival).",
+  "rp.warn.flightDates": "Some flight dates fall outside the travel dates — check them in the preview.",
+  "rp.client.title": "Client and travel dates",
+  "rp.client.hint": "Fill these first — the name and dates appear on the offer the client receives.",
+  "rp.client.departureHint": "Worked out as arrival + {nights} nights; you can change it.",
+  "rp.field.hotelStop": "Hotel's city",
+  "rp.field.visitN": "{city} — visit {n}",
 
   // ---------- ready-made seasonal offers («العروض الجاهزة») ----------
   "pg.fromLibrary": "Add from the approved list ({count})",

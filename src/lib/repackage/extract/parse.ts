@@ -86,6 +86,10 @@ export function parseSupplierPackage(rawText: string): ParseResult {
   else { conf.country = 0; }
   if (!out.destination && out.country) out.destination = out.country;
 
+  // ── the client, only under a client label (never the supplier's contacts) ─
+  out.customer_name = firstMatch(lines, /اسم العميل|العميل|client(?:\s+name)?|customer(?:\s+name)?/i) ?? "";
+  out.customer_phone = (firstMatch(lines, /جوال العميل|هاتف العميل|رقم العميل|(?:client|customer)\s+(?:phone|mobile)/i) ?? "").replace(/[^\d+]/g, "");
+
   // ── cities + nights ────────────────────────────────────────────────────
   // "المدينة: اسطنبول - 3 ليالٍ" / "Istanbul – 3 nights"
   const cities: ExtractedCity[] = [];
