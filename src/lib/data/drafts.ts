@@ -43,6 +43,7 @@ import { clientLines, journeyPricingLines, normalizeJourney, withChangeLog } fro
 import { getRates } from "./rates-actions";
 import { suggestPricingFor } from "./pricing-suggest-core";
 import { customerFor } from "./customer-row";
+import { sendOfferToClient, type ClientSendResult } from "./client-whatsapp";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { byUsage } from "@/lib/offer/country-priority";
 import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
@@ -712,7 +713,14 @@ export async function copyProgramIntoDraft(draftId: string, serial: string): Pro
 }
 
 // ---------- produce the real offer ----------
-export type ProduceResult = { ok: true; serial: string } | { ok: false; error: TranslationKey };
+export type ProduceResult =
+  | {
+      ok: true;
+      serial: string;
+      /** what happened on the client's WhatsApp (client-whatsapp.ts) */
+      whatsapp: ClientSendResult;
+    }
+  | { ok: false; error: TranslationKey };
 
 /** Validate → map the draft onto CreateOfferInput → create the real offer. */
 export async function produceOfferFromDraft(draftId: string): Promise<ProduceResult> {
@@ -1073,7 +1081,9 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // Producing an offer IS sending it: publish v1 (freeze client snapshot +
     // status draft→sent) so the client link + PDF work immediately.
     await publishOffer(result.serial);
-    return { ok: true, serial: result.serial };
+    // the client hears it on WhatsApp — gated (client-whatsapp.ts), never in the way of the issue
+    const whatsapp = await sendOfferToClient(result.serial, Boolean(record.data.produced_serial));
+    return { ok: true, serial: result.serial, whatsapp };
   } catch {
     return { ok: false, error: "err.db" };
   }

@@ -2,7 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
+import { clientWhatsappAllowed, messageClient } from "./client-whatsapp";
 import { fillTemplate, type ClientMessageKey } from "@/lib/operations/client-messages";
 
 /**
@@ -21,20 +21,23 @@ export async function sendClientMessage(operationId: string, key: ClientMessageK
 
     const { data } = await supabase
       .from("operations")
-      .select("id, client_token, client_token_revoked_at, offers(serial, destination, partner_company_id, customers(arabic_name, mobile))")
+      .select("id, client_token, client_token_revoked_at, offers(serial, destination, employee_id, partner_company_id, customers(arabic_name, mobile))")
       .eq("id", operationId)
       .maybeSingle();
     const op = data as unknown as {
       id: string;
       client_token: string | null;
       client_token_revoked_at: string | null;
-      offers: { serial: string; destination: string | null; partner_company_id: string | null; customers: unknown } | null;
+      offers: { serial: string; destination: string | null; employee_id: string | null; partner_company_id: string | null; customers: unknown } | null;
     } | null;
     const offer = Array.isArray(op?.offers) ? op?.offers[0] : op?.offers;
     if (!op || !offer || offer.partner_company_id) return false;
     const c = offer.customers as { arabic_name: string | null; mobile: string | null } | { arabic_name: string | null; mobile: string | null }[] | null;
     const customer = Array.isArray(c) ? c[0] : c;
     if (!customer?.mobile) return false;
+    // the trial gate (client-whatsapp.ts) BEFORE the once-per-stage mark — a file
+    // not yet in the trial must still get its message when it is let in
+    if (await clientWhatsappAllowed({ employee_id: offer.employee_id, partner_company_id: offer.partner_company_id })) return false;
 
     // once per stage: the unique key refuses the second
     const { error: dup } = await supabase.from("operation_alerts").insert({ operation_id: operationId, kind: "client_msg", ref: key });
@@ -54,8 +57,11 @@ export async function sendClientMessage(operationId: string, key: ClientMessageK
       link: token ? `${base}/trip/${token}` : "",
       rate_link: token ? `${base}/trip/${token}/rate` : "",
     });
-    const conversation = await conversationForPhone(customer.mobile);
-    return conversation ? (await sendTeletelMessage(conversation, text)) !== null : false;
+    // a thread is opened if Teletel has never seen them; outside WhatsApp's 24 hours it waits as a team note
+    const sent = await messageClient({ employee_id: offer.employee_id, partner_company_id: offer.partner_company_id, customer }, text, {
+      labels: [`مرحلة-${key}`],
+    });
+    return sent === "sent";
   } catch {
     return false;
   }

@@ -186,6 +186,112 @@ export async function getTeletelContactLabels(contactId: number): Promise<string
   return Array.isArray(data?.payload) ? data.payload.filter((l): l is string => typeof l === "string") : [];
 }
 
+// ---------- a client's WhatsApp thread (the owner, 2026-10-15) ----------
+
+/**
+ * A phone as WhatsApp knows it: "+9665…". A Saudi «05…» or «5…» number gains
+ * its country code; anything else keeps its own digits. Null when too short to
+ * be a number.
+ */
+export function intlPhone(raw: string): string | null {
+  let d = raw.replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.length === 10 && d.startsWith("05")) d = `966${d.slice(1)}`;
+  if (d.length === 9 && d.startsWith("5")) d = `966${d}`;
+  return d.length >= 8 ? `+${d}` : null;
+}
+
+let whatsappInboxId: number | null | undefined;
+
+/** The WhatsApp inbox clients are written from: TELETEL_WHATSAPP_INBOX_ID, else the account's first WhatsApp inbox. */
+async function whatsappInbox(config: TeletelConfig): Promise<number | null> {
+  const fixed = Number(readEnv("TELETEL_WHATSAPP_INBOX_ID"));
+  if (fixed > 0) return fixed;
+  if (whatsappInboxId !== undefined) return whatsappInboxId;
+  const res = await api<{ payload?: { id?: number; channel_type?: string }[] }>(config, "/inboxes");
+  if (res === null) return null; // not cached: Teletel was unreachable, not empty
+  whatsappInboxId = res.payload?.find((i) => i.channel_type === "Channel::Whatsapp")?.id ?? null;
+  return whatsappInboxId;
+}
+
+export type ClientThread = {
+  conversationId: number;
+  /**
+   * WhatsApp's 24-hour rule: false when the client has not written in the last
+   * 24 hours — only an approved template may then reach them.
+   */
+  canReply: boolean;
+};
+
+/**
+ * The client's thread on the company WhatsApp: their most recent conversation
+ * in that inbox — or, for a number Teletel has never seen, a new contact and a
+ * new conversation (its WhatsApp source id is the number's digits). Null when
+ * Teletel cannot be reached or refuses.
+ */
+export async function clientThread(phone: string, name: string): Promise<ClientThread | null> {
+  const config = getTeletelConfig();
+  const intl = intlPhone(phone);
+  if (!config || !intl) return null;
+  const inbox = await whatsappInbox(config);
+  if (!inbox) return null;
+  const digits = intl.slice(1);
+
+  const hits = await searchTeletelContacts(digits.slice(-9), 5);
+  if (hits === null) return null;
+  let contactId = hits.find((h) => h.phone.replace(/\D/g, "").endsWith(digits.slice(-9)))?.id ?? 0;
+  let sourceId: string | null = null;
+  if (!contactId) {
+    const made = await api<{ payload?: { contact?: { id?: number }; contact_inbox?: { source_id?: string } } }>(config, "/contacts", {
+      inbox_id: inbox,
+      name: name.trim() || intl,
+      phone_number: intl,
+    });
+    contactId = made?.payload?.contact?.id ?? 0;
+    sourceId = made?.payload?.contact_inbox?.source_id ?? null;
+    if (!contactId) return null;
+  }
+
+  const listed = await api<{ payload?: { id?: number; inbox_id?: number; can_reply?: boolean }[] }>(config, `/contacts/${contactId}/conversations`);
+  const current = (listed?.payload ?? []).find((c) => c.inbox_id === inbox && typeof c.id === "number");
+  if (current?.id) return { conversationId: current.id, canReply: current.can_reply === true };
+
+  if (!sourceId) {
+    const ci = await api<{ source_id?: string }>(config, `/contacts/${contactId}/contact_inboxes`, { inbox_id: inbox, source_id: digits });
+    sourceId = ci?.source_id ?? digits;
+  }
+  const opened = await api<{ id?: number; can_reply?: boolean }>(config, "/conversations", {
+    source_id: sourceId,
+    inbox_id: inbox,
+    contact_id: contactId,
+    status: "open",
+  });
+  return opened?.id ? { conversationId: opened.id, canReply: opened.can_reply === true } : null;
+}
+
+/** A note on the thread that only the team sees. */
+export async function addTeletelNote(conversationId: number, text: string): Promise<boolean> {
+  const config = getTeletelConfig();
+  if (!config || !text.trim()) return false;
+  const res = await api<{ id?: number }>(config, `/conversations/${conversationId}/messages`, {
+    content: text,
+    message_type: "outgoing",
+    private: true,
+  });
+  return typeof res?.id === "number";
+}
+
+/** Add labels to a thread, keeping the ones it has (the API sets the whole list). */
+export async function addTeletelLabels(conversationId: number, labels: string[]): Promise<boolean> {
+  const config = getTeletelConfig();
+  if (!config || labels.length === 0) return false;
+  const now = await api<{ payload?: unknown[] }>(config, `/conversations/${conversationId}/labels`);
+  const have = (now?.payload ?? []).filter((l): l is string => typeof l === "string");
+  const all = [...new Set([...have, ...labels])];
+  if (all.length === have.length) return true;
+  return (await api<unknown>(config, `/conversations/${conversationId}/labels`, { labels: all })) !== null;
+}
+
 // ---------- pure destination inference (unit-tested) ----------
 
 /** «رحلة جورجيا» / «برنامج تركيا» / «بكج دبي» → the destination word(s). */

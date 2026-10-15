@@ -701,6 +701,8 @@ export function BasicEditor({
 
   const [producing, setProducing] = useState(false);
   const [produceError, setProduceError] = useState<string | null>(null);
+  // what reached the client's WhatsApp on the last issue (nothing shown when the file is outside the trial)
+  const [whatsapp, setWhatsapp] = useState<string | null>(null);
   const [guardBlocked, setGuardBlocked] = useState(false);
   const produced = data.produced_serial;
 
@@ -714,6 +716,8 @@ export function BasicEditor({
       const result = await produceOfferFromDraft(draftId);
       if (!result.ok) return setProduceError(t(result.error));
       patch({ produced_serial: result.serial });
+      const said = { sent: "waSent", window: "waWindow", no_phone: "waNoPhone", unreachable: "waUnreachable" } as const;
+      setWhatsapp(result.whatsapp in said ? tx(said[result.whatsapp as keyof typeof said]) : null);
     } catch {
       setProduceError(tx("serverLost"));
     } finally {
@@ -1575,6 +1579,7 @@ export function BasicEditor({
               )}
               <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} className="mt-2" />
               {produceError ? <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">{produceError}</p> : null}
+              {whatsapp ? <p role="status" className="mt-2 text-[12px] font-bold text-[#557d78]">{whatsapp}</p> : null}
               <div className="mt-3 flex justify-end">
                 <button
                   type="button"
