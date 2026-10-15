@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2, Package, Plus, Zap } from "lucide-react";
+import { FileUp, Loader2, Package, Plane, Plus, Zap } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { createDraft, duplicateDraft, type DraftSummary } from "@/lib/data/drafts";
 import { startDraftFromReadyOffer } from "@/lib/data/ready-offers";
@@ -18,11 +18,14 @@ export function BasicHome({
   drafts,
   meId,
   readyOffers,
+  tools,
 }: {
   drafts: DraftSummary[];
   /** the signed-in employee — «ملفاتي» (null for a partner) */
   meId: string | null;
   readyOffers: ReadyOfferRecord[];
+  /** the other ways to start: a supplier's package, a flight card (null/false: not for this role) */
+  tools: { repackage: boolean; flightCard: string | null };
 }) {
   const tx = useBasicLabels();
   const { t } = useTraveliunUI();
@@ -73,6 +76,7 @@ export function BasicHome({
             {t("nav.basic")}
           </h1>
           <p className="mt-1 mb-4 max-w-3xl text-[12.5px] font-semibold leading-6 text-[#78948f]">{tx("homeHint")}</p>
+          <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => void onCreate()}
@@ -87,12 +91,31 @@ export function BasicHome({
               type="button"
               onClick={() => setShowReady((v) => !v)}
               aria-expanded={showReady}
-              className="ms-2 inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#185045] px-5 text-[13.5px] font-extrabold text-[#185045] hover:bg-[#f0f7f4]"
+              className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#185045] px-5 text-[13.5px] font-extrabold text-[#185045] hover:bg-[#f0f7f4]"
             >
               <Package className="size-4" />
               {tx("fromReady")}
             </button>
           ) : null}
+          {tools.repackage ? (
+            <Link
+              href="/repackage"
+              className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#cfe0d9] px-5 text-[13.5px] font-extrabold text-[#185045] hover:bg-[#f0f7f4]"
+            >
+              <FileUp className="size-4" />
+              {tx("repackageTool")}
+            </Link>
+          ) : null}
+          {tools.flightCard ? (
+            <Link
+              href={tools.flightCard}
+              className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#cfe0d9] px-5 text-[13.5px] font-extrabold text-[#185045] hover:bg-[#f0f7f4]"
+            >
+              <Plane className="size-4" />
+              {tx("flightCardTool")}
+            </Link>
+          ) : null}
+          </div>
           {showReady ? (
             <div className="mt-3 rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
               <p className="mb-2 text-[11.5px] font-semibold text-[#78948f]">{tx("readyHint")}</p>
