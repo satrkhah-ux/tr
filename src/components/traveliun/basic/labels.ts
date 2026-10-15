@@ -79,7 +79,6 @@ const AR = {
   hop: "من {city} عبر",
   hopOut: "إلى {city} عبر",
   plannedLeg: "رحلة مبدئية",
-  moveTo: "الانتقال من {from} إلى {city}",
   next: "التالي",
   edit: "تعديل",
   needFirst: "ينقص: {list}",
@@ -165,8 +164,6 @@ const AR = {
   datesMoved: "تغيّرت التواريخ بعد تغيير الترتيب: كانت {was} وصارت {now} — راجع الفندق والجولات والطيران ثم اضغط «تمت».",
   hopMoved: "تغيّر الانتقال إلى هذه المدينة بعد تغيير الترتيب (صار من {from}) — راجع الطيران أو التنقل ثم اضغط «تمت».",
   sameCityTwice: "لا يمكن أن تأتي المدينة نفسها مرتين متتاليتين — زِد لياليها بدلاً من ذلك.",
-  toAirport: "التوجه إلى {airport}",
-  atAirport: "الاستقبال في {airport}",
   takeOffAt: "الإقلاع {time}",
   landsAt: "الوصول {time}",
   dayTitleHint: "اكتب العنوان أو اختر جولة من القائمة",
@@ -220,6 +217,11 @@ const AR = {
   reception: "الاستقبال",
   farewell: "التوديع",
   simLines: "خطوط الاتصال",
+  addService: "إضافة خدمة",
+  removeService: "حذف الخدمة",
+  fromSheet: "من ورقة التسعير",
+  hotelIs: "الفندق: {hotel}",
+  totalIs: "الإجمالي: {total}",
 } as const;
 
 const EN: Record<keyof typeof AR, string> = {
@@ -294,7 +296,6 @@ const EN: Record<keyof typeof AR, string> = {
   hop: "From {city} by",
   hopOut: "To {city} by",
   plannedLeg: "Planned",
-  moveTo: "Moving from {from} to {city}",
   next: "Next",
   edit: "Edit",
   needFirst: "Missing: {list}",
@@ -380,8 +381,6 @@ const EN: Record<keyof typeof AR, string> = {
   datesMoved: "The dates moved with the order: they were {was}, now {now} — check the hotel, tours and flights, then press «Done».",
   hopMoved: "The way into this city changed with the order (now from {from}) — check the flight or transfer, then press «Done».",
   sameCityTwice: "The same city cannot come twice in a row — give it more nights instead.",
-  toAirport: "Transfer to {airport}",
-  atAirport: "Met at {airport}",
   takeOffAt: "take-off {time}",
   landsAt: "lands {time}",
   dayTitleHint: "Type the title or pick a tour from the list",
@@ -435,6 +434,11 @@ const EN: Record<keyof typeof AR, string> = {
   reception: "Reception",
   farewell: "Farewell",
   simLines: "SIM lines",
+  addService: "Add a service",
+  removeService: "Remove the service",
+  fromSheet: "from the pricing sheet",
+  hotelIs: "Hotel: {hotel}",
+  totalIs: "Total: {total}",
 };
 
 export type BasicLabel = keyof typeof AR;

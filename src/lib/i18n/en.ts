@@ -1474,6 +1474,11 @@ export const en = {
   "pg.tour.description": "Description (from the programme — editable)",
   "pg.tour.add": "Tour on this day",
   "pg.tour.remove": "Remove the tour from this day",
+  "pg.svc.kind": "Service type",
+  "pg.svc.reception": "Reception",
+  "pg.svc.farewell": "Farewell",
+  "pg.svc.transfer": "Transfer",
+  "pg.svc.tour": "Tour",
   // ---- flight-number lookup ----
   "pg.flightLookup.button": "Fetch flight",
   "pg.flightLookup.placeholder": "Flight no. (e.g. SV820)",

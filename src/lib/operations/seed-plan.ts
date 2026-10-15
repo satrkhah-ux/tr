@@ -19,6 +19,7 @@ import {
   stayTotal,
   TRANSPORT_AIRPORT,
   TRANSPORT_HOTEL_PREFIX,
+  transportRef,
   TRANSPORT_TOURS,
   splitVehicle,
   tourCars,
@@ -253,11 +254,12 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       detail["نقطة الالتقاء"] = meet;
       putCar(detail, tr.car_type ?? "");
       detail["الركاب"] = String(people);
-      const buy = buyOf(`transport:${tr.from_place}>${tr.to_place}>${tr.car_type ?? ""}`);
+      const buy = buyOf(transportRef(tr));
       rows.push({
-        origin_ref: `transfer:${tr.from_place}>${tr.to_place}>${date ?? ""}`,
+        // a row the agent added on the city card is its own booking, under its own words
+        origin_ref: tr.ref ? `transfer:${tr.ref}` : `transfer:${tr.from_place}>${tr.to_place}>${date ?? ""}`,
         kind: "transport",
-        title: `${tr.from_place} ← ${tr.to_place}`,
+        title: tr.text || `${tr.from_place} ← ${tr.to_place}`,
         city_name: tr.to_place.startsWith(TRANSPORT_HOTEL_PREFIX) ? tr.to_place.slice(TRANSPORT_HOTEL_PREFIX.length) : tr.from_place.replace(TRANSPORT_HOTEL_PREFIX, ""),
         start_date: date,
         end_date: null,
