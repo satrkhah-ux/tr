@@ -1,6 +1,7 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "./audit";
 import { currentCan } from "@/lib/roles/current";
@@ -96,7 +97,7 @@ export async function listEmployeeAccounts(): Promise<AccountsResult> {
   }
 }
 
-export type IssueResult = { ok: true; email: string } | { ok: false; message: string };
+export type IssueResult = { ok: true; email: string } | { ok: false; message: string; error?: TranslationKey };
 
 export async function issueEmployeeAccount(employeeId: string): Promise<IssueResult> {
   const gate = await guard();
@@ -120,7 +121,8 @@ export async function issueEmployeeAccount(employeeId: string): Promise<IssueRes
     const admin = createSupabaseServiceClient();
 
     // An address may already own an account from an earlier attempt. Inviting
-    // again fails; linking the one that exists is what was actually wanted.
+    // again fails; linking the one that exists is what was wanted — if our own
+    // invite made it (checked below).
     const { data: page } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     let existing = (page?.users ?? []).find((u) => u.email?.toLowerCase() === email);
     let removedLeftover: string | null = null;
@@ -158,17 +160,33 @@ export async function issueEmployeeAccount(employeeId: string): Promise<IssueRes
       if ((partner ?? []).length > 0) {
         return { ok: false, message: "هذا البريد حساب شركة متعاونة — لا يُربط بموظف." };
       }
+
+      // Link only an account our own invite made. Anyone can sign up with the
+      // public key and pick the password (and the user_metadata), so "an account
+      // exists for this address" proves nothing; invited_at is set only by an
+      // admin invite. An outsider's account nobody has confirmed or used is
+      // removed so the invite below reaches whoever really owns the address; one
+      // that is confirmed and in use is someone's — a person must decide.
+      if (!existing.invited_at) {
+        if (existing.email_confirmed_at && existing.last_sign_in_at) {
+          return { ok: false, message: "", error: "emp.err.foreignAccount" };
+        }
+        if ((await admin.auth.admin.deleteUser(existing.id)).error) return { ok: false, message: "تعذّر إصدار الحساب." };
+        removedLeftover = existing.id;
+        existing = undefined;
+      }
     }
 
     let authUserId = existing?.id ?? null;
     if (!authUserId) {
       // WITHOUT redirectTo the invitation lands on the site root, which does
       // nothing at all: the account exists and there is no way to set a
-      // password for it.
+      // password for it. /sign-in itself does not read the link's token either
+      // (the browser client has detectSessionInUrl off) — /sign-in/welcome does.
       const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
       const { data: invite, error } = await admin.auth.admin.inviteUserByEmail(email, {
         data: { employee_id: row.id, employee_name: row.arabic_name },
-        redirectTo: `${site}/sign-in`,
+        redirectTo: `${site}/sign-in/welcome`,
       });
       if (error || !invite?.user) {
         return { ok: false, message: "تعذّر إرسال الدعوة — تأكد من إعدادات البريد لدى Supabase." };

@@ -2,11 +2,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
-import { can } from "@/lib/roles/roles";
 import { currentCan } from "@/lib/roles/current";
 import { GRANTED_COLUMNS, isCostColumn } from "./table-config";
 import type { AllowedTable } from "./types";
-import { getCurrentRole } from "./metrics";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { logAudit } from "./audit";
 
@@ -58,9 +56,8 @@ export type CatalogExport = {
 async function guard(): Promise<"ok" | "err.session" | "err.forbidden"> {
   const user = await getServerUser();
   if (!user) return "err.session";
-  // The same gate the supplier/credential screens use — managing the catalogue
-  // is an administrative act, not every employee's.
-  return can(await getCurrentRole(), "employees.manage") ? "ok" : "err.forbidden";
+  // Managing the catalogue is a settings act, read from the role row's keys.
+  return (await currentCan("settings.manage")) ? "ok" : "err.forbidden";
 }
 
 export type ExportResult =

@@ -54,7 +54,7 @@ export function EmployeeAccounts() {
       const result = await issueEmployeeAccount(row.id);
       setBusy(null);
       if (!result.ok) {
-        setError(result.message);
+        setError(result.error ? t(result.error) : result.message);
         return;
       }
       setError(null);

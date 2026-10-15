@@ -25,6 +25,19 @@ export const DOCUMENT_LABEL: Record<PartnerDocumentKind, string> = {
 const MAX_BYTES = 5 * 1024 * 1024;
 const TYPES: Record<string, string> = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/**
+ * Wildcards and the escape to PostgREST's ilike (`*` reads as `%` there, and
+ * escaping does not survive). Refused outright, so the name-clash lookup can
+ * only ever match this exact name — «تر%» used to probe every company starting
+ * with «تر» and say whether it was approved.
+ */
+const NAME_WILDCARDS = /[%_*\\]/;
+
+/** Valid submissions one network origin may make per window (in memory, registration.ts). */
+export const PER_ORIGIN_LIMIT = 3;
+export const PER_ORIGIN_WINDOW_MS = 60 * 60 * 1000;
+/** A second request from the same email inside this window is refused (read from booking_partners). */
+export const SAME_EMAIL_WINDOW_MS = 10 * 60 * 1000;
 
 export type RegistrationInput = {
   name: string;
@@ -47,7 +60,8 @@ const text = (form: FormData, key: string) => String(form.get(key) ?? "").trim()
 const optional = (form: FormData, key: string) => text(form, key) || null;
 
 export function readRegistration(form: FormData): { ok: true; value: RegistrationInput } | { ok: false; message: string } {
-  const name = text(form, "name");
+  // one space between words: the clash check and the unique index on lower(name) see the same name
+  const name = text(form, "name").replace(/\s+/g, " ");
   const email = text(form, "email").toLowerCase();
   const phone = text(form, "phone");
   const commercial_register = text(form, "commercial_register");
@@ -55,6 +69,7 @@ export function readRegistration(form: FormData): { ok: true; value: Registratio
   const country = text(form, "country");
 
   if (name.length < 3) return { ok: false, message: "اسم الشركة مطلوب." };
+  if (NAME_WILDCARDS.test(name)) return { ok: false, message: "اسم الشركة لا يقبل الرموز % و _ و * و \\." };
   if (!EMAIL.test(email)) return { ok: false, message: "البريد الإلكتروني غير صحيح." };
   if (phone.replace(/\D/g, "").length < 8) return { ok: false, message: "رقم التواصل غير صحيح." };
   if (commercial_register.replace(/\s/g, "").length < 5) return { ok: false, message: "رقم السجل التجاري مطلوب." };
@@ -99,4 +114,25 @@ export function newReferenceNo(now: Date, random: () => number = Math.random): s
   const day = now.toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }).replace(/-/g, "").slice(2);
   const tail = Array.from({ length: 4 }, () => alphabet[Math.floor(random() * alphabet.length)]).join("");
   return `B2B-${day}-${tail}`;
+}
+
+/**
+ * Record one attempt for `key` and say whether it is within `limit` per window.
+ * ponytail: per-process memory — resets on deploy, each server process counts on
+ * its own, and the whole log is dropped past 10,000 origins. Move it to a table
+ * (or Turnstile) if the form is ever flooded across instances.
+ */
+export function allowAttempt(
+  log: Map<string, number[]>,
+  key: string,
+  now: number,
+  limit = PER_ORIGIN_LIMIT,
+  windowMs = PER_ORIGIN_WINDOW_MS,
+): boolean {
+  if (log.size > 10_000) log.clear();
+  const recent = (log.get(key) ?? []).filter((t) => now - t < windowMs);
+  const allowed = recent.length < limit;
+  if (allowed) recent.push(now);
+  log.set(key, recent);
+  return allowed;
 }

@@ -1,12 +1,19 @@
 "use server";
 
+import { headers } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { currentCan } from "@/lib/roles/current";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { notifyPartnerRegistration } from "@/lib/data/ops-notify";
-import { PARTNER_TERMS_VERSION, newReferenceNo, readRegistration } from "./registration-form";
+import {
+  PARTNER_TERMS_VERSION,
+  SAME_EMAIL_WINDOW_MS,
+  allowAttempt,
+  newReferenceNo,
+  readRegistration,
+} from "./registration-form";
 import { getPartnerSession } from "./session";
 
 /**
@@ -26,6 +33,10 @@ function db(): SupabaseClient {
 
 export type RegistrationResult = { ok: true; reference: string } | { ok: false; message: string };
 
+/** Valid submissions per network origin — see allowAttempt for its ceiling. */
+const attemptsByOrigin = new Map<string, number[]>();
+const FAILED = "تعذّر إرسال الطلب. حاول مرة أخرى.";
+
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const BUCKET = "partner-documents";
 
@@ -42,16 +53,32 @@ export async function registerPartnerCompany(form: FormData): Promise<Registrati
   const { name, email } = input;
 
   try {
+    // Each valid submission can store 3×5MB and ping Telegram: cap it per origin
+    // before anything is read or written.
+    const h = await headers();
+    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip")?.trim();
+    if (ip && !allowAttempt(attemptsByOrigin, ip, Date.now())) {
+      return { ok: false, message: "وصلتنا طلبات كثيرة من هذا الجهاز. حاول مرة أخرى بعد ساعة." };
+    }
+
     const supabase = db();
 
     // booking_partners already carries a unique index on lower(name); this check
     // exists to answer the company in words rather than with a database error,
     // and to say something useful when the name belongs to a live partner.
-    const { data: clash } = await supabase
-      .from("booking_partners")
-      .select("id, status")
-      .ilike("name", name)
-      .maybeSingle();
+    // readRegistration refused every ilike wildcard, so this is an exact,
+    // case-insensitive match — never a prefix probe. A failed lookup is a
+    // failure, not a pass (it used to let junk rows through).
+    const since = new Date(Date.now() - SAME_EMAIL_WINDOW_MS).toISOString();
+    const [byName, byEmail] = await Promise.all([
+      supabase.from("booking_partners").select("status").ilike("name", name).limit(1),
+      supabase.from("booking_partners").select("id").eq("email", email).gte("created_at", since).limit(1),
+    ]);
+    if (byName.error || byEmail.error) return { ok: false, message: FAILED };
+    if ((byEmail.data ?? []).length > 0) {
+      return { ok: false, message: "وصلنا طلب بهذا البريد قبل قليل وهو قيد المراجعة." };
+    }
+    const clash = (byName.data ?? [])[0];
     if (clash) {
       const row = clash as { status: string };
       return {

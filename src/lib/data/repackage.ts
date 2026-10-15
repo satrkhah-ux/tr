@@ -17,6 +17,7 @@ import { validateRepackage } from "@/lib/repackage/repackage-validation";
 import { runExtraction, type ExtractionHow, type ExtractionSource } from "@/lib/repackage/extract/extract";
 import { publishOffer, type OfferHotelInput } from "./offers";
 import { insertOffer } from "./offer-insert";
+import { fetchPublic } from "@/lib/repackage/fetch-public";
 
 /**
  * Repackage server actions — import a supplier PDF, review/edit, re-issue as a
@@ -198,21 +199,12 @@ const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
  * handled as that file — the URL is just another envelope.
  */
 async function fetchUrlSource(raw: string): Promise<ExtractionSource | null> {
-  let url: URL;
-  try {
-    url = new URL(raw.trim());
-  } catch {
-    return null;
-  }
-  // Only public web addresses; never let a pasted link reach an internal host.
-  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-  if (/^(localhost$|127\.|10\.|192\.168\.|169\.254\.|\[?::1)/i.test(url.hostname)) return null;
-
-  const res = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(30_000) });
-  if (!res.ok) return null;
-  const type = (res.headers.get("content-type") ?? "").toLowerCase();
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > MAX_SOURCE_BYTES) return null;
+  // Only public web addresses, every redirect hop re-checked, body capped while
+  // it streams — never let a pasted link reach an internal host (fetch-public.ts).
+  const res = await fetchPublic(raw.trim(), MAX_SOURCE_BYTES);
+  if (!res) return null;
+  const type = res.contentType;
+  const buf = res.bytes;
 
   if (type.includes("pdf")) return { kind: "pdf", bytes: buf };
   if (type.startsWith("image/")) return { kind: "image", bytes: buf };
@@ -241,6 +233,9 @@ export async function importFromPdf(id: string, formData: FormData): Promise<Imp
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
+    // The gate comes before anything is read or fetched: a link is a request
+    // our server makes, so nobody without repackage.write may make it.
+    const supabase = await db();
 
     const supplierName = String(formData.get("supplier") ?? "").trim();
     const pastedText = String(formData.get("text") ?? "").trim();
@@ -279,8 +274,6 @@ export async function importFromPdf(id: string, formData: FormData): Promise<Imp
       sourceName = pastedUrl.slice(-80);
     }
     if (!source) return { ok: false, error: "rp.err.noFileUpload" };
-
-    const supabase = await db();
 
     // keep the original for internal audit; text/link imports have no file
     let originalPath: string | null = null;
