@@ -84,6 +84,19 @@ describe("parseSupplierPackage — clean text PDF", () => {
   });
 });
 
+describe("parseSupplierPackage — the client", () => {
+  it("reads the name and phone only under a client label", () => {
+    const { extracted } = parseSupplierPackage(`${SAMPLE}\nاسم العميل: محمد علي\nجوال العميل: ٠٥٥ ١٢٣ ٤٥٦٧\nجوال: 0500000000`);
+    expect(extracted.customer_name).toBe("محمد علي");
+    expect(extracted.customer_phone).toBe("0551234567");
+  });
+
+  it("leaves them empty when the file names nobody (the supplier is not the client)", () => {
+    const { extracted } = parseSupplierPackage(SAMPLE);
+    expect([extracted.customer_name, extracted.customer_phone]).toEqual(["", ""]);
+  });
+});
+
 describe("parseSupplierPackage — never invents", () => {
   const { extracted, confidence } = parseSupplierPackage("نص لا يحتوي أي حقول معروفة");
 

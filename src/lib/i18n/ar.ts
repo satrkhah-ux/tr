@@ -1706,6 +1706,15 @@ export const ar: Dictionary = {
   "rp.warn.noHotels": "لم تُستخرج أي فنادق.",
   "rp.warn.noServices": "لم تُستخرج خدمات مشمولة.",
   "rp.warn.ocrUnavailable": "يبدو الملف ممسوحًا لكن OCR غير مُهيّأ — الحقول تحتاج مراجعة يدوية.",
+  "rp.err.noDeparture": "حدّد تاريخ المغادرة.",
+  "rp.err.departureBeforeArrival": "تاريخ المغادرة يجب أن يكون بعد تاريخ الوصول.",
+  "rp.err.datesNights": "تاريخ المغادرة لا يوافق مدة البكج ({nights} ليالٍ من تاريخ الوصول).",
+  "rp.warn.flightDates": "تواريخ بعض رحلات الطيران خارج فترة السفر — راجعها في المعاينة.",
+  "rp.client.title": "بيانات العميل والسفر",
+  "rp.client.hint": "أول ما يُعبّأ — يظهر الاسم والتواريخ في العرض المرسَل للعميل.",
+  "rp.client.departureHint": "يُحسب من تاريخ الوصول + {nights} ليالٍ، ويمكنك تعديله.",
+  "rp.field.hotelStop": "مدينة الفندق",
+  "rp.field.visitN": "{city} — الزيارة {n}",
 
   // ---------- العروض الجاهزة ----------
   "pg.fromLibrary": "اختر من القائمة المعتمدة ({count})",

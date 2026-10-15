@@ -13,6 +13,9 @@
  */
 
 import type { TranslationKey } from "@/lib/i18n";
+import type { BoardType } from "@/lib/types";
+import { cityKeys, withCityKeys } from "@/lib/offer/draft-types";
+import { localDatePart, withDatePart } from "@/lib/offer/schedule";
 
 // ---------- stage registry ----------
 export const STAGE_KEYS = ["import", "review", "edit", "preview"] as const;
@@ -37,9 +40,20 @@ export function stageHref(draftId: string, stage: StageKey): string {
 }
 
 // ---------- extracted facts (the typed extraction schema) ----------
-export type ExtractedCity = { city_name: string; nights: number | null };
+export type ExtractedCity = {
+  /**
+   * This stop's identity — a city visited twice (تبليسي first and last) is two
+   * stops, each with its own hotel. Written by normalize (cityKeys, as the
+   * generator's DraftCity.key); a hotel points at it through `city_key`.
+   */
+  key?: string;
+  city_name: string;
+  nights: number | null;
+};
 
 export type ExtractedHotel = {
+  /** the stop this hotel is for (ExtractedCity.key) — see keyHotels. */
+  city_key?: string;
   city_name: string;
   hotel_name: string;
   room_type: string;
@@ -66,6 +80,9 @@ export type ExtractedFlight = {
  * (mapped to buy_price internally, never shipped to a client).
  */
 export type ExtractedPackage = {
+  /** the client this package is re-issued FOR — printed on the document. */
+  customer_name: string;
+  customer_phone: string;
   destination: string;
   country: string;
   cities: ExtractedCity[];
@@ -178,6 +195,8 @@ export type RepackageData = {
 
 export function emptyExtractedPackage(): ExtractedPackage {
   return {
+    customer_name: "",
+    customer_phone: "",
     destination: "",
     country: "",
     cities: [],
@@ -241,22 +260,36 @@ function normalizeExtracted(raw: unknown): ExtractedPackage | null {
   if (!raw || typeof raw !== "object") return null;
   const e = raw as Partial<ExtractedPackage>;
   const empty = emptyExtractedPackage();
+  const cities = withCityKeys(
+    Array.isArray(e.cities)
+      ? e.cities.map((c) => {
+          const cc = (c ?? {}) as Partial<ExtractedCity>;
+          return {
+            ...(typeof cc.key === "string" && cc.key ? { key: cc.key } : {}),
+            city_name: str(cc.city_name),
+            nights: numOrNull(cc.nights),
+          };
+        })
+      : [],
+  );
   return {
+    customer_name: str(e.customer_name),
+    customer_phone: str(e.customer_phone),
     destination: str(e.destination),
     country: str(e.country),
-    cities: Array.isArray(e.cities)
-      ? e.cities.map((c) => ({ city_name: str((c as ExtractedCity)?.city_name), nights: numOrNull((c as ExtractedCity)?.nights) }))
-      : [],
+    cities,
     trip_nights: numOrNull(e.trip_nights),
     arrival_date: typeof e.arrival_date === "string" ? e.arrival_date : null,
     departure_date: typeof e.departure_date === "string" ? e.departure_date : null,
     adults: intOr(e.adults, 2),
     children: intOr(e.children, 0),
     infants: intOr(e.infants, 0),
-    hotels: Array.isArray(e.hotels)
+    // a package saved before stops had keys gets its hotels keyed here
+    hotels: keyHotels(cities, Array.isArray(e.hotels)
       ? e.hotels.map((h) => {
           const hh = (h ?? {}) as Partial<ExtractedHotel>;
           return {
+            ...(typeof hh.city_key === "string" && hh.city_key ? { city_key: hh.city_key } : {}),
             city_name: str(hh.city_name),
             hotel_name: str(hh.hotel_name),
             room_type: str(hh.room_type),
@@ -266,7 +299,7 @@ function normalizeExtracted(raw: unknown): ExtractedPackage | null {
             check_out: typeof hh.check_out === "string" ? hh.check_out : null,
           };
         })
-      : [],
+      : []),
     flights: Array.isArray(e.flights)
       ? e.flights.map((f) => {
           const ff = (f ?? {}) as Partial<ExtractedFlight>;
@@ -356,6 +389,128 @@ export function uncertainFields(data: RepackageData): ConfidenceFieldKey[] {
 /** Any CRITICAL field still uncertain? If false + nights invariant holds, /review auto-skips. */
 export function hasUncertainCriticals(data: RepackageData): boolean {
   return CRITICAL_FIELDS.some((k) => !isFieldConfident(data, k));
+}
+
+// ---------- stops, stays and the trip's dates ----------
+/**
+ * Which stop each hotel is for. A city can be visited twice (تبليسي first and
+ * last) with a different hotel each time, so a hotel names its stop by key —
+ * pairing by the city's NAME gave the second visit the first visit's hotel.
+ *
+ * A hotel whose key still names a stop keeps it. Otherwise the n-th hotel of a
+ * city goes to the n-th visit of that city (any extra one stays with its last
+ * visit), and a hotel whose city is not on the list keeps the old positional
+ * pairing: hotel i → stop i.
+ */
+export function keyHotels(cities: ExtractedCity[], hotels: ExtractedHotel[]): ExtractedHotel[] {
+  const keys = cityKeys(cities);
+  const known = new Set(keys);
+  const seen = new Map<string, number>();
+  return hotels.map((h, i) => {
+    const name = h.city_name.trim();
+    const nth = seen.get(name) ?? 0;
+    seen.set(name, nth + 1);
+    if (h.city_key && known.has(h.city_key)) return h;
+    const visits = name ? keys.filter((_, ci) => cities[ci].city_name.trim() === name) : [];
+    const key = visits.length > 0 ? visits[Math.min(nth, visits.length - 1)] : keys[i];
+    return key ? { ...h, city_key: key } : h;
+  });
+}
+
+const BOARDS: BoardType[] = ["RO", "BB", "HB", "FB", "AI"];
+
+/** Supplier PDFs write the board in any of a dozen ways; keep only what we know. */
+export function normalizeBoard(raw: string | null | undefined): BoardType | null {
+  const value = (raw ?? "").trim().toUpperCase();
+  if (BOARDS.includes(value as BoardType)) return value as BoardType;
+  const text = (raw ?? "").trim();
+  if (/إفطار|افطار|breakfast/i.test(text)) return "BB";
+  if (/نصف|half/i.test(text)) return "HB";
+  if (/كامل|full/i.test(text)) return "FB";
+  if (/شامل|all\s*inclusive/i.test(text)) return "AI";
+  if (/غرفة فقط|room only/i.test(text)) return "RO";
+  return null;
+}
+
+const DAY_MS = 86_400_000;
+
+/** ISO date + N days, in UTC so a DST change never shifts the calendar day. */
+export function addDaysIso(iso: string, days: number): string {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
+}
+
+/** The nights the issued offer counts: the package's own, else its cities'. */
+export function packageNights(pkg: ExtractedPackage): number {
+  return pkg.trip_nights ?? pkg.cities.reduce((sum, c) => sum + (c.nights ?? 0), 0);
+}
+
+export type PackageStay = {
+  city_name: string;
+  hotel: ExtractedHotel | null;
+  board_type: BoardType | null;
+  nights: number;
+  check_in: string | null;
+  check_out: string | null;
+};
+
+/**
+ * The package's stays in order — one per stop, each with ITS OWN hotel
+ * (keyHotels) and dates chained from the arrival date, so every stay agrees
+ * with the arrival the employee entered. A package read without cities is its
+ * hotels in order. The one mapping the preview AND the issued offer use.
+ */
+export function packageStays(pkg: ExtractedPackage): PackageStay[] {
+  const cities = withCityKeys(pkg.cities);
+  const keys = cityKeys(cities);
+  const hotels = keyHotels(cities, pkg.hotels);
+  const stops =
+    cities.length > 0
+      ? cities.map((c, i) => ({ city_name: c.city_name, nights: c.nights, hotel: hotels.find((h) => h.city_key === keys[i]) ?? null }))
+      : pkg.hotels.map((h) => ({ city_name: h.city_name, nights: h.nights, hotel: h }));
+  let cursor = pkg.arrival_date;
+  return stops.map(({ city_name, nights: own, hotel }) => {
+    const nights = own ?? hotel?.nights ?? 0;
+    // no arrival yet: whatever dates the supplier printed
+    const check_in = cursor ?? hotel?.check_in ?? null;
+    const check_out = cursor ? addDaysIso(cursor, nights) : (hotel?.check_out ?? null);
+    if (cursor) cursor = check_out;
+    return { city_name, hotel, board_type: normalizeBoard(hotel?.board), nights, check_in, check_out };
+  });
+}
+
+/**
+ * A new arrival MOVES the trip: its length is kept (the departure follows) and
+ * the supplier's flights move by the same number of days, so nothing is left on
+ * the old dates. An empty departure is derived the same way.
+ */
+export function withArrival(pkg: ExtractedPackage, arrival: string | null): Partial<ExtractedPackage> {
+  const shift = pkg.arrival_date && arrival ? daysBetween(pkg.arrival_date, arrival) : 0;
+  const move = (at: string | null) => {
+    const day = localDatePart(at);
+    return day ? withDatePart(at, addDaysIso(day, shift)) : at;
+  };
+  const nights = packageNights(pkg);
+  return {
+    arrival_date: arrival,
+    departure_date: arrival && nights > 0 ? addDaysIso(arrival, nights) : pkg.departure_date,
+    flights: shift ? pkg.flights.map((f) => ({ ...f, departure_at: move(f.departure_at), arrival_at: move(f.arrival_at) })) : pkg.flights,
+  };
+}
+
+/** A typed departure re-measures the nights (the generator's rule) — the cities must then add up to them. */
+export function withDeparture(pkg: ExtractedPackage, departure: string | null): Partial<ExtractedPackage> {
+  const nights = pkg.arrival_date && departure ? daysBetween(pkg.arrival_date, departure) : 0;
+  return nights > 0 ? { departure_date: departure, trip_nights: nights } : { departure_date: departure };
+}
+
+/** The departure an import implies when the supplier did not print one: arrival + nights. */
+export function impliedDeparture(pkg: ExtractedPackage): string | null {
+  const nights = packageNights(pkg);
+  return pkg.departure_date ?? (pkg.arrival_date && nights > 0 ? addDaysIso(pkg.arrival_date, nights) : null);
 }
 
 // ---------- one-tap common items (edit stage) ----------

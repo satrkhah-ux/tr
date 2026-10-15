@@ -6,6 +6,8 @@
  *    so a messy import can never be published without a human confirming it.
  *  - Nights invariant sum(cities.nights)===trip_nights → BLOCKING (reuses the
  *    shared offer/invariants module for a bilingual message).
+ *  - The client's name/phone and the arrival/departure dates (departure =
+ *    arrival + nights) → BLOCKING on /review: the document is addressed to them.
  *  - A missing sell price, or a sell BELOW the supplier cost → BLOCKING on /edit.
  *
  * When NO critical is uncertain and nights reconcile, /review has zero blocking
@@ -17,9 +19,12 @@
 
 import type { TranslationKey } from "@/lib/i18n";
 import { validateInvariants, type InvariantViolation } from "@/lib/offer/invariants";
+import { localDatePart } from "@/lib/offer/schedule";
 import {
+  addDaysIso,
   CRITICAL_FIELDS,
   isFieldConfident,
+  packageNights,
   uncertainFields,
   type RepackageData,
   type StageKey,
@@ -29,6 +34,7 @@ export type RepackageIssue = {
   severity: "blocking" | "warning";
   stage: StageKey;
   key?: TranslationKey;
+  params?: Record<string, string | number>;
   invariant?: InvariantViolation;
 };
 
@@ -86,6 +92,31 @@ export function validateRepackage(data: RepackageData): RepackageValidation {
     if (mismatch) blocking.push({ severity: "blocking", stage: "review", invariant: mismatch });
   }
 
+  // ── the client and the travel dates — the first thing /review asks ─────
+  // The same rules as the generator's customer and trip cards (pg.* keys): an
+  // import carries the supplier's facts, never whom we are selling them to.
+  const need = (key: TranslationKey, params?: RepackageIssue["params"]) =>
+    blocking.push({ severity: "blocking", stage: "review", key, params });
+  if (!pkg.customer_name.trim()) need("pg.warn.noName");
+  if (!pkg.customer_phone.trim()) need("pg.warn.noPhone");
+  if (!pkg.arrival_date) need("pg.err.noArrival");
+  if (!pkg.departure_date) need("rp.err.noDeparture");
+  const nights = packageNights(pkg);
+  if (pkg.arrival_date && pkg.departure_date) {
+    if (pkg.departure_date <= pkg.arrival_date) need("rp.err.departureBeforeArrival");
+    else if (nights <= 0) need("pg.err.noNights");
+    // every stay is chained from the arrival, so the document ends on arrival + nights
+    else if (pkg.departure_date !== addDaysIso(pkg.arrival_date, nights)) need("rp.err.datesNights", { nights });
+    // flights are the supplier's own dates — say so when they sit outside the trip
+    const from = addDaysIso(pkg.arrival_date, -1);
+    const to = addDaysIso(pkg.departure_date, 1);
+    const outside = pkg.flights.some((f) => {
+      const day = localDatePart(f.departure_at);
+      return day != null && (day < from || day > to);
+    });
+    if (outside) warnings.push({ severity: "warning", stage: "review", key: "rp.warn.flightDates" });
+  }
+
   // ── edit: price / floor ───────────────────────────────────────────────
   if (data.final_total == null) {
     blocking.push({ severity: "blocking", stage: "edit", key: "rp.err.noPrice" });
@@ -101,7 +132,8 @@ export function validateRepackage(data: RepackageData): RepackageValidation {
   if (pkg.includes.length === 0) warnings.push({ severity: "warning", stage: "edit", key: "rp.warn.noServices" });
   if (data.source.ocr_unavailable) warnings.push({ severity: "warning", stage: "import", key: "rp.warn.ocrUnavailable" });
 
-  const reviewClear = uncertainCriticals.length === 0 && (pkg.cities.length === 0 || nightsMatch);
+  // nothing left to fix on /review — a file without the client's details stops there
+  const reviewClear = !blocking.some((i) => i.stage === "review") && (pkg.cities.length === 0 || nightsMatch);
 
   return {
     ok: blocking.length === 0,

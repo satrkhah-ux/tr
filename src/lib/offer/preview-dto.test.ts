@@ -11,6 +11,8 @@ import { emptyRepackageData, type ExtractedPackage } from "@/lib/repackage/repac
  */
 function extracted(over: Partial<ExtractedPackage> = {}): ExtractedPackage {
   return {
+    customer_name: "سارة أحمد",
+    customer_phone: "0551234567",
     destination: "ماليزيا",
     country: "ماليزيا",
     cities: [{ city_name: "كوالالمبور", nights: 4 }],
@@ -71,6 +73,38 @@ describe("repackageToPreviewOffer", () => {
       extracted: extracted({ cities: [{ city_name: "مدينة أخرى", nights: 3 }] }),
     })!;
     expect(odd.hotels[0].hotel_name).toBe("فندق سيزونز");
+  });
+
+  it("prints the client and the travel dates, the stays chained from the arrival", () => {
+    expect(preview.customer_name).toBe("سارة أحمد");
+    expect(preview.customer_phone).toBe("0551234567");
+    expect(preview.arrival_date).toBe("2026-08-01");
+    expect(preview.departure_date).toBe("2026-08-05");
+    expect(preview.hotels[0].check_in).toBe("2026-08-01");
+    expect(preview.hotels[0].check_out).toBe("2026-08-05");
+  });
+
+  it("gives a city visited twice its own hotel each time (تبليسي → كازبيجي → تبليسي)", () => {
+    const hotel = (city_name: string, hotel_name: string) =>
+      ({ city_name, hotel_name, room_type: "", board: "BB", nights: null, check_in: null, check_out: null });
+    const georgia = repackageToPreviewOffer({
+      ...data,
+      extracted: extracted({
+        cities: [
+          { city_name: "تبليسي", nights: 2 },
+          { city_name: "كازبيجي", nights: 1 },
+          { city_name: "تبليسي", nights: 2 },
+        ],
+        trip_nights: 5,
+        hotels: [hotel("تبليسي", "Twenties"), hotel("كازبيجي", "Rooms"), hotel("تبليسي", "High Garden")],
+      }),
+    })!;
+    expect(georgia.hotels.map((h) => [h.city_name, h.hotel_name, h.check_in])).toEqual([
+      ["تبليسي", "Twenties", "2026-08-01"],
+      ["كازبيجي", "Rooms", "2026-08-03"],
+      ["تبليسي", "High Garden", "2026-08-04"],
+    ]);
+    expect(georgia.departure_date).toBe("2026-08-06");
   });
 
   it("carries the lists the document prints", () => {
