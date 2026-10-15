@@ -331,6 +331,24 @@ function splitTotal(rooms: DraftRoomSpec[], total: number | null): DraftRoomSpec
 }
 
 /**
+ * What a price typed on the sheet writes onto its line. A typed figure is what
+ * we pay (the «typed = cost» rule), so it is the line's cost as well as its sell
+ * — the package profit then goes on it at issue exactly as the sheet shows it.
+ * A line with no place to write back to stays the agent's own (`overridden`).
+ */
+export function typedSheetPrice(
+  slice: { sell_price?: number | null; sell_currency?: string },
+  atSource: boolean,
+): Partial<DraftPricingItem> {
+  return {
+    ...slice,
+    ...("sell_price" in slice ? { buy_price: slice.sell_price ?? null } : {}),
+    ...(slice.sell_currency ? { buy_currency: slice.sell_currency } : {}),
+    overridden: !atSource,
+  };
+}
+
+/**
  * A price changed on the pricing sheet is changed where it was typed — the
  * stay's rooms, the tour, the flight booking — so the two never disagree.
  * Null when the line has no such place (a transfer from the list, a visa, a

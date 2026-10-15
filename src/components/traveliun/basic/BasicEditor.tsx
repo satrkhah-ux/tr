@@ -83,6 +83,7 @@ import {
   withDomesticFlights,
   withGroupCars,
   withPackageProfit,
+  typedSheetPrice,
   withScopeLines,
   type FlightPlan,
   chainCities,
@@ -640,15 +641,8 @@ export function BasicEditor({
     const fare = item.ref === "flight:intl" ? latest.current.flight_booking.intl_fare : item.ref === "flight:dom" ? latest.current.flight_booking.dom_fare : null;
     if (fare?.price_mode === "per_person" && "sell_price" in slice) setFareNote(item.ref ?? null);
     const at = priceAtSource(latest.current, item, { price: slice.sell_price, currency: slice.sell_currency });
-    // the source's figure is what we pay and what we sell at, as the sheet writes it
-    const both = at
-      ? {
-          ...slice,
-          ...("sell_price" in slice ? { buy_price: slice.sell_price ?? null } : {}),
-          ...(slice.sell_currency ? { buy_currency: slice.sell_currency } : {}),
-          overridden: false,
-        }
-      : { ...slice, overridden: true };
+    // a typed figure is what we pay and what we sell at — with or without a place to write it back
+    const both = typedSheetPrice(slice, Boolean(at));
     const items = data.pricing.items.map((it, i) => (i === index ? { ...it, ...both } : it));
     if (at) commit({ ...at, pricing: { ...data.pricing, items } });
     else patch({ pricing: { ...data.pricing, items } });

@@ -12,9 +12,11 @@ import {
   type DraftData,
   type LookupAirport,
   type TourPick,
+  type DraftPricingItem,
 } from "./draft-types";
 import { findTourPrice, suggestPricing, type PricingReference } from "./pricing-suggest";
 import { domesticMismatches } from "./flight-cities";
+import { applyManualProfit } from "./pricing";
 import {
   addCity,
   baseRoomName,
@@ -34,6 +36,7 @@ import {
   STANDARD_ROOMS,
   withDomesticFlights,
   withPackageProfit,
+  typedSheetPrice,
   withScopeLines,
   priceGroupOf,
   planInternational,
@@ -793,5 +796,26 @@ describe("the day follows its tour (الأمر 3)", () => {
     expect(on({ ...changed, days: basicDays(changed) }, "2026-11-14").title).toBe("التلفريك");
     const gone = { ...data, cities: data.cities.map((c, i) => (i === 1 ? { ...c, tours: 0, tour_picks: [] } : c)) };
     expect([on({ ...gone, days: basicDays(gone) }, "2026-11-14").title, on({ ...gone, days: basicDays(gone) }, "2026-11-14").activities]).toEqual(["يوم حر", []]);
+  });
+});
+
+describe("a price typed on the sheet is a cost (AD-4-8573: the sheet showed 4,040.82, the offer issued at 3,995.82)", () => {
+  it("writes the typed figure as cost and sell, so the profit the sheet shows is the profit issued", () => {
+    // «بونشاك ← بالي (سيارة صغيرة)»: no list price, no place to write it back — the agent types 300
+    const line = { item_type: "transport", description: "بونشاك ← بالي", quantity: 1, buy_price: null, buy_currency: null, sell_price: null, sell_currency: "SAR" } as unknown as DraftPricingItem;
+    const typed = { ...line, ...typedSheetPrice({ sell_price: 300 }, false) };
+    expect(typed).toMatchObject({ buy_price: 300, sell_price: 300, overridden: true });
+    const profit = { mode: "pct" as const, value: 15 };
+    // the sheet (BasicEditor: a line without cost counts as cost) and the issue (as stored) now agree
+    const asCost = (i: DraftPricingItem) => (i.buy_price == null ? { ...i, buy_price: i.sell_price } : i);
+    const shown = withPackageProfit([asCost(typed)], profit, { SAR: 1 }, "SAR")[0];
+    const issued = withPackageProfit([typed], profit, { SAR: 1 }, "SAR")[0];
+    const sell = (i: DraftPricingItem) => applyManualProfit(i.buy_price, i.sell_price, i.profit_pct, i.profit_amount);
+    expect(sell(shown)).toBe(345);
+    expect(sell(issued)).toBe(345);
+  });
+
+  it("keeps a line with a place to write back to as ours (not overridden)", () => {
+    expect(typedSheetPrice({ sell_price: 1200, sell_currency: "MYR" }, true)).toEqual({ sell_price: 1200, sell_currency: "MYR", buy_price: 1200, buy_currency: "MYR", overridden: false });
   });
 });
