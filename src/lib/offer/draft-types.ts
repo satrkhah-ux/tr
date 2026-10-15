@@ -9,7 +9,7 @@
 
 import type { BoardType, FlightLegOrder, PricingItemType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
-import { normalizeJourney, type AdvancedJourney } from "./advanced";
+import { normalizeAdvanced, withAdvancedTransport, type DraftAdvanced } from "./advanced";
 import { withFlightTotals } from "./flight-fare";
 
 // ---------- stage registry ----------
@@ -1237,11 +1237,10 @@ export type DraftData = {
   /** set when the draft was seeded from a ready-made package; null otherwise. */
   source: DraftSource | null;
   /**
-   * «البكج المتقدم» (lib/offer/advanced): the client's route beside our services.
-   * Absent on every file that never opened it. While `enabled` it owns the
-   * file's transfers — the transport plan's derived rows are not printed.
+   * «بكج متقدم» (lib/offer/advanced): four answers that reword the transfers and
+   * the «يشمل / لا يشمل» lines for composite trips. Absent on every other file.
    */
-  journey?: AdvancedJourney;
+  advanced?: DraftAdvanced;
 };
 
 export function emptyDraftData(): DraftData {
@@ -1396,7 +1395,7 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     ...(plan.farewell ? { farewell: mergeLeg(empty.transport_plan.airport, plan.farewell) } : {}),
   };
   const scope = normalizeScope(source.scope);
-  const journey = normalizeJourney(source.journey);
+  const advanced = normalizeAdvanced(source.advanced);
 
   return {
     customer: { ...empty.customer, ...(source.customer ?? {}) },
@@ -1437,14 +1436,14 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     // flip the switch back and the rows return — but leaving the rows derived
     // meant the document still promised an airport pickup on a file whose
     // transport switch was off.
-    transport: scope.transport && !journey?.enabled ? deriveTransportRows(transportPlan, cities) : [],
+    transport: scope.transport ? withAdvancedTransport(deriveTransportRows(transportPlan, cities), advanced, TRANSPORT_AIRPORT) : [],
     services: { ...empty.services, ...(source.services ?? {}) },
     visas: Array.isArray(source.visas) ? source.visas : [],
     days: normalizeDraftDays(source.days),
     pricing: { ...empty.pricing, ...(source.pricing ?? {}) },
     produced_serial: typeof source.produced_serial === "string" ? source.produced_serial : null,
     source: normalizeDraftSource(source.source),
-    ...(journey ? { journey } : {}),
+    ...(advanced ? { advanced } : {}),
   };
 }
 

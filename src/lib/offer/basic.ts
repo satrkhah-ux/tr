@@ -45,6 +45,7 @@ import { roomRank, seatsFromName } from "@/lib/catalog/model";
 import { daysFromTours } from "./itinerary";
 // the tours' days moved to lib/offer/itinerary with the programme; their importers still find them here
 export { cityDates, WELCOME, withTourCount, withTours } from "./itinerary";
+import { AIRPORT_TRANSFER_LINE, meetsElsewhere } from "./advanced";
 import { autoDepartureDate, finalOutbound, itineraryStartDate } from "./schedule";
 import { withTypedTotal } from "./flight-fare";
 
@@ -606,8 +607,8 @@ const SCOPE_LINES: { text: string; on: (d: DraftData) => boolean; otherwiseExclu
   { text: "الطيران الداخلي", on: (d) => d.scope.flights_domestic && d.flights.some((f) => f.leg_order === "internal") },
   { text: "الفنادق", on: (d) => d.scope.hotels },
   { text: "الجولات السياحية", on: (d) => d.transport_plan.tours.enabled },
-  // an advanced journey says where reception really starts — never a blanket «من المطار»
-  { text: "الإستقبال والتوديع من المطار إلى الفندق والعكس", on: (d) => d.scope.transport && !d.journey?.enabled },
+  // «بكج متقدم» that meets or leaves the group elsewhere never promises «من المطار»
+  { text: AIRPORT_TRANSFER_LINE, on: (d) => d.scope.transport && !meetsElsewhere(d.advanced) },
 ];
 
 /**

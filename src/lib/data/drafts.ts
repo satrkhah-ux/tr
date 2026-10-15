@@ -39,7 +39,7 @@ import { draftSellTotal } from "@/lib/offer/preview-dto";
 import { applyManualProfit, offerTotals, rebase, type PricingLineInput } from "@/lib/offer/pricing";
 import { getProfitSettings } from "./app-settings";
 import { packageProfitFor, withPackageProfit, withScopeLines } from "@/lib/offer/basic";
-import { clientLines, journeyPricingLines, normalizeJourney, withChangeLog } from "@/lib/offer/advanced";
+import { advancedDayNote, advancedLines } from "@/lib/offer/advanced";
 import { getRates } from "./rates-actions";
 import { suggestPricingFor } from "./pricing-suggest-core";
 import { customerFor } from "./customer-row";
@@ -278,11 +278,7 @@ export async function saveDraftStages(draftId: string, slices: Partial<DraftData
     slices = { ...slices };
     delete slices.produced_serial;
   }
-  // the advanced journey's change log names who changed what — stamped here, never by the browser
-  const by = (user.user_metadata?.full_name as string | undefined) || user.email || user.id;
-  const stamp = (out: Partial<DraftData>, stored: DraftData): Partial<DraftData> =>
-    out.journey ? { ...out, journey: withChangeLog(stored.journey, normalizeJourney(out.journey)!, by, new Date().toISOString()) } : out;
-  return writeDraftStages(draftId, slices, (sent, stored, owner) => stamp(restoreSlices(sent, stored, owner), stored));
+  return writeDraftStages(draftId, slices, restoreSlices);
   function restoreSlices(sent: Partial<DraftData>, stored: DraftData, owner: string | null): Partial<DraftData> {
     // staff on a partner's file: the prices it shows the partner stay theirs
     const own = owner && !partner ? keepTheirPrices(sent, stored) : sent;
@@ -828,11 +824,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // Matched by stay id where there is one, and by the old
     // «المدينة — الفندق» description otherwise — an item written before cities
     // could hold two hotels must not be reconciled away as a phantom.
-    const validHotelRefs = new Set([
-      ...stays.flatMap((s) => [pricingRefFor(s), `${s.city_name} — ${s.line.hotel_name}`]),
-      // a stay the advanced journey prices itself is a real stay too
-      ...journeyPricingLines(data.journey).filter((l) => l.item_type === "hotel").map((l) => l.ref ?? ""),
-    ]);
+    const validHotelRefs = new Set(stays.flatMap((s) => [pricingRefFor(s), `${s.city_name} — ${s.line.hotel_name}`]));
     const rates = await getRates();
     // The package's profit (stated on the file, or the administration's default
     // margin for a file that states none) laid onto the lines here, from the
@@ -940,8 +932,8 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // so every partner) did not, and printed reception, tours and a domestic
     // flight that had been switched off. Here, once, for both.
     const scoped = withScopeLines(data);
-    // «البكج المتقدم»: where our services start and end, what the client arranges, what is still pending
-    const route = data.journey?.enabled ? clientLines(data.journey) : { includes: [], excludes: [], pending: [] };
+    // «بكج متقدم»: where our service starts and ends, and what the client arranges
+    const route = advancedLines(data.advanced);
 
     // Chosen in the customer stage. A draft that predates the picker carries only
     // the typed company NAME, so resolve that too rather than losing the branding.
@@ -1050,7 +1042,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         ...route.excludes.map((label) => ({ label, kind: "exclude" as const })),
         ...scoped.excludes.map((label) => ({ label, kind: "exclude" as const })),
       ],
-      terms: [...data.services.terms, ...route.pending],
+      terms: data.services.terms,
       hotels,
       pricing_items,
       // Only days with something to say are printed — an untouched skeleton
@@ -1059,7 +1051,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       days: draftDaySkeleton(data)
         .map((d, index, all) => ({
           d,
-          move: data.scope.transport && !data.journey?.enabled ? transportNoteForDay(data.transport_plan, all, index, data.flights) : null,
+          move: data.scope.transport ? advancedDayNote(transportNoteForDay(data.transport_plan, all, index, data.flights), data.advanced) : null,
         }))
         .filter(({ d, move }) => d.title.trim() || d.activities.some((a) => a.trim()) || move)
         .map(({ d, move }) => ({

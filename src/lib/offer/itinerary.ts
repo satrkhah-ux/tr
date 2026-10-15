@@ -28,6 +28,7 @@ import {
   type TransportPlan,
 } from "./draft-types";
 import { itineraryStartDate, localDatePart } from "./schedule";
+import { advancedDayLines } from "./advanced";
 
 function addDays(iso: string, days: number): string {
   const date = new Date(`${iso}T00:00:00Z`);
@@ -504,8 +505,7 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
     });
   });
 
-  // the advanced journey owns the cars: a tour then names only a car it was given itself
-  const tripCar = data.journey?.enabled ? "" : plan.tours.car_type.trim();
+  const tripCar = plan.tours.car_type.trim();
 
   // 3. the days
   return days.map((day, i) => {
@@ -515,10 +515,10 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
     let activities: string[] = [];
     if (kind === "last") {
       title = "المغادرة";
-      activities = ["تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة"];
+      activities = [advancedDayLines(data.advanced).leave ?? "تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة"];
     } else if (kind === "arrive") {
       title = `الوصول إلى ${day.city_name}`;
-      activities = [WELCOME];
+      activities = [advancedDayLines(data.advanced).arrive ?? WELCOME];
     } else if (kind === "move") {
       const from = days[i - 1]?.city_name ?? "";
       const mode = hopMode(plan, from, day.city_name);

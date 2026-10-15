@@ -36,7 +36,6 @@ import {
 import { itineraryStartDate } from "./schedule";
 import type { DraftPricingItem } from "./draft-types";
 import { splitTourName } from "@/lib/catalog/model";
-import { journeyPricingLines } from "./advanced";
 import { fareBreakdown, flightBookingTotal } from "./flight-fare";
 
 /** A transfer price from the reference list. */
@@ -684,9 +683,6 @@ export function suggestPricing(
       });
     }
   }
-
-  // «البكج المتقدم»: each service we charge for, once (journeyPricingLines)
-  items.push(...journeyPricingLines(data.journey));
 
   return items;
 }

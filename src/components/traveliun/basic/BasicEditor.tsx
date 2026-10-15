@@ -116,6 +116,8 @@ import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
 import { basicCard, basicField, basicLabel, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
+import { AdvancedQuestions } from "./AdvancedQuestions";
+import { emptyAdvanced } from "@/lib/offer/advanced";
 import { IssueGuardNotice } from "../IssueGuardNotice";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -1620,14 +1622,31 @@ export function BasicEditor({
                 {tx("reload")}
               </button>
             ) : null}
+            <button
+              type="button"
+              onClick={() => commit({ advanced: { ...(data.advanced ?? emptyAdvanced()), on: !data.advanced?.on } })}
+              className={`ms-auto inline-flex h-8 items-center gap-1 rounded-[8px] px-2.5 text-[11.5px] font-bold ${data.advanced?.on ? "bg-[#185045] text-white" : "border border-[#dbe6e1] bg-white text-[#185045] hover:bg-[#f4f8f6]"}`}
+            >
+              بكج متقدم{data.advanced?.on ? " ✓" : ""}
+            </button>
             <Link
               href={stageHref(draftId, "trip")}
               onClick={() => void flush()}
-              className="ms-auto inline-flex h-8 items-center rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] underline-offset-2 hover:underline"
+              className="inline-flex h-8 items-center rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] underline-offset-2 hover:underline"
             >
               {tx("fullGenerator")}
             </Link>
           </div>
+
+          {data.advanced?.on ? (
+            <AdvancedQuestions
+              value={data.advanced}
+              cities={data.cities}
+              tripCountry={trip.country}
+              countries={lk.countries.map((c) => c.name)}
+              onChange={(advanced) => commit({ advanced })}
+            />
+          ) : null}
 
           {/* one step open at a time; the done ones fold to a line, the next ones wait */}
           {steps.map((step) => fold(step, body[step]))}

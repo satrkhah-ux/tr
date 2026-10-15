@@ -29,7 +29,7 @@ import {
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
 import { transportNoteForDay } from "./itinerary";
-import { clientLines } from "./advanced";
+import { AIRPORT_TRANSFER_LINE, advancedDayNote, advancedLines, meetsElsewhere } from "./advanced";
 import { offerTotals, type CurrencyRates } from "./pricing";
 import { packageNights, packageStays, type ExtractedPackage, type RepackageData } from "@/lib/repackage/repackage-types";
 
@@ -84,7 +84,7 @@ export function draftToPreviewOffer(
   const cities = deriveCityDates(start, data.cities);
   const nights = data.trip.nights || cities.reduce((sum, c) => sum + c.nights, 0);
   const days = data.trip.days || (nights > 0 ? nights + 1 : 0);
-  const route = data.journey?.enabled ? clientLines(data.journey) : { includes: [], excludes: [], pending: [] };
+  const route = advancedLines(data.advanced);
 
   return {
     ...emptyBase(),
@@ -145,14 +145,15 @@ export function draftToPreviewOffer(
     // the agent is previewing the paper rather than something close to it.
     includes: [
       ...route.includes,
-      ...data.services.includes,
+      // what the issued offer drops (withScopeLines), the preview drops too
+      ...data.services.includes.filter((l) => !(meetsElsewhere(data.advanced) && l === AIRPORT_TRANSFER_LINE)),
       ...(mealPlanIncludeLine(data.trip) ? [mealPlanIncludeLine(data.trip)!] : []),
     ],
     excludes: [...route.excludes, ...data.services.excludes],
-    terms: [...data.services.terms, ...route.pending],
+    terms: data.services.terms,
     days: data.days
       // index on the FULL list: the transport line depends on a day's neighbours
-      .map((d, index) => ({ d, move: data.scope.transport && !data.journey?.enabled ? transportNoteForDay(data.transport_plan, data.days, index, data.flights) : null }))
+      .map((d, index) => ({ d, move: data.scope.transport ? advancedDayNote(transportNoteForDay(data.transport_plan, data.days, index, data.flights), data.advanced) : null }))
       .filter(({ d, move }) => d.title.trim() || d.activities.length > 0 || move)
       .map(({ d, move }) => ({
         transport_note: move,
