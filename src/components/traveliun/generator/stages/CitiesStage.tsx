@@ -841,9 +841,6 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                   <div className="space-y-3">
                     {cov.stays.map((stay, stayIndex) => {
                       const line = stay.line;
-                      const roomTypeOptions = lookups.roomTypes.filter(
-                        (rt) => rt.hotel_id === line.hotel_id || rt.hotel_id === null,
-                      );
                       const isChoosing = openLine === line.id;
 
                       return (
@@ -864,7 +861,6 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                           onEditing={(open) => setEditing(open ? line.id : null)}
                           sourceLabel={sourceLabel(sourceFor(line))}
                           hotelOptions={hotelOptions}
-                          roomTypeOptions={roomTypeOptions}
                           countries={lookups.countries}
                           suppliers={suppliersFor(lookups, "فنادق")}
                           canInternal={canInternal}

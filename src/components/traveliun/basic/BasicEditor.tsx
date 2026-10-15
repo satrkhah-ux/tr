@@ -32,7 +32,7 @@ import {
   ScrollText,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
-import { getCountryHotels, getRoomTypeLookups, produceOfferFromDraft } from "@/lib/data/drafts";
+import { getCountryHotels, produceOfferFromDraft } from "@/lib/data/drafts";
 import { getTourPrices, getTourPrograms } from "@/lib/data/tour-programs";
 import type { TourProgram } from "@/lib/offer/itinerary";
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
@@ -66,7 +66,9 @@ import {
   type LookupHotel,
   type MealPlan,
   type TransportMode,
+  roomPickName,
 } from "@/lib/offer/draft-types";
+import { ROOM_TYPES } from "@/lib/catalog/room-catalog";
 import {
   addCity,
   airportDisplay,
@@ -81,7 +83,6 @@ import {
   packageProfitFor,
   priceAtSource,
   resizeGroupCars,
-  roomSuggestions,
   tripCountries,
   withDomesticFlights,
   withGroupCars,
@@ -116,7 +117,6 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useDraftState } from "../generator/useDraftState";
 import { BasicCityCard } from "./BasicCityCard";
 import { BasicFlightPlan } from "./BasicFlightPlan";
-import { SuggestInput } from "../SuggestInput";
 import { BasicPhoneLookup } from "./BasicPhoneLookup";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
@@ -455,12 +455,11 @@ export function BasicEditor({
   const setLines = (lines: DraftHotel[]) => commit({ hotels: data.hotels.map((h) => lines.find((l) => l.id === h.id) ?? h) });
 
   // ---------- the catalogue, fetched per country ----------
-  // The page opens without the 2,300 hotels and 1,300 room types of every
-  // country; the hotels of a country arrive when the file first names it, the
-  // room types once, in the background.
+  // The page opens without the 2,300 hotels of every country; the hotels of a
+  // country arrive when the file first names it. Room types are the owner's
+  // catalogue (src/lib/catalog), in the bundle — nothing to fetch.
   const [newCountry, setNewCountry] = useState("");
   const [hotelsByCountry, setHotelsByCountry] = useState<Record<string, Record<string, LookupHotel[]>>>({});
-  const [roomTypes, setRoomTypes] = useState(lookups.roomTypes);
   const asked = useRef(new Set<string>());
   const wantedCountries = [...new Set([trip.country, newCountry, ...cities.map((c) => c.country ?? "")])]
     .map((name) => findLookupCountry(lookups.countries, name)?.name ?? "")
@@ -476,19 +475,15 @@ export function BasicEditor({
       });
     }
   }, [wantedCountries]);
-  useEffect(() => {
-    if (lookups.roomTypes.length === 0) void getRoomTypeLookups().then(setRoomTypes);
-  }, [lookups.roomTypes.length]);
   const lk = useMemo<GeneratorLookups>(
     () => ({
       ...lookups,
-      roomTypes,
       countries: lookups.countries.map((c) => {
         const byCity = hotelsByCountry[c.name];
         return byCity ? { ...c, cities: c.cities.map((city) => ({ ...city, hotels: byCity[city.id] ?? [] })) } : c;
       }),
     }),
-    [lookups, roomTypes, hotelsByCountry],
+    [lookups, hotelsByCountry],
   );
   // «بكج متقدم» opened on a file whose dates it has not taken yet: take them now
   useEffect(() => {
@@ -584,7 +579,6 @@ export function BasicEditor({
   // the trip's country unless the group crosses into a neighbour
   const barCountry = findLookupCountry(lk.countries, newCountry || trip.country);
   const barHotels = barCountry?.cities.find((c) => c.name === newCity)?.hotels ?? [];
-  const barRoomNames = roomSuggestions(lk.roomTypes, newHotel);
 
   function pickCity(name: string) {
     setNewCity(name);
@@ -604,7 +598,7 @@ export function BasicEditor({
           tours: toursOn ? toursChoice : 0,
           country: barCountry?.name,
           hotel: hotel ? { id: hotel.id, name: hotel.name } : null,
-          room: newRoom,
+          room: newRoom ? roomPickName({ room_type_code: newRoom }) : "",
           rooms: roomsChoice,
           price: newPrice,
         },
@@ -1366,13 +1360,13 @@ export function BasicEditor({
                 </label>
                 <label className={`${basicLabel} w-32 shrink-0 sm:w-40`}>
                   {tx("roomType")}
-                  <SuggestInput
-                    ariaLabel={tx("roomType")}
-                    items={barRoomNames.map((value) => ({ value }))}
-                    value={newRoom}
-                    onChange={(v) => setNewRoom(v)}
-                    className={basicField}
-                  />
+                  {/* the type only — its category is chosen on the city's card */}
+                  <select aria-label={tx("roomType")} value={newRoom} onChange={(e) => setNewRoom(e.target.value)} className={basicField}>
+                    <option value="">{tx("choose")}</option>
+                    {ROOM_TYPES.map((type) => (
+                      <option key={type.id} value={type.id}>{type.label[language === "en" ? "en" : "ar"]}</option>
+                    ))}
+                  </select>
                 </label>
                 <label className={`${basicLabel} w-14 shrink-0`}>
                   {tx("rooms")}

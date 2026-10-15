@@ -50,7 +50,6 @@ import {
   cityDates,
   findAirport,
   rankAirports,
-  roomSuggestions,
   setCityNights,
   tripCountries,
   withTours,
@@ -71,6 +70,7 @@ import { withTypedTotal } from "@/lib/offer/flight-fare";
 import { basicField, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
 import { RefundControl } from "../generator/hotels/RefundControl";
+import { RoomTypePicker } from "../generator/hotels/RoomTypePicker";
 import { nightsText, useBasicLabels } from "./labels";
 import { CarCountSelect, CarOptions, TourRow, type TourCatalog } from "../tours/TourRow";
 
@@ -595,7 +595,6 @@ function HotelPanel({
         const priceTitle = tx("stayPrice", { n: nightsText(nights, language) });
         // a hotel the list does not hold (an older file) still shows its name
         const outside = line.hotel_name && !hotels.some((h) => h.id === line.hotel_id) ? (line.hotel_id ?? "__current") : null;
-        const rooms = roomSuggestions(lookups.roomTypes, line.hotel_id).map((value) => ({ value }));
         return (
           <div key={line.id} className={i > 0 ? "space-y-1.5 border-t border-dashed border-[#DCE9E5] pt-2" : "space-y-1.5"}>
             {lines.length > 1 && stay ? (
@@ -641,13 +640,13 @@ function HotelPanel({
                       {tx("roomN", { n: j + 1 })}
                     </span>
                   )}
-                  <SuggestInput
-                    ariaLabel={tx("roomType")}
-                    placeholder={tx("roomType")}
-                    items={rooms}
-                    value={baseRoomName(r.room_type_name)}
-                    onChange={(value) => onLines([setRoom(line, j, { room_type_id: null, room_type_name: value + (extra ? EXTRA_BED : "") })])}
-                    className={basicField}
+                  {/* the owner's catalogue: type, category, suite type — the extra bed rides on the name as before */}
+                  <RoomTypePicker
+                    room={{ ...r, room_type_name: baseRoomName(r.room_type_name) }}
+                    onPick={(slice) =>
+                      onLines([setRoom(line, j, { ...slice, room_type_name: slice.room_type_name && extra ? slice.room_type_name + EXTRA_BED : slice.room_type_name })])
+                    }
+                    selectClass={basicField}
                   />
                   <select
                     aria-label={tx("board")}

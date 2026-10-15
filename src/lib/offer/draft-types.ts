@@ -11,6 +11,7 @@ import type { BoardType, FlightLegOrder, PricingItemType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
 import { normalizeAdvanced, withAdvancedTransport, type DraftAdvanced } from "./advanced";
 import { withFlightTotals } from "./flight-fare";
+import { classifyRoomName, roomName, ROOM_CATEGORIES, ROOM_TYPES, SUITE_SUBTYPES } from "@/lib/catalog/room-catalog";
 
 // ---------- stage registry ----------
 export const STAGE_KEYS = [
@@ -160,9 +161,9 @@ export type DraftTrip = {
    */
   rooms: number;
   /**
-   * A room-type NAME, not an id: room_types rows belong to a hotel, and at this
-   * point no hotel is chosen. The agent means "a suite", and the hotel stage
-   * resolves that to the picked hotel's own row when it has one.
+   * A room-type NAME: a catalogue type's Arabic label («جناح»), which every
+   * city's room inherits with its codes (roomFromName). An older draft may hold
+   * a free-text name; it is kept as typed.
    */
   default_room_type_name: string;
   /**
@@ -486,8 +487,18 @@ export type SourcingQuote = {
  * booked but never labelled as such on the client document.
  */
 export type DraftRoomSpec = {
+  /** LEGACY: a row of the old per-hotel room_types table. New picks leave it null; normalize drops it. */
   room_type_id: string | null;
+  /**
+   * The room's printed name, in Arabic: roomPickName(codes) for a room picked
+   * from the catalogue, or the text an older file was saved with. Pricing lines,
+   * the per-night rate memory, partner sheets and offer_hotels key on it.
+   */
   room_type_name: string;
+  /** The owner's catalogue (src/lib/catalog/hotel-room-catalog.json): type, category, suite type ids. */
+  room_type_code?: string | null;
+  room_category_code?: string | null;
+  suite_subtype_code?: string | null;
   board_type: BoardType | null;
   /**
    * What THIS room costs for the whole stay.
@@ -502,6 +513,70 @@ export type DraftRoomSpec = {
 
 export function emptyRoomSpec(): DraftRoomSpec {
   return { room_type_id: null, room_type_name: "", board_type: null, price: null };
+}
+
+export type RoomCodes = Required<Pick<DraftRoomSpec, "room_type_code" | "room_category_code" | "suite_subtype_code">>;
+
+/** The catalogue room in Arabic — «غرفة مزدوجة | الفئة: ديلوكس»; "" with no type. */
+export function roomPickName(codes: Partial<RoomCodes>): string {
+  const spec = { room_type_id: codes.room_type_code ?? null, room_category_id: codes.room_category_code, suite_subtype_id: codes.suite_subtype_code };
+  return roomName(spec, "ar").name ?? "";
+}
+
+/** A room picked from the catalogue: its codes and the Arabic name they make. A category needs a type; a suite type, a suite. */
+export function pickRoom(codes: Partial<RoomCodes>): Pick<DraftRoomSpec, "room_type_id" | "room_type_name"> & RoomCodes {
+  const type = codes.room_type_code || null;
+  const picked: RoomCodes = {
+    room_type_code: type,
+    room_category_code: (type && codes.room_category_code) || null,
+    suite_subtype_code: (type === "suite" && codes.suite_subtype_code) || null,
+  };
+  return { room_type_id: null, room_type_name: roomPickName(picked), ...picked };
+}
+
+// every name a pick can make (~200), so a picked name reads back exactly — suite types included
+const PICKED_NAMES = new Map<string, RoomCodes>();
+for (const type of ROOM_TYPES) {
+  for (const category of [null, ...ROOM_CATEGORIES]) {
+    for (const suite of type.id === "suite" ? [null, ...SUITE_SUBTYPES] : [null]) {
+      const codes = { room_type_code: type.id, room_category_code: category?.id ?? null, suite_subtype_code: suite?.id ?? null };
+      PICKED_NAMES.set(roomPickName(codes), codes);
+    }
+  }
+}
+
+/** The codes a name stands for: a catalogue name exactly, else what an older free-text name reads as. */
+export function codesFromName(name: string): RoomCodes {
+  const text = name.trim();
+  const exact = PICKED_NAMES.get(text);
+  if (exact) return exact;
+  const read = text ? classifyRoomName(text) : { room_type_id: null, room_category_id: null };
+  return { room_type_code: read.room_type_id, room_category_code: read.room_category_id, suite_subtype_code: null };
+}
+
+/** A room named by text (the trip default, the add bar): that name kept, its codes beside it. */
+export function roomFromName(name: string): Pick<DraftRoomSpec, "room_type_id" | "room_type_name"> & RoomCodes {
+  return { room_type_id: null, room_type_name: name, ...codesFromName(name) };
+}
+
+/** What a picker shows for a room: its own codes, else what its saved name reads as. */
+export function roomCodes(room: Pick<DraftRoomSpec, "room_type_name" | "room_type_code" | "room_category_code" | "suite_subtype_code">): RoomCodes {
+  if (!room.room_type_code) return codesFromName(room.room_type_name);
+  return { room_type_code: room.room_type_code, room_category_code: room.room_category_code ?? null, suite_subtype_code: room.suite_subtype_code ?? null };
+}
+
+/**
+ * A room as saved, made current: a room from before the catalogue gets the
+ * codes its name reads as (only when it reads something), and its NAME stays
+ * as it was — an old file prints and prices exactly as before. The old table's
+ * id is dropped: those rows are being deleted, and an offer_hotels insert
+ * naming a deleted row fails its foreign key.
+ */
+function cataloguedRoom(room: DraftRoomSpec): DraftRoomSpec {
+  const next = { ...room, room_type_id: null, room_type_name: typeof room.room_type_name === "string" ? room.room_type_name : "" };
+  if (room.room_type_code) return next;
+  const codes = codesFromName(next.room_type_name);
+  return codes.room_type_code || codes.room_category_code ? { ...next, ...codes } : next;
 }
 
 /**
@@ -645,7 +720,7 @@ export function inheritRoomType(line: DraftHotel, from: string, to: string): Dra
   return withRooms(
     line,
     line.rooms.map((r) =>
-      r.room_type_name === from ? { ...r, room_type_name: to, room_type_id: null } : r,
+      r.room_type_name === from ? { ...r, ...roomFromName(to) } : r,
     ),
   );
 }
@@ -685,11 +760,13 @@ export function normalizeDraftHotel(raw: unknown): DraftHotel {
   // Rooms saved before they carried a price get the field, empty. The line's
   // own `manual_price` is NOT copied onto each of them: it was one figure for
   // one room, and writing it into three would treble the stay on sight.
-  const rooms = rawRooms.map((r) => ({
-    ...emptyRoomSpec(),
-    ...(r && typeof r === "object" ? (r as Partial<DraftRoomSpec>) : {}),
-    price: typeof (r as Partial<DraftRoomSpec>)?.price === "number" ? (r as DraftRoomSpec).price : null,
-  }));
+  const rooms = rawRooms.map((r) =>
+    cataloguedRoom({
+      ...emptyRoomSpec(),
+      ...(r && typeof r === "object" ? (r as Partial<DraftRoomSpec>) : {}),
+      price: typeof (r as Partial<DraftRoomSpec>)?.price === "number" ? (r as DraftRoomSpec).price : null,
+    }),
+  );
   const base: DraftHotel = {
     // A missing id means a draft written before a city could hold two hotels.
     // It gets one now; the pricing item that references it by description keeps

@@ -16,12 +16,12 @@ import {
   moveTripCountry,
   resizeRooms,
   resizeAges,
-  roomTypeNames,
   type MealPlan,
 } from "@/lib/offer/draft-types";
 import { FieldIssue, useFieldRing } from "../FieldIssue";
 import { TeletelSearch } from "../TeletelSearch";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
+import { ROOM_TYPES } from "@/lib/catalog/room-catalog";
 import { fieldClass, labelClass, sectionClass, type StageFormProps } from "../stage-props";
 
 /**
@@ -113,7 +113,7 @@ export function CustomerStage({ data, patch, lookups }: StageFormProps) {
       {/* Transport moved to the TRIP card: the vehicle is decided once the
           dates and the cities are known, and the car count belongs beside the
           journey it carries rather than beside the client's phone number. */}
-      <RoomsBlock data={data} patch={patch} lookups={lookups} />
+      <RoomsBlock data={data} patch={patch} />
     </section>
   );
 }
@@ -323,8 +323,8 @@ function AgeField({
  * still follows the trip. Value equality is the flag — there is nothing to
  * mark dirty and nothing to get out of step.
  */
-function RoomsBlock({ data, patch, lookups }: Pick<StageFormProps, "data" | "patch" | "lookups">) {
-  const { t } = useTraveliunUI();
+function RoomsBlock({ data, patch }: Pick<StageFormProps, "data" | "patch">) {
+  const { t, language } = useTraveliunUI();
   const trip = data.trip;
 
   function setRooms(raw: number) {
@@ -338,7 +338,7 @@ function RoomsBlock({ data, patch, lookups }: Pick<StageFormProps, "data" | "pat
     });
   }
 
-  /** A NAME — the id is per-hotel and gets resolved once a hotel is picked. */
+  /** A catalogue type's Arabic NAME — every room still holding the old default follows it (with its codes). */
   function setRoomType(name: string) {
     patch({
       trip: { ...trip, default_room_type_name: name },
@@ -383,11 +383,13 @@ function RoomsBlock({ data, patch, lookups }: Pick<StageFormProps, "data" | "pat
           {t("pg.roomType")}
           <select value={trip.default_room_type_name} onChange={(e) => setRoomType(e.target.value)} className={fieldClass}>
             <option value="">{t("pg.chooseRoomType")}</option>
-            {/* distinct NAMES: the raw table has one row per hotel, so the same
-                «جناح» would otherwise repeat once for every hotel in the system */}
-            {roomTypeNames(lookups.roomTypes).map((name) => (
-              <option key={name} value={name}>{name}</option>
+            {/* the owner's catalogue; the default is kept as its ARABIC name, which every city's room inherits */}
+            {ROOM_TYPES.map((type) => (
+              <option key={type.id} value={type.label.ar}>{type.label[language === "en" ? "en" : "ar"]}</option>
             ))}
+            {trip.default_room_type_name && !ROOM_TYPES.some((type) => type.label.ar === trip.default_room_type_name) ? (
+              <option value={trip.default_room_type_name}>{trip.default_room_type_name}</option>
+            ) : null}
           </select>
         </label>
         <label className={smallLabelClass}>
