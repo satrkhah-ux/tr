@@ -472,6 +472,14 @@ export function BasicEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on open
   }, []);
 
+  // «بكج متقدم» step ③: the first hotel Basic books, by name, city and country
+  const firstStayText = (() => {
+    const c = data.cities[0];
+    if (!c) return "";
+    const h = data.hotels.find((x) => x.city_name === c.city_name)?.hotel_name;
+    return [h && `فندق ${h.replace(/^فندق\s+/, "")}`, [c.city_name, c.country || trip.country].filter(Boolean).join("، ")].filter(Boolean).join(" — ");
+  })();
+
   // «بكج متقدم» picks its places from the catalogue
   const advancedLists = useMemo(() => {
     const wanted = new Set([trip.country, ...data.cities.map((c) => c.country ?? "")].filter(Boolean));
@@ -482,7 +490,7 @@ export function BasicEditor({
         return { label, country: a.country || (a.city ? cityCountry.get(a.city) : undefined) || "", station: isStation(label) };
       }),
       cities: lk.countries.flatMap((c) => c.cities.map((x) => ({ name: x.name, country: c.name }))),
-      hotels: [...new Set(lk.countries.filter((c) => wanted.has(c.name)).flatMap((c) => c.cities.flatMap((x) => x.hotels.map((h) => h.name))))],
+      hotels: Object.fromEntries(lk.countries.map((c) => [c.name, [...new Set(c.cities.flatMap((x) => x.hotels.map((h) => h.name)))]])),
       // the package's own countries first — the usual answer, one tap away
       countries: [...new Set([...wanted, ...lk.countries.map((c) => c.name)])],
       zones: Object.fromEntries(lk.countries.filter((c) => c.timezone).map((c) => [c.name, c.timezone!])),
@@ -1671,6 +1679,7 @@ export function BasicEditor({
               transportOn={data.scope.transport}
               tripCountry={trip.country}
               lists={advancedLists}
+              firstStay={firstStayText}
               onChange={(advanced) => commit({ advanced })}
             />
           ) : null}

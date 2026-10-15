@@ -300,7 +300,7 @@ describe("daysFromTours — the day and its tour (الأمر 3)", () => {
   });
 
   it("«بكج متقدم» meeting the group at a border: the arrival day says where, the tours keep the trip car", () => {
-    const data = { ...picked(), advanced: { ...emptyAdvanced(), on: true, reception: { kind: "border" as const, place: "معبر سارب", side: "جورجيا", date: "", time: "12:30" } } };
+    const data = { ...picked(), advanced: { ...emptyAdvanced(), on: true, reception: { kind: "border" as const, place: "معبر سارب", side: "جورجيا", country: "جورجيا", date: "", time: "12:30" } } };
     const days = daysFromTours(data, true); // Basic's own programme — it writes the arrival day
     expect(days.find((d) => d.activities.some((a) => a.includes("معبر")))?.activities[0]).toBe("الاستقبال من معبر سارب — جانب جورجيا الساعة 12:30 من قبل موظف ترافليون والتوجه إلى الفندق");
     expect(daysFromTours({ ...picked(), advanced: { ...emptyAdvanced(), on: false } }, true)).toEqual(daysFromTours(picked(), true));

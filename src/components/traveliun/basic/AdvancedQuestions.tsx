@@ -9,6 +9,7 @@ import {
   advancedLines,
   advancedSteps,
   emptyAdvanced,
+  pointCountry,
   hopKey,
   setAdvancedDate,
   withAdvancedTransport,
@@ -31,7 +32,8 @@ export type AdvancedPickLists = {
   /** the airports table — airports AND stations / ports, each with its country. */
   stops: { label: string; country: string; station: boolean }[];
   cities: { name: string; country: string }[];
-  hotels: string[];
+  /** hotels by country — the catalogue's, for the countries whose hotels are loaded. */
+  hotels: Record<string, string[]>;
   countries: string[];
   /** country → IANA zone, so every clock is read where it happens. */
   zones: Record<string, string>;
@@ -60,6 +62,7 @@ export function AdvancedQuestions({
   transportOn,
   tripCountry,
   lists,
+  firstStay = "",
   onChange,
 }: {
   value: DraftAdvanced | undefined;
@@ -68,6 +71,8 @@ export function AdvancedQuestions({
   transportOn: boolean;
   tripCountry: string;
   lists: AdvancedPickLists;
+  /** «فندق X — مدينة، دولة»: the first hotel Basic books, said in step ③. */
+  firstStay?: string;
   onChange: (next: DraftAdvanced) => void;
 }) {
   const id = useId();
@@ -77,7 +82,7 @@ export function AdvancedQuestions({
   const tzOf = (country: string) => lists.zones[country] ?? null;
   // the first night's country — where a pickup in another country has to cross to
   const firstCountry = cities[0]?.country || tripCountry;
-  const steps = advancedSteps(adv, tzOf, firstCountry);
+  const steps = advancedSteps(adv, tzOf, firstCountry, firstStay);
   const stepOf = (k: StepKey) => steps.find((s) => s.key === k)!;
   const hopGaps = Object.values(adv.borders).filter((h) => !h.crossing.trim()).length;
   const errors = steps.reduce((n, s) => n + s.errors.length, 0);
@@ -100,7 +105,10 @@ export function AdvancedQuestions({
   const choices: Record<string, string[]> = {
     arrive: placesFor(lists, adv.arrive_by, adv.arrive_country),
     leave: placesFor(lists, adv.leave_by, adv.leave_country),
-    hotels: lists.hotels,
+    rxAirports: lists.stops.filter((x) => !x.station && (!adv.reception.country || x.country === adv.reception.country)).map((x) => x.label),
+    fwAirports: lists.stops.filter((x) => !x.station && (!adv.farewell.country || x.country === adv.farewell.country)).map((x) => x.label),
+    rxHotels: adv.reception.country ? lists.hotels[adv.reception.country] ?? [] : Object.values(lists.hotels).flat(),
+    fwHotels: adv.farewell.country ? lists.hotels[adv.farewell.country] ?? [] : Object.values(lists.hotels).flat(),
     crossings: [],
   };
   const pick = (list: keyof typeof choices, value: string, put: (v: string) => void, placeholder: string) => (
@@ -138,28 +146,26 @@ export function AdvancedQuestions({
       ))}
     </div>
   );
-  const pointChips = (p: ServicePoint, put: (p: ServicePoint) => void, selfWord: string) => (
-    <div className="flex flex-wrap gap-1.5">
+  /** the country first, then what kind of place — a border's side is that country. */
+  const pointChips = (p: ServicePoint, put: (p: ServicePoint) => void, selfWord: string, countryLabel: string) => (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {p.kind !== "self" ? (
+        <span className="w-44">{country(p.country, (c) => put({ ...p, country: c, place: "", side: p.kind === "border" ? c : p.side }), countryLabel)}</span>
+      ) : null}
       {(Object.keys(POINT_AR) as Exclude<PointKind, "">[]).map((k) => (
-        <button key={k} type="button" className={chip(p.kind === k)} onClick={() => put({ ...p, kind: k })}>
+        <button key={k} type="button" className={chip(p.kind === k)} onClick={() => put({ ...p, kind: k, place: k === p.kind ? p.place : "", side: k === "border" ? p.country : "" })}>
           {k === "self" ? selfWord : POINT_AR[k]}
         </button>
       ))}
     </div>
   );
-  const pointPlace = (p: ServicePoint, put: (p: ServicePoint) => void) =>
-    p.kind === "hotel" ? (
-      pick("hotels", p.place, (v) => put({ ...p, place: v }), "اختر الفندق")
+  const pointPlace = (p: ServicePoint, put: (p: ServicePoint) => void, which: "rx" | "fw") =>
+    p.kind === "airport" ? (
+      pick(`${which}Airports`, p.place, (v) => put({ ...p, place: v }), "المطار (اختياري — وإلا مطار الرحلة)")
+    ) : p.kind === "hotel" ? (
+      pick(`${which}Hotels`, p.place, (v) => put({ ...p, place: v }), "اختر الفندق")
     ) : p.kind === "border" ? (
-      <>
-        {pick("crossings", p.place, (v) => put({ ...p, place: v }), "اسم المعبر")}
-        <select className={small} value={p.side} onChange={(e) => put({ ...p, side: e.target.value })}>
-          <option value="">أي جانب؟</option>
-          {lists.countries.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
-      </>
+      pick("crossings", p.place, (v) => put({ ...p, place: v }), p.country ? `اسم المعبر — جانب ${p.country}` : "اسم المعبر")
     ) : null;
 
   /** one step of the trip: its number, its sentence, its state, then its fields and what is wrong with them. */
@@ -251,8 +257,8 @@ export function AdvancedQuestions({
 
   const rx = adv.reception;
   const fw = adv.farewell;
-  const rxCountry = rx.kind === "border" && rx.side ? rx.side : adv.arrive_country;
-  const fwCountry = fw.kind === "border" && fw.side ? fw.side : adv.leave_country;
+  const rxCountry = pointCountry(rx, adv.arrive_country);
+  const fwCountry = pointCountry(fw, adv.leave_country);
 
   return (
     <section className={`${basicCard} space-y-3 border-[#2aa87a]`}>
@@ -291,27 +297,27 @@ export function AdvancedQuestions({
         {stepCard(
           stepOf("reception"),
           <>
-            {pointChips(rx, (reception) => set({ reception }), "يصل بنفسه")}
+            {pointChips(rx, (reception) => set({ reception }), "يصل بنفسه", "دولة الاستقبال")}
             {rx.kind && rx.kind !== "self"
               ? grid(
                   <>
-                    {pointPlace(rx, (reception) => set({ reception }))}
+                    {pointPlace(rx, (reception) => set({ reception }), "rx")}
                     {dateIn("reception_date", rx.date, "يوم الاستقبال")}
                     {timeIn(rx.time, (time) => set({ reception: { ...rx, time } }), "موعد لقاء السائق", rxCountry)}
                   </>,
                 )
               : null}
-            {rx.kind && rx.kind !== "self" && rx.kind !== "border" && adv.arrive_country && firstCountry && adv.arrive_country !== firstCountry ? (
+            {rx.kind && rx.kind !== "self" && rx.kind !== "border" && rxCountry && firstCountry && rxCountry !== firstCountry ? (
               <div className="flex flex-wrap items-center gap-1.5 rounded-[10px] bg-[#f6f9f8] p-2">
                 <span className="text-[12px] font-bold text-[#185045]">
-                  من {adv.arrive_country} إلى أول فندق في {firstCountry} — كيف يعبر الحدود؟
+                  من {rxCountry} إلى أول فندق في {firstCountry} — كيف يعبر الحدود؟
                 </span>
                 {([1, 2] as const).map((d) => (
                   <button
                     key={d}
                     type="button"
                     className={chip(adv.reception_cross?.drivers === d)}
-                    onClick={() => set({ reception_cross: { crossing: adv.reception_cross?.crossing ?? "", side_from: adv.arrive_country, side_to: firstCountry, drivers: d } })}
+                    onClick={() => set({ reception_cross: { crossing: adv.reception_cross?.crossing ?? "", side_from: rxCountry, side_to: firstCountry, drivers: d } })}
                   >
                     {d === 1 ? "سائق واحد يعبر" : "سائقان وعبور ذاتي بينهما"}
                   </button>
@@ -329,11 +335,11 @@ export function AdvancedQuestions({
         {stepCard(
           stepOf("farewell"),
           <>
-            {pointChips(fw, (farewell) => set({ farewell }), "يغادر بنفسه")}
+            {pointChips(fw, (farewell) => set({ farewell }), "يغادر بنفسه", "دولة التوديع")}
             {fw.kind && fw.kind !== "self"
               ? grid(
                   <>
-                    {pointPlace(fw, (farewell) => set({ farewell }))}
+                    {pointPlace(fw, (farewell) => set({ farewell }), "fw")}
                     {dateIn("farewell_date", fw.date, "يوم التوديع")}
                     {timeIn(fw.time, (time) => set({ farewell: { ...fw, time } }), "موعد الانطلاق", fwCountry)}
                   </>,

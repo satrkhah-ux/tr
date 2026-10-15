@@ -19,7 +19,7 @@ describe("«بكج متقدم» — four answers on top of the basic file", () =
   });
 
   it("Trabzon arrival, reception at the Georgian side of the border: no «من المطار» anywhere", () => {
-    const a = adv({ arrive_at: "مطار طرابزون", reception: { kind: "border", place: "معبر سارب", side: "جورجيا", date: "", time: "12:30" }, farewell: { kind: "airport", place: "", side: "", date: "2026-11-14", time: "" } });
+    const a = adv({ arrive_at: "مطار طرابزون", reception: { kind: "border", place: "معبر سارب", side: "جورجيا", country: "جورجيا", date: "", time: "12:30" }, farewell: { kind: "airport", place: "", side: "", country: "تركيا", date: "2026-11-14", time: "" } });
     const out = withAdvancedTransport(rows, a);
     expect(out[0]).toMatchObject({ from_place: "معبر سارب — جانب جورجيا", to_place: "فندق باتومي", note: "اللقاء 12:30" });
     expect(out[1].to_place).toBe(TRANSPORT_AIRPORT); // the farewell was left at the airport
@@ -36,14 +36,14 @@ describe("«بكج متقدم» — four answers on top of the basic file", () =
   });
 
   it("reception from a hotel the client booked: the night is theirs, said once as «غير مشمول»", () => {
-    const a = adv({ arrive_at: "مطار طرابزون", reception: { kind: "hotel", place: "ريزا جراند", side: "", date: "", time: "" }, self_items: ["ليلة في فندق ريزا جراند"] });
+    const a = adv({ arrive_at: "مطار طرابزون", reception: { kind: "hotel", place: "ريزا جراند", side: "", country: "تركيا", date: "", time: "" }, self_items: ["ليلة في فندق ريزا جراند"] });
     expect(withAdvancedTransport(rows, a)[0].from_place).toBe("فندق ريزا جراند");
     expect(advancedLines(a).excludes).toContain("ليلة في فندق ريزا جراند — يرتّبه العميل بنفسه، غير مشمول");
     expect(advancedGaps(a)).toEqual(expect.arrayContaining(["يوم الاستقبال غير محدد", "موعد اللقاء ينتظر التأكيد", "اختر نقطة التوديع"]));
   });
 
   it("the client comes by themselves: the pickup row is gone (so it is not priced) and the day note drops it", () => {
-    const a = adv({ arrive_by: "already", reception: { kind: "self", place: "", side: "", date: "", time: "" } });
+    const a = adv({ arrive_by: "already", reception: { kind: "self", place: "", side: "", country: "", date: "", time: "" } });
     expect(withAdvancedTransport(rows, a).map((r) => r.from_place)).toEqual(["فندق تبليسي", "باتومي"]);
     expect(advancedLines(a).excludes).toContain("وصولكم إلى البلد — ترتيب ذاتي، غير مشمول");
     expect(advancedDayNote("استقبال من المطار إلى الفندق — سيدان", a)).toBeNull();
@@ -65,7 +65,7 @@ describe("«بكج متقدم» — four answers on top of the basic file", () =
   });
 
   it("farewell to a border, departure overland from another country", () => {
-    const a = adv({ leave_by: "land", leave_from: "أرمينيا", farewell: { kind: "border", place: "معبر صدخلو", side: "جورجيا", date: "", time: "09:00" } });
+    const a = adv({ leave_by: "land", leave_from: "أرمينيا", farewell: { kind: "border", place: "معبر صدخلو", side: "جورجيا", country: "جورجيا", date: "", time: "09:00" } });
     expect(withAdvancedTransport(rows, a)[1]).toMatchObject({ to_place: "معبر صدخلو — جانب جورجيا", note: "الانطلاق 09:00" });
     expect(advancedLines(a).includes).toEqual(["تنتهي خدماتنا بتوصيلكم إلى معبر صدخلو — جانب جورجيا الساعة 09:00"]);
     expect(advancedLines(a).excludes).toContain("مغادرتكم من أرمينيا (برّاً) — غير مشمولة");
@@ -73,12 +73,12 @@ describe("«بكج متقدم» — four answers on top of the basic file", () =
   });
 
   it("what is missing is said, never invented", () => {
-    const a = adv({ reception: { kind: "border", place: "", side: "", date: "", time: "" }, borders: { "أ>ب": { drivers: 2, crossing: "", side_from: "", side_to: "" } } });
+    const a = adv({ reception: { kind: "border", place: "", side: "", country: "", date: "", time: "" }, borders: { "أ>ب": { drivers: 2, crossing: "", side_from: "", side_to: "" } } });
     expect(advancedGaps(a)).toEqual(expect.arrayContaining(["اختر المعبر", "حدد أي جانب من الحدود", "يوم الاستقبال غير محدد", "موعد اللقاء ينتظر التأكيد", "اختر نقطة التوديع", "من أين يأتي إلى نقطة الاستقبال؟ اختر مكان وصوله", "أ ← ب: اكتب اسم المعبر"]));
   });
 
   it("an airport reception names the airport the client flies into", () => {
-    const a = adv({ arrive_at: "طرابزون", leave_from: "مطار تبليسي", reception: { kind: "airport", place: "", side: "", date: "", time: "" }, farewell: { kind: "airport", place: "", side: "", date: "", time: "" } });
+    const a = adv({ arrive_at: "طرابزون", leave_from: "مطار تبليسي", reception: { kind: "airport", place: "", side: "", country: "تركيا", date: "", time: "" }, farewell: { kind: "airport", place: "", side: "", country: "تركيا", date: "", time: "" } });
     expect(withAdvancedTransport(rows, a).slice(0, 2).map((r) => [r.from_place, r.to_place])).toEqual([
       ["مطار طرابزون", "فندق باتومي"],
       ["فندق تبليسي", "مطار تبليسي"],
@@ -136,8 +136,8 @@ describe("«بكج متقدم» — the trip read in order (the owner's own file
       arrive_date: "2026-10-18",
       arrive_time: "22:40",
       checkin_date: "2026-10-17",
-      reception: { kind: "border", place: "باتايا", side: "تايلاند", date: "2026-10-16", time: "22:40" },
-      farewell: { kind: "airport", place: "", side: "", date: "2026-10-15", time: "" },
+      reception: { kind: "border", place: "باتايا", side: "تايلاند", country: "تايلاند", date: "2026-10-16", time: "22:40" },
+      farewell: { kind: "airport", place: "", side: "", country: "تركيا", date: "2026-10-15", time: "" },
       leave_country: "الإمارات",
       leave_from: "مطار العين الدولي (AAN)",
       leave_date: "2026-10-16",
@@ -163,7 +163,7 @@ describe("«بكج متقدم» — the trip read in order (the owner's own file
       arrive_at: "مطار كوالالمبور",
       arrive_date: "2026-10-18",
       arrive_time: "22:40",
-      reception: { kind: "border", place: "معبر", side: "تايلاند", date: "2026-10-18", time: "22:00" },
+      reception: { kind: "border", place: "معبر", side: "تايلاند", country: "تايلاند", date: "2026-10-18", time: "22:00" },
       self_items: ["الانتقال إلى الحدود"],
     });
     const s = advancedSteps(a, tz);
@@ -178,7 +178,7 @@ describe("«بكج متقدم» — the trip read in order (the owner's own file
 describe("«بكج متقدم» — lands in one country, first night in another", () => {
   it("Trabzon airport → Batumi: asks how the transfer crosses, then splits it at the border for two drivers", async () => {
     const { advancedSteps } = await import("./advanced");
-    const base = adv({ arrive_country: "تركيا", arrive_at: "مطار طرابزون (TZX)", reception: { kind: "airport", place: "", side: "", date: "2026-10-18", time: "23:30" } });
+    const base = adv({ arrive_country: "تركيا", arrive_at: "مطار طرابزون (TZX)", reception: { kind: "airport", place: "", side: "", country: "تركيا", date: "2026-10-18", time: "23:30" } });
     expect(advancedSteps(base, undefined, "جورجيا")[1].missing).toContain("نقطة الاستقبال في تركيا وأول فندق في جورجيا — اختر كيف يعبر الحدود");
     const two = { ...base, reception_cross: { drivers: 2 as const, crossing: "معبر سارب", side_from: "تركيا", side_to: "جورجيا" } };
     const s = advancedSteps(two, undefined, "جورجيا")[1];
@@ -199,7 +199,7 @@ describe("«بكج متقدم» — lands in one country, first night in another
 
 it("a pickup with no time yet, on the landing day, is not «before arrival»", async () => {
   const { advancedSteps } = await import("./advanced");
-  const a = adv({ arrive_country: "تركيا", arrive_at: "مطار", arrive_date: "2026-11-11", arrive_time: "11:30", reception: { kind: "airport", place: "", side: "", date: "2026-11-11", time: "" } });
+  const a = adv({ arrive_country: "تركيا", arrive_at: "مطار", arrive_date: "2026-11-11", arrive_time: "11:30", reception: { kind: "airport", place: "", side: "", country: "تركيا", date: "2026-11-11", time: "" } });
   expect(advancedSteps(a)[1].errors).toEqual([]);
   expect(advancedSteps({ ...a, reception: { ...a.reception, date: "2026-11-10" } })[1].errors.length).toBe(1);
 });
