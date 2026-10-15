@@ -29,6 +29,7 @@ import {
   Stamp,
   TrainFront,
   XCircle,
+  ScrollText,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { getCountryHotels, getRoomTypeLookups, produceOfferFromDraft } from "@/lib/data/drafts";
@@ -103,6 +104,8 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { FieldIssueProvider } from "../generator/FieldIssue";
 import { FlightsStage } from "../generator/stages/FlightsStage";
 import { ServicesStage } from "../generator/stages/ServicesStage";
+import { TermsStage } from "../generator/stages/TermsStage";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useDraftState } from "../generator/useDraftState";
 import { BasicCityCard } from "./BasicCityCard";
 import { BasicFlightPlan } from "./BasicFlightPlan";
@@ -859,6 +862,21 @@ export function BasicEditor({
     { key: "visas", icon: Stamp },
   ];
 
+  // «الشروط والأحكام» — this file's terms: the trip country's own come in by
+  // themselves when it is chosen (moveTripCountry); more are picked or typed here
+  const termsButton = (
+    <Dialog>
+      <DialogTrigger className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]">
+        <ScrollText className="size-3.5" />
+        {t("pg.terms")} <span className="tv-tnum">({data.services.terms.length})</span>
+      </DialogTrigger>
+      <DialogContent className="w-[min(720px,calc(100vw/var(--tv-zoom)_-_24px))]" dir={language === "ar" ? "rtl" : "ltr"}>
+        <div className="[&>section]:border-0 [&>section]:p-0 [&>section]:shadow-none">
+          <TermsStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
   const body: Record<Step, ReactNode> = {
     // ---- 1. the customer and the trip, and what the programme includes ----
     client: (
@@ -1288,6 +1306,8 @@ export function BasicEditor({
         <div className="-mx-3 -mb-1 [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
           <ServicesStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} />
         </div>
+        {/* without the price step, the terms are reached from here */}
+        {canPricing ? null : <div className="mt-2">{termsButton}</div>}
       </>
     ),
 
@@ -1318,6 +1338,7 @@ export function BasicEditor({
                 {pricingBusy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
                 {pricingBusy ? tx("calcBusy") : tx("calc")}
               </button>
+              {termsButton}
             </div>
             {pricingError ? <p role="alert" className="mb-2 text-[12px] font-bold text-[#c22850]">{pricingError}</p> : null}
             {data.pricing.items.length === 0 ? (

@@ -546,6 +546,11 @@ export type DraftHotel = {
   manual_price: number | null;
   manual_currency: string;
   /**
+   * «مسترد / غير مسترد» — for a stay we price ourselves (a supplier rate carries
+   * its own cancellation policy). Undefined/null = not said; nothing prints.
+   */
+  refundable?: boolean | null;
+  /**
    * Who the stay was booked through (company_suppliers) when the agent typed
    * the price. Internal: never on the client document.
    */
@@ -651,6 +656,7 @@ export function normalizeDraftHotel(raw: unknown): DraftHotel {
     rooms_count: count,
     manual_price: typeof h.manual_price === "number" ? h.manual_price : null,
     manual_currency: typeof h.manual_currency === "string" && h.manual_currency ? h.manual_currency : "SAR",
+    ...(typeof h.refundable === "boolean" ? { refundable: h.refundable } : {}),
     ...(typeof h.supplier === "string" && h.supplier ? { supplier: h.supplier } : {}),
     // deliberately NOT `sourcing: h.sourcing ?? null` — a seeded line must carry
     // no supplier key at all, and a null one still reads as "priced from a
@@ -1489,6 +1495,12 @@ export function sourcingFits(stay: HotelStay, trip: { adults: number; children: 
     q.hotel_name === stay.line.hotel_name &&
     stay.line.rooms.every((r) => r.board_type === q.board_type && r.room_type_name === q.room_name)
   );
+}
+
+/** The cancellation line a stay prints: the supplier's own policy, else what the agent marked. */
+export function stayCancellation(h: Pick<DraftHotel, "sourcing" | "refundable">): string | null {
+  if (h.sourcing) return h.sourcing.cancellation_policy || null;
+  return h.refundable === true ? "قابل للاسترداد" : h.refundable === false ? "غير قابل للاسترداد" : null;
 }
 
 /** Per-city allocated-vs-owed, for the coverage bar and the blocking check. */

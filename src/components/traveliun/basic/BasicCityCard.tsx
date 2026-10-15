@@ -439,6 +439,31 @@ function HotelPanel({
           <Plus className="size-3.5" />
           {tx("addRoom")}
         </button>
+        {/* a stay we price ourselves: is it refundable? (a supplier rate states its own policy) */}
+        {!main.sourcing ? (
+          <span role="group" className="inline-flex overflow-hidden rounded-[7px] border border-[#cfe0d9] text-[11.5px] font-bold">
+            {([true, false] as const).map((v) => (
+              <button
+                key={String(v)}
+                type="button"
+                aria-pressed={main.refundable === v}
+                onClick={() => {
+                  const next = main.refundable === v ? null : v;
+                  allLines((line) => ({ ...line, refundable: next }));
+                }}
+                className={`h-7 px-2.5 transition-colors ${
+                  main.refundable === v
+                    ? v
+                      ? "bg-[#e4f6ef] text-[#0f7a52]"
+                      : "bg-[#fdeeee] text-[#c43d3d]"
+                    : "bg-white text-[#557d78] hover:bg-[#f4f8f6]"
+                }`}
+              >
+                {tx(v ? "refundable" : "nonRefundable")}
+              </button>
+            ))}
+          </span>
+        ) : null}
         <button
           type="button"
           onClick={() => setMore((v) => !v)}

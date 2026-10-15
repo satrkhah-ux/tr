@@ -24,6 +24,7 @@ import {
   matchPartner,
   mealPlanIncludeLine,
   roomTypesText,
+  stayCancellation,
   type DraftData,
   type GeneratorLookups,
 } from "./draft-types";
@@ -128,7 +129,7 @@ export function draftToPreviewOffer(
         check_out,
         sell_price: null,
         sell_currency: null,
-        cancellation_policy: h.sourcing?.cancellation_policy ?? null,
+        cancellation_policy: stayCancellation(h),
         excluded_surcharges: h.sourcing?.excluded_surcharges ?? [],
         valid_until: h.sourcing?.valid_until ?? null,
         image_url: h.sourcing?.image_url ?? null,

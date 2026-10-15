@@ -1320,6 +1320,8 @@ export const ar: Dictionary = {
   "pg.excludes": "لا يشمل العرض",
   "pg.terms": "الشروط والأحكام",
   "pg.termsHint": "ما يحدث إن تغيّرت الرحلة: الإلغاء، والدفع، وما يتحمّله العميل بنفسه.",
+  "pg.refundable": "مسترد",
+  "pg.nonRefundable": "غير مسترد",
   "pg.addItem": "إضافة",
   "pg.itemPlaceholder": "اكتب بنداً واضغط إضافة…",
   // visas stage

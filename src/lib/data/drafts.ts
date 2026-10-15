@@ -32,6 +32,7 @@ import {
   type ReusableProgram,
   type TermLibrary,
   type TermLibraryItem,
+  stayCancellation,
 } from "@/lib/offer/draft-types";
 import { getEnabledHotelSuppliers } from "@/lib/providers/hotel-registry";
 import { draftSellTotal } from "@/lib/offer/preview-dto";
@@ -800,7 +801,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         sell_price: s ? priceForViewer(s.sell_base, terms) : null,
         sell_currency: s ? "SAR" : null,
         // supplier sourcing → frozen into the render snapshot (offer_renders)
-        cancellation_policy: s?.cancellation_policy ?? null,
+        cancellation_policy: stayCancellation(h),
         excluded_surcharges: s?.excluded_surcharges ?? [],
         valid_until: s?.valid_until ?? null,
         supplier_id: s?.supplier_id ?? null,
