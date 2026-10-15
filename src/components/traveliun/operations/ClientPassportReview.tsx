@@ -10,7 +10,7 @@ import {
   reviewClientPassport,
   type PendingClientPassport,
 } from "@/lib/data/client-passports";
-import type { MrzPassport } from "@/lib/operations/mrz";
+import { trustedFields, type MrzPassport } from "@/lib/operations/mrz";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
@@ -73,20 +73,9 @@ export function ClientPassportReview({
       const res = await reviewClientPassport(submission.id);
       if (!res.ok) return setError(t(res.error));
       const p = res.passport;
-      onReview(
-        p
-          ? {
-              cpass: submission.id,
-              display_name: displayName || p.full_name,
-              full_name: p.full_name,
-              number: p.number,
-              nationality: p.nationality,
-              birth_date: p.birth_date ?? "",
-              expiry: p.expiry ?? "",
-            }
-          : { cpass: submission.id },
-        p,
-      );
+      // only what was really read — the rest stays empty, marked «أكمل يدوياً»
+      const values = p ? trustedFields(p, new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" })).values : null;
+      onReview(values ? { cpass: submission.id, display_name: displayName || values.full_name, ...values } : { cpass: submission.id }, p);
     });
 
   const open = () =>

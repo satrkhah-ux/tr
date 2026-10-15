@@ -34,15 +34,18 @@ export function uploadAllowed(createdAts: string[], now: Date): boolean {
 }
 
 /** What the client sees per traveller. */
-export type ClientPassportState = "needed" | "received" | "on_file" | "retake";
+export type ClientPassportState = "needed" | "received" | "on_file" | "retake" | "update";
 
 /**
  * `latest` is the traveller's newest submission. A passport already on file
- * (typed by staff or accepted earlier) reads as received; a rejected photo asks
- * for another only while nothing is on file.
+ * (typed by staff or accepted earlier) reads as received — unless operations
+ * flagged it (`flagged`: travelers.ts passportNeedsUpdate — expired, under six
+ * months, or the age disagrees with the booking), then a valid one is asked
+ * for. A rejected photo asks for another only while nothing is on file.
  */
-export function clientPassportState(hasPassport: boolean, latest: SubmissionStatus | null): ClientPassportState {
+export function clientPassportState(hasPassport: boolean, latest: SubmissionStatus | null, flagged = false): ClientPassportState {
   if (latest === "pending") return "received";
+  if (hasPassport && flagged) return "update";
   if (hasPassport || latest === "accepted") return "on_file";
   if (latest === "rejected") return "retake";
   return "needed";

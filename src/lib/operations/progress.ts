@@ -1,4 +1,7 @@
+import { translate } from "@/lib/i18n";
 import { CLIENT_STATES, EXECUTION_STATES, type ClientStatus, type ExecutionStatus } from "./state";
+import type { TravelerListItem } from "./traveler-dto";
+import { ageOn, passportIssues } from "./travelers";
 
 /**
  * Where a case actually stands — derived, not clicked (operations order 6).
@@ -60,12 +63,10 @@ export const aheadOfClient = (from: ClientStatus, to: ClientStatus | null) => is
 
 // ---------- «جاهز للسفر» ----------
 
-export type ReadinessTraveler = {
-  name: string;
-  passport_expiry: string | null;
-  /** visa: null = not tracked; 'not_required' | 'required' | 'submitted' | 'issued'. */
-  visa_status?: string | null;
-};
+export type ReadinessTraveler = Pick<
+  TravelerListItem,
+  "has_passport" | "passport_expiry" | "birth_date" | "age" | "traveler_kind" | "nationality" | "visa_status"
+> & { name: string };
 
 export type ReadinessItem = { key: "bookings" | "payment" | "documents" | "passports" | "visas"; ok: boolean; detail: string; anchor: string };
 
@@ -88,24 +89,41 @@ export function readiness(input: {
   paid: number;
   total: number | null;
   travelers: ReadinessTraveler[];
+  travelStart: string | null;
   travelEnd: string | null;
+  today: string;
 }): ReadinessItem[] {
   const liveBookings = input.bookings.filter(live);
   const open = liveBookings.filter((b) => b.status !== "confirmed").length;
   const docsReached = derivedExecution(input.bookings, input.documents) === "vouchers_issued";
   const owed = input.total != null ? Math.max(0, Math.round((input.total - input.paid) * 100) / 100) : null;
-  const expiring = input.travelers.filter((t) => !passportValidFor(t.passport_expiry, input.travelEnd));
+  // the traveler row's own decision (travelers.ts), not a second copy of it
+  const trip = { travel_start: input.travelStart, travel_end: input.travelEnd };
+  const flagged = input.travelers
+    .map((t) => ({ t, issues: passportIssues(t, trip, input.today) }))
+    .filter((f) => f.issues.length > 0);
+  const age = (t: ReadinessTraveler) => ageOn(t.birth_date, input.travelStart ?? input.today) ?? "";
   const visaPending = input.travelers.filter((t) => t.visa_status === "required" || t.visa_status === "submitted");
+  const visaCheck = input.travelers.filter((t) => t.visa_status === "check");
+  const visaDetail = [
+    visaPending.length ? `تأشيرة ${visaPending.map((t) => t.name).join("، ")} لم تصدر` : "",
+    ...visaCheck.map((t) => `${t.name}: ${translate("ar", "ops.trav.gap.visa_check", { nat: t.nationality || "—" })}`),
+  ].filter(Boolean);
   return [
     { key: "bookings", ok: liveBookings.length > 0 && open === 0, detail: liveBookings.length === 0 ? "لا حجوزات بعد" : open ? `${open} حجز غير مؤكد` : "كل الحجوزات مؤكدة", anchor: "bookings" },
     { key: "payment", ok: owed === 0, detail: owed == null ? "الإجمالي غير معروف" : owed ? `متبقٍ ${owed.toLocaleString("en-US")}` : "مسدّد بالكامل", anchor: "payments" },
     { key: "documents", ok: docsReached, detail: docsReached ? "مستندات العميل صادرة" : "مستندات العميل لم تصدر كلها", anchor: "bookings" },
     {
       key: "passports",
-      ok: input.travelers.length > 0 && expiring.length === 0,
-      detail: input.travelers.length === 0 ? "لا مسافرين مسجّلين" : expiring.length ? `جواز ${expiring.map((t) => t.name).join("، ")} ناقص أو ينتهي قبل 6 أشهر من العودة` : "الجوازات صالحة",
+      ok: input.travelers.length > 0 && flagged.length === 0,
+      detail:
+        input.travelers.length === 0
+          ? "لا مسافرين مسجّلين"
+          : flagged.length
+            ? flagged.map(({ t, issues }) => `${t.name}: ${issues.map((i) => translate("ar", `ops.trav.gap.${i}`, { n: age(t) })).join("، ")}`).join(" · ")
+            : "الجوازات صالحة",
       anchor: "travelers",
     },
-    { key: "visas", ok: visaPending.length === 0, detail: visaPending.length ? `تأشيرة ${visaPending.map((t) => t.name).join("، ")} لم تصدر` : "التأشيرات جاهزة أو غير مطلوبة", anchor: "travelers" },
+    { key: "visas", ok: visaDetail.length === 0, detail: visaDetail.join(" · ") || "التأشيرات جاهزة أو غير مطلوبة", anchor: "travelers" },
   ];
 }

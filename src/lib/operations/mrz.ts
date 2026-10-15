@@ -117,3 +117,28 @@ export function parseTd3(text: string, today: string): MrzParse {
     },
   };
 }
+
+/** The traveller-form fields a read can fill. */
+export type MrzFormField = "full_name" | "number" | "nationality" | "birth_date" | "expiry";
+export type MrzPrefill = Record<MrzFormField, string>;
+
+/**
+ * What a read may PUT in the form — never an invented value (owner order 10).
+ *
+ * A field that was not read, or failed its own check digit, stays empty and is
+ * named in `missing` («أكمل يدوياً»). A birth date of today or later, or 1 January
+ * of this very year, is a reader's filler rather than a birthday — it stays
+ * empty too. The employee types what is missing from the passport itself.
+ */
+export function trustedFields(p: MrzPassport, today: string): { values: MrzPrefill; missing: MrzFormField[] } {
+  const failed = (f: MrzCheckedField) => p.failed.includes(f);
+  const filler = (d: string) => d >= today || d === `${today.slice(0, 4)}-01-01`;
+  const values: MrzPrefill = {
+    full_name: p.full_name.trim(),
+    number: failed("number") ? "" : p.number,
+    nationality: /^[A-Z]{1,3}$/.test(p.nationality) ? p.nationality : "",
+    birth_date: p.birth_date && !failed("birth_date") && !filler(p.birth_date) ? p.birth_date : "",
+    expiry: p.expiry && !failed("expiry") ? p.expiry : "",
+  };
+  return { values, missing: (Object.keys(values) as MrzFormField[]).filter((k) => !values[k]) };
+}

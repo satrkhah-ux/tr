@@ -12,7 +12,8 @@ import { currentCan } from "@/lib/roles/current";
 import { isOpenAIConfigured } from "@/lib/providers/openai";
 import { readMrzFromImage } from "@/lib/providers/mrz-vision";
 import { parseTd3, type MrzPassport } from "@/lib/operations/mrz";
-import type { TravelerKind } from "@/lib/operations/traveler-dto";
+import type { TravelerKind, TravelerRow } from "@/lib/operations/traveler-dto";
+import { passportIssues, passportNeedsUpdate } from "@/lib/operations/travelers";
 import {
   checkPassportFile,
   clientPassportState,
@@ -46,22 +47,28 @@ function db(): SupabaseClient {
   return createSupabaseServiceClient() as unknown as SupabaseClient;
 }
 
-async function caseFor(token: string): Promise<{ id: string; serial: string } | null> {
+type Case = { id: string; serial: string; travel_start: string | null; travel_end: string | null };
+
+async function caseFor(token: string): Promise<Case | null> {
   if (!token || token.length < 20) return null;
-  const { data } = await db().from("operations").select("id, client_token_revoked_at, offers(serial)").eq("client_token", token).maybeSingle();
-  const row = data as unknown as { id: string; client_token_revoked_at: string | null; offers: { serial: string } | { serial: string }[] | null } | null;
+  const { data } = await db().from("operations").select("id, travel_start, travel_end, client_token_revoked_at, offers(serial)").eq("client_token", token).maybeSingle();
+  const row = data as unknown as (Omit<Case, "serial"> & { client_token_revoked_at: string | null; offers: { serial: string } | { serial: string }[] | null }) | null;
   if (!row || row.client_token_revoked_at) return null;
   const offer = Array.isArray(row.offers) ? row.offers[0] : row.offers;
-  return { id: row.id, serial: offer?.serial ?? "" };
+  return { id: row.id, serial: offer?.serial ?? "", travel_start: row.travel_start ?? null, travel_end: row.travel_end ?? null };
 }
 
 const KIND_AR: Record<TravelerKind, string> = { adult: "بالغ", child: "طفل", infant: "رضيع" };
 
 export type ClientPassportRow = { id: string; label: string; state: ClientPassportState };
 
+type TripTraveler = Pick<TravelerRow, "id" | "display_name" | "traveler_kind" | "passport_encrypted" | "passport_expiry" | "birth_date" | "age">;
+
 /**
  * The trip page's list: «المسافر 1 — <name staff gave>» and whether we have the
- * passport. Null when the link is dead or 0068 is not applied — the section hides.
+ * passport — or that operations flagged it (passportIssues, the same decision as
+ * the case page), which asks the client for a valid one. Only the state leaves
+ * the server. Null when the link is dead or 0068 is not applied — the section hides.
  */
 export async function getClientPassports(token: string): Promise<ClientPassportRow[] | null> {
   try {
@@ -69,7 +76,7 @@ export async function getClientPassports(token: string): Promise<ClientPassportR
     if (!op) return null;
     const supabase = db();
     const [travRes, subRes] = await Promise.all([
-      supabase.from("operation_travelers").select("id, display_name, traveler_kind, passport_encrypted").eq("operation_id", op.id).order("sort", { ascending: true }),
+      supabase.from("operation_travelers").select("id, display_name, traveler_kind, passport_encrypted, passport_expiry, birth_date, age").eq("operation_id", op.id).order("sort", { ascending: true }),
       supabase.from(TABLE).select("traveler_id, status, created_at").eq("operation_id", op.id).order("created_at", { ascending: false }),
     ]);
     if (travRes.error || subRes.error) return null;
@@ -77,11 +84,17 @@ export async function getClientPassports(token: string): Promise<ClientPassportR
     for (const s of (subRes.data ?? []) as { traveler_id: string; status: SubmissionStatus }[]) {
       if (!latest.has(s.traveler_id)) latest.set(s.traveler_id, s.status);
     }
-    return ((travRes.data ?? []) as { id: string; display_name: string; traveler_kind: TravelerKind; passport_encrypted: string | null }[]).map((t, i) => ({
-      id: t.id,
-      label: `المسافر ${i + 1} — ${t.display_name.trim() || KIND_AR[t.traveler_kind] || ""}`,
-      state: clientPassportState(Boolean(t.passport_encrypted), latest.get(t.id) ?? null),
-    }));
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+    const trip = { travel_start: op.travel_start, travel_end: op.travel_end };
+    return ((travRes.data ?? []) as TripTraveler[]).map((t, i) => {
+      const has_passport = Boolean(t.passport_encrypted);
+      const flagged = passportNeedsUpdate(passportIssues({ ...t, has_passport }, trip, today));
+      return {
+        id: t.id,
+        label: `المسافر ${i + 1} — ${t.display_name.trim() || KIND_AR[t.traveler_kind] || ""}`,
+        state: clientPassportState(has_passport, latest.get(t.id) ?? null, flagged),
+      };
+    });
   } catch {
     return null;
   }
