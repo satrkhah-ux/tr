@@ -63,7 +63,7 @@ const rules = catalog.room_name_export;
 const SEP = rules.separator;
 
 /** The bed segment: the chosen arrangement, else every alternative joined by «أو» / «OR», with its status. */
-function bedsText(spec: RoomSpec, locale: RoomLocale): string | null {
+export function bedsText(spec: RoomSpec, locale: RoomLocale): string | null {
   const groups = (spec.bed_groups ?? []).filter((g) => g.beds.some((b) => b.quantity > 0));
   if (groups.length === 0) return null;
   const chosen = spec.selected_bed_group_id ? groups.filter((g) => g.id === spec.selected_bed_group_id) : groups;

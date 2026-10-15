@@ -11,6 +11,8 @@
  * Pure: no React, no Supabase.
  */
 
+import { shownDetail } from "./voucher-dto";
+
 export type RequestLang = "ar" | "en";
 export type SupplierBookingKind = "hotel" | "flight" | "visa" | "transport" | "service";
 
@@ -166,7 +168,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  * does not see Arabic letters. Whatever is left (a tour's free text) stays
  * Arabic, and the agent sees it in the review box before anything is sent.
  */
-function toEnglish(text: string, glossary: Record<string, string>): string {
+export function toEnglish(text: string, glossary: Record<string, string>): string {
   const pairs = Object.entries({ ...PHRASES_EN, ...glossary })
     .filter(([ar, en]) => ar.trim() && en.trim())
     .sort((a, b) => b[0].length - a[0].length);
@@ -208,7 +210,7 @@ export function buildSupplierRequest(input: SupplierRequestInput): { subject: st
     );
   }
 
-  const details = Object.entries(booking.detail ?? {})
+  const details = Object.entries(shownDetail(booking.detail))
     .filter(([k, v]) => v.trim() && !(showCity && k === "المدينة"))
     .map(([k, v]) => `• ${en ? keyToEnglish(k) : k}: ${say(v.trim())}`);
 

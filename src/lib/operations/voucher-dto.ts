@@ -33,7 +33,30 @@ export type VoucherBooking = {
   name_en?: string | null;
   address?: string | null;
   phone?: string | null;
+  /**
+   * Issued after the room catalogue (2026-10-15): the stay's language — the
+   * hotel country's, English unless an Arab country. `title`, the room lines
+   * and `notes` are already in it; `alt_name` is the hotel's name in the other
+   * language, printed small. Absent on older snapshots, which print as before.
+   */
+  locale?: "ar" | "en";
+  alt_name?: string | null;
+  /** the bed and connecting-room notes the catalogue's export contract asks for. */
+  notes?: string[];
 };
+
+/**
+ * The detail key holding a hotel's confirmed room details (room-details.ts) —
+ * JSON text, because everything else in `detail` is a label and its value and is
+ * printed as such. Every reader that lists `detail` goes through shownDetail.
+ */
+export const ROOM_SPEC_KEY = "room_spec";
+
+export function shownDetail(detail: Record<string, string> | null | undefined): Record<string, string> {
+  const rest = { ...(detail ?? {}) };
+  delete rest[ROOM_SPEC_KEY];
+  return rest;
+}
 
 /** The documents the client is given; the booking summary (suppliers, payment state) and the welcome board are ours. */
 export const CLIENT_DOCUMENT_KINDS: VoucherKind[] = ["hotel_voucher", "flight_ticket", "itinerary"];
