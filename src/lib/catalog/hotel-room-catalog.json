@@ -1,0 +1,1104 @@
+{
+  "format": "hotel_room_localization_configuration",
+  "version": "1.0.0",
+  "created_on": "2026-10-15",
+  "title_ar": "دليل الغرف الفندقية والإدخال العربي والتصدير حسب الوجهة",
+  "purpose_ar": "ملف بيانات ومواصفات للمطور لدمجه في النظام؛ لا ينفذ الترجمة أو التصدير بنفسه.",
+  "standards_note_ar": "المسميات شائعة في أنظمة الحجز وليست معيارًا عالميًا ملزمًا. المعرّفات داخل هذا الملف داخلية ولا تمثل أكواد Booking.com أو Expedia. فئات الغرف التجارية ليست ترتيبًا موحدًا بين الفنادق.",
+  "ui": {
+    "locale": "ar",
+    "direction": "rtl",
+    "supported_export_locales": [
+      "ar",
+      "en"
+    ],
+    "selection_label_path": "label.ar",
+    "persist_selection_as": "id",
+    "input_policy_ar": "يعرض الموظف الخيارات بالعربية ويحفظ النظام معرّفات ثابتة. إدخال الفندق بالعربية يبحث في دليل الفنادق ثنائي اللغة. اسم الفندق الإنكليزي الرسمي يدخل مرة واحدة ويُراجع؛ لا يمكن ضمان استخراجه من العربية وحدها.",
+    "export_language_options": [
+      {
+        "id": "auto",
+        "label": {
+          "ar": "تلقائي حسب الوجهة",
+          "en": "Automatic by Destination"
+        }
+      },
+      {
+        "id": "ar",
+        "label": {
+          "ar": "العربية",
+          "en": "Arabic"
+        }
+      },
+      {
+        "id": "en",
+        "label": {
+          "ar": "الإنكليزية",
+          "en": "English"
+        }
+      }
+    ],
+    "fields": [
+      {
+        "key": "hotel_id",
+        "label_ar": "الفندق",
+        "type": "searchable_hotel_select",
+        "required": true,
+        "search_fields": [
+          "names.ar",
+          "names.en",
+          "aliases.ar",
+          "aliases.en"
+        ],
+        "match_policy": "select_confirmed_hotel_id",
+        "ambiguous_match_action": "require_employee_selection"
+      },
+      {
+        "key": "hotel_country_code",
+        "label_ar": "دولة الفندق",
+        "type": "country_select",
+        "required": true,
+        "source": "selected_hotel.country_code"
+      },
+      {
+        "key": "room_type_id",
+        "label_ar": "نوع الغرفة",
+        "type": "select",
+        "catalog": "room_types",
+        "required": true
+      },
+      {
+        "key": "room_category_id",
+        "label_ar": "فئة الغرفة",
+        "type": "select",
+        "catalog": "room_categories",
+        "required": false
+      },
+      {
+        "key": "suite_subtype_id",
+        "label_ar": "نوع الجناح",
+        "type": "select",
+        "catalog": "suite_subtypes",
+        "visible_when": {
+          "room_type_id": "suite"
+        },
+        "required": false
+      },
+      {
+        "key": "bedroom_count",
+        "label_ar": "عدد غرف النوم",
+        "type": "integer",
+        "minimum": 1,
+        "nullable": true,
+        "required": false
+      },
+      {
+        "key": "bed_groups",
+        "label_ar": "ترتيب الأسرّة",
+        "type": "bed_groups_editor",
+        "catalog": "bed_types",
+        "required": false
+      },
+      {
+        "key": "view_ids",
+        "label_ar": "الإطلالة",
+        "type": "multi_select",
+        "catalog": "views",
+        "required": false
+      },
+      {
+        "key": "feature_ids",
+        "label_ar": "المميزات",
+        "type": "multi_select",
+        "catalog": "features",
+        "required": false
+      },
+      {
+        "key": "max_guests",
+        "label_ar": "الحد الأقصى للنزلاء",
+        "type": "integer",
+        "minimum": 1,
+        "required": true
+      },
+      {
+        "key": "max_adults",
+        "label_ar": "الحد الأقصى للبالغين",
+        "type": "integer",
+        "minimum": 0,
+        "required": true
+      },
+      {
+        "key": "max_children",
+        "label_ar": "الحد الأقصى للأطفال",
+        "type": "integer",
+        "minimum": 0,
+        "required": true
+      },
+      {
+        "key": "export_locale",
+        "label_ar": "لغة التصدير",
+        "type": "select",
+        "options": [
+          "auto",
+          "ar",
+          "en"
+        ],
+        "default": "auto"
+      },
+      {
+        "key": "custom_room_name",
+        "label_ar": "اسم الغرفة الخاص بالفندق",
+        "type": "localized_text",
+        "required": false,
+        "help_ar": "للأسماء التجارية أو الغرف غير الموجودة في القوائم؛ يلزم اعتماد النسخة المطلوبة للتصدير."
+      }
+    ]
+  },
+  "destination_language_policy": {
+    "mode": "per_stay",
+    "default_export_locale": "en",
+    "country_code_format": "ISO 3166-1 alpha-2",
+    "precedence": [
+      "explicit_document_locale",
+      "explicit_stay_locale",
+      "hotel_export_locale_override",
+      "destination_country_overrides",
+      "default_export_locale"
+    ],
+    "automatic_country_source": "stay.hotel.country_code",
+    "destination_country_overrides": {
+      "IQ": "ar",
+      "SA": "ar",
+      "AE": "ar",
+      "OM": "ar",
+      "QA": "ar",
+      "KW": "ar",
+      "BH": "ar",
+      "JO": "ar",
+      "EG": "ar",
+      "LB": "ar",
+      "GE": "en",
+      "TR": "en",
+      "MY": "en",
+      "ID": "en",
+      "TH": "en",
+      "AZ": "en"
+    },
+    "editable": true,
+    "notes_ar": [
+      "القيم افتراضية مقترحة قابلة للتعديل، وليست متطلبات رسمية للدول أو الفنادق.",
+      "auto تعني متابعة البحث في ترتيب الأولوية، أما ar أو en فتحسم اللغة.",
+      "الوجهة هنا دولة الفندق في كل إقامة، وليس بلد مطار الوصول أو جنسية العميل أو لغة الموظف.",
+      "رحلة تصل إلى طرابزون وتقيم في باتومي تستخدم دولة الفندق GE. فندق ريزا يستخدم TR. فندق بالي يستخدم ID حتى لو كان الوصول الدولي إلى ماليزيا.",
+      "في الرحلات متعددة البلدان يُحسب القرار لكل إقامة؛ يمكن فرض لغة موحدة للمستند بتعيين explicit_document_locale.",
+      "تغيير لغة التصدير لا يغير لغة واجهة الإدخال العربية."
+    ]
+  },
+  "catalogs": {
+    "room_types": [
+      {
+        "id": "single",
+        "label": {
+          "ar": "غرفة مفردة",
+          "en": "Single Room"
+        }
+      },
+      {
+        "id": "double",
+        "label": {
+          "ar": "غرفة مزدوجة",
+          "en": "Double Room"
+        }
+      },
+      {
+        "id": "twin",
+        "label": {
+          "ar": "غرفة بسريرين منفصلين",
+          "en": "Twin Room"
+        }
+      },
+      {
+        "id": "double_or_twin",
+        "label": {
+          "ar": "غرفة مزدوجة أو بسريرين منفصلين",
+          "en": "Double or Twin Room"
+        }
+      },
+      {
+        "id": "triple",
+        "label": {
+          "ar": "غرفة ثلاثية",
+          "en": "Triple Room"
+        }
+      },
+      {
+        "id": "quadruple",
+        "label": {
+          "ar": "غرفة رباعية",
+          "en": "Quadruple Room"
+        }
+      },
+      {
+        "id": "family",
+        "label": {
+          "ar": "غرفة عائلية",
+          "en": "Family Room"
+        }
+      },
+      {
+        "id": "studio",
+        "label": {
+          "ar": "استوديو",
+          "en": "Studio"
+        }
+      },
+      {
+        "id": "suite",
+        "label": {
+          "ar": "جناح",
+          "en": "Suite"
+        }
+      },
+      {
+        "id": "apartment",
+        "label": {
+          "ar": "شقة",
+          "en": "Apartment"
+        }
+      },
+      {
+        "id": "dormitory",
+        "label": {
+          "ar": "غرفة نوم جماعية كاملة",
+          "en": "Dormitory Room"
+        }
+      },
+      {
+        "id": "bed_in_dormitory",
+        "label": {
+          "ar": "سرير في غرفة نوم مشتركة",
+          "en": "Bed in Dormitory Room"
+        }
+      }
+    ],
+    "room_categories": [
+      {
+        "id": "economy",
+        "label": {
+          "ar": "اقتصادية",
+          "en": "Economy"
+        }
+      },
+      {
+        "id": "standard",
+        "label": {
+          "ar": "ستاندرد",
+          "en": "Standard"
+        }
+      },
+      {
+        "id": "classic",
+        "label": {
+          "ar": "كلاسيكية",
+          "en": "Classic"
+        }
+      },
+      {
+        "id": "superior",
+        "label": {
+          "ar": "سوبيريور",
+          "en": "Superior"
+        }
+      },
+      {
+        "id": "deluxe",
+        "label": {
+          "ar": "ديلوكس",
+          "en": "Deluxe"
+        }
+      },
+      {
+        "id": "premium",
+        "label": {
+          "ar": "بريميوم",
+          "en": "Premium"
+        }
+      },
+      {
+        "id": "premier",
+        "label": {
+          "ar": "بريميير",
+          "en": "Premier"
+        }
+      },
+      {
+        "id": "executive",
+        "label": {
+          "ar": "تنفيذية",
+          "en": "Executive"
+        }
+      },
+      {
+        "id": "club",
+        "label": {
+          "ar": "كلوب",
+          "en": "Club"
+        }
+      },
+      {
+        "id": "signature",
+        "label": {
+          "ar": "سيغنتشر",
+          "en": "Signature"
+        }
+      }
+    ],
+    "suite_subtypes": [
+      {
+        "id": "junior",
+        "label": {
+          "ar": "جونيور",
+          "en": "Junior"
+        }
+      },
+      {
+        "id": "executive",
+        "label": {
+          "ar": "تنفيذي",
+          "en": "Executive"
+        }
+      },
+      {
+        "id": "family",
+        "label": {
+          "ar": "عائلي",
+          "en": "Family"
+        }
+      },
+      {
+        "id": "presidential",
+        "label": {
+          "ar": "رئاسي",
+          "en": "Presidential"
+        }
+      },
+      {
+        "id": "royal",
+        "label": {
+          "ar": "ملكي",
+          "en": "Royal"
+        }
+      },
+      {
+        "id": "penthouse",
+        "label": {
+          "ar": "بنتهاوس",
+          "en": "Penthouse"
+        }
+      }
+    ],
+    "bed_types": [
+      {
+        "id": "single",
+        "label": {
+          "ar": "سرير مفرد",
+          "en": "Single Bed"
+        }
+      },
+      {
+        "id": "double",
+        "label": {
+          "ar": "سرير مزدوج",
+          "en": "Double Bed"
+        }
+      },
+      {
+        "id": "queen",
+        "label": {
+          "ar": "سرير كوين",
+          "en": "Queen Bed"
+        }
+      },
+      {
+        "id": "king",
+        "label": {
+          "ar": "سرير كينغ",
+          "en": "King Bed"
+        }
+      },
+      {
+        "id": "super_king",
+        "label": {
+          "ar": "سرير سوبر كينغ",
+          "en": "Super King Bed"
+        }
+      },
+      {
+        "id": "sofa_bed",
+        "label": {
+          "ar": "أريكة سرير",
+          "en": "Sofa Bed"
+        }
+      },
+      {
+        "id": "bunk_bed",
+        "label": {
+          "ar": "سرير بطابقين",
+          "en": "Bunk Bed"
+        }
+      },
+      {
+        "id": "extra_bed",
+        "label": {
+          "ar": "سرير إضافي",
+          "en": "Extra Bed"
+        }
+      },
+      {
+        "id": "rollaway",
+        "label": {
+          "ar": "سرير إضافي قابل للطي",
+          "en": "Rollaway Bed"
+        }
+      },
+      {
+        "id": "crib",
+        "label": {
+          "ar": "سرير رضيع",
+          "en": "Baby Cot / Crib"
+        }
+      }
+    ],
+    "views": [
+      {
+        "id": "city",
+        "label": {
+          "ar": "إطلالة على المدينة",
+          "en": "City View"
+        }
+      },
+      {
+        "id": "sea",
+        "label": {
+          "ar": "إطلالة على البحر",
+          "en": "Sea View"
+        }
+      },
+      {
+        "id": "partial_sea",
+        "label": {
+          "ar": "إطلالة جزئية على البحر",
+          "en": "Partial Sea View"
+        }
+      },
+      {
+        "id": "ocean",
+        "label": {
+          "ar": "إطلالة على المحيط",
+          "en": "Ocean View"
+        }
+      },
+      {
+        "id": "mountain",
+        "label": {
+          "ar": "إطلالة على الجبل",
+          "en": "Mountain View"
+        }
+      },
+      {
+        "id": "garden",
+        "label": {
+          "ar": "إطلالة على الحديقة",
+          "en": "Garden View"
+        }
+      },
+      {
+        "id": "pool",
+        "label": {
+          "ar": "إطلالة على المسبح",
+          "en": "Pool View"
+        }
+      },
+      {
+        "id": "lake",
+        "label": {
+          "ar": "إطلالة على البحيرة",
+          "en": "Lake View"
+        }
+      },
+      {
+        "id": "river",
+        "label": {
+          "ar": "إطلالة على النهر",
+          "en": "River View"
+        }
+      },
+      {
+        "id": "courtyard",
+        "label": {
+          "ar": "إطلالة على الفناء الداخلي",
+          "en": "Courtyard View"
+        }
+      },
+      {
+        "id": "no_view",
+        "label": {
+          "ar": "دون إطلالة",
+          "en": "No View"
+        }
+      }
+    ],
+    "features": [
+      {
+        "id": "connecting",
+        "label": {
+          "ar": "غرف متصلة بباب داخلي",
+          "en": "Connecting Rooms"
+        }
+      },
+      {
+        "id": "adjacent",
+        "label": {
+          "ar": "غرف متجاورة",
+          "en": "Adjacent Rooms"
+        }
+      },
+      {
+        "id": "balcony",
+        "label": {
+          "ar": "شرفة",
+          "en": "Balcony"
+        }
+      },
+      {
+        "id": "terrace",
+        "label": {
+          "ar": "تراس",
+          "en": "Terrace"
+        }
+      },
+      {
+        "id": "private_pool",
+        "label": {
+          "ar": "مسبح خاص",
+          "en": "Private Pool"
+        }
+      },
+      {
+        "id": "club_lounge_access",
+        "label": {
+          "ar": "دخول صالة النادي",
+          "en": "Club Lounge Access"
+        }
+      },
+      {
+        "id": "accessible",
+        "label": {
+          "ar": "مهيأة لذوي الإعاقة",
+          "en": "Accessible"
+        }
+      },
+      {
+        "id": "non_smoking",
+        "label": {
+          "ar": "لغير المدخنين",
+          "en": "Non-Smoking"
+        }
+      },
+      {
+        "id": "smoking",
+        "label": {
+          "ar": "للمدخنين",
+          "en": "Smoking"
+        }
+      },
+      {
+        "id": "duplex",
+        "label": {
+          "ar": "دوبلكس",
+          "en": "Duplex"
+        }
+      }
+    ]
+  },
+  "hotel_record_template": {
+    "id": null,
+    "names": {
+      "ar": null,
+      "en": null
+    },
+    "name_status": {
+      "ar": "missing",
+      "en": "missing"
+    },
+    "aliases": {
+      "ar": [],
+      "en": []
+    },
+    "country_code": null,
+    "city_names": {
+      "ar": null,
+      "en": null
+    },
+    "address": null,
+    "supplier_hotel_ids": [],
+    "export_locale_override": null,
+    "verification": {
+      "source_url": null,
+      "verified_at": null,
+      "verified_by": null
+    },
+    "hotel_room_types": []
+  },
+  "hotel_name_rules": {
+    "allowed_statuses": [
+      "missing",
+      "draft",
+      "verified"
+    ],
+    "source_priority": [
+      "verified_hotel_website",
+      "verified_supplier_record",
+      "employee_verified_entry"
+    ],
+    "required_for_save": [
+      "id",
+      "names.ar",
+      "country_code"
+    ],
+    "required_for_final_export": [
+      "names[selected_locale]",
+      "name_status[selected_locale] == verified"
+    ],
+    "missing_translation_action": "block_final_export_and_request_verified_name",
+    "automatic_transliteration": {
+      "allowed_as_draft_suggestion": true,
+      "allowed_as_verified_name": false
+    },
+    "notes_ar": [
+      "لا تترجم اسم العلامة التجارية ترجمة حرفية ولا تختلق اسمًا إنكليزيًا رسميًا.",
+      "لا تفترض أن فندقين يحملان الاسم نفسه هما الفندق نفسه؛ المطابقة تتم بالمعرّف والدولة والمدينة.",
+      "لا تغيّر اسم الفندق من أسماء الوجهات ولا تستخدم اسم سلسلة الفنادق بدل الفرع."
+    ]
+  },
+  "room_record_template": {
+    "id": null,
+    "hotel_id": null,
+    "supplier_room_id": null,
+    "original_supplier_name": null,
+    "original_supplier_locale": null,
+    "custom_room_name": {
+      "ar": null,
+      "en": null
+    },
+    "custom_name_status": {
+      "ar": "missing",
+      "en": "missing"
+    },
+    "room_type_id": null,
+    "room_category_id": null,
+    "suite_subtype_id": null,
+    "bedroom_count": null,
+    "bed_groups": [
+      {
+        "id": "option_1",
+        "beds": [
+          {
+            "bed_type_id": "single",
+            "quantity": 2,
+            "width_cm": null,
+            "length_cm": null
+          }
+        ]
+      }
+    ],
+    "bed_configuration_status": "unspecified",
+    "selected_bed_group_id": null,
+    "view_ids": [],
+    "feature_ids": [],
+    "max_guests": null,
+    "max_adults": null,
+    "max_children": null,
+    "connecting_status": "not_applicable",
+    "accessible_details": {
+      "ar": null,
+      "en": null
+    },
+    "notes": {
+      "ar": null,
+      "en": null
+    }
+  },
+  "room_rules_ar": [
+    "Double تعني غرفة بسرير مزدوج؛ Twin غرفة بسريرين منفصلين. لا تعتبرهما مترادفين.",
+    "Triple وQuadruple تصفان السعة؛ لا تستنتج ثلاثة أو أربعة أسرّة من الاسم.",
+    "كل عنصر في bed_groups يمثل ترتيبًا بديلًا كاملًا؛ الأسرّة داخل beds في العنصر نفسه مجتمعة. لا تجمع أسرّة البدائل كأنها كلها موجودة.",
+    "اختر bed_configuration_status من guaranteed أو on_request أو unspecified. لا تحول التفضيل إلى ضمان.",
+    "غرفة Double or Twin تبقى بهذا الاسم إذا لم يُضمن ترتيب محدد. يمكن عرض التفضيل ضمن ملاحظة منفصلة.",
+    "لا تستنتج مقاس السرير بالسنتيمتر من اسمه.",
+    "عدد غرف النوم مستقل عن عدد الغرف المحجوزة وعدد الأسرّة وعدد النزلاء.",
+    "فئة Club لا تضمن دخول الصالة؛ أضف club_lounge_access فقط إذا كان مشمولًا ومؤكدًا.",
+    "Connecting لا تعني Adjacent. اختر connecting_status من confirmed أو on_request أو not_applicable وأظهر حالة الطلب.",
+    "الإطلالة غير المعروفة تحفظ كقائمة فارغة؛ لا تحولها إلى no_view.",
+    "لا تفترض وجود غرفة معيشة منفصلة في كل جناح أو تجهيزات إتاحة محددة بمجرد الاسم.",
+    "احفظ الوجبات والسعر وسياسة الإلغاء في خطة السعر المرتبطة بالغرفة، وليس في room_type_id.",
+    "الخصائص غير المدعومة في بيانات الفندق لا تضاف إلى الاسم تلقائيًا."
+  ],
+  "room_name_export": {
+    "strategy": "verified_custom_name_else_structured_segments",
+    "custom_name_policy_ar": "إذا كانت للغرفة تسمية تجارية مخصصة، استخدم النسخة المعتمدة باللغة المطلوبة؛ عند غيابها أوقف التصدير النهائي حتى اعتمادها، ولا تستبدلها بصمت باسم عام.",
+    "structured_name_strategy": "base_label_then_optional_labeled_segments",
+    "separator": " | ",
+    "base_label_source": "catalogs.room_types[id].label[locale]",
+    "segments_order": [
+      "category",
+      "suite_subtype",
+      "bedroom_count",
+      "beds",
+      "views",
+      "features"
+    ],
+    "field_labels": {
+      "ar": {
+        "category": "الفئة",
+        "suite_subtype": "نوع الجناح",
+        "bedroom_count": "عدد غرف النوم",
+        "beds": "الأسرّة",
+        "views": "الإطلالة",
+        "features": "المميزات"
+      },
+      "en": {
+        "category": "Category",
+        "suite_subtype": "Suite Type",
+        "bedroom_count": "Bedrooms",
+        "beds": "Beds",
+        "views": "View",
+        "features": "Features"
+      }
+    },
+    "list_separator": {
+      "ar": "، ",
+      "en": ", "
+    },
+    "bed_item_template": "{quantity} × {localized_bed_type}",
+    "alternative_bed_group_separator": {
+      "ar": " أو ",
+      "en": " OR "
+    },
+    "bed_status_suffix": {
+      "guaranteed": {
+        "ar": "مضمون",
+        "en": "Guaranteed"
+      },
+      "on_request": {
+        "ar": "حسب الطلب وغير مضمون",
+        "en": "On Request, Not Guaranteed"
+      },
+      "unspecified": {
+        "ar": "ترتيب الأسرّة غير مؤكد",
+        "en": "Bed Configuration Unconfirmed"
+      }
+    },
+    "omit_empty_segments": true,
+    "number_format": "Latin digits",
+    "explanation_ar": "استخدم فواصل وتسميات واضحة لتجنب تركيب عربي أو إنكليزي غير سليم. مثال: Double Room | Category: Deluxe | Beds: 1 × King Bed (Guaranteed) | View: Sea View. الاسم التسويقي السلس يمكن حفظه كاسم مخصص معتمد مثل Deluxe King Room with Sea View."
+  },
+  "validation_rules": [
+    {
+      "id": "known_ids",
+      "severity": "error",
+      "rule_ar": "كل معرّف نوع أو فئة أو سرير أو إطلالة أو ميزة يجب أن يوجد في قاموسه؛ لا تعتمد نصًا حرًا كمعرّف."
+    },
+    {
+      "id": "hotel_identity",
+      "severity": "error",
+      "rule_ar": "معرّف الفندق في الإقامة والغرفة متطابق، ودولة الوجهة مأخوذة من سجل الفندق."
+    },
+    {
+      "id": "hotel_name",
+      "severity": "error",
+      "rule_ar": "التصدير النهائي يتطلب اسم الفندق المعتمد باللغة المحددة؛ لا تبدّل إلى العربية بصمت في تصدير إنكليزي."
+    },
+    {
+      "id": "occupancy",
+      "severity": "error",
+      "rule_ar": "قيم السعة أعداد صحيحة؛ max_guests >= 1 وmax_adults وmax_children >= 0، وكل منهما <= max_guests، وmax_guests <= max_adults + max_children. قيّم أعمار الأطفال وفق سياسة الفندق."
+    },
+    {
+      "id": "bed_groups",
+      "severity": "error",
+      "rule_ar": "كميات الأسرّة أعداد صحيحة موجبة؛ selected_bed_group_id إن وجد يشير إلى أحد البدائل. لا تثبت البديل كتأكيد دون guaranteed."
+    },
+    {
+      "id": "mutually_exclusive_features",
+      "severity": "error",
+      "rule_ar": "لا تجمع smoking وnon_smoking."
+    },
+    {
+      "id": "views",
+      "severity": "error",
+      "rule_ar": "no_view لا يجتمع مع أي إطلالة أخرى؛ sea وpartial_sea لا يجتمعان في الوصف نفسه."
+    },
+    {
+      "id": "suite_subtype",
+      "severity": "error",
+      "rule_ar": "suite_subtype_id يستخدم فقط إذا كان room_type_id هو suite؛ امنع تكرار executive كفئة ونوع جناح في الاسم الناتج."
+    },
+    {
+      "id": "bedroom_count",
+      "severity": "error",
+      "rule_ar": "عدد غرف النوم إن أُدخل عدد صحيح موجب موثق؛ لا يُستنتج من Single أوDouble أوTriple."
+    },
+    {
+      "id": "connecting",
+      "severity": "error",
+      "rule_ar": "عند وجود connecting يلزم confirmed أو on_request؛ عند on_request تظهر عبارة حسب الطلب وغير مضمون."
+    },
+    {
+      "id": "double_twin_consistency",
+      "severity": "error",
+      "rule_ar": "إذا كان النوع twin وترتيب السرير المضمون يخالف سريرين منفصلين، أو كان النوع double يخالف سريرًا مزدوجًا مناسبًا، يجب تصحيح التصنيف أو البيانات قبل التصدير."
+    }
+  ],
+  "export_contract": {
+    "input": {
+      "document_locale": "auto | ar | en",
+      "stay_locale": "auto | ar | en",
+      "hotel": "hotel_record",
+      "room": "room_record"
+    },
+    "output": {
+      "hotel_id": "string",
+      "room_id": "string",
+      "destination_country_code": "string",
+      "resolved_locale": "ar | en",
+      "hotel_name": "string",
+      "room_name": "string",
+      "bed_configuration_note": "string or null",
+      "connection_note": "string or null",
+      "max_guests": "integer",
+      "warnings": "array"
+    },
+    "steps_ar": [
+      "تحقق من ربط الفندق والغرفة وصحة المعرفات والسعات.",
+      "حدد اللغة وفق ترتيب الأولوية؛ تجاهل auto وnull والقيم الفارغة عند فحص التجاوزات.",
+      "استخدم دولة الفندق لكل إقامة لتطبيق قواعد الوجهة، ثم اللغة الافتراضية إن لم توجد قاعدة.",
+      "اجلب اسم الفندق المعتمد باللغة المطلوبة، وإلا أعد خطأ HOTEL_NAME_TRANSLATION_REQUIRED.",
+      "إذا وجد اسم غرفة مخصص بأي لغة فتأكد من وجود نسخته المعتمدة باللغة المطلوبة، وإلا أعد ROOM_NAME_TRANSLATION_REQUIRED.",
+      "عند عدم وجود اسم مخصص ابنِ الاسم من المسميات المترجمة والحقول غير الفارغة وفق room_name_export.",
+      "أظهر قيود الأسرّة والغرف المتصلة ضمن ملاحظات واضحة حتى عندما تستخدم اسم غرفة مخصصًا.",
+      "صدّر الاسم الناتج إلى PDF أو القسيمة أو العرض أو Excel أو واجهة الربط التي ينفذها النظام."
+    ],
+    "errors": {
+      "HOTEL_NAME_TRANSLATION_REQUIRED": "أدخل واعتمد اسم الفندق باللغة المطلوبة قبل التصدير.",
+      "ROOM_NAME_TRANSLATION_REQUIRED": "أدخل واعتمد اسم الغرفة المخصص باللغة المطلوبة قبل التصدير.",
+      "INVALID_ROOM_CONFIGURATION": "راجع بيانات الغرفة؛ توجد حقول متعارضة أو غير مكتملة."
+    }
+  },
+  "examples_note_ar": "جميع أسماء الفنادق التالية افتراضية لتوضيح السلوك، وليست أسماء منشآت موثقة.",
+  "acceptance_examples": [
+    {
+      "id": "georgia_auto",
+      "input": {
+        "document_locale": "auto",
+        "stay_locale": "auto",
+        "hotel": {
+          "country_code": "GE",
+          "names": {
+            "ar": "فندق المثال باتومي",
+            "en": "Example Batumi Hotel"
+          },
+          "name_status": {
+            "ar": "verified",
+            "en": "verified"
+          },
+          "export_locale_override": null
+        },
+        "room": {
+          "room_type_id": "double",
+          "room_category_id": "deluxe",
+          "bed_groups": [
+            {
+              "id": "king",
+              "beds": [
+                {
+                  "bed_type_id": "king",
+                  "quantity": 1
+                }
+              ]
+            }
+          ],
+          "selected_bed_group_id": "king",
+          "bed_configuration_status": "guaranteed",
+          "view_ids": [
+            "sea"
+          ],
+          "custom_room_name": {
+            "ar": "غرفة ديلوكس بسرير كينغ وإطلالة على البحر",
+            "en": "Deluxe King Room with Sea View"
+          },
+          "custom_name_status": {
+            "ar": "verified",
+            "en": "verified"
+          }
+        }
+      },
+      "expected": {
+        "resolved_locale": "en",
+        "hotel_name": "Example Batumi Hotel",
+        "room_name": "Deluxe King Room with Sea View"
+      }
+    },
+    {
+      "id": "oman_auto",
+      "input": {
+        "document_locale": "auto",
+        "stay_locale": "auto",
+        "hotel": {
+          "country_code": "OM",
+          "names": {
+            "ar": "فندق المثال مسقط",
+            "en": "Example Muscat Hotel"
+          },
+          "name_status": {
+            "ar": "verified",
+            "en": "verified"
+          }
+        },
+        "room": {
+          "room_type_id": "twin",
+          "room_category_id": "superior",
+          "view_ids": [],
+          "feature_ids": []
+        }
+      },
+      "expected": {
+        "resolved_locale": "ar",
+        "hotel_name": "فندق المثال مسقط",
+        "room_name": "غرفة بسريرين منفصلين | الفئة: سوبيريور"
+      }
+    },
+    {
+      "id": "english_override",
+      "input": {
+        "document_locale": "en",
+        "stay_locale": "auto",
+        "hotel_country_code": "OM"
+      },
+      "expected": {
+        "resolved_locale": "en"
+      }
+    },
+    {
+      "id": "arabic_override",
+      "input": {
+        "document_locale": "ar",
+        "stay_locale": "en",
+        "hotel_country_code": "GE"
+      },
+      "expected": {
+        "resolved_locale": "ar"
+      }
+    },
+    {
+      "id": "arrival_not_destination",
+      "input": {
+        "arrival_airport_country_code": "TR",
+        "hotel_country_code": "GE",
+        "document_locale": "auto",
+        "stay_locale": "auto"
+      },
+      "expected": {
+        "resolved_locale": "en",
+        "destination_country_code": "GE"
+      }
+    },
+    {
+      "id": "missing_english_name",
+      "input": {
+        "hotel_country_code": "GE",
+        "names": {
+          "ar": "اسم فندق جديد",
+          "en": null
+        },
+        "document_locale": "auto"
+      },
+      "expected": {
+        "final_export_allowed": false,
+        "error_code": "HOTEL_NAME_TRANSLATION_REQUIRED"
+      }
+    },
+    {
+      "id": "unlisted_destination",
+      "input": {
+        "hotel_country_code": "JP",
+        "document_locale": "auto",
+        "stay_locale": "auto"
+      },
+      "expected": {
+        "resolved_locale": "en"
+      }
+    },
+    {
+      "id": "multi_country",
+      "input": {
+        "document_locale": "auto",
+        "stays": [
+          {
+            "hotel_country_code": "OM"
+          },
+          {
+            "hotel_country_code": "GE"
+          },
+          {
+            "hotel_country_code": "TR"
+          }
+        ]
+      },
+      "expected": {
+        "stay_locales": [
+          "ar",
+          "en",
+          "en"
+        ]
+      }
+    },
+    {
+      "id": "custom_translation_missing",
+      "input": {
+        "hotel_country_code": "GE",
+        "custom_room_name": {
+          "ar": "غرفة خاصة",
+          "en": null
+        }
+      },
+      "expected": {
+        "final_export_allowed": false,
+        "error_code": "ROOM_NAME_TRANSLATION_REQUIRED"
+      }
+    }
+  ],
+  "implementation_instructions_ar": [
+    "استورد القواميس إلى النظام أو استخدمها مباشرة كملف إعدادات؛ لا تنشئ واجهة إدخال إنكليزية افتراضيًا.",
+    "لا تُعد الملف بحد ذاته برنامجًا جاهزًا؛ على المطور تنفيذ قواعد التحقق وحسم اللغة والتصدير الموضحة.",
+    "احتفظ بمعرّفات الغرف والفنادق عند تغيير اللغة ولا تنشئ غرفًا مكررة لكل لغة.",
+    "وفّر لوحة لتعديل لغة التصدير لكل دولة وتجاوزها لكل فندق أو إقامة أو مستند.",
+    "وفّر خيار إضافة فندق بالعربية مع الاسم الإنكليزي الرسمي واعتماده مرة واحدة، ثم إعادة استخدامه تلقائيًا.",
+    "ادعم أسماء غرف مخصصة للفندق خارج القائمة دون فقد الاسم الأصلي القادم من المورد.",
+    "نفذ اختبارات القبول للأولوية والوجهات المتعددة والبيانات المفقودة وعدم ضمان الأسرّة."
+  ],
+  "references": [
+    {
+      "title": "Booking.com Room Type Codes",
+      "url": "https://developers.booking.com/connectivity/docs/codes-bcrt"
+    },
+    {
+      "title": "Booking.com Managing Room Types",
+      "url": "https://developers.booking.com/connectivity/docs/room-type-and-rate-plan-management/managing-room-types"
+    },
+    {
+      "title": "Expedia Lodging API Launch Requirements",
+      "url": "https://developers.expediagroup.com/rapid/setup/launch-requirements/lodging-launch-reqs"
+    }
+  ]
+}
