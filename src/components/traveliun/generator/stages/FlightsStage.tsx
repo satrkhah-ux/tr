@@ -18,7 +18,9 @@ import {
 } from "@/lib/offer/draft-types";
 import { rankAirports, tripCountries } from "@/lib/offer/basic";
 import { citiesFromFlights, routeLegOrders } from "@/lib/offer/flight-cities";
-import { FlightBuilder, TripTypeCards, type BuilderSegment } from "../flights/FlightBuilder";
+import { CabinSelect, FlightBuilder, TripTypeCards, type BuilderSegment } from "../flights/FlightBuilder";
+import { FlightFare } from "../flights/FlightFare";
+import { withTypedTotal } from "@/lib/offer/flight-fare";
 import { SupplierPrice } from "../SupplierPrice";
 import { buildJourneys, formatWaitAr, type JourneyLeg } from "@/lib/offer/journey";
 import {
@@ -469,7 +471,8 @@ export function FlightsStage({
             </button>
           </div>
           {/* ONE figure for the booking — every traveller, every leg — and who it was bought from */}
-          <div className="mt-3 rounded-[12px] border border-[#cfe0d9] bg-[#f8fbf9] p-3">
+          <div className="mt-3 space-y-2 rounded-[12px] border border-[#cfe0d9] bg-[#f8fbf9] p-3">
+            <FlightFare booking={booking} kind="intl" trip={data.trip} field={fieldClass} onChange={setBooking} />
             <SupplierPrice
               label={t("pg.fb.intlPrice")}
               price={booking.intl_price}
@@ -480,7 +483,8 @@ export function FlightsStage({
               countries={lookups.countries}
               onChange={(v) =>
                 setBooking({
-                  ...(v.price !== undefined ? { intl_price: v.price } : {}),
+                  // a total typed in the box is a total, whatever the tickets said
+                  ...(v.price !== undefined ? withTypedTotal(booking, "intl", v.price) : {}),
                   ...(v.currency !== undefined ? { intl_currency: v.currency } : {}),
                   ...(v.supplier !== undefined ? { intl_supplier: v.supplier } : {}),
                 })
@@ -533,7 +537,8 @@ export function FlightsStage({
           {t("pg.addFlightDomestic")}
         </button>
         {domestic.length > 0 ? (
-          <div className="mt-3 rounded-[12px] border border-[#cfe0d9] bg-[#f8fbf9] p-3">
+          <div className="mt-3 space-y-2 rounded-[12px] border border-[#cfe0d9] bg-[#f8fbf9] p-3">
+            <FlightFare booking={booking} kind="dom" trip={data.trip} field={fieldClass} onChange={setBooking} />
             <SupplierPrice
               label={t("pg.fb.domPrice")}
               price={booking.dom_price}
@@ -544,7 +549,7 @@ export function FlightsStage({
               countries={lookups.countries}
               onChange={(v) =>
                 setBooking({
-                  ...(v.price !== undefined ? { dom_price: v.price } : {}),
+                  ...(v.price !== undefined ? withTypedTotal(booking, "dom", v.price) : {}),
                   ...(v.currency !== undefined ? { dom_currency: v.currency } : {}),
                   ...(v.supplier !== undefined ? { dom_supplier: v.supplier } : {}),
                 })
@@ -847,11 +852,7 @@ function FlightRow({
         {full ? (
           <label className={rowLabelClass}>
             {t("pg.cabin")}
-            <input
-              value={flight.cabin_class}
-              onChange={(e) => updateRow(index, { cabin_class: e.target.value })}
-              className={fieldClass}
-            />
+            <CabinSelect value={flight.cabin_class} onChange={(cabin_class) => updateRow(index, { cabin_class })} className={fieldClass} />
           </label>
         ) : null}
         {/* two numbers, not one string: an airline enforces the weight AND the

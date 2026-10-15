@@ -3,6 +3,10 @@
 import { ArrowLeftRight, Ticket } from "lucide-react";
 import type { DraftData, GeneratorLookups } from "@/lib/offer/draft-types";
 import { airportDisplay, planInternational, rankAirports, tripCountries, type FlightPlan } from "@/lib/offer/basic";
+import { withTypedTotal } from "@/lib/offer/flight-fare";
+import { CabinOptions } from "../generator/flights/FlightBuilder";
+import { FlightFare } from "../generator/flights/FlightFare";
+import { useTraveliunUI } from "../TraveliunUIProvider";
 import { basicField, typedNumber } from "./styles";
 import { useBasicLabels } from "./labels";
 
@@ -33,6 +37,7 @@ export function BasicFlightPlan({
   onFinal: () => void;
 }) {
   const tx = useBasicLabels();
+  const { t } = useTraveliunUI();
   const booking = data.flight_booking;
   const outbound = data.flights.filter((f) => f.leg_order === "outbound");
   const inbound = data.flights.filter((f) => f.leg_order === "inbound");
@@ -50,6 +55,15 @@ export function BasicFlightPlan({
   const destFirst = rankAirports(lookups.airports, tripCountries(data), data.cities.map((c) => c.city_name));
 
   const write = (change: Partial<FlightPlan>) => onChange(planInternational(data, lookups.airports, { ...now, ...change }));
+  // the booking changes; the legs are planned from it when there are none yet
+  const book = (flight_booking: DraftData["flight_booking"], flights = data.flights) =>
+    onChange(planned ? { flight_booking, flights } : planInternational({ ...data, flight_booking }, lookups.airports, now));
+  // a new cabin goes on every international leg still in the booking's cabin — a leg given its own keeps it
+  const setCabin = (cabin: string) =>
+    book(
+      { ...booking, cabin },
+      data.flights.map((f) => (f.leg_order !== "internal" && (!f.cabin_class || f.cabin_class === booking.cabin) ? { ...f, cabin_class: cabin } : f)),
+    );
 
   const airportInput = (value: string, onValue: (v: string) => void, label: string, list: string) => (
     <input aria-label={label} placeholder={label} list={list} value={value} onChange={(e) => onValue(e.target.value)} className={basicField} />
@@ -73,6 +87,9 @@ export function BasicFlightPlan({
             </button>
           ))}
         </div>
+        <select aria-label={t("pg.cabin")} value={booking.cabin} onChange={(e) => setCabin(e.target.value)} className={`${basicField} w-auto px-2`}>
+          <CabinOptions value={booking.cabin} />
+        </select>
         <span className="text-[11px] font-semibold text-[#7a948f]">{tx("planHint")}</span>
       </div>
 
@@ -118,13 +135,11 @@ export function BasicFlightPlan({
           aria-label={tx("planPrice")}
           placeholder={tx("planPrice")}
           value={booking.intl_price ?? ""}
-          onChange={(e) => {
-            const flight_booking = { ...booking, intl_price: typedNumber(e.target), intl_currency: booking.intl_currency || "SAR" };
-            onChange(planned ? { flight_booking } : planInternational({ ...data, flight_booking }, lookups.airports, now));
-          }}
+          onChange={(e) => book({ ...withTypedTotal(booking, "intl", typedNumber(e.target)), intl_currency: booking.intl_currency || "SAR" })}
           className={`${basicField} tv-tnum text-center`}
         />
       </div>
+      <FlightFare booking={booking} kind="intl" trip={data.trip} field={basicField} onChange={(next) => book(next)} />
       <datalist id="basic-plan-home">
         {homeFirst.map((a) => (
           <option key={a.id} value={airportDisplay(a)} label={a.city ?? a.country ?? undefined} />

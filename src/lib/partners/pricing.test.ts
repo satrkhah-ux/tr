@@ -208,6 +208,16 @@ describe("keepTheirPrices", () => {
     expect(out.cities?.[0].tour_picks?.[0].price).toBe(200);
   });
 
+  it("keeps the partner's own per-person tickets when staff type ours over them", () => {
+    const was = stored();
+    const theirs = { price_mode: "per_person", adult_price: 1500, child_price: 1200, infant_price: null } as const;
+    was.flight_booking = { ...was.flight_booking, intl_fare: theirs, dom_fare: { ...theirs, adult_price: 300 } };
+    const ours = { price_mode: "per_person", adult_price: 900, child_price: 700, infant_price: 100 } as const;
+    const out = keepTheirPrices({ flight_booking: { ...was.flight_booking, intl_fare: ours, dom_fare: ours } }, was);
+    expect(out.flight_booking?.intl_fare).toEqual(theirs);
+    expect(out.flight_booking?.dom_fare).toEqual({ ...theirs, adult_price: 300 });
+  });
+
   it("leaves a changed room or tour unpriced rather than carrying another one's price", () => {
     const was = stored();
     const out = keepTheirPrices(

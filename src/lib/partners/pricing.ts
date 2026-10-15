@@ -181,8 +181,9 @@ export function keepTheirPrices(sent: Partial<DraftData>, stored: DraftData): Pa
     });
   }
   if (sent.flight_booking) {
-    const { intl_price, intl_currency, dom_price, dom_currency } = stored.flight_booking;
-    out.flight_booking = { ...sent.flight_booking, intl_price, intl_currency, dom_price, dom_currency };
+    // the tickets behind a «للفرد» total are prices too: the total is worked out from them
+    const { intl_price, intl_currency, intl_fare, dom_price, dom_currency, dom_fare } = stored.flight_booking;
+    out.flight_booking = { ...sent.flight_booking, intl_price, intl_currency, intl_fare, dom_price, dom_currency, dom_fare };
   }
   if (sent.cities) {
     out.cities = sent.cities.map((c, ci) => {

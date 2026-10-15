@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { saveDraftStages } from "@/lib/data/drafts";
 import type { DraftData } from "@/lib/offer/draft-types";
+import { withFlightTotals } from "@/lib/offer/flight-fare";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -72,7 +73,12 @@ export function useDraftState(
   flush: () => Promise<void>;
   saveState: SaveState;
 } {
-  const [data, setData] = useState<DraftData>(initialData);
+  const [raw, setData] = useState<DraftData>(initialData);
+  // a «للفرد» flight total follows the travellers the moment they change, on every screen
+  const data = useMemo(() => {
+    const flight_booking = withFlightTotals(raw.flight_booking, raw.trip);
+    return flight_booking === raw.flight_booking ? raw : { ...raw, flight_booking };
+  }, [raw]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const pendingRef = useRef<Partial<DraftData>>({});
   const timerRef = useRef<number | null>(null);

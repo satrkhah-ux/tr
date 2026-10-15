@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowDownUp, ArrowLeft, ArrowLeftRight, CalendarDays, MapPin, Plane, Plus, Route, Trash2, UsersRound } from "lucide-react";
 import type { FlightBookingMode } from "@/lib/offer/draft-types";
+import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 
 /**
@@ -16,7 +17,60 @@ import { useTraveliunUI } from "../../TraveliunUIProvider";
 
 export type BuilderSegment = { from: string; to: string; date: string };
 
-export const CABINS = ["اقتصادية", "أعمال", "أولى"] as const;
+/**
+ * The cabins, in the order they are asked. The Arabic word is what is STORED
+ * (old drafts and offer_flights hold it as text); the key is how it is shown.
+ * «سياحية» is its own cabin, not another name for «اقتصادية».
+ */
+export const CABINS = [
+  { value: "اقتصادية", key: "pg.cabin.economy" },
+  { value: "سياحية", key: "pg.cabin.tourist" },
+  { value: "أعمال", key: "pg.cabin.business" },
+  { value: "أولى", key: "pg.cabin.first" },
+] as const satisfies readonly { value: string; key: TranslationKey }[];
+
+/** A booking's cabin: the four, and a cabin some older file typed by hand still shown as itself. */
+export function CabinOptions({ value }: { value: string }) {
+  const { t } = useTraveliunUI();
+  return (
+    <>
+      {CABINS.map((c) => (
+        <option key={c.value} value={c.value}>{t(c.key)}</option>
+      ))}
+      {value && !CABINS.some((c) => c.value === value) ? <option value={value}>{value}</option> : null}
+    </>
+  );
+}
+
+const OTHER = "__other";
+
+/** One leg's cabin: the four, or «أخرى» and the agent types it. */
+export function CabinSelect({ value, onChange, className }: { value: string; onChange: (cabin: string) => void; className: string }) {
+  const { t } = useTraveliunUI();
+  const typed = value !== "" && !CABINS.some((c) => c.value === value);
+  const [other, setOther] = useState(typed);
+  const showOther = other || typed;
+  return (
+    <>
+      <select
+        value={showOther ? OTHER : value}
+        onChange={(e) => {
+          const picked = e.target.value;
+          setOther(picked === OTHER);
+          onChange(picked === OTHER ? "" : picked);
+        }}
+        className={className}
+      >
+        <option value="">—</option>
+        {CABINS.map((c) => (
+          <option key={c.value} value={c.value}>{t(c.key)}</option>
+        ))}
+        <option value={OTHER}>{t("pg.cabin.other")}</option>
+      </select>
+      {showOther ? <input aria-label={t("pg.cabin.other")} value={value} onChange={(e) => onChange(e.target.value)} className={className} /> : null}
+    </>
+  );
+}
 
 // In the order an agent is asked: one way, there and back, several cities.
 const MODES = [
@@ -199,9 +253,7 @@ export function FlightBuilder({
               onChange={(e) => onCabin(e.target.value)}
               className="h-9 rounded-[9px] border border-[#dbe6e1] bg-white px-2 text-[12.5px] font-bold text-[#185045]"
             >
-              {CABINS.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              <CabinOptions value={cabin} />
             </select>
           </label>
         </div>

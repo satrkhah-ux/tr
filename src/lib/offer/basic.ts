@@ -47,6 +47,7 @@ import {
 import { roomRank, seatsFromName } from "@/lib/catalog/model";
 import { draftDaySkeleton } from "./itinerary";
 import { autoDepartureDate, finalOutbound, itineraryStartDate } from "./schedule";
+import { withTypedTotal } from "./flight-fare";
 
 /**
  * A city as this screen holds it. The extra answer rides on the draft's own
@@ -507,9 +508,14 @@ export function priceAtSource(
 ): Partial<Pick<DraftData, "hotels" | "cities" | "flight_booking">> | null {
   const ref = item.ref ?? "";
   if (item.item_type === "flight" && (ref === "flight:intl" || ref === "flight:dom")) {
+    // a total typed on the sheet is a total: a «للفرد» booking becomes «إجمالي» at that figure
     const b = data.flight_booking;
-    if (ref === "flight:intl") return { flight_booking: { ...b, intl_price: change.price !== undefined ? change.price : b.intl_price, intl_currency: change.currency ?? b.intl_currency } };
-    return { flight_booking: { ...b, dom_price: change.price !== undefined ? change.price : b.dom_price, dom_currency: change.currency ?? b.dom_currency } };
+    if (ref === "flight:intl") {
+      const priced = change.price !== undefined ? withTypedTotal(b, "intl", change.price) : b;
+      return { flight_booking: { ...priced, intl_currency: change.currency ?? b.intl_currency } };
+    }
+    const priced = change.price !== undefined ? withTypedTotal(b, "dom", change.price) : b;
+    return { flight_booking: { ...priced, dom_currency: change.currency ?? b.dom_currency } };
   }
   const tour = ref.match(/^tour:(.+):(\d+)$/);
   // a tour is typed in riyals — only its figure goes back
