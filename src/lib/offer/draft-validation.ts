@@ -20,6 +20,7 @@ import {
   type DraftData,
   type StageKey,
   sourcingFits,
+  stayOutsideCity,
 } from "./draft-types";
 import { finalOutbound, flightTiming, itineraryStartDate, localDatePart } from "./schedule";
 import { citiesFromFlights, citiesMatchFlights, domesticMismatches } from "./flight-cities";
@@ -276,6 +277,11 @@ export function validateDraft(data: DraftData): DraftValidation {
   if (supplierBlocked) {
     blocking.push({ severity: "blocking", stage: "hotels", field: "hotels", key: "pg.supplier.blocked" });
   }
+  // A stay on dates of its own must sit inside its city's: a night outside is
+  // a night the programme has the group somewhere else.
+  if (stays.some((s) => stayOutsideCity(s, cities[s.city_index]))) {
+    blocking.push({ severity: "blocking", stage: "hotels", field: "hotels", key: "pg.err.stayOutsideCity" });
+  }
   // A supplier rate prices the stay it was quoted for. Changed since — nights,
   // rooms, guests or the hotel — it is stale, and issuing it would sell (and
   // book) the new stay at the old one's price: search again.
@@ -388,7 +394,7 @@ function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey
   const hotelsComplete =
     data.cities.length > 0 &&
     // «مكتمل» means every night has a bed, not "a row exists per city".
-    hotelCoverage(data.cities, data.hotels).every((c) => c.covered === c.needed) &&
+    hotelCoverage(data.cities, data.hotels).every((c) => c.covered === c.needed && c.extra === 0) &&
     data.hotels.every((h) => Boolean(statedRoom(h) && statedBoard(h)));
   const pricingComplete =
     isFixedPrice(data) || (data.pricing.items.length > 0 && data.pricing.items.every((i) => i.sell_price != null));

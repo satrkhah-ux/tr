@@ -40,6 +40,7 @@ import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
 import type { ProfitSettings } from "@/lib/data/app-settings";
 import {
   AGE_BANDS,
+  cityHotelLines,
   clampAge,
   currencyOptions,
   findLookupCountry,
@@ -815,8 +816,9 @@ export function BasicEditor({
       .join(" · "),
     flights: data.flights.map(legText).join(" · "),
     cities: cities
-      .map((c) => {
-        const hotel = data.hotels.find((h) => h.city_name === c.city_name)?.hotel_name;
+      .map((c, i) => {
+        // each visit of a city with its own hotels
+        const hotel = [...new Set(cityHotelLines(cities, data.hotels, i).map((h) => h.hotel_name.trim()).filter(Boolean))].join(" + ");
         return `${c.city_name} (${nightsText(c.nights, language)})${hotel ? ` — ${hotel}` : ""}`;
       })
       .join(" · "),

@@ -204,9 +204,33 @@ function stayHeightMm(stay: ClientOfferDTO["hotels"][number], flagDomestic: bool
   return 44 + notices * 13;
 }
 
-/** Nights from the stays; falls back to the arrival→departure span. */
+/**
+ * The stays in the order the group checks in, and two (or more) hotels on the
+ * very same dates in one city kept together — one stay, its rooms split over them.
+ */
+export function stayRuns<T extends { city_name: string | null; check_in: string | null; check_out: string | null }>(hotels: T[]): T[][] {
+  const sorted = hotels
+    .map((h, i) => ({ h, i }))
+    .sort((a, b) => (a.h.check_in ?? "9999").localeCompare(b.h.check_in ?? "9999") || a.i - b.i)
+    .map((x) => x.h);
+  const runs = new Map<string, T[]>();
+  sorted.forEach((h, i) => {
+    const key = h.check_in && h.check_out ? `${h.city_name}|${h.check_in}|${h.check_out}` : `#${i}`;
+    runs.set(key, [...(runs.get(key) ?? []), h]);
+  });
+  return [...runs.values()];
+}
+
+/** Nights from the stays — different nights, so two hotels on the same dates count once; falls back to the arrival→departure span. */
 function tripNights(offer: ClientOfferDTO): number {
-  const fromHotels = offer.hotels.reduce((sum, h) => sum + (h.nights ?? 0), 0);
+  const dated = new Set<string>();
+  let undated = 0;
+  for (const h of offer.hotels) {
+    const n = h.nights ?? 0;
+    if (!h.check_in) undated += n;
+    else for (let k = 0; k < n; k++) dated.add(new Date(Date.parse(`${h.check_in}T00:00:00Z`) + k * 86400000).toISOString().slice(0, 10));
+  }
+  const fromHotels = dated.size + undated;
   if (fromHotels > 0) return fromHotels;
   if (offer.arrival_date && offer.departure_date) {
     const ms = Date.parse(`${offer.departure_date}T00:00:00Z`) - Date.parse(`${offer.arrival_date}T00:00:00Z`);
@@ -340,17 +364,34 @@ export function OfferDocument(props: OfferDocumentProps) {
 
   const isFlagged = (h: ClientOfferDTO["hotels"][number]) =>
     Boolean(h.check_out && domesticDepartureDates.has(h.check_out));
-  offer.hotels.forEach((stay, i) => {
+  for (const run of stayRuns(offer.hotels)) {
+    if (run.length === 1) {
+      const [stay] = run;
+      blocks.push({ group: "stays", title: AR.accommodation, heightMm: stayHeightMm(stay, isFlagged(stay)) + 4, kind: "stay", stay, flagDomestic: isFlagged(stay) });
+      continue;
+    }
+    // one stay split over two hotels (ق5): side by side under one line, never apart on two sheets
     blocks.push({
       group: "stays",
       title: AR.accommodation,
-      heightMm: stayHeightMm(stay, isFlagged(stay)) + 4,
-      kind: "stay",
-      stay,
-      flagDomestic: isFlagged(stay),
+      heightMm: SUBHEADING_MM + run.reduce((sum, stay) => sum + stayHeightMm(stay, isFlagged(stay)) + 4, 0),
+      kind: "node",
+      node: (
+        <>
+          <h3 className="od-subhead">{AR.splitStay(run.length)}</h3>
+          {run.map((stay, i) => (
+            <StayCard
+              key={i}
+              stay={stay}
+              country={offer.destination}
+              travelers={{ adults: offer.adults, children: offer.children, infants: offer.infants }}
+              flagDomestic={isFlagged(stay)}
+            />
+          ))}
+        </>
+      ),
     });
-    void i;
-  });
+  }
 
   if (offer.days.length > 0 || offer.transport.length > 0) {
     const rows = offer.days.length * 22 + offer.transport.length * 12;

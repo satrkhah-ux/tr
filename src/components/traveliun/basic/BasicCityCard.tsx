@@ -4,8 +4,10 @@ import { useState, type ReactNode } from "react";
 import { BedDouble, Camera, CheckCircle2, ChevronDown, Pencil, Plane, Plus, Trash2, UserRound, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import {
+  addStay,
   BOARD_LABEL_KEYS,
   BOARD_TYPES,
+  cityHotelLines,
   currencyOptions,
   deriveHotelStays,
   emptyRoomSpec,
@@ -22,10 +24,9 @@ import {
 import {
   baseRoomName,
   changeRoom,
-  cityLines,
   clearRoomChange,
   EXTRA_BED,
-  renameRooms,
+  roomChangeLine,
   airportDisplay,
   cityDates,
   findAirport,
@@ -40,6 +41,7 @@ import { programDayText, type TourProgram } from "@/lib/offer/itinerary";
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { suppliersFor } from "../generator/SupplierPrice";
+import { AddStayMenu, StayDatesLine } from "../generator/hotels/StayDates";
 import { basicField, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
 import { nightsText, useBasicLabels } from "./labels";
@@ -128,8 +130,9 @@ export function BasicCityCard({
   onExpand: () => void;
 }) {
   const tx = useBasicLabels();
-  const lines = cityLines(data.hotels, city.city_name);
-  const [main, change] = lines;
+  // this stop's own stays — a city visited twice has two sets
+  const lines = cityHotelLines(data.cities, data.hotels, index);
+  const [main] = lines;
   const domestic = data.flights.filter(
     (f) => f.leg_order === "internal" && (f.to_city?.trim() === city.city_name || f.from_city?.trim() === city.city_name),
   );
@@ -150,7 +153,7 @@ export function BasicCityCard({
   const tripCar = plan.tours.car_type.trim();
   const rooms = lines.flatMap((l) => l.rooms);
   const missing = [
-    hotelsOn && main && !main.hotel_name.trim() && tx("hotel"),
+    hotelsOn && lines.some((l) => !l.hotel_name.trim()) && tx("hotel"),
     hotelsOn && rooms.some((r) => !(r.room_type_id || r.room_type_name.trim())) && tx("roomType"),
     hotelsOn && rooms.some((r) => !r.board_type) && tx("board"),
     hotelsOn && rooms.some((r) => r.price == null) && tx("price"),
@@ -163,7 +166,7 @@ export function BasicCityCard({
   const stayPrice = rooms.reduce((sum, r) => sum + (r.price ?? 0), 0);
   const tours = picks.filter((p) => !p.free);
   const summary = [
-    main?.hotel_name,
+    [...new Set(lines.map((l) => l.hotel_name.trim()).filter(Boolean))].join(" + "),
     main && main.rooms.length > 0 ? `${main.rooms.length} × ${baseRoomName(main.rooms[0].room_type_name) || "—"}` : "",
     hotelsOn && stayPrice > 0 ? `${stayPrice.toLocaleString("en-US")} ${main?.manual_currency ?? ""}`.trim() : "",
     toursOn ? tx("toursSummary", { n: tours.length, total: tours.reduce((s, p) => s + (p.price ?? 0), 0).toLocaleString("en-US") }) : "",
@@ -232,7 +235,7 @@ export function BasicCityCard({
       ) : open ? (
         <div className="p-3">
           {open === "hotel" && main ? (
-            <HotelPanel index={index} city={city} dayFrom={dayFrom} data={data} lookups={lookups} main={main} change={change} lines={lines} onLines={onLines} onSlice={onSlice} />
+            <HotelPanel index={index} city={city} dayFrom={dayFrom} data={data} lookups={lookups} lines={lines} onLines={onLines} onSlice={onSlice} />
           ) : null}
           {open === "tours" ? (
             <ToursPanel
@@ -281,8 +284,6 @@ function HotelPanel({
   dayFrom,
   data,
   lookups,
-  main,
-  change,
   lines,
   onLines,
   onSlice,
@@ -292,8 +293,7 @@ function HotelPanel({
   dayFrom: number;
   data: DraftData;
   lookups: GeneratorLookups;
-  main: DraftHotel;
-  change: DraftHotel | undefined;
+  /** this stop's stays, in order — each with its own hotel. */
   lines: DraftHotel[];
   onLines: (lines: DraftHotel[]) => void;
   onSlice: (slice: Partial<DraftData>) => void;
@@ -301,23 +301,21 @@ function HotelPanel({
   const tx = useBasicLabels();
   const { t, language } = useTraveliunUI();
   const [more, setMore] = useState(false);
-  const stays = deriveHotelStays(data.cities, data.hotels).filter((s) => s.city_name === city.city_name);
+  const stays = deriveHotelStays(data.cities, data.hotels).filter((s) => s.city_index === index);
+  const [main] = lines;
+  // the same hotel, another room after some nights — it follows the first stay's hotel and rooms
+  const change = roomChangeLine(lines);
   const mainNights = Math.max(stays[0]?.nights ?? city.nights, 1);
-  const changeNights = Math.max(stays[1]?.nights ?? 0, 1);
   const hotels =
     findLookupCountry(lookups.countries, city.country || data.trip.country)?.cities.find((c) => c.name === city.city_name)?.hotels ?? [];
-  // the clear names first, then this hotel's own — never every hotel's
-  const roomNames = roomSuggestions(lookups.roomTypes, main.hotel_id);
-  // a hotel the list does not hold (an older file) still shows its name
-  const outside = main.hotel_name && !hotels.some((h) => h.id === main.hotel_id) ? (main.hotel_id ?? "__current") : null;
-  const priceTitle = tx("stayPrice", { n: nightsText(mainNights, language) });
 
-  /** The same answer for every stay of this city — one hotel, the room changes inside it. */
+  /** The same answer for every stay of this city — the currency, the supplier. */
   const allLines = (fn: (line: DraftHotel) => DraftHotel) => onLines(lines.map(fn));
+  /** A change to the first stay reaches its room change too; any other stay is its own. */
+  const follow = (line: DraftHotel, fn: (line: DraftHotel) => DraftHotel) =>
+    onLines(line.id === main.id && change ? [fn(line), fn(change)] : [fn(line)]);
   const setRoom = (line: DraftHotel, j: number, slice: Partial<DraftRoomSpec>) =>
     withRooms({ ...line, sourcing: null }, line.rooms.map((r, k) => (k === j ? { ...r, ...slice } : r)));
-  const setAllRooms = (line: DraftHotel, slice: Partial<DraftRoomSpec>) =>
-    withRooms({ ...line, sourcing: null }, line.rooms.map((r) => ({ ...r, ...slice })));
 
   const priceField = (value: number | null, nights: number, currency: string, onValue: (v: number | null) => void, label: string) => (
     <span className="grid gap-0.5">
@@ -347,123 +345,159 @@ function HotelPanel({
         <span>{tx("roomType")}</span>
         <span>{tx("board")}</span>
         <span>{tx("extraBed")}</span>
-        <span>{priceTitle}</span>
+        <span>{tx("stayPrice", { n: nightsText(mainNights, language) })}</span>
         <span />
       </div>
 
-      {/* the hotel on the first room's row; each further room under it, field for field */}
-      {main.rooms.map((r, j) => {
-        const extra = r.room_type_name.endsWith(EXTRA_BED);
+      {/* every stay of the city: its hotel on the first room's row, each further room under it */}
+      {lines.map((line, i) => {
+        const stay = stays[i];
+        const nights = Math.max(stay?.nights ?? city.nights, 1);
+        const priceTitle = tx("stayPrice", { n: nightsText(nights, language) });
+        // a hotel the list does not hold (an older file) still shows its name
+        const outside = line.hotel_name && !hotels.some((h) => h.id === line.hotel_id) ? (line.hotel_id ?? "__current") : null;
+        const rooms = `basic-rooms-${index}-${i}`;
         return (
-          <div key={j} className={`${rowGap} ${HOTEL_COLS}`}>
-            {j === 0 ? (
-              <HotelCombobox
-                hotels={hotels}
-                valueId={main.hotel_id}
-                currentName={outside ? main.hotel_name : null}
-                placeholder={`${tx("hotel")} — ${tx("choose")}`}
-                onPick={(h) => {
-                  allLines((line) =>
-                    withRooms(
-                      { ...line, hotel_id: h?.id ?? null, hotel_name: h?.name ?? "", hotel_name_en: "", sourcing: null },
-                      // a room type belongs to its hotel: the old hotel's id must not follow
-                      line.rooms.map((room) => ({ ...room, room_type_id: null })),
-                    ),
-                  );
-                }}
-                className="col-span-2 xl:col-span-1"
-              />
-            ) : (
-              <span className="col-span-2 inline-flex h-9 items-center text-[11.5px] font-extrabold text-[#185045] xl:col-span-1 xl:justify-end xl:pe-2">
-                {tx("roomN", { n: j + 1 })}
-              </span>
-            )}
-            <input
-              aria-label={tx("roomType")}
-              placeholder={tx("roomType")}
-              list={`basic-rooms-${index}`}
-              value={baseRoomName(r.room_type_name)}
-              onChange={(e) => onLines([setRoom(main, j, { room_type_id: null, room_type_name: e.target.value + (extra ? EXTRA_BED : "") })])}
-              className={basicField}
-            />
-            <select
-              aria-label={tx("board")}
-              value={r.board_type ?? ""}
-              onChange={(e) => onLines([setRoom(main, j, { board_type: (e.target.value || null) as BoardType | null })])}
-              className={basicField}
-            >
-              <option value="">{tx("board")}</option>
-              {BOARD_TYPES.map((b) => (
-                <option key={b} value={b}>{t(BOARD_LABEL_KEYS[b])}</option>
+          <div key={line.id} className={i > 0 ? "space-y-1.5 border-t border-dashed border-[#DCE9E5] pt-2" : "space-y-1.5"}>
+            {lines.length > 1 && stay ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11.5px] font-extrabold text-[#185045]">{`${tx("hotel")} ${i + 1}`}</span>
+                <StayDatesLine stay={stay} city={city} inputClass={basicField} onChange={(slice) => onLines([{ ...line, ...slice }])} />
+                {i > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => onSlice({ hotels: data.hotels.filter((h) => h.id !== line.id) })}
+                    aria-label={t("pg.stay.remove")}
+                    title={t("pg.stay.remove")}
+                    className="ms-auto rounded-[7px] p-1 text-[#c43d3d] hover:bg-[#fff1f1]"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            {line.rooms.map((r, j) => {
+              const extra = r.room_type_name.endsWith(EXTRA_BED);
+              return (
+                <div key={j} className={`${rowGap} ${HOTEL_COLS}`}>
+                  {j === 0 ? (
+                    <HotelCombobox
+                      hotels={hotels}
+                      valueId={line.hotel_id}
+                      currentName={outside ? line.hotel_name : null}
+                      placeholder={`${tx("hotel")} — ${tx("choose")}`}
+                      onPick={(h) =>
+                        follow(line, (l) =>
+                          withRooms(
+                            { ...l, hotel_id: h?.id ?? null, hotel_name: h?.name ?? "", hotel_name_en: "", sourcing: null },
+                            // a room type belongs to its hotel: the old hotel's id must not follow
+                            l.rooms.map((room) => ({ ...room, room_type_id: null })),
+                          ),
+                        )
+                      }
+                      className="col-span-2 xl:col-span-1"
+                    />
+                  ) : (
+                    <span className="col-span-2 inline-flex h-9 items-center text-[11.5px] font-extrabold text-[#185045] xl:col-span-1 xl:justify-end xl:pe-2">
+                      {tx("roomN", { n: j + 1 })}
+                    </span>
+                  )}
+                  <input
+                    aria-label={tx("roomType")}
+                    placeholder={tx("roomType")}
+                    list={rooms}
+                    value={baseRoomName(r.room_type_name)}
+                    onChange={(e) => onLines([setRoom(line, j, { room_type_id: null, room_type_name: e.target.value + (extra ? EXTRA_BED : "") })])}
+                    className={basicField}
+                  />
+                  <select
+                    aria-label={tx("board")}
+                    value={r.board_type ?? ""}
+                    onChange={(e) => onLines([setRoom(line, j, { board_type: (e.target.value || null) as BoardType | null })])}
+                    className={basicField}
+                  >
+                    <option value="">{tx("board")}</option>
+                    {BOARD_TYPES.map((b) => (
+                      <option key={b} value={b}>{t(BOARD_LABEL_KEYS[b])}</option>
+                    ))}
+                  </select>
+                  <label className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-[11.5px] font-bold text-[#185045]">
+                    <input
+                      type="checkbox"
+                      checked={extra}
+                      onChange={(e) => onLines([setRoom(line, j, { room_type_name: baseRoomName(r.room_type_name) + (e.target.checked ? EXTRA_BED : "") })])}
+                      className="size-3.5 accent-[#185045]"
+                    />
+                    {tx("extraBed")}
+                  </label>
+                  {priceField(r.price, nights, line.manual_currency, (price) => onLines([setRoom(line, j, { price })]), priceTitle)}
+                  {line.rooms.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => follow(line, (l) => withRooms(l, l.rooms.filter((_, k) => k !== j)))}
+                      aria-label={tx("removeRoom")}
+                      className="inline-flex size-9 items-center justify-center rounded-[8px] text-[#c43d3d] hover:bg-[#fff1f1]"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  ) : (
+                    <span className="max-xl:hidden" />
+                  )}
+                </div>
+              );
+            })}
+            <datalist id={rooms}>
+              {roomSuggestions(lookups.roomTypes, line.hotel_id).map((n) => (
+                <option key={n} value={n} />
               ))}
-            </select>
-            <label className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-[11.5px] font-bold text-[#185045]">
-              <input
-                type="checkbox"
-                checked={extra}
-                onChange={(e) => onLines([setRoom(main, j, { room_type_name: baseRoomName(r.room_type_name) + (e.target.checked ? EXTRA_BED : "") })])}
-                className="size-3.5 accent-[#185045]"
-              />
-              {tx("extraBed")}
-            </label>
-            {priceField(r.price, mainNights, main.manual_currency, (price) => onLines([setRoom(main, j, { price })]), priceTitle)}
-            {main.rooms.length > 1 ? (
+            </datalist>
+            <div className="flex flex-wrap items-center gap-3 pt-0.5">
+              {/* a new room is a room of its own: its type and price are asked, the board follows */}
               <button
                 type="button"
-                onClick={() => allLines((line) => withRooms(line, line.rooms.filter((_, k) => k !== j)))}
-                aria-label={tx("removeRoom")}
-                className="inline-flex size-9 items-center justify-center rounded-[8px] text-[#c43d3d] hover:bg-[#fff1f1]"
+                // a new room starts as the one before it — type, board and price — and is changed if it differs
+                onClick={() => follow(line, (l) => withRooms(l, [...l.rooms, { ...(l.rooms[l.rooms.length - 1] ?? emptyRoomSpec()) }]))}
+                className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
               >
-                <X className="size-4" />
+                <Plus className="size-3.5" />
+                {tx("addRoom")}
               </button>
-            ) : (
-              <span className="max-xl:hidden" />
-            )}
+              {/* a stay we price ourselves: is it refundable? (a supplier rate states its own policy) */}
+              {!line.sourcing ? (
+                <span role="group" className="inline-flex overflow-hidden rounded-[7px] border border-[#cfe0d9] text-[11.5px] font-bold">
+                  {([true, false] as const).map((v) => (
+                    <button
+                      key={String(v)}
+                      type="button"
+                      aria-pressed={line.refundable === v}
+                      onClick={() => {
+                        const next = line.refundable === v ? null : v;
+                        follow(line, (l) => ({ ...l, refundable: next }));
+                      }}
+                      className={`h-7 px-2.5 transition-colors ${
+                        line.refundable === v
+                          ? v
+                            ? "bg-[#e4f6ef] text-[#0f7a52]"
+                            : "bg-[#fdeeee] text-[#c43d3d]"
+                          : "bg-white text-[#557d78] hover:bg-[#f4f8f6]"
+                      }`}
+                    >
+                      {tx(v ? "refundable" : "nonRefundable")}
+                    </button>
+                  ))}
+                </span>
+              ) : null}
+            </div>
           </div>
         );
       })}
-      <datalist id={`basic-rooms-${index}`}>
-        {roomNames.map((n) => (
-          <option key={n} value={n} />
-        ))}
-      </datalist>
 
-      <div className="flex flex-wrap items-center gap-3 pt-0.5">
-        {/* a new room is a room of its own: its type and price are asked, the board follows */}
-        <button
-          type="button"
-          // a new room starts as the one before it — type, board and price — and is changed if it differs
-          onClick={() => allLines((line) => withRooms(line, [...line.rooms, { ...(line.rooms[line.rooms.length - 1] ?? emptyRoomSpec()) }]))}
+      <div className="flex flex-wrap items-center gap-3 border-t border-dashed border-[#DCE9E5] pt-2">
+        <AddStayMenu
+          label={t("pg.stay.addInCity")}
+          onAdd={(dates) => onSlice({ hotels: addStay(data.cities, data.hotels, index, dates).hotels })}
           className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
-        >
-          <Plus className="size-3.5" />
-          {tx("addRoom")}
-        </button>
-        {/* a stay we price ourselves: is it refundable? (a supplier rate states its own policy) */}
-        {!main.sourcing ? (
-          <span role="group" className="inline-flex overflow-hidden rounded-[7px] border border-[#cfe0d9] text-[11.5px] font-bold">
-            {([true, false] as const).map((v) => (
-              <button
-                key={String(v)}
-                type="button"
-                aria-pressed={main.refundable === v}
-                onClick={() => {
-                  const next = main.refundable === v ? null : v;
-                  allLines((line) => ({ ...line, refundable: next }));
-                }}
-                className={`h-7 px-2.5 transition-colors ${
-                  main.refundable === v
-                    ? v
-                      ? "bg-[#e4f6ef] text-[#0f7a52]"
-                      : "bg-[#fdeeee] text-[#c43d3d]"
-                    : "bg-white text-[#557d78] hover:bg-[#f4f8f6]"
-                }`}
-              >
-                {tx(v ? "refundable" : "nonRefundable")}
-              </button>
-            ))}
-          </span>
-        ) : null}
+        />
         <button
           type="button"
           onClick={() => setMore((v) => !v)}
@@ -476,7 +510,7 @@ function HotelPanel({
         {more ? (
           <span className="tv-tnum text-[11px] font-bold text-[#7a948f]">
             {tx("dayRange", { from: dayFrom, to: dayFrom + city.nights })}
-            {stays.map((s) => (s.check_in ? ` · ${tx("stayDates", { in: s.check_in, out: s.check_out ?? "" })}` : ""))}
+            {lines.length === 1 ? stays.map((s) => (s.check_in ? ` · ${tx("stayDates", { in: s.check_in, out: s.check_out ?? "" })}` : "")) : null}
           </span>
         ) : null}
       </div>
@@ -500,6 +534,7 @@ function HotelPanel({
               ))}
             </select>
           </Field>
+          {/* a room change is the first stay's: the new room is typed on its own row above */}
           {city.nights > 1 ? (
             <Field label={tx("roomChange")} className="w-36">
               <select
@@ -507,8 +542,8 @@ function HotelPanel({
                 onChange={(e) =>
                   onSlice(
                     e.target.value === ""
-                      ? clearRoomChange(data, city.city_name)
-                      : changeRoom(data, city.city_name, Number(e.target.value), change ? baseRoomName(change.rooms[0]?.room_type_name ?? "") : ""),
+                      ? clearRoomChange(data, index)
+                      : changeRoom(data, index, Number(e.target.value), change ? baseRoomName(change.rooms[0]?.room_type_name ?? "") : ""),
                   )
                 }
                 className={basicField}
@@ -519,27 +554,6 @@ function HotelPanel({
                 ))}
               </select>
             </Field>
-          ) : null}
-          {change ? (
-            <>
-              <Field label={tx("newRoom")} className="w-52">
-                <input
-                  list={`basic-rooms-${index}`}
-                  value={baseRoomName(change.rooms[0]?.room_type_name ?? "")}
-                  onChange={(e) => onLines([renameRooms(change, e.target.value)])}
-                  className={basicField}
-                />
-              </Field>
-              <Field label={tx("stayPrice", { n: nightsText(changeNights, language) })} className="w-36">
-                {priceField(
-                  change.rooms[0]?.price ?? null,
-                  changeNights,
-                  change.manual_currency,
-                  (price) => onLines([setAllRooms(change, { price })]),
-                  tx("stayPrice", { n: nightsText(changeNights, language) }),
-                )}
-              </Field>
-            </>
           ) : null}
         </div>
       ) : null}

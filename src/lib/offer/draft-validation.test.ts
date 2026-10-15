@@ -258,3 +258,48 @@ describe("a planned international flight (flight_booking.estimate)", () => {
     expect(incomplete(data)).toBe(true);
   });
 });
+
+describe("two hotels in one city on dates of their own (order 1)", () => {
+  /** كوالالمبور 1–4 June: فندق 1 for the city, a second hotel as the test says. */
+  function withSecond(over: Partial<DraftData["hotels"][number]>): DraftData {
+    const data = completeDraft();
+    const second = normalizeDraftHotel({ city_name: "كوالالمبور", hotel_name: "فندق 1ب", room_type_name: "ديلوكس", board_type: "BB", rooms_count: 1, ...over });
+    return withRequiredAnswers({ ...data, hotels: [data.hotels[0], second, data.hotels[1]] });
+  }
+  const outside = (d: DraftData) => validateDraft(d).blocking.some((b) => b.key === "pg.err.stayOutsideCity");
+
+  it("publishes two hotels on the same dates — the rooms split, every night covered once", () => {
+    const result = validateDraft(withSecond({ dates: "same" }));
+    expect(result.blocking).toEqual([]);
+    expect(result.stages.hotels).toBe("complete");
+  });
+
+  it("accepts a custom stay inside its city (acceptance ج)", () => {
+    expect(outside(withSecond({ dates: "custom", check_in: "2026-06-02", nights: 2 }))).toBe(false);
+    expect(validateDraft(withSecond({ dates: "custom", check_in: "2026-06-02", nights: 2 })).ok).toBe(true);
+  });
+
+  it("blocks a custom stay with a night outside its city, with its own message (acceptance ج)", () => {
+    // كوالالمبور is 1–4 June: the 3rd for two nights runs into لنكاوي
+    expect(outside(withSecond({ dates: "custom", check_in: "2026-06-03", nights: 2 }))).toBe(true);
+    expect(outside(withSecond({ dates: "custom", check_in: "2026-05-31", nights: 1 }))).toBe(true);
+    const issue = validateDraft(withSecond({ dates: "custom", check_in: "2026-06-03", nights: 2 })).blocking.find((b) => b.key === "pg.err.stayOutsideCity");
+    expect(issue).toMatchObject({ severity: "blocking", stage: "hotels", field: "hotels" });
+  });
+
+  it("reads a same-dates stay with no stay before it as an ordinary one", () => {
+    const data = completeDraft();
+    const first = { ...data.hotels[0], dates: "same" as const };
+    const result = validateDraft(withRequiredAnswers({ ...data, hotels: [first, data.hotels[1]] }));
+    expect(result.blocking).toEqual([]);
+    expect(result.stages.hotels).toBe("complete");
+  });
+
+  it("asks every stay for its own room, board and price", () => {
+    const result = validateDraft(withSecond({ dates: "same", hotel_name: "فندق 1ب", rooms: [{ room_type_id: null, room_type_name: "", board_type: null, price: null }] }));
+    expect(result.blocking.some((b) => b.invariant?.code === "hotel_missing_room_or_board")).toBe(true);
+    const unpriced = withSecond({ dates: "same" });
+    unpriced.hotels = unpriced.hotels.map((h, i) => (i === 1 ? withRooms(h, h.rooms.map((r) => ({ ...r, price: null }))) : h));
+    expect(validateDraft(unpriced).blocking.some((b) => b.key === "pg.err.stayUnpriced")).toBe(true);
+  });
+});

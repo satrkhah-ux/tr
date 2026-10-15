@@ -517,3 +517,47 @@ describe("syncSuggestions", () => {
     expect(out.map((i) => i.description)).toEqual(["إكرامية"]);
   });
 });
+
+describe("suggestPricing — two or more hotels in one city (order 1)", () => {
+  const QUOTED = { check_in: "2026-09-10", check_out: "2026-09-13", rooms: 1, adults: 2, children: 1, hotel_name: "فندق آيوتا", board_type: "BB" as const, room_name: "مزدوجة" };
+  const DOUBLE = [{ room_type_id: null, room_type_name: "مزدوجة", board_type: "BB" as const, price: null }];
+
+  it("does not price a stay with a rate quoted for a smaller one — a same-dates and a custom-dated stay too", () => {
+    /** إسطنبول 10–13 Sep: the first hotel, then a SECOND stay priced by its own supplier quote. */
+    const second = (over: Partial<DraftData["hotels"][number]>, quoted: typeof QUOTED, change: (d: DraftData) => void = () => {}) => {
+      const data = draftWithOneStay();
+      data.hotels.push(withRooms(normalizeDraftHotel({ city_name: "إسطنبول", hotel_name: "فندق آيوتا", ...over, sourcing: { ...SUPPLIER_RATE, quoted_for: quoted } }), DOUBLE));
+      change(data);
+      return suggestPricing(data, EMPTY, LABELS).filter((i) => i.item_type === "hotel")[1].source;
+    };
+    // same dates as the first stay: priced while the first keeps the dates it was quoted for
+    expect(second({ dates: "same" }, QUOTED)).toBe("supplier");
+    expect(second({ dates: "same" }, QUOTED, (d) => { d.hotels[0] = { ...d.hotels[0], nights: 2 }; })).not.toBe("supplier");
+    // its own dates: priced for exactly those
+    const night = { ...QUOTED, check_in: "2026-09-11", check_out: "2026-09-12" };
+    expect(second({ dates: "custom", check_in: "2026-09-11", nights: 1 }, night)).toBe("supplier");
+    expect(second({ dates: "custom", check_in: "2026-09-11", nights: 2 }, night)).not.toBe("supplier");
+    expect(second({ dates: "custom", check_in: "2026-09-12", nights: 1 }, night)).not.toBe("supplier");
+    // a rate quoted for the whole city never prices one night of it
+    expect(second({ dates: "custom", check_in: "2026-09-11", nights: 1 }, QUOTED)).not.toBe("supplier");
+  });
+
+  it("gives each stay its line, with its dates, at the remembered night × its rooms × its own nights", () => {
+    const data = emptyDraftData();
+    data.trip = { ...data.trip, country: "ماليزيا", arrival_date: "2026-10-20", nights: 4, days: 5, adults: 3 };
+    data.cities = [{ city_name: "كوالالمبور", nights: 4, check_in: null, check_out: null }];
+    data.hotels = [
+      normalizeDraftHotel({ id: "a", city_name: "كوالالمبور", hotel_id: "hA", hotel_name: "A", rooms_count: 2, room_type_name: "ديلوكس", board_type: "BB" }),
+      normalizeDraftHotel({ id: "b", city_name: "كوالالمبور", hotel_id: "hB", hotel_name: "B", dates: "same", rooms_count: 1, room_type_name: "ديلوكس", board_type: "BB" }),
+    ];
+    const rooms = [
+      { hotel_id: "hA", hotel_name: "A", room_type_name: "ديلوكس", board_type: "BB", price: 100, currency: "MYR", per_night: true },
+      { hotel_id: "hB", hotel_name: "B", room_type_name: "ديلوكس", board_type: "BB", price: 150, currency: "MYR", per_night: true },
+    ];
+    const lines = suggestPricing(data, { ...EMPTY, rooms }, LABELS).filter((i) => i.item_type === "hotel");
+    expect(lines.map((i) => [i.ref, i.description, i.quantity, i.sell_price])).toEqual([
+      ["a", "كوالالمبور — A (20/10 – 24/10)", 1, 800],
+      ["b", "كوالالمبور — B (20/10 – 24/10)", 1, 600],
+    ]);
+  });
+});

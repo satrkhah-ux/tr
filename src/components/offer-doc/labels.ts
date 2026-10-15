@@ -72,6 +72,8 @@ export const AR = {
   flightsIntlNote: "يعرض هذا القسم فقط عند وجود بيانات طيران في النظام.",
   domesticFlightAfterStay: "يوجد طيران داخلي إلى المدينة التالية - التفاصيل في صفحة الطيران الداخلي.",
   accommodation: "الإقامة والفنادق",
+  /** two hotels on the same dates in one city (ق5). */
+  splitStay: (n: number) => (n === 2 ? "إقامة موزّعة على فندقين" : `إقامة موزّعة على ${n} فنادق`),
   accommodationNote: "يتم تمديد القسم تلقائياً عند تجاوز خمسة فنادق أو مدن.",
   accommodationNoIntlNote: "لا يحتوي هذا العرض على طيران دولي، لذلك تبدأ الصفحة الثانية بالإقامة والفنادق.",
   roomsCount: "عدد الغرف",

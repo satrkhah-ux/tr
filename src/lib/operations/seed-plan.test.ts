@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveTransportRows, emptyDraftData, emptyFlight, type DraftData, type DraftFlight } from "@/lib/offer/draft-types";
+import { addStay, deriveTransportRows, emptyDraftData, emptyFlight, type DraftData, type DraftFlight } from "@/lib/offer/draft-types";
 import { addCity, withTours } from "@/lib/offer/basic";
 import { planBookingsFromDraft } from "./seed-plan";
 
@@ -72,5 +72,37 @@ describe("the pull from the offer", () => {
     ]);
     expect(by("sim")?.title).toBe("شريحة اتصال × 2");
     expect(new Set(rows.map((r) => r.origin_ref)).size).toBe(rows.length);
+  });
+});
+
+describe("a booking per stay — two hotels in one city (order 1)", () => {
+  const hotelRows = (data: DraftData) =>
+    planBookingsFromDraft(data, "شروط الشركة")
+      .filter((r) => r.kind === "hotel")
+      .map((r) => [r.title, r.start_date, r.end_date, r.detail["عدد الغرف"]]);
+
+  it("books A then B in كوالالمبور, each on its own dates (acceptance أ)", () => {
+    const data = malaysia();
+    // بولمان three nights, then a second hotel for the fourth
+    const three = data.hotels.map((h) => (h.hotel_name === "بولمان سيتي سنتر" ? { ...h, nights: 3 } : h));
+    const added = addStay(data.cities, three, 0, "after");
+    data.hotels = added.hotels.map((h) => (h.id === added.id ? { ...h, hotel_name: "تريدرز" } : h));
+    expect(hotelRows(data)).toEqual([
+      ["بولمان سيتي سنتر", "2026-11-20", "2026-11-23", "2"],
+      ["تريدرز", "2026-11-23", "2026-11-24", "2"],
+      ["منتجع بيرجايا", "2026-11-24", "2026-11-27", "2"],
+    ]);
+  });
+
+  it("books two hotels on the same dates as two bookings, each with its own rooms (acceptance ب)", () => {
+    const data = malaysia();
+    const added = addStay(data.cities, data.hotels, 0, "same");
+    data.hotels = added.hotels.map((h) => (h.id === added.id ? { ...h, hotel_name: "تريدرز" } : h));
+    expect(hotelRows(data)).toEqual([
+      ["بولمان سيتي سنتر", "2026-11-20", "2026-11-24", "2"],
+      ["تريدرز", "2026-11-20", "2026-11-24", "1"],
+      ["منتجع بيرجايا", "2026-11-24", "2026-11-27", "2"],
+    ]);
+    expect(new Set(planBookingsFromDraft(data, "").filter((r) => r.kind === "hotel").map((r) => r.origin_ref)).size).toBe(3);
   });
 });
