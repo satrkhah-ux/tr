@@ -110,6 +110,7 @@ import { BasicPhoneLookup } from "./BasicPhoneLookup";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
 import { basicCard, basicField, basicLabel, typedNumber } from "./styles";
+import { HotelCombobox } from "./HotelCombobox";
 import { IssueGuardNotice } from "../IssueGuardNotice";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -1190,15 +1191,12 @@ export function BasicEditor({
               <>
                 <label className={`${basicLabel} min-w-36 flex-[1.5]`}>
                   {tx("hotel")}
-                  <select value={newHotel} onChange={(e) => setNewHotel(e.target.value)} className={basicField}>
-                    <option value="">{tx("choose")}</option>
-                    {barHotels.map((h) => (
-                      <option key={h.id} value={h.id}>
-                        {h.name}
-                        {h.stars ? ` ${"★".repeat(h.stars)}` : ""}
-                      </option>
-                    ))}
-                  </select>
+                  <HotelCombobox
+                    hotels={barHotels}
+                    valueId={newHotel || null}
+                    placeholder={tx("choose")}
+                    onPick={(h) => setNewHotel(h?.id ?? "")}
+                  />
                 </label>
                 <label className={`${basicLabel} w-32 shrink-0 sm:w-40`}>
                   {tx("roomType")}

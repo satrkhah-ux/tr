@@ -33,20 +33,20 @@ type ListEditorProps = {
 function Bullet({ variant, index }: { variant: ListVariant; index: number }) {
   if (variant === "includes") {
     return (
-      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#e4f6ef]">
-        <Check className="size-3.5 text-[#0f7a52]" />
+      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#e4f6ef]">
+        <Check className="size-3 text-[#0f7a52]" />
       </span>
     );
   }
   if (variant === "excludes") {
     return (
-      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#fdeeee]">
-        <X className="size-3.5 text-[#c43d3d]" />
+      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#fdeeee]">
+        <X className="size-3 text-[#c43d3d]" />
       </span>
     );
   }
   return (
-    <span className="tv-tnum flex size-6 shrink-0 items-center justify-center rounded-full bg-[#eef4f1] text-[11px] font-bold text-[#185045]">
+    <span className="tv-tnum flex size-5 shrink-0 items-center justify-center rounded-full bg-[#eef4f1] text-[10.5px] font-bold text-[#185045]">
       <DirText dir="ltr">{index + 1}</DirText>
     </span>
   );
@@ -64,13 +64,13 @@ function MarkButton({ kind, label, onClick }: { kind: "add" | "remove"; label: s
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`flex size-8 shrink-0 items-center justify-center rounded-[7px] border-2 transition-colors ${
+      className={`flex size-7 shrink-0 items-center justify-center rounded-[6px] border-[1.5px] transition-colors ${
         kind === "add"
           ? "border-[#2aa87a] bg-white text-[#0f7a52] hover:bg-[#e9f7f0]"
           : "border-[#e6a3a3] bg-white text-[#c43d3d] hover:bg-[#fdeeee]"
       }`}
     >
-      {kind === "add" ? <Check className="size-4" strokeWidth={3} /> : <X className="size-4" strokeWidth={3} />}
+      {kind === "add" ? <Check className="size-3.5" strokeWidth={3} /> : <X className="size-3.5" strokeWidth={3} />}
     </button>
   );
 }
@@ -81,7 +81,7 @@ function Picker({ label, entries, onPick }: { label: string; entries: string[]; 
   const [open, setOpen] = useState(true);
   if (entries.length === 0) return null;
   return (
-    <div className="mb-3">
+    <div className="mb-2">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -91,11 +91,11 @@ function Picker({ label, entries, onPick }: { label: string; entries: string[]; 
         {label}
       </button>
       {open ? (
-        <ul className="mt-2 max-h-[180px] space-y-1 overflow-y-auto rounded-[10px] border border-[#e2ebe7] bg-white p-2">
+        <ul className="mt-1.5 max-h-[180px] divide-y divide-[#eef3f1] overflow-y-auto rounded-[10px] border border-[#e2ebe7] bg-white">
           {entries.map((text) => (
-            <li key={text} className="flex items-center gap-2.5 rounded-[8px] px-1.5 py-1 hover:bg-[#f4f8f6]">
+            <li key={text} className="flex items-center gap-2 px-2 py-1 hover:bg-[#f4f8f6]">
               <MarkButton kind="add" label={t("pg.addLine")} onClick={() => onPick(text)} />
-              <span className="min-w-0 flex-1 text-[12.5px] text-[#41615b]">{text}</span>
+              <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-[#41615b]">{text}</span>
             </li>
           ))}
         </ul>
@@ -132,22 +132,19 @@ export function ListEditor({ titleKey, variant, items, library, countryServices,
   }
 
   return (
-    <div className="flex h-full flex-col rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-4">
-      <h3 className="mb-3 text-[13px] font-extrabold text-[#185045]">{t(titleKey)}</h3>
+    <div className="flex h-full flex-col rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
+      <h3 className="mb-2 text-[13px] font-extrabold text-[#185045]">{t(titleKey)}</h3>
 
       {items.length === 0 ? (
-        <p className="mb-3 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
+        <p className="mb-2 rounded-[10px] border border-dashed border-[#cfe0d9] px-3 py-3 text-center text-[12.5px] text-[#93aaa3]">
           {t("pg.docNoContent")}
         </p>
       ) : (
-        <ul className="mb-3 space-y-2">
+        <ul className="mb-2 divide-y divide-[#eef3f1] overflow-hidden rounded-[10px] border border-[#e2ebe7] bg-white">
           {items.map((item, index) => (
-            <li
-              key={index}
-              className="flex items-center gap-2.5 rounded-[10px] border border-[#e2ebe7] bg-white px-3 py-2"
-            >
+            <li key={index} className="flex items-center gap-2 px-2.5 py-1.5">
               <Bullet variant={variant} index={index} />
-              <span className="min-w-0 flex-1 break-words text-sm text-[#185045]">{item}</span>
+              <span className="min-w-0 flex-1 break-words text-[13px] leading-snug text-[#185045]">{item}</span>
               <MarkButton kind="remove" label={t("pg.removeRow")} onClick={() => removeItem(index)} />
             </li>
           ))}

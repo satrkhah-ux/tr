@@ -41,6 +41,7 @@ import { packageProfitFor, withPackageProfit, withScopeLines } from "@/lib/offer
 import { getRates } from "./rates-actions";
 import { suggestPricingFor } from "./pricing-suggest-core";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
+import { byUsage } from "@/lib/offer/country-priority";
 import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { draftDaySkeleton, transportNoteForDay } from "@/lib/offer/itinerary";
@@ -518,7 +519,8 @@ export async function getGeneratorLookups(options: { catalog?: boolean } = {}): 
 
     const rates = await ratesPromise;
     return {
-      countries: builtCountries,
+      // the most-sold countries first, then alphabetical (country-priority.ts)
+      countries: byUsage(builtCountries),
       roomTypes: ((roomTypesRes.data ?? []) as { id: string; arabic_name: string; hotel_id: string | null; default_board: GeneratorLookups["roomTypes"][number]["default_board"] }[]).map(
         (r) => ({ id: r.id, name: r.arabic_name, hotel_id: r.hotel_id, default_board: r.default_board }),
       ),

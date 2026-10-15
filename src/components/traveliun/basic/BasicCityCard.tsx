@@ -41,6 +41,7 @@ import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { suppliersFor } from "../generator/SupplierPrice";
 import { basicField, typedNumber } from "./styles";
+import { HotelCombobox } from "./HotelCombobox";
 import { nightsText, useBasicLabels } from "./labels";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -356,11 +357,12 @@ function HotelPanel({
         return (
           <div key={j} className={`${rowGap} ${HOTEL_COLS}`}>
             {j === 0 ? (
-              <select
-                aria-label={tx("hotel")}
-                value={outside ?? main.hotel_id ?? ""}
-                onChange={(e) => {
-                  const h = hotels.find((x) => x.id === e.target.value);
+              <HotelCombobox
+                hotels={hotels}
+                valueId={main.hotel_id}
+                currentName={outside ? main.hotel_name : null}
+                placeholder={`${tx("hotel")} — ${tx("choose")}`}
+                onPick={(h) => {
                   allLines((line) =>
                     withRooms(
                       { ...line, hotel_id: h?.id ?? null, hotel_name: h?.name ?? "", hotel_name_en: "", sourcing: null },
@@ -369,17 +371,8 @@ function HotelPanel({
                     ),
                   );
                 }}
-                className={`${basicField} col-span-2 xl:col-span-1`}
-              >
-                <option value="">{tx("hotel")} — {tx("choose")}</option>
-                {outside ? <option value={outside}>{main.hotel_name}</option> : null}
-                {hotels.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.name}
-                    {h.stars ? ` ${"★".repeat(h.stars)}` : ""}
-                  </option>
-                ))}
-              </select>
+                className="col-span-2 xl:col-span-1"
+              />
             ) : (
               <span className="col-span-2 inline-flex h-9 items-center text-[11.5px] font-extrabold text-[#185045] xl:col-span-1 xl:justify-end xl:pe-2">
                 {tx("roomN", { n: j + 1 })}
