@@ -30,16 +30,19 @@ export function balances(lines: LedgerLine[]): { currency: string; owed: number 
 
 /**
  * Would confirming a file of `amount` take the partner past its limit? Counted
- * in the limit's own currency — a file in another currency is not converted
- * here (the limit is a business promise, not an FX estimate), so it does not
- * count against it. No limit, never over.
+ * in the limit's own currency. While a limit is set, a file in another currency
+ * is refused: it is not converted (the limit is a business promise, not an FX
+ * estimate), and letting it through uncounted would make the limit optional.
+ * No limit, never over. The rule the database enforces under a per-partner lock
+ * (raise_partner_invoice, 0074) is this one; this is its tested statement.
  */
 export function overCredit(
   lines: LedgerLine[],
   next: { amount: number; currency: string },
   limit: { amount: number | null; currency: string },
 ): boolean {
-  if (limit.amount == null || next.currency !== limit.currency) return false;
+  if (limit.amount == null) return false;
+  if (next.currency !== limit.currency) return true;
   const owed = balances(lines).find((b) => b.currency === limit.currency)?.owed ?? 0;
   return owed + next.amount > limit.amount;
 }
