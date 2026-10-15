@@ -7,7 +7,7 @@ import { getPartnerSession } from "@/lib/partners/session";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 
 /** «تصميم بطاقة طيران» — set to its route once that page is live (null hides the button). */
-const FLIGHT_CARD_HREF: string | null = null;
+const FLIGHT_CARD_HREF: string | null = "/repackage/flight-card";
 
 /** «النظام بيسك» — the one-page entry over the same drafts as the package generator. */
 export default async function BasicPage() {
