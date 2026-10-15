@@ -132,8 +132,8 @@ function keepHotelCost(line: DraftHotel, stored: DraftHotel[]): DraftHotel {
   return {
     ...line,
     sourcing: was?.sourcing
-      ? { ...line.sourcing, ...sourcingCost(was.sourcing) }
-      : withoutSourcingCost(line.sourcing),
+      ? { ...line.sourcing, ...sourcingCost(was.sourcing), quoted_for: was.sourcing.quoted_for }
+      : { ...withoutSourcingCost(line.sourcing), quoted_for: null },
   };
 }
 

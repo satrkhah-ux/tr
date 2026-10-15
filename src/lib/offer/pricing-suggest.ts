@@ -28,9 +28,11 @@ import {
   TRANSPORT_MODE_AR,
   TRANSPORT_TOURS,
   type DraftData,
+  sourcingFits,
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
 import type { DraftPricingItem } from "./draft-types";
+import { journeyPricingLines } from "./advanced";
 
 /** A transfer price from the reference list. */
 export type TransferPrice = {
@@ -306,7 +308,8 @@ export function suggestPricing(
     // the transfers alone and call everything else profit.
     // ponytail: sell starts AT cost (0 profit); the agent adds the margin on the
     // pricing card. Apply markup_rules here if management wants it automatic.
-    const [sell, buy, cur, source]: [number | null, number | null, string, PriceSource] = line.sourcing
+    // a rate quoted for a different stay prices nothing here (sourcingFits)
+    const [sell, buy, cur, source]: [number | null, number | null, string, PriceSource] = line.sourcing && sourcingFits(stay, data.trip)
       ? [line.sourcing.sell_base, line.sourcing.net_base, "SAR", "supplier"]
       : typed != null
         ? [typed, typed, line.manual_currency || currency, "typed"]
@@ -498,6 +501,9 @@ export function suggestPricing(
       });
     }
   }
+
+  // «البكج المتقدم»: each service we charge for, once (journeyPricingLines)
+  items.push(...journeyPricingLines(data.journey));
 
   return items;
 }

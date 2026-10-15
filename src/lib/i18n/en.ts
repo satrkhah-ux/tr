@@ -1191,6 +1191,7 @@ export const en = {
   "pg.err.dayUntitled": "Give every day a title, or mark it a free day.",
   "pg.err.stayUnpriced": "Enter a price for every chosen hotel.",
   "pg.err.priceMissing": "Some pricing lines have no price — enter one (zero is fine).",
+  "pg.err.issuedLocked": "This file's offer is issued — copy it to make changes.",
   "pg.roomTotal": "Room total for {nights} nights ({currency})",
   "pg.perNight": "Per night:",
   "pg.lastSavedNight": "Last saved nightly rate:",
@@ -1320,6 +1321,8 @@ export const en = {
   "pg.excludes": "The offer does not include",
   "pg.terms": "Terms & conditions",
   "pg.termsHint": "What happens if the trip changes: cancellation, payment, what the client carries themselves.",
+  "pg.refundable": "Refundable",
+  "pg.nonRefundable": "Non-refundable",
   "pg.addItem": "Add",
   "pg.itemPlaceholder": "Write an item and press Add…",
   // visas stage

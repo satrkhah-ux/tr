@@ -19,6 +19,7 @@ import {
   STAGE_SCOPE,
   type DraftData,
   type StageKey,
+  sourcingFits,
 } from "./draft-types";
 import { finalOutbound, flightTiming, itineraryStartDate, localDatePart } from "./schedule";
 import { citiesFromFlights, citiesMatchFlights, domesticMismatches } from "./flight-cities";
@@ -274,6 +275,12 @@ export function validateDraft(data: DraftData): DraftValidation {
   });
   if (supplierBlocked) {
     blocking.push({ severity: "blocking", stage: "hotels", field: "hotels", key: "pg.supplier.blocked" });
+  }
+  // A supplier rate prices the stay it was quoted for. Changed since — nights,
+  // rooms, guests or the hotel — it is stale, and issuing it would sell (and
+  // book) the new stay at the old one's price: search again.
+  if (stays.some((s) => s.line.sourcing && !sourcingFits(s, data.trip))) {
+    blocking.push({ severity: "blocking", stage: "hotels", field: "hotels", key: "pg.supplier.rateExpired" });
   }
 
   // ---- warnings ----
