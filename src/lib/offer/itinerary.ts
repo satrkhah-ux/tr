@@ -267,7 +267,8 @@ export function transportNoteForDay(
   } else if (plan.intercity.enabled && cityChanged) {
     const how = hopVehicle(plan, hopMode(plan, days[index - 1]?.city_name ?? "", day.city_name));
     parts.push(`الانتقال إلى ${day.city_name} — ${how}`);
-  } else if (plan.tours.enabled && !first && !last && !isFreeDay(day)) {
+  } else if (plan.tours.enabled && !first && !last && !isFreeDay(day) && !day.activities.some((a) => a.startsWith(TOUR_CAR_LINE))) {
+    // a day whose tour already says its car («التنقل بـفان × 2») does not repeat the trip's
     const label = "سيارة الجولات";
     const car = vehicleText(plan.tours);
     parts.push(car ? `${label} — ${car}` : label);
@@ -338,6 +339,9 @@ export function fillDaysFromPrograms(days: DraftDay[], programs: TourProgram[]):
 }
 
 // ---------- the day and its tour: one model for the basic screen and the generator ----------
+
+/** How a tour day says its car and how many — «التنقل بـفان × 2». The client document prints it on a line of its own. */
+export const TOUR_CAR_LINE = "التنقل بـ";
 
 /** The first thing that happens on arrival — the company's own welcome, on every file. */
 export const WELCOME = "الاستقبال من المطار من قبل موظف ترافليون والتوجه إلى الفندق";
@@ -516,7 +520,7 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
       } else activities = [...activities, ...tours.map(line)];
       // the car each tour goes in, and how many — said once
       const cars = [...new Set(tours.map((t) => tourVehicle(t, tripCar)).filter(Boolean))];
-      if (cars.length > 0) activities = [...activities, `التنقل بـ${cars.join(" و")}`];
+      if (cars.length > 0) activities = [...activities, `${TOUR_CAR_LINE}${cars.join(" و")}`];
     }
 
     const owned = day.auto_title !== undefined ? day.title === day.auto_title : legacyTitles && isAutoTitle(day.title);

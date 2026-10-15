@@ -8,10 +8,13 @@ import {
   LEG_AR,
   fmtDate,
   fmtDayMonth,
+  fmtRange,
   fmtShortDate,
   fmtNum,
   stars,
 } from "./labels";
+import { isFreeDay } from "@/lib/offer/draft-types";
+import { TOUR_CAR_LINE } from "@/lib/offer/itinerary";
 import {
   formatRainAr,
   formatTempsAr,
@@ -393,16 +396,48 @@ export function OfferDocument(props: OfferDocumentProps) {
     });
   }
 
+  // the programme city by city: one block per visit (cut where a visit is taller
+  // than a sheet), so a city heading always travels with its days
   if (offer.days.length > 0 || offer.transport.length > 0) {
-    const rows = offer.days.length * 22 + offer.transport.length * 12;
-    blocks.push({
-      group: "tours",
-      title: AR.tours,
-      note: hasAnyWeather(offer) ? AR.toursWeatherYes : AR.toursWeatherNo,
-      heightMm: 14 + rows + (offer.days.length > 0 ? 18 : 0),
-      kind: "node",
-      node: <ToursTable offer={offer} />,
-    });
+    const note = hasAnyWeather(offer) ? AR.toursWeatherYes : AR.toursWeatherNo;
+    const tours = (heightMm: number, node: ReactNode): DocBlock => ({ group: "tours", title: AR.tours, note, heightMm, kind: "node", node });
+    for (const visit of cityVisits(offer.days)) {
+      const hotels = visit.city ? visitHotels(visit, offer.hotels) : [];
+      const head = visit.city ? VISIT_HEAD_MM + (hotels.join("، ").length > 50 ? 5 : 0) : 0;
+      for (const days of chunkDays(visit.days, head)) {
+        blocks.push(
+          tours(
+            head + days.reduce((sum, d) => sum + dayHeightMm(d), 0) + 4,
+            <VisitTable city={visit.city} from={visit.days[0].date} to={visit.days[visit.days.length - 1].date} hotels={hotels} days={days} />,
+          ),
+        );
+      }
+    }
+    // An offer whose days carry their own transport line does not repeat it as
+    // loose rows underneath; an older one still prints them.
+    const loose = offer.days.some((d) => d.transport_note) ? [] : offer.transport;
+    if (loose.length > 0) {
+      blocks.push(
+        tours(
+          tableMm(loose.length, 12),
+          <table className="od-table od-days">
+            <thead>
+              <tr>
+                <th>{AR.transport}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loose.map((t, i) => (
+                <tr key={i}>
+                  <td>{t}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>,
+        ),
+      );
+    }
+    if (offer.days.length > 0) blocks.push(tours(18, <div className="od-note">{AR.weatherNote}</div>));
   }
 
   blocks.push({
@@ -880,44 +915,135 @@ function hasAnyWeather(offer: ClientOfferDTO): boolean {
   );
 }
 
-function ToursTable({ offer }: { offer: ClientOfferDTO }) {
+type Day = ClientOfferDTO["days"][number];
+
+/**
+ * The programme as a client reads it: city by city. A visit is a run of
+ * consecutive days in one city, so a city the trip returns to is a visit of its
+ * own. Issued days carry only the city's name and the date — no key — and
+ * that is enough: the days are stored in order. Travel days have no city.
+ */
+function cityVisits(days: Day[]): { city: string; days: Day[] }[] {
+  const visits: { city: string; days: Day[] }[] = [];
+  for (const day of days) {
+    const last = visits[visits.length - 1];
+    if (last && last.city === day.city_name) last.days.push(day);
+    else visits.push({ city: day.city_name, days: [day] });
+  }
+  return visits;
+}
+
+/** The hotels of THIS visit: its city, and a stay that overlaps its days — two on the same dates are both named. */
+function visitHotels(visit: { city: string; days: Day[] }, hotels: ClientOfferDTO["hotels"]): string[] {
+  const from = visit.days[0].date;
+  const to = visit.days[visit.days.length - 1].date;
+  const names = hotels
+    .filter((h) => h.city_name === visit.city && (!from || !to || !h.check_in || (h.check_in <= to && (!h.check_out || h.check_out > from))))
+    .map((h) => h.hotel_name?.trim() ?? "")
+    .filter(Boolean);
+  return [...new Set(names)];
+}
+
+/** The city heading band: name, dates, hotels. */
+const VISIT_HEAD_MM = 13;
+/**
+ * ponytail: calibrated like the terms — ~70 characters a line in the details
+ * column at 9.8pt; a title, one joined activity line and the weather measured
+ * 22mm under the old table. Conservative on purpose.
+ */
+const DAY_CHARS_PER_LINE = 70;
+const DAY_LINE_MM = 5.2;
+
+function dayHeightMm(day: Day): number {
+  const lines = [day.title, day.transport_note ?? "", ...day.activities]
+    .filter(Boolean)
+    .reduce((n, text) => n + Math.ceil(text.length / DAY_CHARS_PER_LINE), 0);
+  return 7 + (Math.max(lines, 1) + (day.weather_source ? 1 : 0)) * DAY_LINE_MM;
+}
+
+/** A visit's days cut so each piece, under its own city heading, fits a fresh sheet. */
+function chunkDays(days: Day[], headMm: number): Day[][] {
+  const chunks: Day[][] = [];
+  let used = Infinity;
+  for (const day of days) {
+    const h = dayHeightMm(day);
+    if (used + h + 4 > PAGE_BUDGET_MM - HEADING_MM) {
+      chunks.push([]);
+      used = headMm;
+    }
+    chunks[chunks.length - 1].push(day);
+    used += h;
+  }
+  return chunks;
+}
+
+/** One visit (or a sheet's share of it): the city heading in the table head, so a continuation repeats it. */
+function VisitTable({ city, from, to, hotels, days }: { city: string; from: string | null; to: string | null; hotels: string[]; days: Day[] }) {
   return (
-    <>
-      <table className="od-table">
+    <table className="od-table od-days">
+      {city ? (
         <thead>
           <tr>
-            <th style={{ width: "30mm" }}>{AR.colDate}</th>
-            <th style={{ width: "34mm" }}>{AR.colService}</th>
-            <th>{AR.colDetails}</th>
+            <th colSpan={2} className="od-city-head">
+              <strong>{city}</strong>
+              <span className="od-tnum">{fmtRange(from, to)}</span>
+              {hotels.length > 0 ? (
+                <span>
+                  {AR.visitHotels(hotels.length)}:{" "}
+                  {hotels.map((h, i) => (
+                    <span key={i} className="od-city-hotel">
+                      {i > 0 ? "، " : ""}
+                      <bdi>{h}</bdi>
+                    </span>
+                  ))}
+                </span>
+              ) : null}
+            </th>
           </tr>
         </thead>
-        <tbody>
-          {offer.days.map((day) => (
-            <tr key={`d-${day.day_number}`}>
-              <td className="od-tnum"><Ltr>{fmtDate(day.date)}</Ltr></td>
-              <td>{day.city_name || "—"}</td>
-              <td>
-                <span className="od-route">{day.title || day.city_name || "—"}</span>
-                {day.activities.join(" · ")}
-                {/* the vehicle goes on the day it is used — a client reads day by day */}
-                {day.transport_note ? <span className="od-sub od-day-move">{day.transport_note}</span> : null}
-                <DayWeather day={day} />
-              </td>
-            </tr>
-          ))}
-          {/* An offer whose days carry their own transport line does not repeat
-              it as loose rows underneath; an older one still prints them. */}
-          {(offer.days.some((d) => d.transport_note) ? [] : offer.transport).map((t, i) => (
-            <tr key={`t-${i}`}>
-              <td>—</td>
-              <td>{AR.transport}</td>
-              <td>{t}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {offer.days.length > 0 ? <div className="od-note">{AR.weatherNote}</div> : null}
-    </>
+      ) : null}
+      <tbody>
+        {days.map((day) => (
+          <DayRow key={day.day_number} day={day} />
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/**
+ * One day: the date, the title, then what happens in the order it happens. On
+ * a day with a tour, the way the group arrives (or moves) comes first — the
+ * reception, then the tour — and the tour's car, «التنقل بـفان × 2», last. A
+ * free day is set apart. No price: a day carries none.
+ */
+function DayRow({ day }: { day: Day }) {
+  const cars = day.activities.filter((a) => a.startsWith(TOUR_CAR_LINE));
+  const lines = day.activities.filter((a) => !a.startsWith(TOUR_CAR_LINE));
+  // the vehicle goes on the day it is used — a client reads day by day
+  const move = day.transport_note ? <span className="od-sub od-day-move">{day.transport_note}</span> : null;
+  return (
+    <tr className={isFreeDay(day) ? "od-day od-day-free" : "od-day"}>
+      <td className="od-tnum od-day-date">
+        <Ltr>{fmtDate(day.date)}</Ltr>
+      </td>
+      <td>
+        <span className="od-route">{day.title || day.city_name || "—"}</span>
+        {cars.length > 0 ? move : null}
+        {lines.map((a, i) => (
+          <span key={i} className="od-act">
+            {a}
+          </span>
+        ))}
+        {cars.map((c, i) => (
+          <span key={`c${i}`} className="od-sub od-day-move">
+            {c}
+          </span>
+        ))}
+        {cars.length > 0 ? null : move}
+        <DayWeather day={day} />
+      </td>
+    </tr>
   );
 }
 

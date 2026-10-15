@@ -181,6 +181,16 @@ export const OFFER_DOC_CSS = `
 .od-day-move{display:block;margin-top:1mm;font-weight:700;}
 .od-day-move::before{content:"🚐 ";}
 .od-sub{display:block;margin-top:1mm;color:var(--od-muted);font-size:8.8pt;}
+/* the daily programme, city by city: the heading is the table head, so a visit
+   continued overleaf repeats its city */
+.od-days{margin-bottom:4mm;}
+.od-table .od-city-head{white-space:normal;font-weight:600;font-size:10pt;}
+.od-city-head strong{font-size:12pt;font-weight:800;margin-inline-end:4mm;}
+.od-city-head > span{margin-inline-end:4mm;}
+.od-day-date{width:30mm;white-space:nowrap;}
+.od-act{display:block;}
+.od-day-free td{background:var(--od-soft);}
+.od-day-free .od-route{color:var(--od-muted);}
 .od-note{margin-top:6mm;border:1px solid var(--od-line);border-radius:4mm;background:var(--od-fill);padding:4mm 5mm;color:var(--od-muted);font-size:10.5pt;break-inside:avoid;}
 .od-strip{margin-top:6mm;display:grid;grid-template-columns:1fr 38mm;border:1px solid var(--od-line);border-radius:4mm;overflow:hidden;background:#fff;font-size:11pt;break-inside:avoid;}
 .od-strip div{padding:5mm;}

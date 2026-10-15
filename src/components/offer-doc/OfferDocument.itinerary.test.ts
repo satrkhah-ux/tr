@@ -5,6 +5,9 @@ import { OfferDocument } from "./OfferDocument";
 import { computeOfferPricing } from "@/lib/offer/pricing";
 import { toClientOfferDTO, type InternalOfferDTO, type ItineraryDayLine } from "@/lib/offer/dto";
 import { AR } from "./labels";
+import { deriveCityDates, emptyDraftData, normalizeDraftHotel } from "@/lib/offer/draft-types";
+import { daysFromTours, draftDaySkeleton } from "@/lib/offer/itinerary";
+import { draftToPreviewOffer } from "@/lib/offer/preview-dto";
 
 /**
  * The printed «البرنامج اليومي». Two things must hold no matter what:
@@ -126,5 +129,149 @@ describe("OfferDocument — daily program", () => {
   it("falls back to the city name when the day has no title", () => {
     const html = renderClient([day({ day_number: 1, title: "", activities: [] })]);
     expect(html).toContain("كوالالمبور");
+  });
+});
+
+/**
+ * Generator v4 order 5: the programme city by city. A heading per visit — the
+ * city, its dates, its hotel or hotels — then its days; the arrival day's
+ * reception before its tour; the tour's car on a line of its own; a free day
+ * set apart; no price anywhere in it.
+ */
+describe("OfferDocument — the programme city by city", () => {
+  const KL = "كوالالمبور";
+  const BKK = "بانكوك";
+  const at = (date: string, city: string, over: Partial<ItineraryDayLine> = {}) =>
+    day({ day_number: Number(date.slice(8)), date, city_name: city, weather_source: null, ...over });
+  const hotel = (city: string, name: string, check_in: string, check_out: string) => ({
+    city_name: city, hotel_name: name, stars: 5, room_type: null, board_type: null, rooms_count: 1, nights: 2,
+    check_in, check_out, sell_price: 4321, sell_currency: "SAR", buy_price: 3000, buy_currency: "SAR",
+    cancellation_policy: null, excluded_surcharges: [], valid_until: null, image_url: null, facilities: [],
+    supplier_id: null, supplier_name: null, rate_key: null, net_base: null, net_source_currency: null,
+    fx_rate: null, fx_date: null, ref_sell_base: null, markup_amount: null, markup_pct: null,
+  });
+  const render = (days: ItineraryDayLine[], hotels: ReturnType<typeof hotel>[]) =>
+    renderToStaticMarkup(createElement(OfferDocument, { variant: "client", offer: toClientOfferDTO({ ...offerWith(days), hotels }) }));
+  const headings = (html: string) => [...html.matchAll(/class="od-city-head">([\s\S]*?)<\/th>/g)].map((m) => m[1]);
+
+  it("heads each city with its dates and hotels — two on the same dates both named — then its days", () => {
+    const html = render(
+      [at("2026-10-20", KL), at("2026-10-21", KL), at("2026-10-22", BKK), at("2026-10-23", BKK), at("2026-10-24", BKK)],
+      [
+        hotel(KL, "فندق الشروق", "2026-10-20", "2026-10-22"),
+        hotel(KL, "فندق الغروب", "2026-10-20", "2026-10-22"),
+        hotel(BKK, "فندق النهر", "2026-10-22", "2026-10-23"),
+        hotel(BKK, "فندق الحديقة", "2026-10-23", "2026-10-24"),
+      ],
+    );
+    const [kl, bkk, ...rest] = headings(html);
+    expect(rest).toEqual([]);
+    expect(kl).toContain(KL);
+    expect(kl).toContain("20 – 21 أكتوبر 2026");
+    expect(kl).toContain("فندق الشروق");
+    expect(kl).toContain("فندق الغروب");
+    expect(kl).not.toContain("فندق النهر");
+    expect(bkk).toContain("22 – 24 أكتوبر 2026");
+    expect(bkk).toContain("فندق النهر");
+    expect(bkk).toContain("فندق الحديقة");
+    // the heading comes before its own days, and Bangkok's after Kuala Lumpur's
+    expect(html.indexOf(kl)).toBeLessThan(html.indexOf("2026-10-20"));
+    expect(html.indexOf("2026-10-21")).toBeLessThan(html.indexOf(bkk));
+    // no price in the programme
+    expect(kl + bkk).not.toContain("4321");
+  });
+
+  it("gives a city the trip returns to a heading per visit, each with only that visit's hotel", () => {
+    const html = render(
+      [at("2026-10-20", KL), at("2026-10-21", BKK), at("2026-10-22", KL), at("2026-10-23", KL)],
+      [hotel(KL, "فندق الذهاب", "2026-10-20", "2026-10-21"), hotel(BKK, "فندق النهر", "2026-10-21", "2026-10-22"), hotel(KL, "فندق العودة", "2026-10-22", "2026-10-23")],
+    );
+    const [first, , last] = headings(html);
+    expect(first).toContain("فندق الذهاب");
+    expect(first).not.toContain("فندق العودة");
+    expect(last).toContain("فندق العودة");
+    expect(last).not.toContain("فندق الذهاب");
+  });
+
+  it("prints the arrival day's reception first, then its tour, then the tour's car on its own line", () => {
+    const html = render(
+      [
+        at("2026-10-20", KL, {
+          title: "الوصول إلى كوالالمبور",
+          transport_note: "استقبال من المطار إلى الفندق — فان × 2",
+          activities: ["الاستقبال من المطار من قبل موظف ترافليون والتوجه إلى الفندق", "جولة المدينة: برجا بتروناس", "التنقل بـفان × 2"],
+        }),
+      ],
+      [],
+    );
+    const order = ["استقبال من المطار إلى الفندق — فان × 2", "الاستقبال من المطار من قبل موظف", "جولة المدينة: برجا بتروناس", "التنقل بـفان × 2"].map((s) =>
+      html.indexOf(s),
+    );
+    expect(order.every((i) => i > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(html).toContain('<span class="od-sub od-day-move">التنقل بـفان × 2</span>');
+  });
+
+  it("keeps a day without a tour as it was: what happens, then how the group moves", () => {
+    const html = render([at("2026-10-24", KL, { title: "المغادرة", activities: ["تسجيل الخروج"], transport_note: "توديع من الفندق إلى المطار — فان" })], []);
+    expect(html.indexOf("تسجيل الخروج")).toBeLessThan(html.indexOf("توديع من الفندق"));
+  });
+
+  it("sets a free day apart", () => {
+    const html = render([at("2026-10-20", KL, { title: "الجولة" }), at("2026-10-21", KL, { title: "يوم حر", activities: [] })], []);
+    expect(html.match(/class="od-day od-day-free"/g)).toHaveLength(1);
+    expect(html.match(/class="od-day"/g)).toHaveLength(1);
+  });
+
+  it("prints a travel day with no city under no heading", () => {
+    const html = render([at("2026-10-19", "", { title: "السفر إلى ماليزيا" }), at("2026-10-20", KL)], []);
+    expect(headings(html)).toHaveLength(1);
+    expect(html).toContain("السفر إلى ماليزيا");
+  });
+});
+
+/**
+ * The same, from a draft — the preview path the issue path mirrors: two hotels
+ * on the same dates, a tour on the arrival day in two vans, another the next
+ * day. The trip's «سيارة الجولات» line is not repeated on a day whose tour
+ * already says its car.
+ */
+describe("OfferDocument — a v4 draft's programme", () => {
+  it("one car line per tour day, the reception first, both hotels in the heading", () => {
+    const data = emptyDraftData();
+    data.trip = { ...data.trip, country: "ماليزيا", destination: "ماليزيا", arrival_date: "2026-10-20", nights: 2, days: 3, adults: 9 };
+    data.cities = deriveCityDates("2026-10-20", [{ city_name: "كوالالمبور", nights: 2, check_in: null, check_out: null }]);
+    data.hotels = [
+      normalizeDraftHotel({ city_name: "كوالالمبور", hotel_name: "فندق الشروق", nights: 2 }),
+      normalizeDraftHotel({ city_name: "كوالالمبور", hotel_name: "فندق الغروب", nights: 2, dates: "same" }),
+    ];
+    data.transport_plan = {
+      ...data.transport_plan,
+      airport: { ...data.transport_plan.airport, car_type: "فان", cars: 2 },
+      tours: { ...data.transport_plan.tours, car_type: "فان", cars: 2 },
+    };
+    data.cities[0] = {
+      ...data.cities[0],
+      tours: 2,
+      tour_picks: [
+        { program_id: null, title: "جولة المدينة", text: "برجا بتروناس", price: 400, date: "2026-10-20", cars: 2 },
+        { program_id: null, title: "جزيرة الحامل", text: "رحلة بحرية", price: 500, date: "2026-10-21", cars: 2 },
+      ],
+    };
+    data.days = daysFromTours({ ...data, days: draftDaySkeleton(data) }, true);
+
+    const html = renderToStaticMarkup(createElement(OfferDocument, { variant: "client", offer: draftToPreviewOffer(data) }));
+    expect(html).not.toContain("سيارة الجولات");
+    expect(html.match(/التنقل بـفان × 2/g)).toHaveLength(2);
+    const head = html.match(/class="od-city-head">([\s\S]*?)<\/th>/)?.[1] ?? "";
+    expect(head).toContain("فندق الشروق");
+    expect(head).toContain("فندق الغروب");
+    const reception = html.indexOf("استقبال من المطار إلى الفندق — فان × 2");
+    expect(reception).toBeGreaterThan(0);
+    expect(reception).toBeLessThan(html.indexOf("جولة المدينة: برجا بتروناس"));
+    // the tours were priced 400 and 500 a car: no figure reaches the programme
+    const programme = (html.match(/<table class="od-table od-days">[\s\S]*?<\/table>/g) ?? []).join("");
+    expect(programme).toContain("جزيرة الحامل");
+    expect(programme).not.toMatch(/400|500|800|1000/);
   });
 });
