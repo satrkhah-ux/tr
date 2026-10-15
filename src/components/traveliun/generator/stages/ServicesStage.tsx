@@ -35,9 +35,9 @@ export function ServicesStage({ data, patch, lookups }: StageFormProps) {
 
   return (
     <section className={sectionClass}>
-      <h2 className="mb-4 text-base font-extrabold text-[#003c3a]">{t("pg.servicesTitle")}</h2>
+      <h2 className="mb-3 text-base font-extrabold text-[#003c3a]">{t("pg.servicesTitle")}</h2>
       <FieldIssue field="services.includes" className="mb-3" />
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         <ListEditor
           titleKey="pg.includes"
           variant="includes"

@@ -314,7 +314,12 @@ async function resolveStay(draftId: string, cityName: string, stayId?: string | 
   const cities = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
   const stays = deriveHotelStays(cities, data.hotels);
   const mine = stays.filter((s) => s.city_name === cityName);
+  // a named stay must be one of THIS city's — never a quote for city A written onto a stay in B
+  if (stayId && !mine.some((s) => s.line.id === stayId)) return null;
   const stay = (stayId ? mine.find((s) => s.line.id === stayId) : null) ?? mine[0] ?? null;
+  // a city visited twice (A→B→A) makes one line two stays with different dates:
+  // a quote for the first would never price the second — price it by hand
+  if (stay && stays.filter((s) => s.line.id === stay.line.id).length > 1) return null;
 
   const city = cities.find((c) => c.city_name === cityName);
   const check_in = stay?.check_in ?? city?.check_in ?? data.trip.arrival_date;
@@ -637,7 +642,20 @@ export async function selectHotelRate(
         hotel_id: null, // supplier hotel — not an internal mapping
         hotel_name: content?.name_ar || base.hotel_name || rate.hotel_name,
         // the content cache carries no Latin name; whatever the agent typed stays
-        sourcing,
+        // …and what this rate was quoted FOR, so a stay stretched later is not priced by it
+        sourcing: {
+          ...sourcing,
+          quoted_for: {
+            check_in: stay.check_in,
+            check_out: stay.check_out,
+            rooms: stay.rooms,
+            adults: data.trip.adults,
+            children: data.trip.children,
+            hotel_name: content?.name_ar || base.hotel_name || rate.hotel_name,
+            board_type: rate.board_type,
+            room_name: rate.room_category_raw,
+          },
+        },
       },
       // The supplier quoted the STAY, not each room, and that figure lives on
       // `sourcing`. Leaving the per-room price null keeps the two from being

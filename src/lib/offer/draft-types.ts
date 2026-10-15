@@ -9,6 +9,7 @@
 
 import type { BoardType, FlightLegOrder, PricingItemType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
+import { normalizeJourney, type AdvancedJourney } from "./advanced";
 
 // ---------- stage registry ----------
 export const STAGE_KEYS = [
@@ -426,6 +427,21 @@ export type DraftHotelSourcing = {
   supplier_hotel_id: string | null;
   /** when the LIVE rate was fetched (ISO) — drives the "updated X min ago" hint. */
   rate_fetched_at: string | null;
+  /** the stay this rate was quoted for (server-written, see sourcingFits). */
+  quoted_for?: SourcingQuote | null;
+};
+
+/** A supplier quote is for ONE stay: these dates, this many rooms and guests, this hotel. */
+export type SourcingQuote = {
+  check_in: string;
+  check_out: string;
+  rooms: number;
+  adults: number;
+  children: number;
+  hotel_name: string;
+  /** the one room product the rate is for — a BB rate does not price an AI stay */
+  board_type: BoardType | null;
+  room_name: string;
 };
 
 /**
@@ -530,6 +546,11 @@ export type DraftHotel = {
   /** manual sell price for the whole stay, when not priced from a supplier. */
   manual_price: number | null;
   manual_currency: string;
+  /**
+   * «مسترد / غير مسترد» — for a stay we price ourselves (a supplier rate carries
+   * its own cancellation policy). Undefined/null = not said; nothing prints.
+   */
+  refundable?: boolean | null;
   /**
    * Who the stay was booked through (company_suppliers) when the agent typed
    * the price. Internal: never on the client document.
@@ -636,6 +657,7 @@ export function normalizeDraftHotel(raw: unknown): DraftHotel {
     rooms_count: count,
     manual_price: typeof h.manual_price === "number" ? h.manual_price : null,
     manual_currency: typeof h.manual_currency === "string" && h.manual_currency ? h.manual_currency : "SAR",
+    ...(typeof h.refundable === "boolean" ? { refundable: h.refundable } : {}),
     ...(typeof h.supplier === "string" && h.supplier ? { supplier: h.supplier } : {}),
     // deliberately NOT `sourcing: h.sourcing ?? null` — a seeded line must carry
     // no supplier key at all, and a null one still reads as "priced from a
@@ -1123,6 +1145,12 @@ export type DraftData = {
   produced_serial: string | null;
   /** set when the draft was seeded from a ready-made package; null otherwise. */
   source: DraftSource | null;
+  /**
+   * «البكج المتقدم» (lib/offer/advanced): the client's route beside our services.
+   * Absent on every file that never opened it. While `enabled` it owns the
+   * file's transfers — the transport plan's derived rows are not printed.
+   */
+  journey?: AdvancedJourney;
 };
 
 export function emptyDraftData(): DraftData {
@@ -1276,6 +1304,7 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     ...(plan.farewell ? { farewell: mergeLeg(empty.transport_plan.airport, plan.farewell) } : {}),
   };
   const scope = normalizeScope(source.scope);
+  const journey = normalizeJourney(source.journey);
 
   return {
     customer: { ...empty.customer, ...(source.customer ?? {}) },
@@ -1315,13 +1344,14 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     // flip the switch back and the rows return — but leaving the rows derived
     // meant the document still promised an airport pickup on a file whose
     // transport switch was off.
-    transport: scope.transport ? deriveTransportRows(transportPlan, cities) : [],
+    transport: scope.transport && !journey?.enabled ? deriveTransportRows(transportPlan, cities) : [],
     services: { ...empty.services, ...(source.services ?? {}) },
     visas: Array.isArray(source.visas) ? source.visas : [],
     days: normalizeDraftDays(source.days),
     pricing: { ...empty.pricing, ...(source.pricing ?? {}) },
     produced_serial: typeof source.produced_serial === "string" ? source.produced_serial : null,
     source: normalizeDraftSource(source.source),
+    ...(journey ? { journey } : {}),
   };
 }
 
@@ -1454,6 +1484,32 @@ export function deriveHotelStays(cities: DraftCity[], hotels: DraftHotel[]): Hot
     });
   }
   return out;
+}
+
+/**
+ * Does a supplier rate still price this stay? The quote covered one stay —
+ * stretched since (more nights, rooms or guests, another hotel) it would keep
+ * pricing the original, and the offer would sell and book a bigger stay at the
+ * smaller one's price. A rate with no record of what it quoted never fits.
+ */
+export function sourcingFits(stay: HotelStay, trip: { adults: number; children: number }): boolean {
+  const q = stay.line.sourcing?.quoted_for;
+  return (
+    !!q &&
+    q.check_in === stay.check_in &&
+    q.check_out === stay.check_out &&
+    q.rooms === (stay.line.rooms_count > 0 ? stay.line.rooms_count : 1) &&
+    q.adults === trip.adults &&
+    q.children === trip.children &&
+    q.hotel_name === stay.line.hotel_name &&
+    stay.line.rooms.every((r) => r.board_type === q.board_type && r.room_type_name === q.room_name)
+  );
+}
+
+/** The cancellation line a stay prints: the supplier's own policy, else what the agent marked. */
+export function stayCancellation(h: Pick<DraftHotel, "sourcing" | "refundable">): string | null {
+  if (h.sourcing) return h.sourcing.cancellation_policy || null;
+  return h.refundable === true ? "قابل للاسترداد" : h.refundable === false ? "غير قابل للاسترداد" : null;
 }
 
 /** Per-city allocated-vs-owed, for the coverage bar and the blocking check. */

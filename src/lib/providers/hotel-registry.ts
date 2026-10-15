@@ -55,13 +55,15 @@ export async function getEnabledHotelSuppliers(sink?: SupplierCallRecord[]): Pro
   // management demo runs locally on captured-real data with no server wiring.
   // Guarded by an env flag; never set it in production (it serves fixtures).
   if (process.env.ALMOSAFER_DEMO === "1") list.unshift(buildHotelSupplier("almosafer", null, null));
-  if (list.length === 0) return [buildHotelSupplier("mock", null, null)];
+  // fixtures only where explicitly asked for — production once fell back to them
+  if (list.length === 0 && process.env.HOTEL_MOCK_ENABLED === "1") return [buildHotelSupplier("mock", null, null)];
   return list;
 }
 
 /** The adapter for one supplier code (uses its stored, decrypted credentials). */
 export async function getSupplierAdapter(code: string): Promise<HotelSupplier | null> {
-  const row = (await getSupplierRows()).find((r) => r.code === code);
+  // a disabled supplier (mock, since 2026-10-13) cannot be called by code either
+  const row = (await getSupplierRows()).find((r) => r.code === code && r.enabled);
   if (!row) return null;
   return adapterFor(row);
 }
