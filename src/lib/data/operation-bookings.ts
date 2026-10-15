@@ -389,7 +389,8 @@ export async function cancelBooking(bookingId: string, reason: string): Promise<
     const supabase = await db();
     const { error } = await supabase
       .from("operation_bookings")
-      .update({ status: "cancelled", cancelled_at: new Date().toISOString(), note: reason })
+      // no reason given keeps the booking's own note
+      .update({ status: "cancelled", cancelled_at: new Date().toISOString(), ...(reason.trim() ? { note: reason } : {}) })
       .eq("id", bookingId);
     if (error) return { ok: false, error: "err.updateFailed" };
     await logAudit({ action: "booking.cancelled", entity: "operation_bookings", entity_id: bookingId, meta: { reason } });
@@ -407,11 +408,37 @@ export async function deleteBooking(bookingId: string): Promise<{ ok: true } | F
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
-    const { data: owner } = await supabase.from("operation_bookings").select("operation_id").eq("id", bookingId).maybeSingle();
+    const { data } = await supabase
+      .from("operation_bookings")
+      .select("operation_id, kind, title, status, confirmation_number")
+      .eq("id", bookingId)
+      .maybeSingle();
+    const booking = data as { operation_id: string; kind: string; title: string; status: string; confirmation_number: string | null } | null;
+    if (!booking) return { ok: false, error: "err.loadFailed" };
+    // What the supplier holds is cancelled, not erased: its confirmation number,
+    // its net and its vouchers are the record (cancelBooking keeps them).
+    if (booking.status === "confirmed" || booking.status === "in_flight") return { ok: false, error: "ops.err.deleteConfirmed" };
+    // Recorded BEFORE: the row and its vouchers (0025's cascade) are gone after.
+    const { count } = await supabase
+      .from("operation_documents")
+      .select("id", { count: "exact", head: true })
+      .eq("booking_id", bookingId);
+    await logAudit({
+      action: "booking.deleted",
+      entity: "operation_bookings",
+      entity_id: bookingId,
+      meta: {
+        operation_id: booking.operation_id,
+        kind: booking.kind,
+        title: booking.title,
+        status: booking.status,
+        confirmation_number: booking.confirmation_number,
+        documents: count ?? 0,
+      },
+    });
     const { error } = await supabase.from("operation_bookings").delete().eq("id", bookingId);
     if (error) return { ok: false, error: "err.deleteFailed" };
-    const operationId = (owner as { operation_id: string } | null)?.operation_id;
-    if (operationId) await syncOperation(operationId);
+    await syncOperation(booking.operation_id);
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };

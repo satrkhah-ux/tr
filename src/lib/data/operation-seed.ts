@@ -11,6 +11,7 @@ import type { BoardType } from "@/lib/types";
 import { currentCan } from "@/lib/roles/current";
 import { normalizeDraftData } from "@/lib/offer/draft-types";
 import { planBookingsFromDraft } from "@/lib/operations/seed-plan";
+import { issuedDraftData } from "@/lib/data/issued-draft";
 
 /**
  * Pull the bookings straight out of the offer the client agreed to.
@@ -70,25 +71,25 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
   try {
     const supabase = await db();
 
-    const opRes = await supabase.from("operations").select("id, offer_id, offers(serial)").eq("id", operationId).maybeSingle();
-    const op = opRes.data as { id: string; offer_id: string; offers: { serial: string } | { serial: string }[] | null } | null;
+    type OfferRef = { serial: string; partner_company_id: string | null };
+    const opRes = await supabase
+      .from("operations")
+      .select("id, offer_id, offers(serial, partner_company_id)")
+      .eq("id", operationId)
+      .maybeSingle();
+    const op = opRes.data as { id: string; offer_id: string; offers: OfferRef | OfferRef[] | null } | null;
     if (!op) return { ok: false, error: "ops.err.notFound" };
-    const serial = (Array.isArray(op.offers) ? op.offers[0] : op.offers)?.serial ?? "";
+    const offer = Array.isArray(op.offers) ? op.offers[0] : op.offers;
 
-    // The draft that issued the offer holds every city, flight, tour and transfer
-    // with its date — read it first (service: drafts are the generator's, and
-    // requireOps above is the gate). An offer with no draft (imported, repackaged)
-    // falls back to the offer's own tables below.
-    const draftRes = serial
-      ? await (createSupabaseServiceClient() as unknown as SupabaseClient)
-          .from("offer_drafts")
-          .select("data")
-          .eq("data->>produced_serial", serial)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-      : { data: null };
-    const draft = (draftRes.data as { data: Record<string, unknown> } | null)?.data ?? null;
+    // The draft the offer was ISSUED from holds every city, flight, tour and
+    // transfer with its date — the copy frozen at issue, never a draft edited
+    // since (issued-draft.ts; service: requireOps above is the gate). An offer
+    // with none (imported, repackaged) falls back to its own tables below.
+    const draft = await issuedDraftData(createSupabaseServiceClient() as unknown as SupabaseClient, {
+      id: op.offer_id,
+      serial: offer?.serial ?? "",
+      partner_company_id: offer?.partner_company_id ?? null,
+    });
 
     const [hotelsRes, flightsRes, itemsRes, existingRes] = await Promise.all([
       // Service client: the buy price seeds quoted_net, and 0047 withholds it

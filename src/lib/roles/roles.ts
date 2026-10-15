@@ -95,6 +95,19 @@ export function isPermission(value: unknown): value is Permission {
 }
 
 /**
+ * What a signed-in person may do: an ACTIVE employee's role keys, nothing else.
+ * No implicit administrator — «All Permissions» is simply a role listing every
+ * key. public.staff_can() (migration 0073) is this same rule in SQL, so the
+ * database's write policies and the app's gates answer alike.
+ */
+export function grantedPermissions(
+  employee: { status: string | null; permission_keys: readonly string[] | null } | null,
+): Permission[] {
+  if (!employee || employee.status !== "Active") return [];
+  return (employee.permission_keys ?? []).filter(isPermission);
+}
+
+/**
  * The permission vocabulary, arranged the way an administrator reads it: by the
  * part of the system it opens, and split into what the holder SEES and what they
  * can DO. A flat list of thirteen keys is unanswerable — "what does someone in

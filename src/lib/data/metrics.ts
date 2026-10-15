@@ -68,31 +68,12 @@ export async function touchPresence(): Promise<void> {
 
     // The same beat, kept as a DAY. `presence` is overwritten on every heartbeat,
     // so it can say who is online right now but never when they arrived — and
-    // «عين الإدارة» is asked exactly that. One row per person per day: the first
-    // beat sets the arrival and is never moved, later beats extend the day.
-    const day = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10); // Riyadh
-    const existing = await supabase
-      .from("attendance_days")
-      .select("beats")
-      .eq("employee_id", empId)
-      .eq("day", day)
-      .maybeSingle();
-    const beats = ((existing.data as { beats: number } | null)?.beats ?? 0) + 1;
-    await supabase
-      .from("attendance_days")
-      .upsert(
-        { employee_id: empId, day, first_seen_at: now, last_seen_at: now, beats },
-        { onConflict: "employee_id,day", ignoreDuplicates: false },
-      );
-    // first_seen_at must NOT move once set — the upsert above would overwrite it,
-    // so it is restored for every beat after the first.
-    if (beats > 1) {
-      await supabase
-        .from("attendance_days")
-        .update({ last_seen_at: now })
-        .eq("employee_id", empId)
-        .eq("day", day);
-    }
+    // «عين الإدارة» is asked exactly that. touch_attendance() (0073) inserts the
+    // arrival once and afterwards only moves last_seen_at and the beat count; the
+    // old upsert here rewrote first_seen_at on every beat, and the table's own
+    // write policies let anyone set their arrival. It takes no argument: the
+    // person and the Riyadh day are the database's to decide.
+    await supabase.rpc("touch_attendance");
   } catch {
     /* presence is best-effort; never blocks the page */
   }

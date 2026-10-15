@@ -2,6 +2,8 @@
 
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { currentCan } from "@/lib/roles/current";
+import { getCurrentEmployeeId } from "@/lib/data/metrics";
 
 /**
  * What ONE NIGHT of a room last cost — remembered per (hotel, room type, board).
@@ -59,8 +61,13 @@ export async function recallHotelRate(
   }
 }
 
-export type RememberRateResult = { ok: true } | { ok: false; error: "err.session" | "err.db" };
+export type RememberRateResult = { ok: true } | { ok: false; error: "err.session" | "err.forbidden" | "err.db" };
 
+/**
+ * The house answer for a room is the price makers' to set (offers.write): it
+ * becomes the remembered buy in every later file and re-prices partner sheets.
+ * 0073's policy says the same, and `updated_by` records who set it.
+ */
 export async function rememberHotelRate(input: {
   hotelId: string;
   roomTypeName: string;
@@ -71,6 +78,7 @@ export async function rememberHotelRate(input: {
 }): Promise<RememberRateResult> {
   const user = await getServerUser();
   if (!user) return { ok: false, error: "err.session" };
+  if (!(await currentCan("offers.write"))) return { ok: false, error: "err.forbidden" };
   if (!input.hotelId || !input.roomTypeName.trim() || !Number.isFinite(input.price) || input.price <= 0) {
     return { ok: false, error: "err.db" };
   }
@@ -97,6 +105,7 @@ export async function rememberHotelRate(input: {
       price: input.price,
       currency: input.currency?.trim() || "SAR",
       updated_at: new Date().toISOString(),
+      updated_by: await getCurrentEmployeeId(),
     };
 
     const { error } = row

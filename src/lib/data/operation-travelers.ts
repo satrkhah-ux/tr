@@ -19,6 +19,7 @@ import {
 import { planTravelers } from "@/lib/operations/travelers";
 import { parseTd3, type MrzPassport } from "@/lib/operations/mrz";
 import { normalizeDraftData } from "@/lib/offer/draft-types";
+import { issuedDraftData } from "@/lib/data/issued-draft";
 import { isOpenAIConfigured } from "@/lib/providers/openai";
 import { readMrzFromImage } from "@/lib/providers/mrz-vision";
 import { currentCan } from "@/lib/roles/current";
@@ -160,16 +161,17 @@ export async function upsertTraveler(input: {
     if (input.nationality !== undefined) patch.nationality = input.nationality?.trim().slice(0, 40) || null;
     if (cipher !== undefined) patch.passport_encrypted = cipher;
 
+    // the operation the row really belongs to — an edit never trusts the caller's
     const query = input.id
-      ? db().from("operation_travelers").update(patch).eq("id", input.id).select("id").single()
-      : db().from("operation_travelers").insert(patch).select("id").single();
+      ? db().from("operation_travelers").update(patch).eq("id", input.id).select("id, operation_id").single()
+      : db().from("operation_travelers").insert(patch).select("id, operation_id").single();
 
     const { data, error } = await query;
     if (error || !data) return { ok: false, error: "err.saveOfferFailed" };
-    const id = (data as { id: string }).id;
+    const { id, operation_id } = data as { id: string; operation_id: string };
 
     if (!input.id) {
-      await logAudit({ action: "traveler.created", entity: "operation_travelers", entity_id: id, meta: { operation_id: input.operation_id } });
+      await logAudit({ action: "traveler.created", entity: "operation_travelers", entity_id: id, meta: { operation_id } });
     }
     if (cipher !== undefined) {
       await logAudit({
@@ -177,7 +179,7 @@ export async function upsertTraveler(input: {
         entity: "operation_travelers",
         entity_id: id,
         // NEVER the number itself — only that one was stored.
-        meta: { operation_id: input.operation_id, cleared: cipher === null },
+        meta: { operation_id, cleared: cipher === null },
       });
     }
     return { ok: true, id };
@@ -202,6 +204,20 @@ export async function deleteTraveler(id: string): Promise<{ ok: true } | Fail> {
     > | null;
     if (!row) return { ok: false, error: "err.loadFailed" };
 
+    // Recorded BEFORE: whether a passport was on file — never the number.
+    await logAudit({
+      action: "traveler.deleted",
+      entity: "operation_travelers",
+      entity_id: id,
+      meta: {
+        operation_id: row.operation_id,
+        kind: row.traveler_kind,
+        has_passport: Boolean(row.passport_encrypted),
+        has_scan: Boolean(row.passport_image_path),
+        has_visa_file: Boolean(row.visa_file_path),
+      },
+    });
+
     const { error } = await supabase.from("operation_travelers").delete().eq("id", id);
     if (error) return { ok: false, error: "err.deleteFailed" };
 
@@ -209,13 +225,6 @@ export async function deleteTraveler(id: string): Promise<{ ok: true } | Fail> {
     // is identity data nobody will ever think to clean up.
     if (row.passport_image_path) await supabase.storage.from(BUCKET).remove([row.passport_image_path]);
     if (row.visa_file_path) await supabase.storage.from(VISA_BUCKET).remove([row.visa_file_path]);
-
-    await logAudit({
-      action: "traveler.deleted",
-      entity: "operation_travelers",
-      entity_id: id,
-      meta: { operation_id: row.operation_id, kind: row.traveler_kind, had_passport: Boolean(row.passport_encrypted) },
-    });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -376,6 +385,7 @@ function riyadhToday(): string {
 
 type OfferPax = {
   serial: string;
+  partner_company_id: string | null;
   adults: number | null;
   children: number | null;
   infants: number | null;
@@ -404,25 +414,19 @@ async function seedFromOffer(operationId: string, auto: boolean): Promise<{ ok: 
     let claim = supabase.from("operations").update({ travelers_seeded_at: new Date().toISOString() }).eq("id", operationId);
     if (auto) claim = claim.is("travelers_seeded_at", null);
     const { data: claimed } = await claim
-      .select("offer_id, offers(serial, adults, children, infants, customers(arabic_name))")
+      .select("offer_id, offers(serial, partner_company_id, adults, children, infants, customers(arabic_name))")
       .maybeSingle();
     const op = claimed as { offer_id: string; offers: OfferPax | OfferPax[] | null } | null;
     if (!op) return auto ? { ok: true, added: 0 } : { ok: false, error: "ops.err.notFound" };
     const offer = Array.isArray(op.offers) ? (op.offers[0] ?? null) : op.offers;
     const customer = Array.isArray(offer?.customers) ? (offer.customers[0] ?? null) : (offer?.customers ?? null);
 
-    // The draft holds the children's ages and whether visas were sold; an offer
-    // without one (imported, repackaged) has only the counts.
-    const draftRes = offer?.serial
-      ? await supabase
-          .from("offer_drafts")
-          .select("data")
-          .eq("data->>produced_serial", offer.serial)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-      : { data: null };
-    const raw = (draftRes.data as { data: Record<string, unknown> } | null)?.data;
+    // The draft as ISSUED holds the children's ages and whether visas were sold
+    // (issued-draft.ts — never one edited since); an offer without one
+    // (imported, repackaged) has only the counts.
+    const raw = offer
+      ? await issuedDraftData(supabase, { id: op.offer_id, serial: offer.serial, partner_company_id: offer.partner_company_id })
+      : null;
     const draft = raw ? normalizeDraftData(raw) : null;
 
     const plan = planTravelers({

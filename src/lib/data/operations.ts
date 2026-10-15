@@ -24,10 +24,15 @@ import { mintReceipt } from "@/lib/data/payment-receipt";
 import { isIsoDate, riyadhDate } from "@/lib/operations/payments";
 
 /**
- * «العمليات» — the execution hub. This module is the ONLY writer of
- * operations.client_status and operations.execution_status; bookings, dispatches
- * and vouchers all advance the track by calling setExecutionStatus rather than
- * touching the column, so the transition rules cannot be bypassed.
+ * «العمليات» — the execution hub. A case's two statuses move in three places,
+ * all through the transition rules in operations/state.ts:
+ *   · here — setClientStatus / setExecutionStatus, an agent's hand
+ *     (operations.write, on their own session);
+ *   · operation-sync.ts — forward-only, derived from the bookings, documents
+ *     and payments, after the gated action that changed them (service role);
+ *   · operations/daily.ts — the morning cron: «سافر», then closed (service role).
+ * The database refuses every other session write: since 0073 the operations
+ * tables accept INSERT/UPDATE/DELETE only from staff holding operations.write.
  */
 
 function db(): Promise<SupabaseClient> {
@@ -88,9 +93,15 @@ export async function confirmOffer(input: {
   channel?: ConfirmChannel;
   note?: string | null;
 }): Promise<OkId | Fail> {
-  const denied = await requireOps();
-  if (denied) return { ok: false, error: denied };
-  return recordConfirmation(await db(), input);
+  // «تم تأكيد العميل» is the salesperson's handover (the kanban card) as much as
+  // operations' — offers.write or operations.write. A salesperson holds no
+  // operations.write, so the case is opened through the service role, after
+  // this check (0073 refuses their session's insert into operations).
+  if (!(await getServerUser())) return { ok: false, error: "err.session" };
+  if (!(await currentCan("offers.write")) && !(await currentCan("operations.write"))) {
+    return { ok: false, error: "ops.err.forbidden" };
+  }
+  return recordConfirmation(createSupabaseServiceClient() as unknown as SupabaseClient, input);
 }
 
 /**

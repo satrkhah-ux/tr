@@ -20,6 +20,7 @@ import {
 import { DirText } from "@/components/DirText";
 import {
   addBooking,
+  cancelBooking,
   confirmBookingManually,
   deleteBooking,
   issueDocument,
@@ -538,6 +539,9 @@ function BookingRow({
   const [error, setError] = useState<string | null>(null);
 
   const done = booking.status === "confirmed";
+  // what a supplier holds is cancelled, never deleted (the server refuses it):
+  // a manual one here, an API one through «ألغِ لدى المورّد»
+  const held = done || booking.status === "in_flight";
 
   return (
     <li className={`rounded-[11px] border p-3 ${done ? "border-[#bfe5d4] bg-[#f6fdfa]" : "border-[#e2ebe7]"}`}>
@@ -574,21 +578,25 @@ function BookingRow({
           >
             <Pencil className="size-3.5" />
           </button>
-          <button
-            type="button"
-            disabled={pending}
-            aria-label={t("delete")}
-            onClick={() =>
-              startTransition(async () => {
-                const res = await deleteBooking(booking.id);
-                if (!res.ok) setError(t(res.error));
-                else onDone();
-              })
-            }
-            className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#f2c7c7] text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
+          {!held || booking.source === "manual" ? (
+            <button
+              type="button"
+              disabled={pending}
+              aria-label={held ? t("ops.booking.cancel") : t("delete")}
+              title={held ? t("ops.booking.cancel") : undefined}
+              onClick={() =>
+                startTransition(async () => {
+                  if (held && !window.confirm(t("ops.booking.cancelAsk"))) return;
+                  const res = held ? await cancelBooking(booking.id, "") : await deleteBooking(booking.id);
+                  if (!res.ok) setError(t(res.error));
+                  else onDone();
+                })
+              }
+              className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#f2c7c7] text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+            >
+              {held ? <XCircle className="size-3.5" /> : <Trash2 className="size-3.5" />}
+            </button>
+          ) : null}
         {!done ? (
           <button
             type="button"

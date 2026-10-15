@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
-import { isPermission, type Permission, type Role } from "./roles";
+import { grantedPermissions, type Permission, type Role } from "./roles";
 
 /**
  * What the signed-in user may do — resolved from the ROLE their employee row
@@ -36,14 +36,10 @@ const load = cache(async (): Promise<Permission[]> => {
 
     // No employee row → nothing. This used to fall through to "employee", which
     // meant any authenticated account inherited a working set of permissions
-    // without anyone granting them.
-    if (!employee) return [];
-    // A suspended colleague keeps their row and loses their access.
-    if (employee.status && employee.status !== "Active") return [];
-
-    const role = Array.isArray(employee.roles) ? employee.roles[0] : employee.roles;
-    const keys = role?.permission_keys ?? [];
-    return keys.filter(isPermission);
+    // without anyone granting them. A suspended colleague keeps their row and
+    // loses their access. Same rule as public.staff_can() (0073).
+    const role = Array.isArray(employee?.roles) ? employee.roles[0] : employee?.roles;
+    return grantedPermissions(employee ? { status: employee.status, permission_keys: role?.permission_keys ?? null } : null);
   } catch {
     return [];
   }

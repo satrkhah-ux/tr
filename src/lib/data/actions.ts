@@ -13,6 +13,7 @@ import { hotelRuleError } from "@/lib/catalog/hotel-rules";
 import { getHotelUsage } from "./hotel-tools";
 import { logAudit } from "./audit";
 import { diffRecord, issueRowsFunction } from "./quality";
+import { OFFER_LOCKED_COLUMNS, OFFER_OWNER_COLUMNS, changedLockedColumns } from "@/lib/offer/locked-columns";
 import type {
   DataRow,
   DataValue,
@@ -94,6 +95,10 @@ async function writeAccess(table: AllowedTable): Promise<Access | TranslationKey
 function writable(table: AllowedTable, values: DataRow, internal: boolean): DataRow {
   if (internal) return values;
   return Object.fromEntries(Object.entries(values).filter(([column]) => !isCostColumn(table, column)));
+}
+
+function without(values: DataRow, columns: readonly string[]): DataRow {
+  return Object.fromEntries(Object.entries(values).filter(([column]) => !columns.includes(column)));
 }
 
 /**
@@ -286,7 +291,9 @@ export async function createRow(table: AllowedTable, values: DataRow): Promise<M
       if (typeof checked === "string") return { ok: false, error: checked };
       values = checked;
     }
-    const written = writable(table, values, internal);
+    // an offer's company and what it owes are the producer's (offer-insert.ts) —
+    // never a form's, nor a copy's (duplicateRow) of a partner's file
+    const written = writable(table, table === "offers" ? without(values, OFFER_OWNER_COLUMNS) : values, internal);
     const { data, error } = await supabase
       .from(table)
       .insert(written as never)
@@ -307,6 +314,19 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
     if (typeof granted === "string") return { ok: false, error: granted };
     const { supabase, columns, internal } = granted;
     values = writable(table, values, internal);
+    // 0073: sessions cannot UPDATE an offer's owner or money. The total and the
+    // customer move for offers.write, through the service role; the company and
+    // what it owes, never from here. Untouched ones are dropped — the form sends
+    // every field it shows, total included.
+    let writer = supabase;
+    if (table === "offers") {
+      const { data: stored } = await supabase.from("offers").select(OFFER_LOCKED_COLUMNS.join(", ")).eq("id", id).maybeSingle();
+      const changed = changedLockedColumns(values, stored as unknown as Record<string, unknown> | null);
+      if (changed.some((column) => (OFFER_OWNER_COLUMNS as readonly string[]).includes(column))) return { ok: false, error: "err.forbidden" };
+      if (changed.length === 0) values = without(values, OFFER_LOCKED_COLUMNS);
+      else if (await currentCan("offers.write")) writer = createSupabaseServiceClient();
+      else return { ok: false, error: "err.forbidden" };
+    }
     if (table === "hotels") {
       const checked = await hotelWrite(supabase, values, false);
       if (typeof checked === "string") return { ok: false, error: checked };
@@ -326,9 +346,9 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
     // what the row held, for the change log
     const fields = Object.keys(values).filter((column) => /^[a-z_][a-z0-9_]*$/.test(column));
     const { data: before } = fields.length
-      ? await supabase.from(table).select(fields.join(", ")).eq("id", id).maybeSingle()
+      ? await writer.from(table).select(fields.join(", ")).eq("id", id).maybeSingle()
       : { data: null };
-    const { data, error } = await supabase
+    const { data, error } = await writer
       .from(table)
       .update(values as never)
       .eq("id", id)

@@ -71,6 +71,8 @@ export type AuditAction =
   | "booking.created"
   | "booking.confirmed"
   | "booking.cancelled"
+  // logged BEFORE the row (and its cascaded vouchers) is gone
+  | "booking.deleted"
   | "dispatch.sent"
   | "voucher.issued"
   | "voucher.revoked"

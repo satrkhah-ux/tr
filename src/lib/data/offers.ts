@@ -25,6 +25,7 @@ import { getPartnerSession } from "@/lib/partners/session";
 import { getClimateNote } from "./climate-actions";
 import { insertOffer } from "./offer-insert";
 import { setOfferStatus } from "./offer-status";
+import { draftToFreeze } from "./issued-draft";
 import { getRates, type RatesResult } from "./rates-actions";
 import { STAGE_KEYS } from "./pipeline";
 
@@ -851,7 +852,7 @@ export async function publishOffer(serial: string): Promise<PublishResult> {
     if (!internal) return { ok: false, error: "err.loadFailed" };
     const client = toClientOfferDTO(internal);
 
-    const { data: offerRow } = await supabase.from("offers").select("id").eq("serial", serial).maybeSingle();
+    const { data: offerRow } = await supabase.from("offers").select("id, partner_company_id").eq("serial", serial).maybeSingle();
     if (!offerRow) return { ok: false, error: "err.loadFailed" };
     const offerId = (offerRow as { id: string }).id;
 
@@ -881,11 +882,18 @@ export async function publishOffer(serial: string): Promise<PublishResult> {
     });
     if (clientErr) return { ok: false, error: "err.createFailed" };
 
+    // The first version also freezes the draft that issued it: operations seeds
+    // its bookings and travelers from THIS copy (issued-draft.ts), never from a
+    // draft still editable after issue (audit M1).
+    const sourceDraft =
+      version === 1
+        ? await draftToFreeze(renders, serial, (offerRow as { partner_company_id: string | null }).partner_company_id)
+        : null;
     await renders.from("offer_renders").insert({
       offer_id: offerId,
       version,
       variant: "internal",
-      snapshot_json: internal as unknown as Record<string, unknown>,
+      snapshot_json: (sourceDraft ? { ...internal, source_draft: sourceDraft } : internal) as unknown as Record<string, unknown>,
       file_path: filePath,
       rendered_at: new Date().toISOString(),
     });
