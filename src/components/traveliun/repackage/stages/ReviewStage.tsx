@@ -9,7 +9,9 @@ import {
   isFieldConfident,
   keyHotels,
   packageNights,
+  packageStops,
   stageHref,
+  visitNightsGaps,
   withArrival,
   withDeparture,
   type ConfidenceFieldKey,
@@ -56,6 +58,11 @@ export function ReviewStage({ draftId, data, patch }: RepackageStageProps) {
   // each hotel's stop — a city visited twice is two stops, each with its own hotel
   const keys = cityKeys(pkg.cities);
   const hotelStops = keyHotels(pkg.cities, pkg.hotels);
+  // a visit with two or more hotels: each one's nights, as they will chain (its own, or its share)
+  const shared = new Map(
+    packageStops(pkg).flatMap((stop) => (stop.hotels.length > 1 ? stop.hotels.map((h) => [h.index, h.nights] as const) : [])),
+  );
+  const gaps = visitNightsGaps(pkg);
   const stopLabel = (index: number) => {
     const name = pkg.cities[index].city_name.trim();
     const visits = pkg.cities.filter((c) => c.city_name.trim() === name).length;
@@ -183,12 +190,31 @@ export function ReviewStage({ draftId, data, patch }: RepackageStageProps) {
                       ))}
                     </select>
                   ) : null}
-                  <div className="flex gap-2">
+                  <div className="flex items-end gap-2">
                     <input className={fieldClass} value={h.hotel_name} placeholder={t("rp.field.hotels")} onChange={(e) => { const hotels = [...pkg.hotels]; hotels[i] = { ...h, hotel_name: e.target.value }; update({ hotels }, "hotels"); }} />
+                    {/* several hotels in one visit: how its nights are shared — a cleared box takes its even share again */}
+                    {shared.has(i) ? (
+                      <label className="grid w-24 shrink-0 gap-0.5 text-[10.5px] font-bold text-[#557d78]">
+                        {t("rp.field.hotelNights")}
+                        <input
+                          type="number"
+                          min={0}
+                          dir="ltr"
+                          className={`${fieldClass} tv-tnum`}
+                          value={shared.get(i)}
+                          onChange={(e) => { const hotels = [...pkg.hotels]; hotels[i] = { ...h, nights: e.target.value === "" ? null : Math.max(0, Math.trunc(Number(e.target.value)) || 0) }; update({ hotels }, "hotels"); }}
+                        />
+                      </label>
+                    ) : null}
                     <input className={`${fieldClass} w-24`} value={h.board} placeholder="BB" onChange={(e) => { const hotels = [...pkg.hotels]; hotels[i] = { ...h, board: e.target.value }; update({ hotels }, "hotels"); }} />
                     <button type="button" className={removeButtonClass} onClick={() => update({ hotels: pkg.hotels.filter((_, j) => j !== i) }, "hotels")}><Trash2 className="size-4" /></button>
                   </div>
                 </div>
+              ))}
+              {gaps.map((g, k) => (
+                <p key={k} className="text-[12px] font-bold text-[#c22850]">
+                  {t("rp.err.visitHotelNights", { city: g.city_name.trim() || "—", nights: g.nights, sum: g.sum })}
+                </p>
               ))}
               <button type="button" className={addButtonClass} onClick={() => update({ hotels: [...pkg.hotels, { city_name: "", hotel_name: "", room_type: "", board: "", nights: null, check_in: null, check_out: null }] }, "hotels")}><Plus className="size-4" />{t("rp.edit.add")}</button>
             </div>

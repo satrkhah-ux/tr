@@ -116,6 +116,7 @@ const KEY_EN: Record<string, string> = {
   الرحلة: "Flight",
   "نقطة الالتقاء": "Meeting point",
   السيارة: "Vehicle",
+  "عدد السيارات": "No. of cars",
   "رقم السيارة": "Plate no.",
   السائق: "Driver",
   "جوال السائق": "Driver mobile",

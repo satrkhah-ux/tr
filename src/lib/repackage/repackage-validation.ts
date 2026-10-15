@@ -6,6 +6,8 @@
  *    so a messy import can never be published without a human confirming it.
  *  - Nights invariant sum(cities.nights)===trip_nights → BLOCKING (reuses the
  *    shared offer/invariants module for a bilingual message).
+ *  - A visit with two or more hotels: their nights must add up to the visit's
+ *    → BLOCKING on /review (the stays chain inside the visit).
  *  - The client's name/phone and the arrival/departure dates (departure =
  *    arrival + nights) → BLOCKING on /review: the document is addressed to them.
  *  - A missing sell price, or a sell BELOW the supplier cost → BLOCKING on /edit.
@@ -26,6 +28,7 @@ import {
   isFieldConfident,
   packageNights,
   uncertainFields,
+  visitNightsGaps,
   type RepackageData,
   type StageKey,
 } from "./repackage-types";
@@ -90,6 +93,11 @@ export function validateRepackage(data: RepackageData): RepackageValidation {
     });
     const mismatch = violations.find((v) => v.code === "nights_sum_mismatch");
     if (mismatch) blocking.push({ severity: "blocking", stage: "review", invariant: mismatch });
+  }
+
+  // ── a visit with several hotels: their nights fill the visit, no more, no less ──
+  for (const gap of visitNightsGaps(pkg)) {
+    blocking.push({ severity: "blocking", stage: "review", key: "rp.err.visitHotelNights", params: { city: gap.city_name.trim() || "—", nights: gap.nights, sum: gap.sum } });
   }
 
   // ── the client and the travel dates — the first thing /review asks ─────

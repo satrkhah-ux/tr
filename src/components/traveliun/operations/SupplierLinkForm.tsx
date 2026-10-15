@@ -21,7 +21,7 @@ export function SupplierLinkForm({
   token: string;
   en: boolean;
   driverKind: boolean;
-  initial: { driver: string; phone: string; car: string; plate: string };
+  initial: { driver: string; phone: string; car: string; cars: string; plate: string };
 }) {
   const router = useRouter();
   const [form, setForm] = useState({ ref: "", ...initial });
@@ -66,6 +66,11 @@ export function SupplierLinkForm({
           <label className={label}>
             {L("السيارة", "Vehicle")}
             <input maxLength={120} value={form.car} onChange={set("car")} className={field} />
+          </label>
+          {/* how many, beside the model — typing a model keeps the count */}
+          <label className={label}>
+            {L("عدد السيارات", "No. of cars")}
+            <input type="number" dir="ltr" min={1} max={50} step={1} inputMode="numeric" value={form.cars} onChange={set("cars")} className={field} />
           </label>
           <label className={label}>
             {L("رقم اللوحة", "Plate no.")}

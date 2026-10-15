@@ -1715,6 +1715,8 @@ export const ar: Dictionary = {
   "rp.client.departureHint": "يُحسب من تاريخ الوصول + {nights} ليالٍ، ويمكنك تعديله.",
   "rp.field.hotelStop": "مدينة الفندق",
   "rp.field.visitN": "{city} — الزيارة {n}",
+  "rp.field.hotelNights": "الليالي",
+  "rp.err.visitHotelNights": "ليالي فنادق {city} مجموعها {sum} — يجب أن تساوي ليالي الزيارة ({nights}). عدّل ليالي كل فندق.",
 
   // ---------- العروض الجاهزة ----------
   "pg.fromLibrary": "اختر من القائمة المعتمدة ({count})",
@@ -2060,6 +2062,7 @@ export const ar: Dictionary = {
   "ops.err.emailUnavailable": "البريد الإلكتروني غير مُهيّأ بعد.",
   "ops.err.notFound": "العملية غير موجودة.",
   "ops.err.titleRequired": "أعطِ الحجز عنواناً.",
+  "ops.err.carCount": "عدد السيارات رقم صحيح من 1 إلى 50.",
   "ops.err.confirmationRequired": "رقم التأكيد مطلوب.",
   "ops.err.nothingToIssue": "لا يوجد حجز مؤكّد لإصدار مستند منه.",
   "ops.err.deleteConfirmed": "الحجز المؤكَّد أو الذي لدى المورّد لا يُحذف — ألغِه بزر «إلغاء الحجز».",
@@ -2086,6 +2089,7 @@ export const ar: Dictionary = {
   "ops.drv.driver": "اسم السائق",
   "ops.drv.phone": "جوال السائق",
   "ops.drv.car": "نوع السيارة",
+  "ops.drv.cars": "عدد السيارات",
   "ops.drv.plate": "رقم اللوحة",
   "ops.drv.time": "وقت الالتقاء",
   "ops.drv.meet": "نقطة الالتقاء",

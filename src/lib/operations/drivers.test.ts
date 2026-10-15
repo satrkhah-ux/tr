@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clientService, driverMessage, driverServiceKind, parseLeg, retimeTransfers, waNumber } from "./drivers";
+import { carCount, carFields, carOf, carText, clientService, driverMessage, driverServiceKind, DRV, parseLeg, retimeTransfers, waNumber } from "./drivers";
 
 const intl = {
   title: "طيران دولي RUH ⇄ KUL",
@@ -108,5 +108,35 @@ describe("what the client and the driver are told", () => {
   it("dials a Saudi mobile with its country code", () => {
     expect(waNumber("0569222111")).toBe("966569222111");
     expect(waNumber("+60 12-345 6789")).toBe("60123456789");
+  });
+});
+
+describe("the car and how many — the count has its own key", () => {
+  it("reads a booking pulled before the key: the count inside the car text", () => {
+    expect(carOf({ [DRV.car]: "فان × 2" })).toEqual({ model: "فان", count: 2 });
+    expect(carText({ [DRV.car]: "فان × 2" })).toBe("فان × 2");
+    expect(carText({ [DRV.car]: "ميني فان" })).toBe("ميني فان");
+  });
+
+  it("keeps the count when a model is typed over the car", () => {
+    expect(carText({ [DRV.car]: "Hyundai Staria", [DRV.cars]: "2" })).toBe("Hyundai Staria × 2");
+    // the key wins over an old «× n» left in the text
+    expect(carText({ [DRV.car]: "فان × 2", [DRV.cars]: "3" })).toBe("فان × 3");
+    expect(carText({ [DRV.cars]: "2" })).toBe("× 2");
+    expect(carText({})).toBe("");
+  });
+
+  it("opens the edit form on the model alone, the count beside it", () => {
+    expect(carFields({ [DRV.car]: "فان × 2", السائق: "Ali" })).toEqual({ [DRV.car]: "فان", [DRV.cars]: "2" });
+    expect(carFields({ السائق: "Ali" })).toEqual({});
+  });
+
+  it("takes a whole number from 1 to 50", () => {
+    expect([carCount("1"), carCount(" 50 "), carCount("0"), carCount("51"), carCount("2.5"), carCount("")]).toEqual([1, 50, null, null, null, null]);
+  });
+
+  it("shows the client the car with its count", () => {
+    const tour = { kind: "service", title: "جولة: المدينة", start_date: "2026-11-21", detail: { "وقت الانطلاق": "09:00", [DRV.car]: "H1", [DRV.cars]: "2" } };
+    expect(clientService(tour, "2026-11-20")?.car).toBe("H1 × 2");
   });
 });

@@ -39,6 +39,17 @@ describe("supplierAnswer", () => {
     });
   });
 
+  it("writes the supplier's car model and how many apart, the count 1 to 50", () => {
+    const answer = { ...blank, driver: "Ali", phone: "+60 12", car: "Hyundai Staria" };
+    expect(supplierAnswer("tour", { ...answer, cars: " 2 " })).toEqual({
+      ok: true,
+      ref: null,
+      detail: { السائق: "Ali", "جوال السائق": "+60 12", السيارة: "Hyundai Staria", "عدد السيارات": "2" },
+    });
+    expect(supplierAnswer("tour", { ...answer, cars: "0" })).toEqual({ ok: false, error: "cars" });
+    expect(supplierAnswer("tour", { ...answer, cars: "abc" })).toEqual({ ok: false, error: "cars" });
+  });
+
   it("caps what a public form may write", () => {
     const res = supplierAnswer(null, { ...blank, ref: "x".repeat(500) });
     expect(res.ok && res.ref?.length).toBe(60);

@@ -1717,6 +1717,8 @@ export const en = {
   "rp.client.departureHint": "Worked out as arrival + {nights} nights; you can change it.",
   "rp.field.hotelStop": "Hotel's city",
   "rp.field.visitN": "{city} — visit {n}",
+  "rp.field.hotelNights": "Nights",
+  "rp.err.visitHotelNights": "The hotels in {city} add up to {sum} nights — they must equal the visit's {nights}. Adjust each hotel's nights.",
 
   // ---------- ready-made seasonal offers («العروض الجاهزة») ----------
   "pg.fromLibrary": "Add from the approved list ({count})",
@@ -2062,6 +2064,7 @@ export const en = {
   "ops.err.emailUnavailable": "Email is not configured yet.",
   "ops.err.notFound": "Operation not found.",
   "ops.err.titleRequired": "Give the booking a title.",
+  "ops.err.carCount": "The number of cars is a whole number from 1 to 50.",
   "ops.err.confirmationRequired": "The confirmation number is required.",
   "ops.err.nothingToIssue": "Nothing confirmed to issue a document from yet.",
   "ops.err.deleteConfirmed": "A confirmed booking, or one with the supplier, is not deleted — cancel it instead.",
@@ -2088,6 +2091,7 @@ export const en = {
   "ops.drv.driver": "Driver",
   "ops.drv.phone": "Driver's mobile",
   "ops.drv.car": "Car type",
+  "ops.drv.cars": "No. of cars",
   "ops.drv.plate": "Plate",
   "ops.drv.time": "Meeting time",
   "ops.drv.meet": "Meeting point",

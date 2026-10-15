@@ -107,6 +107,24 @@ describe("repackageToPreviewOffer", () => {
     expect(georgia.departure_date).toBe("2026-08-06");
   });
 
+  it("previews every hotel of a visit, chained inside it (London: one stop, two hotels)", () => {
+    const hotel = (hotel_name: string, nights: number | null) =>
+      ({ city_name: "لندن", hotel_name, room_type: "", board: "BB", nights, check_in: null, check_out: null });
+    const london = repackageToPreviewOffer({
+      ...data,
+      extracted: extracted({
+        cities: [{ city_name: "لندن", nights: 5 }],
+        trip_nights: 5,
+        hotels: [hotel("DoubleTree ExCel", null), hotel("Park Plaza Waterloo", null)],
+      }),
+    })!;
+    expect(london.hotels.map((h) => [h.hotel_name, h.nights, h.check_in, h.check_out])).toEqual([
+      ["DoubleTree ExCel", 2, "2026-08-01", "2026-08-03"],
+      ["Park Plaza Waterloo", 3, "2026-08-03", "2026-08-06"],
+    ]);
+    expect(london.departure_date).toBe("2026-08-06");
+  });
+
   it("carries the lists the document prints", () => {
     expect(preview.includes).toEqual(["الفنادق"]);
     expect(preview.excludes).toEqual(["الطيران الدولي"]);

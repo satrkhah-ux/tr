@@ -993,6 +993,12 @@ export function vehicleText(leg: Pick<TransportLeg, "car_type" | "cars">, fallba
   return leg.cars > 1 ? `${base} × ${leg.cars}` : base;
 }
 
+/** vehicleText read back: «فان × 2» → فان and 2; a text without «× n» is one car. */
+export function splitVehicle(text: string): { car_type: string; cars: number } {
+  const m = text.match(/^(.*?)\s*×\s*(\d+)\s*$/);
+  return m ? { car_type: m[1].trim(), cars: Math.max(Number(m[2]), 1) } : { car_type: text.trim(), cars: 1 };
+}
+
 /**
  * The place labels `deriveTransportRows` writes. Exported because they are
  * also KEYS: the pricing matcher reads «المطار» and «فندق X» back to find the

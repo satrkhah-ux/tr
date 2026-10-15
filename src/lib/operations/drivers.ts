@@ -9,7 +9,7 @@
  * Pure: no React, no Supabase.
  */
 
-import { TRANSPORT_AIRPORT } from "@/lib/offer/draft-types";
+import { splitVehicle, TRANSPORT_AIRPORT, vehicleText } from "@/lib/offer/draft-types";
 import { BEFORE_DOMESTIC, BEFORE_INTL, LANDS, LATER, MEET_AFTER_LANDING, shift } from "./seed-plan";
 
 /** The detail keys a driver card reads and writes. */
@@ -19,6 +19,8 @@ export const DRV = {
   flight: "الرحلة",
   meet: "نقطة الالتقاء",
   car: "السيارة",
+  /** how many of that car — its own key, so a model typed into «السيارة» keeps the count. */
+  cars: "عدد السيارات",
   plate: "رقم السيارة",
   driver: "السائق",
   phone: "جوال السائق",
@@ -31,6 +33,39 @@ export const DRV = {
 /** The two steps a driver marks on his day's page — the words stored in DRV.status. */
 export const DRIVER_STEP = { on_way: "في الطريق", done: "تم الاستقبال" } as const;
 export type DriverStep = keyof typeof DRIVER_STEP;
+
+// ---------------- the car and how many ----------------
+
+/** A typed number of cars, or null: a whole number from 1 to 50. */
+export function carCount(v: unknown): number | null {
+  const s = String(v ?? "").trim();
+  const n = /^\d{1,2}$/.test(s) ? Number(s) : 0;
+  return n >= 1 && n <= 50 ? n : null;
+}
+
+type Detail = Record<string, string> | null | undefined;
+
+/**
+ * The model and the count. The count's own key wins; a booking pulled before
+ * it existed kept the count inside the car text («فان × 2»), read back here.
+ */
+export function carOf(detail: Detail): { model: string; count: number } {
+  const { car_type, cars } = splitVehicle(detail?.[DRV.car] ?? "");
+  return { model: car_type, count: carCount(detail?.[DRV.cars]) ?? cars };
+}
+
+/** «فان × 2» — the car as every reader prints it. */
+export function carText(detail: Detail): string {
+  const { model, count } = carOf(detail);
+  return model ? vehicleText({ car_type: model, cars: count }) : count > 1 ? `× ${count}` : "";
+}
+
+/** What an edit form starts from: the model alone under «السيارة», the count beside it — nothing when no car is set. */
+export function carFields(detail: Detail): Record<string, string> {
+  if (!detail?.[DRV.car]?.trim() && !detail?.[DRV.cars]?.trim()) return {};
+  const { model, count } = carOf(detail);
+  return { [DRV.car]: model, [DRV.cars]: String(count) };
+}
 
 /** The step a booking's detail says the driver reached, or null. */
 export function driverStep(detail: Record<string, string> | null): DriverStep | null {
@@ -205,7 +240,7 @@ export function clientService(b: BookingLike, today: string): ClientService | nu
     date: b.start_date,
     time: meetTime(b),
     meet: d[DRV.meet] ?? "",
-    car: d[DRV.car] ?? "",
+    car: carText(d),
     flight: d[DRV.flight] ?? "",
     program: d["البرنامج"] ?? "",
     driver: b.start_date === today && named ? { name: d[DRV.driver] ?? "", phone: d[DRV.phone] ?? "", plate: d[DRV.plate] ?? "" } : null,

@@ -18,6 +18,7 @@ import {
   TRANSPORT_AIRPORT,
   TRANSPORT_HOTEL_PREFIX,
   TRANSPORT_TOURS,
+  splitVehicle,
   tourCars,
   tourVehicle,
   type DraftData,
@@ -77,6 +78,17 @@ function travellers(trip: DraftData["trip"]): string {
   ]
     .filter(Boolean)
     .join(" + ");
+}
+
+/**
+ * The car under «السيارة» and how many under «عدد السيارات» (DRV in drivers.ts):
+ * apart, so a model typed into the car later does not drop the «× 2».
+ */
+function putCar(detail: Record<string, string>, vehicle: string) {
+  const { car_type, cars } = splitVehicle(vehicle);
+  if (!car_type) return;
+  detail["السيارة"] = car_type;
+  detail["عدد السيارات"] = String(cars);
 }
 
 const byDeparture = (a: DraftFlight, b: DraftFlight) => (a.departure_at ?? "").localeCompare(b.departure_at ?? "");
@@ -201,7 +213,7 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       detail["الوقت"] = time || LATER;
       if (flight) detail["الرحلة"] = `${flight.flight_no.trim() || "—"} ${code(flight.from_airport)} → ${code(flight.to_airport)}`;
       detail["نقطة الالتقاء"] = meet;
-      if (tr.car_type) detail["السيارة"] = tr.car_type;
+      putCar(detail, tr.car_type ?? "");
       detail["الركاب"] = String(people);
       const buy = buyOf(`transport:${tr.from_place}>${tr.to_place}>${tr.car_type ?? ""}`);
       rows.push({
@@ -227,9 +239,8 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
         if (pick.free) return;
         const title = pick.title.trim() || `جولة سياحية في ${city.city_name}`;
         const detail: Record<string, string> = { المدينة: city.city_name, "وقت الانطلاق": "09:00" };
-        // the car and how many, as a transfer says it: «فان × 2»
-        const car = tourVehicle(pick, data.transport_plan.tours.car_type);
-        if (car) detail["السيارة"] = car;
+        // the car and how many — «فان» and 2, read together as «فان × 2»
+        putCar(detail, tourVehicle(pick, data.transport_plan.tours.car_type));
         detail["الركاب"] = String(people);
         if (pick.text.trim()) detail["البرنامج"] = pick.text.trim();
         rows.push({

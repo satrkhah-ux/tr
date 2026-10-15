@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addStay, deriveTransportRows, emptyDraftData, emptyFlight, type DraftData, type DraftFlight } from "@/lib/offer/draft-types";
 import { addCity, withTours } from "@/lib/offer/basic";
 import { planBookingsFromDraft } from "./seed-plan";
+import { carText, DRV } from "./drivers";
 
 /** The trial's case: Malaysia 20–27 Nov, KL 4 + Langkawi 3, 2 + 2, a domestic flight there and back. */
 function malaysia(): DraftData {
@@ -80,11 +81,20 @@ describe("the pull from the offer", () => {
       i === 0 ? { ...c, tour_picks: c.tour_picks!.map((p, k) => (k === 0 ? { ...p, car_type: "فان", cars: 2 } : p)) } : c,
     );
     const tours = planBookingsFromDraft(data, "شروط الشركة").filter((r) => r.origin_ref.startsWith("tour:كوالالمبور"));
-    expect(tours.map((t) => [t.detail["السيارة"], t.quoted_net])).toEqual([
-      ["فان × 2", 600],
+    expect(tours.map((t) => [t.detail["السيارة"], t.detail[DRV.cars], carText(t.detail), t.quoted_net])).toEqual([
+      ["فان", "2", "فان × 2", 600],
       // a pick from before the count: the trip's tour car, once
-      ["ميني فان", 300],
+      ["ميني فان", "1", "ميني فان", 300],
     ]);
+  });
+
+  it("keeps the count when operations type a car model over the seeded car", () => {
+    const data = malaysia();
+    data.cities = data.cities.map((c, i) =>
+      i === 0 ? { ...c, tour_picks: c.tour_picks!.map((p, k) => (k === 0 ? { ...p, car_type: "فان", cars: 2 } : p)) } : c,
+    );
+    const tour = planBookingsFromDraft(data, "شروط الشركة").find((r) => r.origin_ref.startsWith("tour:كوالالمبور"))!;
+    expect(carText({ ...tour.detail, [DRV.car]: "Hyundai Staria" })).toBe("Hyundai Staria × 2");
   });
 });
 
