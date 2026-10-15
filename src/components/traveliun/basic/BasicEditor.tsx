@@ -29,6 +29,8 @@ import {
   Stamp,
   TrainFront,
   XCircle,
+  ScrollText,
+  Route,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { getCountryHotels, getRoomTypeLookups, produceOfferFromDraft } from "@/lib/data/drafts";
@@ -103,6 +105,8 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { FieldIssueProvider } from "../generator/FieldIssue";
 import { FlightsStage } from "../generator/stages/FlightsStage";
 import { ServicesStage } from "../generator/stages/ServicesStage";
+import { TermsStage } from "../generator/stages/TermsStage";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useDraftState } from "../generator/useDraftState";
 import { BasicCityCard } from "./BasicCityCard";
 import { BasicFlightPlan } from "./BasicFlightPlan";
@@ -110,6 +114,7 @@ import { BasicPhoneLookup } from "./BasicPhoneLookup";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
 import { basicCard, basicField, basicLabel, typedNumber } from "./styles";
+import { HotelCombobox } from "./HotelCombobox";
 import { IssueGuardNotice } from "../IssueGuardNotice";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -858,6 +863,21 @@ export function BasicEditor({
     { key: "visas", icon: Stamp },
   ];
 
+  // «الشروط والأحكام» — this file's terms: the trip country's own come in by
+  // themselves when it is chosen (moveTripCountry); more are picked or typed here
+  const termsButton = (
+    <Dialog>
+      <DialogTrigger className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]">
+        <ScrollText className="size-3.5" />
+        {t("pg.terms")} <span className="tv-tnum">({data.services.terms.length})</span>
+      </DialogTrigger>
+      <DialogContent className="w-[min(720px,calc(100vw/var(--tv-zoom)_-_24px))]" dir={language === "ar" ? "rtl" : "ltr"}>
+        <div className="[&>section]:border-0 [&>section]:p-0 [&>section]:shadow-none">
+          <TermsStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
   const body: Record<Step, ReactNode> = {
     // ---- 1. the customer and the trip, and what the programme includes ----
     client: (
@@ -1190,15 +1210,12 @@ export function BasicEditor({
               <>
                 <label className={`${basicLabel} min-w-36 flex-[1.5]`}>
                   {tx("hotel")}
-                  <select value={newHotel} onChange={(e) => setNewHotel(e.target.value)} className={basicField}>
-                    <option value="">{tx("choose")}</option>
-                    {barHotels.map((h) => (
-                      <option key={h.id} value={h.id}>
-                        {h.name}
-                        {h.stars ? ` ${"★".repeat(h.stars)}` : ""}
-                      </option>
-                    ))}
-                  </select>
+                  <HotelCombobox
+                    hotels={barHotels}
+                    valueId={newHotel || null}
+                    placeholder={tx("choose")}
+                    onPick={(h) => setNewHotel(h?.id ?? "")}
+                  />
                 </label>
                 <label className={`${basicLabel} w-32 shrink-0 sm:w-40`}>
                   {tx("roomType")}
@@ -1290,6 +1307,8 @@ export function BasicEditor({
         <div className="-mx-3 -mb-1 [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
           <ServicesStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} />
         </div>
+        {/* without the price step, the terms are reached from here */}
+        {canPricing ? null : <div className="mt-2">{termsButton}</div>}
       </>
     ),
 
@@ -1320,6 +1339,7 @@ export function BasicEditor({
                 {pricingBusy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
                 {pricingBusy ? tx("calcBusy") : tx("calc")}
               </button>
+              {termsButton}
             </div>
             {pricingError ? <p role="alert" className="mb-2 text-[12px] font-bold text-[#c22850]">{pricingError}</p> : null}
             {data.pricing.items.length === 0 ? (
@@ -1593,9 +1613,17 @@ export function BasicEditor({
               </button>
             ) : null}
             <Link
+              href={`/basic/${draftId}/advanced`}
+              onClick={() => void flush()}
+              className="ms-auto inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+            >
+              <Route className="size-3.5" />
+              البكج المتقدم{data.journey?.enabled ? " ✓" : ""}
+            </Link>
+            <Link
               href={stageHref(draftId, "trip")}
               onClick={() => void flush()}
-              className="ms-auto inline-flex h-8 items-center rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] underline-offset-2 hover:underline"
+              className="inline-flex h-8 items-center rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] underline-offset-2 hover:underline"
             >
               {tx("fullGenerator")}
             </Link>

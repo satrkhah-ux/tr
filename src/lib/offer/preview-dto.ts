@@ -24,11 +24,13 @@ import {
   matchPartner,
   mealPlanIncludeLine,
   roomTypesText,
+  stayCancellation,
   type DraftData,
   type GeneratorLookups,
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
 import { transportNoteForDay } from "./itinerary";
+import { clientLines } from "./advanced";
 import { offerTotals, type CurrencyRates } from "./pricing";
 import type { ExtractedPackage, RepackageData } from "@/lib/repackage/repackage-types";
 
@@ -98,6 +100,7 @@ export function draftToPreviewOffer(
   const cities = deriveCityDates(start, data.cities);
   const nights = data.trip.nights || cities.reduce((sum, c) => sum + c.nights, 0);
   const days = data.trip.days || (nights > 0 ? nights + 1 : 0);
+  const route = data.journey?.enabled ? clientLines(data.journey) : { includes: [], excludes: [], pending: [] };
 
   return {
     ...emptyBase(),
@@ -128,7 +131,7 @@ export function draftToPreviewOffer(
         check_out,
         sell_price: null,
         sell_currency: null,
-        cancellation_policy: h.sourcing?.cancellation_policy ?? null,
+        cancellation_policy: stayCancellation(h),
         excluded_surcharges: h.sourcing?.excluded_surcharges ?? [],
         valid_until: h.sourcing?.valid_until ?? null,
         image_url: h.sourcing?.image_url ?? null,
@@ -157,14 +160,15 @@ export function draftToPreviewOffer(
     // The meal plan is stated the same way the produced offer states it, so
     // the agent is previewing the paper rather than something close to it.
     includes: [
+      ...route.includes,
       ...data.services.includes,
       ...(mealPlanIncludeLine(data.trip) ? [mealPlanIncludeLine(data.trip)!] : []),
     ],
-    excludes: data.services.excludes,
-    terms: data.services.terms,
+    excludes: [...route.excludes, ...data.services.excludes],
+    terms: [...data.services.terms, ...route.pending],
     days: data.days
       // index on the FULL list: the transport line depends on a day's neighbours
-      .map((d, index) => ({ d, move: data.scope.transport ? transportNoteForDay(data.transport_plan, data.days, index, data.flights) : null }))
+      .map((d, index) => ({ d, move: data.scope.transport && !data.journey?.enabled ? transportNoteForDay(data.transport_plan, data.days, index, data.flights) : null }))
       .filter(({ d, move }) => d.title.trim() || d.activities.length > 0 || move)
       .map(({ d, move }) => ({
         transport_note: move,

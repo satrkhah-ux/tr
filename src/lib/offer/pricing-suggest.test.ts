@@ -265,15 +265,38 @@ describe("suggestPricing — the order of trust", () => {
     expect(hotel.quantity).toBe(1);
   });
 
+  // the stay draftWithOneStay derives, one room, as selectHotelRate records it
+  const QUOTED = { check_in: "2026-09-10", check_out: "2026-09-13", rooms: 1, adults: 2, children: 1, hotel_name: "فندق آيوتا", board_type: "BB" as const, room_name: "مزدوجة" };
+
   it("never adds a supplier's stay price to the rooms underneath it", () => {
     const data = draftWithOneStay();
     data.hotels[0] = withRooms(
-      { ...data.hotels[0], sourcing: SUPPLIER_RATE },
+      { ...data.hotels[0], sourcing: { ...SUPPLIER_RATE, quoted_for: QUOTED } },
       [{ room_type_id: null, room_type_name: "مزدوجة", board_type: "BB", price: 500 }],
     );
     const [hotel] = suggestPricing(data, EMPTY, LABELS);
     expect(hotel.sell_price).toBe(900);
     expect(hotel.buy_price).toBe(600);
+  });
+
+  it("does not price a stay with a rate quoted for a smaller one", () => {
+    const stretched = (change: (d: DraftData) => void) => {
+      const data = draftWithOneStay();
+      data.hotels[0] = withRooms(
+        { ...data.hotels[0], sourcing: { ...SUPPLIER_RATE, quoted_for: QUOTED } },
+        [{ room_type_id: null, room_type_name: "مزدوجة", board_type: "BB", price: null }],
+      );
+      change(data);
+      return suggestPricing(data, EMPTY, LABELS)[0];
+    };
+    expect(stretched(() => {}).source).toBe("supplier");
+    // a quote with no record of what it priced, more nights, another hotel, more guests
+    expect(stretched((d) => { d.hotels[0].sourcing = { ...SUPPLIER_RATE }; }).source).not.toBe("supplier");
+    expect(stretched((d) => { d.cities[0] = { ...d.cities[0], nights: 7, check_out: "2026-09-17" }; }).source).not.toBe("supplier");
+    expect(stretched((d) => { d.hotels[0] = { ...d.hotels[0], hotel_name: "فندق خمس نجوم" }; }).source).not.toBe("supplier");
+    expect(stretched((d) => { d.trip = { ...d.trip, adults: 8 }; }).source).not.toBe("supplier");
+    // the same stay, another board: a BB rate does not price all-inclusive
+    expect(stretched((d) => { d.hotels[0] = { ...d.hotels[0], rooms: d.hotels[0].rooms.map((r) => ({ ...r, board_type: "AI" as const })) }; }).source).not.toBe("supplier");
   });
 
   it("falls back to the remembered price when nothing was typed", () => {

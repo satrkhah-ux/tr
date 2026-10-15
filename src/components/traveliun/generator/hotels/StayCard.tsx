@@ -225,6 +225,27 @@ export function StayCard({
               were given. Typed prices are per room for the whole stay (above);
               here is what they are in, and who the stay was booked through. */}
           {!line.sourcing ? (
+            <div role="group" className="mt-3 inline-flex overflow-hidden rounded-[8px] border border-[#cfe0d9] text-[12px] font-bold">
+              {([true, false] as const).map((v) => (
+                <button
+                  key={String(v)}
+                  type="button"
+                  aria-pressed={line.refundable === v}
+                  onClick={() => onSetHotel({ refundable: line.refundable === v ? null : v })}
+                  className={`h-8 px-3 transition-colors ${
+                    line.refundable === v
+                      ? v
+                        ? "bg-[#e4f6ef] text-[#0f7a52]"
+                        : "bg-[#fdeeee] text-[#c43d3d]"
+                      : "bg-white text-[#557d78] hover:bg-[#f4f8f6]"
+                  }`}
+                >
+                  {t(v ? "pg.refundable" : "pg.nonRefundable")}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {!line.sourcing ? (
             <div className="mt-3 grid gap-3 sm:grid-cols-[130px_minmax(0,1fr)]">
               <label className={rowLabelClass}>
                 {t("pg.currencyCol")}
