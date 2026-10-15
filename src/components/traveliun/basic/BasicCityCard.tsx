@@ -158,8 +158,19 @@ export function BasicCityCard({
     ...(domestic.length > 0 || (data.scope.flights_domestic && index > 0) ? [{ key: "domestic" as const, label: tx("domesticTab"), icon: Plane }] : []),
     { key: "program" as const, label: tx("programTab"), icon: ListChecks, locked: programLocked },
   ];
-  const [tab, setTab] = useState<Tab>("hotel");
-  const open = tabs.some((x) => x.key === tab && !x.locked) ? tab : tabs[0]?.key;
+  // a stay already complete (picked from the add bar, or a file reopened) is not asked again: the card opens on what is left
+  const stayDone = (ls: DraftHotel[]) =>
+    ls.length > 0 && ls.every((l) => l.hotel_name.trim() && l.rooms.length > 0 && l.rooms.every((r) => (r.room_type_id || r.room_type_name.trim()) && r.board_type && r.price != null));
+  const hasTours = tabs.some((x) => x.key === "tours");
+  const [tab, setTab] = useState<Tab>(() => (hotelsOn && hasTours && stayDone(lines) ? "tours" : "hotel"));
+  // focus left the hotel fields: once the stay is complete the card moves on by itself
+  const [leftHotel, setLeftHotel] = useState(false);
+  const wanted = leftHotel && tab === "hotel" && hasTours && stayDone(lines) ? "tours" : tab;
+  const open = tabs.some((x) => x.key === wanted && !x.locked) ? wanted : tabs[0]?.key;
+  const pickTab = (key: Tab) => {
+    setLeftHotel(false);
+    setTab(key);
+  };
 
   // what the city still lacks before «تمت»: the stay, the tours, the airport cars
   const plan = data.transport_plan;
@@ -208,7 +219,7 @@ export function BasicCityCard({
                 aria-selected={open === key}
                 disabled={locked}
                 title={locked ? tx("programLocked") : undefined}
-                onClick={() => setTab(key)}
+                onClick={() => pickTab(key)}
                 className={`inline-flex h-7 items-center gap-1 rounded-[7px] border px-2.5 text-[11.5px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                   open === key ? "border-[#185045] bg-[#185045] text-white" : "border-[#d3e2dc] bg-white text-[#557d78] hover:border-[#165749]"
                 }`}
@@ -253,7 +264,15 @@ export function BasicCityCard({
       ) : open ? (
         <div className="p-3">
           {open === "hotel" && main ? (
-            <HotelPanel index={index} city={city} dayFrom={dayFrom} data={data} lookups={lookups} lines={lines} onLines={onLines} onSlice={onSlice} />
+            // leaving a complete stay moves on to the tours — never mid-typing; «الفندق» brings it back
+            <div
+              onFocus={() => setLeftHotel(false)}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setLeftHotel(true);
+              }}
+            >
+              <HotelPanel index={index} city={city} dayFrom={dayFrom} data={data} lookups={lookups} lines={lines} onLines={onLines} onSlice={onSlice} />
+            </div>
           ) : null}
           {open === "tours" ? (
             <ToursPanel
@@ -275,7 +294,7 @@ export function BasicCityCard({
             />
           ) : null}
           {open === "program" ? (
-            <BasicCityProgram city={city} data={data} dayLabel={dayLabel} onSlice={onSlice} onTours={() => setTab("tours")} />
+            <BasicCityProgram city={city} data={data} dayLabel={dayLabel} onSlice={onSlice} onTours={() => pickTab("tours")} programs={programs} />
           ) : null}
           {open === "domestic" ? (
             <DomesticPanel index={index} legs={domestic} data={data} lookups={lookups} onSlice={onSlice} />
