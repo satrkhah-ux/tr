@@ -6,6 +6,7 @@ import { FREE_DAY_TITLE, tourCars, type GeneratorLookups, type TourPick } from "
 import { programDayText, tourService, type TourProgram } from "@/lib/offer/itinerary";
 import { findTourPrice, listedTourPrice, tourCarPrice, type TourPrice } from "@/lib/offer/pricing-suggest";
 import { useTraveliunUI } from "../TraveliunUIProvider";
+import { SuggestInput, type Suggestion } from "../SuggestInput";
 import { basicField, typedNumber } from "../basic/styles";
 
 /**
@@ -26,8 +27,6 @@ export type TourCatalog = {
   carTypes: GeneratorLookups["carTypes"];
   /** the trip's tours car — a tour without its own goes in it. */
   tripCar: string;
-  /** the id of the city's TourChoices list. */
-  listId: string;
   /** the prices are shown (the generator: pricing.view). */
   showPrice: boolean;
 };
@@ -38,25 +37,22 @@ const caption = "text-[10.5px] font-bold text-[#7a948f]";
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
 /** The services a city's tour field offers: «يوم حر», its programmes, then the price list — each tour once. */
-export function TourChoices({ catalog }: { catalog: TourCatalog }) {
+export function tourChoices(catalog: TourCatalog): Suggestion[] {
   const own = new Set(catalog.programs.map((p) => p.id));
   // a listed tour of another city's programme is that city's, not this one's
   const prices = catalog.prices.filter((p) => !p.program_id || own.has(p.program_id));
-  return (
-    <datalist id={catalog.listId}>
-      <option value={FREE_DAY_TITLE} />
-      {catalog.programs
-        .filter((p) => !p.is_free_day)
-        .map((p) => (
-          <option key={p.id} value={programDayText(p).title} />
-        ))}
-      {/* one entry per tour: a tour priced per car is listed once, its price shown for the trip's car */}
-      {[...new Set(prices.map((t) => t.name))].map((name) => {
-        const hit = catalog.showPrice ? findTourPrice(prices, name, catalog.tripCar) : null;
-        return <option key={`p-${name}`} value={name} label={hit ? `${hit.price} ${hit.currency}` : undefined} />;
-      })}
-    </datalist>
-  );
+  const out = new Map<string, Suggestion>([[FREE_DAY_TITLE, { value: FREE_DAY_TITLE }]]);
+  const priced = (value: string, programId?: string) => {
+    const hit = catalog.showPrice ? findTourPrice(prices, value, catalog.tripCar, programId) : null;
+    return { value, ...(hit ? { hint: `${hit.price} ${hit.currency}` } : {}) };
+  };
+  for (const p of catalog.programs) {
+    const title = programDayText(p).title;
+    if (!p.is_free_day && !out.has(title)) out.set(title, priced(title, p.id));
+  }
+  // one entry per tour: a tour priced per car is listed once, its price shown for the trip's car
+  for (const name of new Set(prices.map((t) => t.name))) if (!out.has(name)) out.set(name, priced(name));
+  return [...out.values()];
 }
 
 /** The company's cars, and a car typed elsewhere that the list does not hold. */
@@ -163,14 +159,17 @@ export function TourRow({
         : null}
       {cell(
         t("pg.tour.service"),
-        <input
-          list={catalog.listId}
+        <SuggestInput
+          ariaLabel={t("pg.tour.service")}
+          items={tourChoices(catalog)}
           value={pick.free ? FREE_DAY_TITLE : pick.title}
           placeholder={t("pg.tour.serviceHint", { city: catalog.city })}
-          onChange={(e) => {
-            const s = tourService(e.target.value, catalog.programs);
+          onChange={(value, picked) => {
+            // the tour it already is, picked again, changes nothing (a typed price stays)
+            if (picked && value === (pick.free ? FREE_DAY_TITLE : pick.title)) return;
+            const s = tourService(value, catalog.programs);
             // a tour from the price list arrives priced for its car; a typed one keeps what was there
-            onChange({ ...s, price: s.free ? 0 : (listedTourPrice(prices, sarPer, e.target.value, car, s.program_id) ?? (pick.free ? null : pick.price)) });
+            onChange({ ...s, price: s.free ? 0 : (listedTourPrice(prices, sarPer, value, car, s.program_id) ?? (pick.free ? null : pick.price)) });
           }}
           className={`${field} ${pick.free ? "text-[#7a948f]" : ""}`}
         />,

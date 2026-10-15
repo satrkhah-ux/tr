@@ -5,6 +5,7 @@ import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { Check, ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { unzoomedRoot } from "./overlay-root";
 
 /**
  * Select — Base UI single-choice wrapper. Closes on choose (terminal), closes
@@ -42,12 +43,12 @@ function SelectTrigger({ className, children, ...props }: React.ComponentProps<t
 
 function SelectContent({ className, children, ...props }: React.ComponentProps<typeof SelectPrimitive.Popup>) {
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal container={unzoomedRoot()}>
       <SelectPrimitive.Positioner sideOffset={6} className="z-[170] outline-none" alignItemWithTrigger={false}>
         <SelectPrimitive.Popup
           data-slot="select-content"
           className={cn(
-            "max-h-[min(320px,var(--available-height))] min-w-[var(--anchor-width)] overflow-y-auto rounded-md border border-[#d9e0dc] bg-white p-1 text-[#185045] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none",
+            "[zoom:var(--tv-zoom)] max-h-[min(320px,calc(var(--available-height)/var(--tv-zoom)))] min-w-[calc(var(--anchor-width)/var(--tv-zoom))] overflow-y-auto rounded-md border border-[#d9e0dc] bg-white p-1 text-[#185045] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none",
             "dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]",
             className,
           )}

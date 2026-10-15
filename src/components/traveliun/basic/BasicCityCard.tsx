@@ -39,6 +39,7 @@ import {
 } from "@/lib/offer/basic";
 import { arrivalLines, departureDay, departureLines, type TourProgram } from "@/lib/offer/itinerary";
 import { BasicCityProgram } from "./BasicCityProgram";
+import { SuggestInput } from "../SuggestInput";
 import { useRole } from "@/lib/roles/RoleContext";
 import { tourPriced, toursTotal, type TourPrice } from "@/lib/offer/pricing-suggest";
 import type { BoardType } from "@/lib/types";
@@ -51,7 +52,7 @@ import { basicField, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
 import { RefundControl } from "../generator/hotels/RefundControl";
 import { nightsText, useBasicLabels } from "./labels";
-import { CarCountSelect, CarOptions, TourChoices, TourRow, type TourCatalog } from "../tours/TourRow";
+import { CarCountSelect, CarOptions, TourRow, type TourCatalog } from "../tours/TourRow";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 const money = (n: number) => Math.round(n * 100) / 100;
@@ -294,10 +295,25 @@ export function BasicCityCard({
             />
           ) : null}
           {open === "program" ? (
-            <BasicCityProgram city={city} data={data} dayLabel={dayLabel} onSlice={onSlice} onTours={() => pickTab("tours")} programs={programs} />
+            <BasicCityProgram
+              city={city}
+              data={data}
+              dayLabel={dayLabel}
+              onSlice={onSlice}
+              onTours={() => pickTab("tours")}
+              catalog={{
+                city: city.city_name,
+                programs,
+                prices: tourPrices,
+                sarPer: lookups.sarPer ?? { SAR: 1 },
+                carTypes: lookups.carTypes,
+                tripCar: plan.tours.car_type,
+                showPrice,
+              }}
+            />
           ) : null}
           {open === "domestic" ? (
-            <DomesticPanel index={index} legs={domestic} data={data} lookups={lookups} onSlice={onSlice} />
+            <DomesticPanel legs={domestic} data={data} lookups={lookups} onSlice={onSlice} />
           ) : null}
           {/* «تمت <city>»: open only when the city has all it needs, and says what is missing until then */}
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-dashed border-[#DCE9E5] pt-2.5">
@@ -398,7 +414,7 @@ function HotelPanel({
         const priceTitle = tx("stayPrice", { n: nightsText(nights, language) });
         // a hotel the list does not hold (an older file) still shows its name
         const outside = line.hotel_name && !hotels.some((h) => h.id === line.hotel_id) ? (line.hotel_id ?? "__current") : null;
-        const rooms = `basic-rooms-${index}-${i}`;
+        const rooms = roomSuggestions(lookups.roomTypes, line.hotel_id).map((value) => ({ value }));
         return (
           <div key={line.id} className={i > 0 ? "space-y-1.5 border-t border-dashed border-[#DCE9E5] pt-2" : "space-y-1.5"}>
             {lines.length > 1 && stay ? (
@@ -444,12 +460,12 @@ function HotelPanel({
                       {tx("roomN", { n: j + 1 })}
                     </span>
                   )}
-                  <input
-                    aria-label={tx("roomType")}
+                  <SuggestInput
+                    ariaLabel={tx("roomType")}
                     placeholder={tx("roomType")}
-                    list={rooms}
+                    items={rooms}
                     value={baseRoomName(r.room_type_name)}
-                    onChange={(e) => onLines([setRoom(line, j, { room_type_id: null, room_type_name: e.target.value + (extra ? EXTRA_BED : "") })])}
+                    onChange={(value) => onLines([setRoom(line, j, { room_type_id: null, room_type_name: value + (extra ? EXTRA_BED : "") })])}
                     className={basicField}
                   />
                   <select
@@ -502,11 +518,6 @@ function HotelPanel({
                 </div>
               </div>
             ) : null}
-            <datalist id={rooms}>
-              {roomSuggestions(lookups.roomTypes, line.hotel_id).map((n) => (
-                <option key={n} value={n} />
-              ))}
-            </datalist>
             <div className="flex flex-wrap items-center gap-3 pt-0.5">
               {/* a new room is a room of its own: its type and price are asked, the board follows */}
               <button
@@ -659,7 +670,7 @@ function ToursPanel({
   const leaving = isLast ? departureDay(city) : null;
   const dates = leaving ? [...cityDates(city), leaving] : cityDates(city);
   const picks = withTours(city, city.tours ?? 0, plan.tours.cars, isLast);
-  const catalog: TourCatalog = { city: city.city_name, programs, prices: tourPrices, sarPer, carTypes, tripCar, listId: `basic-tours-${index}`, showPrice };
+  const catalog: TourCatalog = { city: city.city_name, programs, prices: tourPrices, sarPer, carTypes, tripCar, showPrice };
   // a tour put on the day home is «قبل المغادرة»; moved off it, a tour of the city's nights
   const onDay = (p: TourPick): TourPick => ({ ...p, departure: leaving !== null && p.date === leaving ? true : undefined });
   const setPick = (k: number, slice: Partial<TourPick>) => onPicks(picks.map((p, i) => (i === k ? onDay({ ...p, ...slice }) : p)));
@@ -771,7 +782,6 @@ function ToursPanel({
               </>
             ) : null}
           </div>
-          <TourChoices catalog={catalog} />
           {/* the city's days in order: each with its tours, or what the day is and a tour to add — on the last city the day home too */}
           {dates.map((date, d) => {
             const on = picks.filter((p) => p.date === date);
@@ -874,13 +884,11 @@ function DayLines({
  * day later and gives back the night spent flying (arrives_next_day).
  */
 function DomesticPanel({
-  index,
   legs,
   data,
   lookups,
   onSlice,
 }: {
-  index: number;
   legs: DraftData["flights"];
   data: DraftData;
   lookups: GeneratorLookups;
@@ -888,8 +896,11 @@ function DomesticPanel({
 }) {
   const tx = useBasicLabels();
   const booking = data.flight_booking;
-  const listId = `basic-dom-airports-${index}`;
-  const ranked = rankAirports(lookups.airports, tripCountries(data), data.cities.map((c) => c.city_name));
+  const ranked = rankAirports(lookups.airports, tripCountries(data), data.cities.map((c) => c.city_name)).map((a) => ({
+    value: airportDisplay(a),
+    hint: a.city ?? a.country ?? undefined,
+    keywords: [a.city, a.country, a.code].filter(Boolean).join(" "),
+  }));
   const setLeg = (leg: DraftData["flights"][number], slice: Partial<DraftData["flights"][number]>) =>
     onSlice({ flights: data.flights.map((f) => (f === leg ? { ...f, ...slice } : f)) });
   const airport = (leg: DraftData["flights"][number], side: "from" | "to", value: string) => {
@@ -943,8 +954,8 @@ function DomesticPanel({
           </div>
           {legs.map((leg, k) => (
             <div key={k} className={`grid grid-cols-2 items-center gap-2 ${cols}`}>
-              <input aria-label={tx("domFrom")} list={listId} value={leg.from_airport} onChange={(e) => airport(leg, "from", e.target.value)} className={basicField} />
-              <input aria-label={tx("domTo")} list={listId} value={leg.to_airport} onChange={(e) => airport(leg, "to", e.target.value)} className={basicField} />
+              <SuggestInput ariaLabel={tx("domFrom")} items={ranked} value={leg.from_airport} onChange={(v) => airport(leg, "from", v)} className={basicField} />
+              <SuggestInput ariaLabel={tx("domTo")} items={ranked} value={leg.to_airport} onChange={(v) => airport(leg, "to", v)} className={basicField} />
               <input
                 type="date"
                 dir="ltr"
@@ -985,11 +996,6 @@ function DomesticPanel({
               </span>
             </div>
           ))}
-          <datalist id={listId}>
-            {ranked.map((a) => (
-              <option key={a.id} value={airportDisplay(a)} label={a.city ?? a.country ?? undefined} />
-            ))}
-          </datalist>
           {/* the domestic booking's one price — the same field as in the flights step and the pricing card */}
           <label className="mt-1 inline-flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#185045]">
             {tx("domPrice")}

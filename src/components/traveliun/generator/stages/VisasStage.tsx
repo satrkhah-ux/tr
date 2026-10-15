@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import type { DraftVisa } from "@/lib/offer/draft-types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { FieldIssue } from "../FieldIssue";
+import { SuggestInput } from "../../SuggestInput";
 import {
   addButtonClass,
   fieldClass,
@@ -46,11 +47,6 @@ export function VisasStage({ data, patch, lookups }: StageFormProps) {
       <h2 className="mb-4 text-base font-extrabold text-[#003c3a]">{t("pg.visasTitle")}</h2>
       <FieldIssue field="visas" className="mb-3" />
 
-      <datalist id="pg-visa-countries">
-        {lookups.countries.map((country) => (
-          <option key={country.id} value={country.name} />
-        ))}
-      </datalist>
 
       {visas.length === 0 ? (
         <p className="mb-4 rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-6 text-center text-sm text-[#93aaa3]">
@@ -65,10 +61,11 @@ export function VisasStage({ data, patch, lookups }: StageFormProps) {
             >
               <label className="grid gap-1.5 text-[12px] font-bold text-[#185045]">
                 {t("pg.visaCountry")}
-                <input
-                  list="pg-visa-countries"
+                <SuggestInput
+                  ariaLabel={t("pg.visaCountry")}
+                  items={lookups.countries.map((country) => ({ value: country.name }))}
                   value={visa.country}
-                  onChange={(e) => updateRow(index, { country: e.target.value })}
+                  onChange={(v) => updateRow(index, { country: v })}
                   className={fieldClass}
                 />
               </label>

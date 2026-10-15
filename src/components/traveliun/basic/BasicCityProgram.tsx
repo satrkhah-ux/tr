@@ -1,10 +1,13 @@
 "use client";
 
 import { Camera, Car, RotateCcw } from "lucide-react";
-import type { DraftData, DraftDay } from "@/lib/offer/draft-types";
-import { dayTours, programDayText, transportNoteForDay, withDayTour, type TourProgram } from "@/lib/offer/itinerary";
+import { FREE_DAY_TITLE, type DraftData, type DraftDay } from "@/lib/offer/draft-types";
+import { dayTours, programDayText, tourService, transportNoteForDay, withDayPick } from "@/lib/offer/itinerary";
 import { advancedDayNote } from "@/lib/offer/advanced";
 import type { BasicCity } from "@/lib/offer/basic";
+import { listedTourPrice } from "@/lib/offer/pricing-suggest";
+import { SuggestInput } from "../SuggestInput";
+import { tourChoices, type TourCatalog } from "../tours/TourRow";
 import { basicField } from "./styles";
 import { useBasicLabels } from "./labels";
 
@@ -13,9 +16,11 @@ import { useBasicLabels } from "./labels";
  * same days the document prints (data.days, written by daysFromTours) — for the
  * agent to check against the tours and the moves, and to reword. A day edited
  * here is the agent's: the screen no longer rewrites it (auto_title ""), until
- * «إعادة النص التلقائي» hands it back. The title box also offers the city's
- * ready tours: picking one puts that tour on the day (its title and text,
- * priced like a tour picked on the tours tab), right here.
+ * «إعادة النص التلقائي» hands it back. The title box also opens the city's
+ * tours — the same list as the tours tab (its programmes, the price list, «يوم
+ * حر»): picking one puts that tour on the day (its title and text, priced from
+ * the list like a tour picked on the tours tab), right here. A title typed is
+ * just the day's title.
  */
 export function BasicCityProgram({
   city,
@@ -23,7 +28,7 @@ export function BasicCityProgram({
   dayLabel,
   onSlice,
   onTours,
-  programs = [],
+  catalog,
 }: {
   /** this stop, with its dates chained. */
   city: BasicCity;
@@ -32,8 +37,8 @@ export function BasicCityProgram({
   onSlice: (slice: Partial<DraftData>) => void;
   /** open the tours tab. */
   onTours: () => void;
-  /** the city's ready-made tours, offered in each day's title. */
-  programs?: TourProgram[];
+  /** the city's tours, as the tours tab offers them. */
+  catalog: TourCatalog;
 }) {
   const tx = useBasicLabels();
   if (!city.check_in) return <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noCityDays")}</p>;
@@ -44,25 +49,31 @@ export function BasicCityProgram({
   // auto_title "" — not undefined: Basic reads an unmarked day by its title, and «يوم حر» would be taken back
   const setDay = (i: number, slice: Partial<DraftDay>) =>
     onSlice({ days: data.days.map((d, k) => (k === i ? { ...d, ...slice, ai_generated: false, auto_title: "" } : d)) });
-  // the city's tours by the title the day would carry
-  const listId = `basic-program-${city.city_name}`;
-  const byTitle = new Map(programs.filter((p) => p.city_name === city.city_name || !p.city_name).map((p) => [programDayText(p).title, p] as const));
-  /** a title typed — or a tour picked from the list, which becomes the day's tour */
-  const setTitle = (i: number, title: string) => {
-    const program = byTitle.get(title);
-    if (!program) return setDay(i, { title });
-    const asTour = withDayTour(data, i, program);
-    // a day no tour can go on (tours switched off) still takes the tour's words
-    onSlice(asTour ?? { days: data.days.map((d, k) => (k === i ? { ...d, ...programDayText(program), ai_generated: false, auto_title: "" } : d)) });
+  const choices = tourChoices(catalog);
+  // the arrival, a move or the day home keeps its own title; a tour joins its lines — never «يوم حر»
+  const joining = choices.filter((c) => c.value !== FREE_DAY_TITLE);
+  // with the tours switched off a day takes no tour, only a programme's words
+  const words = data.transport_plan.tours.enabled ? [] : choices.filter((c) => catalog.programs.some((p) => programDayText(p).title === c.value));
+  /** a title typed is the day's title; a tour picked from the list becomes the day's tour, in place of the one it had */
+  const setTitle = (i: number, title: string, picked: boolean) => {
+    if (!picked) return setDay(i, { title });
+    const on = dayTours(data, i);
+    if (!on) {
+      const program = catalog.programs.find((p) => programDayText(p).title === title);
+      return setDay(i, program ? programDayText(program) : { title });
+    }
+    const s = tourService(title, catalog.programs);
+    // the day's own tour picked again changes nothing — its price, its car, the day's words stay
+    const had = on.picks[0];
+    if (had && Boolean(had.free) === Boolean(s.free) && had.title === s.title) return;
+    const car = had?.car_type?.trim() || catalog.tripCar;
+    const price = s.free ? 0 : (listedTourPrice(catalog.prices, catalog.sarPer, title, car, s.program_id) ?? null);
+    const next = withDayPick(data, i, 0, { ...s, price });
+    if (next) onSlice(next);
   };
 
   return (
     <div className="space-y-1.5">
-      <datalist id={listId}>
-        {[...byTitle.keys()].map((t) => (
-          <option key={t} value={t} />
-        ))}
-      </datalist>
       <p className="text-[11.5px] font-semibold text-[#557d78]">{tx("programHint")}</p>
       {own.map((i) => {
         const day = data.days[i];
@@ -87,12 +98,12 @@ export function BasicCityProgram({
               ) : null}
             </div>
             <div className="min-w-0 space-y-1">
-              <input
-                aria-label={tx("dayTitle")}
-                list={listId}
+              <SuggestInput
+                ariaLabel={tx("dayTitle")}
+                items={dayTours(data, i) ? (day.date === city.check_in || i === data.days.length - 1 ? joining : choices) : words}
                 value={day.title}
-                placeholder="اكتب العنوان أو اختر جولة من القائمة"
-                onChange={(e) => setTitle(i, e.target.value)}
+                placeholder={tx("dayTitleHint")}
+                onChange={(title, picked) => setTitle(i, title, picked)}
                 className={`${basicField} font-bold`}
               />
               {/* written whole on leaving the field: typing a new line must not lose it to the blank-line clean-up */}

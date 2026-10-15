@@ -5,6 +5,7 @@ import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { unzoomedRoot } from "./overlay-root";
 
 /**
  * DropdownMenu — Base UI Menu wrapper. Items CLOSE the menu on activation by
@@ -36,12 +37,12 @@ function DropdownMenuContent({
   sideOffset?: number;
 }) {
   return (
-    <MenuPrimitive.Portal>
+    <MenuPrimitive.Portal container={unzoomedRoot()}>
       <MenuPrimitive.Positioner side={side} align={align} sideOffset={sideOffset} className="z-[120] outline-none">
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
           className={cn(
-            "min-w-[11rem] w-[max-content] max-w-[min(340px,calc(100vw/var(--tv-zoom)_-_24px))] origin-[var(--transform-origin)] rounded-md border border-[#d9e0dc] bg-white p-1.5 text-[#003c3a] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none",
+            "[zoom:var(--tv-zoom)] min-w-[11rem] w-[max-content] max-w-[min(340px,calc(100vw/var(--tv-zoom)_-_24px))] origin-[var(--transform-origin)] rounded-md border border-[#d9e0dc] bg-white p-1.5 text-[#003c3a] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none",
             "transition-[opacity,transform] duration-150 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0",
             "dark:border-[#294039] dark:bg-[#14231f] dark:text-[#eaf3ef]",
             className,

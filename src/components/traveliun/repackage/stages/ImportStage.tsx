@@ -15,6 +15,7 @@ import {
 import { importFromPdf, listRepackageSuppliers, type RepackageSupplierOption } from "@/lib/data/repackage";
 import { stageHref } from "@/lib/repackage/repackage-types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
+import { SuggestInput } from "../../SuggestInput";
 import { fieldClass, labelClass, sectionClass } from "../stage-props";
 import type { RepackageStageProps } from "../stage-props";
 
@@ -133,19 +134,15 @@ export function ImportStage({ draftId, data }: RepackageStageProps) {
       <div className={`${sectionClass} space-y-4`}>
         <label className={labelClass}>
           {t("rp.import.supplierLabel")}
-          <input
+          <SuggestInput
+            ariaLabel={t("rp.import.supplierLabel")}
             className={fieldClass}
+            items={known.map((s) => ({ value: s.name }))}
             value={supplier}
-            onChange={(e) => setSupplier(e.target.value)}
+            onChange={(v) => setSupplier(v)}
             placeholder={t("rp.import.supplierPlaceholder")}
             disabled={loading}
-            list="rp-suppliers"
           />
-          <datalist id="rp-suppliers">
-            {known.map((s) => (
-              <option key={s.id} value={s.name} />
-            ))}
-          </datalist>
         </label>
         {known.length > 0 && !supplier ? (
           <div className="flex flex-wrap gap-1.5">

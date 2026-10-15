@@ -5,6 +5,7 @@ import { ArrowDownUp, ArrowLeft, ArrowLeftRight, CalendarDays, MapPin, Plane, Pl
 import type { FlightBookingMode } from "@/lib/offer/draft-types";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
+import { SuggestInput, type Suggestion } from "../../SuggestInput";
 
 /**
  * «الذهاب والعودة / ذهاب فقط / مدن متعددة» — how a booking engine asks for a
@@ -121,6 +122,7 @@ const cellInput =
   "h-6 w-full min-w-0 border-0 bg-transparent p-0 text-[13px] font-bold text-[#123e3a] outline-none placeholder:text-[#9bb0ac]";
 
 export function FlightBuilder({
+  airports = { home: [], dest: [] },
   mode,
   cabin,
   onCabin,
@@ -129,6 +131,8 @@ export function FlightBuilder({
   passengers,
   onBuild,
 }: {
+  /** what the airport fields offer: home first for where it leaves, the package's first for where it lands. */
+  airports?: { home: Suggestion[]; dest: Suggestion[] };
   /** chosen on the TripTypeCards above the builder. */
   mode: FlightBookingMode;
   cabin: string;
@@ -191,8 +195,8 @@ export function FlightBuilder({
           <div className="space-y-2">
             {multi.map((seg, i) => (
               <div key={i} className="grid gap-2 rounded-[13px] bg-[#f8fbf9] p-2 sm:grid-cols-[1fr_1fr_170px_auto]">
-                <AirportCell label={`${t("pg.fb.from")} ${i + 1}`} value={seg.from} onChange={(v) => setSegment(i, "from", v)} />
-                <AirportCell label={t("pg.fb.to")} value={seg.to} onChange={(v) => setSegment(i, "to", v)} />
+                <AirportCell label={`${t("pg.fb.from")} ${i + 1}`} items={i === 0 ? airports.home : airports.dest} value={seg.from} onChange={(v) => setSegment(i, "from", v)} />
+                <AirportCell label={t("pg.fb.to")} items={airports.dest} value={seg.to} onChange={(v) => setSegment(i, "to", v)} />
                 <DateCell label={t("pg.fb.date")} value={seg.date} onChange={(v) => setSegment(i, "date", v)} />
                 {multi.length > 2 ? (
                   <button
@@ -220,8 +224,8 @@ export function FlightBuilder({
         ) : (
           <>
             <div className="relative grid gap-2">
-              <AirportCell label={t("pg.fb.from")} value={from} onChange={setFrom} />
-              <AirportCell label={t("pg.fb.to")} value={to} onChange={setTo} />
+              <AirportCell label={t("pg.fb.from")} items={airports.home} value={from} onChange={setFrom} />
+              <AirportCell label={t("pg.fb.to")} items={airports.dest} value={to} onChange={setTo} />
               <button
                 type="button"
                 onClick={() => {
@@ -272,14 +276,14 @@ export function FlightBuilder({
   );
 }
 
-function AirportCell({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function AirportCell({ label, items, value, onChange }: { label: string; items: Suggestion[]; value: string; onChange: (v: string) => void }) {
   return (
     <label className={cell}>
       <MapPin className="size-[18px] shrink-0 text-[#185045]" />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className={cellLabel}>{label}</span>
-        {/* the stage's own datalist of airports, «name (CODE)» */}
-        <input list="pg-airports" value={value} onChange={(e) => onChange(e.target.value)} className={cellInput} />
+        {/* the stage's airports, «name (CODE)» — the list the old datalist id no longer pointed at */}
+        <SuggestInput ariaLabel={label} arrow={false} items={items} value={value} onChange={(v) => onChange(v)} className={cellInput} />
       </span>
     </label>
   );

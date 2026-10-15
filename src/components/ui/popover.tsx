@@ -4,6 +4,7 @@ import * as React from "react";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 
 import { cn } from "@/lib/utils";
+import { unzoomedRoot } from "./overlay-root";
 
 /**
  * Popover — Base UI wrapper. Handles outside-click, Escape (topmost only),
@@ -34,7 +35,7 @@ function PopoverContent({
   sideOffset?: number;
 }) {
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={unzoomedRoot()}>
       <PopoverPrimitive.Positioner
         side={side}
         align={align}
@@ -44,7 +45,7 @@ function PopoverContent({
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(
-            "max-h-[var(--available-height)] w-[min(360px,calc(100vw/var(--tv-zoom)_-_24px))] origin-[var(--transform-origin)] overflow-y-auto rounded-md border border-[#d9e0dc] bg-white p-4 text-[#003c3a] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none",
+            "[zoom:var(--tv-zoom)] max-h-[calc(var(--available-height)/var(--tv-zoom))] w-[min(360px,calc(100vw/var(--tv-zoom)_-_24px))] origin-[var(--transform-origin)] overflow-y-auto rounded-md border border-[#d9e0dc] bg-white p-4 text-[#003c3a] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none",
             "transition-[opacity,transform] duration-150 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0",
             "dark:border-[#294039] dark:bg-[#14231f] dark:text-[#eaf3ef]",
             className,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { AlertTriangle, Check, CircleAlert, Pencil, Plus, X } from "lucide-react";
 import { deriveTransportRows, TRANSPORT_AIRPORT, type DraftCity, type TransportPlan } from "@/lib/offer/draft-types";
 import {
@@ -22,6 +22,7 @@ import {
   type StepKey,
 } from "@/lib/offer/advanced";
 import { basicCard, basicField } from "./styles";
+import { SuggestInput } from "../SuggestInput";
 
 const chip = (on: boolean) =>
   `h-8 rounded-full px-3 text-[12px] font-bold transition-colors ${on ? "bg-[#185045] text-white" : "border border-[#dbe6e1] bg-white text-[#557d78] hover:bg-[#f4f8f6]"}`;
@@ -78,7 +79,6 @@ export function AdvancedQuestions({
   notes?: string[];
   onChange: (next: DraftAdvanced) => void;
 }) {
-  const id = useId();
   const adv = value ?? { ...emptyAdvanced(), on: true };
   const set = (patch: Partial<DraftAdvanced>) => onChange({ ...adv, ...patch });
   const setDate = (k: AdvancedDateKey, v: string) => onChange(setAdvancedDate(adv, k, v));
@@ -116,7 +116,7 @@ export function AdvancedQuestions({
     crossings: [],
   };
   const pick = (list: keyof typeof choices, value: string, put: (v: string) => void, placeholder: string) => (
-    <input className={small} list={`${id}-${list}`} value={value} placeholder={placeholder} onChange={(e) => put(e.target.value)} />
+    <SuggestInput className={small} items={choices[list].map((v) => ({ value: v }))} value={value} placeholder={placeholder} ariaLabel={placeholder} onChange={(v) => put(v)} />
   );
   const country = (value: string, put: (v: string) => void, label: string) => (
     <select className={small} value={value} onChange={(e) => put(e.target.value)} aria-label={label}>
@@ -267,13 +267,6 @@ export function AdvancedQuestions({
 
   return (
     <section className={`${basicCard} space-y-3 border-[#2aa87a]`}>
-      {Object.entries(choices).map(([k, values]) => (
-        <datalist key={k} id={`${id}-${k}`}>
-          {values.map((v) => (
-            <option key={v} value={v} />
-          ))}
-        </datalist>
-      ))}
       <div className="grid gap-0.5">
         <h2 className="text-[14px] font-extrabold text-[#003c3a]">بكج متقدم</h2>
         <span className="text-[11.5px] text-[#557d78]">الرحلة بترتيبها الفعلي. كل وقت يُكتب بتوقيت مكانه كما في التذكرة، والنظام يقارن الأوقات بعد احتساب فرق التوقيت.</span>

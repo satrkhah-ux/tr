@@ -37,6 +37,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import type { FlightLegOrder } from "@/lib/types";
 import { parseFlightNumber } from "@/lib/offer/flight-number";
 import { FieldIssue } from "../FieldIssue";
+import { SuggestInput, type Suggestion } from "../../SuggestInput";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import {
   addButtonClass,
@@ -169,6 +170,12 @@ export function FlightsStage({
   const { t } = useTraveliunUI();
   const flights = data.flights;
   const airports = lookups.airports;
+  // home side: Madinah and the Kingdom first; the destination side: the package's countries first
+  const asItems = (list: LookupAirport[]): Suggestion[] => list.map((a) => ({ value: airportDisplay(a), hint: a.city ?? a.country ?? undefined, keywords: [a.city, a.country, a.code].filter(Boolean).join(" ") }));
+  const airportLists = {
+    home: asItems(rankAirports(airports, "home")),
+    dest: asItems(rankAirports(airports, tripCountries(data), data.cities.map((c) => c.city_name))),
+  };
   const airlines = lookups.airlines;
 
   /**
@@ -389,17 +396,6 @@ export function FlightsStage({
       </div>
       ) : null}
 
-      {/* home side: Madinah and the Kingdom first; the destination side: the package's countries first */}
-      <datalist id="pg-airports-home">
-        {rankAirports(airports, "home").map((airport) => (
-          <option key={airport.id} value={airportDisplay(airport)} label={airport.city ?? airport.country ?? undefined} />
-        ))}
-      </datalist>
-      <datalist id="pg-airports-dest">
-        {rankAirports(airports, tripCountries(data), data.cities.map((c) => c.city_name)).map((airport) => (
-          <option key={airport.id} value={airportDisplay(airport)} label={airport.city ?? airport.country ?? undefined} />
-        ))}
-      </datalist>
 
       {/* ── international (outbound / inbound) ──────────────────────────────── */}
       {showIntl ? (
@@ -417,6 +413,7 @@ export function FlightsStage({
       {international.length === 0 || rebuilding ? (
         <div className="mb-3">
           <FlightBuilder
+            airports={airportLists}
             mode={booking.mode}
             cabin={booking.cabin}
             onCabin={(cabin) => setBooking({ cabin })}
@@ -460,6 +457,7 @@ export function FlightsStage({
                         showLegSelect
                         compact={compact}
                         handlers={handlers}
+                        airports={airportLists}
                       />
                     </div>
                   );
@@ -534,6 +532,7 @@ export function FlightsStage({
                     segment={domesticJourney.isTransit ? jl.segment : undefined}
                     compact={compact}
                     handlers={handlers}
+                    airports={airportLists}
                   />
                 </div>
               );
@@ -719,6 +718,7 @@ function FlightRow({
   showLegSelect = false,
   compact = false,
   handlers,
+  airports,
 }: {
   flight: DraftFlight;
   index: number;
@@ -727,6 +727,8 @@ function FlightRow({
   showLegSelect?: boolean;
   compact?: boolean;
   handlers: RowHandlers;
+  /** the airports each side offers — home first, or the package's first. */
+  airports: { home: Suggestion[]; dest: Suggestion[] };
 }) {
   const { t } = useTraveliunUI();
   const [more, setMore] = useState(false);
@@ -800,19 +802,21 @@ function FlightRow({
           <>
             <label className={rowLabelClass}>
               {t("pg.fromAirport")}
-              <input
-                list={flight.leg_order === "outbound" ? "pg-airports-home" : "pg-airports-dest"}
+              <SuggestInput
+                ariaLabel={t("pg.fromAirport")}
+                items={flight.leg_order === "outbound" ? airports.home : airports.dest}
                 value={flight.from_airport}
-                onChange={(e) => setAirport(index, "from_airport", e.target.value)}
+                onChange={(v) => setAirport(index, "from_airport", v)}
                 className={fieldClass}
               />
             </label>
             <label className={rowLabelClass}>
               {t("pg.toAirport")}
-              <input
-                list={flight.leg_order === "inbound" ? "pg-airports-home" : "pg-airports-dest"}
+              <SuggestInput
+                ariaLabel={t("pg.toAirport")}
+                items={flight.leg_order === "inbound" ? airports.home : airports.dest}
                 value={flight.to_airport}
-                onChange={(e) => setAirport(index, "to_airport", e.target.value)}
+                onChange={(v) => setAirport(index, "to_airport", v)}
                 className={fieldClass}
               />
             </label>

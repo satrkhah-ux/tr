@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CalendarDays, ChevronDown, Loader2, MapPin, Minus, Plus, Search, UsersRound } from "lucide-react";
+import { SuggestInput } from "../../SuggestInput";
 
 /**
  * The hotel search bar — one row, six cells, the way every booking engine does it.
@@ -105,18 +106,14 @@ export function HotelSearchBar({
           <MapPin className="size-[19px] shrink-0 text-[#0e5b52]" />
           <span className="flex min-w-0 flex-1 flex-col gap-1">
             <span className={cellLabel}>اسم الفندق</span>
-            <input
+            <SuggestInput
+              ariaLabel="اسم الفندق"
+              items={hotelNames.map((value) => ({ value }))}
               value={nameFilter}
-              onChange={(e) => onNameFilter(e.target.value)}
-              list="hotel-bar-names"
+              onChange={(v) => onNameFilter(v)}
               placeholder={cityName || "إلى أين؟"}
               className={cellInput}
             />
-            <datalist id="hotel-bar-names">
-              {hotelNames.map((n) => (
-                <option key={n} value={n} />
-              ))}
-            </datalist>
           </span>
         </label>
 

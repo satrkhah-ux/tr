@@ -4,6 +4,7 @@ import { Combobox } from "@base-ui/react/combobox";
 import { Check, ChevronDown } from "lucide-react";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { cn } from "@/lib/utils";
+import { unzoomedRoot, ZOOMED_POPUP } from "@/components/ui/overlay-root";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
 export type HotelOption = { id: string; name: string; stars?: number | null };
@@ -62,9 +63,9 @@ export function HotelCombobox({
           <ChevronDown className="size-4" />
         </Combobox.Trigger>
       </div>
-      <Combobox.Portal>
+      <Combobox.Portal container={unzoomedRoot()}>
         <Combobox.Positioner sideOffset={4} className="z-[170] outline-none">
-          <Combobox.Popup className="max-h-[min(320px,var(--available-height))] w-[var(--anchor-width)] min-w-56 overflow-y-auto rounded-md border border-[#d9e0dc] bg-white p-1 text-[#185045] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]">
+          <Combobox.Popup className={`${ZOOMED_POPUP} min-w-56 overflow-y-auto rounded-md border border-[#d9e0dc] bg-white p-1 text-[#185045] shadow-[0_10px_30px_rgba(0,0,0,0.16)] outline-none dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]`}>
             <Combobox.Empty className="px-2 py-2 text-[12px] text-[#93aaa3] empty:hidden">{t("noResults")}</Combobox.Empty>
             <Combobox.List>
               {(h: HotelOption) => (

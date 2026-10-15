@@ -45,7 +45,7 @@ import { getTourPrices, getTourPrograms } from "@/lib/data/tour-programs";
 import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
-import { TourChoices, TourRow, tourField, type TourCatalog } from "../../tours/TourRow";
+import { TourRow, tourField, type TourCatalog } from "../../tours/TourRow";
 import { fieldClass, sectionClass, type StageFormProps } from "../stage-props";
 
 /** Arabic counts: «يوم واحد / يومان / 3 أيام / 11 يوماً». */
@@ -196,8 +196,6 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
     sarPer: lookups.sarPer ?? { SAR: 1 },
     carTypes: lookups.carTypes,
     tripCar,
-    // one open day at a time — one list
-    listId: "itin-tours",
     showPrice: can("pricing.view"),
   });
 
@@ -349,7 +347,6 @@ export function ItineraryStage({ draftId, data, patch, replace, lookups }: Stage
       {/* the day's tour — the same row as the basic screen's city card */}
       {tourRows.length > 0 ? (
         <div className="mb-2 space-y-2 rounded-[10px] border border-[#e2ebe7] bg-white p-2.5">
-          <TourChoices catalog={catalogFor(day.city_name)} />
           {tourRows.map((pick, k) => (
             <TourRow
               key={k}

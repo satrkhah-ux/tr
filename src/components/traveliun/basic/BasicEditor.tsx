@@ -114,6 +114,7 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useDraftState } from "../generator/useDraftState";
 import { BasicCityCard } from "./BasicCityCard";
 import { BasicFlightPlan } from "./BasicFlightPlan";
+import { SuggestInput } from "../SuggestInput";
 import { BasicPhoneLookup } from "./BasicPhoneLookup";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
@@ -1302,12 +1303,13 @@ export function BasicEditor({
                 </label>
                 <label className={`${basicLabel} w-32 shrink-0 sm:w-40`}>
                   {tx("roomType")}
-                  <input list="basic-bar-rooms" value={newRoom} onChange={(e) => setNewRoom(e.target.value)} className={basicField} />
-                  <datalist id="basic-bar-rooms">
-                    {barRoomNames.map((n) => (
-                      <option key={n} value={n} />
-                    ))}
-                  </datalist>
+                  <SuggestInput
+                    ariaLabel={tx("roomType")}
+                    items={barRoomNames.map((value) => ({ value }))}
+                    value={newRoom}
+                    onChange={(v) => setNewRoom(v)}
+                    className={basicField}
+                  />
                 </label>
                 <label className={`${basicLabel} w-14 shrink-0`}>
                   {tx("rooms")}

@@ -10,6 +10,7 @@ import { FlightCardLink } from "../generator/flights/FlightCardLink";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { basicField, typedNumber } from "./styles";
 import { useBasicLabels } from "./labels";
+import { SuggestInput, type Suggestion } from "../SuggestInput";
 
 const COLS = "xl:grid-cols-[minmax(13rem,1.5fr)_2.25rem_minmax(13rem,1.5fr)_minmax(9rem,1fr)_minmax(9rem,1fr)_minmax(9rem,1fr)]";
 
@@ -52,8 +53,9 @@ export function BasicFlightPlan({
     round,
   };
   // the departure side lists Madinah and the Kingdom first; the arrival side, the package's country
-  const homeFirst = rankAirports(lookups.airports, "home");
-  const destFirst = rankAirports(lookups.airports, tripCountries(data), data.cities.map((c) => c.city_name));
+  const asItems = (list: GeneratorLookups["airports"]): Suggestion[] => list.map((a) => ({ value: airportDisplay(a), hint: a.city ?? a.country ?? undefined, keywords: [a.city, a.country, a.code].filter(Boolean).join(" ") }));
+  const homeFirst = asItems(rankAirports(lookups.airports, "home"));
+  const destFirst = asItems(rankAirports(lookups.airports, tripCountries(data), data.cities.map((c) => c.city_name)));
 
   const write = (change: Partial<FlightPlan>) => onChange(planInternational(data, lookups.airports, { ...now, ...change }));
   // the booking changes; the legs are planned from it when there are none yet
@@ -66,8 +68,8 @@ export function BasicFlightPlan({
       data.flights.map((f) => (f.leg_order !== "internal" && (!f.cabin_class || f.cabin_class === booking.cabin) ? { ...f, cabin_class: cabin } : f)),
     );
 
-  const airportInput = (value: string, onValue: (v: string) => void, label: string, list: string) => (
-    <input aria-label={label} placeholder={label} list={list} value={value} onChange={(e) => onValue(e.target.value)} className={basicField} />
+  const airportInput = (value: string, onValue: (v: string) => void, label: string, items: Suggestion[]) => (
+    <SuggestInput ariaLabel={label} placeholder={label} items={items} value={value} onChange={(v) => onValue(v)} className={basicField} />
   );
 
   return (
@@ -103,7 +105,7 @@ export function BasicFlightPlan({
         <span>{tx("planPrice")}</span>
       </div>
       <div className={`grid grid-cols-2 items-center gap-2 ${COLS}`}>
-        {airportInput(now.from, (v) => write({ from: v }), tx("planFrom"), "basic-plan-home")}
+        {airportInput(now.from, (v) => write({ from: v }), tx("planFrom"), homeFirst)}
         <button
           type="button"
           onClick={() => write({ from: now.to, to: now.from })}
@@ -113,7 +115,7 @@ export function BasicFlightPlan({
         >
           <ArrowLeftRight className="size-4" />
         </button>
-        {airportInput(now.to, (v) => write({ to: v }), tx("planTo"), "basic-plan-dest")}
+        {airportInput(now.to, (v) => write({ to: v }), tx("planTo"), destFirst)}
         <input type="date" dir="ltr" aria-label={tx("planGo")} value={now.go} onChange={(e) => write({ go: e.target.value })} className={`${basicField} tv-tnum px-2`} />
         {round ? (
           <input
@@ -141,16 +143,6 @@ export function BasicFlightPlan({
         />
       </div>
       <FlightFare booking={booking} kind="intl" trip={data.trip} field={basicField} onChange={(next) => book(next)} />
-      <datalist id="basic-plan-home">
-        {homeFirst.map((a) => (
-          <option key={a.id} value={airportDisplay(a)} label={a.city ?? a.country ?? undefined} />
-        ))}
-      </datalist>
-      <datalist id="basic-plan-dest">
-        {destFirst.map((a) => (
-          <option key={a.id} value={airportDisplay(a)} label={a.city ?? a.country ?? undefined} />
-        ))}
-      </datalist>
 
       <div className="flex flex-wrap items-center gap-2">
         <button
