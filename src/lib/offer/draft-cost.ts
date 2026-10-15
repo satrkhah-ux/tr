@@ -60,6 +60,21 @@ function withoutItemCost(item: DraftPricingItem): DraftPricingItem {
 }
 
 /** What a viewer without pricing.internal receives. */
+/**
+ * A figure typed on the sheet is what the line COSTS us («typed = cost») — so
+ * the package margin goes on it at issue, as Basic shows it. An agent without
+ * pricing.internal never sends a buy (keepDraftCost drops it), which left such a
+ * line sell-only and issued without the margin the screen had added. Only an
+ * agent's override with no cost on file; a line we priced keeps its own buy.
+ */
+export function typedAsCost(items: DraftPricingItem[]): DraftPricingItem[] {
+  return items.map((i) =>
+    i.overridden && i.buy_price == null && i.sell_price != null
+      ? { ...i, buy_price: i.sell_price, buy_currency: i.sell_currency }
+      : i,
+  );
+}
+
 export function redactDraftCost(data: DraftData): DraftData {
   // The package-level margin is cost too — the same figure as a line's manual
   // profit, set once for the whole file.

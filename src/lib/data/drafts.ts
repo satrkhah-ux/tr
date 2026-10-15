@@ -52,7 +52,7 @@ import { draftDaySkeleton, transportNoteForDay } from "@/lib/offer/itinerary";
 import { validateDraft } from "@/lib/offer/draft-validation";
 import { publishOffer, type OfferHotelInput, type OfferPricingItemInput } from "./offers";
 import { insertOffer } from "./offer-insert";
-import { keepDraftCost, redactDraftCost } from "@/lib/offer/draft-cost";
+import { typedAsCost, keepDraftCost, redactDraftCost } from "@/lib/offer/draft-cost";
 import {
   deleteDraftRow,
   insertDraft,
@@ -842,7 +842,9 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // lines at their terms, their own figures as they typed them — never on the
     // sheet their browser saved, which can lower, drop or re-currency any line.
     // Its total is what they owe us (partner_cost, below).
-    let sheet = data.pricing.items;
+    // our own file: a figure an agent typed is our cost, so the margin goes on it (typedAsCost);
+    // a partner's sheet is re-priced below and carries no cost by design
+    let sheet = record.partner_company_id ? data.pricing.items : typedAsCost(data.pricing.items);
     // A file started from one of our ready packages owes at least that package
     // at their terms. Its price is read here by id — never the final_total their
     // browser can edit — and only ever raises what the sheet says, so pointing

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { keepDraftCost, redactDraftCost } from "./draft-cost";
+import { typedAsCost, keepDraftCost, redactDraftCost } from "./draft-cost";
 import { emptyDraftData, normalizeDraftHotel, type DraftData, type DraftHotelSourcing, type DraftPricingItem } from "./draft-types";
 
 /**
@@ -145,5 +145,16 @@ describe("package margin (DraftPricing.profit)", () => {
     expect(keepDraftCost({ pricing: forged }, stored).pricing?.profit).toEqual({ mode: "pct", value: 18 });
     const none = emptyDraftData();
     expect(keepDraftCost({ pricing: forged }, none).pricing?.profit).toBeUndefined();
+  });
+});
+
+describe("typedAsCost — a typed figure is our cost at issue", () => {
+  const line = (over: Record<string, unknown>) => ({ item_type: "transport", description: "بونشاك ← بالي", quantity: 1, buy_price: null, buy_currency: "", sell_price: 300, sell_currency: "SAR", ...over }) as never;
+  it("puts the agent's typed figure on the cost side, so the margin goes on it (AD-4-8573: 300 issued as 300, shown as 345)", () => {
+    expect(typedAsCost([line({ overridden: true })])[0]).toMatchObject({ buy_price: 300, buy_currency: "SAR", sell_price: 300 });
+  });
+  it("leaves a line we priced, and one nobody overrode, as they are", () => {
+    expect(typedAsCost([line({ overridden: true, buy_price: 250 })])[0]).toMatchObject({ buy_price: 250 });
+    expect(typedAsCost([line({})])[0]).toMatchObject({ buy_price: null });
   });
 });
