@@ -32,6 +32,7 @@ import {
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
 import type { DraftPricingItem } from "./draft-types";
+import { journeyPricingLines } from "./advanced";
 
 /** A transfer price from the reference list. */
 export type TransferPrice = {
@@ -500,6 +501,9 @@ export function suggestPricing(
       });
     }
   }
+
+  // «البكج المتقدم»: each service we charge for, once (journeyPricingLines)
+  items.push(...journeyPricingLines(data.journey));
 
   return items;
 }

@@ -721,7 +721,8 @@ const SCOPE_LINES: { text: string; on: (d: DraftData) => boolean; otherwiseExclu
   { text: "الطيران الداخلي", on: (d) => d.scope.flights_domestic && d.flights.some((f) => f.leg_order === "internal") },
   { text: "الفنادق", on: (d) => d.scope.hotels },
   { text: "الجولات السياحية", on: (d) => d.transport_plan.tours.enabled },
-  { text: "الإستقبال والتوديع من المطار إلى الفندق والعكس", on: (d) => d.scope.transport },
+  // an advanced journey says where reception really starts — never a blanket «من المطار»
+  { text: "الإستقبال والتوديع من المطار إلى الفندق والعكس", on: (d) => d.scope.transport && !d.journey?.enabled },
 ];
 
 /**

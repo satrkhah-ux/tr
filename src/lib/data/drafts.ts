@@ -39,6 +39,7 @@ import { draftSellTotal } from "@/lib/offer/preview-dto";
 import { applyManualProfit, offerTotals, rebase, type PricingLineInput } from "@/lib/offer/pricing";
 import { getProfitSettings } from "./app-settings";
 import { packageProfitFor, withPackageProfit, withScopeLines } from "@/lib/offer/basic";
+import { clientLines, journeyPricingLines, normalizeJourney, withChangeLog } from "@/lib/offer/advanced";
 import { getRates } from "./rates-actions";
 import { suggestPricingFor } from "./pricing-suggest-core";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
@@ -290,7 +291,12 @@ export async function saveDraftStages(draftId: string, slices: Partial<DraftData
     slices = { ...slices };
     delete slices.produced_serial;
   }
-  return writeDraftStages(draftId, slices, (sent, stored, owner) => {
+  // the advanced journey's change log names who changed what — stamped here, never by the browser
+  const by = (user.user_metadata?.full_name as string | undefined) || user.email || user.id;
+  const stamp = (out: Partial<DraftData>, stored: DraftData): Partial<DraftData> =>
+    out.journey ? { ...out, journey: withChangeLog(stored.journey, normalizeJourney(out.journey)!, by, new Date().toISOString()) } : out;
+  return writeDraftStages(draftId, slices, (sent, stored, owner) => stamp(restoreSlices(sent, stored, owner), stored));
+  function restoreSlices(sent: Partial<DraftData>, stored: DraftData, owner: string | null): Partial<DraftData> {
     // staff on a partner's file: the prices it shows the partner stay theirs
     const own = owner && !partner ? keepTheirPrices(sent, stored) : sent;
     if (internal) return own;
@@ -304,7 +310,7 @@ export async function saveDraftStages(draftId: string, slices: Partial<DraftData
       kept.pricing = { ...kept.pricing, profit: sent.pricing.profit };
     }
     return kept;
-  });
+  }
 }
 
 export async function deleteDraft(draftId: string): Promise<SaveDraftResult> {
@@ -828,7 +834,11 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // Matched by stay id where there is one, and by the old
     // «المدينة — الفندق» description otherwise — an item written before cities
     // could hold two hotels must not be reconciled away as a phantom.
-    const validHotelRefs = new Set(stays.flatMap((s) => [pricingRefFor(s), `${s.city_name} — ${s.line.hotel_name}`]));
+    const validHotelRefs = new Set([
+      ...stays.flatMap((s) => [pricingRefFor(s), `${s.city_name} — ${s.line.hotel_name}`]),
+      // a stay the advanced journey prices itself is a real stay too
+      ...journeyPricingLines(data.journey).filter((l) => l.item_type === "hotel").map((l) => l.ref ?? ""),
+    ]);
     const rates = await getRates();
     // The package's profit (stated on the file, or the administration's default
     // margin for a file that states none) laid onto the lines here, from the
@@ -934,6 +944,8 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // so every partner) did not, and printed reception, tours and a domestic
     // flight that had been switched off. Here, once, for both.
     const scoped = withScopeLines(data);
+    // «البكج المتقدم»: where our services start and end, what the client arranges, what is still pending
+    const route = data.journey?.enabled ? clientLines(data.journey) : { includes: [], excludes: [], pending: [] };
 
     // Chosen in the customer stage. A draft that predates the picker carries only
     // the typed company NAME, so resolve that too rather than losing the branding.
@@ -1033,13 +1045,15 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         leg_order: f.leg_order,
       })),
       services: [
+        ...route.includes.map((label) => ({ label, kind: "include" as const })),
         ...scoped.includes.map((label) => ({ label, kind: "include" as const })),
         ...(mealsLine ? [{ label: mealsLine, kind: "include" as const }] : []),
         ...(data.scope.transport ? transportIncludes : []).map((label) => ({ label, kind: "include" as const })),
         ...(data.scope.visas ? visaIncludes : []).map((label) => ({ label, kind: "include" as const })),
+        ...route.excludes.map((label) => ({ label, kind: "exclude" as const })),
         ...scoped.excludes.map((label) => ({ label, kind: "exclude" as const })),
       ],
-      terms: data.services.terms,
+      terms: [...data.services.terms, ...route.pending],
       hotels,
       pricing_items,
       // Only days with something to say are printed — an untouched skeleton
@@ -1048,7 +1062,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       days: draftDaySkeleton(data)
         .map((d, index, all) => ({
           d,
-          move: data.scope.transport ? transportNoteForDay(data.transport_plan, all, index, data.flights) : null,
+          move: data.scope.transport && !data.journey?.enabled ? transportNoteForDay(data.transport_plan, all, index, data.flights) : null,
         }))
         .filter(({ d, move }) => d.title.trim() || d.activities.some((a) => a.trim()) || move)
         .map(({ d, move }) => ({
