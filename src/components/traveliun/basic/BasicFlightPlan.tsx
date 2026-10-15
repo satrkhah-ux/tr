@@ -6,6 +6,7 @@ import { airportDisplay, planInternational, rankAirports, tripCountries, type Fl
 import { withTypedTotal } from "@/lib/offer/flight-fare";
 import { CabinOptions } from "../generator/flights/FlightBuilder";
 import { FlightFare } from "../generator/flights/FlightFare";
+import { FlightCardLink } from "../generator/flights/FlightCardLink";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { basicField, typedNumber } from "./styles";
 import { useBasicLabels } from "./labels";
@@ -151,14 +152,18 @@ export function BasicFlightPlan({
         ))}
       </datalist>
 
-      <button
-        type="button"
-        onClick={onFinal}
-        className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#185045] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
-      >
-        <Ticket className="size-4" />
-        {tx("finalFlight")}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={onFinal}
+          className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#185045] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+        >
+          <Ticket className="size-4" />
+          {tx("finalFlight")}
+        </button>
+        {/* the ticket already issued, set in our identity — staff only */}
+        <FlightCardLink />
+      </div>
     </div>
   );
 }

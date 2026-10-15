@@ -96,9 +96,16 @@ describe("«اختر جولة جاهزة» writes a real tour (الأمر 3)", (
     expect([data.days[1].title, data.days[1].activities]).toEqual(["يوم حر", ["وصف يوم حر"]]);
   });
 
-  it("leaves the day home, and a sale without tours, to the programme's text alone", () => {
+  it("the day home takes a tour only as the last city's «جولة قبل المغادرة»; a sale without tours keeps the text alone", () => {
     const data = trip();
-    expect(withDayTour(data, 4, first)).toBeNull();
+    const home = withDayTour(data, 4, program("l1", "لنكاوي", 1, "جولة بحرية"))!;
+    expect(home.cities[1].tour_picks).toEqual([
+      { program_id: "l1", title: "جولة بحرية", text: "وصف جولة بحرية", price: null, date: "2026-10-24", cars: 2, departure: true },
+    ]);
+    expect([home.days[4].title, home.days[4].activities]).toEqual([
+      "المغادرة",
+      ["جولة بحرية: وصف جولة بحرية", "التنقل بـفان × 2", "تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة"],
+    ]);
     const noTours = { ...data, transport_plan: { ...data.transport_plan, tours: { ...data.transport_plan.tours, enabled: false } } };
     expect(withDayTour(noTours, 1, first)).toBeNull();
   });

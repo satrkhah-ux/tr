@@ -728,6 +728,46 @@ describe("an old Basic file opens the same (الأمر 3)", () => {
       }
     `);
   });
+
+  const LABELS = { hotel: "فندق", airline: "الناقل" };
+
+  it("«جولة قبل المغادرة» moves no tour of this file — the same days and total, even with a date left on the day home", () => {
+    const data = oldBasicFile();
+    // جنتنج, the last city (17–18 Nov, home on the 19th), once had a third night: its tour's date is the day home now
+    const stale = { ...data, cities: data.cities.map((c, i) => (i === 2 ? { ...c, tour_picks: [{ program_id: null, title: "", text: "", price: null, date: "2026-11-19" }] } : c)) };
+    const last = data.cities.length - 1;
+    for (const file of [data, stale]) {
+      // every city's tours on the days they had before the day home could hold one
+      expect(file.cities.map((c, i) => withTours(c, c.tours ?? 0, undefined, i === last).map((p) => p.date))).toEqual(
+        data.cities.map((c) => withTours(c, c.tours ?? 0).map((p) => p.date)),
+      );
+      expect(basicDays(file)).toEqual(basicDays(data));
+      expect(suggestPricing(file, REFERENCE, LABELS)).toEqual(suggestPricing(data, REFERENCE, LABELS));
+    }
+    expect(basicDays(stale).at(-1)!.activities).toEqual(["تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة"]);
+  });
+
+  it("a tour the agent puts on the day home prints before the farewell, priced per car like the rest", () => {
+    const data = oldBasicFile();
+    const cities = data.cities.map((c, i) =>
+      i === 2
+        ? {
+            ...c,
+            tours: 2,
+            tour_picks: [...withTours(c, 1, undefined, true), { program_id: null, title: "مزارع الفراولة", text: "", price: 300, date: "2026-11-19", cars: 2, departure: true }],
+          }
+        : c,
+    );
+    const days = basicDays({ ...data, cities });
+    expect([days.at(-1)!.title, days.at(-1)!.activities]).toEqual([
+      "المغادرة",
+      ["مزارع الفراولة", "التنقل بـفان × 2", "تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة"],
+    ]);
+    // the rest of the programme is the file's own
+    expect(days.slice(0, -1)).toEqual(basicDays(data).slice(0, -1));
+    const line = suggestPricing({ ...data, cities, days }, REFERENCE, LABELS).find((i) => i.ref === "tour:جنتنج:1");
+    expect([line?.quantity, line?.sell_price]).toEqual([2, 300]);
+  });
 });
 
 describe("the day follows its tour (الأمر 3)", () => {

@@ -37,7 +37,8 @@ import {
   withTours,
   type BasicCity,
 } from "@/lib/offer/basic";
-import type { TourProgram } from "@/lib/offer/itinerary";
+import { departureDay, type TourProgram } from "@/lib/offer/itinerary";
+import { useRole } from "@/lib/roles/RoleContext";
 import { tourPriced, toursTotal, type TourPrice } from "@/lib/offer/pricing-suggest";
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../TraveliunUIProvider";
@@ -68,6 +69,12 @@ const head = "hidden px-0.5 text-[10.5px] font-bold text-[#7a948f] xl:grid";
 const rowGap = "grid grid-cols-2 items-start gap-2";
 const HOTEL_COLS = "xl:grid-cols-[minmax(12rem,1.6fr)_minmax(10rem,1.4fr)_minmax(7.5rem,0.9fr)_7rem_minmax(7rem,0.8fr)_2rem]";
 const TOUR_COLS = "xl:grid-cols-[minmax(9.5rem,1fr)_minmax(13rem,2fr)_minmax(9rem,1fr)_4.5rem_minmax(6.5rem,0.7fr)_minmax(6.5rem,0.7fr)]";
+/** the same rows without the price per car and the total — for a viewer without pricing.view. */
+const TOUR_COLS_NO_PRICE = "xl:grid-cols-[minmax(9.5rem,1fr)_minmax(13rem,2fr)_minmax(9rem,1fr)_4.5rem]";
+
+/** «عدد الجولات: 2 · الإجمالي: 800» — without a total (no pricing.view), the count alone. */
+const toursText = (tx: ReturnType<typeof useBasicLabels>, n: number, total: number | null) =>
+  total == null ? `${tx("toursCount")}: ${n}` : tx("toursSummary", { n, total: total.toLocaleString("en-US") });
 
 /**
  * One city: its tabs in the header beside its name — the hotel, the tours (with
@@ -154,8 +161,10 @@ export function BasicCityCard({
 
   // what the city still lacks before «تمت»: the stay, the tours, the airport cars
   const plan = data.transport_plan;
-  const picks = toursOn ? withTours(city, city.tours ?? 0) : [];
+  const picks = toursOn ? withTours(city, city.tours ?? 0, undefined, isLast) : [];
   const tripCar = plan.tours.car_type.trim();
+  // the tours' prices, as the generator shows them: pricing.view only (a hidden price is kept, never cleared)
+  const showPrice = useRole().can("pricing.view");
   const rooms = lines.flatMap((l) => l.rooms);
   const missing = [
     hotelsOn && lines.some((l) => !l.hotel_name.trim()) && tx("hotel"),
@@ -164,8 +173,8 @@ export function BasicCityCard({
     hotelsOn && rooms.some((r) => r.price == null) && tx("price"),
     picks.some((p) => !p.free && !p.title.trim()) && tx("tourService"),
     picks.some((p) => !p.free && !(p.car_type?.trim() || tripCar)) && tx("carType"),
-    // a tour the list prices is priced (the sheet takes the list's figure)
-    picks.some((p) => !tourPriced(p, tripCar, tourPrices)) && tx("tourPrice"),
+    // a tour the list prices is priced (the sheet takes the list's figure) — asked only of who sees the price
+    showPrice && picks.some((p) => !tourPriced(p, tripCar, tourPrices)) && tx("tourPrice"),
     transportOn && isFirst && !plan.airport.car_type.trim() && tx("reception"),
     transportOn && isLast && !(plan.farewell ?? plan.airport).car_type.trim() && tx("farewell"),
   ].filter((x): x is string => Boolean(x));
@@ -175,7 +184,7 @@ export function BasicCityCard({
     [...new Set(lines.map((l) => l.hotel_name.trim()).filter(Boolean))].join(" + "),
     main && main.rooms.length > 0 ? `${main.rooms.length} × ${baseRoomName(main.rooms[0].room_type_name) || "—"}` : "",
     hotelsOn && stayPrice > 0 ? `${stayPrice.toLocaleString("en-US")} ${main?.manual_currency ?? ""}`.trim() : "",
-    toursOn ? tx("toursSummary", { n: tours.length, total: toursTotal(tours, tripCar, tourPrices, lookups.sarPer ?? { SAR: 1 }).toLocaleString("en-US") }) : "",
+    toursOn ? toursText(tx, tours.length, showPrice ? toursTotal(tours, tripCar, tourPrices, lookups.sarPer ?? { SAR: 1 }) : null) : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -256,6 +265,7 @@ export function BasicCityCard({
               isLast={isLast}
               toursOn={toursOn}
               transportOn={transportOn}
+              showPrice={showPrice}
               onPicks={onPicks}
               onCar={onCar}
             />
@@ -573,10 +583,12 @@ function Field({ label, className, children }: { label: string; className?: stri
  * The tours read as the city's days, in order (the generator's «البرنامج
  * اليومي والجولات», compact — no weather, no AI): a day with a tour holds its
  * row (TourRow, shared with the generator), a day without one says what it is
- * and takes one with a press — the arrival day too («جولة بعد الوصول»). The
- * count is still set here (any number — a client may want more tours than
- * days). The tours car is chosen once for the whole trip; a tour given another
- * car keeps its own, and its cars follow the trip's while they were the same.
+ * and takes one with a press — the arrival day too («جولة بعد الوصول»), and
+ * on the last city the day home («جولة قبل المغادرة»: the tour, then the
+ * farewell). The count is still set here (any number — a client may want more
+ * tours than days). The tours car is chosen once for the whole trip; a tour
+ * given another car keeps its own, and its cars follow the trip's while they
+ * were the same. The price per car and the total show with pricing.view only.
  */
 function ToursPanel({
   index,
@@ -590,6 +602,7 @@ function ToursPanel({
   isLast,
   toursOn,
   transportOn,
+  showPrice,
   onPicks,
   onCar,
 }: {
@@ -604,6 +617,8 @@ function ToursPanel({
   isLast: boolean;
   toursOn: boolean;
   transportOn: boolean;
+  /** pricing.view: the price per car and the total. */
+  showPrice: boolean;
   onPicks: (picks: TourPick[]) => void;
   onCar: (leg: "airport" | "farewell" | "tours", slice: Partial<TransportLeg>) => void;
 }) {
@@ -611,15 +626,19 @@ function ToursPanel({
   const { t } = useTraveliunUI();
   const plan = data.transport_plan;
   const tripCar = plan.tours.car_type;
-  // every night of the city may hold a tour; a new one goes in the trip's tour cars
-  const dates = cityDates(city);
-  const picks = withTours(city, city.tours ?? 0, plan.tours.cars);
-  const catalog: TourCatalog = { city: city.city_name, programs, prices: tourPrices, sarPer, carTypes, tripCar, listId: `basic-tours-${index}`, showPrice: true };
-  const setPick = (k: number, slice: Partial<TourPick>) => onPicks(picks.map((p, i) => (i === k ? { ...p, ...slice } : p)));
-  const addOn = (date: string) => onPicks([...picks, { program_id: null, title: "", text: "", price: null, date, cars: plan.tours.cars }]);
+  const cols = showPrice ? TOUR_COLS : TOUR_COLS_NO_PRICE;
+  // every night of the city may hold a tour, and on the last city the day home; a new one goes in the trip's tour cars
+  const leaving = isLast ? departureDay(city) : null;
+  const dates = leaving ? [...cityDates(city), leaving] : cityDates(city);
+  const picks = withTours(city, city.tours ?? 0, plan.tours.cars, isLast);
+  const catalog: TourCatalog = { city: city.city_name, programs, prices: tourPrices, sarPer, carTypes, tripCar, listId: `basic-tours-${index}`, showPrice };
+  // a tour put on the day home is «قبل المغادرة»; moved off it, a tour of the city's nights
+  const onDay = (p: TourPick): TourPick => ({ ...p, departure: leaving !== null && p.date === leaving ? true : undefined });
+  const setPick = (k: number, slice: Partial<TourPick>) => onPicks(picks.map((p, i) => (i === k ? onDay({ ...p, ...slice }) : p)));
+  const addOn = (date: string) => onPicks([...picks, onDay({ program_id: null, title: "", text: "", price: null, date, cars: plan.tours.cars })]);
 
   const tours = picks.filter((p) => !p.free);
-  const total = toursTotal(tours, tripCar, tourPrices, sarPer);
+  const total = showPrice ? toursTotal(tours, tripCar, tourPrices, sarPer) : null;
   // met at the airport the group lands at for this city (a domestic flight in, else the international one);
   // seen off at the one it leaves from (a domestic flight out, else the flight home)
   const byDeparture = [...data.flights].sort((a, b) => (a.departure_at ?? "").localeCompare(b.departure_at ?? ""));
@@ -630,7 +649,7 @@ function ToursPanel({
   const airportRow = (leg: "airport" | "farewell", label: string, airport: string) => {
     const value = leg === "farewell" ? (plan.farewell ?? plan.airport) : plan.airport;
     return (
-      <div className={`${rowGap} ${TOUR_COLS} rounded-[9px] bg-[#f4f9f7] p-1`}>
+      <div className={`${rowGap} ${cols} rounded-[9px] bg-[#f4f9f7] p-1`}>
         <span className="col-span-2 inline-flex min-h-9 flex-wrap items-center gap-1.5 px-1 text-[12px] font-extrabold text-[#185045] xl:col-span-2">
           <UserRound className="size-3.5" />
           {label}
@@ -657,7 +676,7 @@ function ToursPanel({
         dates={dates}
         dayLabel={dayLabel}
         field={basicField}
-        className={`${rowGap} ${TOUR_COLS}`}
+        className={`${rowGap} ${cols}`}
       />
     );
   };
@@ -667,7 +686,7 @@ function ToursPanel({
       {toursOn ? (
         <div className="flex flex-wrap items-end gap-2">
           <Field label={tx("toursCount")} className="w-24">
-            <select value={picks.length} onChange={(e) => onPicks(withTours(city, Number(e.target.value), plan.tours.cars))} className={`${basicField} px-1.5`}>
+            <select value={picks.length} onChange={(e) => onPicks(withTours(city, Number(e.target.value), plan.tours.cars, isLast))} className={`${basicField} px-1.5`}>
               {range(0, 15).map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
@@ -694,7 +713,7 @@ function ToursPanel({
             />
           </Field>
           <span className="tv-tnum mb-1.5 rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11.5px] font-bold text-[#185045]">
-            {tx("toursSummary", { n: tours.length, total: total.toLocaleString("en-US") })}
+            {toursText(tx, tours.length, total)}
           </span>
         </div>
       ) : null}
@@ -710,16 +729,20 @@ function ToursPanel({
 
       {toursOn ? (
         <>
-          <div className={`${head} ${TOUR_COLS} gap-2`}>
+          <div className={`${head} ${cols} gap-2`}>
             <span>{t("pg.tour.date")}</span>
             <span>{t("pg.tour.service")}</span>
             <span>{t("pg.tour.car")}</span>
             <span>{t("pg.tour.cars")}</span>
-            <span>{t("pg.tour.carPrice")}</span>
-            <span>{t("pg.tour.total")}</span>
+            {showPrice ? (
+              <>
+                <span>{t("pg.tour.carPrice")}</span>
+                <span>{t("pg.tour.total")}</span>
+              </>
+            ) : null}
           </div>
           <TourChoices catalog={catalog} />
-          {/* the city's days in order: each with its tours, or what the day is and a tour to add */}
+          {/* the city's days in order: each with its tours, or what the day is and a tour to add — on the last city the day home too */}
           {dates.map((date, d) => {
             const on = picks.filter((p) => p.date === date);
             if (on.length > 0) return <Fragment key={date}>{on.map(row)}</Fragment>;
@@ -734,7 +757,7 @@ function ToursPanel({
                   className="ms-auto inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 font-bold text-[#185045] hover:bg-[#f0f7f4]"
                 >
                   <Plus className="size-3.5" />
-                  {d === 0 ? t("pg.itin.tourAfterArrival") : t("pg.tour.add")}
+                  {d === 0 ? t("pg.itin.tourAfterArrival") : date === leaving ? t("pg.itin.tourBeforeDeparture") : t("pg.tour.add")}
                 </button>
               </div>
             );

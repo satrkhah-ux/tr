@@ -18,7 +18,8 @@ import {
   withTours,
   type TourProgram,
 } from "./itinerary";
-import { deriveCityDates, emptyDraftData, type DraftCity, type DraftData, type DraftDay } from "./draft-types";
+import { deriveCityDates, emptyDraftData, normalizeDraftData, type DraftCity, type DraftData, type DraftDay } from "./draft-types";
+import { suggestPricing, type PricingReference } from "./pricing-suggest";
 import { emptyJourney } from "./advanced";
 
 function city(city_name: string, nights: number): DraftCity {
@@ -396,5 +397,75 @@ describe("the merged day-and-tour screen (الأمر 4)", () => {
     // the first is on the day after arrival, the new one on the arrival day (in date order)
     expect(withTours(kl, 2, 2).map((p) => [p.title, p.cars])).toEqual([["", 2], ["جولة", 1]]);
     expect(withTours(kl, 2).map((p) => p.cars)).toEqual([undefined, 1]);
+  });
+});
+
+describe("«جولة قبل المغادرة» — a tour on the day home", () => {
+  /** KL two nights (20–21) then Langkawi two (22–23), home on the 24th; two vans for the tours. */
+  function klTrip(): DraftData {
+    const data = emptyDraftData();
+    data.trip = { ...data.trip, country: "ماليزيا", destination: "ماليزيا", arrival_date: "2026-10-20", nights: 4, days: 5, adults: 9 };
+    data.cities = deriveCityDates("2026-10-20", [city("كوالالمبور", 2), city("لنكاوي", 2)]);
+    data.transport_plan = { ...data.transport_plan, tours: { ...data.transport_plan.tours, car_type: "فان", cars: 2 } };
+    data.days = draftDaySkeleton(data);
+    return data;
+  }
+  const LGK: TourProgram = { id: "lgk", city_name: "لنكاوي", title: "جولة الجزر", description: "ثلاث جزر بالقارب", is_free_day: false, sort_order: 1 };
+  const NO_LIST: PricingReference = { transfers: [], services: [], rooms: [], fleet: [], tours: [] };
+  const toursTotal = (data: DraftData) =>
+    suggestPricing(data, NO_LIST, { hotel: "فندق", airline: "الناقل" })
+      .filter((i) => i.ref?.startsWith("tour:"))
+      .reduce((sum, i) => sum + (i.sell_price ?? 0) * i.quantity, 0);
+  const datesOn = (data: DraftData) => data.days.map((_, i) => dayTours(data, i)?.picks.map((p) => p.title) ?? null);
+
+  it("an old generator file keeps every tour on its day and the day home as it was — even a date left on that day", () => {
+    let data = klTrip();
+    data.cities = data.cities.map((c, i) =>
+      i === 0
+        ? { ...c, tours: 1, tour_picks: [{ program_id: "kl1", title: "جولة المدينة", text: "برجا بتروناس", price: 300, date: "2026-10-21", cars: 2 }] }
+        : {
+            ...c,
+            tours: 2,
+            tour_picks: [
+              { program_id: "lgk", title: "جولة الجزر", text: "ثلاث جزر بالقارب", price: 250, date: "2026-10-23", cars: 2 },
+              // Langkawi was three nights once: this date is the day home now, and was never put there
+              { program_id: null, title: "الشاطئ", text: "", price: 100, date: "2026-10-24" },
+            ],
+          },
+    );
+    data.days = daysFromTours(data);
+    // saved, then opened again
+    data = normalizeDraftData(JSON.parse(JSON.stringify(data)));
+    expect(datesOn(data)).toEqual([[], ["جولة المدينة"], ["الشاطئ"], ["جولة الجزر"], []]);
+    // the generator's day home is the agent's, and stays empty; nothing is rewritten on reopening
+    expect([data.days[4].title, data.days[4].activities]).toEqual(["", []]);
+    expect(daysFromTours(data)).toEqual(data.days);
+    expect(toursTotal(data)).toBe(300 * 2 + 250 * 2 + 100);
+  });
+
+  it("a tour put on the day home prints first, then the way to the airport — priced, and one more than the nights", () => {
+    const apply = (data: DraftData, slice: Pick<DraftData, "cities" | "days"> | null) => ({ ...data, ...slice! });
+    let data = apply(klTrip(), withDayPick(klTrip(), 4, 0, { ...tourService("جولة الجزر", [LGK]), price: 250 }));
+    expect(data.cities[1].tour_picks).toEqual([
+      { program_id: "lgk", title: "جولة الجزر", text: "ثلاث جزر بالقارب", free: false, price: 250, cars: 2, date: "2026-10-24", departure: true },
+    ]);
+    expect([data.days[4].title, data.days[4].activities]).toEqual([
+      "المغادرة",
+      ["جولة الجزر: ثلاث جزر بالقارب", "التنقل بـفان × 2", "تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة"],
+    ]);
+    // both nights take a tour too: three tours in two nights
+    data = apply(data, withDayPick(data, 2, 0, { title: "الشاطئ", price: 100 }));
+    data = apply(data, withDayPick(data, 3, 0, { title: "الغابة", price: 100 }));
+    expect([data.cities[1].tours, datesOn(data).slice(2)]).toEqual([3, [["الشاطئ"], ["الغابة"], ["جولة الجزر"]]]);
+    expect(toursTotal(data)).toBe(250 * 2 + 100 * 2 + 100 * 2);
+    // taken away, the day home is the agent's again, empty — as it was before
+    const gone = apply(data, withDayPick(data, 4, 0, null));
+    expect([gone.cities[1].tours, gone.days[4].title, gone.days[4].activities]).toEqual([2, "", []]);
+  });
+
+  it("follows the day home when the trip moves; on a city that is no longer the last it takes a night instead", () => {
+    const lgk = { ...deriveCityDates("2026-10-21", klTrip().cities)[1], tour_picks: [{ program_id: null, title: "جولة الجزر", text: "", price: 250, date: "2026-10-24", departure: true }] };
+    expect(withTours(lgk, 1, undefined, true)[0]).toMatchObject({ date: "2026-10-25", departure: true });
+    expect(withTours(lgk, 1)[0]).toMatchObject({ date: "2026-10-24", departure: undefined });
   });
 });

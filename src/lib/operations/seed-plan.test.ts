@@ -86,6 +86,28 @@ describe("the pull from the offer", () => {
       ["ميني فان", 300],
     ]);
   });
+
+  it("books «جولة قبل المغادرة» on the day home — and only the marked one", () => {
+    const data = malaysia();
+    // لنكاوي (24–26 Nov, home on the 27th): one tour put on the day home, one date left there from before
+    data.cities = data.cities.map((c, i) =>
+      i === 1
+        ? {
+            ...c,
+            tours: 2,
+            tour_picks: [
+              { program_id: null, title: "جولة الجزر", text: "", price: 300, date: "2026-11-27", departure: true },
+              { program_id: null, title: "جولة قديمة", text: "", price: 300, date: "2026-11-27" },
+            ],
+          }
+        : c,
+    );
+    const tours = planBookingsFromDraft(data, "شروط الشركة").filter((r) => r.origin_ref.startsWith("tour:لنكاوي"));
+    expect(tours.map((t) => [t.title, t.start_date])).toEqual([
+      ["جولة: جولة قديمة", "2026-11-25"],
+      ["جولة: جولة الجزر", "2026-11-27"],
+    ]);
+  });
 });
 
 describe("a booking per stay — two hotels in one city (order 1)", () => {

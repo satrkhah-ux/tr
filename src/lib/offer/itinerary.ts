@@ -389,6 +389,11 @@ export function cityDates(city: Pick<DraftCity, "check_in" | "nights">): string[
   return Array.from({ length: Math.max(city.nights, 1) }, (_, k) => addDays(city.check_in!, k));
 }
 
+/** The day the group leaves the city — for the last city, the day it flies home («جولة قبل المغادرة»). */
+export function departureDay(city: Pick<DraftCity, "check_in" | "nights">): string | null {
+  return city.check_in ? addDays(city.check_in, Math.max(city.nights, 1)) : null;
+}
+
 /**
  * Every tour gets its day written down — the first of `days` no tour has yet;
  * once they are all taken, the days are shared in turn. A tour that already
@@ -409,10 +414,24 @@ export function fillTourDates(picks: TourPick[], days: string[]): TourPick[] {
 /**
  * The city's tours at a count, each with its day, in date order. A day the city
  * no longer has (its dates moved) is let go and the tour takes the next free one.
+ *
+ * On the trip's last city (`last`) a tour the agent put on the day home
+ * («جولة قبل المغادرة», `departure`) stays on that day, wherever it moves; on
+ * any other city it is a tour like the rest. Only the mark puts a tour there:
+ * the free days handed out never include the day home, so no file's tours move.
  */
-export function withTours(city: Pick<DraftCity, "check_in" | "nights" | "tour_picks">, count: number, cars?: number): TourPick[] {
+export function withTours(city: Pick<DraftCity, "check_in" | "nights" | "tour_picks">, count: number, cars?: number, last = false): TourPick[] {
   const own = cityDates(city);
-  const kept = withTourCount(city.tour_picks, count, cars).map((p) => (p.date && own.length > 0 && !own.includes(p.date) ? { ...p, date: null } : p));
+  const leaving = departureDay(city);
+  const kept = withTourCount(city.tour_picks, count, cars).map((p) =>
+    p.departure
+      ? last
+        ? { ...p, date: leaving ?? p.date ?? null }
+        : { ...p, departure: undefined, date: null }
+      : p.date && own.length > 0 && !own.includes(p.date)
+        ? { ...p, date: null }
+        : p,
+  );
   return fillTourDates(kept, tourDays(city)).sort(byDate);
 }
 
@@ -471,8 +490,8 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
     const cityDays = days.map((_, i) => i).filter((i) => cityOf[i] === c);
     const free = cityDays.filter((i) => kindOf[i] === "stay");
     const undated: TourPick[] = [];
-    // the same days the city card shows
-    for (const pick of withTours(city, count)) {
+    // the same days the city card shows — the last city's may hold the day home
+    for (const pick of withTours(city, count, undefined, c === cities.length - 1)) {
       const named = { ...pick, title: pick.free ? FREE_DAY_TITLE : pick.title.trim() || `جولة سياحية في ${city.city_name}` };
       const day = pick.date ? cityDays.find((i) => days[i].date === pick.date) : undefined;
       if (day !== undefined) put(day, named);
@@ -516,14 +535,17 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
       activities = picked.flatMap((t) => (t.text.trim() ? [t.text.trim()] : [])).slice(0, 1);
     } else if (tours.length > 0) {
       const line = (t: TourPick) => (t.text.trim() ? `${t.title}: ${t.text.trim()}` : t.title);
+      // the car each tour goes in, and how many — said once
+      const cars = [...new Set(tours.map((t) => tourVehicle(t, tripCar)).filter(Boolean))];
+      const car = cars.length > 0 ? [`${TOUR_CAR_LINE}${cars.join(" و")}`] : [];
       if (kind === "stay") {
         // the day is named after its first tour; any more the client asked for follow it
         title = tours[0].title;
-        activities = [...(tours[0].text.trim() ? [tours[0].text.trim()] : []), ...tours.slice(1).map(line)];
-      } else activities = [...activities, ...tours.map(line)];
-      // the car each tour goes in, and how many — said once
-      const cars = [...new Set(tours.map((t) => tourVehicle(t, tripCar)).filter(Boolean))];
-      if (cars.length > 0) activities = [...activities, `${TOUR_CAR_LINE}${cars.join(" و")}`];
+        activities = [...(tours[0].text.trim() ? [tours[0].text.trim()] : []), ...tours.slice(1).map(line), ...car];
+      } else if (kind === "last") {
+        // «جولة قبل المغادرة»: the tour and its car, then the way to the airport
+        activities = [...tours.map(line), ...car, ...activities];
+      } else activities = [...activities, ...tours.map(line), ...car];
     }
 
     // an empty day holding a tour is the tour's: the programme opens already written from it
@@ -543,7 +565,7 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
  * — and the day is written from it. No programme takes the day's tour away and
  * leaves the day empty again.
  *
- * Null when the day is not one of a city's nights (the day home, a travel day)
+ * Null when no tour can go on the day (a travel day — see dayTours)
  * or the sale has no tours: such a day only takes the programme's text.
  */
 export function withDayTour(data: DraftData, index: number, program: TourProgram | null): Pick<DraftData, "cities" | "days"> | null {
@@ -558,7 +580,7 @@ export function withDayTour(data: DraftData, index: number, program: TourProgram
     ? null
     : program.is_free_day
       ? { program_id: program.id, title: FREE_DAY_TITLE, text, price: null, date, free: true }
-      : { program_id: program.id, title: programDayText(program).title, text, price: null, date, cars: data.transport_plan.tours.cars };
+      : { program_id: program.id, title: programDayText(program).title, text, price: null, date, cars: data.transport_plan.tours.cars, ...(on.departure ? { departure: true } : {}) };
   const picks = pick ? [...others, pick].sort(byDate) : others;
   const cities = data.cities.map((c, i) => (i === at ? { ...c, tours: picks.length, tour_picks: picks } : c));
 
@@ -569,18 +591,24 @@ export function withDayTour(data: DraftData, index: number, program: TourProgram
 
 /**
  * The city stop a programme day sleeps in, and the tours on it (that stop's
- * picks dated on the day). Null for a day no tour can go on: a travel day, the
- * day home, or a sale without tours.
+ * picks dated on the day). The day home belongs to the last city
+ * (`departure` — «جولة قبل المغادرة»). Null for a day no tour can go on: a
+ * travel day, or a sale without tours.
  */
-export function dayTours(data: DraftData, index: number): { at: number; date: string; all: TourPick[]; picks: TourPick[] } | null {
+export function dayTours(
+  data: DraftData,
+  index: number,
+): { at: number; date: string; all: TourPick[]; picks: TourPick[]; departure: boolean } | null {
   const day = data.days[index];
   if (!day?.date || day.kind === "travel" || !data.transport_plan.tours.enabled) return null;
   const date = day.date;
   const dated = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
-  const at = dated.findIndex((c) => c.city_name === day.city_name && cityDates(c).includes(date));
+  const lastAt = dated.length - 1;
+  const departure = index === data.days.length - 1 && lastAt >= 0 && dated[lastAt].city_name === day.city_name && departureDay(dated[lastAt]) === date;
+  const at = departure ? lastAt : dated.findIndex((c) => c.city_name === day.city_name && cityDates(c).includes(date));
   if (at < 0) return null;
-  const all = withTours(dated[at], dated[at].tours ?? 0);
-  return { at, date, all, picks: all.filter((p) => p.date === date) };
+  const all = withTours(dated[at], dated[at].tours ?? 0, undefined, at === lastAt);
+  return { at, date, all, picks: all.filter((p) => p.date === date), departure };
 }
 
 /**
@@ -601,7 +629,7 @@ export function withDayPick(data: DraftData, index: number, k: number, slice: Pa
     ? all.filter((p) => p !== old)
     : old
       ? all.map((p) => (p === old ? { ...p, ...slice, date } : p))
-      : [...all, { program_id: null, title: "", text: "", price: null, cars: data.transport_plan.tours.cars, ...slice, date }].sort(byDate);
+      : [...all, { program_id: null, title: "", text: "", price: null, cars: data.transport_plan.tours.cars, ...slice, date, ...(on.departure ? { departure: true } : {}) }].sort(byDate);
   const cities = data.cities.map((c, i) => (i === at ? { ...c, tours: picks.length, tour_picks: picks } : c));
   const service = !slice || "title" in slice || "program_id" in slice || "free" in slice;
   if (!service) return { cities, days: daysFromTours({ ...data, cities }) };

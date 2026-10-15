@@ -1440,6 +1440,7 @@ export const ar: Dictionary = {
   "pg.itin.tours.few": "{n} جولات",
   "pg.itin.tours.many": "{n} جولة",
   "pg.itin.tourAfterArrival": "جولة بعد الوصول",
+  "pg.itin.tourBeforeDeparture": "جولة قبل المغادرة",
   "pg.itin.fold": "طيّ المدينة أو فتحها",
   "pg.tour.service": "الجولة",
   "pg.tour.serviceHint": "من برامج {city} أو قائمة الأسعار، أو اكتب",
