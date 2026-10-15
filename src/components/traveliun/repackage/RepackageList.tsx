@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { FileText, Loader2, Trash2, Wand2 } from "lucide-react";
+import { FileText, Loader2, Plane, Trash2, Wand2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { createRepackage, deleteRepackage, type RepackageSummary } from "@/lib/data/repackage";
@@ -49,15 +49,25 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
             <h1 className="text-lg font-extrabold text-[#003c3a]">{t("rp.title")}</h1>
             <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("rp.subtitle")}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => void onCreate()}
-            disabled={creating}
-            className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
-          >
-            {creating ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
-            {creating ? t("pg.creating") : t("rp.new")}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* a ticket the client already holds, re-set in our identity — no supplier, no price */}
+            <Link
+              href="/repackage/flight-card"
+              className="inline-flex h-11 items-center gap-2 rounded-[11px] border border-[#185045] px-5 text-sm font-bold text-[#185045] transition-colors hover:bg-[#f0f7f4]"
+            >
+              <Plane className="size-4" />
+              {t("fc.open")}
+            </Link>
+            <button
+              type="button"
+              onClick={() => void onCreate()}
+              disabled={creating}
+              className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
+            >
+              {creating ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
+              {creating ? t("pg.creating") : t("rp.new")}
+            </button>
+          </div>
         </section>
 
         {error ? (

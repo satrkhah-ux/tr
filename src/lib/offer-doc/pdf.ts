@@ -109,3 +109,23 @@ export async function offerDocumentToPdf(html: string, footer?: FooterInfo): Pro
     if (browser) await browser.close();
   }
 }
+
+/**
+ * The same printed sheet as a picture — what an employee drops into WhatsApp.
+ * Same browser, same HTML as the PDF, so the image cannot drift from the paper;
+ * only the first `.od-page` is captured, at twice the A4 pixel width.
+ */
+export async function documentToPng(html: string): Promise<Buffer> {
+  let browser: Browser | null = null;
+  try {
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+    await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
+    await page.setContent(html, { waitUntil: "load" });
+    const sheet = await page.$(".od-page");
+    const shot = sheet ? await sheet.screenshot({ type: "png" }) : await page.screenshot({ type: "png", fullPage: true });
+    return Buffer.from(shot);
+  } finally {
+    if (browser) await browser.close();
+  }
+}

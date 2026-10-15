@@ -26,6 +26,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/offer/[serial]/pdf": ["./public/fonts/**", "./node_modules/@sparticuz/chromium/**"],
     "/client-offer/[serial]/pdf": ["./public/fonts/**", "./node_modules/@sparticuz/chromium/**"],
+    "/repackage/flight-card/render": ["./public/fonts/**", "./node_modules/@sparticuz/chromium/**"],
     "/offer/[serial]/image": ["./public/fonts/**"],
   },
   images: {
