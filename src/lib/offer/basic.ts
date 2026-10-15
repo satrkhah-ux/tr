@@ -22,6 +22,7 @@ import {
   MEAL_PLAN_BOARD,
   newStayId,
   resizeRooms,
+  roomTypeNames,
   withRooms,
   type DraftCity,
   type DraftData,
@@ -39,6 +40,7 @@ import {
   type TourPick,
   type TransportMode,
 } from "./draft-types";
+import { roomRank, seatsFromName } from "@/lib/catalog/model";
 import { draftDaySkeleton } from "./itinerary";
 import { autoDepartureDate, finalOutbound, itineraryStartDate } from "./schedule";
 
@@ -766,10 +768,17 @@ export const STANDARD_ROOMS = [
   "فيلا",
 ];
 
-/** What the room field suggests: the clear names, then the chosen hotel's own — never every hotel's. */
-export function roomSuggestions(roomTypes: LookupRoomType[], hotelId: string | null | undefined): string[] {
-  const own = hotelId ? roomTypes.filter((r) => r.hotel_id === hotelId).map((r) => r.name.trim()) : [];
-  return [...new Set([...STANDARD_ROOMS, ...own])].filter(Boolean);
+/**
+ * What the room field suggests: the chosen hotel's own rooms first, in category
+ * order (single, double … suite, villa), then the clear names — never another
+ * hotel's. `withGlobal` (the full generator) keeps the rest of the shared list after them.
+ */
+export function roomSuggestions(roomTypes: LookupRoomType[], hotelId: string | null | undefined, withGlobal = false): string[] {
+  const own = hotelId
+    ? roomTypes.filter((r) => r.hotel_id === hotelId).map((r) => r.name.trim()).sort((a, b) => roomRank(a) - roomRank(b))
+    : [];
+  const shared = withGlobal ? roomTypeNames(roomTypes.filter((r) => r.hotel_id === null)) : [];
+  return [...new Set([...own, ...STANDARD_ROOMS, ...shared])].filter(Boolean);
 }
 
 // ---------- the package's profit ----------
@@ -833,7 +842,11 @@ const SPECIAL_CAR = /vip|ليموزين|ذوي الاحتياجات|مجهزة/i
  * the largest. Null when the list has no sizes.
  */
 export function carForGroup(carTypes: { name: string; pax: number | null }[], people: number): { car_type: string; cars: number } | null {
-  const seats = carTypes.filter((c) => (c.pax ?? 0) > 0 && !SPECIAL_CAR.test(c.name)).sort((a, b) => (a.pax ?? 0) - (b.pax ?? 0));
+  // the seats column first; a type nobody filled in still says them in its name («باص 40 راكب»)
+  const seats = carTypes
+    .map((c) => ({ name: c.name, pax: c.pax ?? seatsFromName(c.name) }))
+    .filter((c) => (c.pax ?? 0) > 0 && !SPECIAL_CAR.test(c.name))
+    .sort((a, b) => (a.pax ?? 0) - (b.pax ?? 0));
   if (seats.length === 0 || people <= 0) return null;
   const need = people >= 3 ? people + 1 : people;
   const fits = seats.find((c) => (c.pax ?? 0) >= need);

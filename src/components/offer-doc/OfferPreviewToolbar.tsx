@@ -15,8 +15,10 @@ import { setOfferPartner, setOfferShowPrices } from "@/lib/data/partner-companie
  *
  * The brand and price choices live in the URL, not in component state: the PDF
  * link is a plain <a> to the same two parameters, so the file that downloads is
- * provably the document on screen. `setOfferPartner` then remembers the choice on
- * the offer, so re-opening it — or the client link — comes out the same way.
+ * provably the document on screen. The offer's own company (who reads and pays
+ * for it) is fixed when it is issued: `setOfferPartner` only confirms the pick
+ * matches it, so a different brand prints in this preview and its PDF and is
+ * not remembered on the offer or its client link.
  */
 export function OfferPreviewToolbar({
   serial,
@@ -55,16 +57,24 @@ export function OfferPreviewToolbar({
     return s ? `?${s}` : "";
   };
 
-  /** Switching identity also records it on the offer, so the client link agrees. */
+  /** A brand for this preview and its PDF; the offer's company itself never moves from here. */
   async function pickBrand(next: string) {
     setPending(true);
     setMessage(null);
     const res = await setOfferPartner(serial, next === "ours" ? null : next);
     setPending(false);
-    // an invoiced offer, or a partner's own file, keeps its company — say so instead of switching
     if (!res.ok) {
-      setMessage(res.error === "partner.err.invoiced" ? "صدرت لهذا العرض فاتورة على الشركة — لا تُغيَّر شركته." : res.error === "partner.err.partnerFile" ? "هذا ملف أنشأته شركة شريكة بنفسها — يبقى باسمها." : "تعذّر تغيير الشركة.");
-      return;
+      const kept =
+        res.error === "partner.err.ownerFixed"
+          ? "هذا العرض صادر لشركة شريكة ويُفوتَر عليها، فتبقى شركته كما هي."
+          : res.error === "partner.err.notPartnerOffer"
+            ? "صدر هذا العرض باسمنا، فلا يُنقل إلى شركة بعد إصداره."
+            : null;
+      if (!kept) {
+        setMessage("تعذّر تغيير الشركة.");
+        return;
+      }
+      setMessage(`${kept} الهوية المختارة تظهر في هذه المعاينة وملف PDF فقط، ورابط العميل يبقى كما هو.`);
     }
     // push ONLY — a refresh() chased straight after a push cancels it, which is
     // why the selection used to snap back to what it was.

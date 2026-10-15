@@ -19,7 +19,12 @@ export type ColumnDef = {
   /** editable in the add/edit form (default true). */
   editable?: boolean;
   /** fixed options for a select input in the form. */
-  options?: { value: string; label: string }[];
+  options?: FilterOption[];
+  /**
+   * An id column shown by its name and edited as a select of that list
+   * (cities.country_id → «ماليزيا»), from the same options the filters use.
+   */
+  source?: Exclude<FilterSource, "static">;
   /** the value is a city's / country's id: shown by name, picked from a searchable list. */
   ref?: "cities" | "countries";
 };
@@ -32,7 +37,7 @@ export type Filter = {
   value: DataValue | DataValue[];
 };
 
-export type FilterSource = "countries" | "cities" | "employees" | "static";
+export type FilterSource = "countries" | "cities" | "employees" | "suppliers" | "static";
 
 export type FilterDef = {
   key: string;
@@ -40,8 +45,8 @@ export type FilterDef = {
   kind: "select" | "date";
   /** where the select options come from. */
   source?: FilterSource;
-  /** static options when source is "static". */
-  options?: { value: string; label: string }[];
+  /** static options when source is "static". A value of FILTER_NULL / FILTER_NOT_NULL tests for an empty column. */
+  options?: FilterOption[];
   /** column(s) the filter applies to; defaults to `key`. */
   column?: string;
   /** a country filter applied through the row's city (city_id in that country's cities). */
@@ -63,6 +68,12 @@ export type TableConfig = {
   isOffers?: boolean;
   /** values forced on every list query + insert (e.g. terms.kind = "include"). */
   fixedValues?: DataRow;
+  /**
+   * Related rows embedded in the list query (PostgREST), read by dotted column
+   * keys: `hotels(arabic_name)` → column `hotels.arabic_name`. Such columns are
+   * display-only (`editable: false`).
+   */
+  select?: string;
 };
 
 export type ListInput = {
@@ -73,9 +84,15 @@ export type ListInput = {
   searchColumns?: string[];
   filters?: Filter[];
   sort?: Sort;
+  /** TableConfig.select — embedded related rows. */
+  select?: string;
   /** a data-quality issue (lib/data/quality.ts): list only the rows that have it, as 0071 ranks them */
   issue?: string;
 };
+
+/** Static filter values that test a column for empty / not empty (room types: «عامة» / «لفندق»). */
+export const FILTER_NULL = "__null__";
+export const FILTER_NOT_NULL = "__not_null__";
 
 export type ListResult =
   | { ok: true; rows: DataRow[]; count: number }
@@ -87,6 +104,6 @@ export type MutateResult =
 
 export type DeleteResult = { ok: true } | { ok: false; error: TranslationKey };
 
-/** `parent`: a city's country id. */
-export type FilterOption = { value: string; label: string; parent?: string | null };
+/** `labelKey`, when set, is translated in place of `label`; `parent`: a city's country id. */
+export type FilterOption = { value: string; label: string; labelKey?: TranslationKey; parent?: string | null };
 export type FilterOptions = Record<FilterSource, FilterOption[]>;

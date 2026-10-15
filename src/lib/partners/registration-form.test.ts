@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { newReferenceNo, readRegistration } from "./registration-form";
+import { PER_ORIGIN_LIMIT, PER_ORIGIN_WINDOW_MS, allowAttempt, newReferenceNo, readRegistration } from "./registration-form";
 
 const pdf = (name = "cr.pdf", size = 1000, type = "application/pdf") => new File([new Uint8Array(size)], name, { type });
 
@@ -44,5 +44,28 @@ describe("the partner registration form", () => {
   it("numbers a request by its Riyadh day, with no 0/O or 1/I to misread", () => {
     const ref = newReferenceNo(new Date("2026-10-12T22:30:00Z"), () => 0.5);
     expect(ref).toMatch(/^B2B-261013-[2-9A-HJ-NP-Z]{4}$/);
+  });
+});
+
+describe("the name-clash lookup cannot be turned into a probe (security audit L12)", () => {
+  it("refuses every ilike wildcard and the escape in the company name", () => {
+    for (const name of ["تر%", "سفر_يات", "ترا*", "سفريات\\الواحة"]) {
+      expect(readRegistration(form({ name })).ok).toBe(false);
+    }
+  });
+
+  it("collapses runs of spaces so the lookup and the unique index see one name", () => {
+    const r = readRegistration(form({ name: "  سفريات    الواحة " }));
+    expect(r.ok && r.value.name).toBe("سفريات الواحة");
+  });
+});
+
+describe("allowAttempt", () => {
+  it("allows the limit per window, then refuses until the window passes", () => {
+    const log = new Map<string, number[]>();
+    for (let i = 0; i < PER_ORIGIN_LIMIT; i++) expect(allowAttempt(log, "1.2.3.4", 1000 + i)).toBe(true);
+    expect(allowAttempt(log, "1.2.3.4", 2000)).toBe(false);
+    expect(allowAttempt(log, "5.6.7.8", 2000)).toBe(true);
+    expect(allowAttempt(log, "1.2.3.4", 1000 + PER_ORIGIN_WINDOW_MS + 5)).toBe(true);
   });
 });

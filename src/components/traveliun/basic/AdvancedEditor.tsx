@@ -237,7 +237,7 @@ export function AdvancedEditor({ draftId, initialData, savedAt, lookups }: { dra
     </button>
   );
   const addBtn = (label: string, onClick: () => void) => (
-    <button type="button" onClick={onClick} className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-dashed border-[#2aa87a] px-2.5 text-[11.5px] font-bold text-[#0f7a52] hover:bg-[#e9f7f0]">
+    <button key={label} type="button" onClick={onClick} className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-dashed border-[#2aa87a] px-2.5 text-[11.5px] font-bold text-[#0f7a52] hover:bg-[#e9f7f0]">
       <Plus className="size-3.5" /> {label}
     </button>
   );

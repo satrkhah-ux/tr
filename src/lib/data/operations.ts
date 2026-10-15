@@ -7,7 +7,7 @@ import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { notifyOperationConfirmed, notifyPartnerCase } from "@/lib/data/ops-notify";
 import { getPartnerSession } from "@/lib/partners/session";
-import { creditRefusal, raisePartnerInvoice } from "@/lib/partners/ledger-server";
+import { raisePartnerInvoice } from "@/lib/partners/ledger-server";
 import { readinessFor, syncOperation } from "@/lib/data/operation-sync";
 import { setOfferStatus } from "@/lib/data/offer-status";
 import {
@@ -119,10 +119,10 @@ export async function confirmPartnerOffer(serial: string): Promise<OkId | Fail> 
     const service = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data } = await service
       .from("offers")
-      .select("id, status, partner_company_id, valid_until")
+      .select("id, status, partner_company_id, valid_until, partner_cost")
       .eq("serial", serial.trim())
       .maybeSingle();
-    const offer = data as { id: string; status: string | null; partner_company_id: string | null; valid_until: string | null } | null;
+    const offer = data as { id: string; status: string | null; partner_company_id: string | null; valid_until: string | null; partner_cost: number | string | null } | null;
     // not theirs and not there read the same — no probing other companies' serials
     if (!offer || offer.partner_company_id !== partner.partner_id) return { ok: false, error: "ops.err.notFound" };
     if (offer.status === "cancelled") return { ok: false, error: "ops.err.invalidTransition" };
@@ -130,13 +130,22 @@ export async function confirmPartnerOffer(serial: string): Promise<OkId | Fail> 
     if (offer.valid_until && offer.valid_until < new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" })) {
       return { ok: false, error: "ops.err.offerExpired" };
     }
-    // past its credit limit the partner cannot confirm alone — we can, from operations
-    if (await creditRefusal(service, offer.id)) return { ok: false, error: "ops.err.creditLimit" };
-    return recordConfirmation(service, {
+    // nothing fixed to bill them: confirmed by us, from operations, once it is priced
+    if (offer.partner_cost == null) return { ok: false, error: "ops.err.noPartnerCost" };
+    // The invoice FIRST, in one locked database step with the credit check, so
+    // parallel confirmations cannot each pass the limit on the same balance.
+    // Past the limit (or in another currency than it) the partner cannot
+    // confirm alone — we can, from operations.
+    const invoice = await raisePartnerInvoice(service, offer.id, true);
+    if (!invoice.ok) return invoice;
+    const confirmed = await recordConfirmation(service, {
       offer_id: offer.id,
       channel: "other",
       note: `أكّدته الشركة الشريكة «${partner.partner_name}» من بوابتها`,
     });
+    // no operation, no invoice: take back the one this call raised
+    if (!confirmed.ok && invoice.created) await service.from("partner_invoices").delete().eq("id", invoice.created);
+    return confirmed;
   } catch {
     return { ok: false, error: "err.db" };
   }
@@ -191,9 +200,11 @@ async function recordConfirmation(
     }
 
     const id = (data as { id: string }).id;
-    // a partner's file raises its invoice now, at the cost fixed when it was issued
+    // a partner's file raises its invoice now, at the cost fixed when it was
+    // issued — no credit check: this is us confirming (the partner's own
+    // confirmation raised it already, and this finds it there)
     try {
-      await raisePartnerInvoice(createSupabaseServiceClient() as unknown as SupabaseClient, input.offer_id);
+      await raisePartnerInvoice(createSupabaseServiceClient() as unknown as SupabaseClient, input.offer_id, false);
     } catch {
       /* the company page lists a confirmed file without an invoice — it is not lost */
     }

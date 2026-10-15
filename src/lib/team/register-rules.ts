@@ -14,8 +14,6 @@ export type RegistrationInput = {
   english_name?: string;
   email: string;
   mobile: string;
-  password: string;
-  password_confirm: string;
   note?: string;
 };
 
@@ -25,22 +23,16 @@ export type CleanRegistration = {
   email: string;
   mobile: string;
   note: string | null;
-  password: string;
 };
 
 export type RegistrationError =
   | "reg.err.name"
   | "reg.err.email"
-  | "reg.err.mobile"
-  | "reg.err.password"
-  | "reg.err.mismatch";
+  | "reg.err.mobile";
 
 export const NAME_MIN = 3;
 export const NAME_MAX = 80;
 export const NOTE_MAX = 500;
-export const PASSWORD_MIN = 8;
-/** bcrypt reads 72 BYTES (an Arabic letter is two); Supabase refuses longer. */
-export const PASSWORD_MAX = 72;
 
 /** Requests one network origin may file in 24 hours. */
 export const PER_IP_24H = 3;
@@ -52,8 +44,9 @@ export const PENDING_CAP = 20;
 /** A rejected address cannot re-apply (silently) for this long. */
 export const REJECT_COOLDOWN_DAYS = 30;
 /**
- * How a pending applicant's account is held shut: banned for ~100 years, so it
- * cannot get a session until approval lifts it ("none").
+ * How a pending applicant's account was held shut before 2026-10-13, when the
+ * form still created one: banned for ~100 years until approval lifted it.
+ * Requests filed since have no account — approval invites the address.
  */
 export const PENDING_BAN = "876000h";
 
@@ -82,11 +75,6 @@ export function normalizeRegistration(
   const mobile = normalizeDigits(input.mobile).replace(/[\s()-]/g, "");
   if (!/^\+?\d{8,15}$/.test(mobile)) return { ok: false, error: "reg.err.mobile" };
 
-  if (input.password.length < PASSWORD_MIN || new TextEncoder().encode(input.password).length > PASSWORD_MAX) {
-    return { ok: false, error: "reg.err.password" };
-  }
-  if (input.password !== input.password_confirm) return { ok: false, error: "reg.err.mismatch" };
-
   const note = (input.note ?? "").trim().slice(0, NOTE_MAX);
   return {
     ok: true,
@@ -96,12 +84,11 @@ export function normalizeRegistration(
       email,
       mobile,
       note: note || null,
-      password: input.password,
     },
   };
 }
 
-/** Checked BEFORE an account is created, so a flood creates nothing. */
+/** Checked BEFORE a request is stored, so a flood stores nothing. */
 export function rateDecision(input: { ipCount24h: number; pendingTotal: number }): "ok" | "closed" {
   if (input.ipCount24h >= PER_IP_24H) return "closed";
   if (input.pendingTotal >= PENDING_CAP) return "closed";

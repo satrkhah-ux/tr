@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { invoiceNoFor, overCredit, type LedgerLine } from "./ledger-math";
+import type { TranslationKey } from "@/lib/i18n";
+import type { LedgerLine } from "./ledger-math";
 
 /**
  * The ledger's writes that ride on a confirmation — called from operations.ts
@@ -42,49 +43,35 @@ export async function readLedger(
   return { lines, limit: { amount: p?.credit_limit != null ? Number(p.credit_limit) : null, currency: p?.credit_currency || "SAR" } };
 }
 
-type OfferCost = { id: string; serial: string; partner_company_id: string | null; partner_cost: number | string | null; currency: string | null };
-
-async function offerCost(service: SupabaseClient, offerId: string): Promise<OfferCost | null> {
-  const { data } = await service
-    .from("offers")
-    .select("id, serial, partner_company_id, partner_cost, currency")
-    .eq("id", offerId)
-    .maybeSingle();
-  return data as OfferCost | null;
-}
-
-/**
- * «العميل أكّد» from a partner: refused when this file would take its account
- * past its credit limit. Null = go ahead (no limit, no cost on the offer, or room).
- */
-export async function creditRefusal(service: SupabaseClient, offerId: string): Promise<string | null> {
-  const offer = await offerCost(service, offerId);
-  if (!offer?.partner_company_id || offer.partner_cost == null) return null;
-  const { lines, limit } = await readLedger(service, offer.partner_company_id);
-  const next = { amount: Number(offer.partner_cost), currency: offer.currency || "SAR" };
-  return overCredit(lines, next, limit)
-    ? `تجاوز الحد الائتماني لشركتكم (${limit.amount?.toLocaleString("en-US")} ${limit.currency}). سدّدوا المستحق أو تواصلوا معنا لتأكيد هذا الملف.`
-    : null;
-}
+/** What raise_partner_invoice (0074) raises, as the partner reads it. */
+const REFUSALS: Record<string, TranslationKey> = {
+  partner_credit_limit: "ops.err.creditLimit",
+  partner_credit_currency: "ops.err.creditCurrency",
+  partner_cost_missing: "ops.err.noPartnerCost",
+};
 
 /**
  * The invoice a confirmed partner file raises — once (unique offer_id), at the
- * cost fixed when it was issued. Our own offers raise none; an offer issued
- * before partner_cost existed raises none either and shows in the company's page
- * as confirmed without an invoice, for someone to price by hand.
+ * cost fixed when it was issued — in ONE database call that holds a lock on the
+ * partner, so the credit check and the invoice that uses the credit cannot be
+ * split by a parallel confirmation (raise_partner_invoice, 0074).
+ *
+ * `enforceLimit`: the partner's own «العميل أكّد» — refused past its credit
+ * limit, or in a currency other than the limit's. We confirm without it, from
+ * operations. Our own offers raise nothing; neither does an offer issued with no
+ * partner_cost (it shows on the company page as confirmed without an invoice,
+ * for someone to price by hand).
+ *
+ * `created` is the invoice THIS call wrote — null when there was nothing to
+ * raise or it already existed — so a caller whose confirmation then fails can
+ * take back exactly that one.
  */
-export async function raisePartnerInvoice(service: SupabaseClient, offerId: string): Promise<boolean> {
-  const offer = await offerCost(service, offerId);
-  if (!offer?.partner_company_id || offer.partner_cost == null) return false;
-  const { error } = await service.from("partner_invoices").upsert(
-    {
-      partner_id: offer.partner_company_id,
-      offer_id: offer.id,
-      invoice_no: invoiceNoFor(offer.serial),
-      amount: Number(offer.partner_cost),
-      currency: offer.currency || "SAR",
-    },
-    { onConflict: "offer_id", ignoreDuplicates: true },
-  );
-  return !error;
+export async function raisePartnerInvoice(
+  service: SupabaseClient,
+  offerId: string,
+  enforceLimit: boolean,
+): Promise<{ ok: true; created: string | null } | { ok: false; error: TranslationKey }> {
+  const { data, error } = await service.rpc("raise_partner_invoice", { p_offer_id: offerId, p_enforce_limit: enforceLimit });
+  if (error) return { ok: false, error: REFUSALS[error.message] ?? "err.db" };
+  return { ok: true, created: (data as string | null) ?? null };
 }

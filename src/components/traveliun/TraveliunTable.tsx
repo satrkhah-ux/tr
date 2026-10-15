@@ -58,9 +58,17 @@ const LTR_TYPES = new Set(["serial", "number", "currency", "date", "phone", "url
 /** matches nothing: a country filter on a country with no cities */
 const NO_ROW = "00000000-0000-0000-0000-000000000000";
 
+/** A cell's value — a dotted key («hotels.arabic_name») reads a row embedded by the config's `select`. */
+function cellValue(row: DataRow, key: string): DataValue {
+  if (!key.includes(".")) return row[key];
+  let value: unknown = row;
+  for (const part of key.split(".")) value = value && typeof value === "object" ? (value as Record<string, unknown>)[part] : null;
+  return (value ?? null) as DataValue;
+}
+
 type OffersMode = "confirmed" | "unconfirmed";
 
-/** The city / country lists, for the cells that hold their ids. */
+/** The id → name lists (the filters' own options): a `ref` or `source` column is shown and edited by them. */
 const RefOptionsContext = createContext<FilterOptions | null>(null);
 
 export function TraveliunTable({
@@ -159,6 +167,7 @@ export function TraveliunTable({
         pageSize,
         search: debounced || undefined,
         searchColumns: config.searchable,
+        select: config.select,
         filters: buildFilters(),
         sort: config.defaultSort,
         issue: issue?.key,
@@ -495,7 +504,8 @@ export function TraveliunTable({
             // A row added while a country is filtered belongs to that country
             // (a Thailand-only term, a city in it); no filter → a global row.
             const country = filterValues["country_id"];
-            const payload = { ...(country ? { country_id: country } : {}), ...values, ...(config.fixedValues ?? {}) };
+            // a country chosen in the form itself wins over the filter's
+            const payload = { ...values, ...(country && values.country_id == null ? { country_id: country } : {}), ...(config.fixedValues ?? {}) };
             const result = await createRow(config.table, payload);
             if (!result.ok) return t(result.error);
             refresh();
@@ -622,8 +632,12 @@ function Cell({ column, row }: { column: ColumnDef; row: DataRow }) {
         const id = refId(column, row, refs.cities);
         return id ? (refs[column.ref].find((o) => o.value === id)?.label ?? id) : null;
       })()
-    : row[column.key];
+    : cellValue(row, column.key);
   if (value === null || value === undefined || value === "") return <span className="text-[#c2cfca]">—</span>;
+  // an id shown by its name; a fixed option by its label
+  if (column.source) return <span>{refs?.[column.source].find((o) => o.value === value)?.label ?? String(value)}</span>;
+  const option = column.options?.find((o) => o.value === value);
+  if (option?.labelKey) return <span>{t(option.labelKey)}</span>;
   if (column.type === "status") {
     const word = String(value).trim().toLowerCase();
     if (word === "active" || word === "inactive") {
@@ -706,7 +720,7 @@ function FilterBar({
               >
                 <option value="">{t("all")}</option>
                 {options.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <option key={opt.value} value={opt.value}>{opt.labelKey ? t(opt.labelKey) : opt.label}</option>
                 ))}
               </select>
             </label>
@@ -966,6 +980,7 @@ function RefSelect({
 
 function FieldInput({ column, value, required, onChange }: { column: ColumnDef; value: string; required?: boolean; onChange: (value: string) => void }) {
   const { t } = useTraveliunUI();
+  const lookups = useContext(RefOptionsContext);
   if (BOOLEAN_KEYS.has(column.key)) {
     return (
       <select value={value} onChange={(e) => onChange(e.target.value)} className={formField}>
@@ -974,11 +989,12 @@ function FieldInput({ column, value, required, onChange }: { column: ColumnDef; 
       </select>
     );
   }
-  if (column.options) {
+  const choices = column.source ? (lookups?.[column.source] ?? []) : column.options;
+  if (choices) {
     return (
       <select value={value} onChange={(e) => onChange(e.target.value)} className={formField}>
         <option value="">{t("chooseOption")}</option>
-        {column.options.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+        {choices.map((opt) => (<option key={opt.value} value={opt.value}>{opt.labelKey ? t(opt.labelKey) : opt.label}</option>))}
       </select>
     );
   }

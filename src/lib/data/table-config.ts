@@ -1,8 +1,14 @@
-import type { AllowedTable, FilterDef, TableConfig } from "./types";
+import { PLACE_KINDS, ROOM_CATEGORIES } from "@/lib/catalog/model";
+import { FILTER_NOT_NULL, FILTER_NULL, type AllowedTable, type FilterDef, type FilterOption, type TableConfig } from "./types";
 
 const COUNTRY_FILTER: FilterDef = { key: "country_id", labelKey: "filter.country", kind: "select", source: "countries" };
 const CITY_FILTER: FilterDef = { key: "city_id", labelKey: "filter.city", kind: "select", source: "cities" };
 const EMPLOYEE_FILTER: FilterDef = { key: "employee_id", labelKey: "filter.employee", kind: "select", source: "employees" };
+
+// ---- the data model's options (0072) ----
+const ROOM_CATEGORY_OPTIONS: FilterOption[] = ROOM_CATEGORIES.map((c) => ({ value: c, label: c, labelKey: `data.model.roomCat.${c}` as const }));
+const PLACE_KIND_OPTIONS: FilterOption[] = PLACE_KINDS.map((k) => ({ value: k, label: k, labelKey: `data.model.kind.${k}` as const }));
+const POINT_KIND_OPTIONS: FilterOption[] = (["airport", "station", "port", "city"] as const).map((k) => ({ value: k, label: k, labelKey: `data.model.point.${k}` as const }));
 
 /** Every DB-backed route. The generic engine turns each entry into a real,
  *  persistent table (list + CRUD + pagination + filters). Labels are i18n keys
@@ -28,6 +34,7 @@ const CONFIGS: TableConfig[] = [
     columns: [
       { key: "arabic_name", labelKey: "col.arabicName" },
       { key: "english_name", labelKey: "col.englishName" },
+      { key: "country_id", labelKey: "filter.country", source: "countries" },
       { key: "default_hotel", labelKey: "col.defaultHotel", minWidth: "220px" },
       // lower first in the generator's city list (ماليزيا: كوالالمبور 1 …); empty = alphabetical after
       { key: "sort_order", labelKey: "col.sortOrder", type: "number" },
@@ -121,11 +128,26 @@ const CONFIGS: TableConfig[] = [
   },
   {
     route: "/rooms-types", table: "room_types", titleKey: "nav.roomTypes",
+    // the hotel a room belongs to, and its city — a room with none is offered everywhere
+    select: "hotels(arabic_name, cities(arabic_name))",
     columns: [
       { key: "arabic_name", labelKey: "col.arabicName" },
       { key: "english_name", labelKey: "col.englishName" },
+      { key: "category", labelKey: "data.model.col.roomCategory", options: ROOM_CATEGORY_OPTIONS },
+      { key: "hotels.arabic_name", labelKey: "data.model.col.hotel", editable: false, minWidth: "220px" },
+      { key: "hotels.cities.arabic_name", labelKey: "filter.city", editable: false },
     ],
     searchable: ["arabic_name", "english_name"],
+    filters: [
+      {
+        key: "room_scope", column: "hotel_id", labelKey: "data.model.filter.roomScope", kind: "select",
+        options: [
+          { value: FILTER_NULL, label: "general", labelKey: "data.model.scope.general" },
+          { value: FILTER_NOT_NULL, label: "hotel", labelKey: "data.model.scope.hotel" },
+        ],
+      },
+      { key: "category", labelKey: "data.model.col.roomCategory", kind: "select", options: ROOM_CATEGORY_OPTIONS },
+    ],
     defaultSort: { column: "arabic_name", ascending: true },
   },
   // terms — three routes, one table, filtered by kind. A row added while a
@@ -204,13 +226,15 @@ const CONFIGS: TableConfig[] = [
     columns: [
       { key: "arabic_name", labelKey: "col.arabicName" },
       { key: "english_name", labelKey: "col.englishName" },
+      // a station or a port has no IATA code; an airport's is three capital letters (0072 checks it)
+      { key: "kind", labelKey: "data.model.col.kind", options: PLACE_KIND_OPTIONS },
       { key: "code", labelKey: "col.iata", type: "serial" },
       { key: "icao", labelKey: "col.icao", type: "serial" },
       { key: "iana_timezone", labelKey: "col.timezone", type: "serial", minWidth: "180px" },
       { key: "status", labelKey: "col.status", type: "status" },
     ],
     searchable: ["arabic_name", "english_name", "code", "icao"],
-    filters: [COUNTRY_FILTER, CITY_FILTER],
+    filters: [COUNTRY_FILTER, CITY_FILTER, { key: "kind", labelKey: "data.model.col.kind", kind: "select", options: PLACE_KIND_OPTIONS }],
     defaultSort: { column: "code", ascending: true },
   },
   {
@@ -289,6 +313,10 @@ const CONFIGS: TableConfig[] = [
       { key: "english_name", labelKey: "col.englishName" },
       { key: "mobile", labelKey: "col.mobile", type: "phone" },
       { key: "car_type", labelKey: "col.carType" },
+      { key: "country_id", labelKey: "filter.country", source: "countries" },
+      { key: "city_id", labelKey: "filter.city", source: "cities" },
+      { key: "supplier_id", labelKey: "col.supplier", source: "suppliers" },
+      { key: "status", labelKey: "col.status", type: "status" },
     ],
     searchable: ["arabic_name", "english_name", "mobile"],
     filters: [COUNTRY_FILTER],
@@ -339,6 +367,9 @@ const CONFIGS: TableConfig[] = [
     columns: [
       { key: "arabic_name", labelKey: "col.arabicName" },
       { key: "english_name", labelKey: "col.englishName" },
+      // one tour, its city and length; its price per car is on /cars/transfers/quick (tour_prices, 0072)
+      { key: "city_id", labelKey: "filter.city", source: "cities" },
+      { key: "duration_hours", labelKey: "data.model.col.durationHours", type: "number" },
       { key: "price", labelKey: "col.price", type: "currency" },
       { key: "currency", labelKey: "col.currency" },
     ],
@@ -351,6 +382,9 @@ const CONFIGS: TableConfig[] = [
     columns: [
       { key: "from_city", labelKey: "col.fromCity" },
       { key: "to_city", labelKey: "col.toCity" },
+      // what each end IS (0072) — set by the quick price grid and data-transfers, never typed
+      { key: "from_kind", labelKey: "data.model.col.fromKind", options: POINT_KIND_OPTIONS, editable: false },
+      { key: "to_kind", labelKey: "data.model.col.toKind", options: POINT_KIND_OPTIONS, editable: false },
       { key: "car_type", labelKey: "col.carType" },
       { key: "price", labelKey: "col.price", type: "currency" },
       { key: "currency", labelKey: "col.currency" },
@@ -358,6 +392,25 @@ const CONFIGS: TableConfig[] = [
     searchable: ["from_city", "to_city", "car_type"],
     filters: [COUNTRY_FILTER],
     defaultSort: { column: "created_at", ascending: false },
+  },
+  {
+    // the old static page's rows, moved by data-texts (0072); src/app/visas/page.tsx switches once they are in
+    route: "/visas", table: "visas", titleKey: "nav.visas",
+    columns: [
+      { key: "country_id", labelKey: "filter.country", source: "countries" },
+      { key: "country", labelKey: "data.model.col.countryText" },
+      { key: "visa_type", labelKey: "col.visaType" },
+      { key: "buy_price", labelKey: "col.buyPrice", type: "currency" },
+      { key: "buy_currency", labelKey: "col.buyCurrency" },
+      { key: "sell_price", labelKey: "col.sellPrice", type: "currency" },
+      { key: "sell_currency", labelKey: "col.sellCurrency" },
+      { key: "arabic_requirements", labelKey: "col.arabicRequirements", minWidth: "300px" },
+      { key: "english_requirements", labelKey: "col.englishRequirements", minWidth: "300px" },
+      { key: "status", labelKey: "col.status", type: "status" },
+    ],
+    searchable: ["country", "visa_type", "arabic_requirements"],
+    filters: [COUNTRY_FILTER],
+    defaultSort: { column: "country", ascending: true },
   },
   {
     route: "/setting/statuses", table: "statuses", titleKey: "nav.statuses",
@@ -444,6 +497,11 @@ export const GRANTED_COLUMNS: Partial<Record<AllowedTable, readonly string[]>> =
   transportation_types: [
     "id", "arabic_name", "english_name", "category", "vehicle_class", "pax_capacity", "luggage_capacity",
     "with_driver", "duration_unit", "sell_price", "sell_currency", "status", "created_at",
+  ],
+  // 0072
+  visas: [
+    "id", "country", "country_id", "visa_type", "sell_price", "sell_currency", "arabic_requirements",
+    "english_requirements", "status", "created_at",
   ],
 };
 

@@ -1,7 +1,7 @@
-"use server";
+import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { CustomerType, MarkupRule, MarkupScope, MarkupType, RoundingRule } from "@/lib/pricing/markup";
 import type { MarkupRuleRow } from "@/lib/types";
 

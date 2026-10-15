@@ -30,7 +30,6 @@ import {
   TrainFront,
   XCircle,
   ScrollText,
-  Route,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { getCountryHotels, getRoomTypeLookups, produceOfferFromDraft } from "@/lib/data/drafts";
@@ -97,7 +96,7 @@ import {
 } from "@/lib/offer/basic";
 import { validateDraft, type DraftIssue } from "@/lib/offer/draft-validation";
 import { computeOfferPricing, rebase } from "@/lib/offer/pricing";
-import { syncSuggestions } from "@/lib/offer/pricing-suggest";
+import { syncSuggestions, type TourPrice } from "@/lib/offer/pricing-suggest";
 import { syncDepartureDates } from "@/lib/offer/schedule";
 import { useRole } from "@/lib/roles/RoleContext";
 import { TraveliunShell } from "../TraveliunShell";
@@ -462,7 +461,7 @@ export function BasicEditor({
   );
 
   // ---------- the tours price list of the trip's countries ----------
-  const [tourPrices, setTourPrices] = useState<{ name: string; price: number; currency: string }[]>([]);
+  const [tourPrices, setTourPrices] = useState<TourPrice[]>([]);
   const countryKey = tripCountries(data).sort().join("|");
   useEffect(() => {
     if (!countryKey) return;
@@ -1613,17 +1612,9 @@ export function BasicEditor({
               </button>
             ) : null}
             <Link
-              href={`/basic/${draftId}/advanced`}
-              onClick={() => void flush()}
-              className="ms-auto inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
-            >
-              <Route className="size-3.5" />
-              البكج المتقدم{data.journey?.enabled ? " ✓" : ""}
-            </Link>
-            <Link
               href={stageHref(draftId, "trip")}
               onClick={() => void flush()}
-              className="inline-flex h-8 items-center rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] underline-offset-2 hover:underline"
+              className="ms-auto inline-flex h-8 items-center rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] underline-offset-2 hover:underline"
             >
               {tx("fullGenerator")}
             </Link>

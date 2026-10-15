@@ -4,7 +4,7 @@ import { WelcomeBoardDocument } from "@/components/offer-doc/WelcomeBoardDocumen
 import { getWelcomeBoard } from "@/lib/data/welcome-board";
 import { renderDocHtml } from "@/lib/offer-doc/html";
 import { inlineImage } from "@/lib/offer-doc/assets";
-import { resolveDocBrand } from "@/lib/data/partner-companies";
+import { resolveDocBrand } from "@/lib/data/doc-brand";
 import { TRAVELIUN_BRAND } from "@/components/offer-doc/brand";
 import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";

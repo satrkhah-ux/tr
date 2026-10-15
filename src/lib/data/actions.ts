@@ -7,7 +7,8 @@ import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser 
 import { currentCan } from "@/lib/roles/current";
 import { editedTotalSar, offerSarTotal } from "@/lib/offer/pricing";
 import { getRates } from "./rates-actions";
-import { DATA_TABLES, GRANTED_COLUMNS, INTERNAL_TABLES, SEARCH_KEY_TABLES, isCostColumn } from "./table-config";
+import { allTableConfigs, DATA_TABLES, GRANTED_COLUMNS, INTERNAL_TABLES, SEARCH_KEY_TABLES, isCostColumn } from "./table-config";
+import { FILTER_NOT_NULL, FILTER_NULL } from "./types";
 import { catalogSkel, normAr } from "@/lib/catalog/norm";
 import { hotelRuleError } from "@/lib/catalog/hotel-rules";
 import { getHotelUsage } from "./hotel-tools";
@@ -37,7 +38,7 @@ const ALLOWED_TABLES: AllowedTable[] = [
   "offer_services", "offer_terms", "offer_revisions",
   "airports", "airlines", "transportation_types", "markup_rules", "ports", "drivers", "tours", "transfers", "statuses",
   "supervisors", "guide_informations", "profits", "care_tickets",
-  "city_climate_notes", "tour_programs", "company_suppliers",
+  "city_climate_notes", "tour_programs", "company_suppliers", "visas",
 ];
 
 /**
@@ -122,7 +123,9 @@ function applyFilters<T>(query: T, filters: Filter[] | undefined): T {
   let q = query as any;
   for (const f of filters) {
     if (f.value === null || f.value === "" || (Array.isArray(f.value) && f.value.length === 0)) continue;
-    if (f.op === "in" && Array.isArray(f.value)) q = q.in(f.column, f.value);
+    if (f.value === FILTER_NULL) q = q.is(f.column, null);
+    else if (f.value === FILTER_NOT_NULL) q = q.not(f.column, "is", null);
+    else if (f.op === "in" && Array.isArray(f.value)) q = q.in(f.column, f.value);
     else if (f.op === "gte") q = q.gte(f.column, f.value);
     else if (f.op === "lte") q = q.lte(f.column, f.value);
     else if (f.op === "ilike") q = q.ilike(f.column, `%${f.value}%`);
@@ -163,13 +166,16 @@ export async function listRows(input: ListInput): Promise<ListResult> {
     // unchanged — and the card's number is this list's count.
     const issueFn = input.issue ? issueRowsFunction(input.table, input.issue) : null;
     if (input.issue && !issueFn) return { ok: false, error: "err.forbidden" };
+    // an embed only as a screen's config names it — never a relation the browser chose
+    const embed = input.select && allTableConfigs().some((c) => c.table === input.table && c.select === input.select) ? input.select : null;
+    const selection = embed ? `${columns}, ${embed}` : columns;
 
     const run = (plan: SearchPlan) => {
-      let query = supabase.from(input.table).select(columns, { count: "exact" });
+      let query = supabase.from(input.table).select(selection, { count: "exact" });
       if (issueFn) {
         query = (supabase as unknown as SupabaseClient)
           .rpc(issueFn, { p_issue: input.issue }, { count: "exact" })
-          .select(columns) as unknown as typeof query;
+          .select(selection) as unknown as typeof query;
       }
       query = applyFilters(query, input.filters);
       if (plan && "key" in plan) query = query.ilike("search_key" as never, `%${plan.key}%`);
@@ -406,13 +412,14 @@ export async function duplicateRow(table: AllowedTable, id: string): Promise<Mut
 
 /** Options for the filter selects (countries / cities / employees). */
 export async function getFilterOptions(): Promise<FilterOptions> {
-  const empty: FilterOptions = { countries: [], cities: [], employees: [], static: [] };
+  const empty: FilterOptions = { countries: [], cities: [], employees: [], suppliers: [], static: [] };
   try {
     const supabase = await createSupabaseServerClient();
-    const [countries, cities, employees] = await Promise.all([
+    const [countries, cities, employees, suppliers] = await Promise.all([
       supabase.from("countries").select("id, arabic_name").order("arabic_name"),
       supabase.from("cities").select("id, arabic_name, country_id").order("arabic_name"),
       supabase.from("employees").select("id, arabic_name").order("arabic_name"),
+      supabase.from("company_suppliers").select("id, arabic_name").order("arabic_name"),
     ]);
     type NamedRow = { id: string; arabic_name: string };
     const toOptions = (rows: unknown): { value: string; label: string }[] =>
@@ -426,6 +433,7 @@ export async function getFilterOptions(): Promise<FilterOptions> {
         parent: r.country_id,
       })),
       employees: toOptions(employees.data),
+      suppliers: toOptions(suppliers.data),
       static: [],
     };
   } catch {

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getDraft, getGeneratorLookups } from "@/lib/data/drafts";
+import { withModelLookups } from "@/lib/data/model-lookups";
 import { GeneratorFlow } from "@/components/traveliun/generator/GeneratorFlow";
 
 /**
@@ -12,7 +13,7 @@ import { GeneratorFlow } from "@/components/traveliun/generator/GeneratorFlow";
  */
 export default async function Page({ params }: { params: Promise<{ draftId: string }> }) {
   const { draftId } = await params;
-  const [draft, lookups] = await Promise.all([getDraft(draftId), getGeneratorLookups()]);
+  const [draft, lookups] = await Promise.all([getDraft(draftId), getGeneratorLookups().then(withModelLookups)]);
   if (!draft) redirect("/package-generator");
   return <GeneratorFlow draftId={draft.id} initialData={draft.data} lookups={lookups} />;
 }

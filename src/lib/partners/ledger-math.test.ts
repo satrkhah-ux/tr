@@ -12,13 +12,14 @@ describe("the partner's account", () => {
     ]);
   });
 
-  it("refuses a file that would pass the limit, in the limit's currency only", () => {
+  it("refuses a file that would pass the limit, and any file in another currency while a limit is set", () => {
     const lines = [inv(8_000), pay(1_000)];
     const limit = { amount: 10_000, currency: "SAR" };
     expect(overCredit(lines, { amount: 3_000, currency: "SAR" }, limit)).toBe(false); // 7,000 + 3,000 = the limit
     expect(overCredit(lines, { amount: 3_001, currency: "SAR" }, limit)).toBe(true);
-    expect(overCredit(lines, { amount: 99_000, currency: "USD" }, limit)).toBe(false);
+    expect(overCredit(lines, { amount: 1, currency: "USD" }, limit)).toBe(true);
     expect(overCredit(lines, { amount: 99_000, currency: "SAR" }, { amount: null, currency: "SAR" })).toBe(false);
+    expect(overCredit(lines, { amount: 99_000, currency: "USD" }, { amount: null, currency: "SAR" })).toBe(false);
   });
 
   it("numbers an invoice by its offer and a receipt by its Riyadh day", () => {
