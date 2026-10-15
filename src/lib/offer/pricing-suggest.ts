@@ -27,6 +27,8 @@ import {
   TRANSPORT_HOTEL_PREFIX,
   TRANSPORT_MODE_AR,
   TRANSPORT_TOURS,
+  tourCars,
+  tourVehicle,
   type DraftData,
   sourcingFits,
 } from "./draft-types";
@@ -110,6 +112,13 @@ export function findTourPrice(
   const key = normalizeName(title);
   let hits = programId ? rows.filter((t) => t.program_id === programId) : [];
   if (hits.length === 0 && key) hits = rows.filter((t) => normalizeName(t.name) === key);
+  // the old list (before 0072) names the car inside the tour: «جولة المدينة (فان)» is «جولة المدينة» in a van
+  if (hits.length === 0 && key) {
+    hits = rows.flatMap((t) => {
+      const split = t.car_type?.trim() ? null : splitTourName(t.name);
+      return split && normalizeName(split.base) === key ? [{ ...t, car_type: split.car }] : [];
+    });
+  }
   let car = baseVehicle(carType);
   if (hits.length === 0) {
     const split = splitTourName(title);
@@ -560,7 +569,8 @@ export function suggestPricing(
     });
   }
 
-  // The tours the basic screen picked, each at the price typed beside it.
+  // The tours picked for the cities' days: a tour is priced per car (ق3), so
+  // its line is the car's price × how many cars — «جولة المدينة — فان × 2».
   for (const city of data.cities) {
     (city.tour_picks ?? []).slice(0, city.tours ?? 0).forEach((pick, i) => {
       // a free day is never a line on the bill
@@ -569,11 +579,14 @@ export function suggestPricing(
       // for the car the tour goes in — its own, else the trip's tours car
       const car = pick.car_type?.trim() || data.transport_plan.tours.car_type;
       const listed = pick.price == null ? findTourPrice(reference.tours, pick.title, car, pick.program_id) : null;
+      const title = pick.title.trim() || `جولة سياحية في ${city.city_name}`;
+      const vehicle = tourVehicle(pick, data.transport_plan.tours.car_type);
       items.push({
         item_type: "service",
-        description: pick.title.trim() || `جولة سياحية في ${city.city_name}`,
+        // an old per-car name already says its car: «جولة المدينة (فان)»
+        description: vehicle && !title.endsWith(`(${car.trim()})`) ? `${title} — ${vehicle}` : title,
         ref: `tour:${city.city_name}:${i}`,
-        quantity: 1,
+        quantity: tourCars(pick),
         buy_price: listed ? listed.price : pick.price,
         buy_currency: listed ? listed.currency : "SAR",
         sell_price: listed ? listed.price : pick.price,

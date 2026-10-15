@@ -18,6 +18,8 @@ import {
   TRANSPORT_AIRPORT,
   TRANSPORT_HOTEL_PREFIX,
   TRANSPORT_TOURS,
+  tourCars,
+  tourVehicle,
   type DraftData,
   type DraftFlight,
 } from "@/lib/offer/draft-types";
@@ -225,7 +227,8 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
         if (pick.free) return;
         const title = pick.title.trim() || `جولة سياحية في ${city.city_name}`;
         const detail: Record<string, string> = { المدينة: city.city_name, "وقت الانطلاق": "09:00" };
-        const car = pick.car_type?.trim() || data.transport_plan.tours.car_type.trim();
+        // the car and how many, as a transfer says it: «فان × 2»
+        const car = tourVehicle(pick, data.transport_plan.tours.car_type);
         if (car) detail["السيارة"] = car;
         detail["الركاب"] = String(people);
         if (pick.text.trim()) detail["البرنامج"] = pick.text.trim();
@@ -239,7 +242,8 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
           detail,
           supplier_name: "",
           cancellation_policy: null,
-          quoted_net: pick.price,
+          // the price is per car
+          quoted_net: pick.price == null ? null : pick.price * tourCars(pick),
           currency: "SAR",
         });
       });

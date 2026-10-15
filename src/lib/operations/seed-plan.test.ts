@@ -73,4 +73,17 @@ describe("the pull from the offer", () => {
     expect(by("sim")?.title).toBe("شريحة اتصال × 2");
     expect(new Set(rows.map((r) => r.origin_ref)).size).toBe(rows.length);
   });
+
+  it("books a tour in its car and how many, at the price per car × the cars (الأمر 3)", () => {
+    const data = malaysia();
+    data.cities = data.cities.map((c, i) =>
+      i === 0 ? { ...c, tour_picks: c.tour_picks!.map((p, k) => (k === 0 ? { ...p, car_type: "فان", cars: 2 } : p)) } : c,
+    );
+    const tours = planBookingsFromDraft(data, "شروط الشركة").filter((r) => r.origin_ref.startsWith("tour:كوالالمبور"));
+    expect(tours.map((t) => [t.detail["السيارة"], t.quoted_net])).toEqual([
+      ["فان × 2", 600],
+      // a pick from before the count: the trip's tour car, once
+      ["ميني فان", 300],
+    ]);
+  });
 });

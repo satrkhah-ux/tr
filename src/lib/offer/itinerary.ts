@@ -12,15 +12,19 @@
 
 import {
   deriveCityDates,
+  FREE_DAY_TITLE,
   hopMode,
   hopVehicle,
   isFreeDay,
+  tourVehicle,
   vehicleText,
   type DraftCity,
   type DraftData,
   type DraftDay,
   type DraftFlight,
   type DraftTrip,
+  type TourPick,
+  type TransportMode,
   type TransportPlan,
 } from "./draft-types";
 import { itineraryStartDate, localDatePart } from "./schedule";
@@ -132,6 +136,9 @@ export function buildDaySkeleton(
       // trip moved, drop it rather than print last month's weather.
       weather: prior && prior.date === date ? (prior.weather ?? null) : null,
       ai_generated: prior?.ai_generated ?? false,
+      // whose the text is travels with it — dropped here, a day the screen wrote
+      // was read as the agent's on the next pass, and a changed tour never reached it
+      ...(prior?.auto_title !== undefined ? { auto_title: prior.auto_title } : {}),
     };
   });
 }
@@ -328,4 +335,226 @@ export function fillDaysFromPrograms(days: DraftDay[], programs: TourProgram[]):
     return day;
   });
   return { days: next, filled };
+}
+
+// ---------- the day and its tour: one model for the basic screen and the generator ----------
+
+/** The first thing that happens on arrival — the company's own welcome, on every file. */
+export const WELCOME = "الاستقبال من المطار من قبل موظف ترافليون والتوجه إلى الفندق";
+
+/** The day titles the basic screen wrote before days carried `auto_title` — its to rewrite. */
+const AUTO_TITLE = /^(الوصول إلى |الانتقال إلى |جولة سياحية في |السفر إلى |المغادرة$|العودة إلى )/;
+const isAutoTitle = (title: string) => !title.trim() || title === FREE_DAY_TITLE || AUTO_TITLE.test(title);
+
+/** How the group reaches a city it moves to, as the day's activities say it. */
+function moveLines(mode: TransportMode, city: string, flightNo: string): string[] {
+  if (mode === "flight") {
+    return [
+      "تسجيل الخروج من الفندق والتوجه إلى المطار",
+      `السفر إلى ${city} على الطيران الداخلي${flightNo ? ` (${flightNo})` : ""}`,
+      `الاستقبال من مطار ${city} والتوجه إلى الفندق`,
+    ];
+  }
+  const how = mode === "train" ? "بالقطار" : mode === "ship" ? "بالعبّارة" : "براً";
+  return ["تسجيل الخروج من الفندق", `الانتقال ${how} إلى ${city} والتوجه إلى الفندق`];
+}
+
+/** Resize a city's tour picks to its tour count, keeping what was chosen. */
+export function withTourCount(picks: TourPick[] | undefined, count: number): TourPick[] {
+  const list = (picks ?? []).slice(0, count);
+  while (list.length < count) list.push({ program_id: null, title: "", text: "", price: null });
+  return list;
+}
+
+/**
+ * The days a city's tours go on, in the order they are handed out: the days
+ * after the group arrives first (the arrival day is spent arriving), then the
+ * arrival day itself — only once those are taken does a day get a second tour.
+ */
+export function tourDays(city: Pick<DraftCity, "check_in" | "nights">): string[] {
+  const all = cityDates(city);
+  return [...all.slice(1), ...all.slice(0, 1)];
+}
+
+/** Every date the group sleeps in the city — the days a tour may be put on. */
+export function cityDates(city: Pick<DraftCity, "check_in" | "nights">): string[] {
+  if (!city.check_in) return [];
+  return Array.from({ length: Math.max(city.nights, 1) }, (_, k) => addDays(city.check_in!, k));
+}
+
+/**
+ * Every tour gets its day written down — the first of `days` no tour has yet;
+ * once they are all taken, the days are shared in turn. A tour that already
+ * has a day keeps it.
+ */
+export function fillTourDates(picks: TourPick[], days: string[]): TourPick[] {
+  if (days.length === 0) return picks;
+  const used = new Set(picks.map((p) => p.date).filter(Boolean));
+  let turn = 0;
+  return picks.map((p) => {
+    if (p.date) return p;
+    const date = days.find((d) => !used.has(d)) ?? days[turn++ % days.length];
+    used.add(date);
+    return { ...p, date };
+  });
+}
+
+/**
+ * The city's tours at a count, each with its day, in date order. A day the city
+ * no longer has (its dates moved) is let go and the tour takes the next free one.
+ */
+export function withTours(city: Pick<DraftCity, "check_in" | "nights" | "tour_picks">, count: number): TourPick[] {
+  const own = cityDates(city);
+  const kept = withTourCount(city.tour_picks, count).map((p) => (p.date && own.length > 0 && !own.includes(p.date) ? { ...p, date: null } : p));
+  return fillTourDates(kept, tourDays(city)).sort(byDate);
+}
+
+const byDate = (a: TourPick, b: TourPick) => (a.date ?? "9999").localeCompare(b.date ?? "9999");
+
+/**
+ * The programme, written from the cities, how the group moves between them and
+ * each city's tours — the one rule the basic screen and the generator share:
+ * the arrival with the company's welcome, the day of each move (a domestic
+ * flight reads «to the airport — the flight — met at the next airport»), each
+ * tour on its day with the car it goes in («التنقل بـفان × 2»), free days, and
+ * the way home.
+ *
+ * A day is the screen's while its title is still the one written here
+ * (`auto_title`); the first hand edit makes it the agent's, and it is never
+ * rewritten again. A day keeps its weather, and the AI's wording of the same
+ * tour. A day without the mark is the agent's: the generator's typed and empty
+ * days are left as they are — only the basic screen (`legacyTitles`) reads a
+ * file from before the mark by its titles.
+ */
+export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[] {
+  const days = draftDaySkeleton(data);
+  const cities = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
+  const plan = data.transport_plan;
+  const stay = days.map((d, i) => (d.kind === "travel" ? -1 : i)).filter((i) => i >= 0);
+  const firstStay = stay[0] ?? -1;
+  const lastDay = days.length - 1;
+
+  // 1. which city each day is in, and what kind of day it is
+  type Kind = "travel" | "arrive" | "move" | "last" | "stay";
+  const cityOf: number[] = [];
+  const kindOf: Kind[] = [];
+  let at = -1;
+  days.forEach((day, i) => {
+    if (day.kind === "travel") {
+      cityOf.push(-1);
+      kindOf.push("travel");
+      return;
+    }
+    const moved = i === firstStay || days[i - 1]?.city_name !== day.city_name;
+    if (moved && i !== lastDay) at += 1;
+    cityOf.push(at);
+    kindOf.push(i === lastDay ? "last" : i === firstStay ? "arrive" : moved ? "move" : "stay");
+  });
+
+  // 2. each city's tours: a tour with a date goes on that day; the rest take the
+  // city's free days in turn. A client may want more tours than the city has
+  // days — they share a day rather than being refused — and a city with no free
+  // day at all takes them on the day the group arrives.
+  const toursOn = plan.tours.enabled;
+  const toursOf = new Map<number, TourPick[]>();
+  const put = (day: number, pick: TourPick) => toursOf.set(day, [...(toursOf.get(day) ?? []), pick]);
+  cities.forEach((city, c) => {
+    const count = toursOn ? (city.tours ?? 0) : 0;
+    if (count === 0) return;
+    const cityDays = days.map((_, i) => i).filter((i) => cityOf[i] === c);
+    const free = cityDays.filter((i) => kindOf[i] === "stay");
+    const undated: TourPick[] = [];
+    // the same days the city card shows
+    for (const pick of withTours(city, count)) {
+      const named = { ...pick, title: pick.free ? FREE_DAY_TITLE : pick.title.trim() || `جولة سياحية في ${city.city_name}` };
+      const day = pick.date ? cityDays.find((i) => days[i].date === pick.date) : undefined;
+      if (day !== undefined) put(day, named);
+      else undated.push(named);
+    }
+    const open = free.filter((i) => !toursOf.has(i));
+    const slots = open.length > 0 ? open : free.length > 0 ? free : cityDays.slice(0, 1);
+    undated.forEach((pick, k) => {
+      if (slots.length > 0) put(slots[k % slots.length], pick);
+    });
+  });
+
+  // the advanced journey owns the cars: a tour then names only a car it was given itself
+  const tripCar = data.journey?.enabled ? "" : plan.tours.car_type.trim();
+
+  // 3. the days
+  return days.map((day, i) => {
+    if (day.kind === "travel") return day;
+    const kind = kindOf[i];
+    let title: string;
+    let activities: string[] = [];
+    if (kind === "last") {
+      title = "المغادرة";
+      activities = ["تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة"];
+    } else if (kind === "arrive") {
+      title = `الوصول إلى ${day.city_name}`;
+      activities = [WELCOME];
+    } else if (kind === "move") {
+      const from = days[i - 1]?.city_name ?? "";
+      const mode = hopMode(plan, from, day.city_name);
+      const leg = data.flights.find((f) => f.leg_order === "internal" && f.to_city?.trim() === day.city_name);
+      title = mode === "flight" ? `السفر إلى ${day.city_name}` : `الانتقال إلى ${day.city_name}`;
+      activities = moveLines(mode, day.city_name, leg?.flight_no.trim() ?? "");
+    } else title = FREE_DAY_TITLE;
+
+    // «يوم حر» picked on purpose keeps the day free; it is not a tour
+    const picked = toursOf.get(i) ?? [];
+    const tours = picked.filter((t) => !t.free);
+    if (tours.length === 0 && kind === "stay") {
+      // a free day says what its programme says about it, if anything
+      activities = picked.flatMap((t) => (t.text.trim() ? [t.text.trim()] : [])).slice(0, 1);
+    } else if (tours.length > 0) {
+      const line = (t: TourPick) => (t.text.trim() ? `${t.title}: ${t.text.trim()}` : t.title);
+      if (kind === "stay") {
+        // the day is named after its first tour; any more the client asked for follow it
+        title = tours[0].title;
+        activities = [...(tours[0].text.trim() ? [tours[0].text.trim()] : []), ...tours.slice(1).map(line)];
+      } else activities = [...activities, ...tours.map(line)];
+      // the car each tour goes in, and how many — said once
+      const cars = [...new Set(tours.map((t) => tourVehicle(t, tripCar)).filter(Boolean))];
+      if (cars.length > 0) activities = [...activities, `التنقل بـ${cars.join(" و")}`];
+    }
+
+    const owned = day.auto_title !== undefined ? day.title === day.auto_title : legacyTitles && isAutoTitle(day.title);
+    if (!owned) return day;
+    // the AI's wording of the same day stays; another day's text does not
+    if (day.ai_generated && day.title === title) return { ...day, auto_title: title };
+    return { ...day, title, activities, auto_title: title, ai_generated: false };
+  });
+}
+
+/**
+ * The generator's «اختر جولة جاهزة»: the programme becomes the day's tour — a
+ * pick of its city, on that day, in the trip's tour cars, priced from the lists
+ * — and the day is written from it. No programme takes the day's tour away and
+ * leaves the day empty again.
+ *
+ * Null when the day is not one of a city's nights (the day home, a travel day)
+ * or the sale has no tours: such a day only takes the programme's text.
+ */
+export function withDayTour(data: DraftData, index: number, program: TourProgram | null): Pick<DraftData, "cities" | "days"> | null {
+  const day = data.days[index];
+  if (!day?.date || day.kind === "travel" || !data.transport_plan.tours.enabled) return null;
+  const date = day.date;
+  const dated = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
+  const at = dated.findIndex((c) => c.city_name === day.city_name && cityDates(c).includes(date));
+  if (at < 0) return null;
+
+  const others = withTours(dated[at], dated[at].tours ?? 0).filter((p) => p.date !== date);
+  const text = program?.description.trim() ?? "";
+  const pick: TourPick | null = !program
+    ? null
+    : program.is_free_day
+      ? { program_id: program.id, title: FREE_DAY_TITLE, text, price: null, date, free: true }
+      : { program_id: program.id, title: programDayText(program).title, text, price: null, date, cars: data.transport_plan.tours.cars };
+  const picks = pick ? [...others, pick].sort(byDate) : others;
+  const cities = data.cities.map((c, i) => (i === at ? { ...c, tours: picks.length, tour_picks: picks } : c));
+
+  // the agent chose this day's tour: the day is the screen's to write — or, with none, theirs again, empty
+  const cleared: DraftDay = { ...day, title: "", activities: [], ai_generated: false, auto_title: pick ? "" : undefined };
+  return { cities, days: daysFromTours({ ...data, cities, days: data.days.map((d, i) => (i === index ? cleared : d)) }) };
 }
