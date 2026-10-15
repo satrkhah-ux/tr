@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { DraftDay } from "./draft-types";
-import { fillDaysFromPrograms, isTouringDay, programDayText, type TourProgram } from "./itinerary";
+import { deriveCityDates, emptyDraftData, type DraftData, type DraftDay } from "./draft-types";
+import { draftDaySkeleton, fillDaysFromPrograms, isTouringDay, programDayText, withDayTour, type TourProgram } from "./itinerary";
 
 const day = (n: number, city: string, title = ""): DraftDay => ({
   day_number: n,
@@ -55,5 +55,51 @@ describe("ready-made day programmes", () => {
   it("names a generic ordinal tour after its city, keeps a specific one as is", () => {
     expect(programDayText(programs[0]).title).toBe("الجولة الأولى في كوالالمبور");
     expect(programDayText(programs[3]).title).toBe("جولة بحرية");
+  });
+});
+
+describe("«اختر جولة جاهزة» writes a real tour (الأمر 3)", () => {
+  /** KL 20–22 Oct then Langkawi 22–24, nine people in two vans. */
+  function trip(): DraftData {
+    const data = emptyDraftData();
+    data.trip = { ...data.trip, country: "ماليزيا", destination: "ماليزيا", arrival_date: "2026-10-20", nights: 4, days: 5, adults: 9 };
+    data.cities = deriveCityDates("2026-10-20", [
+      { city_name: "كوالالمبور", nights: 2, check_in: null, check_out: null },
+      { city_name: "لنكاوي", nights: 2, check_in: null, check_out: null },
+    ]);
+    data.transport_plan = { ...data.transport_plan, tours: { ...data.transport_plan.tours, car_type: "فان", cars: 2 } };
+    data.days = draftDaySkeleton(data);
+    return data;
+  }
+  const first = program("p1", "كوالالمبور", 1, "الجولة الأولى");
+  const second = program("p2", "كوالالمبور", 2, "جولة المدينة");
+
+  it("picks the tour for its city on that day, in the trip's tour cars, to be priced from the lists", () => {
+    const next = withDayTour(trip(), 1, first)!;
+    expect(next.cities[0].tours).toBe(1);
+    expect(next.cities[0].tour_picks).toEqual([
+      { program_id: "p1", title: "الجولة الأولى في كوالالمبور", text: "وصف الجولة الأولى", price: null, date: "2026-10-21", cars: 2 },
+    ]);
+    expect(next.cities[1].tour_picks).toBeUndefined();
+    expect(next.days[1].title).toBe("الجولة الأولى في كوالالمبور");
+  });
+
+  it("replaces the day's tour with another, and keeps a free-day programme free", () => {
+    let data = trip();
+    data = { ...data, ...withDayTour(data, 1, first)! };
+    data = { ...data, ...withDayTour(data, 1, second)! };
+    expect(data.cities[0].tour_picks?.map((p) => p.program_id)).toEqual(["p2"]);
+    expect(data.days[1].title).toBe("جولة المدينة");
+
+    data = { ...data, ...withDayTour(data, 1, program("f", "كوالالمبور", 0, "يوم حر", true))! };
+    expect(data.cities[0].tour_picks?.map((p) => [p.free, p.cars])).toEqual([[true, undefined]]);
+    expect([data.days[1].title, data.days[1].activities]).toEqual(["يوم حر", ["وصف يوم حر"]]);
+  });
+
+  it("leaves the day home, and a sale without tours, to the programme's text alone", () => {
+    const data = trip();
+    expect(withDayTour(data, 4, first)).toBeNull();
+    const noTours = { ...data, transport_plan: { ...data.transport_plan, tours: { ...data.transport_plan.tours, enabled: false } } };
+    expect(withDayTour(noTours, 1, first)).toBeNull();
   });
 });

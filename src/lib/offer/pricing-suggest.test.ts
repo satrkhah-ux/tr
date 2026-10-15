@@ -8,7 +8,9 @@ import {
   type DraftData,
   type DraftHotelSourcing,
   type DraftPricingItem,
+  type TourPick,
 } from "./draft-types";
+import { issuedPartnerSheet, partnerSheet } from "@/lib/partners/pricing";
 
 /** A supplier quote prices the STAY; the rooms under it carry none. */
 const SUPPLIER_RATE: DraftHotelSourcing = {
@@ -649,5 +651,65 @@ describe("suggestPricing — two or more hotels in one city (order 1)", () => {
       ["a", "كوالالمبور — A (20/10 – 24/10)", 1, 800],
       ["b", "كوالالمبور — B (20/10 – 24/10)", 1, 600],
     ]);
+  });
+});
+
+describe("suggestPricing — a tour is its car's price × the cars it goes in (الأمر 3)", () => {
+  /** KL, the 21st: «جولة المدينة» for nine people in two vans. */
+  function klTour(pick: Partial<TourPick> = {}): DraftData {
+    const data = emptyDraftData();
+    data.trip = { ...data.trip, country: "ماليزيا", arrival_date: "2026-10-20", nights: 2, adults: 9 };
+    data.cities = [
+      {
+        city_name: "كوالالمبور",
+        nights: 2,
+        check_in: "2026-10-20",
+        check_out: "2026-10-22",
+        tours: 1,
+        tour_picks: [{ program_id: "p-kl", title: "جولة المدينة", text: "", price: null, date: "2026-10-21", cars: 2, ...pick }],
+      },
+    ];
+    data.transport_plan = { ...data.transport_plan, tours: { ...data.transport_plan.tours, car_type: "فان", cars: 2 } };
+    return data;
+  }
+  const tourLine = (data: DraftData, tours: PricingReference["tours"]) =>
+    suggestPricing(data, { ...EMPTY, tours }, LABELS).find((i) => i.ref?.startsWith("tour:"));
+  // tour_prices (0072): one tour, a price per vehicle
+  const PER_CAR = [
+    { name: "جولة المدينة", price: 400, currency: "SAR", car_type: "فان", program_id: "p-kl" },
+    { name: "جولة المدينة", price: 250, currency: "SAR", car_type: "سيدان", program_id: "p-kl" },
+  ];
+
+  it("prices two vans at the van's price: 2 × 400 = 800", () => {
+    const line = tourLine(klTour(), PER_CAR);
+    expect(line).toMatchObject({ description: "جولة المدينة — فان × 2", quantity: 2, buy_price: 400, sell_price: 400, source: "list" });
+    expect(line!.quantity * line!.sell_price!).toBe(800);
+    // a tour given its own car takes that car's price
+    expect(tourLine(klTour({ car_type: "سيدان", cars: 3 }), PER_CAR)).toMatchObject({ description: "جولة المدينة — سيدان × 3", quantity: 3, sell_price: 250 });
+  });
+
+  it("falls back to the old list by name until 0072 is applied — «جولة المدينة (فان)»", () => {
+    const OLD = [
+      { name: "جولة المدينة (فان)", price: 400, currency: "SAR" },
+      { name: "جولة المدينة (سيدان)", price: 250, currency: "SAR" },
+    ];
+    expect(tourLine(klTour(), OLD)).toMatchObject({ quantity: 2, sell_price: 400, source: "list" });
+    expect(tourLine(klTour({ car_type: "سيدان" }), OLD)?.sell_price).toBe(250);
+    // no car to tell the old rows apart: no guess
+    expect(findTourPrice(OLD, "جولة المدينة")).toBeNull();
+  });
+
+  it("prices a typed figure per car too — and a pick from before the count as one car, as it always was", () => {
+    expect(tourLine(klTour({ price: 350 }), [])).toMatchObject({ quantity: 2, sell_price: 350, source: "typed" });
+    expect(tourLine(klTour({ price: 400, cars: undefined }), [])).toMatchObject({ description: "جولة المدينة — فان", quantity: 1, sell_price: 400 });
+  });
+
+  it("keeps the count on a partner's sheet: per car at their terms, and the server's count at issue", () => {
+    const line = tourLine(klTour(), PER_CAR)!;
+    const [theirs] = partnerSheet([line], { kind: "markup", pct: 35 }, { profit: { mode: "pct", value: 20 }, rates: { SAR: 1 }, quote: "SAR", byPartner: false });
+    // 400 → our 480 → their 648, for each of the two vans
+    expect([theirs.quantity, theirs.sell_price]).toEqual([2, 648]);
+    // their browser saved one van: the issued sheet owes two
+    expect(issuedPartnerSheet([{ ...theirs, quantity: 1 }], [theirs])[0].quantity).toBe(2);
   });
 });

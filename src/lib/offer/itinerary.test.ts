@@ -3,13 +3,17 @@ import {
   buildDaySkeleton,
   cityForDate,
   dayCount,
+  daysFromTours,
   daysNeedRebuild,
   draftDaySkeleton,
   emptyDays,
   itineraryCities,
   itineraryComplete,
+  withDayTour,
+  type TourProgram,
 } from "./itinerary";
-import { deriveCityDates, emptyDraftData, type DraftCity, type DraftDay } from "./draft-types";
+import { deriveCityDates, emptyDraftData, type DraftCity, type DraftData, type DraftDay } from "./draft-types";
+import { emptyJourney } from "./advanced";
 
 function city(city_name: string, nights: number): DraftCity {
   return { city_name, nights, check_in: null, check_out: null };
@@ -234,5 +238,64 @@ describe("emptyDays / itineraryComplete / itineraryCities", () => {
   it("lists the distinct cities in visit order", () => {
     const days = buildDaySkeleton(TRIP, CITIES);
     expect(itineraryCities(days)).toEqual(["كوالالمبور", "لنكاوي"]);
+  });
+});
+
+describe("daysFromTours — the day and its tour (الأمر 3)", () => {
+  /** The generator's file: KL two nights then Langkawi two, nine people in two vans, no day written yet. */
+  function klTrip(): DraftData {
+    const data = emptyDraftData();
+    data.trip = { ...data.trip, country: "ماليزيا", destination: "ماليزيا", arrival_date: "2026-10-20", nights: 4, days: 5, adults: 9 };
+    data.cities = deriveCityDates("2026-10-20", [city("كوالالمبور", 2), city("لنكاوي", 2)]);
+    data.transport_plan = { ...data.transport_plan, tours: { ...data.transport_plan.tours, car_type: "فان", cars: 2 } };
+    data.days = draftDaySkeleton(data);
+    return data;
+  }
+  const CITY_TOUR: TourProgram = { id: "p-kl", city_name: "كوالالمبور", title: "جولة المدينة", description: "برجا بتروناس وساحة الاستقلال", is_free_day: false, sort_order: 1 };
+  const picked = () => {
+    const data = klTrip();
+    return { ...data, ...withDayTour(data, 1, CITY_TOUR)! };
+  };
+
+  it("gives a tour day the tour's title and activities, and the car it goes in × how many", () => {
+    const data = picked();
+    expect([data.days[1].title, data.days[1].activities]).toEqual(["جولة المدينة", ["برجا بتروناس وساحة الاستقلال", "التنقل بـفان × 2"]]);
+    // the generator's other days stay as they were — empty, for the agent or the AI
+    expect(data.days.filter((_, i) => i !== 1).every((d) => d.title === "" && d.activities.length === 0)).toBe(true);
+    // and writing it again changes nothing
+    expect(daysFromTours(data)).toEqual(data.days);
+  });
+
+  it("keeps a title the agent edited; taking the tour away leaves the day empty again", () => {
+    const data = picked();
+    const edited = { ...data, days: data.days.map((d, i) => (i === 1 ? { ...d, title: "جولة المدينة والأسواق" } : d)) };
+    expect(daysFromTours(edited)[1].title).toBe("جولة المدينة والأسواق");
+
+    const removed = { ...data, ...withDayTour(data, 1, null)! };
+    expect([removed.days[1].title, removed.days[1].activities]).toEqual(["", []]);
+    expect([removed.cities[0].tours, removed.cities[0].tour_picks]).toEqual([0, []]);
+  });
+
+  it("keeps the day's weather, and the AI's wording of the same tour", () => {
+    const data = picked();
+    const weather = { temp_max: 31, temp_min: 24, rain_chance: 60, code: 61, source: "forecast" as const, fetched_at: "2026-10-15T08:00:00Z" };
+    const days = data.days.map((d, i) => (i === 1 ? { ...d, weather, activities: ["صباحاً برجا بتروناس، ثم ساحة الاستقلال"], ai_generated: true } : d));
+    const out = daysFromTours({ ...data, days })[1];
+    expect([out.weather, out.activities, out.ai_generated]).toEqual([weather, ["صباحاً برجا بتروناس، ثم ساحة الاستقلال"], true]);
+  });
+
+  it("leaves a generator file's typed days exactly as they were — no tour is made from them", () => {
+    const data = klTrip();
+    data.days = data.days.map((d, i) => (i === 1 ? { ...d, title: "جولة المدينة", activities: ["كتبها الموظف"] } : i === 3 ? { ...d, title: "يوم حر" } : d));
+    // what the stage rebuilt before is what it rebuilds now
+    expect(daysFromTours(data)).toEqual(draftDaySkeleton(data));
+    expect(data.cities.some((c) => c.tour_picks)).toBe(false);
+  });
+
+  it("with the advanced package on, a tour names only a car it was given itself", () => {
+    const data = { ...picked(), journey: { ...emptyJourney(), enabled: true } };
+    expect(daysFromTours(data)[1].activities).toEqual(["برجا بتروناس وساحة الاستقلال"]);
+    const own = { ...data, cities: data.cities.map((c) => ({ ...c, tour_picks: c.tour_picks?.map((p) => ({ ...p, car_type: "سيدان" })) })) };
+    expect(daysFromTours(own)[1].activities.at(-1)).toBe("التنقل بـسيدان × 2");
   });
 });

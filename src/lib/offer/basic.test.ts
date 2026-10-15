@@ -7,11 +7,13 @@ import {
   emptyDraftData,
   emptyFlight,
   hotelCoverage,
+  normalizeDraftData,
   withRooms,
   type DraftData,
   type LookupAirport,
+  type TourPick,
 } from "./draft-types";
-import { findTourPrice } from "./pricing-suggest";
+import { findTourPrice, suggestPricing, type PricingReference } from "./pricing-suggest";
 import { domesticMismatches } from "./flight-cities";
 import {
   addCity,
@@ -516,5 +518,240 @@ describe("النظام بيسك — more than one hotel in a city (order 1)", ()
     ]);
     // undoing it takes the room change only — the other hotel stays
     expect(cityHotelLines(split.cities, clearRoomChange(split, 0).hotels, 0).map((h) => h.hotel_name)).toEqual(["بولمان", "تريدرز"]);
+  });
+});
+
+describe("an old Basic file opens the same (الأمر 3)", () => {
+  /**
+   * A Basic file saved before a tour had a car count: nine travellers in two
+   * vans, KL 3 → Langkawi 3 (by air) → Genting 2 (by road). A typed tour, a free
+   * day, a tour priced from the old list by its per-car name, an undated one, a
+   * city whose tour was never picked, and a day the agent rewrote by hand.
+   */
+  function oldBasicFile(): DraftData {
+    let data = emptyDraftData();
+    data.trip = { ...data.trip, country: "ماليزيا", destination: "ماليزيا", arrival_date: "2026-11-11", nights: 8, days: 9, adults: 7, children: 2, meal_plan: "breakfast" };
+    data.flights = [];
+    for (const [name, nights, tours, id, price] of [
+      ["كوالالمبور", 3, 2, "h-kl", 1800],
+      ["لنكاوي", 3, 2, "h-lgk", 2400],
+      ["جنتنج", 2, 1, "h-gt", 900],
+    ] as const) {
+      data = { ...data, ...addCity(data, { name, nights, tours, hotel: { id, name: `فندق ${name}` }, room: "غرفة ثلاثية", rooms: 3, price }, "SAR") };
+    }
+    data.transport_plan = {
+      ...data.transport_plan,
+      airport: { ...data.transport_plan.airport, car_type: "فان", cars: 2 },
+      tours: { ...data.transport_plan.tours, car_type: "فان", cars: 2 },
+      intercity: { ...data.transport_plan.intercity, enabled: true, modes: ["car", "flight"], mode: "car", hop_modes: { "كوالالمبور>لنكاوي": "flight" } },
+    };
+    data.flights = [{ ...emptyFlight("internal"), from_city: "كوالالمبور", to_city: "لنكاوي", flight_no: "AK6302" }];
+    data.cities = data.cities.map((c, i) =>
+      i === 0
+        ? {
+            ...c,
+            tour_picks: [
+              { program_id: "p-kl", title: "جولة المدينة", text: "برجا بتروناس وساحة الاستقلال", price: 400, date: "2026-11-12" },
+              { program_id: null, title: "يوم حر", text: "", price: 0, date: "2026-11-13", free: true },
+            ],
+          }
+        : i === 1
+          ? {
+              ...c,
+              tour_picks: [
+                { program_id: null, title: "جزيرة الحامل (سيدان)", text: "", price: null, date: "2026-11-15", car_type: "سيدان" },
+                { program_id: null, title: "التلفريك", text: "التلفريك والجسر المعلق", price: 650 },
+              ],
+            }
+          : c,
+    );
+    data.days = basicDays(data);
+    data.days = data.days.map((d) => (d.date === "2026-11-16" ? { ...d, title: "يوم على الشاطئ", activities: ["سباحة"] } : d));
+    // saved, then opened again
+    return normalizeDraftData(JSON.parse(JSON.stringify(data)));
+  }
+
+  const REFERENCE: PricingReference = {
+    transfers: [
+      { from_city: "مطار كوالالمبور الدولي", to_city: "كوالالمبور", car_type: "فان", price: 150, currency: "MYR" },
+      { from_city: "جنتنج", to_city: "مطار كوالالمبور الدولي", car_type: "فان", price: 260, currency: "MYR" },
+    ],
+    services: [],
+    rooms: [],
+    fleet: [],
+    tours: [{ name: "جزيرة الحامل (سيدان)", price: 180, currency: "MYR" }],
+  };
+
+  it("writes the same days and prices the same total, to the riyal", () => {
+    const data = oldBasicFile();
+    const days = basicDays(data);
+    expect(days.map((d) => [d.date, d.title, ...d.activities])).toMatchInlineSnapshot(`
+      [
+        [
+          "2026-11-11",
+          "الوصول إلى كوالالمبور",
+          "الاستقبال من المطار من قبل موظف ترافليون والتوجه إلى الفندق",
+        ],
+        [
+          "2026-11-12",
+          "جولة المدينة",
+          "برجا بتروناس وساحة الاستقلال",
+          "التنقل بـفان",
+        ],
+        [
+          "2026-11-13",
+          "يوم حر",
+        ],
+        [
+          "2026-11-14",
+          "السفر إلى لنكاوي",
+          "تسجيل الخروج من الفندق والتوجه إلى المطار",
+          "السفر إلى لنكاوي على الطيران الداخلي (AK6302)",
+          "الاستقبال من مطار لنكاوي والتوجه إلى الفندق",
+        ],
+        [
+          "2026-11-15",
+          "جزيرة الحامل (سيدان)",
+          "التنقل بـسيدان",
+        ],
+        [
+          "2026-11-16",
+          "يوم على الشاطئ",
+          "سباحة",
+        ],
+        [
+          "2026-11-17",
+          "الانتقال إلى جنتنج",
+          "تسجيل الخروج من الفندق",
+          "الانتقال براً إلى جنتنج والتوجه إلى الفندق",
+        ],
+        [
+          "2026-11-18",
+          "جولة سياحية في جنتنج",
+          "التنقل بـفان",
+        ],
+        [
+          "2026-11-19",
+          "المغادرة",
+          "تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة",
+        ],
+      ]
+    `);
+    const items = suggestPricing(data, REFERENCE, { hotel: "فندق", airline: "الناقل" });
+    // a stay's ref is its random id: read it by its city and hotel
+    expect(items.map((i) => [i.item_type === "hotel" ? i.description : i.ref, i.quantity, i.sell_price, i.sell_currency])).toMatchInlineSnapshot(`
+      [
+        [
+          "كوالالمبور — فندق كوالالمبور",
+          1,
+          5400,
+          "SAR",
+        ],
+        [
+          "لنكاوي — فندق لنكاوي",
+          1,
+          7200,
+          "SAR",
+        ],
+        [
+          "جنتنج — فندق جنتنج",
+          1,
+          2700,
+          "SAR",
+        ],
+        [
+          "flight:dom",
+          1,
+          null,
+          "SAR",
+        ],
+        [
+          "transport:المطار>فندق كوالالمبور>فان × 2",
+          2,
+          150,
+          "MYR",
+        ],
+        [
+          "transport:فندق جنتنج>المطار>فان × 2",
+          2,
+          260,
+          "MYR",
+        ],
+        [
+          "transport:فندق كوالالمبور>المطار>فان × 2",
+          2,
+          150,
+          "MYR",
+        ],
+        [
+          "transport:المطار>فندق لنكاوي>فان × 2",
+          2,
+          null,
+          "SAR",
+        ],
+        [
+          "transport:لنكاوي>جنتنج>سيارة",
+          1,
+          null,
+          "SAR",
+        ],
+        [
+          "tour:كوالالمبور:0",
+          1,
+          400,
+          "SAR",
+        ],
+        [
+          "tour:لنكاوي:0",
+          1,
+          180,
+          "MYR",
+        ],
+        [
+          "tour:لنكاوي:1",
+          1,
+          650,
+          "SAR",
+        ],
+      ]
+    `);
+    // a file from before the days carried their mark reads the same
+    const unmarked = { ...data, days: data.days.map((d) => ({ ...d, auto_title: undefined })) };
+    const text = (list: typeof days) => list.map((d) => [d.date, d.title, ...d.activities]);
+    expect(text(basicDays(unmarked))).toEqual(text(days));
+    const total: Record<string, number> = {};
+    for (const i of items) total[i.sell_currency] = (total[i.sell_currency] ?? 0) + (i.sell_price ?? 0) * i.quantity;
+    expect(total).toMatchInlineSnapshot(`
+      {
+        "MYR": 1300,
+        "SAR": 16350,
+      }
+    `);
+  });
+});
+
+describe("the day follows its tour (الأمر 3)", () => {
+  /** لنكاوي 13–16 Nov: one tour on the 14th. */
+  function withTour(pick: Partial<TourPick>): DraftData {
+    const data = malaysia();
+    data.transport_plan = { ...data.transport_plan, tours: { ...data.transport_plan.tours, car_type: "فان", cars: 2 } };
+    data.cities = data.cities.map((c, i) =>
+      i === 1 ? { ...c, tours: 1, tour_picks: [{ program_id: "p1", title: "جزيرة الحامل", text: "رحلة بحرية", price: 400, date: "2026-11-14", ...pick }] } : c,
+    );
+    return { ...data, days: basicDays(data) };
+  }
+  const on = (data: DraftData, date: string) => data.days.find((d) => d.date === date)!;
+
+  it("names the tour's cars and how many — a pick from before the count is one car", () => {
+    expect(on(withTour({ cars: 2 }), "2026-11-14").activities).toEqual(["رحلة بحرية", "التنقل بـفان × 2"]);
+    expect(on(withTour({}), "2026-11-14").activities).toEqual(["رحلة بحرية", "التنقل بـفان"]);
+  });
+
+  it("rewrites its day when the tour changes, and gives the day back when it goes", () => {
+    const data = withTour({ cars: 2 });
+    const changed = { ...data, cities: data.cities.map((c, i) => (i === 1 ? { ...c, tour_picks: [{ ...c.tour_picks![0], title: "التلفريك", text: "" }] } : c)) };
+    expect(on({ ...changed, days: basicDays(changed) }, "2026-11-14").title).toBe("التلفريك");
+    const gone = { ...data, cities: data.cities.map((c, i) => (i === 1 ? { ...c, tours: 0, tour_picks: [] } : c)) };
+    expect([on({ ...gone, days: basicDays(gone) }, "2026-11-14").title, on({ ...gone, days: basicDays(gone) }, "2026-11-14").activities]).toEqual(["يوم حر", []]);
   });
 });

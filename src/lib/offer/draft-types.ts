@@ -393,9 +393,25 @@ export type TourPick = {
   date?: string | null;
   /** the car it goes in, when it is not the trip's tour car. */
   car_type?: string;
+  /**
+   * How many of that car. A tour is priced per car (ق3), so this is the line's
+   * quantity. A pick is born with the trip's tour cars; one written before the
+   * count priced the group once, and still counts as one (tourCars).
+   */
+  cars?: number;
   /** «يوم حر» — a day the agent keeps open on purpose; never priced, never counted as a tour. */
   free?: boolean;
 };
+
+/** How many cars a tour goes in — at least one, whatever the jsonb holds. */
+export function tourCars(pick: Pick<TourPick, "cars">): number {
+  return Math.max(Math.trunc(Number(pick.cars)) || 1, 1);
+}
+
+/** The car a tour goes in — its own, else the trip's tours car — and how many: «فان × 2». */
+export function tourVehicle(pick: Pick<TourPick, "car_type" | "cars">, tripCar: string): string {
+  return vehicleText({ car_type: pick.car_type?.trim() || tripCar, cars: tourCars(pick) });
+}
 
 /**
  * The supplier rate a hotel line was priced from (set by "price from supplier").
@@ -966,7 +982,7 @@ export function hopVehicle(plan: Pick<TransportPlan, "intercity">, mode: Transpo
  * line and the per-day note all already carry a car_type, and not one of them
  * has to learn a new field.
  */
-export function vehicleText(leg: TransportLeg, fallback = ""): string {
+export function vehicleText(leg: Pick<TransportLeg, "car_type" | "cars">, fallback = ""): string {
   const base = leg.car_type.trim() || fallback;
   if (!base) return "";
   return leg.cars > 1 ? `${base} × ${leg.cars}` : base;

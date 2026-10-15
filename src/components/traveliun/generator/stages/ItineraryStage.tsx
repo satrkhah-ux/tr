@@ -17,11 +17,12 @@ import {
 import { DirText } from "@/components/DirText";
 import { FREE_DAY_TITLE, isFreeDay, type DraftDay } from "@/lib/offer/draft-types";
 import {
+  daysFromTours,
   draftDaysNeedRebuild,
-  draftDaySkeleton,
   fillDaysFromPrograms,
   programDayText,
   transportNoteForDay,
+  withDayTour,
   type TourProgram,
 } from "@/lib/offer/itinerary";
 import { formatWeatherAr, isWeatherEmpty, weatherSourceAr } from "@/lib/offer/weather-format";
@@ -80,16 +81,21 @@ export function ItineraryStage({ draftId, data, patch, replace }: StageFormProps
   useEffect(() => {
     if (lastKey.current === tripKey) return;
     lastKey.current = tripKey;
-    if (draftDaysNeedRebuild(data)) patch({ days: draftDaySkeleton(data) });
+    // the skeleton, with each city's tours put back on their days
+    if (draftDaysNeedRebuild(data)) patch({ days: daysFromTours(data) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripKey]);
 
   function updateDay(index: number, slice: Partial<DraftDay>) {
     patch({
-      days: days.map((day, i) =>
+      days: days.map((day, i) => {
+        if (i !== index) return day;
         // any human edit clears the AI flag — the badge means "unreviewed"
-        i === index ? { ...day, ...slice, ai_generated: false } : day,
-      ),
+        const next = { ...day, ...slice, ai_generated: false };
+        // a day the agent rewrote is theirs: its tour no longer writes it (daysFromTours)
+        const rewritten = next.title !== day.title || next.activities.join("\n") !== day.activities.join("\n");
+        return rewritten ? { ...next, auto_title: undefined } : next;
+      }),
     });
   }
 
@@ -143,6 +149,9 @@ export function ItineraryStage({ draftId, data, patch, replace }: StageFormProps
   const current = Math.min(Math.max(open, 0), Math.max(days.length - 1, 0));
   const day = days[current];
   const dayPrograms = day ? programs.filter((p) => p.city_name === day.city_name) : [];
+  // the tours this day holds (its city's picks on this date), and the ready one among them
+  const dayPicks = day ? data.cities.flatMap((c) => (c.city_name === day.city_name ? (c.tour_picks ?? []) : [])).filter((p) => p.date === day.date && !p.free) : [];
+  const dayTour = dayPicks.find((p) => dayPrograms.some((x) => x.id === p.program_id))?.program_id ?? "";
   const transportNote = day && data.scope.transport ? transportNoteForDay(data.transport_plan, days, current, data.flights) : null;
   // the landing note goes on the day the group lands, after any travel day
   const arrivalIndex = days.findIndex((d) => d.kind !== "travel");
@@ -313,14 +322,13 @@ export function ItineraryStage({ draftId, data, patch, replace }: StageFormProps
                   the day back rather than trapping it. */}
               <button
                 type="button"
-                onClick={() =>
-                  updateDay(
-                    current,
-                    isFreeDay(day)
-                      ? { title: "", activities: [], ai_generated: false }
-                      : { title: FREE_DAY_TITLE, activities: [t("pg.freeDayHint")], ai_generated: false },
-                  )
-                }
+                onClick={() => {
+                  const text = isFreeDay(day) ? { title: "", activities: [] } : { title: FREE_DAY_TITLE, activities: [t("pg.freeDayHint")] };
+                  // a free day holds no tour: one picked for it goes, so it is neither priced nor booked
+                  const untoured = !isFreeDay(day) && dayPicks.length > 0 ? withDayTour(data, current, null) : null;
+                  if (untoured) patch({ cities: untoured.cities, days: untoured.days.map((d, i) => (i === current ? { ...d, ...text } : d)) });
+                  else updateDay(current, { ...text, ai_generated: false });
+                }}
                 className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[11.5px] font-bold transition-colors ${
                   isFreeDay(day)
                     ? "border-[#185045] bg-[#185045] text-white"
@@ -335,10 +343,13 @@ export function ItineraryStage({ draftId, data, patch, replace }: StageFormProps
                   agency's own wording, one choice away. */}
               {dayPrograms.length > 0 ? (
                 <select
-                  value=""
+                  value={dayTour}
                   onChange={(e) => {
-                    const program = dayPrograms.find((p) => p.id === e.target.value);
-                    if (program) updateDay(current, programDayText(program));
+                    // a real tour of the day (its car, its price); a day no tour can go on takes the text
+                    const program = dayPrograms.find((p) => p.id === e.target.value) ?? null;
+                    const next = withDayTour(data, current, program);
+                    if (next) patch(next);
+                    else if (program) updateDay(current, programDayText(program));
                   }}
                   aria-label={t("pg.itin.pickTour", { city: day.city_name })}
                   className="h-9 min-w-0 max-w-full flex-1 rounded-full border border-[#b7d0c7] bg-white px-3 text-[11.5px] font-bold text-[#185045] sm:max-w-[380px]"
