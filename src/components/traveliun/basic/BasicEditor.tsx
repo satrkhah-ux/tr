@@ -92,6 +92,8 @@ import {
   chainCities,
   remainingNights,
   removeCity,
+  moveCity,
+  replaceCity,
   setCityNights,
   withHotelLines,
   withTripDates,
@@ -826,6 +828,36 @@ export function BasicEditor({
   const [focus, setFocus] = useState<string[] | null>(null);
   // the cities the agent marked «تمت» — folded to their summary line
   const [doneCities, setDoneCities] = useState<string[]>([]);
+  // the city being dragged, and the cities whose dates the new order moved (what they were) — red until «تمت»
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [datesWere, setDatesWere] = useState<Record<string, { check_in: string | null; check_out: string | null; prev: string | undefined }>>({});
+  const stopKey = (c: BasicCity, i: number) => c.key ?? `${i}-${c.city_name}`;
+  /**
+   * A city dragged onto another, or its arrows: every stop whose dates or whose
+   * way in (the city before it) changed turns red until «تمت»; one put back
+   * where it was is not red any more. A move that would put a city twice in a
+   * row is refused, and said.
+   */
+  function reorder(from: number, to: number) {
+    const before = new Map(cities.map((c, i) => [stopKey(c, i), { check_in: c.check_in, check_out: c.check_out, prev: cities[i - 1] ? stopKey(cities[i - 1], i - 1) : undefined }]));
+    const moved = moveCity(data, from, to);
+    if (moved.cities === data.cities) {
+      if (from !== to) window.alert(tx("sameCityTwice"));
+      return;
+    }
+    const next = moved.cities as BasicCity[];
+    const now = new Map(next.map((c, i) => [stopKey(c, i), { check_in: c.check_in, check_out: c.check_out, prev: next[i - 1] ? stopKey(next[i - 1], i - 1) : undefined }]));
+    const differs = (a: { check_in: string | null; check_out: string | null; prev: string | undefined }, b: typeof a) =>
+      a.check_in !== b.check_in || a.check_out !== b.check_out || a.prev !== b.prev;
+    // the first state is kept — moved twice it still says where it started — and a stop back there clears
+    setDatesWere((w) => {
+      const all = { ...Object.fromEntries([...before].filter(([k, was]) => now.has(k) && differs(was, now.get(k)!))), ...w };
+      return Object.fromEntries(Object.entries(all).filter(([k, was]) => now.has(k) && differs(was, now.get(k)!)));
+    });
+    // a stop that changed opens again
+    setDoneCities((d) => d.filter((k) => !(before.has(k) && now.has(k) && differs(before.get(k)!, now.get(k)!))));
+    commit(moved);
+  }
   const partner = data.customer.partner_company_id;
   const flightsOn = scope.flights_intl || scope.flights_domestic;
   const missingOf: Record<Step, string[]> = {
@@ -1245,15 +1277,36 @@ export function BasicEditor({
                       : commit({ transport_plan: withCar({ ...plan, farewell: { ...(plan.farewell ?? plan.airport), ...slice, enabled: true } }, slice.car_type) })
                 }
                 onRemove={() => {
-                  if (window.confirm(tx("confirmRemove", { city: city.city_name }))) commit(removeCity(data, i));
+                  if (!window.confirm(tx("confirmRemove", { city: city.city_name }))) return;
+                  // its key may come back with a new city: nothing of this one may carry over
+                  const key = stopKey(city, i);
+                  setDatesWere((w) => Object.fromEntries(Object.entries(w).filter(([k]) => k !== key)));
+                  setDoneCities((d) => d.filter((k) => k !== key));
+                  commit(removeCity(data, i));
                 }}
-                collapsed={doneCities.includes(`${i}-${city.city_name}`)}
+                onMove={reorder}
+                dragFrom={dragFrom}
+                onDragFrom={setDragFrom}
+                onReplace={(next) => {
+                  const changed = replaceCity(data, i, next);
+                  if (changed.cities === data.cities) {
+                    if (next.name.trim() !== city.city_name) window.alert(tx("sameCityTwice"));
+                    return;
+                  }
+                  // its hotel and tours are to be chosen again: the card opens, and a focus on the old name follows it
+                  setDoneCities((d) => d.filter((k) => k !== stopKey(city, i)));
+                  setFocus((f) => (f ? f.map((n) => (n === city.city_name ? next.name.trim() : n)) : f));
+                  commit(changed);
+                }}
+                datesWere={datesWere[stopKey(city, i)] ?? null}
+                collapsed={doneCities.includes(stopKey(city, i))}
                 onDone={() => {
-                  setDoneCities((d) => [...d, `${i}-${city.city_name}`]);
+                  setDoneCities((d) => [...d, stopKey(city, i)]);
+                  setDatesWere((w) => Object.fromEntries(Object.entries(w).filter(([k]) => k !== stopKey(city, i))));
                   // on to the next city
                   window.setTimeout(() => document.getElementById(`basic-city-${i + 1}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
                 }}
-                onExpand={() => setDoneCities((d) => d.filter((k) => k !== `${i}-${city.city_name}`))}
+                onExpand={() => setDoneCities((d) => d.filter((k) => k !== stopKey(city, i)))}
               />
             );
           })

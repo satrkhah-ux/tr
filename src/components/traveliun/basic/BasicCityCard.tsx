@@ -1,7 +1,24 @@
 "use client";
 
-import { Fragment, useState, type ReactNode } from "react";
-import { BedDouble, Camera, CheckCircle2, ChevronDown, ListChecks, Pencil, Plane, Plus, RotateCcw, Trash2, UserRound, X } from "lucide-react";
+import { Fragment, useRef, useState, type ReactNode } from "react";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  BedDouble,
+  Camera,
+  CheckCircle2,
+  ChevronDown,
+  GripVertical,
+  ListChecks,
+  Pencil,
+  Plane,
+  Plus,
+  RotateCcw,
+  Trash2,
+  UserRound,
+  X,
+} from "lucide-react";
 import { DirText } from "@/components/DirText";
 import {
   addStay,
@@ -60,6 +77,10 @@ import { CarCountSelect, CarOptions, TourRow, type TourCatalog } from "../tours/
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 const money = (n: number) => Math.round(n * 100) / 100;
 const DAY = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+const SHORT = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "long", timeZone: "UTC" });
+/** «20 أكتوبر – 24 أكتوبر» */
+const span = (c: { check_in: string | null; check_out: string | null }) =>
+  c.check_in && c.check_out ? `${SHORT.format(new Date(`${c.check_in}T00:00:00Z`))} – ${SHORT.format(new Date(`${c.check_out}T00:00:00Z`))}` : "—";
 /** «الأربعاء، 11 نوفمبر» */
 const dayLabel = (iso: string) => DAY.format(new Date(`${iso}T00:00:00Z`));
 
@@ -108,6 +129,11 @@ export function BasicCityCard({
   onSlice,
   onCar,
   onRemove,
+  onMove,
+  dragFrom,
+  onDragFrom,
+  onReplace,
+  datesWere,
   collapsed,
   onDone,
   onExpand,
@@ -138,6 +164,15 @@ export function BasicCityCard({
   /** the reception (airport), farewell or the trip's tours car changed. */
   onCar: (leg: "airport" | "farewell" | "tours", slice: Partial<TransportLeg>) => void;
   onRemove: () => void;
+  /** the city at `from` goes to `to` — dropped on this card, or this card's arrows. */
+  onMove: (from: number, to: number) => void;
+  /** the city being dragged, while a drag is on. */
+  dragFrom: number | null;
+  onDragFrom: (index: number | null) => void;
+  /** «تعديل المدينة»: another city in this place, its nights and tour days kept. */
+  onReplace: (city: { name: string; country?: string }) => void;
+  /** what the dates were before the order changed — the card is red until «تمت». */
+  datesWere?: { check_in: string | null; check_out: string | null; prev?: string } | null;
   /** «تمت» pressed: the card folds to its summary line. */
   collapsed: boolean;
   onDone: () => void;
@@ -150,13 +185,16 @@ export function BasicCityCard({
   const domestic = data.flights.filter(
     (f) => f.leg_order === "internal" && (f.to_city?.trim() === city.city_name || f.from_city?.trim() === city.city_name),
   );
+  // reached by a domestic flight from another city — its airport transfers show on the tours tab
+  const before = index > 0 ? data.cities[index - 1] : undefined;
+  const byAir = Boolean(before && before.city_name !== city.city_name && hopMode(data.transport_plan, before.city_name, city.city_name) === "flight");
   // «البرنامج السياحي» opens once every tour of the city says what it is
   const picks = toursOn ? withTours(city, city.tours ?? 0, undefined, isLast) : [];
   const programLocked = picks.some((p) => !p.free && !p.title.trim());
   const tabs: { key: Tab; label: string; icon: typeof Plane; locked?: boolean }[] = [
     ...(hotelsOn && main ? [{ key: "hotel" as const, label: tx("hotel"), icon: BedDouble }] : []),
     // the tours, and the reception / farewell cars beside them on the first and last city
-    ...(toursOn || (transportOn && (isFirst || isLast))
+    ...(toursOn || (transportOn && (isFirst || isLast || byAir))
       ? [{ key: "tours" as const, label: toursOn ? tx("tours") : tx("transfersTab"), icon: toursOn ? Camera : UserRound }]
       : []),
     ...(domestic.length > 0 || (data.scope.flights_domestic && index > 0) ? [{ key: "domestic" as const, label: tx("domesticTab"), icon: Plane }] : []),
@@ -205,11 +243,69 @@ export function BasicCityCard({
     .filter(Boolean)
     .join(" · ");
 
+  // the order: a city dragged by its handle and dropped on another takes its place
+  const card = useRef<HTMLElement>(null);
+  const target = dragFrom !== null && dragFrom !== index;
+  // the card the dragged city is over — it goes in above it
+  const [over, setOver] = useState(false);
+  // «تعديل المدينة»
+  const [editing, setEditing] = useState(false);
+  const [editCountry, setEditCountry] = useState(city.country || data.trip.country);
+  const [editCity, setEditCity] = useState(city.city_name);
+  const editCities = editing ? (findLookupCountry(lookups.countries, editCountry)?.cities ?? []) : [];
+  const moved = Boolean(datesWere);
+
   return (
-    <article id={`basic-city-${index}`} className="scroll-mt-20 overflow-hidden rounded-[14px] border border-[#d8e6e0] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+    <article
+      ref={card}
+      id={`basic-city-${index}`}
+      onDragOver={(e) => {
+        if (dragFrom === null) return;
+        // the drop is the card's, never a field's under the pointer
+        e.preventDefault();
+        e.dataTransfer.dropEffect = target ? "move" : "none";
+        if (target && !over) setOver(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
+      }}
+      onDrop={(e) => {
+        if (dragFrom === null) return;
+        e.preventDefault();
+        setOver(false);
+        // dropped on a card, the city goes in above it — wherever it came from
+        if (target) onMove(dragFrom, dragFrom < index ? index - 1 : index);
+        onDragFrom(null);
+      }}
+      className={`scroll-mt-20 overflow-hidden rounded-[14px] border bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)] ${
+        target ? "border-dashed border-[#2aa87a]" : moved ? "border-[#f1b5b5]" : "border-[#d8e6e0]"
+      } ${over ? "border-t-4 border-t-[#2aa87a] shadow-[0_-6px_0_rgba(42,168,122,0.15)]" : ""} ${dragFrom === index ? "opacity-50" : ""}`}
+    >
       {/* the city, its tabs and its nights — one line */}
-      <header className="flex flex-wrap items-center gap-2 bg-[#eef5f2] px-3 py-2">
-        <span className="flex size-6 items-center justify-center rounded-full bg-[#185045] text-[11px] font-extrabold text-white">{index + 1}</span>
+      <header className={`flex flex-wrap items-center gap-2 px-3 py-2 ${moved ? "bg-[#fdecec]" : "bg-[#eef5f2]"}`}>
+        <span
+          draggable
+          role="button"
+          tabIndex={-1}
+          aria-label={tx("dragCity")}
+          title={tx("dragCity")}
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = "move";
+            // not text/plain: dropped on a field by mistake, the city's number would be typed into it
+            e.dataTransfer.setData("application/x-basic-city", String(index));
+            if (card.current) {
+              const r = card.current.getBoundingClientRect();
+              e.dataTransfer.setDragImage(card.current, e.clientX - r.left, e.clientY - r.top);
+            }
+            // after the browser has taken the picture — the card fades only then
+            window.setTimeout(() => onDragFrom(index), 0);
+          }}
+          onDragEnd={() => onDragFrom(null)}
+          className="cursor-grab text-[#7a948f] hover:text-[#185045] active:cursor-grabbing"
+        >
+          <GripVertical className="size-4" />
+        </span>
+        <span className={`flex size-6 items-center justify-center rounded-full text-[11px] font-extrabold text-white ${moved ? "bg-[#c43d3d]" : "bg-[#185045]"}`}>{index + 1}</span>
         <h3 className="text-[13.5px] font-extrabold text-[#0f3d38]">{city.city_name}</h3>
         {city.country ? <span className="rounded-full bg-white px-2 py-0.5 text-[10.5px] font-bold text-[#557d78]">{city.country}</span> : null}
         {hop}
@@ -235,6 +331,28 @@ export function BasicCityCard({
           </div>
         ) : null}
         <div className="ms-auto flex items-center gap-2">
+          {/* the arrows do what the drag does — on a phone, and from the keyboard */}
+          <span className="inline-flex items-center">
+            <button type="button" disabled={isFirst} onClick={() => onMove(index, index - 1)} aria-label={tx("moveUp")} title={tx("moveUp")} className="rounded-[7px] p-1 text-[#557d78] hover:bg-white disabled:opacity-30">
+              <ArrowUp className="size-3.5" />
+            </button>
+            <button type="button" disabled={isLast} onClick={() => onMove(index, index + 1)} aria-label={tx("moveDown")} title={tx("moveDown")} className="rounded-[7px] p-1 text-[#557d78] hover:bg-white disabled:opacity-30">
+              <ArrowDown className="size-3.5" />
+            </button>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setEditCountry(city.country || data.trip.country);
+              setEditCity(city.city_name);
+              setEditing((v) => !v);
+            }}
+            aria-expanded={editing}
+            className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#d3e2dc] bg-white px-2 text-[11px] font-bold text-[#185045] hover:border-[#165749]"
+          >
+            <Pencil className="size-3.5" />
+            {tx("editCity")}
+          </button>
           <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#185045]">
             {tx("nights")}
             <select value={city.nights} onChange={(e) => onNights(Number(e.target.value))} className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold">
@@ -249,6 +367,62 @@ export function BasicCityCard({
         </div>
       </header>
 
+      {/* «تعديل المدينة»: another city, the same place in the trip */}
+      {editing ? (
+        <div className="flex flex-wrap items-end gap-2 border-b border-[#DCE9E5] bg-[#f7fbf9] px-3 py-2">
+          <Field label={tx("country")} className="w-40">
+            <select
+              value={findLookupCountry(lookups.countries, editCountry)?.name ?? ""}
+              onChange={(e) => {
+                setEditCountry(e.target.value);
+                setEditCity("");
+              }}
+              className={`${basicField} px-1.5`}
+            >
+              <option value="">{tx("choose")}</option>
+              {lookups.countries.map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label={tx("city")} className="min-w-40 flex-1">
+            <select value={editCity} onChange={(e) => setEditCity(e.target.value)} className={basicField}>
+              <option value="">{tx("choose")}</option>
+              {editCity && !editCities.some((c) => c.name === editCity) ? <option value={editCity}>{editCity}</option> : null}
+              {editCities.map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+          </Field>
+          <button
+            type="button"
+            disabled={!editCity}
+            onClick={() => {
+              onReplace({ name: editCity, country: findLookupCountry(lookups.countries, editCountry)?.name ?? editCountry });
+              setEditing(false);
+            }}
+            className="inline-flex h-9 items-center gap-1 rounded-[8px] bg-[#185045] px-3 text-[12px] font-extrabold text-white disabled:opacity-50"
+          >
+            <CheckCircle2 className="size-3.5" />
+            {tx("saveCity")}
+          </button>
+          <button type="button" onClick={() => setEditing(false)} className="inline-flex h-9 items-center px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045]">
+            {tx("cancelEdit")}
+          </button>
+          <p className="basis-full text-[11px] font-semibold text-[#7a948f]">{tx("editCityHint")}</p>
+        </div>
+      ) : null}
+
+      {/* the order changed and with it the dates: red until the agent has looked again */}
+      {datesWere ? (
+        <p role="status" className="tv-tnum flex flex-wrap items-center gap-1.5 bg-[#fff5f5] px-3 py-1.5 text-[11.5px] font-bold text-[#b42318]">
+          <AlertTriangle className="size-3.5 shrink-0" />
+          {datesWere.check_in === city.check_in && datesWere.check_out === city.check_out
+            ? tx("hopMoved", { from: data.cities[index - 1]?.city_name ?? "—" })
+            : tx("datesMoved", { was: span(datesWere), now: span(city) })}
+        </p>
+      ) : null}
+
       {collapsed ? (
         // done: one line — what the city holds, and a press reopens it
         <button
@@ -256,7 +430,11 @@ export function BasicCityCard({
           onClick={onExpand}
           className="flex w-full items-center gap-2 px-3 py-2 text-start hover:bg-[#f7fbf9]"
         >
-          <CheckCircle2 className={`size-4 shrink-0 ${missing.length > 0 ? "text-[#a86a10]" : "text-[#0f7a52]"}`} />
+          {moved ? (
+            <AlertTriangle className="size-4 shrink-0 text-[#c43d3d]" />
+          ) : (
+            <CheckCircle2 className={`size-4 shrink-0 ${missing.length > 0 ? "text-[#a86a10]" : "text-[#0f7a52]"}`} />
+          )}
           <span className="tv-tnum min-w-0 flex-1 truncate text-[12px] font-semibold text-[#557d78]">
             {missing.length > 0 ? tx("needFirst", { list: missing.join("، ") }) : summary || city.city_name}
           </span>
@@ -688,8 +866,8 @@ function ToursPanel({
   const leavesHere = byDeparture.find((f) => f.leg_order !== "outbound" && f.from_city?.trim() === city.city_name) ?? byDeparture.find((f) => f.leg_order === "inbound");
 
   // the move in by air (the domestic leg into this city), and the car that takes the group to and from the airports
-  const prev = index > 0 ? data.cities[index - 1] : undefined;
-  const hopLeg = prev ? legInto(data.flights, city.city_name, city.check_in) : undefined;
+  const prev = index > 0 && data.cities[index - 1]?.city_name !== city.city_name ? data.cities[index - 1] : undefined;
+  const hopLeg = prev ? legInto(data.flights, city.city_name, city.check_in, prev.city_name) : undefined;
   const clock = (iso: string | null | undefined) => {
     const t = (iso ?? "").slice(11, 16);
     return t && t !== "00:00" ? t : "";

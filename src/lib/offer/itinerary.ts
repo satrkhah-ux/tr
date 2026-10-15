@@ -439,9 +439,13 @@ function leaveLines(city: string, leg: DraftFlight | undefined): string[] {
   ];
 }
 
-/** The domestic leg into `city` on `date`: landing that day, else leaving it, else any into the city. */
-export function legInto(flights: DraftFlight[], city: string, date: string | null): DraftFlight | undefined {
-  const into = flights.filter((f) => f.leg_order === "internal" && f.to_city?.trim() === city);
+/**
+ * The domestic leg into `city` on `date` — from `from` when it is known (after
+ * a reorder a ticket from the old neighbour must not answer for the new one):
+ * landing that day, else leaving it, else any such leg.
+ */
+export function legInto(flights: DraftFlight[], city: string, date: string | null, from?: string): DraftFlight | undefined {
+  const into = flights.filter((f) => f.leg_order === "internal" && f.to_city?.trim() === city && (!from || !f.from_city?.trim() || f.from_city.trim() === from));
   return into.find((f) => localDatePart(f.arrival_at) === date) ?? into.find((f) => localDatePart(f.departure_at) === date) ?? into[0];
 }
 
@@ -619,7 +623,7 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
       const mode = hopMode(plan, from, day.city_name);
       const overnight = Boolean(cities[cityOf[i]]?.arrives_next_day);
       title = mode === "flight" ? (overnight ? `الوصول إلى ${day.city_name}` : `السفر إلى ${day.city_name}`) : `الانتقال إلى ${day.city_name}`;
-      activities = moveLines(mode, day.city_name, legInto(data.flights, day.city_name, day.date), overnight);
+      activities = moveLines(mode, day.city_name, legInto(data.flights, day.city_name, day.date, from), overnight);
     } else title = FREE_DAY_TITLE;
 
     // «يوم حر» picked on purpose keeps the day free; it is not a tour

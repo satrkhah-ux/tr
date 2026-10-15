@@ -164,6 +164,117 @@ export function removeCity(data: DraftData, index: number): Pick<DraftData, "cit
   };
 }
 
+/**
+ * True when the cities put one city twice in a row somewhere they did not
+ * before — a «move» from a city to itself, priced as a transfer or a flight.
+ * addCity makes that more nights instead; a reorder or «تعديل المدينة» that
+ * would do it is refused (an older file that already has it is left alone).
+ */
+export function repeatsNeighbour(before: DraftCity[], after: DraftCity[]): boolean {
+  const pairs = (list: DraftCity[]) => list.filter((c, i) => i > 0 && c.city_name === list[i - 1].city_name).length;
+  return pairs(after) > pairs(before);
+}
+
+/** Whole days from `a` to `b`. */
+const daysFrom = (a: string, b: string) => Math.round((isoDay(b) - isoDay(a)) / DAY_MS);
+
+/**
+ * The programme's days follow their stop when the stops move: a day the agent
+ * wrote for Langkawi stays a Langkawi day — the same day of its stay — instead
+ * of staying on its date under whichever city now sleeps there. A day the
+ * screen writes needs nothing (it is written again); a slot whose stop brings
+ * no day of its own is handed back to the screen.
+ */
+function carryDays(before: DraftCity[], after: DraftCity[], days: DraftDay[]): DraftDay[] {
+  const stopOn = (cities: DraftCity[], date: string) => cities.findIndex((c) => c.check_in && c.check_out && date >= c.check_in && date < c.check_out);
+  const slot = (c: DraftCity, date: string) => `${c.key}@${daysFrom(c.check_in!, date)}`;
+  const was = new Map<string, DraftDay>();
+  for (const d of days) {
+    const k = d.date && d.kind !== "travel" ? stopOn(before, d.date) : -1;
+    if (k >= 0) was.set(slot(before[k], d.date!), d);
+  }
+  return days.map((d) => {
+    const k = d.date && d.kind !== "travel" ? stopOn(after, d.date) : -1;
+    if (k < 0) return d;
+    const from = was.get(slot(after[k], d.date!));
+    if (from === d) return d;
+    if (!from) return { ...d, title: "", activities: [], ai_generated: false, auto_title: "" };
+    return { ...from, day_number: d.day_number, date: d.date, city_name: after[k].city_name, weather: from.date === d.date ? from.weather : null };
+  });
+}
+
+/**
+ * A city moved to another place in the trip (dragged, or its arrows): its hotel
+ * lines go with it (they point at its key), every date chains again and the
+ * days the agent wrote go with their stop. A night in the air belonged to the
+ * move from the city before; a city that now follows another one takes that
+ * night back — through setCityNights, so its hotel's typed total grows with
+ * it — and lands the same day: the agent says again how the new move goes.
+ * Nothing changes for a move nowhere, or one that puts a city twice in a row.
+ */
+export function moveCity(data: DraftData, from: number, to: number): Pick<DraftData, "cities" | "hotels" | "days"> {
+  const keyed = withCityKeys(data.cities);
+  const same = { cities: data.cities, hotels: data.hotels, days: data.days };
+  if (from === to || !keyed[from] || to < 0 || to >= keyed.length) return same;
+  const list = [...keyed];
+  const [city] = list.splice(from, 1);
+  list.splice(to, 0, city);
+  if (repeatsNeighbour(keyed, list)) return same;
+  const prevOf = new Map(keyed.map((c, i) => [c.key, keyed[i - 1]?.key]));
+  const backs = list.flatMap((c, i) => (c.arrives_next_day && prevOf.get(c.key) !== list[i - 1]?.key ? [i] : []));
+  let out: DraftData = { ...data, cities: chainCities(data, list.map((c, i) => (backs.includes(i) ? { ...c, arrives_next_day: undefined } : c))) };
+  for (const i of backs) out = { ...out, ...setCityNights(out, i, out.cities[i].nights + 1) };
+  const dated = chainCities(data, keyed);
+  return { cities: out.cities, hotels: out.hotels, days: carryDays(dated, out.cities, data.days) };
+}
+
+/**
+ * The city of a stop changed in place («تعديل المدينة»): its nights and its tour
+ * days stay, what belonged to the old city goes — the tours' services (another
+ * city's programmes), the hotel and its price, the days the agent wrote about
+ * it; the rooms and meals stay asked. A hotel line another visit of the old
+ * city still reads (an older file's, matched by name) stays with that visit.
+ */
+export function replaceCity(data: DraftData, index: number, next: { name: string; country?: string }): Pick<DraftData, "cities" | "hotels" | "days"> {
+  const keyed = withCityKeys(data.cities);
+  const old = keyed[index];
+  const name = next.name.trim();
+  const own = (c?: string) => (c && c !== data.trip.country ? c : undefined);
+  const country = own(next.country);
+  const same = { cities: data.cities, hotels: data.hotels, days: data.days };
+  if (!old || !name || (name === old.city_name && country === own(old.country))) return same;
+  const cities = keyed.map((c, i) => {
+    if (i !== index) return c;
+    return {
+      ...c,
+      city_name: name,
+      country,
+      tour_picks: c.tour_picks?.map((p) => (p.free ? p : { ...p, program_id: null, title: "", text: "", price: null })),
+    };
+  });
+  if (repeatsNeighbour(keyed, cities)) return same;
+  // removeCity's rule: its own lines, and a by-name line no other stop reads
+  const others = new Set(keyed.flatMap((_, i) => (i === index ? [] : cityHotelLines(keyed, data.hotels, i))));
+  const mine = new Set(cityHotelLines(keyed, data.hotels, index).filter((h) => h.city_key === old.key || !others.has(h)));
+  const hotels = data.hotels.map((h) =>
+    mine.has(h)
+      ? withRooms(
+          { ...h, city_name: name, city_key: old.key, hotel_id: null, hotel_name: "", hotel_name_en: "", sourcing: null, manual_price: null },
+          h.rooms.map((r) => ({ ...r, room_type_id: null, price: null })),
+        )
+      : h,
+  );
+  const dated = chainCities(data, cities);
+  const stop = dated[index];
+  // the days written about the old city go back to the screen, which writes them for the new one
+  const days = data.days.map((d) =>
+    d.date && stop.check_in && stop.check_out && d.date >= stop.check_in && d.date < stop.check_out
+      ? { ...d, title: "", activities: [], ai_generated: false, auto_title: "" }
+      : d,
+  );
+  return { cities: dated, hotels, days };
+}
+
 /** Every city holds a hotel line while the sale includes hotels — a city the flights created has none yet. */
 export function withHotelLines(data: DraftData, currency: string): DraftHotel[] {
   if (!data.scope.hotels) return data.hotels;
