@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { deriveTransportRows, normalizeDraftData, transportRef, type DraftData } from "./draft-types";
+import { deriveTransportRows, normalizeDraftData, transportIncludeLine, transportRef, type DraftData } from "./draft-types";
+import { draftTransportNote, FAREWELL } from "./itinerary";
+import { draftToPreviewOffer } from "./preview-dto";
 import { addService, basicDays, cityServices, moveCity, priceAtSource, removeService, setService } from "./basic";
 import { ownerExample } from "./draft-test-helpers";
 import { suggestPricing, type PricingReference } from "./pricing-suggest";
@@ -153,5 +155,62 @@ describe("an old Basic file opens as it was", () => {
       "transport:فندق لنكاوي>المطار>فان",
       "transport:المطار>فندق بينانج>فان",
     ]);
+  });
+});
+
+/** The example with these service changes, its transport rows and programme written as the screen writes them. */
+const withServices = (change: (cities: DraftData["cities"]) => DraftData["cities"]) => {
+  const data = ownerExample();
+  const cities = change(data.cities);
+  const next = { ...data, cities, transport: deriveTransportRows(data.transport_plan, cities) };
+  return { ...next, days: basicDays(next) };
+};
+
+describe("the issued offer and the document say a row by its own words", () => {
+  it("an in-city transfer is «التوصيل داخل بينانج», never «بينانج ← بينانج»; a row without words keeps its road", () => {
+    const data = withServices((c) => addService(c, 2, "transfer", "2026-10-26"));
+    const added = data.transport.find((t) => t.ref?.startsWith("transport:svc:"))!;
+    expect(transportIncludeLine(added)).toBe("التوصيلات: التوصيل داخل بينانج (فان)");
+    expect(transportIncludeLine(data.transport[0])).toBe("التوصيلات: المطار ← فندق سيلانجور (فان)");
+    const printed = draftToPreviewOffer(data).transport;
+    expect(printed).toContain("التوصيل داخل بينانج — فان");
+    expect(printed.some((l) => l.includes("بينانج → بينانج"))).toBe(false);
+  });
+});
+
+describe("the programme names each service's own car", () => {
+  const notes = (data: DraftData) => data.days.map((_, i) => draftTransportNote(data, data.days, i));
+
+  it("each reception, farewell and flight move on its day, in the row's car", () => {
+    const data = withServices((c) => setService(setService(setService(c, 1, "in", { car_type: "باص 14 راكب", cars: 2 }), 0, "out", { car_type: "سيارة صغيرة" }), 2, "out", { car_type: "سيارة صغيرة" }));
+    const n = notes(data);
+    expect(n[0]).toBe("استقبال من المطار إلى الفندق — فان");
+    expect(n[2]).toBe(
+      "التوصيل من الفندق إلى المطار — سيارة صغيرة · الانتقال إلى لنكاوي — طيران داخلي (الإقلاع 15:00، الوصول 16:05) · الاستقبال في المطار والتوصيل إلى الفندق — باص 14 راكب × 2",
+    );
+    expect(n[7]).toBe("توديع من الفندق إلى المطار — سيارة صغيرة");
+  });
+
+  it("a row taken away is not said", () => {
+    const n = notes(withServices((c) => removeService(c, 2, "out")));
+    expect(n[7]).toBeNull();
+  });
+
+  it("a day the agent wrote by hand names its tour's own car, not the trip's", () => {
+    const data = withServices((c) => c.map((x, i) => (i === 1 ? { ...x, tour_picks: x.tour_picks!.map((p) => ({ ...p, car_type: "فان", cars: 2 })) } : x)));
+    const days = data.days.map((d) => (d.date === "2026-10-23" ? { ...d, title: "زيارة الجزر", activities: ["بالقارب"], auto_title: "" } : d));
+    expect(draftTransportNote(data, days, 3)).toBe("سيارة الجولات — فان × 2");
+  });
+
+  it("a row the agent added is said on its day in the programme, with its car — on the day home before the way to the airport", () => {
+    const data = withServices((c) => {
+      let next = addService(c, 1, "transfer", "2026-10-24");
+      const id = next[1].services!.at(-1)!.id;
+      next = setService(next, 1, id, { text: "توصيل إلى السوق الليلي", car_type: "باص 14 راكب" });
+      return addService(next, 2, "farewell", "2026-10-27");
+    });
+    const day = (date: string) => data.days.find((d) => d.date === date)!;
+    expect(day("2026-10-24").activities).toContain("توصيل إلى السوق الليلي — باص 14 راكب");
+    expect(day("2026-10-27").activities.slice(-2)).toEqual(["التوصيل من الفندق إلى المطار — فان", FAREWELL]);
   });
 });

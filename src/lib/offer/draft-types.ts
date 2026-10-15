@@ -966,6 +966,10 @@ export type DraftTransport = {
   ref?: string;
 };
 
+/** A transport row as the issued offer's «يشمل» says it: its own words, else its road — and its car. */
+export const transportIncludeLine = (t: Pick<DraftTransport, "from_place" | "to_place" | "car_type" | "text">) =>
+  `التوصيلات: ${t.text || `${t.from_place} ← ${t.to_place}`}${t.car_type ? ` (${t.car_type})` : ""}`;
+
 /** The pricing line a transport row is: its road and its car, or an added row's own ref. */
 export const transportRef = (tr: Pick<DraftTransport, "from_place" | "to_place" | "car_type" | "ref">) =>
   tr.ref ?? `transport:${tr.from_place}>${tr.to_place}>${tr.car_type ?? ""}`;

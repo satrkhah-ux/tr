@@ -2,7 +2,7 @@
 
 import { Camera, Car, RotateCcw } from "lucide-react";
 import { FREE_DAY_TITLE, type DraftData, type DraftDay } from "@/lib/offer/draft-types";
-import { dayTours, programDayText, tourService, transportNoteForDay, withDayPick } from "@/lib/offer/itinerary";
+import { dayTours, draftTransportNote, programDayText, tourService, withDayPick } from "@/lib/offer/itinerary";
 import { advancedDayNote } from "@/lib/offer/advanced";
 import type { BasicCity } from "@/lib/offer/basic";
 import { listedTourPrice } from "@/lib/offer/pricing-suggest";
@@ -78,7 +78,7 @@ export function BasicCityProgram({
       {own.map((i) => {
         const day = data.days[i];
         const mine = day.auto_title !== undefined && day.title !== day.auto_title;
-        const note = data.scope.transport ? advancedDayNote(transportNoteForDay(data.transport_plan, data.days, i, data.flights), data.advanced) : null;
+        const note = data.scope.transport ? advancedDayNote(draftTransportNote(data, data.days, i), data.advanced) : null;
         const tours = dayTours(data, i)?.picks.filter((p) => !p.free && p.title.trim()) ?? [];
         return (
           <div key={day.date} className="grid gap-1.5 rounded-[9px] border border-[#DCE9E5] p-2 xl:grid-cols-[9.5rem_1fr]">
