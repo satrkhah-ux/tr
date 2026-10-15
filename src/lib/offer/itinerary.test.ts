@@ -20,7 +20,7 @@ import {
 } from "./itinerary";
 import { deriveCityDates, emptyDraftData, normalizeDraftData, type DraftCity, type DraftData, type DraftDay } from "./draft-types";
 import { suggestPricing, type PricingReference } from "./pricing-suggest";
-import { emptyJourney } from "./advanced";
+import { emptyAdvanced } from "./advanced";
 
 function city(city_name: string, nights: number): DraftCity {
   return { city_name, nights, check_in: null, check_out: null };
@@ -299,11 +299,11 @@ describe("daysFromTours — the day and its tour (الأمر 3)", () => {
     expect(data.cities.some((c) => c.tour_picks)).toBe(false);
   });
 
-  it("with the advanced package on, a tour names only a car it was given itself", () => {
-    const data = { ...picked(), journey: { ...emptyJourney(), enabled: true } };
-    expect(daysFromTours(data)[1].activities).toEqual(["برجا بتروناس وساحة الاستقلال"]);
-    const own = { ...data, cities: data.cities.map((c) => ({ ...c, tour_picks: c.tour_picks?.map((p) => ({ ...p, car_type: "سيدان" })) })) };
-    expect(daysFromTours(own)[1].activities.at(-1)).toBe("التنقل بـسيدان × 2");
+  it("«بكج متقدم» meeting the group at a border: the arrival day says where, the tours keep the trip car", () => {
+    const data = { ...picked(), advanced: { ...emptyAdvanced(), on: true, reception: { kind: "border" as const, place: "معبر سارب", side: "جورجيا", time: "12:30" } } };
+    const days = daysFromTours(data, true); // Basic's own programme — it writes the arrival day
+    expect(days.find((d) => d.activities.some((a) => a.includes("معبر")))?.activities[0]).toBe("الاستقبال من معبر سارب — جانب جورجيا الساعة 12:30 من قبل موظف ترافليون والتوجه إلى الفندق");
+    expect(daysFromTours({ ...picked(), advanced: { ...emptyAdvanced(), on: false } }, true)).toEqual(daysFromTours(picked(), true));
   });
 });
 
