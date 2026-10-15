@@ -40,6 +40,8 @@ import { programDayText, type TourProgram } from "@/lib/offer/itinerary";
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { suppliersFor } from "../generator/SupplierPrice";
+import { FlightFare } from "../generator/flights/FlightFare";
+import { withTypedTotal } from "@/lib/offer/flight-fare";
 import { basicField, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
 import { nightsText, useBasicLabels } from "./labels";
@@ -880,12 +882,13 @@ function DomesticPanel({
               value={booking.dom_price ?? ""}
               placeholder="0"
               onChange={(e) =>
-                onSlice({ flight_booking: { ...booking, dom_price: typedNumber(e.target), dom_currency: booking.dom_currency || "SAR" } })
+                onSlice({ flight_booking: { ...withTypedTotal(booking, "dom", typedNumber(e.target)), dom_currency: booking.dom_currency || "SAR" } })
               }
               className={`${basicField} tv-tnum w-32 text-center ${booking.dom_price == null ? "border-[#f0b4c2] bg-[#fff5f7]" : ""}`}
             />
             <span className="text-[#557d78]">{booking.dom_currency || "SAR"}</span>
           </label>
+          <FlightFare booking={booking} kind="dom" trip={data.trip} field={basicField} onChange={(flight_booking) => onSlice({ flight_booking })} />
         </>
       )}
       <button

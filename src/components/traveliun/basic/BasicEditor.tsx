@@ -606,6 +606,7 @@ export function BasicEditor({
   );
 
   const [pricingError, setPricingError] = useState<string | null>(null);
+  const [fareNote, setFareNote] = useState<string | null>(null);
   async function calculate() {
     setPricingBusy(true);
     setPricingError(null);
@@ -634,6 +635,9 @@ export function BasicEditor({
     const item = data.pricing.items[index];
     setOpenGroups((o) => ({ ...o, [priceGroupOf(item)]: true }));
     setSavedGroup(null);
+    // a «للفرد» flight priced here becomes «إجمالي» — said under its line
+    const fare = item.ref === "flight:intl" ? latest.current.flight_booking.intl_fare : item.ref === "flight:dom" ? latest.current.flight_booking.dom_fare : null;
+    if (fare?.price_mode === "per_person" && "sell_price" in slice) setFareNote(item.ref ?? null);
     const at = priceAtSource(latest.current, item, { price: slice.sell_price, currency: slice.sell_currency });
     // the source's figure is what we pay and what we sell at, as the sheet writes it
     const both = at
@@ -1404,6 +1408,9 @@ export function BasicEditor({
                               <option key={c} value={c}>{c}</option>
                             ))}
                           </select>
+                          {fareNote && item.ref === fareNote ? (
+                            <p className="col-span-full text-[11px] font-semibold text-[#557d78]">{t("pg.fare.toTotal")}</p>
+                          ) : null}
                         </div>
                       ))}
                       <div className="flex items-center justify-end gap-2 py-2">

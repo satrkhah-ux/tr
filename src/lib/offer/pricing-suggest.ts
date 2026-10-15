@@ -33,6 +33,7 @@ import {
 import { itineraryStartDate } from "./schedule";
 import type { DraftPricingItem } from "./draft-types";
 import { journeyPricingLines } from "./advanced";
+import { fareBreakdown, flightBookingTotal } from "./flight-fare";
 
 /** A transfer price from the reference list. */
 export type TransferPrice = {
@@ -334,22 +335,30 @@ export function suggestPricing(
   }
 
   // Flights are priced the way they are bought: ONE figure for the whole
-  // booking (every traveller, every leg), typed on the flights card. A booking
+  // booking (every traveller, every leg), typed on the flights card — or its
+  // tickets × the travellers («للفرد»), worked out HERE from the tickets so a
+  // re-pricing on the server says exactly what the card said. A booking
   // without its figure yet still gets its line, unpriced, so it is not lost.
-  const bookings: { ref: string; legs: typeof data.flights; price: number | null; currency: string; label: string }[] = [
+  const fare = (kind: "intl" | "dom", tickets: string) => {
+    const breakdown = fareBreakdown(data.flight_booking, data.trip, kind);
+    return breakdown ? `${tickets}: ${breakdown}` : null;
+  };
+  const bookings: { ref: string; legs: typeof data.flights; price: number | null; currency: string; label: string; fare: string | null }[] = [
     {
       ref: "flight:intl",
       legs: data.flights.filter((f) => f.leg_order !== "internal"),
-      price: data.flight_booking.intl_price,
+      price: flightBookingTotal(data.flight_booking, data.trip, "intl"),
       currency: data.flight_booking.intl_currency || currency,
       label: "طيران دولي",
+      fare: fare("intl", "تذاكر دولية"),
     },
     {
       ref: "flight:dom",
       legs: data.flights.filter((f) => f.leg_order === "internal"),
-      price: data.flight_booking.dom_price,
+      price: flightBookingTotal(data.flight_booking, data.trip, "dom"),
       currency: data.flight_booking.dom_currency || currency,
       label: "طيران داخلي",
+      fare: fare("dom", "تذاكر داخلية"),
     },
   ];
   for (const b of bookings) {
@@ -360,7 +369,8 @@ export function suggestPricing(
       .join(" · ");
     items.push({
       item_type: "flight",
-      description: numbers ? `${b.label} — ${numbers}` : b.label,
+      // «تذاكر دولية: 3 بالغ × 1,500 + طفل × 1,200» — how a «للفرد» total was reached
+      description: b.fare ?? (numbers ? `${b.label} — ${numbers}` : b.label),
       ref: b.ref,
       // the figure is already the whole booking — and what we paid for it
       quantity: 1,

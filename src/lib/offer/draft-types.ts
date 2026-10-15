@@ -10,6 +10,7 @@
 import type { BoardType, FlightLegOrder, PricingItemType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
 import { normalizeJourney, type AdvancedJourney } from "./advanced";
+import { withFlightTotals } from "./flight-fare";
 
 // ---------- stage registry ----------
 export const STAGE_KEYS = [
@@ -762,15 +763,30 @@ export function emptyFlight(legOrder: FlightLegOrder, trip?: DraftTrip): DraftFl
  */
 export type FlightBookingMode = "round" | "oneway" | "multi";
 
+/**
+ * How a booking's price was typed: «إجمالي» (one figure, the default and every
+ * older file) or «للفرد» — a ticket per adult, per child (the adult's when
+ * empty) and per infant (none when empty). Either way `intl_price`/`dom_price`
+ * holds the booking total; «للفرد» recomputes it (flight-fare.ts).
+ */
+export type FlightFare = {
+  price_mode: "total" | "per_person";
+  adult_price: number | null;
+  child_price: number | null;
+  infant_price: number | null;
+};
+
 export type FlightBooking = {
   mode: FlightBookingMode;
   cabin: string;
   intl_price: number | null;
   intl_currency: string;
   intl_supplier: string;
+  intl_fare: FlightFare;
   dom_price: number | null;
   dom_currency: string;
   dom_supplier: string;
+  dom_fare: FlightFare;
   /**
    * The international route is only planned yet — the cities, the dates and an
    * approximate price. A leg without a flight number then needs only its two
@@ -786,10 +802,16 @@ export function emptyFlightBooking(): FlightBooking {
     intl_price: null,
     intl_currency: "SAR",
     intl_supplier: "",
+    intl_fare: totalFare(),
     dom_price: null,
     dom_currency: "SAR",
     dom_supplier: "",
+    dom_fare: totalFare(),
   };
+}
+
+function totalFare(): FlightFare {
+  return { price_mode: "total", adult_price: null, child_price: null, infant_price: null };
 }
 
 function normalizeFlightBooking(raw: unknown): FlightBooking {
@@ -797,15 +819,27 @@ function normalizeFlightBooking(raw: unknown): FlightBooking {
   const empty = emptyFlightBooking();
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
   const str = (v: unknown, fallback: string) => (typeof v === "string" ? v : fallback);
+  // a file from before «للفرد» is a total, with the number it had
+  const fare = (value: unknown): FlightFare => {
+    const f = (value && typeof value === "object" ? value : {}) as Partial<FlightFare>;
+    return {
+      price_mode: f.price_mode === "per_person" ? "per_person" : "total",
+      adult_price: num(f.adult_price),
+      child_price: num(f.child_price),
+      infant_price: num(f.infant_price),
+    };
+  };
   return {
     mode: b.mode === "oneway" || b.mode === "multi" ? b.mode : "round",
     cabin: str(b.cabin, empty.cabin),
     intl_price: num(b.intl_price),
     intl_currency: str(b.intl_currency, "SAR") || "SAR",
     intl_supplier: str(b.intl_supplier, ""),
+    intl_fare: fare(b.intl_fare),
     dom_price: num(b.dom_price),
     dom_currency: str(b.dom_currency, "SAR") || "SAR",
     dom_supplier: str(b.dom_supplier, ""),
+    dom_fare: fare(b.dom_fare),
     ...(b.estimate === true ? { estimate: true } : {}),
   };
 }
@@ -1336,7 +1370,8 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     cities,
     hotels: Array.isArray(source.hotels) ? source.hotels.map(normalizeDraftHotel) : [],
     flights: Array.isArray(source.flights) ? source.flights.map(normalizeDraftFlight) : [],
-    flight_booking: normalizeFlightBooking(source.flight_booking),
+    // «للفرد»: the total follows the travellers, whoever changed them last
+    flight_booking: withFlightTotals(normalizeFlightBooking(source.flight_booking), trip),
     transport_plan: transportPlan,
     // DERIVED, always. Rows are no longer authored, so a stale array from an
     // older draft is simply replaced by what the plan says today.

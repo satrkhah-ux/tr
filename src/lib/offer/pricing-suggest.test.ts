@@ -327,6 +327,41 @@ describe("suggestPricing — the order of trust", () => {
     // the booking price already covers every traveller and every leg
     expect(items.find((i) => i.item_type === "flight")).toMatchObject({ quantity: 1, buy_price: 4200, sell_price: 4200, ref: "flight:intl", source: "typed" });
   });
+
+  it("prices a «للفرد» booking from its tickets — never from a total saved before the travellers changed", () => {
+    const data = draftWithOneStay();
+    data.trip = { ...data.trip, adults: 3, children: 1, infants: 1 };
+    const leg = (leg_order: "outbound" | "internal"): DraftData["flights"][number] => ({
+      airline: "الخطوط الماليزية", airline_iata: "MH", flight_no: "1", from_airport: "", to_airport: "",
+      departure_at: null, arrival_at: null, from_tz: null, to_tz: null, date_user_set: false,
+      cabin_class: "سياحية", baggage_allowance: "", baggage_kg: null, baggage_pieces: null,
+      cabin_baggage_kg: null, leg_order,
+    });
+    data.flights = [leg("outbound"), leg("internal")];
+    const fare = (adult_price: number, child_price: number | null, infant_price: number | null) =>
+      ({ price_mode: "per_person", adult_price, child_price, infant_price }) as const;
+    data.flight_booking = {
+      ...data.flight_booking,
+      // what the card wrote for 2 adults — the server re-prices the file as it is now
+      intl_price: 4500,
+      intl_fare: fare(1500, 1200, 300),
+      dom_price: 1,
+      dom_fare: fare(200, null, null),
+    };
+    const items = suggestPricing(data, EMPTY, LABELS);
+    expect(items.find((i) => i.ref === "flight:intl")).toMatchObject({
+      quantity: 1,
+      buy_price: 1500 * 3 + 1200 * 1 + 300 * 1,
+      sell_price: 6000,
+      source: "typed",
+      description: "تذاكر دولية: 3 بالغ × 1,500 + طفل × 1,200 + رضيع × 300",
+    });
+    // a child at the adult's fare, an infant with no fare at nothing
+    expect(items.find((i) => i.ref === "flight:dom")).toMatchObject({
+      sell_price: 800,
+      description: "تذاكر داخلية: 3 بالغ × 200 + طفل × 200",
+    });
+  });
 });
 
 /** The Malaysia draft: arrive in Ipoh, leave from Kuala Lumpur, two travellers, no vehicle chosen. */

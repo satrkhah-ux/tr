@@ -283,6 +283,19 @@ describe("النظام بيسك", () => {
     expect(priceAtSource(data, { item_type: "transport", ref: "transport:a>b>van" }, { price: 90 })).toBeNull();
   });
 
+  it("a total typed on the sheet turns a «للفرد» flight into «إجمالي» at that figure", () => {
+    const data = malaysia();
+    const perPerson = { price_mode: "per_person", adult_price: 1500, child_price: null, infant_price: null } as const;
+    data.flight_booking = { ...data.flight_booking, intl_price: 3000, intl_fare: perPerson, dom_price: 400, dom_fare: { ...perPerson, adult_price: 200 } };
+    const intl = priceAtSource(data, { item_type: "flight", ref: "flight:intl" }, { price: 5200 })!.flight_booking!;
+    expect([intl.intl_fare.price_mode, intl.intl_price, intl.intl_fare.adult_price]).toEqual(["total", 5200, 1500]);
+    // the other booking is not touched
+    expect(intl.dom_fare.price_mode).toBe("per_person");
+    // a currency alone is not a new total: the tickets still decide it
+    const dom = priceAtSource(data, { item_type: "flight", ref: "flight:dom" }, { currency: "USD" })!.flight_booking!;
+    expect([dom.dom_fare.price_mode, dom.dom_price, dom.dom_currency]).toEqual(["per_person", 400, "USD"]);
+  });
+
   const AIRPORTS: LookupAirport[] = [
     { id: "1", name: "مطار كوالالمبور الدولي", code: "KUL", timezone: "Asia/Kuala_Lumpur", city: "كوالالمبور", country: "ماليزيا" },
     { id: "2", name: "مطار لنكاوي الدولي", code: "LGK", timezone: "Asia/Kuala_Lumpur", city: "لنكاوي", country: "ماليزيا" },
