@@ -148,7 +148,8 @@ describe("the pull carries the room's codes", () => {
     const hotel = planBookingsFromDraft(data, "شروط").find((r) => r.kind === "hotel")!;
     expect(readRooms(hotel.detail).rooms).toEqual({
       "الغرفة 1": { room_type_id: "double", room_category_id: "deluxe", suite_subtype_id: null },
-      "الغرفة 2": { room_type_id: "twin", room_category_id: "superior" },
+      // the draft read «Superior Twin» into codes when it loaded (the offer side's normalizeDraftData)
+      "الغرفة 2": { room_type_id: "twin", room_category_id: "superior", suite_subtype_id: null },
     });
   });
 });
