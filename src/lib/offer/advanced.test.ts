@@ -196,3 +196,10 @@ describe("«بكج متقدم» — lands in one country, first night in another
     expect(advancedSteps(base, undefined, "تركيا")[1].missing).toEqual([]);
   });
 });
+
+it("a pickup with no time yet, on the landing day, is not «before arrival»", async () => {
+  const { advancedSteps } = await import("./advanced");
+  const a = adv({ arrive_country: "تركيا", arrive_at: "مطار", arrive_date: "2026-11-11", arrive_time: "11:30", reception: { kind: "airport", place: "", side: "", date: "2026-11-11", time: "" } });
+  expect(advancedSteps(a)[1].errors).toEqual([]);
+  expect(advancedSteps({ ...a, reception: { ...a.reception, date: "2026-11-10" } })[1].errors.length).toBe(1);
+});

@@ -328,6 +328,12 @@ export type TzOf = (country: string) => string | null;
  * landing in Kuala Lumpur and a 22:00 pickup on the Thai side are 20 minutes apart,
  * not 40 the wrong way. Without a zone, the wall clocks are compared as written.
  */
+/** a before b — by the clock when both have one, else by the day alone (an unknown time is not midnight). */
+function earlier(aDate: string, aTime: string, aTz: string | null, bDate: string, bTime: string, bTz: string | null): boolean {
+  if (!aTime || !bTime) return aDate < bDate;
+  return instantOf(aDate, aTime, aTz) < instantOf(bDate, bTime, bTz);
+}
+
 function instantOf(date: string, time: string, tz: string | null): number {
   const local = `${date}T${time || "00:00"}`;
   return toInstant(local, tz)?.getTime() ?? Date.parse(`${local}:00Z`);
@@ -397,7 +403,7 @@ export function advancedSteps(adv: DraftAdvanced, tzOf: TzOf = () => null, first
     if (!rx.date) reception.missing.push("يوم الاستقبال غير محدد");
     if (rx.kind !== "airport" && !rx.time) reception.missing.push("موعد اللقاء ينتظر التأكيد");
     if (rx.kind === "airport" && adv.arrive_by && adv.arrive_by !== "flight") reception.errors.push(`العميل يصل ${ARRIVE_BY_AR[adv.arrive_by]} — لا يوجد مطار نستقبله منه`);
-    if (rx.date && adv.arrive_date && adv.arrive_by !== "already" && instantOf(rx.date, rx.time, tzR) < instantOf(adv.arrive_date, adv.arrive_time, tzA))
+    if (rx.date && adv.arrive_date && adv.arrive_by !== "already" && earlier(rx.date, rx.time, tzR, adv.arrive_date, adv.arrive_time, tzA))
       reception.errors.push(`الاستقبال (${rx.date}${rx.time ? ` ${rx.time}` : ""}) قبل وصول العميل (${adv.arrive_date}${adv.arrive_time ? ` ${adv.arrive_time}` : ""})`);
     // met in another country than the one they land in: how do they get there?
     if (rx.kind === "border" && rx.side && adv.arrive_country && rx.side !== adv.arrive_country && !hasSelf(adv))
@@ -444,7 +450,7 @@ export function advancedSteps(adv: DraftAdvanced, tzOf: TzOf = () => null, first
   else if (adv.leave_by !== "already" && !adv.leave_from.trim()) leave.missing.push("اختر مكان المغادرة");
   const wl = wrongPlace(adv.leave_by, adv.leave_from);
   if (wl) leave.errors.push(wl);
-  if (adv.leave_date && adv.arrive_date && instantOf(adv.leave_date, adv.leave_time, tzL) < instantOf(adv.arrive_date, adv.arrive_time, tzA))
+  if (adv.leave_date && adv.arrive_date && earlier(adv.leave_date, adv.leave_time, tzL, adv.arrive_date, adv.arrive_time, tzA))
     leave.errors.push(`المغادرة (${adv.leave_date}) قبل الوصول (${adv.arrive_date})`);
 
   return [arrive, reception, checkin, farewell, leave];
