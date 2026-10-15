@@ -5,8 +5,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
-import { TRAVELIUN_BRAND, partnerBrand, publicBrandLogoUrl, type DocBrand } from "@/components/offer-doc/brand";
+import { publicBrandLogoUrl } from "@/components/offer-doc/brand";
 import { currentCan } from "@/lib/roles/current";
+import type { Permission } from "@/lib/roles/roles";
 import { isStaffSession } from "@/lib/partners/session";
 
 /**
@@ -24,18 +25,25 @@ import { isStaffSession } from "@/lib/partners/session";
 
 const BUCKET = "brands";
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+/** Raster only: an SVG in a public bucket is a page that can run script. The type is ours, never the browser's. */
+const LOGO_TYPES = new Map([["png", "image/png"], ["jpg", "image/jpeg"], ["jpeg", "image/jpeg"], ["webp", "image/webp"]]);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function db(): Promise<SupabaseClient> {
   return createSupabaseServerClient() as unknown as Promise<SupabaseClient>;
 }
 
+function service(): SupabaseClient {
+  return createSupabaseServiceClient() as unknown as SupabaseClient;
+}
+
 type Fail = { ok: false; error: TranslationKey };
 
-/** Editing a company's identity is reference-data work, like hotels or airports. */
-async function requireWrite(): Promise<TranslationKey | null> {
+/** Editing a company's identity is reference-data work, like hotels or airports (data.write). */
+async function requireWrite(permission: Permission = "data.write"): Promise<TranslationKey | null> {
   const user = await getServerUser();
   if (!user) return "err.session";
-  return await currentCan("data.write") ? null : "err.forbidden";
+  return await currentCan(permission) ? null : "err.forbidden";
 }
 
 export type PartnerCompany = {
@@ -190,22 +198,24 @@ export async function upsertPartnerCompany(input: {
 export async function uploadPartnerLogo(partnerId: string, formData: FormData): Promise<{ ok: true } | Fail> {
   const denied = await requireWrite();
   if (denied) return { ok: false, error: denied };
+  // the id is the storage folder: a real company's, never a path someone typed
+  if (!UUID.test(partnerId)) return { ok: false, error: "err.loadFailed" };
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: "ops.err.noFile" };
   if (file.size > MAX_LOGO_BYTES) return { ok: false, error: "partner.err.logoTooLarge" };
 
-  const ext = (file.name.split(".").pop() ?? "png").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || "png";
-  if (!["png", "jpg", "jpeg", "webp", "svg"].includes(ext)) return { ok: false, error: "partner.err.logoType" };
+  const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+  const contentType = LOGO_TYPES.get(ext);
+  if (!contentType) return { ok: false, error: "partner.err.logoType" };
 
   try {
     const supabase = await db();
+    const { data: company } = await supabase.from("booking_partners").select("id").eq("id", partnerId).maybeSingle();
+    if (!company) return { ok: false, error: "err.loadFailed" };
     const path = `${partnerId}/${randomUUID()}.${ext}`;
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const up = await supabase.storage.from(BUCKET).upload(path, bytes, {
-      contentType: file.type || "image/png",
-      upsert: false,
-    });
+    const up = await supabase.storage.from(BUCKET).upload(path, bytes, { contentType, upsert: false });
     if (up.error) return { ok: false, error: "ops.err.uploadFailed" };
 
     await supabase.from("booking_partners").update({ logo_path: path }).eq("id", partnerId);
@@ -248,35 +258,30 @@ export async function deletePartnerCompany(id: string): Promise<{ ok: true } | F
 }
 
 /**
- * Which company an offer is branded for, or null for our own identity.
+ * Which company an offer belongs to — asked by the export screen's brand picker.
  *
- * The company is also who we BILL (partner_cost, 0058): changing it clears the
- * cost so the new company is never invoiced at the old one's terms (it is priced
- * again by hand — ledger-server.ts). Refused once the offer is invoiced, and on a
- * partner's own file: that one belongs to the company that built it.
+ * The company is not just a look: it is who READS the offer (its customer, its
+ * operation) and who we BILL (partner_cost, 0058). So it is fixed by the one
+ * place that issues the offer (the producer writes partner_company_id and
+ * partner_cost together), and nothing changes it afterwards:
+ *  · a company's offer stays that company's — not moved to another, not detached;
+ *  · an offer issued with no company was produced as our own sale, and is not
+ *    claimed for one (the company is picked in the generator before issuing).
+ * The offer row is the record of how it was produced; the draft is not (its
+ * fields are the browser's to write).
+ *
+ * The picker still prints any brand for one download — the preview and its PDF
+ * take it from the URL — it is only not remembered on the offer.
  */
 export async function setOfferPartner(serial: string, partnerId: string | null): Promise<{ ok: true } | Fail> {
-  const denied = await requireWrite();
+  const denied = await requireWrite("offers.write");
   if (denied) return { ok: false, error: denied };
   try {
-    const supabase = await db();
-    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
-    const { data } = await supabase.from("offers").select("id, partner_company_id").eq("serial", serial).maybeSingle();
-    const offer = data as { id: string; partner_company_id: string | null } | null;
+    const { data } = await (await db()).from("offers").select("partner_company_id").eq("serial", serial).maybeSingle();
+    const offer = data as { partner_company_id: string | null } | null;
     if (!offer) return { ok: false, error: "err.loadFailed" };
     if ((offer.partner_company_id ?? null) === (partnerId ?? null)) return { ok: true };
-
-    const [invoice, draft] = await Promise.all([
-      service.from("partner_invoices").select("id").eq("offer_id", offer.id).limit(1).maybeSingle(),
-      service.from("offer_drafts").select("partner_company_id").eq("data->>produced_serial", serial).not("partner_company_id", "is", null).limit(1).maybeSingle(),
-    ]);
-    if (invoice.data) return { ok: false, error: "partner.err.invoiced" };
-    if (draft.data) return { ok: false, error: "partner.err.partnerFile" };
-
-    const { error } = await supabase.from("offers").update({ partner_company_id: partnerId, partner_cost: null }).eq("id", offer.id);
-    if (error) return { ok: false, error: "err.updateFailed" };
-    await logAudit({ action: "partner.updated", entity: "offers", entity_id: offer.id, meta: { serial, from: offer.partner_company_id, to: partnerId, partner_cost_cleared: true } });
-    return { ok: true };
+    return { ok: false, error: offer.partner_company_id ? "partner.err.ownerFixed" : "partner.err.notPartnerOffer" };
   } catch {
     return { ok: false, error: "err.db" };
   }
@@ -295,70 +300,20 @@ export async function setOfferShowPrices(serial: string, showPrices: boolean): P
   }
 }
 
-export type ResolvedBrand = { brand: DocBrand; showPrices: boolean; partnerId: string | null };
-
-/**
- * The brand a document should print, resolved server-side.
- *
- * `partnerId` wins when given (the export screen's picker); otherwise the
- * offer's own stored partner is used, so a file re-downloaded next week comes out
- * branded the way it was sent. Anything unresolvable falls back to OUR identity —
- * never to a half-filled partner block.
- */
-export async function resolveDocBrand(input: {
-  serial: string;
-  partnerId?: string | null;
-  showPrices?: boolean;
-}): Promise<ResolvedBrand> {
-  const fallback: ResolvedBrand = { brand: TRAVELIUN_BRAND, showPrices: input.showPrices ?? true, partnerId: null };
-  try {
-    // SERVICE client, deliberately: the public client link and its PDF have no
-    // session, and booking_partners is readable by `authenticated` only — with
-    // the user client those two surfaces would silently print OUR branding on a
-    // partner's file. Nothing sensitive leaves: what comes back is exactly the
-    // name, logo and colours the document is meant to display.
-    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
-
-    // One read: whose file it is, and whether it prints a price. Both live on the
-    // offer, so the export screen, the PDF and the client link cannot disagree.
-    const offerRes = await supabase
-      .from("offers")
-      .select("partner_company_id, show_prices")
-      .eq("serial", input.serial)
-      .maybeSingle();
-    const offer = offerRes.data as { partner_company_id: string | null; show_prices: boolean } | null;
-    const storedPrices = offer?.show_prices ?? true;
-
-    const id = input.partnerId ?? offer?.partner_company_id ?? null;
-    if (!id) return { ...fallback, showPrices: input.showPrices ?? storedPrices };
-
-    const { data } = await supabase.from("booking_partners").select(COLUMNS).eq("id", id).maybeSingle();
-    const row = data as Omit<PartnerCompany, "logo_url" | "has_account"> | null;
-    if (!row) return fallback;
-
-    return {
-      brand: partnerBrand(row, publicLogoUrl(baseUrl(), row.logo_path)),
-      // An explicit choice from the export screen wins; otherwise whatever that
-      // screen last saved on this offer.
-      showPrices: input.showPrices ?? storedPrices,
-      partnerId: row.id,
-    };
-  } catch {
-    return fallback;
-  }
-}
-
 /**
  * Suspend a company, or let it back in. «موقوف» shuts the portal and every read
  * at once — current_partner_id() and getPartnerSession() admit «approved» only —
  * while its files, offers and history stay. The reason goes to the audit log.
+ *
+ * The administration's call (settings.manage, as setPartnerStatus): sessions
+ * hold no write on `status` (0045), so the write runs as the service role, after
+ * that check.
  */
 export async function setPartnerSuspended(id: string, suspended: boolean, reason: string): Promise<{ ok: true } | Fail> {
-  const denied = await requireWrite();
+  const denied = await requireWrite("settings.manage");
   if (denied) return { ok: false, error: denied };
   try {
-    const supabase = await db();
-    const { data, error } = await supabase
+    const { data, error } = await service()
       .from("booking_partners")
       .update({ status: suspended ? "suspended" : "approved" })
       .eq("id", id)

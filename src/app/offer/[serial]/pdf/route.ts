@@ -1,5 +1,5 @@
 import { AR } from "@/components/offer-doc/labels";
-import { resolveDocBrand } from "@/lib/data/partner-companies";
+import { resolveDocBrand } from "@/lib/data/doc-brand";
 import type { OfferDocumentProps } from "@/components/offer-doc/OfferDocument";
 import { getInternalOffer, getPublishedClientOffer } from "@/lib/data/offers";
 import { toClientOfferDTO } from "@/lib/offer/dto";

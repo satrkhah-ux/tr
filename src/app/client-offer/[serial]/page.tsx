@@ -1,7 +1,7 @@
 import { Download, ShieldCheck } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
-import { resolveDocBrand } from "@/lib/data/partner-companies";
+import { resolveDocBrand } from "@/lib/data/doc-brand";
 import { getPublishedClientOffer } from "@/lib/data/offers";
 
 /**

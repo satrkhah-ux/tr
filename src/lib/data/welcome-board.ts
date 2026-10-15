@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { resolveDocBrand } from "@/lib/data/partner-companies";
+import { resolveDocBrand } from "@/lib/data/doc-brand";
 import { getPartnerSession, isStaffSession } from "@/lib/partners/session";
 import { fontFamilyOf, type DocFont } from "@/lib/offer-doc/font-families";
 import type { WelcomeBoard } from "@/components/offer-doc/WelcomeBoardDocument";

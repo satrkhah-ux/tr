@@ -3,7 +3,7 @@ import { ReceiptDocument } from "@/components/offer-doc/ReceiptDocument";
 import { getReceiptByToken } from "@/lib/data/payment-receipt";
 import { renderDocHtml } from "@/lib/offer-doc/html";
 import { inlineImage } from "@/lib/offer-doc/assets";
-import { resolveDocBrand } from "@/lib/data/partner-companies";
+import { resolveDocBrand } from "@/lib/data/doc-brand";
 import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
 
 export const runtime = "nodejs";

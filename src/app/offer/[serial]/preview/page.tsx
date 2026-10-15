@@ -2,7 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
 import { OfferPreviewToolbar } from "@/components/offer-doc/OfferPreviewToolbar";
 import { getInternalOffer, getPublishedClientOffer } from "@/lib/data/offers";
-import { listPartnerCompanies, resolveDocBrand } from "@/lib/data/partner-companies";
+import { listPartnerCompanies } from "@/lib/data/partner-companies";
+import { resolveDocBrand } from "@/lib/data/doc-brand";
 import { toClientOfferDTO } from "@/lib/offer/dto";
 import { currentCan } from "@/lib/roles/current";
 

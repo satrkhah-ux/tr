@@ -7,7 +7,7 @@ import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser 
 import { logAudit } from "@/lib/data/audit";
 import { CLIENT_DOCUMENT_KINDS, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { currentCan } from "@/lib/roles/current";
-import { resolveDocBrand } from "@/lib/data/partner-companies";
+import { resolveDocBrand } from "@/lib/data/doc-brand";
 import { getPartnerSession } from "@/lib/partners/session";
 
 /**

@@ -1,7 +1,7 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { currentCan } from "@/lib/roles/current";
@@ -54,9 +54,25 @@ export async function getPartnerStatement(partnerId: string): Promise<PartnerSta
 }
 
 const METHODS = ["bank_transfer", "cash", "card", "other"] as const;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CURRENCY = /^[A-Z]{3}$/;
 type Result = { ok: true; receipt?: string } | { ok: false; message: string };
 
-/** A payment the partner made to us — with a receipt number. Staff with data.write. */
+/**
+ * Money on the account is the administration's call: settings.manage, not the
+ * data.write every role holds. Sessions cannot write partner_payments or the
+ * company's limit, so the write itself goes through the service role, and only
+ * after this check.
+ */
+async function mayManageMoney(): Promise<boolean> {
+  return Boolean(await getServerUser()) && (await currentCan("settings.manage"));
+}
+
+function service(): SupabaseClient {
+  return createSupabaseServiceClient() as unknown as SupabaseClient;
+}
+
+/** A payment the partner made to us — with a receipt number. settings.manage. */
 export async function recordPartnerPayment(input: {
   partner_id: string;
   amount: number;
@@ -66,15 +82,18 @@ export async function recordPartnerPayment(input: {
   paid_at?: string;
   note?: string;
 }): Promise<Result> {
-  if (!(await getServerUser()) || !(await currentCan("data.write"))) return { ok: false, message: "لا تملك صلاحية." };
+  if (!(await mayManageMoney())) return { ok: false, message: "لا تملك صلاحية." };
+  if (!UUID.test(input.partner_id)) return { ok: false, message: "الشركة غير موجودة." };
   if (!(Number.isFinite(input.amount) && input.amount > 0)) return { ok: false, message: "المبلغ غير صحيح." };
   if (!METHODS.includes(input.method as (typeof METHODS)[number])) return { ok: false, message: "طريقة الدفع غير صحيحة." };
+  const currency = input.currency?.trim() || "SAR";
+  if (!CURRENCY.test(currency)) return { ok: false, message: "العملة غير صحيحة." };
   try {
     const receipt = receiptNo(new Date());
-    const { error } = await (await db()).from("partner_payments").insert({
+    const { error } = await service().from("partner_payments").insert({
       partner_id: input.partner_id,
       amount: Math.round(input.amount * 100) / 100,
-      currency: input.currency || "SAR",
+      currency,
       method: input.method,
       reference: input.reference?.trim() || null,
       paid_at: input.paid_at || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }),
@@ -83,7 +102,7 @@ export async function recordPartnerPayment(input: {
       created_by: await getCurrentEmployeeId(),
     });
     if (error) return { ok: false, message: "تعذّر تسجيل الدفعة." };
-    await logAudit({ action: "partner.updated", entity: "booking_partners", entity_id: input.partner_id, meta: { payment: true, receipt, amount: input.amount, currency: input.currency } });
+    await logAudit({ action: "partner.updated", entity: "booking_partners", entity_id: input.partner_id, meta: { payment: true, receipt, amount: input.amount, currency } });
     return { ok: true, receipt };
   } catch {
     return { ok: false, message: "تعذّر تسجيل الدفعة." };
@@ -92,15 +111,19 @@ export async function recordPartnerPayment(input: {
 
 /** How far a company may run before its «العميل أكّد» is refused; null = no limit. */
 export async function setPartnerCreditLimit(partnerId: string, amount: number | null, currency: string): Promise<Result> {
-  if (!(await getServerUser()) || !(await currentCan("data.write"))) return { ok: false, message: "لا تملك صلاحية." };
+  if (!(await mayManageMoney())) return { ok: false, message: "لا تملك صلاحية." };
+  if (!UUID.test(partnerId)) return { ok: false, message: "الشركة غير موجودة." };
   if (amount != null && !(Number.isFinite(amount) && amount >= 0)) return { ok: false, message: "الحد غير صحيح." };
+  const limitCurrency = currency?.trim() || "SAR";
+  if (!CURRENCY.test(limitCurrency)) return { ok: false, message: "العملة غير صحيحة." };
   try {
-    const { error } = await (await db())
+    const { data, error } = await service()
       .from("booking_partners")
-      .update({ credit_limit: amount, credit_currency: currency || "SAR" })
-      .eq("id", partnerId);
-    if (error) return { ok: false, message: "تعذّر الحفظ." };
-    await logAudit({ action: "partner.updated", entity: "booking_partners", entity_id: partnerId, meta: { credit_limit: amount, credit_currency: currency } });
+      .update({ credit_limit: amount, credit_currency: limitCurrency })
+      .eq("id", partnerId)
+      .select("id");
+    if (error || !data?.length) return { ok: false, message: "تعذّر الحفظ." };
+    await logAudit({ action: "partner.updated", entity: "booking_partners", entity_id: partnerId, meta: { credit_limit: amount, credit_currency: limitCurrency } });
     return { ok: true };
   } catch {
     return { ok: false, message: "تعذّر الحفظ." };

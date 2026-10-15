@@ -3,7 +3,7 @@ import { TravelPackDocument } from "@/components/offer-doc/TravelPackDocument";
 import { getTravelPack } from "@/lib/data/travel-pack";
 import { renderDocHtml } from "@/lib/offer-doc/html";
 import { inlineImage } from "@/lib/offer-doc/assets";
-import { resolveDocBrand } from "@/lib/data/partner-companies";
+import { resolveDocBrand } from "@/lib/data/doc-brand";
 import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
 
 export const runtime = "nodejs";
