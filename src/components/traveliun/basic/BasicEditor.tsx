@@ -30,7 +30,6 @@ import {
   TrainFront,
   XCircle,
   ScrollText,
-  Route,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { getCountryHotels, getRoomTypeLookups, produceOfferFromDraft } from "@/lib/data/drafts";
@@ -1613,17 +1612,9 @@ export function BasicEditor({
               </button>
             ) : null}
             <Link
-              href={`/basic/${draftId}/advanced`}
-              onClick={() => void flush()}
-              className="ms-auto inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
-            >
-              <Route className="size-3.5" />
-              البكج المتقدم{data.journey?.enabled ? " ✓" : ""}
-            </Link>
-            <Link
               href={stageHref(draftId, "trip")}
               onClick={() => void flush()}
-              className="inline-flex h-8 items-center rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] underline-offset-2 hover:underline"
+              className="ms-auto inline-flex h-8 items-center rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] underline-offset-2 hover:underline"
             >
               {tx("fullGenerator")}
             </Link>

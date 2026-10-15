@@ -532,6 +532,7 @@ export function checkJourney(j: AdvancedJourney): JourneyIssue[] {
     const from = serviceFrom(j, s);
     if (MOVING.has(s.kind) && s.status === "confirmed" && (!from || !s.to)) add("error", "svc.confirmedNoPlace", `${title}: خدمة نقل مؤكدة بلا نقطة انطلاق أو وصول`, s.id);
     if (MOVING.has(s.kind) && !s.at) add("missing", "svc.noTime", `${title}: الموعد ينتظر التأكيد`, s.id);
+    if (MOVING.has(s.kind) && s.status !== "confirmed" && (!from || !s.to)) add("missing", "svc.noPlace", `${title}: ${!from ? "نقطة الانطلاق" : "نقطة الوصول"} لم تُحدد بعد`, s.id);
     if (MOVING.has(s.kind) && (placeOf(j, from)?.kind === "tbd" || placeOf(j, s.to)?.kind === "tbd")) add("missing", "svc.placeTbd", `${title}: موقع يحدد لاحقاً`, s.id);
     if (s.status === "feasibility") add("missing", "svc.feasibility", `${title}: بانتظار التحقق من قابلية التنفيذ`, s.id);
     if (s.status === "review") add("warning", "svc.review", `${title}: يحتاج مراجعة`, s.id);
