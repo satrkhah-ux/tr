@@ -275,3 +275,15 @@ describe("«بكج متقدم» → the planned flights", () => {
     expect(withAdvancedAirports(d, airports)).toBeNull();
   });
 });
+
+describe("«بكج متقدم» with the city card's services table", () => {
+  it("a price typed for the reception counts once when the transfer splits at the border; airport wording goes when the pickup moves", () => {
+    const priced = [{ ...rows[0], price: 300, text: "الاستقبال من مطار باتومي" }, ...rows.slice(1)];
+    const two = adv({ arrive_country: "تركيا", arrive_at: "مطار طرابزون (TZX)", reception: { kind: "airport", place: "", side: "", country: "تركيا", date: "", time: "" }, reception_cross: { drivers: 2, crossing: "معبر سارب", side_from: "تركيا", side_to: "جورجيا" } });
+    const out = withAdvancedTransport(priced, two);
+    expect(out.slice(0, 2).map((r) => r.price)).toEqual([300, undefined]);
+    const border = adv({ reception: { kind: "border", place: "معبر سارب", side: "جورجيا", country: "جورجيا", date: "", time: "" } });
+    expect(withAdvancedTransport(priced, border)[0].text).toBeUndefined();
+    expect(withAdvancedTransport(priced, border)[0].price).toBe(300);
+  });
+});
