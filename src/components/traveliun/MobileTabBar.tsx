@@ -20,6 +20,7 @@ import {
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useRole } from "@/lib/roles/RoleContext";
 import type { Permission } from "@/lib/roles/roles";
+import { canOpenLink } from "@/lib/roles/section-access";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
@@ -89,7 +90,7 @@ export function MobileTabBar({ pathname }: { pathname: string }) {
     setTabs(loadTabs());
   }, []);
 
-  const allowed = useMemo(() => DESTINATIONS.filter((d) => !d.perm || can(d.perm)), [can]);
+  const allowed = useMemo(() => DESTINATIONS.filter((d) => canOpenLink(d, can)), [can]);
   const allowedById = useMemo(() => new Map(allowed.map((d) => [d.id, d])), [allowed]);
   const partner = usePartnerBrand();
   const shown = partner

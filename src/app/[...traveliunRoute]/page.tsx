@@ -2,6 +2,7 @@ import { TraveliunDataPage } from "@/components/traveliun/TraveliunDataPage";
 import { TraveliunNotReady } from "@/components/traveliun/TraveliunNotReady";
 import { TraveliunTablePage } from "@/components/traveliun/TraveliunTablePage";
 import { resolveTableConfig } from "@/lib/data/table-config";
+import { guardPath } from "@/lib/roles/current";
 import { getTraveliunPage } from "@/lib/traveliun-data";
 
 export default async function TraveliunRoutePage({
@@ -11,6 +12,8 @@ export default async function TraveliunRoutePage({
 }) {
   const { traveliunRoute } = await params;
   const route = `/${traveliunRoute.join("/")}`;
+  // most of «قسم البيانات» and every /setting/* screen is served from here
+  await guardPath(route);
 
   // 1) DB-backed table (real + persistent) if the route has a config.
   if (resolveTableConfig(route)) {

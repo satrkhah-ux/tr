@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Loader2, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { BOARD_LABEL_KEYS, BOARD_TYPES } from "@/lib/offer/draft-types";
+import { useRole } from "@/lib/roles/RoleContext";
+import { canOpenPath } from "@/lib/roles/section-access";
 import type { HotelOption, HotelRateOption, SupplierNote } from "@/lib/data/hotel-search";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { fieldClass } from "../stage-props";
@@ -95,6 +97,7 @@ export function HotelPicker({
   };
 }) {
   const { t } = useTraveliunUI();
+  const { can } = useRole();
   const [showOptions, setShowOptions] = useState(false);
   const [shown, setShown] = useState(PAGE);
 
@@ -289,9 +292,11 @@ export function HotelPicker({
                         {n.name}: {n.detail}
                         {/* The one failure with a fix the agent can act on, so
                             it carries the way there instead of a dead end. */}
-                        <Link href="/settings/suppliers" className="ms-1 underline">
-                          افتح إعدادات المزوّدين
-                        </Link>
+                        {canOpenPath("/settings/suppliers", can) ? (
+                          <Link href="/settings/suppliers" className="ms-1 underline">
+                            افتح إعدادات المزوّدين
+                          </Link>
+                        ) : null}
                       </span>
                     ) : n.reason === "error" || n.reason === "supplier_error" ? (
                       <span className="text-[#c22850]">

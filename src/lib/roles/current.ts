@@ -1,7 +1,9 @@
 import "server-only";
 import { cache } from "react";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { grantedPermissions, type Permission, type Role } from "./roles";
+import { permissionForPath } from "./section-access";
 
 /**
  * What the signed-in user may do — resolved from the ROLE their employee row
@@ -51,6 +53,19 @@ export async function currentPermissions(): Promise<Permission[]> {
 
 export async function currentCan(permission: Permission): Promise<boolean> {
   return (await load()).includes(permission);
+}
+
+/**
+ * The page-side half of section-access.ts: a section the menu hides must not
+ * open from a typed URL either. Called at the top of each gated page or layout.
+ */
+export async function guardPath(pathname: string): Promise<void> {
+  if (!(await currentCanOpen(pathname))) redirect("/dashboard");
+}
+
+export async function currentCanOpen(pathname: string): Promise<boolean> {
+  const permission = permissionForPath(pathname);
+  return permission === null || (await currentCan(permission));
 }
 
 /**

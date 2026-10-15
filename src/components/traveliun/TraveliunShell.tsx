@@ -51,6 +51,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { ROLE_LABEL_KEYS, ROLES, type Permission } from "@/lib/roles/roles";
+import { canOpenLink } from "@/lib/roles/section-access";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { MobileTabBar } from "./MobileTabBar";
 import { TraveliunLogo } from "./TraveliunLogo";
@@ -294,12 +295,17 @@ function useNavGroups(): NavGroup[] {
   return navGroupsFor(can);
 }
 
-/** Our sections, and the links inside them, that this permission check opens. A section left empty goes. */
+/**
+ * Our sections, and the links inside them, that this permission check opens. A section left empty goes.
+ * A link's own `perm` and the route's section (section-access.ts — the same list the pages refuse by)
+ * must both pass, so «قسم البيانات», the settings, the team and operations vanish for whoever cannot open them.
+ */
 export function navGroupsFor(can: (permission: Permission) => boolean): NavGroup[] {
+  const opens = (link: { href: string; perm?: Permission }) => canOpenLink(link, can);
   return navGroups.flatMap((group) => {
-    if (group.perm && !can(group.perm)) return [];
+    if (!opens(group)) return [];
     if (!group.children) return [group];
-    const children = group.children.filter((link) => !link.perm || can(link.perm));
+    const children = group.children.filter(opens);
     return children.length > 0 ? [{ ...group, children }] : [];
   });
 }

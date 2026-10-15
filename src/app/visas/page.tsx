@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TraveliunDataPage } from "@/components/traveliun/TraveliunDataPage";
 import { TraveliunTablePage } from "@/components/traveliun/TraveliunTablePage";
+import { guardPath } from "@/lib/roles/current";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getTraveliunPage } from "@/lib/traveliun-data";
 
@@ -10,6 +11,7 @@ import { getTraveliunPage } from "@/lib/traveliun-data";
  * never goes blank between the migration and the move.
  */
 export default async function VisasPage() {
+  await guardPath("/visas");
   const db = (await createSupabaseServerClient()) as unknown as SupabaseClient;
   const { count, error } = await db.from("visas").select("id", { count: "exact", head: true });
   if (!error && (count ?? 0) > 0) return <TraveliunTablePage route="/visas" />;

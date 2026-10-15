@@ -32,6 +32,7 @@ import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useRole } from "@/lib/roles/RoleContext";
 import type { Permission } from "@/lib/roles/roles";
+import { canOpenLink } from "@/lib/roles/section-access";
 import {
   getAdminMetrics,
   getEmployeeMetrics,
@@ -121,8 +122,8 @@ const HANDLED_HREFS = new Set<string>([
 function ReadySections() {
   const { t } = useTraveliunUI();
   const { can } = useRole();
-  const actions = READY_ACTIONS.filter((a) => !a.perm || can(a.perm));
-  const prepared = PREPARED.filter((p) => !p.perm || can(p.perm));
+  const actions = READY_ACTIONS.filter((a) => canOpenLink(a, can));
+  const prepared = PREPARED.filter((p) => canOpenLink(p, can));
 
   return (
     <section className="space-y-3">

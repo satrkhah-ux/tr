@@ -11,6 +11,8 @@ import {
   type SupplierAccountSummary,
 } from "@/lib/data/supplier-work";
 import type { SupplierBalance } from "@/lib/operations/supplier-request";
+import { useRole } from "@/lib/roles/RoleContext";
+import { canOpenPath } from "@/lib/roles/section-access";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
@@ -134,6 +136,7 @@ export function SupplierAccountsList({
 /** /operations/suppliers/[id] — one supplier: how to reach it, its bookings, payments and balance. */
 export function SupplierAccountView({ account }: { account: SupplierAccount }) {
   const { t } = useTraveliunUI();
+  const { can } = useRole();
   const router = useRouter();
   const [paying, setPaying] = useState(false);
   const { supplier, bookings, payments, balances } = account;
@@ -163,13 +166,15 @@ export function SupplierAccountView({ account }: { account: SupplierAccount }) {
                 {supplier.email ? <DirText dir="ltr">{supplier.email}</DirText> : null}
               </p>
             </div>
-            <Link
-              href="/company-suppliers"
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
-            >
-              <Pencil className="size-3.5" />
-              {t("ops.sup.editContact")}
-            </Link>
+            {canOpenPath("/company-suppliers", can) ? (
+              <Link
+                href="/company-suppliers"
+                className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+              >
+                <Pencil className="size-3.5" />
+                {t("ops.sup.editContact")}
+              </Link>
+            ) : null}
           </div>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

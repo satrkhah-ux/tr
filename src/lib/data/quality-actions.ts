@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
-import { currentCan } from "@/lib/roles/current";
+import { currentCan, currentCanOpen } from "@/lib/roles/current";
 import { listEntityAudit, logAudit, type AuditEntry } from "./audit";
 import { getCurrentEmployeeId } from "./metrics";
 import { allTableConfigs } from "./table-config";
@@ -106,7 +106,8 @@ export async function checkHotelIssueGuard(
     // a partner cannot fix our catalogue — it is warned, never stopped from selling;
     // the data team hears about the record through the weekly quality summary
     const issues = (await getPartnerSession()) ? found.map((i) => ({ ...i, blocking: false })) : found;
-    return { issues, canFix: issues.length > 0 && (await currentCan("data.write")) };
+    // «أصلح» opens /hotels, which is «قسم البيانات» — not every data.write holder can
+    return { issues, canFix: issues.length > 0 && (await currentCan("data.write")) && (await currentCanOpen("/hotels")) };
   } catch {
     return none;
   }
