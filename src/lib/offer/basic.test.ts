@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { deriveTransportRows, emptyDraftData, emptyFlight, withRooms, type DraftData, type LookupAirport } from "./draft-types";
+import {
+  addStay,
+  cityHotelLines,
+  deriveHotelStays,
+  deriveTransportRows,
+  emptyDraftData,
+  emptyFlight,
+  hotelCoverage,
+  withRooms,
+  type DraftData,
+  type LookupAirport,
+} from "./draft-types";
 import { findTourPrice } from "./pricing-suggest";
 import { domesticMismatches } from "./flight-cities";
 import {
@@ -25,6 +36,7 @@ import {
   priceGroupOf,
   planInternational,
   remainingNights,
+  removeCity,
   renameRooms,
   setCityNights,
   withExtraBeds,
@@ -101,13 +113,13 @@ describe("النظام بيسك", () => {
     const data = malaysia();
     // لنكاوي: 3 nights, 900 for the stay = 300 a night
     data.hotels = data.hotels.map((h) => (h.city_name === "لنكاوي" ? { ...h, rooms: h.rooms.map((r) => ({ ...r, price: 900 })) } : h));
-    const split = { ...data, ...changeRoom(data, "لنكاوي", 1, "جناح") };
+    const split = { ...data, ...changeRoom(data, 1, 1, "جناح") };
     const [first, second] = cityLines(split.hotels, "لنكاوي");
     expect([first.nights, first.rooms[0].price]).toEqual([1, 300]);
     expect([second.nights, second.rooms[0].room_type_name, second.rooms[0].price]).toEqual([0, "جناح", null]);
     expect(split.hotels.map((h) => h.city_name)).toEqual(["سيلانغور", "لنكاوي", "لنكاوي", "كوالالمبور"]);
 
-    const joined = clearRoomChange(split, "لنكاوي").hotels;
+    const joined = clearRoomChange(split, 1).hotels;
     expect(cityLines(joined, "لنكاوي").map((h) => [h.nights, h.rooms[0].price])).toEqual([[0, 900]]);
 
     // a city cut to one night has no room left to change into
@@ -424,5 +436,72 @@ describe("النظام بيسك", () => {
     expect(rows).toContain("فندق لنكاوي ← المطار");
     expect(rows).toContain("المطار ← فندق كوالالمبور");
     expect(rows).not.toContain("لنكاوي ← كوالالمبور");
+  });
+});
+
+describe("النظام بيسك — more than one hotel in a city (order 1)", () => {
+  /** كوالالمبور 4 nights, then لنكاوي 3, then كوالالمبور again for 1. */
+  function loop(): DraftData {
+    let data = emptyDraftData();
+    data.trip = { ...data.trip, country: "ماليزيا", arrival_date: "2026-11-11", nights: 8, days: 9, meal_plan: "breakfast" };
+    data.flights = [];
+    for (const [name, nights, hotel] of [
+      ["كوالالمبور", 4, "بولمان"],
+      ["لنكاوي", 3, "بيرجايا"],
+      ["كوالالمبور", 1, "سما سما"],
+    ] as const) {
+      data = { ...data, ...addCity(data, { name, nights, tours: 0, hotel: { id: hotel, name: hotel } }, "SAR") };
+    }
+    return data;
+  }
+  const stopHotels = (data: DraftData, i: number) => cityHotelLines(data.cities, data.hotels, i).map((h) => h.hotel_name);
+
+  it("gives the second visit of a city its own hotel line (acceptance د)", () => {
+    const data = loop();
+    expect(data.cities.map((c) => c.key)).toEqual(["كوالالمبور#1", "لنكاوي#1", "كوالالمبور#2"]);
+    expect([stopHotels(data, 0), stopHotels(data, 1), stopHotels(data, 2)]).toEqual([["بولمان"], ["بيرجايا"], ["سما سما"]]);
+    expect(deriveHotelStays(data.cities, data.hotels).map((s) => [s.line.hotel_name, s.check_in, s.check_out])).toEqual([
+      ["بولمان", "2026-11-11", "2026-11-15"],
+      ["بيرجايا", "2026-11-15", "2026-11-18"],
+      ["سما سما", "2026-11-18", "2026-11-19"],
+    ]);
+    // removing the last visit takes its hotel only
+    const gone = removeCity(data, 2);
+    expect(gone.hotels.map((h) => h.hotel_name)).toEqual(["بولمان", "بيرجايا"]);
+    // a visit the flights made gets a line of its own too
+    const flown = { ...data, hotels: data.hotels.filter((h) => h.hotel_name !== "سما سما") };
+    const lines = withHotelLines(flown, "SAR");
+    expect(lines.at(-1)).toMatchObject({ city_name: "كوالالمبور", city_key: "كوالالمبور#2" });
+  });
+
+  it("moves a same-dates hotel with the stay it follows when the city's nights change", () => {
+    const data = loop();
+    const both = { ...data, hotels: addStay(data.cities, data.hotels, 0, "same").hotels };
+    const next = { ...both, ...setCityNights(both, 0, 5) };
+    expect(deriveHotelStays(next.cities, next.hotels).filter((s) => s.city_index === 0).map((s) => [s.check_in, s.check_out])).toEqual([
+      ["2026-11-11", "2026-11-16"],
+      ["2026-11-11", "2026-11-16"],
+    ]);
+    expect(hotelCoverage(next.cities, next.hotels)[0]).toMatchObject({ needed: 5, covered: 5, extra: 0 });
+  });
+
+  it("keeps the room change working beside another hotel in the same city", () => {
+    const data = loop();
+    // بولمان 2 nights, then another hotel after it
+    const two = { ...data, hotels: data.hotels.map((h) => (h.hotel_name === "بولمان" ? { ...h, nights: 2 } : h)) };
+    const other = addStay(two.cities, two.hotels, 0, "after");
+    const withOther = {
+      ...two,
+      hotels: other.hotels.map((h) => (h.id === other.id ? { ...h, hotel_id: "تريدرز", hotel_name: "تريدرز" } : h)),
+    };
+    const split = { ...withOther, ...changeRoom(withOther, 0, 1, "جناح") };
+    expect(stopHotels(split, 0)).toEqual(["بولمان", "بولمان", "تريدرز"]);
+    expect(deriveHotelStays(split.cities, split.hotels).filter((s) => s.city_index === 0).map((s) => [s.line.hotel_name, s.nights])).toEqual([
+      ["بولمان", 1],
+      ["بولمان", 1],
+      ["تريدرز", 2],
+    ]);
+    // undoing it takes the room change only — the other hotel stays
+    expect(cityHotelLines(split.cities, clearRoomChange(split, 0).hotels, 0).map((h) => h.hotel_name)).toEqual(["بولمان", "تريدرز"]);
   });
 });

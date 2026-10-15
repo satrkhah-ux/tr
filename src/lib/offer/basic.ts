@@ -11,6 +11,8 @@
  */
 
 import {
+  cityHotelLines,
+  cityKeys,
   deriveCityDates,
   deriveHotelStays,
   emptyFlight,
@@ -20,9 +22,11 @@ import {
   hopMode,
   intercityModes,
   MEAL_PLAN_BOARD,
+  newCityKey,
   newStayId,
   resizeRooms,
   roomTypeNames,
+  withCityKeys,
   withRooms,
   type DraftCity,
   type DraftData,
@@ -66,13 +70,14 @@ export function remainingNights(data: Pick<DraftData, "trip" | "cities">): numbe
 }
 
 /** A city's hotel line, born with the trip's rooms and meals so the agent only picks the hotel. */
-export function hotelForCity(data: Pick<DraftData, "trip">, city: string, currency: string): DraftHotel {
+export function hotelForCity(data: Pick<DraftData, "trip">, city: string, currency: string, cityKey?: string): DraftHotel {
   const board = data.trip.meal_plan ? MEAL_PLAN_BOARD[data.trip.meal_plan] : data.trip.default_board;
   const room = { ...emptyRoomSpec(), room_type_name: data.trip.default_room_type_name, board_type: board };
   return withRooms(
     {
       id: newStayId(),
       city_name: city,
+      ...(cityKey ? { city_key: cityKey } : {}),
       // 0 = the whole city, however its nights change later (deriveHotelStays)
       nights: 0,
       hotel_id: null,
@@ -123,7 +128,7 @@ export function addCity(
   if (last && last.city_name === city.name) {
     const longer = setCityNights(data, at, last.nights + city.nights);
     // a hotel picked now fills the city's line only if it has none yet
-    const [main] = cityLines(longer.hotels, city.name);
+    const [main] = cityHotelLines(longer.cities, longer.hotels, at);
     return {
       cities: longer.cities.map((c, i) =>
         i === at ? { ...c, tours: Math.min(((c as BasicCity).tours ?? 0) + city.tours, c.nights) } : c,
@@ -131,7 +136,10 @@ export function addCity(
       hotels: main && !main.hotel_name.trim() ? longer.hotels.map((h) => (h.id === main.id ? withStayPick(h, city) : h)) : longer.hotels,
     };
   }
+  // a stop of its own, with a hotel line of its own: كوالالمبور again at the end is not the first visit's hotel
+  const keyed = withCityKeys(data.cities);
   const next: BasicCity = {
+    key: newCityKey(keyed, city.name),
     city_name: city.name,
     nights: city.nights,
     tours: Math.min(city.tours, city.nights),
@@ -139,29 +147,33 @@ export function addCity(
     check_out: null,
     ...(city.country && city.country !== data.trip.country ? { country: city.country } : {}),
   };
-  const hasHotel = data.hotels.some((h) => h.city_name === city.name);
   return {
-    cities: chainCities(data, [...data.cities, next]),
-    hotels: hasHotel ? data.hotels : [...data.hotels, withStayPick(hotelForCity(data, city.name, currency), city)],
+    cities: chainCities(data, [...keyed, next]),
+    hotels: [...data.hotels, withStayPick(hotelForCity(data, city.name, currency, next.key), city)],
   };
 }
 
 /** Remove a city; its hotel lines go with it unless the same city is visited again. */
 export function removeCity(data: DraftData, index: number): Pick<DraftData, "cities" | "hotels"> {
-  const gone = data.cities[index];
-  const cities = data.cities.filter((_, i) => i !== index);
-  const stillThere = cities.some((c) => c.city_name === gone?.city_name);
+  const keyed = withCityKeys(data.cities);
+  const cities = keyed.filter((_, i) => i !== index);
+  // its own lines go; one another visit of the same city also reads (an older file's, by name) stays with it
+  const shared = new Set(cities.flatMap((_, i) => cityHotelLines(cities, data.hotels, i)));
+  const gone = new Set(cityHotelLines(keyed, data.hotels, index).filter((h) => h.city_key === keyed[index]?.key || !shared.has(h)));
   return {
     cities: chainCities(data, cities),
-    hotels: stillThere ? data.hotels : data.hotels.filter((h) => h.city_name !== gone?.city_name),
+    hotels: data.hotels.filter((h) => !gone.has(h)),
   };
 }
 
 /** Every city holds a hotel line while the sale includes hotels — a city the flights created has none yet. */
 export function withHotelLines(data: DraftData, currency: string): DraftHotel[] {
   if (!data.scope.hotels) return data.hotels;
-  const missing = [...new Set(data.cities.map((c) => c.city_name))].filter((name) => !data.hotels.some((h) => h.city_name === name));
-  return missing.length === 0 ? data.hotels : [...data.hotels, ...missing.map((name) => hotelForCity(data, name, currency))];
+  const keys = cityKeys(data.cities);
+  const missing = data.cities.flatMap((c, i) =>
+    c.city_name.trim() && cityHotelLines(data.cities, data.hotels, i).length === 0 ? [hotelForCity(data, c.city_name, currency, keys[i])] : [],
+  );
+  return missing.length === 0 ? data.hotels : [...data.hotels, ...missing];
 }
 
 /**
@@ -191,12 +203,12 @@ export function setCityNights(data: DraftData, index: number, nights: number): P
   const prev = deriveHotelStays(data.cities, data.hotels);
   const cities = chainCities(
     data,
-    data.cities.map((c, i) => (i === index ? { ...c, nights } : c)),
+    withCityKeys(data.cities).map((c, i) => (i === index ? { ...c, nights } : c)),
   );
-  let hotels = data.hotels.map((h) =>
-    h.city_name === before.city_name && h.nights > 0 ? { ...h, nights: Math.min(h.nights, Math.max(nights - 1, 0)) } : h,
-  );
-  if (nights < 2) hotels = withoutRoomChange(hotels, before.city_name);
+  // the stays that run one after another give way; a same-dates stay follows its own (deriveHotelStays)
+  const mine = new Set(cityHotelLines(cities, data.hotels, index).filter((h) => (h.dates ?? "after") === "after"));
+  let hotels = data.hotels.map((h) => (mine.has(h) && h.nights > 0 ? { ...h, nights: Math.min(h.nights, Math.max(nights - 1, 0)) } : h));
+  if (nights < 2) hotels = withoutRoomChange(cities, hotels, index);
   return { cities, hotels: keepNightlyRates(prev, hotels, cities) };
 }
 
@@ -228,14 +240,24 @@ export function renameRooms(line: DraftHotel, name: string): DraftHotel {
   );
 }
 
-/** The city's stays in order: the main one, and the one a room change moves to. */
+/** Every line named after the city, on every visit to it. One stop's own lines: cityHotelLines. */
 export const cityLines = (hotels: DraftHotel[], cityName: string) => hotels.filter((h) => h.city_name === cityName);
 
-function withoutRoomChange(hotels: DraftHotel[], cityName: string): DraftHotel[] {
-  const [main, ...rest] = cityLines(hotels, cityName);
-  if (!main || rest.length === 0) return hotels;
-  const gone = new Set(rest.map((h) => h.id));
-  return hotels.filter((h) => !gone.has(h.id)).map((h) => (h.id === main.id ? { ...h, nights: 0 } : h));
+/**
+ * The stay a room change moved to: the line right after the stop's first, in
+ * the same hotel, running after it. Another hotel the agent added is not one.
+ */
+export function roomChangeLine(lines: DraftHotel[]): DraftHotel | undefined {
+  const [main, next] = lines;
+  if (!main || !next || (next.dates ?? "after") !== "after") return undefined;
+  return next.hotel_id === main.hotel_id && next.hotel_name === main.hotel_name ? next : undefined;
+}
+
+function withoutRoomChange(cities: DraftCity[], hotels: DraftHotel[], index: number): DraftHotel[] {
+  const lines = cityHotelLines(cities, hotels, index);
+  const change = roomChangeLine(lines);
+  if (!change) return hotels;
+  return hotels.filter((h) => h.id !== change.id).map((h) => (h.id === lines[0].id ? { ...h, nights: 0 } : h));
 }
 
 /**
@@ -243,16 +265,18 @@ function withoutRoomChange(hotels: DraftHotel[], cityName: string): DraftHotel[]
  * — the first keeps `after` nights, the second takes the rest. Each half carries
  * its own total, so the first is cut to its nights at the same rate.
  */
-export function changeRoom(data: DraftData, cityName: string, after: number, roomName: string): Pick<DraftData, "hotels"> {
-  const city = data.cities.find((c) => c.city_name === cityName);
-  const [main, second] = cityLines(data.hotels, cityName);
+export function changeRoom(data: DraftData, index: number, after: number, roomName: string): Pick<DraftData, "hotels"> {
+  const city = data.cities[index];
+  const lines = cityHotelLines(data.cities, data.hotels, index);
+  const [main] = lines;
+  const second = roomChangeLine(lines);
   if (!city || !main || city.nights < 2) return { hotels: data.hotels };
   const nights = Math.min(Math.max(Math.trunc(after), 1), city.nights - 1);
   const prev = deriveHotelStays(data.cities, data.hotels);
   const next = renameRooms(
     second
       ? { ...second, nights: 0 }
-      : withRooms({ ...main, id: newStayId(), nights: 0, sourcing: null }, main.rooms.map((r) => ({ ...r, price: null }))),
+      : withRooms({ ...main, id: newStayId(), nights: 0, sourcing: null, dates: undefined, check_in: undefined }, main.rooms.map((r) => ({ ...r, price: null }))),
     roomName,
   );
   let hotels = data.hotels.map((h) => (h.id === main.id ? { ...main, nights } : h.id === next.id ? next : h));
@@ -264,9 +288,9 @@ export function changeRoom(data: DraftData, cityName: string, after: number, roo
 }
 
 /** Undo the room change: one stay for the whole city again, at the first stay's nightly rate. */
-export function clearRoomChange(data: DraftData, cityName: string): Pick<DraftData, "hotels"> {
+export function clearRoomChange(data: DraftData, index: number): Pick<DraftData, "hotels"> {
   const prev = deriveHotelStays(data.cities, data.hotels);
-  return { hotels: keepNightlyRates(prev, withoutRoomChange(data.hotels, cityName), data.cities) };
+  return { hotels: keepNightlyRates(prev, withoutRoomChange(data.cities, data.hotels, index), data.cities) };
 }
 
 // ---------- the trip's dates ----------

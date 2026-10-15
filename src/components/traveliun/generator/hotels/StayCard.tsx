@@ -1,7 +1,6 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { DirText } from "@/components/DirText";
 import {
   BOARD_LABEL_KEYS,
   BOARD_TYPES,
@@ -9,6 +8,7 @@ import {
   withRooms,
   type DraftHotel,
   type DraftRoomSpec,
+  type HotelStay,
   type LookupCountry,
   type LookupRoomType,
 } from "@/lib/offer/draft-types";
@@ -26,6 +26,7 @@ import { fieldClass } from "../stage-props";
 import { HotelPicker, type PickerFilters, type PickerSource } from "./HotelPicker";
 import type { SearchBarGuests } from "./HotelSearchBar";
 import { StaySummary } from "./StaySummary";
+import { StayDatesLine } from "./StayDates";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 
 const rowLabelClass = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
@@ -39,11 +40,11 @@ const rowLabelClass = "grid gap-1.5 text-[12px] font-bold text-[#185045]";
  */
 export function StayCard({
   line,
+  stay,
+  city,
   index,
   count,
   nights,
-  checkIn,
-  checkOut,
   choosing,
   onChoosing,
   editing,
@@ -62,11 +63,13 @@ export function StayCard({
   onRefresh,
 }: {
   line: DraftHotel;
+  /** the stay this line makes — its dates, and how they were decided. */
+  stay: HotelStay;
+  /** its city's dates — a stay on dates of its own is held inside them. */
+  city: { check_in: string | null; check_out: string | null; nights: number };
   index: number;
   count: number;
   nights: number;
-  checkIn: string | null;
-  checkOut: string | null;
   choosing: boolean;
   onChoosing: (open: boolean) => void;
   editing: boolean;
@@ -123,8 +126,9 @@ export function StayCard({
             {count > 1 ? `الفندق ${index + 1}` : "الفندق"}
           </span>
           {/* While a hotel is being searched for, the nights live in the search
-              bar beside the two dates; here they would be a second copy. */}
-          {!choosing ? (
+              bar beside the two dates; here they would be a second copy. A
+              same-dates stay has no nights of its own, a custom one sets them below. */}
+          {!choosing && stay.dates === "after" ? (
             <label className="flex items-center gap-1.5 text-[11px] font-bold text-[#557d78]">
               ليالٍ
               <input
@@ -137,11 +141,12 @@ export function StayCard({
               />
             </label>
           ) : null}
-          {checkIn && checkOut ? (
-            <span className="tv-tnum text-[11px] font-semibold text-[#93aaa3]">
-              <DirText dir="ltr">{`${checkIn} → ${checkOut}`}</DirText>
-            </span>
-          ) : null}
+          <StayDatesLine
+            stay={stay}
+            city={city}
+            inputClass={`${fieldClass} h-8`}
+            onChange={(slice) => onSetHotel(slice)}
+          />
         </div>
         {count > 1 ? (
           <button

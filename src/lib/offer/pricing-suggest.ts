@@ -390,6 +390,12 @@ export function suggestPricing(
   );
 
   const items: SuggestedItem[] = [];
+  // «20/10 – 23/10»: said only where a stop holds more than one stay — two hotels in one city read alike
+  const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+  const when = (stay: (typeof stays)[number]) =>
+    stay.check_in && stay.check_out && stays.filter((s) => s.city_index === stay.city_index).length > 1
+      ? ` (${dm(stay.check_in)} – ${dm(stay.check_out)})`
+      : "";
 
   for (const stay of stays) {
     const line = stay.line;
@@ -424,7 +430,7 @@ export function suggestPricing(
 
     items.push({
       item_type: "hotel",
-      description: `${stay.city_name} — ${line.hotel_name || labels.hotel}`,
+      description: `${stay.city_name} — ${line.hotel_name || labels.hotel}${when(stay)}`,
       ref: pricingRefFor(stay),
       // ONE, because the figure is already the whole stay: the rooms are priced
       // individually on the card and added up there. Multiplying by the room

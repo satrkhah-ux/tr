@@ -356,6 +356,12 @@ export function resizeAges(ages: number[], count: number, fallback = 0): number[
 }
 
 export type DraftCity = {
+  /**
+   * This stop's own identity — a city visited twice (كوالالمبور first and last)
+   * is two stops with two sets of hotels. Filled by normalizeDraftData (see
+   * cityKeys); a hotel line points at it through `city_key`.
+   */
+  key?: string;
   city_name: string;
   nights: number;
   /** true when the flights put this city here (and decide its nights). */
@@ -518,6 +524,20 @@ export type DraftHotel = {
   id: string;
   city_name: string;
   /**
+   * The stop this line belongs to (DraftCity.key). Absent on lines written
+   * before a city could repeat — those still match their city by name.
+   */
+  city_key?: string;
+  /**
+   * When this stay is, inside its city (absent = "after"):
+   *   "after"  — starts where the previous stay of the city ended;
+   *   "same"   — the previous stay's dates, its rooms split over two hotels;
+   *   "custom" — from `check_in` for `nights`, typed by the agent.
+   */
+  dates?: StayDates;
+  /** the first night of a "custom" stay. */
+  check_in?: string | null;
+  /**
    * Nights THIS line covers, inside its city.
    *
    * The unit of the whole stage: a city's nights are covered by one or more
@@ -657,6 +677,10 @@ export function normalizeDraftHotel(raw: unknown): DraftHotel {
     rooms_count: count,
     manual_price: typeof h.manual_price === "number" ? h.manual_price : null,
     manual_currency: typeof h.manual_currency === "string" && h.manual_currency ? h.manual_currency : "SAR",
+    // absent on every older line: "after" by name — exactly what it always meant
+    ...(typeof h.city_key === "string" && h.city_key ? { city_key: h.city_key } : {}),
+    ...(h.dates === "same" || h.dates === "custom" ? { dates: h.dates } : {}),
+    ...(h.dates === "custom" && typeof h.check_in === "string" && /^\d{4}-\d{2}-\d{2}$/.test(h.check_in) ? { check_in: h.check_in } : {}),
     ...(typeof h.refundable === "boolean" ? { refundable: h.refundable } : {}),
     ...(typeof h.supplier === "string" && h.supplier ? { supplier: h.supplier } : {}),
     // deliberately NOT `sourcing: h.sourcing ?? null` — a seeded line must carry
@@ -1285,7 +1309,8 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
   if (!raw || typeof raw !== "object") return empty;
   const source = raw as Partial<DraftData>;
   const trip = { ...empty.trip, ...(source.trip ?? {}) };
-  const cities = Array.isArray(source.cities) ? source.cities : [];
+  // every stop gets its key here, once — derived, so an unsaved draft read twice keys the same
+  const cities = withCityKeys(Array.isArray(source.cities) ? source.cities : []);
 
   // A draft written before the plan existed has authored rows and no plan. Its
   // switches default to ON so the derived rows keep saying roughly what the old
@@ -1423,10 +1448,22 @@ export function deriveCityDates(arrivalDate: string | null, cities: DraftCity[])
   });
 }
 
+/** When a stay is inside its city — see DraftHotel.dates. */
+export type StayDates = "after" | "same" | "custom";
+
 /** A stay: one hotel line, with the dates its position in the city gives it. */
 export type HotelStay = {
   line: DraftHotel;
   city_name: string;
+  /** which stop of the trip (index into the cities, and its key) — a city may repeat. */
+  city_index: number;
+  city_key: string;
+  /** how its dates were decided — "same" with nothing before it, or "custom" without a date, is "after". */
+  dates: StayDates;
+  /** "same": the stay whose dates it shares. */
+  same_as: DraftHotel | null;
+  /** its first night, counted from the city's first (0); null when it cannot be placed. */
+  from: number | null;
   nights: number;
   check_in: string | null;
   check_out: string | null;
@@ -1435,10 +1472,58 @@ export type HotelStay = {
 /** Nights allocated vs nights owed, per city. */
 export type CityCoverage = {
   city_name: string;
+  city_key: string;
   needed: number;
+  /** DIFFERENT nights with a bed — two hotels on the same 4 nights cover 4, not 8. */
   covered: number;
+  /** of those, the nights outside the city's own — «زائد». */
+  extra: number;
   stays: HotelStay[];
 };
+
+/**
+ * Every stop's key: its own, or one made from its name and how many stops of
+ * that name came before it («كوالالمبور#2»). Made, not random, so a draft read
+ * twice before it is saved keys the same both times.
+ */
+export function cityKeys(cities: Pick<DraftCity, "key" | "city_name">[]): string[] {
+  const own = cities.map((c, i) => (c.key && cities.findIndex((x) => x.key === c.key) === i ? c.key : null));
+  const taken = new Set(own.filter(Boolean));
+  return cities.map((c, i) => {
+    if (own[i]) return own[i]!;
+    let n = 1;
+    while (taken.has(`${c.city_name.trim()}#${n}`)) n++;
+    const key = `${c.city_name.trim()}#${n}`;
+    taken.add(key);
+    return key;
+  });
+}
+
+/** The cities with their keys written in — normalize does this, and so does anything that reorders them. */
+export function withCityKeys<T extends Pick<DraftCity, "key" | "city_name">>(cities: T[]): T[] {
+  const keys = cityKeys(cities);
+  return cities.map((c, i) => (c.key === keys[i] ? c : { ...c, key: keys[i] }));
+}
+
+/** A key for a stop about to be added. */
+export function newCityKey(cities: Pick<DraftCity, "key" | "city_name">[], name: string): string {
+  return cityKeys([...cities, { city_name: name }]).at(-1)!;
+}
+
+/**
+ * The hotel lines of ONE stop, in order. A line names its stop by key; a line
+ * written before stops had keys (or whose stop is gone) still goes by the
+ * city's name, as it always did.
+ */
+export function cityHotelLines(cities: Pick<DraftCity, "key" | "city_name">[], hotels: DraftHotel[], index: number): DraftHotel[] {
+  const keys = cityKeys(cities);
+  const known = new Set(keys);
+  const city = cities[index];
+  if (!city) return [];
+  return hotels.filter((h) => (h.city_key && known.has(h.city_key) ? h.city_key === keys[index] : h.city_name === city.city_name));
+}
+
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 
 /** Ids only have to be unique inside one draft, and readable in a log. */
 export function newStayId(): string {
@@ -1456,34 +1541,102 @@ export function newStayId(): string {
  *
  * Pure and total: cities without dates yield stays without dates rather than
  * being dropped, because the hotels stage must still show them.
+ *
+ * A "same" stay takes the previous stay's dates and moves nothing; a "custom"
+ * one sits on its own date. Only the "after" lines share out the city's nights,
+ * and the one after any stay starts where the latest one so far ends.
  */
 export function deriveHotelStays(cities: DraftCity[], hotels: DraftHotel[]): HotelStay[] {
   const out: HotelStay[] = [];
-  for (const city of cities) {
-    const lines = hotels.filter((h) => h.city_name === city.city_name);
+  const keys = cityKeys(cities);
+  cities.forEach((city, ci) => {
+    const lines = cityHotelLines(cities, hotels, ci);
+    const mode = lines.map((l, i): StayDates =>
+      (l.dates === "same" && i > 0) || (l.dates === "custom" && l.check_in) ? l.dates : "after",
+    );
+    const seq = lines.filter((_, i) => mode[i] === "after");
     // What the explicit numbers do not claim is left for the lines that ask for
     // "the rest" — split evenly, remainder to the first, so 3 nights over 2
     // blank lines is 2+1 rather than 1.5 each.
-    const explicit = lines.reduce((sum, l) => sum + Math.max(0, l.nights), 0);
-    const blanks = lines.filter((l) => l.nights <= 0).length;
+    const explicit = seq.reduce((sum, l) => sum + Math.max(0, l.nights), 0);
+    const blanks = seq.filter((l) => l.nights <= 0).length;
     let remaining = Math.max(0, city.nights - explicit);
-    let cursor = city.check_in;
+    let cursor = 0;
+    let s = -1;
+    const mine: HotelStay[] = [];
 
     lines.forEach((line, i) => {
+      const base = { line, city_name: city.city_name, city_index: ci, city_key: keys[ci], dates: mode[i], same_as: null };
+      if (mode[i] === "same") {
+        const prev = mine[i - 1];
+        mine.push({ ...base, same_as: prev.line, from: prev.from, nights: prev.nights, check_in: prev.check_in, check_out: prev.check_out });
+        return;
+      }
+      if (mode[i] === "custom") {
+        const from = city.check_in ? daysBetween(city.check_in, line.check_in!) : null;
+        // no nights of its own: the rest of the city from its first night
+        const nights = line.nights > 0 ? line.nights : from != null ? Math.max(city.nights - from, 0) : 0;
+        if (from != null) cursor = Math.max(cursor, from + nights);
+        mine.push({ ...base, from, nights, check_in: line.check_in!, check_out: addDays(line.check_in!, nights) });
+        return;
+      }
+      s += 1;
       let nights = Math.max(0, line.nights);
       if (nights === 0 && blanks > 0) {
         const share = Math.floor(remaining / blanks);
-        const isLastBlank = lines.filter((l, j) => l.nights <= 0 && j > i).length === 0;
-        nights = isLastBlank ? remaining : share;
+        const isLastBlank = seq.filter((l, j) => l.nights <= 0 && j > s).length === 0;
+        // never past the city's end — only bites after a custom stay moved the cursor
+        nights = Math.min(isLastBlank ? remaining : share, Math.max(city.nights - cursor, 0));
         remaining -= nights;
       }
-      const check_in = cursor;
-      const check_out = check_in ? addDays(check_in, nights) : null;
-      cursor = check_out;
-      out.push({ line, city_name: city.city_name, nights, check_in, check_out });
+      const check_in = city.check_in ? addDays(city.check_in, cursor) : null;
+      mine.push({ ...base, from: cursor, nights, check_in, check_out: check_in ? addDays(check_in, nights) : null });
+      cursor += nights;
     });
-  }
+    out.push(...mine);
+  });
   return out;
+}
+
+/**
+ * Another hotel in a stop — after the last one, on the same dates (its rooms
+ * split over the two), or on dates of its own (the city's, until the agent
+ * narrows them). It carries the rooms' types, the currency and «مسترد / غير
+ * مسترد» of the stay it was added from, never its price.
+ */
+export function addStay(
+  cities: DraftCity[],
+  hotels: DraftHotel[],
+  index: number,
+  dates: StayDates,
+): { hotels: DraftHotel[]; id: string } {
+  const city = cities[index];
+  const lines = cityHotelLines(cities, hotels, index);
+  const from = lines[lines.length - 1];
+  if (!city) return { hotels, id: "" };
+  const cov = hotelCoverage(cities, hotels)[index];
+  const rooms = (from?.rooms ?? [emptyRoomSpec()]).map((r) => ({ ...r, price: null }));
+  const line = withRooms(
+    {
+      ...normalizeDraftHotel({ city_name: city.city_name }),
+      city_key: cityKeys(cities)[index],
+      // "after" takes what the city still lacks (0 = shares the rest with the last stay)
+      nights: dates === "after" ? Math.max(cov.needed - (cov.covered - cov.extra), 0) : dates === "custom" ? city.nights : 0,
+      ...(dates !== "after" ? { dates } : {}),
+      ...(dates === "custom" && city.check_in ? { check_in: city.check_in } : {}),
+      ...(from ? { manual_currency: from.manual_currency } : {}),
+      ...(typeof from?.refundable === "boolean" ? { refundable: from.refundable } : {}),
+    },
+    // the point of a same-dates hotel is to take some of the rooms: it starts with one
+    dates === "same" ? rooms.slice(0, 1) : rooms,
+  );
+  const at = from ? hotels.lastIndexOf(from) + 1 : hotels.length;
+  return { hotels: [...hotels.slice(0, at), line, ...hotels.slice(at)], id: line.id };
+}
+
+/** A custom-dated stay with a night outside its city's — never issued (pg.err.stayOutsideCity). */
+export function stayOutsideCity(stay: HotelStay, city: Pick<DraftCity, "nights">): boolean {
+  return stay.dates === "custom" && stay.from != null && (stay.from < 0 || stay.from + stay.nights > city.nights);
 }
 
 /**
@@ -1512,15 +1665,24 @@ export function stayCancellation(h: Pick<DraftHotel, "sourcing" | "refundable">)
   return h.refundable === true ? "قابل للاسترداد" : h.refundable === false ? "غير قابل للاسترداد" : null;
 }
 
-/** Per-city allocated-vs-owed, for the coverage bar and the blocking check. */
+/**
+ * Per-stop allocated-vs-owed, for the coverage bar and the blocking check — in
+ * the cities' order, one entry per stop. Complete = covered === needed with no
+ * extra night.
+ */
 export function hotelCoverage(cities: DraftCity[], hotels: DraftHotel[]): CityCoverage[] {
   const stays = deriveHotelStays(cities, hotels);
-  return cities.map((city) => {
-    const mine = stays.filter((s) => s.city_name === city.city_name);
+  const keys = cityKeys(cities);
+  return cities.map((city, i) => {
+    const mine = stays.filter((s) => s.city_index === i);
+    const nights = new Set<number>();
+    for (const s of mine) if (s.from != null) for (let k = 0; k < s.nights; k++) nights.add(s.from + k);
     return {
       city_name: city.city_name,
+      city_key: keys[i],
       needed: city.nights,
-      covered: mine.reduce((sum, s) => sum + s.nights, 0),
+      covered: nights.size,
+      extra: [...nights].filter((n) => n < 0 || n >= city.nights).length,
       stays: mine,
     };
   });

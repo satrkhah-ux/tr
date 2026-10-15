@@ -7,20 +7,27 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { copyProgramIntoDraft, findReusablePrograms, getDraft } from "@/lib/data/drafts";
 import { createCityForCountry } from "@/lib/data/catalog-actions";
 import {
+  addStay as addStayLine,
+  cityHotelLines,
+  cityKeys,
   deriveCityDates,
   findLookupCountry,
   hotelCoverage,
+  newCityKey,
   normalizeDraftHotel,
   resizeRooms,
   stayTotal,
   totalCityNights,
+  withCityKeys,
   withRooms,
   type DraftCity,
   type DraftHotel,
+  type StayDates,
   type DraftTrip,
   type ReusableProgram,
 } from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
+import { removeCity as removeStop } from "@/lib/offer/basic";
 import { citiesFromFlights, citiesMatchFlights } from "@/lib/offer/flight-cities";
 import { getHotelSearchSource } from "@/lib/data/app-settings";
 import { suppliersFor } from "../SupplierPrice";
@@ -38,6 +45,7 @@ import { FieldIssue } from "../FieldIssue";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { addButtonClass, fieldClass, sectionClass, type StageFormProps } from "../stage-props";
 import { StayCard } from "../hotels/StayCard";
+import { AddStayMenu } from "../hotels/StayDates";
 import { EMPTY_FILTERS, type PickerFilters, type PickerSource } from "../hotels/HotelPicker";
 
 /** Everything on a hotel line EXCEPT the rooms and the scalars mirroring them. */
@@ -51,10 +59,11 @@ type HotelScalarSlice = Omit<
  * customer — room count, room type and board. Per-city edits happen here on top
  * of that, so the common case (same room everywhere) is zero extra typing.
  */
-function defaultLine(cityName: string, trip: DraftTrip): DraftHotel {
+function defaultLine(cityName: string, trip: DraftTrip, cityKey?: string): DraftHotel {
   const room = { room_type_id: null, room_type_name: trip.default_room_type_name, board_type: trip.default_board };
   return normalizeDraftHotel({
     city_name: cityName,
+    ...(cityKey ? { city_key: cityKey } : {}),
     rooms: Array.from({ length: Math.max(trip.rooms || 1, 1) }, () => ({ ...room })),
     rooms_count: Math.max(trip.rooms || 1, 1),
   });
@@ -136,15 +145,23 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
   const start = itineraryStartDate(data.trip, data.flights);
   const derivedCities = deriveCityDates(start, data.cities);
 
-  /** Lines to render: the draft's, plus a starter for any city that has none. */
-  const lines: DraftHotel[] = derivedCities.flatMap((c) => {
+  /**
+   * Lines to render: each stop's own (a city visited twice has two sets), plus
+   * a starter for any stop that has none. An older file's line that two visits
+   * of a city share by name is listed once.
+   */
+  const keys = cityKeys(derivedCities);
+  const listed = new Set<string>();
+  const lines: DraftHotel[] = derivedCities.flatMap((c, i) => {
     // An unnamed city owns no hotels. Without this, every city still on «اختر
     // مدينة» shares the same empty name, so each one claimed ALL the empty-named
     // hotels and rendered them again — the runaway duplication the agent saw.
     if (!c.city_name.trim()) return [];
-    const mine = data.hotels.filter((h) => h.city_name === c.city_name);
-    return mine.length > 0 ? mine : [defaultLine(c.city_name, data.trip)];
+    const mine = cityHotelLines(derivedCities, data.hotels, i);
+    if (mine.length === 0) return [defaultLine(c.city_name, data.trip, keys[i])];
+    return mine.filter((l) => !listed.has(l.id) && Boolean(listed.add(l.id)));
   });
+  // one entry per stop, in the cities' order
   const coverage = hotelCoverage(derivedCities, lines);
 
   /**
@@ -176,11 +193,12 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
   function cityDone(index: number): boolean {
     const city = data.cities[index];
     if (!city?.city_name.trim() || city.nights <= 0) return false;
-    if (!showHotels || data.cities.findIndex((c) => c.city_name === city.city_name) !== index) return true;
-    const cov = coverage.find((c) => c.city_name === city.city_name);
+    if (!showHotels) return true;
+    const cov = coverage[index];
     return Boolean(
       cov &&
         cov.covered === cov.needed &&
+        cov.extra === 0 &&
         cov.stays.every(
           ({ line }) =>
             line.hotel_name.trim() &&
@@ -241,19 +259,19 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
    * pricing item became a phantom the producer quietly reconciled away.
    */
   function setCityName(index: number, name: string) {
-    const previous = data.cities[index]?.city_name ?? "";
-    const hotels = data.hotels.map((h) => (h.city_name === previous ? { ...h, city_name: name } : h));
+    // the keys written in first: the stop keeps its identity through the rename
+    const keyed = withCityKeys(data.cities);
+    const mine = new Set(cityHotelLines(keyed, data.hotels, index));
+    const hotels = data.hotels.map((h) => (mine.has(h) ? { ...h, city_name: name } : h));
+    const cities = keyed.map((c, i) => (i === index ? { ...c, city_name: name } : c));
     patch({
-      cities: deriveCityDates(
-        start,
-        data.cities.map((c, i) => (i === index ? { ...c, city_name: name } : c)),
-      ),
+      cities: deriveCityDates(start, cities),
       // A city that had no stay yet (it was still unnamed) gets its starter
       // line in the same patch — addCity's rule, so the popup and the
       // validation count the same stays.
       hotels:
-        name && !hotels.some((h) => h.city_name === name)
-          ? [...hotels, { ...defaultLine(name, data.trip), nights: 0 }]
+        name && cityHotelLines(cities, hotels, index).length === 0
+          ? [...hotels, { ...defaultLine(name, data.trip, cities[index].key), nights: 0 }]
           : hotels,
     });
   }
@@ -303,8 +321,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
     resetPicker();
     const next = data.cities.findIndex((c, i) => {
       if (i <= from || !c.city_name.trim()) return false;
-      if (data.cities.findIndex((x) => x.city_name === c.city_name) !== i) return false;
-      const cv = coverage.find((x) => x.city_name === c.city_name);
+      const cv = coverage[i];
       return !cv || cv.stays.some((s) => !s.line.hotel_name.trim());
     });
     setHotelsFor(next >= 0 ? next : null);
@@ -330,28 +347,22 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
     // All taken (or none at all) -> an unnamed row the agent fills or adds to.
     const name = cityNames.find((n) => !taken.has(n)) ?? "";
     const left = Math.max(0, data.trip.nights - used);
+    const keyed = withCityKeys(data.cities);
+    const key = newCityKey(keyed, name);
     patch({
       cities: deriveCityDates(start, [
-        ...data.cities,
-        { city_name: name, nights: left > 0 ? left : 1, check_in: null, check_out: null },
+        ...keyed,
+        { key, city_name: name, nights: left > 0 ? left : 1, check_in: null, check_out: null },
       ]),
       // Only a NAMED city gets a starter hotel line — an unnamed one would share
       // the empty name with every other unnamed city and multiply.
-      hotels: name ? [...data.hotels, { ...defaultLine(name, data.trip), nights: 0 }] : data.hotels,
+      hotels: name ? [...data.hotels, { ...defaultLine(name, data.trip, key), nights: 0 }] : data.hotels,
     });
   }
 
+  /** The stop goes with its own stays; one an older file shares with another visit of the city stays (basic.removeCity). */
   function removeCity(index: number) {
-    const name = data.cities[index]?.city_name ?? "";
-    const next = data.cities.filter((_, i) => i !== index);
-    patch({
-      cities: deriveCityDates(start, next),
-      // A repeated city name keeps its stays — they belong to the stop that is
-      // still in the programme.
-      hotels: next.some((c) => c.city_name === name)
-        ? data.hotels
-        : data.hotels.filter((h) => h.city_name !== name),
-    });
+    patch(removeStop(data, index));
   }
 
   // ---------- stays ----------
@@ -389,23 +400,11 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
     });
   }
 
-  /**
-   * A second hotel in the same city, inserted after that city's last line —
-   * order decides the dates, so appending to the end of the array would hand
-   * the new stay another city's nights.
-   */
-  function addStay(cityName: string) {
-    const next = [...lines];
-    let at = -1;
-    next.forEach((l, i) => {
-      if (l.city_name === cityName) at = i;
-    });
-    const cov = coverage.find((c) => c.city_name === cityName);
-    const left = Math.max(0, (cov?.needed ?? 0) - (cov?.covered ?? 0));
-    const fresh = { ...defaultLine(cityName, data.trip), nights: left };
-    next.splice(at + 1, 0, fresh);
-    patch({ hotels: next });
-    setChoosing(fresh.id);
+  /** Another hotel in this stop — after it, on the same dates, or on dates of its own (addStay). */
+  function addStay(cityIndex: number, dates: StayDates) {
+    const next = addStayLine(derivedCities, lines, cityIndex, dates);
+    patch({ hotels: next.hotels });
+    setChoosing(next.id);
     resetPicker();
   }
 
@@ -588,16 +587,11 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
           <div className="mb-4 space-y-3">
             {data.cities.map((city, cityIndex) => {
               const derived = derivedCities[cityIndex];
-              const cov = coverage.find((c) => c.city_name === city.city_name);
-              // A city name can still repeat — an agent may type one by hand,
-              // and an older draft may already hold one. Each stay belongs to
-              // the FIRST city of that name; the later one shows none rather
-              // than a duplicate of someone else's hotel.
-              const firstOfName = data.cities.findIndex((c) => c.city_name === city.city_name);
-              const ownsStays = firstOfName === cityIndex;
+              // a city visited twice is two stops, each with its own stays
+              const cov = coverage[cityIndex];
               const lookupCity = country?.cities.find((c) => c.name === city.city_name);
               const hotelOptions = lookupCity?.hotels ?? [];
-              const short = cov ? cov.covered !== cov.needed : false;
+              const short = cov ? cov.covered !== cov.needed || cov.extra > 0 : false;
               const done = cityDone(cityIndex);
 
               if (cityIndex !== openCity) {
@@ -752,7 +746,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                   {/* Hotels live in a POPUP, not inline. The agent enters the
                       cities first; the chosen hotels show here beside the name,
                       small, and «الفنادق» opens the popup to add or edit them. */}
-                  {showHotels && ownsStays ? (
+                  {showHotels ? (
                     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#e7f0ec] pt-3">
                       {city.city_name.trim() ? (
                         <>
@@ -774,7 +768,8 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                                 short ? "bg-[#fff8e8] text-[#a86a10]" : "bg-[#e9f7f0] text-[#0f7a52]"
                               }`}
                             >
-                              <DirText dir="ltr">{`${cov.covered}/${cov.needed}`}</DirText> ليالٍ مغطّاة
+                              <DirText dir="ltr">{`${cov.covered - cov.extra}/${cov.needed}`}</DirText> ليالٍ مغطّاة
+                              {cov.extra > 0 ? ` · ${t("pg.nightsExcessN", { n: cov.extra })}` : ""}
                             </span>
                           ) : null}
                           {cov && cov.stays.some((s) => s.line.hotel_name.trim()) ? (
@@ -830,7 +825,7 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
               if (hotelsFor === null) return null;
               const city = data.cities[hotelsFor];
               if (!city) return null;
-              const cov = coverage.find((c) => c.city_name === city.city_name);
+              const cov = city.city_name.trim() ? coverage[hotelsFor] : undefined;
               const hotelOptions = country?.cities.find((c) => c.name === city.city_name)?.hotels ?? [];
               // No coverage means the city has no name or no nights yet — nothing
               // to pick a hotel for. (Also narrows `cov` for the block below.)
@@ -855,11 +850,11 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                         <StayCard
                           key={`${hotelsFor}-${line.id}`}
                           line={line}
+                          stay={stay}
+                          city={derivedCities[hotelsFor]}
                           index={stayIndex}
                           count={cov.stays.length}
                           nights={stay.nights}
-                          checkIn={stay.check_in}
-                          checkOut={stay.check_out}
                           choosing={isChoosing}
                           onChoosing={(open) => {
                             setChoosing(open ? line.id : null);
@@ -921,14 +916,11 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
                     })}
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e7f0ec] pt-3">
-                    <button
-                      type="button"
-                      onClick={() => addStay(cov.city_name)}
+                    <AddStayMenu
+                      label={t("pg.stay.addAnother")}
+                      onAdd={(dates) => addStay(hotelsFor, dates)}
                       className="inline-flex h-10 items-center gap-1 rounded-[10px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
-                    >
-                      <Plus className="size-3.5" />
-                      فندق آخر
-                    </button>
+                    />
                     <button
                       type="button"
                       onClick={() => void saveHotels()}
