@@ -9,7 +9,7 @@ import { listTravelers } from "@/lib/data/operation-travelers";
 import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
 import { COMPANY } from "@/components/offer-doc/labels";
 import { currentCan } from "@/lib/roles/current";
-import { DRV, driverMessage, driverServiceKind, meetTime, type ServiceKind } from "@/lib/operations/drivers";
+import { carText, DRV, driverMessage, driverServiceKind, meetTime, type ServiceKind } from "@/lib/operations/drivers";
 
 /**
  * «السائقون والاستقبال» — the driver's card sent to the driver, and the day's
@@ -100,7 +100,7 @@ export async function draftDriverMessage(bookingId: string): Promise<{ ok: true;
       hotel,
       guests: guests.length > 0 ? guests : [one(offer?.customers)?.arabic_name ?? ""].filter(Boolean),
       pax: d["الركاب"] ?? "",
-      car: d[DRV.car] ?? "",
+      car: carText(d),
       plate: d[DRV.plate] ?? "",
       // the driver works for us whoever sold the trip — he calls our operations line
       contact: COMPANY.phone,
@@ -233,7 +233,7 @@ export async function listDriverSchedule(date: string): Promise<ScheduleRow[]> {
             time: meetTime(r),
             flight: d[DRV.flight] ?? "",
             meet: d[DRV.meet] ?? "",
-            car: d[DRV.car] ?? "",
+            car: carText(d),
             plate: d[DRV.plate] ?? "",
             driver: d[DRV.driver] ?? "",
             phone: d[DRV.phone] ?? "",

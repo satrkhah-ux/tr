@@ -448,7 +448,68 @@ export function packageNights(pkg: ExtractedPackage): number {
   return pkg.trip_nights ?? pkg.cities.reduce((sum, c) => sum + (c.nights ?? 0), 0);
 }
 
+/**
+ * How a visit's nights are shared by its hotels: a hotel that says its nights
+ * keeps them; the ones that do not share what is left evenly, the remainder on
+ * the last of them (5 nights, two hotels → 2 then 3).
+ */
+export function splitVisitNights(total: number, own: (number | null)[]): number[] {
+  const left = Math.max(total - own.reduce<number>((sum, n) => sum + (n ?? 0), 0), 0);
+  const open = own.filter((n) => n == null).length;
+  const each = open > 0 ? Math.floor(left / open) : 0;
+  let seen = 0;
+  return own.map((n) => {
+    if (n != null) return n;
+    seen += 1;
+    return seen === open ? left - each * (open - 1) : each;
+  });
+}
+
+export type PackageStop = {
+  city_name: string;
+  /** the visit's own nights — its hotels' nights must add up to them (visitNightsGaps). */
+  nights: number;
+  /** its hotels in order, each with the nights it is booked for; `index` is its place in pkg.hotels. */
+  hotels: { hotel: ExtractedHotel; index: number; nights: number }[];
+};
+
+/**
+ * The package's visits in order, each with ALL its hotels (keyHotels). One
+ * hotel takes the visit's nights, as it always did; two or more chain inside
+ * the visit (splitVisitNights). A package read without cities is its hotels in
+ * order, each its own stop.
+ */
+export function packageStops(pkg: ExtractedPackage): PackageStop[] {
+  const cities = withCityKeys(pkg.cities);
+  if (cities.length === 0) {
+    return pkg.hotels.map((hotel, index) => ({ city_name: hotel.city_name, nights: hotel.nights ?? 0, hotels: [{ hotel, index, nights: hotel.nights ?? 0 }] }));
+  }
+  const keys = cityKeys(cities);
+  const keyed = keyHotels(cities, pkg.hotels).map((hotel, index) => ({ hotel, index }));
+  return cities.map((c, i) => {
+    const mine = keyed.filter(({ hotel }) => hotel.city_key === keys[i]);
+    if (mine.length <= 1) {
+      const nights = c.nights ?? mine[0]?.hotel.nights ?? 0;
+      return { city_name: c.city_name, nights, hotels: mine.map((h) => ({ ...h, nights })) };
+    }
+    const nights = c.nights ?? mine.reduce((sum, { hotel }) => sum + (hotel.nights ?? 0), 0);
+    const split = splitVisitNights(nights, mine.map(({ hotel }) => hotel.nights));
+    return { city_name: c.city_name, nights, hotels: mine.map((h, k) => ({ ...h, nights: split[k] })) };
+  });
+}
+
+/** The visits whose hotels' nights do not add up to the visit's — the review asks for them to. */
+export function visitNightsGaps(pkg: ExtractedPackage): { city_name: string; nights: number; sum: number }[] {
+  return packageStops(pkg).flatMap((stop) => {
+    if (stop.hotels.length < 2) return [];
+    const sum = stop.hotels.reduce((total, h) => total + h.nights, 0);
+    return sum === stop.nights ? [] : [{ city_name: stop.city_name, nights: stop.nights, sum }];
+  });
+}
+
 export type PackageStay = {
+  /** the visit it belongs to — its place in packageStops. */
+  stop: number;
   city_name: string;
   hotel: ExtractedHotel | null;
   board_type: BoardType | null;
@@ -458,27 +519,27 @@ export type PackageStay = {
 };
 
 /**
- * The package's stays in order — one per stop, each with ITS OWN hotel
- * (keyHotels) and dates chained from the arrival date, so every stay agrees
- * with the arrival the employee entered. A package read without cities is its
- * hotels in order. The one mapping the preview AND the issued offer use.
+ * The package's stays in order — one per hotel of each visit (packageStops),
+ * dates chained from the arrival date, so every stay agrees with the arrival
+ * the employee entered; a visit's second hotel starts where its first ends. A
+ * visit without a hotel is still a stay. The one mapping the preview AND the
+ * issued offer use.
  */
 export function packageStays(pkg: ExtractedPackage): PackageStay[] {
-  const cities = withCityKeys(pkg.cities);
-  const keys = cityKeys(cities);
-  const hotels = keyHotels(cities, pkg.hotels);
-  const stops =
-    cities.length > 0
-      ? cities.map((c, i) => ({ city_name: c.city_name, nights: c.nights, hotel: hotels.find((h) => h.city_key === keys[i]) ?? null }))
-      : pkg.hotels.map((h) => ({ city_name: h.city_name, nights: h.nights, hotel: h }));
   let cursor = pkg.arrival_date;
-  return stops.map(({ city_name, nights: own, hotel }) => {
-    const nights = own ?? hotel?.nights ?? 0;
-    // no arrival yet: whatever dates the supplier printed
-    const check_in = cursor ?? hotel?.check_in ?? null;
-    const check_out = cursor ? addDaysIso(cursor, nights) : (hotel?.check_out ?? null);
-    if (cursor) cursor = check_out;
-    return { city_name, hotel, board_type: normalizeBoard(hotel?.board), nights, check_in, check_out };
+  return packageStops(pkg).flatMap((stop, at) => {
+    const start = cursor;
+    const parts: { hotel: ExtractedHotel | null; nights: number }[] = stop.hotels.length > 0 ? stop.hotels : [{ hotel: null, nights: stop.nights }];
+    const stays = parts.map(({ hotel, nights }) => {
+      // no arrival yet: whatever dates the supplier printed
+      const check_in = cursor ?? hotel?.check_in ?? null;
+      const check_out = cursor ? addDaysIso(cursor, nights) : (hotel?.check_out ?? null);
+      if (cursor) cursor = check_out;
+      return { stop: at, city_name: stop.city_name, hotel, board_type: normalizeBoard(hotel?.board), nights, check_in, check_out };
+    });
+    // the next visit starts when this one's nights end, whatever its hotels add up to (the review flags a gap)
+    if (start) cursor = addDaysIso(start, stop.nights);
+    return stays;
   });
 }
 

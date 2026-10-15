@@ -7,7 +7,7 @@ import { CalendarDays, Car, Check, Copy, Loader2, Pencil, Plane, Send, UserRound
 import { DirText } from "@/components/DirText";
 import { updateBooking, type OperationBooking } from "@/lib/data/operation-bookings";
 import { draftDriverMessage, sendDriverMessage, type DriverDraft } from "@/lib/data/operation-drivers";
-import { DRV, driverServiceKind, driverStep, meetTime, timeKey, waNumber, type ServiceKind } from "@/lib/operations/drivers";
+import { carFields, carText, DRV, driverServiceKind, driverStep, meetTime, timeKey, waNumber, type ServiceKind } from "@/lib/operations/drivers";
 import type { TranslationKey } from "@/lib/i18n";
 import { WelcomeBoardButton } from "../WelcomeBoardButton";
 import { useTraveliunUI } from "../TraveliunUIProvider";
@@ -75,7 +75,7 @@ export function DriversPanel({ serial, customerName, bookings }: { serial: strin
   );
 }
 
-const FORM_KEYS = [DRV.driver, DRV.phone, DRV.car, DRV.plate, DRV.meet] as const;
+const FORM_KEYS = [DRV.driver, DRV.phone, DRV.car, DRV.cars, DRV.plate, DRV.meet] as const;
 
 function parseKept(kept: string): Record<string, string> {
   try {
@@ -100,7 +100,8 @@ function DriverCard({
   const router = useRouter();
   const d = booking.detail ?? {};
   const tk = timeKey(kind);
-  const initial = Object.fromEntries([...FORM_KEYS, tk].map((k) => [k, d[k] ?? ""]));
+  // the car opens as its model, the count in its own field («فان × 2» → فان, 2)
+  const initial = { ...Object.fromEntries([...FORM_KEYS, tk].map((k) => [k, d[k] ?? ""])), ...carFields(d) };
   const [editing, setEditing] = useState(false);
   // what was typed survives a reload after a deploy, until it is saved (order 4)
   const [kept, setKept] = useSessionField(`drv:${booking.id}`, "");
@@ -164,7 +165,7 @@ function DriverCard({
         {d[DRV.meet] ? <Fact label={t("ops.drv.meet")} value={d[DRV.meet]} /> : null}
         <Fact icon={<UserRound className="size-3" />} label={t("ops.drv.driver")} value={d[DRV.driver] || t("ops.drv.noDriver")} muted={!d[DRV.driver]} />
         {d[DRV.phone] ? <Fact label={t("ops.drv.phone")} value={d[DRV.phone]} ltr /> : null}
-        {d[DRV.car] || d[DRV.plate] ? <Fact icon={<Car className="size-3" />} label={t("ops.drv.car")} value={[d[DRV.car], d[DRV.plate]].filter(Boolean).join(" · ")} /> : null}
+        {carText(d) || d[DRV.plate] ? <Fact icon={<Car className="size-3" />} label={t("ops.drv.car")} value={[carText(d), d[DRV.plate]].filter(Boolean).join(" · ")} /> : null}
         {driverStep(d) ? <Fact label={t("ops.link.step")} value={[d[DRV.status], d[DRV.handedAt]].filter(Boolean).join(" · ")} /> : null}
         {d[DRV.landing] ? <Fact icon={<Plane className="size-3" />} label={t("ops.link.landing")} value={d[DRV.landing]} ltr /> : null}
       </dl>
@@ -175,6 +176,7 @@ function DriverCard({
             [DRV.driver, "ops.drv.driver"],
             [DRV.phone, "ops.drv.phone"],
             [DRV.car, "ops.drv.car"],
+            [DRV.cars, "ops.drv.cars"],
             [DRV.plate, "ops.drv.plate"],
             [tk, "ops.drv.time"],
             [DRV.meet, "ops.drv.meet"],
@@ -184,7 +186,8 @@ function DriverCard({
               <input
                 value={form[key] ?? ""}
                 onChange={(e) => set(key, e.target.value)}
-                dir={key === DRV.phone || key === DRV.plate || key === tk ? "ltr" : undefined}
+                {...(key === DRV.cars ? { type: "number", min: 1, max: 50, inputMode: "numeric" as const } : {})}
+                dir={key === DRV.phone || key === DRV.plate || key === tk || key === DRV.cars ? "ltr" : undefined}
                 placeholder={key === tk ? "15:15" : undefined}
                 className={`${field} ${key === DRV.phone || key === tk ? "tv-tnum" : ""}`}
               />

@@ -7,7 +7,7 @@ import { notifyBookingChanged, notifyOps } from "@/lib/data/ops-notify";
 import { syncOperationOfBooking } from "@/lib/data/operation-sync";
 import { COMPANY } from "@/components/offer-doc/labels";
 import { buildSupplierRequest, type RequestLang, type SupplierBookingKind } from "@/lib/operations/supplier-request";
-import { DRV, driverServiceKind, driverStep, mapsLink, meetTime, type DriverStep, type ServiceKind } from "@/lib/operations/drivers";
+import { carFields, carText, DRV, driverServiceKind, driverStep, mapsLink, meetTime, type DriverStep, type ServiceKind } from "@/lib/operations/drivers";
 import { linkOpen, sameDriver, stepAllowed, stepDetail, supplierAnswer, type LinkKind, type SupplierAnswerInput } from "@/lib/operations/op-links";
 import type { TravelerKind } from "@/lib/operations/traveler-dto";
 
@@ -91,7 +91,7 @@ export type SupplierLinkView = {
   body: string;
   confirmed: { ref: string | null } | null;
   /** what is already on the booking — the form starts from it. */
-  driver: { driver: string; phone: string; car: string; plate: string };
+  driver: { driver: string; phone: string; car: string; cars: string; plate: string };
   expires_at: string;
 };
 
@@ -137,13 +137,15 @@ export async function getSupplierLinkView(token: string): Promise<SupplierLinkVi
       glossary,
     });
     const d = b.detail ?? {};
+    // the model and the count apart — «فان × 2» opens as فان and 2
+    const car = carFields(d);
     return {
       lang,
       service: driverServiceKind(b),
       subject,
       body,
       confirmed: b.status === "confirmed" ? { ref: b.confirmation_number } : null,
-      driver: { driver: d[DRV.driver] ?? "", phone: d[DRV.phone] ?? "", car: d[DRV.car] ?? "", plate: d[DRV.plate] ?? "" },
+      driver: { driver: d[DRV.driver] ?? "", phone: d[DRV.phone] ?? "", car: car[DRV.car] ?? "", cars: car[DRV.cars] ?? "", plate: d[DRV.plate] ?? "" },
       expires_at: link.expires_at,
     };
   } catch {
@@ -157,6 +159,7 @@ const SAY = {
   gone: "الرابط غير صالح أو انتهى. / This link is no longer valid.",
   ref: "أدخل رقم التأكيد. / Enter the confirmation number.",
   driver: "أدخل اسم السائق وجواله. / Enter the driver's name and mobile.",
+  cars: "عدد السيارات رقم من 1 إلى 50. / The number of cars is 1 to 50.",
   done: "تم التأكيد — شكراً لكم. / Confirmed — thank you.",
   already: "هذا الحجز مؤكد من قبل. / This booking is already confirmed.",
   failed: "تعذّر الحفظ. حاولوا مرة أخرى. / Could not save. Please try again.",
@@ -180,6 +183,7 @@ export async function confirmViaSupplierLink(token: string, input: SupplierAnswe
       driver: String(input?.driver ?? ""),
       phone: String(input?.phone ?? ""),
       car: String(input?.car ?? ""),
+      cars: String(input?.cars ?? ""),
       plate: String(input?.plate ?? ""),
     });
     if (!answer.ok) return { ok: false, message: SAY[answer.error] };
@@ -251,7 +255,7 @@ export type DriverPickup = {
   landing: string;
   hotel: { name: string; name_en: string | null; map: string } | null;
   pax: string;
-  /** the car and how many, as the sale wrote it — «فان × 2» — or the one operations typed. */
+  /** the car and how many — «فان × 2» — the model as operations or the supplier typed it, the count kept (carText). */
   car: string;
   plate: string;
   /** a tour's programme: where the day goes. */
@@ -328,7 +332,7 @@ export async function getDriverDay(token: string): Promise<DriverDay | null> {
           ? { name: stay.title, name_en: info?.english_name ?? null, map: mapsLink(info?.address || info?.english_name || stay.title, city) }
           : null,
         pax: d["الركاب"] || (count > 0 ? String(count) : ""),
-        car: d[DRV.car] ?? "",
+        car: carText(d),
         plate: d[DRV.plate] ?? "",
         program: d["البرنامج"] ?? "",
         step: driverStep(d),

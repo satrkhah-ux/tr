@@ -13,6 +13,7 @@ import {
   normalizeRepackageData,
   packageNights,
   packageStays,
+  packageStops,
   type RepackageData,
 } from "@/lib/repackage/repackage-types";
 import { validateRepackage } from "@/lib/repackage/repackage-validation";
@@ -434,8 +435,9 @@ export async function produceRepackageOffer(id: string): Promise<ProduceResult> 
     const nights = packageNights(pkg);
     const days = nights > 0 ? nights + 1 : 0;
 
-    // One stay per stop, each with ITS OWN hotel (a city visited twice keeps
-    // two hotels) and dates chained from the arrival — what the preview showed.
+    // One stay per hotel of each visit (a city visited twice keeps a hotel per
+    // visit; two hotels in one visit chain inside it), dates chained from the
+    // arrival — what the preview showed.
     const stays = packageStays(pkg);
 
     const hotels: OfferHotelInput[] = stays.flatMap((s) => {
@@ -493,15 +495,22 @@ export async function produceRepackageOffer(id: string): Promise<ProduceResult> 
       total: data.final_total,          // our SELL
       buy_total: pkg.supplier_total,    // supplier COST (internal — pricings only)
       currency: data.final_currency,
-      cities: stays.map((s) => ({
-        city_name: s.city_name,
-        hotel_name: s.hotel?.hotel_name || null,
-        room_type: s.hotel?.room_type || null,
-        nights: s.nights,
-        check_in: s.check_in,
-        check_out: s.check_out,
-        meals: s.board_type ? BOARD_LABEL[s.board_type] : null,
-      })),
+      // one row per VISIT, as the generator writes it: two hotels in one visit
+      // name the first and say how many follow; each hotel is its own offer_hotels row
+      cities: packageStops(pkg).map((stop, i) => {
+        const mine = stays.filter((s) => s.stop === i);
+        const first = mine[0];
+        const extra = mine.length > 1 ? ` + ${mine.length - 1}` : "";
+        return {
+          city_name: stop.city_name,
+          hotel_name: first?.hotel?.hotel_name ? `${first.hotel.hotel_name}${extra}` : null,
+          room_type: first?.hotel?.room_type || null,
+          nights: stop.nights,
+          check_in: first?.check_in ?? null,
+          check_out: mine.at(-1)?.check_out ?? null,
+          meals: first?.board_type ? BOARD_LABEL[first.board_type] : null,
+        };
+      }),
       flights: pkg.flights.map((f) => ({
         carrier: f.airline || null,
         from_airport: f.from_airport || null,

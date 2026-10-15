@@ -35,7 +35,7 @@ import {
 import { seedBookingsFromOffer } from "@/lib/data/operation-seed";
 import { ensureClientLink, revokeClientLink } from "@/lib/data/operation-hub";
 import type { VoucherKind } from "@/lib/operations/voucher-dto";
-import { DRV } from "@/lib/operations/drivers";
+import { carFields, carText, DRV } from "@/lib/operations/drivers";
 import type { TranslationKey } from "@/lib/i18n";
 import type { AssigneeOption, SentRequest } from "@/lib/data/operation-assign";
 import { AssignBooking, AssigneeChip } from "./AssignBooking";
@@ -508,6 +508,19 @@ const KIND_FIELDS: Partial<Record<OperationBooking["kind"], string[]>> = {
   service: ["وقت الانطلاق", "السيارة", "رقم السيارة", "السائق", "جوال السائق"],
 };
 
+/**
+ * The detail as the edit form lays it out: every key the booking has plus its
+ * kind's, the car as its model with «عدد السيارات» right after it — so typing a
+ * model into «السيارة» keeps the «× 2» (carFields).
+ */
+function detailForm(booking: OperationBooking): Record<string, string> {
+  const d = { ...(booking.detail ?? {}), ...carFields(booking.detail) };
+  const keys = [...new Set([...Object.keys(d), ...(KIND_FIELDS[booking.kind] ?? [])])].filter((k) => k !== DRV.cars);
+  const car = keys.indexOf(DRV.car);
+  if (car >= 0) keys.splice(car + 1, 0, DRV.cars);
+  return Object.fromEntries(keys.map((k) => [k, d[k] ?? ""]));
+}
+
 /** A single-day booking (a transfer, a tour, a visa) has a date, not a range. */
 const singleDay = (kind: OperationBooking["kind"]) => kind === "transport" || kind === "service" || kind === "visa";
 
@@ -534,7 +547,7 @@ function BookingRow({
     city_name: booking.city_name,
     start_date: booking.start_date ?? "",
     end_date: booking.end_date ?? "",
-    detail: Object.fromEntries([...new Set([...Object.keys(booking.detail ?? {}), ...(KIND_FIELDS[booking.kind] ?? [])])].map((k) => [k, booking.detail?.[k] ?? ""])),
+    detail: detailForm(booking),
   });
   const when = booking.detail?.["الوقت"] || booking.detail?.["وقت الانطلاق"] || "";
   const [pending, startTransition] = useSafeTransition();
@@ -561,10 +574,10 @@ function BookingRow({
               </DirText>
             ) : null}
             {/* a tour's car and how many — «فان × 2» — without opening the edit form */}
-            {booking.detail?.[DRV.car] ? (
+            {carText(booking.detail) ? (
               <span className="inline-flex items-center gap-1 text-[#557d78]" title={t("ops.drv.car")}>
                 <Car className="size-3" />
-                {booking.detail[DRV.car]}
+                {carText(booking.detail)}
               </span>
             ) : null}
             {booking.confirmation_number ? (
@@ -691,6 +704,7 @@ function BookingRow({
                   <input
                     value={value}
                     onChange={(e) => setForm((f) => ({ ...f, detail: { ...f.detail, [key]: e.target.value } }))}
+                    {...(key === DRV.cars ? { type: "number", min: 1, max: 50, inputMode: "numeric" as const, dir: "ltr" } : {})}
                     className={field}
                   />
                 </label>

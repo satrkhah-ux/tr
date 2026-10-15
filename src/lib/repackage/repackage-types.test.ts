@@ -5,6 +5,9 @@ import {
   keyHotels,
   normalizeRepackageData,
   packageStays,
+  packageStops,
+  splitVisitNights,
+  visitNightsGaps,
   withArrival,
   withDeparture,
   type ExtractedHotel,
@@ -137,5 +140,83 @@ describe("validation — the client's details come first", () => {
   it("blocks a departure that is not arrival + the package's nights", () => {
     expect(reviewKeys(georgia({ departure_date: "2026-10-25" }))).toEqual(["rp.err.datesNights"]);
     expect(reviewKeys(georgia({ departure_date: "2026-10-18" }))).toEqual(["rp.err.departureBeforeArrival"]);
+  });
+});
+
+/** The London import (dea0143d): one 5-night stop, two hotels — the second used to be dropped. */
+function london(nights: [number | null, number | null], over: Partial<ExtractedPackage> = {}): ExtractedPackage {
+  return {
+    ...emptyExtractedPackage(),
+    customer_name: "خالد",
+    customer_phone: "0551234567",
+    country: "المملكة المتحدة",
+    destination: "لندن",
+    cities: [{ city_name: "لندن", nights: 5 }],
+    trip_nights: 5,
+    arrival_date: "2026-12-26",
+    departure_date: "2026-12-31",
+    hotels: [
+      { ...hotel("لندن", "DoubleTree by Hilton Hotel London ExCel"), board: "شامل الافطار", nights: nights[0] },
+      { ...hotel("لندن", "Park Plaza London Waterloo"), board: "شامل الافطار", nights: nights[1] },
+    ],
+    ...over,
+  };
+}
+
+describe("several hotels in one visit", () => {
+  it("shares a visit's nights evenly, the remainder on the last", () => {
+    expect(splitVisitNights(5, [null, null])).toEqual([2, 3]);
+    expect(splitVisitNights(7, [null, null, null])).toEqual([2, 2, 3]);
+    expect(splitVisitNights(5, [1, null])).toEqual([1, 4]);
+    expect(splitVisitNights(5, [3, 2])).toEqual([3, 2]);
+  });
+
+  it("publishes every hotel, chained inside the visit by its own nights", () => {
+    expect(stayRows(london([3, 2]))).toEqual([
+      ["لندن", "DoubleTree by Hilton Hotel London ExCel", "2026-12-26", "2026-12-29"],
+      ["لندن", "Park Plaza London Waterloo", "2026-12-29", "2026-12-31"],
+    ]);
+    expect(packageStays(london([3, 2])).map((s) => [s.nights, s.board_type, s.stop])).toEqual([[3, "BB", 0], [2, "BB", 0]]);
+  });
+
+  it("splits the visit when the hotels do not say their nights", () => {
+    expect(packageStays(london([null, null])).map((s) => [s.nights, s.check_in, s.check_out])).toEqual([
+      [2, "2026-12-26", "2026-12-28"],
+      [3, "2026-12-28", "2026-12-31"],
+    ]);
+    expect(visitNightsGaps(london([null, null]))).toEqual([]);
+  });
+
+  it("flags hotels whose nights do not fill the visit — the import as read (4 + 2 for 5)", () => {
+    expect(visitNightsGaps(london([4, 2]))).toEqual([{ city_name: "لندن", nights: 5, sum: 6 }]);
+    const v = validateRepackage({
+      ...emptyRepackageData(),
+      extracted: london([4, 2]),
+      confidence: { country: 1, cities: 1, trip_nights: 1, hotels: 1, supplier_total: 1 },
+      final_total: 5000,
+    });
+    expect(v.blocking.map((i) => [i.key, i.params])).toEqual([["rp.err.visitHotelNights", { city: "لندن", nights: 5, sum: 6 }]]);
+    expect(v.reviewClear).toBe(false);
+  });
+
+  it("starts the next visit when this one's nights end, whatever its hotels add up to", () => {
+    const pkg = london([4, 2], {
+      cities: [{ city_name: "لندن", nights: 5 }, { city_name: "مانشستر", nights: 2 }],
+      trip_nights: 7,
+      hotels: [...london([4, 2]).hotels, hotel("مانشستر", "Midland")],
+    });
+    expect(stayRows(pkg).at(-1)).toEqual(["مانشستر", "Midland", "2026-12-31", "2027-01-02"]);
+  });
+
+  it("tells the review each hotel's place and nights", () => {
+    expect(packageStops(london([null, null])).map((s) => [s.city_name, s.nights, s.hotels.map((h) => [h.index, h.nights])])).toEqual([
+      ["لندن", 5, [[0, 2], [1, 3]]],
+    ]);
+  });
+
+  it("leaves a one-hotel visit on the visit's nights, as before", () => {
+    const one = london([4, null], { hotels: [london([4, null]).hotels[0]] });
+    expect(packageStays(one).map((s) => [s.nights, s.check_out])).toEqual([[5, "2026-12-31"]]);
+    expect(visitNightsGaps(one)).toEqual([]);
   });
 });

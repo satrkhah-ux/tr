@@ -8,7 +8,7 @@
  * step writes. Pure: no React, no Supabase.
  */
 
-import { DRIVER_STEP, DRV, waNumber, type DriverStep, type ServiceKind } from "./drivers";
+import { carCount, DRIVER_STEP, DRV, waNumber, type DriverStep, type ServiceKind } from "./drivers";
 
 export type LinkKind = "supplier" | "driver";
 
@@ -37,7 +37,7 @@ export function sameDriver(a: string | null | undefined, b: string | null | unde
 
 // ---------------- the supplier's answer ----------------
 
-export type SupplierAnswerInput = { ref: string; driver: string; phone: string; car: string; plate: string };
+export type SupplierAnswerInput = { ref: string; driver: string; phone: string; car: string; plate: string; cars?: string };
 
 /** A public form: every field trimmed and capped, whatever the browser sent. */
 const clean = (s: unknown, max = 120) => String(s ?? "").trim().slice(0, max);
@@ -50,16 +50,20 @@ const clean = (s: unknown, max = 120) => String(s ?? "").trim().slice(0, max);
 export function supplierAnswer(
   service: ServiceKind | null,
   input: SupplierAnswerInput,
-): { ok: true; ref: string | null; detail: Record<string, string> } | { ok: false; error: "ref" | "driver" } {
+): { ok: true; ref: string | null; detail: Record<string, string> } | { ok: false; error: "ref" | "driver" | "cars" } {
   const ref = clean(input.ref, 60);
   if (!service) return ref ? { ok: true, ref, detail: {} } : { ok: false, error: "ref" };
+  // how many cars, beside the model: a model typed here no longer drops the «× 2»
+  const cars = clean(input.cars, 3);
   const fields: [string, string][] = [
     [DRV.driver, clean(input.driver)],
     [DRV.phone, clean(input.phone, 30)],
     [DRV.car, clean(input.car)],
+    [DRV.cars, cars],
     [DRV.plate, clean(input.plate, 30)],
   ];
   if (!fields[0][1] || !fields[1][1]) return { ok: false, error: "driver" };
+  if (cars && carCount(cars) === null) return { ok: false, error: "cars" };
   return { ok: true, ref: ref || null, detail: Object.fromEntries(fields.filter(([, v]) => v)) };
 }
 

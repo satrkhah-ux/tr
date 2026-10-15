@@ -12,6 +12,7 @@ import { notifyBookingChanged, notifyPartnerCase } from "@/lib/data/ops-notify";
 import { syncOperation, syncOperationOfBooking } from "@/lib/data/operation-sync";
 import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, type VoucherBooking, type VoucherDTO, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { currentCan } from "@/lib/roles/current";
+import { carCount, DRV } from "@/lib/operations/drivers";
 
 /**
  * Bookings and the documents issued from them.
@@ -332,6 +333,8 @@ export async function updateBooking(input: {
   const denied = await requireOps();
   if (denied) return { ok: false, error: denied };
   if (input.title !== undefined && !input.title.trim()) return { ok: false, error: "ops.err.titleRequired" };
+  const cars = input.detail?.[DRV.cars];
+  if (cars !== undefined && carCount(cars) === null) return { ok: false, error: "ops.err.carCount" };
 
   try {
     const patch: Record<string, unknown> = {};
