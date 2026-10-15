@@ -26,7 +26,22 @@ const small = `${basicField} h-8 text-[12px]`;
 const qTitle = "text-[12px] font-extrabold text-[#185045]";
 
 /** what the agent picks places from — the catalogue, never a blank box first. */
-export type AdvancedPickLists = { airports: string[]; places: string[]; hotels: string[]; countries: string[] };
+export type AdvancedPickLists = {
+  /** the airports table — airports AND stations / ports, each with its country. */
+  stops: { label: string; country: string; station: boolean }[];
+  cities: { name: string; country: string }[];
+  hotels: string[];
+  countries: string[];
+};
+
+/** what to offer for «arrives / leaves at»: by flight the airports, by train or ferry the stations and ports, by road a city or a station — in the chosen country. */
+function placesFor(lists: AdvancedPickLists, by: ArriveBy, country: string): string[] {
+  const inCountry = <T extends { country: string }>(xs: T[]) => (country ? xs.filter((x) => x.country === country) : xs);
+  const stops = inCountry(lists.stops);
+  if (by === "flight") return stops.filter((s) => !s.station).map((s) => s.label);
+  if (by === "rail_sea") return stops.filter((s) => s.station).map((s) => s.label);
+  return [...new Set([...inCountry(lists.cities).map((c) => c.name), ...stops.filter((s) => s.station).map((s) => s.label)])];
+}
 
 /**
  * «بكج متقدم»: four short questions inside the basic file — nothing else changes.
@@ -69,18 +84,30 @@ export function AdvancedQuestions({
     `${r.from_place} ← ${r.to_place}${r.date ? ` — ${r.date}` : ""}${r.note ? ` (${r.note})` : ""}`;
   const changed = rows.filter((r) => !before.some((b) => rowText(b) === rowText(r)));
 
-  const pick = (list: keyof AdvancedPickLists, value: string, put: (v: string) => void, placeholder: string) => (
-    <>
-      <input className={small} list={`${id}-${list}`} value={value} placeholder={placeholder} onChange={(e) => put(e.target.value)} />
-    </>
+  const choices: Record<string, string[]> = {
+    arrive: placesFor(lists, adv.arrive_by, adv.arrive_country),
+    leave: placesFor(lists, adv.leave_by, adv.leave_country),
+    hotels: lists.hotels,
+    crossings: [],
+  };
+  const pick = (list: keyof typeof choices, value: string, put: (v: string) => void, placeholder: string) => (
+    <input className={small} list={`${id}-${list}`} value={value} placeholder={placeholder} onChange={(e) => put(e.target.value)} />
   );
-  const datalists = (Object.keys(lists) as (keyof AdvancedPickLists)[]).map((k) => (
+  const datalists = Object.entries(choices).map(([k, values]) => (
     <datalist key={k} id={`${id}-${k}`}>
-      {lists[k].map((v) => (
+      {values.map((v) => (
         <option key={v} value={v} />
       ))}
     </datalist>
   ));
+  const countryQ = (value: string, put: (v: string) => void, label: string) => (
+    <select className={small} value={value} onChange={(e) => put(e.target.value)} aria-label={label}>
+      <option value="">{label}</option>
+      {lists.countries.map((c) => (
+        <option key={c}>{c}</option>
+      ))}
+    </select>
+  );
   const dateIn = (k: AdvancedDateKey, value: string, title: string) => (
     <label className="grid gap-0.5 text-[10.5px] font-bold text-[#557d78]">
       <span>
@@ -120,7 +147,7 @@ export function AdvancedQuestions({
       {p.kind && p.kind !== "self" ? (
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           {p.kind === "hotel" ? pick("hotels", p.place, (v) => put({ ...p, place: v }), "اختر الفندق") : null}
-          {p.kind === "border" ? pick("places", p.place, (v) => put({ ...p, place: v }), "اسم المعبر") : null}
+          {p.kind === "border" ? pick("crossings", p.place, (v) => put({ ...p, place: v }), "اسم المعبر") : null}
           {p.kind === "border" ? (
             <select className={small} value={p.side} onChange={(e) => put({ ...p, side: e.target.value })}>
               <option value="">أي جانب؟</option>
@@ -198,10 +225,11 @@ export function AdvancedQuestions({
       <div className="grid gap-2 sm:grid-cols-2">
         {block(
           <>
-            <span className={qTitle}>١. كيف يصل العميل؟</span>
+            <span className={qTitle}>١. إلى أي دولة يصل العميل؟ وكيف؟</span>
+            {countryQ(adv.arrive_country, (arrive_country) => set({ arrive_country, arrive_at: "" }), "دولة الوصول")}
             {byQ(adv.arrive_by, (arrive_by) => set({ arrive_by }))}
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-              {adv.arrive_by && adv.arrive_by !== "already" ? <span className="col-span-2">{pick(adv.arrive_by === "flight" ? "airports" : "places", adv.arrive_at, (arrive_at) => set({ arrive_at }), "إلى أين يصل؟")}</span> : null}
+              {adv.arrive_by && adv.arrive_by !== "already" ? <span className="col-span-2">{pick("arrive", adv.arrive_at, (arrive_at) => set({ arrive_at }), "إلى أين يصل؟")}</span> : null}
               {dateIn("arrive_date", adv.arrive_date, "تاريخ الوصول")}
               {timeIn(adv.arrive_time, (v) => onChange(setAdvancedDate(adv, "arrive_time", v)), "وقت الوصول")}
               {dateIn("checkin_date", adv.checkin_date, "الدخول لأول فندق")}
@@ -210,10 +238,11 @@ export function AdvancedQuestions({
         )}
         {block(
           <>
-            <span className={qTitle}>وكيف يغادر؟</span>
+            <span className={qTitle}>ومن أي دولة يغادر؟ وكيف؟</span>
+            {countryQ(adv.leave_country, (leave_country) => set({ leave_country, leave_from: "" }), "دولة المغادرة")}
             {byQ(adv.leave_by, (leave_by) => set({ leave_by }))}
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-              {adv.leave_by && adv.leave_by !== "already" ? <span className="col-span-2">{pick(adv.leave_by === "flight" ? "airports" : "places", adv.leave_from, (leave_from) => set({ leave_from }), "من أين يغادر؟")}</span> : null}
+              {adv.leave_by && adv.leave_by !== "already" ? <span className="col-span-2">{pick("leave", adv.leave_from, (leave_from) => set({ leave_from }), "من أين يغادر؟")}</span> : null}
               {dateIn("leave_date", adv.leave_date, "تاريخ المغادرة")}
               {timeIn(adv.leave_time, (v) => onChange(setAdvancedDate(adv, "leave_time", v)), "وقت المغادرة")}
             </div>
@@ -265,7 +294,7 @@ export function AdvancedQuestions({
                     <button type="button" className={chip(!!adv.borders[key] && hop.drivers === 2)} onClick={() => put({ drivers: 2 })}>
                       سائقان وعبور ذاتي
                     </button>
-                    {adv.borders[key] ? <span className="w-44">{pick("places", hop.crossing, (crossing) => put({ crossing }), "اسم المعبر")}</span> : null}
+                    {adv.borders[key] ? <span className="w-44">{pick("crossings", hop.crossing, (crossing) => put({ crossing }), "اسم المعبر")}</span> : null}
                   </div>
                 );
               })}

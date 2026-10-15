@@ -117,7 +117,7 @@ import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
 import { basicCard, basicField, basicLabel, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
 import { AdvancedQuestions } from "./AdvancedQuestions";
-import { advancedDefaults, emptyAdvanced, fillAdvanced } from "@/lib/offer/advanced";
+import { advancedDefaults, emptyAdvanced, fillAdvanced, isStation } from "@/lib/offer/advanced";
 import { IssueGuardNotice } from "../IssueGuardNotice";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -475,11 +475,16 @@ export function BasicEditor({
   // «بكج متقدم» picks its places from the catalogue
   const advancedLists = useMemo(() => {
     const wanted = new Set([trip.country, ...data.cities.map((c) => c.country ?? "")].filter(Boolean));
+    const cityCountry = new Map(lk.countries.flatMap((c) => c.cities.map((x) => [x.name, c.name] as const)));
     return {
-      airports: lk.airports.map((a) => `${a.name}${a.code ? ` (${a.code})` : ""}`),
-      places: [...new Set(lk.countries.flatMap((c) => c.cities.map((x) => x.name)))],
+      stops: lk.airports.map((a) => {
+        const label = `${a.name}${a.code ? ` (${a.code})` : ""}`;
+        return { label, country: a.country || (a.city ? cityCountry.get(a.city) : undefined) || "", station: isStation(label) };
+      }),
+      cities: lk.countries.flatMap((c) => c.cities.map((x) => ({ name: x.name, country: c.name }))),
       hotels: [...new Set(lk.countries.filter((c) => wanted.has(c.name)).flatMap((c) => c.cities.flatMap((x) => x.hotels.map((h) => h.name))))],
-      countries: lk.countries.map((c) => c.name),
+      // the package's own countries first — the usual answer, one tap away
+      countries: [...new Set([...wanted, ...lk.countries.map((c) => c.name)])],
     };
   }, [lk, trip.country, data.cities]);
 

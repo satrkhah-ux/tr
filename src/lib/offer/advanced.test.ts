@@ -9,7 +9,7 @@ const rows = [
   { from_place: "فندق تبليسي", to_place: TRANSPORT_AIRPORT, car_type: "سيدان", date: null, note: "" },
   { from_place: "باتومي", to_place: "تبليسي", car_type: "سيدان", date: "2026-11-13", note: "" },
 ];
-const adv = (patch: Partial<DraftAdvanced>): DraftAdvanced => ({ ...emptyAdvanced(), on: true, arrive_by: "flight", leave_by: "flight", ...patch });
+const adv = (patch: Partial<DraftAdvanced>): DraftAdvanced => ({ ...emptyAdvanced(), on: true, arrive_country: "تركيا", arrive_by: "flight", leave_country: "جورجيا", leave_by: "flight", ...patch });
 
 describe("«بكج متقدم» — four answers on top of the basic file", () => {
   it("off (or absent) changes nothing: the basic file stays the basic file", () => {
@@ -120,5 +120,17 @@ describe("«بكج متقدم» — Basic's dates", () => {
     expect(advancedDefaults(d)).toMatchObject({ arrive_date: "2026-11-10", arrive_time: "12:00", leave_date: "2026-11-14", leave_time: "19:00" });
     d.flights[0] = { ...d.flights[0], arrival_at: null, departure_at: "2026-11-09" };
     expect(advancedDefaults(d).arrive_date).toBe("2026-11-09");
+  });
+});
+
+describe("«بكج متقدم» — the place fits the way they travel", () => {
+  it("a station picked for a flight (the airports table holds stations too) is flagged", async () => {
+    const { isStation } = await import("./advanced");
+    expect(isStation("محطة القطار هانوي (12go)")).toBe(true);
+    expect(isStation("مطار طرابزون (TZX)")).toBe(false);
+    expect(isStation("محطه الباص في نينه بينه (bu)")).toBe(true);
+    const a = adv({ arrive_at: "محطة القطار هانوي (12go)" });
+    expect(advancedGaps(a)[0]).toBe("«محطة القطار هانوي (12go)» محطة وليست مطاراً — غيّر الوسيلة إلى «قطار / عبّارة» أو اختر مطاراً");
+    expect(advancedGaps({ ...a, arrive_by: "rail_sea" }).some((g) => g.includes("محطة وليست"))).toBe(false);
   });
 });

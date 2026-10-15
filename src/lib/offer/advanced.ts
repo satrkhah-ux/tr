@@ -43,6 +43,8 @@ export type AdvancedDateKey = "arrive_date" | "arrive_time" | "checkin_date" | "
 
 export type DraftAdvanced = {
   on: boolean;
+  /** the country the client lands / arrives in — it narrows the airports and stations offered. */
+  arrive_country: string;
   arrive_by: ArriveBy;
   /** where the client actually lands / arrives, when it is not where we meet them. */
   arrive_at: string;
@@ -50,6 +52,7 @@ export type DraftAdvanced = {
   arrive_time: string;
   /** the first hotel we book — a night before it is not ours. */
   checkin_date: string;
+  leave_country: string;
   leave_by: ArriveBy;
   leave_from: string;
   leave_date: string;
@@ -72,11 +75,13 @@ const point = (): ServicePoint => ({ kind: "", place: "", side: "", date: "", ti
 export function emptyAdvanced(): DraftAdvanced {
   return {
     on: false,
+    arrive_country: "",
     arrive_by: "",
     arrive_at: "",
     arrive_date: "",
     arrive_time: "",
     checkin_date: "",
+    leave_country: "",
     leave_by: "",
     leave_from: "",
     leave_date: "",
@@ -263,12 +268,33 @@ export function advancedLines(adv: DraftAdvanced | undefined): { includes: strin
   return { includes, excludes };
 }
 
+/**
+ * The airports table also holds train stations, bus stations and ports (the
+ * old system's «12go» stops). Their names say which they are.
+ */
+export function isStation(name: string): boolean {
+  return /محط[ةه]|قطار|ميناء|مرفأ|حافلات|باص|station|port|pier|ferry|12go/i.test(name);
+}
+const looksAirport = (name: string) => /مطار|airport/i.test(name) && !isStation(name);
+
+/** the place does not fit the way the client travels: a station picked for a flight, an airport for a train. */
+function wrongPlace(by: ArriveBy, place: string): string | null {
+  const p = place.trim();
+  if (!p) return null;
+  if (by === "flight" && isStation(p)) return `«${p}» محطة وليست مطاراً — غيّر الوسيلة إلى «${ARRIVE_BY_AR.rail_sea}» أو اختر مطاراً`;
+  if (by === "rail_sea" && looksAirport(p)) return `«${p}» مطار — غيّر الوسيلة إلى «${ARRIVE_BY_AR.flight}» أو اختر محطة / ميناء`;
+  return null;
+}
+
 /** What is still open or does not add up — said to the agent, never invented. */
 export function advancedGaps(adv: DraftAdvanced | undefined): string[] {
   if (!adv?.on) return [];
   const gaps: string[] = [];
+  if (!adv.arrive_country) gaps.push("اختر دولة وصول العميل");
   if (!adv.arrive_by) gaps.push("اختر كيف يصل العميل");
+  if (!adv.leave_country) gaps.push("اختر دولة مغادرة العميل");
   if (!adv.leave_by) gaps.push("اختر كيف يغادر العميل");
+  for (const w of [wrongPlace(adv.arrive_by, adv.arrive_at), wrongPlace(adv.leave_by, adv.leave_from)]) if (w) gaps.push(w);
   for (const [label, p] of [["الاستقبال", adv.reception], ["التوديع", adv.farewell]] as const) {
     if (!p.kind) {
       gaps.push(`اختر نقطة ${label}`);
