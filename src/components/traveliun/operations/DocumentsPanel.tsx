@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  BedDouble,
   Car,
   CheckCircle2,
   Copy,
@@ -35,7 +36,8 @@ import {
 } from "@/lib/data/operation-bookings";
 import { seedBookingsFromOffer } from "@/lib/data/operation-seed";
 import { ensureClientLink, revokeClientLink } from "@/lib/data/operation-hub";
-import type { VoucherKind } from "@/lib/operations/voucher-dto";
+import { ROOM_SPEC_KEY, type VoucherKind } from "@/lib/operations/voucher-dto";
+import { roomDetailsOpen } from "@/lib/operations/room-details";
 import { carFields, carText, DRV } from "@/lib/operations/drivers";
 import type { TranslationKey } from "@/lib/i18n";
 import type { AssigneeOption, SentRequest } from "@/lib/data/operation-assign";
@@ -48,6 +50,7 @@ import { AssignBooking, AssigneeChip } from "./AssignBooking";
 import { SupplierBooking } from "./SupplierBooking";
 import { CatalogHotelPick, useCaseHotels } from "./CaseHotelPicker";
 import { ConfirmAllBookings } from "./ConfirmAllBookings";
+import { RoomDetails } from "./RoomDetails";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition, useSessionField } from "../useSafeTransition";
 
@@ -134,7 +137,7 @@ export function DocumentsPanel({
         for (const h of hotels) {
           const res = await issueDocument({ operation_id: operationId, kind, booking_id: h.id });
           if (!res.ok) {
-            setError(t(res.error));
+            setError(t(res.error, res.params));
             return;
           }
         }
@@ -142,7 +145,7 @@ export function DocumentsPanel({
         return;
       }
       const res = await issueDocument({ operation_id: operationId, kind, welcome_name: kind === "welcome_board" ? welcomeName : null });
-      if (!res.ok) setError(t(res.error));
+      if (!res.ok) setError(t(res.error, res.params));
       else router.refresh();
     });
   }
@@ -642,7 +645,8 @@ const KIND_FIELDS: Partial<Record<OperationBooking["kind"], string[]>> = {
  */
 function detailForm(booking: OperationBooking): Record<string, string> {
   const d = { ...(booking.detail ?? {}), ...carFields(booking.detail) };
-  const keys = [...new Set([...Object.keys(d), ...(KIND_FIELDS[booking.kind] ?? [])])].filter((k) => k !== DRV.cars);
+  // the room details are «تفاصيل الغرفة»'s, not a field to type JSON into
+  const keys = [...new Set([...Object.keys(d), ...(KIND_FIELDS[booking.kind] ?? [])])].filter((k) => k !== DRV.cars && k !== ROOM_SPEC_KEY);
   const car = keys.indexOf(DRV.car);
   if (car >= 0) keys.splice(car + 1, 0, DRV.cars);
   return Object.fromEntries(keys.map((k) => [k, d[k] ?? ""]));
@@ -667,6 +671,7 @@ function BookingRow({
   const { t } = useTraveliunUI();
   const [confirming, setConfirming] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [rooming, setRooming] = useState(false);
   // kept in this tab until sent — a reload after a deploy used to lose it
   const [ref, setRef, forgetRef] = useSessionField(`ref:${booking.id}`, booking.confirmation_number ?? "");
   const [form, setForm] = useState({
@@ -718,6 +723,18 @@ function BookingRow({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
+          {/* what the hotel confirmed about the room — only once it is confirmed */}
+          {roomDetailsOpen(booking) ? (
+            <button
+              type="button"
+              onClick={() => setRooming((v) => !v)}
+              aria-expanded={rooming}
+              className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+            >
+              <BedDouble className="size-3.5" />
+              {t("ops.room.details")}
+            </button>
+          ) : null}
           {/* corrective work is the norm here — a date read wrong off a supplier
               email, a room the hotel downgraded. Without edit the only recourse
               is delete-and-retype, which loses the confirmation number too. */}
@@ -791,6 +808,16 @@ function BookingRow({
       {/* Hotels only — TBO is a hotel API, and flights/visas stay manual. */}
       <SupplierBooking booking={booking} canBook={canBook} onDone={onDone} />
 
+      {rooming && roomDetailsOpen(booking) ? (
+        <RoomDetails
+          booking={booking}
+          onDone={() => {
+            setRooming(false);
+            onDone();
+          }}
+        />
+      ) : null}
+
       {editing ? (
         <div className="mt-2 grid gap-2 rounded-[9px] border border-[#e2ebe7] bg-[#f8fbf9] p-3 sm:grid-cols-2">
           {booking.kind === "hotel" ? (
@@ -862,8 +889,11 @@ function BookingRow({
                     city_name: form.city_name,
                     start_date: form.start_date || null,
                     end_date: singleDay(booking.kind) ? null : form.end_date || null,
-                    // empty fields are left out — a blank «السائق» is not a driver
-                    detail: Object.fromEntries(Object.entries(form.detail).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()])),
+                    // empty fields are left out — a blank «السائق» is not a driver; the room details ride along
+                    detail: {
+                      ...Object.fromEntries(Object.entries(form.detail).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()])),
+                      ...(booking.detail?.[ROOM_SPEC_KEY] ? { [ROOM_SPEC_KEY]: booking.detail[ROOM_SPEC_KEY] } : {}),
+                    },
                   });
                   if (!res.ok) setError(t(res.error));
                   else {

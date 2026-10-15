@@ -33,6 +33,8 @@ import { cityDates, withTours } from "@/lib/offer/basic";
 import { itineraryStartDate } from "@/lib/offer/schedule";
 import { BOARD_AR } from "@/components/offer-doc/labels";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
+import { roomsJson, seededSpec, type BookingRoomSpec } from "./room-details";
+import { ROOM_SPEC_KEY } from "./voucher-dto";
 
 export type PlannedBooking = {
   origin_ref: string;
@@ -174,13 +176,19 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
     for (const stay of [...stays, ...orphans]) {
       const line = stay.line;
       const detail: Record<string, string> = { المدينة: stay.city_name };
+      // the room as the catalogue names it — the offer's codes, else read from its name — for «تفاصيل الغرفة» and the voucher
+      const specs: Record<string, BookingRoomSpec> = {};
       line.rooms.forEach((r, k) => {
         const board = r.board_type ? BOARD_AR[r.board_type] : "";
-        detail[line.rooms.length > 1 ? `الغرفة ${k + 1}` : "الغرفة"] = [r.room_type_name.trim() || "—", board].filter(Boolean).join(" — ");
+        const key = line.rooms.length > 1 ? `الغرفة ${k + 1}` : "الغرفة";
+        detail[key] = [r.room_type_name.trim() || "—", board].filter(Boolean).join(" — ");
+        const spec = seededSpec(r);
+        if (spec) specs[key] = spec;
       });
       detail["عدد الغرف"] = String(line.rooms.length);
       if (stay.nights) detail["عدد الليالي"] = String(stay.nights);
       detail["النزلاء"] = pax;
+      if (Object.keys(specs).length > 0) detail[ROOM_SPEC_KEY] = roomsJson(specs);
       rows.push({
         origin_ref: `stay:${line.id}`,
         kind: "hotel",

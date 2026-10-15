@@ -46,6 +46,25 @@ describe("the operational documents", () => {
     expect(out).not.toContain("مورّد داخلي");
   });
 
+  it("prints a stay issued in English under its English name, the Arabic below, with its room notes", () => {
+    const out = html(
+      voucher("hotel_voucher", [
+        booking({
+          title: "Pullman Kuala Lumpur City Centre",
+          alt_name: "بولمان سيتي سنتر",
+          city_name: "Kuala Lumpur",
+          locale: "en",
+          detail: { الغرفة: "Deluxe King Room — Bed & breakfast" },
+          notes: ["Beds: 1 × King Bed (Guaranteed)"],
+        }),
+      ]),
+    );
+    expect(out).toContain("Pullman Kuala Lumpur City Centre");
+    expect(out).toContain("بولمان سيتي سنتر");
+    expect(out).toContain("Deluxe King Room — Bed &amp; breakfast");
+    expect(out).toContain("Beds: 1 × King Bed (Guaranteed)");
+  });
+
   it("dates a ticket as departure and return, prints a planned time as «to be set», and names the route once", () => {
     const out = html(
       voucher("flight_ticket", [

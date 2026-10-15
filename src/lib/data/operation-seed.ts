@@ -12,6 +12,8 @@ import { currentCan } from "@/lib/roles/current";
 import { normalizeDraftData } from "@/lib/offer/draft-types";
 import { LATER, newBookings, planBookingsFromDraft, type ExistingBooking } from "@/lib/operations/seed-plan";
 import { issuedDraftData } from "@/lib/data/issued-draft";
+import { roomsJson, seededSpec } from "@/lib/operations/room-details";
+import { ROOM_SPEC_KEY } from "@/lib/operations/voucher-dto";
 
 /**
  * Pull the bookings straight out of the offer the client agreed to.
@@ -152,10 +154,12 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
     }[]) {
       const detail: Record<string, string> = {};
       if (h.room_type_name) detail["نوع الغرفة"] = h.room_type_name;
+      const spec = h.room_type_name ? seededSpec({ room_type_name: h.room_type_name }) : null;
       // the board CODE means nothing to a hotel receptionist — print the words
       if (h.board_type) detail["الإقامة"] = BOARD_AR[h.board_type as BoardType] ?? h.board_type;
       if (h.rooms_count) detail["عدد الغرف"] = String(h.rooms_count);
       if (h.nights) detail["عدد الليالي"] = String(h.nights);
+      if (spec) detail[ROOM_SPEC_KEY] = roomsJson({ "نوع الغرفة": spec });
 
       rows.push({
         origin_ref: `hotel:${h.id}`,

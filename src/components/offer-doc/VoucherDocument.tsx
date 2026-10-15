@@ -312,12 +312,17 @@ function Bookings({ voucher, bookings, first }: { voucher: VoucherDTO; bookings:
             ) : null}
           </div>
           <div>
-            <div style={{ fontSize: "13pt", fontWeight: 800, color: "var(--od-green)" }}>
+            {/* a stay issued after the room catalogue is in its destination's language — the hotel's name in it, the other below */}
+            <div style={{ fontSize: "13pt", fontWeight: 800, color: "var(--od-green)", ...(b.locale === "en" ? { direction: "ltr", textAlign: "right" } : {}) }}>
               {b.title}
               {city ? <span style={{ fontWeight: 500 }}> — {city}</span> : null}
             </div>
-            {/* the name the hotel knows itself by */}
-            {bilingual && b.name_en ? <div style={{ fontSize: "11pt", fontWeight: 700, direction: "ltr", textAlign: "right" }}>{b.name_en}</div> : null}
+            {b.locale ? (
+              b.alt_name ? <div style={{ fontSize: "10.5pt", fontWeight: 600, color: "var(--od-muted)", ...(b.locale === "ar" ? { direction: "ltr", textAlign: "right" } : {}) }}>{b.alt_name}</div> : null
+            ) : bilingual && b.name_en ? (
+              // the name the hotel knows itself by
+              <div style={{ fontSize: "11pt", fontWeight: 700, direction: "ltr", textAlign: "right" }}>{b.name_en}</div>
+            ) : null}
             {/* the number that makes this document worth carrying */}
             {b.confirmation_number ? (
               <div style={{ marginTop: "2mm", fontSize: "11.5pt", fontWeight: 800 }}>
@@ -344,6 +349,11 @@ function Bookings({ voucher, bookings, first }: { voucher: VoucherDTO; bookings:
                 ))}
               </tbody>
             </table>
+            {(b.notes ?? []).map((n) => (
+              <p key={n} className="od-note" dir={b.locale === "en" ? "ltr" : undefined}>
+                {n}
+              </p>
+            ))}
             {b.cancellation_policy ? <p className="od-note">{b.cancellation_policy}</p> : null}
           </div>
         </div>
