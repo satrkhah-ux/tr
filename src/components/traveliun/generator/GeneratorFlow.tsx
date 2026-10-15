@@ -36,6 +36,7 @@ import { useDraftState } from "./useDraftState";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { IssueGuardNotice } from "../IssueGuardNotice";
+import { ReissueOffer } from "../ReissueOffer";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
 import { draftBrand, draftToPreviewOffer } from "@/lib/offer/preview-dto";
 
@@ -95,7 +96,7 @@ export function GeneratorFlow({
   // Issues that belong to permission-gated stages are hidden from roles without
   // access — a visitor must see NO trace of the pricing stage anywhere.
   const validation = useMemo(() => {
-    const raw = validateDraft(data);
+    const raw = validateDraft(data, { partnerFile: partner !== null });
     if (canPricing) return raw;
     const gated = new Set(STAGES.filter((s) => s.gated).map((s) => s.key));
     return {
@@ -103,7 +104,7 @@ export function GeneratorFlow({
       blocking: raw.blocking.filter((issue) => !gated.has(issue.stage)),
       warnings: raw.warnings.filter((issue) => !gated.has(issue.stage)),
     };
-  }, [data, canPricing]);
+  }, [data, canPricing, partner]);
 
   /**
    * The cards, in order. `visibleStagesFor` drops what the scope switches
@@ -347,7 +348,7 @@ export function GeneratorFlow({
                   </FieldIssueProvider>
 
                   {meta.key === "itinerary" ? (
-                    <ProduceBar draftId={draftId} data={data} patch={patch} ok={validation.ok} />
+                    <ProduceBar draftId={draftId} data={data} patch={patch} flush={flush} ok={validation.ok} partnerFile={partner !== null} />
                   ) : null}
 
                   {nextLabel ? (
@@ -469,12 +470,17 @@ function ProduceBar({
   draftId,
   data,
   patch,
+  flush,
   ok,
+  partnerFile,
 }: {
   draftId: string;
   data: DraftData;
   patch: (slice: Partial<DraftData>) => void;
+  flush: () => Promise<void>;
   ok: boolean;
+  /** a partner's issued file is locked (a copy is their way): no re-issue button */
+  partnerFile: boolean;
 }) {
   const { t } = useTraveliunUI();
   const [producing, setProducing] = useState(false);
@@ -510,6 +516,10 @@ function ProduceBar({
         >
           {t("pg.openClientLink")}
         </Link>
+        {/* edited since: the next version under the same serial */}
+        {partnerFile ? null : (
+          <ReissueOffer draftId={draftId} hotels={data.hotels} blocked={!ok} flush={flush} className="w-full border-t border-[#bfe5d4] pt-2" />
+        )}
       </div>
     );
   }

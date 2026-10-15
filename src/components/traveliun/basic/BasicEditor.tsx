@@ -99,7 +99,7 @@ import {
   type BasicCity,
   type PriceGroup,
 } from "@/lib/offer/basic";
-import { validateDraft, type DraftIssue } from "@/lib/offer/draft-validation";
+import { citiesWithoutHotel, validateDraft, type DraftIssue } from "@/lib/offer/draft-validation";
 import { computeOfferPricing, rebase } from "@/lib/offer/pricing";
 import { syncSuggestions, type TourPrice } from "@/lib/offer/pricing-suggest";
 import { syncDepartureDates } from "@/lib/offer/schedule";
@@ -123,6 +123,8 @@ import { HotelCombobox } from "./HotelCombobox";
 import { AdvancedQuestions } from "./AdvancedQuestions";
 import { advancedDefaults, advancedTripDates, emptyAdvanced, fillAdvanced, isStation, type DraftAdvanced } from "@/lib/offer/advanced";
 import { IssueGuardNotice } from "../IssueGuardNotice";
+import { ReissueOffer } from "../ReissueOffer";
+import { OverlandHopNotice } from "../OverlandHopNotice";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 /** Hotels are entered in riyals unless the agent says otherwise. */
@@ -763,7 +765,7 @@ export function BasicEditor({
   }
 
   // ---------- what is still missing, and issuing ----------
-  const validation = useMemo(() => validateDraft(data), [data]);
+  const validation = useMemo(() => validateDraft(data, { partnerFile: partnerSession !== null }), [data, partnerSession]);
   const gated = new Set(STAGES.filter((s) => s.gated).map((s) => s.key));
   const blocking = validation.blocking.filter((i) => canPricing || !gated.has(i.stage));
   // «hotels» has no rail entry of its own (its stays live in the city card)
@@ -780,6 +782,10 @@ export function BasicEditor({
   const [whatsapp, setWhatsapp] = useState<string | null>(null);
   const [guardBlocked, setGuardBlocked] = useState(false);
   const produced = data.produced_serial;
+  const sayWhatsapp = (sent: string) => {
+    const said = { sent: "waSent", window: "waWindow", no_phone: "waNoPhone", unreachable: "waUnreachable" } as const;
+    setWhatsapp(sent in said ? tx(said[sent as keyof typeof said]) : null);
+  };
 
   async function produce() {
     if (producing || blocking.length > 0 || guardBlocked) return;
@@ -791,8 +797,7 @@ export function BasicEditor({
       const result = await produceOfferFromDraft(draftId);
       if (!result.ok) return setProduceError(t(result.error));
       patch({ produced_serial: result.serial });
-      const said = { sent: "waSent", window: "waWindow", no_phone: "waNoPhone", unreachable: "waUnreachable" } as const;
-      setWhatsapp(result.whatsapp in said ? tx(said[result.whatsapp as keyof typeof said]) : null);
+      sayWhatsapp(result.whatsapp);
     } catch {
       setProduceError(tx("serverLost"));
     } finally {
@@ -813,9 +818,12 @@ export function BasicEditor({
   const [flightView, setFlightView] = useState<"plan" | "final">(() => (hasTickets ? "final" : "plan"));
 
   // ---------- the steps: one open at a time ----------
-  // the cities whose stay still lacks a room type, a board or a price — «إكمال» opens only these
+  // the cities whose stay still lacks a hotel, a room type, a board or a price — «إكمال» opens only these
+  // (no hotel at all: the same function the server's issue gate asks)
+  const noHotel = citiesWithoutHotel(data);
   const hotelGaps = scope.hotels
     ? [...new Set(cities.map((c) => c.city_name))].filter((name) =>
+        noHotel.includes(name) ||
         data.hotels.some(
           (h) =>
             h.city_name === name &&
@@ -1190,6 +1198,8 @@ export function BasicEditor({
             ))}
           </div>
         ) : null}
+        {/* a road hop nobody would drive (Puncak → Bali): said, never blocked */}
+        {cities.length > 1 && !focus ? <OverlandHopNotice data={data} countries={lk.countries} /> : null}
         {focus ? (
           <div className="flex flex-wrap items-center gap-2 rounded-[10px] bg-[#fff8e8] px-3 py-1.5 text-[12px] font-bold text-[#a86a10]">
             <AlertTriangle className="size-4" />
@@ -1609,52 +1619,55 @@ export function BasicEditor({
                 {t("pg.viewPdf")}
               </a>
             </div>
+          ) : null}
+          {blocking.length > 0 ? (
+            <>
+              <h3 className={`mb-2 inline-flex items-center gap-2 text-[13px] font-extrabold text-[#a86a10] ${produced ? "mt-3" : ""}`}>
+                <AlertTriangle className="size-4" />
+                {tx("missing")}
+              </h3>
+              <ul className="space-y-1">
+                {blocking.map((issue, i) => {
+                  const target = STEP_OF[issue.stage];
+                  return (
+                  <li key={i} className="flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[#5b4a2a]">
+                    <span className="rounded-full bg-[#fff3d6] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">{stageLabel(issue.stage)}</span>
+                    <span className="min-w-0 flex-1">{issueText(issue)}</span>
+                    {target && steps.includes(target) ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          show(target);
+                          if (issue.stage === "hotels" && hotelGaps.length > 0) setFocus(hotelGaps);
+                        }}
+                        className="text-[11.5px] font-bold text-[#185045] underline"
+                      >
+                        {tx("fix")}
+                      </button>
+                    ) : (
+                      // services lists, terms: only the full generator edits those
+                      <Link href={stageHref(draftId, issue.stage)} onClick={() => void flush()} className="text-[11.5px] font-bold text-[#185045] underline">
+                        {tx("fix")}
+                      </Link>
+                    )}
+                  </li>
+                  );
+                })}
+              </ul>
+            </>
+          ) : produced ? null : (
+            <p className="inline-flex items-center gap-2 text-[13px] font-bold text-[#0f7a52]">
+              <CheckCircle2 className="size-4" />
+              {tx("allGood")}
+            </p>
+          )}
+          {produced ? (
+            // edited since it was issued: the next version, same serial (a partner's issued file is locked)
+            partnerSession ? null : <ReissueOffer draftId={draftId} hotels={data.hotels} blocked={blocking.length > 0} flush={flush} onIssued={(r) => sayWhatsapp(r.whatsapp)} className="mt-3" />
           ) : (
             <>
-              {blocking.length === 0 ? (
-                <p className="inline-flex items-center gap-2 text-[13px] font-bold text-[#0f7a52]">
-                  <CheckCircle2 className="size-4" />
-                  {tx("allGood")}
-                </p>
-              ) : (
-                <>
-                  <h3 className="mb-2 inline-flex items-center gap-2 text-[13px] font-extrabold text-[#a86a10]">
-                    <AlertTriangle className="size-4" />
-                    {tx("missing")}
-                  </h3>
-                  <ul className="space-y-1">
-                    {blocking.map((issue, i) => {
-                      const target = STEP_OF[issue.stage];
-                      return (
-                      <li key={i} className="flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[#5b4a2a]">
-                        <span className="rounded-full bg-[#fff3d6] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">{stageLabel(issue.stage)}</span>
-                        <span className="min-w-0 flex-1">{issueText(issue)}</span>
-                        {target && steps.includes(target) ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              show(target);
-                              if (issue.stage === "hotels" && hotelGaps.length > 0) setFocus(hotelGaps);
-                            }}
-                            className="text-[11.5px] font-bold text-[#185045] underline"
-                          >
-                            {tx("fix")}
-                          </button>
-                        ) : (
-                          // services lists, terms: only the full generator edits those
-                          <Link href={stageHref(draftId, issue.stage)} onClick={() => void flush()} className="text-[11.5px] font-bold text-[#185045] underline">
-                            {tx("fix")}
-                          </Link>
-                        )}
-                      </li>
-                      );
-                    })}
-                  </ul>
-                </>
-              )}
               <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} className="mt-2" />
               {produceError ? <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">{produceError}</p> : null}
-              {whatsapp ? <p role="status" className="mt-2 text-[12px] font-bold text-[#557d78]">{whatsapp}</p> : null}
               <div className="mt-3 flex justify-end">
                 <button
                   type="button"
@@ -1669,6 +1682,7 @@ export function BasicEditor({
               </div>
             </>
           )}
+          {whatsapp ? <p role="status" className="mt-2 text-[12px] font-bold text-[#557d78]">{whatsapp}</p> : null}
         </div>
     ),
   };

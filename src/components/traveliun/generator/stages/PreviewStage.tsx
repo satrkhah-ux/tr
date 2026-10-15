@@ -8,6 +8,7 @@ import { produceOfferFromDraft } from "@/lib/data/drafts";
 import { validateDraft } from "@/lib/offer/draft-validation";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { IssueGuardNotice } from "../../IssueGuardNotice";
+import { ReissueOffer } from "../../ReissueOffer";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
 import { draftBrand, draftToPreviewOffer } from "@/lib/offer/preview-dto";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
@@ -18,14 +19,14 @@ import { sectionClass, type StageFormProps } from "../stage-props";
  * client variant (sell price only). Producing is blocked while blocking errors
  * remain; the button then lists what to fix.
  */
-export function PreviewStage({ draftId, data, patch, lookups }: StageFormProps) {
+export function PreviewStage({ draftId, data, patch, flush, lookups }: StageFormProps) {
   const ownFile = usePartnerBrand() !== null;
   const { t, language } = useTraveliunUI();
   const [producing, setProducing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [guardBlocked, setGuardBlocked] = useState(false);
 
-  const validation = useMemo(() => validateDraft(data), [data]);
+  const validation = useMemo(() => validateDraft(data, { partnerFile: ownFile }), [data, ownFile]);
   const produced = data.produced_serial;
 
   async function produce() {
@@ -86,6 +87,12 @@ export function PreviewStage({ draftId, data, patch, lookups }: StageFormProps) 
           </button>
         )}
       </section>
+
+      {produced && !ownFile ? (
+        <section className={sectionClass}>
+          <ReissueOffer draftId={draftId} hotels={data.hotels} blocked={!validation.ok} flush={flush} />
+        </section>
+      ) : null}
 
       {!validation.ok ? (
         <section className="rounded-2xl border border-[#f2d0d7] bg-[#fdeef2] p-4">
