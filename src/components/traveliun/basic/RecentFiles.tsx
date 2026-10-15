@@ -31,18 +31,21 @@ const dayKey = (iso: string | Date) => new Date(iso).toLocaleDateString("en-CA",
 export function RecentFiles({
   drafts,
   meId,
+  allByDefault = false,
   busy,
   onCopy,
 }: {
   drafts: DraftSummary[];
   /** the signed-in employee; null for a partner (all their files are their company's) */
   meId: string | null;
+  /** the administration opens on everyone's files */
+  allByDefault?: boolean;
   busy: string | null;
   onCopy: (id: string) => void;
 }) {
   const tx = useBasicLabels();
   const { t, language } = useTraveliunUI();
-  const [who, setWho] = useState<string>(meId ? "mine" : "all");
+  const [who, setWho] = useState<string>(meId && !allByDefault ? "mine" : "all");
   const [country, setCountry] = useState("");
   const [service, setService] = useState<ServiceKey | "">("");
   const [query, setQuery] = useState("");

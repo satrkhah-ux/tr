@@ -13,16 +13,19 @@ const FLIGHT_CARD_HREF: string | null = "/repackage/flight-card";
 export default async function BasicPage() {
   // our agents, and a partner company on its own files (the drafts and pricing already scope to it)
   if (!(await currentCan("offers.write")) && !(await getPartnerSession())) redirect("/dashboard");
-  const [drafts, readyOffers, meId, canRepackage] = await Promise.all([
+  const [drafts, readyOffers, meId, canRepackage, management] = await Promise.all([
     listDrafts(),
     listReadyOffers(),
     getCurrentEmployeeId(),
     currentCan("repackage.write"),
+    // the administration opens on everyone's files; an agent on their own
+    currentCan("dashboard.admin"),
   ]);
   return (
     <BasicHome
       drafts={drafts}
       meId={meId}
+      allByDefault={management}
       readyOffers={readyOffers.filter((o) => o.status !== "coming_soon" && o.seed)}
       tools={{ repackage: canRepackage, flightCard: FLIGHT_CARD_HREF && canRepackage ? FLIGHT_CARD_HREF : null }}
     />

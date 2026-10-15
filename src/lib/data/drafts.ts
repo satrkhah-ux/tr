@@ -42,6 +42,7 @@ import { packageProfitFor, withPackageProfit, withScopeLines } from "@/lib/offer
 import { clientLines, journeyPricingLines, normalizeJourney, withChangeLog } from "@/lib/offer/advanced";
 import { getRates } from "./rates-actions";
 import { suggestPricingFor } from "./pricing-suggest-core";
+import { customerFor } from "./customer-row";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { byUsage } from "@/lib/offer/country-priority";
 import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
@@ -70,36 +71,6 @@ import { checkHotelIssueGuard } from "./quality-actions";
  * are reached only through draft-store.ts (offers.write, or a partner's own
  * company), and the cost leaves here only for pricing.internal.
  */
-
-/**
- * The customers row an issued offer points at — the client link reads the name
- * and phone from it. Found by the same name and phone, else created. Null when
- * the file names nobody (a partner's sale) or the row cannot be written: the
- * offer still goes out, without the name, as before.
- *
- * Service role: only staff may write customers (RLS), and a partner issuing its
- * own offer must still have its client named on the link. The caller —
- * produceOfferFromDraft — has already checked who may issue this draft.
- *
- * Only staff reuse an existing row: a partner always gets a new one, so a
- * partner's offer is never tied to one of our customers who shares the phone.
- */
-async function customerFor(customer: { customer_name: string; customer_phone: string }, reuse: boolean): Promise<string | null> {
-  const name = customer.customer_name.trim();
-  const phone = customer.customer_phone.trim();
-  if (!name && !phone) return null;
-  try {
-    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
-    let found = supabase.from("customers").select("id").eq("arabic_name", name || phone);
-    found = phone ? found.eq("mobile", phone) : found.is("mobile", null);
-    const { data: hit } = reuse ? await found.limit(1).maybeSingle() : { data: null };
-    if (hit) return (hit as { id: string }).id;
-    const { data: row } = await supabase.from("customers").insert({ arabic_name: name || phone, mobile: phone || null }).select("id").single();
-    return (row as { id: string } | null)?.id ?? null;
-  } catch {
-    return null;
-  }
-}
 
 /** The user client — reference lookups and offers only, never `offer_drafts`. */
 async function db(): Promise<SupabaseClient> {

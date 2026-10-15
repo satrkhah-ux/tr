@@ -17,12 +17,15 @@ import { RecentFiles } from "./RecentFiles";
 export function BasicHome({
   drafts,
   meId,
+  allByDefault,
   readyOffers,
   tools,
 }: {
   drafts: DraftSummary[];
   /** the signed-in employee — «ملفاتي» (null for a partner) */
   meId: string | null;
+  /** the administration: «آخر الملفات» opens on everyone's */
+  allByDefault: boolean;
   readyOffers: ReadyOfferRecord[];
   /** the other ways to start: a supplier's package, a flight card (null/false: not for this role) */
   tools: { repackage: boolean; flightCard: string | null };
@@ -152,6 +155,7 @@ export function BasicHome({
           <RecentFiles
             drafts={drafts}
             meId={meId}
+            allByDefault={allByDefault}
             busy={busy}
             onCopy={(id) => void openNew(`c-${id}`, () => duplicateDraft(id, { freshClient: true }))}
           />
