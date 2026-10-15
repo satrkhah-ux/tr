@@ -41,6 +41,10 @@ const render = () => {
       onSlice={() => {}}
       onCar={() => {}}
       onRemove={() => {}}
+      onMove={() => {}}
+      dragFrom={null}
+      onDragFrom={() => {}}
+      onReplace={() => {}}
       collapsed={false}
       onDone={() => {}}
       onExpand={() => {}}

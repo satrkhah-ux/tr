@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveCityDates, emptyDraftData, normalizeDraftData, totalCityNights, travelNights, type DraftData, type LookupAirport } from "./draft-types";
+import { deriveCityDates, deriveTransportRows, emptyDraftData, normalizeDraftData, totalCityNights, travelNights, type DraftData, type LookupAirport } from "./draft-types";
 import { arrivalLines, daysFromTours, departureLines, FAREWELL, transportNoteForDay, WELCOME } from "./itinerary";
 import { remainingNights, withDomesticFlights } from "./basic";
 import { domesticMismatches } from "./flight-cities";
@@ -102,5 +102,16 @@ describe("the welcome and the farewell, in this file's own words", () => {
     const back = normalizeDraftData(raw);
     expect(back.arrival_lines).toEqual(["سطر"]);
     expect("departure_lines" in back).toBe(false);
+  });
+});
+
+describe("the transfers either side of a domestic flight", () => {
+  it("takes the group to the airport the evening it flies, and meets it the day it lands", () => {
+    const data = overnight();
+    const rows = deriveTransportRows(data.transport_plan, data.cities).filter((r) => r.from_place.includes("كوالالمبور") || r.to_place.includes("لنكاوي"));
+    expect(rows.map((r) => [r.from_place, r.to_place, r.date])).toEqual([
+      ["فندق كوالالمبور", "المطار", "2026-11-15"],
+      ["المطار", "فندق لنكاوي", "2026-11-16"],
+    ]);
   });
 });

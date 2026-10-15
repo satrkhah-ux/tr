@@ -1034,7 +1034,10 @@ export const TRANSPORT_HOTEL_PREFIX = "فندق ";
  * طرابزون» is a thing that happens on a date and gets priced; "moving between
  * cities" is not.
  */
-export function deriveTransportRows(plan: TransportPlan, cities: { city_name: string; check_in: string | null }[]): DraftTransport[] {
+export function deriveTransportRows(
+  plan: TransportPlan,
+  cities: { city_name: string; check_in: string | null; check_out?: string | null }[],
+): DraftTransport[] {
   const rows: DraftTransport[] = [];
   const first = cities[0]?.city_name?.trim();
   const last = cities[cities.length - 1]?.city_name?.trim();
@@ -1078,7 +1081,9 @@ export function deriveTransportRows(plan: TransportPlan, cities: { city_name: st
         if (!plan.airport.enabled) continue;
         const car = vehicleText(plan.airport);
         const date = cities[i]?.check_in ?? null;
-        rows.push({ from_place: `${TRANSPORT_HOTEL_PREFIX}${from}`, to_place: TRANSPORT_AIRPORT, car_type: car, date, note: plan.airport.note });
+        // to the airport the day the flight leaves — the evening before, when it lands after midnight
+        const leaves = cities[i - 1]?.check_out ?? date;
+        rows.push({ from_place: `${TRANSPORT_HOTEL_PREFIX}${from}`, to_place: TRANSPORT_AIRPORT, car_type: car, date: leaves, note: plan.airport.note });
         rows.push({ from_place: TRANSPORT_AIRPORT, to_place: `${TRANSPORT_HOTEL_PREFIX}${to}`, car_type: car, date, note: plan.airport.note });
         continue;
       }
