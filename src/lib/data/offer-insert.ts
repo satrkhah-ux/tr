@@ -105,10 +105,20 @@ export async function insertOffer(input: CreateOfferInput, asPartner?: string): 
  * path like insertOffer: its one caller (produceOfferFromDraft) builds `input`
  * from the stored draft and has checked offers.write and the partner-file lock.
  *
- * ponytail: not one transaction — a failure between the deletes and the inserts
- * leaves the offer's rows short until the button is pressed again (delete all,
- * insert all: a retry repairs it). The client link is untouched meanwhile — it
- * reads the last published render. An RPC makes it atomic if that ever bites.
+ * A failure never leaves the offer with fewer rows than it had: the new rows go
+ * in FIRST, and the old ones (their ids read up front) are deleted only after
+ * every write landed. A failed write deletes what this call added — every row of
+ * the offer that is not an old one — and the old rows stay. offer_days cannot
+ * hold both copies (unique on offer_id + day_number), so it is UPSERTED on that
+ * key in one statement after the other inserts, and the days the new programme
+ * no longer has go with the old rows.
+ *
+ * ponytail: still not one transaction — a head update failing after the days
+ * upsert leaves the new days beside the old rows, and a failed delete leaves
+ * both copies (more rows, never fewer). Pressing the button again repairs
+ * either: every row present then counts as old. The client link is untouched
+ * meanwhile — it reads the last published render. An RPC makes it atomic if
+ * that ever bites.
  */
 export async function replaceOffer(serial: string, input: CreateOfferInput): Promise<CreateOfferResult> {
   try {
@@ -118,6 +128,35 @@ export async function replaceOffer(serial: string, input: CreateOfferInput): Pro
     const { data: offer } = await supabase.from("offers").select("id").eq("serial", serial).maybeSingle();
     if (!offer) return { ok: false, error: "err.loadFailed" };
     const offerId = (offer as { id: string }).id;
+    const failed: CreateOfferResult = { ok: false, error: "err.saveOfferFailed" };
+
+    // the rows being replaced — offer_hotels first: it points at offer_cities
+    const tables = [
+      { table: "offer_hotels", via: cost },
+      { table: "offer_pricing_items", via: cost },
+      ...["offer_cities", "offer_flights", "offer_services", "offer_terms"].map((table) => ({ table, via: supabase })),
+    ];
+    const old = new Map<string, string[]>();
+    for (const { table, via } of tables) {
+      const { data, error } = await via.from(table).select("id").eq("offer_id", offerId);
+      if (error) return failed;
+      old.set(table, ((data ?? []) as { id: string }[]).map((r) => r.id));
+    }
+    /** Undo this call's inserts: every row of the offer that is not an old one. */
+    const rollback = async (): Promise<CreateOfferResult> => {
+      for (const { table, via } of tables) {
+        const keep = old.get(table) ?? [];
+        const rows = via.from(table).delete().eq("offer_id", offerId);
+        await (keep.length ? rows.not("id", "in", `(${keep.join(",")})`) : rows);
+      }
+      return failed;
+    };
+
+    if (!(await insertChildren(supabase, cost, offerId, { ...input, days: [] }))) return rollback();
+    const days = input.days ?? [];
+    if (days.length && (await supabase.from("offer_days").upsert(dayRows(offerId, days), { onConflict: "offer_id,day_number" })).error) {
+      return rollback();
+    }
 
     const { error: headError } = await supabase
       .from("offers")
@@ -135,17 +174,17 @@ export async function replaceOffer(serial: string, input: CreateOfferInput): Pro
         partner_cost: input.partner_cost ?? null,
       })
       .eq("id", offerId);
-    if (headError) return { ok: false, error: "err.saveOfferFailed" };
-
-    // offer_hotels first: it points at offer_cities
-    for (const table of ["offer_hotels", "offer_pricing_items"]) {
-      if ((await cost.from(table).delete().eq("offer_id", offerId)).error) return { ok: false, error: "err.saveOfferFailed" };
-    }
-    for (const table of ["offer_cities", "offer_flights", "offer_days", "offer_services", "offer_terms"]) {
-      if ((await supabase.from(table).delete().eq("offer_id", offerId)).error) return { ok: false, error: "err.saveOfferFailed" };
-    }
-    if (!(await insertChildren(supabase, cost, offerId, input))) return { ok: false, error: "err.saveOfferFailed" };
+    if (headError) return rollback();
     await cost.from("pricings").upsert({ offer_id: offerId, ...pricingRow(input) }, { onConflict: "offer_id" });
+
+    // every write landed: now the old rows go
+    for (const { table, via } of tables) {
+      const ids = old.get(table) ?? [];
+      if (ids.length && (await via.from(table).delete().in("id", ids)).error) return failed;
+    }
+    const gone = supabase.from("offer_days").delete().eq("offer_id", offerId);
+    const kept = days.map((d) => d.day_number);
+    if ((await (kept.length ? gone.not("day_number", "in", `(${kept.join(",")})`) : gone)).error) return failed;
 
     const { data: last } = await supabase
       .from("offer_revisions")
@@ -215,23 +254,7 @@ async function insertChildren(supabase: SupabaseClient, cost: SupabaseClient, of
     ));
   }
   if (input.days && input.days.length > 0) {
-    writes.push(supabase.from("offer_days").insert(
-      input.days.map((d) => ({
-        offer_id: offerId,
-        day_number: d.day_number,
-        day_date: d.day_date,
-        city_name: d.city_name,
-        title: d.title,
-        activities: d.activities,
-        temp_max: d.temp_max,
-        temp_min: d.temp_min,
-        rain_chance: d.rain_chance,
-        weather_code: d.weather_code,
-        weather_source: d.weather_source,
-        weather_fetched_at: d.weather_fetched_at,
-        transport_note: d.transport_note ?? null,
-      })),
-    ));
+    writes.push(supabase.from("offer_days").insert(dayRows(offerId, input.days)));
   }
   if (input.hotels && input.hotels.length > 0) {
     writes.push(cost.from("offer_hotels").insert(
@@ -306,6 +329,25 @@ async function insertChildren(supabase: SupabaseClient, cost: SupabaseClient, of
     ));
   }
   return (await Promise.all(writes)).every((w) => !w.error);
+}
+
+/** The programme's day rows — every column, so replaceOffer's upsert leaves nothing of the old day behind. */
+function dayRows(offerId: string, days: NonNullable<CreateOfferInput["days"]>) {
+  return days.map((d) => ({
+    offer_id: offerId,
+    day_number: d.day_number,
+    day_date: d.day_date,
+    city_name: d.city_name,
+    title: d.title,
+    activities: d.activities,
+    temp_max: d.temp_max,
+    temp_min: d.temp_min,
+    rain_chance: d.rain_chance,
+    weather_code: d.weather_code,
+    weather_source: d.weather_source,
+    weather_fetched_at: d.weather_fetched_at,
+    transport_note: d.transport_note ?? null,
+  }));
 }
 
 /** The offer's pricings row (cost table): totals, profit and the rates it was priced at. */

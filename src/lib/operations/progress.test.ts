@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aheadOfClient, aheadOfExecution, derivedClient, derivedExecution, passportValidFor, readiness, type ReadinessTraveler } from "./progress";
+import { aheadOfClient, aheadOfExecution, derivedClient, derivedExecution, passportAlerts, readiness, type AlertTraveler, type ReadinessTraveler } from "./progress";
 
 const b = (kind: string, status = "confirmed") => ({ kind, status });
 const malaysia = [b("flight"), b("flight"), b("hotel"), b("hotel"), b("transport"), b("transport"), b("service")];
@@ -39,10 +39,27 @@ describe("a case's progress, derived", () => {
     expect(aheadOfExecution("cancelled", "vouchers_issued")).toBe(false);
   });
 
-  it("asks a passport to outlive the return by six months", () => {
-    expect(passportValidFor("2027-05-27", "2026-11-27")).toBe(true);
-    expect(passportValidFor("2027-05-26", "2026-11-27")).toBe(false);
-    expect(passportValidFor(null, "2026-11-27")).toBe(false);
+  it("alerts on every passport issue the ops screen and /trip show — once per traveler and issue", () => {
+    const trip = { travel_start: "2026-11-20", travel_end: "2026-11-27" };
+    const p = (id: string, patch: Partial<AlertTraveler> = {}): AlertTraveler => ({
+      id, display_name: id, has_passport: true, passport_expiry: "2030-01-01", birth_date: null, age: null, traveler_kind: "adult", ...patch,
+    });
+    const alerts = passportAlerts(
+      [
+        p("ok"),
+        p("valid", { passport_expiry: "2027-05-28" }),
+        p("short", { passport_expiry: "2027-05-27" }), // exactly six months after the return: short, as on the ops screen
+        p("expired", { passport_expiry: "2026-11-19" }),
+        p("none", { has_passport: false, passport_expiry: null }),
+        p("no-expiry", { passport_expiry: null }),
+        p("grown", { traveler_kind: "child", age: 11, birth_date: "2014-11-01" }),
+      ],
+      trip,
+      "2026-10-15",
+    );
+    expect(alerts.map((a) => a.ref)).toEqual(["short", "expired", "none:passport", "no-expiry:passport_expiry", "grown:age_mismatch"]);
+    expect(alerts[0].text).toBe("🛂 short: الجواز أقل من 6 أشهر بعد العودة (2027-05-27)");
+    expect(alerts[4].text).toBe("🛂 grown: عمره يوم السفر 12 — لا يطابق العرض");
   });
 
   it("lists what «جاهز للسفر» still waits for", () => {

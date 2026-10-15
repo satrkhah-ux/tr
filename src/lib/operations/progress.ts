@@ -70,13 +70,23 @@ export type ReadinessTraveler = Pick<
 
 export type ReadinessItem = { key: "bookings" | "payment" | "documents" | "passports" | "visas"; ok: boolean; detail: string; anchor: string };
 
-/** six months after the return day, as the airlines ask */
-export function passportValidFor(expiry: string | null, travelEnd: string | null): boolean {
-  if (!expiry) return false;
-  if (!travelEnd) return true;
-  const [y, m, d] = travelEnd.split("-").map(Number);
-  const limit = new Date(Date.UTC(y, m - 1 + 6, d)).toISOString().slice(0, 10);
-  return expiry >= limit;
+export type AlertTraveler = Pick<TravelerListItem, "id" | "display_name" | "has_passport" | "passport_expiry" | "birth_date" | "age" | "traveler_kind">;
+
+/**
+ * The daily Telegram passport alerts (daily.ts): passportIssues — the same
+ * decision as the traveler row, «جاهز للسفر» and /trip — one alert per traveler
+ * and issue. `ref` is the operation_alerts key that sends it once; the expiry
+ * pair keeps the bare traveler id the expiry-only check used, so an alert
+ * already sent is not sent again.
+ */
+export function passportAlerts(travelers: AlertTraveler[], trip: { travel_start: string | null; travel_end: string | null }, today: string): { ref: string; text: string }[] {
+  return travelers.flatMap((t) =>
+    passportIssues(t, trip, today).map((issue) => {
+      const expiry = issue === "passport_expired" || issue === "passport_short";
+      const gap = translate("ar", `ops.trav.gap.${issue}`, { n: ageOn(t.birth_date, trip.travel_start ?? today) ?? "" });
+      return { ref: expiry ? t.id : `${t.id}:${issue}`, text: `🛂 ${t.display_name || "مسافر"}: ${gap}${expiry ? ` (${t.passport_expiry})` : ""}` };
+    }),
+  );
 }
 
 /**

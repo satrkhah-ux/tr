@@ -6,7 +6,7 @@ import { notifyOps, notifyPartnerCase } from "@/lib/data/ops-notify";
 import { sendWeeklyDataQuality } from "@/lib/data/quality-weekly";
 import { readinessFor } from "@/lib/data/operation-sync";
 import { sendClientMessage } from "@/lib/data/client-messages";
-import { passportValidFor } from "./progress";
+import { passportAlerts, type AlertTraveler } from "./progress";
 import { defaultSchedule, installmentStates, paidTotal } from "./payments";
 import { canAdvanceClient, canAdvanceExecution, type ClientStatus, type ExecutionStatus } from "./state";
 
@@ -17,7 +17,8 @@ import { canAdvanceClient, canAdvanceExecution, type ClientStatus, type Executio
  *  1. a trip whose last day has passed is «سافر»;
  *  2. a «سافر» case is closed (client «مكتمل») once rated, or seven days after;
  *  3. alerts — 7, 3 and 1 days before travel with what is still missing, a
- *     passport that ends within six months of the return — each sent ONCE
+ *     passport issue (missing, no expiry, expired by the travel day, under six
+ *     months after the return, age not as sold) — each sent ONCE
  *     (operation_alerts), to the operations team on Telegram.
  */
 
@@ -127,11 +128,17 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
       }
     }
 
-    const { data: travelers } = await supabase.from("operation_travelers").select("id, display_name, passport_expiry").eq("operation_id", op.id);
-    for (const t of (travelers ?? []) as { id: string; display_name: string; passport_expiry: string | null }[]) {
-      if (t.passport_expiry && !passportValidFor(t.passport_expiry, op.travel_end)) {
-        if (await alertOnce(supabase, op.id, "passport", t.id, `🛂 جواز ${t.display_name || "مسافر"} ينتهي ${t.passport_expiry} — أقل من 6 أشهر بعد العودة (${head})`)) result.alerts += 1;
-      }
+    // the passports — the ops screen's and /trip's own decision (passportAlerts → passportIssues)
+    const { data: travelers } = await supabase
+      .from("operation_travelers")
+      .select("id, display_name, traveler_kind, passport_encrypted, passport_expiry, birth_date, age")
+      .eq("operation_id", op.id);
+    const people = ((travelers ?? []) as (Omit<AlertTraveler, "has_passport"> & { passport_encrypted: string | null })[]).map(
+      // the ciphertext is read only to become a yes/no, here, server-side
+      ({ passport_encrypted, ...t }) => ({ ...t, has_passport: Boolean(passport_encrypted) }),
+    );
+    for (const alert of passportAlerts(people, op, today)) {
+      if (await alertOnce(supabase, op.id, "passport", alert.ref, `${alert.text} — ${head}`)) result.alerts += 1;
     }
   }
   return result;
