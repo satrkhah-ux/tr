@@ -30,6 +30,7 @@ import {
   tourCars,
   tourVehicle,
   type DraftData,
+  type TourPick,
   sourcingFits,
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
@@ -130,6 +131,42 @@ export function findTourPrice(
   const perCar = hits.filter((t) => t.car_type?.trim());
   if (car && perCar.length > 0) return perCar.find((t) => baseVehicle(t.car_type) === car) ?? null;
   return hits.find((t) => !t.car_type?.trim()) ?? (perCar.length === 1 ? perCar[0] : null);
+}
+
+/** A listed tour for the car it goes in, in riyals (the tours are typed in riyals) — null when the list or the rate does not know it. */
+export function listedTourPrice(
+  list: TourPrice[] | undefined,
+  sarPer: Record<string, number>,
+  title: string,
+  carType?: string | null,
+  programId?: string | null,
+): number | null {
+  const hit = findTourPrice(list, title, carType, programId);
+  if (!hit) return null;
+  const rate = hit.currency === "SAR" ? 1 : sarPer[hit.currency];
+  return rate ? Math.round(hit.price * rate) : null;
+}
+
+type PricedPick = Pick<TourPick, "title" | "price" | "car_type" | "program_id" | "free">;
+
+/**
+ * One car's price for a tour, in riyals: the typed figure, else the list's for
+ * the car it goes in — the same order the pricing sheet takes (ق3: the line is
+ * this × the cars).
+ */
+export function tourCarPrice(pick: PricedPick, tripCar: string, list: TourPrice[] | undefined, sarPer: Record<string, number>): number | null {
+  if (pick.free) return 0;
+  return pick.price ?? listedTourPrice(list, sarPer, pick.title, pick.car_type?.trim() || tripCar, pick.program_id);
+}
+
+/** What a city's tours come to in riyals: each car's price × its cars (a tour the rate cannot turn into riyals adds nothing). */
+export function toursTotal(picks: (PricedPick & Pick<TourPick, "cars">)[], tripCar: string, list: TourPrice[] | undefined, sarPer: Record<string, number>): number {
+  return picks.reduce((sum, p) => sum + (tourCarPrice(p, tripCar, list, sarPer) ?? 0) * tourCars(p), 0);
+}
+
+/** A tour has its price — typed, or on the list for its car (the sheet prices it from there). A free day needs none. */
+export function tourPriced(pick: PricedPick, tripCar: string, list: TourPrice[] | undefined): boolean {
+  return Boolean(pick.free) || pick.price != null || findTourPrice(list, pick.title, pick.car_type?.trim() || tripCar, pick.program_id) != null;
 }
 
 /**

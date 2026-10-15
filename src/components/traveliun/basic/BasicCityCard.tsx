@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { BedDouble, Camera, CheckCircle2, ChevronDown, Pencil, Plane, Plus, Trash2, UserRound, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import {
@@ -12,7 +12,7 @@ import {
   deriveHotelStays,
   emptyRoomSpec,
   findLookupCountry,
-  FREE_DAY_TITLE,
+  tourCars,
   withRooms,
   type DraftData,
   type DraftHotel,
@@ -37,8 +37,8 @@ import {
   withTours,
   type BasicCity,
 } from "@/lib/offer/basic";
-import { programDayText, type TourProgram } from "@/lib/offer/itinerary";
-import { findTourPrice, type TourPrice } from "@/lib/offer/pricing-suggest";
+import type { TourProgram } from "@/lib/offer/itinerary";
+import { tourPriced, toursTotal, type TourPrice } from "@/lib/offer/pricing-suggest";
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { suppliersFor } from "../generator/SupplierPrice";
@@ -48,6 +48,7 @@ import { withTypedTotal } from "@/lib/offer/flight-fare";
 import { basicField, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
 import { nightsText, useBasicLabels } from "./labels";
+import { CarCountSelect, CarOptions, TourChoices, TourRow, type TourCatalog } from "../tours/TourRow";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 const money = (n: number) => Math.round(n * 100) / 100;
@@ -65,7 +66,7 @@ type Tab = "hotel" | "tours" | "domestic";
 const head = "hidden px-0.5 text-[10.5px] font-bold text-[#7a948f] xl:grid";
 const rowGap = "grid grid-cols-2 items-start gap-2";
 const HOTEL_COLS = "xl:grid-cols-[minmax(12rem,1.6fr)_minmax(10rem,1.4fr)_minmax(7.5rem,0.9fr)_7rem_minmax(7rem,0.8fr)_2rem]";
-const TOUR_COLS = "xl:grid-cols-[minmax(10rem,1fr)_minmax(14rem,2fr)_minmax(10rem,1.1fr)_minmax(7rem,0.7fr)]";
+const TOUR_COLS = "xl:grid-cols-[minmax(9.5rem,1fr)_minmax(13rem,2fr)_minmax(9rem,1fr)_4.5rem_minmax(6.5rem,0.7fr)_minmax(6.5rem,0.7fr)]";
 
 /**
  * One city: its tabs in the header beside its name — the hotel, the tours (with
@@ -162,7 +163,8 @@ export function BasicCityCard({
     hotelsOn && rooms.some((r) => r.price == null) && tx("price"),
     picks.some((p) => !p.free && !p.title.trim()) && tx("tourService"),
     picks.some((p) => !p.free && !(p.car_type?.trim() || tripCar)) && tx("carType"),
-    picks.some((p) => !p.free && p.price == null) && tx("tourPrice"),
+    // a tour the list prices is priced (the sheet takes the list's figure)
+    picks.some((p) => !tourPriced(p, tripCar, tourPrices)) && tx("tourPrice"),
     transportOn && isFirst && !plan.airport.car_type.trim() && tx("reception"),
     transportOn && isLast && !(plan.farewell ?? plan.airport).car_type.trim() && tx("farewell"),
   ].filter((x): x is string => Boolean(x));
@@ -172,7 +174,7 @@ export function BasicCityCard({
     [...new Set(lines.map((l) => l.hotel_name.trim()).filter(Boolean))].join(" + "),
     main && main.rooms.length > 0 ? `${main.rooms.length} × ${baseRoomName(main.rooms[0].room_type_name) || "—"}` : "",
     hotelsOn && stayPrice > 0 ? `${stayPrice.toLocaleString("en-US")} ${main?.manual_currency ?? ""}`.trim() : "",
-    toursOn ? tx("toursSummary", { n: tours.length, total: tours.reduce((s, p) => s + (p.price ?? 0), 0).toLocaleString("en-US") }) : "",
+    toursOn ? tx("toursSummary", { n: tours.length, total: toursTotal(tours, tripCar, tourPrices, lookups.sarPer ?? { SAR: 1 }).toLocaleString("en-US") }) : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -578,9 +580,13 @@ function Field({ label, className, children }: { label: string; className?: stri
  * The city's tours, and on the first and last city the airport reception and
  * farewell beside them — one tab for every car the group rides in.
  *
- * The count is set here (any number — a client may want more tours than days);
- * each tour gets its day written down, the next one the city has free. The tours
- * car is chosen once for the whole trip; a tour given another car keeps its own.
+ * The tours read as the city's days, in order (the generator's «البرنامج
+ * اليومي والجولات», compact — no weather, no AI): a day with a tour holds its
+ * row (TourRow, shared with the generator), a day without one says what it is
+ * and takes one with a press — the arrival day too («جولة بعد الوصول»). The
+ * count is still set here (any number — a client may want more tours than
+ * days). The tours car is chosen once for the whole trip; a tour given another
+ * car keeps its own, and its cars follow the trip's while they were the same.
  */
 function ToursPanel({
   index,
@@ -612,55 +618,24 @@ function ToursPanel({
   onCar: (leg: "airport" | "farewell" | "tours", slice: Partial<TransportLeg>) => void;
 }) {
   const tx = useBasicLabels();
+  const { t } = useTraveliunUI();
   const plan = data.transport_plan;
   const tripCar = plan.tours.car_type;
-  const offered = programs.filter((p) => !p.is_free_day).map((p) => ({ program: p, ...programDayText(p) }));
-  // every night of the city may hold a tour; each tour shows the day it is on
+  // every night of the city may hold a tour; a new one goes in the trip's tour cars
   const dates = cityDates(city);
-  const picks = withTours(city, city.tours ?? 0);
-  const isFree = (title: string) => title.trim() === FREE_DAY_TITLE;
-
-  /** What a typed service is: «يوم حر», one of the ready programmes, or a tour of the agent's own. */
-  const serviceOf = (title: string): Pick<TourPick, "program_id" | "title" | "text" | "free"> => {
-    if (isFree(title)) return { program_id: null, title: FREE_DAY_TITLE, text: "", free: true };
-    const hit = offered.find((o) => o.title === title);
-    return hit ? { program_id: hit.program.id, title: hit.title, text: hit.activities[0] ?? "", free: false } : { program_id: null, title, text: "", free: false };
-  };
+  const picks = withTours(city, city.tours ?? 0, plan.tours.cars);
+  const catalog: TourCatalog = { city: city.city_name, programs, prices: tourPrices, sarPer, carTypes, tripCar, listId: `basic-tours-${index}`, showPrice: true };
   const setPick = (k: number, slice: Partial<TourPick>) => onPicks(picks.map((p, i) => (i === k ? { ...p, ...slice } : p)));
-  /** A tour on the company's price list for the car it goes in, in riyals (the tours are priced in riyals). */
-  const listedPrice = (title: string, car: string, programId?: string | null): number | null => {
-    const hit = findTourPrice(tourPrices, title, car, programId);
-    if (!hit) return null;
-    const rate = hit.currency === "SAR" ? 1 : sarPer[hit.currency];
-    return rate ? Math.round(hit.price * rate) : null;
-  };
+  const addOn = (date: string) => onPicks([...picks, { program_id: null, title: "", text: "", price: null, date, cars: plan.tours.cars }]);
 
   const tours = picks.filter((p) => !p.free);
-  const total = tours.reduce((sum, p) => sum + (p.price ?? 0), 0);
+  const total = toursTotal(tours, tripCar, tourPrices, sarPer);
   // met at the airport the group lands at for this city (a domestic flight in, else the international one);
   // seen off at the one it leaves from (a domestic flight out, else the flight home)
   const byDeparture = [...data.flights].sort((a, b) => (a.departure_at ?? "").localeCompare(b.departure_at ?? ""));
   const landsHere = byDeparture.filter((f) => f.leg_order !== "inbound" && f.to_city?.trim() === city.city_name).at(-1) ?? byDeparture.filter((f) => f.leg_order === "outbound").at(-1);
   const leavesHere = byDeparture.find((f) => f.leg_order !== "outbound" && f.from_city?.trim() === city.city_name) ?? byDeparture.find((f) => f.leg_order === "inbound");
 
-  const carOptions = (placeholder: string) => (
-    <>
-      <option value="">{placeholder}</option>
-      {carTypes.map((c) => (
-        <option key={c.name} value={c.name}>
-          {c.name}
-          {c.pax ? ` (${c.pax})` : ""}
-        </option>
-      ))}
-    </>
-  );
-  const countSelect = (value: number, onValue: (n: number) => void, label: string) => (
-    <select aria-label={label} value={value} onChange={(e) => onValue(Number(e.target.value))} className={`${basicField} px-1.5`}>
-      {range(1, 10).map((n) => (
-        <option key={n} value={n}>{n}</option>
-      ))}
-    </select>
-  );
   // the airport legs, as rows of the same table: who meets the group, in what
   const airportRow = (leg: "airport" | "farewell", label: string, airport: string) => {
     const value = leg === "farewell" ? (plan.farewell ?? plan.airport) : plan.airport;
@@ -674,10 +649,26 @@ function ToursPanel({
           </span>
         </span>
         <select aria-label={tx("carType")} value={value.car_type} onChange={(e) => onCar(leg, { car_type: e.target.value })} className={basicField}>
-          {carOptions(tx("carType"))}
+          <CarOptions carTypes={carTypes} placeholder={tx("carType")} current={value.car_type} />
         </select>
-        {countSelect(value.cars, (cars) => onCar(leg, { cars }), tx("cars"))}
+        <CarCountSelect value={value.cars} onChange={(cars) => onCar(leg, { cars })} label={tx("cars")} className={basicField} />
       </div>
+    );
+  };
+  const row = (pick: TourPick) => {
+    const k = picks.indexOf(pick);
+    return (
+      <TourRow
+        key={k}
+        pick={pick}
+        catalog={catalog}
+        onChange={(slice) => setPick(k, slice)}
+        onTripCar={(car) => onCar("tours", { car_type: car })}
+        dates={dates}
+        dayLabel={dayLabel}
+        field={basicField}
+        className={`${rowGap} ${TOUR_COLS}`}
+      />
     );
   };
 
@@ -686,7 +677,7 @@ function ToursPanel({
       {toursOn ? (
         <div className="flex flex-wrap items-end gap-2">
           <Field label={tx("toursCount")} className="w-24">
-            <select value={picks.length} onChange={(e) => onPicks(withTours(city, Number(e.target.value)))} className={`${basicField} px-1.5`}>
+            <select value={picks.length} onChange={(e) => onPicks(withTours(city, Number(e.target.value), plan.tours.cars))} className={`${basicField} px-1.5`}>
               {range(0, 15).map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
@@ -695,11 +686,22 @@ function ToursPanel({
           {/* the tours car, once for the whole trip */}
           <Field label={tx("tourCarAll")} className="w-52">
             <select value={tripCar} onChange={(e) => onCar("tours", { car_type: e.target.value })} className={basicField}>
-              {carOptions(tx("carType"))}
+              <CarOptions carTypes={carTypes} placeholder={tx("carType")} current={tripCar} />
             </select>
           </Field>
           <Field label={tx("cars")} className="w-16">
-            {countSelect(plan.tours.cars, (cars) => onCar("tours", { cars }), tx("cars"))}
+            <CarCountSelect
+              value={plan.tours.cars}
+              onChange={(cars) => {
+                // a tour in the trip's count of cars keeps going in it
+                if (picks.some((p) => tourCars(p) === plan.tours.cars)) {
+                  onPicks(picks.map((p) => (tourCars(p) === plan.tours.cars ? { ...p, cars } : p)));
+                }
+                onCar("tours", { cars });
+              }}
+              label={tx("cars")}
+              className={basicField}
+            />
           </Field>
           <span className="tv-tnum mb-1.5 rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11.5px] font-bold text-[#185045]">
             {tx("toursSummary", { n: tours.length, total: total.toLocaleString("en-US") })}
@@ -716,72 +718,39 @@ function ToursPanel({
       ) : null}
       {isFirst && transportOn ? airportRow("airport", tx("reception"), landsHere?.to_airport || "—") : null}
 
-      {toursOn && picks.length > 0 ? (
+      {toursOn ? (
         <>
           <div className={`${head} ${TOUR_COLS} gap-2`}>
-            <span>{tx("tourDate")}</span>
-            <span>{tx("tourService")}</span>
-            <span>{tx("carType")}</span>
-            <span>{tx("tourPrice")}</span>
+            <span>{t("pg.tour.date")}</span>
+            <span>{t("pg.tour.service")}</span>
+            <span>{t("pg.tour.car")}</span>
+            <span>{t("pg.tour.cars")}</span>
+            <span>{t("pg.tour.carPrice")}</span>
+            <span>{t("pg.tour.total")}</span>
           </div>
-          <datalist id={`basic-tours-${index}`}>
-            <option value={FREE_DAY_TITLE} />
-            {offered.map((o) => (
-              <option key={o.program.id} value={o.title} />
-            ))}
-            {/* one entry per tour: a tour priced per car is listed once, its price shown for the trip's car */}
-            {[...new Set(tourPrices.map((t) => t.name))].map((name) => {
-              const hit = findTourPrice(tourPrices, name, tripCar);
-              return <option key={`p-${name}`} value={name} label={hit ? `${hit.price} ${hit.currency}` : undefined} />;
-            })}
-          </datalist>
-          {picks.map((pick, k) => (
-            <div key={k} className={`${rowGap} ${TOUR_COLS}`}>
-              <select aria-label={tx("tourDate")} value={pick.date ?? ""} onChange={(e) => setPick(k, { date: e.target.value || null })} className={basicField}>
-                {dates.map((d) => (
-                  <option key={d} value={d}>{dayLabel(d)}</option>
-                ))}
-              </select>
-              <input
-                aria-label={tx("tourService")}
-                list={`basic-tours-${index}`}
-                value={pick.free ? FREE_DAY_TITLE : pick.title}
-                placeholder={offered.length > 0 ? tx("tourPickHint") : `${FREE_DAY_TITLE} / جولة سياحية في ${city.city_name}`}
-                onChange={(e) => {
-                  const s = serviceOf(e.target.value);
-                  // a tour from the price list arrives priced for its car; a typed one keeps what was there
-                  setPick(k, { ...s, price: s.free ? 0 : (listedPrice(e.target.value, pick.car_type || tripCar, s.program_id) ?? (pick.free ? null : pick.price)) });
-                }}
-                className={`${basicField} ${pick.free ? "text-[#7a948f]" : ""}`}
-              />
-              {/* the trip's tours car until this tour is given its own; the first car chosen becomes the trip's */}
-              <select
-                aria-label={tx("carType")}
-                value={pick.car_type || tripCar}
-                onChange={(e) => {
-                  const car = e.target.value;
-                  // another car is another price, when the list has the tour for it
-                  const listed = !pick.free && pick.title.trim() ? listedPrice(pick.title, car, pick.program_id) : null;
-                  if (!tripCar) onCar("tours", { car_type: car });
-                  else setPick(k, { car_type: car && car !== tripCar ? car : undefined, ...(listed != null ? { price: listed } : {}) });
-                }}
-                className={basicField}
-              >
-                {carOptions(tx("carType"))}
-              </select>
-              <input
-                type="number"
-                min={0}
-                dir="ltr"
-                aria-label={tx("tourPrice")}
-                disabled={pick.free}
-                value={pick.free ? 0 : (pick.price ?? "")}
-                placeholder="0"
-                onChange={(e) => setPick(k, { price: typedNumber(e.target) })}
-                className={`${basicField} tv-tnum text-center disabled:bg-[#f4f7f6]`}
-              />
-            </div>
-          ))}
+          <TourChoices catalog={catalog} />
+          {/* the city's days in order: each with its tours, or what the day is and a tour to add */}
+          {dates.map((date, d) => {
+            const on = picks.filter((p) => p.date === date);
+            if (on.length > 0) return <Fragment key={date}>{on.map(row)}</Fragment>;
+            const title = data.days.find((x) => x.date === date && x.city_name === city.city_name)?.title;
+            return (
+              <div key={date} className="flex min-h-9 flex-wrap items-center gap-2 rounded-[8px] border border-dashed border-[#DCE9E5] px-2 py-1 text-[11.5px]">
+                <span className="tv-tnum font-bold text-[#185045]">{dayLabel(date)}</span>
+                {title ? <span className="min-w-0 truncate font-semibold text-[#7a948f]">{title}</span> : null}
+                <button
+                  type="button"
+                  onClick={() => addOn(date)}
+                  className="ms-auto inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 font-bold text-[#185045] hover:bg-[#f0f7f4]"
+                >
+                  <Plus className="size-3.5" />
+                  {d === 0 ? t("pg.itin.tourAfterArrival") : t("pg.tour.add")}
+                </button>
+              </div>
+            );
+          })}
+          {/* a city without dates yet: its tours, as they are */}
+          {picks.filter((p) => !p.date || !dates.includes(p.date)).map(row)}
         </>
       ) : null}
 

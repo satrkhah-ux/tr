@@ -193,6 +193,17 @@ export function validateDraft(data: DraftData): DraftValidation {
   // A day with no title is a day the client reads as missing. «يوم حر» is a
   // title, so a deliberately empty day is one press away.
   if (data.days.length > 0 && data.days.some((d) => !d.title.trim())) need("itinerary", "itinerary", "pg.err.dayUntitled");
+  // A tour goes in a car: one with neither its own nor the trip's, while the
+  // tours have their transport, is a day nobody drives. Said, not blocked —
+  // the car may still be on its way from the supplier.
+  {
+    const tourCar = data.transport_plan.tours;
+    const carless = (c: DraftData["cities"][number]) =>
+      (c.tour_picks ?? []).slice(0, c.tours ?? 0).some((p) => !p.free && !(p.car_type?.trim() || tourCar.car_type.trim()));
+    if (tourCar.enabled && data.cities.some(carless)) {
+      warnings.push({ severity: "warning", stage: "itinerary", field: "itinerary", key: "pg.warn.tourNoCar" });
+    }
+  }
 
   // ---- structural invariants (nights sum, date spans, room+board) ----
   // A city's nights are covered by one or more stays in sequence; each stay

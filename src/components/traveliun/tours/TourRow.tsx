@@ -1,0 +1,249 @@
+"use client";
+
+import type { ReactNode } from "react";
+import { X } from "lucide-react";
+import { FREE_DAY_TITLE, tourCars, type GeneratorLookups, type TourPick } from "@/lib/offer/draft-types";
+import { programDayText, tourService, type TourProgram } from "@/lib/offer/itinerary";
+import { findTourPrice, listedTourPrice, tourCarPrice, type TourPrice } from "@/lib/offer/pricing-suggest";
+import { useTraveliunUI } from "../TraveliunUIProvider";
+import { basicField, typedNumber } from "../basic/styles";
+
+/**
+ * A city's tours, as both screens choose them — the basic screen's city card
+ * and the generator's «البرنامج اليومي والجولات»: the service (the city's ready
+ * programmes and the price list, or typed), the car it goes in, how many, and
+ * the price per car with its total (ق3: the line is the car's price × the cars).
+ */
+
+/** What one city's tours are chosen from — the same for every row of the city. */
+export type TourCatalog = {
+  city: string;
+  /** the city's ready programmes (tour_programs). */
+  programs: TourProgram[];
+  /** the trip's tours price list. */
+  prices: TourPrice[];
+  sarPer: Record<string, number>;
+  carTypes: GeneratorLookups["carTypes"];
+  /** the trip's tours car — a tour without its own goes in it. */
+  tripCar: string;
+  /** the id of the city's TourChoices list. */
+  listId: string;
+  /** the prices are shown (the generator: pricing.view). */
+  showPrice: boolean;
+};
+
+/** The compact field both screens' tour rows use. */
+export const tourField = basicField;
+const caption = "text-[10.5px] font-bold text-[#7a948f]";
+const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+/** The services a city's tour field offers: «يوم حر», its programmes, then the price list — each tour once. */
+export function TourChoices({ catalog }: { catalog: TourCatalog }) {
+  const own = new Set(catalog.programs.map((p) => p.id));
+  // a listed tour of another city's programme is that city's, not this one's
+  const prices = catalog.prices.filter((p) => !p.program_id || own.has(p.program_id));
+  return (
+    <datalist id={catalog.listId}>
+      <option value={FREE_DAY_TITLE} />
+      {catalog.programs
+        .filter((p) => !p.is_free_day)
+        .map((p) => (
+          <option key={p.id} value={programDayText(p).title} />
+        ))}
+      {/* one entry per tour: a tour priced per car is listed once, its price shown for the trip's car */}
+      {[...new Set(prices.map((t) => t.name))].map((name) => {
+        const hit = catalog.showPrice ? findTourPrice(prices, name, catalog.tripCar) : null;
+        return <option key={`p-${name}`} value={name} label={hit ? `${hit.price} ${hit.currency}` : undefined} />;
+      })}
+    </datalist>
+  );
+}
+
+/** The company's cars, and a car typed elsewhere that the list does not hold. */
+export function CarOptions({ carTypes, placeholder, current }: { carTypes: GeneratorLookups["carTypes"]; placeholder: string; current?: string }) {
+  return (
+    <>
+      <option value="">{placeholder}</option>
+      {current && !carTypes.some((c) => c.name === current) ? <option value={current}>{current}</option> : null}
+      {carTypes.map((c) => (
+        <option key={c.name} value={c.name}>
+          {c.name}
+          {c.pax ? ` (${c.pax})` : ""}
+        </option>
+      ))}
+    </>
+  );
+}
+
+/** How many cars: 1–10. */
+export function CarCountSelect({
+  value,
+  onChange,
+  label,
+  className,
+  disabled,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  label: string;
+  className: string;
+  disabled?: boolean;
+}) {
+  return (
+    <select aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))} className={`${className} px-1.5`}>
+      {range(1, 10).map((n) => (
+        <option key={n} value={n}>
+          {n}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * One tour: its day (when it may move — the basic screen), its service, car,
+ * cars, price per car and total, and its wording (the generator's open day).
+ * A service from the list arrives priced for its car; another car is another
+ * price when the list has the tour for it.
+ */
+export function TourRow({
+  pick,
+  catalog,
+  onChange,
+  onTripCar,
+  dates,
+  dayLabel,
+  describe,
+  labelled,
+  field,
+  className,
+  onRemove,
+}: {
+  pick: TourPick;
+  catalog: TourCatalog;
+  onChange: (slice: Partial<TourPick>) => void;
+  /** no trip car yet: the first car chosen becomes the trip's. */
+  onTripCar: (car: string) => void;
+  /** the days it may move to. */
+  dates?: string[];
+  dayLabel?: (iso: string) => string;
+  /** the programme's wording, editable. */
+  describe?: boolean;
+  /** captions over the fields; without them they are read aloud only (a heading row stands over them). */
+  labelled?: boolean;
+  field: string;
+  className?: string;
+  onRemove?: () => void;
+}) {
+  const { t } = useTraveliunUI();
+  const { tripCar, prices, sarPer, showPrice } = catalog;
+  const car = pick.car_type?.trim() || tripCar;
+  const unit = tourCarPrice(pick, tripCar, prices, sarPer);
+  const fromList = !pick.free && pick.price == null && unit != null;
+  const cell = (label: string, control: ReactNode, wide = false) => (
+    <label className={`grid min-w-0 gap-1 ${wide ? "col-span-full" : ""}`}>
+      <span className={labelled ? caption : "sr-only"}>{label}</span>
+      {control}
+    </label>
+  );
+
+  return (
+    <div className={className}>
+      {dates
+        ? cell(
+            t("pg.tour.date"),
+            <select value={pick.date ?? ""} onChange={(e) => onChange({ date: e.target.value || null })} className={field}>
+              {dates.map((d) => (
+                <option key={d} value={d}>
+                  {dayLabel ? dayLabel(d) : d}
+                </option>
+              ))}
+            </select>,
+          )
+        : null}
+      {cell(
+        t("pg.tour.service"),
+        <input
+          list={catalog.listId}
+          value={pick.free ? FREE_DAY_TITLE : pick.title}
+          placeholder={t("pg.tour.serviceHint", { city: catalog.city })}
+          onChange={(e) => {
+            const s = tourService(e.target.value, catalog.programs);
+            // a tour from the price list arrives priced for its car; a typed one keeps what was there
+            onChange({ ...s, price: s.free ? 0 : (listedTourPrice(prices, sarPer, e.target.value, car, s.program_id) ?? (pick.free ? null : pick.price)) });
+          }}
+          className={`${field} ${pick.free ? "text-[#7a948f]" : ""}`}
+        />,
+      )}
+      {cell(
+        t("pg.tour.car"),
+        <select
+          value={car}
+          disabled={pick.free}
+          onChange={(e) => {
+            const next = e.target.value;
+            // another car is another price, when the list has the tour for it
+            const listed = pick.title.trim() ? listedTourPrice(prices, sarPer, pick.title, next, pick.program_id) : null;
+            if (!tripCar) onTripCar(next);
+            else onChange({ car_type: next && next !== tripCar ? next : undefined, ...(listed != null ? { price: listed } : {}) });
+          }}
+          className={field}
+        >
+          <CarOptions carTypes={catalog.carTypes} placeholder={t("pg.tour.car")} current={car} />
+        </select>,
+      )}
+      {cell(t("pg.tour.cars"), <CarCountSelect value={tourCars(pick)} disabled={pick.free} onChange={(cars) => onChange({ cars })} label={t("pg.tour.cars")} className={field} />)}
+      {showPrice
+        ? cell(
+            t("pg.tour.carPrice"),
+            <span className="grid gap-0.5">
+              <input
+                type="number"
+                min={0}
+                dir="ltr"
+                disabled={pick.free}
+                value={pick.free ? 0 : (pick.price ?? "")}
+                // the list's figure shows through until one is typed
+                placeholder={fromList ? String(unit) : "0"}
+                onChange={(e) => onChange({ price: typedNumber(e.target) })}
+                className={`${field} tv-tnum text-center disabled:bg-[#f4f7f6]`}
+              />
+              {fromList ? <span className="text-[10px] font-bold text-[#0f7a52]">{t("pg.tour.fromList")}</span> : null}
+            </span>,
+          )
+        : null}
+      {showPrice ? (
+        <div className="grid min-w-0 gap-1">
+          <span className={labelled ? caption : "sr-only"}>{t("pg.tour.total")}</span>
+          <output className="tv-tnum inline-flex h-9 items-center justify-center rounded-[8px] bg-[#eef4f1] px-2 text-[12.5px] font-extrabold text-[#185045]">
+            {pick.free ? "—" : unit != null ? `${(unit * tourCars(pick)).toLocaleString("en-US")} SAR` : "—"}
+          </output>
+        </div>
+      ) : null}
+      {describe
+        ? cell(
+            t("pg.tour.description"),
+            <textarea
+              value={pick.text}
+              disabled={pick.free}
+              onChange={(e) => onChange({ text: e.target.value })}
+              rows={2}
+              className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[13px] leading-6 text-[#185045] outline-none transition-colors focus:border-[#2aa87a] disabled:bg-[#f4f7f6]"
+            />,
+            true,
+          )
+        : null}
+      {onRemove ? (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={t("pg.tour.remove")}
+          title={t("pg.tour.remove")}
+          className="inline-flex size-9 items-center justify-center self-end rounded-[8px] text-[#c43d3d] hover:bg-[#fff1f1]"
+        >
+          <X className="size-4" />
+        </button>
+      ) : null}
+    </div>
+  );
+}

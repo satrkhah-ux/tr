@@ -9,7 +9,13 @@ import {
   emptyDays,
   itineraryCities,
   itineraryComplete,
+  dayTours,
+  fillCityTours,
+  tourService,
+  withAiText,
+  withDayPick,
   withDayTour,
+  withTours,
   type TourProgram,
 } from "./itinerary";
 import { deriveCityDates, emptyDraftData, type DraftCity, type DraftData, type DraftDay } from "./draft-types";
@@ -297,5 +303,98 @@ describe("daysFromTours — the day and its tour (الأمر 3)", () => {
     expect(daysFromTours(data)[1].activities).toEqual(["برجا بتروناس وساحة الاستقلال"]);
     const own = { ...data, cities: data.cities.map((c) => ({ ...c, tour_picks: c.tour_picks?.map((p) => ({ ...p, car_type: "سيدان" })) })) };
     expect(daysFromTours(own)[1].activities.at(-1)).toBe("التنقل بـسيدان × 2");
+  });
+});
+
+describe("the merged day-and-tour screen (الأمر 4)", () => {
+  /** KL two nights (20–21) then Langkawi two (22–23), home on the 24th; two vans for the tours. */
+  function klTrip(): DraftData {
+    const data = emptyDraftData();
+    data.trip = { ...data.trip, country: "ماليزيا", destination: "ماليزيا", arrival_date: "2026-10-20", nights: 4, days: 5, adults: 9 };
+    data.cities = deriveCityDates("2026-10-20", [city("كوالالمبور", 2), city("لنكاوي", 2)]);
+    data.transport_plan = { ...data.transport_plan, tours: { ...data.transport_plan.tours, car_type: "فان", cars: 2 } };
+    data.days = draftDaySkeleton(data);
+    return data;
+  }
+  const KL1: TourProgram = { id: "kl1", city_name: "كوالالمبور", title: "جولة المدينة", description: "برجا بتروناس", is_free_day: false, sort_order: 1 };
+  const KL2: TourProgram = { id: "kl2", city_name: "كوالالمبور", title: "جنتنج", description: "المرتفعات والتلفريك", is_free_day: false, sort_order: 2 };
+  const LGK: TourProgram = { id: "lgk", city_name: "لنكاوي", title: "جولة الجزر", description: "ثلاث جزر بالقارب", is_free_day: false, sort_order: 1 };
+  const apply = (data: DraftData, slice: Pick<DraftData, "cities" | "days"> | null) => ({ ...data, ...slice! });
+
+  it("swaps the tour on a day in place — the same pick, never a second", () => {
+    let data = apply(klTrip(), withDayPick(klTrip(), 1, 0, tourService("جولة المدينة", [KL1, KL2])));
+    expect(data.cities[0].tour_picks).toHaveLength(1);
+    expect(data.cities[0].tour_picks![0]).toMatchObject({ program_id: "kl1", text: "برجا بتروناس", date: "2026-10-21", cars: 2 });
+    data = apply(data, withDayPick(data, 1, 0, tourService("جنتنج", [KL1, KL2])));
+    expect(data.cities[0].tour_picks).toHaveLength(1);
+    expect([data.cities[0].tours, data.cities[0].tour_picks![0].program_id]).toEqual([1, "kl2"]);
+    expect([data.days[1].title, data.days[1].activities]).toEqual(["جنتنج", ["المرتفعات والتلفريك", "التنقل بـفان × 2"]]);
+  });
+
+  it("a car or a count reaches the day while it is the screen's, and leaves a hand-written day alone", () => {
+    const data = apply(klTrip(), withDayPick(klTrip(), 1, 0, tourService("جولة المدينة", [KL1])));
+    const three = apply(data, withDayPick(data, 1, 0, { car_type: "باص", cars: 3 }));
+    expect(three.days[1].activities.at(-1)).toBe("التنقل بـباص × 3");
+    const typed = { ...data, days: data.days.map((d, i) => (i === 1 ? { ...d, title: "يوم المدينة", auto_title: undefined } : d)) };
+    expect(apply(typed, withDayPick(typed, 1, 0, { cars: 3 })).days[1].title).toBe("يوم المدينة");
+  });
+
+  it("taking the tour away leaves the day empty and the city without it", () => {
+    const data = apply(klTrip(), withDayPick(klTrip(), 1, 0, tourService("جولة المدينة", [KL1])));
+    const gone = apply(data, withDayPick(data, 1, 0, null));
+    expect([gone.cities[0].tours, gone.cities[0].tour_picks, gone.days[1].title]).toEqual([0, [], ""]);
+  });
+
+  it("a tour after arrival: the day keeps the reception, then the tour, in that order", () => {
+    const data = apply(klTrip(), withDayPick(klTrip(), 0, 0, tourService("جولة المدينة", [KL1])));
+    expect(data.days[0].title).toBe("الوصول إلى كوالالمبور");
+    expect(data.days[0].activities).toEqual([
+      "الاستقبال من المطار من قبل موظف ترافليون والتوجه إلى الفندق",
+      "جولة المدينة: برجا بتروناس",
+      "التنقل بـفان × 2",
+    ]);
+    // two tours in two nights — the arrival day's is one more than nights − 1
+    const both = apply(data, withDayPick(data, 1, 0, tourService("جنتنج", [KL1, KL2])));
+    expect(both.cities[0].tours).toBe(2);
+    expect(dayTours(both, 0)?.picks.map((p) => p.program_id)).toEqual(["kl1"]);
+  });
+
+  it("opens already written: an empty day holding a tour picked elsewhere takes it", () => {
+    const data = klTrip();
+    data.cities = data.cities.map((c, i) => (i === 1 ? { ...c, tours: 1, tour_picks: [{ program_id: "lgk", title: "جولة الجزر", text: "ثلاث جزر بالقارب", price: 300, date: "2026-10-23", cars: 2 }] } : c));
+    const days = daysFromTours(data);
+    expect([days[3].title, days[3].activities]).toEqual(["جولة الجزر", ["ثلاث جزر بالقارب", "التنقل بـفان × 2"]]);
+    // the days without a tour stay the agent's, empty
+    expect(days.filter((_, i) => i !== 3).every((d) => d.title === "")).toBe(true);
+  });
+
+  it("fills a city's empty touring days with its own programmes, as real tours", () => {
+    const data = klTrip();
+    const out = fillCityTours(data, [KL1, KL2, LGK], "لنكاوي");
+    expect(out.filled).toBe(1);
+    expect(out.cities[0].tour_picks).toBeUndefined();
+    expect(out.cities[1].tour_picks).toEqual([{ program_id: "lgk", title: "جولة الجزر", text: "ثلاث جزر بالقارب", price: null, cars: 2, free: false, date: "2026-10-23" }]);
+    expect(out.days[3].title).toBe("جولة الجزر");
+    // without tours on the sale the day takes the text only
+    const off = { ...data, transport_plan: { ...data.transport_plan, tours: { ...data.transport_plan.tours, enabled: false } } };
+    const text = fillCityTours(off, [LGK], "لنكاوي");
+    expect([text.days[3].title, text.cities[1].tour_picks]).toEqual(["جولة الجزر", undefined]);
+  });
+
+  it("the AI words a tour day's activities only — its title and car line stay", () => {
+    const data = apply(klTrip(), withDayPick(klTrip(), 1, 0, tourService("جولة المدينة", [KL1])));
+    const day = withAiText(data, 1, { title: "يوم رائع", activities: ["صباحاً برجا بتروناس ثم السوق المركزي"] });
+    expect([day.title, day.activities, day.ai_generated]).toEqual(["جولة المدينة", ["صباحاً برجا بتروناس ثم السوق المركزي", "التنقل بـفان × 2"], true]);
+    // and the next pass keeps the AI's wording of the same tour
+    expect(daysFromTours({ ...data, days: data.days.map((d, i) => (i === 1 ? day : d)) })[1]).toEqual(day);
+    // a day with no tour takes the AI's title as well
+    expect(withAiText(data, 3, { title: "يوم على الشاطئ", activities: ["شاطئ سينانج"] }).title).toBe("يوم على الشاطئ");
+  });
+
+  it("a new tour from the count goes in the trip's cars; one chosen before keeps its own", () => {
+    const kl = { ...klTrip().cities[0], tour_picks: [{ program_id: null, title: "جولة", text: "", price: 1, cars: 1 }] };
+    // the first is on the day after arrival, the new one on the arrival day (in date order)
+    expect(withTours(kl, 2, 2).map((p) => [p.title, p.cars])).toEqual([["", 2], ["جولة", 1]]);
+    expect(withTours(kl, 2).map((p) => p.cars)).toEqual([undefined, 1]);
   });
 });
