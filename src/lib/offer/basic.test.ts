@@ -357,13 +357,25 @@ describe("النظام بيسك", () => {
     expect(three.reduce((sum, i) => sum + (i.profit_amount ?? 0), 0)).toBeCloseTo(1000, 6);
   });
 
-  it("suggests the clear room names first, then only the chosen hotel's own", () => {
+  it("suggests the chosen hotel's own rooms first, by category, then the clear names — never another hotel's", () => {
     const types = [
-      { id: "a", name: "ديلوكس", hotel_id: "h1", default_board: null },
+      { id: "a", name: "جناح ديلوكس", hotel_id: "h1", default_board: null },
+      { id: "c", name: "Superior Twin", hotel_id: "h1", default_board: null },
       { id: "b", name: "سويت المحيط", hotel_id: "h2", default_board: null },
+      { id: "g", name: "بانوراما", hotel_id: null, default_board: null },
     ];
-    expect(roomSuggestions(types, "h1")).toEqual([...STANDARD_ROOMS, "ديلوكس"]);
+    expect(roomSuggestions(types, "h1")).toEqual(["Superior Twin", "جناح ديلوكس", ...STANDARD_ROOMS]);
     expect(roomSuggestions(types, null)).toEqual(STANDARD_ROOMS);
+    // the full generator keeps the shared list after them
+    expect(roomSuggestions(types, "h1", true)).toEqual(["Superior Twin", "جناح ديلوكس", ...STANDARD_ROOMS, "بانوراما"]);
+  });
+
+  it("seats a group by the seats a car's name states when its column is empty", () => {
+    const fleet = [
+      { name: "سيارة صغيرة", pax: 3 },
+      { name: "باص 40 راكب", pax: null },
+    ];
+    expect(carForGroup(fleet, 20)).toEqual({ car_type: "باص 40 راكب", cars: 1 });
   });
 
   it("starts a file on the default margin only when nobody stated a profit", () => {
