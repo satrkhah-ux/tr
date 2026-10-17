@@ -8,7 +8,18 @@
  * was. Pure: no database here; the reading is in features-server.ts, the
  * writing in data/app-settings.ts.
  */
-export const FEATURES = ["legacy_generator", "repackage", "flight_card", "ready_offers", "kanban"] as const;
+export const FEATURES = [
+  "legacy_generator",
+  "repackage",
+  "flight_card",
+  "ready_offers",
+  "kanban",
+  // Buttons, not routes: the programme's AI drafting (OpenAI) and the flights
+  // stage's flight-number lookup (AviationStack, a tiny monthly quota). Off hides
+  // the button (getAssistantAvailability) and the server action refuses.
+  "ai_itinerary",
+  "flight_lookup",
+] as const;
 
 export type Feature = (typeof FEATURES)[number];
 export type FeatureFlags = Record<Feature, boolean>;
@@ -20,6 +31,8 @@ export const FEATURE_DEFAULTS: FeatureFlags = {
   flight_card: true,
   ready_offers: true,
   kanban: true,
+  ai_itinerary: true,
+  flight_lookup: true,
 };
 
 export const FEATURES_SETTING_KEY = "features";

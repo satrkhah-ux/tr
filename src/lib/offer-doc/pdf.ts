@@ -50,6 +50,11 @@ function isServerless(): boolean {
   );
 }
 
+/** What would print a PDF on this host — for /developer. Looks only, never launches a browser. */
+export function pdfEngine(): { serverless: true } | { serverless: false; executable: string | null } {
+  return isServerless() ? { serverless: true } : { serverless: false, executable: findExecutable() };
+}
+
 /**
  * Launch headless Chromium. On serverless hosts there is no installed browser,
  * so use the bundled @sparticuz/chromium binary (loaded dynamically so it is

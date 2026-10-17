@@ -16,7 +16,7 @@ import "server-only";
  *   OPENAI_MODEL     optional override (defaults below)
  */
 
-const DEFAULT_MODEL = "gpt-4o-mini";
+export const DEFAULT_MODEL = "gpt-4o-mini";
 
 function readEnv(name: string): string | undefined {
   return process.env[name] || undefined;
