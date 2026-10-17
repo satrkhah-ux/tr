@@ -178,6 +178,8 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.legacyGenerator", href: "/package-generator", perm: "offers.write" },
     ],
   },
+  // «العملاء» — every client conversation (the sheet pulled in), for every employee
+  { labelKey: "nav.customers", href: "/clients", icon: Users },
   { labelKey: "nav.partnerCompanies", href: "/partner-companies", icon: Building2 },
   // Operations stays at the top level on purpose: it is the screen an ops agent
   // lives in all day. No `perm` of its own — section-access.ts opens it to
