@@ -3,10 +3,10 @@
 import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { CLIENT_DOCUMENT_KINDS, type VoucherKind } from "@/lib/operations/voucher-dto";
-import { currentCan } from "@/lib/roles/current";
+import { gateOperation } from "@/lib/operations/access";
 import { resolveDocBrand } from "@/lib/data/doc-brand";
 import { getPartnerSession } from "@/lib/partners/session";
 
@@ -25,15 +25,9 @@ import { getPartnerSession } from "@/lib/partners/session";
 
 type Fail = { ok: false; error: TranslationKey };
 
-async function requireOps(): Promise<TranslationKey | null> {
-  const user = await getServerUser();
-  if (!user) return "err.session";
-  return await currentCan("operations.write") ? null : "ops.err.forbidden";
-}
-
 /** Mint the client link, or return the existing one. Idempotent. */
 export async function ensureClientLink(operationId: string): Promise<{ ok: true; token: string } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
   return mintClientLink((await createSupabaseServerClient()) as unknown as SupabaseClient, operationId);
 }
@@ -87,7 +81,7 @@ async function mintClientLink(supabase: SupabaseClient, operationId: string): Pr
 }
 
 export async function revokeClientLink(operationId: string): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;

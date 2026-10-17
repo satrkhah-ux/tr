@@ -20,6 +20,7 @@ import {
   type ExecutionStatus,
 } from "@/lib/operations/state";
 import { currentCan } from "@/lib/roles/current";
+import { gateManager, gateOperation, mayWork, opsAccess } from "@/lib/operations/access";
 import { mintReceipt } from "@/lib/data/payment-receipt";
 import { isIsoDate, riyadhDate } from "@/lib/operations/payments";
 
@@ -27,23 +28,18 @@ import { isIsoDate, riyadhDate } from "@/lib/operations/payments";
  * «العمليات» — the execution hub. A case's two statuses move in three places,
  * all through the transition rules in operations/state.ts:
  *   · here — setClientStatus / setExecutionStatus, an agent's hand
- *     (operations.write, on their own session);
+ *     (the case's gate in operations/access.ts, on their own session);
  *   · operation-sync.ts — forward-only, derived from the bookings, documents
  *     and payments, after the gated action that changed them (service role);
  *   · operations/daily.ts — the morning cron: «سافر», then closed (service role).
  * The database refuses every other session write: since 0073 the operations
- * tables accept INSERT/UPDATE/DELETE only from staff holding operations.write.
+ * tables accept INSERT/UPDATE/DELETE only from staff holding operations.write —
+ * and, since 0078, from an operations.own holder on the files they issued.
+ * Who may touch which case is one rule: operations/access.ts.
  */
 
 function db(): Promise<SupabaseClient> {
   return createSupabaseServerClient() as unknown as Promise<SupabaseClient>;
-}
-
-/** null when allowed, else the i18n key to return. */
-async function requireOps(): Promise<TranslationKey | null> {
-  const user = await getServerUser();
-  if (!user) return "err.session";
-  return await currentCan("operations.write") ? null : "ops.err.forbidden";
 }
 
 export type ConfirmChannel = "phone" | "whatsapp" | "office" | "other";
@@ -272,7 +268,8 @@ export async function setClientStatus(
   to: ClientStatus,
   note?: string | null,
 ): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  // cancelling a case stays the manager's, even on one's own file (access.ts gateManager)
+  const denied = (await gateOperation(operationId)) ?? (to === "cancelled" ? await gateManager() : null);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
@@ -309,7 +306,7 @@ export async function setExecutionStatus(
   to: ExecutionStatus,
   note?: string | null,
 ): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = (await gateOperation(operationId)) ?? (to === "cancelled" ? await gateManager() : null);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
@@ -372,7 +369,8 @@ export async function recordPayment(input: {
   paid_at?: string;
   note?: string | null;
 }): Promise<{ ok: true; id: string } | Fail> {
-  const denied = await requireOps();
+  // money IN is the file's work; a refund is money going OUT — the manager's
+  const denied = (await gateOperation(input.operation_id)) ?? (input.kind === "refund" ? await gateManager() : null);
   if (denied) return { ok: false, error: denied };
   if (!(input.amount > 0)) return { ok: false, error: "ops.err.amountPositive" };
   try {
@@ -420,7 +418,7 @@ export async function recordPayment(input: {
 
 export async function listOperationPayments(operationId: string): Promise<OperationPayment[]> {
   try {
-    if (await requireOps()) return [];
+    if (await gateOperation(operationId)) return [];
     const supabase = await db();
     const { data } = await supabase
       .from("operation_payments")
@@ -444,6 +442,7 @@ type OfferJoin = {
   adults: number | null;
   children: number | null;
   infants: number | null;
+  employee_id: string | null;
   customers: { arabic_name: string | null; mobile: string | null } | null;
   booking_partners: { name: string | null } | { name: string | null }[] | null;
 };
@@ -459,21 +458,23 @@ function one<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null;
 }
 
-/** The board: every live operation with what the cards and signals need. */
+/** The board: every live operation with what the cards and signals need — an own-files holder's own only. */
 export async function listOperations(): Promise<OperationCard[]> {
   try {
-    const user = await getServerUser();
-    if (!user) return [];
+    const access = await opsAccess();
+    if (!access) return [];
     const supabase = await db();
 
     const { data } = await supabase
       .from("operations")
       .select(
-        "id, offer_id, render_id, client_status, execution_status, travel_start, travel_end, confirm_channel, confirmed_at, note, offers(serial, destination, total, currency, adults, children, infants, customers(arabic_name, mobile), booking_partners(name))",
+        "id, offer_id, render_id, client_status, execution_status, travel_start, travel_end, confirm_channel, confirmed_at, note, offers(serial, destination, total, currency, adults, children, infants, employee_id, customers(arabic_name, mobile), booking_partners(name))",
       )
       .order("travel_start", { ascending: true, nullsFirst: false });
 
-    const rows = (data ?? []) as unknown as (OperationRow & { offers: OfferJoin | OfferJoin[] | null })[];
+    const rows = ((data ?? []) as unknown as (OperationRow & { offers: OfferJoin | OfferJoin[] | null })[]).filter((r) =>
+      mayWork(access, one(r.offers)?.employee_id),
+    );
     if (rows.length === 0) return [];
 
     const ids = rows.map((r) => r.id);

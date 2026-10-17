@@ -2466,4 +2466,6 @@ export const ar: Dictionary = {
   "ops.pay.err.noProof": "لا يوجد إيصال محفوظ.",
   "ops.pay.err.refundReceipt": "الاسترجاع لا يصدر له سند قبض.",
   "ops.signal.installment_overdue": "قسط متأخر",
+  "ops.err.notYours": "هذا الملف ليس من ملفاتك — تعمل على عمليات الملفات التي أصدرتها أنت فقط.",
+  "ops.err.managerOnly": "هذه الخطوة لقسم العمليات: إلغاء الملف وتعديل الدفعات وحذفها والاسترجاع وجدول الأقساط ومبالغ الموردين.",
 };

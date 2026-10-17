@@ -2,11 +2,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
-import { currentCan } from "@/lib/roles/current";
+import { gateOperation, gateOps, gateRow } from "@/lib/operations/access";
 import { composeRequest } from "@/lib/data/supplier-work";
 
 /**
@@ -28,12 +28,6 @@ function db(): Promise<SupabaseClient> {
 }
 
 type Fail = { ok: false; error: TranslationKey };
-
-async function requireOps(): Promise<TranslationKey | null> {
-  const user = await getServerUser();
-  if (!user) return "err.session";
-  return await currentCan("operations.write") ? null : "ops.err.forbidden";
-}
 
 export type AssigneeKind = "ops" | "employee" | "partner" | "supplier";
 
@@ -58,7 +52,7 @@ export type AssigneeOption = {
 
 /** Everyone a booking can be handed to: the team, colleagues, partner companies, our suppliers. */
 export async function listAssignees(): Promise<AssigneeOption[]> {
-  if (await requireOps()) return [];
+  if (await gateOps()) return [];
   try {
     const supabase = await db();
     const [emps, partners, suppliers] = await Promise.all([
@@ -95,7 +89,7 @@ export async function listAssignees(): Promise<AssigneeOption[]> {
 }
 
 export async function listPartners(): Promise<BookingPartner[]> {
-  if (await requireOps()) return [];
+  if (await gateOps()) return [];
   try {
     const supabase = await db();
     const { data } = await supabase
@@ -117,7 +111,9 @@ export async function upsertPartner(input: {
   email?: string | null;
   active?: boolean;
 }): Promise<{ ok: true; id: string } | Fail> {
-  const denied = await requireOps();
+  // the partner-agency list is shared, not a file's — the same any-operations
+  // gate as before (sales edit it on /partner-companies with data.write anyway)
+  const denied = await gateOps();
   if (denied) return { ok: false, error: denied };
   if (!input.name.trim()) return { ok: false, error: "ops.err.titleRequired" };
   try {
@@ -153,7 +149,7 @@ export async function assignBooking(input: {
   assignee_id?: string | null;
   handoff_note?: string | null;
 }): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_bookings", input.booking_id);
   if (denied) return { ok: false, error: denied };
   if (input.kind !== "ops" && !input.assignee_id) return { ok: false, error: "ops.err.pickAssignee" };
 
@@ -221,7 +217,8 @@ export async function sendBookingRequest(input: {
   to_phone: string | null;
   body: string;
 }): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  // both ids come from the browser: the booking AND the case the log lands on
+  const denied = (await gateRow("operation_bookings", input.booking_id)) ?? (await gateOperation(input.operation_id));
   if (denied) return { ok: false, error: denied };
   if (!input.body.trim()) return { ok: false, error: "ops.err.emptyMessage" };
 
@@ -290,7 +287,7 @@ export type SentRequest = {
 
 /** What was already sent for this operation — the paper trail per case. */
 export async function listSentRequests(operationId: string): Promise<SentRequest[]> {
-  if (await requireOps()) return [];
+  if (await gateOperation(operationId)) return [];
   try {
     const supabase = await db();
     const { data } = await supabase

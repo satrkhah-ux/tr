@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
+import { gateManager, gateOperation } from "@/lib/operations/access";
 import { defaultSchedule, paidTotal, riyadhDate, type Installment } from "@/lib/operations/payments";
 import { bookingCost } from "@/lib/operations/supplier-request";
 import {
@@ -37,6 +38,15 @@ import {
 
 async function allowed(): Promise<boolean> {
   return Boolean(await getServerUser()) && (await currentCan("pricing.internal"));
+}
+
+/**
+ * The reports across every case (profitability, cash flow) are the manager's
+ * too: a salesperson holds pricing.internal, and an own-files holder sees their
+ * own case's profit only (getCaseProfit).
+ */
+async function allowedAll(): Promise<boolean> {
+  return (await allowed()) && !(await gateManager());
 }
 
 const service = () => createSupabaseServiceClient() as unknown as SupabaseClient;
@@ -250,7 +260,7 @@ export type CaseProfitView = CaseProfit & { partner: boolean };
 
 /** «ربحية الحالة» on the case page; null for anyone without pricing.internal. */
 export async function getCaseProfit(operationId: string): Promise<CaseProfitView | null> {
-  if (!(await allowed())) return null;
+  if (!(await allowed()) || (await gateOperation(operationId))) return null;
   try {
     const [c] = await loadCases(service(), operationId);
     return c ? { ...caseProfit(c.facts), partner: c.facts.partner } : null;
@@ -279,7 +289,7 @@ const isMonth = (s: string | undefined): s is string => !!s && /^\d{4}-(0[1-9]|1
  * `from`/`to` are YYYY-MM; anything else means the last twelve months.
  */
 export async function getProfitReport(range: { from?: string; to?: string }): Promise<ProfitReport | null> {
-  if (!(await allowed())) return null;
+  if (!(await allowedAll())) return null;
   try {
     const db = service();
     const all = (await loadCases(db)).filter((c) => !c.cancelled);
@@ -325,7 +335,7 @@ export type Cashflow = { today: string; buckets: CashBucket[] };
  * partner's invoice, which stays on its account whatever became of the file.
  */
 export async function getCashflow(): Promise<Cashflow | null> {
-  if (!(await allowed())) return null;
+  if (!(await allowedAll())) return null;
   try {
     const db = service();
     const today = riyadhDate();

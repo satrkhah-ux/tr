@@ -23,6 +23,7 @@ import { issuedDraftData } from "@/lib/data/issued-draft";
 import { isOpenAIConfigured } from "@/lib/providers/openai";
 import { readMrzFromImage } from "@/lib/providers/mrz-vision";
 import { currentCan } from "@/lib/roles/current";
+import { gateOperation, gateRow, gateRows } from "@/lib/operations/access";
 
 /**
  * Travelers and their passports.
@@ -51,12 +52,6 @@ function db(): SupabaseClient {
 
 type Fail = { ok: false; error: TranslationKey };
 
-async function requireOps(): Promise<TranslationKey | null> {
-  const user = await getServerUser();
-  if (!user) return "err.session";
-  return await currentCan("operations.write") ? null : "ops.err.forbidden";
-}
-
 /** The stricter gate: decrypt identifiers / open a scan. */
 async function requirePassport(): Promise<TranslationKey | null> {
   const user = await getServerUser();
@@ -66,7 +61,7 @@ async function requirePassport(): Promise<TranslationKey | null> {
 
 /** The list view — redacted by construction, never carries ciphertext or paths. */
 export async function listTravelers(operationId: string): Promise<TravelerListItem[]> {
-  if (await requireOps()) return [];
+  if (await gateOperation(operationId)) return [];
   try {
     const { data } = await db()
       .from("operation_travelers")
@@ -90,7 +85,7 @@ export async function listTravelersByOperation(
   operationIds: string[],
 ): Promise<Record<string, TravelerListItem[]>> {
   if (operationIds.length === 0) return {};
-  if (await requireOps()) return {};
+  if (await gateRows("operations", operationIds)) return {};
   try {
     const { data } = await db()
       .from("operation_travelers")
@@ -124,7 +119,7 @@ export async function upsertTraveler(input: {
   /** clear (0061) — printed on the hotel voucher; also inside the passport blob. */
   nationality?: string | null;
 }): Promise<{ ok: true; id: string } | Fail> {
-  const denied = await requireOps();
+  const denied = input.id ? await gateRow("operation_travelers", input.id) : await gateOperation(input.operation_id);
   if (denied) return { ok: false, error: denied };
   if ([input.birth_date, input.passport_expiry].some((d) => d && !ISO_DATE.test(d))) {
     return { ok: false, error: "ops.trav.err.date" };
@@ -197,7 +192,7 @@ export async function upsertTraveler(input: {
 }
 
 export async function deleteTraveler(id: string): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_travelers", id);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = db();
@@ -248,7 +243,7 @@ export async function deleteTraveler(id: string): Promise<{ ok: true } | Fail> {
  * read share one service client, so a failure means the database is unreachable.
  */
 export async function getTravelerPassport(travelerId: string): Promise<PassportRead | Fail> {
-  const denied = await requirePassport();
+  const denied = (await gateRow("operation_travelers", travelerId)) ?? (await requirePassport());
   if (denied) return { ok: false, error: denied };
 
   try {
@@ -294,7 +289,7 @@ export async function uploadPassportScan(
   travelerId: string,
   formData: FormData,
 ): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_travelers", travelerId);
   if (denied) return { ok: false, error: denied };
 
   const file = pickFile(formData);
@@ -332,7 +327,7 @@ export async function uploadPassportScan(
 
 /** A 5-minute signed URL for the scan. Audited, and withheld if the audit fails. */
 export async function getPassportScanUrl(travelerId: string): Promise<{ ok: true; url: string } | Fail> {
-  const denied = await requirePassport();
+  const denied = (await gateRow("operation_travelers", travelerId)) ?? (await requirePassport());
   if (denied) return { ok: false, error: denied };
 
   try {
@@ -470,7 +465,7 @@ async function seedFromOffer(operationId: string, auto: boolean): Promise<{ ok: 
 
 /** «أنشئ المسافرين من العرض». */
 export async function seedTravelersFromOffer(operationId: string): Promise<{ ok: true; added: number } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
   return seedFromOffer(operationId, false);
 }
@@ -478,7 +473,7 @@ export async function seedTravelersFromOffer(operationId: string): Promise<{ ok:
 /** The case page's list: a never-seeded empty case fills itself from the offer first. */
 export async function listOrSeedTravelers(operationId: string): Promise<TravelerListItem[]> {
   const listed = await listTravelers(operationId);
-  if (listed.length > 0 || (await requireOps())) return listed;
+  if (listed.length > 0 || (await gateOperation(operationId))) return listed;
   const seeded = await seedFromOffer(operationId, true);
   return seeded.ok && seeded.added > 0 ? listTravelers(operationId) : listed;
 }
@@ -492,7 +487,7 @@ const MRZ_IMAGE = /^image\/(jpeg|png|webp|gif)$/;
  * Photo → the passport fields, for the employee to REVIEW. Nothing is saved
  * here except the photo itself, as the scan, when the traveler has none.
  *
- * operations.write, not operations.passport: the answer comes from a picture
+ * The case's gate, not operations.passport: the answer comes from a picture
  * the employee just handed over — nothing stored is decrypted. Every read is
  * audited, failed ones too, and the result is withheld if the audit cannot be
  * written, like a reveal.
@@ -501,7 +496,7 @@ export async function readPassportMrz(
   travelerId: string,
   formData: FormData,
 ): Promise<{ ok: true; passport: MrzPassport } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_travelers", travelerId);
   if (denied) return { ok: false, error: denied };
   if (!isOpenAIConfigured()) return { ok: false, error: "ops.trav.err.mrzOff" };
   const file = pickFile(formData);
@@ -617,7 +612,7 @@ async function revisitVisa(
 }
 
 export async function setTravelerVisa(travelerId: string, status: VisaStatus): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_travelers", travelerId);
   if (denied) return { ok: false, error: denied };
   if (!VISA_STATUSES.includes(status)) return { ok: false, error: "err.updateFailed" };
   try {
@@ -642,7 +637,7 @@ export async function setTravelerVisa(travelerId: string, status: VisaStatus): P
 
 /** The visa itself (image or PDF) into the private `visas` bucket. */
 export async function uploadVisaFile(travelerId: string, formData: FormData): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_travelers", travelerId);
   if (denied) return { ok: false, error: denied };
   const file = pickFile(formData);
   if (typeof file === "string") return { ok: false, error: file };
@@ -680,7 +675,7 @@ export async function uploadVisaFile(travelerId: string, formData: FormData): Pr
 
 /** A 5-minute signed URL to the visa — it carries the passport number, so the passport gate and an audit first. */
 export async function getVisaFileUrl(travelerId: string): Promise<{ ok: true; url: string } | Fail> {
-  const denied = await requirePassport();
+  const denied = (await gateRow("operation_travelers", travelerId)) ?? (await requirePassport());
   if (denied) return { ok: false, error: denied };
 
   try {

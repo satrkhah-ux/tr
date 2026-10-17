@@ -3,8 +3,8 @@
 import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
-import { currentCan } from "@/lib/roles/current";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { gateOperation } from "@/lib/operations/access";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { clientWhatsappAllowed, greeting, messageClient, type ClientSendResult, type OfferClient } from "@/lib/data/client-whatsapp";
@@ -23,11 +23,6 @@ import { paidTotal, remainingBalance } from "@/lib/operations/payments";
 
 type Fail = { ok: false; error: TranslationKey };
 
-async function requireOps(): Promise<TranslationKey | null> {
-  if (!(await getServerUser())) return "err.session";
-  return (await currentCan("operations.write")) ? null : "ops.err.forbidden";
-}
-
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
 
 /** Why a file's client cannot be written to, in the agent's words. */
@@ -43,7 +38,7 @@ type CaseOffer = OfferClient & { serial: string; destination: string | null; tot
 type CaseClient = { offer: CaseOffer; token: string | null; bookings: SummaryBooking[]; paid: number };
 type OfferRow = Omit<CaseOffer, "customer"> & { customers: OfferClient["customer"] | OfferClient["customer"][] };
 
-/** The file as the message needs it — service role, after requireOps. */
+/** The file as the message needs it — service role, after gateOperation. */
 async function loadCase(service: SupabaseClient, operationId: string): Promise<CaseClient | null> {
   const { data } = await service
     .from("operations")
@@ -82,7 +77,7 @@ export type ClientDraft = {
 };
 
 export async function draftClientMessage(operationId: string): Promise<{ ok: true; draft: ClientDraft } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
   try {
     const service = createSupabaseServiceClient() as unknown as SupabaseClient;
@@ -117,7 +112,7 @@ export async function draftClientMessage(operationId: string): Promise<{ ok: tru
  * thread (messageClient), said on screen and in the log, never claimed as sent.
  */
 export async function sendClientMessageNow(input: { operation_id: string; body: string }): Promise<{ ok: true; result: "sent" | "window" } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateOperation(input.operation_id);
   if (denied) return { ok: false, error: denied };
   const body = input.body.trim();
   if (!body) return { ok: false, error: "ops.err.emptyMessage" };

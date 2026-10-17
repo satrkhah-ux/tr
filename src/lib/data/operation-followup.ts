@@ -2,12 +2,12 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { readinessFor } from "@/lib/data/operation-sync";
 import type { ReadinessItem } from "@/lib/operations/progress";
-import { currentCan } from "@/lib/roles/current";
+import { gateOperation, gateRow } from "@/lib/operations/access";
 
 /**
  * After the bookings (operations order 6): the «جاهز للسفر» checklist, the
@@ -16,18 +16,12 @@ import { currentCan } from "@/lib/roles/current";
 
 type Fail = { ok: false; error: TranslationKey };
 
-async function requireOps(): Promise<TranslationKey | null> {
-  const user = await getServerUser();
-  if (!user) return "err.session";
-  return (await currentCan("operations.write")) ? null : "ops.err.forbidden";
-}
-
 async function db(): Promise<SupabaseClient> {
   return (await createSupabaseServerClient()) as unknown as SupabaseClient;
 }
 
 export async function getReadiness(operationId: string): Promise<ReadinessItem[] | null> {
-  if (await requireOps()) return null;
+  if (await gateOperation(operationId)) return null;
   return readinessFor(operationId);
 }
 
@@ -40,7 +34,7 @@ export type OperationIssue = {
 };
 
 export async function listIssues(operationId: string): Promise<{ issues: OperationIssue[]; rating: { score: number; comment: string | null } | null }> {
-  if (await requireOps()) return { issues: [], rating: null };
+  if (await gateOperation(operationId)) return { issues: [], rating: null };
   try {
     const supabase = await db();
     const [issues, rating] = await Promise.all([
@@ -54,7 +48,7 @@ export async function listIssues(operationId: string): Promise<{ issues: Operati
 }
 
 export async function addIssue(operationId: string, description: string): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
   if (!description.trim()) return { ok: false, error: "ops.issue.required" };
   try {
@@ -70,7 +64,7 @@ export async function addIssue(operationId: string, description: string): Promis
 }
 
 export async function resolveIssue(issueId: string, resolution: string): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_issues", issueId);
   if (denied) return { ok: false, error: denied };
   if (!resolution.trim()) return { ok: false, error: "ops.issue.resolutionRequired" };
   try {

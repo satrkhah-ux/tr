@@ -3,23 +3,30 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { syncOperation } from "@/lib/data/operation-sync";
 import { mintReceipt } from "@/lib/data/payment-receipt";
 import type { PaymentKind, PaymentMethod } from "@/lib/data/operations";
 import { PAYMENT_KINDS, PAYMENT_METHODS, isIsoDate } from "@/lib/operations/payments";
-import { currentCan } from "@/lib/roles/current";
+import { gateManager, gateOperation, gateRow } from "@/lib/operations/access";
 
 /**
  * «الدفعات» beyond recording one (recordPayment, operations.ts): correcting and
  * deleting a payment, the client's proof of payment, the receipt link, and the
- * installment schedule. Every action is behind operations.write and audited.
+ * installment schedule. Every action is audited and behind operations/access.ts:
+ * the slip and the receipt are the file's work (an own-files holder on their
+ * own file too); correcting or deleting a payment, replacing a slip already on
+ * file, and the schedule are the manager's (operations.write) — money records
+ * and payment terms are not erased or moved by the person they are about.
  *
- * Rows go through the USER client (RLS is staff-only). The service role is used
- * for one thing — the private `payment-proofs` bucket, which has no storage
- * policy — and only after the permission check.
+ * Rows go through the USER client (RLS is staff-only), except two narrow
+ * writes the server builds itself — the receipt number and the slip's path —
+ * which go through the service role after the gate, because 0078 gives an
+ * own-files holder no UPDATE on payments (they could PATCH the amount). The
+ * private `payment-proofs` bucket has no storage policy, so it is the service
+ * role too, and only after the permission check.
  */
 
 const BUCKET = "payment-proofs";
@@ -31,12 +38,6 @@ const PROOF_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp",
 const MAX_INSTALLMENTS = 24;
 
 type Fail = { ok: false; error: TranslationKey };
-
-async function requireOps(): Promise<TranslationKey | null> {
-  const user = await getServerUser();
-  if (!user) return "err.session";
-  return (await currentCan("operations.write")) ? null : "ops.err.forbidden";
-}
 
 async function db(): Promise<SupabaseClient> {
   return (await createSupabaseServerClient()) as unknown as SupabaseClient;
@@ -77,7 +78,7 @@ export type PaymentInput = {
 
 /** Correct a payment. The before/after goes to the audit log — money edited silently is money nobody can explain. */
 export async function updatePayment(id: string, input: PaymentInput): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateManager();
   if (denied) return { ok: false, error: denied };
   if (!(Number.isFinite(input.amount) && input.amount > 0)) return { ok: false, error: "ops.err.amountPositive" };
   if (!PAYMENT_KINDS.includes(input.kind) || (input.method && !PAYMENT_METHODS.includes(input.method)) || !isIsoDate(input.paid_at)) {
@@ -123,7 +124,7 @@ export async function updatePayment(id: string, input: PaymentInput): Promise<{ 
 
 /** Delete a payment — its receipt link dies with the row, its slip with the storage object. */
 export async function deletePayment(id: string): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateManager();
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
@@ -148,7 +149,7 @@ export async function deletePayment(id: string): Promise<{ ok: true } | Fail> {
 
 /** Attach the client's transfer slip / POS receipt. Replaces any earlier one. */
 export async function uploadPaymentProof(paymentId: string, formData: FormData): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_payments", paymentId);
   if (denied) return { ok: false, error: denied };
 
   const file = formData.get("file");
@@ -160,6 +161,11 @@ export async function uploadPaymentProof(paymentId: string, formData: FormData):
     const supabase = await db();
     const row = await loadPayment(supabase, paymentId);
     if (!row) return { ok: false, error: "err.loadFailed" };
+    // the first slip is the file's work; replacing one already on file erases it — the manager's
+    if (row.proof_path) {
+      const manager = await gateManager();
+      if (manager) return { ok: false, error: manager };
+    }
 
     // random leaf: a leaked path names no client and lets nobody guess its neighbours
     const ext = (file.name.split(".").pop() ?? "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || "bin";
@@ -167,7 +173,8 @@ export async function uploadPaymentProof(paymentId: string, formData: FormData):
     const up = await storage().upload(path, new Uint8Array(await file.arrayBuffer()), { contentType: file.type, upsert: false });
     if (up.error) return { ok: false, error: "ops.err.uploadFailed" };
 
-    const { error } = await supabase
+    // service: a server-built path, after the gate (see the module note)
+    const { error } = await (createSupabaseServiceClient() as unknown as SupabaseClient)
       .from("operation_payments")
       .update({ proof_path: path, updated_at: new Date().toISOString() })
       .eq("id", paymentId);
@@ -186,7 +193,7 @@ export async function uploadPaymentProof(paymentId: string, formData: FormData):
 
 /** A 5-minute signed URL to the slip, for staff only. */
 export async function getPaymentProofUrl(paymentId: string): Promise<{ ok: true; url: string } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_payments", paymentId);
   if (denied) return { ok: false, error: denied };
   try {
     const row = await loadPayment(await db(), paymentId);
@@ -206,7 +213,7 @@ export async function getPaymentProofUrl(paymentId: string): Promise<{ ok: true;
  * asked for. Idempotent: the `is null` guard keeps a double click to one number.
  */
 export async function ensurePaymentReceipt(paymentId: string): Promise<{ ok: true; token: string } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_payments", paymentId);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
@@ -216,7 +223,8 @@ export async function ensurePaymentReceipt(paymentId: string): Promise<{ ok: tru
     if (row.receipt_token) return { ok: true, token: row.receipt_token };
 
     const minted = mintReceipt();
-    await supabase.from("operation_payments").update(minted).eq("id", paymentId).is("receipt_token", null);
+    // service: a server-minted number, after the gate (see the module note)
+    await (createSupabaseServiceClient() as unknown as SupabaseClient).from("operation_payments").update(minted).eq("id", paymentId).is("receipt_token", null);
     const after = await loadPayment(supabase, paymentId);
     if (!after?.receipt_token) return { ok: false, error: "err.updateFailed" };
     await logAudit({ action: "payment.updated", entity: "operations", entity_id: row.operation_id, meta: { payment_id: paymentId, receipt_no: after.receipt_no } });
@@ -230,7 +238,7 @@ export type InstallmentRow = { id: string; due_date: string; amount: number; not
 
 /** The stored schedule; empty = the default terms apply (payments.ts defaultSchedule). */
 export async function listInstallments(operationId: string): Promise<InstallmentRow[]> {
-  if (await requireOps()) return [];
+  if (await gateOperation(operationId)) return [];
   try {
     const { data } = await (await db())
       .from("operation_installments")
@@ -255,7 +263,7 @@ export async function saveInstallments(
   operationId: string,
   rows: { due_date: string; amount: number; note?: string | null }[],
 ): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateManager();
   if (denied) return { ok: false, error: denied };
   if (rows.length > MAX_INSTALLMENTS || rows.some((r) => !isIsoDate(r.due_date) || !(Number.isFinite(r.amount) && r.amount > 0))) {
     return { ok: false, error: "ops.pay.err.invalid" };

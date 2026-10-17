@@ -2468,4 +2468,6 @@ export const en = {
   "ops.pay.err.noProof": "No proof on file.",
   "ops.pay.err.refundReceipt": "A refund has no receipt.",
   "ops.signal.installment_overdue": "Installment overdue",
+  "ops.err.notYours": "This is not one of your files — you work the operations of the files you issued only.",
+  "ops.err.managerOnly": "This step is for the operations team: cancelling a file, correcting or deleting payments, refunds, the installment schedule and supplier money.",
 } as const;

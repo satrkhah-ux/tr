@@ -21,7 +21,8 @@ const amountIn = (list: Money[], currency: string) => list.find((m) => m.currenc
  * «ربحية الحالة» — internal. Rendered only when the page's loader returned
  * figures, which it does for pricing.internal alone.
  */
-export function CaseProfitCard({ profit }: { profit: CaseProfitView }) {
+/** `showReport`: the link to the all-cases report — the manager's (operation-money.ts). */
+export function CaseProfitCard({ profit, showReport }: { profit: CaseProfitView; showReport: boolean }) {
   const { t } = useTraveliunUI();
   return (
     <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
@@ -31,9 +32,11 @@ export function CaseProfitCard({ profit }: { profit: CaseProfitView }) {
           {t("ops.money.caseTitle")}
           <span className="rounded-full bg-[#fff8e8] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">{t("ops.money.internal")}</span>
         </h2>
-        <Link href="/operations/profitability" className="text-[12px] font-bold text-[#2aa87a] hover:underline">
-          {t("ops.money.report")}
-        </Link>
+        {showReport ? (
+          <Link href="/operations/profitability" className="text-[12px] font-bold text-[#2aa87a] hover:underline">
+            {t("ops.money.report")}
+          </Link>
+        ) : null}
       </div>
       <p className="mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("ops.money.caseHint")}</p>
 

@@ -2,10 +2,10 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { listAssignees } from "@/lib/data/operation-assign";
-import { currentCan } from "@/lib/roles/current";
+import { gateOperation, gateOps } from "@/lib/operations/access";
 import { toClientInfo, type ClientInfo } from "@/lib/operations/case-list";
 
 /**
@@ -23,18 +23,12 @@ function db(): Promise<SupabaseClient> {
 
 type Fail = { ok: false; error: TranslationKey };
 
-async function requireOps(): Promise<TranslationKey | null> {
-  const user = await getServerUser();
-  if (!user) return "err.session";
-  return (await currentCan("operations.write")) ? null : "ops.err.forbidden";
-}
-
 export type StaffOption = { id: string; label: string };
 
 /** The board's owner column and the people a case can be given to. */
 export async function listCaseOwners(): Promise<{ owners: Record<string, string>; staff: StaffOption[] }> {
   const empty = { owners: {}, staff: [] };
-  if (await requireOps()) return empty;
+  if (await gateOps()) return empty;
   try {
     const supabase = await db();
     const [ownersRes, people] = await Promise.all([supabase.from("operations").select("id, assignee_id").not("assignee_id", "is", null), listAssignees()]);
@@ -47,7 +41,7 @@ export async function listCaseOwners(): Promise<{ owners: Record<string, string>
 
 export async function getCaseExtras(operationId: string): Promise<{ assignee_id: string | null; client_info: ClientInfo }> {
   const empty = { assignee_id: null, client_info: toClientInfo(null) };
-  if (await requireOps()) return empty;
+  if (await gateOperation(operationId)) return empty;
   try {
     const { data } = await (await db()).from("operations").select("assignee_id, client_info").eq("id", operationId).maybeSingle();
     const row = data as { assignee_id: string | null; client_info: unknown } | null;
@@ -58,7 +52,7 @@ export async function getCaseExtras(operationId: string): Promise<{ assignee_id:
 }
 
 export async function setCaseAssignee(operationId: string, employeeId: string | null): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
   try {
     const { error } = await (await db()).from("operations").update({ assignee_id: employeeId || null }).eq("id", operationId);
@@ -72,7 +66,7 @@ export async function setCaseAssignee(operationId: string, employeeId: string | 
 
 /** What /trip shows the client about reaching us. Only the four known fields are kept. */
 export async function saveClientInfo(operationId: string, info: ClientInfo): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
   try {
     const clean = toClientInfo(info);
@@ -92,7 +86,7 @@ export async function saveClientInfo(operationId: string, info: ClientInfo): Pro
  * construction.
  */
 export async function addCaseNote(operationId: string, note: string): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
   const text = note.trim().slice(0, 2000);
   if (!text) return { ok: false, error: "ops.err.emptyMessage" };
@@ -119,9 +113,9 @@ const SHOWN_META = ["from", "to", "amount", "currency", "kind", "confirmation_nu
 
 /** Who did what to this case and when — the case row, its bookings, documents and travellers. */
 export async function listCaseActivity(operationId: string): Promise<ActivityEntry[]> {
-  if (await requireOps()) return [];
+  if (await gateOperation(operationId)) return [];
   try {
-    // service: audit_logs and operation_travelers are both locked to it; requireOps is the gate
+    // service: audit_logs and operation_travelers are both locked to it; gateOperation is the gate
     const service = createSupabaseServiceClient() as unknown as SupabaseClient;
     const [bookings, documents, travelers] = await Promise.all(
       ["operation_bookings", "operation_documents", "operation_travelers"].map((table) => service.from(table).select("id").eq("operation_id", operationId)),

@@ -7,7 +7,7 @@ import { listTravelersByOperation } from "@/lib/data/operation-travelers";
 import { operationSignals, severityRank, type OperationSignal, type OperationSnapshot } from "@/lib/operations/signals";
 import { isLiveCase, summarizeOperations, type OpsCase, type OpsCounts } from "@/lib/operations/summary";
 import type { ExecutionStatus } from "@/lib/operations/state";
-import { currentCan } from "@/lib/roles/current";
+import { opsAccess } from "@/lib/operations/access";
 import { defaultSchedule, riyadhDate } from "@/lib/operations/payments";
 
 /**
@@ -59,8 +59,10 @@ async function load(): Promise<Loaded> {
   try {
     const user = await getServerUser();
     if (!user) return closed;
-    if (!await currentCan("operations.write")) return closed;
+    if (!(await opsAccess())) return closed;
 
+    // an own-files holder gets their own cases only — so the board, the
+    // dashboard panel and every count below are theirs (operations/access.ts)
     const operations = await listOperations();
     if (operations.length === 0) return { ...closed, ok: true };
 
