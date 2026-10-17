@@ -9,8 +9,8 @@ import { activeTeam, pullSheet, pushToSheet, type LeadRow } from "@/lib/leads/sy
 
 /**
  * «العملاء» — every client conversation, open to every employee (the owner,
- * 2026-10-17, phase one). The sheet comes in on its own (instrumentation.ts
- * every two minutes, and on opening the page when the last pull is over a
+ * 2026-10-17, phase one). The sheet comes in on its own (the crontab on
+ * api/leads/pull every two minutes, and on opening the page when the last pull is over a
  * minute old); what is logged or edited here goes back out (sync.ts).
  */
 
@@ -42,7 +42,9 @@ async function db(): Promise<SupabaseClient> {
 
 async function pullOnce(supabase: SupabaseClient): Promise<string | null> {
   lastPull = Date.now();
-  return pullSheet(supabase).catch((e: unknown) => (e instanceof Error ? e.message : "pull failed"));
+  return pullSheet(supabase)
+    .then((r) => r.error ?? null)
+    .catch((e: unknown) => (e instanceof Error ? e.message : "pull failed"));
 }
 
 /** The Basic files of these phones (newest first): the client's name and the programme's destination. */

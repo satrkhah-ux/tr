@@ -386,6 +386,16 @@ const CHECKS: Check[] = [
           : { key: "dev.d.opsFlightsJob", params: { checked: Number(s.checked ?? 0), moved: Number(s.moved ?? 0), alerts: Number(s.alerts ?? 0) } },
     ),
   },
+  {
+    id: "job_leads_pull",
+    group: "jobs",
+    label: "dev.c.leadsPullJob",
+    // the VPS crontab: every 2 minutes (api/leads/pull/route.ts); late after 10
+    run: cronCheck("leads_pull", 10 * 60 * 1000, (s) => ({
+      key: "dev.d.leadsPullJob",
+      params: { read: Number(s.read ?? 0), added: Number(s.added ?? 0), updated: Number(s.updated ?? 0) },
+    })),
+  },
 ];
 
 async function settle(check: Check, run: () => Promise<Outcome> = check.run): Promise<CheckResult> {

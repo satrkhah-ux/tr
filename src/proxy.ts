@@ -115,6 +115,8 @@ const PUBLIC_PREFIXES = [
   "/api/telegram",
   "/api/eye",
   "/api/ops",
+  // «العملاء»: the conversations sheet pull, the same crontab with the same secret
+  "/api/leads/pull",
   "/b2b",
 ];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);

@@ -16,7 +16,8 @@ import {
 /**
  * «العملاء» ⇄ the conversations sheet, both ways.
  *
- *  · in: the sheet's CSV (it is shared by link). New rows are added; on a row
+ *  · in: the sheet's CSV (it is shared by link), from the crontab
+ *    (api/leads/pull) and on opening the page. New rows are added; on a row
  *    already here only the cells that changed since the last pull are applied
  *    (sheet_raw), so an edit made in the app is not undone by an unchanged sheet.
  *  · out: when LEADS_SHEET_WEBHOOK is set (the Apps Script in
@@ -54,18 +55,21 @@ function columnsFor(field: SheetField, value: string, people: Person[]): Record<
 
 const FIELDS = (Object.keys(HEADERS) as SheetField[]).filter((f) => f !== "phone");
 
-/** Pull the sheet into client_leads. Returns an error's wording, or null. */
-export async function pullSheet(supabase: SupabaseClient): Promise<string | null> {
+export type PullResult = { read: number; added: number; updated: number; error?: string };
+
+/** Pull the sheet into client_leads. Idempotent: a key already here is updated, never added twice. */
+export async function pullSheet(supabase: SupabaseClient): Promise<PullResult> {
   const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv${SHEET_GID ? `&gid=${SHEET_GID}` : ""}`, { cache: "no-store" });
-  if (!res.ok) return `sheet ${res.status}`;
+  if (!res.ok) return { read: 0, added: 0, updated: 0, error: `sheet ${res.status}` };
   const rows = parseLeadsSheet(await res.text());
-  if (!rows.length) return null;
+  if (!rows.length) return { read: 0, added: 0, updated: 0 };
   const [people, { data: existing }] = await Promise.all([
     activeTeam(supabase),
     supabase.from("client_leads").select("id, sheet_key, sheet_raw").in("sheet_key", rows.map((r) => r.key)),
   ]);
   const byKey = new Map(((existing ?? []) as { id: string; sheet_key: string; sheet_raw: Partial<SheetLead> | null }[]).map((r) => [r.sheet_key, r]));
   const fresh: Record<string, unknown>[] = [];
+  let updated = 0;
   for (const row of rows) {
     const had = byKey.get(row.key);
     const changed = FIELDS.filter((f) => !had || (had.sheet_raw?.[f] ?? "") !== row[f]);
@@ -73,16 +77,17 @@ export async function pullSheet(supabase: SupabaseClient): Promise<string | null
     const cols = Object.assign({}, ...changed.map((f) => columnsFor(f, row[f], people)));
     if (had) {
       await supabase.from("client_leads").update({ ...cols, sheet_raw: row, updated_at: new Date().toISOString() }).eq("id", had.id);
+      updated += 1;
     } else {
       // a millisecond apart in the sheet's order: a phone's second row in one pull is still «عميل سابق»
       fresh.push({ ...cols, phone: normalizePhone(row.phone), source: "sheet", sheet_key: row.key, sheet_raw: row, created_at: new Date(Date.now() + fresh.length).toISOString() });
     }
   }
-  if (fresh.length) {
-    const { error } = await supabase.from("client_leads").insert(fresh);
-    if (error) return error.message;
-  }
-  return null;
+  // two pulls at once (a page and the crontab, or two servers) add each key once
+  const { error } = fresh.length
+    ? await supabase.from("client_leads").upsert(fresh, { onConflict: "sheet_key", ignoreDuplicates: true })
+    : { error: null };
+  return { read: rows.length, added: error ? 0 : fresh.length, updated, ...(error ? { error: error.message } : {}) };
 }
 
 export type LeadRow = {
