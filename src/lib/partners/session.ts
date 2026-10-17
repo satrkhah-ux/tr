@@ -1,4 +1,5 @@
 import "server-only";
+import { ttlCache } from "@/lib/ttl-cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { publicBrandLogoUrl } from "@/components/offer-doc/brand";
@@ -49,6 +50,20 @@ function db(): SupabaseClient {
  * shut, not half-open.
  */
 export async function getPartnerSession(): Promise<PartnerSession | null> {
+  const user = await getServerUser();
+  if (!user) return null;
+  // across requests, 30 s per account — staff included («not a partner»): every
+  // navigation asked, and each ask is a round trip to the database in Mumbai
+  const known = partnerSessions.get(user.id);
+  if (known) return known.session;
+  const session = await loadPartnerSession();
+  partnerSessions.set(user.id, { session });
+  return session;
+}
+
+const partnerSessions = ttlCache<string, { session: PartnerSession | null }>(30_000);
+
+async function loadPartnerSession(): Promise<PartnerSession | null> {
   try {
     const user = await getServerUser();
     if (!user) return null;

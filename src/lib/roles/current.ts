@@ -1,4 +1,5 @@
 import "server-only";
+import { ttlCache } from "@/lib/ttl-cache";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -23,9 +24,22 @@ import { getFeatureFlags } from "@/lib/features-server";
  */
 
 /** Cached per request: several gates may ask in one action. */
+/**
+ * Across requests, 15 s: a role edited or an account suspended reaches every
+ * request within that (sooner in this process — forgetPermissions). The
+ * database's own policies (staff_can) are never cached.
+ */
+const permissionsByUser = ttlCache<string, Permission[]>(15_000);
+
+export function forgetPermissions(): void {
+  permissionsByUser.clear();
+}
+
 const loadReal = cache(async (): Promise<Permission[]> => {
   const user = await getServerUser();
   if (!user) return [];
+  const known = permissionsByUser.get(user.id);
+  if (known) return known;
   try {
     const supabase = await createSupabaseServerClient();
     const { data: emp } = await supabase
@@ -43,7 +57,9 @@ const loadReal = cache(async (): Promise<Permission[]> => {
     // without anyone granting them. A suspended colleague keeps their row and
     // loses their access. Same rule as public.staff_can() (0073).
     const role = Array.isArray(employee?.roles) ? employee.roles[0] : employee?.roles;
-    return grantedPermissions(employee ? { status: employee.status, permission_keys: role?.permission_keys ?? null } : null);
+    const granted = grantedPermissions(employee ? { status: employee.status, permission_keys: role?.permission_keys ?? null } : null);
+    permissionsByUser.set(user.id, granted);
+    return granted;
   } catch {
     return [];
   }

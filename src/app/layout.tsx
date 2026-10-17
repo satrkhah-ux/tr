@@ -92,19 +92,25 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const realRole = await getCurrentRole();
-  const permissions = await currentPermissions();
-  // «عرض النظام كـ»: who may switch and what is being looked through come from
-  // the account's OWN role — the viewed-as one could never lead back.
-  const realPermissions = await currentRealPermissions();
-  const viewAs = await currentViewAs();
-  // A login handed over with a temporary password (scripts/flag-password-change.mjs)
-  // changes it before anything else; app_metadata is not user-writable.
-  const mustChangePassword = (await getServerUser())?.app_metadata?.["must_change_password"] === true;
-  const features = await getFeatureFlags();
-  // A partner wears their own colours. Resolved here, on the server, so the very
-  // first paint is already theirs — a client-side swap would flash ours first.
-  const partnerBrand = await getPartnerBrand();
+  // Side by side, not one after another: each is a round trip to the database
+  // in Mumbai (the server is in Frankfurt), and none waits on another's answer
+  // — they share the one session lookup (getServerUser, cached per token).
+  //  · «عرض النظام كـ»: who may switch and what is being looked through come
+  //    from the account's OWN role — the viewed-as one could never lead back.
+  //  · A login handed over with a temporary password changes it before anything
+  //    else (scripts/flag-password-change.mjs); app_metadata is not user-writable.
+  //  · A partner wears their own colours, resolved here so the first paint is
+  //    already theirs — a client-side swap would flash ours first.
+  const [realRole, permissions, realPermissions, viewAs, user, features, partnerBrand] = await Promise.all([
+    getCurrentRole(),
+    currentPermissions(),
+    currentRealPermissions(),
+    currentViewAs(),
+    getServerUser(),
+    getFeatureFlags(),
+    getPartnerBrand(),
+  ]);
+  const mustChangePassword = user?.app_metadata?.["must_change_password"] === true;
   // Public Supabase config, read at RUNTIME and injected so the browser gets it
   // even when NEXT_PUBLIC_* were not baked at build time (Coolify/VPS deploys).
   // These are public values (anon key + URL) — safe to embed in the HTML.

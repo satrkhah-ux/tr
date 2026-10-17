@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
 import { logAudit } from "@/lib/data/audit";
-import { getFeatureFlags } from "@/lib/features-server";
+import { forgetFeatureFlags, getFeatureFlags } from "@/lib/features-server";
 import { FEATURES_SETTING_KEY, isFeature, type Feature } from "@/lib/features";
 
 /**
@@ -103,6 +103,7 @@ export async function setFeature(feature: Feature, on: boolean): Promise<SetSett
       .from("app_settings")
       .upsert({ key: FEATURES_SETTING_KEY, value: JSON.stringify(next), updated_at: new Date().toISOString() });
     if (error) return { ok: false, error: "err.db" };
+    forgetFeatureFlags();
     await logAudit({ action: "feature.toggled", entity: "app_settings", entity_id: FEATURES_SETTING_KEY, meta: { feature, on } });
     return { ok: true };
   } catch {

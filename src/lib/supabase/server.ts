@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { ttlCache } from "@/lib/ttl-cache";
 import { cookies } from "next/headers";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types";
@@ -60,7 +61,13 @@ export async function getServerUser(): Promise<User | null> {
  * them in a row. Keyed by the token, so a sign-in or sign-out inside the same
  * request (a new cookie) is still validated fresh.
  */
+const usersByToken = ttlCache<string, User>(60_000);
+
 const userForToken = cache(async (accessToken: string): Promise<User | null> => {
+  // across requests too: the token is a signed JWT valid ~1 h, and validating it
+  // is a Frankfurt → Mumbai round trip on every navigation (lib/ttl-cache.ts)
+  const known = usersByToken.get(accessToken);
+  if (known) return known;
   try {
     const { url, anonKey } = getSupabaseEnv();
     const supabase = createClient<Database>(url, anonKey, {
@@ -68,6 +75,7 @@ const userForToken = cache(async (accessToken: string): Promise<User | null> => 
     });
     const { data, error } = await supabase.auth.getUser(accessToken);
     if (error) return null;
+    if (data.user) usersByToken.set(accessToken, data.user);
     return data.user;
   } catch {
     return null;

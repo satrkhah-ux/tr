@@ -6,7 +6,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
-import { currentCan, currentRealPermissions, deniedForNonDeveloper } from "@/lib/roles/current";
+import { currentCan, currentRealPermissions, deniedForNonDeveloper, forgetPermissions } from "@/lib/roles/current";
 import { isDeveloperRole, isPermission, type Permission } from "@/lib/roles/roles";
 import { PENDING_BAN } from "@/lib/team/register-rules";
 
@@ -193,6 +193,7 @@ export async function deleteRole(id: string): Promise<{ ok: true } | Fail> {
     const { error } = await supabase.from("roles").delete().eq("id", id);
     if (error) return { ok: false, error: "err.deleteFailed" };
     await logAudit({ action: "role.deleted", entity: "roles", entity_id: id, meta: {} });
+    forgetPermissions();
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -223,6 +224,7 @@ export async function setMemberRole(employeeId: string, roleId: string | null): 
       entity_id: employeeId,
       meta: { from: (before.data as { role_id: string | null } | null)?.role_id ?? null, to: roleId },
     });
+    forgetPermissions();
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -302,6 +304,7 @@ export async function suspendMember(employeeId: string, suspended: boolean): Pro
       entity_id: employeeId,
       meta: { suspended },
     });
+    forgetPermissions();
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -445,6 +448,7 @@ export async function approveRegistration(id: string, roleId: string): Promise<{
       meta: { employee_id: employeeId as string, role_id: roleId, invited },
     });
     revalidatePath("/employees");
+    forgetPermissions();
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -496,6 +500,7 @@ export async function rejectRegistration(id: string, reason: string): Promise<{ 
       meta: { reason: why, account_deleted: removed },
     });
     revalidatePath("/employees");
+    forgetPermissions();
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };

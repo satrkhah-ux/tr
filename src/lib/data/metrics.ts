@@ -1,4 +1,5 @@
 "use server";
+import { ttlCache } from "@/lib/ttl-cache";
 
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -37,8 +38,19 @@ export async function getCurrentEmployeeId(): Promise<string | null> {
   }
 }
 
-/** asked many times per request (stamps, «ملفاتي», audit rows) — read once per user per request */
-const employeeIdOf = cache(async (userId: string): Promise<string | null> => employeeIdForUser(await db(), userId));
+/**
+ * asked many times per request (stamps, «ملفاتي», audit rows) — read once per
+ * user per request, and kept 5 min across requests: an account's employee row
+ * does not change, and each read is a round trip to the database in Mumbai
+ */
+const employeeIds = ttlCache<string, string>(5 * 60_000);
+const employeeIdOf = cache(async (userId: string): Promise<string | null> => {
+  const known = employeeIds.get(userId);
+  if (known) return known;
+  const id = await employeeIdForUser(await db(), userId);
+  if (id) employeeIds.set(userId, id);
+  return id;
+});
 
 async function employeeIdForUser(supabase: SupabaseClient, userId: string): Promise<string | null> {
   const { data } = await supabase.from("employees").select("id").eq("auth_user_id", userId).maybeSingle();
