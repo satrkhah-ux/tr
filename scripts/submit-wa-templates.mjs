@@ -44,7 +44,14 @@ await db.connect();
 const enabled = new Set((await db.query("select key from public.client_message_templates where enabled")).rows.map((r) => r.key));
 await db.end();
 
-const sample = ["أحمد", "ماليزيا", "https://pkg.traveliun.com/trip/abc123"];
+// Meta wants one example value per variable, in the template's own order
+const SAMPLE = {
+  name: "أحمد",
+  destination: "ماليزيا",
+  serial: "AD-6-3056-20261017",
+  date: "الخميس، 20 نوفمبر",
+  link: "https://pkg.traveliun.com/trip/abc123",
+};
 
 /** A sample PDF for a document header: Meta wants an uploaded example file. */
 async function documentHandle() {
@@ -72,7 +79,7 @@ for (const [key, def] of Object.entries(WA_TEMPLATES)) {
     console.log(`= ${def.name}: already on the account (${existing.get(def.name)})`);
     continue;
   }
-  const components = [{ type: "BODY", text: def.body, example: { body_text: [sample] } }];
+  const components = [{ type: "BODY", text: def.body, example: { body_text: [def.params.map((p) => SAMPLE[p])] } }];
   if (def.document) {
     const handle = SUBMIT ? await documentHandle() : "<uploaded sample pdf>";
     if (!handle) {
@@ -91,5 +98,9 @@ for (const [key, def] of Object.entries(WA_TEMPLATES)) {
     headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify(payload),
   }).then((r) => r.json());
-  console.log(res.id ? `+ ${def.name}: submitted (${res.status ?? "PENDING"}, ${res.category ?? ""})` : `! ${def.name}: ${res.error?.message ?? JSON.stringify(res)}`);
+  console.log(
+    res.id
+      ? `+ ${def.name}: submitted (${res.status ?? "PENDING"}, ${res.category ?? ""})`
+      : `! ${def.name}: ${[res.error?.message, res.error?.error_user_title, res.error?.error_user_msg].filter(Boolean).join(" — ") || JSON.stringify(res)}`,
+  );
 }
