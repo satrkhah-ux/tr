@@ -14,6 +14,7 @@ import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, shownDetail, type VoucherBooking
 import { applyRoomDetails, roomDetailsOpen, voucherStay, type StayError, type StayHotel } from "@/lib/operations/room-details";
 import type { LocaleChoice } from "@/lib/catalog/room-catalog";
 import { currentCan } from "@/lib/roles/current";
+import { gateOperation, gateRow } from "@/lib/operations/access";
 import { carCount, DRV } from "@/lib/operations/drivers";
 import { entriesToSave, type ConfirmEntry } from "@/lib/operations/confirm-all";
 import { findLookupCountry, type LookupRoomType } from "@/lib/offer/draft-types";
@@ -36,11 +37,6 @@ function db(): Promise<SupabaseClient> {
 
 type Fail = { ok: false; error: TranslationKey };
 
-async function requireOps(): Promise<TranslationKey | null> {
-  const user = await getServerUser();
-  if (!user) return "err.session";
-  return await currentCan("operations.write") ? null : "ops.err.forbidden";
-}
 
 
 /**
@@ -145,10 +141,10 @@ export type OperationBooking = {
 };
 
 export async function listBookings(operationId: string): Promise<OperationBooking[]> {
-  if (await requireOps()) return [];
+  if (await gateOperation(operationId)) return [];
   try {
-    // Service client: 0047 withholds the net columns from sessions — requireOps is
-    // the gate. The nets themselves leave only for pricing.internal (order 8:
+    // Service client: 0047 withholds the net columns from sessions — gateOperation
+    // is the gate. The nets themselves leave only for pricing.internal (order 8:
     // cost is internal); the supplier's own price check is supplier-booking.ts.
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const internal = await currentCan("pricing.internal");
@@ -195,7 +191,7 @@ export type CaseHotelCatalog = { hotels: CatalogHotel[]; roomTypes: LookupRoomTy
  */
 export async function caseHotelCatalog(operationId: string): Promise<CaseHotelCatalog> {
   const none: CaseHotelCatalog = { hotels: [], roomTypes: [] };
-  if (await requireOps()) return none;
+  if (await gateOperation(operationId)) return none;
   try {
     const supabase = await db();
     const [opRes, bookingsRes, countriesRes, citiesRes] = await Promise.all([
@@ -255,7 +251,7 @@ export async function addBooking(input: {
   quoted_net?: number | null;
   currency?: string;
 }): Promise<{ ok: true; id: string } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateOperation(input.operation_id);
   if (denied) return { ok: false, error: denied };
   if (!input.title.trim()) return { ok: false, error: "ops.err.titleRequired" };
 
@@ -341,7 +337,7 @@ async function writeConfirmation(supabase: SupabaseClient, input: Confirmation, 
  * because "confirmed" without one is a claim nobody can check at the hotel desk.
  */
 export async function confirmBookingManually(input: Confirmation): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_bookings", input.booking_id);
   if (denied) return { ok: false, error: denied };
   if (!input.confirmation_number.trim()) return { ok: false, error: "ops.err.confirmationRequired" };
 
@@ -362,7 +358,7 @@ export async function confirmBookingManually(input: Confirmation): Promise<{ ok:
  * own; the case's statuses then move once, through operation-sync.
  */
 export async function confirmBookings(input: { operation_id: string; entries: ConfirmEntry[] }): Promise<{ ok: true; confirmed: number } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateOperation(input.operation_id);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
@@ -399,7 +395,7 @@ export async function confirmBookings(input: { operation_id: string; entries: Co
  * warning band across it.
  */
 export async function markBookingPaid(bookingId: string, paid: boolean): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_bookings", bookingId);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
@@ -441,7 +437,7 @@ export async function updateBooking(input: {
   cancellation_policy?: string | null;
   note?: string | null;
 }): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_bookings", input.id);
   if (denied) return { ok: false, error: denied };
   if (input.title !== undefined && !input.title.trim()) return { ok: false, error: "ops.err.titleRequired" };
   const cars = input.detail?.[DRV.cars];
@@ -509,7 +505,7 @@ export async function saveRoomDetails(input: {
   rooms: Record<string, unknown>;
   locale: LocaleChoice;
 }): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_bookings", input.booking_id);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
@@ -530,7 +526,7 @@ export async function saveRoomDetails(input: {
 }
 
 export async function cancelBooking(bookingId: string, reason: string): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_bookings", bookingId);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
@@ -551,7 +547,7 @@ export async function cancelBooking(bookingId: string, reason: string): Promise<
 }
 
 export async function deleteBooking(bookingId: string): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_bookings", bookingId);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
@@ -605,7 +601,7 @@ export type OperationDocument = {
 };
 
 export async function listDocuments(operationId: string): Promise<OperationDocument[]> {
-  if (await requireOps()) return [];
+  if (await gateOperation(operationId)) return [];
   try {
     const supabase = await db();
     const { data } = await supabase
@@ -660,7 +656,7 @@ export async function issueDocument(input: {
   /** «لوحة الاستقبال» only — the name the client asked to see at the airport. */
   welcome_name?: string | null;
 }): Promise<{ ok: true; id: string; token: string } | (Fail & { params?: Record<string, string> })> {
-  const denied = await requireOps();
+  const denied = (await gateOperation(input.operation_id)) ?? (input.booking_id ? await gateRow("operation_bookings", input.booking_id) : null);
   if (denied) return { ok: false, error: denied };
 
   try {
@@ -870,7 +866,7 @@ export async function issueDocument(input: {
 }
 
 export async function revokeDocument(documentId: string): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_documents", documentId);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();

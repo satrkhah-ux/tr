@@ -3,10 +3,10 @@
 import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
-import { currentCan } from "@/lib/roles/current";
+import { gateRow } from "@/lib/operations/access";
 import { DRV, waNumber } from "@/lib/operations/drivers";
 import { driverLinkExpiry, supplierLinkExpiry, type LinkKind } from "@/lib/operations/op-links";
 
@@ -14,23 +14,19 @@ import { driverLinkExpiry, supplierLinkExpiry, type LinkKind } from "@/lib/opera
  * «رابط المورد» and «رابط السائق» — minted and stopped by operations
  * (operations order 11). The pages they open live in public-links.ts.
  *
- * Service role behind operations.write: 0067's table is closed to sessions.
+ * Service role behind the case's gate (operations/access.ts — a link is judged
+ * by its booking's case): 0067's table is closed to sessions.
  * Asking twice gives the same open link, so the one already sent keeps working.
  */
 
 type Fail = { ok: false; error: TranslationKey };
 export type OpsLink = { id: string; token: string; expires_at: string };
 
-async function requireOps(): Promise<TranslationKey | null> {
-  if (!(await getServerUser())) return "err.session";
-  return (await currentCan("operations.write")) ? null : "ops.err.forbidden";
-}
-
 const service = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 
 /** The supplier link of a booking's request, or the link of its driver's day. */
 export async function ensureOpsLink(kind: LinkKind, bookingId: string): Promise<{ ok: true; link: OpsLink } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_bookings", bookingId);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = service();
@@ -94,7 +90,7 @@ export async function ensureOpsLink(kind: LinkKind, bookingId: string): Promise<
 
 /** Stop a link now — the page answers «not found» from the next request. */
 export async function revokeOpsLink(linkId: string): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_links", linkId);
   if (denied) return { ok: false, error: denied };
   try {
     const { data, error } = await service()

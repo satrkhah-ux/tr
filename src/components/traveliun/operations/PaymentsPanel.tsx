@@ -54,10 +54,17 @@ export function PaymentsPanel({
   operation,
   payments,
   installments,
+  canManage,
 }: {
   operation: OperationCard;
   payments: OperationPayment[];
   installments: InstallmentRow[];
+  /**
+   * operations.write: correct / delete a payment, record a refund, set the
+   * schedule. An own-files holder records money IN and attaches its slip; the
+   * server refuses the rest either way (operation-payments.ts).
+   */
+  canManage: boolean;
 }) {
   const { t } = useTraveliunUI();
   const currency = operation.currency ?? "SAR";
@@ -96,6 +103,7 @@ export function PaymentsPanel({
         operationId={operation.id}
         currency={currency}
         editing={editing}
+        canManage={canManage}
         onDone={(message) => {
           setEditing(null);
           setFormKey((k) => k + 1);
@@ -107,12 +115,12 @@ export function PaymentsPanel({
       {payments.length > 0 ? (
         <ul className="mt-3 space-y-2 border-t border-[#f0f4f2] pt-3">
           {payments.map((p) => (
-            <PaymentItem key={p.id} payment={p} onEdit={() => setEditing(p)} />
+            <PaymentItem key={p.id} payment={p} onEdit={canManage ? () => setEditing(p) : null} />
           ))}
         </ul>
       ) : null}
 
-      <Schedule operation={operation} installments={installments} paid={paid} currency={currency} />
+      <Schedule operation={operation} installments={installments} paid={paid} currency={currency} canManage={canManage} />
     </section>
   );
 }
@@ -121,11 +129,13 @@ function PaymentForm({
   operationId,
   currency,
   editing,
+  canManage,
   onDone,
 }: {
   operationId: string;
   currency: string;
   editing: OperationPayment | null;
+  canManage: boolean;
   /** saved; `message` when the payment is in but its slip is not. */
   onDone: (message?: string) => void;
 }) {
@@ -184,7 +194,8 @@ function PaymentForm({
       <label className={label}>
         {t("ops.payment.kind")}
         <select value={kind} onChange={(e) => setKind(e.target.value as PaymentKind)} className={field}>
-          {PAYMENT_KINDS.map((k) => (
+          {/* a refund is money going out — the manager's */}
+          {PAYMENT_KINDS.filter((k) => canManage || k !== "refund").map((k) => (
             <option key={k} value={k}>
               {t(`ops.payment.${k}` as TranslationKey)}
             </option>
@@ -248,7 +259,8 @@ function PaymentForm({
   );
 }
 
-function PaymentItem({ payment, onEdit }: { payment: OperationPayment; onEdit: () => void }) {
+/** `onEdit` null: no edit / delete — correcting or erasing a money record is the manager's. */
+function PaymentItem({ payment, onEdit }: { payment: OperationPayment; onEdit: (() => void) | null }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -338,19 +350,23 @@ function PaymentItem({ payment, onEdit }: { payment: OperationPayment; onEdit: (
               {t("ops.pay.proofOpen")}
             </button>
           ) : null}
-          <button type="button" disabled={pending} onClick={onEdit} className={chip}>
-            <Pencil className="size-3.5" />
-            {t("edit")}
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => setConfirming(true)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[11.5px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
-          >
-            <Trash2 className="size-3.5" />
-            {t("delete")}
-          </button>
+          {onEdit ? (
+            <>
+              <button type="button" disabled={pending} onClick={onEdit} className={chip}>
+                <Pencil className="size-3.5" />
+                {t("edit")}
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => setConfirming(true)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[11.5px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+              >
+                <Trash2 className="size-3.5" />
+                {t("delete")}
+              </button>
+            </>
+          ) : null}
         </div>
       )}
       {error ? <p className="mt-2 text-[11.5px] font-bold text-[#c22850]">{error}</p> : null}
@@ -363,11 +379,14 @@ function Schedule({
   installments,
   paid,
   currency,
+  canManage,
 }: {
   operation: OperationCard;
   installments: InstallmentRow[];
   paid: number;
   currency: string;
+  /** the client's payment terms are the manager's to set */
+  canManage: boolean;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -405,7 +424,7 @@ function Schedule({
           <CalendarClock className="size-4" />
           {t("ops.pay.schedule")}
         </h3>
-        {draft ? null : (
+        {draft || !canManage ? null : (
           <div className="flex flex-wrap gap-1.5">
             {stored ? (
               <button type="button" disabled={pending} onClick={() => save([])} className={chip}>

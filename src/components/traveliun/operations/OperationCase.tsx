@@ -54,6 +54,7 @@ export function OperationCase({
   assignees,
   sentRequests,
   canBook,
+  canManage,
   canReadMrz,
   installments,
   drivers,
@@ -72,6 +73,12 @@ export function OperationCase({
   sentRequests: SentRequest[];
   /** may commit a reservation at the supplier — `operations.book`. */
   canBook: boolean;
+  /**
+   * `operations.write`: every file, and the manager's steps on it (cancel the
+   * case, correct/erase payments, the schedule, supplier money). An own-files
+   * holder works their file without them; the server refuses them either way.
+   */
+  canManage: boolean;
   /** the OpenAI key is set: passports can be read from their photo. */
   canReadMrz: boolean;
   installments: InstallmentRow[];
@@ -146,7 +153,7 @@ export function OperationCase({
             <TrackControl
               title={t("ops.clientTrack")}
               current={operation.client_status}
-              states={[...CLIENT_STATES, "cancelled"]}
+              states={canManage ? [...CLIENT_STATES, "cancelled"] : CLIENT_STATES}
               labelFor={(s) => t(CLIENT_KEY(s))}
               canAdvance={(to) => canAdvanceClient(operation.client_status, to as never)}
               onPick={async (to) => setClientStatus(operation.id, to as never)}
@@ -155,7 +162,7 @@ export function OperationCase({
             <TrackControl
               title={t("ops.executionTrack")}
               current={operation.execution_status}
-              states={[...EXECUTION_STATES, "cancelled"]}
+              states={canManage ? [...EXECUTION_STATES, "cancelled"] : EXECUTION_STATES}
               labelFor={(s) => t(EXEC_KEY(s))}
               canAdvance={(to) => canAdvanceExecution(operation.execution_status, to as never)}
               onPick={async (to) => setExecutionStatus(operation.id, to as never)}
@@ -193,12 +200,34 @@ export function OperationCase({
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <TravelersPanel operationId={operation.id} trip={operation} travelers={travelers} canReadMrz={canReadMrz} />
-          <PaymentsPanel operation={operation} payments={payments} installments={installments} />
+          <PaymentsPanel operation={operation} payments={payments} installments={installments} canManage={canManage} />
         </div>
 
         <IssuesPanel operationId={operation.id} />
         {management}
       </div>
+    </TraveliunShell>
+  );
+}
+
+/**
+ * Another employee's file opened by its URL (an own-files holder): said
+ * plainly, with the way back to their board — not a 404, not a crash.
+ */
+export function OperationRefused({ reason }: { reason: TranslationKey }) {
+  const { t } = useTraveliunUI();
+  return (
+    <TraveliunShell title="nav.operations">
+      <section className={`${card} tv-fade-up`}>
+        <p className="text-[14px] font-extrabold text-[#c22850]">{t(reason)}</p>
+        <Link
+          href="/operations"
+          className="mt-3 inline-flex h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6]"
+        >
+          <ArrowRight className="size-4 ltr:rotate-180" />
+          {t("ops.backToBoard")}
+        </Link>
+      </section>
     </TraveliunShell>
   );
 }

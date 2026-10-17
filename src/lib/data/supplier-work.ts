@@ -13,6 +13,7 @@ import { conversationForPhone } from "@/lib/providers/teletel";
 import { decryptJson, isVaultConfigured } from "@/lib/crypto/secrets";
 import type { PassportView, TravelerKind } from "@/lib/operations/traveler-dto";
 import { currentCan } from "@/lib/roles/current";
+import { gateManager, gateOperation, gateRow, gateRows } from "@/lib/operations/access";
 import {
   bookingCost,
   buildSupplierRequest,
@@ -34,8 +35,13 @@ import {
  * check, because 0063's columns are not granted to sessions (a partner reads its
  * own bookings and must not learn whom we buy from) and money is closed to them
  * entirely (0047). Two gates:
- *   operations.write  — who handles it, the request, the answer, the papers;
+ *   the case's own (operations/access.ts) — who handles it, the request, the
+ *                       answer, the papers: anyone who may work that file;
  *   pricing.internal  — any figure: a booking's cost, a payment, a balance.
+ * What we owe and pay a supplier — a booking's cost, a supplier payment, the
+ * accounts across every case — is also the manager's (operations.write): a
+ * salesperson holds pricing.internal, and the cost of their own file is their
+ * own profit.
  */
 
 function service(): SupabaseClient {
@@ -46,7 +52,7 @@ type Fail = { ok: false; error: TranslationKey };
 
 async function gate(permission: Permission): Promise<TranslationKey | null> {
   if (!(await getServerUser())) return "err.session";
-  return (await currentCan(permission)) ? null : permission === "operations.write" ? "ops.err.forbidden" : "err.forbidden";
+  return (await currentCan(permission)) ? null : "err.forbidden";
 }
 
 // PostgREST returns an embedded relation as an array even when to-one.
@@ -171,6 +177,8 @@ export type SupplierWork = {
   now: string;
   replyHours: number;
   canSeeCost: boolean;
+  /** pricing.internal AND operations.write — set a booking's cost, pay a supplier, open the accounts. */
+  canManageMoney: boolean;
   suppliers: CaseSupplier[];
   bookings: CaseBookingSupplier[];
   /** this case's payments to suppliers — empty without pricing.internal. */
@@ -198,10 +206,11 @@ const toCaseSupplier = (s: SupplierRow): CaseSupplier => ({
 });
 
 export async function getSupplierWork(operationId: string): Promise<SupplierWork | null> {
-  if (await gate("operations.write")) return null;
+  if (await gateOperation(operationId)) return null;
   try {
     const supabase = service();
     const canSeeCost = await currentCan("pricing.internal");
+    const canManageMoney = canSeeCost && !(await gateManager());
     const [bookingsRes, hours] = await Promise.all([
       supabase
         .from("operation_bookings")
@@ -248,6 +257,7 @@ export async function getSupplierWork(operationId: string): Promise<SupplierWork
       now: now.toISOString(),
       replyHours: hours,
       canSeeCost,
+      canManageMoney,
       suppliers: ((suppliersRes.data ?? []) as SupplierRow[]).map(toCaseSupplier),
       bookings: costed.map((r) => ({
         booking_id: r.id,
@@ -278,7 +288,7 @@ export async function getSupplierWork(operationId: string): Promise<SupplierWork
  * The passport NUMBER never leaves: a supplier books a name, not a document.
  */
 export async function composeRequest(bookingId: string): Promise<{ ok: true; draft: RequestDraft } | Fail> {
-  const denied = await gate("operations.write");
+  const denied = await gateRow("operation_bookings", bookingId);
   if (denied) return { ok: false, error: denied };
 
   try {
@@ -391,7 +401,7 @@ export async function composeRequest(bookingId: string): Promise<{ ok: true; dra
 
 /** The supplier said no. The booking stays open for someone else to take. */
 export async function declineSupplierRequest(bookingId: string): Promise<{ ok: true } | Fail> {
-  const denied = await gate("operations.write");
+  const denied = await gateRow("operation_bookings", bookingId);
   if (denied) return { ok: false, error: denied };
   try {
     const { error } = await service()
@@ -417,7 +427,7 @@ export async function confirmSupplierBookings(input: {
   booking_ids: string[];
   confirmation_number: string;
 }): Promise<{ ok: true; confirmed: number } | Fail> {
-  const denied = await gate("operations.write");
+  const denied = await gateRows("operation_bookings", input.booking_ids);
   if (denied) return { ok: false, error: denied };
   if (!input.confirmation_number.trim()) return { ok: false, error: "ops.err.confirmationRequired" };
   try {
@@ -441,9 +451,9 @@ export async function confirmSupplierBookings(input: {
 
 /** The supplier's own confirmation (PDF/photo), filed on one booking or on all it covers. */
 export async function attachSupplierConfirmation(formData: FormData): Promise<{ ok: true } | Fail> {
-  const denied = await gate("operations.write");
-  if (denied) return { ok: false, error: denied };
   const ids = String(formData.get("booking_ids") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const denied = await gateRows("operation_bookings", ids);
+  if (denied) return { ok: false, error: denied };
   if (ids.length === 0) return { ok: false, error: "ops.err.notFound" };
   try {
     const supabase = service();
@@ -472,7 +482,7 @@ export async function attachSupplierConfirmation(formData: FormData): Promise<{ 
 }
 
 export async function getSupplierConfirmationUrl(bookingId: string): Promise<{ ok: true; url: string } | Fail> {
-  const denied = await gate("operations.write");
+  const denied = await gateRow("operation_bookings", bookingId);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = service();
@@ -491,7 +501,7 @@ export async function getSupplierConfirmationUrl(bookingId: string): Promise<{ o
  * column the manual and the API confirmations already write it to.
  */
 export async function setBookingCost(input: { booking_id: string; amount: number | null; currency: string }): Promise<{ ok: true } | Fail> {
-  const denied = await gate("pricing.internal");
+  const denied = (await gateManager()) ?? (await gate("pricing.internal"));
   if (denied) return { ok: false, error: denied };
   if (input.amount != null && !(Number.isFinite(input.amount) && input.amount >= 0)) return { ok: false, error: "ops.err.amountPositive" };
   try {
@@ -513,7 +523,7 @@ export async function setBookingCost(input: { booking_id: string; amount: number
  * — the switch the voucher's warning band reads.
  */
 export async function recordSupplierPayment(formData: FormData): Promise<{ ok: true } | Fail> {
-  const denied = await gate("pricing.internal");
+  const denied = (await gateManager()) ?? (await gate("pricing.internal"));
   if (denied) return { ok: false, error: denied };
 
   const text = (k: string) => String(formData.get(k) ?? "").trim();
@@ -585,7 +595,7 @@ export async function recordSupplierPayment(formData: FormData): Promise<{ ok: t
 }
 
 export async function getSupplierReceiptUrl(paymentId: string): Promise<{ ok: true; url: string } | Fail> {
-  const denied = await gate("pricing.internal");
+  const denied = (await gateRow("supplier_payments", paymentId)) ?? (await gate("pricing.internal"));
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = service();
@@ -660,7 +670,7 @@ async function accountRows(supabase: SupabaseClient, supplierId: string | null) 
 
 /** Every supplier with its balance — the list a manager settles from — and the reply window. */
 export async function listSupplierAccounts(): Promise<{ suppliers: SupplierAccountSummary[]; replyHours: number } | null> {
-  if (await gate("pricing.internal")) return null;
+  if ((await gateManager()) || (await gate("pricing.internal"))) return null;
   try {
     const supabase = service();
     const [suppliersRes, { bookings, payments }, hours] = await Promise.all([
@@ -686,7 +696,7 @@ export async function listSupplierAccounts(): Promise<{ suppliers: SupplierAccou
 }
 
 export async function getSupplierAccount(supplierId: string): Promise<SupplierAccount | null> {
-  if (await gate("pricing.internal")) return null;
+  if ((await gateManager()) || (await gate("pricing.internal"))) return null;
   try {
     const supabase = service();
     const [supRes, { bookings, payments }] = await Promise.all([

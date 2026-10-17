@@ -9,6 +9,7 @@ import { notifyOps } from "@/lib/data/ops-notify";
 import { upsertTraveler } from "@/lib/data/operation-travelers";
 import { decryptJson, encryptJson, isVaultConfigured } from "@/lib/crypto/secrets";
 import { currentCan } from "@/lib/roles/current";
+import { gateOperation, gateRow } from "@/lib/operations/access";
 import { isOpenAIConfigured } from "@/lib/providers/openai";
 import { readMrzFromImage } from "@/lib/providers/mrz-vision";
 import { parseTd3, type MrzPassport } from "@/lib/operations/mrz";
@@ -31,7 +32,8 @@ import {
  * Client side: the trip token is the only gate (service role, as for /trip
  * itself); an upload lands as a PENDING submission and the client is told only
  * that it arrived — never what was read. Staff side: the operation_travelers
- * gates — operations.write to list/accept/reject, operations.passport (audited
+ * gates — the case's own (operations/access.ts) to list/accept/reject, and
+ * operations.passport besides (audited
  * first, withheld if the audit fails) to see what was read or open the photo.
  * Accepting saves through upsertTraveler, the existing encrypted path.
  */
@@ -201,11 +203,6 @@ async function supersede(supabase: SupabaseClient, travelerId: string, keepId: s
 
 // ---------- staff ----------
 
-async function requireOps(): Promise<TranslationKey | null> {
-  if (!(await getServerUser())) return "err.session";
-  return (await currentCan("operations.write")) ? null : "ops.err.forbidden";
-}
-
 async function requirePassport(): Promise<TranslationKey | null> {
   if (!(await getServerUser())) return "err.session";
   return (await currentCan("operations.passport")) ? null : "ops.err.forbiddenPassport";
@@ -220,7 +217,7 @@ export type PendingClientPassport = { id: string; created_at: string; read: bool
 
 /** The newest pending upload per traveller of a case — no ciphertext, no path. */
 export async function listClientPassports(operationId: string): Promise<Record<string, PendingClientPassport>> {
-  if (await requireOps()) return {};
+  if (await gateOperation(operationId)) return {};
   try {
     const { data } = await db().from(TABLE).select("id, traveler_id, status, parsed_encrypted, created_at").eq("operation_id", operationId).eq("status", "pending");
     const latest = latestPending((data ?? []) as (Pick<Sub, "id" | "traveler_id" | "status" | "created_at" | "parsed_encrypted">)[]);
@@ -234,7 +231,7 @@ export async function listClientPassports(operationId: string): Promise<Record<s
 
 /** What the reader made of the client's photo, for the employee to compare and save. Audited first. */
 export async function reviewClientPassport(submissionId: string): Promise<{ ok: true; passport: MrzPassport | null } | Fail> {
-  const denied = await requirePassport();
+  const denied = (await gateRow("operation_passport_submissions", submissionId)) ?? (await requirePassport());
   if (denied) return { ok: false, error: denied };
   try {
     const sub = await loadSub(submissionId);
@@ -257,7 +254,7 @@ export async function reviewClientPassport(submissionId: string): Promise<{ ok: 
 
 /** A 5-minute signed URL to the client's photo — the passport gate and an audit first, like any scan. */
 export async function clientPassportScanUrl(submissionId: string): Promise<{ ok: true; url: string } | Fail> {
-  const denied = await requirePassport();
+  const denied = (await gateRow("operation_passport_submissions", submissionId)) ?? (await requirePassport());
   if (denied) return { ok: false, error: denied };
   try {
     const sub = await loadSub(submissionId);
@@ -286,7 +283,7 @@ export async function acceptClientPassport(
   submissionId: string,
   input: Omit<Parameters<typeof upsertTraveler>[0], "id" | "operation_id">,
 ): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_passport_submissions", submissionId);
   if (denied) return { ok: false, error: denied };
   try {
     const sub = await loadSub(submissionId);
@@ -317,7 +314,7 @@ export async function acceptClientPassport(
 
 /** Reject: the photo and what was read from it are deleted; the client is asked for another. */
 export async function rejectClientPassport(submissionId: string): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_passport_submissions", submissionId);
   if (denied) return { ok: false, error: denied };
   try {
     const sub = await loadSub(submissionId);

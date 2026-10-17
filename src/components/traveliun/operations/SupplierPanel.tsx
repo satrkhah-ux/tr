@@ -90,7 +90,7 @@ export function SupplierPanel({
           <Store className="size-4" />
           {t("ops.sup.title")}
         </h2>
-        {work.canSeeCost ? (
+        {work.canManageMoney ? (
           <Link href="/operations/suppliers" className={chipBtn}>
             <Wallet className="size-3.5" />
             {t("ops.sup.accounts")}
@@ -130,7 +130,7 @@ export function SupplierPanel({
                 {unassigned.map((b) => (
                   <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[9px] border border-[#eef3f1] px-3 py-2">
                     <span className="min-w-0 truncate text-[12.5px] font-bold text-[#0f3d38]">{b.title}</span>
-                    <CostCell bookingId={b.id} cost={byId.get(b.id)?.cost ?? null} />
+                    <CostCell bookingId={b.id} cost={byId.get(b.id)?.cost ?? null} editable={work.canManageMoney} />
                   </li>
                 ))}
               </ul>
@@ -193,7 +193,7 @@ function SupplierGroup({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[13px] font-extrabold text-[#0f3d38]">
-            {work.canSeeCost ? (
+            {work.canManageMoney ? (
               <Link href={`/operations/suppliers/${supplier.id}`} className="hover:underline">
                 {supplier.name}
               </Link>
@@ -257,11 +257,14 @@ function SupplierGroup({
 
       {work.canSeeCost ? (
         <div className="mt-3 border-t border-[#e8efec] pt-2">
-          <button type="button" onClick={() => setPaying((v) => !v)} className={chipBtn}>
-            <Wallet className="size-3.5" />
-            {t("ops.sup.pay")}
-          </button>
-          {paying ? (
+          {/* paying a supplier is the manager's (supplier-work.ts) — an own-files holder sees what was paid */}
+          {work.canManageMoney ? (
+            <button type="button" onClick={() => setPaying((v) => !v)} className={chipBtn}>
+              <Wallet className="size-3.5" />
+              {t("ops.sup.pay")}
+            </button>
+          ) : null}
+          {paying && work.canManageMoney ? (
             <SupplierPaymentForm
               supplierId={supplier.id}
               operationId={operationId}
@@ -324,7 +327,7 @@ function SupplierBookingRow({ booking, info, work }: { booking: OperationBooking
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          {work.canSeeCost ? <CostCell bookingId={booking.id} cost={info?.cost ?? null} /> : null}
+          {work.canSeeCost ? <CostCell bookingId={booking.id} cost={info?.cost ?? null} editable={work.canManageMoney} /> : null}
           {state === "sent" || state === "overdue" ? (
             <button
               type="button"
@@ -372,7 +375,7 @@ function SupplierBookingRow({ booking, info, work }: { booking: OperationBooking
 }
 
 /** A booking's cost, and what the supplier actually charged when it differs. pricing.internal only. */
-function CostCell({ bookingId, cost }: { bookingId: string; cost: Money | null }) {
+function CostCell({ bookingId, cost, editable }: { bookingId: string; cost: Money | null; editable: boolean }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -381,6 +384,10 @@ function CostCell({ bookingId, cost }: { bookingId: string; cost: Money | null }
   const [pending, startTransition] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
 
+  // what a booking costs us is the manager's to set (supplier-work.ts setBookingCost)
+  if (!editable) {
+    return <span className="tv-tnum text-[11.5px] font-bold text-[#557d78]">{cost ? <DirText dir="ltr">{money(cost)}</DirText> : t("ops.sup.costNone")}</span>;
+  }
   if (!editing) {
     return (
       <button

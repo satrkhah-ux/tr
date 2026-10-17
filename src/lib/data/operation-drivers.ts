@@ -2,13 +2,13 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { listTravelers } from "@/lib/data/operation-travelers";
 import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
 import { COMPANY } from "@/components/offer-doc/labels";
-import { currentCan } from "@/lib/roles/current";
+import { gateOps, gateRow, mayWork, opsAccess } from "@/lib/operations/access";
 import { carText, DRV, driverMessage, driverServiceKind, meetTime, type ServiceKind } from "@/lib/operations/drivers";
 
 /**
@@ -27,21 +27,15 @@ function db(): Promise<SupabaseClient> {
 
 type Fail = { ok: false; error: TranslationKey };
 
-async function requireOps(): Promise<TranslationKey | null> {
-  const user = await getServerUser();
-  if (!user) return "err.session";
-  return (await currentCan("operations.write")) ? null : "ops.err.forbidden";
-}
-
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
 
-type OfferJoin = { serial: string; customers: { arabic_name: string | null } | { arabic_name: string | null }[] | null };
+type OfferJoin = { serial: string; employee_id?: string | null; customers: { arabic_name: string | null } | { arabic_name: string | null }[] | null };
 type OpJoin = { execution_status?: string; offers: OfferJoin | OfferJoin[] | null };
 
 export type DriverDraft = { to_label: string; to_phone: string | null; body: string; canSendWhatsapp: boolean };
 
 export async function draftDriverMessage(bookingId: string): Promise<{ ok: true; draft: DriverDraft } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_bookings", bookingId);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
@@ -127,7 +121,7 @@ export async function sendDriverMessage(input: {
   to_phone: string | null;
   body: string;
 }): Promise<{ ok: true } | Fail> {
-  const denied = await requireOps();
+  const denied = await gateRow("operation_bookings", input.booking_id);
   if (denied) return { ok: false, error: denied };
   if (!input.body.trim()) return { ok: false, error: "ops.err.emptyMessage" };
   try {
@@ -191,15 +185,16 @@ export type ScheduleRow = {
   confirmed: boolean;
 };
 
-/** Every drive and tour of every live case on one date, in the order the cars leave. */
+/** Every drive and tour of every live case on one date, in the order the cars leave — an own-files holder's cases only. */
 export async function listDriverSchedule(date: string): Promise<ScheduleRow[]> {
-  if (await requireOps()) return [];
+  if (await gateOps()) return [];
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
   try {
+    const access = await opsAccess();
     const supabase = await db();
     const { data } = await supabase
       .from("operation_bookings")
-      .select("id, operation_id, kind, title, city_name, start_date, detail, status, operations(execution_status, offers(serial, customers(arabic_name)))")
+      .select("id, operation_id, kind, title, city_name, start_date, detail, status, operations(execution_status, offers(serial, employee_id, customers(arabic_name)))")
       .eq("start_date", date)
       .in("kind", ["transport", "service"])
       .neq("status", "cancelled");
@@ -220,6 +215,7 @@ export async function listDriverSchedule(date: string): Promise<ScheduleRow[]> {
         const op = one(r.operations);
         if (!kind || op?.execution_status === "cancelled") return [];
         const offer = one(op?.offers);
+        if (!mayWork(access, offer?.employee_id)) return [];
         const d = r.detail ?? {};
         return [
           {

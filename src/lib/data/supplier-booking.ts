@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/data/audit";
 import { syncOperationOfBooking } from "@/lib/data/operation-sync";
 import { listTravelers } from "@/lib/data/operation-travelers";
 import { currentCan } from "@/lib/roles/current";
+import { gateRow } from "@/lib/operations/access";
 import { getSupplierAdapterLogged } from "@/lib/providers/hotel-registry";
 import type { BookGuest, SupplierCallRecord } from "@/lib/providers/hotel-supplier";
 
@@ -27,15 +28,15 @@ import type { BookGuest, SupplierCallRecord } from "@/lib/providers/hotel-suppli
  *     (BookingDetail by BookingReferenceId, 120s later) is impossible without it;
  *   - `unreachable` never becomes `failed` — it becomes "check the status".
  *
- * Permissions split deliberately: re-checking a price is `operations.write`
- * (everyone in operations), committing is `operations.book` (whoever the owner
+ * Permissions split deliberately: re-checking a price is the case's own gate
+ * (anyone who may work the file), committing is `operations.book` (whoever the owner
  * names). One is a question, the other is a purchase.
  */
 
 /**
  * Service client: a booking here runs on the supplier's net (quoted_net, the
  * offer's rate_key), which 0047 withholds from sessions. Every export is behind
- * requireWrite / requireBook, and that is the gate.
+ * gateRow (operations/access.ts) and, to commit, requireBook — that is the gate.
  */
 async function db(): Promise<SupabaseClient> {
   return createSupabaseServiceClient() as unknown as SupabaseClient;
@@ -43,12 +44,6 @@ async function db(): Promise<SupabaseClient> {
 
 type Fail = { ok: false; error: TranslationKey };
 type Blocked = { ok: false; message: string };
-
-async function requireWrite(): Promise<TranslationKey | null> {
-  const user = await getServerUser();
-  if (!user) return "err.session";
-  return (await currentCan("operations.write")) ? null : "ops.err.forbidden";
-}
 
 async function requireBook(): Promise<TranslationKey | null> {
   const user = await getServerUser();
@@ -163,7 +158,7 @@ export type PriceCheck = {
  * the margin quietly becomes someone else's.
  */
 export async function prebookHotel(bookingId: string): Promise<PriceCheck | Fail | Blocked> {
-  const denied = await requireWrite();
+  const denied = await gateRow("operation_bookings", bookingId);
   if (denied) return { ok: false, error: denied };
 
   const row = await loadBooking(bookingId);
@@ -258,7 +253,7 @@ export async function bookHotel(input: {
   email: string;
   phone: string;
 }): Promise<BookOk | BookUnknown | Fail | Blocked> {
-  const denied = await requireBook();
+  const denied = (await gateRow("operation_bookings", input.booking_id)) ?? (await requireBook());
   if (denied) return { ok: false, error: denied };
 
   const row = await loadBooking(input.booking_id);
@@ -389,7 +384,7 @@ export async function refreshSupplierBooking(bookingId: string): Promise<
   | Fail
   | Blocked
 > {
-  const denied = await requireWrite();
+  const denied = await gateRow("operation_bookings", bookingId);
   if (denied) return { ok: false, error: denied };
 
   const row = await loadBooking(bookingId);
@@ -445,7 +440,7 @@ export async function refreshSupplierBooking(bookingId: string): Promise<
 
 /** Cancel at the supplier. Same permission as booking — it is the same money. */
 export async function cancelSupplierBooking(bookingId: string): Promise<{ ok: true; message: string } | Fail | Blocked> {
-  const denied = await requireBook();
+  const denied = (await gateRow("operation_bookings", bookingId)) ?? (await requireBook());
   if (denied) return { ok: false, error: denied };
 
   const row = await loadBooking(bookingId);

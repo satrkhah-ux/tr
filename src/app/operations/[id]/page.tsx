@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { OperationCase } from "@/components/traveliun/operations/OperationCase";
+import { OperationCase, OperationRefused } from "@/components/traveliun/operations/OperationCase";
 import { listOperationPayments, listOperations } from "@/lib/data/operations";
 import { listInstallments } from "@/lib/data/operation-payments";
 import { listBookings, listDocuments } from "@/lib/data/operation-bookings";
@@ -14,11 +14,15 @@ import { currentCan } from "@/lib/roles/current";
 import { getSupplierWork } from "@/lib/data/supplier-work";
 import { getCaseProfit } from "@/lib/data/operation-money";
 import { CaseProfitCard } from "@/components/traveliun/operations/CaseProfitCard";
+import { gateOperation } from "@/lib/operations/access";
 
 export const dynamic = "force-dynamic";
 
 export default async function OperationCasePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // an own-files holder opening a colleague's case by its URL is told so, plainly
+  const denied = await gateOperation(id);
+  if (denied) return <OperationRefused reason={denied} />;
   const operations = await listOperations();
   const operation = operations.find((o) => o.id === id);
   if (!operation) notFound();
@@ -27,7 +31,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
   const supplierWorkP = getSupplierWork(id);
   // null without pricing.internal — the card is then not drawn at all
   const profitP = getCaseProfit(id);
-  const [travelers, payments, installments, bookings, documents, assignees, sentRequests, canBook, extras, activity] = await Promise.all([
+  const [travelers, payments, installments, bookings, documents, assignees, sentRequests, canBook, canManage, extras, activity] = await Promise.all([
     // a new case starts with the travelers the offer was sold for
     listOrSeedTravelers(id),
     listOperationPayments(id),
@@ -39,6 +43,8 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
     // Only decides whether the button is DRAWN. The server action checks the
     // same permission again — this is courtesy, not security.
     currentCan("operations.book"),
+    // every file and the manager's steps (cancel, money corrections) — courtesy too
+    currentCan("operations.write"),
     getCaseExtras(id),
     listCaseActivity(id),
   ]);
@@ -73,6 +79,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
       assignees={assignees}
       sentRequests={sentRequests}
       canBook={canBook}
+      canManage={canManage}
       canReadMrz={isOpenAIConfigured()}
       drivers={<DriversPanel serial={operation.serial} customerName={operation.customer_name} bookings={bookings} />}
       management={
@@ -85,7 +92,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
         />
       }
       supplierWork={await supplierWorkP}
-      money={await profitP.then((p) => (p ? <CaseProfitCard profit={p} /> : null))}
+      money={await profitP.then((p) => (p ? <CaseProfitCard profit={p} showReport={canManage} /> : null))}
     />
   );
 }

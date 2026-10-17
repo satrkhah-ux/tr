@@ -3,12 +3,12 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { BOARD_AR } from "@/components/offer-doc/labels";
 import type { BoardType } from "@/lib/types";
-import { currentCan } from "@/lib/roles/current";
+import { gateOperation } from "@/lib/operations/access";
 import { normalizeDraftData } from "@/lib/offer/draft-types";
 import { LATER, newBookings, planBookingsFromDraft, type ExistingBooking } from "@/lib/operations/seed-plan";
 import { issuedDraftData } from "@/lib/data/issued-draft";
@@ -37,12 +37,6 @@ function db(): Promise<SupabaseClient> {
 
 type Fail = { ok: false; error: TranslationKey };
 
-async function requireOps(): Promise<TranslationKey | null> {
-  const user = await getServerUser();
-  if (!user) return "err.session";
-  return await currentCan("operations.write") ? null : "ops.err.forbidden";
-}
-
 /**
  * The company's standing cancellation terms, used when the hotel row carries
  * none of its own. Stated rather than left blank: a voucher with an empty
@@ -68,7 +62,7 @@ type SeedRow = {
 export type SeedResult = { ok: true; added: number; linked: number; skipped: number } | Fail;
 
 export async function seedBookingsFromOffer(operationId: string): Promise<SeedResult> {
-  const denied = await requireOps();
+  const denied = await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
 
   try {
@@ -86,7 +80,7 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
 
     // The draft the offer was ISSUED from holds every city, flight, tour and
     // transfer with its date — the copy frozen at issue, never a draft edited
-    // since (issued-draft.ts; service: requireOps above is the gate). An offer
+    // since (issued-draft.ts; service: gateOperation above is the gate). An offer
     // with none (imported, repackaged) falls back to its own tables below.
     const draft = await issuedDraftData(createSupabaseServiceClient() as unknown as SupabaseClient, {
       id: op.offer_id,
@@ -96,7 +90,7 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
 
     const [hotelsRes, flightsRes, itemsRes, existingRes] = await Promise.all([
       // Service client: the buy price seeds quoted_net, and 0047 withholds it
-      // from sessions. requireOps above is the gate.
+      // from sessions. gateOperation above is the gate.
       (createSupabaseServiceClient() as unknown as SupabaseClient)
         .from("offer_hotels")
         .select(
