@@ -19,6 +19,10 @@ export const FEATURES = [
   // the button (getAssistantAvailability) and the server action refuses.
   "ai_itinerary",
   "flight_lookup",
+  // A job, not a screen: the operations flight watch (/api/ops/flights and the
+  // morning run) asks the same AviationStack quota about travel-day landings.
+  // Off: the job still runs and records its run, but asks nothing (trackFlights).
+  "flight_tracking",
 ] as const;
 
 export type Feature = (typeof FEATURES)[number];
@@ -33,6 +37,7 @@ export const FEATURE_DEFAULTS: FeatureFlags = {
   kanban: true,
   ai_itinerary: true,
   flight_lookup: true,
+  flight_tracking: true,
 };
 
 export const FEATURES_SETTING_KEY = "features";

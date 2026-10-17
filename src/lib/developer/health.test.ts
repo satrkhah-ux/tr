@@ -11,6 +11,10 @@ describe("developer connection health", () => {
     expect(ageStatus(24.9 * HOUR, 24 * HOUR)).toBe("ok");
     expect(ageStatus(30 * HOUR, 24 * HOUR)).toBe("warn");
     expect(ageStatus(80 * HOUR, 24 * HOUR)).toBe("down");
+    // the 30-minute flight watch: a late run warns before it reads as dead
+    expect(ageStatus(80 * 60_000, HOUR / 2)).toBe("ok");
+    expect(ageStatus(2 * HOUR, HOUR / 2)).toBe("warn");
+    expect(ageStatus(4 * HOUR, HOUR / 2)).toBe("down");
   });
 
   it("shows the worst row's colour", () => {

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { trackFlights } from "@/lib/data/flight-tracking";
+import { recordCronRun } from "@/lib/data/cron-runs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,5 +23,6 @@ function authorised(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!authorised(req)) return NextResponse.json({ ok: false }, { status: 401 });
-  return NextResponse.json({ ok: true, ...(await trackFlights()) });
+  // every run leaves its trace for /developer, even one outside any landing's window (cron-runs.ts)
+  return NextResponse.json({ ok: true, ...(await recordCronRun("ops_flights", () => trackFlights())) });
 }
