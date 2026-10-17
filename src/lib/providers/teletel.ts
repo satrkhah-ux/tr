@@ -111,6 +111,85 @@ export async function sendTeletelMessage(conversationId: number, content: string
   return typeof res?.id === "number" ? res.id : null;
 }
 
+/** Send a file (the programme's PDF) into an existing conversation, with a caption. */
+export async function sendTeletelAttachment(
+  conversationId: number,
+  caption: string,
+  file: { name: string; type: string; bytes: Uint8Array },
+): Promise<number | null> {
+  const config = getTeletelConfig();
+  if (!config) return null;
+  try {
+    const form = new FormData();
+    form.append("content", caption);
+    form.append("message_type", "outgoing");
+    form.append("private", "false");
+    form.append("attachments[]", new Blob([new Uint8Array(file.bytes)], { type: file.type }), file.name);
+    const res = await fetch(`${config.baseUrl}/api/v1/accounts/${config.accountId}/conversations/${conversationId}/messages`, {
+      method: "POST",
+      headers: { api_access_token: config.token },
+      body: form,
+      signal: AbortSignal.timeout(30000),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { id?: number };
+    return typeof body.id === "number" ? body.id : null;
+  } catch {
+    return null;
+  }
+}
+
+let approvedCache: { at: number; names: Map<string, string> } | null = null;
+
+/**
+ * The WhatsApp templates on the client inbox and their Meta status
+ * (APPROVED / PENDING / REJECTED), by name. Teletel syncs them from Meta; we
+ * only read. Cached ten minutes — the morning job asks once per case.
+ */
+export async function whatsappTemplateStatus(): Promise<Map<string, string> | null> {
+  if (approvedCache && Date.now() - approvedCache.at < 10 * 60_000) return approvedCache.names;
+  const config = getTeletelConfig();
+  if (!config) return null;
+  const inbox = await whatsappInbox(config);
+  if (!inbox) return null;
+  const res = await api<{ message_templates?: { name?: string; status?: string }[] }>(config, `/inboxes/${inbox}`);
+  if (!res) return null;
+  const names = new Map((res.message_templates ?? []).filter((t) => t.name).map((t) => [t.name as string, String(t.status ?? "")]));
+  approvedCache = { at: Date.now(), names };
+  return names;
+}
+
+/**
+ * An approved WhatsApp template — the one way to reach a client whose last
+ * message is older than 24 hours (reminders, the programme). `preview` is the
+ * text as the client reads it, shown on the thread; a document header carries a
+ * PUBLIC file URL that Meta fetches itself.
+ */
+export async function sendTeletelTemplate(
+  conversationId: number,
+  template: { name: string; params: string[]; preview: string; document?: { url: string; name: string } },
+): Promise<number | null> {
+  const config = getTeletelConfig();
+  if (!config) return null;
+  const body = Object.fromEntries(template.params.map((v, i) => [String(i + 1), v]));
+  const res = await api<{ id?: number }>(config, `/conversations/${conversationId}/messages`, {
+    content: template.preview,
+    message_type: "outgoing",
+    private: false,
+    template_params: {
+      name: template.name,
+      category: "UTILITY",
+      language: "ar",
+      processed_params: {
+        body,
+        ...(template.document ? { header: { media_url: template.document.url, media_type: "document", media_name: template.document.name } } : {}),
+      },
+    },
+  });
+  return typeof res?.id === "number" ? res.id : null;
+}
+
 export type TeletelFailure = "token" | "blocked" | "down";
 
 /**

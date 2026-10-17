@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { clientWhatsappAllowed, messageClient } from "./client-whatsapp";
-import { fillTemplate, type ClientMessageKey } from "@/lib/operations/client-messages";
+import { fillTemplate, waParams, type ClientMessageKey } from "@/lib/operations/client-messages";
 
 /**
  * Send the client the stage's message (operations order 11, suggestion 5):
@@ -50,16 +50,18 @@ export async function sendClientMessage(operationId: string, key: ClientMessageK
       await supabase.from("operations").update({ client_token: token }).eq("id", operationId);
     }
     const base = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
-    const text = fillTemplate(template.body, {
+    const fields = {
       name: customer.arabic_name ?? "",
       destination: offer.destination ?? "",
       serial: offer.serial,
       link: token ? `${base}/trip/${token}` : "",
       rate_link: token ? `${base}/trip/${token}/rate` : "",
-    });
-    // a thread is opened if Teletel has never seen them; outside WhatsApp's 24 hours it waits as a team note
-    const sent = await messageClient({ employee_id: offer.employee_id, partner_company_id: offer.partner_company_id, customer }, text, {
+    };
+    // a thread is opened if Teletel has never seen them; outside WhatsApp's 24
+    // hours it goes as its approved template, or waits as a team note
+    const sent = await messageClient({ employee_id: offer.employee_id, partner_company_id: offer.partner_company_id, customer }, fillTemplate(template.body, fields), {
       labels: [`مرحلة-${key}`],
+      template: { key, params: waParams(key, fields) },
     });
     return sent === "sent";
   } catch {
