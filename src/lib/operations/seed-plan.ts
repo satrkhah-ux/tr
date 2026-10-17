@@ -154,7 +154,8 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       origin_ref: ref,
       kind: "flight",
       title: `${label} ${route}`.trim(),
-      city_name: route,
+      // a flight has no city — its route is the title, and a «title — city» line said it twice (0086)
+      city_name: "",
       start_date: legs[0].departure_at?.slice(0, 10) ?? null,
       end_date: legs.at(-1)?.departure_at?.slice(0, 10) ?? null,
       detail,

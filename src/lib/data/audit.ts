@@ -70,6 +70,8 @@ export type AuditAction =
   // execution
   | "booking.created"
   | "booking.confirmed"
+  // a flight's ticket on file («معالج الحجوزات»): its PNR, ticket numbers and legs
+  | "booking.ticketed"
   | "booking.cancelled"
   // logged BEFORE the row (and its cascaded vouchers) is gone
   | "booking.deleted"

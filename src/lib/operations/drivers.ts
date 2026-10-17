@@ -167,7 +167,9 @@ export function retimeTransfers(
   transfers: (BookingLike & { id: string })[],
 ): Retime[] {
   const domestic = flight.title.startsWith("طيران داخلي");
-  const legs = flightLegs(flight.detail).filter(({ key }) => previous?.[key] !== flight.detail[key]);
+  const all = flightLegs(flight.detail);
+  const legs = all.filter(({ key }) => previous?.[key] !== flight.detail[key]);
+  const dep = (l: Leg) => l.departure ?? "";
   const out: Retime[] = [];
   for (const t of transfers) {
     const kind = driverServiceKind(t);
@@ -175,9 +177,15 @@ export function retimeTransfers(
     const link = linkOf(t.detail?.[DRV.flight]);
     if (!link) continue;
     // by number first; a renumbered flight (the airline swapped it) is still found by its route
+    // and a ticket that connects where the plan flew direct (RUH → DOH → IST for «RUH → IST») by the leg
+    // landing at (or leaving) the drive's airport — only when the journey's other end is on the ticket too,
+    // so a domestic return into the same airport never takes the international arrival's reception
     const hit =
       legs.find(({ leg }) => link.flight_no && leg.flight_no === link.flight_no) ??
-      legs.find(({ leg }) => leg.from === link.from && leg.to === link.to);
+      legs.find(({ leg }) => leg.from === link.from && leg.to === link.to) ??
+      (kind === "reception"
+        ? legs.find(({ leg }) => leg.to === link.to && all.some((o) => o.leg.from === link.from && dep(o.leg) <= dep(leg)))
+        : legs.find(({ leg }) => leg.from === link.from && all.some((o) => o.leg.to === link.to && dep(o.leg) >= dep(leg))));
     if (!hit) continue;
     const { key, leg } = hit;
 

@@ -56,10 +56,10 @@ const TRANSCRIBE_SCHEMA = {
   properties: { text: { type: "string" } },
 } as const;
 
-/** Pictures of a ticket → its text, line by line, as printed. */
-export async function transcribeTicket(images: AiImage[]): Promise<string> {
+/** Pictures of a ticket (or a hotel's confirmation — `what`) → its text, line by line, as printed. */
+export async function transcribeTicket(images: AiImage[], what = "flight ticket"): Promise<string> {
   const content = [
-    { type: "text", text: "Transcribe all the text in these flight ticket images." },
+    { type: "text", text: `Transcribe all the text in these ${what} images.` },
     ...images.slice(0, MAX_IMAGES).map((img) => ({
       type: "image_url",
       image_url: { url: `data:${img.mime};base64,${img.base64}`, detail: "high" },
@@ -69,7 +69,7 @@ export async function transcribeTicket(images: AiImage[]): Promise<string> {
     "ticket_transcript",
     TRANSCRIBE_SCHEMA,
     [
-      "You transcribe flight tickets and itineraries (Arabic or English).",
+      "You transcribe travel documents — flight tickets, itineraries, hotel confirmations (Arabic or English).",
       "Copy the text exactly, line by line, in reading order. Keep codes, numbers, dates and times exactly as printed.",
       "Do not translate, summarise, correct or add anything. If nothing is legible, return an empty string.",
     ].join("\n"),

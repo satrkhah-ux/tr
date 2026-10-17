@@ -52,6 +52,9 @@ describe("the pull from the offer", () => {
     expect(Object.keys(by("flight:dom")!.detail)).toEqual(expect.arrayContaining(["رحلة 1", "رحلة 2"]));
     // the landing rides on the line, so the reception can follow it (drivers.ts)
     expect(by("flight:intl")!.detail["الذهاب"]).toBe("SV834 · RUH → KUL · 2026-11-20 01:00 · الوصول 2026-11-20 14:30");
+    // the route is said once: in the title, not again as the flight's «city» («title — city» read it twice)
+    expect([by("flight:dom")!.title, by("flight:dom")!.city_name]).toEqual(["طيران داخلي KUL → LGK · LGK → KUL", ""]);
+    expect(by("flight:intl")!.city_name).toBe("");
   });
 
   it("times every transfer from the flight it meets, the day-of-move ones included", () => {
