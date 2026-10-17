@@ -21,12 +21,12 @@ const policies = (await c.query(`select * from pg_policies where schemaname = 'p
 const fns = (
   await c.query(
     `select p.proname, pg_get_functiondef(p.oid) as def from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = 'public' and p.proname in ('merge_hotels', 'owns_offer', 'owns_operation', 'offers_owner_locked')`,
+      where n.nspname = 'public' and p.proname in ('merge_hotels', 'owns_offer', 'owns_operation', 'offers_owner_locked', 'operation_bookings_money_locked', 'operations_money_locked')`,
   )
 ).rows;
-const triggers = (await c.query(`select tgname, tgrelid::regclass::text as tbl from pg_trigger where tgname = 'offers_owner_locked'`)).rows;
-const dir = "data-import/backups/policies-2026-10-17";
+const triggers = (await c.query(`select tgname, tgrelid::regclass::text as tbl from pg_trigger where tgname in ('offers_owner_locked', 'operation_bookings_money_locked', 'operations_money_locked')`)).rows;
+const dir = process.argv[2] ?? "data-import/backups/policies-2026-10-17";
 mkdirSync(dir, { recursive: true });
-writeFileSync(`${dir}/before-0078-0079.json`, JSON.stringify({ taken_at: new Date().toISOString(), policies, functions: fns, triggers }, null, 1));
+writeFileSync(`${dir}/before.json`, JSON.stringify({ taken_at: new Date().toISOString(), policies, functions: fns, triggers }, null, 1));
 console.log(`policies: ${policies.length}, functions: ${fns.map((f) => f.proname).join(",")}, triggers: ${triggers.length} → ${dir}`);
 await c.end();
