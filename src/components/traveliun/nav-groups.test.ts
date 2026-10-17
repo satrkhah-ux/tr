@@ -11,8 +11,8 @@ const on = (f: Feature) => FEATURE_DEFAULTS[f];
 const off = (feature: Feature) => (f: Feature) => f !== feature && FEATURE_DEFAULTS[f];
 
 describe("the sidebar", () => {
-  it("shows sales the home, «بيسك», operations and the data — nothing else", () => {
-    expect(navGroupsFor(SALES, on).map((g) => g.labelKey)).toEqual(["nav.dashboard", "nav.basic", "nav.operations", "nav.dataSection"]);
+  it("shows sales the home, «بيسك», the clients, operations and the data — nothing else", () => {
+    expect(navGroupsFor(SALES, on).map((g) => g.labelKey)).toEqual(["nav.dashboard", "nav.basic", "nav.customers", "nav.operations", "nav.dataSection"]);
   });
 
   it("holds the old «البكجات السياحية» inside «بيسك», the legacy generator only while it is on", () => {
