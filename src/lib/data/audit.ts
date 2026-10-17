@@ -42,6 +42,9 @@ export type AuditAction =
   | "operation.cancelled"
   | "operation.issue"
   | "operation.rated"
+  // «معالج الحجوزات»: «ينتظر» set or cleared on a step, and a manager's exception to «جاهز للسفر»'s payment rule
+  | "operation.waiting"
+  | "operation.ready_exception"
   | "payment.recorded"
   | "payment.updated"
   | "payment.deleted"

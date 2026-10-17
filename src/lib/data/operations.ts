@@ -8,7 +8,7 @@ import { logAudit } from "@/lib/data/audit";
 import { notifyOperationConfirmed, notifyPartnerCase } from "@/lib/data/ops-notify";
 import { getPartnerSession } from "@/lib/partners/session";
 import { raisePartnerInvoice } from "@/lib/partners/ledger-server";
-import { readinessFor, syncOperation } from "@/lib/data/operation-sync";
+import { syncOperation } from "@/lib/data/operation-sync";
 import { setOfferStatus } from "@/lib/data/offer-status";
 import {
   canAdvanceClient,
@@ -319,10 +319,12 @@ export async function setExecutionStatus(
     const current = await loadStatuses(supabase, operationId);
     if (!current) return { ok: false, error: "err.loadFailed" };
     if (!canAdvanceExecution(current.execution_status, to)) return { ok: false, error: "ops.err.invalidTransition" };
-    // «جاهز للسفر» is a promise to the client — only on a green checklist (operations order 6)
+    // «جاهز للسفر» is a promise to the client — only on a green checklist: the wizard's steps'
+    // mandatory items (2026-10-17), the same rules its button shows. Imported here, not at the top:
+    // the wizard's loader reads this module's own lists.
     if (to === "ready_to_travel") {
-      const items = await readinessFor(operationId);
-      if (!items || items.some((i) => !i.ok)) return { ok: false, error: "ops.err.notReady" };
+      const { wizardReady } = await import("@/lib/data/wizard-case");
+      if (!(await wizardReady(operationId))) return { ok: false, error: "ops.err.notReady" };
     }
 
     const { error } = await supabase

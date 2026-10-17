@@ -22,12 +22,28 @@ export type WizardStep = (typeof WIZARD_STEPS)[number];
 export type StepState = "done" | "todo" | "waiting" | "na";
 
 /** «ينتظر»: who the step waits on, and until when (operations.waits, 0084). */
-export type WaitFrom = "airline" | "supplier" | "agent" | "client";
+export const WAIT_FROM = ["airline", "supplier", "agent", "client"] as const;
+export type WaitFrom = (typeof WAIT_FROM)[number];
 export type StepWait = { from: WaitFrom; until: string; note?: string | null; at: string; by?: string | null };
 export type CaseWaits = Partial<Record<WizardStep, StepWait>>;
 
 /** A manager's exception to a readiness rule (operations.ready_exceptions, 0084). */
 export type ReadyExceptions = { payment?: { by: string | null; at: string; note?: string | null } };
+
+/** What the offer was SOLD for — the passports are counted against it. */
+export type SoldTravelers = { adults: number; children: number; infants: number };
+
+/** The destination's emergency guide (/settings, destination_guides) — client-safe fields only. */
+export type CaseGuide = {
+  country: string;
+  local_agent_name: string | null;
+  local_agent_phone: string | null;
+  embassy_phone: string | null;
+  ambulance: string | null;
+  police: string | null;
+  hospital: string | null;
+  notes: string | null;
+};
 
 /** Everything a step screen and its state function may read — loaded once by the case page. */
 export type WizardCase = {
@@ -42,6 +58,12 @@ export type WizardCase = {
   waits: CaseWaits;
   readyExceptions: ReadyExceptions;
   hasDays: boolean;
+  /** the office's day (Riyadh, YYYY-MM-DD) the case was loaded on — every date rule reads this, never a clock. */
+  today: string;
+  /** offers.adults / children / infants; null when the offer row could not be read. */
+  sold: SoldTravelers | null;
+  /** the destination's guide, or null when none is kept for its country. */
+  guide: CaseGuide | null;
 };
 
 /** What every step screen receives. `canManage`: the manager steps on THIS case (gateCaseManager). */
@@ -51,5 +73,8 @@ export type StepProps = {
   canReadMrz: boolean;
 };
 
-/** One readiness rule's answer before «جاهز للسفر» — `ok` false blocks it unless `optional`. */
+/**
+ * One readiness rule's answer before «جاهز للسفر» — `ok` false blocks it unless `optional`.
+ * The gate labels it with the i18n key `wz.ready.<step>.<key>` when one exists.
+ */
 export type ReadinessItem = { step: WizardStep; key: string; ok: boolean; optional?: boolean };

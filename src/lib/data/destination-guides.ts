@@ -5,6 +5,7 @@ import { findLookupCountry } from "@/lib/offer/draft-types";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { currentCan } from "@/lib/roles/current";
+import { gateOperation } from "@/lib/operations/access";
 import { CLIENT_MESSAGE_KEYS, type ClientMessageKey } from "@/lib/operations/client-messages";
 
 /**
@@ -86,36 +87,53 @@ export async function getTripGuide(token: string): Promise<Omit<DestinationGuide
     const { data: op } = await supabase.from("operations").select("client_token_revoked_at, offers(destination)").eq("client_token", token).maybeSingle();
     const row = op as unknown as { client_token_revoked_at: string | null; offers: { destination: string | null } | { destination: string | null }[] | null } | null;
     if (!row || row.client_token_revoked_at) return null;
-    const destination = ((Array.isArray(row.offers) ? row.offers[0] : row.offers)?.destination ?? "").trim();
-    if (!destination) return null;
-    // the offer names its destination as the country — spelled as the agent spelled it,
-    // «اندونيسيا» or «إندونيسيا» — or a city in it, «بالي 7», «تبليسي +باكورياني+باتومي»
-    const { data: countries } = await supabase.from("countries").select("id, arabic_name");
-    const all = ((countries ?? []) as { id: string; arabic_name: string }[]).map((c) => ({ ...c, name: c.arabic_name }));
-    let countryRow: { id: string; arabic_name: string } | null = findLookupCountry(all, destination) ?? null;
-    if (!countryRow) {
-      const first = destination.split(/[+،,\d]/)[0].trim();
-      const { data: city } = await supabase.from("cities").select("countries(id, arabic_name)").in("arabic_name", [destination, first]).limit(1).maybeSingle();
-      const c = (city as unknown as { countries: { id: string; arabic_name: string } | { id: string; arabic_name: string }[] | null } | null)?.countries;
-      countryRow = (Array.isArray(c) ? c[0] : c) ?? (first ? (findLookupCountry(all, first) ?? null) : null);
-    }
-    if (!countryRow) return null;
-    const { data: guide } = await supabase.from("destination_guides").select("*").eq("country_id", countryRow.id).maybeSingle();
-    const g = guide as DestinationGuide | null;
-    if (!g) return null;
-    return {
-      country: countryRow.arabic_name,
-      local_agent_name: g.local_agent_name,
-      local_agent_phone: g.local_agent_phone,
-      embassy_phone: g.embassy_phone,
-      ambulance: g.ambulance,
-      police: g.police,
-      hospital: g.hospital,
-      notes: g.notes,
-    };
+    return guideFor(supabase, (Array.isArray(row.offers) ? row.offers[0] : row.offers)?.destination ?? "");
   } catch {
     return null;
   }
+}
+
+/** The same guide for a case's own page («معالج الحجوزات», step 6) — the case's gate, no trip link needed. */
+export async function getCaseGuide(operationId: string): Promise<Omit<DestinationGuide, "country_id"> | null> {
+  if (await gateOperation(operationId)) return null;
+  try {
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { data: op } = await supabase.from("operations").select("offers(destination)").eq("id", operationId).maybeSingle();
+    const offers = (op as unknown as { offers: { destination: string | null } | { destination: string | null }[] | null } | null)?.offers;
+    return guideFor(supabase, (Array.isArray(offers) ? offers[0] : offers)?.destination ?? "");
+  } catch {
+    return null;
+  }
+}
+
+async function guideFor(supabase: SupabaseClient, rawDestination: string): Promise<Omit<DestinationGuide, "country_id"> | null> {
+  const destination = rawDestination.trim();
+  if (!destination) return null;
+  // the offer names its destination as the country — spelled as the agent spelled it,
+  // «اندونيسيا» or «إندونيسيا» — or a city in it, «بالي 7», «تبليسي +باكورياني+باتومي»
+  const { data: countries } = await supabase.from("countries").select("id, arabic_name");
+  const all = ((countries ?? []) as { id: string; arabic_name: string }[]).map((c) => ({ ...c, name: c.arabic_name }));
+  let countryRow: { id: string; arabic_name: string } | null = findLookupCountry(all, destination) ?? null;
+  if (!countryRow) {
+    const first = destination.split(/[+،,\d]/)[0].trim();
+    const { data: city } = await supabase.from("cities").select("countries(id, arabic_name)").in("arabic_name", [destination, first]).limit(1).maybeSingle();
+    const c = (city as unknown as { countries: { id: string; arabic_name: string } | { id: string; arabic_name: string }[] | null } | null)?.countries;
+    countryRow = (Array.isArray(c) ? c[0] : c) ?? (first ? (findLookupCountry(all, first) ?? null) : null);
+  }
+  if (!countryRow) return null;
+  const { data: guide } = await supabase.from("destination_guides").select("*").eq("country_id", countryRow.id).maybeSingle();
+  const g = guide as DestinationGuide | null;
+  if (!g) return null;
+  return {
+    country: countryRow.arabic_name,
+    local_agent_name: g.local_agent_name,
+    local_agent_phone: g.local_agent_phone,
+    embassy_phone: g.embassy_phone,
+    ambulance: g.ambulance,
+    police: g.police,
+    hospital: g.hospital,
+    notes: g.notes,
+  };
 }
 
 export type MessageTemplate = { key: ClientMessageKey; body: string; enabled: boolean };

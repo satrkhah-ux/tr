@@ -10,6 +10,7 @@ import { messagesDueToday } from "./client-messages";
 import { passportAlerts, type AlertTraveler } from "./progress";
 import { defaultSchedule, installmentStates, paidTotal } from "./payments";
 import { canAdvanceClient, canAdvanceExecution, type ClientStatus, type ExecutionStatus } from "./state";
+import { notifyDueWaits } from "@/lib/data/wizard-case";
 
 /**
  * The operations day (operations order 6), run once a morning by the server's
@@ -144,5 +145,7 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
       if (await alertOnce(supabase, op.id, "passport", alert.ref, `${alert.text} — ${head}`)) result.alerts += 1;
     }
   }
+  // «قائمة متابعتك اليوم» — the waits whose day has come, once per case a day (wizard-case.ts)
+  result.alerts += await notifyDueWaits(supabase, today);
   return result;
 }
