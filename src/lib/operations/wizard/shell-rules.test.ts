@@ -222,8 +222,9 @@ describe("the shell", () => {
     const states = stepStates(data);
     expect(states.passports).toBe("done");
     expect(states.payment).toBe("waiting");
-    // the other agents' placeholder steps are «todo» until theirs land
-    expect(firstOpenStep(data)).toBe("flights");
+    // this case has no flight, hotel or transport booking — those steps are «na» — so the
+    // first step with work is the documents
+    expect(firstOpenStep(data)).toBe("documents");
     expect(stepStates(wizardCase({ payments: [pay(10000)], waits: { payment: { from: "client", until: TODAY, at: TODAY } } })).payment).toBe("done");
   });
 
