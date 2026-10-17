@@ -135,6 +135,8 @@ const range = (from: number, to: number) => Array.from({ length: to - from + 1 }
 const BASE_CURRENCY = "SAR";
 /** The «يشمل» line the SIM count writes. */
 const SIM_LINE = "شريحة اتصال";
+/** «الوكيل / الشركة» on the client step — hidden for now, every file a direct client (owner, 2026-10-17). */
+const SHOW_AGENT = false;
 const MODE_CHIPS: { mode: TransportMode; label: BasicLabel; icon: typeof Car }[] = [
   { mode: "car", label: "byCar", icon: Car },
   { mode: "flight", label: "byFlight", icon: PlaneTakeoff },
@@ -1010,8 +1012,8 @@ export function BasicEditor({
     // ---- 1. the customer and the trip, and what the programme includes ----
     client: (
       <>
-        {/* who: four equal columns */}
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {/* who: equal columns */}
+        <div className={`grid grid-cols-2 gap-2 ${SHOW_AGENT && !partnerSession ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
           <label className={basicLabel}>
             {tx("country")}
             <select value={country?.name ?? trip.country} onChange={(e) => setCountry(e.target.value)} className={basicField}>
@@ -1022,7 +1024,7 @@ export function BasicEditor({
             </select>
           </label>
           {/* who sells it is ours to choose — a partner's own file is already its own */}
-          {partnerSession ? null : (
+          {partnerSession || !SHOW_AGENT ? null : (
           <label className={basicLabel}>
             {tx("agent")}
             <select
