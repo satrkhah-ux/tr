@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canSwitchRoles, isDeveloperRole, switchableRoles, viewAsPermissions, type Permission } from "./roles";
 
-const admin: Permission[] = ["dashboard.admin", "offers.write", "data.write", "settings.manage", "operations.write"];
+const admin: Permission[] = ["dashboard.admin", "employees.manage", "offers.write", "data.write", "settings.manage", "operations.write"];
 const developer: Permission[] = [...admin, "developer.access", "operations.own"];
 const sales = ["dashboard.employee", "offers.write", "data.write", "operations.own", "not.a.key"];
 
@@ -10,6 +10,8 @@ describe("«التبديل بين الحسابات»", () => {
     expect(canSwitchRoles(admin)).toBe(true);
     expect(canSwitchRoles(["developer.access"])).toBe(true);
     expect(canSwitchRoles(["dashboard.employee", "offers.write"])).toBe(false);
+    // «مدير مبيعات» reads the admin dashboard but does not switch
+    expect(canSwitchRoles(["dashboard.admin", "operations.write", "offers.write"])).toBe(false);
     expect(viewAsPermissions(["offers.write"], sales)).toBeNull();
   });
 

@@ -205,8 +205,13 @@ export function can(role: Role, permission: Permission): boolean {
  */
 export const VIEW_AS_COOKIE = "tv_view_role";
 
+/**
+ * The administration (it manages the team: employees.manage) and the developer.
+ * Not dashboard.admin: «مدير مبيعات» reads the admin dashboard but is not the
+ * administration the owner meant.
+ */
 export function canSwitchRoles(realPermissions: readonly Permission[]): boolean {
-  return realPermissions.includes("dashboard.admin") || realPermissions.includes("developer.access");
+  return realPermissions.includes("employees.manage") || realPermissions.includes("developer.access");
 }
 
 /** The permissions a view-as session runs with, or null when that role may not be viewed as. */
