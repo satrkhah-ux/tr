@@ -123,6 +123,8 @@ export type AuditAction =
   // managers changing what the system says or shows (guides, message templates)
   | "settings.updated"
   | "catalog.imported"
+  // «استعادة نسخة سابقة»: an older version's draft put back and issued as the next version
+  | "offer.version_restored"
   // «إصدار نسخة محدّثة»: an issued offer's next version, from its corrected draft
   | "offer.reissued";
 

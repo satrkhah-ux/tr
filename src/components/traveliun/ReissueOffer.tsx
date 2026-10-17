@@ -6,6 +6,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { produceOfferFromDraft, type ProduceResult } from "@/lib/data/drafts";
 import type { OfferChange, OfferChangeKind } from "@/lib/offer/version-diff";
 import { IssueGuardNotice } from "./IssueGuardNotice";
+import { OfferVersions } from "./OfferVersions";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
 const KIND_KEY: Record<OfferChangeKind, TranslationKey> = {
@@ -28,6 +29,7 @@ const KIND_KEY: Record<OfferChangeKind, TranslationKey> = {
  */
 export function ReissueOffer({
   draftId,
+  serial,
   hotels,
   blocked,
   flush,
@@ -35,6 +37,8 @@ export function ReissueOffer({
   className = "",
 }: {
   draftId: string;
+  /** the issued serial — «سجل النسخ» lists its versions under the button. */
+  serial?: string | null;
   hotels: readonly { hotel_id: string | null; hotel_name: string }[];
   /** validateDraft has a blocking issue — the server would refuse anyway. */
   blocked: boolean;
@@ -47,6 +51,7 @@ export function ReissueOffer({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ version: number; changes: OfferChange[] } | null>(null);
   const [guardBlocked, setGuardBlocked] = useState(false);
+  const [issuedCount, setIssuedCount] = useState(0);
 
   async function reissue() {
     if (busy || blocked || guardBlocked) return;
@@ -58,6 +63,7 @@ export function ReissueOffer({
       const result = await produceOfferFromDraft(draftId);
       if (!result.ok) return setError(t(result.error));
       setDone({ version: result.version ?? 0, changes: result.changes ?? [] });
+      setIssuedCount((n) => n + 1);
       onIssued?.(result);
     } catch {
       setError(t("err.db"));
@@ -107,6 +113,7 @@ export function ReissueOffer({
           )}
         </div>
       ) : null}
+      {serial ? <OfferVersions serial={serial} draftId={draftId} refreshKey={issuedCount} flush={flush} /> : null}
     </div>
   );
 }
