@@ -103,6 +103,8 @@ export type DraftSummary = {
   currency: string;
   /** the issued programme's number, e.g. AD-6-3427-20260729. */
   produced_serial: string | null;
+  /** the version the client has now (offer_renders), for an issued file; null otherwise. */
+  version: number | null;
   updated_at: string;
   created_at: string;
   /** the employee who started the file, and their name (null: unknown or a partner's). */
@@ -116,7 +118,9 @@ export type DraftSummary = {
 export async function listDrafts(): Promise<DraftSummary[]> {
   const { sarPer } = await getRates();
   try {
-    return (await listDraftRows()).map(
+    const rows = await listDraftRows();
+    const versions = await latestVersions(rows.map((r) => normalizeDraftData(r.data).produced_serial).filter((s): s is string => Boolean(s)));
+    return rows.map(
       (row) => {
         const draft = normalizeDraftData(row.data);
         return {
@@ -135,6 +139,7 @@ export async function listDrafts(): Promise<DraftSummary[]> {
           total: draftSellTotal(draft, sarPer),
           currency: draft.pricing.display_currency,
           produced_serial: draft.produced_serial,
+          version: draft.produced_serial ? (versions.get(draft.produced_serial) ?? null) : null,
           updated_at: row.updated_at,
           created_at: row.created_at,
           created_by: row.created_by,
@@ -147,6 +152,26 @@ export async function listDrafts(): Promise<DraftSummary[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * The version each issued serial is at, for the files list («مُصدر · نسخة 3»).
+ * offer_renders is closed to sessions (0047) — read through the service role,
+ * and only the version numbers of the serials this caller's own list holds.
+ */
+async function latestVersions(serials: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (serials.length === 0) return out;
+  const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+  const { data: offers } = await service.from("offers").select("id, serial").in("serial", serials);
+  const bySerial = new Map(((offers ?? []) as { id: string; serial: string }[]).map((o) => [o.id, o.serial]));
+  if (bySerial.size === 0) return out;
+  const { data: renders } = await service.from("offer_renders").select("offer_id, version").eq("variant", "client").in("offer_id", [...bySerial.keys()]);
+  for (const r of (renders ?? []) as { offer_id: string; version: number }[]) {
+    const serial = bySerial.get(r.offer_id)!;
+    out.set(serial, Math.max(out.get(serial) ?? 0, r.version));
+  }
+  return out;
 }
 
 export type CreateDraftResult = InsertDraftResult;

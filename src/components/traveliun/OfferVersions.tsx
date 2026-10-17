@@ -34,9 +34,22 @@ const VERSION_KIND: Record<OfferVersionKind, TranslationKey> = {
  * it as the next version under the same serial (offer-versions.ts) — the
  * history only ever grows.
  */
-export function OfferVersions({ serial, draftId, refreshKey = 0, flush }: { serial: string; draftId: string; refreshKey?: number; flush?: () => Promise<void> }) {
+export function OfferVersions({
+  serial,
+  draftId,
+  refreshKey = 0,
+  flush,
+  defaultOpen = false,
+}: {
+  serial: string;
+  draftId: string;
+  refreshKey?: number;
+  flush?: () => Promise<void>;
+  /** opened from the files list's «سجل النسخ»: already unfolded. */
+  defaultOpen?: boolean;
+}) {
   const { t, language } = useTraveliunUI();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [versions, setVersions] = useState<OfferVersion[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<number | null>(null);
