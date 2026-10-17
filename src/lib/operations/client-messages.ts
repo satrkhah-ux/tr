@@ -117,8 +117,11 @@ export function messagesDueToday(start: string | null, end: string | null, today
 
 // ---------- WhatsApp templates (Meta-approved, for after the 24 hours) ----------
 
-/** What a template is about: a stage message, or the programme sent when a file is issued. */
-export type WaTemplateKey = ClientMessageKey | "programme";
+/**
+ * What a template is about: a stage message, the programme sent when a file is
+ * issued, or a booking's update prepared for staff (client-booking-state.ts).
+ */
+export type WaTemplateKey = ClientMessageKey | "programme" | "booking_update";
 
 type WaField = "name" | "destination" | "serial" | "link" | "date";
 
@@ -154,6 +157,12 @@ export const WA_TEMPLATES: Record<WaTemplateKey, WaTemplateDef> = {
     name: "traveliun_bookings_confirmed",
     params: ["name", "destination", "serial", "link"],
     body: [HELLO, "تم تأكيد حجوزات رحلتك إلى {{2}}", "(رقم الملف {{3}})", "تابع تفاصيل رحلتك من هنا:", "{{4}}", SIGN].join("\n\n"),
+  },
+  // a flight ticketed or a hotel's own confirmation in (the owner, 2026-10-17) — NOT submitted to Meta yet
+  booking_update: {
+    name: "traveliun_booking_update",
+    params: ["name", "destination", "serial", "link"],
+    body: [HELLO, "تم تحديث حجوزات رحلتك إلى {{2}}", "(رقم الملف {{3}})", "أرقام الحجز والمستندات المحدَّثة من هنا:", "{{4}}", SIGN].join("\n\n"),
   },
   documents_ready: {
     name: "traveliun_documents_ready",

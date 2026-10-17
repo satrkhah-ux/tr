@@ -6,17 +6,9 @@
  */
 
 import { LATER } from "./seed-plan";
+import { clientFlight, hotelFinal, type ClientBookingRow } from "./client-booking-state";
 
-export type SummaryBooking = {
-  kind: string;
-  title: string;
-  city_name: string;
-  start_date: string | null;
-  end_date: string | null;
-  status: string;
-  confirmation_number: string | null;
-  detail: Record<string, string> | null;
-};
+export type SummaryBooking = ClientBookingRow;
 
 export type ClientSummary = {
   /** «عميلنا فلان،» — client-whatsapp.ts greeting(). */
@@ -33,9 +25,19 @@ export type ClientSummary = {
 
 const money = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
-/** «رقم التأكيد: X», or «قيد التأكيد» until the supplier gives one. */
+/**
+ * What the trip link shows (client-booking-state.ts): our booking number from
+ * the start — a hotel's is never called provisional; the hotel's own number
+ * once it is in; a flight's PNR once ticketed, «سيتم تأكيد الحجز» before.
+ */
 function state(b: SummaryBooking): string {
-  return b.status === "confirmed" && b.confirmation_number ? `رقم التأكيد: ${b.confirmation_number}` : "قيد التأكيد";
+  const ours = b.company_ref ? `رقم الحجز: ${b.company_ref}` : null;
+  if (b.kind === "hotel") return hotelFinal(b) ? `رقم التأكيد: ${b.confirmation_number?.trim()}` : (ours ?? "قيد التأكيد");
+  if (b.kind === "flight") {
+    const f = clientFlight(b);
+    return f.ticketed && f.pnr ? `رقم الحجز (PNR): ${f.pnr}` : [ours, "سيتم تأكيد الحجز"].filter(Boolean).join(" — ");
+  }
+  return b.status === "confirmed" && b.confirmation_number ? `رقم التأكيد: ${b.confirmation_number}` : (ours ?? "قيد التأكيد");
 }
 
 function hotelLine(b: SummaryBooking): string {

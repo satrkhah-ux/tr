@@ -943,6 +943,13 @@ export const ar: Dictionary = {
   "hub.excludes": "بنود لا يشملها العرض",
   "hub.noOffer": "لا يوجد عرض بعد",
   "hub.noOfferDesc": "أنشئ أول عرض من «مولد البكجات» أو «إضافة عرض» لعرضه هنا.",
+  // ---------- the client's trip link: what each service shows, the prepared updates (2026-10-17) ----------
+  "trip.status.voucherNeedsFinal": "قسيمة الفندق لا تصدر قبل تأكيد الفندق النهائي — سجّل رقم تأكيد الفندق نفسه أولاً.",
+  "trip.status.prepared": "رسائل جاهزة للإرسال",
+  "trip.status.preparedHint": "تُحضَّر عند تأكيد العميل، وعند صدور التذكرة، وعند تأكيد الفندق وإصدار قسيمته — لا يصل العميلَ شيء حتى تراجعها وتضغط «إرسال».",
+  "trip.status.review": "مراجعة وإرسال",
+  "trip.status.preparedGone": "لم تعد هذه الرسالة جاهزة — أُرسلت أو تغيّر الحجز. حدّث الصفحة.",
+  "trip.status.hotelAtRisk": "{hotel}: لم يصل تأكيد الفندق النهائي والسفر خلال يوم — العميل يرى رقم حجزنا فقط",
 
   // ---------- validation checks ----------
   "check.nightsOk": "تطابق عدد الليالي مع تواريخ الفنادق",

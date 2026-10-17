@@ -10,6 +10,7 @@ import { messagesDueToday } from "./client-messages";
 import { passportAlerts, type AlertTraveler } from "./progress";
 import { defaultSchedule, installmentStates, paidTotal } from "./payments";
 import { canAdvanceClient, canAdvanceExecution, type ClientStatus, type ExecutionStatus } from "./state";
+import { hotelAtRisk, type ClientBookingRow } from "./client-booking-state";
 
 /**
  * The operations day (operations order 6), run once a morning by the server's
@@ -144,5 +145,31 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
       if (await alertOnce(supabase, op.id, "passport", alert.ref, `${alert.text} — ${head}`)) result.alerts += 1;
     }
   }
+  result.alerts += await provisionalHotelAlerts(supabase, ops, today);
   return result;
+}
+
+/**
+ * Red (the owner, 2026-10-17): a hotel still holding only OUR number from the
+ * day before travel — the client is about to arrive at a desk with no
+ * confirmation of the hotel's own. To the case's issuer and operations.write
+ * (notifyOps), once per booking.
+ */
+async function provisionalHotelAlerts(supabase: SupabaseClient, ops: Op[], today: string): Promise<number> {
+  const tomorrow = addDays(today, 1);
+  const soon = ops.filter((op) => op.travel_start && op.travel_start <= tomorrow && (op.travel_end ?? op.travel_start) >= today);
+  if (soon.length === 0) return 0;
+  const { data } = await supabase
+    .from("operation_bookings")
+    .select("id, operation_id, kind, title, city_name, start_date, end_date, status, confirmation_number, company_ref, detail")
+    .eq("kind", "hotel")
+    .in("operation_id", soon.map((op) => op.id));
+  let sent = 0;
+  for (const b of (data ?? []) as (ClientBookingRow & { id: string; operation_id: string })[]) {
+    const op = soon.find((o) => o.id === b.operation_id);
+    if (!op || !hotelAtRisk(b, op.travel_start, today)) continue;
+    const text = `🔴 فندق بلا تأكيد نهائي و${op.travel_start && op.travel_start > today ? "السفر غداً" : "الرحلة بدأت"}: ${b.title}${b.city_name ? ` — ${b.city_name}` : ""} (رقم حجزنا ${b.company_ref ?? "—"}) — ${serialOf(op)}`;
+    if (await alertOnce(supabase, op.id, "hotel_provisional", b.id, text)) sent += 1;
+  }
+  return sent;
 }
