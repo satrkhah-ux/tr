@@ -21,7 +21,7 @@ set -euo pipefail
 #
 # As `deploy`, not root: the app and its .env live in /home/deploy, and root's
 # ~ has neither, so a root deploy builds a tree with no .env and the run fails.
-HOST=deploy@vps-new
+HOST=${HOST:-deploy@vps-new}  # HOST=vps-deploy ships to the standby server (187.124.112.104)
 DIR=apps/traveliun-app
 DOMAIN=pkg.traveliun.com
 
