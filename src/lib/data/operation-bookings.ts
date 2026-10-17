@@ -138,7 +138,17 @@ export type OperationBooking = {
   cancellation_policy: string | null;
   cancellation_deadline: string | null;
   note: string | null;
+  /** ours, per service — <serial>-<H|F|T|V|S><n>, set by the database (0084); what the client's link shows. */
+  company_ref: string | null;
+  /** a flight's ticket, read from the uploaded ticket (0084). */
+  pnr: string | null;
+  ticket_numbers: string[];
+  flight_legs: FlightLeg[];
+  baggage: string | null;
 };
+
+/** One leg of a ticketed flight booking — times ISO with their offset; the drivers' pickups come from these. */
+export type FlightLeg = { flight_no: string; from: string; to: string; departs_at: string | null; arrives_at: string | null };
 
 export async function listBookings(operationId: string): Promise<OperationBooking[]> {
   if (await gateOperation(operationId)) return [];
@@ -151,7 +161,7 @@ export async function listBookings(operationId: string): Promise<OperationBookin
     const read = (columns: string) =>
       supabase.from("operation_bookings").select(columns).eq("operation_id", operationId).order("start_date", { ascending: true, nullsFirst: false });
     const base =
-      "id, operation_id, kind, title, city_name, start_date, end_date, detail, supplier_name, source, status, is_paid, origin, assignee_kind, assignee_employee_id, assignee_partner_id, handoff_note, confirmation_number, quoted_net, net_charged, currency, cancellation_policy, cancellation_deadline, note, employees:assignee_employee_id(arabic_name), booking_partners:assignee_partner_id(name)";
+      "id, operation_id, kind, title, city_name, start_date, end_date, detail, supplier_name, source, status, is_paid, origin, assignee_kind, assignee_employee_id, assignee_partner_id, handoff_note, confirmation_number, quoted_net, net_charged, currency, cancellation_policy, cancellation_deadline, note, company_ref, pnr, ticket_numbers, flight_legs, baggage, employees:assignee_employee_id(arabic_name), booking_partners:assignee_partner_id(name)";
     let { data, error } = await read(`${base}, assignee_supplier_id, company_suppliers:assignee_supplier_id(arabic_name)`);
     // until 0063 is applied the supplier columns do not exist — the case still opens
     if (error) ({ data, error } = await read(base));
