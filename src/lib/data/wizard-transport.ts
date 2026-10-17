@@ -6,10 +6,13 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { gateOperation, gateRows } from "@/lib/operations/access";
 import { assignBooking, listAssignees, sendBookingRequest, type AssigneeOption, type RequestDraft } from "@/lib/data/operation-assign";
 import { confirmBookings, updateBooking } from "@/lib/data/operation-bookings";
-import { composeRequest } from "@/lib/data/supplier-work";
+import { attachSupplierConfirmation, composeRequest } from "@/lib/data/supplier-work";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
+import { awaitingConfirmation } from "@/lib/operations/confirm-all";
 import { DRV, driverServiceKind } from "@/lib/operations/drivers";
 import { suppliersFor } from "@/lib/operations/supplier-request";
+import { parseHotelConfirmation } from "@/lib/operations/wizard/hotels";
+import { uploadText } from "@/lib/repackage/extract/upload-text";
 
 /**
  * «المواصلات» in the case wizard — a city's drives and tours handed, requested,
@@ -178,6 +181,44 @@ export async function confirmCity(input: { operation_id: string; booking_ids: st
     operation_id: input.operation_id,
     entries: res.trips.map((t) => ({ booking_id: t.id, confirmation_number: input.confirmation_number })),
   });
+}
+
+/**
+ * The supplier's confirmation for the city (PDF or photo): filed ONCE and
+ * pointed at by every confirmed trip of the city (supplier-work.ts
+ * attachSupplierConfirmation — one paper, every booking it covers). The city's
+ * number — typed, or with none typed read off the paper — confirms the trips
+ * still waiting under it, through confirmBookings like «تأكيد الكل للمدينة».
+ * A paper with no trip to land on (nothing confirmed, no number) is refused.
+ */
+export async function attachCityConfirmation(formData: FormData): Promise<{ ok: true; number: string | null } | Fail> {
+  const operationId = String(formData.get("operation_id") ?? "");
+  const ids = String(formData.get("booking_ids") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const res = await cityTrips(operationId, ids);
+  if ("ok" in res) return res;
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "ops.err.noFile" };
+
+  const open = res.trips.filter((t) => awaitingConfirmation(t.status));
+  let number = String(formData.get("confirmation_number") ?? "").trim().slice(0, 40);
+  if (!number && open.length > 0) {
+    // the labels a confirmation prints its number under are the same for a hotel and a transfer
+    const text = await uploadText(formData, "ground transport booking confirmation").catch(() => null);
+    if (text?.ok) number = parseHotelConfirmation(text.text).confirmation;
+  }
+  const targets = res.trips.filter((t) => t.status === "confirmed" || (number && awaitingConfirmation(t.status)));
+  if (targets.length === 0) return { ok: false, error: "wz.transport.err.paperNumber" };
+
+  const paper = new FormData();
+  paper.set("booking_ids", targets.map((t) => t.id).join(","));
+  paper.set("file", file);
+  const filed = await attachSupplierConfirmation(paper);
+  if (!filed.ok) return filed;
+  if (number && open.length > 0) {
+    const done = await confirmBookings({ operation_id: operationId, entries: open.map((t) => ({ booking_id: t.id, confirmation_number: number })) });
+    if (!done.ok) return done;
+  }
+  return { ok: true, number: number || null };
 }
 
 /**

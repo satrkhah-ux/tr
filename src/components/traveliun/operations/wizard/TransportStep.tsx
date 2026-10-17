@@ -2,11 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Car, Check, CheckCircle2, Copy, Loader2, Mail, MapPin, Send, UserRound } from "lucide-react";
+import { Car, Check, CheckCircle2, Copy, ExternalLink, Loader2, Mail, MapPin, Paperclip, Send, UserRound } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import type { RequestDraft } from "@/lib/data/operation-assign";
+import { getSupplierConfirmationUrl } from "@/lib/data/supplier-work";
 import {
   assignCitySupplier,
+  attachCityConfirmation,
   confirmCity,
   draftCityRequest,
   sendCityRequest,
@@ -71,17 +73,39 @@ export function TransportStep({ data }: StepProps) {
   }
   // the server's clock, as the supplier panel reads it — the same hours on both renders (no work, no request to time)
   const now = new Date(data.supplierWork?.now ?? 0);
+  // the trips whose supplier's paper is on file (one paper is filed on every trip it covers)
+  const filed = new Set((data.supplierWork?.bookings ?? []).filter((b) => b.has_confirmation).map((b) => b.booking_id));
   return (
     <section className="space-y-3">
       <p className="text-[12px] font-semibold text-[#557d78]">{t("wz.transport.hint")}</p>
       {cities.map((c) => (
-        <CityCard key={c.key || "-"} city={c} operationId={operationId} setup={setup} now={now} />
+        <CityCard
+          key={c.key || "-"}
+          city={c}
+          operationId={operationId}
+          setup={setup}
+          now={now}
+          filedId={c.trips.find((x) => filed.has(x.booking.id))?.booking.id ?? null}
+        />
       ))}
     </section>
   );
 }
 
-function CityCard({ city, operationId, setup, now }: { city: TransportCity; operationId: string; setup: TransportSetup | null; now: Date }) {
+function CityCard({
+  city,
+  operationId,
+  setup,
+  now,
+  filedId,
+}: {
+  city: TransportCity;
+  operationId: string;
+  setup: TransportSetup | null;
+  now: Date;
+  /** a trip of the city with the supplier's paper on file — what «فتح الورقة» opens. */
+  filedId: string | null;
+}) {
   const { t } = useTraveliunUI();
   const router = useRouter();
   const [pending, run] = useSafeTransition();
@@ -105,6 +129,9 @@ function CityCard({ city, operationId, setup, now }: { city: TransportCity; oper
   const [body, setBody] = useState("");
   const [copied, setCopied] = useState(false);
   const [number, setNumber] = useState("");
+  const [paper, setPaper] = useState<File | null>(null);
+  // remounts the file input once its paper is filed
+  const [paperKey, setPaperKey] = useState(0);
   const [driver, setDriver] = useState<Driver | null>(null);
   const drv = driver ?? city.driver;
   const targets = driverTargets(city);
@@ -133,6 +160,33 @@ function CityCard({ city, operationId, setup, now }: { city: TransportCity; oper
         setDraft(res.draft);
         setBody(res.draft.body);
       }
+    });
+  }
+
+  // the paper, with the number typed above if any — the server reads it off the paper otherwise
+  function attachPaper() {
+    if (!paper) return;
+    const fd = new FormData();
+    fd.set("operation_id", operationId);
+    fd.set("booking_ids", ids.join(","));
+    fd.set("confirmation_number", number);
+    fd.set("file", paper);
+    act(
+      () => attachCityConfirmation(fd),
+      () => {
+        setPaper(null);
+        setPaperKey((k) => k + 1);
+        setNumber("");
+      },
+    );
+  }
+
+  function openPaper() {
+    if (!filedId) return;
+    run(async () => {
+      const res = await getSupplierConfirmationUrl(filedId);
+      if (res.ok) window.open(res.url, "_blank", "noopener");
+      else setError(t(res.error));
     });
   }
 
@@ -222,6 +276,32 @@ function CityCard({ city, operationId, setup, now }: { city: TransportCity; oper
           </button>
         </div>
       ) : null}
+
+      {/* the supplier's confirmation — one paper for every trip of the city */}
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <label className={`${label} min-w-[12rem] flex-1`}>
+          {t("wz.transport.paper")}
+          <input
+            key={paperKey}
+            type="file"
+            accept="application/pdf,.pdf,image/png,image/jpeg,image/webp"
+            disabled={pending}
+            onChange={(e) => setPaper(e.target.files?.[0] ?? null)}
+            className="block w-full cursor-pointer rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] text-[#185045] file:me-3 file:rounded-md file:border-0 file:bg-[#185045] file:px-3 file:py-1 file:text-white"
+          />
+        </label>
+        <button type="button" disabled={pending || !paper} onClick={attachPaper} className={secondary}>
+          {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Paperclip className="size-3.5" />}
+          {t("wz.transport.paperAttach")}
+        </button>
+        {filedId ? (
+          <button type="button" disabled={pending} onClick={openPaper} className={secondary}>
+            <ExternalLink className="size-3.5" />
+            {t("wz.transport.paperOpen")}
+          </button>
+        ) : null}
+        <p className="w-full text-[11px] font-semibold text-[#93aaa3]">{t(city.confirmed ? "wz.transport.paperHintDone" : "wz.transport.paperHint")}</p>
+      </div>
 
       {draft ? (
         <div className="mt-3 rounded-[9px] border border-[#d6eadf] bg-[#f8fbf9] p-3">
