@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { carCount, carFields, carOf, carText, clientService, driverMessage, driverServiceKind, DRV, parseLeg, retimeTransfers, waNumber } from "./drivers";
+import { carCount, carFields, carOf, carText, clientService, driverServiceKind, DRV, parseLeg, retimeTransfers, waNumber } from "./drivers";
 
 const intl = {
   title: "طيران دولي RUH ⇄ KUL",
@@ -82,27 +82,6 @@ describe("what the client and the driver are told", () => {
     expect(driverServiceKind({ kind: "service", title: "جولة: المدينة", start_date: null, detail: { "وقت الانطلاق": "09:00" } })).toBe("tour");
     expect(driverServiceKind({ kind: "service", title: "شريحة اتصال × 2", start_date: null, detail: { العدد: "2" } })).toBeNull();
     expect(driverServiceKind(farewell)).toBe("farewell");
-  });
-
-  it("sends the names, the flight, the time, the hotel and a map", () => {
-    const text = driverMessage({
-      kind: "reception",
-      serial: "AD-6-3056",
-      title: reception.title,
-      date: "2026-11-20",
-      time: "15:15",
-      flight: "SV834 RUH → KUL",
-      meet: "صالة القادمين — KUL",
-      hotel: { name: "بولمان سيتي سنتر", name_en: "Pullman Kuala Lumpur City Centre", address: null, city: "كوالالمبور" },
-      guests: ["أحمد علي", "سارة علي"],
-      pax: "4",
-      car: "ميني فان",
-      plate: "WXY 1234",
-      contact: "0569222111",
-    });
-    for (const part of ["AD-6-3056", "SV834", "15:15", "أحمد علي", "Pullman Kuala Lumpur City Centre", "google.com/maps", "WXY 1234"]) {
-      expect(text).toContain(part);
-    }
   });
 
   it("dials a Saudi mobile with its country code", () => {

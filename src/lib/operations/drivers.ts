@@ -248,31 +248,6 @@ export function clientService(b: BookingLike, today: string): ClientService | nu
   };
 }
 
-// ---------------- what the driver is sent ----------------
-
-export type DriverBrief = {
-  kind: ServiceKind;
-  serial: string;
-  title: string;
-  date: string | null;
-  time: string;
-  flight: string;
-  meet: string;
-  hotel: { name: string; name_en: string | null; address: string | null; city: string } | null;
-  guests: string[];
-  pax: string;
-  car: string;
-  plate: string;
-  contact: string;
-};
-
-const KIND_LINE: Record<ServiceKind, string> = {
-  reception: "استقبال من المطار / Airport pick-up",
-  farewell: "توصيل إلى المطار / Airport drop-off",
-  transfer: "انتقال / Transfer",
-  tour: "جولة / Tour",
-};
-
 export function mapsLink(...parts: (string | null | undefined)[]): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts.filter(Boolean).join(", "))}`;
 }
@@ -281,24 +256,4 @@ export function mapsLink(...parts: (string | null | undefined)[]): string {
 export function waNumber(phone: string): string {
   const d = phone.replace(/\D/g, "").replace(/^00/, "");
   return /^05\d{8}$/.test(d) ? `966${d.slice(1)}` : d;
-}
-
-/** The card as one WhatsApp message. Bilingual labels: the driver abroad may not read Arabic. */
-export function driverMessage(b: DriverBrief): string {
-  const h = b.hotel;
-  return [
-    `${KIND_LINE[b.kind]} — ${b.serial}`,
-    b.kind === "tour" || b.kind === "transfer" ? b.title : null,
-    `التاريخ / Date: ${b.date ?? "—"}`,
-    `الوقت / Time: ${b.time || "—"}`,
-    b.flight ? `الرحلة / Flight: ${b.flight}` : null,
-    b.meet ? `نقطة الالتقاء / Meeting point: ${b.meet}` : null,
-    h ? `الفندق / Hotel: ${[h.name, h.name_en].filter(Boolean).join(" — ")}` : null,
-    h ? `الموقع / Map: ${mapsLink(h.address || h.name_en || h.name, h.city)}` : null,
-    `الضيوف / Guests (${b.pax || b.guests.length}): ${b.guests.join("، ") || "—"}`,
-    b.car || b.plate ? `السيارة / Car: ${[b.car, b.plate].filter(Boolean).join(" · ")}` : null,
-    b.contact ? `للتواصل / Contact: ${b.contact}` : null,
-  ]
-    .filter((l): l is string => Boolean(l))
-    .join("\n");
 }

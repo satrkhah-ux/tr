@@ -46,7 +46,7 @@ export function CaseWizard({
   const [error, setError] = useState<string | null>(null);
 
   const steps = wizardSteps({
-    bookings: bookings.map((b) => ({ id: b.id, kind: b.kind, status: b.status, assignee_kind: b.assignee_kind })),
+    bookings: bookings.map((b) => ({ id: b.id, kind: b.kind, status: b.status, assignee_kind: b.assignee_kind, assigned_at: b.assigned_at })),
     travelers,
     documents,
     clientToken,

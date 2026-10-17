@@ -13,6 +13,7 @@ import {
 } from "@/lib/data/operation-assign";
 import type { OperationBooking } from "@/lib/data/operation-bookings";
 import { suppliersFor } from "@/lib/operations/supplier-request";
+import { isUnassigned } from "@/lib/operations/wizard";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
@@ -54,7 +55,9 @@ export function AssignBooking({
   const [copied, setCopied] = useState(false);
 
   const currentId = booking.assignee_employee_id ?? booking.assignee_partner_id ?? booking.assignee_supplier_id ?? null;
-  const value = `${booking.assignee_kind ?? "ops"}:${currentId ?? ""}`;
+  // nobody chose yet (the column default, no assigned_at) reads as that — not as «قسم العمليات»
+  const unset = isUnassigned(booking);
+  const value = unset ? "" : `${booking.assignee_kind ?? "ops"}:${currentId ?? ""}`;
   // our suppliers that sell this kind of booking — and whoever already has it
   const matching = new Set(suppliersFor(assignees.filter((a) => a.kind === "supplier"), booking.kind).map((a) => a.id));
   const options = assignees.filter((a) => a.kind !== "supplier" || matching.has(a.id) || a.id === currentId);
@@ -117,6 +120,11 @@ export function AssignBooking({
         <label className="grid gap-1.5 text-[11.5px] font-bold text-[#185045]">
           {t("ops.assignee")}
           <select value={value} onChange={(e) => assign(e.target.value)} disabled={pending} className={field}>
+            {unset ? (
+              <option value="" disabled>
+                {t("wz.transport.unassigned")}
+              </option>
+            ) : null}
             {options.map((a) => (
               <option key={`${a.kind}:${a.id ?? ""}`} value={`${a.kind}:${a.id ?? ""}`}>
                 {a.kind === "partner" ? `🏢 ${a.label}` : a.kind === "employee" ? `👤 ${a.label}` : a.kind === "supplier" ? `🧾 ${a.label}` : a.label}
@@ -219,11 +227,22 @@ export function AssignBooking({
 export function AssigneeChip({
   kind,
   label,
+  unset,
 }: {
   kind: AssigneeKind | undefined;
   label: string | null;
+  /** isUnassigned — said plainly instead of «قسم العمليات». */
+  unset?: boolean;
 }) {
   const { t } = useTraveliunUI();
+  if (unset) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-[#fff4e0] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">
+        <Users className="size-3" />
+        {t("wz.transport.unassigned")}
+      </span>
+    );
+  }
   if (!kind || kind === "ops") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-[#eef4f1] px-2 py-0.5 text-[10.5px] font-bold text-[#557d78]">

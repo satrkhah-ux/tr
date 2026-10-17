@@ -39,20 +39,27 @@ export function suppliersFor<T extends { categories?: string | null }>(list: T[]
 
 export type RequestTraveler = { name: string; kind: "adult" | "child" | "infant" };
 
+export type RequestBooking = {
+  kind: SupplierBookingKind;
+  title: string;
+  city_name: string;
+  start_date: string | null;
+  end_date: string | null;
+  detail: Record<string, string>;
+};
+
 export type SupplierRequestInput = {
   lang: RequestLang;
   /** our file number — the offer serial — so their answer can be matched. */
   reference: string;
   /** the person it is addressed to. */
   contact: string | null;
-  booking: {
-    kind: SupplierBookingKind;
-    title: string;
-    city_name: string;
-    start_date: string | null;
-    end_date: string | null;
-    detail: Record<string, string>;
-  };
+  booking: RequestBooking;
+  /**
+   * More bookings in the SAME message — a city's transfers and tours go to its
+   * ground agent as one request (the wizard's «المواصلات»), numbered 1) 2) …
+   */
+  also?: RequestBooking[];
   /** in passport order, the lead first; names as in the passport where we have them. */
   travelers: RequestTraveler[];
   /** what the agent asked for in their own words — never translated. */
@@ -191,29 +198,41 @@ export function buildSupplierRequest(input: SupplierRequestInput): { subject: st
   const L = TEXT[input.lang];
   const en = input.lang === "en";
   const say = (s: string) => (en ? toEnglish(s, input.glossary ?? {}) : s);
-  const { booking } = input;
+  const all = [input.booking, ...(input.also ?? [])];
 
-  const title = say(booking.title.trim()) || "—";
-  const city = booking.city_name.trim();
-  // a flight's «city» is its route, already in the title
-  const showCity = city && booking.kind !== "flight" && !booking.title.includes(city);
+  // one block per booking; numbered only when the message carries several
+  const block = (booking: RequestBooking, i: number): (string | null)[] => {
+    const title = say(booking.title.trim()) || "—";
+    const city = booking.city_name.trim();
+    // a flight's «city» is its route, already in the title
+    const showCity = city && booking.kind !== "flight" && !booking.title.includes(city);
 
-  const dates: string[] = [];
-  if (booking.kind === "hotel") {
-    if (booking.start_date) dates.push(`${L.checkIn}: ${booking.start_date}`);
-    if (booking.end_date) dates.push(`${L.checkOut}: ${booking.end_date}`);
-  } else if (booking.start_date) {
-    dates.push(
-      booking.end_date && booking.end_date !== booking.start_date
-        ? `${L.dates}: ${booking.start_date} → ${booking.end_date}`
-        : `${L.date}: ${booking.start_date}`,
-    );
-  }
+    const dates: string[] = [];
+    if (booking.kind === "hotel") {
+      if (booking.start_date) dates.push(`${L.checkIn}: ${booking.start_date}`);
+      if (booking.end_date) dates.push(`${L.checkOut}: ${booking.end_date}`);
+    } else if (booking.start_date) {
+      dates.push(
+        booking.end_date && booking.end_date !== booking.start_date
+          ? `${L.dates}: ${booking.start_date} → ${booking.end_date}`
+          : `${L.date}: ${booking.start_date}`,
+      );
+    }
 
-  const details = Object.entries(shownDetail(booking.detail))
-    .filter(([k, v]) => v.trim() && !(showCity && k === "المدينة"))
-    .map(([k, v]) => `• ${en ? keyToEnglish(k) : k}: ${say(v.trim())}`);
+    const details = Object.entries(shownDetail(booking.detail))
+      .filter(([k, v]) => v.trim() && !(showCity && k === "المدينة"))
+      .map(([k, v]) => `• ${en ? keyToEnglish(k) : k}: ${say(v.trim())}`);
 
+    return [
+      all.length > 1 ? "" : null,
+      `${all.length > 1 ? `${i + 1}) ` : ""}${L.service}: ${title}`,
+      showCity ? `${L.city}: ${say(city)}` : null,
+      ...dates,
+      ...details,
+    ];
+  };
+
+  const title = say(input.booking.title.trim()) || "—";
   const guests = input.travelers.filter((t) => t.name.trim());
   const body = [
     `${L.title} — ${L.company}`,
@@ -222,10 +241,7 @@ export function buildSupplierRequest(input: SupplierRequestInput): { subject: st
     L.intro,
     "",
     `${L.reference}: ${input.reference || "—"}`,
-    `${L.service}: ${title}`,
-    showCity ? `${L.city}: ${say(city)}` : null,
-    ...dates,
-    ...details,
+    ...all.flatMap(block),
     "",
     `${L.guests}:`,
     ...(guests.length > 0
@@ -239,7 +255,7 @@ export function buildSupplierRequest(input: SupplierRequestInput): { subject: st
     .filter((l): l is string => l !== null)
     .join("\n");
 
-  return { subject: `${L.title} ${input.reference} — ${title}`, body };
+  return { subject: `${L.title} ${input.reference} — ${title}${all.length > 1 ? ` (+${all.length - 1})` : ""}`, body };
 }
 
 // ---------- the answer ----------

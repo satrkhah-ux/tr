@@ -1,24 +1,36 @@
 "use server";
 
+import { createElement } from "react";
+import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
+import { listBookings } from "@/lib/data/operation-bookings";
 import { listTravelers } from "@/lib/data/operation-travelers";
-import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
+import { getWelcomeBoard } from "@/lib/data/welcome-board";
+import { conversationForPhone, sendTeletelAttachment, sendTeletelMessage } from "@/lib/providers/teletel";
 import { COMPANY } from "@/components/offer-doc/labels";
+import { WelcomeBoardDocument } from "@/components/offer-doc/WelcomeBoardDocument";
+import { renderDocHtml } from "@/lib/offer-doc/html";
+import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
+import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { gateOps, gateRow, mayWork, opsAccess } from "@/lib/operations/access";
-import { carText, DRV, driverMessage, driverServiceKind, meetTime, type ServiceKind } from "@/lib/operations/drivers";
+import { carText, DRV, driverServiceKind, linkOf, meetTime, type ServiceKind } from "@/lib/operations/drivers";
+import { hotelsMessage, programmeMessage, programmeUpdate, recipientKey, type HotelGap, type ProgrammeInput } from "@/lib/operations/driver-programme";
+import { cityOf, transportCities } from "@/lib/operations/wizard/transport";
 
 /**
- * «السائقون والاستقبال» — the driver's card sent to the driver, and the day's
- * drives of every case on one sheet.
+ * «السائقون والاستقبال» — what the driver (or the city's local agent) is sent,
+ * and the day's drives of every case on one sheet.
  *
- * The card's facts are booking detail (edited through updateBooking like any
- * other detail); this module only reads them out and sends them. Sending is a
- * reviewed act, as for supplier requests: the message is drafted, shown in an
- * editable box, and leaves when a human presses the button.
+ * The facts are booking detail (edited through updateBooking like any other
+ * detail); this module only reads them out and sends them — since the owner's
+ * order of 2026-10-17, as TWO messages for the recipient's whole part of the
+ * trip (driver-programme.ts), not a card per drive. Sending is a reviewed act,
+ * as for supplier requests: drafted, shown in an editable box, and gone only
+ * when a human presses the button.
  */
 
 function db(): Promise<SupabaseClient> {
@@ -32,90 +44,179 @@ const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ?
 type OfferJoin = { serial: string; employee_id?: string | null; customers: { arabic_name: string | null } | { arabic_name: string | null }[] | null };
 type OpJoin = { execution_status?: string; offers: OfferJoin | OfferJoin[] | null };
 
-export type DriverDraft = { to_label: string; to_phone: string | null; body: string; canSendWhatsapp: boolean };
+/** The driver's (or the local agent's) two messages, ready for review — and what changed since the last. */
+export type ProgrammeDraft = {
+  to_label: string;
+  to_phone: string | null;
+  canSendWhatsapp: boolean;
+  /** the cities this recipient covers — their part of the trip, nobody else's. */
+  cities: string[];
+  programme: string;
+  hotels: string;
+  /** the lines new since the programme (and updates) last sent to them — null when nothing changed or nothing was sent. */
+  update: string | null;
+  /** hotels missing an address or a phone — warned before sending, never printed as «—». */
+  gaps: HotelGap[];
+  serial: string;
+  /** the arrival sign's name, for sending it by hand. */
+  customer: string;
+};
 
-export async function draftDriverMessage(bookingId: string): Promise<{ ok: true; draft: DriverDraft } | Fail> {
+const PROGRAMME_TEMPLATES = ["driver_programme", "driver_update"];
+
+/** What this recipient was last told: the last programme and every update since, newest first. */
+async function toldBefore(supabase: SupabaseClient, operationId: string, to: { label: string; phone: string | null }): Promise<string | null> {
+  let q = supabase
+    .from("operation_dispatches")
+    .select("template, body")
+    .eq("operation_id", operationId)
+    .in("template", PROGRAMME_TEMPLATES)
+    .order("sent_at", { ascending: false })
+    .limit(20);
+  q = to.phone ? q.eq("to_address", to.phone) : q.eq("to_label", to.label);
+  const rows = ((await q).data ?? []) as { template: string; body: string }[];
+  const last = rows.findIndex((r) => r.template === "driver_programme");
+  return last < 0 ? null : rows.slice(0, last + 1).map((r) => r.body).join("\n");
+}
+
+/**
+ * The programme and the hotels for whoever drives this booking's city — its
+ * driver once named, else the supplier its trips are with — covering every city
+ * they have on this case and no other (driver-programme.ts recipientKey).
+ */
+export async function draftDriverProgramme(bookingId: string): Promise<{ ok: true; draft: ProgrammeDraft } | Fail> {
   const denied = await gateRow("operation_bookings", bookingId);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
-    const { data } = await supabase
-      .from("operation_bookings")
-      .select("id, operation_id, kind, title, city_name, start_date, detail, operations(offers(serial, customers(arabic_name)))")
-      .eq("id", bookingId)
-      .maybeSingle();
-    const row = data as unknown as {
-      operation_id: string;
-      kind: string;
-      title: string;
-      city_name: string;
-      start_date: string | null;
-      detail: Record<string, string> | null;
-      operations: OpJoin | OpJoin[] | null;
-    } | null;
-    const kind = row ? driverServiceKind(row) : null;
-    if (!row || !kind) return { ok: false, error: "ops.err.notFound" };
-    const offer = one(one(row.operations)?.offers);
-    const d = row.detail ?? {};
+    const { data: own } = await supabase.from("operation_bookings").select("operation_id").eq("id", bookingId).maybeSingle();
+    const operationId = (own as { operation_id: string } | null)?.operation_id;
+    if (!operationId) return { ok: false, error: "ops.err.notFound" };
 
-    // the hotel the drive starts or ends at: the stay in the same city that covers the day
-    const [staysRes, travelers] = await Promise.all([
-      supabase
-        .from("operation_bookings")
-        .select("title, city_name, start_date, end_date")
-        .eq("operation_id", row.operation_id)
-        .eq("kind", "hotel")
-        .neq("status", "cancelled"),
-      listTravelers(row.operation_id),
+    const [bookings, travelers, opRes] = await Promise.all([
+      listBookings(operationId),
+      listTravelers(operationId),
+      supabase.from("operations").select("travel_start, travel_end, offers(serial, destination, customers(arabic_name))").eq("id", operationId).maybeSingle(),
     ]);
-    const city = row.city_name.trim();
-    const stays = ((staysRes.data ?? []) as { title: string; city_name: string; start_date: string | null; end_date: string | null }[]).filter(
-      (s) => s.city_name.trim() === city,
-    );
-    const day = row.start_date ?? "";
-    const stay = stays.find((s) => day && (s.start_date ?? "") <= day && day <= (s.end_date ?? s.start_date ?? "")) ?? stays[0] ?? null;
-    let hotel: { name: string; name_en: string | null; address: string | null; city: string } | null = null;
-    if (stay) {
-      // what the driver types into a map: the English name and address from /hotels
-      const { data: h } = await supabase.from("hotels").select("english_name, address").eq("arabic_name", stay.title.trim()).limit(1).maybeSingle();
-      const info = h as { english_name: string | null; address: string | null } | null;
-      hotel = { name: stay.title, name_en: info?.english_name ?? null, address: info?.address ?? null, city };
+    const cities = transportCities({ bookings, supplierWork: null });
+    const mine = cities.find((c) => c.trips.some((t) => t.booking.id === bookingId));
+    if (!mine) return { ok: false, error: "ops.err.notFound" };
+    const key = recipientKey(mine);
+    const covered = key ? cities.filter((c) => recipientKey(c) === key) : [mine];
+    const keys = new Set(covered.map((c) => c.key));
+    const stays = bookings.filter((b) => b.kind === "hotel" && b.status !== "cancelled" && keys.has(normalizeName(cityOf(b))));
+
+    const op = opRes.data as unknown as { travel_start: string | null; travel_end: string | null; offers: unknown } | null;
+    const offer = one(op?.offers as { serial: string; destination: string | null; customers: unknown } | { serial: string; destination: string | null; customers: unknown }[] | null);
+    const customer = one(offer?.customers as { arabic_name: string | null } | { arabic_name: string | null }[] | null)?.arabic_name?.trim() ?? "";
+
+    // the catalogue: the hotels' names, addresses and links, the cities' places and countries, the airports' names
+    const trips = covered.flatMap((c) => c.trips);
+    const codes = [...new Set(trips.flatMap((t) => {
+      const link = linkOf(t.booking.detail?.[DRV.flight]);
+      return link ? [link.from, link.to] : [];
+    }))];
+    const cityNames = [...new Set([...covered.map((c) => c.name), ...stays.map(cityOf)].filter(Boolean))];
+    type HotelRow = { arabic_name: string; english_name: string | null; address: string | null; contact_number: string | null; google_maps: string | null };
+    type CityRow = { arabic_name: string; lat: number | null; lng: number | null; country_id: string | null };
+    const [hotelsRes, citiesRes, airportsRes] = await Promise.all([
+      stays.length > 0
+        ? supabase.from("hotels").select("arabic_name, english_name, address, contact_number, google_maps").in("arabic_name", [...new Set(stays.map((s) => s.title.trim()))])
+        : Promise.resolve({ data: [] }),
+      cityNames.length > 0 ? supabase.from("cities").select("arabic_name, lat, lng, country_id").in("arabic_name", cityNames) : Promise.resolve({ data: [] }),
+      codes.length > 0 ? supabase.from("airports").select("code, arabic_name").in("code", codes) : Promise.resolve({ data: [] }),
+    ]);
+    const hotelRows = (hotelsRes.data ?? []) as HotelRow[];
+    const cityRows = (citiesRes.data ?? []) as CityRow[];
+    const countryIds = [...new Set(cityRows.map((c) => c.country_id).filter((x): x is string => !!x))];
+    const countries = countryIds.length > 0 ? (((await supabase.from("countries").select("arabic_name").in("id", countryIds)).data ?? []) as { arabic_name: string }[]) : [];
+    const cityRow = (name: string) => cityRows.find((c) => normalizeName(c.arabic_name) === normalizeName(name));
+
+    const input: ProgrammeInput = {
+      serial: offer?.serial ?? "",
+      from: op?.travel_start ?? null,
+      to: op?.travel_end ?? null,
+      customer,
+      travellers: travelers.length,
+      country: countries.map((c) => c.arabic_name).join("، ") || offer?.destination || "",
+      trips: trips.map((t) => ({
+        kind: t.kind,
+        title: t.booking.title,
+        city: cityOf(t.booking),
+        date: t.booking.start_date,
+        time: t.time,
+        flight: t.booking.detail?.[DRV.flight] ?? "",
+        car: carText(t.booking.detail),
+      })),
+      stays: stays.map((s) => {
+        const h = hotelRows.find((r) => r.arabic_name.trim() === s.title.trim());
+        const c = cityRow(cityOf(s));
+        return {
+          name: s.title,
+          name_en: h?.english_name ?? null,
+          city: cityOf(s),
+          check_in: s.start_date,
+          check_out: s.end_date,
+          address: h?.address ?? null,
+          phone: h?.contact_number ?? null,
+          map: h?.google_maps ?? null,
+          coords: c?.lat != null && c?.lng != null ? { lat: Number(c.lat), lng: Number(c.lng) } : null,
+        };
+      }),
+      legs: bookings.filter((b) => b.kind === "flight" && b.status !== "cancelled").flatMap((b) => b.flight_legs ?? []),
+      airports: Object.fromEntries(((airportsRes.data ?? []) as { code: string; arabic_name: string }[]).map((a) => [a.code, a.arabic_name])),
+      // the driver works for us whoever sold the trip — he calls our operations line
+      emergency: COMPANY.phone,
+    };
+
+    // to the driver once named, else to the agent the city's trips are with
+    let to = { label: mine.driver.name || "السائق", phone: mine.driver.phone || null };
+    if (!mine.driver.name && !mine.driver.phone && mine.supplierId) {
+      const { data: s } = await supabase.from("company_suppliers").select("arabic_name, mobile, whatsapp").eq("id", mine.supplierId).maybeSingle();
+      const sup = s as { arabic_name: string; mobile: string | null; whatsapp: string | null } | null;
+      if (sup) to = { label: sup.arabic_name, phone: sup.whatsapp || sup.mobile || null };
     }
 
-    const guests = travelers.map((t) => t.display_name).filter(Boolean);
-    const body = driverMessage({
-      kind,
-      serial: offer?.serial ?? "",
-      title: row.title,
-      date: row.start_date,
-      time: meetTime(row),
-      flight: d[DRV.flight] ?? "",
-      meet: d[DRV.meet] ?? "",
-      hotel,
-      guests: guests.length > 0 ? guests : [one(offer?.customers)?.arabic_name ?? ""].filter(Boolean),
-      pax: d["الركاب"] ?? "",
-      car: carText(d),
-      plate: d[DRV.plate] ?? "",
-      // the driver works for us whoever sold the trip — he calls our operations line
-      contact: COMPANY.phone,
-    });
-
-    const to_phone = d[DRV.phone]?.trim() || null;
-    const conversation = to_phone ? await conversationForPhone(to_phone) : null;
-    return { ok: true, draft: { to_label: d[DRV.driver]?.trim() || "السائق", to_phone, body, canSendWhatsapp: conversation !== null } };
+    const programme = programmeMessage(input);
+    const hotels = hotelsMessage(input);
+    const conversation = to.phone ? await conversationForPhone(to.phone) : null;
+    return {
+      ok: true,
+      draft: {
+        to_label: to.label,
+        to_phone: to.phone,
+        canSendWhatsapp: conversation !== null,
+        cities: covered.map((c) => c.name).filter(Boolean),
+        programme,
+        hotels: hotels.body,
+        update: programmeUpdate(await toldBefore(supabase, operationId, to), programme, input.serial),
+        gaps: hotels.gaps,
+        serial: input.serial,
+        customer,
+      },
+    };
   } catch {
     return { ok: false, error: "err.db" };
   }
 }
 
+/** The arrival sign, as /welcome-board prints it — the company's own identity, the booking name. */
+async function arrivalSign(serial: string): Promise<Uint8Array | null> {
+  const source = await getWelcomeBoard(serial);
+  if (!source) return null;
+  const html = await renderDocHtml(() => createElement(WelcomeBoardDocument, { board: source.board }), source.font);
+  return new Uint8Array(await offerDocumentToPdf(html));
+}
+
 /**
- * Send the card the agent reviewed, and keep what went out.
- *
- * The operation is read off the booking, not taken from the browser: the
- * dispatch log is the case's paper trail and must land on the right case.
+ * Send one of the reviewed messages, and keep what went out. The programme over
+ * WhatsApp carries the arrival sign after it, as a PDF; by hand, the agent
+ * attaches it (the button beside it prints it). The operation is read off the
+ * booking, not taken from the browser: the log must land on the right case.
  */
-export async function sendDriverMessage(input: {
+export async function sendDriverProgramme(input: {
   booking_id: string;
+  part: "programme" | "hotels" | "update";
   channel: "whatsapp" | "manual";
   to_label: string;
   to_phone: string | null;
@@ -126,11 +227,13 @@ export async function sendDriverMessage(input: {
   if (!input.body.trim()) return { ok: false, error: "ops.err.emptyMessage" };
   try {
     const supabase = await db();
-    const { data } = await supabase.from("operation_bookings").select("operation_id").eq("id", input.booking_id).maybeSingle();
-    const operationId = (data as { operation_id: string } | null)?.operation_id;
-    if (!operationId) return { ok: false, error: "ops.err.notFound" };
+    const { data } = await supabase.from("operation_bookings").select("operation_id, operations(offers(serial))").eq("id", input.booking_id).maybeSingle();
+    const row = data as unknown as { operation_id: string; operations: { offers: unknown } | { offers: unknown }[] | null } | null;
+    if (!row) return { ok: false, error: "ops.err.notFound" };
+    const serial = one(one(row.operations)?.offers as { serial: string } | { serial: string }[] | null)?.serial ?? "";
 
     let providerMessageId: string | null = null;
+    let signed = false;
     if (input.channel === "whatsapp") {
       // an existing Teletel conversation only — a new one cannot be opened safely (teletel.ts)
       const conversationId = input.to_phone ? await conversationForPhone(input.to_phone) : null;
@@ -138,17 +241,26 @@ export async function sendDriverMessage(input: {
       const sent = await sendTeletelMessage(conversationId, input.body);
       if (sent === null) return { ok: false, error: "ops.err.sendFailed" };
       providerMessageId = String(sent);
+      if (input.part === "programme" && serial) {
+        signed = true;
+        // the PDF takes a browser and seconds: after the answer, as the client's programme is (client-whatsapp.ts)
+        after(async () => {
+          const bytes = await arrivalSign(serial).catch(() => null);
+          if (bytes) await sendTeletelAttachment(conversationId, "📎 لوحة الاستقبال / Arrival sign", { name: `welcome-${serial}.pdf`, type: "application/pdf", bytes });
+        });
+      }
     }
 
     await supabase.from("operation_dispatches").insert({
-      operation_id: operationId,
+      operation_id: row.operation_id,
       channel: input.channel,
       // a driver is the ground supplier's man — the existing audience, not a new one
       audience: "supplier",
-      template: "driver_card",
+      template: input.part === "hotels" ? "driver_hotels" : input.part === "update" ? "driver_update" : "driver_programme",
       to_label: input.to_label,
       to_address: input.to_phone,
       body: input.body,
+      attachments: signed ? [{ kind: "welcome_board" }] : [],
       status: "sent",
       provider_message_id: providerMessageId,
       approved_by: await getCurrentEmployeeId(),
@@ -158,7 +270,7 @@ export async function sendDriverMessage(input: {
       action: "dispatch.sent",
       entity: "operation_bookings",
       entity_id: input.booking_id,
-      meta: { channel: input.channel, to: input.to_label, template: "driver_card" },
+      meta: { channel: input.channel, to: input.to_label, template: `driver_${input.part}` },
     });
     return { ok: true };
   } catch {

@@ -131,6 +131,8 @@ export type OperationBooking = {
   /** one of our suppliers (company_suppliers, 0063) — staff screens only. */
   assignee_supplier_id: string | null;
   assignee_label: string | null;
+  /** when someone CHOSE the assignee — null on 'ops' means nobody did yet (the column default), not «قسم العمليات» doing it. */
+  assigned_at: string | null;
   handoff_note: string | null;
   confirmation_number: string | null;
   quoted_net: number | null;
@@ -162,7 +164,7 @@ export async function listBookings(operationId: string): Promise<OperationBookin
     const read = (columns: string) =>
       supabase.from("operation_bookings").select(columns).eq("operation_id", operationId).order("start_date", { ascending: true, nullsFirst: false });
     const base =
-      "id, operation_id, kind, title, city_name, start_date, end_date, detail, supplier_name, source, status, is_paid, origin, assignee_kind, assignee_employee_id, assignee_partner_id, handoff_note, confirmation_number, quoted_net, net_charged, currency, cancellation_policy, cancellation_deadline, note, company_ref, pnr, ticket_numbers, flight_legs, baggage, employees:assignee_employee_id(arabic_name), booking_partners:assignee_partner_id(name)";
+      "id, operation_id, kind, title, city_name, start_date, end_date, detail, supplier_name, source, status, is_paid, origin, assignee_kind, assignee_employee_id, assignee_partner_id, assigned_at, handoff_note, confirmation_number, quoted_net, net_charged, currency, cancellation_policy, cancellation_deadline, note, company_ref, pnr, ticket_numbers, flight_legs, baggage, employees:assignee_employee_id(arabic_name), booking_partners:assignee_partner_id(name)";
     let { data, error } = await read(`${base}, assignee_supplier_id, company_suppliers:assignee_supplier_id(arabic_name)`);
     // until 0063 is applied the supplier columns do not exist — the case still opens
     if (error) ({ data, error } = await read(base));

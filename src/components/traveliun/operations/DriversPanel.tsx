@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 import { CalendarDays, Car, Check, Copy, Loader2, Pencil, Plane, Send, UserRound } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { updateBooking, type OperationBooking } from "@/lib/data/operation-bookings";
-import { draftDriverMessage, sendDriverMessage, type DriverDraft } from "@/lib/data/operation-drivers";
+import { draftDriverProgramme, sendDriverProgramme, type ProgrammeDraft } from "@/lib/data/operation-drivers";
 import { carFields, carText, DRV, driverServiceKind, driverStep, meetTime, timeKey, waNumber, type ServiceKind } from "@/lib/operations/drivers";
 import type { TranslationKey } from "@/lib/i18n";
 import { WelcomeBoardButton } from "../WelcomeBoardButton";
@@ -239,42 +239,26 @@ function Fact({ label, value, icon, ltr, muted }: { label: string; value: string
 }
 
 /**
- * «أرسل للسائق»: draft from the booking, review, then send — over Teletel when
- * the driver already has a conversation there, else copy / open WhatsApp and
- * mark it sent. Shared by the case card and the day's schedule.
+ * «أرسل للسائق» (the owner, 2026-10-17): TWO messages for the whole of this
+ * driver's — or local agent's — part of the trip, from any of their trips: the
+ * programme (the arrival sign goes after it on WhatsApp), then the hotels; and,
+ * once something changed since they were sent, the update on its own. Each is
+ * reviewed in its box and sent over Teletel when the driver already has a
+ * conversation there, else copied / opened in WhatsApp and marked sent.
+ * Shared by the case card, the wizard's city card and the day's schedule.
  */
 export function DriverSend({ bookingId, onSent }: { bookingId: string; onSent?: () => void }) {
   const { t } = useTraveliunUI();
   const [pending, startTransition] = useSafeTransition();
-  const [draft, setDraft] = useState<DriverDraft | null>(null);
-  const [body, setBody] = useState("");
+  const [draft, setDraft] = useState<ProgrammeDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [sent, setSent] = useState(false);
 
   function prepare() {
     startTransition(async () => {
       setError(null);
-      const res = await draftDriverMessage(bookingId);
+      const res = await draftDriverProgramme(bookingId);
       if (!res.ok) setError(t(res.error));
-      else {
-        setDraft(res.draft);
-        setBody(res.draft.body);
-      }
-    });
-  }
-
-  function send(channel: "whatsapp" | "manual") {
-    if (!draft) return;
-    startTransition(async () => {
-      setError(null);
-      const res = await sendDriverMessage({ booking_id: bookingId, channel, to_label: draft.to_label, to_phone: draft.to_phone, body });
-      if (!res.ok) setError(t(res.error));
-      else {
-        setDraft(null);
-        setSent(true);
-        onSent?.();
-      }
+      else setDraft(res.draft);
     });
   }
 
@@ -286,71 +270,136 @@ export function DriverSend({ bookingId, onSent }: { bookingId: string; onSent?: 
         onClick={() => (draft ? setDraft(null) : prepare())}
         className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#185045] px-2.5 text-[11.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60"
       >
-        {pending ? <Loader2 className="size-3.5 animate-spin" /> : sent ? <Check className="size-3.5" /> : <Send className="size-3.5" />}
+        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
         {t("ops.drv.send")}
       </button>
       {error ? <p className="w-full text-[11.5px] font-bold text-[#c22850]">{error}</p> : null}
       {draft ? (
-        <div className="w-full rounded-[9px] border border-[#d6eadf] bg-white p-3">
-          <p className="mb-1.5 flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#0f7a52]">
+        <div className="grid w-full gap-2">
+          <p className="flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#0f7a52]">
             <UserRound className="size-3.5" />
             {draft.to_label}
             {draft.to_phone ? <DirText dir="ltr" className="font-semibold text-[#93aaa3]">{draft.to_phone}</DirText> : null}
+            {draft.cities.length > 0 ? <span className="font-semibold text-[#557d78]">{t("wz.transport.drv.cities", { cities: draft.cities.join("، ") })}</span> : null}
           </p>
-          <p className="mb-2 text-[11px] font-semibold text-[#93aaa3]">{t("ops.drv.review")}</p>
-          {/* editable on purpose — what is stored is what actually went out */}
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={10}
-            dir="auto"
-            className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]"
-          />
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={pending || !draft.canSendWhatsapp}
-              title={draft.canSendWhatsapp ? undefined : t("ops.err.noConversation")}
-              onClick={() => send("whatsapp")}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              <Send className="size-3.5" />
-              {t("ops.request.sendWhatsapp")}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                void navigator.clipboard.writeText(body);
-                setCopied(true);
-                window.setTimeout(() => setCopied(false), 1600);
-              }}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
-            >
-              <Copy className="size-3.5" />
-              {copied ? t("copied") : t("ops.dispatch.copy")}
-            </button>
-            {draft.to_phone ? (
-              <a
-                href={`https://wa.me/${waNumber(draft.to_phone)}?text=${encodeURIComponent(body)}`}
-                target="_blank"
-                rel="noopener"
-                className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
-              >
-                {t("ops.dispatch.openWhatsapp")}
-              </a>
-            ) : null}
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => send("manual")}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60"
-            >
-              <Check className="size-3.5" />
-              {t("ops.request.markSent")}
-            </button>
-          </div>
+          <p className="text-[11px] font-semibold text-[#93aaa3]">{t("ops.drv.review")}</p>
+          {draft.update ? <MessageBox bookingId={bookingId} draft={draft} part="update" initial={draft.update} onSent={onSent} /> : null}
+          <MessageBox bookingId={bookingId} draft={draft} part="programme" initial={draft.programme} onSent={onSent} />
+          <MessageBox bookingId={bookingId} draft={draft} part="hotels" initial={draft.hotels} onSent={onSent} />
         </div>
       ) : null}
     </>
+  );
+}
+
+const PART_TITLE = { update: "wz.transport.drv.update", programme: "wz.transport.drv.programme", hotels: "wz.transport.drv.hotels" } as const;
+
+/** One of the messages: its box, its warnings, its own send — so each can go, or go again, on its own. */
+function MessageBox({
+  bookingId,
+  draft,
+  part,
+  initial,
+  onSent,
+}: {
+  bookingId: string;
+  draft: ProgrammeDraft;
+  part: "programme" | "hotels" | "update";
+  initial: string;
+  onSent?: () => void;
+}) {
+  const { t } = useTraveliunUI();
+  const [pending, startTransition] = useSafeTransition();
+  const [body, setBody] = useState(initial);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  function send(channel: "whatsapp" | "manual") {
+    startTransition(async () => {
+      setError(null);
+      const res = await sendDriverProgramme({ booking_id: bookingId, part, channel, to_label: draft.to_label, to_phone: draft.to_phone, body });
+      if (!res.ok) setError(t(res.error));
+      else {
+        setSent(true);
+        onSent?.();
+      }
+    });
+  }
+
+  return (
+    <div className={`rounded-[9px] border bg-white p-3 ${part === "update" ? "border-[#f1d9a6]" : "border-[#d6eadf]"}`}>
+      <p className="mb-1.5 flex flex-wrap items-center gap-2 text-[12px] font-extrabold text-[#185045]">
+        {t(PART_TITLE[part])}
+        {sent ? <Check className="size-3.5 text-[#0f7a52]" /> : null}
+      </p>
+      {part === "hotels" && draft.gaps.length > 0 ? (
+        <ul className="mb-2 grid gap-1 rounded-[8px] border border-[#f1d9a6] bg-[#fff8ea] px-3 py-2 text-[11.5px] font-bold text-[#a86a10]">
+          {draft.gaps.map((g) => (
+            <li key={g.hotel}>
+              {t("wz.transport.drv.gap", { hotel: g.hotel, what: g.missing.map((m) => t(`wz.transport.drv.gap.${m}`)).join("، ") })}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {part === "programme" ? (
+        <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[#557d78]">
+          {t("wz.transport.drv.sign")}
+          <WelcomeBoardButton serial={draft.serial} defaultName={draft.customer} />
+        </div>
+      ) : null}
+      {/* editable on purpose — what is stored is what actually went out */}
+      <textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        rows={part === "update" ? 4 : 10}
+        dir="auto"
+        className="mb-2 block w-full rounded-[9px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] leading-relaxed text-[#0f3d38] outline-none focus:border-[#2aa87a]"
+      />
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={pending || !draft.canSendWhatsapp}
+          title={draft.canSendWhatsapp ? undefined : t("ops.err.noConversation")}
+          onClick={() => send("whatsapp")}
+          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3.5 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+          {t("ops.request.sendWhatsapp")}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard.writeText(body);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1600);
+          }}
+          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+        >
+          <Copy className="size-3.5" />
+          {copied ? t("copied") : t("ops.dispatch.copy")}
+        </button>
+        {draft.to_phone ? (
+          <a
+            href={`https://wa.me/${waNumber(draft.to_phone)}?text=${encodeURIComponent(body)}`}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] bg-white px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+          >
+            {t("ops.dispatch.openWhatsapp")}
+          </a>
+        ) : null}
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => send("manual")}
+          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60"
+        >
+          <Check className="size-3.5" />
+          {t("ops.request.markSent")}
+        </button>
+      </div>
+      {error ? <p className="mt-2 text-[11.5px] font-bold text-[#c22850]">{error}</p> : null}
+    </div>
   );
 }
