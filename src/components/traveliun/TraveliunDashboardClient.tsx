@@ -47,6 +47,8 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
 import { ExecutiveOverview } from "./ExecutiveDashboardClient";
 import { OperationsSnapshot } from "./operations/OperationsSnapshot";
 import { MyDashboard } from "./MyDashboard";
+// SLA follow-ups a manager handed me — nothing when there are none
+import { MyFollowups } from "./sla/MyFollowups";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -260,6 +262,7 @@ function AdminHome({ opsSummary, mine }: { opsSummary: OpsSummary; mine: MyDashb
         </button>
       </div>
 
+      {tab === "mine" ? <MyFollowups /> : null}
       {tab === "mine" ? <MyDashboard data={mine} /> : canExec && tab === "exec" ? <ExecutiveOverview /> : <TeamOperations />}
 
       {/* live work before navigation: a case whose free-cancellation window
@@ -275,6 +278,7 @@ function AdminHome({ opsSummary, mine }: { opsSummary: OpsSummary; mine: MyDashb
 function EmployeeHome({ opsSummary, mine }: { opsSummary: OpsSummary; mine: MyDashboardData }) {
   return (
     <div className="space-y-4">
+      <MyFollowups />
       <MyDashboard data={mine} />
       <OperationsSnapshot summary={opsSummary} />
       <ReadySections />

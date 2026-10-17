@@ -371,6 +371,142 @@ export async function addTeletelLabels(conversationId: number, labels: string[])
   return (await api<unknown>(config, `/conversations/${conversationId}/labels`, { labels: all })) !== null;
 }
 
+// ---------- SLA: the open conversations and one thread (sla.ts) ----------
+
+/** One open conversation, as the SLA board reads it. Times are unix seconds (0 / null: none). */
+export type OpenConversation = {
+  id: number;
+  inboxId: number;
+  contactId: number | null;
+  name: string;
+  phone: string;
+  assignee: string | null;
+  team: string | null;
+  teamId: number | null;
+  /** since when the client has waited for our reply — 0 when we spoke last */
+  waitingSince: number;
+  firstReplyAt: number | null;
+  lastActivityAt: number;
+  createdAt: number;
+  /** inside WhatsApp's 24 hours: a free text reaches them, else only a template */
+  canReply: boolean;
+  preview: string;
+};
+
+type RawConversation = {
+  id?: number;
+  inbox_id?: number;
+  can_reply?: boolean;
+  waiting_since?: number | null;
+  first_reply_created_at?: number | null;
+  last_activity_at?: number;
+  created_at?: number;
+  last_non_activity_message?: { content?: string | null } | null;
+  meta?: {
+    sender?: { id?: number; name?: string | null; phone_number?: string | null };
+    assignee?: { name?: string | null } | null;
+    team?: { id?: number; name?: string | null } | null;
+  };
+};
+
+let openCache: { at: number; rows: OpenConversation[] } | null = null;
+
+/**
+ * Every OPEN conversation, all pages (25 a page, the API's fixed size) asked at
+ * once after the first — about thirty requests for the 600-odd the company keeps
+ * open; six at a time took twenty seconds. Kept five minutes, with the time it
+ * was read (the board shows it, and «تحديث» asks again): a manager editing a
+ * rule or assigning a follow-up never waits on Teletel. Null when Teletel
+ * cannot be reached (the board says so; it never shows a partial list as the whole).
+ */
+export async function listOpenConversations(fresh = false): Promise<{ rows: OpenConversation[]; at: number } | null> {
+  if (!fresh && openCache && Date.now() - openCache.at < 5 * 60_000) return openCache;
+  const config = getTeletelConfig();
+  if (!config) return null;
+  type Page = { data?: { meta?: { all_count?: number }; payload?: RawConversation[] } };
+  const page = (n: number) => api<Page>(config, `/conversations?status=open&assignee_type=all&page=${n}`);
+  const first = await page(1);
+  if (!first?.data) return null;
+  const raw = [...(first.data.payload ?? [])];
+  const pages = Math.ceil((first.data.meta?.all_count ?? raw.length) / Math.max(raw.length, 1));
+  // ponytail: every page at once — fine for ~30; batch them if the open count grows past a few thousand
+  const rest = await Promise.all(Array.from({ length: Math.max(0, pages - 1) }, (_, i) => page(i + 2)));
+  if (rest.some((b) => !b?.data)) return null;
+  for (const b of rest) raw.push(...(b?.data?.payload ?? []));
+  const seen = new Set<number>();
+  const rows: OpenConversation[] = [];
+  for (const c of raw) {
+    if (typeof c.id !== "number" || seen.has(c.id)) continue;
+    seen.add(c.id);
+    const sender = c.meta?.sender;
+    rows.push({
+      id: c.id,
+      inboxId: c.inbox_id ?? 0,
+      contactId: typeof sender?.id === "number" ? sender.id : null,
+      name: sender?.name?.trim() || sender?.phone_number || `#${c.id}`,
+      phone: sender?.phone_number ?? "",
+      assignee: c.meta?.assignee?.name ?? null,
+      team: c.meta?.team?.name ?? null,
+      teamId: typeof c.meta?.team?.id === "number" ? c.meta.team.id : null,
+      waitingSince: c.waiting_since ?? 0,
+      firstReplyAt: c.first_reply_created_at || null,
+      lastActivityAt: c.last_activity_at ?? 0,
+      createdAt: c.created_at ?? 0,
+      canReply: c.can_reply === true,
+      preview: (c.last_non_activity_message?.content ?? "").slice(0, 160),
+    });
+  }
+  openCache = { at: Date.now(), rows };
+  return openCache;
+}
+
+export type TeletelTeam = { id: number; name: string };
+let teamsCache: { at: number; teams: TeletelTeam[] } | null = null;
+
+/** The account's teams («قسم المبيعات»، «متابعة المبيعات»…) — what an SLA rule may move a conversation to. Kept ten minutes. */
+export async function listTeletelTeams(): Promise<TeletelTeam[]> {
+  if (teamsCache && Date.now() - teamsCache.at < 10 * 60_000) return teamsCache.teams;
+  const config = getTeletelConfig();
+  if (!config) return [];
+  const res = await api<{ id?: number; name?: string }[]>(config, "/teams");
+  if (!Array.isArray(res)) return teamsCache?.teams ?? [];
+  const teams = res.filter((t) => typeof t.id === "number" && t.name).map((t) => ({ id: t.id as number, name: (t.name as string).trim() }));
+  teamsCache = { at: Date.now(), teams };
+  return teams;
+}
+
+/** Hand a conversation to a team (its agent stays) — the SLA move «ينقل إلى فريق في Teletel». */
+export async function assignTeletelTeam(conversationId: number, teamId: number): Promise<boolean> {
+  const config = getTeletelConfig();
+  if (!config) return false;
+  return (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { team_id: teamId })) !== null;
+}
+
+export type ThreadMessage = { id: number; at: number; text: string; fromClient: boolean; sender: string | null; isPrivate: boolean };
+
+/** A thread's latest messages, oldest first (the API's last page) — activity lines left out. */
+export async function conversationThread(conversationId: number): Promise<{ messages: ThreadMessage[]; canReply: boolean } | null> {
+  const config = getTeletelConfig();
+  if (!config) return null;
+  type Raw = { id?: number; created_at?: number; content?: string | null; message_type?: number; private?: boolean; sender?: { name?: string | null } | null; attachments?: unknown[] };
+  const [list, conv] = await Promise.all([
+    api<{ payload?: Raw[] }>(config, `/conversations/${conversationId}/messages`),
+    api<{ can_reply?: boolean }>(config, `/conversations/${conversationId}`),
+  ]);
+  if (!list) return null;
+  const messages = (list.payload ?? [])
+    .filter((m) => typeof m.id === "number" && m.message_type !== 2)
+    .map((m) => ({
+      id: m.id as number,
+      at: m.created_at ?? 0,
+      text: m.content?.trim() || (m.attachments?.length ? "📎" : ""),
+      fromClient: m.message_type === 0,
+      sender: m.sender?.name ?? null,
+      isPrivate: m.private === true,
+    }));
+  return { messages, canReply: conv?.can_reply === true };
+}
+
 // ---------- pure destination inference (unit-tested) ----------
 
 /** «رحلة جورجيا» / «برنامج تركيا» / «بكج دبي» → the destination word(s). */

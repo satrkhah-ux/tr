@@ -77,6 +77,9 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   ["/operations", ["operations.write", "operations.own"]],
   // «المطوّر»: service switches and external links' health
   ["/developer", "developer.access"],
+  // «SLA»: the administration and the developer only (the owner, 2026-10-17);
+  // a follow-up's own page (/followups) opens to its assignee too (data/sla.ts)
+  ["/sla", ["dashboard.admin", "developer.access"]],
 ];
 
 /** The permissions a path needs (any one opens it), or null when any employee may open it. Query and hash are ignored. */

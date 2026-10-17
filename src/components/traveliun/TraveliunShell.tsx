@@ -40,6 +40,7 @@ import {
   Settings2,
   Table2,
   UserCircle,
+  Timer,
   Wrench,
   X,
   Zap,
@@ -258,6 +259,8 @@ export const navGroups: NavGroup[] = [
     ],
   },
 
+  // «SLA» — how long Teletel conversations wait, and «المتابعة» (dashboard.admin / developer.access, section-access.ts)
+  { labelKey: "nav.sla", href: "/sla", icon: Timer },
   // «المطوّر» — the service switches and the external links' health (developer.access, section-access.ts)
   { labelKey: "nav.developer", href: "/developer", icon: Wrench },
 ];

@@ -1862,6 +1862,7 @@ export const en = {
   // the menus' reorganisation (2026-10-17)
   "nav.legacyGenerator": "Package generator (legacy)",
   "nav.developer": "Developer",
+  "nav.sla": "SLA — response time",
   "rp.title": "Repackage a supplier program",
   "rp.subtitle": "Send the supplier offer however it reached you — a file, a picture, a message or a link. The system reads it, then you review, re-price, and issue it as a Traveliun offer.",
   "rp.new": "Start a repackage",
