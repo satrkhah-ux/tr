@@ -92,11 +92,12 @@ type ReadyAction = { key: string; labelKey: TranslationKey; descKey: Translation
 
 const READY_ACTIONS: ReadyAction[] = [
   { key: "operations", labelKey: "nav.operations", descKey: "dash.qa.operations", href: "/operations", icon: ClipboardCheck, color: "#185045" },
-  { key: "generator", labelKey: "nav.packageGenerator", descKey: "dash.qa.generator", href: "/package-generator", icon: FilePlus2, color: "#2aa87a", perm: "offers.write" },
+  // all work is in «النظام بيسك» (owner, 2026-10-17)
+  { key: "generator", labelKey: "nav.basic", descKey: "dash.qa.generator", href: "/basic", icon: FilePlus2, color: "#2aa87a", perm: "offers.write" },
   { key: "readyOffers", labelKey: "nav.readyOffers", descKey: "dash.qa.readyOffers", href: "/ready-offers", icon: PackageCheck, color: "#8b5cf6", perm: "offers.write" },
   { key: "repackage", labelKey: "nav.repackage", descKey: "dash.qa.repackage", href: "/repackage", icon: FileUp, color: "#0e9bb5", perm: "repackage.write" },
   { key: "kanban", labelKey: "nav.kanban", descKey: "dash.qa.kanban", href: "/kanban-board", icon: Columns3, color: "#d99a00" },
-  { key: "offers", labelKey: "nav.packages", descKey: "dash.qa.offers", href: "/offers", icon: FileText, color: "#0f7a52", perm: "offers.write" },
+  { key: "offers", labelKey: "nav.issuedOffers", descKey: "dash.qa.offers", href: "/basic?files=issued", icon: FileText, color: "#0f7a52", perm: "offers.write" },
   { key: "partners", labelKey: "nav.partnerCompanies", descKey: "dash.qa.partners", href: "/partner-companies", icon: Building2, color: "#b45309" },
 ];
 
