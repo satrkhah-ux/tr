@@ -70,6 +70,18 @@ export const ALL_PERMISSIONS = [
    * scoped to offers.employee_id = you, in the app and in RLS (0078).
    */
   "operations.own",
+  /**
+   * The manager's steps on the files YOU issued — cancelling the case, a refund,
+   * correcting or deleting a payment, replacing a slip, the client's installment
+   * schedule, what a supplier charged and was paid for it. The owner,
+   * 2026-10-17: «اريد كل شخص يدير مبيعاته الى ان نوظف مدير مبيعات يجمع كل
+   * العمليات» — until a sales manager is hired, each salesperson runs their own
+   * files whole. Revoke = remove this one key from «مبيعات» (app gate access.ts
+   * gateManagerRows, database 0081 — both read the role's keys live). Only
+   * matters beside operations.own; the company-wide money (reports, cash flow,
+   * supplier accounts) stays operations.write.
+   */
+  "operations.manage_own",
   /** «مطوّر»: the developer page — external links' health, and turning system services on and off. */
   "developer.access",
 ] as const;
@@ -162,6 +174,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     items: [
       { key: "operations.write", kind: "do" },
       { key: "operations.own", kind: "do" },
+      { key: "operations.manage_own", kind: "do", sensitive: true },
       { key: "operations.passport", kind: "view", sensitive: true },
     ],
   },

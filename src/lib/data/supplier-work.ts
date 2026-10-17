@@ -13,7 +13,7 @@ import { conversationForPhone } from "@/lib/providers/teletel";
 import { decryptJson, isVaultConfigured } from "@/lib/crypto/secrets";
 import type { PassportView, TravelerKind } from "@/lib/operations/traveler-dto";
 import { currentCan } from "@/lib/roles/current";
-import { gateManager, gateOperation, gateRow, gateRows } from "@/lib/operations/access";
+import { gateCaseManager, gateManager, gateManagerRow, gateManagerRows, gateOperation, gateRow, gateRows } from "@/lib/operations/access";
 import {
   bookingCost,
   buildSupplierRequest,
@@ -38,10 +38,12 @@ import {
  *   the case's own (operations/access.ts) — who handles it, the request, the
  *                       answer, the papers: anyone who may work that file;
  *   pricing.internal  — any figure: a booking's cost, a payment, a balance.
- * What we owe and pay a supplier — a booking's cost, a supplier payment, the
- * accounts across every case — is also the manager's (operations.write): a
- * salesperson holds pricing.internal, and the cost of their own file is their
- * own profit.
+ * What we owe and pay a supplier is also the manager's: a salesperson holds
+ * pricing.internal, and the cost of their own file is their own profit. On one
+ * case — a booking's cost, a payment for its bookings — that is operations.write
+ * or operations.manage_own on one's own file (access.ts gateManagerRows, the
+ * owner's 2026-10-17 interim); the accounts across every case stay
+ * operations.write (gateManager).
  */
 
 function service(): SupabaseClient {
@@ -177,8 +179,10 @@ export type SupplierWork = {
   now: string;
   replyHours: number;
   canSeeCost: boolean;
-  /** pricing.internal AND operations.write — set a booking's cost, pay a supplier, open the accounts. */
+  /** pricing.internal AND the manager's step on THIS case (access.ts gateCaseManager) — set a booking's cost, pay a supplier. */
   canManageMoney: boolean;
+  /** pricing.internal AND operations.write — the suppliers' accounts across every case. */
+  canOpenAccounts: boolean;
   suppliers: CaseSupplier[];
   bookings: CaseBookingSupplier[];
   /** this case's payments to suppliers — empty without pricing.internal. */
@@ -210,7 +214,8 @@ export async function getSupplierWork(operationId: string): Promise<SupplierWork
   try {
     const supabase = service();
     const canSeeCost = await currentCan("pricing.internal");
-    const canManageMoney = canSeeCost && !(await gateManager());
+    const canManageMoney = canSeeCost && !(await gateCaseManager(operationId));
+    const canOpenAccounts = canSeeCost && !(await gateManager());
     const [bookingsRes, hours] = await Promise.all([
       supabase
         .from("operation_bookings")
@@ -258,6 +263,7 @@ export async function getSupplierWork(operationId: string): Promise<SupplierWork
       replyHours: hours,
       canSeeCost,
       canManageMoney,
+      canOpenAccounts,
       suppliers: ((suppliersRes.data ?? []) as SupplierRow[]).map(toCaseSupplier),
       bookings: costed.map((r) => ({
         booking_id: r.id,
@@ -501,7 +507,7 @@ export async function getSupplierConfirmationUrl(bookingId: string): Promise<{ o
  * column the manual and the API confirmations already write it to.
  */
 export async function setBookingCost(input: { booking_id: string; amount: number | null; currency: string }): Promise<{ ok: true } | Fail> {
-  const denied = (await gateManager()) ?? (await gate("pricing.internal"));
+  const denied = (await gateManagerRow("operation_bookings", input.booking_id)) ?? (await gate("pricing.internal"));
   if (denied) return { ok: false, error: denied };
   if (input.amount != null && !(Number.isFinite(input.amount) && input.amount >= 0)) return { ok: false, error: "ops.err.amountPositive" };
   try {
@@ -523,7 +529,7 @@ export async function setBookingCost(input: { booking_id: string; amount: number
  * — the switch the voucher's warning band reads.
  */
 export async function recordSupplierPayment(formData: FormData): Promise<{ ok: true } | Fail> {
-  const denied = (await gateManager()) ?? (await gate("pricing.internal"));
+  const denied = await gate("pricing.internal");
   if (denied) return { ok: false, error: denied };
 
   const text = (k: string) => String(formData.get(k) ?? "").trim();
@@ -546,6 +552,12 @@ export async function recordSupplierPayment(formData: FormData): Promise<{ ok: t
       : { data: [] };
     const covered = (data ?? []) as { id: string; operation_id: string }[];
     const operationId = text("operation_id") || covered[0]?.operation_id || null;
+    // the manager's step on every case it is filed under or pays for: operations.write anywhere
+    // (the accounts page pays across cases, or for none); manage_own only when each is a file
+    // the payer issued — the browser's operation_id included
+    const cases = [...new Set([operationId, ...covered.map((b) => b.operation_id)].filter((x): x is string => !!x))];
+    const notManager = cases.length > 0 ? await gateManagerRows("operations", cases) : await gateManager();
+    if (notManager) return { ok: false, error: notManager };
 
     const file = formData.get("file");
     let receiptPath: string | null = null;

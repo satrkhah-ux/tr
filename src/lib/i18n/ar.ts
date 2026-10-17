@@ -800,6 +800,8 @@ export const ar: Dictionary = {
   "perm.group.developer": "المطوّر",
   "perm.operations.own": "عمليات ملفاته فقط",
   "perm.operations.own.hint": "تنفيذ الملفات التي أصدرها هو بعد تأكيد العميل، دون ملفات الزملاء.",
+  "perm.operations.manage_own": "إدارة ملفاته كاملة",
+  "perm.operations.manage_own.hint": "خطوات المدير على ملفاته فقط: إلغاء الملف، الاسترداد، تعديل الدفعات، جدول الأقساط، تكلفة الموردين ودفعاتهم — إلى أن يُعيَّن مدير مبيعات.",
   "perm.developer.access": "مطوّر",
   "perm.developer.access.hint": "صفحة المطوّر: حالة الارتباطات الخارجية، وإيقاف خدمات النظام وتشغيلها.",
   // ---------- /developer (المطوّر) ----------

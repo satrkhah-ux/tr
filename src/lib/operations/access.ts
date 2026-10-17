@@ -17,6 +17,8 @@ import { getCurrentEmployeeId } from "@/lib/data/metrics";
  *                        employee (offers.employee_id, «الموظف المختص» on the
  *                        document, stamped with the issuer when the offer is
  *                        produced — offer-insert.ts);
+ *     + operations.manage_own — the manager's steps on those same files too
+ *                        (gateManagerRows), until a sales manager is hired;
  *   · neither          — nothing.
  * currentCan honours a role view-as, so an administrator looking through
  * «مبيعات» sees exactly what a salesperson would, on their own files.
@@ -122,13 +124,37 @@ export async function gateRow(table: OpsTable, id: string): Promise<Gate> {
 }
 
 /**
- * The steps kept on operations.write even on one's own file: cancelling a case,
- * correcting or erasing money records, the client's payment terms, what a
- * supplier is owed and paid, and the company-wide reports. Asked AFTER the
- * row's own gate.
+ * What spans every case — the profitability report, the cash flow, the
+ * suppliers' accounts — stays operations.write: an own-files holder, even with
+ * operations.manage_own, sees their own case's money only.
  */
 export async function gateManager(): Promise<Gate> {
   if (!(await getServerUser())) return "err.session";
   const access = await opsAccess();
   return access?.all ? null : access ? "ops.err.managerOnly" : "ops.err.forbidden";
+}
+
+/**
+ * The manager's steps on ONE case — cancelling it, a refund, correcting or
+ * erasing a payment, replacing a slip on file, the client's installment
+ * schedule, what a supplier charged and was paid for its bookings, the net in
+ * «تأكيد الكل». operations.write on every file; operations.manage_own (the
+ * owner, 2026-10-17: each salesperson runs their own files whole until a sales
+ * manager is hired) on a file one issued — the rows' own gate first, so a
+ * colleague's file is still «ليس ملفك». Removing the key from «مبيعات» puts
+ * every one of these back on operations.write; 0081 is the database's half.
+ */
+export async function gateManagerRows(table: OpsTable, ids: string[]): Promise<Gate> {
+  const denied = await gateRows(table, ids);
+  if (denied) return denied;
+  if ((await opsAccess())?.all) return null;
+  return (await currentCan("operations.manage_own")) ? null : "ops.err.managerOnly";
+}
+
+export async function gateCaseManager(operationId: string): Promise<Gate> {
+  return gateManagerRows("operations", [operationId]);
+}
+
+export async function gateManagerRow(table: OpsTable, id: string): Promise<Gate> {
+  return gateManagerRows(table, [id]);
 }

@@ -14,7 +14,7 @@ import { currentCan } from "@/lib/roles/current";
 import { getSupplierWork } from "@/lib/data/supplier-work";
 import { getCaseProfit } from "@/lib/data/operation-money";
 import { CaseProfitCard } from "@/components/traveliun/operations/CaseProfitCard";
-import { gateOperation } from "@/lib/operations/access";
+import { gateCaseManager, gateOperation } from "@/lib/operations/access";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
   const supplierWorkP = getSupplierWork(id);
   // null without pricing.internal — the card is then not drawn at all
   const profitP = getCaseProfit(id);
-  const [travelers, payments, installments, bookings, documents, assignees, sentRequests, canBook, canManage, extras, activity] = await Promise.all([
+  const [travelers, payments, installments, bookings, documents, assignees, sentRequests, canBook, canManage, canReport, extras, activity] = await Promise.all([
     // a new case starts with the travelers the offer was sold for
     listOrSeedTravelers(id),
     listOperationPayments(id),
@@ -43,7 +43,10 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
     // Only decides whether the button is DRAWN. The server action checks the
     // same permission again — this is courtesy, not security.
     currentCan("operations.book"),
-    // every file and the manager's steps (cancel, money corrections) — courtesy too
+    // the manager's steps on THIS case (cancel, refunds, money corrections, the schedule, supplier
+    // money): operations.write, or operations.manage_own on one's own file — courtesy too
+    gateCaseManager(id).then((denied) => !denied),
+    // the all-cases report stays operations.write
     currentCan("operations.write"),
     getCaseExtras(id),
     listCaseActivity(id),
@@ -92,7 +95,7 @@ export default async function OperationCasePage({ params }: { params: Promise<{ 
         />
       }
       supplierWork={await supplierWorkP}
-      money={await profitP.then((p) => (p ? <CaseProfitCard profit={p} showReport={canManage} /> : null))}
+      money={await profitP.then((p) => (p ? <CaseProfitCard profit={p} showReport={canReport} /> : null))}
     />
   );
 }

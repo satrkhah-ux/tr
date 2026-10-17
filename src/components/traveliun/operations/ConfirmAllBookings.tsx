@@ -30,7 +30,7 @@ export function ConfirmAllBookings({
 }: {
   operationId: string;
   bookings: OperationBooking[];
-  /** operations.write: what the supplier charged is the manager's (0080) — no column for anyone else. */
+  /** the manager's step on this case (operations.write, or manage_own on one's own file): what the supplier charged (0080/0081) — no column for anyone else. */
   canSetNet: boolean;
   onDone: () => void;
 }) {

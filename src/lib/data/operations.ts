@@ -20,7 +20,7 @@ import {
   type ExecutionStatus,
 } from "@/lib/operations/state";
 import { currentCan } from "@/lib/roles/current";
-import { gateManager, gateOperation, mayWork, opsAccess } from "@/lib/operations/access";
+import { gateCaseManager, gateOperation, mayWork, opsAccess } from "@/lib/operations/access";
 import { mintReceipt } from "@/lib/data/payment-receipt";
 import { isIsoDate, riyadhDate } from "@/lib/operations/payments";
 
@@ -34,7 +34,8 @@ import { isIsoDate, riyadhDate } from "@/lib/operations/payments";
  *   · operations/daily.ts — the morning cron: «سافر», then closed (service role).
  * The database refuses every other session write: since 0073 the operations
  * tables accept INSERT/UPDATE/DELETE only from staff holding operations.write —
- * and, since 0078, from an operations.own holder on the files they issued.
+ * and, since 0078, from an operations.own holder on the files they issued
+ * (cancelling one, since 0081, with operations.manage_own beside it).
  * Who may touch which case is one rule: operations/access.ts.
  */
 
@@ -271,8 +272,8 @@ export async function setClientStatus(
   to: ClientStatus,
   note?: string | null,
 ): Promise<{ ok: true } | Fail> {
-  // cancelling a case stays the manager's, even on one's own file (access.ts gateManager)
-  const denied = (await gateOperation(operationId)) ?? (to === "cancelled" ? await gateManager() : null);
+  // cancelling a case is the manager's step: operations.write, or manage_own on one's own file (access.ts)
+  const denied = to === "cancelled" ? await gateCaseManager(operationId) : await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
@@ -280,10 +281,12 @@ export async function setClientStatus(
     if (!current) return { ok: false, error: "err.loadFailed" };
     if (!canAdvanceClient(current.client_status, to)) return { ok: false, error: "ops.err.invalidTransition" };
 
-    await supabase
+    // checked: a write RLS refuses must not be audited and announced as done
+    const { error } = await supabase
       .from("operations")
       .update({ client_status: to, updated_at: new Date().toISOString() })
       .eq("id", operationId);
+    if (error) return { ok: false, error: "err.updateFailed" };
     await logAudit({
       action: "operation.client_status",
       entity: "operations",
@@ -309,7 +312,7 @@ export async function setExecutionStatus(
   to: ExecutionStatus,
   note?: string | null,
 ): Promise<{ ok: true } | Fail> {
-  const denied = (await gateOperation(operationId)) ?? (to === "cancelled" ? await gateManager() : null);
+  const denied = to === "cancelled" ? await gateCaseManager(operationId) : await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
@@ -322,10 +325,11 @@ export async function setExecutionStatus(
       if (!items || items.some((i) => !i.ok)) return { ok: false, error: "ops.err.notReady" };
     }
 
-    await supabase
+    const { error } = await supabase
       .from("operations")
       .update({ execution_status: to, updated_at: new Date().toISOString() })
       .eq("id", operationId);
+    if (error) return { ok: false, error: "err.updateFailed" };
 
     const stage = kanbanStageFor(to);
     if (stage) await supabase.from("offers").update({ pipeline_stage: stage }).eq("id", current.offer_id);
@@ -372,8 +376,8 @@ export async function recordPayment(input: {
   paid_at?: string;
   note?: string | null;
 }): Promise<{ ok: true; id: string } | Fail> {
-  // money IN is the file's work; a refund is money going OUT — the manager's
-  const denied = (await gateOperation(input.operation_id)) ?? (input.kind === "refund" ? await gateManager() : null);
+  // money IN is the file's work; a refund is money going OUT — the manager's step (access.ts gateCaseManager)
+  const denied = input.kind === "refund" ? await gateCaseManager(input.operation_id) : await gateOperation(input.operation_id);
   if (denied) return { ok: false, error: denied };
   if (!(input.amount > 0)) return { ok: false, error: "ops.err.amountPositive" };
   try {

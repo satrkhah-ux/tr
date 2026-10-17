@@ -10,7 +10,7 @@ import { syncOperation } from "@/lib/data/operation-sync";
 import { mintReceipt } from "@/lib/data/payment-receipt";
 import type { PaymentKind, PaymentMethod } from "@/lib/data/operations";
 import { PAYMENT_KINDS, PAYMENT_METHODS, isIsoDate } from "@/lib/operations/payments";
-import { gateManager, gateOperation, gateRow } from "@/lib/operations/access";
+import { gateCaseManager, gateManagerRow, gateOperation, gateRow } from "@/lib/operations/access";
 
 /**
  * «الدفعات» beyond recording one (recordPayment, operations.ts): correcting and
@@ -18,13 +18,17 @@ import { gateManager, gateOperation, gateRow } from "@/lib/operations/access";
  * installment schedule. Every action is audited and behind operations/access.ts:
  * the slip and the receipt are the file's work (an own-files holder on their
  * own file too); correcting or deleting a payment, replacing a slip already on
- * file, and the schedule are the manager's (operations.write) — money records
- * and payment terms are not erased or moved by the person they are about.
+ * file, and the schedule are the manager's step (gateManagerRow /
+ * gateCaseManager: operations.write, or operations.manage_own on one's own file
+ * — the owner, 2026-10-17, until a sales manager is hired). Because the person a
+ * money record is about may now erase it, a deletion is logged WHOLE first.
  *
  * Rows go through the USER client (RLS is staff-only), except two narrow
  * writes the server builds itself — the receipt number and the slip's path —
  * which go through the service role after the gate, because 0078 gives an
- * own-files holder no UPDATE on payments (they could PATCH the amount). The
+ * own-files holder no UPDATE on payments (they could PATCH the amount); 0081
+ * gives one with operations.manage_own UPDATE / DELETE on their own cases'
+ * payments and the schedule, which these session writes need. The
  * private `payment-proofs` bucket has no storage policy, so it is the service
  * role too, and only after the permission check.
  */
@@ -78,7 +82,7 @@ export type PaymentInput = {
 
 /** Correct a payment. The before/after goes to the audit log — money edited silently is money nobody can explain. */
 export async function updatePayment(id: string, input: PaymentInput): Promise<{ ok: true } | Fail> {
-  const denied = await gateManager();
+  const denied = await gateManagerRow("operation_payments", id);
   if (denied) return { ok: false, error: denied };
   if (!(Number.isFinite(input.amount) && input.amount > 0)) return { ok: false, error: "ops.err.amountPositive" };
   if (!PAYMENT_KINDS.includes(input.kind) || (input.method && !PAYMENT_METHODS.includes(input.method)) || !isIsoDate(input.paid_at)) {
@@ -122,25 +126,43 @@ export async function updatePayment(id: string, input: PaymentInput): Promise<{ 
   }
 }
 
-/** Delete a payment — its receipt link dies with the row, its slip with the storage object. */
+/**
+ * Delete a payment — its receipt link dies with the row.
+ *
+ * An own-files holder may erase a money record on their own file since
+ * operations.manage_own, so the deletion is only as good as its trail: the
+ * WHOLE row goes to the audit log BEFORE the delete, and nothing is erased when
+ * that write fails (the passport rule, audit.ts). The slip stays in the private
+ * bucket, its path in that log row — the record can be rebuilt, evidence and all.
+ */
 export async function deletePayment(id: string): Promise<{ ok: true } | Fail> {
-  const denied = await gateManager();
+  const denied = await gateManagerRow("operation_payments", id);
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = await db();
-    const row = await loadPayment(supabase, id);
+    const { data } = await supabase.from("operation_payments").select("*").eq("id", id).maybeSingle();
+    const row = data as (Record<string, unknown> & { operation_id: string }) | null;
     if (!row) return { ok: false, error: "err.loadFailed" };
 
-    const { error } = await supabase.from("operation_payments").delete().eq("id", id);
-    if (error) return { ok: false, error: "err.deleteFailed" };
-    if (row.proof_path) await storage().remove([row.proof_path]);
-
-    await logAudit({
+    const logged = await logAudit({
       action: "payment.deleted",
       entity: "operations",
       entity_id: row.operation_id,
-      meta: { payment_id: id, amount: Number(row.amount), currency: row.currency, kind: row.kind, paid_at: row.paid_at, receipt_no: row.receipt_no },
+      meta: {
+        payment_id: id,
+        amount: Number(row.amount),
+        currency: row.currency,
+        kind: row.kind,
+        paid_at: row.paid_at,
+        receipt_no: row.receipt_no,
+        // every column but the receipt's share token (audit meta is non-secret; the link dies with the row)
+        row: { ...row, receipt_token: undefined },
+      },
     });
+    if (!logged) return { ok: false, error: "err.deleteFailed" };
+
+    const { error } = await supabase.from("operation_payments").delete().eq("id", id);
+    if (error) return { ok: false, error: "err.deleteFailed" };
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -161,9 +183,9 @@ export async function uploadPaymentProof(paymentId: string, formData: FormData):
     const supabase = await db();
     const row = await loadPayment(supabase, paymentId);
     if (!row) return { ok: false, error: "err.loadFailed" };
-    // the first slip is the file's work; replacing one already on file erases it — the manager's
+    // the first slip is the file's work; replacing one already on file is the manager's step
     if (row.proof_path) {
-      const manager = await gateManager();
+      const manager = await gateManagerRow("operation_payments", paymentId);
       if (manager) return { ok: false, error: manager };
     }
 
@@ -182,9 +204,13 @@ export async function uploadPaymentProof(paymentId: string, formData: FormData):
       await storage().remove([path]);
       return { ok: false, error: "err.updateFailed" };
     }
-    if (row.proof_path) await storage().remove([row.proof_path]);
-
-    await logAudit({ action: "payment.updated", entity: "operations", entity_id: row.operation_id, meta: { payment_id: paymentId, proof: true } });
+    // a replaced slip is kept, its path in the log — the slip a deleted payment leaves behind is kept too
+    await logAudit({
+      action: "payment.updated",
+      entity: "operations",
+      entity_id: row.operation_id,
+      meta: { payment_id: paymentId, proof: true, ...(row.proof_path ? { replaced_proof: row.proof_path } : {}) },
+    });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -263,7 +289,7 @@ export async function saveInstallments(
   operationId: string,
   rows: { due_date: string; amount: number; note?: string | null }[],
 ): Promise<{ ok: true } | Fail> {
-  const denied = await gateManager();
+  const denied = await gateCaseManager(operationId);
   if (denied) return { ok: false, error: denied };
   if (rows.length > MAX_INSTALLMENTS || rows.some((r) => !isIsoDate(r.due_date) || !(Number.isFinite(r.amount) && r.amount > 0))) {
     return { ok: false, error: "ops.pay.err.invalid" };

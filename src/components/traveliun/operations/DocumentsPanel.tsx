@@ -90,7 +90,7 @@ export function DocumentsPanel({
   assignees: AssigneeOption[];
   sentRequests: SentRequest[];
   canBook: boolean;
-  /** operations.write — «تأكيد الكل» takes the net charged from the manager only. */
+  /** the manager's step on this case (access.ts gateCaseManager) — «تأكيد الكل» takes the net charged from it only. */
   canManage: boolean;
 }) {
   const { t } = useTraveliunUI();

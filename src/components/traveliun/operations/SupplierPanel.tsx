@@ -90,7 +90,7 @@ export function SupplierPanel({
           <Store className="size-4" />
           {t("ops.sup.title")}
         </h2>
-        {work.canManageMoney ? (
+        {work.canOpenAccounts ? (
           <Link href="/operations/suppliers" className={chipBtn}>
             <Wallet className="size-3.5" />
             {t("ops.sup.accounts")}
@@ -193,7 +193,7 @@ function SupplierGroup({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[13px] font-extrabold text-[#0f3d38]">
-            {work.canManageMoney ? (
+            {work.canOpenAccounts ? (
               <Link href={`/operations/suppliers/${supplier.id}`} className="hover:underline">
                 {supplier.name}
               </Link>
@@ -257,7 +257,7 @@ function SupplierGroup({
 
       {work.canSeeCost ? (
         <div className="mt-3 border-t border-[#e8efec] pt-2">
-          {/* paying a supplier is the manager's (supplier-work.ts) — an own-files holder sees what was paid */}
+          {/* paying a supplier is the manager's step (supplier-work.ts) — without it, what was paid is shown */}
           {work.canManageMoney ? (
             <button type="button" onClick={() => setPaying((v) => !v)} className={chipBtn}>
               <Wallet className="size-3.5" />

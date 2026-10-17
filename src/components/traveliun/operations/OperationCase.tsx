@@ -74,9 +74,11 @@ export function OperationCase({
   /** may commit a reservation at the supplier — `operations.book`. */
   canBook: boolean;
   /**
-   * `operations.write`: every file, and the manager's steps on it (cancel the
-   * case, correct/erase payments, the schedule, supplier money). An own-files
-   * holder works their file without them; the server refuses them either way.
+   * The manager's steps on THIS case (cancel it, refunds, correct/erase
+   * payments, the schedule, supplier money): operations.write, or
+   * operations.manage_own on one's own file (access.ts gateCaseManager). Without
+   * it an own-files holder works their file without them; the server refuses
+   * them either way.
    */
   canManage: boolean;
   /** the OpenAI key is set: passports can be read from their photo. */
