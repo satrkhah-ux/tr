@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
+import type { Permission } from "@/lib/roles/roles";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 
 /**
@@ -42,6 +43,12 @@ export type OpsTable =
   | "operation_passport_submissions"
   | "operation_links"
   | "supplier_payments";
+
+/** Pure: opsAccess for an employee who is not this request — the bot's caller, a notice's recipient. */
+export function accessOf(employeeId: string, permissions: readonly Permission[]): OpsAccess | null {
+  if (permissions.includes("operations.write")) return { all: true };
+  return permissions.includes("operations.own") ? { all: false, employeeId } : null;
+}
 
 /** Pure: may this access work a file issued by `issuerId`? */
 export function mayWork(access: OpsAccess | null, issuerId: string | null | undefined): boolean {

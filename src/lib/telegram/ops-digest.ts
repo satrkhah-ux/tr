@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { operationSignals, severityRank, type OperationSnapshot } from "@/lib/operations/signals";
 import { isLiveCase, summarizeOperations, type OpsCase } from "@/lib/operations/summary";
 import { isClientStatus, isExecutionStatus } from "@/lib/operations/state";
+import { mayWork, type OpsAccess } from "@/lib/operations/access";
 import { escapeHtml } from "./ops-bot";
 
 /**
@@ -11,9 +12,11 @@ import { escapeHtml } from "./ops-bot";
  *
  * A webhook has no session cookie, so the ordinary loader — which resolves the
  * signed-in user from a cookie — cannot run here. This reads with the service
- * client AFTER the caller has resolved the Telegram account to an employee who
- * holds `operations.write`; the permission check is the caller's, the reading is
- * this module's, and neither is skippable.
+ * client AFTER the caller has resolved the Telegram account to an employee and
+ * their operations access (access.ts accessOf): every file on operations.write,
+ * only the files they issued on operations.own — the same mayWork the board
+ * scopes by. The permission check is the caller's, the reading is this
+ * module's, and neither is skippable.
  *
  * The rules themselves are NOT re-implemented: the same pure signals and the same
  * summariser the board and the dashboard use are called here, so the bot cannot
@@ -33,6 +36,8 @@ export type DigestCase = { id: string; serial: string; customer: string | null; 
 
 export type OpsDigest = {
   today: string;
+  /** only the reader's own files (operations.own) */
+  own: boolean;
   liveCases: number;
   needsAction: number;
   critical: number;
@@ -41,23 +46,25 @@ export type OpsDigest = {
   urgent: DigestCase[];
 };
 
-export async function buildOpsDigest(limit = 5): Promise<OpsDigest> {
+export async function buildOpsDigest(limit = 5, access: OpsAccess = { all: true }): Promise<OpsDigest> {
   const today = new Date().toISOString().slice(0, 10);
-  const empty: OpsDigest = { today, liveCases: 0, needsAction: 0, critical: 0, openBookings: 0, travelSoon: 0, urgent: [] };
+  const empty: OpsDigest = { today, own: !access.all, liveCases: 0, needsAction: 0, critical: 0, openBookings: 0, travelSoon: 0, urgent: [] };
 
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
 
     const { data: opsRows } = await supabase
       .from("operations")
-      .select("id, client_status, execution_status, travel_start, offers(serial, total, currency, customers(arabic_name))");
-    const operations = (opsRows ?? []) as unknown as {
-      id: string;
-      client_status: string;
-      execution_status: string;
-      travel_start: string | null;
-      offers: { serial: string; total: number | null; currency: string | null; customers: { arabic_name: string | null } | { arabic_name: string | null }[] | null } | null;
-    }[];
+      .select("id, client_status, execution_status, travel_start, offers(serial, total, currency, employee_id, customers(arabic_name))");
+    const operations = (
+      (opsRows ?? []) as unknown as {
+        id: string;
+        client_status: string;
+        execution_status: string;
+        travel_start: string | null;
+        offers: { serial: string; total: number | null; currency: string | null; employee_id: string | null; customers: { arabic_name: string | null } | { arabic_name: string | null }[] | null } | null;
+      }[]
+    ).filter((o) => mayWork(access, (Array.isArray(o.offers) ? o.offers[0] : o.offers)?.employee_id));
     if (operations.length === 0) return empty;
 
     const ids = operations.map((o) => o.id);
@@ -143,6 +150,7 @@ export async function buildOpsDigest(limit = 5): Promise<OpsDigest> {
 
     return {
       today,
+      own: !access.all,
       liveCases: counts.liveCases,
       needsAction: counts.needsAction,
       critical: counts.critical,
@@ -158,10 +166,10 @@ export async function buildOpsDigest(limit = 5): Promise<OpsDigest> {
 /** The digest as the message the bot sends. */
 export function digestText(digest: OpsDigest, name: string): string {
   if (digest.liveCases === 0) {
-    return [`🗂️ <b>قسم العمليات</b>`, "", `أهلاً ${escapeHtml(name)} — لا توجد ملفات جارية الآن.`].join("\n");
+    return [`🗂️ <b>قسم العمليات</b>`, "", `أهلاً ${escapeHtml(name)} — لا توجد ${digest.own ? "لك " : ""}ملفات جارية الآن.`].join("\n");
   }
   const lines = [
-    "🗂️ <b>قسم العمليات — ما يحتاج إجراءً</b>",
+    digest.own ? "🗂️ <b>ملفاتك — ما يحتاج إجراءً</b>" : "🗂️ <b>قسم العمليات — ما يحتاج إجراءً</b>",
     `<code>${digest.today}</code>`,
     "",
     `• يحتاج إجراءً: <b>${digest.needsAction}</b>${digest.critical > 0 ? ` (منها <b>${digest.critical}</b> حرِج)` : ""}`,
