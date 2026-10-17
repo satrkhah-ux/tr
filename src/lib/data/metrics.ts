@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import type { Role } from "@/lib/roles/roles";
-import { currentRole } from "@/lib/roles/current";
+import { currentCan, currentRole } from "@/lib/roles/current";
 
 /**
  * Dashboard metric queries — the ONLY place that reads metric data. Backend
@@ -96,8 +96,8 @@ export async function getAdminMetrics(employeeFilterId?: string): Promise<AdminM
     requestsAnswered: 0, employeesNotResponded: 0, notRespondedNames: [],
   };
   try {
-    const user = await getServerUser();
-    if (!user) return empty;
+    // the team's activity is the admin dashboard's, not every caller's
+    if (!(await currentCan("dashboard.admin"))) return empty;
     const supabase = await db();
     const onlineCut = new Date(Date.now() - ONLINE_WINDOW_MINUTES * 60_000).toISOString();
     const today = startOfTodayIso();
@@ -147,6 +147,7 @@ export type EmployeeOption = { id: string; name: string };
 
 export async function searchEmployees(query: string): Promise<EmployeeOption[]> {
   try {
+    if (!(await currentCan("dashboard.admin"))) return [];
     const supabase = await db();
     let q = supabase.from("employees").select("id, arabic_name").order("arabic_name").limit(25);
     const trimmed = query.trim();
