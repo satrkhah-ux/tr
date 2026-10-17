@@ -34,6 +34,17 @@ if [ "${FORCE:-0}" != "1" ] && [ "$((10#$HOUR))" -ge 8 ] && [ "$((10#$HOUR))" -l
   exit 1
 fi
 
+# One deploy at a time ON THE SERVER, whichever session or machine runs it:
+# three sessions deployed within minutes on 2026-10-17, each a full no-cache
+# build beside the live app. mkdir is atomic; a lock older than 30 min is a
+# deploy that died, and is taken over. Released on any exit.
+LOCK=/tmp/traveliun-deploy.lock
+if ! ssh "$HOST" "mkdir $LOCK 2>/dev/null || { [ -n \"\$(find $LOCK -maxdepth 0 -mmin +30)\" ] && rm -rf $LOCK && mkdir $LOCK; }"; then
+  echo "refusing: another deploy is running on the server ($LOCK) — wait for it to finish" >&2
+  exit 1
+fi
+trap 'ssh "$HOST" "rm -rf $LOCK" >/dev/null 2>&1 || true' EXIT
+
 # The commit is pinned ONCE, here. Reading HEAD again at the end reported the
 # wrong commit when another one landed while this deploy was still building.
 SHIPPED=$(git rev-parse HEAD)
@@ -73,7 +84,7 @@ ssh "$HOST" "cd ~/$DIR && docker rm -f traveliun-app 2>/dev/null || true; docker
 # --no-cache means the build cache is never reused, yet BuildKit keeps every
 # layer (~2.5 GB per deploy, 37 GB after one day). Drop it once the new
 # container is running — images, containers and volumes are untouched.
-ssh "$HOST" "docker builder prune -af >/dev/null 2>&1 || true"
+ssh "$HOST" "docker builder prune -af >/dev/null 2>&1 || true; docker image prune -f >/dev/null 2>&1 || true"
 
 echo "==> waiting for https://$DOMAIN"
 up=""
