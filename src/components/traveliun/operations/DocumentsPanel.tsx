@@ -45,6 +45,7 @@ import { BOARD_AR } from "@/components/offer-doc/labels";
 import { BOARD_LABEL_KEYS, BOARD_TYPES } from "@/lib/offer/draft-types";
 import { roomSuggestions } from "@/lib/offer/basic";
 import { awaitingConfirmation } from "@/lib/operations/confirm-all";
+import { isUnassigned } from "@/lib/operations/wizard";
 import type { BoardType } from "@/lib/types";
 import { AssignBooking, AssigneeChip } from "./AssignBooking";
 import { SupplierBooking } from "./SupplierBooking";
@@ -723,7 +724,7 @@ function BookingRow({
                 {t("ops.booking.confirmationNo")} <DirText dir="ltr">{booking.confirmation_number}</DirText>
               </span>
             ) : null}
-            <AssigneeChip kind={booking.assignee_kind} label={booking.assignee_label} />
+            <AssigneeChip kind={booking.assignee_kind} label={booking.assignee_label} unset={isUnassigned(booking)} />
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">

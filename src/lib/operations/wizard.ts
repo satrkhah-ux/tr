@@ -12,7 +12,7 @@ export type WizardStepKey = "pull" | "travelers" | "assign" | "requests" | "conf
 export type WizardStep = { key: WizardStepKey; done: boolean; /** how many items still hold it back */ left: number };
 
 export type WizardInput = {
-  bookings: { id: string; kind: string; status: string; assignee_kind: string }[];
+  bookings: { id: string; kind: string; status: string; assignee_kind: string; assigned_at?: string | null }[];
   travelers: number;
   documents: { kind: string; revoked_at?: string | null }[];
   clientToken: string | null;
@@ -22,11 +22,17 @@ export type WizardInput = {
 
 const live = (b: { status: string }) => b.status !== "cancelled" && b.status !== "failed";
 
+/**
+ * «بلا منفّذ»: 'ops' is the column's default AND a real choice — «قسم العمليات» books it
+ * itself (0027). Only the default, which nobody picked (no assigned_at), is no executor
+ * yet; the picker and the chip say so instead of «قسم العمليات».
+ */
+export const isUnassigned = (b: { assignee_kind?: string; assigned_at?: string | null }) => (b.assignee_kind ?? "ops") === "ops" && !b.assigned_at;
+
 export function wizardSteps(input: WizardInput): WizardStep[] {
   const bookings = input.bookings.filter(live);
   const open = bookings.filter((b) => b.status !== "confirmed");
-  // «ops» is the default — nobody chose who books it yet (a supplier, a colleague, a partner)
-  const unassigned = open.filter((b) => b.assignee_kind === "ops");
+  const unassigned = open.filter(isUnassigned);
   const stateOf = new Map(input.requests.map((r) => [r.booking_id, r.state]));
   const unsent = open.filter((b) => b.assignee_kind !== "ops" && !["sent", "overdue", "confirmed"].includes(stateOf.get(b.id) ?? "none"));
   const documentsOut = derivedExecution(input.bookings, input.documents.filter((d) => !d.revoked_at)) === "vouchers_issued";

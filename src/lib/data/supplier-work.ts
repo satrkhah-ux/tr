@@ -292,9 +292,13 @@ export async function getSupplierWork(operationId: string): Promise<SupplierWork
  * log first, exactly as opening the passport would be; without that, or
  * without the vault, the request carries the names as typed on the case.
  * The passport NUMBER never leaves: a supplier books a name, not a document.
+ *
+ * `alsoIds`: more bookings of the same case in the same message — a city's
+ * transfers and tours to its one ground agent (the wizard's «المواصلات»). The
+ * addressee is the first booking's.
  */
-export async function composeRequest(bookingId: string): Promise<{ ok: true; draft: RequestDraft } | Fail> {
-  const denied = await gateRow("operation_bookings", bookingId);
+export async function composeRequest(bookingId: string, alsoIds: string[] = []): Promise<{ ok: true; draft: RequestDraft } | Fail> {
+  const denied = await gateRows("operation_bookings", [bookingId, ...alsoIds]);
   if (denied) return { ok: false, error: denied };
 
   try {
@@ -325,6 +329,17 @@ export async function composeRequest(bookingId: string): Promise<{ ok: true; dra
     };
     const offer = one(one(row.operations)?.offers as { serial: string; customers: unknown } | { serial: string; customers: unknown }[] | null);
     const customer = one(offer?.customers as { arabic_name: string | null } | { arabic_name: string | null }[] | null);
+
+    // the other bookings of the message, in the order asked — this case's only
+    type Extra = { id: string; operation_id: string; kind: SupplierBookingKind; title: string; city_name: string; start_date: string | null; end_date: string | null; detail: Record<string, string> | null };
+    const extraRes = alsoIds.length > 0
+      ? await supabase.from("operation_bookings").select("id, operation_id, kind, title, city_name, start_date, end_date, detail").in("id", alsoIds)
+      : { data: [] };
+    const extraById = new Map(((extraRes.data ?? []) as Extra[]).filter((e) => e.operation_id === row.operation_id).map((e) => [e.id, e]));
+    const also = alsoIds.filter((id) => id !== bookingId).flatMap((id) => {
+      const e = extraById.get(id);
+      return e ? [{ kind: e.kind, title: e.title, city_name: e.city_name, start_date: e.start_date, end_date: e.end_date, detail: e.detail ?? {} }] : [];
+    });
 
     const to =
       row.assignee_kind === "supplier"
@@ -365,8 +380,7 @@ export async function composeRequest(bookingId: string): Promise<{ ok: true; dra
     // ---- the catalogue's English names, for a request in English ----
     const glossary: Record<string, string> = {};
     if (lang === "en") {
-      const detail = row.detail ?? {};
-      const cityNames = [...new Set([row.city_name, detail["المدينة"]].map((c) => c?.trim()).filter((c): c is string => !!c))];
+      const cityNames = [...new Set([row, ...also].flatMap((b) => [b.city_name, (b.detail ?? {})["المدينة"]]).map((c) => c?.trim()).filter((c): c is string => !!c))];
       const [cities, hotels] = await Promise.all([
         cityNames.length > 0 ? supabase.from("cities").select("arabic_name, english_name").in("arabic_name", cityNames) : Promise.resolve({ data: [] }),
         row.kind === "hotel" && row.title.trim()
@@ -390,6 +404,7 @@ export async function composeRequest(bookingId: string): Promise<{ ok: true; dra
         end_date: row.end_date,
         detail: row.detail ?? {},
       },
+      also,
       travelers: named,
       note: row.handoff_note,
       glossary,

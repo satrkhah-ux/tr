@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
-import { gateOperation, gateOps, gateRow } from "@/lib/operations/access";
+import { gateOperation, gateOps, gateRow, gateRows } from "@/lib/operations/access";
 import { composeRequest } from "@/lib/data/supplier-work";
 
 /**
@@ -211,6 +211,8 @@ export async function draftBookingRequest(bookingId: string): Promise<{ ok: true
  */
 export async function sendBookingRequest(input: {
   booking_id: string;
+  /** more bookings the same message covers (composeRequest's alsoIds) — each marked requested, the message sent once. */
+  also_ids?: string[];
   operation_id: string;
   channel: "whatsapp" | "manual";
   to_label: string;
@@ -218,7 +220,8 @@ export async function sendBookingRequest(input: {
   body: string;
 }): Promise<{ ok: true } | Fail> {
   // both ids come from the browser: the booking AND the case the log lands on
-  const denied = (await gateRow("operation_bookings", input.booking_id)) ?? (await gateOperation(input.operation_id));
+  const ids = [...new Set([input.booking_id, ...(input.also_ids ?? [])])];
+  const denied = (await gateRows("operation_bookings", ids)) ?? (await gateOperation(input.operation_id));
   if (denied) return { ok: false, error: denied };
   if (!input.body.trim()) return { ok: false, error: "ops.err.emptyMessage" };
 
@@ -255,22 +258,24 @@ export async function sendBookingRequest(input: {
     await supabase
       .from("operation_bookings")
       .update({ status: "pending" })
-      .eq("id", input.booking_id)
+      .in("id", ids)
       .in("status", ["pending", "prebooked", "in_flight", "failed"]);
 
     // the request's own clock — «بلا رد» is counted from here (0063)
     await supabase
       .from("operation_bookings")
       .update({ request_status: "sent", request_sent_at: new Date().toISOString(), request_answered_at: null })
-      .eq("id", input.booking_id)
+      .in("id", ids)
       .neq("status", "cancelled");
 
-    await logAudit({
-      action: "dispatch.sent",
-      entity: "operation_bookings",
-      entity_id: input.booking_id,
-      meta: { channel: input.channel, to: input.to_label },
-    });
+    for (const id of ids) {
+      await logAudit({
+        action: "dispatch.sent",
+        entity: "operation_bookings",
+        entity_id: id,
+        meta: { channel: input.channel, to: input.to_label },
+      });
+    }
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
