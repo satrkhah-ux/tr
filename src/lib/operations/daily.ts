@@ -6,6 +6,7 @@ import { notifyOps, notifyPartnerCase } from "@/lib/data/ops-notify";
 import { sendWeeklyDataQuality } from "@/lib/data/quality-weekly";
 import { readinessFor } from "@/lib/data/operation-sync";
 import { sendClientMessage } from "@/lib/data/client-messages";
+import { messagesDueToday } from "./client-messages";
 import { passportAlerts, type AlertTraveler } from "./progress";
 import { defaultSchedule, installmentStates, paidTotal } from "./payments";
 import { canAdvanceClient, canAdvanceExecution, type ClientStatus, type ExecutionStatus } from "./state";
@@ -88,6 +89,12 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
       result.completed += 1;
       continue;
     }
+    // the client's dated messages — three days before, the day before, the
+    // travel day, the morning after it, mid-trip (each once: sendClientMessage keeps count)
+    if (op.execution_status !== "travelled") {
+      for (const key of messagesDueToday(op.travel_start, op.travel_end, today)) await sendClientMessage(op.id, key);
+    }
+
     // 3. before travel
     if (!op.travel_start || op.travel_start < today || op.execution_status === "travelled") continue;
     const days = Math.round((Date.parse(op.travel_start) - Date.parse(today)) / 86_400_000);
@@ -97,10 +104,6 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
       return (Array.isArray(c) ? c[0]?.arabic_name : c?.arabic_name) ?? "";
     })();
     const head = `${serialOf(op)}${name ? ` — ${name}` : ""}`;
-
-    // the client: the day before, and on arrival (each once — sendClientMessage keeps count)
-    if (days === 1) await sendClientMessage(op.id, "day_before");
-    if (days === 0) await sendClientMessage(op.id, "welcome");
 
     if ([7, 3, 1].includes(days)) {
       const items = (await readinessFor(op.id)) ?? [];
