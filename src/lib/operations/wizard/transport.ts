@@ -50,7 +50,7 @@ export type TransportCity = {
 };
 
 /** The city a trip belongs to: the booking's own, else the one its detail names (a tour). */
-const cityOf = (b: OperationBooking) => b.city_name.trim() || (b.detail?.["المدينة"] ?? "").trim();
+export const cityOf = (b: Pick<OperationBooking, "city_name" | "detail">) => b.city_name.trim() || (b.detail?.["المدينة"] ?? "").trim();
 
 const driverOf = (b: OperationBooking): Driver => ({ name: (b.detail?.[DRV.driver] ?? "").trim(), phone: (b.detail?.[DRV.phone] ?? "").trim() });
 

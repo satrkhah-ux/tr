@@ -1179,6 +1179,14 @@ export const en = {
   "wz.transport.ready.driver": "The driver's name (a day before travel)",
   "wz.transport.err.oneSupplier": "Hand all the city's unconfirmed trips to one supplier first.",
   "wz.transport.unassigned": "No executor yet",
+  "wz.transport.drv.cities": "Covers: {cities}",
+  "wz.transport.drv.update": "Update — what changed since the last send",
+  "wz.transport.drv.programme": "1) The programme",
+  "wz.transport.drv.hotels": "2) The hotels",
+  "wz.transport.drv.gap": "{hotel}: missing {what} — add it under Hotels before sending.",
+  "wz.transport.drv.gap.address": "the address",
+  "wz.transport.drv.gap.phone": "the phone",
+  "wz.transport.drv.sign": "Over WhatsApp the arrival sign follows on its own; any other way, attach it yourself:",
 
   // ---------- not found / not ready ----------
   "notready.title": "Page unavailable",

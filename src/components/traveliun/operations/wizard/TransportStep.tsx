@@ -29,6 +29,7 @@ import type { StepProps } from "@/lib/operations/wizard/types";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { useSafeTransition } from "../../useSafeTransition";
+import { DriverSend } from "../DriversPanel";
 
 const card = "rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
@@ -295,6 +296,10 @@ function CityCard({ city, operationId, setup, now }: { city: TransportCity; oper
           {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
           {t("wz.transport.driverSave", { n: String(targets.length) })}
         </button>
+        {/* the programme and the hotels for this city's driver — or its agent, before a driver is named */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:col-span-3">
+          <DriverSend bookingId={city.trips[0].booking.id} onSent={() => router.refresh()} />
+        </div>
       </div>
 
       {error ? <p className="mt-2 text-[11.5px] font-bold text-[#c22850]">{error}</p> : null}

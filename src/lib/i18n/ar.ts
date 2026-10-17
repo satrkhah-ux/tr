@@ -1177,6 +1177,14 @@ export const ar: Dictionary = {
   "wz.transport.ready.driver": "اسم السائق (قبل السفر بيوم)",
   "wz.transport.err.oneSupplier": "اعتمد مورّداً واحداً لكل رحلات المدينة غير المؤكدة أولاً.",
   "wz.transport.unassigned": "بلا منفّذ",
+  "wz.transport.drv.cities": "يغطي: {cities}",
+  "wz.transport.drv.update": "تحديث — ما تغيّر منذ آخر إرسال",
+  "wz.transport.drv.programme": "١) البرنامج",
+  "wz.transport.drv.hotels": "٢) الفنادق",
+  "wz.transport.drv.gap": "{hotel}: ينقصه {what} — أضفه في «الفنادق» قبل الإرسال.",
+  "wz.transport.drv.gap.address": "العنوان",
+  "wz.transport.drv.gap.phone": "الهاتف",
+  "wz.transport.drv.sign": "عبر واتساب تُرسل لوحة الاستقبال بعده تلقائياً، وبغيره أرفقها بنفسك:",
 
   // ---------- not found / not ready ----------
   "notready.title": "الصفحة غير متوفرة",
