@@ -159,12 +159,16 @@ const STEP_OF: Partial<Record<string, Step>> = {
   customer: "client",
   trip: "client",
   visas: "client",
+  // «البرنامج يشمل» chips sit on the first step
+  scope: "client",
   flights: "flights",
   cities: "cities",
   hotels: "cities",
   transport: "cities",
   services: "services",
   pricing: "pricing",
+  // a day with no title is fixed in its city's «البرنامج السياحي» tab
+  itinerary: "cities",
 };
 
 /** «Booking engine» chip from the program-includes spec: whole chip clickable, state not by colour alone. */
@@ -1696,7 +1700,7 @@ export function BasicEditor({
                         {tx("fix")}
                       </button>
                     ) : legacyOpen ? (
-                      // services lists, terms: only the full generator edits those
+                      // a stage Basic has no step for (none today) — the full generator, while it is on
                       <Link href={stageHref(draftId, issue.stage)} onClick={() => void flush()} className="text-[11.5px] font-bold text-[#185045] underline">
                         {tx("fix")}
                       </Link>
