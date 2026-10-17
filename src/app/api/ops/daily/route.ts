@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { runOpsDaily } from "@/lib/operations/daily";
 import { trackFlights } from "@/lib/data/flight-tracking";
+import { recordCronRun } from "@/lib/data/cron-runs";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -24,8 +25,12 @@ function authorised(req: NextRequest): boolean {
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!authorised(req)) return NextResponse.json({ ok: false }, { status: 401 });
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
-  const result = await runOpsDaily(today);
-  // the morning's first look at today's arrivals (operations order 11)
-  const flights = await trackFlights();
-  return NextResponse.json({ ok: true, day: today, ...result, flights });
+  // every run leaves its trace for /developer, moved anything or not (cron-runs.ts)
+  const summary = await recordCronRun("ops_daily", async () => {
+    const result = await runOpsDaily(today);
+    // the morning's first look at today's arrivals (operations order 11)
+    const flights = await trackFlights();
+    return { day: today, ...result, flights };
+  });
+  return NextResponse.json({ ok: true, ...summary });
 }

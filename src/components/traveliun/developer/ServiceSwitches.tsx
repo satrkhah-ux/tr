@@ -23,6 +23,7 @@ const FEATURE_TEXT: Record<Feature, { label: TranslationKey; hint: TranslationKe
   kanban: { label: "dev.f.kanban", hint: "dev.f.kanban.hint" },
   ai_itinerary: { label: "dev.f.ai_itinerary", hint: "dev.f.ai_itinerary.hint" },
   flight_lookup: { label: "dev.f.flight_lookup", hint: "dev.f.flight_lookup.hint" },
+  flight_tracking: { label: "dev.f.flight_tracking", hint: "dev.f.flight_tracking.hint" },
 };
 
 export type FeatureChange = { id: string; at: string; who: string | null; feature: string; on: boolean };

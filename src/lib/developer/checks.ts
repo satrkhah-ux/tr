@@ -8,6 +8,7 @@ import { getOcrProvider } from "@/lib/repackage/extract/ocr";
 import { pdfEngine } from "@/lib/offer-doc/pdf";
 import { eyeBotToken } from "@/lib/telegram/eye-bot";
 import { opsBotToken } from "@/lib/telegram/ops-bot";
+import { cronRunKey, type CronJob, type CronRun } from "@/lib/data/cron-runs";
 import {
   ageStatus,
   CHECK_TIMEOUT_MS,
@@ -132,6 +133,35 @@ async function flightApiCall(): Promise<Outcome> {
     return { status: "down", latencyMs: ms, detail: { key: "dev.d.apiError", params: { reason } } };
   }
   return res.ok ? ok(ms, { key: "dev.d.flightOk" }) : httpProblem(res.status, ms);
+}
+
+// ---------- scheduled jobs ----------
+/**
+ * A job's last run, from the row each run overwrites (data/cron-runs.ts). A run
+ * that failed is «متوقف» whatever its age; otherwise its age against `everyMs`.
+ */
+function cronCheck(job: CronJob, everyMs: number, describe: (summary: Record<string, unknown>) => Msg): () => Promise<Outcome> {
+  return async () => {
+    if (!serviceReady()) return unconfigured("SUPABASE_SERVICE_ROLE_KEY");
+    const { data, error } = await db().from("app_settings").select("value").eq("key", cronRunKey(job)).abortSignal(signal()).maybeSingle();
+    if (error) return failed(error);
+    let run: Partial<CronRun> | null = null;
+    try {
+      run = JSON.parse((data as { value?: string } | null)?.value ?? "null") as Partial<CronRun> | null;
+    } catch {
+      /* an unreadable row reads as no run */
+    }
+    if (!run?.at) return { status: "warn", latencyMs: null, detail: { key: "dev.d.cronNever" } };
+    const summary = run.summary ?? {};
+    return {
+      status: run.ok ? ageStatus(Date.now() - Date.parse(run.at), everyMs) : "down",
+      latencyMs: null,
+      lastRunAt: run.at,
+      detail: run.ok
+        ? describe(summary)
+        : { key: "dev.d.cronFailed", params: { reason: scrub(String(summary.error ?? ""), SECRET_ENV.map(env)) } },
+    };
+  };
 }
 
 // ---------- the list ----------
@@ -311,8 +341,7 @@ const CHECKS: Check[] = [
     group: "jobs",
     label: "dev.c.eyeJob",
     // The VPS crontab posts /api/eye/daily at 20:00 Riyadh; every delivery is an
-    // eye.report_sent row. /api/ops/daily and /api/ops/flights leave no row when
-    // nothing moved, so there is no heartbeat to read for them.
+    // eye.report_sent row.
     run: async () => {
       if (!eyeBotToken()) return unconfigured("TELEGRAM_EYE_BOT_TOKEN");
       if (!serviceReady()) return unconfigured("SUPABASE_SERVICE_ROLE_KEY");
@@ -333,6 +362,29 @@ const CHECKS: Check[] = [
         detail: { key: "dev.d.eyeJob", params: { delivered: last.meta?.delivered ?? 0 } },
       };
     },
+  },
+  {
+    id: "job_ops_daily",
+    group: "jobs",
+    label: "dev.c.opsDailyJob",
+    // the VPS crontab: 07:00 every day (api/ops/daily/route.ts)
+    run: cronCheck("ops_daily", 24 * HOUR, (s) => ({
+      key: "dev.d.opsDailyJob",
+      params: { travelled: Number(s.travelled ?? 0), completed: Number(s.completed ?? 0), alerts: Number(s.alerts ?? 0) },
+    })),
+  },
+  {
+    id: "job_ops_flights",
+    group: "jobs",
+    label: "dev.c.opsFlightsJob",
+    // the VPS crontab: every 30 minutes (api/ops/flights/route.ts)
+    run: cronCheck("ops_flights", HOUR / 2, (s): Msg =>
+      s.skipped === "switched_off"
+        ? { key: "dev.d.opsFlightsOff" }
+        : s.skipped === "not_configured"
+          ? { key: "dev.d.notConfigured", params: { env: "AVIATIONSTACK_API_KEY" } }
+          : { key: "dev.d.opsFlightsJob", params: { checked: Number(s.checked ?? 0), moved: Number(s.moved ?? 0), alerts: Number(s.alerts ?? 0) } },
+    ),
   },
 ];
 

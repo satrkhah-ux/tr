@@ -5,6 +5,7 @@ import { logAudit } from "@/lib/data/audit";
 import { notifyOps } from "@/lib/data/ops-notify";
 import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
 import { isFlightLookupConfigured } from "@/lib/providers/flight-lookup";
+import { featureOn } from "@/lib/features-server";
 import { flightObservations } from "@/lib/providers/flight-status";
 import { toInstant } from "@/lib/offer/schedule";
 import { DRV } from "@/lib/operations/drivers";
@@ -25,7 +26,7 @@ import { inWindow, pickObservation, toStored, trackDecision, trackTargets, type 
  * month — a busy season needs the paid plan, or a wider cron interval.
  */
 
-export type FlightTrackResult = { checked: number; moved: number; alerts: number; skipped?: "not_configured" };
+export type FlightTrackResult = { checked: number; moved: number; alerts: number; skipped?: "not_configured" | "switched_off" };
 
 const addDays = (day: string, n: number) => {
   const [y, m, d] = day.split("-").map(Number);
@@ -48,6 +49,8 @@ type Transfer = {
 export async function trackFlights(now = new Date()): Promise<FlightTrackResult> {
   const result: FlightTrackResult = { checked: 0, moved: 0, alerts: 0 };
   if (!isFlightLookupConfigured()) return { ...result, skipped: "not_configured" };
+  // «متابعة رحلات العمليات» off (/developer): here, so neither cron route spends the quota
+  if (!(await featureOn("flight_tracking"))) return { ...result, skipped: "switched_off" };
   const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
 
   const today = now.toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });

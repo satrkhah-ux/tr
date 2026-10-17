@@ -39,11 +39,15 @@ export function latencyStatus(ms: number): CheckStatus {
 /**
  * A job meant to run every `everyMs`: on time within a grace of an hour (or a
  * tenth of the period, if longer); late → warn; three periods without a run → down.
+ * A short period's hour of grace would swallow its three periods (30 minutes:
+ * on time to 90, "down" from 90 — no warning at all), so down waits at least
+ * twice the on-time limit.
  */
 export function ageStatus(ageMs: number | null, everyMs: number): CheckStatus {
   if (ageMs === null) return "down";
-  if (ageMs <= everyMs + Math.max(everyMs / 10, 3_600_000)) return "ok";
-  return ageMs <= everyMs * 3 ? "warn" : "down";
+  const onTime = everyMs + Math.max(everyMs / 10, 3_600_000);
+  if (ageMs <= onTime) return "ok";
+  return ageMs <= Math.max(everyMs * 3, onTime * 2) ? "warn" : "down";
 }
 
 /** The card's colour for several rows at once: the worst of them. */
