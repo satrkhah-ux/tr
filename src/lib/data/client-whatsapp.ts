@@ -14,11 +14,7 @@ import {
   whatsappTemplateStatus,
 } from "@/lib/providers/teletel";
 import { tidyWhatsapp, WA_TEMPLATES, waParams, waPreview, type WaTemplateKey } from "@/lib/operations/client-messages";
-import { AR } from "@/components/offer-doc/labels";
-import { resolveDocBrand } from "./doc-brand";
-import { getPublishedClientOffer } from "./offers";
-import { renderOfferDocumentHtml } from "@/lib/offer-doc/html";
-import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
+import { clientOfferPdf } from "@/lib/offer-doc/client-pdf";
 
 /**
  * The client hears about their file on WhatsApp, through Teletel (the owner,
@@ -31,7 +27,10 @@ import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
  *   "admins" (the default, the trial): only files a MANAGER issued
  *            (dashboard.admin) — whoever or whatever triggers the message,
  *            the nightly job included, so the rule needs no signed-in actor;
- *   "all":   every file;  "off": none.
+ *   "all":   every file;  "off": none;
+ *   "test":  only a client whose number is app_settings `client_whatsapp_test_phone`
+ *            — the owner's test phone, until the packages are reset and it goes live
+ *            (2026-10-17). Every other client hears nothing.
  * Never a partner's file: that client is the partner's to talk to.
  *
  * WhatsApp lets a business write freely only within 24 hours of the client's
@@ -52,19 +51,29 @@ export type OfferClient = {
 
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 
-async function mode(service: SupabaseClient): Promise<"admins" | "all" | "off"> {
+async function mode(service: SupabaseClient): Promise<"admins" | "all" | "off" | "test"> {
   const { data } = await service.from("app_settings").select("value").eq("key", "client_whatsapp").maybeSingle();
   const v = (data as { value?: string } | null)?.value;
-  return v === "all" || v === "off" ? v : "admins";
+  return v === "all" || v === "off" || v === "test" ? v : "admins";
 }
 
+/** The same Saudi mobile however it was typed: its last nine digits. */
+const lastNine = (phone: string | null | undefined) => (phone ?? "").replace(/\D/g, "").slice(-9);
+
 /** Whether this file's client may be written to now (the gate above). */
-export async function clientWhatsappAllowed(offer: Pick<OfferClient, "employee_id" | "partner_company_id">): Promise<ClientSendResult | null> {
+export async function clientWhatsappAllowed(
+  offer: Pick<OfferClient, "employee_id" | "partner_company_id"> & { customer?: OfferClient["customer"] },
+): Promise<ClientSendResult | null> {
   if (offer.partner_company_id) return "partner";
   const service = db();
   const m = await mode(service);
   if (m === "off") return "off";
   if (m === "all") return null;
+  if (m === "test") {
+    const { data } = await service.from("app_settings").select("value").eq("key", "client_whatsapp_test_phone").maybeSingle();
+    const test = lastNine((data as { value?: string } | null)?.value);
+    return test.length === 9 && lastNine(offer.customer?.mobile) === test ? null : "not_allowed";
+  }
   if (!offer.employee_id) return "not_allowed";
   const { data } = await service.from("employees").select("status, roles(permission_keys)").eq("id", offer.employee_id).maybeSingle();
   const emp = data as unknown as { status: string | null; roles: { permission_keys: string[] } | { permission_keys: string[] }[] | null } | null;
@@ -79,21 +88,13 @@ export function greeting(name: string | null | undefined): string {
 }
 
 /** The approved template a message travels as after the 24 hours, and its values. */
-export type WaTemplateSend = { key: WaTemplateKey; params: string[]; document?: { url: string; name: string } };
+export type WaTemplateSend = {
+  key: WaTemplateKey;
+  params: string[];
+  /** the programme's PDF: its public URL (Meta fetches it) and the serial it is rendered from first. */
+  document?: { url: string; name: string; serial: string };
+};
 
-/** The programme's PDF — the same published snapshot the client's link shows. */
-async function programmePdf(serial: string): Promise<Uint8Array | null> {
-  const published = await getPublishedClientOffer(serial);
-  if (!published) return null;
-  const { brand, showPrices } = await resolveDocBrand({ serial });
-  const html = await renderOfferDocumentHtml({ variant: "client", offer: published.offer, brand, showPrices });
-  const pdf = await offerDocumentToPdf(html, {
-    brand: brand.nameAr,
-    serial,
-    contact: brand.vars ? [brand.phone, brand.website].filter(Boolean).join(" · ") : AR.contact,
-  });
-  return new Uint8Array(pdf);
-}
 
 /**
  * Write to the client of one offer: the gate, their thread (opened if Teletel
@@ -123,12 +124,31 @@ export async function messageClient(
       const def = extra.template ? WA_TEMPLATES[extra.template.key] : null;
       const approved = def ? (await whatsappTemplateStatus())?.get(def.name) === "APPROVED" : false;
       if (def && extra.template && approved) {
-        const sent = await sendTeletelTemplate(thread.conversationId, {
+        const template = {
           name: def.name,
           params: extra.template.params,
           preview: waPreview(def, extra.template.params),
           document: def.document ? extra.template.document : undefined,
-        });
+        };
+        if (template.document) {
+          // Meta fetches the document itself and will not wait the ~5 s Chromium takes:
+          // render it into the cache first, then send. After the response, so issuing
+          // never waits; a failure is left on the thread for the agent, never hidden.
+          const { conversationId } = thread;
+          const { serial } = template.document;
+          try {
+            after(async () => {
+              await clientOfferPdf(serial).catch(() => null);
+              if ((await sendTeletelTemplate(conversationId, template)) === null) {
+                await addTeletelNote(conversationId, `تعذّر إرسال قالب «${def.name}» للعميل. أرسل له البرنامج يدوياً:\n\n${body}`);
+              }
+            });
+            return "template";
+          } catch {
+            // outside a request (a script): send it now, the cache warmed by hand
+          }
+        }
+        const sent = await sendTeletelTemplate(thread.conversationId, template);
         if (sent !== null) return "template";
       }
       await addTeletelNote(
@@ -143,7 +163,7 @@ export async function messageClient(
       const conversationId = thread.conversationId;
       try {
         after(async () => {
-          const bytes = await programmePdf(serial).catch(() => null);
+          const bytes = await clientOfferPdf(serial).catch(() => null);
           if (bytes) await sendTeletelAttachment(conversationId, "📎 برنامج رحلتك", { name, type: "application/pdf", bytes });
         });
       } catch {
@@ -232,7 +252,7 @@ export async function offerMessage(serial: string, updated: boolean): Promise<Of
       template: {
         key: "programme",
         params: waParams("programme", { name: customer?.arabic_name ?? "", destination, serial: row.serial, link, rate_link: "" }),
-        document: { url: `${link}/pdf`, name: pdfName },
+        document: { url: `${link}/pdf`, name: pdfName, serial: row.serial },
       },
     };
   } catch {
