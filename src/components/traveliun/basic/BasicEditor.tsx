@@ -1710,7 +1710,7 @@ export function BasicEditor({
           )}
           {produced ? (
             // edited since it was issued: the next version, same serial (a partner's issued file is locked)
-            partnerSession ? null : <ReissueOffer draftId={draftId} hotels={data.hotels} blocked={blocking.length > 0} flush={flush} onIssued={(r) => sayWhatsapp(r.whatsapp)} className="mt-3" />
+            partnerSession ? null : <ReissueOffer draftId={draftId} serial={data.produced_serial} hotels={data.hotels} blocked={blocking.length > 0} flush={flush} onIssued={(r) => sayWhatsapp(r.whatsapp)} className="mt-3" />
           ) : (
             <>
               <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} className="mt-2" />

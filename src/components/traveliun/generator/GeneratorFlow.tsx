@@ -518,7 +518,7 @@ function ProduceBar({
         </Link>
         {/* edited since: the next version under the same serial */}
         {partnerFile ? null : (
-          <ReissueOffer draftId={draftId} hotels={data.hotels} blocked={!ok} flush={flush} className="w-full border-t border-[#bfe5d4] pt-2" />
+          <ReissueOffer draftId={draftId} serial={data.produced_serial} hotels={data.hotels} blocked={!ok} flush={flush} className="w-full border-t border-[#bfe5d4] pt-2" />
         )}
       </div>
     );

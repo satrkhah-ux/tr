@@ -90,7 +90,7 @@ export function PreviewStage({ draftId, data, patch, flush, lookups }: StageForm
 
       {produced && !ownFile ? (
         <section className={sectionClass}>
-          <ReissueOffer draftId={draftId} hotels={data.hotels} blocked={!validation.ok} flush={flush} />
+          <ReissueOffer draftId={draftId} serial={data.produced_serial} hotels={data.hotels} blocked={!validation.ok} flush={flush} />
         </section>
       ) : null}
 
