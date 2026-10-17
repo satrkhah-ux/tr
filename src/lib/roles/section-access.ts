@@ -69,6 +69,11 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   // the executive dashboard's numbers, so the executive dashboard's permission
   ["/travel-intelligence", "dashboard.admin"],
   // «العمليات»: every file, or the files you issued
+  // company-wide money and supplier accounts: every case, so all-files only —
+  // listed before /operations, the first matching prefix wins
+  ["/operations/cashflow", "operations.write"],
+  ["/operations/profitability", "operations.write"],
+  ["/operations/suppliers", "operations.write"],
   ["/operations", ["operations.write", "operations.own"]],
   // «المطوّر»: service switches and external links' health
   ["/developer", "developer.access"],
