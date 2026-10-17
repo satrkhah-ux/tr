@@ -227,15 +227,18 @@ export async function notifyBookingChanged(notice: BookingChangeNotice): Promise
   let whatsapp = false;
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    // The file's issuer (offers.employee_id) — the salesperson who manages it and
+    // whom operations.own lets open the link; whoever recorded the confirmation
+    // only when the file has no issuer.
     const { data } = await supabase
       .from("operations")
-      .select("confirmed_by, employees:confirmed_by(mobile, telegram_chat_id, arabic_name)")
+      .select("employees:confirmed_by(mobile, telegram_chat_id), offers(employees:employee_id(mobile, telegram_chat_id))")
       .eq("id", notice.operationId)
       .maybeSingle();
-    const row = data as unknown as {
-      employees: { mobile: string | null; telegram_chat_id: number | string | null } | { mobile: string | null; telegram_chat_id: number | string | null }[] | null;
-    } | null;
-    const emp = Array.isArray(row?.employees) ? row?.employees[0] : row?.employees;
+    type Contact = { mobile: string | null; telegram_chat_id: number | string | null };
+    const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
+    const row = data as unknown as { employees: Contact | Contact[] | null; offers: { employees: Contact | Contact[] | null } | { employees: Contact | Contact[] | null }[] | null } | null;
+    const emp = one(one(row?.offers)?.employees) ?? one(row?.employees);
 
     if (emp?.mobile) {
       const conversationId = await conversationForPhone(emp.mobile);
