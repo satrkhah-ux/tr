@@ -11,6 +11,7 @@ import { passportAlerts, type AlertTraveler } from "./progress";
 import { defaultSchedule, installmentStates, paidTotal } from "./payments";
 import { canAdvanceClient, canAdvanceExecution, type ClientStatus, type ExecutionStatus } from "./state";
 import { hotelAtRisk, type ClientBookingRow } from "./client-booking-state";
+import { notifyDueWaits } from "@/lib/data/wizard-case";
 
 /**
  * The operations day (operations order 6), run once a morning by the server's
@@ -146,6 +147,8 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
     }
   }
   result.alerts += await provisionalHotelAlerts(supabase, ops, today);
+  // «قائمة متابعتك اليوم» — the waits whose day has come, once per case a day (wizard-case.ts)
+  result.alerts += await notifyDueWaits(supabase, today);
   return result;
 }
 

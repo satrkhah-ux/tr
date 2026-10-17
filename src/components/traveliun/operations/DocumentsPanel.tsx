@@ -401,7 +401,7 @@ export function DocumentsPanel({
  * track of which is current, which is exactly why ops keeps being asked "did the
  * hotel come through?".
  */
-function ClientLinkBlock({ operationId, token }: { operationId: string; token: string | null }) {
+export function ClientLinkBlock({ operationId, token }: { operationId: string; token: string | null }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
   const [pending, startTransition] = useSafeTransition();

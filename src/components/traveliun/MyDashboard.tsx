@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { CheckCircle2, FilePen, FileText, Globe2, Percent, Receipt, Search, UserX, Users, type LucideIcon } from "lucide-react";
+import { CheckCircle2, Clock, FilePen, FileText, Globe2, Percent, Receipt, Search, UserX, Users, type LucideIcon } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { normAr } from "@/lib/catalog/norm";
@@ -10,6 +10,7 @@ import { isConfirmed, type MyClient, type MyDashboard as MyDashboardData, type M
 import { useRole } from "@/lib/roles/RoleContext";
 import { canOpenLink } from "@/lib/roles/section-access";
 import type { TranslationKey } from "@/lib/i18n";
+import type { FollowUpItem, FollowUpTone } from "@/lib/operations/wizard/followup";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { ChartCard, KpiCard } from "./ExecutiveDashboardClient";
 import { DestinationBar, StageBar } from "./charts/ExecutiveCharts";
@@ -104,6 +105,8 @@ function MyBoard({ data }: { data: Extract<MyDashboardData, { ok: true }> }) {
         <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("dash.mine.hint")}</p>
       </div>
 
+      <FollowUpList items={data.followUp} />
+
       {/* the four numbers — each one is the switch for its list */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {cards.map((c) => {
@@ -180,6 +183,57 @@ function MyBoard({ data }: { data: Extract<MyDashboardData, { ok: true }> }) {
 
       <Analysis data={data} />
     </div>
+  );
+}
+
+// ---------- «قائمة متابعتك اليوم» ----------
+const TONE: Record<FollowUpTone, string> = {
+  grey: "border-[#e2ebe7] bg-[#f6f8f7]",
+  yellow: "border-[#f0d9a8] bg-[#fff8e8]",
+  red: "border-[#f2c7c7] bg-[#fdecef]",
+};
+
+/**
+ * The cases I answer for whose «ينتظر» day has come — red when the trip is
+ * within a day, yellow past the day, grey due today. Opening one lands on its
+ * first step with work left (the case page does that by itself).
+ */
+function FollowUpList({ items }: { items: FollowUpItem[] }) {
+  const { t } = useTraveliunUI();
+  if (items.length === 0) return null;
+  return (
+    <section className={`${CARD} p-4`}>
+      <h3 className="mb-2 flex items-center gap-1.5 text-[14px] font-extrabold text-[#003c3a]">
+        <Clock className="size-4" />
+        {t("wz.follow.title")}
+        <span className="tv-tnum rounded-full bg-[#eef4f1] px-2 py-0.5 text-[11px] font-bold text-[#557d78]">
+          <DirText>{fmt(items.length)}</DirText>
+        </span>
+      </h3>
+      <ul className="grid gap-1.5">
+        {items.map((f) => (
+          <li key={f.operationId}>
+            <Link href={`/operations/${f.operationId}`} className={`block rounded-[11px] border px-3 py-2 transition-opacity hover:opacity-85 ${TONE[f.tone]}`}>
+              <span className="flex flex-wrap items-center gap-2 text-[13px] font-extrabold text-[#185045]">
+                <DirText>{f.serial}</DirText>
+                <span className="font-bold text-[#557d78]">{f.client ?? t("dash.mine.noClient")}</span>
+                {f.travelStart ? (
+                  <span className="tv-tnum ms-auto text-[11.5px] font-bold text-[#557d78]">
+                    {t("wz.follow.travel")} <DirText>{f.travelStart}</DirText>
+                  </span>
+                ) : null}
+              </span>
+              {f.steps.map((w) => (
+                <span key={w.step} className="mt-0.5 block text-[12px] font-semibold text-[#0f3d38]">
+                  {t(`wz.step.${w.step}` as TranslationKey)}: {t("wz.wait.from", { from: t(`wz.from.${w.from}` as TranslationKey), until: w.until })}
+                  {w.note ? <span className="text-[#557d78]"> — {w.note}</span> : null}
+                </span>
+              ))}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

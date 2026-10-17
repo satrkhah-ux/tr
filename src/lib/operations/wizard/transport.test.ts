@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { OperationBooking } from "@/lib/data/operation-bookings";
 import type { SupplierWork } from "@/lib/data/supplier-work";
 import { buildSupplierRequest } from "@/lib/operations/supplier-request";
-import { isUnassigned, wizardSteps } from "@/lib/operations/wizard";
+import { isUnassigned } from "@/lib/operations/wizard";
 import { driverTargets, requestTrips, transportCities, transportReadiness, transportState } from "./transport";
 import type { WizardCase } from "./types";
 
@@ -138,16 +138,5 @@ describe("«بلا منفّذ»", () => {
     expect(isUnassigned({ assignee_kind: "ops", assigned_at: null })).toBe(true);
     expect(isUnassigned({ assignee_kind: "ops", assigned_at: "2026-10-17T10:00:00Z" })).toBe(false);
     expect(isUnassigned({ assignee_kind: "supplier", assigned_at: null })).toBe(false);
-    const steps = wizardSteps({
-      bookings: [
-        { id: "a", kind: "hotel", status: "pending", assignee_kind: "ops", assigned_at: "2026-10-17T10:00:00Z" },
-        { id: "b", kind: "transport", status: "pending", assignee_kind: "ops", assigned_at: null },
-      ],
-      travelers: 2,
-      documents: [],
-      clientToken: null,
-      requests: [],
-    });
-    expect(steps.find((s) => s.key === "assign")?.left).toBe(1);
   });
 });

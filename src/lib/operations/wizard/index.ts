@@ -1,4 +1,5 @@
 import { documentsReadiness, documentsState } from "./documents";
+export { isUnassigned } from "./assignment";
 import { flightsReadiness, flightsState } from "./flights";
 import { hotelsReadiness, hotelsState } from "./hotels";
 import { passportsReadiness, passportsState } from "./passports";
@@ -15,6 +16,11 @@ const RULES: Record<WizardStep, { state: (d: WizardCase) => StepState; readiness
   payment: { state: paymentState, readiness: paymentReadiness },
   documents: { state: documentsState, readiness: documentsReadiness },
 };
+
+/** A step's own state, before «ينتظر» — what decides whether a wait is still worth keeping. */
+export function ownState(data: WizardCase, step: WizardStep): StepState {
+  return RULES[step].state(data);
+}
 
 /** A waiting step reads «ينتظر» whatever its own rule says — until it is done. */
 export function stepStates(data: WizardCase): Record<WizardStep, StepState> {
@@ -35,4 +41,9 @@ export function firstOpenStep(data: WizardCase): WizardStep {
 /** Everything «جاهز للسفر» needs; a mandatory item not ok blocks it. */
 export function readiness(data: WizardCase): ReadinessItem[] {
   return WIZARD_STEPS.flatMap((step) => RULES[step].readiness(data));
+}
+
+/** The gate itself — the button and setExecutionStatus("ready_to_travel") both ask this. */
+export function readyToTravel(items: ReadinessItem[]): boolean {
+  return items.every((i) => i.ok || i.optional);
 }

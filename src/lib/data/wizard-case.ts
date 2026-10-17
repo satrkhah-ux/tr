@@ -1,0 +1,150 @@
+import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { listOperationPayments, listOperations } from "@/lib/data/operations";
+import { listInstallments } from "@/lib/data/operation-payments";
+import { listBookings, listDocuments } from "@/lib/data/operation-bookings";
+import { listOrSeedTravelers } from "@/lib/data/operation-travelers";
+import { getSupplierWork } from "@/lib/data/supplier-work";
+import { getCaseGuide } from "@/lib/data/destination-guides";
+import { notifyOps } from "@/lib/data/ops-notify";
+import { translate, type TranslationKey } from "@/lib/i18n";
+import { riyadhDate } from "@/lib/operations/payments";
+import { readiness, readyToTravel } from "@/lib/operations/wizard/index";
+import { followUpOf, readWaits, type FollowUpItem, type FollowUpTone } from "@/lib/operations/wizard/followup";
+import type { ReadyExceptions, WizardCase } from "@/lib/operations/wizard/types";
+
+/**
+ * «معالج الحجوزات» on the server: the one load every step reads (the case
+ * page, and the «جاهز للسفر» gate in setExecutionStatus — the same data, the
+ * same rules, so the button and the server cannot disagree), and the
+ * follow-up list of the waits whose day has come.
+ *
+ * NOT a server action: every list below is the session's own gated loader
+ * (operations/access.ts), so this reads exactly what the caller may see.
+ */
+
+/** null when the case is not the caller's to see, or does not exist. */
+export async function loadWizardCase(operationId: string): Promise<WizardCase | null> {
+  const operation = (await listOperations()).find((o) => o.id === operationId);
+  if (!operation) return null;
+  const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
+  const [travelers, payments, installments, bookings, documents, supplierWork, guide, days, op, offer] = await Promise.all([
+    // a new case starts with the travelers the offer was sold for
+    listOrSeedTravelers(operationId),
+    listOperationPayments(operationId),
+    listInstallments(operationId),
+    listBookings(operationId),
+    listDocuments(operationId),
+    getSupplierWork(operationId),
+    getCaseGuide(operationId),
+    supabase.from("offer_days").select("id", { count: "exact", head: true }).eq("offer_id", operation.offer_id),
+    supabase.from("operations").select("client_token, client_token_revoked_at, waits, ready_exceptions").eq("id", operationId).maybeSingle(),
+    supabase.from("offers").select("adults, children, infants").eq("id", operation.offer_id).maybeSingle(),
+  ]);
+  const row = op.data as { client_token: string | null; client_token_revoked_at: string | null; waits: unknown; ready_exceptions: unknown } | null;
+  const pax = offer.data as { adults: number | null; children: number | null; infants: number | null } | null;
+  const exceptions = row?.ready_exceptions;
+  return {
+    operation,
+    travelers,
+    payments,
+    installments,
+    bookings,
+    documents,
+    supplierWork,
+    clientToken: row?.client_token && !row.client_token_revoked_at ? row.client_token : null,
+    waits: readWaits(row?.waits),
+    readyExceptions: exceptions && typeof exceptions === "object" ? (exceptions as ReadyExceptions) : {},
+    hasDays: (days.count ?? 0) > 0,
+    today: riyadhDate(),
+    sold: pax ? { adults: pax.adults ?? 0, children: pax.children ?? 0, infants: pax.infants ?? 0 } : null,
+    guide,
+  };
+}
+
+/** The «جاهز للسفر» gate — every mandatory readiness item of every step. */
+export async function wizardReady(operationId: string): Promise<boolean> {
+  const data = await loadWizardCase(operationId);
+  return data !== null && readyToTravel(readiness(data));
+}
+
+// ---------- «قائمة متابعتك اليوم» ----------
+
+type WaitRow = {
+  id: string;
+  travel_start: string | null;
+  waits: unknown;
+  assignee_id: string | null;
+  offers: One<{ serial: string; employee_id: string | null; customers: One<{ arabic_name: string | null }> }>;
+};
+type One<T> = T | T[] | null;
+const one = <T,>(v: One<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
+
+/** Every live case holding a wait, with its follow-up today (or none). */
+async function followUps(supabase: SupabaseClient, today: string): Promise<(FollowUpItem & { responsible: string | null })[]> {
+  const { data } = await supabase
+    .from("operations")
+    .select("id, travel_start, waits, assignee_id, offers(serial, employee_id, customers(arabic_name))")
+    .neq("waits", "{}")
+    .not("execution_status", "in", "(cancelled,travelled)")
+    .limit(2000);
+  return ((data ?? []) as unknown as WaitRow[]).flatMap((r) => {
+    const due = followUpOf(readWaits(r.waits), r.travel_start, today);
+    if (!due) return [];
+    const offer = one(r.offers);
+    return [
+      {
+        operationId: r.id,
+        serial: offer?.serial ?? "",
+        client: one(offer?.customers ?? null)?.arabic_name ?? null,
+        travelStart: r.travel_start,
+        tone: due.tone,
+        steps: due.steps.map((w) => ({ step: w.step, from: w.from, until: w.until, note: w.note ?? null })),
+        // «مسؤول الحالة», else the file's issuer
+        responsible: r.assignee_id ?? offer?.employee_id ?? null,
+      },
+    ];
+  });
+}
+
+const TONE_ORDER: Record<FollowUpTone, number> = { red: 0, yellow: 1, grey: 2 };
+
+/** «لوحتي»: the signed-in employee's own follow-ups today — the cases they are answerable for — red first. */
+export async function myFollowUps(supabase: SupabaseClient, employeeId: string): Promise<FollowUpItem[]> {
+  try {
+    const all = await followUps(supabase, riyadhDate());
+    return all
+      .filter((f) => f.responsible === employeeId)
+      .sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone] || (a.travelStart ?? "9999").localeCompare(b.travelStart ?? "9999"));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The morning notice (daily.ts): each case with a follow-up today, once per
+ * case per day (operation_alerts: kind «wait», ref = the day), to whoever its
+ * page opens for — the operations team (the managers) and the file's own
+ * salesperson (ops-notify recipientsFor); «مسؤول الحالة» holds one or the other.
+ * Service role: the cron has no session.
+ */
+export async function notifyDueWaits(service: SupabaseClient, today: string): Promise<number> {
+  let sent = 0;
+  try {
+    for (const f of await followUps(service, today)) {
+      const { error } = await service.from("operation_alerts").insert({ operation_id: f.operationId, kind: "wait", ref: today });
+      if (error) continue; // the unique key: already told today
+      const ar = (key: string, params?: Record<string, string>) => translate("ar", key as TranslationKey, params);
+      const lines = [
+        `${f.tone === "red" ? "🔴" : f.tone === "yellow" ? "🟡" : "⏳"} ${ar("wz.follow.notice")}: ${f.serial}${f.client ? ` — ${f.client}` : ""}`,
+        ...f.steps.map((w) => `• ${ar(`wz.step.${w.step}`)}: ${ar("wz.wait.from", { from: ar(`wz.from.${w.from}`), until: w.until })}${w.note ? ` — ${w.note}` : ""}`),
+      ];
+      await notifyOps(lines.join("\n"), `/operations/${f.operationId}`);
+      sent += 1;
+    }
+  } catch {
+    /* best-effort — the morning's other work is done either way */
+  }
+  return sent;
+}

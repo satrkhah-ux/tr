@@ -55,10 +55,13 @@ export function PaymentsPanel({
   payments,
   installments,
   canManage,
+  prefill,
 }: {
   operation: OperationCard;
   payments: OperationPayment[];
   installments: InstallmentRow[];
+  /** «معالج الحجوزات»: the amount and kind owed next, already in the new-payment form. */
+  prefill?: { amount: number; kind: PaymentKind } | null;
   /**
    * The manager's step on this case — operations.write, or manage_own on one's
    * own file: correct / delete a payment, record a refund, set the schedule.
@@ -100,10 +103,12 @@ export function PaymentsPanel({
       </div>
 
       <PaymentForm
-        key={editing?.id ?? `new-${formKey}`}
+        // a new amount owed (after a save and the refresh) is a fresh form
+        key={editing?.id ?? `new-${formKey}-${prefill?.amount ?? ""}`}
         operationId={operation.id}
         currency={currency}
         editing={editing}
+        prefill={editing ? null : (prefill ?? null)}
         canManage={canManage}
         onDone={(message) => {
           setEditing(null);
@@ -130,12 +135,14 @@ function PaymentForm({
   operationId,
   currency,
   editing,
+  prefill,
   canManage,
   onDone,
 }: {
   operationId: string;
   currency: string;
   editing: OperationPayment | null;
+  prefill?: { amount: number; kind: PaymentKind } | null;
   canManage: boolean;
   /** saved; `message` when the payment is in but its slip is not. */
   onDone: (message?: string) => void;
@@ -143,8 +150,8 @@ function PaymentForm({
   const { t } = useTraveliunUI();
   const router = useRouter();
   // kept in this tab until saved — a reload after a deploy used to lose it
-  const [amount, setAmount, forgetAmount] = useSessionField(`pay:${operationId}:${editing?.id ?? "new"}`, editing ? String(editing.amount) : "");
-  const [kind, setKind] = useState<PaymentKind>(editing?.kind ?? "deposit");
+  const [amount, setAmount, forgetAmount] = useSessionField(`pay:${operationId}:${editing?.id ?? "new"}`, editing ? String(editing.amount) : prefill ? String(prefill.amount) : "");
+  const [kind, setKind] = useState<PaymentKind>(editing?.kind ?? prefill?.kind ?? "deposit");
   const [method, setMethod] = useState<PaymentMethod | "">(editing?.method ?? "");
   const [reference, setReference] = useState(editing?.reference ?? "");
   const [date, setDate] = useState(editing?.paid_at ?? riyadhDate());

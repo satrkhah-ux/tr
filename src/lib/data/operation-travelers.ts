@@ -552,6 +552,40 @@ export async function readPassportMrz(
   }
 }
 
+/**
+ * «معالج الحجوزات» — a passport photo read BEFORE anyone knows whose it is:
+ * the wizard uploads every passport at once, reads each, then decides from the
+ * birth date and the name which traveller it belongs to (wizard/passports.ts
+ * matchPassport) and saves it through upsertTraveler + uploadPassportScan.
+ * The same posture as readPassportMrz — the case's gate, audited, withheld if
+ * the audit fails — and nothing is stored here.
+ */
+export async function readPassportPhoto(operationId: string, formData: FormData): Promise<{ ok: true; passport: MrzPassport } | Fail> {
+  const denied = await gateOperation(operationId);
+  if (denied) return { ok: false, error: denied };
+  if (!isOpenAIConfigured()) return { ok: false, error: "ops.trav.err.mrzOff" };
+  const file = pickFile(formData);
+  if (typeof file === "string") return { ok: false, error: file };
+  if (!MRZ_IMAGE.test(file.type)) return { ok: false, error: "ops.trav.err.imageOnly" };
+  try {
+    const read = await readMrzFromImage({ mime: file.type, base64: Buffer.from(await file.arrayBuffer()).toString("base64") });
+    const parsed = read.ok ? parseTd3(read.text, riyadhToday()) : null;
+    const logged = await logAudit({
+      action: "passport.mrz_read",
+      entity: "operations",
+      entity_id: operationId,
+      // field NAMES that failed their check digit — never a value
+      meta: { operation_id: operationId, read: parsed?.ok ?? false, failed: parsed?.ok ? parsed.passport.failed : null, bulk: true },
+    });
+    if (!logged) return { ok: false, error: "ops.err.auditFailed" };
+    if (!read.ok && read.error === "request_failed") return { ok: false, error: "ops.trav.err.mrzFailed" };
+    if (!parsed?.ok) return { ok: false, error: "ops.trav.err.mrzUnreadable" };
+    return { ok: true, passport: parsed.passport };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
 // ---------- visas ----------
 
 /** The trip's country (countries.iso2 + visa_required) and whether the offer SOLD visas — what visaFor decides with. */

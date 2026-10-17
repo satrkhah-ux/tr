@@ -11,6 +11,7 @@
 import { catalogSkel, normAr } from "@/lib/catalog/norm";
 import type { StageKey } from "@/lib/offer/draft-types";
 import type { OfferStatus } from "@/lib/types";
+import type { FollowUpItem } from "@/lib/operations/wizard/followup";
 
 export type MyOperation = { id: string; clientStatus: string; executionStatus: string; live: boolean };
 
@@ -69,7 +70,7 @@ export type Count = { label: string; value: number };
 
 /** What /dashboard hands «لوحتي» — loaded on the server by data/my-dashboard.ts. */
 export type MyDashboard =
-  | { ok: true; offers: MyOffer[]; drafts: MyDraft[]; clients: MyClient[]; stats: MyStats }
+  | { ok: true; offers: MyOffer[]; drafts: MyDraft[]; clients: MyClient[]; stats: MyStats; followUp: FollowUpItem[] }
   | { ok: false; reason: "forbidden" | "noEmployee" | "error" };
 
 export type MyStats = {

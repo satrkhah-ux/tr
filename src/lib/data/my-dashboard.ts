@@ -5,6 +5,7 @@ import { currentCan } from "@/lib/roles/current";
 import { getCurrentEmployeeId } from "./metrics";
 import { listMyOpenDraftRows } from "./draft-store";
 import { getRates } from "./rates-actions";
+import { myFollowUps } from "./wizard-case";
 import { normalizeDraftData, STAGES, type StageKey } from "@/lib/offer/draft-types";
 import { validateDraft } from "@/lib/offer/draft-validation";
 import { draftSellTotal } from "@/lib/offer/preview-dto";
@@ -75,7 +76,7 @@ export async function getMyDashboard(): Promise<MyDashboard> {
     if (!me) return { ok: false, reason: "noEmployee" };
 
     const db = (await createSupabaseServerClient()) as unknown as SupabaseClient;
-    const [offersRes, draftRows, countriesRes, citiesRes, rates, canPricing] = await Promise.all([
+    const [offersRes, draftRows, countriesRes, citiesRes, rates, canPricing, followUp] = await Promise.all([
       // ponytail: one account's whole history in one read (PostgREST caps it at 1000 rows);
       // move the lists to server paging + SQL counts if an account ever passes that.
       db
@@ -91,6 +92,8 @@ export async function getMyDashboard(): Promise<MyDashboard> {
       db.from("cities").select("arabic_name, countries(arabic_name)"),
       getRates(),
       currentCan("pricing.view"),
+      // «قائمة متابعتك اليوم» — the cases I answer for whose «ينتظر» day has come
+      myFollowUps(db, me),
     ]);
     if (offersRes.error) return { ok: false, reason: "error" };
 
@@ -170,7 +173,7 @@ export async function getMyDashboard(): Promise<MyDashboard> {
       };
     });
 
-    return { ok: true, offers, drafts, clients: clientsOf(offers), stats: summarizeMine(offers, drafts.length, riyadhDate()) };
+    return { ok: true, offers, drafts, clients: clientsOf(offers), stats: summarizeMine(offers, drafts.length, riyadhDate()), followUp };
   } catch {
     return { ok: false, reason: "error" };
   }

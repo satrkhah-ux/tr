@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 import {
   ArrowRight,
   ExternalLink,
-  Loader2,
+  ListChecks,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import {
@@ -29,9 +29,9 @@ import type { SupplierWork } from "@/lib/data/supplier-work";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
-import { ReadinessPanel } from "./ReadinessPanel";
 import { CasePresence } from "./CasePresence";
-import { CaseWizard } from "./CaseWizard";
+import { UnbackedStatus } from "./wizard/PaymentStep";
+import { clientStatusUnbacked } from "@/lib/operations/wizard/payment";
 import { IssuesPanel } from "./IssuesPanel";
 import { ClientSend } from "./ClientSend";
 
@@ -61,6 +61,7 @@ export function OperationCase({
   management,
   supplierWork,
   money,
+  ready,
 }: {
   operation: OperationCard;
   travelers: TravelerListItem[];
@@ -91,6 +92,8 @@ export function OperationCase({
   supplierWork?: SupplierWork | null;
   /** order 11: «ربحية الحالة», built by the page for pricing.internal only. */
   money?: ReactNode;
+  /** «جاهز للسفر» — the wizard's own gate (wizard/CaseWizardShell ReadyGate), built by the page. */
+  ready?: ReactNode;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -105,6 +108,13 @@ export function OperationCase({
           >
             <ArrowRight className="size-4 ltr:rotate-180" />
             {t("ops.backToBoard")}
+          </Link>
+          <Link
+            href={`/operations/${operation.id}`}
+            className="inline-flex h-9 items-center gap-2 rounded-[9px] border border-[#185045] bg-white px-3 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+          >
+            <ListChecks className="size-4" />
+            {t("wz.open")}
           </Link>
           <Link
             href={`/client-offer/${operation.serial}`}
@@ -150,6 +160,13 @@ export function OperationCase({
             </div>
           )}
 
+          {/* «مسدّد» picked by hand while the recorded payments say otherwise — said, not blocked */}
+          {clientStatusUnbacked(operation.client_status, operation.total, operation.paid) ? (
+            <div className="mt-3">
+              <UnbackedStatus status={operation.client_status} />
+            </div>
+          ) : null}
+
           {/* the two tracks, advanced independently */}
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <TrackControl
@@ -173,17 +190,8 @@ export function OperationCase({
           </div>
         </section>
 
-        <CaseWizard
-          operationId={operation.id}
-          bookings={bookings}
-          travelers={travelers.length}
-          documents={documents}
-          clientToken={clientToken}
-          supplierWork={supplierWork}
-          hasDays={hasDays}
-        />
         <CasePresence operationId={operation.id} />
-        <ReadinessPanel operationId={operation.id} execution={operation.execution_status} />
+        {ready}
 
         <DocumentsPanel
           operationId={operation.id}

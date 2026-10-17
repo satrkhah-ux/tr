@@ -5,24 +5,18 @@ import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
-import { readinessFor } from "@/lib/data/operation-sync";
-import type { ReadinessItem } from "@/lib/operations/progress";
 import { gateOperation, gateRow } from "@/lib/operations/access";
 
 /**
- * After the bookings (operations order 6): the «جاهز للسفر» checklist, the
- * problems met during the trip, and the client's rating once back.
+ * After the bookings (operations order 6): the problems met during the trip,
+ * and the client's rating once back. («جاهز للسفر» is the wizard's now —
+ * lib/data/wizard-case.ts wizardReady.)
  */
 
 type Fail = { ok: false; error: TranslationKey };
 
 async function db(): Promise<SupabaseClient> {
   return (await createSupabaseServerClient()) as unknown as SupabaseClient;
-}
-
-export async function getReadiness(operationId: string): Promise<ReadinessItem[] | null> {
-  if (await gateOperation(operationId)) return null;
-  return readinessFor(operationId);
 }
 
 export type OperationIssue = {
