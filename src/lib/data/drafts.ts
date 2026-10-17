@@ -121,7 +121,7 @@ export async function listDrafts(): Promise<DraftSummary[]> {
   const { sarPer } = await getRates();
   try {
     const rows = await listDraftRows();
-    const { versions, statuses } = await issuedState(rows.map((r) => normalizeDraftData(r.data).produced_serial).filter((s): s is string => Boolean(s)));
+    const { versions, statuses, totals } = await issuedState(rows.map((r) => normalizeDraftData(r.data).produced_serial).filter((s): s is string => Boolean(s)));
     return rows.map(
       (row) => {
         const draft = normalizeDraftData(row.data);
@@ -138,8 +138,10 @@ export async function listDrafts(): Promise<DraftSummary[]> {
           days: draft.trip.days,
           nights: draft.trip.nights,
           travel_date: draft.trip.arrival_date || null,
-          total: draftSellTotal(draft, sarPer),
-          currency: draft.pricing.display_currency,
+          // an issued file: what the client was quoted (the offer's own total, profit included) — the
+          // draft's sheet can read as the cost before the package profit is laid on at issue
+          total: draft.produced_serial && totals.has(draft.produced_serial) ? totals.get(draft.produced_serial)!.total : draftSellTotal(draft, sarPer),
+          currency: draft.produced_serial && totals.has(draft.produced_serial) ? totals.get(draft.produced_serial)!.currency : draft.pricing.display_currency,
           produced_serial: draft.produced_serial,
           version: draft.produced_serial ? (versions.get(draft.produced_serial) ?? null) : null,
           offer_status: draft.produced_serial ? (statuses.get(draft.produced_serial) ?? null) : null,
@@ -162,21 +164,25 @@ export async function listDrafts(): Promise<DraftSummary[]> {
  * offer_renders is closed to sessions (0047) — read through the service role,
  * and only the version numbers of the serials this caller's own list holds.
  */
-async function issuedState(serials: string[]): Promise<{ versions: Map<string, number>; statuses: Map<string, OfferStatus> }> {
+async function issuedState(serials: string[]): Promise<{ versions: Map<string, number>; statuses: Map<string, OfferStatus>; totals: Map<string, { total: number; currency: string }> }> {
   const out = new Map<string, number>();
   const statuses = new Map<string, OfferStatus>();
-  if (serials.length === 0) return { versions: out, statuses };
+  const totals = new Map<string, { total: number; currency: string }>();
+  if (serials.length === 0) return { versions: out, statuses, totals };
   const service = createSupabaseServiceClient() as unknown as SupabaseClient;
-  const { data: offers } = await service.from("offers").select("id, serial, status").in("serial", serials);
-  for (const o of (offers ?? []) as { serial: string; status: OfferStatus }[]) statuses.set(o.serial, o.status);
+  const { data: offers } = await service.from("offers").select("id, serial, status, total, currency").in("serial", serials);
+  for (const o of (offers ?? []) as { serial: string; status: OfferStatus; total: number | string | null; currency: string | null }[]) {
+    statuses.set(o.serial, o.status);
+    if (o.total != null && Number.isFinite(Number(o.total))) totals.set(o.serial, { total: Number(o.total), currency: o.currency || "SAR" });
+  }
   const bySerial = new Map(((offers ?? []) as { id: string; serial: string }[]).map((o) => [o.id, o.serial]));
-  if (bySerial.size === 0) return { versions: out, statuses };
+  if (bySerial.size === 0) return { versions: out, statuses, totals };
   const { data: renders } = await service.from("offer_renders").select("offer_id, version").eq("variant", "client").in("offer_id", [...bySerial.keys()]);
   for (const r of (renders ?? []) as { offer_id: string; version: number }[]) {
     const serial = bySerial.get(r.offer_id)!;
     out.set(serial, Math.max(out.get(serial) ?? 0, r.version));
   }
-  return { versions: out, statuses };
+  return { versions: out, statuses, totals };
 }
 
 export type CreateDraftResult = InsertDraftResult;

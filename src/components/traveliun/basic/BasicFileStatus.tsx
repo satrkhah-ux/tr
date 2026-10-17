@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BriefcaseBusiness, CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { cancelFile, confirmFromBasic, getFileStatus, type FileError, type FileStatusView } from "@/lib/data/file-status";
-import { AWAITING_CLIENT, SENDABLE, type TimelineEntry } from "@/lib/offer/file-state";
+import { AWAITING_CLIENT, SENDABLE, type FileState, type TimelineEntry } from "@/lib/offer/file-state";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { OfferSend } from "../OfferSend";
@@ -36,23 +36,52 @@ const when = (iso: string, language: string) =>
  * واتساب» (OfferSend), «العميل أكّد» and «إلغاء الملف». Staff only; it reads
  * its own data, again whenever `refresh` changes.
  */
+/**
+ * What was loaded, by draft — a second open of the same file is immediate (and
+ * refreshed behind it), and the files list loads it as the mouse comes over the
+ * button. One tab's memory: nothing here outlives the page.
+ */
+const loaded = new Map<string, FileStatusView>();
+const inFlight = new Map<string, Promise<FileStatusView | null>>();
+
+function fetchStatus(draftId: string): Promise<FileStatusView | null> {
+  const running = inFlight.get(draftId);
+  if (running) return running;
+  const p = getFileStatus(draftId)
+    .then((r) => {
+      if (r.ok) loaded.set(draftId, r);
+      return r.ok ? r : null;
+    })
+    .finally(() => inFlight.delete(draftId));
+  inFlight.set(draftId, p);
+  return p;
+}
+
+/** start loading a file's status before its panel opens (hover / focus on the button). */
+export function prefetchFileStatus(draftId: string): void {
+  if (!loaded.has(draftId)) void fetchStatus(draftId);
+}
+
 export function BasicFileStatus({
   draftId,
   serial,
   variant,
   refresh = 0,
   onChanged,
+  known,
 }: {
   draftId: string;
   serial: string;
   variant: "chip" | "panel";
   refresh?: number;
   onChanged?: () => void;
+  /** what the files list already knows — shown at once while the rest loads */
+  known?: { state: FileState; version: number | null; sentVersion: number | null; stale: boolean; operationId: string | null };
 }) {
   const tx = useBasicLabels();
   const { t, language } = useTraveliunUI();
   const router = useRouter();
-  const [view, setView] = useState<FileStatusView | null>(null);
+  const [view, setView] = useState<FileStatusView | null>(() => loaded.get(draftId) ?? null);
   const [tick, setTick] = useState(0);
   const [channel, setChannel] = useState<"whatsapp" | "phone" | "office">("whatsapp");
   const [busy, setBusy] = useState<"confirm" | "cancel" | null>(null);
@@ -63,15 +92,39 @@ export function BasicFileStatus({
 
   useEffect(() => {
     let live = true;
-    void getFileStatus(draftId).then((r) => {
-      if (live) setView(r.ok ? r : null);
+    // after an action the stored copy is stale: load again
+    if (tick > 0 || refresh > 0) loaded.delete(draftId);
+    void fetchStatus(draftId).then((r) => {
+      if (live) setView(r);
     });
     return () => {
       live = false;
     };
   }, [draftId, serial, refresh, tick]);
 
-  if (!view) return null;
+  if (!view) {
+    // the list's row already says where the file stands: that at once, the rest when it comes
+    if (variant !== "panel" || !known) return null;
+    return (
+      <div className="mt-3 space-y-3 rounded-[12px] border border-[#dbe6e1] bg-white p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <FileStateChip state={known.state} version={known.version} sentVersion={known.sentVersion} stale={known.stale} />
+          {known.operationId ? (
+            <Link
+              href={`/operations/${known.operationId}`}
+              className="ms-auto inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+            >
+              <BriefcaseBusiness className="size-3.5" />
+              {tx("openOperations")}
+            </Link>
+          ) : null}
+        </div>
+        <p className="flex items-center gap-1.5 text-[12px] font-semibold text-[#557d78]">
+          <Loader2 className="size-3.5 animate-spin" /> {tx("statusLoading")}
+        </p>
+      </div>
+    );
+  }
   if (variant === "chip") return <FileStateChip state={view.state} version={view.version} sentVersion={view.sentVersion} stale={view.stale} />;
 
   const changed = () => {

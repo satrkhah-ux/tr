@@ -37,19 +37,22 @@ type Issued = {
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 
 async function issuedFile(draftId: string, act: boolean): Promise<Issued | Fail> {
-  if (!(await getServerUser())) return { ok: false, error: "session" };
+  // the independent reads side by side — this gate opens every status panel
+  const [user, staff, record, me] = await Promise.all([getServerUser(), currentCan("offers.write"), loadDraft(draftId), getCurrentEmployeeId()]);
+  if (!user) return { ok: false, error: "session" };
   // a partner's own screen is the partner portal; Basic's status is staff's
-  if (!(await currentCan("offers.write"))) return { ok: false, error: "forbidden" };
-  const record = await loadDraft(draftId);
+  if (!staff) return { ok: false, error: "forbidden" };
   if (!record) return { ok: false, error: "notFound" };
   const serial = record.data.produced_serial;
   if (!serial) return { ok: false, error: "notIssued" };
   const { data } = await db().from("offers").select("id, status, employee_id, partner_company_id").eq("serial", serial).maybeSingle();
   const offer = data as Issued["offer"] | null;
   if (!offer) return { ok: false, error: "notFound" };
-  const me = await getCurrentEmployeeId();
   const mine = !offer.employee_id || offer.employee_id === me;
-  if (act && !mine && !(await currentCan("operations.write")) && !(await currentCan("dashboard.admin"))) return { ok: false, error: "forbidden" };
+  if (act && !mine) {
+    const [ops, admin] = await Promise.all([currentCan("operations.write"), currentCan("dashboard.admin")]);
+    if (!ops && !admin) return { ok: false, error: "forbidden" };
+  }
   return { serial, offer, mine };
 }
 const failed = (r: Issued | Fail): r is Fail => "ok" in r;
@@ -76,9 +79,9 @@ export async function getFileStatus(draftId: string): Promise<FileStatusView | F
   try {
     const file = await issuedFile(draftId, false);
     if (failed(file)) return file;
-    const detail = await loadFileStatus(file.serial);
+    const [detail, ops, admin, opensOps] = await Promise.all([loadFileStatus(file.serial), currentCan("operations.write"), currentCan("dashboard.admin"), currentCanOpen("/operations")]);
     if (!detail) return { ok: false, error: "notFound" };
-    const manager = (await currentCan("operations.write")) || (await currentCan("dashboard.admin"));
+    const manager = ops || admin;
     return {
       ok: true,
       state: detail.state,
@@ -87,7 +90,7 @@ export async function getFileStatus(draftId: string): Promise<FileStatusView | F
       version: detail.version,
       sentVersion: detail.sentVersion,
       operationId: detail.operation?.id ?? null,
-      canOpenCase: Boolean(detail.operation) && (await currentCanOpen("/operations")),
+      canOpenCase: Boolean(detail.operation) && opensOps,
       cancel: canCancelFile({ partner: Boolean(file.offer.partner_company_id), hasCase: Boolean(detail.operation), state: detail.state }),
       canAct: file.mine || manager,
       partner: Boolean(file.offer.partner_company_id),

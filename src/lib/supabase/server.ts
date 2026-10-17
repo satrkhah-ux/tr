@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types";
@@ -49,16 +50,26 @@ export async function getServerUser(): Promise<User | null> {
   const cookieStore = await cookies();
   const session = parseSessionCookie(cookieStore.get(AUTH_STORAGE_KEY)?.value);
   if (!session) return null;
+  return userForToken(session.accessToken);
+}
 
+/**
+ * One round trip to Supabase Auth per token per request. Every permission
+ * check, draft read and employee lookup asks for the user, and each used to
+ * validate the token again — opening a file's status panel waited on four of
+ * them in a row. Keyed by the token, so a sign-in or sign-out inside the same
+ * request (a new cookie) is still validated fresh.
+ */
+const userForToken = cache(async (accessToken: string): Promise<User | null> => {
   try {
     const { url, anonKey } = getSupabaseEnv();
     const supabase = createClient<Database>(url, anonKey, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
-    const { data, error } = await supabase.auth.getUser(session.accessToken);
+    const { data, error } = await supabase.auth.getUser(accessToken);
     if (error) return null;
     return data.user;
   } catch {
     return null;
   }
-}
+});
