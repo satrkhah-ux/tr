@@ -12,14 +12,19 @@ const state = vi.hoisted(() => ({
   updates: [] as { id: string; patch: Record<string, unknown> }[],
   audits: [] as { action: string; entity_id: string; meta?: Record<string, unknown> }[],
   synced: [] as string[],
-  can: true,
+  /** true: every permission; a list: those only (["operations.own"] is a salesperson). */
+  can: true as boolean | string[],
 }));
 
-/** operation_bookings only: the select honours eq/in, an update records its patch. */
+/** whose file each case is — what access.ts reads for an own-files holder */
+const OPERATIONS = [{ id: "op-1", offers: { employee_id: "emp-1" } }];
+
+/** operation_bookings (and the cases' issuers): the select honours eq/in, an update records its patch. */
 function fakeDb() {
   return {
-    from() {
-      const filters: ((b: (typeof state.bookings)[number]) => boolean)[] = [];
+    from(table: string) {
+      const rows = (table === "operations" ? OPERATIONS : state.bookings) as Record<string, unknown>[];
+      const filters: ((b: Record<string, unknown>) => boolean)[] = [];
       let patch: Record<string, unknown> | null = null;
       const builder = {
         select: () => builder,
@@ -29,14 +34,14 @@ function fakeDb() {
             state.updates.push({ id: value, patch });
             return Promise.resolve({ error: null });
           }
-          filters.push((b) => (b as Record<string, unknown>)[col] === value);
+          filters.push((b) => b[col] === value);
           return builder;
         },
         in: (col: string, values: string[]) => {
-          filters.push((b) => values.includes((b as Record<string, unknown>)[col] as string));
+          filters.push((b) => values.includes(b[col] as string));
           return builder;
         },
-        then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: state.bookings.filter((b) => filters.every((f) => f(b))), error: null }).then(ok),
+        then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: rows.filter((b) => filters.every((f) => f(b))), error: null }).then(ok),
       };
       return builder;
     },
@@ -48,7 +53,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => fakeDb(),
   createSupabaseServiceClient: () => fakeDb(),
 }));
-vi.mock("@/lib/roles/current", () => ({ currentCan: async () => state.can }));
+vi.mock("@/lib/roles/current", () => ({ currentCan: async (p: string) => state.can === true || (Array.isArray(state.can) && state.can.includes(p)) }));
 vi.mock("@/lib/data/metrics", () => ({ getCurrentEmployeeId: async () => "emp-1" }));
 vi.mock("@/lib/data/audit", () => ({
   logAudit: async (a: { action: string; entity_id: string; meta?: Record<string, unknown> }) => (state.audits.push(a), true),
@@ -138,6 +143,14 @@ describe("confirmBookings", () => {
     expect(res).toEqual({ ok: false, error: "ops.err.confirmationRequired" });
     expect(state.updates).toEqual([]);
     expect(state.synced).toEqual([]);
+  });
+
+  it("takes the net charged from the manager only — a salesperson's own file confirms without it (0080)", async () => {
+    state.can = ["operations.own"];
+    const res = await confirmBookings({ operation_id: "op-1", entries: [{ booking_id: "h1", confirmation_number: "GRP-77", net_charged: 1 }] });
+    expect(res).toEqual({ ok: true, confirmed: 1 });
+    expect(state.updates[0].patch.confirmation_number).toBe("GRP-77");
+    expect(state.updates[0].patch).not.toHaveProperty("net_charged");
   });
 
   it("refuses without operations.write", async () => {

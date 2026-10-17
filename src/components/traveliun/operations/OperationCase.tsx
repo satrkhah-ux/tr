@@ -192,6 +192,7 @@ export function OperationCase({
           assignees={assignees}
           sentRequests={sentRequests}
           canBook={canBook}
+          canManage={canManage}
         />
 
         {drivers}

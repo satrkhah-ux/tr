@@ -22,7 +22,18 @@ const supplierOf = (b: OperationBooking) => b.supplier_name.trim() || b.assignee
  * number can be put on several lines at once: a supplier that answers the whole
  * file with one reference, picked by its name.
  */
-export function ConfirmAllBookings({ operationId, bookings, onDone }: { operationId: string; bookings: OperationBooking[]; onDone: () => void }) {
+export function ConfirmAllBookings({
+  operationId,
+  bookings,
+  canSetNet,
+  onDone,
+}: {
+  operationId: string;
+  bookings: OperationBooking[];
+  /** operations.write: what the supplier charged is the manager's (0080) — no column for anyone else. */
+  canSetNet: boolean;
+  onDone: () => void;
+}) {
   const { t } = useTraveliunUI();
   const [rows, setRows] = useState<Record<string, Row>>(() =>
     Object.fromEntries(bookings.map((b) => [b.id, { no: b.confirmation_number ?? "", supplier: b.supplier_name, net: "" }])),
@@ -51,7 +62,7 @@ export function ConfirmAllBookings({ operationId, bookings, onDone }: { operatio
             booking_id: b.id,
             confirmation_number: r.no,
             ...(r.supplier.trim() && r.supplier.trim() !== b.supplier_name.trim() ? { supplier_name: r.supplier } : {}),
-            ...(net != null && Number.isFinite(net) ? { net_charged: net } : {}),
+            ...(canSetNet && net != null && Number.isFinite(net) ? { net_charged: net } : {}),
           };
         }),
       });
@@ -107,7 +118,7 @@ export function ConfirmAllBookings({ operationId, bookings, onDone }: { operatio
           return (
             <li
               key={b.id}
-              className="grid items-end gap-2 rounded-[9px] border border-[#e2ebe7] bg-white p-2.5 sm:grid-cols-[auto_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_6.5rem]"
+              className={`grid items-end gap-2 rounded-[9px] border border-[#e2ebe7] bg-white p-2.5 ${canSetNet ? "sm:grid-cols-[auto_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_6.5rem]" : "sm:grid-cols-[auto_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"}`}
             >
               <input
                 type="checkbox"
@@ -139,21 +150,23 @@ export function ConfirmAllBookings({ operationId, bookings, onDone }: { operatio
                 {t("ops.booking.confirmationNo")}
                 <input dir="ltr" value={r.no} onChange={(e) => edit(b.id, { no: e.target.value })} className={`${field} tv-tnum text-start`} />
               </label>
-              <label className="grid gap-1 text-[11px] font-bold text-[#557d78]">
-                {t("ops.confirmAll.net")}
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  dir="ltr"
-                  inputMode="decimal"
-                  value={r.net}
-                  // the quoted net as a hint (staff with the internal view only) — saved only when typed
-                  placeholder={b.quoted_net != null ? `${b.quoted_net} ${b.currency}` : b.currency}
-                  onChange={(e) => edit(b.id, { net: e.target.value })}
-                  className={`${field} tv-tnum`}
-                />
-              </label>
+              {canSetNet ? (
+                <label className="grid gap-1 text-[11px] font-bold text-[#557d78]">
+                  {t("ops.confirmAll.net")}
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    dir="ltr"
+                    inputMode="decimal"
+                    value={r.net}
+                    // the quoted net as a hint (staff with the internal view only) — saved only when typed
+                    placeholder={b.quoted_net != null ? `${b.quoted_net} ${b.currency}` : b.currency}
+                    onChange={(e) => edit(b.id, { net: e.target.value })}
+                    className={`${field} tv-tnum`}
+                  />
+                </label>
+              ) : null}
             </li>
           );
         })}
