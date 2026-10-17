@@ -13,7 +13,7 @@ const state = vi.hoisted(() => ({
   can: { "offers.write": true, "operations.write": false, "dashboard.admin": false } as Record<string, boolean>,
   me: "emp-1",
   draft: { id: "d1", data: { produced_serial: "AD-1" }, partner_company_id: null } as { id: string; data: { produced_serial: string | null }; partner_company_id: string | null } | null,
-  offer: { id: "o1", status: "sent", employee_id: "emp-1", partner_company_id: null as string | null },
+  offer: { id: "o1", status: "sent", employee_id: "emp-1", partner_company_id: null as string | null, total: 8970, currency: "SAR" },
   sentBefore: [] as { action: string; meta: Record<string, unknown> }[],
   operation: null as { id: string } | null,
   audits: [] as { action: string; entity_id: string; meta?: Record<string, unknown> }[],
@@ -87,7 +87,7 @@ beforeEach(() => {
   state.can = { "offers.write": true, "operations.write": false, "dashboard.admin": false };
   state.me = "emp-1";
   state.draft = { id: "d1", data: { produced_serial: "AD-1" }, partner_company_id: null };
-  state.offer = { id: "o1", status: "sent", employee_id: "emp-1", partner_company_id: null };
+  state.offer = { id: "o1", status: "sent", employee_id: "emp-1", partner_company_id: null, total: 8970, currency: "SAR" };
   state.sentBefore = [];
   state.operation = null;
   state.audits = [];
@@ -198,12 +198,19 @@ describe("«حذف» from the files list (the owner, 2026-10-17)", () => {
   const row = (id: string, over: Partial<(typeof state.drafts)[number]> = {}) => ({ id, title: null, data: {}, created_by: "emp-1", partner_company_id: null, ...over });
 
   it("deletes a draft, and an issued file with its offer while nothing is booked; never a partner's or a colleague's", async () => {
-    state.drafts = [row("d0"), row("d1", { data: { produced_serial: "AD-1" } }), row("dp", { created_by: null, partner_company_id: "p-1" }), row("dx", { created_by: "emp-2" })];
-    expect(await deleteFiles(["d0", "d1", "dp", "dx"])).toEqual({ ok: true, deleted: 2, refused: 2 });
+    state.drafts = [
+      row("d0"),
+      row("d1", { data: { produced_serial: "AD-1" } }),
+      row("dp", { created_by: null, partner_company_id: "p-1" }),
+      row("dx", { created_by: "emp-2" }),
+      // made before its maker was recorded: not anyone's to delete
+      row("dn", { created_by: null }),
+    ];
+    expect(await deleteFiles(["d0", "d1", "dp", "dx", "dn"])).toEqual({ ok: true, deleted: 2, refused: 3 });
     expect(state.deletes).toEqual(["offer_drafts", "offers", "offer_drafts"]);
     expect(state.audits.map((a) => a.action)).toEqual(["draft.deleted", "offer.deleted"]);
-    // the draft as it was, so a wrong press can be rebuilt
-    expect(state.audits[1]?.meta).toMatchObject({ serial: "AD-1", draft: { produced_serial: "AD-1" } });
+    // the offer's serial and total, and the draft as it was, so a wrong press can be rebuilt
+    expect(state.audits[1]?.meta).toMatchObject({ serial: "AD-1", total: 8970, currency: "SAR", draft: { produced_serial: "AD-1" } });
   });
 
   it("never deletes a file operations holds — that one is cancelled from its case", async () => {
