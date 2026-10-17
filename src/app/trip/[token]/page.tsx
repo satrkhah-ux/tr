@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getClientHub } from "@/lib/data/operation-hub";
 import { getClientTrip, type TripFlight } from "@/lib/data/client-trip";
@@ -7,6 +8,8 @@ import { TripReceipts } from "@/components/traveliun/operations/TripReceipts";
 import { TripPassports } from "@/components/traveliun/operations/TripPassports";
 import { getTripGuide } from "@/lib/data/destination-guides";
 import { waNumber, type ClientService, type ServiceKind } from "@/lib/operations/drivers";
+import { fromAbroad, phoneParts } from "@/lib/phone-links";
+import { dayStates } from "@/lib/operations/trip-days";
 
 export const dynamic = "force-dynamic";
 export const metadata = { robots: { index: false, follow: false } };
@@ -62,6 +65,7 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
       : 0;
 
   const todays = trip.services.filter((s) => s.date === trip.today);
+  const dayWhen = dayStates(trip.days.map((d) => d.date), trip.today);
   const dated = new Set(trip.days.map((d) => d.date).filter(Boolean));
   const loose = trip.services.filter((s) => !s.date || !dated.has(s.date));
   // flights, stays and drives carry their own status above; the rest still being worked on
@@ -165,16 +169,35 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
 
         {trip.days.length > 0 || loose.length > 0 ? (
           <Card title="البرنامج يوماً بيوم">
-            <ol className="space-y-3">
-              {trip.days.map((d) => {
+            {/* today and tomorrow open, every other day one tap away — the page stays short */}
+            <ol className="space-y-2.5">
+              {trip.days.map((d, i) => {
                 const drives = trip.services.filter((s) => s.date && s.date === d.date);
+                const when = dayWhen[i];
                 return (
-                  <li key={d.day_number} className="rounded-[12px] border border-[#e2ebe7] p-3.5">
-                    <p className="text-[12px] font-bold text-[#93aaa3]">
-                      اليوم {d.day_number} · {dayLabel(d.date)}
-                      {d.city ? ` · ${d.city}` : ""}
-                    </p>
-                    {d.title ? <p className="mt-0.5 break-words text-[14px] font-extrabold">{d.title}</p> : null}
+                  <li key={d.day_number}>
+                    <details
+                      open={when === "today" || when === "next"}
+                      className={`group rounded-[12px] border bg-white ${
+                        when === "today" ? "border-2 border-[var(--trip)]" : "border-[#e2ebe7]"
+                      } ${when === "past" ? "opacity-75" : ""}`}
+                    >
+                      <summary className="flex cursor-pointer list-none items-start gap-2 p-3.5 [&::-webkit-details-marker]:hidden">
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-1.5 text-[12px] font-bold text-[#93aaa3]">
+                            اليوم {d.day_number} · {dayLabel(d.date)}
+                            {d.city ? ` · ${d.city}` : ""}
+                            {when === "today" ? (
+                              <span className="rounded-full bg-[var(--trip)] px-2 py-0.5 text-[11px] font-extrabold text-white">اليوم</span>
+                            ) : when === "past" ? (
+                              <span className="text-[#0f7a52]">✓</span>
+                            ) : null}
+                          </span>
+                          {d.title ? <span className="mt-0.5 block break-words text-[14px] font-extrabold text-[#263633]">{d.title}</span> : null}
+                        </span>
+                        <ChevronDown aria-hidden className="mt-0.5 size-5 shrink-0 text-[var(--trip)] transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="px-3.5 pb-3.5">
                     {d.activities.length > 0 ? (
                       <ul className="mt-1.5 list-disc space-y-0.5 ps-5 text-[12.5px] font-semibold text-[#334f4b]">
                         {d.activities.map((a, i) => (
@@ -187,11 +210,13 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
                     {d.note ? <p className="mt-1.5 break-words text-[12px] font-semibold text-[#557d78]">{d.note}</p> : null}
                     {drives.length > 0 ? (
                       <ul className="mt-2.5 space-y-2">
-                        {drives.map((s, i) => (
-                          <ServiceItem key={i} s={s} today={trip.today} />
+                        {drives.map((s, k) => (
+                          <ServiceItem key={k} s={s} today={trip.today} />
                         ))}
                       </ul>
                     ) : null}
+                      </div>
+                    </details>
                   </li>
                 );
               })}
@@ -212,9 +237,10 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
         <Card title="للتواصل والطوارئ">
           <div className="space-y-2">
             {emergency ? (
+              // dialled from abroad: our 05… number with the country code already on it
               <Row label="رقم الطوارئ">
-                <a href={tel(emergency)} className="font-extrabold text-[#0f7a52] underline-offset-2 hover:underline">
-                  <bdi dir="ltr">{emergency}</bdi>
+                <a href={fromAbroad(emergency).tel} className="whitespace-nowrap font-extrabold text-[#0f7a52] underline decoration-dotted underline-offset-4">
+                  <bdi dir="ltr">{fromAbroad(emergency).display}</bdi>
                 </a>
               </Row>
             ) : null}
@@ -269,8 +295,23 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
                   <a href={tel(guide.embassy_phone)} className="font-extrabold"><bdi dir="ltr">{guide.embassy_phone}</bdi></a>
                 </Row>
               ) : null}
-              {guide.hospital ? <Row label="مستشفى">{guide.hospital}</Row> : null}
-              {guide.notes ? <p className="whitespace-pre-line break-words text-[12.5px] font-semibold text-[#557d78]">{guide.notes}</p> : null}
+              {guide.hospital ? (
+                <Row label="مستشفى">
+                  <Dialable text={guide.hospital} />
+                </Row>
+              ) : null}
+              {guide.notes ? (
+                <ul className="mt-1 space-y-1 border-t border-[#e2ebe7] pt-2 text-[12.5px] font-semibold text-[#557d78]">
+                  {guide.notes
+                    .split(/\r?\n/)
+                    .filter((line) => line.trim())
+                    .map((line, i) => (
+                      <li key={i} className="break-words">
+                        <Dialable text={line} />
+                      </li>
+                    ))}
+                </ul>
+              ) : null}
             </div>
           </Card>
         ) : null}
@@ -414,6 +455,23 @@ function Metric({ label, value, day }: { label: string; value?: string; day?: st
       <p className="mt-1 break-words text-[17px] font-extrabold leading-tight text-[var(--trip)]">{date}</p>
       {weekday ? <p className="mt-0.5 text-[11px] font-bold text-[#93aaa3]">{weekday}</p> : null}
     </div>
+  );
+}
+
+/** Text whose phone numbers are tap-to-call and read left-to-right inside the Arabic. */
+function Dialable({ text }: { text: string }) {
+  return (
+    <>
+      {phoneParts(text).map((p, i) =>
+        p.tel ? (
+          <a key={i} href={p.tel} className="whitespace-nowrap font-extrabold text-[#0f7a52] underline decoration-dotted underline-offset-4">
+            <bdi dir="ltr">{p.text}</bdi>
+          </a>
+        ) : (
+          <span key={i}>{p.text}</span>
+        ),
+      )}
+    </>
   );
 }
 

@@ -40,6 +40,7 @@ export function RecentFiles({
   states = {},
   meId,
   allByDefault = false,
+  initialTab = "all",
   busy,
   onCopy,
 }: {
@@ -50,6 +51,7 @@ export function RecentFiles({
   meId: string | null;
   /** the administration opens on everyone's files */
   allByDefault?: boolean;
+  initialTab?: "all" | "draft" | "issued";
   busy: string | null;
   onCopy: (id: string) => void;
 }) {
@@ -59,7 +61,7 @@ export function RecentFiles({
   const [country, setCountry] = useState("");
   const [service, setService] = useState<ServiceKey | "">("");
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<"all" | "draft" | "issued">("all");
+  const [status, setStatus] = useState<"all" | "draft" | "issued">(initialTab);
   // one state of the ladder («أُرسل للعميل», «مؤكّد»…), on top of the tabs
   const [state, setState] = useState<FileState | "">("");
   // an issued file the lookup missed claims nothing: «صدر»

@@ -11,7 +11,8 @@ import { fileStatesFor } from "@/lib/data/file-status-core";
 const FLIGHT_CARD_HREF: string | null = "/repackage/flight-card";
 
 /** «النظام بيسك» — the one-page entry over the same drafts as the package generator. */
-export default async function BasicPage() {
+export default async function BasicPage({ searchParams }: { searchParams: Promise<{ files?: string }> }) {
+  const { files } = await searchParams;
   // our agents, and a partner company on its own files (the drafts and pricing already scope to it)
   if (!(await currentCan("offers.write")) && !(await getPartnerSession())) redirect("/dashboard");
   // the doors to the other services follow their switches (features.ts) as the menu does
@@ -33,6 +34,7 @@ export default async function BasicPage() {
       states={states}
       meId={meId}
       allByDefault={management}
+      initialTab={files === "issued" || files === "draft" ? files : "all"}
       readyOffers={readyOffers.filter((o) => o.status !== "coming_soon" && o.seed)}
       tools={{ repackage: canRepackage && repackageOn, flightCard: FLIGHT_CARD_HREF && canRepackage && flightCardOn ? FLIGHT_CARD_HREF : null }}
     />

@@ -79,7 +79,8 @@ export function stageHref(draftId: string, stage: StageKey): string {
  * landed on «الخدمات», duplicating and continuing on «العميل». One address.
  */
 export function draftHref(draftId: string): string {
-  return `/package-generator/${draftId}`;
+  // the owner (2026-10-17): «العمل بالكامل على النظام البيسك» — every «open this file» lands in Basic
+  return `/basic/${draftId}`;
 }
 
 /**
