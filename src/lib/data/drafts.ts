@@ -1,6 +1,7 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { OfferStatus } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
@@ -105,6 +106,8 @@ export type DraftSummary = {
   produced_serial: string | null;
   /** the version the client has now (offer_renders), for an issued file; null otherwise. */
   version: number | null;
+  /** where the issued offer stands (sent / confirmed / cancelled); null for a draft. */
+  offer_status: OfferStatus | null;
   updated_at: string;
   created_at: string;
   /** the employee who started the file, and their name (null: unknown or a partner's). */
@@ -119,7 +122,7 @@ export async function listDrafts(): Promise<DraftSummary[]> {
   const { sarPer } = await getRates();
   try {
     const rows = await listDraftRows();
-    const versions = await latestVersions(rows.map((r) => normalizeDraftData(r.data).produced_serial).filter((s): s is string => Boolean(s)));
+    const { versions, statuses } = await issuedState(rows.map((r) => normalizeDraftData(r.data).produced_serial).filter((s): s is string => Boolean(s)));
     return rows.map(
       (row) => {
         const draft = normalizeDraftData(row.data);
@@ -140,6 +143,7 @@ export async function listDrafts(): Promise<DraftSummary[]> {
           currency: draft.pricing.display_currency,
           produced_serial: draft.produced_serial,
           version: draft.produced_serial ? (versions.get(draft.produced_serial) ?? null) : null,
+          offer_status: draft.produced_serial ? (statuses.get(draft.produced_serial) ?? null) : null,
           updated_at: row.updated_at,
           created_at: row.created_at,
           created_by: row.created_by,
@@ -159,19 +163,21 @@ export async function listDrafts(): Promise<DraftSummary[]> {
  * offer_renders is closed to sessions (0047) — read through the service role,
  * and only the version numbers of the serials this caller's own list holds.
  */
-async function latestVersions(serials: string[]): Promise<Map<string, number>> {
+async function issuedState(serials: string[]): Promise<{ versions: Map<string, number>; statuses: Map<string, OfferStatus> }> {
   const out = new Map<string, number>();
-  if (serials.length === 0) return out;
+  const statuses = new Map<string, OfferStatus>();
+  if (serials.length === 0) return { versions: out, statuses };
   const service = createSupabaseServiceClient() as unknown as SupabaseClient;
-  const { data: offers } = await service.from("offers").select("id, serial").in("serial", serials);
+  const { data: offers } = await service.from("offers").select("id, serial, status").in("serial", serials);
+  for (const o of (offers ?? []) as { serial: string; status: OfferStatus }[]) statuses.set(o.serial, o.status);
   const bySerial = new Map(((offers ?? []) as { id: string; serial: string }[]).map((o) => [o.id, o.serial]));
-  if (bySerial.size === 0) return out;
+  if (bySerial.size === 0) return { versions: out, statuses };
   const { data: renders } = await service.from("offer_renders").select("offer_id, version").eq("variant", "client").in("offer_id", [...bySerial.keys()]);
   for (const r of (renders ?? []) as { offer_id: string; version: number }[]) {
     const serial = bySerial.get(r.offer_id)!;
     out.set(serial, Math.max(out.get(serial) ?? 0, r.version));
   }
-  return out;
+  return { versions: out, statuses };
 }
 
 export type CreateDraftResult = InsertDraftResult;

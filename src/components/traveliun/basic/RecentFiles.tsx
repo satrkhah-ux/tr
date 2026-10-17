@@ -21,6 +21,22 @@ const SERVICES: { key: ServiceKey; label: "svcHotels" | "svcFlightsIntl" | "svcF
 
 const select = "h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12px] font-bold text-[#185045]";
 
+/** one column grid for the header and every row, so the columns line up (lg and up; below, a row stacks) */
+const COLS = "lg:grid-cols-[8.5rem_minmax(0,1fr)_9.5rem_7.5rem_8.5rem_23rem]";
+type FileState = "draft" | "sent" | "confirmed" | "cancelled";
+const STATE_LABEL: Record<FileState, "stDraft" | "stSent" | "stConfirmed" | "stCancelled"> = {
+  draft: "stDraft",
+  sent: "stSent",
+  confirmed: "stConfirmed",
+  cancelled: "stCancelled",
+};
+const STATE_STYLE: Record<FileState, string> = {
+  draft: "bg-[#f2f4f3] text-[#6f7c78]",
+  sent: "bg-[#eaf1fd] text-[#2f5bd3]",
+  confirmed: "bg-[#e6f6ee] text-[#0f7a52]",
+  cancelled: "bg-[#fdeef2] text-[#c22850]",
+};
+
 /** the company's day, whatever the browser's clock zone */
 const dayKey = (iso: string | Date) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
 
@@ -180,72 +196,94 @@ export function RecentFiles({
                 {dayTitle(key)}
                 <span className="tv-tnum rounded-full bg-[#eef4f1] px-1.5 text-[10.5px]">{list.length}</span>
               </h3>
-              <ul className="divide-y divide-[#edf3f0] rounded-[10px] border border-[#edf3f0]">
-                {list.map((d) => {
-                  const name = d.customer_name || (d.title && d.title !== d.destination ? d.title : null);
-                  return (
-                    <li key={d.id}>
-                      <div className="grid items-center gap-x-3 gap-y-1 px-3 py-2 sm:grid-cols-[7.5rem_minmax(0,1fr)_11rem_8rem_auto]">
-                        {/* the state first: a draft, or issued and at which version */}
-                        <span
-                          className={`w-fit rounded-full px-2 py-0.5 text-[10.5px] font-bold ${d.produced_serial ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#f2f4f3] text-[#7a8783]"}`}
-                        >
-                          {d.produced_serial ? tx("statusIssued") : tx("statusDraft")}
-                          {d.produced_serial && d.version ? ` · ${tx("versionN", { n: d.version })}` : ""}
-                        </span>
-                        <Link href={`/basic/${d.id}`} className="min-w-0 hover:underline">
-                          <span className={`block truncate text-[13px] font-bold ${name ? "text-[#185045]" : "text-[#93aaa3]"}`}>{name ?? tx("unnamed")}</span>
-                          <span className="block truncate text-[11px] font-semibold text-[#78948f]">
-                            {d.destination ?? ""}
-                            {d.destination && d.produced_serial ? " · " : ""}
-                            {d.produced_serial ? <DirText>{d.produced_serial}</DirText> : null}
+              <div className="overflow-hidden rounded-[10px] border border-[#e3ece8]">
+                {/* the columns, said once per day */}
+                <div className={`${COLS} hidden bg-[#f6f9f8] px-3 py-1.5 text-[10.5px] font-extrabold text-[#78948f] lg:grid`}>
+                  <span>{tx("colStatus")}</span>
+                  <span>{tx("colClient")}</span>
+                  <span>{tx("colTrip")}</span>
+                  <span>{tx("colTotal")}</span>
+                  <span>{tx("colMaker")}</span>
+                  <span className="text-end">{tx("colActions")}</span>
+                </div>
+                <ul className="divide-y divide-[#edf3f0]">
+                  {list.map((d) => {
+                    const name = d.customer_name || (d.title && d.title !== d.destination ? d.title : null);
+                    const state = !d.produced_serial ? "draft" : d.offer_status === "confirmed" ? "confirmed" : d.offer_status === "cancelled" ? "cancelled" : "sent";
+                    return (
+                      <li key={d.id} className={history === d.id ? "bg-[#fbfdfc]" : ""}>
+                        <div className={`${COLS} grid items-center gap-x-3 gap-y-1.5 px-3 py-2.5`}>
+                          {/* where the file stands — the first thing to read */}
+                          <span className="flex flex-col items-start gap-0.5">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-extrabold ${STATE_STYLE[state]}`}>
+                              <span className="size-1.5 rounded-full bg-current" />
+                              {tx(STATE_LABEL[state])}
+                            </span>
+                            {d.produced_serial && d.version ? <span className="ps-1 text-[10.5px] font-bold text-[#93aaa3]">{tx("versionN", { n: d.version })}</span> : null}
                           </span>
-                        </Link>
-                        <span className="tv-tnum text-[11.5px] font-semibold text-[#557d78]">
-                          {[d.travel_date, d.nights ? nightsText(d.nights, language) : "", d.travelers ? tx("travellersN", { n: d.travelers }) : ""].filter(Boolean).join(" · ") || "—"}
-                        </span>
-                        <span className="truncate text-[11px] font-bold text-[#557d78]">
-                          {d.total != null ? <DirText className="tv-tnum">{`${Math.round(d.total).toLocaleString("en-US")} ${d.currency}`}</DirText> : null}
-                          {who !== "mine" && d.created_by_name ? <span className="block truncate font-semibold text-[#93aaa3]">{d.created_by_name}</span> : null}
-                        </span>
-                        <span className="flex items-center gap-1.5 justify-self-end">
-                          <Link href={`/basic/${d.id}`} className="inline-flex h-8 items-center rounded-[8px] bg-[#185045] px-3 text-[11.5px] font-bold text-white hover:bg-[#0f4439]">
-                            {tx("open")}
+                          <Link href={`/basic/${d.id}`} className="min-w-0">
+                            <span className={`block truncate text-[13px] font-bold hover:underline ${name ? "text-[#185045]" : "text-[#a3b5b0]"}`}>{name ?? tx("unnamed")}</span>
+                            <span className="block truncate text-[11px] font-semibold text-[#78948f]">
+                              {d.destination ?? ""}
+                              {d.destination && d.produced_serial ? " · " : ""}
+                              {d.produced_serial ? <DirText>{d.produced_serial}</DirText> : null}
+                            </span>
                           </Link>
-                          {/* staff only: a partner (no meId) has no version history to open */}
-                          {d.produced_serial && meId ? (
+                          <span className="tv-tnum text-[11.5px] font-semibold text-[#557d78]">
+                            {d.travel_date ? <DirText className="block">{d.travel_date}</DirText> : null}
+                            <span className="block text-[#93aaa3]">
+                              {[d.nights ? nightsText(d.nights, language) : "", d.travelers ? tx("travellersN", { n: d.travelers }) : ""].filter(Boolean).join(" · ") || "—"}
+                            </span>
+                          </span>
+                          <span className="tv-tnum text-[12px] font-extrabold text-[#185045]">
+                            {d.total != null ? <DirText>{`${Math.round(d.total).toLocaleString("en-US")} ${d.currency}`}</DirText> : <span className="font-semibold text-[#a3b5b0]">—</span>}
+                          </span>
+                          <span className="truncate text-[11.5px] font-semibold text-[#557d78]">{d.created_by_name ?? "—"}</span>
+                          {/* fixed slots, so the buttons line up row under row */}
+                          <span className="flex items-center gap-1.5 lg:justify-end">
+                            <Link
+                              href={`/basic/${d.id}`}
+                              className="inline-flex h-8 w-[7.25rem] items-center justify-center rounded-[8px] bg-[#185045] text-[11.5px] font-bold text-white hover:bg-[#0f4439]"
+                            >
+                              {d.produced_serial ? tx("openFile") : tx("continueEntry")}
+                            </Link>
+                            {d.produced_serial && meId ? (
+                              <button
+                                type="button"
+                                aria-expanded={history === d.id}
+                                onClick={() => setHistory(history === d.id ? null : d.id)}
+                                className={`inline-flex h-8 w-[6.25rem] items-center justify-center gap-1 rounded-[8px] border text-[11.5px] font-bold text-[#185045] ${history === d.id ? "border-[#185045] bg-[#f0f7f4]" : "border-[#cfe0d9] hover:bg-[#f4f8f6]"}`}
+                              >
+                                <History className="size-3.5" />
+                                {tx("versionsBtn")}
+                              </button>
+                            ) : (
+                              <span className="hidden w-[6.25rem] lg:block" aria-hidden />
+                            )}
+                            {/* the same programme for the next client */}
                             <button
                               type="button"
-                              aria-expanded={history === d.id}
-                              onClick={() => setHistory(history === d.id ? null : d.id)}
-                              className={`inline-flex h-8 items-center gap-1 rounded-[8px] border px-2.5 text-[11.5px] font-bold text-[#185045] ${history === d.id ? "border-[#185045] bg-[#f0f7f4]" : "border-[#cfe0d9] hover:bg-[#f4f8f6]"}`}
+                              title={tx("copyHint")}
+                              aria-label={tx("copyForNew")}
+                              disabled={busy !== null}
+                              onClick={() => onCopy(d.id)}
+                              className="inline-flex h-8 w-[8.5rem] items-center justify-center gap-1 rounded-[8px] border border-[#cfe0d9] text-[11px] font-bold text-[#557d78] hover:bg-[#f4f8f6] disabled:opacity-60"
                             >
-                              <History className="size-3.5" />
-                              {tx("versionsBtn")}
+                              {busy === `c-${d.id}` ? <Loader2 className="size-3.5 animate-spin" /> : <Copy className="size-3.5" />}
+                              {tx("copyForNew")}
                             </button>
-                          ) : null}
-                          {/* the same programme for the next client */}
-                          <button
-                            type="button"
-                            title={tx("copyHint")}
-                            disabled={busy !== null}
-                            onClick={() => onCopy(d.id)}
-                            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[8px] border border-[#cfe0d9] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
-                          >
-                            {busy === `c-${d.id}` ? <Loader2 className="size-3.5 animate-spin" /> : <Copy className="size-3.5" />}
-                            {tx("copy")}
-                          </button>
-                        </span>
-                      </div>
-                      {history === d.id && d.produced_serial ? (
-                        <div className="px-3 pb-3">
-                          <OfferVersions serial={d.produced_serial} draftId={d.id} defaultOpen />
+                          </span>
                         </div>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
+                        {history === d.id && d.produced_serial ? (
+                          <div className="px-3 pb-3">
+                            <OfferVersions serial={d.produced_serial} draftId={d.id} defaultOpen />
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             </div>
           ))}
         </div>
