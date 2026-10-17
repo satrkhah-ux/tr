@@ -895,7 +895,7 @@ export const en = {
   "dev.services.off": "Off",
   "dev.services.failed": "Could not save — the switch was put back",
   "dev.f.legacy_generator": "Previous package generator",
-  "dev.f.legacy_generator.hint": "When off, old drafts open in the Basic system.",
+  "dev.f.legacy_generator.hint": "When off, old drafts open in the Basic system. Note: a file missing something in «Terms» or «Daily programme» is fixed only from the old generator's pages today.",
   "dev.f.repackage": "Supplier package redesign",
   "dev.f.repackage.hint": "When off, the supplier package import disappears and its links are refused; what it issued stays.",
   "dev.f.flight_card": "Flight card design",
