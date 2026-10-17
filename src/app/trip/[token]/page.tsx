@@ -48,8 +48,10 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
   const [hub, trip, guide] = await Promise.all([getClientHub(token), getClientTrip(token), getTripGuide(token)]);
   if (!hub || !trip) notFound();
 
-  // a partner's colour when it is their client — a validated hex from brandVars, else ours
-  const accent = { "--trip": hub.brand.color ?? "#135549" } as CSSProperties;
+  // the programme PDF's identity — its green, its gold, its logo, its world map;
+  // a partner's own colours and logo when it is their client (brandVars, validated)
+  const accent = { "--trip": hub.brand.color ?? "#135549", "--gold": hub.brand.accent ?? "#f0ad22" } as CSSProperties;
+  const logo = hub.brand.logo ?? "/traveliun/offer-logo.png";
   const whatsapp = waNumber(hub.brand.whatsapp || hub.brand.phone);
   const say = (text: string) => `https://wa.me/${whatsapp}?text=${encodeURIComponent(text)}`;
   const emergency = trip.info.emergency_phone || hub.brand.phone;
@@ -61,22 +63,40 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
   const pending = hub.pending.filter((p) => p.kind === "visa" || (p.kind === "service" && !p.title.startsWith("جولة")));
 
   return (
-    <main dir="rtl" style={accent} className="min-h-screen bg-[#f4f8f6] px-4 py-6 text-[#0f3d38] sm:py-10">
-      <div className="mx-auto w-full max-w-[680px] space-y-4">
-        <header className="rounded-2xl bg-[var(--trip)] px-5 py-6 text-white shadow-[0_10px_30px_rgba(19,85,73,0.25)] sm:px-6">
-          <p className="text-[13px] font-bold opacity-80">{hub.brand.name}</p>
-          <h1 className="mt-1 break-words text-[24px] font-extrabold">{hub.destination || "رحلتك"}</h1>
-          <p className="mt-2 break-words text-[13.5px] font-semibold opacity-90">
-            {hub.customer_name ? `${hub.customer_name} · ` : ""}
-            <bdi dir="ltr">{hub.serial}</bdi>
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2 text-[12.5px] font-bold">
-            {hub.travel_start ? (
-              <span className="rounded-full bg-white/15 px-3 py-1">
-                {dayLabel(hub.travel_start)} ← {dayLabel(hub.travel_end)}
-              </span>
-            ) : null}
-            {trip.travellers > 0 ? <span className="rounded-full bg-white/15 px-3 py-1">المسافرون: {trip.travellers}</span> : null}
+    <main dir="rtl" style={accent} className="relative min-h-screen bg-[#f5f7f4] px-4 py-6 text-[#263633] sm:py-10">
+      {/* the world map the programme is printed on, faint behind the page */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 bg-[url('/traveliun/world-map.png')] bg-cover bg-center opacity-[0.14]" />
+      <div className="relative mx-auto w-full max-w-[680px] space-y-4">
+        <header className="overflow-hidden rounded-2xl border border-[#c8dad6] bg-white shadow-[0_8px_24px_rgba(20,54,48,0.10)]">
+          {/* the company block on the reading side, the logo opposite — the programme's cover */}
+          <div className="flex items-center justify-between gap-4 px-5 py-4 sm:px-6">
+            <div className="min-w-0 border-s-4 border-[var(--trip)] ps-3">
+              <p className="break-words text-[15px] font-extrabold text-[var(--trip)]">{hub.brand.name}</p>
+              {hub.brand.nameLatin ? (
+                <p dir="ltr" className="text-end text-[11px] font-bold tracking-wide text-[#6b7c78]">
+                  {hub.brand.nameLatin}
+                </p>
+              ) : null}
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element -- a public page, the logo may be a partner's remote file */}
+            <img src={logo} alt={hub.brand.name} className="h-14 w-auto max-w-[170px] shrink-0 object-contain" />
+          </div>
+          <div className="bg-[var(--trip)] px-5 py-5 text-white sm:px-6">
+            <p className="text-[12px] font-bold text-white/75">برنامج رحلتك</p>
+            <h1 className="mt-0.5 break-words text-[26px] font-extrabold">{hub.destination || "رحلتك"}</h1>
+            <span aria-hidden className="mt-2 block h-[3px] w-14 rounded-full bg-[var(--gold)]" />
+            <p className="mt-2.5 break-words text-[13.5px] font-semibold text-white/90">
+              {hub.customer_name ? `${hub.customer_name} · ` : ""}
+              <bdi dir="ltr">{hub.serial}</bdi>
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2 text-[12.5px] font-bold">
+              {hub.travel_start ? (
+                <span className="rounded-full bg-white/15 px-3 py-1">
+                  {dayLabel(hub.travel_start)} ← {dayLabel(hub.travel_end)}
+                </span>
+              ) : null}
+              {trip.travellers > 0 ? <span className="rounded-full bg-white/15 px-3 py-1">المسافرون: {trip.travellers}</span> : null}
+            </div>
           </div>
         </header>
 
@@ -342,10 +362,14 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
           </a>
         ) : null}
 
-        <footer className="pb-4 text-center text-[12px] font-semibold text-[#93aaa3]">
-          {hub.brand.name}
-          {hub.brand.phone ? <> · <bdi dir="ltr">{hub.brand.phone}</bdi></> : null}
-          {hub.brand.website ? <> · <bdi dir="ltr">{hub.brand.website}</bdi></> : null}
+        <footer className="rounded-2xl border-t-[3px] border-[var(--trip)] bg-white/90 px-5 py-4 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element -- see the header */}
+          <img src={logo} alt="" className="mx-auto h-9 w-auto object-contain" />
+          <p className="mt-2 text-[12px] font-bold text-[#6b7c78]">
+            {hub.brand.name}
+            {hub.brand.phone ? <> · <bdi dir="ltr">{hub.brand.phone}</bdi></> : null}
+            {hub.brand.website ? <> · <bdi dir="ltr">{hub.brand.website}</bdi></> : null}
+          </p>
         </footer>
       </div>
     </main>
@@ -355,11 +379,15 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
 function Card({ title, tone, children }: { title: string; tone?: "accent"; children: ReactNode }) {
   return (
     <section
-      className={`rounded-2xl border bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)] ${
-        tone === "accent" ? "border-[var(--trip)]" : "border-[#e2ebe7]"
+      className={`rounded-2xl border bg-white/95 p-5 shadow-[0_8px_20px_rgba(20,54,48,0.06)] ${
+        tone === "accent" ? "border-2 border-[var(--trip)]" : "border-[#d7e4e0]"
       }`}
     >
-      <h2 className="mb-3 text-[15px] font-extrabold">{title}</h2>
+      {/* the programme's section heading: green, with the gold mark */}
+      <h2 className="mb-3 flex items-center gap-2 text-[15px] font-extrabold text-[var(--trip)]">
+        <span aria-hidden className="h-5 w-1.5 shrink-0 rounded-full bg-[var(--gold)]" />
+        {title}
+      </h2>
       {children}
     </section>
   );
@@ -442,18 +470,18 @@ function FlightItem({ f }: { f: TripFlight }) {
 
 function ServiceItem({ s, today, withDate }: { s: ClientService; today: string; withDate?: boolean }) {
   return (
-    <li className="rounded-[11px] border border-[#e2ebe7] bg-[#fbfdfc] p-3">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <li className="overflow-hidden rounded-[12px] border border-[#c8dad6] bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-[var(--trip)] px-3 py-2 text-white">
         <p className="min-w-0 break-words text-[13px] font-extrabold">
           {SERVICE_LABEL[s.kind]}
-          {s.kind === "tour" || s.kind === "transfer" ? <span className="font-semibold text-[#557d78]"> — {s.title.replace(/^جولة:\s*/, "")}</span> : null}
+          {s.kind === "tour" || s.kind === "transfer" ? <span className="font-semibold text-white/80"> — {s.title.replace(/^جولة:\s*/, "")}</span> : null}
         </p>
-        <span className="shrink-0 rounded-full bg-[#eef4f1] px-2.5 py-0.5 text-[12px] font-extrabold">
+        <span className="shrink-0 rounded-full bg-[var(--gold)] px-2.5 py-0.5 text-[12px] font-extrabold text-[#263633]">
           {withDate ? `${dayLabel(s.date)} · ` : ""}
           <bdi dir="ltr">{s.time || "يُحدَّد لاحقاً"}</bdi>
         </span>
       </div>
-      <div className="mt-1 space-y-0.5 text-[12.5px] font-semibold text-[#334f4b]">
+      <div className="space-y-0.5 px-3 py-2.5 text-[12.5px] font-semibold text-[#334f4b]">
         {s.meet ? <p className="break-words">نقطة الالتقاء: {s.meet}</p> : null}
         {s.flight ? (
           <p>
@@ -464,12 +492,12 @@ function ServiceItem({ s, today, withDate }: { s: ClientService; today: string; 
         {s.program ? <p className="break-words text-[#557d78]">{s.program}</p> : null}
       </div>
       {s.progress ? (
-        <p className={`mt-1.5 text-[12.5px] font-extrabold ${s.progress === "done" ? "text-[#0f7a52]" : "text-[#a86a10]"}`}>
+        <p className={`mx-3 mb-2.5 text-[12.5px] font-extrabold ${s.progress === "done" ? "text-[#0f7a52]" : "text-[#a86a10]"}`}>
           {s.progress === "done" ? "✓ تم الاستقبال" : "السائق في الطريق"}
         </p>
       ) : null}
       {s.driver ? (
-        <div className="mt-2 rounded-[10px] bg-[var(--trip)] px-3 py-2.5 text-white">
+        <div className="mx-3 mb-3 rounded-[10px] border-2 border-[var(--gold)] bg-[var(--trip)] px-3 py-2.5 text-white">
           <p className="text-[11.5px] font-bold opacity-80">سائقك اليوم</p>
           <p className="mt-0.5 break-words text-[14px] font-extrabold">
             {s.driver.name || "السائق"}
@@ -486,7 +514,7 @@ function ServiceItem({ s, today, withDate }: { s: ClientService; today: string; 
           ) : null}
         </div>
       ) : s.date && s.date > today ? (
-        <p className="mt-1.5 text-[11.5px] font-semibold text-[#93aaa3]">تظهر بيانات السائق هنا يوم الخدمة.</p>
+        <p className="mx-3 mb-3 text-[11.5px] font-semibold text-[#93aaa3]">تظهر بيانات السائق هنا يوم الخدمة.</p>
       ) : null}
     </li>
   );

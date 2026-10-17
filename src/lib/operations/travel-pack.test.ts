@@ -80,7 +80,7 @@ function pack(withDriver: boolean): TravelPack {
       travel_end: "2026-11-27",
       documents: [],
       pending: [],
-      brand: { name: "ترافليون", phone: "", website: "", color: null, whatsapp: "" },
+      brand: { name: "ترافليون", nameLatin: "", phone: "", website: "", color: null, accent: null, logo: null, whatsapp: "" },
     },
     trip: {
       today: "2026-11-20",
