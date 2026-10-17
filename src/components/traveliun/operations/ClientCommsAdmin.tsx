@@ -58,7 +58,7 @@ export function ClientCommsAdmin({
         <section className={card}>
           <h1 className="text-lg font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">رسائل العميل في محطات رحلته</h1>
           <p className="mt-1 text-[12.5px] font-semibold text-[#78948f]">
-            تُرسل بواتساب إلى محادثة العميل، مرة واحدة لكل محطة، ولا تُرسل لعملاء الشركات الشريكة. المتغيّرات: {"{name} {destination} {serial} {link} {rate_link}"}.
+            تُرسل بواتساب إلى محادثة العميل، مرة واحدة لكل محطة، ولا تُرسل لعملاء الشركات الشريكة. المتغيّرات: {"{name} {destination} {serial} {date} {link} {rate_link}"}.
             يُوضع كل رابط في سطر وحده تلقائياً، و*النجمتان* تجعلان النص عريضاً في واتساب. بعد 24 ساعة من آخر رسالة للعميل يُرسل قالب ميتا المعتمد بدل النص.
           </p>
           <div className="mt-3 rounded-[10px] bg-[#f6faf8] px-3 py-2 dark:bg-[#0f1f1b]">

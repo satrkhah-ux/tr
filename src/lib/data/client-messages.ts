@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { clientWhatsappAllowed, messageClient } from "./client-whatsapp";
-import { fillTemplate, waParams, type ClientMessageKey } from "@/lib/operations/client-messages";
+import { arabicDay, fillTemplate, waParams, type ClientMessageKey } from "@/lib/operations/client-messages";
 
 /**
  * Send the client the stage's message (operations order 11, suggestion 5):
@@ -21,13 +21,14 @@ export async function sendClientMessage(operationId: string, key: ClientMessageK
 
     const { data } = await supabase
       .from("operations")
-      .select("id, client_token, client_token_revoked_at, offers(serial, destination, employee_id, partner_company_id, customers(arabic_name, mobile))")
+      .select("id, client_token, client_token_revoked_at, travel_start, offers(serial, destination, employee_id, partner_company_id, customers(arabic_name, mobile))")
       .eq("id", operationId)
       .maybeSingle();
     const op = data as unknown as {
       id: string;
       client_token: string | null;
       client_token_revoked_at: string | null;
+      travel_start: string | null;
       offers: { serial: string; destination: string | null; employee_id: string | null; partner_company_id: string | null; customers: unknown } | null;
     } | null;
     const offer = Array.isArray(op?.offers) ? op?.offers[0] : op?.offers;
@@ -56,6 +57,7 @@ export async function sendClientMessage(operationId: string, key: ClientMessageK
       serial: offer.serial,
       link: token ? `${base}/trip/${token}` : "",
       rate_link: token ? `${base}/trip/${token}/rate` : "",
+      date: arabicDay(op.travel_start),
     };
     // a thread is opened if Teletel has never seen them; outside WhatsApp's 24
     // hours it goes as its approved template, or waits as a team note

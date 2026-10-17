@@ -1,6 +1,7 @@
 // Submit the client's WhatsApp templates (WA_TEMPLATES in src/lib/operations/client-messages.ts)
 // to Meta for approval, through the same WhatsApp Business account Teletel sends from.
 //
+// Only the messages switched on in /settings/client-comms, and the programme.
 // Usage: node scripts/submit-wa-templates.mjs            (dry run: prints what would be sent)
 //        node scripts/submit-wa-templates.mjs --submit   (submits the ones not already on the account)
 //
@@ -11,6 +12,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import pg from "pg";
 import { WA_TEMPLATES } from "../src/lib/operations/client-messages.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,6 +38,12 @@ const waba = detail.provider_config?.business_account_id;
 if (!token || !waba) throw new Error("the inbox does not expose its Meta connection");
 const existing = new Map((detail.message_templates ?? []).map((t) => [t.name, t.status]));
 
+// only the messages a manager has switched on (/settings/client-comms) — and the programme
+const db = new pg.Client({ connectionString: env.SUPABASE_DB_URL, ssl: { rejectUnauthorized: false } });
+await db.connect();
+const enabled = new Set((await db.query("select key from public.client_message_templates where enabled")).rows.map((r) => r.key));
+await db.end();
+
 const sample = ["أحمد", "ماليزيا", "https://pkg.traveliun.com/trip/abc123"];
 
 /** A sample PDF for a document header: Meta wants an uploaded example file. */
@@ -58,7 +66,8 @@ async function documentHandle() {
   return up?.h ?? null;
 }
 
-for (const def of Object.values(WA_TEMPLATES)) {
+for (const [key, def] of Object.entries(WA_TEMPLATES)) {
+  if (key !== "programme" && !enabled.has(key)) continue;
   if (existing.has(def.name)) {
     console.log(`= ${def.name}: already on the account (${existing.get(def.name)})`);
     continue;

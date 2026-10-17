@@ -8,10 +8,11 @@
 export const CLIENT_MESSAGE_KEYS = [
   "bookings_confirmed",
   "documents_ready",
+  "trip_reminder",
+  "welcome",
   "three_days_before",
   "day_before",
   "departure_day",
-  "welcome",
   "midway",
   "rate_trip",
 ] as const;
@@ -20,16 +21,36 @@ export type ClientMessageKey = (typeof CLIENT_MESSAGE_KEYS)[number];
 export const CLIENT_MESSAGE_LABEL: Record<ClientMessageKey, string> = {
   bookings_confirmed: "تأكيد الحجوزات",
   documents_ready: "جاهزية المستندات",
+  trip_reminder: "قبل السفر بيومين — التذكير الشامل",
   three_days_before: "قبل السفر بثلاثة أيام",
   day_before: "قبل السفر بيوم",
   departure_day: "يوم السفر — سفراً ممتعاً",
-  welcome: "الترحيب بعد الوصول",
+  welcome: "صباح اليوم التالي للسفر — الحمد لله على السلامة",
   midway: "الاطمئنان في منتصف الرحلة",
   rate_trip: "طلب التقييم بعد العودة",
 };
 
 /** The placeholders a template may use — anything else is left as written. */
-export type MessageFields = { name: string; destination: string; serial: string; link: string; rate_link: string };
+export type MessageFields = {
+  name: string;
+  destination: string;
+  serial: string;
+  link: string;
+  rate_link: string;
+  /** the travel day in words, «الخميس، 20 نوفمبر» — arabicDay(). */
+  date?: string;
+};
+
+/** «الخميس، 20 نوفمبر» — the day a client reads, not an ISO date. */
+export function arabicDay(iso: string | null | undefined): string {
+  if (!iso) return "";
+  return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  });
+}
 
 /**
  * A message laid out the way WhatsApp reads well: each link alone on its own
@@ -50,7 +71,7 @@ export function tidyWhatsapp(text: string): string {
 }
 
 export function fillTemplate(body: string, fields: MessageFields): string {
-  return tidyWhatsapp(body.replace(/\{(name|destination|serial|link|rate_link)\}/g, (_, key: keyof MessageFields) => fields[key] ?? ""));
+  return tidyWhatsapp(body.replace(/\{(name|destination|serial|link|rate_link|date)\}/g, (_, key: keyof MessageFields) => fields[key] ?? ""));
 }
 
 /** The execution step that sends a message when the case reaches it (the rest are dated, see messagesDueToday). */
@@ -63,24 +84,35 @@ const dayDiff = (from: string, to: string) => Math.round((Date.parse(`${to}T00:0
 
 /**
  * The dated messages due on `today` for a trip from `start` to `end` (the
- * morning job runs once a day, so a day is the finest it can aim):
- * three days before, the day before, the travel day itself, the morning AFTER
- * it — by then the group has landed, so «الحمد لله على سلامتك» is true — and
- * the middle of a trip of four nights or more. «rate_trip» goes when the trip is
- * marked travelled (daily.ts), not by date.
+ * morning job runs once a day, so a day is the finest it can aim). Only the
+ * ones a manager switched on go out (client_message_templates.enabled), each
+ * once per trip (sendClientMessage keeps count).
+ *
+ * The administration's set (2026-10-17): ONE reminder two days before —
+ * passport and tickets, the documents and the driver, «سفراً ممتعاً», and the
+ * rating after the return, together — and the welcome the morning AFTER the
+ * travel day, when the group has landed and «الحمد لله على سلامتك» is true.
+ * The reminder also goes to a file made later than that, up to the travel day.
+ *
+ * The finer ones (three days, the day before, the travel day, mid-trip) stay
+ * here for a manager who switches them back on.
  */
 export function messagesDueToday(start: string | null, end: string | null, today: string): ClientMessageKey[] {
   if (!start) return [];
   const until = dayDiff(today, start);
-  if (until === 3) return ["three_days_before"];
-  if (until === 1) return ["day_before"];
-  if (until === 0) return ["departure_day"];
+  const due: ClientMessageKey[] = [];
+  if (until >= 0 && until <= 2) due.push("trip_reminder");
+  if (until === 3) due.push("three_days_before");
+  if (until === 1) due.push("day_before");
+  if (until === 0) due.push("departure_day");
   const since = -until;
-  if (!end || today > end) return [];
-  if (since === 1) return ["welcome"];
-  const length = dayDiff(start, end);
-  const middle = Math.floor(length / 2);
-  return length >= 4 && middle > 1 && since === middle ? ["midway"] : [];
+  if (since >= 1 && end && today <= end) {
+    if (since === 1) due.push("welcome");
+    const length = dayDiff(start, end);
+    const middle = Math.floor(length / 2);
+    if (length >= 4 && middle > 1 && since === middle) due.push("midway");
+  }
+  return due;
 }
 
 // ---------- WhatsApp templates (Meta-approved, for after the 24 hours) ----------
@@ -88,7 +120,7 @@ export function messagesDueToday(start: string | null, end: string | null, today
 /** What a template is about: a stage message, or the programme sent when a file is issued. */
 export type WaTemplateKey = ClientMessageKey | "programme";
 
-type WaField = "name" | "destination" | "serial" | "link";
+type WaField = "name" | "destination" | "serial" | "link" | "date";
 
 export type WaTemplateDef = {
   /** the name it is approved under in Meta's WhatsApp Manager. */
@@ -128,6 +160,19 @@ export const WA_TEMPLATES: Record<WaTemplateKey, WaTemplateDef> = {
     params: ["name", "destination", "serial", "link"],
     body: [HELLO, "مستندات رحلتك إلى {{2}} جاهزة: قسائم الفنادق والتذاكر والبرنامج", "(رقم الملف {{3}})", "تجدها كلها من هنا:", "{{4}}", SIGN].join("\n\n"),
   },
+  trip_reminder: {
+    name: "traveliun_trip_reminder",
+    params: ["name", "destination", "date", "serial", "link"],
+    body: [
+      HELLO,
+      "نذكّرك بموعد رحلتك إلى {{2}} يوم {{3}}",
+      "(رقم الملف {{4}})",
+      "تأكد من جواز السفر والتذاكر، وتجد مستندات رحلتك وبيانات الاستقبال والسائق من هنا:",
+      "{{5}}",
+      "نتمنى لك سفراً ممتعاً وآمناً، وبعد عودتك يسعدنا تقييمك لرحلتك من الرابط نفسه",
+      SIGN,
+    ].join("\n\n"),
+  },
   three_days_before: {
     name: "traveliun_trip_in_3_days",
     params: ["name", "destination", "link"],
@@ -161,8 +206,9 @@ export const WA_TEMPLATES: Record<WaTemplateKey, WaTemplateDef> = {
 };
 
 /** The template's values in its own order — the rating message points at the rating link. */
-export function waParams(key: WaTemplateKey, fields: Pick<MessageFields, "name" | "destination" | "serial" | "link" | "rate_link">): string[] {
+export function waParams(key: WaTemplateKey, fields: Pick<MessageFields, "name" | "destination" | "serial" | "link" | "rate_link" | "date">): string[] {
   const value: Record<WaField, string> = {
+    date: fields.date?.trim() || "-",
     name: fields.name.trim() || "العزيز",
     destination: fields.destination.trim() || "وجهتك",
     serial: fields.serial.trim() || "-",

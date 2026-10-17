@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultMessageBody, fillTemplate, messagesDueToday, tidyWhatsapp, WA_TEMPLATES, waParams, waPreview } from "./client-messages";
+import { arabicDay, defaultMessageBody, fillTemplate, messagesDueToday, tidyWhatsapp, WA_TEMPLATES, waParams, waPreview } from "./client-messages";
 
 const fields = { name: "أحمد", destination: "ماليزيا", serial: "AD-6-3056", link: "https://pkg.traveliun.com/trip/x", rate_link: "https://pkg.traveliun.com/trip/x/rate" };
 
@@ -26,11 +26,17 @@ describe("the dated messages of a trip", () => {
   // 10 → 18 Nov: eight nights
   const due = (today: string) => messagesDueToday("2026-11-10", "2026-11-18", today);
 
-  it("goes three days before, the day before and on the travel day", () => {
+  it("sends the one reminder two days before — and still to a file made later, up to the travel day", () => {
+    expect(due("2026-11-08")).toEqual(["trip_reminder"]);
+    expect(due("2026-11-09")).toContain("trip_reminder");
+    expect(due("2026-11-10")).toContain("trip_reminder");
+    expect(due("2026-11-07")).not.toContain("trip_reminder");
+  });
+
+  it("keeps the finer ones on their days, for a manager who switches them back on", () => {
     expect(due("2026-11-07")).toEqual(["three_days_before"]);
-    expect(due("2026-11-09")).toEqual(["day_before"]);
-    expect(due("2026-11-10")).toEqual(["departure_day"]);
-    expect(due("2026-11-08")).toEqual([]);
+    expect(due("2026-11-09")).toEqual(["trip_reminder", "day_before"]);
+    expect(due("2026-11-10")).toEqual(["trip_reminder", "departure_day"]);
   });
 
   it("welcomes the morning after the flight, and checks in mid-trip", () => {
@@ -68,6 +74,13 @@ describe("the WhatsApp templates", () => {
         "فريق ترافليون للسفر والسياحة",
       ].join("\n\n"),
     );
+  });
+
+  it("puts the travel day in the combined reminder", () => {
+    const text = waPreview(WA_TEMPLATES.trip_reminder, waParams("trip_reminder", { ...fields, date: arabicDay("2026-11-10") }));
+    expect(text).toContain("نذكّرك بموعد رحلتك إلى ماليزيا يوم الثلاثاء، 10 نوفمبر");
+    expect(text).toContain("(رقم الملف AD-6-3056)");
+    expect(fillTemplate(defaultMessageBody("trip_reminder"), { ...fields, date: arabicDay("2026-11-10") })).toBe(text);
   });
 
   it("points the rating at the rating link, and gives the editable text the same words", () => {
