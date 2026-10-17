@@ -1,9 +1,12 @@
 import "server-only";
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
-import { grantedPermissions, type Permission, type Role } from "./roles";
+import { grantedPermissions, VIEW_AS_COOKIE, viewAsPermissions, type Permission, type Role } from "./roles";
 import { permissionForPath } from "./section-access";
+import { featureForPath } from "@/lib/features";
+import { getFeatureFlags } from "@/lib/features-server";
 
 /**
  * What the signed-in user may do — resolved from the ROLE their employee row
@@ -21,7 +24,7 @@ import { permissionForPath } from "./section-access";
  */
 
 /** Cached per request: several gates may ask in one action. */
-const load = cache(async (): Promise<Permission[]> => {
+const loadReal = cache(async (): Promise<Permission[]> => {
   const user = await getServerUser();
   if (!user) return [];
   try {
@@ -47,8 +50,44 @@ const load = cache(async (): Promise<Permission[]> => {
   }
 });
 
+export type ViewAs = { roleId: string; name: string };
+
+/**
+ * «التبديل بين الحسابات»: the role an administrator / the developer is looking
+ * through (cookie VIEW_AS_COOKIE), with the narrowed permissions — or null.
+ * A cookie the account may not use is ignored, never trusted (roles.ts viewAsPermissions).
+ */
+const loadViewAs = cache(async (): Promise<(ViewAs & { permissions: Permission[] }) | null> => {
+  const real = await loadReal();
+  try {
+    const roleId = (await cookies()).get(VIEW_AS_COOKIE)?.value;
+    if (!roleId) return null;
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase.from("roles").select("id, arabic_name, permission_keys").eq("id", roleId).maybeSingle();
+    const role = data as { id: string; arabic_name: string | null; permission_keys: string[] | null } | null;
+    if (!role) return null;
+    const permissions = viewAsPermissions(real, role.permission_keys ?? []);
+    return permissions ? { roleId: role.id, name: role.arabic_name ?? "", permissions } : null;
+  } catch {
+    return null;
+  }
+});
+
+/** What this request runs with: the viewed-as role's keys while switching, else the account's own. */
+const load = cache(async (): Promise<Permission[]> => (await loadViewAs())?.permissions ?? (await loadReal()));
+
 export async function currentPermissions(): Promise<Permission[]> {
   return load();
+}
+
+/** The account's OWN permissions, ignoring any view-as — for the switcher and for granting. */
+export async function currentRealPermissions(): Promise<Permission[]> {
+  return loadReal();
+}
+
+export async function currentViewAs(): Promise<ViewAs | null> {
+  const v = await loadViewAs();
+  return v ? { roleId: v.roleId, name: v.name } : null;
 }
 
 export async function currentCan(permission: Permission): Promise<boolean> {
@@ -64,6 +103,8 @@ export async function guardPath(pathname: string): Promise<void> {
 }
 
 export async function currentCanOpen(pathname: string): Promise<boolean> {
+  const feature = featureForPath(pathname);
+  if (feature && !(await getFeatureFlags())[feature]) return false;
   const permission = permissionForPath(pathname);
   return permission === null || (await currentCan(permission));
 }

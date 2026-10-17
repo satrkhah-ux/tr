@@ -63,6 +63,14 @@ export const ALL_PERMISSIONS = [
    * written to audit_logs.
    */
   "operations.passport",
+  /**
+   * Run the operations of the files YOU issued — and only those (sales,
+   * 2026-10-17). operations.write is every file; this is the same screens
+   * scoped to offers.employee_id = you, in the app and in RLS (0078).
+   */
+  "operations.own",
+  /** «مطوّر»: the developer page — external links' health, and turning system services on and off. */
+  "developer.access",
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
@@ -152,6 +160,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     key: "perm.group.operations",
     items: [
       { key: "operations.write", kind: "do" },
+      { key: "operations.own", kind: "do" },
       { key: "operations.passport", kind: "view", sensitive: true },
     ],
   },
@@ -167,6 +176,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     items: [{ key: "employees.manage", kind: "do", sensitive: true }],
   },
   {
+    key: "perm.group.developer",
+    items: [{ key: "developer.access", kind: "do", sensitive: true }],
+  },
+  {
     key: "perm.group.guide",
     items: [{ key: "guide.view", kind: "view" }],
   },
@@ -179,6 +192,28 @@ export const UNGROUPED_PERMISSIONS: Permission[] = ALL_PERMISSIONS.filter((p) =>
 
 export function can(role: Role, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role].includes(permission);
+}
+
+/**
+ * «التبديل بين الحسابات» (2026-10-17): the administration and the developer can
+ * look at the system as another role sees it — sales, operations… — to check
+ * what that role gets. It only ever NARROWS: the view is the chosen role's keys
+ * that the real account also holds, and a role carrying developer.access is
+ * not offered to an account without it (the developer's view stays the
+ * developer's). The real session still decides what the database lets through.
+ */
+export const VIEW_AS_COOKIE = "tv_view_role";
+
+export function canSwitchRoles(realPermissions: readonly Permission[]): boolean {
+  return realPermissions.includes("dashboard.admin") || realPermissions.includes("developer.access");
+}
+
+/** The permissions a view-as session runs with, or null when that role may not be viewed as. */
+export function viewAsPermissions(realPermissions: readonly Permission[], roleKeys: readonly string[]): Permission[] | null {
+  if (!canSwitchRoles(realPermissions)) return null;
+  const keys = roleKeys.filter(isPermission);
+  if (keys.includes("developer.access") && !realPermissions.includes("developer.access")) return null;
+  return keys.filter((k) => realPermissions.includes(k));
 }
 
 export type DashboardView = "admin" | "employee" | "none";

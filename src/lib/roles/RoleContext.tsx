@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { can, dashboardViewFor, type DashboardView, type Permission, type Role } from "./roles";
+import { FEATURE_DEFAULTS, type Feature, type FeatureFlags } from "@/lib/features";
 
 type RoleContextValue = {
   /** The user's real role from the DB — never changed by view-as. */
@@ -15,6 +16,8 @@ type RoleContextValue = {
   /** True only in development — gates the view-as feature. */
   devMode: boolean;
   can: (permission: Permission) => boolean;
+  /** is this system service switched on (features.ts, /developer)? */
+  featureOn: (feature: Feature) => boolean;
   dashboardView: DashboardView;
 };
 
@@ -27,11 +30,14 @@ const DEV_MODE = process.env.NODE_ENV !== "production";
 export function RoleProvider({
   realRole,
   permissions,
+  features = FEATURE_DEFAULTS,
   children,
 }: {
   realRole: Role;
   /** what the user's role row actually grants (current.ts) — not the label's default set. */
   permissions: readonly Permission[];
+  /** the services switched on, read once on the server (features-server.ts). */
+  features?: FeatureFlags;
   children: ReactNode;
 }) {
   const [viewAs, setViewAsState] = useState<Role | null>(null);
@@ -81,6 +87,7 @@ export function RoleProvider({
     // empty. View-as previews a label's set, as before.
     can: (permission: Permission) =>
       DEV_MODE && viewAs ? can(viewAs, permission) : permissions.includes(permission),
+    featureOn: (feature: Feature) => features[feature],
     dashboardView: dashboardViewFor(effectiveRole),
   };
 
@@ -98,6 +105,7 @@ export function useRole(): RoleContextValue {
       resetViewAs: () => {},
       devMode: false,
       can: (permission: Permission) => can("visitor", permission),
+      featureOn: (feature: Feature) => FEATURE_DEFAULTS[feature],
       dashboardView: dashboardViewFor("visitor"),
     };
   }

@@ -5,6 +5,7 @@ import { LanguageProvider } from "@/components/LanguageProvider";
 import { StoreProvider } from "@/lib/store";
 import { TraveliunUIProvider } from "@/components/traveliun/TraveliunUIProvider";
 import { RoleProvider } from "@/lib/roles/RoleContext";
+import { getFeatureFlags } from "@/lib/features-server";
 import { PartnerProvider } from "@/lib/partners/PartnerContext";
 import { getPartnerBrand } from "@/lib/partners/session";
 import { getCurrentRole } from "@/lib/data/metrics";
@@ -90,6 +91,7 @@ export default async function RootLayout({
 }>) {
   const realRole = await getCurrentRole();
   const permissions = await currentPermissions();
+  const features = await getFeatureFlags();
   // A partner wears their own colours. Resolved here, on the server, so the very
   // first paint is already theirs — a client-side swap would flash ours first.
   const partnerBrand = await getPartnerBrand();
@@ -117,7 +119,7 @@ export default async function RootLayout({
         />
         <StoreProvider>
           <LanguageProvider>
-            <RoleProvider realRole={realRole} permissions={permissions}>
+            <RoleProvider realRole={realRole} permissions={permissions} features={features}>
               <PartnerProvider brand={partnerBrand}>
                 <TraveliunUIProvider>{children}</TraveliunUIProvider>
               </PartnerProvider>

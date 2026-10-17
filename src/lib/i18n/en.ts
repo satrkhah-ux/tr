@@ -759,6 +759,11 @@ export const en = {
   "perm.employees.manage.hint": "Add colleagues, move them between sections, change what a section grants.",
   "perm.guide.view": "The Traveliun guide",
   "perm.guide.view.hint": "Internal reference pages.",
+  "perm.group.developer": "Developer",
+  "perm.operations.own": "Own files' operations",
+  "perm.operations.own.hint": "Run the files they issued once the client confirms — not colleagues' files.",
+  "perm.developer.access": "Developer",
+  "perm.developer.access.hint": "The developer page: external links' health, and turning system services on and off.",
 
   // ---------- intelligence hub ----------
   "hub.heading": "Offers & customers operations center",

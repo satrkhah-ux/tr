@@ -757,6 +757,11 @@ export const ar: Dictionary = {
   "perm.employees.manage.hint": "إضافة الزملاء ونقلهم بين الأقسام وتغيير ما يمنحه القسم.",
   "perm.guide.view": "دليل ترافليون",
   "perm.guide.view.hint": "صفحات مرجعية داخلية.",
+  "perm.group.developer": "المطوّر",
+  "perm.operations.own": "عمليات ملفاته فقط",
+  "perm.operations.own.hint": "تنفيذ الملفات التي أصدرها هو بعد تأكيد العميل، دون ملفات الزملاء.",
+  "perm.developer.access": "مطوّر",
+  "perm.developer.access.hint": "صفحة المطوّر: حالة الارتباطات الخارجية، وإيقاف خدمات النظام وتشغيلها.",
 
   // ---------- intelligence hub ----------
   "hub.heading": "مركز تشغيل العروض والعملاء",

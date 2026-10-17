@@ -124,7 +124,9 @@ export type AuditAction =
   | "settings.updated"
   | "catalog.imported"
   // «إصدار نسخة محدّثة»: an issued offer's next version, from its corrected draft
-  | "offer.reissued";
+  | "offer.reissued"
+  // «مطوّر»: a system service switched off or on (/developer)
+  | "feature.toggled";
 
 export type AuditInput = {
   action: AuditAction;

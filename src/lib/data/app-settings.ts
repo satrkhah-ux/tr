@@ -3,6 +3,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
+import { logAudit } from "@/lib/data/audit";
+import { getFeatureFlags } from "@/lib/features-server";
+import { FEATURES_SETTING_KEY, isFeature, type Feature } from "@/lib/features";
 
 /**
  * Choices the administration makes once for everyone (app_settings, 0054).
@@ -84,6 +87,24 @@ export async function setProfitSettings(next: ProfitSettings): Promise<SetSettin
       { key: "profit_default_pct", value: pct == null || pct === 0 ? "" : String(pct), updated_at: at },
     ]);
     return error ? { ok: false, error: "err.db" } : { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/** «مطوّر»: switch one system service off or on (features.ts). Audited — who stopped what, and when. */
+export async function setFeature(feature: Feature, on: boolean): Promise<SetSettingResult> {
+  if (!(await currentCan("developer.access"))) return { ok: false, error: "err.forbidden" };
+  if (!isFeature(feature) || typeof on !== "boolean") return { ok: false, error: "err.db" };
+  try {
+    const next = { ...(await getFeatureFlags()), [feature]: on };
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { error } = await supabase
+      .from("app_settings")
+      .upsert({ key: FEATURES_SETTING_KEY, value: JSON.stringify(next), updated_at: new Date().toISOString() });
+    if (error) return { ok: false, error: "err.db" };
+    await logAudit({ action: "feature.toggled", entity: "app_settings", entity_id: FEATURES_SETTING_KEY, meta: { feature, on } });
+    return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
   }
