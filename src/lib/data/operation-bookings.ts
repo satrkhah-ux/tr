@@ -14,7 +14,7 @@ import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, shownDetail, type VoucherBooking
 import { applyRoomDetails, roomDetailsOpen, voucherStay, type StayError, type StayHotel } from "@/lib/operations/room-details";
 import type { LocaleChoice } from "@/lib/catalog/room-catalog";
 import { currentCan } from "@/lib/roles/current";
-import { gateManager, gateOperation, gateRow } from "@/lib/operations/access";
+import { gateManagerRow, gateOperation, gateRow } from "@/lib/operations/access";
 import { carCount, DRV } from "@/lib/operations/drivers";
 import { entriesToSave, type ConfirmEntry } from "@/lib/operations/confirm-all";
 import { findLookupCountry, type LookupRoomType } from "@/lib/offer/draft-types";
@@ -316,8 +316,9 @@ async function writeConfirmation(supabase: SupabaseClient, input: Confirmation, 
     confirmed_by: by,
   };
   if (input.supplier_name !== undefined) patch.supplier_name = input.supplier_name;
-  // what the booking cost us is the manager's (supplier-work.ts setBookingCost) — 0080 refuses it from any other session
-  if (input.net_charged !== undefined && !(await gateManager())) patch.net_charged = input.net_charged;
+  // what the booking cost us is the manager's step (supplier-work.ts setBookingCost): operations.write, or
+  // manage_own on one's own file — 0080/0081 refuse it from any other session
+  if (input.net_charged !== undefined && !(await gateManagerRow("operation_bookings", input.booking_id))) patch.net_charged = input.net_charged;
   if (input.cancellation_policy !== undefined) patch.cancellation_policy = input.cancellation_policy;
   if (input.cancellation_deadline !== undefined) patch.cancellation_deadline = input.cancellation_deadline;
   const { error } = await supabase.from("operation_bookings").update(patch).eq("id", input.booking_id);

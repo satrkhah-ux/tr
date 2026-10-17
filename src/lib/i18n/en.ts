@@ -809,6 +809,8 @@ export const en = {
   "perm.group.developer": "Developer",
   "perm.operations.own": "Own files' operations",
   "perm.operations.own.hint": "Run the files they issued once the client confirms — not colleagues' files.",
+  "perm.operations.manage_own": "Fully manage own files",
+  "perm.operations.manage_own.hint": "The manager's steps on their own files only: cancelling the file, refunds, correcting payments, the installment schedule, supplier costs and payments — until a sales manager is appointed.",
   "perm.developer.access": "Developer",
   "perm.developer.access.hint": "The developer page: external links' health, and turning system services on and off.",
   // ---------- /developer ----------

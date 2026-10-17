@@ -153,6 +153,13 @@ describe("confirmBookings", () => {
     expect(state.updates[0].patch).not.toHaveProperty("net_charged");
   });
 
+  it("takes the net from a salesperson on their own file with operations.manage_own (the owner, 2026-10-17)", async () => {
+    state.can = ["operations.own", "operations.manage_own"];
+    const res = await confirmBookings({ operation_id: "op-1", entries: [{ booking_id: "h1", confirmation_number: "GRP-78", net_charged: 1 }] });
+    expect(res).toEqual({ ok: true, confirmed: 1 });
+    expect(state.updates[0].patch.net_charged).toBe(1);
+  });
+
   it("refuses without operations.write", async () => {
     state.can = false;
     expect(await confirmBookings({ operation_id: "op-1", entries: [{ booking_id: "h1", confirmation_number: "X" }] })).toEqual({ ok: false, error: "ops.err.forbidden" });

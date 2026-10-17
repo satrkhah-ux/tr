@@ -58,7 +58,7 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/roles/current", () => ({ currentCan: async (p: string) => state.perms.includes(p) }));
 vi.mock("@/lib/data/metrics", () => ({ getCurrentEmployeeId: async () => state.employeeId }));
 
-import { gateManager, gateOperation, gateOps, gateRow, gateRows, mayWork } from "./access";
+import { gateCaseManager, gateManager, gateManagerRow, gateManagerRows, gateOperation, gateOps, gateRow, gateRows, mayWork } from "./access";
 
 beforeEach(() => {
   state.user = { id: "user-1" };
@@ -114,6 +114,39 @@ describe("the gates", () => {
 
   it("keeps the manager's steps from an own-files holder, even on their file", async () => {
     expect(await gateManager()).toBe("ops.err.managerOnly");
+  });
+
+  it("the manager's steps on one case: operations.write on every file", async () => {
+    state.perms = ["operations.write", "operations.own"];
+    expect(await gateCaseManager("op-theirs")).toBeNull();
+    expect(await gateManagerRow("operation_payments", "p-theirs")).toBeNull();
+    expect(await gateManagerRows("operations", ["op-mine", "op-theirs"])).toBeNull();
+  });
+
+  it("operations.manage_own: the manager's steps on my file, never a colleague's (the owner, 2026-10-17)", async () => {
+    state.perms = ["operations.own", "operations.manage_own"];
+    expect(await gateCaseManager("op-mine")).toBeNull();
+    expect(await gateManagerRow("operation_payments", "p-mine")).toBeNull();
+    expect(await gateManagerRow("operation_bookings", "b-mine")).toBeNull();
+    expect(await gateCaseManager("op-theirs")).toBe("ops.err.notYours");
+    expect(await gateManagerRow("operation_payments", "p-theirs")).toBe("ops.err.notYours");
+    expect(await gateCaseManager("op-nobody")).toBe("ops.err.notYours");
+    // a supplier payment naming one foreign case among mine is refused whole
+    expect(await gateManagerRows("operations", ["op-mine", "op-theirs"])).toBe("ops.err.notYours");
+    // what spans every case stays operations.write
+    expect(await gateManager()).toBe("ops.err.managerOnly");
+  });
+
+  it("operations.own without manage_own: the manager's steps refused even on my file — the revoke path", async () => {
+    expect(await gateCaseManager("op-mine")).toBe("ops.err.managerOnly");
+    expect(await gateManagerRow("operation_payments", "p-mine")).toBe("ops.err.managerOnly");
+    expect(await gateCaseManager("op-theirs")).toBe("ops.err.notYours");
+  });
+
+  it("manage_own alone (no operations.own) opens nothing", async () => {
+    state.perms = ["operations.manage_own"];
+    expect(await gateCaseManager("op-mine")).toBe("ops.err.forbidden");
+    expect(await gateManager()).toBe("ops.err.forbidden");
   });
 
   it("refuses without a permission, an employee row or a session", async () => {

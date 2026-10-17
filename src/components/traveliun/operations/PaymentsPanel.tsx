@@ -60,8 +60,9 @@ export function PaymentsPanel({
   payments: OperationPayment[];
   installments: InstallmentRow[];
   /**
-   * operations.write: correct / delete a payment, record a refund, set the
-   * schedule. An own-files holder records money IN and attaches its slip; the
+   * The manager's step on this case — operations.write, or manage_own on one's
+   * own file: correct / delete a payment, record a refund, set the schedule.
+   * Without it an own-files holder records money IN and attaches its slip; the
    * server refuses the rest either way (operation-payments.ts).
    */
   canManage: boolean;
