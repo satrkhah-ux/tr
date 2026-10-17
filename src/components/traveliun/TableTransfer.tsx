@@ -44,6 +44,7 @@ export function TableTransfer({
   importColumns,
   query,
   onImported,
+  canImport,
 }: {
   config: TableConfig;
   filterOptions: FilterOptions;
@@ -52,6 +53,8 @@ export function TableTransfer({
   /** the screen's search + filters, for the export */
   query: () => Omit<ListInput, "page" | "pageSize">;
   onImported: () => void;
+  /** settings.manage — an import writes a whole file at once, the administration's job (importRows refuses it too) */
+  canImport: boolean;
 }) {
   const { t, dir } = useTraveliunUI();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -151,6 +154,7 @@ export function TableTransfer({
         {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Download className="size-4" aria-hidden />}
         {t("data.tools.export.button")}
       </button>
+      {canImport ? (
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
@@ -160,6 +164,7 @@ export function TableTransfer({
         <Upload className="size-4" aria-hidden />
         {t("data.tools.import.button")}
       </button>
+      ) : null}
       <input
         ref={fileRef}
         type="file"

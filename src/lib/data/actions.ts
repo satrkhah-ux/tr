@@ -92,6 +92,18 @@ async function writeAccess(table: AllowedTable): Promise<Access | TranslationKey
   return (await access(table)) ?? "err.forbidden";
 }
 
+/**
+ * Deleting a row, and importing a whole file, are the administration's
+ * (settings.manage): «البيانات» is data.write for sales — view, add, edit — and
+ * nothing more (owner, 2026-10-17). The database says the same for the
+ * catalogue's DELETE (0079). The table hides the controls (TraveliunTable).
+ */
+async function manageAccess(table: AllowedTable): Promise<Access | TranslationKey> {
+  const granted = await writeAccess(table);
+  if (typeof granted === "string") return granted;
+  return (await currentCan("settings.manage")) ? granted : "err.forbidden";
+}
+
 /** A write from someone who cannot see the cost never carries it. */
 function writable(table: AllowedTable, values: DataRow, internal: boolean): DataRow {
   if (internal) return values;
@@ -237,7 +249,8 @@ export type ImportRowsResult =
 
 /**
  * Save a previewed import: new rows added, changed fields written — nothing
- * deleted. Row by row through createRow / updateRow, so every rule (data.write,
+ * deleted. settings.manage to start (manageAccess); then row by row through
+ * createRow / updateRow, so every rule (data.write,
  * the cost columns, the hotel rules) holds exactly as for the form. Not one
  * transaction: a row that fails is reported and the others stand.
  */
@@ -248,7 +261,7 @@ export async function importRows(
 ): Promise<ImportRowsResult> {
   if (!DATA_TABLES.includes(table)) return { ok: false, error: "err.forbidden" };
   try {
-    const granted = await writeAccess(table);
+    const granted = await manageAccess(table);
     if (typeof granted === "string") return { ok: false, error: granted };
   } catch {
     return { ok: false, error: "err.forbidden" };
@@ -373,7 +386,7 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
 
 export async function deleteRow(table: AllowedTable, id: string): Promise<DeleteResult> {
   try {
-    const granted = await writeAccess(table);
+    const granted = await manageAccess(table);
     if (typeof granted === "string") return { ok: false, error: granted };
     // A hotel an offer, a draft, a remembered price or a booking uses is merged or
     // stopped, never deleted: the FKs would quietly null the offers' hotel.

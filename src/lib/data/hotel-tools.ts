@@ -9,7 +9,9 @@ import { similarHotels, type HotelLite, type SimilarHotel } from "@/lib/catalog/
 
 /**
  * The /hotels tools: what uses a hotel, merging one into another, and «يوجد
- * فندق مشابه». All behind data.write — the gate of every data-section write.
+ * فندق مشابه». Behind data.write — the gate of every data-section write —
+ * except the merge, which deletes the merged hotels: settings.manage, like every
+ * delete in «البيانات» (owner, 2026-10-17; merge_hotels checks it too, 0079).
  *
  * The counts read drafts and offer stays, which no session may read since 0047,
  * so they go through the service role AFTER the gate (as draft-store.ts does).
@@ -17,9 +19,9 @@ import { similarHotels, type HotelLite, type SimilarHotel } from "@/lib/catalog/
  * session: it checks is_staff() and writes its audit row in the same transaction.
  */
 
-async function gate(): Promise<TranslationKey | null> {
+async function gate(permission: "data.write" | "settings.manage" = "data.write"): Promise<TranslationKey | null> {
   if (!(await getServerUser())) return "err.session";
-  return (await currentCan("data.write")) ? null : "err.forbidden";
+  return (await currentCan(permission)) ? null : "err.forbidden";
 }
 
 function service(): SupabaseClient {
@@ -85,7 +87,7 @@ export type PreviewResult = { ok: true; preview: MergePreview } | { ok: false; e
 
 /** What «دمج» would move — counted, nothing changed. */
 export async function previewHotelMerge(keepId: string, dropIds: string[]): Promise<PreviewResult> {
-  const denied = await gate();
+  const denied = await gate("settings.manage");
   if (denied) return { ok: false, error: denied };
   const drops = [...new Set(dropIds)].filter((id) => id && id !== keepId);
   if (!keepId || drops.length === 0) return { ok: false, error: "data.tools.err.nothingToMerge" };
@@ -132,7 +134,7 @@ export type MergeResult = { ok: true; removed: number } | { ok: false; error: Tr
 
 /** Merge `dropIds` into `keepId` — one transaction in the database (0070), audited there. */
 export async function mergeHotels(keepId: string, dropIds: string[]): Promise<MergeResult> {
-  const denied = await gate();
+  const denied = await gate("settings.manage");
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
