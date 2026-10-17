@@ -79,51 +79,6 @@ export async function touchPresence(): Promise<void> {
   }
 }
 
-// ---------- employee view ----------
-export type RequestTypeCount = { type: string; count: number };
-export type EmployeeMetrics = {
-  ok: boolean;
-  requestsToday: number;
-  packages: number;
-  executed: number;
-  requestTypes: RequestTypeCount[];
-};
-
-export async function getEmployeeMetrics(employeeId?: string): Promise<EmployeeMetrics> {
-  const empty: EmployeeMetrics = { ok: false, requestsToday: 0, packages: 0, executed: 0, requestTypes: [] };
-  try {
-    const user = await getServerUser();
-    if (!user) return empty;
-    const supabase = await db();
-    const scopeId = employeeId ?? (await employeeIdForUser(supabase, user.id));
-    if (!scopeId) return { ...empty, ok: true };
-
-    const today = startOfTodayIso();
-    const [todayCount, packagesCount, executedCount, typeRows] = await Promise.all([
-      supabase.from("care_tickets").select("id", { count: "exact", head: true }).eq("employee_id", scopeId).gte("created_at", today),
-      supabase.from("offers").select("id", { count: "exact", head: true }).eq("employee_id", scopeId),
-      supabase.from("care_tickets").select("id", { count: "exact", head: true }).eq("employee_id", scopeId).not("responded_at", "is", null),
-      supabase.from("care_tickets").select("type").eq("employee_id", scopeId),
-    ]);
-
-    const counts = new Map<string, number>();
-    for (const row of (typeRows.data ?? []) as { type: string | null }[]) {
-      const key = row.type ?? "غير محدد";
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-
-    return {
-      ok: true,
-      requestsToday: todayCount.count ?? 0,
-      packages: packagesCount.count ?? 0,
-      executed: executedCount.count ?? 0,
-      requestTypes: [...counts.entries()].map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count),
-    };
-  } catch {
-    return empty;
-  }
-}
-
 // ---------- admin view ----------
 export type AdminMetrics = {
   ok: boolean;

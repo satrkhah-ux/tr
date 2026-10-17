@@ -430,7 +430,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function KpiCard({ label, value, unit, hint, icon: Icon, color }: { label: string; value: string; unit?: string; hint: string; icon: LucideIcon; color: string }) {
+export function KpiCard({ label, value, unit, hint, icon: Icon, color }: { label: string; value: string; unit?: string; hint: string; icon: LucideIcon; color: string }) {
   return (
     <article className="rounded-[15px] border border-[#e2ebe7] bg-white p-[18px] shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
       <div className="flex items-start justify-between">
@@ -448,7 +448,7 @@ function KpiCard({ label, value, unit, hint, icon: Icon, color }: { label: strin
   );
 }
 
-function ChartCard({ title, caption, children }: { title: string; caption: string; children: React.ReactNode }) {
+export function ChartCard({ title, caption, children }: { title: string; caption: string; children: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] lg:p-5">
       <h3 className="text-sm font-extrabold text-[#003c3a]">{title}</h3>
