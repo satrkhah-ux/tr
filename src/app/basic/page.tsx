@@ -5,6 +5,7 @@ import { listReadyOffers } from "@/lib/data/ready-offers";
 import { currentCan, currentCanOpen } from "@/lib/roles/current";
 import { getPartnerSession } from "@/lib/partners/session";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
+import { fileStatesFor } from "@/lib/data/file-status-core";
 
 /** «تصميم بطاقة طيران» — set to its route once that page is live (null hides the button). */
 const FLIGHT_CARD_HREF: string | null = "/repackage/flight-card";
@@ -24,9 +25,12 @@ export default async function BasicPage() {
     currentCanOpen("/repackage"),
     currentCanOpen("/repackage/flight-card"),
   ]);
+  // where each issued file stands — staff only (a partner follows theirs in the partner portal)
+  const states = meId ? await fileStatesFor(drafts) : {};
   return (
     <BasicHome
       drafts={drafts}
+      states={states}
       meId={meId}
       allByDefault={management}
       readyOffers={readyOffers.filter((o) => o.status !== "coming_soon" && o.seed)}

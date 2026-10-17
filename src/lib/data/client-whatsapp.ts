@@ -22,8 +22,10 @@ import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
 
 /**
  * The client hears about their file on WhatsApp, through Teletel (the owner,
- * 2026-10-15): the programme when it is issued, «تم تحديث ملفك» when it is
- * issued again, and the operations stages (client-messages.ts).
+ * 2026-10-15): the programme once it is issued — prepared, reviewed and sent by
+ * the employee's button, never on issue itself (the owner, 2026-10-17) —
+ * «تم تحديث ملفك» for a newer version, and the operations stages
+ * (client-messages.ts).
  *
  * Who it applies to — app_settings `client_whatsapp`:
  *   "admins" (the default, the trial): only files a MANAGER issued
@@ -153,11 +155,27 @@ export async function messageClient(
   }
 }
 
+/** An issued programme's message to its client, as the employee reviews it before sending. */
+export type OfferMessage = {
+  text: string;
+  client: OfferClient;
+  /** the client's link and its PDF — shown for review beside the text. */
+  link: string;
+  pdf: string;
+  /** the team note and labels that travel with the send. */
+  note: string;
+  labels: string[];
+  template: WaTemplateSend;
+  pdfName: string;
+};
+
 /**
- * The programme to its client, right after it is issued — «تم إعداد برنامج
- * رحلتك» the first time, «تم تحديث ملفك» when the file is issued again.
+ * The programme's message — «تم إعداد برنامج رحلتك» the first time, «تم تحديث
+ * ملفك» when the client already had a version. It is only PREPARED here: the
+ * owner (2026-10-17) wants every message reviewed and sent by a person, never
+ * on issue (offer-send.ts).
  */
-export async function sendOfferToClient(serial: string, updated: boolean): Promise<ClientSendResult> {
+export async function offerMessage(serial: string, updated: boolean): Promise<OfferMessage | null> {
   try {
     const { data } = await db()
       .from("offers")
@@ -175,7 +193,7 @@ export async function sendOfferToClient(serial: string, updated: boolean): Promi
       customers: OfferClient["customer"] | OfferClient["customer"][];
       employees: { arabic_name: string | null } | { arabic_name: string | null }[] | null;
     } | null;
-    if (!row) return "unreachable";
+    if (!row) return null;
     const customer = Array.isArray(row.customers) ? (row.customers[0] ?? null) : row.customers;
     const issuer = Array.isArray(row.employees) ? row.employees[0] : row.employees;
     const base = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
@@ -200,22 +218,40 @@ export async function sendOfferToClient(serial: string, updated: boolean): Promi
     ]
       .filter(Boolean)
       .join("\n");
-    return await messageClient(
-      { employee_id: row.employee_id, partner_company_id: row.partner_company_id, customer },
+    const pdfName = `برنامج-رحلتك-${row.serial}.pdf`;
+    return {
       text,
-      {
-        note,
-        labels: [updated ? "عرض-محدث" : "عرض-مرسل"],
-        pdf: { serial: row.serial, name: `برنامج-رحلتك-${row.serial}.pdf` },
-        // after the 24 hours: the approved template, the PDF riding as its document
-        template: {
-          key: "programme",
-          params: waParams("programme", { name: customer?.arabic_name ?? "", destination, serial: row.serial, link, rate_link: "" }),
-          document: { url: `${link}/pdf`, name: `برنامج-رحلتك-${row.serial}.pdf` },
-        },
+      client: { employee_id: row.employee_id, partner_company_id: row.partner_company_id, customer },
+      link,
+      pdf: `${link}/pdf`,
+      note,
+      labels: [updated ? "عرض-محدث" : "عرض-مرسل"],
+      pdfName,
+      // after the 24 hours: the approved template, the PDF riding as its document
+      template: {
+        key: "programme",
+        params: waParams("programme", { name: customer?.arabic_name ?? "", destination, serial: row.serial, link, rate_link: "" }),
+        document: { url: `${link}/pdf`, name: pdfName },
       },
-    );
+    };
   } catch {
-    return "unreachable";
+    return null;
   }
+}
+
+/**
+ * Send the programme to its client — only from the employee's «أرسل إلى العميل
+ * عبر واتساب» (offer-send.ts), with the text as they reviewed it (`body`).
+ * The PDF follows the text inside WhatsApp's 24 hours; after them it rides on
+ * the approved template.
+ */
+export async function sendOfferToClient(serial: string, updated: boolean, body?: string): Promise<ClientSendResult> {
+  const message = await offerMessage(serial, updated);
+  if (!message) return "unreachable";
+  return messageClient(message.client, body?.trim() || message.text, {
+    note: message.note,
+    labels: message.labels,
+    pdf: { serial, name: message.pdfName },
+    template: message.template,
+  });
 }

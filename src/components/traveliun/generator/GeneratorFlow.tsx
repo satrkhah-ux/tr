@@ -37,6 +37,7 @@ import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { IssueGuardNotice } from "../IssueGuardNotice";
 import { ReissueOffer } from "../ReissueOffer";
+import { BasicFileStatus } from "../basic/BasicFileStatus";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
 import { draftBrand, draftToPreviewOffer } from "@/lib/offer/preview-dto";
 
@@ -486,6 +487,7 @@ function ProduceBar({
   const [producing, setProducing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [guardBlocked, setGuardBlocked] = useState(false);
+  const [statusTick, setStatusTick] = useState(0);
   const produced = data.produced_serial;
 
   async function produce() {
@@ -499,6 +501,7 @@ function ProduceBar({
       return;
     }
     patch({ produced_serial: result.serial });
+    setStatusTick((n) => n + 1);
   }
 
   if (produced) {
@@ -518,7 +521,13 @@ function ProduceBar({
         </Link>
         {/* edited since: the next version under the same serial */}
         {partnerFile ? null : (
-          <ReissueOffer draftId={draftId} serial={data.produced_serial} hotels={data.hotels} blocked={!ok} flush={flush} className="w-full border-t border-[#bfe5d4] pt-2" />
+          <ReissueOffer draftId={draftId} serial={data.produced_serial} hotels={data.hotels} blocked={!ok} flush={flush} className="w-full border-t border-[#bfe5d4] pt-2" onIssued={() => setStatusTick((n) => n + 1)} />
+        )}
+        {/* issuing sends nothing: the programme goes to the client from here, after a look */}
+        {partnerFile ? null : (
+          <div className="w-full">
+            <BasicFileStatus draftId={draftId} serial={produced} variant="panel" refresh={statusTick} onChanged={() => setStatusTick((n) => n + 1)} />
+          </div>
         )}
       </div>
     );

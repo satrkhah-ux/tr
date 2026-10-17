@@ -128,7 +128,11 @@ export type AuditAction =
   // «إصدار نسخة محدّثة»: an issued offer's next version, from its corrected draft
   | "offer.reissued"
   // «مطوّر»: a system service switched off or on (/developer)
-  | "feature.toggled";
+  | "feature.toggled"
+  // the programme sent to its client by the employee («أرسل إلى العميل عبر واتساب», or «أرسلته يدوياً»)
+  | "offer.client_sent"
+  // «إلغاء الملف» from Basic, before any booking or payment
+  | "offer.cancelled";
 
 export type AuditInput = {
   action: AuditAction;
