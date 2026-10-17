@@ -88,68 +88,103 @@ export function messagesDueToday(start: string | null, end: string | null, today
 /** What a template is about: a stage message, or the programme sent when a file is issued. */
 export type WaTemplateKey = ClientMessageKey | "programme";
 
+type WaField = "name" | "destination" | "serial" | "link";
+
 export type WaTemplateDef = {
   /** the name it is approved under in Meta's WhatsApp Manager. */
   name: string;
-  /** {{1}} the client's name · {{2}} the destination · {{3}} the link. */
+  /** what {{1}}, {{2}}, … stand for, in order. */
+  params: WaField[];
   body: string;
   /** the programme carries its PDF as the template's document header. */
   document?: boolean;
 };
 
 const SIGN = "فريق ترافليون للسفر والسياحة";
+const HELLO = "عميلنا {{1}}،";
 
 /**
- * The approved texts, one per message. «UTILITY», Arabic. They are submitted to
- * Meta as written here (scripts/submit-wa-templates.mjs) — so this is the one
- * copy of them; Teletel only syncs and sends what Meta approved.
+ * The approved texts, one per message, laid out the way the owner asked
+ * (2026-10-17): the greeting, then every sentence and the link on its own line
+ * with a blank line between, the signature last. «UTILITY», Arabic. Submitted
+ * to Meta as written here (scripts/submit-wa-templates.mjs) — this is the one
+ * copy; Teletel only syncs and sends what Meta approved. A body never starts or
+ * ends with a variable: Meta refuses those.
  */
 export const WA_TEMPLATES: Record<WaTemplateKey, WaTemplateDef> = {
   programme: {
     name: "traveliun_trip_program",
     document: true,
-    body: `مرحباً {{1}} 👋\n\nتم إعداد برنامج رحلتك إلى *{{2}}* ✈️\nتجد البرنامج كاملاً في الملف المرفق، وعلى الرابط:\n{{3}}\n\n${SIGN}`,
+    params: ["name", "destination", "serial", "link"],
+    body: [HELLO, "تم إعداد برنامج رحلتك إلى {{2}}", "(رقم الملف {{3}})", "البرنامج كاملاً في الملف المرفق، وتفاصيله من هنا:", "{{4}}", SIGN].join("\n\n"),
   },
   bookings_confirmed: {
     name: "traveliun_bookings_confirmed",
-    body: `مرحباً {{1}} 👋\n\n✅ تم تأكيد حجوزات رحلتك إلى *{{2}}*.\nتابع تفاصيل رحلتك من هنا:\n{{3}}\n\n${SIGN}`,
+    params: ["name", "destination", "serial", "link"],
+    body: [HELLO, "تم تأكيد حجوزات رحلتك إلى {{2}}", "(رقم الملف {{3}})", "تابع تفاصيل رحلتك من هنا:", "{{4}}", SIGN].join("\n\n"),
   },
   documents_ready: {
     name: "traveliun_documents_ready",
-    body: `مرحباً {{1}} 👋\n\n📄 مستندات رحلتك إلى *{{2}}* جاهزة: قسائم الفنادق والتذاكر والبرنامج.\n{{3}}\n\n${SIGN}`,
+    params: ["name", "destination", "serial", "link"],
+    body: [HELLO, "مستندات رحلتك إلى {{2}} جاهزة: قسائم الفنادق والتذاكر والبرنامج", "(رقم الملف {{3}})", "تجدها كلها من هنا:", "{{4}}", SIGN].join("\n\n"),
   },
   three_days_before: {
     name: "traveliun_trip_in_3_days",
-    body: `مرحباً {{1}} 👋\n\n⏳ باقي *3 أيام* على رحلتك إلى *{{2}}*.\nتأكد من جواز السفر والتذاكر — كل مستندات رحلتك هنا:\n{{3}}\n\n${SIGN}`,
+    params: ["name", "destination", "link"],
+    body: [HELLO, "باقي 3 أيام على رحلتك إلى {{2}}", "تأكد من جواز السفر والتذاكر، وكل مستندات رحلتك من هنا:", "{{3}}", SIGN].join("\n\n"),
   },
   day_before: {
     name: "traveliun_trip_tomorrow",
-    body: `مرحباً {{1}} 👋\n\n✈️ رحلتك إلى *{{2}}* غداً.\nبيانات الاستقبال والسائق في الرابط:\n{{3}}\n\nنتمنى لك رحلة سعيدة 🤍\n${SIGN}`,
+    params: ["name", "destination", "link"],
+    body: [HELLO, "رحلتك إلى {{2}} غداً", "بيانات الاستقبال والسائق من هنا:", "{{3}}", "نتمنى لك رحلة سعيدة", SIGN].join("\n\n"),
   },
   departure_day: {
     name: "traveliun_bon_voyage",
-    body: `مرحباً {{1}} 👋\n\nاليوم موعد رحلتك إلى *{{2}}* ✈️\nنتمنى لك سفراً ممتعاً وآمناً، ونحن معك خطوة بخطوة:\n{{3}}\n\n${SIGN}`,
+    params: ["name", "destination", "link"],
+    body: [HELLO, "اليوم موعد رحلتك إلى {{2}}", "نتمنى لك سفراً ممتعاً وآمناً، ونحن معك خطوة بخطوة:", "{{3}}", SIGN].join("\n\n"),
   },
   welcome: {
     name: "traveliun_welcome_arrival",
-    body: `الحمد لله على سلامتك يا {{1}} 🌴\n\nأهلاً بك في *{{2}}*. نتابع معك رحلتك بكل لحظة، وإن احتجت أي شيء راسلنا هنا.\n{{3}}\n\n${SIGN}`,
+    params: ["name", "destination", "link"],
+    body: [HELLO, "الحمد لله على سلامتك، وأهلاً بك في {{2}}", "نتابع معك رحلتك بكل لحظة، وإن احتجت أي شيء راسلنا هنا:", "{{3}}", SIGN].join("\n\n"),
   },
   midway: {
     name: "traveliun_trip_checkin",
-    body: `مرحباً {{1}} 👋\n\nنطمئن عليك في *{{2}}* 😊 نتمنى أن رحلتك تسير كما تحب.\nإن احتجت أي شيء نحن هنا، وبرنامجك على الرابط:\n{{3}}\n\n${SIGN}`,
+    params: ["name", "destination", "link"],
+    body: [HELLO, "نطمئن عليك في {{2}}، ونتمنى أن رحلتك تسير كما تحب", "إن احتجت أي شيء نحن هنا، وبرنامجك من هنا:", "{{3}}", SIGN].join("\n\n"),
   },
   rate_trip: {
     name: "traveliun_rate_trip",
-    body: `حمداً لله على سلامة العودة يا {{1}} 🤍\n\nنتمنى أن رحلتك إلى *{{2}}* كانت ممتعة. شاركنا رأيك بنقرة:\n{{3}}\n\n${SIGN}`,
+    params: ["name", "destination", "link"],
+    body: [HELLO, "حمداً لله على سلامة العودة، ونتمنى أن رحلتك إلى {{2}} كانت ممتعة", "شاركنا رأيك بنقرة من هنا:", "{{3}}", SIGN].join("\n\n"),
   },
 };
 
-/** The template's three values, in order — the link the message is about. */
-export function waParams(key: WaTemplateKey, fields: Pick<MessageFields, "name" | "destination" | "link" | "rate_link">): string[] {
-  return [fields.name.trim() || "عميلنا العزيز", fields.destination.trim() || "وجهتك", (key === "rate_trip" ? fields.rate_link : fields.link) || "-"];
+/** The template's values in its own order — the rating message points at the rating link. */
+export function waParams(key: WaTemplateKey, fields: Pick<MessageFields, "name" | "destination" | "serial" | "link" | "rate_link">): string[] {
+  const value: Record<WaField, string> = {
+    name: fields.name.trim() || "العزيز",
+    destination: fields.destination.trim() || "وجهتك",
+    serial: fields.serial.trim() || "-",
+    link: (key === "rate_trip" ? fields.rate_link : fields.link) || "-",
+  };
+  return WA_TEMPLATES[key].params.map((f) => value[f]);
 }
 
 /** The template text as the client will read it — shown on the thread beside the template. */
 export function waPreview(def: WaTemplateDef, params: string[]): string {
   return def.body.replace(/\{\{(\d)\}\}/g, (_, n: string) => params[Number(n) - 1] ?? "");
+}
+
+/**
+ * The same words as the stage's editable text (/settings/client-comms), in the
+ * placeholders a manager writes — so the message reads the same inside the 24
+ * hours and after them.
+ */
+export function defaultMessageBody(key: ClientMessageKey): string {
+  const def = WA_TEMPLATES[key];
+  return def.body.replace(/\{\{(\d)\}\}/g, (_, n: string) => {
+    const field = def.params[Number(n) - 1];
+    return field === "link" && key === "rate_trip" ? "{rate_link}" : `{${field}}`;
+  });
 }

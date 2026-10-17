@@ -13,7 +13,7 @@ import {
   sendTeletelTemplate,
   whatsappTemplateStatus,
 } from "@/lib/providers/teletel";
-import { tidyWhatsapp, WA_TEMPLATES, waPreview, type WaTemplateKey } from "@/lib/operations/client-messages";
+import { tidyWhatsapp, WA_TEMPLATES, waParams, waPreview, type WaTemplateKey } from "@/lib/operations/client-messages";
 import { AR } from "@/components/offer-doc/labels";
 import { resolveDocBrand } from "./doc-brand";
 import { getPublishedClientOffer } from "./offers";
@@ -182,21 +182,17 @@ export async function sendOfferToClient(serial: string, updated: boolean): Promi
     const where = [row.destination, row.duration ? `(${row.duration})` : ""].filter(Boolean).join(" ");
     const link = `${base}/client-offer/${row.serial}`;
     const destination = row.destination?.trim() || "";
+    // the owner's layout (2026-10-17): every line apart, the link alone, the signature last
     const text = [
-      `${greeting(customer?.arabic_name)} 👋`,
-      "",
+      greeting(customer?.arabic_name),
       updated
-        ? `تم تحديث ملفك، وهذا برنامج رحلتك المحدَّث${destination ? ` إلى *${destination}*` : ""} ✈️`
-        : `تم إعداد برنامج رحلتك${destination ? ` إلى *${destination}*` : ""} ✈️`,
-      row.duration ? `🗓️ ${row.duration}` : "",
-      "",
-      "📄 تفاصيل البرنامج كاملة من الرابط، وتصلك نسخة PDF في الرسالة التالية:",
+        ? `تم تحديث ملفك، وهذا برنامج رحلتك المحدَّث${where ? ` إلى ${where}` : ""}`
+        : `تم إعداد برنامج رحلتك${where ? ` إلى ${where}` : ""}`,
+      `(رقم الملف ${row.serial})`,
+      "تفاصيل البرنامج كاملة من هنا، وتصلك نسخة PDF في الرسالة التالية:",
       link,
-      "",
       "فريق ترافليون للسفر والسياحة",
-    ]
-      .filter((line, i, all) => line !== "" || all[i - 1] !== "")
-      .join("\n");
+    ].join("\n\n");
     const note = [
       `${updated ? "أُعيد إصدار" : "أُصدر"} العرض ${row.serial}${where ? ` — ${where}` : ""}`,
       row.total != null ? `الإجمالي: ${Number(row.total).toLocaleString("en-US")} ${row.currency ?? ""}`.trim() : null,
@@ -214,7 +210,7 @@ export async function sendOfferToClient(serial: string, updated: boolean): Promi
         // after the 24 hours: the approved template, the PDF riding as its document
         template: {
           key: "programme",
-          params: [customer?.arabic_name?.trim() || "عميلنا العزيز", destination || "وجهتك", link],
+          params: waParams("programme", { name: customer?.arabic_name ?? "", destination, serial: row.serial, link, rate_link: "" }),
           document: { url: `${link}/pdf`, name: `برنامج-رحلتك-${row.serial}.pdf` },
         },
       },

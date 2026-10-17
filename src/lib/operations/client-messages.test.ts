@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fillTemplate, messagesDueToday, tidyWhatsapp, WA_TEMPLATES, waParams, waPreview } from "./client-messages";
+import { defaultMessageBody, fillTemplate, messagesDueToday, tidyWhatsapp, WA_TEMPLATES, waParams, waPreview } from "./client-messages";
 
 const fields = { name: "أحمد", destination: "ماليزيا", serial: "AD-6-3056", link: "https://pkg.traveliun.com/trip/x", rate_link: "https://pkg.traveliun.com/trip/x/rate" };
 
@@ -51,11 +51,30 @@ describe("the WhatsApp templates", () => {
       expect(def.body.trim().startsWith("{{")).toBe(false);
       expect(def.body.trim().endsWith("}}")).toBe(false);
       expect(def.name).toMatch(/^[a-z0-9_]+$/);
+      // every {{n}} has its value, in order
+      const used = [...def.body.matchAll(/\{\{(\d)\}\}/g)].map((m) => Number(m[1]));
+      expect(Math.max(...used)).toBe(def.params.length);
     }
   });
 
-  it("fills name, destination and the right link", () => {
+  it("is laid out the way the owner asked: greeting, sentences and link apart, signature last", () => {
+    expect(waPreview(WA_TEMPLATES.bookings_confirmed, waParams("bookings_confirmed", fields))).toBe(
+      [
+        "عميلنا أحمد،",
+        "تم تأكيد حجوزات رحلتك إلى ماليزيا",
+        "(رقم الملف AD-6-3056)",
+        "تابع تفاصيل رحلتك من هنا:",
+        "https://pkg.traveliun.com/trip/x",
+        "فريق ترافليون للسفر والسياحة",
+      ].join("\n\n"),
+    );
+  });
+
+  it("points the rating at the rating link, and gives the editable text the same words", () => {
     expect(waParams("rate_trip", fields)).toEqual(["أحمد", "ماليزيا", fields.rate_link]);
-    expect(waPreview(WA_TEMPLATES.day_before, waParams("day_before", fields))).toContain("رحلتك إلى *ماليزيا* غداً");
+    expect(fillTemplate(defaultMessageBody("bookings_confirmed"), fields)).toBe(
+      waPreview(WA_TEMPLATES.bookings_confirmed, waParams("bookings_confirmed", fields)),
+    );
+    expect(defaultMessageBody("rate_trip")).toContain("{rate_link}");
   });
 });
