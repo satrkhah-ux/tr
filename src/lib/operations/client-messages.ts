@@ -188,10 +188,20 @@ export const WA_TEMPLATES: Record<WaTemplateKey, WaTemplateDef> = {
     params: ["name", "destination", "link"],
     body: [HELLO, "اليوم موعد رحلتك إلى {{2}}", "نتمنى لك سفراً ممتعاً وآمناً، ونحن معك خطوة بخطوة:", "{{3}}", SIGN].join("\n\n"),
   },
+  // Meta classed the first wording («الحمد لله على سلامتك، وأهلاً بك…») as MARKETING;
+  // this one speaks about the booking itself (the file, its hotel and driver), so
+  // it travels as UTILITY (owner, 2026-10-17).
   welcome: {
-    name: "traveliun_welcome_arrival",
-    params: ["name", "destination", "link"],
-    body: [HELLO, "الحمد لله على سلامتك، وأهلاً بك في {{2}}", "نتابع معك رحلتك بكل لحظة، وإن احتجت أي شيء راسلنا هنا:", "{{3}}", SIGN].join("\n\n"),
+    name: "traveliun_arrival_update",
+    params: ["name", "destination", "serial", "link"],
+    body: [
+      HELLO,
+      "بخصوص رحلتك إلى {{2}} (رقم الملف {{3}})",
+      "نرجو أن وصولك تم بسلامة، وتجد بيانات الفندق والسائق وبرنامج الأيام القادمة من هنا:",
+      "{{4}}",
+      "لأي طلب أثناء الرحلة راسلنا على هذه المحادثة",
+      SIGN,
+    ].join("\n\n"),
   },
   midway: {
     name: "traveliun_trip_checkin",
