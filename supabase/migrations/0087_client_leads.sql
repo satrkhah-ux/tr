@@ -12,6 +12,9 @@
 --    the sheet has no row id) and sheet_raw: the cells as last pulled. A pull
 --    only overwrites a field whose CELL changed since then, so an edit made
 --    here is not undone by an unchanged sheet.
+--  · every column of the sheet has its own here, under its corrected name
+--    (تأخير المحادثة = delay, مسؤول التواصل = contact_owner…), inquiry in one
+--    spelling («باكدج» → «بكج») so the daily counts add up.
 --  · received_by_name / assigned_to_name keep the sheet's own wording when no
 --    employee matches it.
 --
@@ -30,10 +33,12 @@ create table if not exists public.client_leads (
   received_by_name text,
   assigned_to uuid references public.employees (id) on delete set null,
   assigned_to_name text,
+  delay text,
   sent_status text,
   done_text text,
   status text not null default 'open' check (status in ('open', 'closed')),
   next_action text,
+  contact_owner text,
   result text,
   draft_id uuid references public.offer_drafts (id) on delete set null,
   source text not null default 'manual' check (source in ('manual', 'sheet')),

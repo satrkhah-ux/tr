@@ -4,37 +4,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "./metrics";
 import { createDraft } from "./drafts";
-import { matchEmployee, normalizePhone, parseLeadsSheet, sheetStatus, type SheetField, type SheetLead } from "@/lib/leads/sheet";
+import { normalizeInquiry, normalizePhone } from "@/lib/leads/sheet";
+import { activeTeam, pullSheet, pushToSheet, type LeadRow } from "@/lib/leads/sync";
 
 /**
  * «العملاء» — every client conversation, open to every employee (the owner,
- * 2026-10-17, phase one). The company's sheet is pulled in on its own: opening
- * the page pulls it when the last pull is over a minute old. Phase two (no
- * sheet, the conversations straight from WhatsApp) replaces the pull, not this.
+ * 2026-10-17, phase one). The sheet comes in on its own (instrumentation.ts
+ * every two minutes, and on opening the page when the last pull is over a
+ * minute old); what is logged or edited here goes back out (sync.ts).
  */
 
-const SHEET_ID = process.env.LEADS_SHEET_ID || "1jCwYe6c661ik3Az5RAu9X9jxQgOoY_TwNqGMg2YMi6s";
-// no tab id: the sheet's first tab (the conversations)
-const SHEET_GID = process.env.LEADS_SHEET_GID || "";
 const PULL_EVERY_MS = 60_000;
 // ponytail: one server process, so one in-memory clock; a shared row if the app ever runs twice
 let lastPull = 0;
 
-export type Lead = {
-  id: string;
-  phone: string;
+export type Lead = Omit<LeadRow, "sheet_key"> & {
   name: string | null;
-  inquiry: string | null;
-  destination: string | null;
-  received_by: string | null;
-  received_by_name: string | null;
-  assigned_to: string | null;
-  assigned_to_name: string | null;
-  sent_status: string | null;
-  done_text: string | null;
-  status: "open" | "closed";
-  next_action: string | null;
-  result: string | null;
   draft_id: string | null;
   source: "manual" | "sheet";
   created_at: string;
@@ -44,66 +29,25 @@ export type Lead = {
   returning: boolean;
 };
 
-export type LeadsPage = { leads: Lead[]; team: { id: string; arabic_name: string }[]; meId: string | null; pulledAt: number; pullError: string | null };
+export type LeadsPage = { leads: Lead[]; team: { id: string; arabic_name: string }[]; meId: string | null; pullError: string | null; twoWay: boolean };
 
 const COLS =
-  "id, phone, name, inquiry, destination, received_by, received_by_name, assigned_to, assigned_to_name, sent_status, done_text, status, next_action, result, draft_id, source, created_at";
+  "id, phone, name, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, draft_id, source, created_at";
+const ROW_COLS =
+  "id, phone, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, sheet_key";
 
 async function db(): Promise<SupabaseClient> {
   return (await createSupabaseServerClient()) as unknown as SupabaseClient;
 }
 
-async function team(supabase: SupabaseClient) {
-  const { data } = await supabase.from("employees").select("id, arabic_name").eq("status", "Active").order("arabic_name");
-  return (data ?? []) as { id: string; arabic_name: string }[];
-}
-
-/** what a sheet cell means in our columns */
-function columnsFor(field: SheetField, value: string, people: { id: string; arabic_name: string }[]): Record<string, unknown> {
-  const v = value || null;
-  if (field === "received_by") return { received_by_name: v, received_by: matchEmployee(value, people) };
-  if (field === "assigned_to") return { assigned_to_name: v, assigned_to: matchEmployee(value, people) };
-  if (field === "status") return { status: sheetStatus(value) };
-  if (field === "phone") return {};
-  return { [field]: v };
-}
-
-const FIELDS: SheetField[] = ["inquiry", "destination", "received_by", "sent_status", "assigned_to", "done_text", "status", "next_action", "result"];
-
-/** Pull the sheet: new rows in, and only the cells that changed since the last pull over what is here. */
-async function pull(supabase: SupabaseClient): Promise<string | null> {
-  const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv${SHEET_GID ? `&gid=${SHEET_GID}` : ""}`, { cache: "no-store" });
-  if (!res.ok) return `sheet ${res.status}`;
-  const rows = parseLeadsSheet(await res.text());
-  if (!rows.length) return null;
-  const [people, { data: existing }] = await Promise.all([
-    team(supabase),
-    supabase.from("client_leads").select("id, sheet_key, sheet_raw").in("sheet_key", rows.map((r) => r.key)),
-  ]);
-  const byKey = new Map(((existing ?? []) as { id: string; sheet_key: string; sheet_raw: Partial<SheetLead> | null }[]).map((r) => [r.sheet_key, r]));
-  const fresh: Record<string, unknown>[] = [];
-  for (const row of rows) {
-    const had = byKey.get(row.key);
-    const changed = FIELDS.filter((f) => !had || (had.sheet_raw?.[f] ?? "") !== row[f]);
-    if (had && !changed.length) continue;
-    const cols = Object.assign({}, ...changed.map((f) => columnsFor(f, row[f], people)));
-    if (had) {
-      await supabase.from("client_leads").update({ ...cols, sheet_raw: row, updated_at: new Date().toISOString() }).eq("id", had.id);
-    } else {
-      // a millisecond apart in the sheet's order: a phone's second row in one pull is still «عميل سابق»
-      fresh.push({ ...cols, phone: row.phone, source: "sheet", sheet_key: row.key, sheet_raw: row, created_at: new Date(Date.now() + fresh.length).toISOString() });
-    }
-  }
-  if (fresh.length) {
-    const { error } = await supabase.from("client_leads").insert(fresh);
-    if (error) return error.message;
-  }
-  return null;
+async function pullOnce(supabase: SupabaseClient): Promise<string | null> {
+  lastPull = Date.now();
+  return pullSheet(supabase).catch((e: unknown) => (e instanceof Error ? e.message : "pull failed"));
 }
 
 /** The Basic files of these phones (newest first): the client's name and the programme's destination. */
 async function filesByPhone(phones: Set<string>): Promise<Map<string, Lead["file"]>> {
-  // service role, three fields only: a colleague's file may not be readable to
+  // service role, a few fields only: a colleague's file may not be readable to
   // this session, but which country it is for is what classifies the client
   const service = createSupabaseServiceClient() as unknown as SupabaseClient;
   const { data } = await service
@@ -123,15 +67,12 @@ async function filesByPhone(phones: Set<string>): Promise<Map<string, Lead["file
 export async function listLeads(): Promise<LeadsPage> {
   const supabase = await db();
   const meId = await getCurrentEmployeeId();
-  if (!meId) return { leads: [], team: [], meId: null, pulledAt: lastPull, pullError: null };
-  let pullError: string | null = null;
-  if (Date.now() - lastPull > PULL_EVERY_MS) {
-    lastPull = Date.now();
-    pullError = await pull(supabase).catch((e: unknown) => (e instanceof Error ? e.message : "pull failed"));
-  }
+  const twoWay = Boolean(process.env.LEADS_SHEET_WEBHOOK);
+  if (!meId) return { leads: [], team: [], meId: null, pullError: null, twoWay };
+  const pullError = Date.now() - lastPull > PULL_EVERY_MS ? await pullOnce(supabase) : null;
   const [{ data }, people] = await Promise.all([
-    supabase.from("client_leads").select(COLS).order("created_at", { ascending: false }).limit(1000),
-    team(supabase),
+    supabase.from("client_leads").select(COLS).order("created_at", { ascending: false }).limit(3000),
+    activeTeam(supabase),
   ]);
   const rows = (data ?? []) as Omit<Lead, "file" | "returning">[];
   const files = await filesByPhone(new Set(rows.map((r) => r.phone)));
@@ -146,15 +87,21 @@ export async function listLeads(): Promise<LeadsPage> {
     const returning = firstSeen.get(r.phone)! < r.created_at || Boolean(byPhone?.created_at && byPhone.created_at < r.created_at);
     return { ...r, name: r.name || byPhone?.name || null, file, returning };
   });
-  return { leads, team: people, meId, pulledAt: lastPull, pullError };
+  return { leads, team: people, meId, pullError, twoWay };
 }
 
 /** a pull now, whatever the clock says («تحديث من الشيت») */
 export async function pullLeadsNow(): Promise<{ ok: boolean; error?: string }> {
   if (!(await getCurrentEmployeeId())) return { ok: false, error: "err.session" };
-  lastPull = Date.now();
-  const error = await pull(await db()).catch((e: unknown) => (e instanceof Error ? e.message : "pull failed"));
+  const error = await pullOnce(await db());
   return error ? { ok: false, error } : { ok: true };
+}
+
+/** after a save here: the row into the sheet too */
+async function push(supabase: SupabaseClient, id: string): Promise<string | null> {
+  if (!process.env.LEADS_SHEET_WEBHOOK) return null;
+  const [{ data }, people] = await Promise.all([supabase.from("client_leads").select(ROW_COLS).eq("id", id).maybeSingle(), activeTeam(supabase)]);
+  return data ? pushToSheet(supabase, data as LeadRow, people) : null;
 }
 
 export async function addLead(input: { phone: string; name?: string; inquiry?: string; destination?: string }): Promise<{ ok: boolean; error?: string }> {
@@ -162,19 +109,26 @@ export async function addLead(input: { phone: string; name?: string; inquiry?: s
   if (!meId) return { ok: false, error: "err.session" };
   const phone = normalizePhone(input.phone);
   if (phone.length < 7) return { ok: false, error: "phone" };
-  const { error } = await (await db()).from("client_leads").insert({
-    phone,
-    name: input.name?.trim() || null,
-    inquiry: input.inquiry?.trim() || null,
-    destination: input.destination?.trim() || null,
-    // the one who logs it is the one who received it
-    received_by: meId,
-    created_by: meId,
-  });
-  return error ? { ok: false, error: error.message } : { ok: true };
+  const supabase = await db();
+  const { data, error } = await supabase
+    .from("client_leads")
+    .insert({
+      phone,
+      name: input.name?.trim() || null,
+      inquiry: normalizeInquiry(input.inquiry ?? "") || null,
+      destination: input.destination?.trim() || null,
+      // the one who logs it is the one who received it
+      received_by: meId,
+      created_by: meId,
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  const sheetError = await push(supabase, (data as { id: string }).id);
+  return sheetError ? { ok: true, error: `sheet: ${sheetError}` } : { ok: true };
 }
 
-const EDITABLE = ["name", "inquiry", "destination", "assigned_to", "sent_status", "done_text", "status", "next_action", "result"] as const;
+const EDITABLE = ["name", "inquiry", "destination", "delay", "assigned_to", "sent_status", "done_text", "status", "next_action", "contact_owner", "result"] as const;
 export type LeadPatch = Partial<Record<(typeof EDITABLE)[number], string | null>>;
 
 export async function updateLead(id: string, patch: LeadPatch): Promise<{ ok: boolean; error?: string }> {
@@ -182,10 +136,14 @@ export async function updateLead(id: string, patch: LeadPatch): Promise<{ ok: bo
   const clean: Record<string, unknown> = {};
   for (const k of EDITABLE) if (k in patch) clean[k] = patch[k] === "" ? null : patch[k];
   if (clean.status !== undefined && clean.status !== "open" && clean.status !== "closed") return { ok: false, error: "status" };
+  if (typeof clean.inquiry === "string") clean.inquiry = normalizeInquiry(clean.inquiry) || null;
   // handing it over here: the sheet's handwritten name no longer applies
   if ("assigned_to" in clean) clean.assigned_to_name = null;
-  const { error } = await (await db()).from("client_leads").update({ ...clean, updated_at: new Date().toISOString() }).eq("id", id);
-  return error ? { ok: false, error: error.message } : { ok: true };
+  const supabase = await db();
+  const { error } = await supabase.from("client_leads").update({ ...clean, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  const sheetError = await push(supabase, id);
+  return sheetError ? { ok: true, error: `sheet: ${sheetError}` } : { ok: true };
 }
 
 /** «ابدأ برنامج»: a Basic file with the client's name and phone, tied to the conversation, which becomes mine if nobody has it. */
@@ -200,5 +158,6 @@ export async function startProgramme(id: string): Promise<{ ok: boolean; draftId
   const made = await createDraft({ customer: { customer_name: row.name ?? "", customer_phone: row.phone, company: "", partner_company_id: null } });
   if (!made.ok) return { ok: false, error: made.error };
   await supabase.from("client_leads").update({ draft_id: made.id, assigned_to: row.assigned_to ?? meId, updated_at: new Date().toISOString() }).eq("id", id);
+  await push(supabase, id);
   return { ok: true, draftId: made.id };
 }
