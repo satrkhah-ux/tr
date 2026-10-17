@@ -235,10 +235,14 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
     }
 
     const { fresh, links } = newBookings(rows, existing);
+    // Service client for the writes: the ref and the buy price are what the
+    // booking costs, which 0080 takes from no session but operations.write — the
+    // values here come from the offer, never the browser. gateOperation above is the gate.
+    const writer = createSupabaseServiceClient() as unknown as SupabaseClient;
     // a booking typed by hand that IS a planned one takes its ref — the next pull matches it outright
     let linked = 0;
     for (const link of links) {
-      const { error } = await supabase.from("operation_bookings").update({ origin_ref: link.origin_ref }).eq("id", link.id).eq("operation_id", operationId);
+      const { error } = await writer.from("operation_bookings").update({ origin_ref: link.origin_ref }).eq("id", link.id).eq("operation_id", operationId);
       if (!error) linked += 1;
     }
     if (fresh.length === 0) {
@@ -247,7 +251,7 @@ export async function seedBookingsFromOffer(operationId: string): Promise<SeedRe
     }
 
     const employeeId = await getCurrentEmployeeId();
-    const { error } = await supabase.from("operation_bookings").insert(
+    const { error } = await writer.from("operation_bookings").insert(
       fresh.map((r) => ({
         operation_id: operationId,
         kind: r.kind,

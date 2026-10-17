@@ -80,6 +80,7 @@ export function DocumentsPanel({
   assignees,
   sentRequests,
   canBook,
+  canManage,
 }: {
   operationId: string;
   bookings: OperationBooking[];
@@ -89,6 +90,8 @@ export function DocumentsPanel({
   assignees: AssigneeOption[];
   sentRequests: SentRequest[];
   canBook: boolean;
+  /** operations.write — «تأكيد الكل» takes the net charged from the manager only. */
+  canManage: boolean;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -221,7 +224,7 @@ export function DocumentsPanel({
 
         {adding ? <AddBooking operationId={operationId} onDone={() => { setAdding(false); router.refresh(); }} /> : null}
         {confirmingAll && waiting.length > 0 ? (
-          <ConfirmAllBookings operationId={operationId} bookings={waiting} onDone={() => router.refresh()} />
+          <ConfirmAllBookings operationId={operationId} bookings={waiting} canSetNet={canManage} onDone={() => router.refresh()} />
         ) : null}
 
         {bookings.length === 0 ? (

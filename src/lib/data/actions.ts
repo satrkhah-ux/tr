@@ -339,9 +339,15 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
     // every field it shows, total included.
     let writer = supabase;
     if (table === "offers") {
-      const { data: stored } = await supabase.from("offers").select(OFFER_LOCKED_COLUMNS.join(", ")).eq("id", id).maybeSingle();
+      const { data: stored } = await supabase.from("offers").select([...OFFER_LOCKED_COLUMNS, "employee_id"].join(", ")).eq("id", id).maybeSingle();
       const changed = changedLockedColumns(values, stored as unknown as Record<string, unknown> | null);
       if (changed.some((column) => (OFFER_OWNER_COLUMNS as readonly string[]).includes(column))) return { ok: false, error: "err.forbidden" };
+      // the issuer is «my file» in operations (0078/0080). No form carries it, and
+      // a total edit below goes through the service role, past the database's check.
+      const issuer = (stored as { employee_id?: string | null } | null)?.employee_id ?? null;
+      if ("employee_id" in values && (values.employee_id || null) !== issuer && !(await currentCan("operations.write"))) {
+        return { ok: false, error: "err.forbidden" };
+      }
       if (changed.length === 0) values = without(values, OFFER_LOCKED_COLUMNS);
       else if (await currentCan("offers.write")) writer = createSupabaseServiceClient();
       else return { ok: false, error: "err.forbidden" };
