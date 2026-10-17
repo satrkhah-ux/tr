@@ -1,8 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { clientService, flightLegs, type ClientService, type Leg } from "@/lib/operations/drivers";
+import { clientService, type ClientService } from "@/lib/operations/drivers";
 import { toClientInfo, type ClientInfo } from "@/lib/operations/case-list";
+import { clientFlight, clientHotel, type ClientBookingRow, type TripFlight, type TripHotel } from "@/lib/operations/client-booking-state";
 
 /**
  * Everything the traveller's trip page shows beyond the documents — the
@@ -15,8 +16,9 @@ import { toClientInfo, type ClientInfo } from "@/lib/operations/case-list";
  * stays off this page until someone decides it belongs on it.
  */
 
-export type TripFlight = { title: string; confirmed: boolean; pnr: string | null; cabin: string; legs: (Leg & { label: string })[] };
-export type TripHotel = { name: string; city: string; check_in: string | null; check_out: string | null; nights: string; rooms: string[]; confirmed: boolean; confirmation: string | null };
+export type { TripFlight, TripHotel };
+/** a drive or a tour, with our booking number for it (0084). */
+export type TripService = ClientService & { ref: string | null };
 export type TripDay = { day_number: number; date: string | null; city: string; title: string; activities: string[]; note: string };
 
 export type ClientTrip = {
@@ -25,16 +27,13 @@ export type ClientTrip = {
   flights: TripFlight[];
   hotels: TripHotel[];
   days: TripDay[];
-  services: ClientService[];
+  services: TripService[];
   /** null for a partner's file — their client pays them, and our ledger is not theirs to see. */
   money: { total: number; paid: number; remaining: number; currency: string } | null;
   info: ClientInfo;
 };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
-
-/** The rooms of a stay, as the voucher words them — and nothing else from its detail. */
-const ROOM_KEY = /^(الغرفة|نوع الغرفة|الإقامة|عدد الغرف)/;
 
 export async function getClientTrip(token: string): Promise<ClientTrip | null> {
   try {
@@ -52,7 +51,7 @@ export async function getClientTrip(token: string): Promise<ClientTrip | null> {
     const [bookingsRes, daysRes, paymentsRes, infoRes] = await Promise.all([
       supabase
         .from("operation_bookings")
-        .select("kind, title, city_name, start_date, end_date, detail, status, confirmation_number")
+        .select("kind, title, city_name, start_date, end_date, detail, status, confirmation_number, company_ref, pnr, ticket_numbers, flight_legs, is_paid")
         .eq("operation_id", op.id)
         .neq("status", "cancelled")
         .order("start_date", { ascending: true, nullsFirst: false }),
@@ -68,48 +67,17 @@ export async function getClientTrip(token: string): Promise<ClientTrip | null> {
 
     // the company's day — the driver card turns on at the Riyadh midnight of the service date
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
-    const bookings = (bookingsRes.data ?? []) as {
-      kind: string;
-      title: string;
-      city_name: string;
-      start_date: string | null;
-      end_date: string | null;
-      detail: Record<string, string> | null;
-      status: string;
-      confirmation_number: string | null;
-    }[];
+    const bookings = (bookingsRes.data ?? []) as ClientBookingRow[];
 
-    const flights = bookings
-      .filter((b) => b.kind === "flight")
-      .map((b) => ({
-        title: b.title,
-        confirmed: b.status === "confirmed",
-        pnr: b.status === "confirmed" ? b.confirmation_number : null,
-        cabin: b.detail?.["الدرجة"] ?? "",
-        legs: flightLegs(b.detail ?? {}).map(({ key, leg }) => ({ ...leg, label: key === "رقم الرحلة" ? "" : key })),
-      }));
-
-    const hotels = bookings
-      .filter((b) => b.kind === "hotel")
-      .map((b) => {
-        const d = b.detail ?? {};
-        return {
-          name: b.title,
-          city: b.city_name || d["المدينة"] || "",
-          check_in: b.start_date,
-          check_out: b.end_date,
-          nights: d["عدد الليالي"] ?? "",
-          rooms: Object.entries(d)
-            .filter(([k]) => ROOM_KEY.test(k))
-            .map(([k, v]) => `${k}: ${v}`),
-          confirmed: b.status === "confirmed",
-          confirmation: b.status === "confirmed" ? b.confirmation_number : null,
-        };
-      });
+    // what each shows, and when — client-booking-state.ts (the owner, 2026-10-17)
+    const flights = bookings.filter((b) => b.kind === "flight").map(clientFlight);
+    const hotels = bookings.filter((b) => b.kind === "hotel").map(clientHotel);
 
     const services = bookings
-      .map((b) => clientService(b, today))
-      .filter((s): s is ClientService => s !== null)
+      .flatMap((b) => {
+        const s = clientService(b, today);
+        return s ? [{ ...s, ref: b.company_ref ?? null }] : [];
+      })
       .sort((a, b) => `${a.date ?? "9999"} ${a.time || "99:99"}`.localeCompare(`${b.date ?? "9999"} ${b.time || "99:99"}`));
 
     const days = ((daysRes.data ?? []) as {

@@ -6,6 +6,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { CLIENT_DOCUMENT_KINDS, type VoucherKind } from "@/lib/operations/voucher-dto";
+import { voucherLive, type ClientBookingRow, type StayKey } from "@/lib/operations/client-booking-state";
 import { gateOperation } from "@/lib/operations/access";
 import { resolveDocBrand } from "@/lib/data/doc-brand";
 import { getPartnerSession } from "@/lib/partners/session";
@@ -106,8 +107,8 @@ export type ClientHub = {
   travel_start: string | null;
   travel_end: string | null;
   documents: ClientHubDoc[];
-  /** what is still being worked on, in words the client can read. */
-  pending: { kind: string; title: string }[];
+  /** what is still being worked on, in words the client can read — with our booking number for it (0084). */
+  pending: { kind: string; title: string; ref: string | null }[];
   /** whose trip it is — a partner's client sees the partner's name, number and colour, not ours. */
   brand: {
     name: string;
@@ -155,7 +156,8 @@ export async function getClientHub(token: string): Promise<ClientHub | null> {
     const [docsRes, bookingsRes] = await Promise.all([
       supabase
         .from("operation_documents")
-        .select("kind, version, token, created_at")
+        // a hotel voucher's stays: whether its confirmation still holds (voucherLive)
+        .select("kind, version, token, created_at, stays:snapshot_json->bookings")
         .eq("operation_id", op.id)
         // the booking summary (suppliers, what is unpaid) and the welcome board are ours, never the client's
         .in("kind", CLIENT_DOCUMENT_KINDS)
@@ -163,19 +165,21 @@ export async function getClientHub(token: string): Promise<ClientHub | null> {
         .order("created_at", { ascending: false }),
       supabase
         .from("operation_bookings")
-        .select("kind, title, status")
+        .select("kind, title, start_date, status, confirmation_number, company_ref")
         .eq("operation_id", op.id)
         .neq("status", "cancelled"),
     ]);
 
-    const documents = ((docsRes.data ?? []) as { kind: VoucherKind; version: number; token: string; created_at: string }[]).map(
-      (d) => ({ kind: d.kind, version: d.version, token: d.token, issued_at: d.created_at.slice(0, 10) }),
-    );
+    const bookings = (bookingsRes.data ?? []) as Pick<ClientBookingRow, "kind" | "title" | "start_date" | "status" | "confirmation_number" | "company_ref">[];
+    const documents = ((docsRes.data ?? []) as { kind: VoucherKind; version: number; token: string; created_at: string; stays: StayKey[] | null }[])
+      // the paper shown at the hotel desk only while the hotel's own confirmation it prints holds
+      .filter((d) => d.kind !== "hotel_voucher" || voucherLive(d.stays, bookings))
+      .map((d) => ({ kind: d.kind, version: d.version, token: d.token, issued_at: d.created_at.slice(0, 10) }));
 
     // Only "still being worked on" — never a price, never a supplier name.
-    const pending = ((bookingsRes.data ?? []) as { kind: string; title: string; status: string }[])
+    const pending = bookings
       .filter((b) => b.status !== "confirmed")
-      .map((b) => ({ kind: b.kind, title: b.title }));
+      .map((b) => ({ kind: b.kind, title: b.title, ref: b.company_ref ?? null }));
 
     const { brand } = await resolveDocBrand({ serial: offer?.serial ?? "" });
 

@@ -9,6 +9,7 @@ import { TRAVELIUN_BRAND } from "@/components/offer-doc/brand";
 import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { VoucherDTO } from "@/lib/operations/voucher-dto";
+import { voucherLive, type ClientBookingRow } from "@/lib/operations/client-booking-state";
 
 export const runtime = "nodejs";
 export const maxDuration = 26;
@@ -33,16 +34,30 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   const supabase = createSupabaseServiceClient();
   const { data } = await supabase
     .from("operation_documents")
-    .select("snapshot_json, revoked_at")
+    .select("snapshot_json, revoked_at, operation_id")
     .eq("token", token)
     .maybeSingle();
 
-  const row = data as { snapshot_json: VoucherDTO; revoked_at: string | null } | null;
+  const row = data as { snapshot_json: VoucherDTO; revoked_at: string | null; operation_id: string } | null;
   if (!row || row.revoked_at) {
     return new NextResponse("Not found", { status: 404 });
   }
 
   const voucher = row.snapshot_json;
+
+  // The hotel voucher is shown at the desk: only while the hotel's own
+  // confirmation it prints still holds (the owner, 2026-10-17) — a number taken
+  // back or dates moved since, and it is stale. Issue a new one.
+  if (voucher.kind === "hotel_voucher") {
+    const { data: hotels } = await supabase
+      .from("operation_bookings")
+      .select("kind, status, confirmation_number, company_ref, start_date")
+      .eq("operation_id", row.operation_id)
+      .eq("kind", "hotel");
+    if (!voucherLive(voucher.bookings, (hotels ?? []) as Pick<ClientBookingRow, "kind" | "status" | "confirmation_number" | "company_ref" | "start_date">[])) {
+      return new NextResponse("Not found", { status: 404 });
+    }
+  }
 
   // «لوحة الاستقبال» is a different sheet in every way — landscape, one name,
   // the issuing company's own logo and colours — so it renders its own document

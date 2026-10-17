@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Check, Copy, Loader2, Send, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, Check, Copy, Loader2, Send, UserRound } from "lucide-react";
 import { DirText } from "@/components/DirText";
-import { draftClientMessage, sendClientMessageNow, type ClientDraft } from "@/lib/data/operation-client-send";
+import { draftClientMessage, listPreparedMessages, sendClientMessageNow, type ClientDraft, type PreparedList } from "@/lib/data/operation-client-send";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
@@ -13,6 +13,11 @@ import { useSafeTransition } from "../useSafeTransition";
  * confirmation numbers, drives, trip link and balance drafted into one
  * message, to the mobile on the file — read, edited, then sent through Teletel.
  * Never drawn for a partner's file (the server refuses it too).
+ *
+ * Under it, «رسائل جاهزة للإرسال» (the owner, 2026-10-17): the trip link with
+ * our booking numbers once the client confirmed, a flight's ticket, a hotel's
+ * own confirmation and voucher — prepared, never sent until the agent presses
+ * «إرسال» — and, in red, a hotel still on our number alone the day before travel.
  */
 export function ClientSend({ operationId }: { operationId: string }) {
   const { t } = useTraveliunUI();
@@ -23,6 +28,20 @@ export function ClientSend({ operationId }: { operationId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [list, setList] = useState<PreparedList | null>(null);
+  /** the prepared update being reviewed; null for the booking summary. */
+  const [key, setKey] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    listPreparedMessages(operationId)
+      .then((res) => live && setList(res.ok ? res.list : null))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [operationId, loaded]);
 
   function prepare() {
     startTransition(async () => {
@@ -31,6 +50,7 @@ export function ClientSend({ operationId }: { operationId: string }) {
       const res = await draftClientMessage(operationId);
       if (!res.ok) setError(t(res.error));
       else {
+        setKey(null);
         setDraft(res.draft);
         setBody(res.draft.body);
       }
@@ -40,10 +60,11 @@ export function ClientSend({ operationId }: { operationId: string }) {
   function send() {
     startTransition(async () => {
       setError(null);
-      const res = await sendClientMessageNow({ operation_id: operationId, body });
+      const res = await sendClientMessageNow({ operation_id: operationId, body, ...(key ? { key } : {}) });
       if (!res.ok) setError(t(res.error));
       else {
         setDraft(null);
+        setLoaded((n) => n + 1);
         setNotice(t(res.result === "sent" ? "ops.toClient.sent" : "ops.toClient.window"));
         router.refresh();
       }
@@ -62,6 +83,44 @@ export function ClientSend({ operationId }: { operationId: string }) {
         {pending && !draft ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
         {t("ops.toClient.send")}
       </button>
+      {list && list.risks.length > 0 ? (
+        <ul className="mt-2 space-y-1">
+          {list.risks.map((hotel) => (
+            <li key={hotel} className="flex items-start gap-1.5 rounded-[9px] border border-[#f3c2cf] bg-[#fdecf0] px-2.5 py-1.5 text-[11.5px] font-bold text-[#c22850]">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+              {t("trip.status.hotelAtRisk", { hotel })}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {list && list.items.length > 0 ? (
+        <div className="mt-2 rounded-[10px] border border-[#d6eadf] bg-[#f6fbf8] p-2.5">
+          <p className="text-[12px] font-extrabold text-[#185045]">{t("trip.status.prepared")}</p>
+          <p className="mb-1.5 text-[11px] font-semibold text-[#93aaa3]">{t("trip.status.preparedHint")}</p>
+          <ul className="space-y-1">
+            {list.items.map((m) => (
+              <li key={m.key} className="flex flex-wrap items-center justify-between gap-2 text-[12px] font-bold text-[#0f3d38]">
+                <span className="min-w-0 break-words">{m.label}</span>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    setError(null);
+                    setNotice(null);
+                    setKey(m.key);
+                    setDraft({ to_name: list.to_name, to_phone: list.to_phone, body: m.body, blocked: list.blocked });
+                    setBody(m.body);
+                  }}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#cfe3da] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#eef6f2] disabled:opacity-60"
+                >
+                  <Send className="size-3" />
+                  {t("trip.status.review")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {notice ? <p className="mt-1.5 text-[11.5px] font-bold text-[#0f7a52]">{notice}</p> : null}
       {error ? <p className="mt-1.5 text-[11.5px] font-bold text-[#c22850]">{error}</p> : null}
       {draft ? (

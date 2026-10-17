@@ -12,6 +12,7 @@ import { notifyBookingChanged, notifyPartnerCase } from "@/lib/data/ops-notify";
 import { syncOperation, syncOperationOfBooking } from "@/lib/data/operation-sync";
 import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, shownDetail, type VoucherBooking, type VoucherDTO, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { applyRoomDetails, roomDetailsOpen, voucherStay, type StayError, type StayHotel } from "@/lib/operations/room-details";
+import { hotelFinal } from "@/lib/operations/client-booking-state";
 import type { LocaleChoice } from "@/lib/catalog/room-catalog";
 import { currentCan } from "@/lib/roles/current";
 import { gateManagerRow, gateOperation, gateRow } from "@/lib/operations/access";
@@ -709,7 +710,7 @@ export async function issueDocument(input: {
     // A booking_id means "this hotel alone gets its own document"; without one
     // every confirmed hotel goes on ONE voucher, which is what a client wants to
     // carry and what a desk wants to be handed.
-    const scoped = input.booking_id
+    const picked = input.booking_id
       ? confirmed.filter((b) => b.id === input.booking_id)
       : input.kind === "hotel_voucher"
         ? confirmed.filter((b) => b.kind === "hotel")
@@ -718,6 +719,11 @@ export async function issueDocument(input: {
           : input.kind === "booking_summary"
             ? confirmed
             : [];
+    // The hotel voucher is the paper shown at the desk: never before the hotel's
+    // OWN confirmation (the owner, 2026-10-17). A hotel still holding only our
+    // number — or "confirmed" with no number at all — stays off it.
+    const scoped = input.kind === "hotel_voucher" ? picked.filter((b) => b.kind === "hotel" && hotelFinal(b)) : picked;
+    if (scoped.length === 0 && picked.length > 0) return { ok: false, error: "trip.status.voucherNeedsFinal" };
 
     const days = ((daysRes.data ?? []) as {
       day_number: number;

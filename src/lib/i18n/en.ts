@@ -945,6 +945,13 @@ export const en = {
   "hub.excludes": "Not included in the offer",
   "hub.noOffer": "No offer yet",
   "hub.noOfferDesc": "Create your first offer from the Package Generator or “Add Offer” to see it here.",
+  // ---------- the client's trip link: what each service shows, the prepared updates (2026-10-17) ----------
+  "trip.status.voucherNeedsFinal": "A hotel voucher is not issued before the hotel's final confirmation — record the hotel's own confirmation number first.",
+  "trip.status.prepared": "Messages ready to send",
+  "trip.status.preparedHint": "Prepared when the client confirms, when a ticket is issued, and when a hotel is confirmed and its voucher issued — nothing reaches the client until you review it and press Send.",
+  "trip.status.review": "Review & send",
+  "trip.status.preparedGone": "This message is no longer ready — it was sent or the booking changed. Refresh the page.",
+  "trip.status.hotelAtRisk": "{hotel}: no final hotel confirmation and travel is within a day — the client sees only our booking number",
 
   // ---------- validation checks ----------
   "check.nightsOk": "Nights match the hotel dates",

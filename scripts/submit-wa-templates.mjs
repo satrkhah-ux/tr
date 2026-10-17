@@ -1,7 +1,7 @@
 // Submit the client's WhatsApp templates (WA_TEMPLATES in src/lib/operations/client-messages.ts)
 // to Meta for approval, through the same WhatsApp Business account Teletel sends from.
 //
-// Only the messages switched on in /settings/client-comms, and the programme.
+// Only the messages switched on in /settings/client-comms, the programme and the booking update.
 // Usage: node scripts/submit-wa-templates.mjs            (dry run: prints what would be sent)
 //        node scripts/submit-wa-templates.mjs --submit   (submits the ones not already on the account)
 //
@@ -74,7 +74,8 @@ async function documentHandle() {
 }
 
 for (const [key, def] of Object.entries(WA_TEMPLATES)) {
-  if (key !== "programme" && !enabled.has(key)) continue;
+  // the programme and the prepared booking updates are always sent by a person — no switch to wait for
+  if (key !== "programme" && key !== "booking_update" && !enabled.has(key)) continue;
   if (existing.has(def.name)) {
     console.log(`= ${def.name}: already on the account (${existing.get(def.name)})`);
     continue;

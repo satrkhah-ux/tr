@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   mobile: "0541638023" as string | null,
   token: "TOKEN123" as string | null,
   sends: [] as { phone: string | null | undefined; text: string }[],
+  extras: [] as unknown[],
   result: "sent" as string,
   gate: null as string | null,
   dispatches: [] as Record<string, unknown>[],
@@ -21,7 +22,7 @@ const state = vi.hoisted(() => ({
 const BOOKINGS: SummaryBooking[] = [
   { kind: "transport", title: "فندق بالي ← المطار", city_name: "بالي", start_date: "2026-11-07", end_date: null, status: "confirmed", confirmation_number: "TRF-DEP", detail: { الوقت: "يُحدَّد لاحقاً" } },
   { kind: "hotel", title: "نوفوتيل بالي نوسا دوا", city_name: "بالي", start_date: "2026-11-03", end_date: "2026-11-07", status: "confirmed", confirmation_number: "HTL-BALI", detail: { الغرفة: "غرفة مزدوجة — إفطار" } },
-  { kind: "hotel", title: "جراند استون بونشاك", city_name: "بونشاك", start_date: "2026-10-31", end_date: "2026-11-03", status: "pending", confirmation_number: null, detail: {} },
+  { kind: "hotel", title: "جراند استون بونشاك", city_name: "بونشاك", start_date: "2026-10-31", end_date: "2026-11-03", status: "pending", confirmation_number: null, company_ref: "AD-4-8573-20261015-H1", detail: {} },
   { kind: "transport", title: "المطار ← فندق بونشاك", city_name: "بونشاك", start_date: "2026-10-31", end_date: null, status: "confirmed", confirmation_number: "TRF-ARR", detail: { الوقت: "14:45" } },
   { kind: "service", title: "جولة: استكشاف بونشاك", city_name: "بونشاك", start_date: "2026-11-01", end_date: null, status: "cancelled", confirmation_number: "X", detail: {} },
 ];
@@ -79,20 +80,22 @@ vi.mock("@/lib/data/audit", () => ({
 vi.mock("@/lib/data/client-whatsapp", () => ({
   greeting: (name: string | null | undefined) => `عميلنا ${name?.trim() || "العزيز"}،`,
   clientWhatsappAllowed: async (offer: { partner_company_id: string | null }) => (offer.partner_company_id ? "partner" : state.gate),
-  messageClient: async (offer: { partner_company_id: string | null; customer: { mobile: string | null } | null }, text: string) => {
+  messageClient: async (offer: { partner_company_id: string | null; customer: { mobile: string | null } | null }, text: string, extra?: unknown) => {
     if (offer.partner_company_id) return "partner";
     state.sends.push({ phone: offer.customer?.mobile, text });
+    state.extras.push(extra);
     return state.result;
   },
 }));
 
-const { draftClientMessage, sendClientMessageNow } = await import("./operation-client-send");
+const { draftClientMessage, listPreparedMessages, sendClientMessageNow } = await import("./operation-client-send");
 
 beforeEach(() => {
   state.partner = null;
   state.mobile = "0541638023";
   state.token = "TOKEN123";
   state.sends = [];
+  state.extras = [];
   state.result = "sent";
   state.gate = null;
   state.dispatches = [];
@@ -110,12 +113,12 @@ describe("the client's message", () => {
     currency: "SAR",
   });
 
-  it("lists the hotels in date order with their numbers — «قيد التأكيد» until the supplier gives one", () => {
+  it("lists the hotels in date order with their numbers — ours until the hotel gives its own, never «قيد التأكيد»", () => {
     expect(text).toContain("هذه حجوزات رحلتك إلى اندونيسيا (AD-4-8573-20261015):");
     const hotels = text.slice(text.indexOf("الفنادق:"), text.indexOf("التنقلات والجولات:"));
     expect(hotels.indexOf("جراند استون بونشاك")).toBeLessThan(hotels.indexOf("نوفوتيل بالي نوسا دوا"));
     expect(hotels).toContain("• نوفوتيل بالي نوسا دوا (بالي) — من 2026-11-03 إلى 2026-11-07\n  الغرفة: غرفة مزدوجة — إفطار\n  رقم التأكيد: HTL-BALI");
-    expect(hotels).toContain("• جراند استون بونشاك (بونشاك) — من 2026-10-31 إلى 2026-11-03\n  قيد التأكيد");
+    expect(hotels).toContain("• جراند استون بونشاك (بونشاك) — من 2026-10-31 إلى 2026-11-03\n  رقم الحجز: AD-4-8573-20261015-H1");
   });
 
   it("dates the drives with their time when known, and leaves out what was cancelled", () => {
@@ -162,6 +165,24 @@ describe("«أرسل للعميل»", () => {
     expect(await sendClientMessageNow({ operation_id: "op-1", body: "نص" })).toEqual({ ok: true, result: "window" });
     expect(state.dispatches[0]).toMatchObject({ status: "failed", sent_at: null });
     expect(state.audits.map((a) => a.action)).toEqual(["dispatch.held"]);
+  });
+
+  it("prepares the trip link with our numbers, and sends it only when pressed — as its template after the 24 hours", async () => {
+    const res = await listPreparedMessages("op-1");
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.list.items.map((m) => m.key)).toEqual(["trip_link"]);
+    expect(res.list.items[0].body).toContain("• جراند استون بونشاك: AD-4-8573-20261015-H1");
+    expect(state.sends).toEqual([]);
+
+    expect(await sendClientMessageNow({ operation_id: "op-1", body: res.list.items[0].body, key: "trip_link" })).toEqual({ ok: true, result: "sent" });
+    expect(state.extras[0]).toMatchObject({ template: { key: "bookings_confirmed" } });
+    expect(state.dispatches[0]).toMatchObject({ audience: "client", template: "trip_link", status: "sent" });
+  });
+
+  it("refuses a prepared key that is no longer ready", async () => {
+    expect(await sendClientMessageNow({ operation_id: "op-1", body: "نص", key: "hotel:x:y" })).toEqual({ ok: false, error: "trip.status.preparedGone" });
+    expect(state.sends).toEqual([]);
   });
 
   it("never writes to a partner's client", async () => {

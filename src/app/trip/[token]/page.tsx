@@ -2,12 +2,12 @@ import type { CSSProperties, ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getClientHub } from "@/lib/data/operation-hub";
-import { getClientTrip, type TripFlight } from "@/lib/data/client-trip";
+import { getClientTrip, type TripFlight, type TripService } from "@/lib/data/client-trip";
 import { DOCUMENT_LABEL } from "@/lib/operations/voucher-dto";
 import { TripReceipts } from "@/components/traveliun/operations/TripReceipts";
 import { TripPassports } from "@/components/traveliun/operations/TripPassports";
 import { getTripGuide } from "@/lib/data/destination-guides";
-import { waNumber, type ClientService, type ServiceKind } from "@/lib/operations/drivers";
+import { waNumber, type ServiceKind } from "@/lib/operations/drivers";
 import { fromAbroad, phoneParts } from "@/lib/phone-links";
 import { dayStates } from "@/lib/operations/trip-days";
 
@@ -141,7 +141,8 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
                       {h.name}
                       {h.city ? <span className="font-semibold text-[#557d78]"> — {h.city}</span> : null}
                     </p>
-                    <Status confirmed={h.confirmed} />
+                    {/* before the hotel's own confirmation: no badge — never called provisional (the owner) */}
+                    {h.confirmation ? <Status ok /> : null}
                   </div>
                   <p className="mt-1 text-[12.5px] font-semibold text-[#557d78]">
                     {dayLabel(h.check_in)} ← {dayLabel(h.check_out)}
@@ -161,6 +162,7 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
                       رقم التأكيد <bdi dir="ltr">{h.confirmation}</bdi>
                     </p>
                   ) : null}
+                  <BookingRef value={h.ref} />
                 </li>
               ))}
             </ul>
@@ -352,6 +354,11 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
               {pending.map((p, i) => (
                 <li key={i} className="break-words text-[13px] font-bold text-[#8a5a0c]">
                   {p.title}
+                  {p.ref ? (
+                    <span className="ms-2 text-[11.5px] font-semibold">
+                      رقم الحجز <bdi dir="ltr">{p.ref}</bdi>
+                    </span>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -484,12 +491,22 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Status({ confirmed }: { confirmed: boolean }) {
-  return confirmed ? (
+/** «مؤكد», or — a flight before its ticket — «سيتم تأكيد الحجز». */
+function Status({ ok }: { ok: boolean }) {
+  return ok ? (
     <span className="shrink-0 rounded-full bg-[#e9f7f0] px-2.5 py-0.5 text-[11.5px] font-bold text-[#0f7a52]">مؤكد</span>
   ) : (
-    <span className="shrink-0 rounded-full bg-[#fff8e8] px-2.5 py-0.5 text-[11.5px] font-bold text-[#a86a10]">قيد التأكيد</span>
+    <span className="shrink-0 rounded-full bg-[#fff8e8] px-2.5 py-0.5 text-[11.5px] font-bold text-[#a86a10]">سيتم تأكيد الحجز</span>
   );
+}
+
+/** Our booking number for the service (0084) — on the link from the day the client confirmed. */
+function BookingRef({ value }: { value: string | null }) {
+  return value ? (
+    <p className="mt-1 text-[11.5px] font-bold text-[#557d78]">
+      رقم الحجز <bdi dir="ltr" className="text-[var(--trip)]">{value}</bdi>
+    </p>
+  ) : null;
 }
 
 function Money({ label, value, currency, strong }: { label: string; value: number; currency: string; strong?: boolean }) {
@@ -508,49 +525,53 @@ function FlightItem({ f }: { f: TripFlight }) {
     <li className="rounded-[12px] border border-[#e2ebe7] p-3.5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <p className="min-w-0 break-words text-[13.5px] font-extrabold">{f.title}</p>
-        <Status confirmed={f.confirmed} />
+        <Status ok={f.ticketed} />
       </div>
-      <ul className="mt-2 space-y-2">
-        {f.legs.map((l, i) => (
-          <li key={i} className="rounded-[10px] bg-[#f4f8f6] px-3 py-2.5">
-            <p className="flex flex-wrap items-center justify-between gap-2 text-[12.5px] font-bold">
-              <span className="text-[#557d78]">{l.label}</span>
-              <bdi dir="ltr" className="font-extrabold">
-                {`${l.flight_no || "—"} · ${l.from} → ${l.to}`}
-              </bdi>
-            </p>
-            <p className="mt-1 text-[12.5px] font-semibold text-[#334f4b]">
-              {l.departure ? (
-                <>
-                  الإقلاع {dayLabel(l.departure.slice(0, 10))} <bdi dir="ltr">{l.departure.slice(11, 16)}</bdi>
-                  {l.arrival ? (
-                    <>
-                      {" "}
-                      · الوصول <bdi dir="ltr">{l.arrival.slice(11, 16)}</bdi>
-                      {l.arrival.slice(0, 10) !== l.departure.slice(0, 10) ? ` (${dayLabel(l.arrival.slice(0, 10))})` : ""}
-                    </>
-                  ) : null}
-                </>
-              ) : (
-                "الموعد يُحدَّد لاحقاً"
-              )}
-            </p>
-          </li>
-        ))}
-      </ul>
+      {/* the flight numbers and times once the ticket is in — none before */}
+      {f.legs.length > 0 ? (
+        <ul className="mt-2 space-y-2">
+          {f.legs.map((l, i) => (
+            <li key={i} className="rounded-[10px] bg-[#f4f8f6] px-3 py-2.5">
+              <p className="flex flex-wrap items-center justify-between gap-2 text-[12.5px] font-bold">
+                <span className="text-[#557d78]">{l.label}</span>
+                <bdi dir="ltr" className="font-extrabold">
+                  {`${l.flight_no || "—"} · ${l.from} → ${l.to}`}
+                </bdi>
+              </p>
+              <p className="mt-1 text-[12.5px] font-semibold text-[#334f4b]">
+                {l.departure ? (
+                  <>
+                    الإقلاع {dayLabel(l.departure.slice(0, 10))} <bdi dir="ltr">{l.departure.slice(11, 16)}</bdi>
+                    {l.arrival ? (
+                      <>
+                        {" "}
+                        · الوصول <bdi dir="ltr">{l.arrival.slice(11, 16)}</bdi>
+                        {l.arrival.slice(0, 10) !== l.departure.slice(0, 10) ? ` (${dayLabel(l.arrival.slice(0, 10))})` : ""}
+                      </>
+                    ) : null}
+                  </>
+                ) : (
+                  "الموعد يُحدَّد لاحقاً"
+                )}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <p className="mt-2 flex flex-wrap gap-x-3 text-[12px] font-bold text-[#557d78]">
         {f.cabin ? <span>الدرجة: {f.cabin}</span> : null}
         {f.pnr ? (
           <span className="text-[#0f7a52]">
-            رقم الحجز <bdi dir="ltr">{f.pnr}</bdi>
+            رمز الحجز لدى الطيران (PNR) <bdi dir="ltr">{f.pnr}</bdi>
           </span>
         ) : null}
       </p>
+      <BookingRef value={f.ref} />
     </li>
   );
 }
 
-function ServiceItem({ s, today, withDate }: { s: ClientService; today: string; withDate?: boolean }) {
+function ServiceItem({ s, today, withDate }: { s: TripService; today: string; withDate?: boolean }) {
   return (
     <li className="overflow-hidden rounded-[12px] border border-[#c8dad6] bg-white">
       <div className="flex flex-wrap items-center justify-between gap-2 bg-[var(--trip)] px-3 py-2 text-white">
@@ -572,6 +593,7 @@ function ServiceItem({ s, today, withDate }: { s: ClientService; today: string; 
         ) : null}
         {s.car ? <p className="break-words">السيارة: {s.car}</p> : null}
         {s.program ? <p className="break-words text-[#557d78]">{s.program}</p> : null}
+        <BookingRef value={s.ref} />
       </div>
       {s.progress ? (
         <p className={`mx-3 mb-2.5 text-[12.5px] font-extrabold ${s.progress === "done" ? "text-[#0f7a52]" : "text-[#a86a10]"}`}>
