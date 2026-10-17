@@ -5,6 +5,7 @@ import { listReadyOffers } from "@/lib/data/ready-offers";
 import { currentCan, currentCanOpen } from "@/lib/roles/current";
 import { getPartnerSession } from "@/lib/partners/session";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
+import { bookingSummaries } from "@/lib/data/booking-summary";
 import { fileStatesFor } from "@/lib/data/file-status-core";
 
 /** «تصميم بطاقة طيران» — set to its route once that page is live (null hides the button). */
@@ -28,10 +29,13 @@ export default async function BasicPage({ searchParams }: { searchParams: Promis
   ]);
   // where each issued file stands — staff only (a partner follows theirs in the partner portal)
   const states = meId ? await fileStatesFor(drafts) : {};
+  // a confirmed file's services as operations holds them («الطيران ✓»، «الفنادق 1/3»)
+  const services = await bookingSummaries(Object.values(states).map((s) => s.operation_id).filter((id): id is string => Boolean(id)));
   return (
     <BasicHome
       drafts={drafts}
       states={states}
+      services={services}
       meId={meId}
       allByDefault={management}
       initialTab={files === "issued" || files === "draft" ? files : "all"}

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Copy, History, Loader2, Search } from "lucide-react";
+import { Copy, FolderOpen, History, Loader2, Search, Settings2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import type { DraftSummary } from "@/lib/data/drafts";
@@ -10,6 +11,8 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { nightsText, useBasicLabels } from "./labels";
 import { OfferVersions } from "../OfferVersions";
 import { FileStateChip } from "./FileStateChip";
+import { BasicFileStatus } from "./BasicFileStatus";
+import type { ServiceKind, ServiceSummary } from "@/lib/operations/booking-summary";
 import type { FileStatusRow } from "@/lib/data/file-status-core";
 import { FILE_STATES, type FileState } from "@/lib/offer/file-state";
 
@@ -25,7 +28,47 @@ const SERVICES: { key: ServiceKey; label: "svcHotels" | "svcFlightsIntl" | "svcF
 const select = "h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12px] font-bold text-[#185045]";
 
 /** one column grid for the header and every row, so the columns line up (lg and up; below, a row stacks) */
-const COLS = "lg:grid-cols-[8.5rem_minmax(0,1fr)_9.5rem_7.5rem_8.5rem_23rem]";
+const COLS = "lg:grid-cols-[minmax(0,1fr)_9.5rem_7.5rem_8.5rem_11rem_17rem]";
+const PRIMARY = "inline-flex h-8 w-[7.5rem] items-center justify-center rounded-[8px] text-[11.5px] font-bold";
+const ICON = "inline-flex size-8 shrink-0 items-center justify-center rounded-[8px] border border-[#cfe0d9] bg-white text-[#185045] hover:bg-[#f4f8f6]";
+
+/** the row's own colour — a stripe on the start edge and a wash — by where the file stands */
+const ROW_TONE: Record<FileState, string> = {
+  draft: "border-[#d5dcd9] bg-white",
+  issued: "border-[#e0a92a] bg-[#fffbf1]",
+  published: "border-[#9fb8b1] bg-[#f8fbfa]",
+  sent: "border-[#2f7fc0] bg-[#f3f8fd]",
+  expired: "border-[#d9772b] bg-[#fdf6f0]",
+  confirmed: "border-[#16a06a] bg-[#f1faf5]",
+  paid_partial: "border-[#16a06a] bg-[#eef9f3]",
+  paid_full: "border-[#0b6140] bg-[#eaf7f0]",
+  ready: "border-[#0b8b8b] bg-[#eef9f9]",
+  travelled: "border-[#6b7a99] bg-[#f5f7fa]",
+  cancelled: "border-[#d14268] bg-[#fdf3f6]",
+};
+
+/** the one thing the file asks for next — on the left, beside its state */
+function nextAction(state: FileState, staff: boolean): "continue" | "send" | "confirm" | "bookings" | "open" {
+  if (state === "draft") return "continue";
+  if (!staff) return "open";
+  if (state === "issued" || state === "published" || state === "expired") return "send";
+  if (state === "sent") return "confirm";
+  if (state === "confirmed" || state === "paid_partial" || state === "paid_full" || state === "ready") return "bookings";
+  return "open";
+}
+
+const SVC_LABEL: Record<ServiceKind, "svcK_flight" | "svcK_hotel" | "svcK_transport" | "svcK_service" | "svcK_visa"> = {
+  flight: "svcK_flight",
+  hotel: "svcK_hotel",
+  transport: "svcK_transport",
+  service: "svcK_service",
+  visa: "svcK_visa",
+};
+const SVC_TONE: Record<ServiceSummary["state"], string> = {
+  done: "border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]",
+  progress: "border-[#f4d9a6] bg-[#fff8e8] text-[#a86a10]",
+  problem: "border-[#f2b8c6] bg-[#fdeef2] text-[#c22850]",
+};
 
 /** the company's day, whatever the browser's clock zone */
 const dayKey = (iso: string | Date) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
@@ -38,6 +81,7 @@ const dayKey = (iso: string | Date) => new Date(iso).toLocaleDateString("en-CA",
 export function RecentFiles({
   drafts,
   states = {},
+  services = {},
   meId,
   allByDefault = false,
   initialTab = "all",
@@ -47,6 +91,8 @@ export function RecentFiles({
   drafts: DraftSummary[];
   /** where each issued file stands (sent, confirmed, paid…), by draft id — staff only */
   states?: Record<string, FileStatusRow>;
+  /** a confirmed file's services in operations, by operation id */
+  services?: Record<string, ServiceSummary[]>;
   /** the signed-in employee; null for a partner (all their files are their company's) */
   meId: string | null;
   /** the administration opens on everyone's files */
@@ -66,7 +112,10 @@ export function RecentFiles({
   const [state, setState] = useState<FileState | "">("");
   // an issued file the lookup missed claims nothing: «صدر»
   const stateOf = (d: DraftSummary): FileState => states[d.id]?.state ?? (d.produced_serial ? "published" : "draft");
-  const [history, setHistory] = useState<string | null>(null);
+  // one panel open under a row: the file's state and actions, or its versions
+  const [panel, setPanel] = useState<{ id: string; kind: "status" | "versions" } | null>(null);
+  const toggle = (id: string, kind: "status" | "versions") => setPanel(panel?.id === id && panel.kind === kind ? null : { id, kind });
+  const router = useRouter();
 
   const makers = useMemo(
     () =>
@@ -212,37 +261,51 @@ export function RecentFiles({
               </h3>
               <div className="overflow-hidden rounded-[10px] border border-[#e3ece8]">
                 {/* the columns, said once per day */}
-                <div className={`${COLS} hidden bg-[#f6f9f8] px-3 py-1.5 text-[10.5px] font-extrabold text-[#78948f] lg:grid`}>
-                  <span>{tx("colStatus")}</span>
+                <div className={`${COLS} hidden border-s-4 border-transparent bg-[#f6f9f8] px-3 py-1.5 text-[10.5px] font-extrabold text-[#78948f] lg:grid`}>
                   <span>{tx("colClient")}</span>
                   <span>{tx("colTrip")}</span>
                   <span>{tx("colTotal")}</span>
                   <span>{tx("colMaker")}</span>
+                  <span>{tx("colStatus")}</span>
                   <span className="text-end">{tx("colActions")}</span>
                 </div>
-                <ul className="divide-y divide-[#edf3f0]">
+                <ul className="divide-y divide-[#e6eeea]">
                   {list.map((d) => {
                     const name = d.customer_name || (d.title && d.title !== d.destination ? d.title : null);
+                    const state = stateOf(d);
+                    const opId = states[d.id]?.operation_id ?? null;
+                    const svc = opId ? (services[opId] ?? []) : [];
+                    const next = nextAction(state, Boolean(meId));
                     return (
-                      <li key={d.id} className={history === d.id ? "bg-[#fbfdfc]" : ""}>
-                        <div className={`${COLS} grid items-center gap-x-3 gap-y-1.5 px-3 py-2.5`}>
-                          {/* where the file stands — the first thing to read */}
-                          <span className="flex flex-col items-start gap-0.5">
-                            <FileStateChip
-                              state={stateOf(d)}
-                              version={d.version}
-                              sentVersion={states[d.id]?.sent_version}
-                              stale={states[d.id]?.stale}
-                            />
-                          </span>
-                          <Link href={`/basic/${d.id}`} className="min-w-0">
-                            <span className={`block truncate text-[13px] font-bold hover:underline ${name ? "text-[#185045]" : "text-[#a3b5b0]"}`}>{name ?? tx("unnamed")}</span>
+                      // the whole row in the state's colour: what the eye reads first
+                      <li key={d.id} className={`border-s-4 ${ROW_TONE[state]}`}>
+                        {/* narrower than lg: client · trip · total · maker on one line, the state and the buttons under them */}
+                        <div className={`${COLS} flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2.5 lg:grid lg:gap-x-3`}>
+                          <span className="min-w-[11rem] flex-1">
+                            <Link href={`/basic/${d.id}`} className={`block truncate text-[13px] font-bold hover:underline ${name ? "text-[#103f37]" : "text-[#a3b5b0]"}`}>
+                              {name ?? tx("unnamed")}
+                            </Link>
                             <span className="block truncate text-[11px] font-semibold text-[#78948f]">
                               {d.destination ?? ""}
                               {d.destination && d.produced_serial ? " · " : ""}
                               {d.produced_serial ? <DirText>{d.produced_serial}</DirText> : null}
                             </span>
-                          </Link>
+                            {/* a confirmed file: its services as operations holds them */}
+                            {svc.length > 0 && opId ? (
+                              <span className="mt-1 flex flex-wrap gap-1">
+                                {svc.map((s) => (
+                                  <Link
+                                    key={s.kind}
+                                    href={`/operations/${opId}`}
+                                    title={tx("svcOf", { done: s.confirmed, total: s.total })}
+                                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-bold ${SVC_TONE[s.state]}`}
+                                  >
+                                    {s.state === "done" ? "✓" : s.state === "problem" ? "!" : `${s.confirmed}/${s.total}`} {tx(SVC_LABEL[s.kind])}
+                                  </Link>
+                                ))}
+                              </span>
+                            ) : null}
+                          </span>
                           <span className="tv-tnum text-[11.5px] font-semibold text-[#557d78]">
                             {d.travel_date ? <DirText className="block">{d.travel_date}</DirText> : null}
                             <span className="block text-[#93aaa3]">
@@ -253,44 +316,79 @@ export function RecentFiles({
                             {d.total != null ? <DirText>{`${Math.round(d.total).toLocaleString("en-US")} ${d.currency}`}</DirText> : <span className="font-semibold text-[#a3b5b0]">—</span>}
                           </span>
                           <span className="truncate text-[11.5px] font-semibold text-[#557d78]">{d.created_by_name ?? "—"}</span>
-                          {/* fixed slots, so the buttons line up row under row */}
-                          <span className="flex items-center gap-1.5 lg:justify-end">
-                            <Link
-                              href={`/basic/${d.id}`}
-                              className="inline-flex h-8 w-[7.25rem] items-center justify-center rounded-[8px] bg-[#185045] text-[11.5px] font-bold text-white hover:bg-[#0f4439]"
-                            >
-                              {d.produced_serial ? tx("openFile") : tx("continueEntry")}
-                            </Link>
+                          {/* the state, beside the action it calls for */}
+                          <FileStateChip state={state} version={d.version} sentVersion={states[d.id]?.sent_version} stale={states[d.id]?.stale} />
+                          <span className="ms-auto flex items-center gap-1.5 lg:ms-0 lg:justify-end">
+                            {next === "continue" ? (
+                              <Link href={`/basic/${d.id}`} className={`${PRIMARY} bg-[#185045] text-white hover:bg-[#0f4439]`}>
+                                {tx("continueEntry")}
+                              </Link>
+                            ) : next === "bookings" && opId ? (
+                              <Link href={`/operations/${opId}`} className={`${PRIMARY} bg-[#0f7a52] text-white hover:bg-[#0b6140]`}>
+                                {tx("actBookings")}
+                              </Link>
+                            ) : next === "send" || next === "confirm" ? (
+                              <button
+                                type="button"
+                                aria-expanded={panel?.id === d.id && panel.kind === "status"}
+                                onClick={() => toggle(d.id, "status")}
+                                className={`${PRIMARY} ${next === "send" ? "bg-[#1d5f8a] hover:bg-[#174d70]" : "bg-[#0f7a52] hover:bg-[#0b6140]"} text-white`}
+                              >
+                                {next === "send" ? tx("actSend") : tx("actConfirmed")}
+                              </button>
+                            ) : (
+                              <Link href={`/basic/${d.id}`} className={`${PRIMARY} border border-[#cfe0d9] bg-white text-[#185045] hover:bg-[#f4f8f6]`}>
+                                {tx("openFile")}
+                              </Link>
+                            )}
+                            {d.produced_serial ? (
+                              <Link href={`/basic/${d.id}`} title={tx("openFile")} aria-label={tx("openFile")} className={ICON}>
+                                <FolderOpen className="size-4" />
+                              </Link>
+                            ) : (
+                              <span className="hidden size-8 lg:block" aria-hidden />
+                            )}
                             {d.produced_serial && meId ? (
                               <button
                                 type="button"
-                                aria-expanded={history === d.id}
-                                onClick={() => setHistory(history === d.id ? null : d.id)}
-                                className={`inline-flex h-8 w-[6.25rem] items-center justify-center gap-1 rounded-[8px] border text-[11.5px] font-bold text-[#185045] ${history === d.id ? "border-[#185045] bg-[#f0f7f4]" : "border-[#cfe0d9] hover:bg-[#f4f8f6]"}`}
+                                title={tx("fileMore")}
+                                aria-label={tx("fileMore")}
+                                aria-expanded={panel?.id === d.id && panel.kind === "status"}
+                                onClick={() => toggle(d.id, "status")}
+                                className={`${ICON} ${panel?.id === d.id && panel.kind === "status" ? "border-[#185045] bg-[#f0f7f4]" : ""}`}
                               >
-                                <History className="size-3.5" />
-                                {tx("versionsBtn")}
+                                <Settings2 className="size-4" />
                               </button>
                             ) : (
-                              <span className="hidden w-[6.25rem] lg:block" aria-hidden />
+                              <span className="hidden size-8 lg:block" aria-hidden />
+                            )}
+                            {d.produced_serial && meId ? (
+                              <button
+                                type="button"
+                                title={tx("versionsBtn")}
+                                aria-label={tx("versionsBtn")}
+                                aria-expanded={panel?.id === d.id && panel.kind === "versions"}
+                                onClick={() => toggle(d.id, "versions")}
+                                className={`${ICON} ${panel?.id === d.id && panel.kind === "versions" ? "border-[#185045] bg-[#f0f7f4]" : ""}`}
+                              >
+                                <History className="size-4" />
+                              </button>
+                            ) : (
+                              <span className="hidden size-8 lg:block" aria-hidden />
                             )}
                             {/* the same programme for the next client */}
-                            <button
-                              type="button"
-                              title={tx("copyHint")}
-                              aria-label={tx("copyForNew")}
-                              disabled={busy !== null}
-                              onClick={() => onCopy(d.id)}
-                              className="inline-flex h-8 w-[8.5rem] items-center justify-center gap-1 rounded-[8px] border border-[#cfe0d9] text-[11px] font-bold text-[#557d78] hover:bg-[#f4f8f6] disabled:opacity-60"
-                            >
-                              {busy === `c-${d.id}` ? <Loader2 className="size-3.5 animate-spin" /> : <Copy className="size-3.5" />}
-                              {tx("copyForNew")}
+                            <button type="button" title={tx("copyHint")} aria-label={tx("copyForNew")} disabled={busy !== null} onClick={() => onCopy(d.id)} className={`${ICON} disabled:opacity-60`}>
+                              {busy === `c-${d.id}` ? <Loader2 className="size-4 animate-spin" /> : <Copy className="size-4" />}
                             </button>
                           </span>
                         </div>
-                        {history === d.id && d.produced_serial ? (
-                          <div className="px-3 pb-3">
-                            <OfferVersions serial={d.produced_serial} draftId={d.id} defaultOpen />
+                        {panel?.id === d.id && d.produced_serial ? (
+                          <div className="border-t border-[#e6eeea] bg-white px-3 py-3">
+                            {panel.kind === "versions" ? (
+                              <OfferVersions serial={d.produced_serial} draftId={d.id} defaultOpen />
+                            ) : (
+                              <BasicFileStatus draftId={d.id} serial={d.produced_serial} variant="panel" onChanged={() => router.refresh()} />
+                            )}
                           </div>
                         ) : null}
                       </li>
