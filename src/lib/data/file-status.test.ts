@@ -23,6 +23,7 @@ const state = vi.hoisted(() => ({
   confirmed: [] as string[],
   drafts: [] as { id: string; title: string | null; data: Record<string, unknown>; created_by: string | null; partner_company_id: string | null }[],
   deletes: [] as string[],
+  auditFails: false,
 }));
 
 /** offers / audit_logs / offer_renders / operations — each read the way file-status.ts reads it. */
@@ -66,7 +67,9 @@ vi.mock("@/lib/roles/current", () => ({
 }));
 vi.mock("./draft-store", () => ({ loadDraft: async () => state.draft }));
 vi.mock("./metrics", () => ({ getCurrentEmployeeId: async () => state.me }));
-vi.mock("./audit", () => ({ logAudit: async (a: { action: string; entity_id: string; meta?: Record<string, unknown> }) => (state.audits.push(a), true) }));
+vi.mock("./audit", () => ({
+  logAudit: async (a: { action: string; entity_id: string; meta?: Record<string, unknown> }) => (state.auditFails ? false : (state.audits.push(a), true)),
+}));
 vi.mock("./offer-status", () => ({ setOfferStatus: async (_db: unknown, offerId: string, to: string) => void state.statuses.push({ offerId, to }) }));
 vi.mock("./operations", () => ({ confirmOffer: async (i: { offer_id: string }) => (state.confirmed.push(i.offer_id), { ok: true, id: "op-1" }) }));
 vi.mock("./file-status-core", () => ({ loadFileStatus: async () => null }));
@@ -97,6 +100,7 @@ beforeEach(() => {
   state.confirmed = [];
   state.drafts = [];
   state.deletes = [];
+  state.auditFails = false;
 });
 
 describe("issuing sends nothing", () => {
@@ -211,6 +215,13 @@ describe("«حذف» from the files list (the owner, 2026-10-17)", () => {
     expect(state.audits.map((a) => a.action)).toEqual(["draft.deleted", "offer.deleted"]);
     // the offer's serial and total, and the draft as it was, so a wrong press can be rebuilt
     expect(state.audits[1]?.meta).toMatchObject({ serial: "AD-1", total: 8970, currency: "SAR", draft: { produced_serial: "AD-1" } });
+  });
+
+  it("deletes nothing when the audit row cannot be written", async () => {
+    state.auditFails = true;
+    state.drafts = [row("d0"), row("d1", { data: { produced_serial: "AD-1" } })];
+    expect(await deleteFiles(["d0", "d1"])).toEqual({ ok: true, deleted: 0, refused: 2 });
+    expect(state.deletes).toEqual([]);
   });
 
   it("never deletes a file operations holds — that one is cancelled from its case", async () => {

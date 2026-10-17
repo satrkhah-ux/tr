@@ -236,9 +236,10 @@ export async function cancelFile(draftId: string, reason: string): Promise<{ ok:
  * cascade) — only while nothing is booked or paid: a file in operations is
  * cancelled from its case, never deleted. Never a partner's file. A salesperson
  * deletes their OWN files only; a colleague's, or one made before its maker was
- * recorded, takes operations or a manager. The audit row (service-only) is written
- * as soon as anything is gone — the offer's serial and total, and the draft as it
- * was, so a wrong press can be rebuilt.
+ * recorded, takes operations or a manager. The audit row (service-only) comes
+ * FIRST — the offer's serial and total, and the draft as it was, so a wrong press
+ * can be rebuilt — and nothing is deleted when it cannot be written (as
+ * deletePayment).
  */
 export async function deleteFiles(draftIds: string[]): Promise<{ ok: true; deleted: number; refused: number } | Fail> {
   try {
@@ -275,15 +276,15 @@ export async function deleteFiles(draftIds: string[]): Promise<{ ok: true; delet
           // checked here, not trusted from the list: a booked file is never deleted
           const { data: op } = await db().from("operations").select("id").eq("offer_id", offer.id).maybeSingle();
           if (op) continue;
+          if (!(await record(offer))) continue;
           if ((await db().from("offers").delete().eq("id", offer.id)).error) continue;
-          await record(offer);
           if (!(await db().from("offer_drafts").delete().eq("id", d.id)).error) deleted += 1;
           continue;
         }
         if (!may(d.created_by)) continue;
       } else if (!may(d.created_by)) continue;
+      if (!(await record(null))) continue;
       if ((await db().from("offer_drafts").delete().eq("id", d.id)).error) continue;
-      await record(null);
       deleted += 1;
     }
     return { ok: true, deleted, refused: ids.length - deleted };
