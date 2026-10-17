@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import type { Role } from "@/lib/roles/roles";
@@ -30,11 +31,14 @@ export async function getCurrentEmployeeId(): Promise<string | null> {
   try {
     const user = await getServerUser();
     if (!user) return null;
-    return await employeeIdForUser(await db(), user.id);
+    return await employeeIdOf(user.id);
   } catch {
     return null;
   }
 }
+
+/** asked many times per request (stamps, «ملفاتي», audit rows) — read once per user per request */
+const employeeIdOf = cache(async (userId: string): Promise<string | null> => employeeIdForUser(await db(), userId));
 
 async function employeeIdForUser(supabase: SupabaseClient, userId: string): Promise<string | null> {
   const { data } = await supabase.from("employees").select("id").eq("auth_user_id", userId).maybeSingle();

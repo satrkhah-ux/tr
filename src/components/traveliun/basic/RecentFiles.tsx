@@ -11,7 +11,8 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { nightsText, useBasicLabels } from "./labels";
 import { OfferVersions } from "../OfferVersions";
 import { FileStateChip } from "./FileStateChip";
-import { BasicFileStatus } from "./BasicFileStatus";
+import { BasicFileStatus, prefetchFileStatus } from "./BasicFileStatus";
+import { ClientConfirmedButton } from "./ClientConfirmedButton";
 import type { ServiceKind, ServiceSummary } from "@/lib/operations/booking-summary";
 import type { FileStatusRow } from "@/lib/data/file-status-core";
 import { FILE_STATES, type FileState } from "@/lib/offer/file-state";
@@ -28,7 +29,7 @@ const SERVICES: { key: ServiceKey; label: "svcHotels" | "svcFlightsIntl" | "svcF
 const select = "h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12px] font-bold text-[#185045]";
 
 /** one column grid for the header and every row, so the columns line up (lg and up; below, a row stacks) */
-const COLS = "lg:grid-cols-[minmax(0,1fr)_9.5rem_7.5rem_8.5rem_11rem_17rem]";
+const COLS = "lg:grid-cols-[minmax(0,1fr)_9.5rem_7.5rem_8.5rem_10rem_25.5rem]";
 const PRIMARY = "inline-flex h-8 w-[7.5rem] items-center justify-center rounded-[8px] text-[11.5px] font-bold";
 const ICON = "inline-flex size-8 shrink-0 items-center justify-center rounded-[8px] border border-[#cfe0d9] bg-white text-[#185045] hover:bg-[#f4f8f6]";
 
@@ -259,7 +260,8 @@ export function RecentFiles({
                 {dayTitle(key)}
                 <span className="tv-tnum rounded-full bg-[#eef4f1] px-1.5 text-[10.5px]">{list.length}</span>
               </h3>
-              <div className="overflow-hidden rounded-[10px] border border-[#e3ece8]">
+              {/* no overflow clip: «العميل أكّد» opens its choice over the rows */}
+              <div className="rounded-[10px] border border-[#e3ece8] [&>ul>li:last-child]:rounded-b-[10px]">
                 {/* the columns, said once per day */}
                 <div className={`${COLS} hidden border-s-4 border-transparent bg-[#f6f9f8] px-3 py-1.5 text-[10.5px] font-extrabold text-[#78948f] lg:grid`}>
                   <span>{tx("colClient")}</span>
@@ -328,18 +330,26 @@ export function RecentFiles({
                                 {tx("actBookings")}
                               </Link>
                             ) : next === "send" || next === "confirm" ? (
-                              <button
-                                type="button"
-                                aria-expanded={panel?.id === d.id && panel.kind === "status"}
-                                onClick={() => toggle(d.id, "status")}
-                                className={`${PRIMARY} ${next === "send" ? "bg-[#1d5f8a] hover:bg-[#174d70]" : "bg-[#0f7a52] hover:bg-[#0b6140]"} text-white`}
-                              >
-                                {next === "send" ? tx("actSend") : tx("actConfirmed")}
-                              </button>
+                              // waiting on the client: «العميل أكّد» is always in sight — it is how a file reaches its bookings
+                              <ClientConfirmedButton draftId={d.id} expired={state === "expired"} className="w-[7.5rem]" />
                             ) : (
                               <Link href={`/basic/${d.id}`} className={`${PRIMARY} border border-[#cfe0d9] bg-white text-[#185045] hover:bg-[#f4f8f6]`}>
                                 {tx("openFile")}
                               </Link>
+                            )}
+                            {next === "send" ? (
+                              <button
+                                type="button"
+                                aria-expanded={panel?.id === d.id && panel.kind === "status"}
+                                onClick={() => toggle(d.id, "status")}
+                                onMouseEnter={() => prefetchFileStatus(d.id)}
+                                onFocus={() => prefetchFileStatus(d.id)}
+                                className={`${PRIMARY} bg-[#1d5f8a] text-white hover:bg-[#174d70]`}
+                              >
+                                {tx("actSend")}
+                              </button>
+                            ) : (
+                              <span className="hidden w-[7.5rem] lg:block" aria-hidden />
                             )}
                             {d.produced_serial ? (
                               <Link href={`/basic/${d.id}`} title={tx("openFile")} aria-label={tx("openFile")} className={ICON}>
@@ -355,6 +365,8 @@ export function RecentFiles({
                                 aria-label={tx("fileMore")}
                                 aria-expanded={panel?.id === d.id && panel.kind === "status"}
                                 onClick={() => toggle(d.id, "status")}
+                                onMouseEnter={() => prefetchFileStatus(d.id)}
+                                onFocus={() => prefetchFileStatus(d.id)}
                                 className={`${ICON} ${panel?.id === d.id && panel.kind === "status" ? "border-[#185045] bg-[#f0f7f4]" : ""}`}
                               >
                                 <Settings2 className="size-4" />
@@ -387,7 +399,13 @@ export function RecentFiles({
                             {panel.kind === "versions" ? (
                               <OfferVersions serial={d.produced_serial} draftId={d.id} defaultOpen />
                             ) : (
-                              <BasicFileStatus draftId={d.id} serial={d.produced_serial} variant="panel" onChanged={() => router.refresh()} />
+                              <BasicFileStatus
+                                draftId={d.id}
+                                serial={d.produced_serial}
+                                variant="panel"
+                                onChanged={() => router.refresh()}
+                                known={{ state, version: d.version, sentVersion: states[d.id]?.sent_version ?? null, stale: Boolean(states[d.id]?.stale), operationId: opId }}
+                              />
                             )}
                           </div>
                         ) : null}

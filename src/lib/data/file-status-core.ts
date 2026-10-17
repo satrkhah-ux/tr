@@ -98,20 +98,22 @@ export async function loadFileStatus(serial: string): Promise<FileStatusDetail |
     .maybeSingle();
   const offer = offerData as OfferRow | null;
   if (!offer) return null;
-  const [opRes, historyRes, rendersRes] = await Promise.all([
+  // the operation, the trail, the versions and the offer's own audit rows side by side;
+  // only the operation's audit rows wait for its id
+  const AUDITED = [SENT_ACTION, "operation.cancelled", "operation.client_status", "operation.execution_status"];
+  const auditsOf = (ids: string[]) =>
+    service.from("audit_logs").select("action, meta, created_at, actor_id").in("entity_id", ids).in("action", AUDITED).order("created_at", { ascending: false }).limit(60);
+  const [opRes, historyRes, rendersRes, offerAudits] = await Promise.all([
     service.from("operations").select("id, offer_id, client_status, execution_status").eq("offer_id", offer.id).maybeSingle(),
     service.from("offer_status_history").select("to_status, note, created_at, changed_by").eq("offer_id", offer.id),
     service.from("offer_renders").select("version, rendered_at, rendered_by").eq("offer_id", offer.id).eq("variant", "client"),
+    auditsOf([offer.id]),
   ]);
   const operation = (opRes.data ?? null) as OpRow | null;
-  const entityIds = [offer.id, ...(operation ? [operation.id] : [])];
-  const { data: auditData } = await service
-    .from("audit_logs")
-    .select("action, meta, created_at, actor_id")
-    .in("entity_id", entityIds)
-    .in("action", [SENT_ACTION, "operation.cancelled", "operation.client_status", "operation.execution_status"])
-    .order("created_at", { ascending: false })
-    .limit(60);
+  const opAudits = operation ? await auditsOf([operation.id]) : { data: [] };
+  const auditData = [...((offerAudits.data ?? []) as { created_at: string }[]), ...((opAudits.data ?? []) as { created_at: string }[])]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, 60);
   const history = (historyRes.data ?? []) as { to_status: string; note: string | null; created_at: string; changed_by: string | null }[];
   const audits = (auditData ?? []) as { action: string; meta: Record<string, unknown> | null; created_at: string; actor_id: string | null }[];
   // the people, by name
