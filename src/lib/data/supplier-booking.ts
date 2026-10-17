@@ -431,6 +431,8 @@ export async function refreshSupplierBooking(bookingId: string): Promise<
   } catch {
     return { ok: false, error: "err.db" };
   }
+  // confirmed (or cancelled) by what the supplier says — the case moves, its papers issue
+  await syncOperationOfBooking(row.id);
 
   return {
     ok: true,

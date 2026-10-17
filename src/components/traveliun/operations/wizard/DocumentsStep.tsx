@@ -6,18 +6,18 @@ import { CheckCircle2, Clock, ExternalLink, Loader2, PhoneCall } from "lucide-re
 import { DirText } from "@/components/DirText";
 import type { TranslationKey } from "@/lib/i18n";
 import { issueDocument } from "@/lib/data/operation-bookings";
-import { ensureClientLink } from "@/lib/data/operation-hub";
 import { documentPlan, dueDocuments } from "@/lib/operations/wizard/documents";
 import type { StepProps, WizardCase } from "@/lib/operations/wizard/types";
-import { CLIENT_DOCUMENT_KINDS } from "@/lib/operations/voucher-dto";
 import { ClientLinkBlock } from "../DocumentsPanel";
 import { ClientSend } from "../ClientSend";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 
 /**
  * Step 6 — «المستندات والإرسال»: no button per document. Each line says it is
- * out (open it), on its way, or what it still waits for; AutoIssue — mounted by
- * the shell on every step — issues the ones whose data just became final.
+ * out (open it), on its way, or what it still waits for. The server issues
+ * each one the moment its data is final (wizard-sync.ts, after every
+ * confirmation); AutoIssue — mounted by the shell — is the fallback for what
+ * is still due when the case opens, and says why a refused one was refused.
  * Then the client's one link, the message to the client, and the destination's
  * emergency numbers that link shows.
  */
@@ -91,13 +91,13 @@ export function DocumentsStep({ data }: StepProps) {
 }
 
 /**
- * Issues what is due, once per page load each — a refused one (a hotel without
- * its English name …) is said here and tried again on the next visit, never in
- * a loop — then mints the client's link once a client document is out. Mounted
- * by the shell, so confirming a hotel in step 3 puts its voucher out at once.
- *
- * ponytail: two people opening the case in the same second can each issue a
- * due voucher (v1 and v2) — harmless, the link shows the latest; a lock if it bites.
+ * The fallback: what is STILL due when the case opens — normally nothing, the
+ * server issued it with the confirmation — once per page load each. A refused
+ * one (a hotel without its English name …) is said here and tried again on
+ * the next visit, never in a loop. Issuing is idempotent (document-issue.ts):
+ * this racing the server, or a colleague, never puts out a second identical
+ * version. The client's link is the server's to mint, with the first client
+ * document (wizard-sync.ts) — never here: a link someone stopped stays stopped.
  */
 export function AutoIssue({ data }: { data: WizardCase }) {
   const { t } = useTraveliunUI();
@@ -106,30 +106,20 @@ export function AutoIssue({ data }: { data: WizardCase }) {
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const keyOf = (l: { kind: string; booking_id: string | null }) => `${l.kind}:${l.booking_id ?? ""}`;
-  const hasClientDoc = data.documents.some((d) => !d.revoked_at && CLIENT_DOCUMENT_KINDS.includes(d.kind));
   // what is due now, by name — the effect runs when that changes (after each refresh)
-  const work = [...dueDocuments(data).map(keyOf), ...(!data.clientToken && hasClientDoc ? ["link"] : [])].join("|");
+  const work = dueDocuments(data).map(keyOf).join("|");
 
   useEffect(() => {
     // claimed before the first await: a second run of this effect (React's dev double-run, a quick refresh) finds nothing left
     const due = dueDocuments(data).filter((l) => !tried.current.has(keyOf(l)));
-    const link = !data.clientToken && hasClientDoc && !tried.current.has("link");
-    if (due.length === 0 && !link) return;
+    if (due.length === 0) return;
     due.forEach((l) => tried.current.add(keyOf(l)));
-    if (link) tried.current.add("link");
     void (async () => {
       setBusy(true);
       const failed: string[] = [];
-      let clientDocOut = false;
       for (const l of due) {
         const res = await issueDocument({ operation_id: data.operation.id, kind: l.kind, booking_id: l.booking_id }).catch(() => null);
-        if (res?.ok && CLIENT_DOCUMENT_KINDS.includes(l.kind)) clientDocOut = true;
         if (res && !res.ok) failed.push(`${t(`ops.doc.${l.kind}` as TranslationKey)}${l.title ? ` (${l.title})` : ""}: ${t(res.error, res.params)}`);
-      }
-      // the client's link carries every document; minted with the first one out (or already out)
-      if (link || (!data.clientToken && clientDocOut)) {
-        tried.current.add("link");
-        await ensureClientLink(data.operation.id).catch(() => null);
       }
       setErrors((e) => [...e, ...failed]);
       setBusy(false);

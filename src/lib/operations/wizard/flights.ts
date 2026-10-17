@@ -32,7 +32,7 @@ export function isTicketed(b: OperationBooking): boolean {
   return b.status === "confirmed" && Boolean(b.pnr?.trim()) && (b.ticket_numbers?.length ?? 0) > 0 && (b.flight_legs?.length ?? 0) > 0;
 }
 
-export function flightsState(data: WizardCase): StepState {
+export function flightsState(data: Pick<WizardCase, "bookings">): StepState {
   const flights = flightBookings(data);
   if (flights.length === 0) return "na";
   return flights.every(isTicketed) ? "done" : "todo";

@@ -17,7 +17,7 @@ const chip =
 /**
  * «ينتظر» — one press on any step: from whom, until when (tomorrow unless
  * changed), a note if any. Set, it shows as a banner with its own «إلغاء»;
- * the shell clears it by itself once the step is done.
+ * the server drops it by itself once the step is done, from whatever screen.
  */
 export function WaitButton({ operationId, step, wait, today }: { operationId: string; step: WizardStep; wait: StepWait | undefined; today: string }) {
   const { t } = useTraveliunUI();

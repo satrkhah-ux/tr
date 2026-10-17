@@ -1,18 +1,17 @@
 "use server";
 
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
-import { listTravelers } from "@/lib/data/operation-travelers";
 import { followFlight } from "@/lib/data/flight-follow";
-import { notifyBookingChanged, notifyPartnerCase } from "@/lib/data/ops-notify";
+import { notifyBookingChanged } from "@/lib/data/ops-notify";
 import { syncOperation, syncOperationOfBooking } from "@/lib/data/operation-sync";
-import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, shownDetail, type VoucherBooking, type VoucherDTO, type VoucherKind } from "@/lib/operations/voucher-dto";
-import { applyRoomDetails, roomDetailsOpen, voucherStay, type StayError, type StayHotel } from "@/lib/operations/room-details";
-import { hotelFinal } from "@/lib/operations/client-booking-state";
+import { CLIENT_DOCUMENT_KINDS, type VoucherKind } from "@/lib/operations/voucher-dto";
+import { issueDocumentNow, type IssueInput } from "@/lib/data/document-issue";
+import { applyRoomDetails, roomDetailsOpen } from "@/lib/operations/room-details";
 import type { LocaleChoice } from "@/lib/catalog/room-catalog";
 import { currentCan } from "@/lib/roles/current";
 import { gateManagerRow, gateOperation, gateRow } from "@/lib/operations/access";
@@ -501,6 +500,8 @@ export async function updateBooking(input: {
       meta: { edited: Object.keys(patch) },
     });
     await announce(input.id, describeEdit(patch));
+    // a number typed here confirms the booking as surely as «تأكيد» does — the case moves, its papers issue
+    if (input.confirmation_number !== undefined) await syncOperationOfBooking(input.id);
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
@@ -630,262 +631,20 @@ export async function listDocuments(operationId: string): Promise<OperationDocum
   }
 }
 
-function toVoucherBooking(b: OperationBooking): VoucherBooking {
-  return {
-    kind: b.kind,
-    title: b.title,
-    city_name: b.city_name,
-    start_date: b.start_date,
-    end_date: b.end_date,
-    confirmation_number: b.confirmation_number,
-    supplier_name: b.supplier_name,
-    detail: shownDetail(b.detail),
-    cancellation_policy: b.cancellation_policy,
-    is_paid: b.is_paid,
-  };
-}
-
-/** Why a stay's voucher was refused, told to the agent with what to fill. */
-const STAY_ERROR: Record<StayError, Record<"ar" | "en", TranslationKey>> = {
-  hotelUnknown: { ar: "ops.voucher.err.hotelUnknown", en: "ops.voucher.err.hotelUnknown" },
-  hotelName: { ar: "ops.voucher.err.hotelNameAr", en: "ops.voucher.err.hotelNameEn" },
-  roomName: { ar: "ops.voucher.err.roomNameAr", en: "ops.voucher.err.roomNameEn" },
-  roomInvalid: { ar: "ops.voucher.err.roomInvalid", en: "ops.voucher.err.roomInvalid" },
-};
-
 /**
- * Freeze a voucher.
- *
- * The snapshot IS the document: re-rendering it later must not pick up a hotel
- * name or a date that changed after the traveller was handed the paper. Same
- * reasoning as offer_renders, which is why neither is generated on the fly.
- *
- * A voucher can only be issued against a CONFIRMED booking. Handing someone a
- * document for a room nobody booked is worse than handing them nothing — they
- * stop chasing it and find out at the desk.
+ * «إصدار» a document — the gate, then the one write behind every issued paper
+ * (document-issue.ts, shared with the documents the server issues by itself).
+ * A paper identical to the latest of its kind comes back as it is, not as a
+ * second version.
  */
-export async function issueDocument(input: {
-  operation_id: string;
-  kind: VoucherKind;
-  booking_id?: string | null;
-  /** «لوحة الاستقبال» only — the name the client asked to see at the airport. */
-  welcome_name?: string | null;
-}): Promise<{ ok: true; id: string; token: string } | (Fail & { params?: Record<string, string> })> {
+export async function issueDocument(input: IssueInput): Promise<{ ok: true; id: string; token: string } | (Fail & { params?: Record<string, string> })> {
   const denied = (await gateOperation(input.operation_id)) ?? (input.booking_id ? await gateRow("operation_bookings", input.booking_id) : null);
   if (denied) return { ok: false, error: denied };
-
-  try {
-    const supabase = await db();
-
-    const opRes = await supabase
-      .from("operations")
-      .select("id, offer_id, offers(serial, destination, customers(arabic_name, mobile))")
-      .eq("id", input.operation_id)
-      .maybeSingle();
-    if (!opRes.data) return { ok: false, error: "ops.err.notFound" };
-    const op = opRes.data as unknown as {
-      offer_id: string;
-      offers:
-        | { serial: string; destination: string | null; customers: { arabic_name: string | null; mobile: string | null } | { arabic_name: string | null; mobile: string | null }[] | null }
-        | { serial: string; destination: string | null; customers: unknown }[]
-        | null;
-    };
-    const offer = Array.isArray(op.offers) ? op.offers[0] : op.offers;
-    const cust = Array.isArray(offer?.customers) ? offer?.customers[0] : offer?.customers;
-    const customer = (cust ?? null) as { arabic_name: string | null; mobile: string | null } | null;
-
-    const [allBookings, travelers, daysRes] = await Promise.all([
-      listBookings(input.operation_id),
-      listTravelers(input.operation_id),
-      supabase
-        // the column is day_date, not date — selecting a name that does not
-        // exist makes PostgREST return NOTHING rather than error loudly, which
-        // reads as "this trip has no program" instead of "the query is wrong"
-        .from("offer_days")
-        .select("day_number, day_date, city_name, title, activities")
-        .eq("offer_id", op.offer_id)
-        .order("day_number", { ascending: true }),
-    ]);
-
-    // Only confirmed bookings belong on a document handed to a traveller.
-    const confirmed = allBookings.filter((b) => b.status === "confirmed");
-    // A booking_id means "this hotel alone gets its own document"; without one
-    // every confirmed hotel goes on ONE voucher, which is what a client wants to
-    // carry and what a desk wants to be handed.
-    const picked = input.booking_id
-      ? confirmed.filter((b) => b.id === input.booking_id)
-      : input.kind === "hotel_voucher"
-        ? confirmed.filter((b) => b.kind === "hotel")
-        : input.kind === "flight_ticket"
-          ? confirmed.filter((b) => b.kind === "flight")
-          : input.kind === "booking_summary"
-            ? confirmed
-            : [];
-    // The hotel voucher is the paper shown at the desk: never before the hotel's
-    // OWN confirmation (the owner, 2026-10-17). A hotel still holding only our
-    // number — or "confirmed" with no number at all — stays off it.
-    const scoped = input.kind === "hotel_voucher" ? picked.filter((b) => b.kind === "hotel" && hotelFinal(b)) : picked;
-    if (scoped.length === 0 && picked.length > 0) return { ok: false, error: "trip.status.voucherNeedsFinal" };
-
-    const days = ((daysRes.data ?? []) as {
-      day_number: number;
-      day_date: string | null;
-      city_name: string | null;
-      title: string | null;
-      activities: string[] | null;
-    }[]).map((d) => ({
-      day_number: d.day_number,
-      date: d.day_date,
-      city_name: d.city_name ?? "",
-      title: d.title ?? "",
-      activities: d.activities ?? [],
-    }));
-
-    // A welcome board needs nothing confirmed: it is a name on a sheet, and the
-    // whole point is that it can be printed the moment the trip is sold — often
-    // before a single hotel has come back. Every other kind still requires
-    // something real to put on it.
-    if (input.kind === "itinerary" ? days.length === 0 : input.kind !== "welcome_board" && scoped.length === 0) {
-      return { ok: false, error: "ops.err.nothingToIssue" };
-    }
-
-    // the hotel desk reads the hotel's name, address and phone — from /hotels, by its name; its
-    // city and country decide the language a hotel voucher prints the stay in
-    type HotelRow = { arabic_name: string; english_name: string | null; address: string | null; contact_number: string | null; google_maps: string | null; city_id: string | null; country_id: string | null };
-    type CityRow = { id: string; arabic_name: string; english_name: string | null; country_id: string | null };
-    const hotelNames = [...new Set(scoped.filter((b) => b.kind === "hotel").map((b) => b.title.trim()).filter(Boolean))];
-    const hotelRows = hotelNames.length
-      ? (((await supabase.from("hotels").select("arabic_name, english_name, address, contact_number, google_maps, city_id, country_id").in("arabic_name", hotelNames)).data ?? []) as HotelRow[])
-      : [];
-    const cityIds = [...new Set(hotelRows.map((h) => h.city_id).filter((c): c is string => Boolean(c)))];
-    const cityRows = cityIds.length ? (((await supabase.from("cities").select("id, arabic_name, english_name, country_id").in("id", cityIds)).data ?? []) as CityRow[]) : [];
-    const countryIds = [...new Set([...hotelRows.map((h) => h.country_id), ...cityRows.map((c) => c.country_id)].filter((c): c is string => Boolean(c)))];
-    const iso2 = new Map(
-      countryIds.length
-        ? (((await supabase.from("countries").select("id, iso2").in("id", countryIds)).data ?? []) as { id: string; iso2: string | null }[]).map((c) => [c.id, c.iso2])
-        : [],
-    );
-    const cityOf = new Map(cityRows.map((c) => [c.id, c]));
-    // two hotels may share a name: the one in the booking's city
-    const hotelFor = (b: VoucherBooking) => {
-      const same = hotelRows.filter((h) => h.arabic_name.trim() === b.title.trim());
-      const row = same.find((h) => h.city_id && normalizeName(cityOf.get(h.city_id)?.arabic_name) === normalizeName(b.city_name)) ?? same[0];
-      return row ? { row, city: row.city_id ? cityOf.get(row.city_id) : undefined } : null;
-    };
-    const withHotel = (b: VoucherBooking): VoucherBooking => {
-      const h = b.kind === "hotel" ? hotelFor(b)?.row : undefined;
-      return h ? { ...b, name_en: h.english_name, address: h.address, phone: h.contact_number } : b;
-    };
-
-    // A hotel voucher prints each stay in its destination's language (room catalogue,
-    // 2026-10-15) — or is not issued, saying which name is missing.
-    const stays: VoucherBooking[] = [];
-    if (input.kind === "hotel_voucher") {
-      for (const raw of scoped) {
-        const b = toVoucherBooking(raw);
-        const found = hotelFor(b);
-        const city = found?.city;
-        const hotel: StayHotel | null = found
-          ? { ar: found.row.arabic_name, en: found.row.english_name, country: iso2.get(found.row.country_id ?? city?.country_id ?? "") ?? null }
-          : null;
-        const cityEn = city?.english_name?.trim();
-        const glossary = cityEn && /[A-Za-z]/.test(cityEn) ? { [city!.arabic_name.trim()]: cityEn, [b.city_name.trim()]: cityEn } : {};
-        // the raw detail: toVoucherBooking has already set the room details aside
-        const stay = voucherStay({ title: raw.title, city_name: raw.city_name, detail: raw.detail ?? {} }, hotel, glossary);
-        if (!stay.ok) return { ok: false, error: STAY_ERROR[stay.error][stay.locale], params: { hotel: b.title } };
-        stays.push({
-          ...b,
-          title: stay.title,
-          city_name: stay.city_name,
-          detail: stay.detail,
-          locale: stay.locale,
-          alt_name: stay.alt_name,
-          notes: stay.notes,
-          address: found?.row.address ?? null,
-          phone: found?.row.contact_number ?? null,
-          map: found?.row.google_maps?.trim() || null,
-        });
-      }
-    }
-
-    // each day of the itinerary says when its drives and tours start
-    const timedOn = (date: string | null) =>
-      allBookings
-        .filter((b) => b.status !== "cancelled" && (b.kind === "transport" || b.kind === "service") && b.start_date && b.start_date === date)
-        .map((b) => {
-          const at = b.detail?.["الوقت"] || b.detail?.["وقت الانطلاق"] || "";
-          return `${at && at !== "يُحدَّد لاحقاً" ? `${at} — ` : ""}${b.title}`;
-        });
-
-    const snapshot: VoucherDTO = {
-      kind: input.kind,
-      serial: offer?.serial ?? "",
-      // the company's day, not the server's UTC one
-      issued_at: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }),
-      destination: offer?.destination ?? null,
-      customer: { name: customer?.arabic_name ?? "", phone: customer?.mobile ?? null },
-      travelers: travelers.map((t) => ({ name: t.display_name, nationality: t.nationality })),
-      bookings: input.kind === "hotel_voucher" ? stays : scoped.map(toVoucherBooking).map(withHotel),
-      days: input.kind === "itinerary" ? days.map((d) => ({ ...d, activities: [...timedOn(d.date), ...d.activities] })) : [],
-      notes: [],
-      // a booking that chose Arabic keeps the bilingual voucher
-      ...(input.kind === "hotel_voucher" && stays.every((s) => s.locale === "en") ? { lang: "en" as const } : {}),
-      // Falls back to the lead traveller, then the booking name — a sign that
-      // says nothing is worse than one with the wrong spelling.
-      welcome_name:
-        input.kind === "welcome_board"
-          ? (input.welcome_name ?? "").trim() ||
-            travelers[0]?.display_name ||
-            customer?.arabic_name ||
-            null
-          : null,
-    };
-
-    const prev = await supabase
-      .from("operation_documents")
-      .select("version")
-      .eq("operation_id", input.operation_id)
-      .eq("kind", input.kind)
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const version = ((prev.data as { version: number } | null)?.version ?? 0) + 1;
-
-    // 32 bytes of randomness: the token IS the access control for the public
-    // link, so it must not be guessable the way a serial is.
-    const token = randomBytes(24).toString("base64url");
-
-    const { data, error } = await supabase
-      .from("operation_documents")
-      .insert({
-        operation_id: input.operation_id,
-        booking_id: input.booking_id ?? null,
-        kind: input.kind,
-        version,
-        snapshot_json: snapshot,
-        token,
-        issued_by: await getCurrentEmployeeId(),
-      })
-      .select("id")
-      .single();
-    if (error || !data) return { ok: false, error: "err.createFailed" };
-
-    const id = (data as { id: string }).id;
-    await logAudit({
-      action: "voucher.issued",
-      entity: "operation_documents",
-      entity_id: id,
-      meta: { operation_id: input.operation_id, kind: input.kind, version },
-    });
-    // a partner's client gets this document from the partner — tell them it is out
-    if (CLIENT_DOCUMENT_KINDS.includes(input.kind)) {
-      await notifyPartnerCase({ offerId: op.offer_id, what: `صدر مستند: ${DOCUMENT_LABEL[input.kind]}` });
-      await syncOperation(input.operation_id);
-    }
-    return { ok: true, id, token };
-  } catch {
-    return { ok: false, error: "err.db" };
-  }
+  const res = await issueDocumentNow(input, await getCurrentEmployeeId());
+  if (!res.ok) return res;
+  // a new client document moves the case — and issues whatever else just became due with it
+  if (!res.reused && CLIENT_DOCUMENT_KINDS.includes(input.kind)) await syncOperation(input.operation_id);
+  return { ok: true, id: res.id, token: res.token };
 }
 
 export async function revokeDocument(documentId: string): Promise<{ ok: true } | Fail> {

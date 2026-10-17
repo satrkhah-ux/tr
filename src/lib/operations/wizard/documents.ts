@@ -1,16 +1,19 @@
 import type { OperationBooking } from "@/lib/data/operation-bookings";
+import { hotelFinal } from "@/lib/operations/client-booking-state";
 import { derivedExecution } from "@/lib/operations/progress";
 import { CLIENT_DOCUMENT_KINDS, type VoucherKind } from "@/lib/operations/voucher-dto";
 import type { ReadinessItem, StepState, WizardCase } from "./types";
 
 /**
  * Step 6 — «المستندات والإرسال»: no «إصدار» button per document. Each one
- * issues by itself the moment what it prints is final (the shell does it on
- * opening the case — DocumentsStep AutoIssue), and this file says which are due,
- * which are out, and what each of the rest still waits for.
+ * issues by itself the moment what it prints is final — on the server, after
+ * every confirmation, whatever screen made it (wizard-sync.ts
+ * autoIssueDocuments, run by operation-sync) — and this file says which are
+ * due, which are out, and what each of the rest still waits for.
  *
- * A hotel voucher waits for the hotel's FINAL confirmation — confirmed AND its
- * confirmation number — one voucher per hotel (the owner, 2026-10-17); the
+ * A hotel voucher waits for the hotel's FINAL confirmation — confirmed AND the
+ * hotel's own number, not ours (client-booking-state hotelFinal, the rule
+ * issueDocument enforces) — one voucher per hotel (the owner, 2026-10-17); the
  * ticket waits for every flight; the itinerary for the authored days; the
  * arrival sign for a transfer to meet the travellers. issueDocument keeps its
  * own checks: a voucher it refuses comes back as an error, never a blank page.
@@ -33,9 +36,6 @@ export type DocLine = {
 type Docs = Pick<WizardCase, "bookings" | "documents" | "hasDays" | "travelers">;
 
 const live = (b: OperationBooking) => b.status !== "cancelled" && b.status !== "failed";
-
-/** A hotel's confirmation is final once it is confirmed AND carries the hotel's own number. */
-export const hotelFinal = (b: Pick<OperationBooking, "status" | "confirmation_number">) => b.status === "confirmed" && Boolean(b.confirmation_number?.trim());
 
 /** A flight is ticketed once confirmed with a record locator, a ticket number or a confirmation number on it. */
 export const flightFinal = (b: Pick<OperationBooking, "status" | "confirmation_number" | "pnr" | "ticket_numbers">) =>
@@ -65,8 +65,40 @@ export function documentPlan(data: Docs): DocLine[] {
   ];
 }
 
-/** What AutoIssue sends to issueDocument now. */
+/** What is issued now — by the server after every change, and by the shell's AutoIssue for whatever is still due. */
 export const dueDocuments = (data: Docs) => documentPlan(data).filter((l) => l.state === "due");
+
+/**
+ * A snapshot as one comparable string: keys sorted at every level (jsonb gives
+ * them back in its own order), the issue day left out — the same paper issued
+ * again tomorrow is still the same paper.
+ */
+export function snapshotKey(snapshot: unknown): string {
+  const canon = (v: unknown): unknown =>
+    Array.isArray(v)
+      ? v.map(canon)
+      : v && typeof v === "object"
+        ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon((v as Record<string, unknown>)[k])]))
+        : v;
+  const rest: Record<string, unknown> = { ...((snapshot ?? {}) as Record<string, unknown>) };
+  delete rest.issued_at;
+  return JSON.stringify(canon(rest));
+}
+
+type IssuedDoc = { booking_id: string | null; revoked_at: string | null; created_at: string; snapshot_json: unknown };
+
+/**
+ * The live document of this kind and booking that already prints exactly this
+ * snapshot — `docs` are the case's documents of one kind. Issuing again would
+ * only add an identical version, so issueDocument hands this one back instead.
+ * Only the LATEST counts: a paper changed and then changed back is a new version.
+ */
+export function sameDocument<T extends IssuedDoc>(docs: readonly T[], bookingId: string | null, snapshot: unknown): T | null {
+  const latest = docs
+    .filter((d) => !d.revoked_at && (d.booking_id ?? null) === bookingId)
+    .reduce<T | null>((a, d) => (!a || d.created_at > a.created_at ? d : a), null);
+  return latest && snapshotKey(latest.snapshot_json) === snapshotKey(snapshot) ? latest : null;
+}
 
 /**
  * Every client document is out: progress.ts's rule (the one that moves the case
@@ -81,7 +113,7 @@ export function clientDocumentsOut(data: Docs): boolean {
   );
 }
 
-export function documentsState(data: WizardCase): StepState {
+export function documentsState(data: Docs & Pick<WizardCase, "clientToken">): StepState {
   return clientDocumentsOut(data) && data.clientToken ? "done" : "todo";
 }
 

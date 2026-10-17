@@ -41,6 +41,12 @@ export function readWaits(raw: unknown): CaseWaits {
   return out;
 }
 
+/** `waits` without these steps' — null when none of them was waiting, so there is nothing to write. */
+export function withoutWaits(waits: CaseWaits, steps: readonly WizardStep[]): CaseWaits | null {
+  if (!steps.some((s) => waits[s])) return null;
+  return Object.fromEntries(Object.entries(waits).filter(([s]) => !steps.includes(s as WizardStep))) as CaseWaits;
+}
+
 /** The case's follow-up today, or null when none of its waits is due and the trip is not upon it. */
 export function followUpOf(waits: CaseWaits, travelStart: string | null, today: string): FollowUp | null {
   const all = WIZARD_STEPS.flatMap((step) => (waits[step] ? [{ ...waits[step], step }] : []));

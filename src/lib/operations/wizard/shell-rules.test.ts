@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { OperationBooking, OperationDocument } from "@/lib/data/operation-bookings";
 import type { OperationCard, OperationPayment } from "@/lib/data/operations";
 import type { TravelerListItem } from "@/lib/operations/traveler-dto";
-import { documentPlan, documentsReadiness, dueDocuments } from "./documents";
-import { followUpOf, readWaits } from "./followup";
-import { firstOpenStep, readiness, readyToTravel, stepStates } from "./index";
+import { documentPlan, documentsReadiness, dueDocuments, sameDocument, snapshotKey } from "./documents";
+import { followUpOf, readWaits, withoutWaits } from "./followup";
+import { bookingStepStates, firstOpenStep, ownStates, readiness, readyToTravel, staleWaits, stepStates } from "./index";
 import { kindOnTrip, matchPassport, passportSummary, passportsReadiness, passportsState } from "./passports";
 import { clientStatusUnbacked, paidState, paymentPrefill, paymentReadiness } from "./payment";
 import type { WizardCase } from "./types";
@@ -207,6 +207,29 @@ describe("documents", () => {
     expect(dueDocuments(wizardCase({ hasDays: false })).map((l) => l.kind)).toEqual([]);
   });
 
+  it("keeps a hotel voucher waiting while the only number is OURS — the rule issueDocument enforces", () => {
+    const ours = booking({ id: "h1", status: "confirmed", confirmation_number: "AD-2-7287-H1", company_ref: "AD-2-7287-H1" });
+    expect(documentPlan(wizardCase({ bookings: [ours] }))[0]).toMatchObject({ kind: "hotel_voucher", state: "waiting", why: "hotel_final" });
+  });
+
+  it("hands back the paper already out instead of issuing an identical version", () => {
+    const snap = { kind: "itinerary", serial: "AD-2-7287", issued_at: "2026-10-16", customer: { name: "عميل", phone: null }, days: [{ day_number: 1, title: "وصول" }] };
+    const issued = { id: "d1", booking_id: null, revoked_at: null, created_at: "2026-10-16T08:00:00+00:00", snapshot_json: snap };
+    // the same paper: keys in jsonb's order, issued again on another day
+    const again = { days: [{ title: "وصول", day_number: 1 }], customer: { phone: null, name: "عميل" }, issued_at: TODAY, serial: "AD-2-7287", kind: "itinerary" };
+    expect(snapshotKey(again)).toBe(snapshotKey(snap));
+    expect(sameDocument([issued], null, again)?.id).toBe("d1");
+    // something it prints changed: a new version
+    expect(sameDocument([issued], null, { ...again, days: [{ day_number: 1, title: "وصول وجولة" }] })).toBeNull();
+    // revoked, or another hotel's voucher, is not the paper out
+    expect(sameDocument([{ ...issued, revoked_at: TODAY }], null, again)).toBeNull();
+    expect(sameDocument([{ ...issued, booking_id: "h2" }], "h1", again)).toBeNull();
+    // only the latest counts: changed and changed back is a new version
+    const later = { ...issued, id: "d2", created_at: "2026-10-17T08:00:00+00:00", snapshot_json: { ...snap, days: [] } };
+    expect(sameDocument([issued, later], null, again)).toBeNull();
+    expect(sameDocument([later, { ...issued, id: "d3", created_at: "2026-10-17T09:00:00+00:00" }], null, again)?.id).toBe("d3");
+  });
+
   it("counts the documents out only with a voucher for EACH hotel", () => {
     const bookings = [booking({ id: "h1", status: "confirmed", confirmation_number: "1" }), booking({ id: "h2", status: "confirmed", confirmation_number: "2" })];
     const one = [doc({ kind: "hotel_voucher", booking_id: "h1" }), doc({ id: "d2", kind: "itinerary" })];
@@ -226,6 +249,24 @@ describe("the shell", () => {
     // first step with work is the documents
     expect(firstOpenStep(data)).toBe("documents");
     expect(stepStates(wizardCase({ payments: [pay(10000)], waits: { payment: { from: "client", until: TODAY, at: TODAY } } })).payment).toBe("done");
+  });
+
+  it("drops the wait of a step done on any screen — and only that step's", () => {
+    const wait = { from: "supplier" as const, until: TODAY, at: TODAY };
+    // hotels confirmed on «عرض الكل», flights none on the file, payment still owed
+    const data = wizardCase({
+      bookings: [booking({ id: "h1", status: "confirmed", confirmation_number: "HX-1" })],
+      waits: { hotels: wait, flights: wait, payment: { ...wait, from: "client" } },
+    });
+    expect(staleWaits(data.waits, ownStates(data))).toEqual(["flights", "hotels"]);
+    expect(withoutWaits(data.waits, ["flights", "hotels"])).toEqual({ payment: { ...wait, from: "client" } });
+    expect(withoutWaits({ payment: wait }, ["hotels"])).toBeNull();
+    // the server after a confirmation: the bookings' steps only — the payment is not its to judge
+    const fromBookings = bookingStepStates(data);
+    expect(fromBookings.payment).toBeUndefined();
+    expect(staleWaits({ ...data.waits, passports: wait }, fromBookings)).toEqual(["flights", "hotels"]);
+    // a step still open keeps its wait
+    expect(staleWaits({ hotels: wait }, ownStates(wizardCase({ bookings: [booking({ id: "h1", status: "pending" })] })))).toEqual([]);
   });
 
   it("opens «جاهز للسفر» only on every mandatory item", () => {

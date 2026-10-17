@@ -5,7 +5,7 @@ import { hotelsReadiness, hotelsState } from "./hotels";
 import { passportsReadiness, passportsState } from "./passports";
 import { paymentReadiness, paymentState } from "./payment";
 import { transportReadiness, transportState } from "./transport";
-import { WIZARD_STEPS, type ReadinessItem, type StepState, type WizardCase, type WizardStep } from "./types";
+import { WIZARD_STEPS, type CaseWaits, type ReadinessItem, type StepState, type WizardCase, type WizardStep } from "./types";
 
 /** Each step's own rules, in one place for the progress bar and the readiness gate. */
 const RULES: Record<WizardStep, { state: (d: WizardCase) => StepState; readiness: (d: WizardCase) => ReadinessItem[] }> = {
@@ -22,13 +22,36 @@ export function ownState(data: WizardCase, step: WizardStep): StepState {
   return RULES[step].state(data);
 }
 
+/** Every step's own state. */
+export function ownStates(data: WizardCase): Record<WizardStep, StepState> {
+  return Object.fromEntries(WIZARD_STEPS.map((step) => [step, ownState(data, step)])) as Record<WizardStep, StepState>;
+}
+
+/**
+ * The steps the bookings and the documents alone decide — what the server can
+ * tell after a confirmation made anywhere (a supplier's link, the supplier's
+ * API), with no session and without loading the whole case.
+ */
+export function bookingStepStates(
+  data: Pick<WizardCase, "bookings" | "documents" | "hasDays" | "travelers" | "clientToken" | "supplierWork">,
+): Partial<Record<WizardStep, StepState>> {
+  return { flights: flightsState(data), hotels: hotelsState(data), transport: transportState(data), documents: documentsState(data) };
+}
+
+/**
+ * The waits that no longer hold: their step is done, or has nothing to do, by
+ * its own rule — whichever screen finished it. A step `states` does not cover
+ * keeps its wait.
+ */
+export function staleWaits(waits: CaseWaits, states: Partial<Record<WizardStep, StepState>>): WizardStep[] {
+  return WIZARD_STEPS.filter((step) => waits[step] && (states[step] === "done" || states[step] === "na"));
+}
+
 /** A waiting step reads «ينتظر» whatever its own rule says — until it is done. */
 export function stepStates(data: WizardCase): Record<WizardStep, StepState> {
+  const own = ownStates(data);
   return Object.fromEntries(
-    WIZARD_STEPS.map((step) => {
-      const own = RULES[step].state(data);
-      return [step, own !== "done" && own !== "na" && data.waits[step] ? "waiting" : own];
-    }),
+    WIZARD_STEPS.map((step) => [step, own[step] !== "done" && own[step] !== "na" && data.waits[step] ? "waiting" : own[step]]),
   ) as Record<WizardStep, StepState>;
 }
 

@@ -10,8 +10,9 @@ import { getCaseGuide } from "@/lib/data/destination-guides";
 import { notifyOps } from "@/lib/data/ops-notify";
 import { translate, type TranslationKey } from "@/lib/i18n";
 import { riyadhDate } from "@/lib/operations/payments";
-import { readiness, readyToTravel } from "@/lib/operations/wizard/index";
-import { followUpOf, readWaits, type FollowUpItem, type FollowUpTone } from "@/lib/operations/wizard/followup";
+import { ownStates, readiness, readyToTravel, staleWaits } from "@/lib/operations/wizard/index";
+import { followUpOf, readWaits, withoutWaits, type FollowUpItem, type FollowUpTone } from "@/lib/operations/wizard/followup";
+import { writeWaits } from "@/lib/data/wizard-sync";
 import type { ReadyExceptions, WizardCase } from "@/lib/operations/wizard/types";
 
 /**
@@ -22,6 +23,10 @@ import type { ReadyExceptions, WizardCase } from "@/lib/operations/wizard/types"
  *
  * NOT a server action: every list below is the session's own gated loader
  * (operations/access.ts), so this reads exactly what the caller may see.
+ *
+ * Loading the case also drops the «ينتظر» of every step now done, whichever
+ * screen finished it («عرض الكل» loads this too) — the server half of the
+ * rule; operation-sync drops the bookings' steps' after each confirmation.
  */
 
 /** null when the case is not the caller's to see, or does not exist. */
@@ -45,7 +50,7 @@ export async function loadWizardCase(operationId: string): Promise<WizardCase | 
   const row = op.data as { client_token: string | null; client_token_revoked_at: string | null; waits: unknown; ready_exceptions: unknown } | null;
   const pax = offer.data as { adults: number | null; children: number | null; infants: number | null } | null;
   const exceptions = row?.ready_exceptions;
-  return {
+  const data: WizardCase = {
     operation,
     travelers,
     payments,
@@ -61,6 +66,13 @@ export async function loadWizardCase(operationId: string): Promise<WizardCase | 
     sold: pax ? { adults: pax.adults ?? 0, children: pax.children ?? 0, infants: pax.infants ?? 0 } : null,
     guide,
   };
+  // a step that is done no longer waits on anyone
+  const stale = staleWaits(data.waits, ownStates(data));
+  if (stale.length > 0) {
+    const res = await writeWaits(supabase, operationId, (waits) => withoutWaits(waits, stale));
+    if (res.ok && res.waits) data.waits = res.waits;
+  }
+  return data;
 }
 
 /** The «جاهز للسفر» gate — every mandatory readiness item of every step. */

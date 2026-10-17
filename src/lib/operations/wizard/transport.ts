@@ -131,7 +131,7 @@ export function requestTrips(city: TransportCity): { supplierId: string; ids: st
 }
 
 /** «na» with no drive or tour on the file; done once every city has its supplier and its confirmation. */
-export function transportState(data: WizardCase): StepState {
+export function transportState(data: Pick<WizardCase, "bookings" | "supplierWork">): StepState {
   const cities = transportCities(data);
   if (cities.length === 0) return "na";
   return cities.every((c) => c.supplied && c.confirmed) ? "done" : "todo";

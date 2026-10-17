@@ -10,6 +10,7 @@ import { CLIENT_DOCUMENT_KINDS } from "@/lib/operations/voucher-dto";
 import type { TravelerRow } from "@/lib/operations/traveler-dto";
 import { MESSAGE_ON_STATE } from "@/lib/operations/client-messages";
 import { sendClientMessage } from "@/lib/data/client-messages";
+import { autoIssueDocuments } from "@/lib/data/wizard-sync";
 
 /**
  * The ONE place a case's statuses move by themselves (operations order 6):
@@ -20,9 +21,14 @@ import { sendClientMessage } from "@/lib/data/client-messages";
  * manual change. Service role: every caller has already checked the agent's
  * permission for the action that triggered it. Best-effort: a failed sync never
  * fails the confirmation or the payment it follows.
+ *
+ * First, the documents whose data just became final are issued (and the
+ * wizard's stale waits dropped — wizard-sync.ts), so the statuses below
+ * already count them.
  */
 export async function syncOperation(operationId: string): Promise<void> {
   try {
+    await autoIssueDocuments(operationId);
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data: op } = await supabase
       .from("operations")

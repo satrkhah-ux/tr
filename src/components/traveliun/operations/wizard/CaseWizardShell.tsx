@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { useState, type ComponentType } from "react";
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, Clock, LayoutList, Loader2, Minus, PlaneTakeoff } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { en, type TranslationKey } from "@/lib/i18n";
 import { setExecutionStatus } from "@/lib/data/operations";
-import { setStepWait } from "@/lib/data/operation-wizard";
 import { paidTotal } from "@/lib/operations/payments";
-import { firstOpenStep, ownState, readiness, readyToTravel, stepStates } from "@/lib/operations/wizard/index";
+import { firstOpenStep, readiness, readyToTravel, stepStates } from "@/lib/operations/wizard/index";
 import { clientStatusUnbacked, paidState } from "@/lib/operations/wizard/payment";
 import { WIZARD_STEPS, type ReadinessItem, type StepProps, type StepState, type WizardCase, type WizardStep } from "@/lib/operations/wizard/types";
 import { TraveliunShell } from "../../TraveliunShell";
@@ -49,7 +48,6 @@ const TONE: Record<StepState, string> = {
 
 export function CaseWizardShell({ data, canManage, canReadMrz }: { data: WizardCase; canManage: boolean; canReadMrz: boolean }) {
   const { t } = useTraveliunUI();
-  const router = useRouter();
   const op = data.operation;
   const states = stepStates(data);
   const [step, setStep] = useState<WizardStep>(() => firstOpenStep(data));
@@ -58,16 +56,6 @@ export function CaseWizardShell({ data, canManage, canReadMrz }: { data: WizardC
   const finished = WIZARD_STEPS.filter((s) => states[s] === "done" || states[s] === "na").length;
   const paid = paidTotal(data.payments);
   const money = paidState(op.total, paid);
-
-  // a step that is done no longer waits on anyone — its «ينتظر» goes, once per load
-  const cleared = useRef(new Set<WizardStep>());
-  const stale = WIZARD_STEPS.filter((s) => data.waits[s] && ["done", "na"].includes(ownState(data, s)) && !cleared.current.has(s));
-  useEffect(() => {
-    if (stale.length === 0) return;
-    stale.forEach((s) => cleared.current.add(s));
-    void Promise.all(stale.map((s) => setStepWait(op.id, s, null).catch(() => null))).then(() => router.refresh());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stale.join("|")]);
 
   return (
     <TraveliunShell title="nav.operations">

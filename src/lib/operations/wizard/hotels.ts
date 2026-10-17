@@ -28,7 +28,7 @@ export function isFinal(b: Pick<OperationBooking, "status" | "confirmation_numbe
   return b.status === "confirmed" && Boolean(b.confirmation_number?.trim());
 }
 
-export function hotelsState(data: WizardCase): StepState {
+export function hotelsState(data: Pick<WizardCase, "bookings">): StepState {
   const hotels = hotelBookings(data);
   if (hotels.length === 0) return "na";
   return hotels.every(isFinal) ? "done" : "todo";

@@ -7,7 +7,8 @@ import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { gateCaseManager, gateOperation } from "@/lib/operations/access";
 import { isIsoDate } from "@/lib/operations/payments";
-import { readWaits } from "@/lib/operations/wizard/followup";
+import { withoutWaits } from "@/lib/operations/wizard/followup";
+import { writeWaits } from "@/lib/data/wizard-sync";
 import { WAIT_FROM, WIZARD_STEPS, type ReadyExceptions, type WaitFrom, type WizardStep } from "@/lib/operations/wizard/types";
 
 /**
@@ -17,8 +18,10 @@ import { WAIT_FROM, WIZARD_STEPS, type ReadyExceptions, type WaitFrom, type Wiza
  * write a step makes goes through the action that already owns it
  * (upsertTraveler, recordPayment, issueDocument …).
  *
- * ponytail: read-modify-write of one jsonb column — two people setting waits
- * on the same case in the same second can lose one; a jsonb_set RPC if it bites.
+ * A wait is written one step's key at a time (wizard-sync.ts writeWaits:
+ * re-read and retried when the case changed in between, guarded by
+ * updated_at): two people setting «ينتظر» on the same case at once both keep
+ * theirs.
  */
 
 type Fail = { ok: false; error: TranslationKey };
@@ -40,23 +43,14 @@ export async function setStepWait(
   if (!WIZARD_STEPS.includes(step)) return { ok: false, error: "err.updateFailed" };
   if (wait && (!WAIT_FROM.includes(wait.from) || !isIsoDate(wait.until))) return { ok: false, error: "wz.wait.err.invalid" };
   try {
-    const supabase = await db();
-    const { data, error: readError } = await supabase.from("operations").select("waits").eq("id", operationId).maybeSingle();
-    if (readError || !data) return { ok: false, error: "err.loadFailed" };
-    const waits = readWaits((data as { waits: unknown }).waits);
-    if (!wait && !waits[step]) return { ok: true };
-    if (wait) {
-      waits[step] = {
-        from: wait.from,
-        until: wait.until,
-        note: wait.note?.trim().slice(0, NOTE_MAX) || null,
-        at: new Date().toISOString(),
-        by: await getCurrentEmployeeId(),
-      };
-    } else delete waits[step];
+    const set = wait
+      ? { from: wait.from, until: wait.until, note: wait.note?.trim().slice(0, NOTE_MAX) || null, at: new Date().toISOString(), by: await getCurrentEmployeeId() }
+      : null;
+    // only this step's key — whatever another step holds is re-read and kept
+    const res = await writeWaits(await db(), operationId, (waits) => (set ? { ...waits, [step]: set } : withoutWaits(waits, [step])));
     // checked: a write RLS refuses must not be audited as done
-    const { error } = await supabase.from("operations").update({ waits }).eq("id", operationId);
-    if (error) return { ok: false, error: "err.updateFailed" };
+    if (!res.ok) return { ok: false, error: "err.updateFailed" };
+    if (!res.waits) return { ok: true };
     await logAudit({
       action: "operation.waiting",
       entity: "operations",
