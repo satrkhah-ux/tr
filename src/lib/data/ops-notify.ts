@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
 import { miniAppUrl, sendMessage } from "@/lib/telegram/ops-bot";
+import { grantedPermissions } from "@/lib/roles/roles";
+import { noticeRecipients, operationOfPath, type StaffMember } from "./notify-recipients";
 
 /**
  * Tell the operations team a case has landed.
@@ -13,7 +15,8 @@ import { miniAppUrl, sendMessage } from "@/lib/telegram/ops-bot";
  * open the board.
  *
  * Sent over the Traveliun bot to the employees who have already linked their
- * Telegram (employees.telegram_chat_id, migration 0019). Best-effort by design:
+ * Telegram (employees.telegram_chat_id, migration 0019) and whose role opens the
+ * page the notice links to (recipientsFor). Best-effort by design:
  * a notification that fails must never roll back the confirmation itself — the
  * operation exists either way and the board still shows it.
  */
@@ -35,25 +38,45 @@ async function send(chatId: number, text: string, path?: string): Promise<boolea
 }
 
 /**
- * Employees who should hear about operations work.
- *
- * "Has the operations permission" is a role question, and roles live in a table
- * whose only marker for full access is english_name = 'All Permissions'. Rather
- * than re-implement that lookup, this takes everyone with a linked Telegram —
- * the linking itself is the opt-in, and an employee without ops work simply has
- * no reason to have linked. Narrow it to a role when someone complains.
+ * The linked Telegram chats a notice opening `href` goes to: active employees
+ * whose role opens that page — for one operation's page, who may work that
+ * file (notify-recipients.ts). Linking Telegram is the opt-in; the role is the
+ * filter, so nobody taps a button that lands them on the dashboard.
  */
-async function opsRecipients(supabase: SupabaseClient): Promise<number[]> {
+async function recipientsFor(supabase: SupabaseClient, href: string): Promise<number[]> {
   const { data } = await supabase
     .from("employees")
-    .select("telegram_chat_id")
+    .select("id, status, telegram_chat_id, roles(permission_keys)")
     .not("telegram_chat_id", "is", null)
     // a suspended employee keeps their chat id but must stop receiving
     // operations — including new applicants' names
     .eq("status", "Active");
-  return ((data ?? []) as { telegram_chat_id: number | string }[])
-    .map((e) => Number(e.telegram_chat_id))
-    .filter((n) => Number.isFinite(n) && n !== 0);
+  const rows = (data ?? []) as unknown as {
+    id: string;
+    status: string | null;
+    telegram_chat_id: number | string;
+    roles: { permission_keys: string[] | null } | { permission_keys: string[] | null }[] | null;
+  }[];
+  const staff: StaffMember[] = rows
+    .map((e) => {
+      const role = Array.isArray(e.roles) ? e.roles[0] : e.roles;
+      return {
+        id: e.id,
+        chatId: Number(e.telegram_chat_id),
+        permissions: grantedPermissions({ status: e.status, permission_keys: role?.permission_keys ?? null }),
+      };
+    })
+    .filter((e) => Number.isFinite(e.chatId) && e.chatId !== 0);
+
+  const operationId = operationOfPath(href);
+  let issuerId: string | null = null;
+  if (operationId) {
+    // unreadable → no issuer: the own-files holders are left out, never let in
+    const { data: op } = await supabase.from("operations").select("offers(employee_id)").eq("id", operationId).maybeSingle();
+    const offers = (op as { offers: { employee_id: string | null } | { employee_id: string | null }[] | null } | null)?.offers;
+    issuerId = (Array.isArray(offers) ? offers[0] : offers)?.employee_id ?? null;
+  }
+  return noticeRecipients(staff, href, issuerId).map((s) => s.chatId);
 }
 
 export type OpsNotice = {
@@ -69,7 +92,8 @@ export type OpsNotice = {
 export async function notifyOperationConfirmed(notice: OpsNotice): Promise<number> {
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
-    const chatIds = await opsRecipients(supabase);
+    const path = `/operations/${notice.operationId}`;
+    const chatIds = await recipientsFor(supabase, path);
     if (chatIds.length === 0) return 0;
 
     const base = readEnv("NEXT_PUBLIC_SITE_URL") ?? "https://pkg.traveliun.com";
@@ -83,11 +107,11 @@ export async function notifyOperationConfirmed(notice: OpsNotice): Promise<numbe
       notice.confirmedBy ? `سجّله: ${escapeHtml(notice.confirmedBy)}` : null,
       "",
       "ابدأ الحجوزات وإصدار الفواتشر:",
-      `${base}/operations/${notice.operationId}`,
+      `${base}${path}`,
     ].filter((l): l is string => l !== null);
 
     const text = lines.join("\n");
-    const results = await Promise.all(chatIds.map((id) => send(id, text, `/operations/${notice.operationId}`)));
+    const results = await Promise.all(chatIds.map((id) => send(id, text, path)));
     return results.filter(Boolean).length;
   } catch {
     return 0;
@@ -112,7 +136,7 @@ export async function notifyPartnerRegistration(notice: {
 }): Promise<number> {
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
-    const chatIds = await opsRecipients(supabase);
+    const chatIds = await recipientsFor(supabase, "/partner-companies");
     if (chatIds.length === 0) return 0;
 
     const text = [
@@ -139,13 +163,13 @@ export async function notifyPartnerRegistration(notice: {
  * opens the Employees screen. Bounded by the form's own caps (3 per origin a
  * day, 20 open at once), so a flood cannot turn this into a flood of messages.
  *
- * The name only. This goes to every linked colleague, not just the people who
- * decide; the applicant's email and mobile stay behind `employees.manage`.
+ * The name only — to whoever /employees opens for (employees.manage); the
+ * applicant's email and mobile stay on that screen.
  */
 export async function notifyEmployeeRegistration(notice: { name: string }): Promise<number> {
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
-    const chatIds = await opsRecipients(supabase);
+    const chatIds = await recipientsFor(supabase, "/employees");
     if (chatIds.length === 0) return 0;
 
     const text = [
@@ -277,13 +301,14 @@ export async function notifyPartnerCase(notice: { offerId: string; what: string 
 }
 
 /**
- * A plain note to the operations team (the daily alerts): everyone with a
- * linked Telegram, with a button opening the case when there is one.
+ * A plain note to the operations team (the daily alerts), with a button opening
+ * `path`: to whoever that page opens for — a case's notes to the operations
+ * team and the case's own salesperson, never to a colleague's own-files holder.
  */
-export async function notifyOps(text: string, path?: string): Promise<number> {
+export async function notifyOps(text: string, path: string): Promise<number> {
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
-    const chats = await opsRecipients(supabase);
+    const chats = await recipientsFor(supabase, path);
     const results = await Promise.all(chats.map((chat) => send(chat, escapeHtml(text), path)));
     return results.filter(Boolean).length;
   } catch {

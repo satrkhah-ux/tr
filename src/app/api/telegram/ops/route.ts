@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { accessOf } from "@/lib/operations/access";
 import { buildOpsDigest, digestText } from "@/lib/telegram/ops-digest";
 import { answerCallback, employeeForChat, escapeHtml, miniAppUrl, opsBotToken, sendMessage } from "@/lib/telegram/ops-bot";
 
@@ -14,7 +15,9 @@ export const runtime = "nodejs";
  * actions as chat commands would mean a second, weaker copy of every rule.
  *
  * The bot answers only accounts it can resolve to an ACTIVE employee holding
- * `operations.write`. A message is not an authorisation.
+ * `operations.write` (every file) or `operations.own` (the files they issued —
+ * their digest counts only those, as the board does). A message is not an
+ * authorisation.
  */
 
 type TgUpdate = {
@@ -77,7 +80,8 @@ async function handle(update: TgUpdate): Promise<void> {
     return;
   }
 
-  if (!employee.permissions.includes("operations.write")) {
+  const access = accessOf(employee.id, employee.permissions);
+  if (!access) {
     await sendMessage(
       chatId,
       `أهلاً ${escapeHtml(employee.name)} — حسابك مربوط، لكن قسمك لا يملك صلاحية العمليات.\nراجع الإدارة لنقلك إلى قسم العمليات.`,
@@ -91,8 +95,10 @@ async function handle(update: TgUpdate): Promise<void> {
       [
         `🗂️ <b>قسم العمليات</b> — أهلاً ${escapeHtml(employee.name)}`,
         "",
-        "• الزر أدناه يفتح لوحة العمليات كاملة داخل تيليجرام: الحجوزات، أرقام التأكيد، الفوتشرات، رابط العميل.",
-        "• اكتب <b>المهام</b> في أي وقت لتصلك خلاصة ما يحتاج إجراءً.",
+        access.all
+          ? "• الزر أدناه يفتح لوحة العمليات كاملة داخل تيليجرام: الحجوزات، أرقام التأكيد، الفوتشرات، رابط العميل."
+          : "• الزر أدناه يفتح ملفاتك في لوحة العمليات داخل تيليجرام: الحجوزات، أرقام التأكيد، الفوتشرات، رابط العميل.",
+        `• اكتب <b>المهام</b> في أي وقت لتصلك خلاصة ما يحتاج إجراءً${access.all ? "" : " في ملفاتك"}.`,
         "",
         "<i>بيانات الجوازات لا تُرسل في المحادثة — تُفتح داخل الشاشة حيث يُسجَّل كل اطلاع.</i>",
       ].join("\n"),
@@ -102,7 +108,7 @@ async function handle(update: TgUpdate): Promise<void> {
   }
 
   if (text.includes("المهام") || text.startsWith("/tasks") || text.includes("إجراء")) {
-    const digest = await buildOpsDigest();
+    const digest = await buildOpsDigest(5, access);
     await sendMessage(chatId, digestText(digest, employee.name), OPEN_BOARD());
     return;
   }
