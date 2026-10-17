@@ -1,6 +1,7 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { findLookupCountry } from "@/lib/offer/draft-types";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { currentCan } from "@/lib/roles/current";
@@ -87,13 +88,16 @@ export async function getTripGuide(token: string): Promise<Omit<DestinationGuide
     if (!row || row.client_token_revoked_at) return null;
     const destination = ((Array.isArray(row.offers) ? row.offers[0] : row.offers)?.destination ?? "").trim();
     if (!destination) return null;
-    // the offer names its destination as the country (or a city in it)
-    const { data: country } = await supabase.from("countries").select("id, arabic_name").eq("arabic_name", destination).maybeSingle();
-    let countryRow = country as { id: string; arabic_name: string } | null;
+    // the offer names its destination as the country — spelled as the agent spelled it,
+    // «اندونيسيا» or «إندونيسيا» — or a city in it, «بالي 7», «تبليسي +باكورياني+باتومي»
+    const { data: countries } = await supabase.from("countries").select("id, arabic_name");
+    const all = ((countries ?? []) as { id: string; arabic_name: string }[]).map((c) => ({ ...c, name: c.arabic_name }));
+    let countryRow: { id: string; arabic_name: string } | null = findLookupCountry(all, destination) ?? null;
     if (!countryRow) {
-      const { data: city } = await supabase.from("cities").select("countries(id, arabic_name)").eq("arabic_name", destination).limit(1).maybeSingle();
+      const first = destination.split(/[+،,\d]/)[0].trim();
+      const { data: city } = await supabase.from("cities").select("countries(id, arabic_name)").in("arabic_name", [destination, first]).limit(1).maybeSingle();
       const c = (city as unknown as { countries: { id: string; arabic_name: string } | { id: string; arabic_name: string }[] | null } | null)?.countries;
-      countryRow = (Array.isArray(c) ? c[0] : c) ?? null;
+      countryRow = (Array.isArray(c) ? c[0] : c) ?? (first ? (findLookupCountry(all, first) ?? null) : null);
     }
     if (!countryRow) return null;
     const { data: guide } = await supabase.from("destination_guides").select("*").eq("country_id", countryRow.id).maybeSingle();
