@@ -13,6 +13,7 @@
  * Pure: no React, no Supabase.
  */
 import type { OperationBooking } from "@/lib/data/operation-bookings";
+import { hotelFinal } from "@/lib/operations/client-booking-state";
 import { datesOn, normalizeTicketText, passengersIn } from "@/lib/flights/ticket-parse";
 import { nameTokens, type NameCheck } from "./flights";
 import type { ReadinessItem, StepState, WizardCase } from "./types";
@@ -24,8 +25,9 @@ export function hotelBookings(data: Pick<WizardCase, "bookings">): OperationBook
 }
 
 /** The hotel's final number is on file: confirmed, with its confirmation number. */
-export function isFinal(b: Pick<OperationBooking, "status" | "confirmation_number">): boolean {
-  return b.status === "confirmed" && Boolean(b.confirmation_number?.trim());
+/** The hotel's OWN number is in — our company_ref alone is not final (the same rule as the voucher, client-booking-state.ts). */
+export function isFinal(b: Pick<OperationBooking, "status" | "confirmation_number" | "company_ref">): boolean {
+  return hotelFinal(b);
 }
 
 export function hotelsState(data: Pick<WizardCase, "bookings">): StepState {

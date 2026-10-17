@@ -11,9 +11,12 @@ const NOW = new Date("2026-10-17T00:00:00Z");
 
 describe("the step's state and «التأكيد النهائي»", () => {
   it("is final only when confirmed AND holding the hotel's number — our company_ref is not it", () => {
-    expect(isFinal({ status: "confirmed", confirmation_number: "554871203" })).toBe(true);
-    expect(isFinal({ status: "confirmed", confirmation_number: " " })).toBe(false);
-    expect(isFinal({ status: "pending", confirmation_number: "554871203" })).toBe(false);
+    const ours = "AD-2-7287-20261012-H1";
+    expect(isFinal({ status: "confirmed", confirmation_number: "554871203", company_ref: ours })).toBe(true);
+    expect(isFinal({ status: "confirmed", confirmation_number: " ", company_ref: ours })).toBe(false);
+    expect(isFinal({ status: "pending", confirmation_number: "554871203", company_ref: ours })).toBe(false);
+    // only our own number typed as the confirmation — still not the hotel's
+    expect(isFinal({ status: "confirmed", confirmation_number: ours, company_ref: ours })).toBe(false);
   });
 
   it("is na without hotels, done when every live hotel is final", () => {
