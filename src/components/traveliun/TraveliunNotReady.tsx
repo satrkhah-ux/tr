@@ -3,6 +3,8 @@
 import Link from "next/link";
 import type { TranslationKey } from "@/lib/i18n";
 import { DirText } from "@/components/DirText";
+import type { Permission } from "@/lib/roles/roles";
+import { useCanOpen } from "@/lib/roles/useCanOpen";
 import { TraveliunShell } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
@@ -11,17 +13,20 @@ type TraveliunNotReadyProps = {
   title?: string;
 };
 
-const RELATED: { labelKey: TranslationKey; href: string }[] = [
+/** Where to go instead — each shown only to whoever can open it (the menus' rule). */
+const RELATED: { labelKey: TranslationKey; href: string; perm?: Permission }[] = [
   { labelKey: "nav.dashboard", href: "/dashboard" },
+  { labelKey: "nav.basic", href: "/basic", perm: "offers.write" },
   { labelKey: "nav.intelligenceHub", href: "/travel-intelligence" },
   { labelKey: "nav.kanban", href: "/kanban-board" },
   { labelKey: "nav.customers", href: "/customers" },
-  { labelKey: "nav.packages", href: "/offers" },
-  { labelKey: "nav.packageGenerator", href: "/package-generator" },
+  { labelKey: "nav.issuedOffers", href: "/offers", perm: "offers.write" },
+  { labelKey: "nav.legacyGenerator", href: "/package-generator", perm: "offers.write" },
 ];
 
 export function TraveliunNotReady({ title }: TraveliunNotReadyProps) {
   const { t } = useTraveliunUI();
+  const opens = useCanOpen();
 
   return (
     <TraveliunShell title="notready.title">
@@ -34,7 +39,7 @@ export function TraveliunNotReady({ title }: TraveliunNotReadyProps) {
         <h2 className="mb-3 text-2xl font-bold text-[#185045]">{t("notready.heading")}</h2>
         <p className="mb-6 max-w-[720px] text-sm leading-7 text-[#557d78]">{t("notready.desc")}</p>
         <div className="flex flex-wrap gap-3">
-          {RELATED.map((item) => (
+          {RELATED.filter(opens).map((item) => (
             <Link
               key={item.href}
               href={item.href}

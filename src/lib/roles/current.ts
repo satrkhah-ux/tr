@@ -4,8 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import { grantedPermissions, VIEW_AS_COOKIE, viewAsPermissions, type Permission, type Role } from "./roles";
-import { permissionForPath } from "./section-access";
-import { featureForPath } from "@/lib/features";
+import { canOpenPath } from "./section-access";
 import { getFeatureFlags } from "@/lib/features-server";
 
 /**
@@ -102,11 +101,10 @@ export async function guardPath(pathname: string): Promise<void> {
   if (!(await currentCanOpen(pathname))) redirect("/dashboard");
 }
 
+/** The menus' rule (section-access.ts canOpenPath) with this request's permissions and switches. */
 export async function currentCanOpen(pathname: string): Promise<boolean> {
-  const feature = featureForPath(pathname);
-  if (feature && !(await getFeatureFlags())[feature]) return false;
-  const permission = permissionForPath(pathname);
-  return permission === null || (await currentCan(permission));
+  const [permissions, flags] = await Promise.all([load(), getFeatureFlags()]);
+  return canOpenPath(pathname, (p) => permissions.includes(p), (f) => flags[f]);
 }
 
 /**

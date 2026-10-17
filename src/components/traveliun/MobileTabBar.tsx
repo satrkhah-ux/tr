@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BarChart3,
   Calculator,
+  ClipboardCheck,
   Columns3,
   Contact,
   FilePlus2,
@@ -15,12 +16,12 @@ import {
   LayoutGrid,
   RotateCcw,
   Users,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { useRole } from "@/lib/roles/RoleContext";
 import type { Permission } from "@/lib/roles/roles";
-import { canOpenLink } from "@/lib/roles/section-access";
+import { useCanOpen } from "@/lib/roles/useCanOpen";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
@@ -28,15 +29,18 @@ import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 /**
  * Mobile bottom tab bar (app idiom) — 4 USER-PICKED shortcuts + a "more" button
  * that opens a bottom sheet where the user customizes which destinations appear.
- * Selection persists in localStorage; destinations are permission-filtered.
+ * Selection persists in localStorage; destinations are filtered by the menus'
+ * own rule (useCanOpen: permissions, sections and the service switches).
  */
 
 type TabDest = { id: string; labelKey: TranslationKey; href: string; icon: LucideIcon; perm?: Permission };
 
 const DESTINATIONS: TabDest[] = [
   { id: "dashboard", labelKey: "nav.dashboard", href: "/dashboard", icon: BarChart3 },
+  { id: "basic", labelKey: "nav.basic", href: "/basic", icon: Zap, perm: "offers.write" },
+  { id: "operations", labelKey: "nav.operations", href: "/operations", icon: ClipboardCheck },
   { id: "kanban", labelKey: "nav.kanban", href: "/kanban-board", icon: Columns3 },
-  { id: "generator", labelKey: "nav.packageGenerator", href: "/package-generator", icon: FilePlus2, perm: "offers.write" },
+  { id: "generator", labelKey: "nav.legacyGenerator", href: "/package-generator", icon: FilePlus2, perm: "offers.write" },
   { id: "repackage", labelKey: "nav.repackage", href: "/repackage", icon: FileUp, perm: "repackage.write" },
   { id: "offers", labelKey: "nav.packages", href: "/offers", icon: FileText, perm: "offers.write" },
   { id: "customers", labelKey: "nav.customers", href: "/customers", icon: Contact },
@@ -55,7 +59,8 @@ const PARTNER_TABS: TabDest[] = [
   { id: "profile", labelKey: "nav.myProfile", href: "/b2b/profile", icon: Contact },
 ];
 
-const DEFAULT_TABS = ["dashboard", "kanban", "generator", "repackage"];
+// «بيسك» is where a package starts now (2026-10-17); a saved pick keeps whatever it chose
+const DEFAULT_TABS = ["dashboard", "basic", "kanban", "repackage"];
 const MAX_TABS = 4;
 
 function loadTabs(): string[] {
@@ -81,7 +86,7 @@ function isActive(pathname: string, href: string): boolean {
 
 export function MobileTabBar({ pathname }: { pathname: string }) {
   const { t } = useTraveliunUI();
-  const { can } = useRole();
+  const opens = useCanOpen();
   const [tabs, setTabs] = useState<string[]>(DEFAULT_TABS);
   const [customizing, setCustomizing] = useState(false);
 
@@ -90,11 +95,11 @@ export function MobileTabBar({ pathname }: { pathname: string }) {
     setTabs(loadTabs());
   }, []);
 
-  const allowed = useMemo(() => DESTINATIONS.filter((d) => canOpenLink(d, can)), [can]);
-  const allowedById = useMemo(() => new Map(allowed.map((d) => [d.id, d])), [allowed]);
+  const allowed = DESTINATIONS.filter(opens);
+  const allowedById = new Map(allowed.map((d) => [d.id, d]));
   const partner = usePartnerBrand();
   const shown = partner
-    ? PARTNER_TABS
+    ? PARTNER_TABS.filter(opens)
     : tabs.map((id) => allowedById.get(id)).filter((d): d is TabDest => Boolean(d)).slice(0, MAX_TABS);
 
   function persist(next: string[]) {

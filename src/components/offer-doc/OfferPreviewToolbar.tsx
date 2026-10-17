@@ -7,6 +7,7 @@ import { ArrowUpRight, CheckCircle2, FileText, Link2, Loader2, Send } from "luci
 import { DirText } from "@/components/DirText";
 import { publishOffer } from "@/lib/data/offers";
 import { setOfferPartner, setOfferShowPrices } from "@/lib/data/partner-companies";
+import { useCanOpen } from "@/lib/roles/useCanOpen";
 
 /**
  * Staff toolbar over the live offer preview: publish (freeze snapshot + send),
@@ -40,6 +41,7 @@ export function OfferPreviewToolbar({
   showPrices: boolean;
 }) {
   const router = useRouter();
+  const opens = useCanOpen();
   const [publishing, setPublishing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -182,7 +184,8 @@ export function OfferPreviewToolbar({
             <option key={r.id} value={r.id}>{r.name}</option>
           ))}
         </select>
-        {resellers.length === 0 ? (
+        {/* the partner companies are the administration's (section-access.ts) — no dead link for sales */}
+        {resellers.length === 0 && opens({ href: "/partner-companies" }) ? (
           <Link href="/partner-companies" className="text-[11.5px] font-bold text-[#0e9bb5] underline">
             أضف شركة متعاونة
           </Link>

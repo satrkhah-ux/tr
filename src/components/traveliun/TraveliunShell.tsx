@@ -42,6 +42,7 @@ import {
   Settings2,
   Table2,
   UserCircle,
+  Wrench,
   X,
   Zap,
   type LucideIcon,
@@ -51,7 +52,8 @@ import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { ROLE_LABEL_KEYS, ROLES, type Permission } from "@/lib/roles/roles";
-import { canOpenLink } from "@/lib/roles/section-access";
+import { canOpenLink, type FeatureCheck } from "@/lib/roles/section-access";
+import { useCanOpen } from "@/lib/roles/useCanOpen";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { MobileTabBar } from "./MobileTabBar";
 import { TraveliunLogo } from "./TraveliunLogo";
@@ -92,7 +94,7 @@ export type NavGroup = {
   href: string;
   icon: LucideIcon;
   children?: NavLink[];
-  /** hides the group unless the effective role holds this permission. */
+  /** hides a link-less section unless the role holds this permission; a section with links is decided by its links. */
   perm?: Permission;
 };
 
@@ -153,34 +155,34 @@ function usePinnedSidebar(): [boolean, (next: boolean) => void] {
 export const navGroups: NavGroup[] = [
   { labelKey: "nav.dashboard", href: "/dashboard", icon: BarChart3 },
   { labelKey: "nav.intelligenceHub", href: "/travel-intelligence", icon: Calculator },
+  // «النظام بيسك» — the company's one-page entry, and since the owner's order of
+  // 2026-10-17 the home of everything «البكجات السياحية» held: same routes, same
+  // pages, only the menu moved. The doing comes first, then what to do it from,
+  // then what came out of it; the legacy generator last, and only while the
+  // developer has it switched on (features.ts legacy_generator — its pages send
+  // staff to the same draft in /basic when it is off).
   {
-    labelKey: "nav.packages",
-    href: "/offers",
-    icon: FileText,
-    // The doing comes first, then what to do it from, then what came out of it.
-    // The reference lists (margin rules, hotel suppliers, includes/excludes,
-    // terms) moved to «قسم البيانات»: they are tables an admin maintains
-    // occasionally, and sitting here they made a nine-item menu out of a
-    // four-item job.
+    labelKey: "nav.basic",
+    href: "/basic",
+    icon: Zap,
     children: [
-      { labelKey: "nav.issuePackage", href: "/package-generator", perm: "offers.write" },
+      { labelKey: "nav.issuePackage", href: "/basic", perm: "offers.write" },
       { labelKey: "nav.readyOffers", href: "/ready-offers", perm: "offers.write" },
       // Issued only. Drafts stay where they are made.
       { labelKey: "nav.issuedOffers", href: "/offers", perm: "offers.write" },
-      // the offers by stage — sales work, not a reference table (moved out of «قسم البيانات»)
+      // the offers by stage — sales work, not a reference table
       { labelKey: "nav.kanban", href: "/kanban-board" },
       { labelKey: "nav.repackage", href: "/repackage", perm: "repackage.write" },
+      // same gate as its page (app/repackage/flight-card)
+      { labelKey: "fc.title", href: "/repackage/flight-card", perm: "repackage.write" },
+      { labelKey: "nav.legacyGenerator", href: "/package-generator", perm: "offers.write" },
     ],
   },
-  // The company's own one-page entry, on trial beside the generator: same
-  // drafts, fewer questions. Its own entry so it can be found — and removed — whole.
-  { labelKey: "nav.basic", href: "/basic", icon: Zap, perm: "offers.write" },
   { labelKey: "nav.partnerCompanies", href: "/partner-companies", icon: Building2 },
-  // Operations was not in the requested list, and it stays at the top level on
-  // purpose: it is the screen an ops agent lives in all day, and one that only
-  // appears for whoever holds the permission. Burying it two clicks deep would
-  // cost more than the tidier menu is worth.
-  { labelKey: "nav.operations", href: "/operations", icon: ClipboardCheck, perm: "operations.write" },
+  // Operations stays at the top level on purpose: it is the screen an ops agent
+  // lives in all day. No `perm` of its own — section-access.ts opens it to
+  // operations.write (every file) or operations.own (the files you issued).
+  { labelKey: "nav.operations", href: "/operations", icon: ClipboardCheck },
 
   // ---------- «قسم البيانات» — the reference tables the generator reads ----------
   {
@@ -253,6 +255,9 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.guideInfo", href: "/guide/informations" },
     ],
   },
+
+  // «المطوّر» — the service switches and the external links' health (developer.access, section-access.ts)
+  { labelKey: "nav.developer", href: "/developer", icon: Wrench },
 ];
 
 /**
@@ -290,23 +295,43 @@ export const partnerNavGroups: NavGroup[] = [
  */
 function useNavGroups(): NavGroup[] {
   const partner = usePartnerBrand();
-  const { can } = useRole();
-  if (partner) return partnerNavGroups;
-  return navGroupsFor(can);
+  const opens = useCanOpen();
+  // a partner's own menu goes through the same filter: a service the developer
+  // switched off (ready offers…) leaves their menu too — but never «ملفاتي»
+  return filterGroups(partner ? partnerNavGroups : navGroups, opens);
 }
 
 /**
- * Our sections, and the links inside them, that this permission check opens. A section left empty goes.
- * A link's own `perm` and the route's section (section-access.ts — the same list the pages refuse by)
- * must both pass, so «قسم البيانات», the settings, the team and operations vanish for whoever cannot open them.
+ * Our sections, and the links inside them, that this permission check (and, when given, these
+ * service switches) opens. A link's own `perm`, the route's section (section-access.ts — the same
+ * list the pages refuse by) and its service must all pass, so «قسم الإدارة», the settings, the team
+ * and a switched-off service vanish for whoever cannot open them. A section left empty goes.
  */
-export function navGroupsFor(can: (permission: Permission) => boolean): NavGroup[] {
-  const opens = (link: { href: string; perm?: Permission }) => canOpenLink(link, can);
-  return navGroups.flatMap((group) => {
-    if (!opens(group)) return [];
-    if (!group.children) return [group];
-    const children = group.children.filter(opens);
-    return children.length > 0 ? [{ ...group, children }] : [];
+export function navGroupsFor(can: (permission: Permission) => boolean, featureOn?: FeatureCheck): NavGroup[] {
+  return filterGroups(navGroups, (link) => canOpenLink(link, can, featureOn));
+}
+
+function filterGroups(groups: NavGroup[], opens: (link: { href: string; perm?: Permission }) => boolean): NavGroup[] {
+  return groups.flatMap((group) => {
+    if (!group.children) return opens(group) ? [group] : [];
+    // a hidden link's caption heads the next shown one, so a block whose first
+    // link is closed (the supplier vault, for sales) keeps its heading
+    const children: NavLink[] = [];
+    let caption: TranslationKey | undefined;
+    for (const child of group.children) {
+      if (!opens(child)) {
+        caption = child.captionKey ?? caption;
+        continue;
+      }
+      children.push(caption && !child.captionKey ? { ...child, captionKey: caption } : child);
+      caption = undefined;
+    }
+    if (children.length === 0) return [];
+    // A section's own link goes where its first open link does when its home is
+    // closed to this user: ops hold the kanban but not «بيسك» (offers.write), and
+    // the mobile menu draws a section as that one link.
+    const href = children.some((child) => child.href === group.href) ? group.href : children[0].href;
+    return [{ ...group, href, children }];
   });
 }
 
@@ -364,6 +389,8 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
   const { viewAs, resetViewAs, effectiveRole } = useRole();
   const partner = usePartnerBrand();
   const visibleNavGroups = useNavGroups();
+  const opens = useCanOpen();
+  const guideLinks = GUIDE_LINKS.filter(opens);
   const [activeMenu, setActiveMenu] = useState<TranslationKey>(() => {
     return visibleNavGroups.find((group) => isGroupActive(pathname, group))?.labelKey ?? visibleNavGroups[0].labelKey;
   });
@@ -552,14 +579,16 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
           {/* the guide, the calculator and the table view are our tools — a partner keeps settings and account */}
           {partner ? null : (
           <>
+          {guideLinks.length > 0 ? (
           <div className="hidden sm:block">
             <Popover open={panel === "guide"} onOpenChange={(o) => setPanel(o ? "guide" : null)}>
               <PopoverTrigger render={<HeaderIcon label={t("header.guide")} icon={NotebookText} active={panel === "guide"} />} />
               <PopoverContent className="w-[min(300px,calc(100vw/var(--tv-zoom)_-_24px))]">
-                <GuidePanel close={() => setPanel(null)} />
+                <GuidePanel links={guideLinks} close={() => setPanel(null)} />
               </PopoverContent>
             </Popover>
           </div>
+          ) : null}
 
           <div className="hidden sm:block">
             <Popover open={panel === "calculator"} onOpenChange={(o) => setPanel(o ? "calculator" : null)}>
@@ -909,18 +938,21 @@ const HeaderIcon = forwardRef<
   );
 });
 
-function GuidePanel({ close }: { close: () => void }) {
+/** The header's guide shortcuts — «قسم الإدارة» pages, so they show only to whoever can open them. */
+const GUIDE_LINKS: { labelKey: TranslationKey; href: string }[] = [
+  { labelKey: "nav.guide", href: "/web-guide" },
+  { labelKey: "nav.guideCategories", href: "/guide/categories" },
+  { labelKey: "nav.guideInfo", href: "/guide/informations" },
+  { labelKey: "nav.customerCare", href: "/customers_care" },
+];
+
+function GuidePanel({ links, close }: { links: typeof GUIDE_LINKS; close: () => void }) {
   const { t } = useTraveliunUI();
   return (
     <div>
       <h3 className="mb-3 text-sm font-bold text-[var(--tv-brand)]">{t("guideTitle")}</h3>
       <div className="grid gap-2">
-        {([
-          ["nav.guide", "/web-guide"],
-          ["nav.guideCategories", "/guide/categories"],
-          ["nav.guideInfo", "/guide/informations"],
-          ["nav.customerCare", "/customers_care"],
-        ] as const).map(([labelKey, href]) => (
+        {links.map(({ labelKey, href }) => (
           <Link
             key={href}
             href={href}
