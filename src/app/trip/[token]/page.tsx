@@ -265,7 +265,7 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
                 </Row>
               ) : null}
               {guide.embassy_phone ? (
-                <Row label="السفارة">
+                <Row label="السفارة السعودية">
                   <a href={tel(guide.embassy_phone)} className="font-extrabold"><bdi dir="ltr">{guide.embassy_phone}</bdi></a>
                 </Row>
               ) : null}
