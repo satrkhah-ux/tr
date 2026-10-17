@@ -137,3 +137,23 @@ export async function writeDraftStages(
     return { ok: false, error: "err.db" };
   }
 }
+
+/**
+ * The signed-in employee's own files not yet issued — «غير مكتملة» on «لوحتي».
+ * The employee comes from the session, never from an argument, so no caller can
+ * ask for a colleague's. Full rows, cost included: the dashboard loader keeps
+ * only the sell total and the steps still missing.
+ */
+export async function listMyOpenDraftRows(): Promise<Pick<DraftRow, "id" | "title" | "data" | "updated_at">[]> {
+  const a = await access();
+  if (!a || a.partnerId) return [];
+  const me = await getCurrentEmployeeId();
+  if (!me) return [];
+  const { data } = await a.db
+    .from("offer_drafts")
+    .select("id, title, data, updated_at")
+    .eq("created_by", me)
+    .is("data->>produced_serial", null)
+    .order("updated_at", { ascending: false });
+  return (data ?? []) as Pick<DraftRow, "id" | "title" | "data" | "updated_at">[];
+}

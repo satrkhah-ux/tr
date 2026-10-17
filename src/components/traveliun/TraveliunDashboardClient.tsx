@@ -18,11 +18,11 @@ import {
   FileText,
   FileUp,
   Inbox,
-  Package,
   PackageCheck,
   RotateCcw,
   Search,
   SlidersHorizontal,
+  UserRound,
   Users,
   Wifi,
   X,
@@ -35,22 +35,22 @@ import type { Permission } from "@/lib/roles/roles";
 import { canOpenLink } from "@/lib/roles/section-access";
 import {
   getAdminMetrics,
-  getEmployeeMetrics,
   searchEmployees,
   touchPresence,
   type AdminMetrics,
-  type EmployeeMetrics,
   type EmployeeOption,
 } from "@/lib/data/metrics";
 import type { OpsSummary } from "@/lib/data/operations-work";
+import type { MyDashboard as MyDashboardData } from "@/lib/dashboard/my-stats";
 import { TraveliunShell, navGroupsFor } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { ExecutiveOverview } from "./ExecutiveDashboardClient";
 import { OperationsSnapshot } from "./operations/OperationsSnapshot";
+import { MyDashboard } from "./MyDashboard";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import type { TranslationKey } from "@/lib/i18n";
 
-export function TraveliunDashboardClient({ opsSummary }: { opsSummary: OpsSummary }) {
+export function TraveliunDashboardClient({ opsSummary, mine }: { opsSummary: OpsSummary; mine: MyDashboardData }) {
   const { dashboardView } = useRole();
   const { t, dir } = useTraveliunUI();
 
@@ -65,9 +65,9 @@ export function TraveliunDashboardClient({ opsSummary }: { opsSummary: OpsSummar
     <TraveliunShell title="nav.dashboard">
       <div className="tv-fade-up" dir={dir}>
         {dashboardView === "admin" ? (
-          <AdminHome opsSummary={opsSummary} />
+          <AdminHome opsSummary={opsSummary} mine={mine} />
         ) : dashboardView === "employee" ? (
-          <EmployeeHome opsSummary={opsSummary} />
+          <EmployeeHome opsSummary={opsSummary} mine={mine} />
         ) : (
           <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState title={t("dash.noPermission")} description={t("dash.noPermissionDesc")} />
@@ -226,50 +226,57 @@ function PreviousSections() {
   );
 }
 
-// ---------- ADMIN home: operations first, then sections, then the tabs ----------
-function AdminHome({ opsSummary }: { opsSummary: OpsSummary }) {
+// ---------- ADMIN home: the tabs («لوحتي» first), then operations and sections ----------
+/**
+ * The owner's order (2026-10-17): every account opens on its OWN numbers, the
+ * administration too. So «لوحتي» is the first tab and the tabs lead the page;
+ * the executive and team tabs are unchanged behind it.
+ */
+function AdminHome({ opsSummary, mine }: { opsSummary: OpsSummary; mine: MyDashboardData }) {
   const { t } = useTraveliunUI();
   const { can } = useRole();
   const canExec = can("pricing.internal");
-  const [tab, setTab] = useState<"exec" | "team">(canExec ? "exec" : "team");
+  const [tab, setTab] = useState<"mine" | "exec" | "team">("mine");
 
   const tabClass = (active: boolean) =>
-    `inline-flex h-10 items-center gap-2 rounded-[9px] px-4 text-[13px] font-bold transition-colors ${
+    `inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-[9px] px-4 text-[13px] font-bold transition-colors ${
       active ? "bg-[#185045] text-white shadow-[0_2px_8px_rgba(24,80,69,0.25)]" : "text-[#557d78] hover:bg-[#f0f7f4]"
     }`;
 
   return (
     <div className="space-y-4">
+      <div className="flex max-w-full overflow-x-auto rounded-[12px] border border-[#dbe6e1] bg-white p-1 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:inline-flex">
+        <button type="button" onClick={() => setTab("mine")} className={tabClass(tab === "mine")}>
+          <UserRound className="size-4" /> {t("dash.tab.mine")}
+        </button>
+        {canExec ? (
+          <button type="button" onClick={() => setTab("exec")} className={tabClass(tab === "exec")}>
+            <BarChart3 className="size-4" /> {t("dash.tab.executive")}
+          </button>
+        ) : null}
+        <button type="button" onClick={() => setTab("team")} className={tabClass(tab === "team")}>
+          <Users className="size-4" /> {t("dash.tab.team")}
+        </button>
+      </div>
+
+      {tab === "mine" ? <MyDashboard data={mine} /> : canExec && tab === "exec" ? <ExecutiveOverview /> : <TeamOperations />}
+
       {/* live work before navigation: a case whose free-cancellation window
           closes tomorrow matters more than a link to the generator. */}
       <OperationsSnapshot summary={opsSummary} />
       <ReadySections />
-
-      {canExec ? (
-        <div className="inline-flex rounded-[12px] border border-[#dbe6e1] bg-white p-1 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-          <button type="button" onClick={() => setTab("exec")} className={tabClass(tab === "exec")}>
-            <BarChart3 className="size-4" /> {t("dash.tab.executive")}
-          </button>
-          <button type="button" onClick={() => setTab("team")} className={tabClass(tab === "team")}>
-            <Users className="size-4" /> {t("dash.tab.team")}
-          </button>
-        </div>
-      ) : null}
-
-      {canExec && tab === "exec" ? <ExecutiveOverview /> : <TeamOperations />}
-
       <PreviousSections />
     </div>
   );
 }
 
-// ---------- EMPLOYEE home: operations + sections + own metrics ----------
-function EmployeeHome({ opsSummary }: { opsSummary: OpsSummary }) {
+// ---------- EMPLOYEE home: «لوحتي» first, then operations + sections ----------
+function EmployeeHome({ opsSummary, mine }: { opsSummary: OpsSummary; mine: MyDashboardData }) {
   return (
     <div className="space-y-4">
+      <MyDashboard data={mine} />
       <OperationsSnapshot summary={opsSummary} />
       <ReadySections />
-      <EmployeeDashboard />
       <PreviousSections />
     </div>
   );
@@ -311,67 +318,6 @@ function CardError({ onRetry }: { onRetry: () => void }) {
 }
 
 const GRID = "grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(210px,1fr))]";
-
-// ---------- EMPLOYEE VIEW ----------
-type EmpCardDef = { key: string; label: TranslationKey; icon: LucideIcon; color: string; get: (m: EmployeeMetrics) => number };
-const EMPLOYEE_CARDS: EmpCardDef[] = [
-  { key: "today", label: "dash.requestsToday", icon: Inbox, color: "#2aa87a", get: (m) => m.requestsToday },
-  { key: "packages", label: "dash.packages", icon: Package, color: "#0e9bb5", get: (m) => m.packages },
-  { key: "executed", label: "dash.executed", icon: CheckCircle2, color: "#0f7a52", get: (m) => m.executed },
-];
-
-function EmployeeDashboard() {
-  const { t } = useTraveliunUI();
-  const [metrics, setMetrics] = useState<EmployeeMetrics | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-    const result = await getEmployeeMetrics();
-    if (!result.ok) setError(true);
-    setMetrics(result);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { void load(); }, [load]);
-
-  const maxType = metrics ? Math.max(1, ...metrics.requestTypes.map((rt) => rt.count)) : 1;
-
-  return (
-    <div className="space-y-4">
-      <section className={GRID}>
-        {loading
-          ? EMPLOYEE_CARDS.map((c) => <CardSkeleton key={c.key} />)
-          : error
-            ? EMPLOYEE_CARDS.map((c) => <CardError key={c.key} onRetry={load} />)
-            : EMPLOYEE_CARDS.map((c) => <KpiCard key={c.key} label={t(c.label)} value={String(metrics ? c.get(metrics) : 0)} icon={c.icon} color={c.color} detail={t("dash.ownData")} />)}
-      </section>
-
-      <section className="rounded-2xl border border-[#e2ebe7] bg-white p-5 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-        <h2 className="mb-4 text-base font-extrabold text-[#003c3a]">{t("dash.requestTypes")}</h2>
-        {loading ? (
-          <div className="space-y-3">{[0, 1, 2].map((i) => <div key={i} className="tv-shimmer h-6 rounded-md" />)}</div>
-        ) : metrics && metrics.requestTypes.length > 0 ? (
-          <div className="space-y-3">
-            {metrics.requestTypes.map((rt) => (
-              <div key={rt.type} className="flex items-center gap-3">
-                <span className="w-28 shrink-0 text-sm font-bold text-[#185045]">{rt.type}</span>
-                <div className="h-6 flex-1 overflow-hidden rounded-md bg-[#eef4f1]">
-                  <div className="h-full rounded-md bg-[#2aa87a]" style={{ width: `${Math.round((rt.count / maxType) * 100)}%` }} />
-                </div>
-                <span className="tv-tnum w-8 text-end text-sm font-extrabold text-[#0f3d38]"><DirText>{String(rt.count)}</DirText></span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="py-6 text-center text-sm text-[#93aaa3]">{t("dash.noTypes")}</p>
-        )}
-      </section>
-    </div>
-  );
-}
 
 // ---------- ADMIN: team & requests (live presence + request metrics) ----------
 type AdminCardDef = { key: string; label: TranslationKey; icon: LucideIcon; color: string; detail: TranslationKey; get: (m: AdminMetrics) => number };
