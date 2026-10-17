@@ -14,6 +14,7 @@ const ERR: Partial<Record<FileError, "fileErr_forbidden" | "fileErr_cancelled" |
 };
 const SAID = {
   sent: "waSent",
+  template: "waTemplate",
   window: "waWindow",
   no_phone: "waNoPhone",
   unreachable: "waUnreachable",
@@ -21,6 +22,14 @@ const SAID = {
   not_allowed: "blocked_not_allowed",
   partner: "blocked_partner",
   manual: "sendManualDone",
+} as const;
+/** Why the system will not send it, told before the employee writes a word. */
+const BLOCKED = {
+  no_phone: "blocked_no_phone",
+  off: "blocked_off",
+  not_allowed: "blocked_not_allowed",
+  partner: "blocked_partner",
+  unreachable: "waUnreachable",
 } as const;
 
 /**
@@ -63,9 +72,9 @@ export function OfferSend({ draftId, again = false, onSent, className = "" }: { 
     try {
       const r = await sendOfferMessage(draftId, body, manual);
       if (!r.ok) return fail(r.error);
-      setSaid({ text: tx(SAID[r.result]), ok: r.result === "sent" || r.result === "manual" });
+      setSaid({ text: tx(SAID[r.result]), ok: r.result === "sent" || r.result === "template" || r.result === "manual" });
       // a send or a note left in the client's thread: the status moves on and the panel closes
-      if (r.result === "sent" || r.result === "manual" || r.result === "window") {
+      if (r.result === "sent" || r.result === "template" || r.result === "manual" || r.result === "window") {
         setDraft(null);
         onSent?.();
       }
@@ -76,7 +85,7 @@ export function OfferSend({ draftId, again = false, onSent, className = "" }: { 
     }
   }
 
-  const blockedText = draft?.blocked ? (draft.blocked in SAID ? tx(SAID[draft.blocked as keyof typeof SAID]) : null) : null;
+  const blockedText = draft?.blocked && draft.blocked in BLOCKED ? tx(BLOCKED[draft.blocked as keyof typeof BLOCKED]) : null;
   const canSend = Boolean(draft) && !draft?.blocked && body.trim().length > 0 && busy === null;
 
   return (
@@ -115,7 +124,11 @@ export function OfferSend({ draftId, again = false, onSent, className = "" }: { 
             aria-label={tx("sendTitle")}
             className="w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[13px] leading-6 text-[#185045] outline-none focus:border-[#2aa87a]"
           />
-          {blockedText ? <p className="text-[11.5px] font-bold text-[#a86a10]">{blockedText}</p> : null}
+          {blockedText ? (
+            <p className="text-[11.5px] font-bold text-[#a86a10]">{blockedText}</p>
+          ) : (
+            <p className="text-[11px] font-semibold text-[#7a948f]">{tx("sendTemplateHint")}</p>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"

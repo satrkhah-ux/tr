@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BriefcaseBusiness, CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { cancelFile, confirmFromBasic, getFileStatus, type FileError, type FileStatusView } from "@/lib/data/file-status";
-import { AWAITING_CLIENT, type TimelineEntry } from "@/lib/offer/file-state";
+import { AWAITING_CLIENT, SENDABLE, type TimelineEntry } from "@/lib/offer/file-state";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { OfferSend } from "../OfferSend";
@@ -72,7 +72,7 @@ export function BasicFileStatus({
   }, [draftId, serial, refresh, tick]);
 
   if (!view) return null;
-  if (variant === "chip") return <FileStateChip state={view.state} version={view.version} stale={view.stale} />;
+  if (variant === "chip") return <FileStateChip state={view.state} version={view.version} sentVersion={view.sentVersion} stale={view.stale} />;
 
   const changed = () => {
     setTick((n) => n + 1);
@@ -123,13 +123,15 @@ export function BasicFileStatus({
     return tx(`ev_${e.key}`, { v: e.version ?? "" });
   };
   const awaiting = AWAITING_CLIENT.includes(view.state);
-  const sendable = view.canAct && view.state !== "cancelled";
+  // until the client has the newest version — a confirmed file re-issued included
+  const sendable =
+    view.canAct && !view.partner && SENDABLE.includes(view.state) && (awaiting || view.sentVersion == null || (view.version ?? 0) > view.sentVersion);
   const shown = all ? view.timeline : view.timeline.slice(0, 6);
 
   return (
     <div className="mt-3 space-y-3 rounded-[12px] border border-[#dbe6e1] bg-white p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <FileStateChip state={view.state} version={view.version} stale={view.stale} />
+        <FileStateChip state={view.state} version={view.version} sentVersion={view.sentVersion} stale={view.stale} />
         {view.canOpenCase && view.operationId ? (
           <Link
             href={`/operations/${view.operationId}`}
@@ -142,7 +144,8 @@ export function BasicFileStatus({
       </div>
 
       {/* the programme to the client — only from this button, after a look */}
-      {sendable && (awaiting || view.stale) ? <OfferSend draftId={draftId} again={view.stale} onSent={changed} /> : null}
+      {sendable ? <OfferSend draftId={draftId} again={view.stale} onSent={changed} /> : null}
+      {view.partner ? <p className="text-[11.5px] font-bold text-[#557d78]">{tx("blocked_partner")}</p> : null}
 
       {/* the client said yes: the file goes to operations */}
       {view.canAct && awaiting ? (

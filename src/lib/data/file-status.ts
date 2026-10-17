@@ -66,6 +66,8 @@ export type FileStatusView = {
   cancel: ReturnType<typeof canCancelFile>;
   /** this employee may send, confirm and cancel (their own file, or operations / a manager). */
   canAct: boolean;
+  /** a partner company's file: its client is theirs — no send from here. */
+  partner: boolean;
   timeline: TimelineEntry[];
 };
 
@@ -88,6 +90,7 @@ export async function getFileStatus(draftId: string): Promise<FileStatusView | F
       canOpenCase: Boolean(detail.operation) && (await currentCanOpen("/operations")),
       cancel: canCancelFile({ partner: Boolean(file.offer.partner_company_id), hasCase: Boolean(detail.operation), state: detail.state }),
       canAct: file.mine || manager,
+      partner: Boolean(file.offer.partner_company_id),
       timeline: detail.timeline.slice(0, 40),
     };
   } catch {
@@ -114,8 +117,7 @@ export async function prepareOfferMessage(draftId: string): Promise<OfferMessage
     if (failed(file)) return file;
     if (file.offer.partner_company_id) return { ok: false, error: "partner" };
     if (file.offer.status === "cancelled") return { ok: false, error: "cancelled" };
-    const sends = await sentAudits(file.offer.id);
-    const updated = lastSentVersion(sends) != null;
+    const updated = await newerThanSent(file.offer.id);
     const message = await offerMessage(file.serial, updated);
     if (!message) return { ok: false, error: "notFound" };
     const phone = message.client.customer?.mobile?.trim() ?? "";
@@ -145,6 +147,12 @@ async function latestVersion(offerId: string): Promise<number | null> {
   return Math.max(0, ...((data ?? []) as { version: number }[]).map((r) => r.version)) || null;
 }
 
+/** «تم تحديث ملفك» only when the client had a version and this one is newer — a resend of the same says «تم إعداد». */
+async function newerThanSent(offerId: string): Promise<boolean> {
+  const [sent, latest] = await Promise.all([sentAudits(offerId).then(lastSentVersion), latestVersion(offerId)]);
+  return sent != null && (latest ?? 0) > sent;
+}
+
 const MAX_BODY = 4000;
 
 /**
@@ -167,10 +175,10 @@ export async function sendOfferMessage(draftId: string, body: string, manual = f
       await logAudit({ action: "offer.client_sent", entity: "offers", entity_id: file.offer.id, meta: { result: "manual", version, serial: file.serial } });
       return { ok: true, result: "manual", at };
     }
-    const updated = lastSentVersion(await sentAudits(file.offer.id)) != null;
+    const updated = await newerThanSent(file.offer.id);
     const result = await sendOfferToClient(file.serial, updated, text);
     // what happened on WhatsApp is recorded; the trial gate («off», «not_allowed») sent nothing and records nothing
-    if (result === "sent" || result === "window" || result === "no_phone" || result === "unreachable") {
+    if (result === "sent" || result === "template" || result === "window" || result === "no_phone" || result === "unreachable") {
       await logAudit({ action: "offer.client_sent", entity: "offers", entity_id: file.offer.id, meta: { result, version, serial: file.serial } });
     }
     return { ok: true, result, at };

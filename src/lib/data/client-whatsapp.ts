@@ -41,7 +41,8 @@ import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
  * screen, never claimed as sent.
  */
 
-export type ClientSendResult = "sent" | "window" | "no_phone" | "unreachable" | "partner" | "off" | "not_allowed";
+/** «template»: delivered as the approved template, outside the 24 hours — its fixed text, not the one written. */
+export type ClientSendResult = "sent" | "template" | "window" | "no_phone" | "unreachable" | "partner" | "off" | "not_allowed";
 
 export type OfferClient = {
   employee_id: string | null;
@@ -128,7 +129,7 @@ export async function messageClient(
           preview: waPreview(def, extra.template.params),
           document: def.document ? extra.template.document : undefined,
         });
-        if (sent !== null) return "sent";
+        if (sent !== null) return "template";
       }
       await addTeletelNote(
         thread.conversationId,

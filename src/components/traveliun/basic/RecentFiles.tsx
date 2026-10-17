@@ -62,7 +62,8 @@ export function RecentFiles({
   const [status, setStatus] = useState<"all" | "draft" | "issued">("all");
   // one state of the ladder («أُرسل للعميل», «مؤكّد»…), on top of the tabs
   const [state, setState] = useState<FileState | "">("");
-  const stateOf = (d: DraftSummary): FileState => states[d.id]?.state ?? (d.produced_serial ? "issued" : "draft");
+  // an issued file the lookup missed claims nothing: «صدر»
+  const stateOf = (d: DraftSummary): FileState => states[d.id]?.state ?? (d.produced_serial ? "published" : "draft");
   const [history, setHistory] = useState<string | null>(null);
 
   const makers = useMemo(
@@ -92,14 +93,15 @@ export function RecentFiles({
           [d.title, d.destination, d.customer_name, d.company, d.produced_serial, d.created_by_name].some((v) => v?.toLowerCase().includes(q))),
     );
   }, [drafts, who, meId, country, service, query]);
-  // «مسودات / مُصدرة» on top of the other filters, each with how many it holds
-  const counts = { all: filtered.length, draft: filtered.filter((d) => !d.produced_serial).length, issued: filtered.filter((d) => d.produced_serial).length };
-  const shown = useMemo(
-    () => filtered.filter((d) => (status === "all" || (status === "issued") === Boolean(d.produced_serial)) && (!state || stateOf(d) === state)),
+  const inState = useMemo(
+    () => filtered.filter((d) => !state || stateOf(d) === state),
     // stateOf reads states, which is a prop
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filtered, status, state, states],
+    [filtered, state, states],
   );
+  // «مسودات / مُصدرة» on top of the other filters (the state's too), each with how many it holds
+  const counts = { all: inState.length, draft: inState.filter((d) => !d.produced_serial).length, issued: inState.filter((d) => d.produced_serial).length };
+  const shown = useMemo(() => inState.filter((d) => status === "all" || (status === "issued") === Boolean(d.produced_serial)), [inState, status]);
   const presentStates = FILE_STATES.filter((s) => drafts.some((d) => stateOf(d) === s));
 
   const days = useMemo(() => {
@@ -165,7 +167,7 @@ export function RecentFiles({
           ))}
         </select>
         {Object.keys(states).length > 0 ? (
-          <select value={state} onChange={(e) => setState(e.target.value as FileState | "")} aria-label={tx("historyTitle")} className={select}>
+          <select value={state} onChange={(e) => setState(e.target.value as FileState | "")} aria-label={tx("allStates")} className={select}>
             <option value="">{tx("allStates")}</option>
             {presentStates.map((s) => (
               <option key={s} value={s}>{tx(`st_${s}`)}</option>

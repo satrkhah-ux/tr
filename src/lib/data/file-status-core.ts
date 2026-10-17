@@ -24,13 +24,16 @@ import {
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 export const riyadhToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
 
-type OfferRow = { id: string; serial: string; status: OfferStatus; valid_until: string | null; employee_id: string | null; partner_company_id: string | null };
+type OfferRow = { id: string; serial: string; status: OfferStatus; valid_until: string | null; employee_id: string | null; partner_company_id: string | null; created_at: string | null };
+const OFFER_COLUMNS = "id, serial, status, valid_until, employee_id, partner_company_id, created_at";
 type OpRow = { id: string; offer_id: string; client_status: ClientStatus; execution_status: ExecutionStatus };
 
 export type FileStatusRow = {
   state: FileState;
   /** the client has an older version than the file */
   stale: boolean;
+  /** the version the client last had — the chip of a sent file names it, not the newest. */
+  sent_version: number | null;
   operation_id: string | null;
 };
 
@@ -45,7 +48,7 @@ export async function fileStatesFor(drafts: { id: string; produced_serial: strin
     const service = db();
     const { data: offers } = await service
       .from("offers")
-      .select("id, serial, status, valid_until, employee_id, partner_company_id")
+      .select(OFFER_COLUMNS)
       .in("serial", issued.map((d) => d.produced_serial as string));
     const bySerial = new Map(((offers ?? []) as OfferRow[]).map((o) => [o.serial, o]));
     const ids = [...bySerial.values()].map((o) => o.id);
@@ -66,8 +69,8 @@ export async function fileStatesFor(drafts: { id: string; produced_serial: strin
       if (!offer) continue;
       const op = opOf.get(offer.id) ?? null;
       const sentVersion = lastSentVersion(sendsOf.get(offer.id) ?? []);
-      const facts = { serial: offer.serial, offerStatus: offer.status, validUntil: offer.valid_until, sentVersion, version: d.version, op, today };
-      out[d.id] = { state: fileState(facts), stale: staleSend(facts), operation_id: op?.id ?? null };
+      const facts = { serial: offer.serial, offerStatus: offer.status, validUntil: offer.valid_until, sentVersion, version: d.version, issuedAt: offer.created_at, op, today };
+      out[d.id] = { state: fileState(facts), stale: staleSend(facts), sent_version: sentVersion, operation_id: op?.id ?? null };
     }
   } catch {
     // the list still opens; the chips fall back to «صدر»
@@ -90,7 +93,7 @@ export async function loadFileStatus(serial: string): Promise<FileStatusDetail |
   const service = db();
   const { data: offerData } = await service
     .from("offers")
-    .select("id, serial, status, valid_until, employee_id, partner_company_id")
+    .select(OFFER_COLUMNS)
     .eq("serial", serial)
     .maybeSingle();
   const offer = offerData as OfferRow | null;
@@ -98,7 +101,7 @@ export async function loadFileStatus(serial: string): Promise<FileStatusDetail |
   const [opRes, historyRes, rendersRes] = await Promise.all([
     service.from("operations").select("id, offer_id, client_status, execution_status").eq("offer_id", offer.id).maybeSingle(),
     service.from("offer_status_history").select("to_status, note, created_at, changed_by").eq("offer_id", offer.id),
-    service.from("offer_renders").select("version").eq("offer_id", offer.id).eq("variant", "client"),
+    service.from("offer_renders").select("version, rendered_at, rendered_by").eq("offer_id", offer.id).eq("variant", "client"),
   ]);
   const operation = (opRes.data ?? null) as OpRow | null;
   const entityIds = [offer.id, ...(operation ? [operation.id] : [])];
@@ -106,20 +109,22 @@ export async function loadFileStatus(serial: string): Promise<FileStatusDetail |
     .from("audit_logs")
     .select("action, meta, created_at, actor_id")
     .in("entity_id", entityIds)
-    .in("action", [SENT_ACTION, "offer.reissued", "offer.cancelled", "operation.client_status", "operation.execution_status"])
+    .in("action", [SENT_ACTION, "operation.cancelled", "operation.client_status", "operation.execution_status"])
     .order("created_at", { ascending: false })
     .limit(60);
   const history = (historyRes.data ?? []) as { to_status: string; note: string | null; created_at: string; changed_by: string | null }[];
   const audits = (auditData ?? []) as { action: string; meta: Record<string, unknown> | null; created_at: string; actor_id: string | null }[];
   // the people, by name
-  const people = [...new Set([...history.map((h) => h.changed_by), ...audits.map((a) => a.actor_id)].filter((x): x is string => Boolean(x)))];
+  const renders = (rendersRes.data ?? []) as { version: number; rendered_at: string; rendered_by: string | null }[];
+  const people = [...new Set([...history.map((h) => h.changed_by), ...audits.map((a) => a.actor_id), ...renders.map((r) => r.rendered_by)].filter((x): x is string => Boolean(x)))];
   const { data: names } = people.length ? await service.from("employees").select("id, arabic_name").in("id", people) : { data: [] };
   const nameOf = new Map(((names ?? []) as { id: string; arabic_name: string | null }[]).map((e) => [e.id, e.arabic_name]));
   const historyRows: HistoryRow[] = history.map((h) => ({ to_status: h.to_status, note: h.note, created_at: h.created_at, by: h.changed_by ? (nameOf.get(h.changed_by) ?? null) : null }));
   const auditRows: AuditRow[] = audits.map((a) => ({ action: a.action, meta: a.meta, created_at: a.created_at, by: a.actor_id ? (nameOf.get(a.actor_id) ?? null) : null }));
-  const version = Math.max(0, ...((rendersRes.data ?? []) as { version: number }[]).map((r) => r.version)) || null;
+  const version = Math.max(0, ...renders.map((r) => r.version)) || null;
   const sentVersion = lastSentVersion(auditRows);
-  const facts = { serial: offer.serial, offerStatus: offer.status, validUntil: offer.valid_until, sentVersion, version, op: operation, today: riyadhToday() };
+  const facts = { serial: offer.serial, offerStatus: offer.status, validUntil: offer.valid_until, sentVersion, version, issuedAt: offer.created_at, op: operation, today: riyadhToday() };
+  const renderRows = renders.map((r) => ({ version: r.version, at: r.rendered_at, by: r.rendered_by ? (nameOf.get(r.rendered_by) ?? null) : null }));
   return {
     offer,
     operation,
@@ -127,6 +132,6 @@ export async function loadFileStatus(serial: string): Promise<FileStatusDetail |
     stale: staleSend(facts),
     version,
     sentVersion,
-    timeline: fileTimeline(historyRows, auditRows),
+    timeline: fileTimeline(historyRows, auditRows, renderRows),
   };
 }

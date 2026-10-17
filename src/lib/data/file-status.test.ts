@@ -119,6 +119,15 @@ describe("«أرسل إلى العميل عبر واتساب» — reviewed, the
     expect(await prepareOfferMessage("d1")).toMatchObject({ updated: false });
     state.sentBefore = [{ action: "offer.client_sent", meta: { result: "sent", version: 1 } }];
     expect(await prepareOfferMessage("d1")).toMatchObject({ updated: true });
+    // the client already has version 2, the newest: sending it again is not an update
+    state.sentBefore = [{ action: "offer.client_sent", meta: { result: "sent", version: 2 } }];
+    expect(await prepareOfferMessage("d1")).toMatchObject({ updated: false });
+  });
+
+  it("records the approved template as what it is", async () => {
+    state.sendResult = "template";
+    expect(await sendOfferMessage("d1", "نص")).toMatchObject({ ok: true, result: "template" });
+    expect(state.audits[0]?.meta).toMatchObject({ result: "template", version: 2 });
   });
 
   it("records «أرسلته يدوياً» without touching WhatsApp", async () => {
@@ -158,6 +167,14 @@ describe("«العميل أكّد» and «إلغاء الملف» from Basic", (
     expect(state.confirmed).toEqual(["o1"]);
     state.offer = { ...state.offer, status: "cancelled" };
     expect(await confirmFromBasic("d1", "phone")).toEqual({ ok: false, error: "cancelled" });
+  });
+
+  it("a file cancelled here is not confirmed back to life from the kanban either", () => {
+    const src = fs.readFileSync(path.join(__dirname, "operations.ts"), "utf8");
+    const body = src.slice(src.indexOf("async function recordConfirmation"));
+    const refusal = body.indexOf('=== "cancelled"');
+    expect(refusal).toBeGreaterThan(-1);
+    expect(refusal).toBeLessThan(body.indexOf("setOfferStatus("));
   });
 
   it("cancels with a reason before operations hold the file, and records it", async () => {

@@ -10,6 +10,12 @@ describe("fileState — one ladder for the file", () => {
     expect(fileState({ ...base, sentVersion: 1 })).toBe("sent");
   });
 
+  it("claims nothing about a file issued before sends were recorded — «صدر», never «لم يُرسل»", () => {
+    expect(fileState({ ...base, issuedAt: "2026-10-12T09:00:00Z" })).toBe("published");
+    expect(fileState({ ...base, issuedAt: "2026-10-18T09:00:00Z" })).toBe("issued");
+    expect(fileState({ ...base, issuedAt: "2026-10-12T09:00:00Z", sentVersion: 2 })).toBe("sent");
+  });
+
   it("asks for a price check once the offer's date has passed — until the client confirms", () => {
     expect(fileState({ ...base, sentVersion: 1, validUntil: "2026-10-16" })).toBe("expired");
     expect(fileState({ ...base, validUntil: "2026-10-17" })).toBe("issued");
@@ -48,11 +54,22 @@ describe("what was really sent, and the file's history", () => {
     expect(lastSentVersion(audits)).toBe(1);
     expect(lastSentVersion([...audits, { action: "offer.client_sent", meta: { result: "manual", version: 2 } }])).toBe(2);
     expect(lastSentVersion([])).toBeNull();
+    // outside the 24 hours the approved template went: the client has that version
+    expect(lastSentVersion([...audits, { action: "offer.client_sent", meta: { result: "template", version: 3 } }])).toBe(3);
   });
 
-  it("merges the status history and the audit rows, newest first", () => {
-    const line = fileTimeline([{ to_status: "sent", note: "published v1", created_at: "2026-10-16T08:00:00Z", by: null }], audits);
-    expect(line.map((e) => e.key)).toEqual(["sentWindow", "reissued", "sent", "issued"]);
+  it("merges the status history, the audit rows and each new version, newest first", () => {
+    const line = fileTimeline(
+      [{ to_status: "sent", note: "published v1", created_at: "2026-10-16T08:00:00Z", by: null }],
+      [...audits, { action: "operation.cancelled", meta: null, created_at: "2026-10-18T08:00:00Z", by: "سارة" }],
+      [
+        { version: 1, at: "2026-10-16T08:00:00Z", by: null },
+        { version: 2, at: "2026-10-17T09:30:00Z", by: "أحمد" },
+      ],
+    );
+    // the version comes from its render, once — not again from offer.reissued
+    expect(line.map((e) => e.key)).toEqual(["cancelled", "sentWindow", "reissued", "sent", "issued"]);
+    expect(line.find((e) => e.key === "reissued")).toMatchObject({ version: 2, by: "أحمد" });
   });
 });
 
