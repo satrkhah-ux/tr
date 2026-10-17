@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { BarChart3, ChevronLeft, ChevronRight, Loader2, MessageCircle, Plus, RefreshCw, Search, Users } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { addLead, pullLeadsNow, startProgramme, updateLead, type Lead, type LeadPatch, type LeadsPage } from "@/lib/data/leads";
@@ -69,7 +69,7 @@ function Bars({ title, rows, tone }: { title: string; rows: { label: string; cou
   );
 }
 
-export function LeadsBoard({ leads, team, meId, pullError, twoWay }: LeadsPage) {
+export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: LeadsPage) {
   const router = useRouter();
   const today = riyadhDay(Date.now());
   const [day, setDay] = useState(today);
@@ -80,6 +80,8 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay }: LeadsPage) 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(pullError ? `تعذّر السحب من الشيت: ${pullError}` : null);
   const [draft, setDraft] = useState({ phone: "", name: "", inquiry: "", destination: "" });
+  const scroller = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; left: number } | null>(null);
   const nameOf = useMemo(() => new Map(team.map((e) => [e.id, e.arabic_name])), [team]);
   const dayOf = useMemo(() => new Map(leads.map((l) => [l.id, riyadhDay(l.created_at)])), [leads]);
   const receiver = (l: Lead) => nameOf.get(l.received_by ?? "") ?? l.received_by_name;
@@ -133,7 +135,7 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay }: LeadsPage) 
     }
   }
   const save = (l: Lead, patch: LeadPatch) => void run(l.id, () => updateLead(l.id, patch));
-  const text = (l: Lead, field: "destination" | "delay" | "done_text" | "next_action" | "contact_owner" | "result", placeholder = "") => (
+  const text = (l: Lead, field: "name" | "destination" | "delay" | "done_text" | "next_action" | "contact_owner" | "result", placeholder = "") => (
     <input
       key={`${l.id}-${field}-${l[field] ?? ""}`}
       defaultValue={l[field] ?? ""}
@@ -177,12 +179,16 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay }: LeadsPage) 
                 className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[8px] border border-[#cfe0d9] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
               >
                 {busy === "pull" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-                تحديث من الشيت
+                {live ? "تحديث الآن" : "تحديث من الشيت"}
               </button>
             </div>
           </div>
           <p className="mt-1 text-[12px] font-semibold text-[#78948f]">
-            {twoWay ? "متزامن مع شيت المحادثات في الاتجاهين: ما يُكتب هناك يظهر هنا، وما يُسجَّل هنا يُكتب هناك." : "ما يُسجَّل في شيت المحادثات يظهر هنا وحده."}
+            {live
+              ? "تلقائي بالكامل: كل محادثة واتساب في Teletel تظهر هنا وحدها كل ٥ دقائق — اسم العميل ورقمه، الموظف، التاريخ، نوع الطلب والدولة من كلامه، وتُغلق حين تُغلق هناك."
+              : twoWay
+                ? "متزامن مع شيت المحادثات في الاتجاهين: ما يُكتب هناك يظهر هنا، وما يُسجَّل هنا يُكتب هناك."
+                : "ما يُسجَّل في شيت المحادثات يظهر هنا وحده."}
           </p>
 
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-9">
@@ -254,7 +260,9 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay }: LeadsPage) 
               ))}
             </div>
           </div>
-          <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">يوم المحادثة هو يوم وصولها إلى النظام (الشيت لا يحمل تاريخاً)، والدولة من البرنامج المصدَر إن وُجد وإلا من خانة الدولة.</p>
+          <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">
+            {live ? "يوم المحادثة يوم بدئها في واتساب" : "يوم المحادثة يوم وصولها إلى النظام (الشيت لا يحمل تاريخاً)"}، والدولة من البرنامج المصدَر إن وُجد وإلا من خانة الدولة.
+          </p>
         </section>
 
         {/* ---------- a new conversation, and the conversations ---------- */}
@@ -297,10 +305,46 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay }: LeadsPage) 
             </label>
           </div>
 
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[1900px] border-separate border-spacing-y-1 text-start text-[12px]">
-              <thead className="text-[10.5px] font-extrabold text-[#78948f]">
-                <tr className="[&>th]:px-2 [&>th]:text-start">
+          {/* the table is wider than the screen: arrows, or drag it with the mouse; the name stays in place */}
+          <div className="mt-3 flex items-center justify-end gap-1.5">
+            <span className="me-auto text-[11px] font-semibold text-[#93aaa3]">اسحب الجدول بالماوس أو استخدم الأسهم لرؤية بقية الأعمدة</span>
+            {([
+              ["الأعمدة السابقة", -1, <ChevronRight key="r" className="size-4" />],
+              ["الأعمدة التالية", 1, <ChevronLeft key="l" className="size-4" />],
+            ] as const).map(([label, step, icon]) => (
+              <button
+                key={label}
+                type="button"
+                aria-label={label}
+                title={label}
+                // the next columns lie to the left in Arabic, to the right in English
+                onClick={() => scroller.current?.scrollBy({ left: step * 480 * (getComputedStyle(scroller.current).direction === "rtl" ? -1 : 1), behavior: "smooth" })}
+                className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#cfe0d9] text-[#185045] hover:bg-[#f4f8f6]"
+              >
+                {icon}
+              </button>
+            ))}
+          </div>
+          <div
+            ref={scroller}
+            className="mt-1.5 max-h-[70vh] cursor-grab overflow-auto active:cursor-grabbing"
+            onPointerDown={(e) => {
+              // a drag on the table moves it; a press on a field or a button is still a press
+              if ((e.target as HTMLElement).closest("input, select, button, a, textarea") || !scroller.current) return;
+              e.preventDefault(); // no text selection while dragging
+              drag.current = { x: e.clientX, left: scroller.current.scrollLeft };
+            }}
+            onPointerMove={(e) => {
+              if (!drag.current || !scroller.current) return;
+              scroller.current.scrollLeft = drag.current.left - (e.clientX - drag.current.x);
+            }}
+            onPointerUp={() => (drag.current = null)}
+            onPointerLeave={() => (drag.current = null)}
+          >
+            <table className="w-full min-w-[2050px] border-separate border-spacing-y-1 text-start text-[12px]">
+              <thead className="sticky top-0 z-20 bg-white text-[10.5px] font-extrabold text-[#78948f]">
+                <tr className="[&>th]:px-2 [&>th]:py-1 [&>th]:text-start">
+                  <th className="sticky start-0 z-10 bg-white">اسم العميل</th>
                   <th>{HEADERS.phone}</th>
                   <th>{HEADERS.inquiry}</th>
                   <th>{HEADERS.destination}</th>
@@ -321,8 +365,10 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay }: LeadsPage) 
                   const tone = TONE.get(l.inquiry ?? "");
                   return (
                     <tr key={l.id} className={`[&>td]:px-2 [&>td]:py-1.5 ${l.status === "closed" ? "bg-[#f5f7fa] text-[#78948f]" : "bg-[#f8fbfa]"}`}>
-                      <td className="min-w-[10rem] rounded-s-[10px] border-s-4" style={{ borderInlineStartColor: tone?.color ?? "#cfe0d9" }}>
-                        <span className="block truncate font-bold text-[#103f37]">{l.name || "—"}</span>
+                      <td className="sticky start-0 z-10 w-44 min-w-[11rem] rounded-s-[10px] border-s-4 bg-inherit" style={{ borderInlineStartColor: tone?.color ?? "#cfe0d9" }}>
+                        {text(l, "name", "اسم العميل")}
+                      </td>
+                      <td className="min-w-[9rem]">
                         <a href={`https://wa.me/${l.phone}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-[#0f7a52] hover:underline">
                           <MessageCircle className="size-3" />
                           <DirText>{l.phone}</DirText>

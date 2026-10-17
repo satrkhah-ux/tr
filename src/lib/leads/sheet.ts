@@ -113,11 +113,13 @@ export function sheetStatus(raw: string): "open" | "closed" {
  * and the sheet's wording is kept beside it.
  */
 export function matchEmployee(name: string, employees: { id: string; arabic_name: string }[]): string | null {
-  const n = name.trim();
+  // compared folded: «احمد القدسي» is «أحمد القدسي», a trailing space is nothing
+  const n = fold(name);
   if (!n) return null;
-  const exact = employees.filter((e) => e.arabic_name.trim() === n);
+  const exact = employees.filter((e) => fold(e.arabic_name) === n);
   if (exact.length === 1) return exact[0].id;
-  const starts = employees.filter((e) => e.arabic_name.trim().startsWith(`${n} `));
+  const words = name.trim().split(/\s+/).length;
+  const starts = employees.filter((e) => fold(e.arabic_name.trim().split(/\s+/).slice(0, words).join(" ")) === n);
   return starts.length === 1 ? starts[0].id : null;
 }
 

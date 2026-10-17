@@ -6,10 +6,13 @@ import { getCurrentEmployeeId } from "./metrics";
 import { createDraft } from "./drafts";
 import { normalizeInquiry, normalizePhone } from "@/lib/leads/sheet";
 import { activeTeam, pullSheet, pushToSheet, type LeadRow } from "@/lib/leads/sync";
+import { pullTeletel } from "@/lib/leads/teletel-pull";
+import { getTeletelConfig } from "@/lib/providers/teletel";
 
 /**
  * «العملاء» — every client conversation, open to every employee (the owner,
- * 2026-10-17, phase one). The sheet comes in on its own (the crontab on
+ * 2026-10-17). Phase two: the conversations come from Teletel (teletel-pull.ts),
+ * nobody types them; without Teletel, phase one's sheet. Either comes in on its own (the crontab on
  * api/leads/pull every two minutes, and on opening the page when the last pull is over a
  * minute old); what is logged or edited here goes back out (sync.ts).
  */
@@ -29,7 +32,15 @@ export type Lead = Omit<LeadRow, "sheet_key"> & {
   returning: boolean;
 };
 
-export type LeadsPage = { leads: Lead[]; team: { id: string; arabic_name: string }[]; meId: string | null; pullError: string | null; twoWay: boolean };
+export type LeadsPage = {
+  leads: Lead[];
+  team: { id: string; arabic_name: string }[];
+  meId: string | null;
+  pullError: string | null;
+  twoWay: boolean;
+  /** phase two: the conversations come from Teletel, nobody types them */
+  live: boolean;
+};
 
 const COLS =
   "id, phone, name, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, draft_id, source, created_at";
@@ -40,8 +51,14 @@ async function db(): Promise<SupabaseClient> {
   return (await createSupabaseServerClient()) as unknown as SupabaseClient;
 }
 
+/** phase two once Teletel is configured: its conversations; the sheet only without it */
 async function pullOnce(supabase: SupabaseClient): Promise<string | null> {
   lastPull = Date.now();
+  if (getTeletelConfig()) {
+    return pullTeletel(supabase)
+      .then((r) => (r.error === "teletel" ? "تعذّر الوصول إلى Teletel" : (r.error ?? null)))
+      .catch((e: unknown) => (e instanceof Error ? e.message : "pull failed"));
+  }
   return pullSheet(supabase)
     .then((r) => r.error ?? null)
     .catch((e: unknown) => (e instanceof Error ? e.message : "pull failed"));
@@ -70,8 +87,10 @@ export async function listLeads(): Promise<LeadsPage> {
   const supabase = await db();
   const meId = await getCurrentEmployeeId();
   const twoWay = Boolean(process.env.LEADS_SHEET_WEBHOOK);
-  if (!meId) return { leads: [], team: [], meId: null, pullError: null, twoWay };
-  const pullError = Date.now() - lastPull > PULL_EVERY_MS ? await pullOnce(supabase) : null;
+  const live = Boolean(getTeletelConfig());
+  if (!meId) return { leads: [], team: [], meId: null, pullError: null, twoWay, live };
+  // the sheet is quick enough to read on opening; Teletel is the crontab's (ten seconds for its 26 pages)
+  const pullError = !live && Date.now() - lastPull > PULL_EVERY_MS ? await pullOnce(supabase) : null;
   const [{ data }, people] = await Promise.all([
     supabase.from("client_leads").select(COLS).order("created_at", { ascending: false }).limit(3000),
     activeTeam(supabase),
@@ -89,7 +108,7 @@ export async function listLeads(): Promise<LeadsPage> {
     const returning = firstSeen.get(r.phone)! < r.created_at || Boolean(byPhone?.created_at && byPhone.created_at < r.created_at);
     return { ...r, name: r.name || byPhone?.name || null, file, returning };
   });
-  return { leads, team: people, meId, pullError, twoWay };
+  return { leads, team: people, meId, pullError, twoWay, live };
 }
 
 /** a pull now, whatever the clock says («تحديث من الشيت») */

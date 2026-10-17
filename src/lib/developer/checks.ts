@@ -390,8 +390,8 @@ const CHECKS: Check[] = [
     id: "job_leads_pull",
     group: "jobs",
     label: "dev.c.leadsPullJob",
-    // the VPS crontab: every 2 minutes (api/leads/pull/route.ts); late after 10
-    run: cronCheck("leads_pull", 10 * 60 * 1000, (s) => ({
+    // the VPS crontab: every 5 minutes (api/leads/pull/route.ts); late after 20
+    run: cronCheck("leads_pull", 20 * 60 * 1000, (s) => ({
       key: "dev.d.leadsPullJob",
       params: { read: Number(s.read ?? 0), added: Number(s.added ?? 0), updated: Number(s.updated ?? 0) },
     })),

@@ -391,6 +391,8 @@ export type OpenConversation = {
   /** inside WhatsApp's 24 hours: a free text reaches them, else only a template */
   canReply: boolean;
   preview: string;
+  /** the conversation's Teletel labels («رحلة ماليزيا»…) — «العملاء» classifies by them */
+  labels: string[];
 };
 
 type RawConversation = {
@@ -402,6 +404,7 @@ type RawConversation = {
   last_activity_at?: number;
   created_at?: number;
   last_non_activity_message?: { content?: string | null } | null;
+  labels?: string[];
   meta?: {
     sender?: { id?: number; name?: string | null; phone_number?: string | null };
     assignee?: { name?: string | null } | null;
@@ -485,6 +488,7 @@ async function readOpen(): Promise<OpenList | null> {
       createdAt: c.created_at ?? 0,
       canReply: c.can_reply === true,
       preview: (c.last_non_activity_message?.content ?? "").slice(0, 160),
+      labels: Array.isArray(c.labels) ? c.labels : [],
     });
   }
   openCache = { at: Date.now(), rows };
