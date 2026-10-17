@@ -2,7 +2,7 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types";
-import { AUTH_COOKIE_MAX_AGE, AUTH_STORAGE_KEY, getSupabaseEnv } from "./constants";
+import { AUTH_COOKIE_MAX_AGE, AUTH_STORAGE_KEY, getSupabaseEnv, sessionJson } from "./constants";
 
 /**
  * Cookie-backed storage adapter so the Supabase session is available to the
@@ -13,7 +13,7 @@ const cookieStorage = {
     if (typeof document === "undefined") return null;
     const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const match = document.cookie.match(new RegExp("(?:^|; )" + escaped + "=([^;]*)"));
-    return match ? decodeURIComponent(match[1]) : null;
+    return match ? sessionJson(match[1]) : null;
   },
   setItem(key: string, value: string): void {
     if (typeof document === "undefined") return;

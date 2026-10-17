@@ -75,7 +75,8 @@ async function refreshSession(refreshToken: string): Promise<RefreshedSession> {
           ? session.expires_at
           : Math.floor(Date.now() / 1000) + (session.expires_in ?? 3600),
     };
-    return { cookieValue: encodeURIComponent(JSON.stringify(withExpiry)) };
+    // plain JSON: response.cookies.set() URI-encodes it itself
+    return { cookieValue: JSON.stringify(withExpiry) };
   } catch {
     return null;
   }

@@ -65,9 +65,9 @@ export async function telegramSignIn(initData: string): Promise<TelegramSignInRe
     if (otpError || !otpData.session) return { ok: false, code: "failed" };
 
     // Same cookie shape the browser client persists (client.ts cookieStorage):
-    // the whole session JSON, URI-encoded — server AND browser clients read it.
+    // the whole session JSON, URI-encoded once — by cookies().set() itself.
     const cookieStore = await cookies();
-    cookieStore.set(AUTH_STORAGE_KEY, encodeURIComponent(JSON.stringify(otpData.session)), {
+    cookieStore.set(AUTH_STORAGE_KEY, JSON.stringify(otpData.session), {
       path: "/",
       maxAge: AUTH_COOKIE_MAX_AGE,
       sameSite: "lax",
