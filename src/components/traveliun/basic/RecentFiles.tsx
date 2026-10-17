@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Copy, FolderOpen, History, Loader2, Search, Settings2 } from "lucide-react";
+import { Copy, FolderOpen, History, Loader2, Search, Settings2, Trash2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import type { DraftSummary } from "@/lib/data/drafts";
+import { deleteFiles } from "@/lib/data/file-status";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { nightsText, useBasicLabels } from "./labels";
 import { OfferVersions } from "../OfferVersions";
@@ -28,10 +29,15 @@ const SERVICES: { key: ServiceKey; label: "svcHotels" | "svcFlightsIntl" | "svcF
 
 const select = "h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12px] font-bold text-[#185045]";
 
-/** one column grid for the header and every row, so the columns line up (lg and up; below, a row stacks) */
-const COLS = "lg:grid-cols-[minmax(0,1fr)_9.5rem_7.5rem_8.5rem_10rem_25.5rem]";
+/**
+ * one column grid for the header and every row, so the columns line up — from
+ * 1640px, where the client's name still has room beside the buttons (body zoom
+ * 1.12); below, a row stacks: its details on one line, the buttons under them
+ */
+const COLS = "min-[1640px]:grid-cols-[minmax(0,1fr)_9.5rem_7.5rem_8.5rem_10rem_28rem]";
 const PRIMARY = "inline-flex h-8 w-[7.5rem] items-center justify-center rounded-[8px] text-[11.5px] font-bold";
 const ICON = "inline-flex size-8 shrink-0 items-center justify-center rounded-[8px] border border-[#cfe0d9] bg-white text-[#185045] hover:bg-[#f4f8f6]";
+const DANGER_ICON = "inline-flex size-8 shrink-0 items-center justify-center rounded-[8px] border border-[#f2c9d4] bg-white text-[#c22850] hover:bg-[#fdf3f6] disabled:opacity-35";
 
 /** the row's own colour — a stripe on the start edge and a wash — by where the file stands */
 const ROW_TONE: Record<FileState, string> = {
@@ -117,6 +123,34 @@ export function RecentFiles({
   const [panel, setPanel] = useState<{ id: string; kind: "status" | "versions" } | null>(null);
   const toggle = (id: string, kind: "status" | "versions") => setPanel(panel?.id === id && panel.kind === kind ? null : { id, kind });
   const router = useRouter();
+  // «حذف»: one row's button, or the rows ticked — staff only (the owner, 2026-10-17)
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [deleteNote, setDeleteNote] = useState<string | null>(null);
+  const pick = (id: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  async function remove(ids: string[]) {
+    const one = ids.length === 1 ? drafts.find((d) => d.id === ids[0]) : undefined;
+    const ask = one ? tx("deleteOne", { name: one.customer_name || one.title || tx("unnamed") }) : tx("deleteMany", { n: ids.length });
+    if (ids.length === 0 || !window.confirm(ask)) return;
+    setDeleting(true);
+    setDeleteNote(null);
+    try {
+      const r = await deleteFiles(ids);
+      if (!r.ok) return setDeleteNote(tx("deleteFailed"));
+      if (r.refused > 0) setDeleteNote(tx("deleteRefused", { n: r.refused }));
+      setPicked(new Set());
+      router.refresh();
+    } catch {
+      setDeleteNote(tx("deleteFailed"));
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const makers = useMemo(
     () =>
@@ -154,6 +188,7 @@ export function RecentFiles({
   // «مسودات / مُصدرة» on top of the other filters (the state's too), each with how many it holds
   const counts = { all: inState.length, draft: inState.filter((d) => !d.produced_serial).length, issued: inState.filter((d) => d.produced_serial).length };
   const shown = useMemo(() => inState.filter((d) => status === "all" || (status === "issued") === Boolean(d.produced_serial)), [inState, status]);
+  const pickedShown = shown.filter((d) => picked.has(d.id)).map((d) => d.id);
   const presentStates = FILE_STATES.filter((s) => drafts.some((d) => stateOf(d) === s));
 
   const days = useMemo(() => {
@@ -243,6 +278,36 @@ export function RecentFiles({
         </label>
       </div>
 
+      {meId && (pickedShown.length > 0 || deleteNote) ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[10px] border border-[#f2b8c6] bg-[#fdf3f6] px-3 py-2 text-[12px] font-bold text-[#8a1f3c]">
+          {pickedShown.length > 0 ? (
+            <>
+              <span className="tv-tnum">{tx("pickedN", { n: pickedShown.length })}</span>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => remove(pickedShown)}
+                className="inline-flex h-8 items-center gap-1 rounded-[8px] bg-[#c22850] px-3 text-white hover:bg-[#a51f43] disabled:opacity-60"
+              >
+                {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                {tx("deletePicked")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPicked(new Set(shown.filter((d) => !states[d.id]?.operation_id).map((d) => d.id)))}
+                className="h-8 rounded-[8px] border border-[#f2b8c6] bg-white px-3 hover:bg-[#fff7f9]"
+              >
+                {tx("pickAll")}
+              </button>
+              <button type="button" onClick={() => setPicked(new Set())} className="h-8 rounded-[8px] px-2 text-[#78948f] hover:underline">
+                {tx("clearPicked")}
+              </button>
+            </>
+          ) : null}
+          {deleteNote ? <span className="font-semibold">{deleteNote}</span> : null}
+        </div>
+      ) : null}
+
       {days.length === 0 ? (
         <p className="text-[12.5px] font-semibold text-[#93aaa3]">
           {drafts.length === 0 ? tx("emptyList") : who === "mine" ? tx("mineEmpty") : tx("noMatch")}
@@ -263,7 +328,7 @@ export function RecentFiles({
               {/* no overflow clip: «العميل أكّد» opens its choice over the rows */}
               <div className="rounded-[10px] border border-[#e3ece8] [&>ul>li:last-child]:rounded-b-[10px]">
                 {/* the columns, said once per day */}
-                <div className={`${COLS} hidden border-s-4 border-transparent bg-[#f6f9f8] px-3 py-1.5 text-[10.5px] font-extrabold text-[#78948f] lg:grid`}>
+                <div className={`${COLS} hidden border-s-4 border-transparent bg-[#f6f9f8] px-3 py-1.5 text-[10.5px] font-extrabold text-[#78948f] min-[1640px]:grid`}>
                   <span>{tx("colClient")}</span>
                   <span>{tx("colTrip")}</span>
                   <span>{tx("colTotal")}</span>
@@ -281,12 +346,25 @@ export function RecentFiles({
                     return (
                       // the whole row in the state's colour: what the eye reads first
                       <li key={d.id} className={`border-s-4 ${ROW_TONE[state]}`}>
-                        {/* narrower than lg: client · trip · total · maker on one line, the state and the buttons under them */}
-                        <div className={`${COLS} flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2.5 lg:grid lg:gap-x-3`}>
+                        {/* narrower: client · trip · total · maker on one line, the state and the buttons under them */}
+                        <div className={`${COLS} flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2.5 min-[1640px]:grid min-[1640px]:gap-x-3`}>
                           <span className="min-w-[11rem] flex-1">
-                            <Link href={`/basic/${d.id}`} className={`block truncate text-[13px] font-bold hover:underline ${name ? "text-[#103f37]" : "text-[#a3b5b0]"}`}>
-                              {name ?? tx("unnamed")}
-                            </Link>
+                            <span className="flex items-center gap-2">
+                              {meId ? (
+                                <input
+                                  type="checkbox"
+                                  aria-label={tx("pickFile")}
+                                  checked={picked.has(d.id)}
+                                  disabled={Boolean(opId)}
+                                  title={opId ? tx("deleteInOps") : undefined}
+                                  onChange={() => pick(d.id)}
+                                  className="size-4 shrink-0 accent-[#c22850] disabled:opacity-30"
+                                />
+                              ) : null}
+                              <Link href={`/basic/${d.id}`} className={`block min-w-0 truncate text-[13px] font-bold hover:underline ${name ? "text-[#103f37]" : "text-[#a3b5b0]"}`}>
+                                {name ?? tx("unnamed")}
+                              </Link>
+                            </span>
                             <span className="block truncate text-[11px] font-semibold text-[#78948f]">
                               {d.destination ?? ""}
                               {d.destination && d.produced_serial ? " · " : ""}
@@ -320,7 +398,7 @@ export function RecentFiles({
                           <span className="truncate text-[11.5px] font-semibold text-[#557d78]">{d.created_by_name ?? "—"}</span>
                           {/* the state, beside the action it calls for */}
                           <FileStateChip state={state} version={d.version} sentVersion={states[d.id]?.sent_version} stale={states[d.id]?.stale} />
-                          <span className="ms-auto flex items-center gap-1.5 lg:ms-0 lg:justify-end">
+                          <span className="ms-auto flex items-center gap-1.5 min-[1640px]:ms-0 min-[1640px]:justify-end">
                             {next === "continue" ? (
                               <Link href={`/basic/${d.id}`} className={`${PRIMARY} bg-[#185045] text-white hover:bg-[#0f4439]`}>
                                 {tx("continueEntry")}
@@ -349,14 +427,14 @@ export function RecentFiles({
                                 {tx("actSend")}
                               </button>
                             ) : (
-                              <span className="hidden w-[7.5rem] lg:block" aria-hidden />
+                              <span className="hidden w-[7.5rem] min-[1640px]:block" aria-hidden />
                             )}
                             {d.produced_serial ? (
                               <Link href={`/basic/${d.id}`} title={tx("openFile")} aria-label={tx("openFile")} className={ICON}>
                                 <FolderOpen className="size-4" />
                               </Link>
                             ) : (
-                              <span className="hidden size-8 lg:block" aria-hidden />
+                              <span className="hidden size-8 min-[1640px]:block" aria-hidden />
                             )}
                             {d.produced_serial && meId ? (
                               <button
@@ -372,7 +450,7 @@ export function RecentFiles({
                                 <Settings2 className="size-4" />
                               </button>
                             ) : (
-                              <span className="hidden size-8 lg:block" aria-hidden />
+                              <span className="hidden size-8 min-[1640px]:block" aria-hidden />
                             )}
                             {d.produced_serial && meId ? (
                               <button
@@ -386,12 +464,24 @@ export function RecentFiles({
                                 <History className="size-4" />
                               </button>
                             ) : (
-                              <span className="hidden size-8 lg:block" aria-hidden />
+                              <span className="hidden size-8 min-[1640px]:block" aria-hidden />
                             )}
                             {/* the same programme for the next client */}
                             <button type="button" title={tx("copyHint")} aria-label={tx("copyForNew")} disabled={busy !== null} onClick={() => onCopy(d.id)} className={`${ICON} disabled:opacity-60`}>
                               {busy === `c-${d.id}` ? <Loader2 className="size-4 animate-spin" /> : <Copy className="size-4" />}
                             </button>
+                            {meId ? (
+                              <button
+                                type="button"
+                                title={opId ? tx("deleteInOps") : tx("deleteFile")}
+                                aria-label={tx("deleteFile")}
+                                disabled={deleting || Boolean(opId)}
+                                onClick={() => remove([d.id])}
+                                className={DANGER_ICON}
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
+                            ) : null}
                           </span>
                         </div>
                         {panel?.id === d.id && d.produced_serial ? (

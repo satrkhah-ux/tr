@@ -229,3 +229,53 @@ export async function cancelFile(draftId: string, reason: string): Promise<{ ok:
     return { ok: false, error: "failed" };
   }
 }
+
+/**
+ * «حذف» — one file or several, from the files list (the owner, 2026-10-17). A
+ * draft goes; an issued file goes with its offer (its renders, lines and history
+ * cascade) — only while nothing is booked or paid: a file in operations is
+ * cancelled from its case, never deleted. Never a partner's file. The same hands
+ * as cancelling: the file's own employee, operations or a manager. The draft as it
+ * was is kept in the audit row (service-only), so a wrong press can be rebuilt.
+ */
+export async function deleteFiles(draftIds: string[]): Promise<{ ok: true; deleted: number; refused: number } | Fail> {
+  try {
+    const [user, staff, me, ops, admin] = await Promise.all([
+      getServerUser(),
+      currentCan("offers.write"),
+      getCurrentEmployeeId(),
+      currentCan("operations.write"),
+      currentCan("dashboard.admin"),
+    ]);
+    if (!user) return { ok: false, error: "session" };
+    if (!staff) return { ok: false, error: "forbidden" };
+    const ids = [...new Set((draftIds ?? []).map(String))].slice(0, 200);
+    if (ids.length === 0) return { ok: false, error: "empty" };
+    const may = (owner: string | null) => !owner || owner === me || ops || admin;
+
+    const { data } = await db().from("offer_drafts").select("id, title, data, created_by, partner_company_id").in("id", ids);
+    let deleted = 0;
+    for (const d of (data ?? []) as { id: string; title: string | null; data: Record<string, unknown>; created_by: string | null; partner_company_id: string | null }[]) {
+      if (d.partner_company_id) continue;
+      const serial = typeof d.data.produced_serial === "string" ? d.data.produced_serial : null;
+      let offerId: string | null = null;
+      if (serial) {
+        const { data: o } = await db().from("offers").select("id, employee_id, partner_company_id").eq("serial", serial).maybeSingle();
+        const offer = o as { id: string; employee_id: string | null; partner_company_id: string | null } | null;
+        if (offer) {
+          if (offer.partner_company_id || !may(offer.employee_id)) continue;
+          const { data: op } = await db().from("operations").select("id").eq("offer_id", offer.id).maybeSingle();
+          if (op) continue;
+          if ((await db().from("offers").delete().eq("id", offer.id)).error) continue;
+          offerId = offer.id;
+        }
+      } else if (!may(d.created_by)) continue;
+      if ((await db().from("offer_drafts").delete().eq("id", d.id)).error) continue;
+      deleted += 1;
+      await logAudit({ action: serial ? "offer.deleted" : "draft.deleted", entity: "offer_drafts", entity_id: d.id, meta: { serial, offer_id: offerId, title: d.title, draft: d.data } });
+    }
+    return { ok: true, deleted, refused: ids.length - deleted };
+  } catch {
+    return { ok: false, error: "failed" };
+  }
+}

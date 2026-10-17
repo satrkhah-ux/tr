@@ -21,6 +21,8 @@ const state = vi.hoisted(() => ({
   sendResult: "sent" as string,
   statuses: [] as { offerId: string; to: string }[],
   confirmed: [] as string[],
+  drafts: [] as { id: string; title: string | null; data: Record<string, unknown>; created_by: string | null; partner_company_id: string | null }[],
+  deletes: [] as string[],
 }));
 
 /** offers / audit_logs / offer_renders / operations — each read the way file-status.ts reads it. */
@@ -38,11 +40,14 @@ function fakeDb() {
                 ? state.operation
                   ? [state.operation]
                   : []
-                : [];
+                : table === "offer_drafts"
+                  ? state.drafts
+                  : [];
       const builder = {
         select: () => builder,
         eq: () => builder,
         in: () => builder,
+        delete: () => (state.deletes.push(table), builder),
         maybeSingle: async () => ({ data: rows()[0] ?? null, error: null }),
         then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: rows(), error: null }).then(ok),
       };
@@ -76,7 +81,7 @@ vi.mock("./client-whatsapp", () => ({
   sendOfferToClient: async (serial: string, updated: boolean, body?: string) => (state.sends.push({ serial, updated, body }), state.sendResult),
 }));
 
-const { prepareOfferMessage, sendOfferMessage, cancelFile, confirmFromBasic } = await import("./file-status");
+const { prepareOfferMessage, sendOfferMessage, cancelFile, confirmFromBasic, deleteFiles } = await import("./file-status");
 
 beforeEach(() => {
   state.can = { "offers.write": true, "operations.write": false, "dashboard.admin": false };
@@ -90,6 +95,8 @@ beforeEach(() => {
   state.sendResult = "sent";
   state.statuses = [];
   state.confirmed = [];
+  state.drafts = [];
+  state.deletes = [];
 });
 
 describe("issuing sends nothing", () => {
@@ -184,5 +191,33 @@ describe("«العميل أكّد» and «إلغاء الملف» from Basic", (
     expect(state.audits.at(-1)).toMatchObject({ action: "offer.cancelled", meta: { reason: "العميل اعتذر" } });
     state.operation = { id: "op-1" };
     expect(await cancelFile("d1", "سبب")).toEqual({ ok: false, error: "inOperations" });
+  });
+});
+
+describe("«حذف» from the files list (the owner, 2026-10-17)", () => {
+  const row = (id: string, over: Partial<(typeof state.drafts)[number]> = {}) => ({ id, title: null, data: {}, created_by: "emp-1", partner_company_id: null, ...over });
+
+  it("deletes a draft, and an issued file with its offer while nothing is booked; never a partner's or a colleague's", async () => {
+    state.drafts = [row("d0"), row("d1", { data: { produced_serial: "AD-1" } }), row("dp", { created_by: null, partner_company_id: "p-1" }), row("dx", { created_by: "emp-2" })];
+    expect(await deleteFiles(["d0", "d1", "dp", "dx"])).toEqual({ ok: true, deleted: 2, refused: 2 });
+    expect(state.deletes).toEqual(["offer_drafts", "offers", "offer_drafts"]);
+    expect(state.audits.map((a) => a.action)).toEqual(["draft.deleted", "offer.deleted"]);
+    // the draft as it was, so a wrong press can be rebuilt
+    expect(state.audits[1]?.meta).toMatchObject({ serial: "AD-1", draft: { produced_serial: "AD-1" } });
+  });
+
+  it("never deletes a file operations holds — that one is cancelled from its case", async () => {
+    state.operation = { id: "op-1" };
+    state.drafts = [row("d1", { data: { produced_serial: "AD-1" } })];
+    expect(await deleteFiles(["d1"])).toEqual({ ok: true, deleted: 0, refused: 1 });
+    expect(state.deletes).toEqual([]);
+  });
+
+  it("a manager may delete a colleague's file; nobody without offers.write", async () => {
+    state.drafts = [row("dx", { created_by: "emp-2" })];
+    state.can["dashboard.admin"] = true;
+    expect(await deleteFiles(["dx"])).toEqual({ ok: true, deleted: 1, refused: 0 });
+    state.can["offers.write"] = false;
+    expect(await deleteFiles(["dx"])).toEqual({ ok: false, error: "forbidden" });
   });
 });
