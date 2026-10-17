@@ -539,13 +539,6 @@ export const ar: Dictionary = {
   "data.tools.import.failed": "لم يُحفظ {count} صفاً — مثلاً: {reason}",
 
   // ---------- dashboard ----------
-  "dash.requestsToday": "عدد الطلبات اليوم",
-  "dash.packages": "عدد البكجات",
-  "dash.executed": "الطلبات التي تم تنفيذها",
-  "dash.requestTypes": "أنواع الطلبات",
-  "dash.ownData": "بياناتك الخاصة",
-  "dash.noTypes": "لا توجد طلبات لعرض تصنيفها.",
-  "dash.uncategorized": "غير محدد",
   "dash.onlineNow": "عدد الموظفين الآن",
   "dash.onlineNowDetail": "متصلون الآن",
   "dash.activeToday": "عدد الموظفين اليوم",

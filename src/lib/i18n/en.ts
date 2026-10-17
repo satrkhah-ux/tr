@@ -541,13 +541,6 @@ export const en = {
   "data.tools.import.failed": "{count} rows were not saved — e.g. {reason}",
 
   // ---------- dashboard ----------
-  "dash.requestsToday": "Requests today",
-  "dash.packages": "Packages",
-  "dash.executed": "Executed requests",
-  "dash.requestTypes": "Request types",
-  "dash.ownData": "Your own data",
-  "dash.noTypes": "No requests to categorize yet.",
-  "dash.uncategorized": "Uncategorized",
   "dash.onlineNow": "Employees online now",
   "dash.onlineNowDetail": "Online now",
   "dash.activeToday": "Employees active today",
