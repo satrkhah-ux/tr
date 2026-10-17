@@ -99,10 +99,11 @@ type BookingRow = {
   currency: string;
   start_date: string | null;
   end_date: string | null;
+  detail: Record<string, string> | null;
 };
 
 const BOOKING_COLUMNS =
-  "id, operation_id, kind, title, status, supplier_name, client_reference, supplier_booking_code, supplier_ref, confirmation_number, quoted_net, currency, start_date, end_date";
+  "id, operation_id, kind, title, status, supplier_name, client_reference, supplier_booking_code, supplier_ref, confirmation_number, quoted_net, currency, start_date, end_date, detail";
 
 async function loadBooking(bookingId: string): Promise<BookingRow | null> {
   const supabase = await db();
@@ -423,7 +424,8 @@ export async function refreshSupplierBooking(bookingId: string): Promise<
         ...(d.total_fare != null ? { net_charged: d.total_fare } : {}),
         ...(d.cancellation_policy ? { cancellation_policy: d.cancellation_policy } : {}),
         ...(d.cancellation_deadline ? { cancellation_deadline: d.cancellation_deadline } : {}),
-        ...(d.hotel_confirmation_number ? { detail: { hotel_confirmation_number: d.hotel_confirmation_number } } : {}),
+        // added to the room lines, never in place of them
+        ...(d.hotel_confirmation_number ? { detail: { ...(row.detail ?? {}), hotel_confirmation_number: d.hotel_confirmation_number } } : {}),
       })
       .eq("id", row.id);
   } catch {

@@ -164,6 +164,11 @@ const DATE_READERS: { re: RegExp; read: (m: RegExpExecArray) => DateParts | null
   },
 ];
 
+/** Every date on a line as YYYY-MM-DD — a hotel confirmation's stay is read with the ticket's own readers. */
+export function datesOn(line: string, now: Date = new Date()): string[] {
+  return findDates(normalizeTicketText(line)).map((h) => withYear(h.value, now).date);
+}
+
 function findDates(line: string): Hit<DateParts>[] {
   const hits: Hit<DateParts>[] = [];
   for (const { re, read } of DATE_READERS) {
@@ -340,6 +345,26 @@ function findPassengers(lines: string[]): string[] {
     }
   }
   return out.slice(0, 12);
+}
+
+/** The names a document prints — «Guest name:» on a hotel confirmation reads like «Passenger:». */
+export function passengersIn(text: string): string[] {
+  return findPassengers(normalizeTicketText(text).split("\n"));
+}
+
+/**
+ * The e-ticket numbers: the airline's three-digit code and ten digits, printed
+ * «065-2400000001», «065 2400000001» or run together (Amadeus FA, Sabre TE).
+ * Exactly thirteen digits — a phone or a card number is longer or shorter. A
+ * conjunction suffix («/02», the same booklet's next coupon) is not another ticket.
+ */
+export function ticketNumbersIn(input: string): string[] {
+  const out: string[] = [];
+  for (const m of normalizeTicketText(input).matchAll(/(?<!\d)(\d{3})[\s-]?(\d{10})(?!\d)/g)) {
+    const n = `${m[1]}-${m[2]}`;
+    if (!out.includes(n)) out.push(n);
+  }
+  return out.slice(0, LIMITS.passengers);
 }
 
 const PNR_LABEL =
