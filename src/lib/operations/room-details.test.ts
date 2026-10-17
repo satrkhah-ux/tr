@@ -22,14 +22,14 @@ const stay = (rooms: Record<string, BookingRoomSpec> = {}, extra: Record<string,
 });
 const pullman = (country: string, en: string | null = "Pullman Kuala Lumpur City Centre") => ({ ar: "بولمان سيتي سنتر", en, country });
 
-describe("the hotel voucher speaks the destination's language", () => {
-  it("English for Malaysia, Türkiye and Georgia; Arabic for Saudi Arabia, the Emirates and Oman — by the hotel's country", () => {
+describe("the hotel voucher is in English", () => {
+  it("in every country — Saudi Arabia, the Emirates and Oman too (the owner, 2026-10-17: «إنجليزي دائماً»)", () => {
     const locale = (c: string) => {
       const s = voucherStay(stay(), pullman(c));
       return s.ok ? s.locale : s.error;
     };
     expect(["MY", "TR", "GE"].map(locale)).toEqual(["en", "en", "en"]);
-    expect(["SA", "AE", "OM"].map(locale)).toEqual(["ar", "ar", "ar"]);
+    expect(["SA", "AE", "OM"].map(locale)).toEqual(["en", "en", "en"]);
   });
 
   it("prints the room's details in English on an English voucher, the board and the guests too", () => {
@@ -43,8 +43,9 @@ describe("the hotel voucher speaks the destination's language", () => {
     expect(s.ok && ROOM_SPEC_KEY in s.detail).toBe(false);
   });
 
-  it("an Arabic stay keeps the Arabic name, the English one below", () => {
-    const s = voucherStay(stay({ الغرفة: { room_type_id: "twin", room_category_id: "superior" } }), { ar: "فندق المثال مسقط", en: "Example Muscat Hotel", country: "OM" });
+  it("a stay the booking set to «العربية» keeps the Arabic name, the English one below", () => {
+    const rooms = { الغرفة: { room_type_id: "twin", room_category_id: "superior" } };
+    const s = voucherStay({ ...stay(), detail: { ...stay().detail, [ROOM_SPEC_KEY]: roomsJson(rooms, "ar") } }, { ar: "فندق المثال مسقط", en: "Example Muscat Hotel", country: "OM" });
     expect(s.ok && [s.title, s.alt_name, s.detail["الغرفة"]]).toEqual(["فندق المثال مسقط", "Example Muscat Hotel", `غرفة بسريرين منفصلين | الفئة: سوبيريور — ${BOARD_AR.BB}`]);
   });
 

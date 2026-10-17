@@ -98,7 +98,8 @@ export function DocumentsPanel({
   const [confirmingAll, setConfirmingAll] = useState(false);
   // what the last pull added — 0 says the case already holds everything the offer has
   const [seeded, setSeeded] = useState<number | null>(null);
-  const [perHotel, setPerHotel] = useState(false);
+  // one voucher per hotel, each desk its own page (the owner, 2026-10-17)
+  const [perHotel, setPerHotel] = useState(true);
   const [welcomeName, setWelcomeName] = useState("");
 
   const confirmed = bookings.filter((b) => b.status === "confirmed");

@@ -65,6 +65,32 @@ describe("the operational documents", () => {
     expect(out).toContain("Beds: 1 × King Bed (Guaranteed)");
   });
 
+  it("prints a voucher issued in English left to right, every label in English, with the hotel's map", () => {
+    const out = html({
+      ...voucher("hotel_voucher", [
+        booking({
+          title: "Pullman Kuala Lumpur City Centre",
+          alt_name: "بولمان سيتي سنتر",
+          city_name: "Kuala Lumpur",
+          locale: "en",
+          detail: { الغرفة: "Deluxe King Room — Bed & breakfast", النزلاء: "2 adults" },
+          map: "https://maps.google.com/?q=Pullman+KL",
+        }),
+      ]),
+      lang: "en",
+    });
+    expect(out).toContain('dir="ltr"');
+    for (const s of ["Hotel Voucher", "Check-in", "Check-out", "Confirmation no.", "Lead guest", "TRAVELIUN TECH", "Open in Google Maps", "https://maps.google.com/?q=Pullman+KL"]) expect(out).toContain(s);
+    // Arabic only in the hotel's own Arabic name, printed small
+    expect(out.replace("بولمان سيتي سنتر", "").replace(/<style[\s\S]*?<\/style>/g, "")).not.toMatch(/[؀-ۿ]/);
+    expect(out).not.toContain("مورّد داخلي");
+  });
+
+  it("never links a map that is not a web address", () => {
+    const out = html({ ...voucher("hotel_voucher", [booking({ locale: "en", map: "javascript:alert(1)" })]), lang: "en" });
+    expect(out).not.toContain("javascript:");
+  });
+
   it("dates a ticket as departure and return, prints a planned time as «to be set», and names the route once", () => {
     const out = html(
       voucher("flight_ticket", [

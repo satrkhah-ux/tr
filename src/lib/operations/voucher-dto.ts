@@ -43,6 +43,8 @@ export type VoucherBooking = {
   alt_name?: string | null;
   /** the bed and connecting-room notes the catalogue's export contract asks for. */
   notes?: string[];
+  /** a hotel's location (hotels.google_maps) — «Open in Google Maps» on the voucher. */
+  map?: string | null;
 };
 
 /**
@@ -98,6 +100,12 @@ export type VoucherDTO = {
    * so re-printing a board months later reproduces exactly what was handed over.
    */
   welcome_name?: string | null;
+  /**
+   * «en»: a hotel voucher issued after the owner's «إنجليزي دائماً»
+   * (2026-10-17) — every word in English, left to right, for the desk abroad.
+   * Absent on older snapshots, which print as they were issued.
+   */
+  lang?: "en";
 };
 
 /** A booking's detail map, ordered so a voucher reads the same way every time. */
