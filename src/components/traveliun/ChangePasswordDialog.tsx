@@ -157,7 +157,24 @@ export function ChangePasswordDialog({
             ) : null}
 
             <div className="flex justify-end gap-2 pt-1">
-              {forced ? null : (
+              {forced ? (
+                // The only way out of a forced change: if Supabase refuses it
+                // (an old session needing re-authentication), sign out and in again.
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await createSupabaseBrowserClient().auth.signOut();
+                    } catch {
+                      /* leave regardless */
+                    }
+                    window.location.assign("/sign-in");
+                  }}
+                  className="h-11 rounded-[10px] border border-[#d8e3de] px-5 text-sm font-bold text-[var(--tv-brand)] transition-colors hover:bg-[#f4f8f6]"
+                >
+                  {t("signOut")}
+                </button>
+              ) : (
                 <button
                   type="button"
                   onClick={close}
