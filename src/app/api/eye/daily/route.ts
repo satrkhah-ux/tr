@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { deliverBriefing, prepareBriefing } from "@/lib/eye/deliver";
 import { eyeListeners } from "@/lib/telegram/eye-bot";
+import { riyadhParts } from "@/lib/eye/report";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -23,6 +25,18 @@ function authorised(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!authorised(req)) return NextResponse.json({ ok: false }, { status: 401 });
+
+  // Once a day: the VPS carries this job in two crontabs (deploy's and root's),
+  // and each run delivered the briefing again. A day already sent answers
+  // without building, speaking or sending anything.
+  const { day } = riyadhParts();
+  const { data: sent } = await createSupabaseServiceClient()
+    .from("audit_logs")
+    .select("id")
+    .eq("action", "eye.report_sent")
+    .eq("entity_id", day)
+    .limit(1);
+  if (sent?.length) return NextResponse.json({ ok: true, day, already: true });
 
   const listeners = await eyeListeners();
   const briefing = await prepareBriefing();

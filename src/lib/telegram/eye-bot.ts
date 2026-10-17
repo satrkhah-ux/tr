@@ -65,7 +65,9 @@ export async function eyeListeners(): Promise<EyeListener[]> {
       .filter((r) => (r.status ?? "Active") === "Active")
       .filter((r) => {
         const role = Array.isArray(r.roles) ? r.roles[0] : r.roles;
-        return (role?.permission_keys ?? []).filter(isPermission).includes("dashboard.admin");
+        // the administration (it manages the team), not every reader of the admin
+        // dashboard: «مدير مبيعات» holds dashboard.admin and must not hear about colleagues
+        return (role?.permission_keys ?? []).filter(isPermission).includes("employees.manage");
       })
       .map((r) => ({ id: r.id, name: r.arabic_name, chatId: Number(r.telegram_chat_id) }))
       .filter((r) => Number.isFinite(r.chatId) && r.chatId !== 0);

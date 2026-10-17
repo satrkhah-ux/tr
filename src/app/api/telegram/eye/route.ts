@@ -92,7 +92,7 @@ async function handle(update: TgUpdate): Promise<void> {
     );
     return;
   }
-  if (!employee.permissions.includes("dashboard.admin")) {
+  if (!employee.permissions.includes("employees.manage")) {
     await eyeSend(chatId, `أهلاً ${escapeHtml(employee.name)} — هذا التقرير للإدارة فقط.`);
     return;
   }
