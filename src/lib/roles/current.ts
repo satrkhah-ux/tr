@@ -3,7 +3,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
-import { grantedPermissions, VIEW_AS_COOKIE, viewAsPermissions, type Permission, type Role } from "./roles";
+import { grantedPermissions, isDeveloperRole, VIEW_AS_COOKIE, viewAsPermissions, type Permission, type Role } from "./roles";
 import { permissionForPath } from "./section-access";
 import { featureForPath } from "@/lib/features";
 import { getFeatureFlags } from "@/lib/features-server";
@@ -90,6 +90,36 @@ export async function currentViewAs(): Promise<ViewAs | null> {
   return v ? { roleId: v.roleId, name: v.name } : null;
 }
 
+/**
+ * True when this write must be refused: the actor's OWN role lacks
+ * developer.access (a developer looking through another role still counts as
+ * the developer) and one of the roles — or the employee's current role —
+ * carries it (roles.ts isDeveloperRole). An unreadable row refuses: this is the
+ * gate between the administration and the developer's account, so it fails closed.
+ */
+export async function deniedForNonDeveloper(target: {
+  roleIds?: (string | null | undefined)[];
+  employeeId?: string | null;
+}): Promise<boolean> {
+  if ((await loadReal()).includes("developer.access")) return false;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const roleIds = (target.roleIds ?? []).filter((id): id is string => Boolean(id));
+    if (target.employeeId) {
+      const { data, error } = await supabase.from("employees").select("role_id").eq("id", target.employeeId).maybeSingle();
+      if (error) return true;
+      const roleId = (data as { role_id: string | null } | null)?.role_id;
+      if (roleId) roleIds.push(roleId);
+    }
+    if (roleIds.length === 0) return false;
+    const { data, error } = await supabase.from("roles").select("permission_keys").in("id", roleIds);
+    if (error) return true;
+    return ((data ?? []) as { permission_keys: string[] | null }[]).some((r) => isDeveloperRole(r.permission_keys));
+  } catch {
+    return true;
+  }
+}
+
 export async function currentCan(permission: Permission): Promise<boolean> {
   return (await load()).includes(permission);
 }
@@ -110,7 +140,7 @@ export async function currentCanOpen(pathname: string): Promise<boolean> {
 }
 
 /**
- * The coarse label, for the UI and the dev "view as" switch only.
+ * The coarse label, for the UI only (view-as already applied).
  *
  * It is DERIVED from the permission set rather than stored: a role is an
  * administrator because it can open the admin dashboard, not because of its name

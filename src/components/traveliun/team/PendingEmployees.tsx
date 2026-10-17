@@ -11,6 +11,8 @@ import {
   type PendingRegistration,
   type TeamRole,
 } from "@/lib/data/team";
+import { isDeveloperRole } from "@/lib/roles/roles";
+import { useRole } from "@/lib/roles/RoleContext";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
 /**
@@ -62,6 +64,8 @@ function PendingRow({
   const [error, setError] = useState<TranslationKey | null>(null);
 
   const role = roles.find((r) => r.id === roleId);
+  // Only the developer lets someone into the developer's section (team.ts refuses it too).
+  const { isDeveloper } = useRole();
   const date = new Intl.DateTimeFormat(language === "ar" ? "ar-SA" : "en-GB", { dateStyle: "medium" }).format(
     new Date(request.created_at),
   );
@@ -109,7 +113,7 @@ function PendingRow({
                 {t("team.pending.pickRole")}
               </option>
               {roles.map((r) => (
-                <option key={r.id} value={r.id}>
+                <option key={r.id} value={r.id} disabled={!isDeveloper && isDeveloperRole(r.permission_keys)}>
                   {r.arabic_name}
                 </option>
               ))}

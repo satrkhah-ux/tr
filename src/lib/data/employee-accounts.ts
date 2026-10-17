@@ -4,7 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "./audit";
-import { currentCan } from "@/lib/roles/current";
+import { currentCan, deniedForNonDeveloper } from "@/lib/roles/current";
+import { isDeveloperRole } from "@/lib/roles/roles";
 
 /**
  * Issue a staff login from inside the system.
@@ -30,6 +31,8 @@ export type EmployeeAccount = {
   active: boolean;
   last_sign_in_at: string | null;
   invited_at: string | null;
+  /** sits in a role carrying developer.access — only the developer issues its login. */
+  developer: boolean;
 };
 
 export type AccountsResult =
@@ -57,17 +60,18 @@ export async function listEmployeeAccounts(): Promise<AccountsResult> {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from("employees")
-      .select("id, arabic_name, email, status, type, auth_user_id")
+      .select("id, arabic_name, email, status, type, auth_user_id, roles(permission_keys)")
       .order("arabic_name");
     if (error) return { ok: false, error: "err.db" };
 
-    const rows = (data ?? []) as {
+    const rows = (data ?? []) as unknown as {
       id: string;
       arabic_name: string;
       email: string | null;
       status: string | null;
       type: string | null;
       auth_user_id: string | null;
+      roles: { permission_keys: string[] | null } | { permission_keys: string[] | null }[] | null;
     }[];
 
     // The sign-in history lives in auth.users, which only the service role may
@@ -80,7 +84,9 @@ export async function listEmployeeAccounts(): Promise<AccountsResult> {
       ok: true,
       rows: rows.map((r) => {
         const u = r.auth_user_id ? byId.get(r.auth_user_id) : undefined;
+        const role = Array.isArray(r.roles) ? r.roles[0] : r.roles;
         return {
+          developer: isDeveloperRole(role?.permission_keys),
           id: r.id,
           arabic_name: r.arabic_name,
           email: r.email,
@@ -103,6 +109,9 @@ export async function issueEmployeeAccount(employeeId: string): Promise<IssueRes
   const gate = await guard();
   if (gate === "err.session") return { ok: false, message: "انتهت الجلسة." };
   if (gate === "err.forbidden") return { ok: false, message: "لا تملك صلاحية إدارة الموظفين." };
+  // Issuing the developer's login sends its invitation to whatever address the
+  // row holds — the developer's to do, not the administration's.
+  if (await deniedForNonDeveloper({ employeeId })) return { ok: false, message: "", error: "team.developerOnly" };
 
   try {
     const supabase = await createSupabaseServerClient();
@@ -126,6 +135,15 @@ export async function issueEmployeeAccount(employeeId: string): Promise<IssueRes
     const { data: page } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     let existing = (page?.users ?? []).find((u) => u.email?.toLowerCase() === email);
     let removedLeftover: string | null = null;
+
+    // A login already linked to an employee is that person's: linking it again
+    // would sit it in a second role, and the "unused leftover" branch below would
+    // delete it — the developer's included, before their first sign-in.
+    if (existing) {
+      const { data: holder, error: holderError } = await admin.from("employees").select("id").eq("auth_user_id", existing.id).limit(1);
+      if (holderError) return { ok: false, message: "تعذّر إصدار الحساب." };
+      if ((holder ?? []).length > 0) return { ok: false, message: "هذا البريد مرتبط بحساب موظف آخر." };
+    }
 
     if (existing?.banned_until && Date.parse(existing.banned_until) > Date.now()) {
       // A banned account is a self-registration. Still in the queue: linking it

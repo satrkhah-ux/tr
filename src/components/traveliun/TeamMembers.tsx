@@ -7,6 +7,8 @@ import { Check, KeyRound, Loader2, Pencil, Plus, Search, ShieldCheck, UserPlus, 
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { saveMember, setMemberRole, suspendMember, type PendingRegistration, type TeamMember, type TeamRole } from "@/lib/data/team";
+import { ALL_PERMISSIONS, isDeveloperRole } from "@/lib/roles/roles";
+import { useRole } from "@/lib/roles/RoleContext";
 import { PendingEmployees } from "./team/PendingEmployees";
 import { TraveliunShell } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
@@ -66,6 +68,10 @@ export function TeamMembers({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
+  // The developer's section, and whoever sits in it, are the developer's to
+  // change (team.ts refuses the rest): read-only here for everyone else.
+  const { isDeveloper } = useRole();
+  const developerRole = (roleId: string | null) => !isDeveloper && isDeveloperRole(roles.find((r) => r.id === roleId)?.permission_keys);
 
   const q = query.trim().toLowerCase();
   const rows = q
@@ -197,7 +203,7 @@ export function TeamMembers({
                 <select className={field} value={draft.role_id} onChange={(e) => setDraft({ ...draft, role_id: e.target.value })}>
                   <option value="">{t("team.noRole")}</option>
                   {roles.map((r) => (
-                    <option key={r.id} value={r.id}>{r.arabic_name}</option>
+                    <option key={r.id} value={r.id} disabled={developerRole(r.id)}>{r.arabic_name}</option>
                   ))}
                 </select>
               </label>
@@ -260,7 +266,7 @@ export function TeamMembers({
                     <span className="rounded-full bg-[#fdeef2] px-2.5 py-1 text-[11px] font-bold text-[#c22850]">{t("team.suspended")}</span>
                   ) : null}
 
-                  {canManage ? (
+                  {canManage && !developerRole(m.role_id) ? (
                     <select
                       value={m.role_id ?? ""}
                       disabled={busyId === m.id}
@@ -269,7 +275,7 @@ export function TeamMembers({
                     >
                       <option value="">{t("team.noRole")}</option>
                       {roles.map((r) => (
-                        <option key={r.id} value={r.id}>{r.arabic_name}</option>
+                        <option key={r.id} value={r.id} disabled={developerRole(r.id)}>{r.arabic_name}</option>
                       ))}
                     </select>
                   ) : (
@@ -278,7 +284,9 @@ export function TeamMembers({
                     </span>
                   )}
 
-                  {canManage ? (
+                  {canManage && developerRole(m.role_id) ? (
+                    <span className="rounded-full bg-[#fff8e8] px-2.5 py-1 text-[11px] font-bold text-[#a86a10]">{t("team.developerOnly")}</span>
+                  ) : canManage ? (
                     <>
                       <button
                         type="button"
@@ -319,7 +327,7 @@ function RoleSummary({ role }: { role?: TeamRole }) {
       <p className="mt-1 text-[11px] font-bold text-[#93aaa3]">
         {role.permission_keys.length === 0
           ? t("team.grantsNone")
-          : t("team.grants", { n: String(role.permission_keys.length), total: "13" })}
+          : t("team.grants", { n: String(role.permission_keys.length), total: String(ALL_PERMISSIONS.length) })}
       </p>
     </div>
   );
