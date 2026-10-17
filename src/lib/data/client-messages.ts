@@ -38,7 +38,7 @@ export async function sendClientMessage(operationId: string, key: ClientMessageK
     if (!customer?.mobile) return false;
     // the trial gate (client-whatsapp.ts) BEFORE the once-per-stage mark — a file
     // not yet in the trial must still get its message when it is let in
-    if (await clientWhatsappAllowed({ employee_id: offer.employee_id, partner_company_id: offer.partner_company_id })) return false;
+    if (await clientWhatsappAllowed({ employee_id: offer.employee_id, partner_company_id: offer.partner_company_id, customer })) return false;
 
     // once per stage: the unique key refuses the second
     const { error: dup } = await supabase.from("operation_alerts").insert({ operation_id: operationId, kind: "client_msg", ref: key });

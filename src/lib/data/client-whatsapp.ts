@@ -31,7 +31,10 @@ import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
  *   "admins" (the default, the trial): only files a MANAGER issued
  *            (dashboard.admin) — whoever or whatever triggers the message,
  *            the nightly job included, so the rule needs no signed-in actor;
- *   "all":   every file;  "off": none.
+ *   "all":   every file;  "off": none;
+ *   "test":  only a client whose number is app_settings `client_whatsapp_test_phone`
+ *            — the owner's test phone, until the packages are reset and it goes live
+ *            (2026-10-17). Every other client hears nothing.
  * Never a partner's file: that client is the partner's to talk to.
  *
  * WhatsApp lets a business write freely only within 24 hours of the client's
@@ -52,19 +55,29 @@ export type OfferClient = {
 
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 
-async function mode(service: SupabaseClient): Promise<"admins" | "all" | "off"> {
+async function mode(service: SupabaseClient): Promise<"admins" | "all" | "off" | "test"> {
   const { data } = await service.from("app_settings").select("value").eq("key", "client_whatsapp").maybeSingle();
   const v = (data as { value?: string } | null)?.value;
-  return v === "all" || v === "off" ? v : "admins";
+  return v === "all" || v === "off" || v === "test" ? v : "admins";
 }
 
+/** The same Saudi mobile however it was typed: its last nine digits. */
+const lastNine = (phone: string | null | undefined) => (phone ?? "").replace(/\D/g, "").slice(-9);
+
 /** Whether this file's client may be written to now (the gate above). */
-export async function clientWhatsappAllowed(offer: Pick<OfferClient, "employee_id" | "partner_company_id">): Promise<ClientSendResult | null> {
+export async function clientWhatsappAllowed(
+  offer: Pick<OfferClient, "employee_id" | "partner_company_id"> & { customer?: OfferClient["customer"] },
+): Promise<ClientSendResult | null> {
   if (offer.partner_company_id) return "partner";
   const service = db();
   const m = await mode(service);
   if (m === "off") return "off";
   if (m === "all") return null;
+  if (m === "test") {
+    const { data } = await service.from("app_settings").select("value").eq("key", "client_whatsapp_test_phone").maybeSingle();
+    const test = lastNine((data as { value?: string } | null)?.value);
+    return test.length === 9 && lastNine(offer.customer?.mobile) === test ? null : "not_allowed";
+  }
   if (!offer.employee_id) return "not_allowed";
   const { data } = await service.from("employees").select("status, roles(permission_keys)").eq("id", offer.employee_id).maybeSingle();
   const emp = data as unknown as { status: string | null; roles: { permission_keys: string[] } | { permission_keys: string[] }[] | null } | null;
