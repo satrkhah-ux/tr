@@ -8,6 +8,7 @@ import { attachWeather } from "@/lib/offer/weather-attach";
 import { generateItineraryText, isOpenAIConfigured, type ItineraryPromptDay } from "@/lib/providers/openai";
 import { isFlightLookupConfigured, lookupFlight, type FlightLookupHit } from "@/lib/providers/flight-lookup";
 import { getDraft, saveDraftStages } from "./drafts";
+import { getFeatureFlags } from "@/lib/features-server";
 
 /**
  * The itinerary stage's three assisted actions: fetch real weather, draft the
@@ -21,9 +22,13 @@ import { getDraft, saveDraftStages } from "./drafts";
 
 export type ItineraryActionResult = { ok: true; days: DraftDay[] } | { ok: false; error: TranslationKey };
 
-/** Availability flags for the UI — never expose the keys themselves. */
+/**
+ * Availability flags for the UI — never expose the keys themselves. A service
+ * the developer switched off (/developer) reads as unavailable: its button hides.
+ */
 export async function getAssistantAvailability(): Promise<{ ai: boolean; flightLookup: boolean }> {
-  return { ai: isOpenAIConfigured(), flightLookup: isFlightLookupConfigured() };
+  const flags = await getFeatureFlags();
+  return { ai: isOpenAIConfigured() && flags.ai_itinerary, flightLookup: isFlightLookupConfigured() && flags.flight_lookup };
 }
 
 /**
@@ -87,6 +92,8 @@ export async function generateItineraryDays(
   const user = await getServerUser();
   if (!user) return { ok: false, error: "err.session" };
   if (!isOpenAIConfigured()) return { ok: false, error: "pg.itin.err.aiNotConfigured" };
+  // a tab opened before the switch still holds the button — the action refuses
+  if (!(await getFeatureFlags()).ai_itinerary) return { ok: false, error: "dev.err.serviceOff" };
 
   const record = await getDraft(draftId);
   if (!record) return { ok: false, error: "err.loadFailed" };
@@ -147,6 +154,7 @@ export type FlightLookupActionResult =
 export async function lookupFlightNumber(input: string): Promise<FlightLookupActionResult> {
   const user = await getServerUser();
   if (!user) return { ok: false, error: "err.session" };
+  if (!(await getFeatureFlags()).flight_lookup) return { ok: false, error: "dev.err.serviceOff" };
   const result = await lookupFlight(input);
   if (result.ok) return result;
   const map: Record<typeof result.error, TranslationKey> = {
