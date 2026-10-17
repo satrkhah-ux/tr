@@ -7,7 +7,9 @@ import { notifyBookingChanged, notifyOps } from "@/lib/data/ops-notify";
 import { syncOperationOfBooking } from "@/lib/data/operation-sync";
 import { COMPANY } from "@/components/offer-doc/labels";
 import { buildSupplierRequest, type RequestLang, type SupplierBookingKind } from "@/lib/operations/supplier-request";
-import { carFields, carText, DRV, driverServiceKind, driverStep, mapsLink, meetTime, type DriverStep, type ServiceKind } from "@/lib/operations/drivers";
+import { carFields, carText, DRV, driverServiceKind, driverStep, meetTime, type DriverStep, type ServiceKind } from "@/lib/operations/drivers";
+import { hotelMap } from "@/lib/operations/driver-programme";
+import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { linkOpen, sameDriver, stepAllowed, stepDetail, supplierAnswer, type LinkKind, type SupplierAnswerInput } from "@/lib/operations/op-links";
 import type { TravelerKind } from "@/lib/operations/traveler-dto";
 
@@ -306,8 +308,19 @@ export async function getDriverDay(token: string): Promise<DriverDay | null> {
       : { data: [] };
     const stays = (staysData ?? []) as { operation_id: string; title: string; city_name: string; start_date: string | null; end_date: string | null }[];
     const names = [...new Set(stays.map((s) => s.title.trim()))];
-    const { data: hotelsData } = names.length ? await supabase.from("hotels").select("arabic_name, english_name, address").in("arabic_name", names) : { data: [] };
-    const hotels = new Map(((hotelsData ?? []) as { arabic_name: string; english_name: string | null; address: string | null }[]).map((h) => [h.arabic_name.trim(), h]));
+    const cityNames = [...new Set(stays.map((s) => s.city_name.trim()).filter(Boolean))];
+    // the map link as the driver's programme words it (driver-programme hotelMap): the hotel's own
+    // google_maps link, else its name around the city's coordinates — short, never percent-encoded Arabic
+    const [{ data: hotelsData }, { data: citiesData }] = await Promise.all([
+      names.length ? supabase.from("hotels").select("arabic_name, english_name, google_maps").in("arabic_name", names) : Promise.resolve({ data: [] }),
+      cityNames.length ? supabase.from("cities").select("arabic_name, lat, lng").in("arabic_name", cityNames) : Promise.resolve({ data: [] }),
+    ]);
+    const hotels = new Map(((hotelsData ?? []) as { arabic_name: string; english_name: string | null; google_maps: string | null }[]).map((h) => [h.arabic_name.trim(), h]));
+    const cities = (citiesData ?? []) as { arabic_name: string; lat: number | string | null; lng: number | string | null }[];
+    const coordsOf = (city: string) => {
+      const c = cities.find((x) => normalizeName(x.arabic_name) === normalizeName(city));
+      return c?.lat != null && c?.lng != null ? { lat: Number(c.lat), lng: Number(c.lng) } : null;
+    };
     const day = link.service_date;
 
     const pickups = rows.map((r): DriverPickup => {
@@ -329,7 +342,11 @@ export async function getDriverDay(token: string): Promise<DriverDay | null> {
         meet: d[DRV.meet] ?? "",
         landing: d[DRV.landing] ?? "",
         hotel: stay
-          ? { name: stay.title, name_en: info?.english_name ?? null, map: mapsLink(info?.address || info?.english_name || stay.title, city) }
+          ? {
+              name: stay.title,
+              name_en: info?.english_name ?? null,
+              map: hotelMap({ name: stay.title, name_en: info?.english_name ?? null, city, map: info?.google_maps ?? null, coords: coordsOf(city) }),
+            }
           : null,
         pax: d["الركاب"] || (count > 0 ? String(count) : ""),
         car: carText(d),

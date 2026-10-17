@@ -256,10 +256,6 @@ export function clientService(b: BookingLike, today: string): ClientService | nu
   };
 }
 
-export function mapsLink(...parts: (string | null | undefined)[]): string {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts.filter(Boolean).join(", "))}`;
-}
-
 /** A phone as wa.me wants it: digits with the country code — a Saudi «05…» gains its 966. */
 export function waNumber(phone: string): string {
   const d = phone.replace(/\D/g, "").replace(/^00/, "");

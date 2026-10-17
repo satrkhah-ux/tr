@@ -81,6 +81,14 @@ describe("the driver's hotels", () => {
       "https://www.google.com/maps/search/Arise+Hotel+Golden+Horn+اسطنبول",
     );
   });
+
+  it("gives the driver's link page the same short link — never a percent-encoded Arabic query", () => {
+    // what getDriverDay passes: the hotel's own link if /hotels holds one, else its name around the city
+    const link = hotelMap({ name: "فندق الريتز كارلتون", name_en: null, city: "إسطنبول", map: null, coords: { lat: 41.04, lng: 28.99 } });
+    expect(link).toBe("https://www.google.com/maps/search/فندق+الريتز+كارلتون/@41.04,28.99,14z");
+    expect(link).not.toContain("%");
+    expect(hotelMap({ name: "فندق", name_en: null, city: "إسطنبول", map: "  https://maps.app.goo.gl/xyz ", coords: null })).toBe("https://maps.app.goo.gl/xyz");
+  });
 });
 
 describe("who gets a city's part", () => {
