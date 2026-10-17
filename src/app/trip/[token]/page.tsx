@@ -56,6 +56,11 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
   const say = (text: string) => `https://wa.me/${whatsapp}?text=${encodeURIComponent(text)}`;
   const emergency = trip.info.emergency_phone || hub.brand.phone;
 
+  const nights =
+    hub.travel_start && hub.travel_end
+      ? Math.round((Date.parse(`${hub.travel_end}T00:00:00Z`) - Date.parse(`${hub.travel_start}T00:00:00Z`)) / 86_400_000)
+      : 0;
+
   const todays = trip.services.filter((s) => s.date === trip.today);
   const dated = new Set(trip.days.map((d) => d.date).filter(Boolean));
   const loose = trip.services.filter((s) => !s.date || !dated.has(s.date));
@@ -81,21 +86,23 @@ export default async function TripHubPage({ params }: { params: Promise<{ token:
             {/* eslint-disable-next-line @next/next/no-img-element -- a public page, the logo may be a partner's remote file */}
             <img src={logo} alt={hub.brand.name} className="h-14 w-auto max-w-[170px] shrink-0 object-contain" />
           </div>
-          <div className="bg-[var(--trip)] px-5 py-5 text-white sm:px-6">
-            <p className="text-[12px] font-bold text-white/75">برنامج رحلتك</p>
-            <h1 className="mt-0.5 break-words text-[26px] font-extrabold">{hub.destination || "رحلتك"}</h1>
-            <span aria-hidden className="mt-2 block h-[3px] w-14 rounded-full bg-[var(--gold)]" />
-            <p className="mt-2.5 break-words text-[13.5px] font-semibold text-white/90">
-              {hub.customer_name ? `${hub.customer_name} · ` : ""}
-              <bdi dir="ltr">{hub.serial}</bdi>
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2 text-[12.5px] font-bold">
-              {hub.travel_start ? (
-                <span className="rounded-full bg-white/15 px-3 py-1">
-                  {dayLabel(hub.travel_start)} ← {dayLabel(hub.travel_end)}
-                </span>
-              ) : null}
-              {trip.travellers > 0 ? <span className="rounded-full bg-white/15 px-3 py-1">المسافرون: {trip.travellers}</span> : null}
+          {/* the programme's cover: the destination centred on the map, then its four figures */}
+          <div className="relative border-t border-[#d7e4e0] px-5 pb-5 pt-6 text-center sm:px-6">
+            <div aria-hidden className="pointer-events-none absolute inset-0 bg-[url('/traveliun/world-map.png')] bg-cover bg-center opacity-40" />
+            <div className="relative">
+              <p className="text-[13px] font-bold text-[#6b7c78]">برنامج رحلتك إلى</p>
+              <h1 className="mt-1 break-words text-[32px] font-extrabold leading-tight text-[var(--trip)]">{hub.destination || "رحلتك"}</h1>
+              <span aria-hidden className="mx-auto mt-2 block h-[3px] w-16 rounded-full bg-[var(--gold)]" />
+              {hub.customer_name ? <p className="mt-3 break-words text-[15px] font-extrabold text-[#263633]">{hub.customer_name}</p> : null}
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <Metric label="الذهاب" day={hub.travel_start} />
+                <Metric label="العودة" day={hub.travel_end} />
+                <Metric label="الليالي" value={nights > 0 ? String(nights) : "—"} />
+                <Metric label="المسافرون" value={trip.travellers > 0 ? String(trip.travellers) : "—"} />
+              </div>
+              <p className="mt-3 text-[12px] font-bold text-[#6b7c78]">
+                رقم الملف <bdi dir="ltr" className="text-[var(--trip)]">{hub.serial}</bdi>
+              </p>
             </div>
           </div>
         </header>
@@ -390,6 +397,23 @@ function Card({ title, tone, children }: { title: string; tone?: "accent"; child
       </h2>
       {children}
     </section>
+  );
+}
+
+/** One of the cover's figures — the programme PDF's metric box: a label, then the value in the brand green. */
+function Metric({ label, value, day }: { label: string; value?: string; day?: string | null }) {
+  const [weekday, date] = day
+    ? [
+        new Date(`${day}T00:00:00Z`).toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", timeZone: "UTC" }),
+        new Date(`${day}T00:00:00Z`).toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "long", timeZone: "UTC" }),
+      ]
+    : [null, value ?? "—"];
+  return (
+    <div className="rounded-[14px] border border-[#d7e4e0] bg-[rgba(246,250,248,0.94)] px-2 py-3">
+      <p className="text-[11.5px] font-bold text-[#6b7c78]">{label}</p>
+      <p className="mt-1 break-words text-[17px] font-extrabold leading-tight text-[var(--trip)]">{date}</p>
+      {weekday ? <p className="mt-0.5 text-[11px] font-bold text-[#93aaa3]">{weekday}</p> : null}
+    </div>
   );
 }
 
