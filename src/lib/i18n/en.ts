@@ -89,11 +89,6 @@ export const en = {
   "role.employee": "Employee",
   "role.developer": "Developer",
   "role.visitor": "Visitor",
-  "viewas.title": "View as role (developers only)",
-  "viewas.as": "View as {role}",
-  "viewas.banner": "Developer mode: you are viewing the interface as “{role}” — this grants no real permissions.",
-  "viewas.return": "Return to my real role",
-  "viewas.returnWithRole": "Return to my real role ({role})",
 
   // ---------- change password ----------
   "pwd.title": "Change password",
@@ -632,6 +627,13 @@ export const en = {
   "nav.partnerCompanies": "Partner companies",
   "nav.dataSection": "Data",
   "nav.adminSection": "Administration",
+  // ---------- view-as + developer accounts + forced password (2026-10-17) ----------
+  "viewAs.label": "View the system as",
+  "viewAs.mine": "My account",
+  "viewAs.banner": "You are viewing the system with the permissions of: {role}",
+  "viewAs.back": "Back to my account",
+  "team.developerOnly": "Developer account — only the developer account can change it",
+  "pwd.forced": "You must change your password before continuing.",
   "partner.title": "Partner companies",
   "partner.subtitle": "Agencies that resell our files, and the ones that execute our bookings — one record each.",
   "partner.add": "Add a company",

@@ -1,20 +1,26 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { can, dashboardViewFor, type DashboardView, type Permission, type Role } from "./roles";
 import { FEATURE_DEFAULTS, type Feature, type FeatureFlags } from "@/lib/features";
 
+/** The role being looked through («عرض النظام كـ»), as current.ts currentViewAs() resolves it. */
+export type ViewAsRole = { roleId: string; name: string };
+
 type RoleContextValue = {
-  /** The user's real role from the DB — never changed by view-as. */
+  /**
+   * The coarse label of what this request runs with. View-as is resolved on the
+   * server now (current.ts reads the cookie), so the label already reflects it
+   * and realRole and effectiveRole are the same value.
+   */
   realRole: Role;
-  /** Role the UI currently renders as (view-as in dev, otherwise realRole). */
   effectiveRole: Role;
-  /** dev-only override, or null. */
-  viewAs: Role | null;
-  setViewAs: (role: Role) => void;
-  resetViewAs: () => void;
-  /** True only in development — gates the view-as feature. */
-  devMode: boolean;
+  /** the role being looked through, or null on the account's own. */
+  viewAs: ViewAsRole | null;
+  /** the account's OWN role may switch (roles.ts canSwitchRoles) — never narrowed by view-as. */
+  canSwitch: boolean;
+  /** the account's OWN role carries developer.access — who may touch developer-held roles and logins. */
+  isDeveloper: boolean;
   can: (permission: Permission) => boolean;
   /** is this system service switched on (features.ts, /developer)? */
   featureOn: (feature: Feature) => boolean;
@@ -23,72 +29,36 @@ type RoleContextValue = {
 
 const RoleCtx = createContext<RoleContextValue | null>(null);
 
-const STORAGE_KEY = "traveliun-view-as";
-// Inlined at build time; false in a production build → view-as fully disabled.
-const DEV_MODE = process.env.NODE_ENV !== "production";
-
 export function RoleProvider({
   realRole,
   permissions,
   features = FEATURE_DEFAULTS,
+  viewAs = null,
+  canSwitch = false,
+  isDeveloper = false,
   children,
 }: {
   realRole: Role;
-  /** what the user's role row actually grants (current.ts) — not the label's default set. */
+  /** what this request may do (current.ts) — the viewed-as role's keys while switching. */
   permissions: readonly Permission[];
   /** the services switched on, read once on the server (features-server.ts). */
   features?: FeatureFlags;
+  viewAs?: ViewAsRole | null;
+  canSwitch?: boolean;
+  isDeveloper?: boolean;
   children: ReactNode;
 }) {
-  const [viewAs, setViewAsState] = useState<Role | null>(null);
-
-  useEffect(() => {
-    if (!DEV_MODE) return;
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY) as Role | null;
-      if (stored) setViewAsState(stored);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const setViewAs = useCallback((role: Role) => {
-    if (!DEV_MODE) return;
-    setViewAsState(role);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, role);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const resetViewAs = useCallback(() => {
-    setViewAsState(null);
-    try {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  // view-as only affects the EFFECTIVE role, and only in dev. It never touches
-  // realRole and grants no server access (RLS + server actions use the real session).
-  const effectiveRole = DEV_MODE && viewAs ? viewAs : realRole;
-
+  // The old dev-only, label-based view-as (localStorage) is gone: it previewed a
+  // label's DEFAULT set, which no real role matches, and only in development.
   const value: RoleContextValue = {
     realRole,
-    effectiveRole,
-    viewAs: DEV_MODE ? viewAs : null,
-    setViewAs,
-    resetViewAs,
-    devMode: DEV_MODE,
-    // The real grant, not the label's: «التأشيرات» is an "employee" too and holds
-    // no offers.write, so the label's set drew menus whose screens then came up
-    // empty. View-as previews a label's set, as before.
-    can: (permission: Permission) =>
-      DEV_MODE && viewAs ? can(viewAs, permission) : permissions.includes(permission),
+    effectiveRole: realRole,
+    viewAs,
+    canSwitch,
+    isDeveloper,
+    can: (permission: Permission) => permissions.includes(permission),
     featureOn: (feature: Feature) => features[feature],
-    dashboardView: dashboardViewFor(effectiveRole),
+    dashboardView: dashboardViewFor(realRole),
   };
 
   return <RoleCtx.Provider value={value}>{children}</RoleCtx.Provider>;
@@ -101,9 +71,8 @@ export function useRole(): RoleContextValue {
       realRole: "visitor",
       effectiveRole: "visitor",
       viewAs: null,
-      setViewAs: () => {},
-      resetViewAs: () => {},
-      devMode: false,
+      canSwitch: false,
+      isDeveloper: false,
       can: (permission: Permission) => can("visitor", permission),
       featureOn: (feature: Feature) => FEATURE_DEFAULTS[feature],
       dashboardView: dashboardViewFor("visitor"),

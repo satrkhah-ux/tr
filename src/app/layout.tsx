@@ -9,8 +9,11 @@ import { getFeatureFlags } from "@/lib/features-server";
 import { PartnerProvider } from "@/lib/partners/PartnerContext";
 import { getPartnerBrand } from "@/lib/partners/session";
 import { getCurrentRole } from "@/lib/data/metrics";
-import { currentPermissions } from "@/lib/roles/current";
+import { currentPermissions, currentRealPermissions, currentViewAs } from "@/lib/roles/current";
+import { canSwitchRoles } from "@/lib/roles/roles";
 import { getPublicSupabaseConfig } from "@/lib/supabase/constants";
+import { getServerUser } from "@/lib/supabase/server";
+import { ChangePasswordDialog } from "@/components/traveliun/ChangePasswordDialog";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -91,6 +94,13 @@ export default async function RootLayout({
 }>) {
   const realRole = await getCurrentRole();
   const permissions = await currentPermissions();
+  // «عرض النظام كـ»: who may switch and what is being looked through come from
+  // the account's OWN role — the viewed-as one could never lead back.
+  const realPermissions = await currentRealPermissions();
+  const viewAs = await currentViewAs();
+  // A login handed over with a temporary password (scripts/flag-password-change.mjs)
+  // changes it before anything else; app_metadata is not user-writable.
+  const mustChangePassword = (await getServerUser())?.app_metadata?.["must_change_password"] === true;
   const features = await getFeatureFlags();
   // A partner wears their own colours. Resolved here, on the server, so the very
   // first paint is already theirs — a client-side swap would flash ours first.
@@ -119,9 +129,19 @@ export default async function RootLayout({
         />
         <StoreProvider>
           <LanguageProvider>
-            <RoleProvider realRole={realRole} permissions={permissions} features={features}>
+            <RoleProvider
+              realRole={realRole}
+              permissions={permissions}
+              features={features}
+              viewAs={viewAs}
+              canSwitch={canSwitchRoles(realPermissions)}
+              isDeveloper={realPermissions.includes("developer.access")}
+            >
               <PartnerProvider brand={partnerBrand}>
-                <TraveliunUIProvider>{children}</TraveliunUIProvider>
+                <TraveliunUIProvider>
+                  {children}
+                  {mustChangePassword ? <ChangePasswordDialog forced /> : null}
+                </TraveliunUIProvider>
               </PartnerProvider>
             </RoleProvider>
           </LanguageProvider>

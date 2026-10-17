@@ -8,6 +8,7 @@ import {
   listEmployeeAccounts,
   type EmployeeAccount,
 } from "@/lib/data/employee-accounts";
+import { useRole } from "@/lib/roles/RoleContext";
 import { TraveliunShell } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
@@ -25,6 +26,8 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
  */
 export function EmployeeAccounts() {
   const { t, language } = useTraveliunUI();
+  // The developer's login is issued by the developer (employee-accounts.ts refuses the rest).
+  const { isDeveloper } = useRole();
   const [rows, setRows] = useState<EmployeeAccount[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -140,7 +143,9 @@ export function EmployeeAccounts() {
                       {row.active && !row.last_sign_in_at ? t("emp.neverSignedIn") : fmt(row.last_sign_in_at)}
                     </td>
                     <td className="px-4 py-3 text-end">
-                      {row.active ? null : (
+                      {row.active ? null : row.developer && !isDeveloper ? (
+                        <span className="rounded-full bg-[#fff8e8] px-2.5 py-1 text-[11px] font-bold text-[#a86a10]">{t("team.developerOnly")}</span>
+                      ) : (
                         <button
                           type="button"
                           onClick={() => issue(row)}

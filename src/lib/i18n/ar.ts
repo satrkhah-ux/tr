@@ -87,11 +87,6 @@ export const ar: Dictionary = {
   "role.employee": "موظف",
   "role.developer": "مطور",
   "role.visitor": "زائر",
-  "viewas.title": "المشاهدة كدور (للمطوّرين فقط)",
-  "viewas.as": "المشاهدة كـ{role}",
-  "viewas.banner": "وضع المطوّر: أنت تشاهد الواجهة كـ «{role}» — لا يمنح هذا صلاحيات فعلية.",
-  "viewas.return": "العودة لدوري الحقيقي",
-  "viewas.returnWithRole": "العودة لدوري الحقيقي ({role})",
 
   // ---------- change password ----------
   "pwd.title": "تغيير كلمة المرور",
@@ -630,6 +625,13 @@ export const ar: Dictionary = {
   "nav.partnerCompanies": "الشركات المتعاونة",
   "nav.dataSection": "قسم البيانات",
   "nav.adminSection": "قسم الإدارة",
+  // ---------- view-as + developer accounts + forced password (2026-10-17) ----------
+  "viewAs.label": "عرض النظام كـ",
+  "viewAs.mine": "حسابي",
+  "viewAs.banner": "تشاهد النظام بصلاحيات: {role}",
+  "viewAs.back": "رجوع لحسابي",
+  "team.developerOnly": "حساب مطوّر — لا يُعدَّل إلا من حساب المطوّر",
+  "pwd.forced": "يجب تغيير كلمة المرور قبل المتابعة.",
   "partner.title": "الشركات المتعاونة",
   "partner.subtitle": "الشركات التي تعيد بيع ملفاتنا، والتي تنفّذ حجوزاتنا — سجل واحد لكل شركة.",
   "partner.add": "إضافة شركة",

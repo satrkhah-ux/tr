@@ -10,7 +10,6 @@ import {
   useState,
   useSyncExternalStore,
   type ComponentProps,
-  type FormEvent,
 } from "react";
 import { DirectionProvider } from "@base-ui/react/direction-provider";
 import { Dialog as PaletteDialog } from "@base-ui/react/dialog";
@@ -18,7 +17,6 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { DirText } from "@/components/DirText";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   AlertTriangle,
@@ -50,10 +48,12 @@ import { getRates } from "@/lib/data/rates-actions";
 import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
-import { ROLE_LABEL_KEYS, ROLES, type Permission } from "@/lib/roles/roles";
+import { ROLE_LABEL_KEYS, type Permission } from "@/lib/roles/roles";
 import { canOpenLink } from "@/lib/roles/section-access";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { MobileTabBar } from "./MobileTabBar";
+import { ChangePasswordDialog } from "./ChangePasswordDialog";
+import { ViewAsBanner, ViewAsSwitcher } from "./ViewAsSwitcher";
 import { TraveliunLogo } from "./TraveliunLogo";
 import { clearPendingDrafts } from "./generator/useDraftState";
 import { SERVER_LOST_EVENT } from "./useSafeTransition";
@@ -361,7 +361,6 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
   const [menuHovered, setMenuHovered] = useState(false);
   const [panel, setPanel] = useState<"guide" | "calculator" | "view" | "settings" | "profile" | null>(null);
   const { language, setLanguage, view, setView, theme, setTheme, dir, t } = useTraveliunUI();
-  const { viewAs, resetViewAs, effectiveRole } = useRole();
   const partner = usePartnerBrand();
   const visibleNavGroups = useNavGroups();
   const [activeMenu, setActiveMenu] = useState<TranslationKey>(() => {
@@ -592,7 +591,6 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
             <PopoverTrigger render={<HeaderIcon label={t("account")} icon={UserCircle} muted active={panel === "profile"} />} />
             <PopoverContent className="w-[min(320px,calc(100vw/var(--tv-zoom)_-_24px))]">
               <ProfilePanel
-                close={() => setPanel(null)}
                 onChangePassword={() => {
                   setPanel(null);
                   setChangeOpen(true);
@@ -621,16 +619,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
       >
         {/* bottom padding on phones clears the fixed tab bar (+ safe area). */}
         <div className="px-4 py-4 pb-[calc(84px+env(safe-area-inset-bottom))] sm:px-5 lg:px-[30px] lg:pb-4">
-          {viewAs ? (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[11px] border border-[#f2c94c] bg-[#fff8e8] px-4 py-3 text-[#8a6a00]">
-              <span className="text-[13px] font-bold">
-                {t("viewas.banner", { role: t(ROLE_LABEL_KEYS[effectiveRole]) })}
-              </span>
-              <button type="button" onClick={resetViewAs} className="inline-flex h-9 items-center gap-2 rounded-md bg-[#8a6a00] px-3 text-xs font-bold text-white hover:bg-[#6f5500]">
-                {t("viewas.return")}
-              </button>
-            </div>
-          ) : null}
+          <ViewAsBanner />
           <ServerLostBanner />
           {children}
         </div>
@@ -1105,13 +1094,12 @@ function SettingsPanel({
   );
 }
 
-function ProfilePanel({ close, onChangePassword }: { close: () => void; onChangePassword: () => void }) {
+function ProfilePanel({ onChangePassword }: { onChangePassword: () => void }) {
   const router = useRouter();
   const { t } = useTraveliunUI();
-  const { devMode, realRole, effectiveRole, viewAs, setViewAs, resetViewAs } = useRole();
+  const { effectiveRole, viewAs } = useRole();
   const [email, setEmail] = useState<string>("");
   const [signingOut, setSigningOut] = useState(false);
-  const [showViewAs, setShowViewAs] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -1147,55 +1135,16 @@ function ProfilePanel({ close, onChangePassword }: { close: () => void; onChange
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => devMode && setShowViewAs((v) => !v)}
-        className={`mb-4 flex w-full items-center gap-3 rounded-md px-1 py-1 text-start ${devMode ? "hover:bg-[#f4f8f6]" : "cursor-default"}`}
-      >
+      <div className="mb-4 flex w-full items-center gap-3 px-1 py-1">
         <UserCircle className="size-10 text-[#b2b7bc]" />
         <div className="min-w-0 flex-1">
-          <p className="font-bold text-[var(--tv-brand)]">{t("account")} · {t(ROLE_LABEL_KEYS[effectiveRole])}</p>
+          {/* while looking through another role, the label says which */}
+          <p className="font-bold text-[var(--tv-brand)]">{t("account")} · {viewAs ? viewAs.name : t(ROLE_LABEL_KEYS[effectiveRole])}</p>
           <p dir="ltr" className="truncate text-start text-xs text-[#8ba09b]">{email || "—"}</p>
         </div>
-        {devMode ? <ChevronDown className={`size-4 text-[#9caaa6] transition-transform ${showViewAs ? "rotate-180" : ""}`} /> : null}
-      </button>
+      </div>
 
-      {devMode && showViewAs ? (
-        <div className="mb-3 rounded-md border border-[#f2e2b4] bg-[#fffdf5] p-2">
-          <p className="mb-2 px-1 text-[11px] font-bold text-[#a86a10]">{t("viewas.title")}</p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {ROLES.map((role) => {
-              const active = (viewAs ?? realRole) === role;
-              return (
-                <button
-                  key={role}
-                  type="button"
-                  onClick={() => {
-                    if (role === realRole) resetViewAs();
-                    else setViewAs(role);
-                    close();
-                  }}
-                  className={`rounded-md px-2 py-2 text-xs font-bold transition-colors ${active ? "bg-[var(--tv-brand)] text-white" : "border border-[#e2d8d4] text-[var(--tv-brand)] hover:bg-[#f4f8f6]"}`}
-                >
-                  {t("viewas.as", { role: t(ROLE_LABEL_KEYS[role]) })}
-                </button>
-              );
-            })}
-          </div>
-          {viewAs ? (
-            <button
-              type="button"
-              onClick={() => {
-                resetViewAs();
-                close();
-              }}
-              className="mt-2 w-full rounded-md bg-[#8a6a00] px-2 py-1.5 text-xs font-bold text-white hover:bg-[#6f5500]"
-            >
-              {t("viewas.returnWithRole", { role: t(ROLE_LABEL_KEYS[realRole]) })}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+      <ViewAsSwitcher />
 
       <button
         type="button"
@@ -1214,137 +1163,6 @@ function ProfilePanel({ close, onChangePassword }: { close: () => void; onChange
         {signingOut ? t("signingOut") : t("signOut")}
       </button>
     </div>
-  );
-}
-
-function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { t } = useTraveliunUI();
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
-  const close = () => onOpenChange(false);
-
-  // Reset the form whenever the dialog is closed so it opens clean next time.
-  useEffect(() => {
-    if (!open) {
-      setPassword("");
-      setConfirm("");
-      setError(null);
-      setDone(false);
-      setLoading(false);
-    }
-  }, [open]);
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (loading) return;
-    setError(null);
-
-    if (password.length < 6) {
-      setError(t("pwd.tooShort"));
-      return;
-    }
-    if (password !== confirm) {
-      setError(t("pwd.mismatch"));
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { error: updateError } = await createSupabaseBrowserClient().auth.updateUser({ password });
-      if (updateError) {
-        setError(t("pwd.failed"));
-        return;
-      }
-      setDone(true);
-    } catch {
-      setError(t("pwd.connection"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[440px]" showClose={false}>
-        <form onSubmit={submit}>
-        <div className="mb-5 flex items-center justify-between border-b border-[#e1e9e5] pb-4 dark:border-[#294039]">
-          <h2 className="text-lg font-extrabold">{t("pwd.title")}</h2>
-          <button type="button" onClick={close} className="rounded-md p-2 text-[#557d78] hover:bg-[#edf3f0] dark:hover:bg-[#1b2d27]" aria-label={t("close")}>
-            <X className="size-5" />
-          </button>
-        </div>
-
-        {done ? (
-          <div className="space-y-4 text-center">
-            <p className="rounded-[10px] border border-[#bfe5d4] bg-[#e9f7f0] px-4 py-3 text-sm font-bold text-[#0f7a52]">
-              {t("pwd.success")}
-            </p>
-            <button
-              type="button"
-              onClick={close}
-              className="h-11 w-full rounded-[10px] bg-[var(--tv-brand)] text-sm font-bold text-white transition-colors hover:bg-[#0f4439]"
-            >
-              {t("done")}
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <label className="grid gap-2 text-[13px] font-bold">
-              {t("pwd.new")}
-              <input
-                type="password"
-                dir="ltr"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                disabled={loading}
-                autoComplete="new-password"
-                className="h-11 rounded-[10px] border border-[#d9e3df] bg-white px-3 text-start text-sm font-normal outline-none transition-colors focus:border-[#2aa87a]"
-              />
-            </label>
-            <label className="grid gap-2 text-[13px] font-bold">
-              {t("pwd.confirm")}
-              <input
-                type="password"
-                dir="ltr"
-                value={confirm}
-                onChange={(event) => setConfirm(event.target.value)}
-                disabled={loading}
-                autoComplete="new-password"
-                className="h-11 rounded-[10px] border border-[#d9e3df] bg-white px-3 text-start text-sm font-normal outline-none transition-colors focus:border-[#2aa87a]"
-              />
-            </label>
-
-            {error ? (
-              <p role="alert" className="rounded-[10px] border border-[#f4c9d4] bg-[#fdeef2] px-4 py-2.5 text-[13px] font-semibold text-[#c22850]">
-                {error}
-              </p>
-            ) : null}
-
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={close}
-                className="h-11 rounded-[10px] border border-[#d8e3de] px-5 text-sm font-bold text-[var(--tv-brand)] transition-colors hover:bg-[#f4f8f6]"
-              >
-                {t("cancel")}
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[var(--tv-brand)] px-6 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
-              >
-                {loading ? <Loader2 className="size-4 animate-spin" /> : null}
-                {loading ? t("saving") : t("save")}
-              </button>
-            </div>
-          </div>
-        )}
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 

@@ -6,8 +6,8 @@ import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
-import { currentCan } from "@/lib/roles/current";
-import { isPermission, type Permission } from "@/lib/roles/roles";
+import { currentCan, currentRealPermissions, deniedForNonDeveloper } from "@/lib/roles/current";
+import { isDeveloperRole, isPermission, type Permission } from "@/lib/roles/roles";
 import { PENDING_BAN } from "@/lib/team/register-rules";
 
 /**
@@ -138,6 +138,12 @@ export async function saveRole(input: {
   // Only keys the app actually understands reach the column. A typo stored here
   // would read as a permission on the screen and grant nothing in the code.
   const keys = [...new Set(input.permission_keys.filter(isPermission))];
+  // Adding developer.access, or editing a role that already carries it (which
+  // includes removing it), is the developer's alone (roles.ts isDeveloperRole).
+  const actorIsDeveloper = (await currentRealPermissions()).includes("developer.access");
+  if ((isDeveloperRole(keys) && !actorIsDeveloper) || (await deniedForNonDeveloper({ roleIds: [input.id] }))) {
+    return { ok: false, error: "team.developerOnly" };
+  }
 
   try {
     const supabase = service();
@@ -176,6 +182,7 @@ export async function saveRole(input: {
 export async function deleteRole(id: string): Promise<{ ok: true } | Fail> {
   const denied = await requireManage();
   if (denied) return { ok: false, error: denied };
+  if (await deniedForNonDeveloper({ roleIds: [id] })) return { ok: false, error: "team.developerOnly" };
   try {
     const supabase = service();
     // Deleting a section with people in it would null their role_id and silently
@@ -202,6 +209,8 @@ export async function deleteRole(id: string): Promise<{ ok: true } | Fail> {
 export async function setMemberRole(employeeId: string, roleId: string | null): Promise<{ ok: true } | Fail> {
   const denied = await requireManage();
   if (denied) return { ok: false, error: denied };
+  // Neither into the developer's section nor out of it, unless the actor is the developer.
+  if (await deniedForNonDeveloper({ roleIds: [roleId], employeeId })) return { ok: false, error: "team.developerOnly" };
   try {
     const supabase = service();
     const before = await supabase.from("employees").select("role_id").eq("id", employeeId).maybeSingle();
@@ -232,6 +241,11 @@ export async function saveMember(input: {
   const denied = await requireManage();
   if (denied) return { ok: false, error: denied };
   if (!input.arabic_name.trim()) return { ok: false, error: "team.err.nameRequired" };
+  // The developer's email is where their login's invitations go — editing that
+  // row is as good as taking the account.
+  if (await deniedForNonDeveloper({ roleIds: [input.role_id], employeeId: input.id })) {
+    return { ok: false, error: "team.developerOnly" };
+  }
 
   try {
     const supabase = service();
@@ -274,6 +288,7 @@ export async function saveMember(input: {
 export async function suspendMember(employeeId: string, suspended: boolean): Promise<{ ok: true } | Fail> {
   const denied = await requireManage();
   if (denied) return { ok: false, error: denied };
+  if (await deniedForNonDeveloper({ employeeId })) return { ok: false, error: "team.developerOnly" };
   try {
     const supabase = service();
     const { error } = await supabase
@@ -361,6 +376,7 @@ export async function approveRegistration(id: string, roleId: string): Promise<{
   const denied = await requireManage();
   if (denied) return { ok: false, error: denied };
   if (!roleId) return { ok: false, error: "team.err.roleRequired" };
+  if (await deniedForNonDeveloper({ roleIds: [roleId] })) return { ok: false, error: "team.developerOnly" };
 
   try {
     const supabase = service();

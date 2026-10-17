@@ -1,7 +1,8 @@
 /**
  * Role + permission model (single source of truth). The real role is derived
- * from the signed-in employee's DB role; a dev-only "view as" can override the
- * EFFECTIVE role for inspection without granting real access.
+ * from the signed-in employee's DB role; the administration and the developer
+ * can look through another role («عرض النظام كـ», viewAsPermissions below),
+ * which only ever narrows what they hold.
  */
 
 export type Role = "admin" | "employee" | "developer" | "visitor";
@@ -214,6 +215,25 @@ export function viewAsPermissions(realPermissions: readonly Permission[], roleKe
   const keys = roleKeys.filter(isPermission);
   if (keys.includes("developer.access") && !realPermissions.includes("developer.access")) return null;
   return keys.filter((k) => realPermissions.includes(k));
+}
+
+/** The roles the switcher offers this account: the ones viewAsPermissions accepts, nothing else. */
+export function switchableRoles<R extends { permission_keys: readonly string[] | null }>(
+  realPermissions: readonly Permission[],
+  roles: readonly R[],
+): R[] {
+  return roles.filter((r) => viewAsPermissions(realPermissions, r.permission_keys ?? []) !== null);
+}
+
+/**
+ * «حساب المطوّر لا يُوصَل إليه من حساب الإدارة» (2026-10-17): a role carrying
+ * developer.access — and every employee sitting in one — is managed only by an
+ * account whose OWN role carries it. Otherwise an administrator could tick the
+ * key onto their own section, move themselves into the developer's, or point
+ * the developer's login at their own mailbox.
+ */
+export function isDeveloperRole(permissionKeys: readonly string[] | null | undefined): boolean {
+  return (permissionKeys ?? []).includes("developer.access");
 }
 
 export type DashboardView = "admin" | "employee" | "none";

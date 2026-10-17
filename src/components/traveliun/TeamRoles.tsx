@@ -18,7 +18,8 @@ import {
   Zap,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
-import { PERMISSION_GROUPS, type Permission } from "@/lib/roles/roles";
+import { isDeveloperRole, PERMISSION_GROUPS, type Permission } from "@/lib/roles/roles";
+import { useRole } from "@/lib/roles/RoleContext";
 import {
   deleteRole,
   saveRole,
@@ -158,6 +159,8 @@ function RoleCard({ role, members, onEdit }: { role: TeamRole; members: TeamMemb
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // The developer's section is the developer's to edit (team.ts refuses it too).
+  const locked = !useRole().isDeveloper && isDeveloperRole(role.permission_keys);
 
   const held = new Set(role.permission_keys);
   const sees = PERMISSION_GROUPS.flatMap((g) => g.items).filter((i) => i.kind === "view" && held.has(i.key));
@@ -178,6 +181,9 @@ function RoleCard({ role, members, onEdit }: { role: TeamRole; members: TeamMemb
               : t("team.grants", { n: String(held.size), total: String(TOTAL_PERMISSIONS) })}
           </p>
         </div>
+        {locked ? (
+          <span className="shrink-0 rounded-full bg-[#fff8e8] px-2.5 py-1 text-[11px] font-bold text-[#a86a10]">{t("team.developerOnly")}</span>
+        ) : (
         <div className="flex shrink-0 gap-1.5">
           <button
             type="button"
@@ -204,6 +210,7 @@ function RoleCard({ role, members, onEdit }: { role: TeamRole; members: TeamMemb
             {pending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
           </button>
         </div>
+        )}
       </div>
 
       {error ? <p className="mt-2 text-[11.5px] font-bold text-[#c22850]">{error}</p> : null}
@@ -297,6 +304,9 @@ function RoleForm({
   error: string | null;
 }) {
   const { t } = useTraveliunUI();
+  // Only the developer grants «مطوّر» (team.ts refuses it from anyone else).
+  const { isDeveloper } = useRole();
+  const lockedKey = (key: Permission) => key === "developer.access" && !isDeveloper;
 
   const toggle = (key: Permission) => {
     const keys = new Set(draft.keys);
@@ -340,7 +350,7 @@ function RoleForm({
         </span>
         <button
           type="button"
-          onClick={() => setDraft({ ...draft, keys: new Set(PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i.key))) })}
+          onClick={() => setDraft({ ...draft, keys: new Set(PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i.key)).filter((k) => !lockedKey(k))) })}
           className="rounded-full border border-[#dbe6e1] px-3 py-1 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
         >
           {t("team.pickAll")}
@@ -368,7 +378,14 @@ function RoleForm({
                       on ? "border-[#bfe5d4] bg-[#f4fbf7]" : "border-[#eef2f0] hover:bg-[#f8fbfa]"
                     }`}
                   >
-                    <input type="checkbox" checked={on} onChange={() => toggle(item.key)} className="mt-0.5 size-4 accent-[#185045]" />
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      disabled={lockedKey(item.key)}
+                      title={lockedKey(item.key) ? t("team.developerOnly") : undefined}
+                      onChange={() => toggle(item.key)}
+                      className="mt-0.5 size-4 accent-[#185045] disabled:opacity-50"
+                    />
                     <span className="min-w-0">
                       <span className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[12.5px] font-bold text-[#185045]">{t(PERM_LABEL(item.key))}</span>
@@ -429,6 +446,8 @@ function MembersTable({ roles, members }: { roles: TeamRole[]; members: TeamMemb
   const { t } = useTraveliunUI();
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const { isDeveloper } = useRole();
+  const developerRole = (roleId: string | null) => !isDeveloper && isDeveloperRole(roles.find((r) => r.id === roleId)?.permission_keys);
 
   async function move(employeeId: string, roleId: string) {
     setPendingId(employeeId);
@@ -476,16 +495,19 @@ function MembersTable({ roles, members }: { roles: TeamRole[]; members: TeamMemb
 
             <select
               value={m.role_id ?? ""}
-              disabled={pendingId === m.id}
+              disabled={pendingId === m.id || developerRole(m.role_id)}
               onChange={(e) => void move(m.id, e.target.value)}
               className="h-9 rounded-[9px] border border-[#dbe6e1] bg-white px-2 text-[12px] font-bold text-[#185045] outline-none focus:border-[#2aa87a] disabled:opacity-60"
             >
               <option value="">{t("team.noRole")}</option>
               {roles.map((r) => (
-                <option key={r.id} value={r.id}>{r.arabic_name}</option>
+                <option key={r.id} value={r.id} disabled={developerRole(r.id)}>{r.arabic_name}</option>
               ))}
             </select>
 
+            {developerRole(m.role_id) ? (
+              <span className="rounded-full bg-[#fff8e8] px-2.5 py-1 text-[11px] font-bold text-[#a86a10]">{t("team.developerOnly")}</span>
+            ) : (
             <button
               type="button"
               disabled={pendingId === m.id}
@@ -494,6 +516,7 @@ function MembersTable({ roles, members }: { roles: TeamRole[]; members: TeamMemb
             >
               {pendingId === m.id ? <Loader2 className="size-3.5 animate-spin" /> : m.status === "Active" ? t("team.suspend") : t("team.reactivate")}
             </button>
+            )}
           </li>
         ))}
       </ul>
