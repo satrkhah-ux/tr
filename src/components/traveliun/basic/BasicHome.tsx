@@ -20,6 +20,7 @@ export function BasicHome({
   states,
   meId,
   allByDefault,
+  initialTab = "all",
   readyOffers,
   tools,
 }: {
@@ -30,6 +31,8 @@ export function BasicHome({
   meId: string | null;
   /** the administration: «آخر الملفات» opens on everyone's */
   allByDefault: boolean;
+  /** the files list's tab to open on («العروض المصدرة» lands on «مُصدرة») */
+  initialTab?: "all" | "draft" | "issued";
   readyOffers: ReadyOfferRecord[];
   /** the other ways to start: a supplier's package, a flight card (null/false: not for this role) */
   tools: { repackage: boolean; flightCard: string | null };
@@ -161,6 +164,7 @@ export function BasicHome({
             states={states}
             meId={meId}
             allByDefault={allByDefault}
+            initialTab={initialTab}
             busy={busy}
             onCopy={(id) => void openNew(`c-${id}`, () => duplicateDraft(id, { freshClient: true }))}
           />

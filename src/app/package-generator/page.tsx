@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { DraftsList } from "@/components/traveliun/generator/DraftsList";
 import { listDrafts } from "@/lib/data/drafts";
-import { featureOn } from "@/lib/features-server";
 import { getPartnerSession } from "@/lib/partners/session";
 
 /** Package generator home: the offer drafts list. Each draft edits in
@@ -9,7 +8,8 @@ import { getPartnerSession } from "@/lib/partners/session";
 export default async function PackageGeneratorPage() {
   // the legacy generator switched off (/developer): staff start in «بيسك»; a
   // partner keeps this list — it is their «ملفاتي» ([draftId]/layout.tsx says the same)
-  if (!(await featureOn("legacy_generator")) && !(await getPartnerSession())) redirect("/basic");
+  // the owner (2026-10-17): all work is on «بيسك» — staff use its files list whatever the switch says
+  if (!(await getPartnerSession())) redirect("/basic");
   const drafts = await listDrafts();
   return <DraftsList drafts={drafts} />;
 }
