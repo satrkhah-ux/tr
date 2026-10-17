@@ -54,7 +54,7 @@ function asRecord(v: unknown): Record<string, unknown> {
  * One transport for both directions. `body` is what makes it a POST — the
  * signature stays optional so every existing read call is untouched.
  */
-async function api<T>(config: TeletelConfig, path: string, body?: unknown): Promise<T | null> {
+async function api<T>(config: TeletelConfig, path: string, body?: unknown, timeoutMs = 8000): Promise<T | null> {
   try {
     const res = await fetch(`${config.baseUrl}/api/v1/accounts/${config.accountId}${path}`, {
       method: body === undefined ? "GET" : "POST",
@@ -63,7 +63,7 @@ async function api<T>(config: TeletelConfig, path: string, body?: unknown): Prom
           ? { api_access_token: config.token }
           : { api_access_token: config.token, "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(timeoutMs),
       cache: "no-store",
     });
     if (!res.ok) return null;
@@ -409,30 +409,61 @@ type RawConversation = {
   };
 };
 
-let openCache: { at: number; rows: OpenConversation[] } | null = null;
+type OpenList = { rows: OpenConversation[]; at: number };
+let openCache: OpenList | null = null;
+let openLoading: Promise<OpenList | null> | null = null;
 
 /**
- * Every OPEN conversation, all pages (25 a page, the API's fixed size) asked at
- * once after the first — about thirty requests for the 600-odd the company keeps
- * open; six at a time took twenty seconds. Kept five minutes, with the time it
- * was read (the board shows it, and «تحديث» asks again): a manager editing a
- * rule or assigning a follow-up never waits on Teletel. Null when Teletel
- * cannot be reached (the board says so; it never shows a partial list as the whole).
+ * Every OPEN conversation, all pages (25 a page, the API's fixed size) — about
+ * twenty-six requests for the 600-odd the company keeps open.
+ *
+ * Six in flight at a time, twenty seconds each, one more try for a page that
+ * failed: measured from the server, Teletel answers one page in under two
+ * seconds but all at once in six to eight, and a third of them ran past the
+ * old eight-second limit — the live board said «تعذّر الوصول» while the same
+ * code worked from a laptop. Six at a time: about ten seconds, none lost.
+ *
+ * Kept, with the time it was read: an older copy is served at once and
+ * refreshed behind it (five minutes), so only the first look of a fresh
+ * process — or «تحديث» — waits. Null when Teletel cannot be read (the board
+ * says so; it never shows a partial list as the whole).
  */
-export async function listOpenConversations(fresh = false): Promise<{ rows: OpenConversation[]; at: number } | null> {
-  if (!fresh && openCache && Date.now() - openCache.at < 5 * 60_000) return openCache;
+export async function listOpenConversations(fresh = false): Promise<OpenList | null> {
+  if (!fresh && openCache) {
+    if (Date.now() - openCache.at > 5 * 60_000 && !openLoading) void loadOpen();
+    return openCache;
+  }
+  return loadOpen();
+}
+
+function loadOpen(): Promise<OpenList | null> {
+  // one read at a time, whoever asks: the board, its refresh, a manual follow-up
+  openLoading ??= readOpen().finally(() => {
+    openLoading = null;
+  });
+  return openLoading;
+}
+
+async function readOpen(): Promise<OpenList | null> {
   const config = getTeletelConfig();
   if (!config) return null;
   type Page = { data?: { meta?: { all_count?: number }; payload?: RawConversation[] } };
-  const page = (n: number) => api<Page>(config, `/conversations?status=open&assignee_type=all&page=${n}`);
+  const page = async (n: number) =>
+    (await api<Page>(config, `/conversations?status=open&assignee_type=all&page=${n}`, undefined, 20_000)) ??
+    (await api<Page>(config, `/conversations?status=open&assignee_type=all&page=${n}`, undefined, 20_000));
   const first = await page(1);
   if (!first?.data) return null;
   const raw = [...(first.data.payload ?? [])];
   const pages = Math.ceil((first.data.meta?.all_count ?? raw.length) / Math.max(raw.length, 1));
-  // ponytail: every page at once — fine for ~30; batch them if the open count grows past a few thousand
-  const rest = await Promise.all(Array.from({ length: Math.max(0, pages - 1) }, (_, i) => page(i + 2)));
-  if (rest.some((b) => !b?.data)) return null;
-  for (const b of rest) raw.push(...(b?.data?.payload ?? []));
+  const queue = Array.from({ length: Math.max(0, pages - 1) }, (_, i) => i + 2);
+  const got: (Page | null)[] = [];
+  await Promise.all(
+    Array.from({ length: Math.min(6, queue.length) }, async () => {
+      for (let n = queue.shift(); n !== undefined; n = queue.shift()) got.push(await page(n));
+    }),
+  );
+  if (got.some((b) => !b?.data)) return null;
+  for (const b of got) raw.push(...(b?.data?.payload ?? []));
   const seen = new Set<number>();
   const rows: OpenConversation[] = [];
   for (const c of raw) {
