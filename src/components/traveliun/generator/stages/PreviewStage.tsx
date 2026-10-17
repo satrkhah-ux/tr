@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, FileText, Link2, Loader2, Rocket } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { produceOfferFromDraft } from "@/lib/data/drafts";
+import { BasicFileStatus } from "../../basic/BasicFileStatus";
 import { validateDraft } from "@/lib/offer/draft-validation";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { IssueGuardNotice } from "../../IssueGuardNotice";
@@ -25,6 +26,7 @@ export function PreviewStage({ draftId, data, patch, flush, lookups }: StageForm
   const [producing, setProducing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [guardBlocked, setGuardBlocked] = useState(false);
+  const [statusTick, setStatusTick] = useState(0);
 
   const validation = useMemo(() => validateDraft(data, { partnerFile: ownFile }), [data, ownFile]);
   const produced = data.produced_serial;
@@ -40,6 +42,7 @@ export function PreviewStage({ draftId, data, patch, flush, lookups }: StageForm
       return;
     }
     patch({ produced_serial: result.serial });
+    setStatusTick((n) => n + 1);
   }
 
   return (
@@ -90,7 +93,9 @@ export function PreviewStage({ draftId, data, patch, flush, lookups }: StageForm
 
       {produced && !ownFile ? (
         <section className={sectionClass}>
-          <ReissueOffer draftId={draftId} serial={data.produced_serial} hotels={data.hotels} blocked={!validation.ok} flush={flush} />
+          <ReissueOffer draftId={draftId} serial={data.produced_serial} hotels={data.hotels} blocked={!validation.ok} flush={flush} onIssued={() => setStatusTick((n) => n + 1)} />
+          {/* issuing sends nothing: the programme goes to the client from here, after a look */}
+          <BasicFileStatus draftId={draftId} serial={produced} variant="panel" refresh={statusTick} onChanged={() => setStatusTick((n) => n + 1)} />
         </section>
       ) : null}
 

@@ -731,11 +731,11 @@ export async function issueDocument(input: {
 
     // the hotel desk reads the hotel's name, address and phone — from /hotels, by its name; its
     // city and country decide the language a hotel voucher prints the stay in
-    type HotelRow = { arabic_name: string; english_name: string | null; address: string | null; contact_number: string | null; city_id: string | null; country_id: string | null };
+    type HotelRow = { arabic_name: string; english_name: string | null; address: string | null; contact_number: string | null; google_maps: string | null; city_id: string | null; country_id: string | null };
     type CityRow = { id: string; arabic_name: string; english_name: string | null; country_id: string | null };
     const hotelNames = [...new Set(scoped.filter((b) => b.kind === "hotel").map((b) => b.title.trim()).filter(Boolean))];
     const hotelRows = hotelNames.length
-      ? (((await supabase.from("hotels").select("arabic_name, english_name, address, contact_number, city_id, country_id").in("arabic_name", hotelNames)).data ?? []) as HotelRow[])
+      ? (((await supabase.from("hotels").select("arabic_name, english_name, address, contact_number, google_maps, city_id, country_id").in("arabic_name", hotelNames)).data ?? []) as HotelRow[])
       : [];
     const cityIds = [...new Set(hotelRows.map((h) => h.city_id).filter((c): c is string => Boolean(c)))];
     const cityRows = cityIds.length ? (((await supabase.from("cities").select("id, arabic_name, english_name, country_id").in("id", cityIds)).data ?? []) as CityRow[]) : [];
@@ -783,6 +783,7 @@ export async function issueDocument(input: {
           notes: stay.notes,
           address: found?.row.address ?? null,
           phone: found?.row.contact_number ?? null,
+          map: found?.row.google_maps?.trim() || null,
         });
       }
     }
@@ -807,6 +808,8 @@ export async function issueDocument(input: {
       bookings: input.kind === "hotel_voucher" ? stays : scoped.map(toVoucherBooking).map(withHotel),
       days: input.kind === "itinerary" ? days.map((d) => ({ ...d, activities: [...timedOn(d.date), ...d.activities] })) : [],
       notes: [],
+      // a booking that chose Arabic keeps the bilingual voucher
+      ...(input.kind === "hotel_voucher" && stays.every((s) => s.locale === "en") ? { lang: "en" as const } : {}),
       // Falls back to the lead traveller, then the booking name — a sign that
       // says nothing is worse than one with the wrong spelling.
       welcome_name:

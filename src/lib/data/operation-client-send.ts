@@ -26,7 +26,7 @@ type Fail = { ok: false; error: TranslationKey };
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
 
 /** Why a file's client cannot be written to, in the agent's words. */
-const BLOCKED: Record<Exclude<ClientSendResult, "sent" | "window">, TranslationKey> = {
+const BLOCKED: Record<Exclude<ClientSendResult, "sent" | "template" | "window">, TranslationKey> = {
   partner: "ops.err.clientPartner",
   off: "ops.err.clientOff",
   not_allowed: "ops.err.clientNotAllowed",
@@ -121,7 +121,9 @@ export async function sendClientMessageNow(input: { operation_id: string; body: 
     const c = await loadCase(service, input.operation_id);
     if (!c) return { ok: false, error: "ops.err.notFound" };
     if (c.offer.partner_company_id) return { ok: false, error: "ops.err.clientPartner" };
-    const result = await messageClient(c.offer, body, { labels: ["ملخص-الحجوزات"] });
+    // no template rides with this one, so «template» never comes back — read as sent if it ever does
+    const raw = await messageClient(c.offer, body, { labels: ["ملخص-الحجوزات"] });
+    const result = raw === "template" ? "sent" : raw;
     if (result !== "sent" && result !== "window") return { ok: false, error: BLOCKED[result] };
 
     const name = c.offer.customer?.arabic_name ?? "";

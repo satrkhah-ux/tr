@@ -92,6 +92,8 @@ const CONFIGS: TableConfig[] = [
       { key: "address", labelKey: "col.address", minWidth: "200px" },
       { key: "contact_number", labelKey: "col.contactNumber", type: "phone" },
       { key: "website", labelKey: "col.website", type: "url", minWidth: "180px" },
+      // the hotel voucher's «Open in Google Maps», and the driver's
+      { key: "google_maps", labelKey: "col.googleMaps", type: "url", minWidth: "180px" },
       { key: "status", labelKey: "col.status", type: "status" },
     ],
     searchable: ["arabic_name", "english_name", "address"],

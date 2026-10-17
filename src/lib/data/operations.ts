@@ -154,6 +154,9 @@ async function recordConfirmation(
   try {
     const existing = await supabase.from("operations").select("id").eq("offer_id", input.offer_id).maybeSingle();
     if (existing.data) return { ok: true, id: (existing.data as { id: string }).id };
+    // a file cancelled from Basic stays cancelled — the kanban's «تم تأكيد العميل» included
+    const { data: current } = await supabase.from("offers").select("status").eq("id", input.offer_id).maybeSingle();
+    if ((current as { status: string | null } | null)?.status === "cancelled") return { ok: false, error: "ops.err.invalidTransition" };
 
     // The offer's own status trail records the commercial fact; the operation
     // records the work. Both, not one.

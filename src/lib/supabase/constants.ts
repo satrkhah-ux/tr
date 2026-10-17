@@ -57,14 +57,29 @@ export function getSupabaseEnv(): { url: string; anonKey: string } {
   return { url, anonKey };
 }
 
+/**
+ * The session's JSON from a cookie value, however many times it was URI-encoded.
+ * Next's cookie API encodes a value itself, so one encoded before cookies.set()
+ * arrived twice-encoded: the server still read it, the browser client got a
+ * string («Cannot create property 'user' on string»). Old cookies heal here.
+ */
+export function sessionJson(raw: string): string {
+  let v = raw;
+  try {
+    for (let i = 0; i < 3 && v.startsWith("%"); i++) v = decodeURIComponent(v);
+  } catch {
+    // malformed: JSON.parse refuses it, which reads as signed out
+  }
+  return v;
+}
+
 /** Extracts `access_token` / `expires_at` from a serialized session cookie value. */
 export function parseSessionCookie(
   raw: string | undefined,
 ): { accessToken: string; refreshToken: string | null; expiresAt: number | null } | null {
   if (!raw) return null;
   try {
-    const decoded = decodeURIComponent(raw);
-    const session = JSON.parse(decoded) as {
+    const session = JSON.parse(sessionJson(raw)) as {
       access_token?: string;
       refresh_token?: string;
       expires_at?: number;

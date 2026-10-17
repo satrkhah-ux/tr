@@ -12,16 +12,20 @@ import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useBasicLabels } from "./labels";
 import { RecentFiles } from "./RecentFiles";
+import type { FileStatusRow } from "@/lib/data/file-status-core";
 
 /** «النظام بيسك» home: start a file, or reopen one — every draft opens here as well as in the generator. */
 export function BasicHome({
   drafts,
+  states,
   meId,
   allByDefault,
   readyOffers,
   tools,
 }: {
   drafts: DraftSummary[];
+  /** each issued file's state (file-status-core), by draft id */
+  states?: Record<string, FileStatusRow>;
   /** the signed-in employee — «ملفاتي» (null for a partner) */
   meId: string | null;
   /** the administration: «آخر الملفات» opens on everyone's */
@@ -154,6 +158,7 @@ export function BasicHome({
           <h2 className="mb-3 text-[14px] font-extrabold text-[#003c3a]">{tx("recent")}</h2>
           <RecentFiles
             drafts={drafts}
+            states={states}
             meId={meId}
             allByDefault={allByDefault}
             busy={busy}

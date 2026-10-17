@@ -204,8 +204,9 @@ export type VoucherStay =
   | { ok: false; error: StayError; locale: RoomLocale };
 
 /**
- * One stay on a hotel voucher, in its own language: the booking's choice, then
- * the hotel country's (the file's destination policy), then English. The hotel
+ * One stay on a hotel voucher, in its own language: the booking's choice, else
+ * English — the owner (2026-10-17): «الفاوتشر بالإنجليزية دائماً», the hotel's
+ * country no longer decides (an Arab country's stay was Arabic). The hotel
  * and the rooms are named in it or the voucher is refused — an English voucher
  * never falls back to Arabic in silence. A line without details keeps its old
  * text (older bookings); other values go through the supplier request's
@@ -217,7 +218,7 @@ export function voucherStay(
   glossary: Record<string, string> = {},
 ): VoucherStay {
   const { locale: stay, rooms } = readRooms(b.detail);
-  const locale = exportLocale({ stay, countryCode: hotel?.country });
+  const locale = exportLocale({ stay });
   const names = { ar: hotel?.ar ?? b.title, en: hotel?.en ?? null };
   const name = hotelNameFor(names, locale);
   if (!name.name) return { ok: false, error: hotel ? "hotelName" : "hotelUnknown", locale };

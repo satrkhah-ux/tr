@@ -9,6 +9,9 @@ import type { DraftSummary } from "@/lib/data/drafts";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { nightsText, useBasicLabels } from "./labels";
 import { OfferVersions } from "../OfferVersions";
+import { FileStateChip } from "./FileStateChip";
+import type { FileStatusRow } from "@/lib/data/file-status-core";
+import { FILE_STATES, type FileState } from "@/lib/offer/file-state";
 
 type ServiceKey = DraftSummary["services"][number];
 const SERVICES: { key: ServiceKey; label: "svcHotels" | "svcFlightsIntl" | "svcFlightsDom" | "svcTransport" | "svcVisas" }[] = [
@@ -23,19 +26,6 @@ const select = "h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12
 
 /** one column grid for the header and every row, so the columns line up (lg and up; below, a row stacks) */
 const COLS = "lg:grid-cols-[8.5rem_minmax(0,1fr)_9.5rem_7.5rem_8.5rem_23rem]";
-type FileState = "draft" | "sent" | "confirmed" | "cancelled";
-const STATE_LABEL: Record<FileState, "stDraft" | "stSent" | "stConfirmed" | "stCancelled"> = {
-  draft: "stDraft",
-  sent: "stSent",
-  confirmed: "stConfirmed",
-  cancelled: "stCancelled",
-};
-const STATE_STYLE: Record<FileState, string> = {
-  draft: "bg-[#f2f4f3] text-[#6f7c78]",
-  sent: "bg-[#eaf1fd] text-[#2f5bd3]",
-  confirmed: "bg-[#e6f6ee] text-[#0f7a52]",
-  cancelled: "bg-[#fdeef2] text-[#c22850]",
-};
 
 /** the company's day, whatever the browser's clock zone */
 const dayKey = (iso: string | Date) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
@@ -47,12 +37,15 @@ const dayKey = (iso: string | Date) => new Date(iso).toLocaleDateString("en-CA",
  */
 export function RecentFiles({
   drafts,
+  states = {},
   meId,
   allByDefault = false,
   busy,
   onCopy,
 }: {
   drafts: DraftSummary[];
+  /** where each issued file stands (sent, confirmed, paid…), by draft id — staff only */
+  states?: Record<string, FileStatusRow>;
   /** the signed-in employee; null for a partner (all their files are their company's) */
   meId: string | null;
   /** the administration opens on everyone's files */
@@ -67,6 +60,10 @@ export function RecentFiles({
   const [service, setService] = useState<ServiceKey | "">("");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | "draft" | "issued">("all");
+  // one state of the ladder («أُرسل للعميل», «مؤكّد»…), on top of the tabs
+  const [state, setState] = useState<FileState | "">("");
+  // an issued file the lookup missed claims nothing: «صدر»
+  const stateOf = (d: DraftSummary): FileState => states[d.id]?.state ?? (d.produced_serial ? "published" : "draft");
   const [history, setHistory] = useState<string | null>(null);
 
   const makers = useMemo(
@@ -96,9 +93,16 @@ export function RecentFiles({
           [d.title, d.destination, d.customer_name, d.company, d.produced_serial, d.created_by_name].some((v) => v?.toLowerCase().includes(q))),
     );
   }, [drafts, who, meId, country, service, query]);
-  // «مسودات / مُصدرة» on top of the other filters, each with how many it holds
-  const counts = { all: filtered.length, draft: filtered.filter((d) => !d.produced_serial).length, issued: filtered.filter((d) => d.produced_serial).length };
-  const shown = useMemo(() => filtered.filter((d) => status === "all" || (status === "issued") === Boolean(d.produced_serial)), [filtered, status]);
+  const inState = useMemo(
+    () => filtered.filter((d) => !state || stateOf(d) === state),
+    // stateOf reads states, which is a prop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, state, states],
+  );
+  // «مسودات / مُصدرة» on top of the other filters (the state's too), each with how many it holds
+  const counts = { all: inState.length, draft: inState.filter((d) => !d.produced_serial).length, issued: inState.filter((d) => d.produced_serial).length };
+  const shown = useMemo(() => inState.filter((d) => status === "all" || (status === "issued") === Boolean(d.produced_serial)), [inState, status]);
+  const presentStates = FILE_STATES.filter((s) => drafts.some((d) => stateOf(d) === s));
 
   const days = useMemo(() => {
     const groups = new Map<string, DraftSummary[]>();
@@ -162,6 +166,14 @@ export function RecentFiles({
             <option key={key} value={key}>{name}</option>
           ))}
         </select>
+        {Object.keys(states).length > 0 ? (
+          <select value={state} onChange={(e) => setState(e.target.value as FileState | "")} aria-label={tx("allStates")} className={select}>
+            <option value="">{tx("allStates")}</option>
+            {presentStates.map((s) => (
+              <option key={s} value={s}>{tx(`st_${s}`)}</option>
+            ))}
+          </select>
+        ) : null}
         <select value={service} onChange={(e) => setService(e.target.value as ServiceKey | "")} aria-label={tx("allServices")} className={select}>
           <option value="">{tx("allServices")}</option>
           {SERVICES.map((s) => (
@@ -209,17 +221,17 @@ export function RecentFiles({
                 <ul className="divide-y divide-[#edf3f0]">
                   {list.map((d) => {
                     const name = d.customer_name || (d.title && d.title !== d.destination ? d.title : null);
-                    const state = !d.produced_serial ? "draft" : d.offer_status === "confirmed" ? "confirmed" : d.offer_status === "cancelled" ? "cancelled" : "sent";
                     return (
                       <li key={d.id} className={history === d.id ? "bg-[#fbfdfc]" : ""}>
                         <div className={`${COLS} grid items-center gap-x-3 gap-y-1.5 px-3 py-2.5`}>
                           {/* where the file stands — the first thing to read */}
                           <span className="flex flex-col items-start gap-0.5">
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-extrabold ${STATE_STYLE[state]}`}>
-                              <span className="size-1.5 rounded-full bg-current" />
-                              {tx(STATE_LABEL[state])}
-                            </span>
-                            {d.produced_serial && d.version ? <span className="ps-1 text-[10.5px] font-bold text-[#93aaa3]">{tx("versionN", { n: d.version })}</span> : null}
+                            <FileStateChip
+                              state={stateOf(d)}
+                              version={d.version}
+                              sentVersion={states[d.id]?.sent_version}
+                              stale={states[d.id]?.stale}
+                            />
                           </span>
                           <Link href={`/basic/${d.id}`} className="min-w-0">
                             <span className={`block truncate text-[13px] font-bold hover:underline ${name ? "text-[#185045]" : "text-[#a3b5b0]"}`}>{name ?? tx("unnamed")}</span>

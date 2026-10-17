@@ -118,6 +118,7 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useDraftState } from "../generator/useDraftState";
 import { BasicCityCard } from "./BasicCityCard";
 import { BasicFlightPlan } from "./BasicFlightPlan";
+import { BasicFileStatus } from "./BasicFileStatus";
 import { BasicPhoneLookup } from "./BasicPhoneLookup";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
@@ -782,14 +783,11 @@ export function BasicEditor({
 
   const [producing, setProducing] = useState(false);
   const [produceError, setProduceError] = useState<string | null>(null);
-  // what reached the client's WhatsApp on the last issue (nothing shown when the file is outside the trial)
-  const [whatsapp, setWhatsapp] = useState<string | null>(null);
   const [guardBlocked, setGuardBlocked] = useState(false);
   const produced = data.produced_serial;
-  const sayWhatsapp = (sent: string) => {
-    const said = { sent: "waSent", window: "waWindow", no_phone: "waNoPhone", unreachable: "waUnreachable" } as const;
-    setWhatsapp(sent in said ? tx(said[sent as keyof typeof said]) : null);
-  };
+  // the file's status (top bar + finish step) reads again after an issue, a send or a confirmation
+  const [statusTick, setStatusTick] = useState(0);
+  const bumpStatus = () => setStatusTick((n) => n + 1);
 
   async function produce() {
     if (producing || blocking.length > 0 || guardBlocked) return;
@@ -801,7 +799,8 @@ export function BasicEditor({
       const result = await produceOfferFromDraft(draftId);
       if (!result.ok) return setProduceError(t(result.error));
       patch({ produced_serial: result.serial });
-      sayWhatsapp(result.whatsapp);
+      // issued — nothing went to the client: the finish step offers «أرسل إلى العميل عبر واتساب»
+      bumpStatus();
     } catch {
       setProduceError(tx("serverLost"));
     } finally {
@@ -1718,7 +1717,7 @@ export function BasicEditor({
           )}
           {produced ? (
             // edited since it was issued: the next version, same serial (a partner's issued file is locked)
-            partnerSession ? null : <ReissueOffer draftId={draftId} serial={data.produced_serial} hotels={data.hotels} blocked={blocking.length > 0} flush={flush} onIssued={(r) => sayWhatsapp(r.whatsapp)} className="mt-3" />
+            partnerSession ? null : <ReissueOffer draftId={draftId} serial={data.produced_serial} hotels={data.hotels} blocked={blocking.length > 0} flush={flush} onIssued={bumpStatus} className="mt-3" />
           ) : (
             <>
               <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} className="mt-2" />
@@ -1737,7 +1736,7 @@ export function BasicEditor({
               </div>
             </>
           )}
-          {whatsapp ? <p role="status" className="mt-2 text-[12px] font-bold text-[#557d78]">{whatsapp}</p> : null}
+          {produced && !partnerSession ? <BasicFileStatus draftId={draftId} serial={produced} variant="panel" refresh={statusTick} onChanged={bumpStatus} /> : null}
         </div>
     ),
   };
@@ -1770,6 +1769,7 @@ export function BasicEditor({
                 {tx("reload")}
               </button>
             ) : null}
+            {produced && !partnerSession ? <BasicFileStatus draftId={draftId} serial={produced} variant="chip" refresh={statusTick} /> : null}
             <button
               type="button"
               onClick={() => commit({ advanced: { ...(data.advanced ?? emptyAdvanced()), on: !data.advanced?.on } })}

@@ -45,7 +45,6 @@ import { advancedDayNote, advancedLines } from "@/lib/offer/advanced";
 import { getRates } from "./rates-actions";
 import { suggestPricingFor } from "./pricing-suggest-core";
 import { customerFor } from "./customer-row";
-import { sendOfferToClient, type ClientSendResult } from "./client-whatsapp";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { byUsage } from "@/lib/offer/country-priority";
 import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
@@ -751,8 +750,6 @@ export type ProduceResult =
   | {
       ok: true;
       serial: string;
-      /** what happened on the client's WhatsApp (client-whatsapp.ts) */
-      whatsapp: ClientSendResult;
       /** a re-issue only: the version it published and «ما تغيّر» against the one before. */
       version?: number;
       changes?: OfferChange[];
@@ -1149,9 +1146,9 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         meta: { serial: result.serial, version: published.version, draft_id: draftId, changes },
       });
     }
-    // the client hears it on WhatsApp — gated (client-whatsapp.ts), never in the way of the issue
-    const whatsapp = await sendOfferToClient(result.serial, Boolean(record.data.produced_serial));
-    return { ok: true, serial: result.serial, whatsapp, ...versionChanges };
+    // Nothing reaches the client here: the employee reviews the issued programme and
+    // sends it with «أرسل إلى العميل عبر واتساب» (offer-send.ts) — the owner, 2026-10-17.
+    return { ok: true, serial: result.serial, ...versionChanges };
   } catch {
     return { ok: false, error: "err.db" };
   }

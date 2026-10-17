@@ -60,6 +60,8 @@ export function newestFrozen(rows: { version: number; source: FrozenDraft | null
 export async function reissueLocked(service: SupabaseClient, serial: string): Promise<boolean> {
   const { data } = await service.from("offers").select("id, status, partner_company_id").eq("serial", serial).maybeSingle();
   const offer = data as { id: string; status: string | null; partner_company_id: string | null } | null;
+  // a cancelled file is not issued again — «نسخ» starts a new one
+  if (offer?.status === "cancelled") return true;
   if (!offer?.partner_company_id) return false;
   if (offer.status === "confirmed") return true;
   const { count } = await service.from("partner_invoices").select("offer_id", { count: "exact", head: true }).eq("offer_id", offer.id);

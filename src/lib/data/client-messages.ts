@@ -65,7 +65,7 @@ export async function sendClientMessage(operationId: string, key: ClientMessageK
       labels: [`مرحلة-${key}`],
       template: { key, params: waParams(key, fields) },
     });
-    return sent === "sent";
+    return sent === "sent" || sent === "template";
   } catch {
     return false;
   }

@@ -94,15 +94,25 @@ const keyEn = (key: string) =>
     .replace(/^العودة (\d+)$/, "Return $1")
     .replace(/^رحلة (\d+)$/, "Flight $1");
 const both = (bilingual: boolean, ar: string, en: string) => (bilingual && en && en !== ar ? `${ar} · ${en}` : ar);
+/** English only on a voucher issued in English (VoucherDTO.lang), else as before. */
+const say = (english: boolean, bilingual: boolean, ar: string, en: string) => (english ? en : both(bilingual, ar, en));
+
+const KIND_NOTE_EN: Partial<Record<VoucherKind, string>> = {
+  hotel_voucher: "Please present this voucher at check-in, with a valid ID for every guest.",
+};
+/** OFFER_DOC_CSS is drawn right to left: its one-sided borders, mirrored. */
+const LTR_CSS = `.od-root[dir="ltr"] .od-table td{border-left:0;border-right:1px solid var(--od-line-2);}.od-root[dir="ltr"] .od-table td:last-child{border-right:0;}.od-root[dir="ltr"] .od-notice{border-right:0;border-left:3px solid var(--od-notice);}`;
+/** Only a real web link becomes a link on the paper. */
+const mapLink = (url: string | null | undefined) => (url && /^https?:\/\//i.test(url.trim()) ? url.trim() : null);
 const LATER = "يُحدَّد لاحقاً";
 /** A planned leg's «00:00» is not a time: say it is still to be set. */
 const cleanValue = (v: string) => v.replace(/ 00:00$/, ` — ${LATER}`);
 
 /** The two date labels a booking reads with — a stay checks in and out, a ticket goes and comes back, a drive is one day. */
-function dateLabels(kind: string, bilingual: boolean): [string, string | null] {
-  if (kind === "hotel") return [both(bilingual, AR.checkIn, "Check-in"), both(bilingual, AR.checkOut, "Check-out")];
-  if (kind === "flight") return [both(bilingual, "الذهاب", "Departure"), both(bilingual, "العودة", "Return")];
-  return [both(bilingual, "التاريخ", "Date"), null];
+function dateLabels(kind: string, bilingual: boolean, english = false): [string, string | null] {
+  if (kind === "hotel") return [say(english, bilingual, AR.checkIn, "Check-in"), say(english, bilingual, AR.checkOut, "Check-out")];
+  if (kind === "flight") return [say(english, bilingual, "الذهاب", "Departure"), say(english, bilingual, "العودة", "Return")];
+  return [say(english, bilingual, "التاريخ", "Date"), null];
 }
 
 const chunks = <T,>(list: T[], first: number, rest: number): T[][] => {
@@ -142,7 +152,7 @@ export function VoucherDocument({
           <Days days={daySheets[0]} />
         </div>
       ) : null}
-      {lastBookings === 0 && daySheets.length <= 1 && travelersFit ? <Travelers travelers={voucher.travelers} /> : null}
+      {lastBookings === 0 && daySheets.length <= 1 && travelersFit ? <Travelers travelers={voucher.travelers} english={voucher.lang === "en"} /> : null}
       {lastBookings === 0 && daySheets.length <= 1 ? <Notes voucher={voucher} brand={brand} /> : null}
     </Page>,
   );
@@ -150,7 +160,7 @@ export function VoucherDocument({
     pages.push(
       <Page key={`b${i}`}>
         {summary ? <SummaryTable bookings={sheet} /> : <Bookings voucher={voucher} bookings={sheet} />}
-        {i + 1 === lastBookings && daySheets.length <= 1 && travelersFit ? <Travelers travelers={voucher.travelers} /> : null}
+        {i + 1 === lastBookings && daySheets.length <= 1 && travelersFit ? <Travelers travelers={voucher.travelers} english={voucher.lang === "en"} /> : null}
         {i + 1 === lastBookings && daySheets.length <= 1 ? <Notes voucher={voucher} brand={brand} /> : null}
       </Page>,
     ),
@@ -170,8 +180,8 @@ export function VoucherDocument({
     for (let i = 0; i < voucher.travelers.length; i += TRAVELERS_PER_PAGE) {
       pages.push(
         <Page key={`t${i}`}>
-          <SectionTitle title={AR.travelers ?? "المسافرون"} />
-          <Travelers travelers={voucher.travelers.slice(i, i + TRAVELERS_PER_PAGE)} />
+          <SectionTitle title={voucher.lang === "en" ? "Guests" : (AR.travelers ?? "المسافرون")} />
+          <Travelers travelers={voucher.travelers.slice(i, i + TRAVELERS_PER_PAGE)} english={voucher.lang === "en"} />
         </Page>,
       );
     }
@@ -181,8 +191,8 @@ export function VoucherDocument({
     // the map variable lives on the root, exactly as OfferDocument sets it —
     // every .od-page::before reads it from here
     // brand.vars is null for our own palette, as in OfferDocument
-    <div className="od-root" dir="rtl" style={{ ["--od-map" as string]: `url("${assets.mapUrl}")`, ...(brand.vars ?? {}) }}>
-      <style dangerouslySetInnerHTML={{ __html: OFFER_DOC_CSS }} />
+    <div className="od-root" dir={voucher.lang === "en" ? "ltr" : "rtl"} style={{ ["--od-map" as string]: `url("${assets.mapUrl}")`, ...(brand.vars ?? {}) }}>
+      <style dangerouslySetInnerHTML={{ __html: OFFER_DOC_CSS + (voucher.lang === "en" ? LTR_CSS : "") }} />
       {pages}
     </div>
   );
@@ -199,6 +209,35 @@ function Ltr({ children }: { children: ReactNode }) {
 function Header({ voucher, assets, brand }: { voucher: VoucherDTO; assets: OfferDocAssets; brand: DocBrand }) {
   // the house logo is the fallback for OUR brand only — a partner without a logo prints its name
   const logoUrl = brand.vars ? brand.logoUrl : (brand.logoUrl ?? assets.logoUrl);
+  if (voucher.lang === "en") {
+    const cities = [...new Set(voucher.bookings.map((b) => b.city_name).filter(Boolean))].join(" · ");
+    return (
+      <>
+        <div className="od-top">
+          <div>
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="od-logo" src={logoUrl} alt={brand.nameLatin} />
+            ) : (
+              <div className="od-wordmark">{brand.nameLatin}</div>
+            )}
+          </div>
+          <div className="od-company">
+            <h2>{brand.nameLatin}</h2>
+            {brand.phone ? <div>Tel: {brand.phone}</div> : null}
+            {brand.website ? <div>Web: {brand.website}</div> : null}
+          </div>
+        </div>
+        <div className="od-hero" style={{ marginTop: "12mm" }}>
+          <div className="od-hero-label">{KIND_TITLE_EN[voucher.kind]}</div>
+          <h1 style={{ fontSize: "24pt" }}>{cities || brand.nameLatin}</h1>
+          <div className="od-hero-meta">
+            File no. {voucher.serial} | Issued {fmtDate(voucher.issued_at)}
+          </div>
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <div className="od-top">
@@ -238,6 +277,27 @@ function Header({ voucher, assets, brand }: { voucher: VoucherDTO; assets: Offer
 }
 
 function Parties({ voucher }: { voucher: VoucherDTO }) {
+  if (voucher.lang === "en") {
+    return (
+      <div className="od-panel">
+        <div className="od-panel-head">
+          <span>Guest details</span>
+          <span>{voucher.travelers.length > 0 ? `${voucher.travelers.length} ${voucher.travelers.length === 1 ? "guest" : "guests"}` : ""}</span>
+        </div>
+        <table className="od-info">
+          <tbody>
+            <tr>
+              {/* the desk looks for the name on the passport: the lead traveller's, else the file's */}
+              <th>Lead guest</th>
+              <td>{voucher.travelers[0]?.name || voucher.customer.name || "—"}</td>
+              <th>Contact</th>
+              <td>{voucher.customer.phone ? <Ltr>{voucher.customer.phone}</Ltr> : "—"}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    );
+  }
   return (
     <div className="od-panel">
       <div className="od-panel-head">
@@ -269,11 +329,13 @@ function SectionTitle({ title, note }: { title: string; note?: string }) {
 
 function Bookings({ voucher, bookings, first }: { voucher: VoucherDTO; bookings: VoucherBooking[]; first?: boolean }) {
   const bilingual = BILINGUAL.has(voucher.kind);
+  const english = voucher.lang === "en";
   return (
     <div style={{ marginTop: first ? "9mm" : 0 }}>
-      {first ? <SectionTitle title={both(bilingual, KIND_TITLE[voucher.kind], KIND_TITLE_EN[voucher.kind])} /> : null}
+      {first ? <SectionTitle title={say(english, bilingual, KIND_TITLE[voucher.kind], KIND_TITLE_EN[voucher.kind])} /> : null}
       {bookings.map((b, i) => {
-        const [fromLabel, toLabel] = dateLabels(b.kind, bilingual);
+        const [fromLabel, toLabel] = dateLabels(b.kind, bilingual, english);
+        const map = mapLink(b.map);
         const when = b.detail["الوقت"] || b.detail["وقت الانطلاق"] || "";
         // the city once: «RUH → KUL — RUH → KUL» printed the route twice
         const city = b.city_name && !b.title.includes(b.city_name) && !b.city_name.includes(b.title) ? b.city_name : "";
@@ -304,7 +366,7 @@ function Bookings({ voucher, bookings, first }: { voucher: VoucherDTO; bookings:
               </>
             ) : when && when !== LATER ? (
               <>
-                <span>{both(bilingual, "الوقت", "Time")}</span>
+                <span>{say(english, bilingual, "الوقت", "Time")}</span>
                 <strong>
                   <Ltr>{when}</Ltr>
                 </strong>
@@ -313,20 +375,31 @@ function Bookings({ voucher, bookings, first }: { voucher: VoucherDTO; bookings:
           </div>
           <div>
             {/* a stay issued after the room catalogue is in its destination's language — the hotel's name in it, the other below */}
-            <div style={{ fontSize: "13pt", fontWeight: 800, color: "var(--od-green)", ...(b.locale === "en" ? { direction: "ltr", textAlign: "right" } : {}) }}>
+            <div style={{ fontSize: "13pt", fontWeight: 800, color: "var(--od-green)", ...(b.locale === "en" && !english ? { direction: "ltr", textAlign: "right" } : {}) }}>
               {b.title}
               {city ? <span style={{ fontWeight: 500 }}> — {city}</span> : null}
             </div>
             {b.locale ? (
-              b.alt_name ? <div style={{ fontSize: "10.5pt", fontWeight: 600, color: "var(--od-muted)", ...(b.locale === "ar" ? { direction: "ltr", textAlign: "right" } : {}) }}>{b.alt_name}</div> : null
+              b.alt_name ? (
+                <div
+                  style={{
+                    fontSize: "10.5pt",
+                    fontWeight: 600,
+                    color: "var(--od-muted)",
+                    ...(b.locale === "ar" ? { direction: "ltr", textAlign: "right" } : english ? { direction: "rtl", textAlign: "left" } : {}),
+                  }}
+                >
+                  {b.alt_name}
+                </div>
+              ) : null
             ) : bilingual && b.name_en ? (
               // the name the hotel knows itself by
               <div style={{ fontSize: "11pt", fontWeight: 700, direction: "ltr", textAlign: "right" }}>{b.name_en}</div>
             ) : null}
             {/* the number that makes this document worth carrying */}
             {b.confirmation_number ? (
-              <div style={{ marginTop: "2mm", fontSize: "11.5pt", fontWeight: 800 }}>
-                {both(bilingual, "رقم التأكيد", "Confirmation no.")}: <Ltr>{b.confirmation_number}</Ltr>
+              <div style={{ marginTop: "2mm", fontSize: english ? "14pt" : "11.5pt", fontWeight: 800 }}>
+                {say(english, bilingual, "رقم التأكيد", "Confirmation no.")}: <Ltr>{b.confirmation_number}</Ltr>
               </div>
             ) : null}
             {/*
@@ -336,12 +409,12 @@ function Bookings({ voucher, bookings, first }: { voucher: VoucherDTO; bookings:
               family turned away at a counter is holding a document that said
               nothing about the difference.
             */}
-            <BookingState booking={b} />
+            <BookingState booking={b} english={english} />
             <table className="od-table" style={{ marginTop: "3mm" }}>
               <tbody>
                 {rows.map(([k, v]) => (
                   <tr key={k}>
-                    <th style={{ width: "34%" }}>{both(bilingual, k, keyEn(k))}</th>
+                    <th style={{ width: "34%" }}>{say(english, bilingual, k, keyEn(k))}</th>
                     <td>
                       <Ltr>{cleanValue(v)}</Ltr>
                     </td>
@@ -354,6 +427,13 @@ function Bookings({ voucher, bookings, first }: { voucher: VoucherDTO; bookings:
                 {n}
               </p>
             ))}
+            {map ? (
+              <p className="od-note">
+                <a href={map} style={{ color: "var(--od-green)", fontWeight: 700 }}>
+                  {english ? "Open in Google Maps" : "الموقع على خرائط جوجل · Google Maps"}
+                </a>
+              </p>
+            ) : null}
             {b.cancellation_policy ? <p className="od-note">{b.cancellation_policy}</p> : null}
           </div>
         </div>
@@ -412,18 +492,22 @@ function SummaryTable({ bookings, first }: { bookings: VoucherBooking[]; first?:
  *   number, not paid       → حجز مؤكّد غير مُصدر
  *   number and paid        → حجز كامل    (clean, no band)
  */
-function BookingState({ booking }: { booking: VoucherBooking }) {
+function BookingState({ booking, english = false }: { booking: VoucherBooking; english?: boolean }) {
   const hasRef = Boolean(booking.confirmation_number);
   if (hasRef && booking.is_paid) {
     return (
       <div style={{ marginTop: "2mm", fontSize: "10pt", fontWeight: 800, color: "#0f7a52" }}>
-        ✓ حجز كامل — صادر ومُسدَّد
+        {english ? "✓ Confirmed and paid" : "✓ حجز كامل — صادر ومُسدَّد"}
       </div>
     );
   }
-  const text = hasRef
-    ? "⚠ حجز مؤكّد غير مُصدر — لم تُسدَّد قيمته بعد. لا يُعتمد للسفر حتى إشعار من قسم العمليات."
-    : "⚠ حجز مبدئي — لم يصدر رقم التأكيد بعد. هذا المستند للاطلاع ولا يُعتمد لدى المزوّد.";
+  const text = english
+    ? hasRef
+      ? "⚠ Confirmed, payment pending — not valid for travel until our operations team confirms."
+      : "⚠ Provisional — no confirmation number yet. For information only."
+    : hasRef
+      ? "⚠ حجز مؤكّد غير مُصدر — لم تُسدَّد قيمته بعد. لا يُعتمد للسفر حتى إشعار من قسم العمليات."
+      : "⚠ حجز مبدئي — لم يصدر رقم التأكيد بعد. هذا المستند للاطلاع ولا يُعتمد لدى المزوّد.";
   return (
     <div
       style={{
@@ -443,12 +527,12 @@ function BookingState({ booking }: { booking: VoucherBooking }) {
   );
 }
 
-function Travelers({ travelers }: { travelers: VoucherDTO["travelers"] }) {
+function Travelers({ travelers, english = false }: { travelers: VoucherDTO["travelers"]; english?: boolean }) {
   const nationality = travelers.some((t) => t.nationality);
   return (
     <div className="od-panel" style={{ marginTop: "7mm" }}>
       <div className="od-panel-head">
-        <span>المسافرون</span>
+        <span>{english ? "Guests" : "المسافرون"}</span>
         <span>
           <Ltr>{String(travelers.length)}</Ltr>
         </span>
@@ -505,6 +589,20 @@ function Days({ days }: { days: VoucherDay[] }) {
 type VoucherDay = VoucherDTO["days"][number];
 
 function Notes({ voucher, brand }: { voucher: VoucherDTO; brand: DocBrand }) {
+  if (voucher.lang === "en") {
+    return (
+      <div style={{ marginTop: "8mm" }}>
+        {[KIND_NOTE_EN[voucher.kind] ?? "", ...voucher.notes].filter(Boolean).map((n, i) => (
+          <p key={i} className="od-note">
+            {n}
+          </p>
+        ))}
+        <p className="od-note" style={{ marginTop: "5mm" }}>
+          {[brand.nameLatin, brand.phone, brand.email].filter(Boolean).join(" · ")}
+        </p>
+      </div>
+    );
+  }
   const notes = [KIND_NOTE[voucher.kind], ...voucher.notes];
   return (
     <div style={{ marginTop: "8mm" }}>
