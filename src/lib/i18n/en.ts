@@ -1809,6 +1809,9 @@ export const en = {
   // ---------- repackage a supplier PDF ----------
   "nav.repackage": "Repackage Supplier",
   "nav.basic": "Basic system",
+  // the menus' reorganisation (2026-10-17)
+  "nav.legacyGenerator": "Package generator (legacy)",
+  "nav.developer": "Developer",
   "rp.title": "Repackage a supplier program",
   "rp.subtitle": "Send the supplier offer however it reached you — a file, a picture, a message or a link. The system reads it, then you review, re-price, and issue it as a Traveliun offer.",
   "rp.new": "Start a repackage",

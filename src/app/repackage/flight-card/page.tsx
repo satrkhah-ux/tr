@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { FlightCardTool } from "@/components/traveliun/repackage/FlightCardTool";
 import { getFlightCardLookups } from "@/lib/data/flight-card";
-import { currentCan } from "@/lib/roles/current";
+import { currentCan, guardPath } from "@/lib/roles/current";
 
 /** The preview loads the same Tajawal files the PDF embeds, so the two lay out alike. */
 const PREVIEW_FONT = `
@@ -10,6 +10,7 @@ const PREVIEW_FONT = `
 
 /** «تصميم بطاقة الطيران» — staff only, behind the same gate as /repackage. */
 export default async function FlightCardPage() {
+  await guardPath("/repackage/flight-card");
   if (!(await currentCan("repackage.write"))) redirect("/dashboard");
   const lookups = await getFlightCardLookups();
   return (

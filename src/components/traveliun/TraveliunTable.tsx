@@ -46,6 +46,7 @@ import type {
   FilterOptions,
   TableConfig,
 } from "@/lib/data/types";
+import { useRole } from "@/lib/roles/RoleContext";
 import { DataRecordExtras } from "./DataRecordExtras";
 import { HotelMergeDialog, HotelUsageLine, SimilarHotelsHint, usageTotal, useHotelUsage } from "./HotelTools";
 import { TableTransfer } from "./TableTransfer";
@@ -113,8 +114,16 @@ export function TraveliunTable({
   /** the ?id= whose details already opened once — closing them must not reopen them */
   const autoOpened = useRef("");
 
+  // «البيانات» is data.write — view, add, edit (owner, 2026-10-17). Deleting,
+  // merging and importing are the administration's: their controls show only
+  // with settings.manage, and the actions refuse without it (data/actions.ts,
+  // data/hotel-tools.ts).
+  const { can } = useRole();
+  const manage = can("settings.manage");
+
   // «دمج» in /hotels: the rows ticked, kept across pages
   const isHotels = config.table === "hotels";
+  const merges = isHotels && manage;
   const [selected, setSelected] = useState<Map<string, DataRow>>(new Map());
   const [merging, setMerging] = useState<DataRow[] | null>(null);
 
@@ -271,7 +280,7 @@ export function TraveliunTable({
   }
 
   const pageSelected = rows.length > 0 && rows.every((r) => selected.has(String(r.id)));
-  const columnCount = config.columns.length + 1 + (isHotels ? 1 : 0);
+  const columnCount = config.columns.length + 1 + (merges ? 1 : 0);
 
   return (
     <RefOptionsContext.Provider value={filterOptions}>
@@ -351,9 +360,10 @@ export function TraveliunTable({
                   sort: config.defaultSort,
                 })}
                 onImported={refresh}
+                canImport={manage}
               />
             ) : null}
-            {isHotels && selected.size > 0 ? (
+            {merges && selected.size > 0 ? (
               <button
                 type="button"
                 onClick={() => setMerging([...selected.values()])}
@@ -404,7 +414,7 @@ export function TraveliunTable({
                 <table className="min-w-full border-collapse text-start text-sm">
                   <thead>
                     <tr className="sticky top-0 z-10 bg-[#185045] text-white">
-                      {isHotels ? (
+                      {merges ? (
                         <th className="w-[44px] px-[14px] py-[15px]">
                           <input
                             type="checkbox"
@@ -435,7 +445,7 @@ export function TraveliunTable({
                     {loading ? (
                       Array.from({ length: 6 }).map((_, rowIndex) => (
                         <tr key={`sk-${rowIndex}`} className="border-b border-[#eef2f0]">
-                          {isHotels ? <td /> : null}
+                          {merges ? <td /> : null}
                           <td className="px-[18px] py-[19px]"><div className="tv-shimmer size-[18px] rounded-md" /></td>
                           {config.columns.map((column) => (
                             <td key={column.key} className="px-[14px] py-[19px]"><div className="tv-shimmer h-[13px] w-24 rounded-md" /></td>
@@ -445,7 +455,7 @@ export function TraveliunTable({
                     ) : rows.length > 0 ? (
                       rows.map((row) => (
                         <tr key={String(row.id)} className="cursor-pointer border-b border-[#eef2f0] text-[#557d78] transition-colors hover:bg-[#f6faf8]">
-                          {isHotels ? (
+                          {merges ? (
                             <td className="px-[14px] py-[17px]">
                               <input
                                 type="checkbox"
@@ -537,8 +547,8 @@ export function TraveliunTable({
           onClose={() => setViewing(null)}
           onEdit={() => { setEditing(viewing); setViewing(null); }}
           onCopy={() => onDuplicate(viewing)}
-          onDelete={() => onDelete(viewing)}
-          onMerge={isHotels ? () => { setMerging([viewing]); setViewing(null); } : undefined}
+          onDelete={manage ? () => onDelete(viewing) : undefined}
+          onMerge={merges ? () => { setMerging([viewing]); setViewing(null); } : undefined}
           onStatus={isHotels ? (status) => onStatus(viewing, status) : undefined}
         />
       ) : null}
@@ -1027,7 +1037,8 @@ function RowActionModal({
   onClose: () => void;
   onEdit: () => void;
   onCopy: () => Promise<void>;
-  onDelete: () => Promise<void>;
+  /** absent without settings.manage — the button goes with it */
+  onDelete?: () => Promise<void>;
   /** /hotels: merge this hotel into another */
   onMerge?: () => void;
   /** /hotels: stop / restart it instead of deleting it */
@@ -1081,7 +1092,7 @@ function RowActionModal({
               ) : null}
             </div>
           </div>
-        ) : confirming ? (
+        ) : confirming && onDelete ? (
           <div className="rounded-[10px] border border-[#f2d0d7] bg-[#fdeef2] p-4">
             <p className="mb-3 text-sm font-bold text-[#c22850]">{t("confirmDeleteHint")}</p>
             <div className="flex justify-end gap-2">
@@ -1092,7 +1103,7 @@ function RowActionModal({
             </div>
           </div>
         ) : (
-          <div className={`grid gap-2 ${onMerge ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
+          <div className={`grid gap-2 ${onMerge ? "sm:grid-cols-4" : onDelete ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
             <button type="button" onClick={onEdit} className="flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#185045] text-sm font-bold text-white hover:bg-[#0f4439]">
               <Eye className="size-4" /> {t("edit")}
             </button>
@@ -1104,9 +1115,11 @@ function RowActionModal({
                 <GitMerge className="size-4" aria-hidden /> {t("data.tools.merge.action")}
               </button>
             ) : null}
+            {onDelete ? (
             <button type="button" onClick={() => setConfirming(true)} className="flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#f2c7c7] text-sm font-bold text-[#c43d3d] hover:bg-[#fff1f1]">
               <Trash2 className="size-4" /> {t("delete")}
             </button>
+            ) : null}
             {onStatus && inactive ? (
               <button type="button" disabled={busy} onClick={() => start(() => onStatus("Active"))} className="flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#185045] text-sm font-bold sm:col-span-4 disabled:opacity-70">
                 <Power className="size-4" aria-hidden /> {t("data.tools.activate")}

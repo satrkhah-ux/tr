@@ -107,6 +107,7 @@ import { computeOfferPricing, rebase } from "@/lib/offer/pricing";
 import { syncSuggestions, type TourPrice } from "@/lib/offer/pricing-suggest";
 import { syncDepartureDates } from "@/lib/offer/schedule";
 import { useRole } from "@/lib/roles/RoleContext";
+import { useCanOpen } from "@/lib/roles/useCanOpen";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { FieldIssueProvider } from "../generator/FieldIssue";
@@ -292,6 +293,9 @@ export function BasicEditor({
   const tx = useBasicLabels();
   const { t, language } = useTraveliunUI();
   const { can } = useRole();
+  // the full generator's pages, while the developer has the legacy generator on
+  // (a partner always: it is their «ملفاتي») — off, its addresses only lead back here
+  const legacyOpen = useCanOpen()({ href: "/package-generator" });
   const { data, patch, replace, flush, saveState } = useDraftState(draftId, initialData, savedAt);
   const trip = data.trip;
   const country = findLookupCountry(lookups.countries, trip.country);
@@ -1691,12 +1695,12 @@ export function BasicEditor({
                       >
                         {tx("fix")}
                       </button>
-                    ) : (
+                    ) : legacyOpen ? (
                       // services lists, terms: only the full generator edits those
                       <Link href={stageHref(draftId, issue.stage)} onClick={() => void flush()} className="text-[11.5px] font-bold text-[#185045] underline">
                         {tx("fix")}
                       </Link>
-                    )}
+                    ) : null}
                   </li>
                   );
                 })}
@@ -1769,6 +1773,7 @@ export function BasicEditor({
             >
               بكج متقدم{data.advanced?.on ? " ✓" : ""}
             </button>
+            {legacyOpen ? (
             <Link
               href={stageHref(draftId, "trip")}
               onClick={() => void flush()}
@@ -1776,6 +1781,7 @@ export function BasicEditor({
             >
               {tx("fullGenerator")}
             </Link>
+            ) : null}
           </div>
 
           {data.advanced?.on ? (

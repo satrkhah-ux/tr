@@ -5,6 +5,7 @@ import { getPartnerHome } from "@/lib/partners/home";
 import { getMyStatement } from "@/lib/partners/ledger";
 import { getPartnerSession, isStaffSession } from "@/lib/partners/session";
 import { describeTerms } from "@/lib/partners/pricing";
+import { currentCanOpen } from "@/lib/roles/current";
 
 export const dynamic = "force-dynamic";
 
@@ -45,12 +46,15 @@ export default async function B2BPage() {
             المتعاونة.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
+            {/* the administration's section (section-access.ts) — not a link that bounces the rest */}
+            {(await currentCanOpen("/partner-companies")) ? (
             <Link
               href="/partner-companies"
               className="inline-flex h-10 items-center rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439]"
             >
               قسم الشركات المتعاونة
             </Link>
+            ) : null}
             <Link
               href="/dashboard"
               className="inline-flex h-10 items-center rounded-[10px] border border-[#dbe6e1] px-4 text-[12.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6]"

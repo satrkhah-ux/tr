@@ -32,7 +32,7 @@ import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useRole } from "@/lib/roles/RoleContext";
 import type { Permission } from "@/lib/roles/roles";
-import { canOpenLink } from "@/lib/roles/section-access";
+import { useCanOpen } from "@/lib/roles/useCanOpen";
 import {
   getAdminMetrics,
   searchEmployees,
@@ -91,7 +91,7 @@ export function TraveliunDashboardClient({ opsSummary, mine }: { opsSummary: Ops
 type ReadyAction = { key: string; labelKey: TranslationKey; descKey: TranslationKey; href: string; icon: LucideIcon; color: string; perm?: Permission };
 
 const READY_ACTIONS: ReadyAction[] = [
-  { key: "operations", labelKey: "nav.operations", descKey: "dash.qa.operations", href: "/operations", icon: ClipboardCheck, color: "#185045", perm: "operations.write" },
+  { key: "operations", labelKey: "nav.operations", descKey: "dash.qa.operations", href: "/operations", icon: ClipboardCheck, color: "#185045" },
   { key: "generator", labelKey: "nav.packageGenerator", descKey: "dash.qa.generator", href: "/package-generator", icon: FilePlus2, color: "#2aa87a", perm: "offers.write" },
   { key: "readyOffers", labelKey: "nav.readyOffers", descKey: "dash.qa.readyOffers", href: "/ready-offers", icon: PackageCheck, color: "#8b5cf6", perm: "offers.write" },
   { key: "repackage", labelKey: "nav.repackage", descKey: "dash.qa.repackage", href: "/repackage", icon: FileUp, color: "#0e9bb5", perm: "repackage.write" },
@@ -121,9 +121,9 @@ const HANDLED_HREFS = new Set<string>([
 
 function ReadySections() {
   const { t } = useTraveliunUI();
-  const { can } = useRole();
-  const actions = READY_ACTIONS.filter((a) => canOpenLink(a, can));
-  const prepared = PREPARED.filter((p) => canOpenLink(p, can));
+  const opens = useCanOpen();
+  const actions = READY_ACTIONS.filter(opens);
+  const prepared = PREPARED.filter(opens);
 
   return (
     <section className="space-y-3">
@@ -177,9 +177,9 @@ function ReadySections() {
  */
 function PreviousSections() {
   const { t } = useTraveliunUI();
-  const { can } = useRole();
+  const { can, featureOn } = useRole();
 
-  const groups = navGroupsFor(can)
+  const groups = navGroupsFor(can, featureOn)
     .map((group) => ({
       labelKey: group.labelKey,
       icon: group.icon,
