@@ -12,7 +12,7 @@ const env = Object.fromEntries(
 const c = new pg.Client({ connectionString: env.SUPABASE_DB_URL, ssl: { rejectUnauthorized: false } });
 await c.connect();
 const tables = [
-  "operations", "operation_bookings", "operation_documents", "operation_dispatches", "operation_issues", "operation_payments", "offers",
+  "operations", "operation_bookings", "operation_installments", "supplier_payments", "operation_documents", "operation_dispatches", "operation_issues", "operation_payments", "offers",
   "countries", "cities", "hotels", "room_types", "airlines", "airports", "ports", "transportation_types", "drivers", "services",
   "service_types", "tours", "tour_programs", "company_suppliers", "visas", "terms", "transfers", "customers", "statuses",
   "supervisors", "guide_informations", "care_tickets", "city_climate_notes",
