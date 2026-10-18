@@ -66,6 +66,7 @@ import {
 import { arrivalLines, departureDay, departureLines, type TourProgram } from "@/lib/offer/itinerary";
 import { BasicCityProgram } from "./BasicCityProgram";
 import { SuggestInput } from "../SuggestInput";
+import { DirText } from "@/components/DirText";
 import { useRole } from "@/lib/roles/RoleContext";
 import { tourPriced, toursTotal, type TourPrice } from "@/lib/offer/pricing-suggest";
 import type { BoardType } from "@/lib/types";
@@ -970,6 +971,7 @@ function ServicesPanel({
           carTypes={carTypes}
           showPrice={showPrice}
           unit={unitOf(s)}
+          sarPer={sarPer}
           className={`${rowGap} ${cols}`}
           onKind={(kind) => setKind(s, kind)}
           onDate={(date) => setSvc(s, { date })}
@@ -1140,6 +1142,7 @@ function ServiceLine({
   carTypes,
   showPrice,
   unit,
+  sarPer,
   className,
   onKind,
   onDate,
@@ -1156,6 +1159,8 @@ function ServiceLine({
   showPrice: boolean;
   /** what one car costs — typed, or the sheet's. */
   unit: { price: number; currency: string } | null;
+  /** riyals per unit of a currency — the list's dollars shown in the file's riyals */
+  sarPer: Record<string, number>;
   className: string;
   onKind: (kind: ServiceKind) => void;
   onDate: (date: string) => void;
@@ -1168,6 +1173,9 @@ function ServiceLine({
   const tx = useBasicLabels();
   const { t } = useTraveliunUI();
   const fromSheet = row.price == null && unit != null;
+  // one car's figure in riyals, the file's currency: 80 USD in the list is 300 here (the owner's review, 2026-10-18)
+  const rate = unit ? (unit.currency === "SAR" ? 1 : (sarPer[unit.currency] ?? 0)) : 0;
+  const inSar = unit && rate ? Math.round(unit.price * rate * 100) / 100 : null;
   return (
     <div className={`${className} rounded-[9px] bg-[#f4f9f7] p-1`}>
       {row.auto || !row.date ? (
@@ -1208,18 +1216,23 @@ function ServiceLine({
             min={0}
             dir="ltr"
             aria-label={t("pg.tour.carPrice")}
-            value={row.price ?? ""}
-            // the sheet's figure shows through until one is typed
-            placeholder={fromSheet ? String(unit.price) : "0"}
+            // the list's figure, in riyals, stands in the field until one is typed — not a grey hint mistaken for empty
+            value={row.price ?? (fromSheet && inSar != null ? inSar : "")}
+            placeholder="0"
             onChange={(e) => onPrice(typedNumber(e.target))}
             className={`${basicField} tv-tnum text-center`}
           />
-          {fromSheet ? <span className="text-[10px] font-bold text-[#0f7a52]">{tx("fromSheet")}</span> : null}
+          {fromSheet ? (
+            <span className="tv-tnum text-[10px] font-bold text-[#0f7a52]">
+              {tx("fromSheet")}
+              {unit.currency !== "SAR" ? <DirText>{`: ${unit.price} ${unit.currency}`}</DirText> : null}
+            </span>
+          ) : null}
         </span>
       ) : null}
       {showPrice ? (
         <output className="tv-tnum inline-flex h-9 items-center justify-center rounded-[8px] bg-[#eef4f1] px-2 text-[12.5px] font-extrabold text-[#185045]">
-          {unit ? `${(unit.price * row.cars).toLocaleString("en-US")} ${unit.currency}` : "—"}
+          {inSar != null ? `${(inSar * row.cars).toLocaleString("en-US")} SAR` : unit ? `${(unit.price * row.cars).toLocaleString("en-US")} ${unit.currency}` : "—"}
         </output>
       ) : null}
       <button

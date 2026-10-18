@@ -342,7 +342,7 @@ const AR = {
   simLines: "خطوط الاتصال",
   addService: "إضافة خدمة",
   removeService: "حذف الخدمة",
-  fromSheet: "من ورقة التسعير",
+  fromSheet: "من القائمة",
   hotelIs: "الفندق: {hotel}",
   totalIs: "الإجمالي: {total}",
 } as const;
@@ -682,7 +682,7 @@ const EN: Record<keyof typeof AR, string> = {
   simLines: "SIM lines",
   addService: "Add a service",
   removeService: "Remove the service",
-  fromSheet: "from the pricing sheet",
+  fromSheet: "from the list",
   hotelIs: "Hotel: {hotel}",
   totalIs: "Total: {total}",
 };
