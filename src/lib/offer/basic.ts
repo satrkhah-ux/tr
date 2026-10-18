@@ -46,8 +46,6 @@ import {
   type LookupRoomType,
   type PackageProfit,
   type DraftTrip,
-  type ArrivalEdge,
-  type DepartureEdge,
   type HotelStay,
   type LookupAirport,
   type ServiceKind,
@@ -332,28 +330,6 @@ function keepNightlyRates(prev: HotelStay[], hotels: DraftHotel[], cities: Draft
   const was = new Map(prev.map((s) => [s.line.id, s.nights]));
   const marked = hotels.map((h) => (h.priced_nights || !was.get(h.id) ? h : { ...h, priced_nights: was.get(h.id) }));
   return keepNightlyRatesByMark(cities, marked);
-}
-
-/** How many hotel nights an edge takes from (−1) or adds to (+1) the city it sits on. */
-const edgeDelta = (mode: ArrivalEdge | DepartureEdge | null | undefined) => (mode === "no_hotel" || mode === "no_hotel_day" ? -1 : mode === "prev_night" ? 1 : 0);
-
-/**
- * «بكج متقدم»: the arrival's or the departure's edge chosen (null: as Basic has
- * it). The first or last city's hotel nights follow — a night without a hotel
- * leaves it, a night before the landing joins it — at the same nightly rate,
- * and the dates re-chain; the trip's nights stay what the tickets say
- * (edgeNights keeps the count whole). Choosing again, or null, undoes it.
- */
-export function setEdge(data: DraftData, side: "in" | "out", mode: ArrivalEdge | DepartureEdge | null): Pick<DraftData, "cities" | "hotels"> {
-  const at = side === "in" ? 0 : data.cities.length - 1;
-  const city = data.cities[at];
-  if (!city) return { cities: data.cities, hotels: data.hotels };
-  const field = side === "in" ? "edge_in" : "edge_out";
-  const was = city[field];
-  if ((was ?? null) === mode) return { cities: data.cities, hotels: data.hotels };
-  const cities = data.cities.map((c, i) => (i === at ? { ...c, [field]: mode ?? undefined } : c));
-  const nights = Math.max(city.nights + edgeDelta(mode) - edgeDelta(was), 1);
-  return setCityNights({ ...data, cities }, at, nights);
 }
 
 /** A city's nights changed: its stays keep their nightly rate, and a room change keeps a night after it. */
