@@ -118,6 +118,7 @@ import { ServicesStage } from "../generator/stages/ServicesStage";
 import { TermsStage } from "../generator/stages/TermsStage";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useDraftState } from "../generator/useDraftState";
+import { BasicHotelsStep } from "./BasicHotelsStep";
 import { BasicCityCard } from "./BasicCityCard";
 import { BasicFlightPlan } from "./BasicFlightPlan";
 import { BasicFileStatus } from "./BasicFileStatus";
@@ -1274,6 +1275,13 @@ export function BasicEditor({
             </button>
           </div>
         ) : null}
+        {/* «١. الفنادق» for every city first, then the cards for the tours and transfers (2026-10-18); a focused view keeps the card's own hotel tab */}
+        {scope.hotels && cities.length > 0 && !focus ? (
+          <>
+            <BasicHotelsStep cities={cities} firstDay={travelDays + 1} data={data} lookups={lk} onLines={setLines} onSlice={commit} />
+            <h3 className="px-1 pt-1 text-[13.5px] font-extrabold text-[#0f3d38]">{tx("toursStep")}</h3>
+          </>
+        ) : null}
         {cities.length === 0 ? (
           <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[12.5px] font-semibold text-[#93aaa3]">{tx("noCities")}</p>
         ) : (
@@ -1303,7 +1311,8 @@ export function BasicEditor({
                 programs={programs.filter((p) => p.city_name === city.city_name)}
                 tourPrices={pricesForCity(tourPrices, city.city_name, cities.map((c) => c.city_name), normAr)}
                 listPrices={listPrices}
-                hotelsOn={scope.hotels}
+                // the hotels are entered in «١. الفنادق» above — the card keeps the tours, transfers and programme
+                hotelsOn={scope.hotels && Boolean(focus)}
                 toursOn={toursOn}
                 transportOn={scope.transport}
                 isFirst={i === 0}

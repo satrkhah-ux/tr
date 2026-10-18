@@ -117,6 +117,10 @@ const toursText = (tx: ReturnType<typeof useBasicLabels>, n: number, total: numb
  * Everything the trip already said (dates, meals, currency) is filled in for
  * the agent and kept under «معلومات إضافية».
  */
+/** a stop's stays are complete: a hotel, and every room typed, with its board and price */
+export const stayDone = (ls: DraftHotel[]) =>
+  ls.length > 0 && ls.every((l) => l.hotel_name.trim() && l.rooms.length > 0 && l.rooms.every((r) => (r.room_type_id || r.room_type_name.trim()) && r.board_type && r.price != null));
+
 export function BasicCityCard({
   index,
   city,
@@ -211,8 +215,6 @@ export function BasicCityCard({
     { key: "program" as const, label: tx("programTab"), icon: ListChecks, locked: programLocked },
   ];
   // a stay already complete (picked from the add bar, or a file reopened) is not asked again: the card opens on what is left
-  const stayDone = (ls: DraftHotel[]) =>
-    ls.length > 0 && ls.every((l) => l.hotel_name.trim() && l.rooms.length > 0 && l.rooms.every((r) => (r.room_type_id || r.room_type_name.trim()) && r.board_type && r.price != null));
   const hasTours = tabs.some((x) => x.key === "tours");
   const [tab, setTab] = useState<Tab>(() => (hotelsOn && hasTours && stayDone(lines) ? "tours" : "hotel"));
   // focus left the hotel fields: once the stay is complete the card moves on by itself
@@ -539,7 +541,8 @@ export function BasicCityCard({
 
 // ---------- the panels ----------
 
-function HotelPanel({
+/** a city's stays — the hotel, rooms, board and price; on the card and in «١. الفنادق» (BasicHotelsStep). */
+export function HotelPanel({
   index,
   city,
   dayFrom,
