@@ -114,7 +114,7 @@ async function readTrip(text: string): Promise<OfferAsk | null> {
       name: "trip_facts",
       system: [
         `Today is ${today} (Riyadh). A client writes to a travel company in Arabic. Extract only what the client actually said:`,
-        "name: the client's own name if they gave it (not a place); arrival_date / departure_date as YYYY-MM-DD in the future (a month without a year is the next one to come);",
+        "name: the client's own personal name if they gave it (e.g. «محمد») — never a place, and never words about who travels («انا وزوجتي», «شخصين», «عائلة»), which are null; arrival_date / departure_date as YYYY-MM-DD in the future (a month without a year is the next one to come);",
         "days: the trip's length in days if they said it («10 أيام», «اسبوع» = 7); adults and children counts («شخصين» = 2 adults, «انا وزوجتي» = 2 adults, «عائلة 4» unknown split = 4 adults only if no children are mentioned).",
         "null for anything not said. Never invent.",
       ].join(" "),

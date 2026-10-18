@@ -66,4 +66,12 @@ describe("the model's dates held to what the client wrote", () => {
   it("«null» as a name is no name", () => {
     expect(holdToText("x", { ...none, name: "null" }, today).name).toBeNull();
   });
+  it("the manager's test (2026-10-19): «انا وزوجتي» is no name, and «1 نووفمبر» is a date", () => {
+    const text = "انا وزوجتي لمدة 10 ايام \nتاريخ السفر 1 نووفمبر";
+    const held = holdToText(text, { ...none, name: "انا وزوجتي", arrival: "2026-11-01", days: 10, adults: 2 }, today);
+    expect(held).toMatchObject({ name: null, arrival: "2026-11-01", days: 10, adults: 2 });
+    expect(missing(held)).toEqual(["name"]);
+    for (const party of ["شخصين", "عائلتي", "أنا", "انا وابني", "نحن 3"]) expect(holdToText("x", { ...none, name: party }, today).name).toBeNull();
+    for (const real of ["محمد", "عبدالله السالم", "Sara"]) expect(holdToText("x", { ...none, name: real }, today).name).toBe(real);
+  });
 });

@@ -148,6 +148,9 @@ const roomsText = (n: number) => (n === 2 ? "غرفتان" : n <= 10 ? `${n} غ�
 
 const MONTHS = /(يناير|فبراير|مارس|ابريل|أبريل|مايو|يونيو|يوليو|اغسطس|أغسطس|سبتمبر|اكتوبر|أكتوبر|نوفمبر|ديسمبر|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)|\d{1,2}\s*[/.-]\s*\d{1,2}/giu;
 
+/** words that describe who travels, never who the client is */
+const PARTY = /(^|\s)(انا|أنا|احنا|إحنا|نحن|مع)(\s|$)|زوج|عائل|عايل|طفل|أطفال|اطفال|شخص|اشخاص|أشخاص|نفر|ولد|بنت|عيال|اخو|أخو|اخت|أخت|صديق|ربع|\d/u;
+
 /**
  * The model's dates, held to what the client wrote (it proposes a date when
  * none was said, and slips a year): a date counts only when the text names
@@ -156,7 +159,8 @@ const MONTHS = /(يناير|فبراير|مارس|ابريل|أبريل|مايو
  * from them, both days in.
  */
 export function holdToText(text: string, a: OfferAsk, today: string): OfferAsk {
-  const said = (text.normalize("NFKC").match(MONTHS) ?? []).length;
+  // «نووفمبر»: a letter typed twice still names the month
+  const said = (text.normalize("NFKC").replace(/(\p{L})\1+/gu, "$1").match(MONTHS) ?? []).length;
   const future = (d: string | null) => {
     if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
     let iso = d;
@@ -166,7 +170,8 @@ export function holdToText(text: string, a: OfferAsk, today: string): OfferAsk {
   const arrival = said >= 1 ? future(a.arrival) : null;
   let departure = said >= 2 ? future(a.departure) : null;
   if (arrival && departure && departure < arrival) departure = `${Number(departure.slice(0, 4)) + 1}${departure.slice(4)}`;
-  const name = a.name && !/^(null|none|غير معروف)$/i.test(a.name.trim()) ? a.name.trim() : null;
+  // «انا وزوجتي» is the party, not a name (the manager's test, 2026-10-19: «أهلاً انا وزوجتي»)
+  const name = a.name && !/^(null|none|غير معروف)$/i.test(a.name.trim()) && !PARTY.test(a.name) ? a.name.trim() : null;
   const days = arrival && departure ? tripDays({ days: null, arrival, departure }) : a.days;
   return { ...a, name, arrival, departure, days };
 }
