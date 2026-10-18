@@ -2,8 +2,20 @@ import { describe, expect, it } from "vitest";
 import { addStay, deriveTransportRows, emptyDraftData, emptyFlight, normalizeDraftData, type DraftData, type DraftFlight } from "@/lib/offer/draft-types";
 import { BOARD_AR } from "@/components/offer-doc/labels";
 import { addCity, withTours } from "@/lib/offer/basic";
-import { newBookings, planBookingsFromDraft, type ExistingBooking } from "./seed-plan";
+import {
+  ARRIVAL_DAY_TOUR,
+  FAREWELL_UNSOLD,
+  LATER,
+  newBookings,
+  NOTICE,
+  offerHotelCity,
+  offerHotelFor,
+  oldPullStays,
+  planBookingsFromDraft,
+  type ExistingBooking,
+} from "./seed-plan";
 import { carText, DRV } from "./drivers";
+import { HOTEL_ID_KEY } from "./voucher-dto";
 
 /** The trial's case: Malaysia 20–27 Nov, KL 4 + Langkawi 3, 2 + 2, a domestic flight there and back. */
 function malaysia(): DraftData {
@@ -313,5 +325,176 @@ describe("pulling again never makes a twin (order 3)", () => {
     ]);
     expect(fresh).toHaveLength(2);
     expect(links).toEqual([]);
+  });
+});
+
+/**
+ * AD-2-3599 as it was issued (offer_renders v1 source_draft, 2026-10-17): Bali 11 nights, the
+ * international flight planned but not ticketed (no number, no landing), a tour put on the
+ * arrival day, the farewell taken off the city's card and «جولة قبل المغادرة» on the day home.
+ */
+function bali(over: { flights?: Partial<DraftFlight>[]; airport?: boolean } = {}): DraftData {
+  const room = { price: 900, board_type: "BB", room_type_id: null, room_type_name: "غرفة ديلوكس" };
+  const flights = [
+    { ...emptyFlight("outbound"), from_airport: "مطار الملك عبدالعزيز الدولي (JED)", to_airport: "مطار بالي نجوراه راي (DPS)", from_city: "جدة", to_city: "بالي", departure_at: "2026-10-07T00:00" },
+    { ...emptyFlight("inbound"), from_airport: "مطار بالي نجوراه راي (DPS)", to_airport: "مطار الملك عبدالعزيز الدولي (JED)", from_city: "بالي", to_city: "جدة", departure_at: "2026-10-18T00:00" },
+  ].map((f, i) => ({ ...f, ...(over.flights?.[i] ?? {}) }));
+  const leg = { cars: 1, note: "", enabled: true, car_type: "سيارة صغيرة" };
+  return normalizeDraftData({
+    trip: { ...emptyDraftData().trip, adults: 2, nights: 11, country: "اندونيسيا", arrival_date: "2026-10-07", departure_date: "2026-10-18" },
+    scope: { visas: true, hotels: true, services: true, transport: true, flights_intl: true, flights_domestic: false },
+    cities: [
+      {
+        key: "بالي#1",
+        nights: 11,
+        check_in: "2026-10-07",
+        check_out: "2026-10-18",
+        city_name: "بالي",
+        tours: 3,
+        tour_picks: [
+          { program_id: null, title: "الجولة الأولى في بالي", text: "", price: 122, date: "2026-10-07", cars: 1 },
+          { program_id: null, title: "الجولة الثالثة في بالي", text: "", price: 120, date: "2026-10-08", cars: 1 },
+          { program_id: null, title: "الجولة الخامسة في بالي", text: "", price: 1122, date: "2026-10-14", cars: 1, departure: true },
+        ],
+        services: [{ id: "in", price: 122 }, { id: "out", removed: true }],
+      },
+    ],
+    hotels: [{ id: "stay-fx928rg2", rooms: [room], nights: 0, hotel_id: "51e1ab4b", city_name: "بالي", hotel_name: "فندق اريادوتا بالي", rooms_count: 1, manual_currency: "SAR" }],
+    flights,
+    transport_plan: { tours: leg, airport: { ...leg, enabled: over.airport ?? true }, intercity: { ...leg, enabled: false, mode: "car", modes: ["car"], hop_modes: {} } },
+  } as unknown as Record<string, unknown>);
+}
+
+describe("the pull on AD-2-3599 — the owner's evaluation (2026-10-18)", () => {
+  const transfers = (data: DraftData) => planBookingsFromDraft(data, "").filter((r) => r.kind === "transport");
+
+  it("books the drive to the airport though the farewell was taken off the card — and says so", () => {
+    const rows = transfers(bali());
+    expect(rows.map((r) => [r.title, r.start_date])).toEqual([
+      ["المطار ← فندق بالي", "2026-10-07"],
+      ["فندق بالي ← المطار", "2026-10-18"],
+    ]);
+    expect(rows[1].detail[NOTICE]).toBe(FAREWELL_UNSOLD);
+    expect(rows[1].detail["الوقت"]).toBe(LATER);
+    expect(rows[0].detail[NOTICE]).toBeUndefined();
+  });
+
+  it("adds no farewell of its own where the offer has one, nor where it books no airport drives or no flight home", () => {
+    const own = planBookingsFromDraft(malaysia(), "").filter((r) => r.kind === "transport" && r.title.endsWith("← المطار"));
+    expect(own.map((r) => r.detail[NOTICE])).toEqual([undefined, undefined]);
+    expect(transfers(bali({ airport: false }))).toEqual([]);
+    const home = bali();
+    home.flights = home.flights.filter((f) => f.leg_order !== "inbound");
+    expect(transfers(home).map((r) => r.title)).toEqual(["المطار ← فندق بالي"]);
+  });
+
+  it("never sets a tour off at 09:00 on the day the group lands — «يُحدَّد لاحقاً» and a notice while the landing is unknown", () => {
+    const tours = planBookingsFromDraft(bali(), "").filter((r) => r.origin_ref.startsWith("tour:"));
+    expect(tours.map((t) => [t.start_date, t.detail[DRV.start], t.detail[NOTICE] ?? null])).toEqual([
+      ["2026-10-07", LATER, ARRIVAL_DAY_TOUR],
+      ["2026-10-08", "09:00", null],
+      // «جولة قبل المغادرة» on the day home is no arrival day
+      ["2026-10-18", "09:00", null],
+    ]);
+  });
+
+  it("sets it off three hours after a known landing", () => {
+    const data = bali({ flights: [{ flight_no: "GA881", departure_at: "2026-10-07T01:10", arrival_at: "2026-10-07T14:30" }] });
+    const first = planBookingsFromDraft(data, "").find((r) => r.origin_ref.startsWith("tour:"))!;
+    expect([first.start_date, first.detail[DRV.start], first.detail[NOTICE]]).toEqual(["2026-10-07", "17:30", ARRIVAL_DAY_TOUR]);
+    // landing too late for the day: left for operations to time
+    const late = bali({ flights: [{ flight_no: "GA881", departure_at: "2026-10-07T10:00", arrival_at: "2026-10-07T22:40" }] });
+    expect(planBookingsFromDraft(late, "").find((r) => r.origin_ref.startsWith("tour:"))!.detail[DRV.start]).toBe(LATER);
+  });
+
+  it("carries the catalogue hotel on the stay, so its address is its own and not a namesake's", () => {
+    const stay = planBookingsFromDraft(bali(), "").find((r) => r.kind === "hotel")!;
+    expect(stay.detail[HOTEL_ID_KEY]).toBe("51e1ab4b");
+  });
+});
+
+describe("one bad hotel line never fails the whole pull (owner's order B6)", () => {
+  it("gives a line held by two stops of one city's name a ref per visit", () => {
+    // KL → Langkawi → KL, its hotel line written before stops had keys: it belongs to both KL stops by name
+    const data = malaysia();
+    data.cities = [...data.cities, { ...data.cities[0], key: "كوالالمبور#2", nights: 1, check_in: "2026-11-27", check_out: "2026-11-28", tours: 0, tour_picks: [] }];
+    data.hotels = data.hotels.map((h) => (h.city_name === "كوالالمبور" ? { ...h, city_key: undefined } : h));
+    const id = data.hotels.find((h) => h.city_name === "كوالالمبور")!.id;
+    const refs = planBookingsFromDraft(data, "")
+      .filter((r) => r.kind === "hotel")
+      .map((r) => r.origin_ref);
+    expect(refs.filter((r) => r.startsWith(`stay:${id}`))).toEqual([`stay:${id}`, `stay:${id}#2`]);
+    expect(new Set(refs).size).toBe(refs.length);
+  });
+});
+
+describe("what a hand-typed booking stands for (owner's order B3–B4)", () => {
+  const plan = planBookingsFromDraft(bali(), "");
+  const row = (p: Partial<ExistingBooking>): ExistingBooking => ({ origin_ref: null, kind: "hotel", city_name: "", start_date: null, end_date: null, status: "pending", ...p });
+
+  it("an empty city is no city — a hotel typed without one swallows no stay of its day", () => {
+    const { fresh, links } = newBookings(plan, [row({ id: "typed", title: "فندق مضاف", start_date: "2026-10-07", end_date: "2026-10-18" })]);
+    expect(fresh.map((r) => r.origin_ref)).toContain("stay:stay-fx928rg2");
+    expect(links).toEqual([]);
+  });
+
+  it("the same day alone does not make two hotels one — another named hotel of the city is added, not merged", () => {
+    const { fresh, links } = newBookings(plan, [row({ id: "second", title: "فندق آخر في بالي", city_name: "بالي", start_date: "2026-10-07", end_date: "2026-10-18" })]);
+    expect(fresh.map((r) => r.origin_ref)).toContain("stay:stay-fx928rg2");
+    expect(links).toEqual([]);
+  });
+
+  it("still links the same hotel typed by hand — by its catalogue id under another spelling, or by its name", () => {
+    const byId = newBookings(plan, [row({ id: "a", title: "Ariaduta Bali", city_name: "بالي", start_date: "2026-10-07", detail: { [HOTEL_ID_KEY]: "51e1ab4b" } })]);
+    expect(byId.links).toEqual([{ id: "a", origin_ref: "stay:stay-fx928rg2" }]);
+    const byName = newBookings(plan, [row({ id: "b", title: "فندق اريادوتا بالي - غرفة ديلوكس", city_name: "بالي", start_date: "2026-10-07" })]);
+    expect(byName.links).toEqual([{ id: "b", origin_ref: "stay:stay-fx928rg2" }]);
+    // two catalogue ids are two hotels, whatever the names say
+    const other = newBookings(plan, [row({ id: "c", title: "فندق اريادوتا بالي", city_name: "بالي", start_date: "2026-10-07", detail: { [HOTEL_ID_KEY]: "another" } })]);
+    expect(other.links).toEqual([]);
+  });
+
+  it("compares the old pull's «hotel:» rows stay by stay: the stay it is links, the others are still pulled", () => {
+    const stays = planBookingsFromDraft(malaysia(), "").filter((r) => r.kind === "hotel");
+    const lines = [{ id: "oh1", hotel_id: null, hotel_name: "بولمان سيتي سنتر", check_in: "2026-11-20" }];
+    const cities = [
+      { id: "c1", city_name: "كوالالمبور", check_in: "2026-11-20", check_out: "2026-11-24", hotel_name: "بولمان سيتي سنتر" },
+      { id: "c2", city_name: "لنكاوي", check_in: "2026-11-24", check_out: "2026-11-27", hotel_name: "منتجع بيرجايا" },
+    ];
+    // as the old pull wrote it: no city
+    const held = oldPullStays([row({ id: "old", origin_ref: "hotel:oh1", title: "بولمان سيتي سنتر", start_date: "2026-11-20", end_date: "2026-11-24" })], lines, cities);
+    expect(held[0].city_name).toBe("كوالالمبور");
+    const { fresh, links } = newBookings(stays, held);
+    expect(links).toEqual([{ id: "old", origin_ref: stays[0].origin_ref }]);
+    expect(fresh.map((r) => r.title)).toEqual(["منتجع بيرجايا"]);
+  });
+});
+
+describe("the offer's own hotel line (owner's order B2, B5)", () => {
+  const cities = [
+    { id: "c1", city_name: "بونشاك", check_in: "2026-10-31", check_out: "2026-11-03", hotel_name: null },
+    { id: "c2", city_name: "بالي", check_in: "2026-11-03", check_out: "2026-11-07", hotel_name: "نوفوتيل بالي" },
+  ];
+
+  it("finds an offer_hotels row's city — its stop, its printed hotel, its dates", () => {
+    expect(offerHotelCity({ offer_city_id: "c1", hotel_name: "x", check_in: null }, cities)).toBe("بونشاك");
+    expect(offerHotelCity({ hotel_name: "نوفوتيل بالي", check_in: null }, cities)).toBe("بالي");
+    expect(offerHotelCity({ hotel_name: "فندق", check_in: "2026-11-01" }, cities)).toBe("بونشاك");
+    expect(offerHotelCity({ hotel_name: "فندق", check_in: "2026-12-01" }, cities)).toBe("");
+  });
+
+  it("takes the rate of the booking's OWN hotel — never the offer's first", () => {
+    const lines = [
+      { hotel_id: "h-a", hotel_name: "فندق أ", check_in: "2026-10-31", check_out: "2026-11-03", rate_key: "RATE-A", city: "بونشاك" },
+      { hotel_id: "h-b", hotel_name: "فندق ب", check_in: "2026-11-03", check_out: "2026-11-07", rate_key: "RATE-B", city: "بالي" },
+    ];
+    const b = { title: "فندق ب", city_name: "بالي", start_date: "2026-11-03", end_date: "2026-11-07" };
+    expect(offerHotelFor(b, lines)?.rate_key).toBe("RATE-B");
+    expect(offerHotelFor({ ...b, title: "Hotel B", detail: { [HOTEL_ID_KEY]: "h-b" } }, lines)?.rate_key).toBe("RATE-B");
+    // a hotel the offer never priced, or the right name on other dates: none — refused, not borrowed
+    expect(offerHotelFor({ ...b, title: "فندق ج" }, lines)).toBeNull();
+    expect(offerHotelFor({ ...b, start_date: "2026-11-04" }, lines)).toBeNull();
+    // two lines it could be: refused as well
+    expect(offerHotelFor(b, [...lines, { ...lines[1], rate_key: "RATE-B2" }])).toBeNull();
   });
 });

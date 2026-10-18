@@ -16,6 +16,8 @@ import { WelcomeBoardDocument } from "@/components/offer-doc/WelcomeBoardDocumen
 import { renderDocHtml } from "@/lib/offer-doc/html";
 import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
+import { normAr } from "@/lib/catalog/norm";
+import { catalogHotelsFor } from "@/lib/data/hotel-match";
 import { gateOps, gateRow, mayWork, opsAccess } from "@/lib/operations/access";
 import { carText, DRV, driverServiceKind, linkOf, meetTime, type ServiceKind } from "@/lib/operations/drivers";
 import { hotelsMessage, programmeMessage, programmeUpdate, recipientKey, type HotelGap, type ProgrammeInput } from "@/lib/operations/driver-programme";
@@ -58,6 +60,8 @@ export type ProgrammeDraft = {
   update: string | null;
   /** hotels missing an address or a phone — warned before sending, never printed as «—». */
   gaps: HotelGap[];
+  /** the case's hotels whose city none of its drives names — left out of this message, and said so. */
+  unplaced: string[];
   serial: string;
   /** the arrival sign's name, for sending it by hand — the lead traveller's as in the passport (leadName). */
   customer: string;
@@ -104,8 +108,17 @@ export async function draftDriverProgramme(bookingId: string): Promise<{ ok: tru
     if (!mine) return { ok: false, error: "ops.err.notFound" };
     const key = recipientKey(mine);
     const covered = key ? cities.filter((c) => recipientKey(c) === key) : [mine];
-    const keys = new Set(covered.map((c) => c.key));
-    const stays = bookings.filter((b) => b.kind === "hotel" && b.status !== "cancelled" && keys.has(normalizeName(cityOf(b))));
+    // the cities by their letters alone — «كوالا لمبور» is «كوالالمبور», «جده» is «جدة»
+    const place = (s: string) => normAr(s).replace(/\s+/g, "");
+    const mineAt = new Set(covered.map((c) => place(c.name)));
+    const anyAt = new Set(cities.map((c) => place(c.name)));
+    const hotelsOn = bookings.filter((b) => b.kind === "hotel" && b.status !== "cancelled");
+    const stays = hotelsOn.filter((b) => mineAt.has(place(cityOf(b))));
+    // A hotel whose city no drive of the case names (none written, or another spelling) is
+    // nobody's by city: the one recipient of the whole trip gets it all the same; anyone
+    // else is told it is missing — it used to drop out of the message without a word.
+    const unplaced = hotelsOn.filter((b) => !anyAt.has(place(cityOf(b))));
+    if (covered.length === cities.length) stays.push(...unplaced);
 
     const op = opRes.data as unknown as { travel_start: string | null; travel_end: string | null; offers: unknown } | null;
     const offer = one(op?.offers as { serial: string; destination: string | null } | { serial: string; destination: string | null }[] | null);
@@ -119,16 +132,14 @@ export async function draftDriverProgramme(bookingId: string): Promise<{ ok: tru
       return link ? [link.from, link.to] : [];
     }))];
     const cityNames = [...new Set([...covered.map((c) => c.name), ...stays.map(cityOf)].filter(Boolean))];
-    type HotelRow = { arabic_name: string; english_name: string | null; address: string | null; contact_number: string | null; google_maps: string | null };
+    type HotelRow = { id: string; arabic_name: string; city_id: string | null; english_name: string | null; address: string | null; contact_number: string | null; google_maps: string | null };
     type CityRow = { arabic_name: string; lat: number | null; lng: number | null; country_id: string | null };
-    const [hotelsRes, citiesRes, airportsRes] = await Promise.all([
-      stays.length > 0
-        ? supabase.from("hotels").select("arabic_name, english_name, address, contact_number, google_maps").in("arabic_name", [...new Set(stays.map((s) => s.title.trim()))])
-        : Promise.resolve({ data: [] }),
+    const [catalog, citiesRes, airportsRes] = await Promise.all([
+      // the booking's own hotel (its catalogue id, else its name in its city) — never a namesake elsewhere
+      catalogHotelsFor<HotelRow>(supabase, stays.map((s) => ({ ...s, city_name: cityOf(s) })), "english_name, address, contact_number, google_maps"),
       cityNames.length > 0 ? supabase.from("cities").select("arabic_name, lat, lng, country_id").in("arabic_name", cityNames) : Promise.resolve({ data: [] }),
       codes.length > 0 ? supabase.from("airports").select("code, arabic_name").in("code", codes) : Promise.resolve({ data: [] }),
     ]);
-    const hotelRows = (hotelsRes.data ?? []) as HotelRow[];
     const cityRows = (citiesRes.data ?? []) as CityRow[];
     const countryIds = [...new Set(cityRows.map((c) => c.country_id).filter((x): x is string => !!x))];
     const countries = countryIds.length > 0 ? (((await supabase.from("countries").select("arabic_name").in("id", countryIds)).data ?? []) as { arabic_name: string }[]) : [];
@@ -151,7 +162,7 @@ export async function draftDriverProgramme(bookingId: string): Promise<{ ok: tru
         car: carText(t.booking.detail),
       })),
       stays: stays.map((s) => {
-        const h = hotelRows.find((r) => r.arabic_name.trim() === s.title.trim());
+        const h = catalog.pick({ ...s, city_name: cityOf(s) });
         const c = cityRow(cityOf(s));
         return {
           name: s.title,
@@ -193,6 +204,7 @@ export async function draftDriverProgramme(bookingId: string): Promise<{ ok: tru
         hotels: hotels.body,
         update: programmeUpdate(await toldBefore(supabase, operationId, to), programme, input.serial),
         gaps: hotels.gaps,
+        unplaced: covered.length === cities.length ? [] : unplaced.map((b) => `${b.title}${cityOf(b) ? ` — ${cityOf(b)}` : ""}`),
         serial: input.serial,
         customer,
       },

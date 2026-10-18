@@ -60,7 +60,15 @@ export function AssignBooking({
   const value = unset ? "" : `${booking.assignee_kind ?? "ops"}:${currentId ?? ""}`;
   // our suppliers that sell this kind of booking — and whoever already has it
   const matching = new Set(suppliersFor(assignees.filter((a) => a.kind === "supplier"), booking.kind).map((a) => a.id));
-  const options = assignees.filter((a) => a.kind !== "supplier" || matching.has(a.id) || a.id === currentId);
+  const listed = assignees.filter((a) => a.kind !== "supplier" || matching.has(a.id) || a.id === currentId);
+  // Whoever holds it now, even when the list no longer offers them (a supplier set «Disabled»,
+  // a partner made inactive): shown by name and marked — a value with no option of its own
+  // made the browser show the first one, «قسم العمليات» (as TransportStep keeps its city's supplier).
+  const missing = !unset && !listed.some((a) => `${a.kind}:${a.id ?? ""}` === value);
+  const holder = booking.assignee_label ?? (booking.assignee_kind === "ops" ? t("ops.assignee.ops") : "—");
+  // the list still loading says nothing about them yet
+  const shown = assignees.length > 0 ? `${holder} (${t("ops.assignee.inactive")})` : holder;
+  const options: AssigneeOption[] = missing ? [...listed, { kind: booking.assignee_kind ?? "ops", id: currentId, label: shown, phone: null }] : listed;
 
   function assign(raw: string) {
     const [kind, id] = raw.split(":") as [AssigneeKind, string];

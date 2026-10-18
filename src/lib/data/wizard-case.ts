@@ -14,6 +14,10 @@ import { toTravelerListItem, type TravelerRow } from "@/lib/operations/traveler-
 import { ownStates, readiness, readyToTravel, staleWaits } from "@/lib/operations/wizard/index";
 import { followUpOf, readWaits, withoutWaits, type FollowUpItem, type FollowUpTone } from "@/lib/operations/wizard/followup";
 import { writeWaits } from "@/lib/data/wizard-sync";
+import { seedBookingsFromOffer } from "@/lib/data/operation-seed";
+import { offerBookingKinds } from "@/lib/data/offer-pull";
+import { isOpenAIConfigured } from "@/lib/providers/openai";
+import { getOcrProvider } from "@/lib/repackage/extract/ocr";
 import type { ReadinessItem, ReadyExceptions, WizardCase } from "@/lib/operations/wizard/types";
 
 /**
@@ -28,25 +32,38 @@ import type { ReadinessItem, ReadyExceptions, WizardCase } from "@/lib/operation
  * Loading the case also drops the «ينتظر» of every step now done, whichever
  * screen finished it («عرض الكل» loads this too) — the server half of the
  * rule; operation-sync drops the bookings' steps' after each confirmation.
+ *
+ * A case with no booking at all is pulled from its offer here, as its
+ * travelers are seeded: the wizard has no «اسحب» of its own to forget to press.
  */
+
+/** The case's bookings — pulled from the offer first when it holds none yet (the pull adds no twin). */
+async function listOrPullBookings(operationId: string) {
+  const listed = await listBookings(operationId);
+  if (listed.length > 0) return listed;
+  const pulled = await seedBookingsFromOffer(operationId);
+  return pulled.ok && pulled.added > 0 ? listBookings(operationId) : listed;
+}
 
 /** null when the case is not the caller's to see, or does not exist. */
 export async function loadWizardCase(operationId: string): Promise<WizardCase | null> {
   const operation = (await listOperations()).find((o) => o.id === operationId);
   if (!operation) return null;
   const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
-  const [travelers, payments, installments, bookings, documents, supplierWork, guide, days, op, offer] = await Promise.all([
+  const [travelers, payments, installments, bookings, documents, supplierWork, guide, days, op, offer, offerKinds] = await Promise.all([
     // a new case starts with the travelers the offer was sold for
     listOrSeedTravelers(operationId),
     listOperationPayments(operationId),
     listInstallments(operationId),
-    listBookings(operationId),
+    listOrPullBookings(operationId),
     listDocuments(operationId),
     getSupplierWork(operationId),
     getCaseGuide(operationId),
     supabase.from("offer_days").select("id", { count: "exact", head: true }).eq("offer_id", operation.offer_id),
     supabase.from("operations").select("client_token, client_token_revoked_at, waits, ready_exceptions").eq("id", operationId).maybeSingle(),
     supabase.from("offers").select("adults, children, infants").eq("id", operation.offer_id).maybeSingle(),
+    // what the offer books — «لا ينطبق» only for a kind it has none of (the caller sees this case: listOperations)
+    offerBookingKinds(operationId),
   ]);
   const row = op.data as { client_token: string | null; client_token_revoked_at: string | null; waits: unknown; ready_exceptions: unknown } | null;
   const pax = offer.data as { adults: number | null; children: number | null; infants: number | null } | null;
@@ -66,6 +83,9 @@ export async function loadWizardCase(operationId: string): Promise<WizardCase | 
     today: riyadhDate(),
     sold: pax ? { adults: pax.adults ?? 0, children: pax.children ?? 0, infants: pax.infants ?? 0 } : null,
     guide,
+    offerKinds,
+    // the readers upload-text.ts tries for a picture; without either, only text reads
+    readsImages: isOpenAIConfigured() || getOcrProvider().isConfigured(),
   };
   // a step that is done no longer waits on anyone
   const stale = staleWaits(data.waits, ownStates(data));

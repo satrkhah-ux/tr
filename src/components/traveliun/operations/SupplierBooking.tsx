@@ -11,6 +11,8 @@ import {
   type PriceCheck,
 } from "@/lib/data/supplier-booking";
 import { DirText } from "@/components/DirText";
+import type { TranslationKey } from "@/lib/i18n";
+import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
 /**
@@ -45,6 +47,7 @@ export function SupplierBooking({
   canBook: boolean;
   onDone: () => void;
 }) {
+  const { t } = useTraveliunUI();
   const [pending, startTransition] = useSafeTransition();
   const [price, setPrice] = useState<PriceCheck | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -58,8 +61,9 @@ export function SupplierBooking({
   const inFlight = booking.status === "in_flight";
   const dearer = price?.difference != null && price.difference > 0;
 
-  const say = (res: { ok: boolean; error?: string; message?: string }) =>
-    setMessage("message" in res && res.message ? res.message : "error" in res && res.error ? res.error : null);
+  // an error is a key — said in words, never printed as «ops.err.…»
+  const say = (res: { ok: boolean; error?: TranslationKey; message?: string }) =>
+    setMessage("message" in res && res.message ? res.message : "error" in res && res.error ? t(res.error) : null);
 
   return (
     <div className="mt-2 rounded-[9px] border border-[#dbe6e1] bg-[#f8fbf9] p-3">

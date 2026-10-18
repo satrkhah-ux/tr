@@ -21,6 +21,7 @@ import { toInstant } from "@/lib/offer/schedule";
 import { flightTicketed } from "@/lib/operations/client-booking-state";
 import { parseLeg } from "@/lib/operations/drivers";
 import { LANDS, LATER } from "@/lib/operations/seed-plan";
+import { notPulled } from "./pull";
 import type { ReadinessItem, StepState, WizardCase } from "./types";
 
 // ---------------- the step's state ----------------
@@ -30,16 +31,17 @@ export function flightBookings(data: Pick<WizardCase, "bookings">): OperationBoo
   return data.bookings.filter((b) => b.kind === "flight" && b.status !== "cancelled");
 }
 
-export function flightsState(data: Pick<WizardCase, "bookings">): StepState {
+export function flightsState(data: Pick<WizardCase, "bookings" | "offerKinds">): StepState {
   const flights = flightBookings(data);
-  if (flights.length === 0) return "na";
+  if (flights.length === 0) return notPulled(data, "flight") ? "todo" : "na";
   return flights.every(flightTicketed) ? "done" : "todo";
 }
 
 /** «التذاكر»: every flight booking ticketed — mandatory before «جاهز للسفر». */
 export function flightsReadiness(data: Pick<WizardCase, "bookings">): ReadinessItem[] {
   const flights = flightBookings(data);
-  return flights.length === 0 ? [] : [{ step: "flights", key: "tickets", ok: flights.every(flightTicketed) }];
+  if (flights.length === 0) return notPulled(data, "flight") ? [{ step: "flights", key: "pulled", ok: false }] : [];
+  return [{ step: "flights", key: "tickets", ok: flights.every(flightTicketed) }];
 }
 
 // ---------------- the legs, as stored ----------------

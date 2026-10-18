@@ -22,16 +22,19 @@ import {
   driverDiffers,
   driverTargets,
   requestTrips,
+  tourBeforeArrival,
   transportCities,
   type Driver,
   type TransportCity,
   type TransportTrip,
 } from "@/lib/operations/wizard/transport";
+import { notPulled } from "@/lib/operations/wizard/pull";
 import type { StepProps } from "@/lib/operations/wizard/types";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { useSafeTransition } from "../../useSafeTransition";
 import { DriverSend } from "../DriversPanel";
+import { PullNotice } from "./FlightsStep";
 
 const card = "rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]";
 const field =
@@ -69,6 +72,8 @@ export function TransportStep({ data }: StepProps) {
   }, [operationId, names]);
 
   if (cities.length === 0) {
+    // the offer has drives or tours the case does not hold yet — pull them, never «لا ينطبق»
+    if (notPulled(data, "transport")) return <PullNotice operationId={operationId} />;
     return <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">{t("wz.transport.none")}</p>;
   }
   // the server's clock, as the supplier panel reads it — the same hours on both renders (no work, no request to time)
@@ -447,6 +452,9 @@ function TripRow({ trip, city, operationId }: { trip: TransportTrip; city: Trans
           <span className="rounded-full bg-[#fff4e0] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">
             {t("wz.transport.driverDiffers")}: {[trip.driver.name, trip.driver.phone].filter(Boolean).join(" · ")}
           </span>
+        ) : null}
+        {tourBeforeArrival(trip, city) ? (
+          <span className="rounded-full bg-[#fdeef2] px-2 py-0.5 text-[10.5px] font-bold text-[#c22850]">{t("wz.transport.arrivalTour")}</span>
         ) : null}
         <button
           type="button"

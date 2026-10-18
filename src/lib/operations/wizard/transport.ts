@@ -2,6 +2,8 @@ import type { OperationBooking } from "@/lib/data/operation-bookings";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { DRV, driverServiceKind, meetTime, type ServiceKind } from "@/lib/operations/drivers";
 import type { RequestState } from "@/lib/operations/supplier-request";
+import { MEET_AFTER_LANDING, TOUR_AFTER_LANDING } from "@/lib/operations/seed-plan";
+import { notPulled } from "./pull";
 import type { ReadinessItem, StepState, WizardCase } from "./types";
 
 /**
@@ -105,6 +107,22 @@ export function transportCities(data: Pick<WizardCase, "bookings" | "supplierWor
     .sort((a, b) => when(a.trips[0]).localeCompare(when(b.trips[0])));
 }
 
+const minutesOf = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+
+/**
+ * A tour on the day the group is met at the city's airport that may set off
+ * before the group is at its hotel (AD-2-3599: two tours at 09:00 on a day
+ * landing at an unknown hour): either time still unknown, or the tour less than
+ * TOUR_AFTER_LANDING after the landing (the reception meets 45 min after it).
+ */
+export function tourBeforeArrival(trip: TransportTrip, city: TransportCity): boolean {
+  if (trip.kind !== "tour" || !trip.booking.start_date) return false;
+  const met = city.trips.find((t) => t.kind === "reception" && t.booking.start_date === trip.booking.start_date);
+  if (!met) return false;
+  if (!trip.time || !met.time) return true;
+  return minutesOf(trip.time) < minutesOf(met.time) + TOUR_AFTER_LANDING - MEET_AFTER_LANDING;
+}
+
 /** A trip whose driver was set apart from the city's — shown, and kept when the city's driver changes. */
 export const driverDiffers = (trip: TransportTrip, city: TransportCity) =>
   Boolean(trip.driver.name || trip.driver.phone) && !sameDriver(trip.driver, city.driver);
@@ -130,10 +148,10 @@ export function requestTrips(city: TransportCity): { supplierId: string; ids: st
   return { supplierId, ids: open.map((b) => b.id) };
 }
 
-/** «na» with no drive or tour on the file; done once every city has its supplier and its confirmation. */
-export function transportState(data: Pick<WizardCase, "bookings" | "supplierWork">): StepState {
+/** «na» with no drive or tour in the offer; done once every city has its supplier and its confirmation. */
+export function transportState(data: Pick<WizardCase, "bookings" | "supplierWork" | "offerKinds">): StepState {
   const cities = transportCities(data);
-  if (cities.length === 0) return "na";
+  if (cities.length === 0) return notPulled(data, "transport") ? "todo" : "na";
   return cities.every((c) => c.supplied && c.confirmed) ? "done" : "todo";
 }
 
@@ -144,7 +162,7 @@ export function transportState(data: Pick<WizardCase, "bookings" | "supplierWork
  */
 export function transportReadiness(data: Pick<WizardCase, "bookings" | "supplierWork">): ReadinessItem[] {
   const cities = transportCities(data);
-  if (cities.length === 0) return [];
+  if (cities.length === 0) return notPulled(data, "transport") ? [{ step: "transport", key: "pulled", ok: false }] : [];
   return [
     { step: "transport", key: "supplier", ok: cities.every((c) => c.supplied) },
     { step: "transport", key: "confirmed", ok: cities.every((c) => c.confirmed) },

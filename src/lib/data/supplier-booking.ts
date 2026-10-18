@@ -11,6 +11,7 @@ import { listTravelers } from "@/lib/data/operation-travelers";
 import { currentCan } from "@/lib/roles/current";
 import { gateRow } from "@/lib/operations/access";
 import { getSupplierAdapterLogged } from "@/lib/providers/hotel-registry";
+import { offerHotelCity, offerHotelFor } from "@/lib/operations/seed-plan";
 import type { BookGuest, SupplierCallRecord } from "@/lib/providers/hotel-supplier";
 
 /**
@@ -89,6 +90,7 @@ type BookingRow = {
   operation_id: string;
   kind: string;
   title: string;
+  city_name: string;
   status: string;
   supplier_name: string;
   client_reference: string | null;
@@ -103,7 +105,7 @@ type BookingRow = {
 };
 
 const BOOKING_COLUMNS =
-  "id, operation_id, kind, title, status, supplier_name, client_reference, supplier_booking_code, supplier_ref, confirmation_number, quoted_net, currency, start_date, end_date, detail";
+  "id, operation_id, kind, title, city_name, status, supplier_name, client_reference, supplier_booking_code, supplier_ref, confirmation_number, quoted_net, currency, start_date, end_date, detail";
 
 async function loadBooking(bookingId: string): Promise<BookingRow | null> {
   const supabase = await db();
@@ -116,21 +118,27 @@ async function loadBooking(bookingId: string): Promise<BookingRow | null> {
  *
  * Prefers the code returned by the most recent PreBook (TBO re-issues it and the
  * new one is the only valid session), and falls back to the rate the offer was
- * priced from. Never invents one — no code means no machine booking, and the
- * agent uses the manual path.
+ * priced from — for THIS booking's hotel: its catalogue hotel (else its name) on
+ * its own dates, in its own city (offerHotelFor). It used to take the first
+ * priced hotel of the offer for any booking, and the price check then wrote that
+ * other hotel's rate over this one. Never invents one, never borrows one: no
+ * line of its own means no machine booking, and the agent uses the manual path.
  */
 async function bookingCodeFor(row: BookingRow): Promise<string | null> {
   if (row.supplier_booking_code) return row.supplier_booking_code;
   try {
     const supabase = await db();
-    const { data } = await supabase
-      .from("offer_hotels")
-      .select("rate_key, offers!inner(operations!inner(id))")
-      .eq("offers.operations.id", row.operation_id)
-      .not("rate_key", "is", null)
-      .limit(1)
-      .maybeSingle();
-    return (data as { rate_key: string | null } | null)?.rate_key ?? null;
+    const { data: op } = await supabase.from("operations").select("offer_id").eq("id", row.operation_id).maybeSingle();
+    const offerId = (op as { offer_id: string } | null)?.offer_id;
+    if (!offerId) return null;
+    const [linesRes, citiesRes] = await Promise.all([
+      supabase.from("offer_hotels").select("hotel_id, offer_city_id, hotel_name, check_in, check_out, rate_key").eq("offer_id", offerId).not("rate_key", "is", null),
+      supabase.from("offer_cities").select("id, city_name, check_in, check_out, hotel_name").eq("offer_id", offerId),
+    ]);
+    type Line = { hotel_id: string | null; offer_city_id: string | null; hotel_name: string | null; check_in: string | null; check_out: string | null; rate_key: string };
+    const cities = (citiesRes.data ?? []) as { id: string; city_name: string; check_in: string | null; check_out: string | null; hotel_name: string | null }[];
+    const lines = ((linesRes.data ?? []) as Line[]).map((l) => ({ ...l, city: offerHotelCity(l, cities) }));
+    return offerHotelFor(row, lines)?.rate_key ?? null;
   } catch {
     return null;
   }
@@ -168,7 +176,8 @@ export async function prebookHotel(bookingId: string): Promise<PriceCheck | Fail
   if (row.status === "cancelled") return { ok: false, message: "هذا الحجز ملغى." };
 
   const code = await bookingCodeFor(row);
-  if (!code) return { ok: false, message: "لا يوجد رمز سعر من المورّد لهذا الحجز — استخدم التأكيد اليدوي." };
+  // refused, and said why: no priced line of the offer is this hotel on these dates — another's is never used
+  if (!code) return { ok: false, error: "ops.err.rateNoMatch" };
 
   const sink: SupplierCallRecord[] = [];
   const adapter = await getSupplierAdapterLogged("tbo", sink);

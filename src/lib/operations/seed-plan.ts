@@ -24,9 +24,11 @@ import {
   splitVehicle,
   tourCars,
   tourVehicle,
+  vehicleText,
   type DraftCity,
   type DraftData,
   type DraftFlight,
+  type DraftTransport,
   type TourPick,
 } from "@/lib/offer/draft-types";
 import { cityDates, withTours } from "@/lib/offer/basic";
@@ -34,7 +36,7 @@ import { itineraryStartDate } from "@/lib/offer/schedule";
 import { BOARD_AR } from "@/components/offer-doc/labels";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { roomsJson, seededSpec, type BookingRoomSpec } from "./room-details";
-import { ROOM_SPEC_KEY } from "./voucher-dto";
+import { HOTEL_ID_KEY, hotelIdOf, ROOM_SPEC_KEY } from "./voucher-dto";
 
 export type PlannedBooking = {
   origin_ref: string;
@@ -58,8 +60,14 @@ export const LATER = "يُحدَّد لاحقاً";
 export const MEET_AFTER_LANDING = 45;
 export const BEFORE_INTL = 180;
 export const BEFORE_DOMESTIC = 120;
+/** A tour on the day the group lands sets off this long after the landing: met, driven, checked in. */
+export const TOUR_AFTER_LANDING = 180;
 /** The word a leg line puts before its landing — drivers.ts reads it back. */
 export const LANDS = "الوصول";
+/** The detail line that tells operations what the pull could not settle on its own. */
+export const NOTICE = "تنبيه";
+export const ARRIVAL_DAY_TOUR = "يوم الوصول — تبدأ الجولة بعد وصول المجموعة إلى الفندق";
+export const FAREWELL_UNSOLD = "التوديع إلى المطار — لم يكن بنداً مستقلاً في العرض (أُزيل أو صار جولة قبل المغادرة)";
 
 /** «YYYY-MM-DDTHH:mm» shifted by minutes, as the wall clock of the same place. */
 export function shift(at: string, minutes: number): { date: string; time: string } {
@@ -124,6 +132,9 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
   const pax = travellers(data.trip);
   const people = data.trip.adults + data.trip.children + data.trip.infants;
   const flights = [...data.flights].sort(byDeparture);
+  // the flight that brings the group to `city` on `date` — by its landing, else its take-off
+  const landsIn = (city: string, date: string) =>
+    flights.find((f) => f.leg_order !== "inbound" && f.to_city?.trim() === city.trim() && (f.arrival_at ?? f.departure_at ?? "").slice(0, 10) === date);
   const buyOf = (ref: string) => {
     const item = data.pricing.items.find((i) => i.ref === ref);
     return item?.buy_price != null ? { price: item.buy_price * (item.quantity > 0 ? item.quantity : 1), currency: item.buy_currency || "SAR" } : null;
@@ -174,9 +185,17 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
     const orphans = data.hotels
       .filter((h) => !placed.has(h.id) && h.hotel_name.trim())
       .map((line) => ({ line, city_name: line.city_name, nights: line.nights, check_in: null, check_out: null }));
+    // A line written before stops had keys goes by its city's NAME, so a city visited twice
+    // holds it twice (cityHotelLines) — booked on each visit, the second under a ref of its
+    // own: two rows under one ref broke the unique index and failed the whole pull.
+    const seen = new Map<string, number>();
     for (const stay of [...stays, ...orphans]) {
       const line = stay.line;
+      const n = (seen.get(line.id) ?? 0) + 1;
+      seen.set(line.id, n);
       const detail: Record<string, string> = { المدينة: stay.city_name };
+      // the catalogue's hotel, so its address and map are this one's, not a namesake's
+      if (line.hotel_id) detail[HOTEL_ID_KEY] = line.hotel_id;
       // the room as the catalogue names it — the offer's codes, else read from its name — for «تفاصيل الغرفة» and the voucher
       const specs: Record<string, BookingRoomSpec> = {};
       line.rooms.forEach((r, k) => {
@@ -191,7 +210,7 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       detail["النزلاء"] = pax;
       if (Object.keys(specs).length > 0) detail[ROOM_SPEC_KEY] = roomsJson(specs);
       rows.push({
-        origin_ref: `stay:${line.id}`,
+        origin_ref: n === 1 ? `stay:${line.id}` : `stay:${line.id}#${n}`,
         kind: "hotel",
         // issued before the hotel was chosen: booked all the same, named by operations
         title: line.hotel_name.trim() || `فندق ${stay.city_name} — ${LATER}`,
@@ -230,7 +249,16 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       if (from === TRANSPORT_AIRPORT) return named(to)[0]?.check_in ?? data.trip.arrival_date ?? null;
       return cities.find((c, i) => i > 0 && c.city_name.trim() === to.trim() && cities[i - 1].city_name.trim() === from.trim())?.check_in ?? null;
     };
-    for (const tr of data.transport) {
+    // The way home. A farewell taken off the last city's card — or turned into «جولة قبل
+    // المغادرة» (AD-2-3599) — leaves the offer without it, but the group still flies home
+    // from that city: the drive to the airport is booked all the same, and says why.
+    const last = cities.at(-1)?.city_name.trim();
+    const seenOff = data.transport.some((tr) => tr.to_place === TRANSPORT_AIRPORT && tr.from_place.replace(TRANSPORT_HOTEL_PREFIX, "").trim() === last);
+    const unsold: DraftTransport[] =
+      last && !seenOff && data.transport_plan.airport.enabled && intl.some((f) => f.leg_order === "inbound")
+        ? [{ from_place: `${TRANSPORT_HOTEL_PREFIX}${last}`, to_place: TRANSPORT_AIRPORT, car_type: vehicleText(data.transport_plan.farewell ?? data.transport_plan.airport), date: null, note: "" }]
+        : [];
+    for (const tr of [...data.transport, ...unsold]) {
       if (tr.from_place === TRANSPORT_TOURS) continue; // a tour's price includes its car
       const detail: Record<string, string> = {};
       let date = tr.date;
@@ -263,6 +291,7 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       detail["نقطة الالتقاء"] = meet;
       putCar(detail, tr.car_type ?? "");
       detail["الركاب"] = String(people);
+      if (unsold.includes(tr)) detail[NOTICE] = FAREWELL_UNSOLD;
       const buy = buyOf(transportRef(tr));
       rows.push({
         // a row the agent added on the city card is its own booking, under its own words
@@ -290,10 +319,19 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
         if (pick.free) return;
         const title = pick.title.trim() || `جولة سياحية في ${city.city_name}`;
         const detail: Record<string, string> = { المدينة: city.city_name, "وقت الانطلاق": "09:00" };
+        // The day the group reaches the city is no 09:00 tour — the plane may not be down
+        // yet (AD-2-3599): set off a while after a known landing, else «يُحدَّد لاحقاً», and say so.
+        const arrival = pick.date && (pick.date === city.check_in || landsIn(city.city_name, pick.date));
+        if (arrival) {
+          const f = landsIn(city.city_name, pick.date!);
+          const after = f?.arrival_at && timed(f, f.arrival_at) ? shift(f.arrival_at, TOUR_AFTER_LANDING) : null;
+          detail["وقت الانطلاق"] = after && after.date === pick.date ? after.time : LATER;
+        }
         // the car and how many — «فان» and 2, read together as «فان × 2»
         putCar(detail, tourVehicle(pick, data.transport_plan.tours.car_type));
         detail["الركاب"] = String(people);
         if (pick.text.trim()) detail["البرنامج"] = pick.text.trim();
+        if (arrival) detail[NOTICE] = ARRIVAL_DAY_TOUR;
         rows.push({
           origin_ref: `tour:${city.city_name}:${i}`,
           kind: "service",
@@ -344,18 +382,98 @@ export type ExistingBooking = {
   start_date: string | null;
   end_date: string | null;
   status: string;
+  /** a hotel's catalogue id rides here (HOTEL_ID_KEY). */
+  detail?: Record<string, string> | null;
 };
 
 /** A transfer's ref without its date — the pull wrote the farewell undated before it knew the day. */
 const undated = (ref: string) => (ref.startsWith("transfer:") ? ref.replace(/>[^>]*$/, ">") : ref);
-const dayPart = (d: string | null) => d?.slice(0, 10) ?? null;
-/** «نوفوتيل بالي» in «نوفوتيل بالي - غرفة مزدوجة شامل الإفطار» — the name the agent typed, with or without the room after it. */
-const sameName = (a: string | undefined, b: string) => {
+const dayPart = (d: string | null | undefined) => d?.slice(0, 10) ?? null;
+/** A name before its « - …» — «نوفوتيل بالي نوسا دوا» of «نوفوتيل بالي نوسا دوا - فندق». */
+const head = (s: string) => s.split(/\s[-–—]\s/)[0].trim();
+/**
+ * «نوفوتيل بالي» in «نوفوتيل بالي - غرفة مزدوجة شامل الإفطار» — the name the agent
+ * typed, with or without the room after it; or the same name before two different
+ * tails. A head of one word («فندق — يُحدَّد لاحقاً») says nothing.
+ */
+const sameName = (a: string | null | undefined, b: string | null | undefined) => {
   const x = normalizeName(a);
   const y = normalizeName(b);
-  return Boolean(x && y && (x.includes(y) || y.includes(x)));
+  if (!x || !y) return false;
+  if (x.includes(y) || y.includes(x)) return true;
+  const [hx, hy] = [head(x), head(y)];
+  const short = hx.length < hy.length ? hx : hy;
+  return short.split(" ").length >= 2 && (hx.includes(hy) || hy.includes(hx));
 };
-const sameCity = (a: string, b: string) => !a.trim() || !b.trim() || normalizeName(a) === normalizeName(b);
+/**
+ * The same city, spelling aside. An empty city is a city nobody wrote — it is no
+ * city at all, not every city: a hotel typed by hand without one used to cover
+ * any stay of its day (AD-2-3599).
+ */
+const sameCity = (a: string | null | undefined, b: string | null | undefined) => normalizeName(a) === normalizeName(b);
+/** «فندق بالي — يُحدَّد لاحقاً»: a stay booked before its hotel was chosen. */
+const unnamedStay = (title: string | undefined) => (title ?? "").trim().endsWith(LATER);
+
+/**
+ * The offer's city of an offer_hotels row, for an offer pulled without its draft:
+ * the stop it names, else the one stop that prints its hotel, else the one whose
+ * dates hold its check-in, else the trip's only city — "" when none says.
+ */
+export function offerHotelCity(
+  h: { offer_city_id?: string | null; hotel_name: string | null; check_in: string | null },
+  cities: { id: string; city_name: string; check_in: string | null; check_out: string | null; hotel_name?: string | null }[],
+): string {
+  const one = <T,>(list: T[]) => (list.length === 1 ? list[0] : undefined);
+  const day = dayPart(h.check_in);
+  const city =
+    cities.find((c) => h.offer_city_id && c.id === h.offer_city_id) ??
+    one(cities.filter((c) => sameName(c.hotel_name, h.hotel_name))) ??
+    one(cities.filter((c) => day && c.check_in && dayPart(c.check_in)! <= day && (!c.check_out || day < dayPart(c.check_out)!))) ??
+    one(cities);
+  return city?.city_name.trim() ?? "";
+}
+
+/**
+ * The hotels the OLD pull wrote («hotel:<offer_hotels.id>», no city, no
+ * catalogue id), as their offer lines say they are — so newBookings compares
+ * them stay by stay like any booking: the stay one IS links to it, and the
+ * stays none is are still pulled. A single «hotel:» ref used to keep every
+ * stay of the offer from being pulled at all.
+ */
+export function oldPullStays(
+  existing: ExistingBooking[],
+  lines: { id: string; hotel_id: string | null; offer_city_id?: string | null; hotel_name: string | null; check_in: string | null }[],
+  cities: Parameters<typeof offerHotelCity>[1],
+): ExistingBooking[] {
+  return existing.map((e) => {
+    const line = e.origin_ref?.startsWith("hotel:") ? lines.find((h) => `hotel:${h.id}` === e.origin_ref) : undefined;
+    if (!line) return e;
+    const detail = { ...(e.detail ?? {}) };
+    if (line.hotel_id && !hotelIdOf(detail)) detail[HOTEL_ID_KEY] = line.hotel_id;
+    return { ...e, city_name: e.city_name.trim() || offerHotelCity(line, cities), detail };
+  });
+}
+
+/**
+ * The offer's hotel line a booking is — never another's: its catalogue hotel
+ * when both hold one, else its name; on its own dates and in its own city where
+ * both say them. null when no line is, or more than one could be.
+ */
+export function offerHotelFor<T extends { hotel_id: string | null; hotel_name: string | null; check_in: string | null; check_out: string | null; city?: string }>(
+  b: { title: string; city_name: string; start_date: string | null; end_date: string | null; detail?: Record<string, string> | null },
+  lines: T[],
+): T | null {
+  const id = hotelIdOf(b.detail);
+  const agree = (x: string | null | undefined, y: string | null | undefined) => !x || !y || x === y;
+  const hits = lines.filter(
+    (l) =>
+      (id && l.hotel_id ? l.hotel_id === id : sameName(b.title, l.hotel_name)) &&
+      agree(dayPart(b.start_date), dayPart(l.check_in)) &&
+      agree(dayPart(b.end_date), dayPart(l.check_out)) &&
+      (!b.city_name.trim() || !l.city?.trim() || sameCity(b.city_name, l.city)),
+  );
+  return hits.length === 1 ? hits[0] : null;
+}
 
 export type SeedMatch<T> = {
   /** what the pull inserts. */
@@ -376,11 +494,15 @@ export type SeedMatch<T> = {
  * for them («سيارة الجولات ٠١–٠٢»). Each row covers one booking (a tour car:
  * one tour a day), so two hotels on the same dates still need two. A row that
  * stands for one booking is linked to it.
+ *
+ * A hotel is its catalogue hotel (or, without one, its name): the same day
+ * alone is not the same hotel. Another name stands in for a stay only when one
+ * of the two was booked before its hotel was chosen, on the same nights. A city
+ * matters wherever one is written — only a flight has none.
  */
-export function newBookings<T extends Pick<PlannedBooking, "origin_ref" | "city_name" | "start_date" | "title"> & { kind: string }>(
-  plan: T[],
-  existing: ExistingBooking[],
-): SeedMatch<T> {
+export function newBookings<
+  T extends Pick<PlannedBooking, "origin_ref" | "city_name" | "start_date" | "title"> & { kind: string; end_date?: string | null; detail?: Record<string, string> },
+>(plan: T[], existing: ExistingBooking[]): SeedMatch<T> {
   const refs = new Set(existing.map((e) => e.origin_ref).filter(Boolean));
   const planned = new Set(plan.map((p) => p.origin_ref));
   const pool = existing
@@ -390,7 +512,15 @@ export function newBookings<T extends Pick<PlannedBooking, "origin_ref" | "city_
   const covered = new Set<T>();
   const links: SeedMatch<T>["links"] = [];
   const isTour = (p: T) => p.origin_ref.startsWith("tour:");
-  const sameDay = (e: (typeof pool)[number], p: T) => Boolean(e.start && e.start === dayPart(p.start_date) && sameCity(e.city_name, p.city_name));
+  type Held = (typeof pool)[number];
+  const sameDay = (e: Held, p: T) => Boolean(e.start && e.start === dayPart(p.start_date) && (p.kind === "flight" || sameCity(e.city_name, p.city_name)));
+  // the catalogue's hotel when both hold one — two ids are two hotels whatever their names
+  const sameHotel = (e: Held, p: T) => {
+    const [a, b] = [hotelIdOf(e.detail), hotelIdOf(p.detail)];
+    return a && b ? a === b : sameName(e.title, p.title);
+  };
+  const sameNights = (e: Held, p: T) => !e.end || !p.end_date || e.end === dayPart(p.end_date);
+  const standsFor = (e: Held, p: T) => p.kind !== "hotel" || ((unnamedStay(p.title) || unnamedStay(e.title)) && sameNights(e, p));
   const take = (p: T, hit: (typeof pool)[number] | undefined) => {
     if (!hit) return;
     const date = dayPart(p.start_date);
@@ -407,7 +537,8 @@ export function newBookings<T extends Pick<PlannedBooking, "origin_ref" | "city_
       pool.find(
         (e) =>
           e.used.size === 0 &&
-          ((e.origin_ref && undated(e.origin_ref) === undated(p.origin_ref)) || (e.kind === p.kind && sameDay(e, p) && sameName(e.title, p.title))),
+          ((e.origin_ref && undated(e.origin_ref) === undated(p.origin_ref)) ||
+            (e.kind === p.kind && sameDay(e, p) && (p.kind === "hotel" ? sameHotel(e, p) : sameName(e.title, p.title)))),
       ),
     );
   }
@@ -427,7 +558,7 @@ export function newBookings<T extends Pick<PlannedBooking, "origin_ref" | "city_
             date <= (e.end ?? e.start!) &&
             !e.used.has(date) &&
             !e.used.has("*")
-          : e.kind === p.kind && e.used.size === 0 && sameDay(e, p),
+          : e.kind === p.kind && e.used.size === 0 && sameDay(e, p) && standsFor(e, p),
       ),
     );
   }

@@ -14,8 +14,8 @@ import { isOpenAIConfigured } from "@/lib/providers/openai";
 import { uploadText, type UploadHow } from "@/lib/repackage/extract/upload-text";
 import { mergeTicket, parseTicketText, sanitizeTicket, ticketGaps, ticketNumbersIn, type TicketLeg } from "@/lib/flights/ticket-parse";
 import { readTicketText } from "@/lib/flights/ticket-ai";
-import { normalizeName } from "@/lib/offer/pricing-suggest";
 import type { PassportView, TravelerRow } from "@/lib/operations/traveler-dto";
+import { catalogHotelsFor } from "@/lib/data/hotel-match";
 import { badLeg, checkNames, toFlightLegs, withTicketLines, type LegInput, type NameCheck, type TravelerNames } from "@/lib/operations/wizard/flights";
 import { hotelDiffs, parseHotelConfirmation, type HotelConfirmation, type HotelDiff } from "@/lib/operations/wizard/hotels";
 
@@ -224,14 +224,15 @@ export async function saveBookingTicket(input: {
 
 type HotelRow = { id: string; address: string | null; contact_number: string | null };
 
-/** The /hotels row the booking is — by its name, in its city when two share it; none when unsure. */
+/**
+ * The /hotels row the booking is — its catalogue id, else its name in its city
+ * (hotel-match.ts); none when unsure: this row's empty address is FILLED from the
+ * paper, and a namesake in another city must never be the one written.
+ */
 async function hotelOf(db: SupabaseClient, booking: BookingRow): Promise<HotelRow | null> {
-  const name = booking.title.trim();
-  if (!name) return null;
-  const { data } = await db.from("hotels").select("id, address, contact_number, cities(arabic_name)").eq("arabic_name", name).limit(5);
-  const rows = (data ?? []) as unknown as (HotelRow & { cities: { arabic_name: string } | { arabic_name: string }[] | null })[];
-  const cityOf = (r: (typeof rows)[number]) => (Array.isArray(r.cities) ? r.cities[0] : r.cities)?.arabic_name;
-  const hit = rows.length === 1 ? rows[0] : rows.find((r) => normalizeName(cityOf(r)) === normalizeName(booking.city_name));
+  if (!booking.title.trim()) return null;
+  const { pick } = await catalogHotelsFor<HotelRow & { arabic_name: string; city_id: string | null }>(db, [booking], "address, contact_number");
+  const hit = pick(booking);
   return hit ? { id: hit.id, address: hit.address, contact_number: hit.contact_number } : null;
 }
 

@@ -7,6 +7,7 @@ import type { Permission } from "@/lib/roles/roles";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
+import { catalogHotelsFor } from "@/lib/data/hotel-match";
 import { confirmBookingManually } from "@/lib/data/operation-bookings";
 import type { RequestDraft } from "@/lib/data/operation-assign";
 import { conversationForPhone } from "@/lib/providers/teletel";
@@ -382,8 +383,12 @@ export async function composeRequest(bookingId: string, alsoIds: string[] = []):
       const cityNames = [...new Set([row, ...also].flatMap((b) => [b.city_name, (b.detail ?? {})["المدينة"]]).map((c) => c?.trim()).filter((c): c is string => !!c))];
       const [cities, hotels] = await Promise.all([
         cityNames.length > 0 ? supabase.from("cities").select("arabic_name, english_name").in("arabic_name", cityNames) : Promise.resolve({ data: [] }),
+        // the booking's own hotel, never a namesake in another city (hotel-match.ts)
         row.kind === "hotel" && row.title.trim()
-          ? supabase.from("hotels").select("arabic_name, english_name").eq("arabic_name", row.title.trim()).limit(1)
+          ? catalogHotelsFor<{ id: string; arabic_name: string; city_id: string | null; english_name: string | null }>(supabase, [row], "english_name").then((cat) => ({
+              // keyed by the booking's own title: that is the word the request prints
+              data: [cat.pick(row)].flatMap((h) => (h ? [{ arabic_name: row.title, english_name: h.english_name }] : [])),
+            }))
           : Promise.resolve({ data: [] }),
       ]);
       for (const r of [...((cities.data ?? []) as { arabic_name: string; english_name: string | null }[]), ...((hotels.data ?? []) as { arabic_name: string; english_name: string | null }[])]) {

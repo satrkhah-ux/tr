@@ -16,6 +16,7 @@ import type { OperationBooking } from "@/lib/data/operation-bookings";
 import { hotelFinal } from "@/lib/operations/client-booking-state";
 import { datesOn, normalizeTicketText, passengersIn } from "@/lib/flights/ticket-parse";
 import { nameTokens, type NameCheck } from "./flights";
+import { notPulled } from "./pull";
 import type { ReadinessItem, StepState, WizardCase } from "./types";
 
 // ---------------- the step's state ----------------
@@ -29,16 +30,17 @@ export function isFinal(b: Pick<OperationBooking, "status" | "confirmation_numbe
   return hotelFinal(b);
 }
 
-export function hotelsState(data: Pick<WizardCase, "bookings">): StepState {
+export function hotelsState(data: Pick<WizardCase, "bookings" | "offerKinds">): StepState {
   const hotels = hotelBookings(data);
-  if (hotels.length === 0) return "na";
+  if (hotels.length === 0) return notPulled(data, "hotel") ? "todo" : "na";
   return hotels.every(isFinal) ? "done" : "todo";
 }
 
 /** «التأكيد النهائي»: every hotel final — mandatory before «جاهز للسفر». */
 export function hotelsReadiness(data: Pick<WizardCase, "bookings">): ReadinessItem[] {
   const hotels = hotelBookings(data);
-  return hotels.length === 0 ? [] : [{ step: "hotels", key: "final", ok: hotels.every(isFinal) }];
+  if (hotels.length === 0) return notPulled(data, "hotel") ? [{ step: "hotels", key: "pulled", ok: false }] : [];
+  return [{ step: "hotels", key: "final", ok: hotels.every(isFinal) }];
 }
 
 // ---------------- reading a confirmation ----------------

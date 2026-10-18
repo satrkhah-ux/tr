@@ -2,14 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, Check, CheckCircle2, Loader2, Pencil, Plane, Plus, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Download, Loader2, Pencil, Plane, Plus, Sparkles, Trash2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import type { TranslationKey } from "@/lib/i18n";
 import type { OperationBooking } from "@/lib/data/operation-bookings";
+import { seedBookingsFromOffer } from "@/lib/data/operation-seed";
 import { readBookingTicket, saveBookingTicket, type TicketRead } from "@/lib/data/wizard-tickets";
 import { MAX_TICKET_BYTES } from "@/lib/flights/ticket-parse";
 import { flightTicketed } from "@/lib/operations/client-booking-state";
 import { flightBookings, type LegInput, type NameCheck } from "@/lib/operations/wizard/flights";
+import { notPulled } from "@/lib/operations/wizard/pull";
 import type { StepProps } from "@/lib/operations/wizard/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { useSafeTransition } from "../../useSafeTransition";
@@ -33,11 +35,14 @@ const HOW: Record<TicketRead["how"], TranslationKey> = { text: "fc.how.text", pd
 export function PaperReader({
   labels,
   busy,
+  readsImages = true,
   onRead,
   onManual,
 }: {
   labels: { file: TranslationKey; paste: TranslationKey; read: TranslationKey; manual: TranslationKey };
   busy: boolean;
+  /** false: no OCR service and no AI key on the server — a photo or a scan cannot be read, and the screen says so up front. */
+  readsImages?: boolean;
   onRead: (fd: FormData, file: File | null) => void;
   onManual: () => void;
 }) {
@@ -68,6 +73,8 @@ export function PaperReader({
           className="block w-full cursor-pointer rounded-[10px] border border-[#dbe6e1] bg-white px-3 py-2 text-[12.5px] text-[#185045] file:me-3 file:rounded-md file:border-0 file:bg-[#185045] file:px-3 file:py-1 file:text-white"
         />
       </label>
+      {/* said before the upload, not after a failed read: what is off, why, and what still works */}
+      {readsImages ? null : <p className="rounded-[9px] bg-[#fff8ea] px-3 py-2 text-[11.5px] font-semibold text-[#7a4e0c]">{t("wz.paper.noImages")}</p>}
       {file ? null : (
         <label className={wzLabel}>
           {t(labels.paste)}
@@ -91,6 +98,45 @@ export function PaperReader({
           {t(labels.manual)}
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * «مطلوب — لم تُسحب الحجوزات»: the offer books this step's kind and the case
+ * holds none of it (notPulled) — one press pulls what the offer has. Shared
+ * with HotelsStep and TransportStep.
+ */
+export function PullNotice({ operationId }: { operationId: string }) {
+  const { t } = useTraveliunUI();
+  const router = useRouter();
+  const [pending, run] = useSafeTransition();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="grid justify-items-center gap-2 rounded-[10px] border border-[#f1dfb8] bg-[#fff8ea] px-4 py-5 text-center">
+      <p className="flex items-center gap-1.5 text-[13px] font-extrabold text-[#a86a10]">
+        <AlertTriangle className="size-4" />
+        {t("wz.pull.needed")}
+      </p>
+      <p className="text-[11.5px] font-semibold text-[#7a4e0c]">{t("wz.pull.hint")}</p>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() =>
+          run(async () => {
+            setError(null);
+            const res = await seedBookingsFromOffer(operationId);
+            if (!res.ok) return setError(t(res.error));
+            if (res.failed.length > 0) setError(t("ops.seedFailed", { list: res.failed.join("، ") }));
+            router.refresh();
+          })
+        }
+        className={wzPrimary}
+      >
+        {pending ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+        {t("ops.seedFromOffer")}
+      </button>
+      {error ? <p className="text-[12px] font-bold text-[#c22850]">{error}</p> : null}
     </div>
   );
 }
@@ -143,20 +189,22 @@ export function FlightsStep({ data }: StepProps) {
         {t("wz.flights.title")}
       </h2>
       <p className="mb-3 mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("wz.flights.hint")}</p>
-      {flights.length === 0 ? (
-        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">{t("wz.flights.none")}</p>
-      ) : (
+      {flights.length > 0 ? (
         <ul className="grid gap-3">
           {flights.map((b) => (
-            <FlightCard key={b.id} booking={b} travelers={data.travelers.length} />
+            <FlightCard key={b.id} booking={b} travelers={data.travelers.length} readsImages={data.readsImages ?? true} />
           ))}
         </ul>
+      ) : notPulled(data, "flight") ? (
+        <PullNotice operationId={data.operation.id} />
+      ) : (
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">{t("wz.flights.none")}</p>
       )}
     </section>
   );
 }
 
-function FlightCard({ booking, travelers }: { booking: OperationBooking; travelers: number }) {
+function FlightCard({ booking, travelers, readsImages }: { booking: OperationBooking; travelers: number; readsImages: boolean }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
   // the one flight-done rule — a flight confirmed by hand in «عرض الكل» is done here too
@@ -255,6 +303,7 @@ function FlightCard({ booking, travelers }: { booking: OperationBooking; travele
           <PaperReader
             labels={{ file: "wz.flights.file", paste: "wz.flights.paste", read: "wz.flights.read", manual: "wz.flights.manual" }}
             busy={pending}
+            readsImages={readsImages}
             onRead={onRead}
             onManual={() => setForm({ pnr: "", tickets: "", baggage: "", legs: [blankLeg()] })}
           />

@@ -336,12 +336,15 @@ function MessageBox({
         {t(PART_TITLE[part])}
         {sent ? <Check className="size-3.5 text-[#0f7a52]" /> : null}
       </p>
-      {part === "hotels" && draft.gaps.length > 0 ? (
+      {part === "hotels" && draft.gaps.length + draft.unplaced.length > 0 ? (
         <ul className="mb-2 grid gap-1 rounded-[8px] border border-[#f1d9a6] bg-[#fff8ea] px-3 py-2 text-[11.5px] font-bold text-[#a86a10]">
           {draft.gaps.map((g) => (
             <li key={g.hotel}>
               {t("wz.transport.drv.gap", { hotel: g.hotel, what: g.missing.map((m) => t(`wz.transport.drv.gap.${m}`)).join("، ") })}
             </li>
+          ))}
+          {draft.unplaced.map((h) => (
+            <li key={`u:${h}`}>{t("wz.transport.drv.unplaced", { hotel: h })}</li>
           ))}
         </ul>
       ) : null}
