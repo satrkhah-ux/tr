@@ -462,6 +462,12 @@ export type TourPick = {
    * departure day is a stale one and the tour takes a night of the city.
    */
   departure?: boolean;
+  /**
+   * Put there by the screen from the city's programmes (autoTourPicks), not
+   * chosen by the agent: it goes first when the count comes down, and the
+   * agent's first edit of the row makes it theirs.
+   */
+  auto?: boolean;
 };
 
 /** How many cars a tour goes in — at least one, whatever the jsonb holds. */

@@ -502,9 +502,16 @@ export function legInto(flights: DraftFlight[], city: string, date: string | nul
 /**
  * Resize a city's tour picks to its tour count, keeping what was chosen. A new
  * pick goes in `cars` cars when given (the trip's tour cars); without it, one.
+ * Fewer: the rows the screen filled go first, then the empty ones, and only then
+ * the last — a tour the agent chose is never the one dropped while another is.
  */
 export function withTourCount(picks: TourPick[] | undefined, count: number, cars?: number): TourPick[] {
-  const list = (picks ?? []).slice(0, count);
+  const list = [...(picks ?? [])];
+  while (list.length > Math.max(count, 0)) {
+    const auto = list.findLastIndex((p) => p.auto);
+    const empty = list.findLastIndex((p) => !p.free && !p.title.trim());
+    list.splice(auto >= 0 ? auto : empty >= 0 ? empty : list.length - 1, 1);
+  }
   while (list.length < count) list.push({ program_id: null, title: "", text: "", price: null, ...(cars ? { cars } : {}) });
   return list;
 }
@@ -833,7 +840,7 @@ export function autoTourPicks(picks: TourPick[], programs: TourProgram[]): TourP
       .map((p) => programDayText(p).title),
   )].filter((title) => !taken.has(title));
   if (queue.length === 0 || !picks.some((p) => !p.free && !p.title.trim())) return picks;
-  return picks.map((p) => (p.free || p.title.trim() || queue.length === 0 ? p : { ...p, ...tourService(queue.shift()!, programs) }));
+  return picks.map((p) => (p.free || p.title.trim() || queue.length === 0 ? p : { ...p, ...tourService(queue.shift()!, programs), auto: true }));
 }
 
 /**

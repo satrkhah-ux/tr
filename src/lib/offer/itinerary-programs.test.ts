@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deriveCityDates, emptyDraftData, type DraftData, type DraftDay } from "./draft-types";
-import { autoTourPicks, draftDaySkeleton, fillDaysFromPrograms, isTouringDay, programDayText, withDayTour, type TourProgram } from "./itinerary";
+import { autoTourPicks, withTourCount, draftDaySkeleton, fillDaysFromPrograms, isTouringDay, programDayText, withDayTour, type TourProgram } from "./itinerary";
 
 const day = (n: number, city: string, title = ""): DraftDay => ({
   day_number: n,
@@ -124,6 +124,15 @@ describe("autoTourPicks — a city's tours arrive filled (the owner, 2026-10-18)
     const mine = { ...blank, program_id: "b", title: "جولة حيدر نبي" };
     const free = { ...blank, title: "يوم حر", free: true };
     expect(autoTourPicks([mine, free, blank], programs).map((p) => p.title)).toEqual(["جولة حيدر نبي", "يوم حر", "جولة اوزنغول"]);
+  });
+  it("the count coming down drops the row the screen filled, never the agent's (the evaluator, 795a682)", () => {
+    const mine = { ...blank, program_id: "a", title: "جولة اوزنغول", date: "2026-07-03" };
+    const theirs = { ...blank, program_id: "b", title: "جولة حيدر نبي", date: "2026-07-04" };
+    const [filled] = autoTourPicks([{ ...blank, date: "2026-07-02" }], [...programs, program("z", "طرابزون", 3, "جولة زيغانا")].filter((p) => p.id === "z"));
+    expect(filled).toMatchObject({ title: "جولة زيغانا", auto: true });
+    expect(withTourCount([filled, mine, theirs], 2).map((p) => p.title)).toEqual(["جولة اوزنغول", "جولة حيدر نبي"]);
+    // no row of the screen's: an empty one goes before a chosen one
+    expect(withTourCount([mine, blank, theirs], 2).map((p) => p.title)).toEqual(["جولة اوزنغول", "جولة حيدر نبي"]);
   });
   it("nothing to fill → the same list", () => {
     const picks = [{ ...blank, title: "جولة خاصة" }];

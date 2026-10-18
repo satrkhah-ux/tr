@@ -896,7 +896,8 @@ function ServicesPanel({
   const kinds: ServiceKind[] = [...(transportOn ? (["reception", "farewell", "transfer"] as const) : []), ...(toursOn ? (["tour"] as const) : [])];
   // a tour put on the day home is «قبل المغادرة»; moved off it, a tour of the city's nights
   const onDay = (p: TourPick): TourPick => ({ ...p, departure: isLast && leaving !== null && p.date === leaving ? true : undefined });
-  const setPick = (k: number, slice: Partial<TourPick>) => onPicks(picks.map((p, i) => (i === k ? onDay({ ...p, ...slice }) : p)));
+  // the agent's edit makes a row the screen filled theirs (auto) — the count coming down then keeps it
+  const setPick = (k: number, slice: Partial<TourPick>) => onPicks(picks.map((p, i) => (i === k ? onDay({ ...p, ...slice, auto: undefined }) : p)));
   // a tour added — by the count or on a day — arrives as the city's next programme, priced from the list
   const addOn = (date: string | null) => onPicks(autoTourPicks([...picks, onDay({ program_id: null, title: "", text: "", price: null, date, cars: plan.tours.cars })], programs));
 
