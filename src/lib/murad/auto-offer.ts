@@ -124,11 +124,25 @@ export function priceOffer(c: OfferCountry, days: number, adults: number, sarPer
 }
 
 /** The one question — the first time all of it, the second time only what is still missing. */
-export function askText(country: string, need: ("name" | "days" | "people")[], first: boolean): string {
-  if (first) return `حياك الله، عشان نجهز لك برنامج ${country}: تكرماً الاسم، وتاريخ الوصول، وعدد الأيام، وعدد الأشخاص (بالغين وأطفال)؟`;
+export function askText(country: string, need: ("name" | "days" | "people")[], first: boolean, hasArrival = false): string {
   const words = { name: "الاسم", days: "عدد الأيام (أو تاريخ الوصول والمغادرة)", people: "عدد الأشخاص (بالغين وأطفال)" };
+  if (first) {
+    // only what is missing — and the arrival date, asked once but never required
+    const items = [
+      ...(need.includes("name") ? ["الاسم"] : []),
+      ...(hasArrival ? [] : ["تاريخ الوصول"]),
+      ...(need.includes("days") ? ["عدد الأيام"] : []),
+      ...(need.includes("people") ? ["عدد الأشخاص (بالغين وأطفال)"] : []),
+    ];
+    return `حياك الله، عشان نجهز لك برنامج ${country}: تكرماً ${items.join("، و")}؟`;
+  }
   return `شكراً لك، باقي فقط: ${need.map((n) => words[n]).join("، و")}؟`;
 }
+
+/** «ليلة واحدة» · «ليلتان» · «3 ليالٍ» · «11 ليلة» */
+export const nightsText = (n: number) => (n === 1 ? "ليلة واحدة" : n === 2 ? "ليلتان" : n <= 10 ? `${n} ليالٍ` : `${n} ليلة`);
+/** «غرفتان» · «3 غرف» */
+const roomsText = (n: number) => (n === 2 ? "غرفتان" : n <= 10 ? `${n} غرف` : `${n} غرفة`);
 
 const MONTHS = /(يناير|فبراير|مارس|ابريل|أبريل|مايو|يونيو|يوليو|اغسطس|أغسطس|سبتمبر|اكتوبر|أكتوبر|نوفمبر|ديسمبر|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)|\d{1,2}\s*[/.-]\s*\d{1,2}/giu;
 
@@ -164,11 +178,11 @@ export function sayDate(iso: string): string {
 export function offerText(i: { name: string; country: string; price: OfferPrice; arrival: string; provisional: boolean; c: OfferCountry }): string {
   const lines = [
     `أهلاً ${i.name}، هذا برنامج ${i.country} المقترح لك:`,
-    `🗓️ ${i.price.days} أيام / ${i.price.nights} ليالٍ — الوصول ${sayDate(i.arrival)}${i.provisional ? " (التواريخ مبدئية)" : ""}`,
+    `🗓️ ${i.price.days} أيام / ${nightsText(i.price.nights)} — الوصول ${sayDate(i.arrival)}${i.provisional ? " (التواريخ مبدئية)" : ""}`,
     "",
-    ...i.price.route.map((r) => `📍 ${r.city}: ${r.nights} ${r.nights === 1 ? "ليلة" : r.nights === 2 ? "ليلتان" : "ليالٍ"} — ${r.hotel}`),
+    ...i.price.route.map((r) => `📍 ${r.city}: ${nightsText(r.nights)} — ${r.hotel}`),
     "",
-    `💰 الإجمالي: ${i.price.totalSar.toLocaleString("en-US")} ريال${i.price.rooms > 1 ? ` (${i.price.rooms} غرف)` : ""}`,
+    `💰 الإجمالي: ${i.price.totalSar.toLocaleString("en-US")} ريال${i.price.rooms > 1 ? ` (${roomsText(i.price.rooms)})` : ""}`,
     "",
     `✅ يشمل: ${i.c.includes.join("، ")}`,
     `❌ لا يشمل: ${i.c.excludes.join("، ")}`,

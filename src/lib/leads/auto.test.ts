@@ -69,3 +69,11 @@ describe("the conversation's turns (0099)", () => {
     expect(timelineFrom(events.filter((e) => e.kind !== "activity"), 100, isTeam)).toEqual([{ agent: "رشا", from: 100, reply: 160, handed: null, by: null }]);
   });
 });
+
+describe("a service the client does not want is not their request", () => {
+  it("«رحلة جورجيا 10 أيام بدون طيران» is no flight", () => {
+    expect(classifyInquiry([], "ابي رحلة جورجيا 10 أيام بدون طيران")).toBe("يستفسر");
+    expect(classifyInquiry([], "بكج تركيا بدون طيران")).toBe("بكج");
+    expect(classifyInquiry([], "ابي تذاكر طيران")).toBe("طيران");
+  });
+});

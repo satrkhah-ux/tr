@@ -16,9 +16,12 @@ const KINDS: [string, RegExp][] = [
   ["مواصلات", /(مواصلات|سياره|سائق|توصيل|استقبالمنالمطار|transfer)/i],
 ];
 
+/** a service the client says they do NOT want — «رحلة جورجيا بدون طيران» is no flight request */
+const NOT_WANTED = /(?:بدون|بلا|من غير|غير شامل|ما يحتاج|ماابي|ما ابي|مو محتاج)\s*(?:ال)?(?:طيران|تذاكر|تذكرة|تذكره|فندق|فنادق|سكن|تأشيرة|تاشيرة|تأشيره|فيزا|مواصلات|سيارة)/gu;
+
 /** «بكج» … from the labels first (staff put them), else the client's words; «يستفسر» when they wrote but named nothing */
 export function classifyInquiry(labels: string[], text: string): string {
-  for (const source of [labels.join(" "), text]) {
+  for (const source of [labels.join(" "), text.replace(NOT_WANTED, " ")]) {
     const f = fold(source);
     for (const [label, re] of KINDS) if (re.test(f)) return label;
   }

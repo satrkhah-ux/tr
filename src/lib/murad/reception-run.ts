@@ -309,7 +309,8 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       if (trip && !outOfRule(trip, offer)) {
         const need = missing(trip);
         if (need.length && offerAsked.length < 2) {
-          const text = askText(offer.country, need, offerAsked.length === 0);
+          // the first question returns the client's salam, as the reception's greeting does
+          const text = `${request.salam && offerAsked.length === 0 ? "وعليكم السلام ورحمة الله، " : ""}${askText(offer.country, need, offerAsked.length === 0, Boolean(trip.arrival))}`;
           const replyId = await sendTeletelMessage(m.conversationId, text);
           await finish({ reason: replyId ? `offer:asked${offerAsked.length + 1}` : "send_failed", reply: text, reply_message_id: replyId, intake: { country: offer.country, ...trip } });
           return replyId ? "asked" : "send_failed";

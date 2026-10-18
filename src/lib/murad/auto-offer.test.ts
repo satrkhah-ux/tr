@@ -26,7 +26,9 @@ describe("«عرض آلي» — Georgia, the owner's defaults (2026-10-18)", () 
     expect(missing({ ...none, name: "محمد", days: 10, adults: 2 })).toEqual([]);
     expect(missing({ ...none, name: "محمد", arrival: "2026-11-15", departure: "2026-11-24", adults: 2 })).toEqual([]);
     expect(tripDays({ days: null, arrival: "2026-11-15", departure: "2026-11-24" })).toBe(10);
-    expect(askText("جورجيا", ["name", "days", "people"], true)).toContain("برنامج جورجيا");
+    expect(askText("جورجيا", ["name", "days", "people"], true)).toBe("حياك الله، عشان نجهز لك برنامج جورجيا: تكرماً الاسم، وتاريخ الوصول، وعدد الأيام، وعدد الأشخاص (بالغين وأطفال)؟");
+    // «10 أيام» already said: not asked again
+    expect(askText("جورجيا", ["name", "people"], true)).toBe("حياك الله، عشان نجهز لك برنامج جورجيا: تكرماً الاسم، وتاريخ الوصول، وعدد الأشخاص (بالغين وأطفال)؟");
     expect(askText("جورجيا", ["people"], false)).toBe("شكراً لك، باقي فقط: عدد الأشخاص (بالغين وأطفال)؟");
   });
 
@@ -40,6 +42,8 @@ describe("«عرض آلي» — Georgia, the owner's defaults (2026-10-18)", () 
   it("writes the proposal with the route, the total, and «مبدئي»", () => {
     const text = offerText({ name: "محمد", country: "جورجيا", price: priceOffer(georgia, 10, 2, 3.75), arrival: "2026-11-15", provisional: true, c: georgia });
     expect(text).toContain("10 أيام / 9 ليالٍ");
+    expect(text).toContain("باكورياني: ليلتان — Dialog");
+    expect(text).toContain("تبليسي: ليلة واحدة — Old Wall");
     expect(text).toContain("(التواريخ مبدئية)");
     expect(text).toContain("تبليسي: 3 ليالٍ — Old Wall Tbilisi 4★");
     expect(text).toContain("9,186 ريال");
