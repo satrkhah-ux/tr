@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { basicDays, chainCities, setEdge, withHotelLines, type BasicCity } from "./basic";
+import { advancedDefaults, emptyAdvanced, fillAdvanced } from "./advanced";
 import { deriveHotelStays, deriveTransportRows, emptyDraftData, emptyFlight, totalCityNights, type DraftData } from "./draft-types";
 
 /** Istanbul `nights` nights from `from`, home on the flight `homeAt` (the owner's case, 2026-10-18). */
@@ -52,6 +53,16 @@ describe("«بكج متقدم» — the trip's edges (the owner, 2026-10-18)", (
     expect(totalCityNights(out.cities)).toBe(out.trip.nights);
     expect([stay(out).check_in, stay(out).check_out]).toEqual(["2026-12-11", "2026-12-15"]);
     expect(out.days[0].activities.join(" ")).toContain("الليلة الأولى بدون إقامة حسب طلبكم");
+  });
+
+  it("1b. «بكج متقدم»'s farewell follows: the check-out day at 22:30, and back to the flight's day when undone", () => {
+    const d = trip("2026-12-07", 6, "2026-12-13T01:30");
+    const out = apply(d, setEdge(d, "out", "no_hotel_day"));
+    const adv = fillAdvanced({ ...emptyAdvanced(), on: true, parts: { arrival: false, departure: true } }, advancedDefaults(out));
+    expect([adv.farewell.date, adv.farewell.time]).toEqual(["2026-12-12", "22:30"]);
+    const back = apply(out, setEdge(out, "out", null));
+    const again = fillAdvanced(adv, advancedDefaults(back));
+    expect([again.farewell.date, again.farewell.time]).toEqual(["2026-12-13", ""]);
   });
 
   it("4. choosing «as Basic has it» again gives back the nights and the dates", () => {

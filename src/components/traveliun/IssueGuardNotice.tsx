@@ -19,11 +19,15 @@ export function IssueGuardNotice({
   hotels,
   onBlocked,
   className = "",
+  compact = false,
 }: {
   hotels: readonly { hotel_id: string | null; hotel_name: string }[];
   onBlocked?: (blocked: boolean) => void;
   className?: string;
+  /** an issued file: one line that opens — a warning that blocks nothing takes no room (the owner, 2026-10-18) */
+  compact?: boolean;
 }) {
+  const [open, setOpen] = useState(!compact);
   const { t } = useTraveliunUI();
   const [result, setResult] = useState<GuardResult>({ issues: [], canFix: false });
   const [pending, run] = useSafeTransition();
@@ -48,6 +52,19 @@ export function IssueGuardNotice({
   }, [check]);
 
   if (result.issues.length === 0) return null;
+  if (compact && !open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={`flex w-full items-center gap-2 rounded-[10px] border border-[#f3dfb0] bg-[#fff8e6] px-3 py-1.5 text-start text-[12px] font-bold text-[#8a5a00] hover:bg-[#fdf0d2] ${className}`}
+      >
+        <AlertTriangle className="size-3.5 shrink-0" />
+        {t("data.quality.guard.oneLine", { n: new Set(result.issues.map((i) => i.hotelId)).size })}
+        <span className="ms-auto text-[11.5px] underline">{t("data.quality.guard.show")}</span>
+      </button>
+    );
+  }
   const blocking = result.issues.filter((i) => i.blocking);
   const voucher = result.issues.filter((i) => !i.blocking);
 

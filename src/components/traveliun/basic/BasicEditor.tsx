@@ -132,6 +132,7 @@ import { BasicEdges } from "./BasicEdges";
 import { AdvancedQuestions } from "./AdvancedQuestions";
 import { advancedDefaults, advancedTripDates, emptyAdvanced, fillAdvanced, isStation, type DraftAdvanced } from "@/lib/offer/advanced";
 import { IssueGuardNotice } from "../IssueGuardNotice";
+import { OfferVersions } from "../OfferVersions";
 import { ReissueOffer } from "../ReissueOffer";
 import { OverlandHopNotice } from "../OverlandHopNotice";
 
@@ -1749,7 +1750,8 @@ export function BasicEditor({
     // ---- 6. what is missing, and issuing — here ----
     finish: (
         <div>
-          {produced ? (
+          {/* an issued file: one panel, the steps in order (BasicFileStatus) — a partner keeps the plain line */}
+          {produced && partnerSession ? (
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-full bg-[#e9f7f0] px-3 py-1.5 text-[12.5px] font-extrabold text-[#0f7a52]">
                 <CheckCircle2 className="size-4" />
@@ -1807,10 +1809,7 @@ export function BasicEditor({
               {tx("allGood")}
             </p>
           )}
-          {produced ? (
-            // edited since it was issued: the next version, same serial (a partner's issued file is locked)
-            partnerSession ? null : <ReissueOffer draftId={draftId} serial={data.produced_serial} hotels={data.hotels} blocked={blocking.length > 0} flush={flush} onIssued={bumpStatus} className="mt-3" />
-          ) : (
+          {produced ? null : (
             <>
               <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} className="mt-2" />
               {produceError ? <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">{produceError}</p> : null}
@@ -1828,7 +1827,21 @@ export function BasicEditor({
               </div>
             </>
           )}
-          {produced && !partnerSession ? <BasicFileStatus draftId={draftId} serial={produced} variant="panel" refresh={statusTick} onChanged={bumpStatus} /> : null}
+          {produced && !partnerSession ? (
+            <BasicFileStatus
+              draftId={draftId}
+              serial={produced}
+              variant="panel"
+              refresh={statusTick}
+              onChanged={bumpStatus}
+              extras={{
+                // edited since it was issued: the next version, same serial
+                reissue: <ReissueOffer compact draftId={draftId} hotels={data.hotels} blocked={blocking.length > 0} flush={flush} onIssued={bumpStatus} />,
+                versions: <OfferVersions serial={produced} draftId={draftId} defaultOpen flush={flush} refreshKey={statusTick} />,
+                guard: <IssueGuardNotice compact hotels={data.hotels} />,
+              }}
+            />
+          ) : null}
         </div>
     ),
   };

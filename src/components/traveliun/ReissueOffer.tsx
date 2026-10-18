@@ -35,6 +35,7 @@ export function ReissueOffer({
   flush,
   onIssued,
   className = "",
+  compact = false,
 }: {
   draftId: string;
   /** the issued serial — «سجل النسخ» lists its versions under the button. */
@@ -45,6 +46,8 @@ export function ReissueOffer({
   flush?: () => Promise<void>;
   onIssued?: (result: Extract<ProduceResult, { ok: true }>) => void;
   className?: string;
+  /** a small link in the issued file's secondary row — the guard and «سجل النسخ» live elsewhere there */
+  compact?: boolean;
 }) {
   const { t, language } = useTraveliunUI();
   const [busy, setBusy] = useState(false);
@@ -70,6 +73,50 @@ export function ReissueOffer({
     } finally {
       setBusy(false);
     }
+  }
+
+  const result = (
+    <>
+      {error ? (
+        <p role="alert" className="mt-2 basis-full text-[12px] font-bold text-[#c22850]">
+          {error}
+        </p>
+      ) : null}
+      {done ? (
+        <div role="status" className="mt-2 basis-full rounded-[10px] border border-[#bfe5d4] bg-[#f3fbf7] px-3 py-2">
+          <p className="text-[12.5px] font-extrabold text-[#0f7a52]">{t("pg.reissue.done", { n: done.version })}</p>
+          {done.changes.length === 0 ? (
+            <p className="mt-1 text-[12px] font-semibold text-[#557d78]">{t("pg.reissue.noChange")}</p>
+          ) : (
+            <ul className="mt-1 space-y-0.5 text-[12px] font-semibold text-[#3f5f59]">
+              {done.changes.map((c, i) => (
+                <li key={i}>
+                  • {t(KIND_KEY[c.kind])}
+                  {c.where ? ` — ${c.where}` : ""}: <span dir="auto">{c.before}</span> {language === "ar" ? "←" : "→"} <span dir="auto">{c.after}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+    </>
+  );
+  if (compact) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => void reissue()}
+          disabled={busy || blocked}
+          title={blocked ? t("pg.err.blockingLeft") : t("pg.reissue.hint")}
+          className={`inline-flex items-center gap-1 text-[12px] font-bold text-[#185045] hover:underline disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+        >
+          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+          {busy ? t("pg.reissuing") : t("pg.reissue.button")}
+        </button>
+        {result}
+      </>
+    );
   }
 
   return (
