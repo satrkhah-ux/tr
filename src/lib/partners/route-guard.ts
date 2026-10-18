@@ -31,7 +31,7 @@ export function partnerIdFromToken(accessToken: string): string | null {
   return typeof id === "string" && id ? id : null;
 }
 
-/** A transport-only partner («المطار», 0099) books on /b2b and nothing else. */
+/** A transport-only partner («المطار», 0100) books on /b2b and nothing else. */
 export const TRANSPORT_PARTNER_PREFIXES = ["/b2b"];
 
 /** The prefixes this partner token may open — the same redirect-not-permission caveat as above. */

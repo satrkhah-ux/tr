@@ -100,7 +100,7 @@ async function loadPartnerSession(): Promise<PartnerSession | null> {
 
     const company = Array.isArray(row.booking_partners) ? row.booking_partners[0] : row.booking_partners;
     if (!company || company.status !== "approved") return null;
-    // a transport-only partner («المطار», 0099) has its own screen (lib/almatar), never the package portal
+    // a transport-only partner («المطار», 0100) has its own screen (lib/almatar), never the package portal
     if (company.portal === "transport") return null;
 
     return {

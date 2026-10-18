@@ -29,7 +29,7 @@ export const metadata = {
  * exist, which is the least useful thing to tell someone standing at a door.
  */
 export default async function B2BPage() {
-  // a transport-only partner («المطار», 0099) books its transport here and sees nothing else
+  // a transport-only partner («المطار», 0100) books its transport here and sees nothing else
   const transport = await getAlmatarSession();
   if (transport) {
     const [services, bookings] = await Promise.all([listServices(false), listPartnerBookings(transport.partner_id)]);

@@ -208,7 +208,7 @@ export async function createAlmatarLogin(input: { username: string; password: st
   if (weak) return { ok: false, message: weak };
 
   const company = await getAlmatarCompany();
-  if (!company) return { ok: false, message: "شركة المطار غير موجودة — طبّق المهاجرة 0099 أولاً." };
+  if (!company) return { ok: false, message: "شركة المطار غير موجودة — طبّق المهاجرة 0100 أولاً." };
   const email = loginEmail(username);
   try {
     const admin = createSupabaseServiceClient();

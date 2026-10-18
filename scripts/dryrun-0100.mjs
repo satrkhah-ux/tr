@@ -1,4 +1,4 @@
-// Dry run of 0099 («المطار») on the live database inside ONE transaction that
+// Dry run of 0100 («المطار») on the live database inside ONE transaction that
 // is always rolled back: applied twice (idempotent), 32 price lines with th-07
 // flagged, no existing row touched (transfers / price_grid / tours counts and
 // every other partner's portal unchanged), the group rule held by the table,
@@ -39,13 +39,13 @@ const [partnerUser] = await q(`
   select pu.auth_user_id as uid, pu.partner_id from partner_users pu join booking_partners bp on bp.id = pu.partner_id
    where pu.status = 'active' and bp.status = 'approved' and pu.auth_user_id is not null limit 1`);
 
-const sql = readFileSync("supabase/migrations/0099_almatar.sql", "utf8");
+const sql = readFileSync("supabase/migrations/0100_almatar.sql", "utf8");
 const before = await counts();
 await c.query("begin");
 try {
   await c.query(sql);
   await c.query(sql);
-  check("0099 applies twice (idempotent)", true);
+  check("0100 applies twice (idempotent)", true);
 
   const after = await counts();
   check("transfers / tours untouched", after.t === before.t && after.r === before.r, `${before.t}/${before.r}`);

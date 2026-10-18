@@ -87,7 +87,7 @@ export function AlmatarAdmin({
           <p className="mt-1 max-w-3xl text-[12px] font-semibold leading-6 text-[#93aaa3]">
             شريك مواصلات فقط في تايلاند وماليزيا وإندونيسيا، بلائحة أسعار 15 أكتوبر 2026 السارية حتى ديسمبر 2027. أسعاره وحجوزاته في جداول خاصة به لا تختلط ببيانات ترافليون. الفوتشر يصدر بهوية المطار.
           </p>
-          {!hasCompany ? <p className="mt-2 text-[12.5px] font-bold text-[#c22850]">شركة المطار غير موجودة بعد — تُنشأ مع المهاجرة 0099.</p> : null}
+          {!hasCompany ? <p className="mt-2 text-[12.5px] font-bold text-[#c22850]">شركة المطار غير موجودة بعد — تُنشأ مع المهاجرة 0100.</p> : null}
         </section>
 
         {notice ? (

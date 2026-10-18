@@ -5,7 +5,7 @@ import { publicBrandLogoUrl } from "@/components/offer-doc/brand";
 
 /**
  * «المطار» — reads for its two screens. Every almatar_* table is closed to
- * every session (0099), so these go through the service role AFTER the caller
+ * every session (0100), so these go through the service role AFTER the caller
  * is resolved: Almatar's own login, or staff with the section's permission
  * (checked by the page and again by each action).
  */

@@ -1,6 +1,6 @@
-// «المطار» (0099): put Almatar's Arabic logo (from almatar.com) in the public
+// «المطار» (0100): put Almatar's Arabic logo (from almatar.com) in the public
 // `brands` bucket and point its booking_partners row at it, so its portal and
-// its vouchers carry its own mark. Run AFTER 0099 is applied.
+// its vouchers carry its own mark. Run AFTER 0100 is applied.
 //
 //   node scripts/almatar-setup.mjs            dry run (default)
 //   node scripts/almatar-setup.mjs --commit   upload + set logo_path
@@ -20,7 +20,7 @@ const admin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_RO
 
 const { data: company, error } = await admin.from("booking_partners").select("id, name, logo_path").eq("slug", "almatar").maybeSingle();
 if (error || !company) {
-  console.error("no Almatar row — apply 0099 first", error?.message ?? "");
+  console.error("no Almatar row — apply 0100 first", error?.message ?? "");
   process.exitCode = 1;
 } else {
   const res = await fetch("https://almatar.com/assets/img/almatar_logo_ar.png", { headers: { "user-agent": "Mozilla/5.0" } });
