@@ -97,6 +97,7 @@ import {
   moveCity,
   replaceCity,
   setCityNights,
+  setEdge,
   withHotelLines,
   withTripDates,
   priceGroupOf,
@@ -127,6 +128,7 @@ import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
 import { basicCard, basicField, basicLabel, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
+import { BasicEdges } from "./BasicEdges";
 import { AdvancedQuestions } from "./AdvancedQuestions";
 import { advancedDefaults, advancedTripDates, emptyAdvanced, fillAdvanced, isStation, type DraftAdvanced } from "@/lib/offer/advanced";
 import { IssueGuardNotice } from "../IssueGuardNotice";
@@ -1859,13 +1861,20 @@ export function BasicEditor({
             {produced && !partnerSession ? <BasicFileStatus draftId={draftId} serial={produced} variant="chip" refresh={statusTick} /> : null}
             <button
               type="button"
-              onClick={() => commit({ advanced: { ...(data.advanced ?? emptyAdvanced()), on: !data.advanced?.on } })}
+              onClick={() => {
+                const on = !data.advanced?.on;
+                // switched off, the edges go with it: the nights and dates come back as Basic has them
+                let d = latest.current;
+                if (!on) for (const side of ["in", "out"] as const) d = { ...d, ...setEdge(d, side, null) };
+                commit({ advanced: { ...(data.advanced ?? emptyAdvanced()), on }, ...(on ? {} : { cities: d.cities, hotels: d.hotels }) });
+              }}
               className={`ms-auto inline-flex h-8 items-center gap-1 rounded-[8px] px-2.5 text-[11.5px] font-bold ${data.advanced?.on ? "bg-[#185045] text-white" : "border border-[#dbe6e1] bg-white text-[#185045] hover:bg-[#f4f8f6]"}`}
             >
               بكج متقدم{data.advanced?.on ? " ✓" : ""}
             </button>
           </div>
 
+          {data.advanced?.on && cities.length > 0 ? <BasicEdges data={data} onEdge={(side, mode) => commit(setEdge(latest.current, side, mode))} /> : null}
           {data.advanced?.on ? (
             <AdvancedQuestions
               value={data.advanced}

@@ -16,7 +16,18 @@ type Channel = (typeof CHANNELS)[number];
  * same confirmation as the file's own panel and the kanban (confirmFromBasic →
  * confirmOffer: the operations case opens) — and goes straight to its bookings.
  */
-export function ClientConfirmedButton({ draftId, className = "", expired = false }: { draftId: string; className?: string; expired?: boolean }) {
+export function ClientConfirmedButton({
+  draftId,
+  className = "",
+  expired = false,
+  secondary = false,
+}: {
+  draftId: string;
+  className?: string;
+  expired?: boolean;
+  /** before the file is sent: a framed button beside the filled «أرسل للعميل» */
+  secondary?: boolean;
+}) {
   const tx = useBasicLabels();
   const router = useRouter();
   const [asking, setAsking] = useState(false);
@@ -44,7 +55,7 @@ export function ClientConfirmedButton({ draftId, className = "", expired = false
       <button
         type="button"
         onClick={() => setAsking(true)}
-        className={`inline-flex h-8 items-center justify-center gap-1 rounded-[8px] bg-[#0f7a52] text-[11.5px] font-bold text-white hover:bg-[#0b6140] ${className}`}
+        className={`inline-flex h-8 items-center justify-center gap-1 rounded-[8px] text-[11.5px] font-bold ${secondary ? "border border-[#0f7a52] bg-white text-[#0f7a52] hover:bg-[#e9f7f0]" : "bg-[#0f7a52] text-white hover:bg-[#0b6140]"} ${className}`}
       >
         <CheckCircle2 className="size-3.5" />
         {tx("clientConfirmedBtn")}

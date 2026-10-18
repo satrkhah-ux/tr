@@ -387,6 +387,19 @@ export type DraftCity = {
    */
   arrives_next_day?: boolean;
   /**
+   * The trip's edges (the owner, 2026-10-18, «بكج متقدم»), read on the FIRST
+   * city only: «prev_night» books the night before the arrival (a 03:00 landing
+   * walks straight in), «early_checkin» asks for it, «no_hotel» spends the
+   * arrival night elsewhere — the hotel starts the next day.
+   */
+  edge_in?: ArrivalEdge;
+  /**
+   * Read on the LAST city only: «no_hotel_day» checks out at noon the day before
+   * a small-hours flight and keeps the car (and a tour) until the airport — no
+   * hotel that last night; «late_checkout» asks for it.
+   */
+  edge_out?: DepartureEdge;
+  /**
    * The visit's services other than its tours — what the agent changed on the
    * reception / farewell / transfer the trip writes, and the rows they added
    * (CityService). Absent on every file from before: the trip's rows as they were.
@@ -1189,7 +1202,7 @@ export function deriveTransportRows(plan: TransportPlan, cities: TransportCity[]
   return transportEntries(plan, cities).map((e) => e.row);
 }
 
-type TransportCity = Pick<DraftCity, "city_name" | "check_in"> & Partial<Pick<DraftCity, "check_out" | "services">>;
+type TransportCity = Pick<DraftCity, "city_name" | "check_in"> & Partial<Pick<DraftCity, "check_out" | "services" | "edge_out">>;
 
 /**
  * A transport row as a city visit's service: the stop it belongs to, its id
@@ -1239,12 +1252,14 @@ function transportEntries(plan: TransportPlan, cities: TransportCity[]): { row: 
       date: cities[0]?.check_in ?? null,
       note: plan.airport.note,
     });
+    // a last day without a hotel: one car from check-out at noon, with the luggage, until the airport
+    const dayCar = cities[lastAt]?.edge_out === "no_hotel_day";
     put(lastAt, "out", "farewell", plan.farewell ?? plan.airport, {
       from_place: last ? `${TRANSPORT_HOTEL_PREFIX}${last}` : "الفندق",
       to_place: TRANSPORT_AIRPORT,
       car_type: "",
-      date: null,
-      note: plan.airport.note,
+      date: dayCar ? (cities[lastAt]?.check_out ?? null) : null,
+      note: dayCar ? ["سيارة يوم المغادرة: من الفندق الساعة 12:00 حتى المطار — الأمتعة في السيارة", plan.airport.note].filter(Boolean).join(" · ") : plan.airport.note,
     });
   }
 
@@ -1760,7 +1775,9 @@ export function deriveCityDates(arrivalDate: string | null, cities: DraftCity[])
   if (!arrivalDate) return cities.map((c) => ({ ...c, check_in: null, check_out: null }));
   let cursor = arrivalDate;
   return cities.map((c, i) => {
-    const check_in = i > 0 && c.arrives_next_day ? addDays(cursor, 1) : cursor;
+    // the first hotel starts the day after an arrival night spent elsewhere, or the night before a small-hours landing
+    const check_in =
+      i > 0 && c.arrives_next_day ? addDays(cursor, 1) : i === 0 && c.edge_in === "no_hotel" ? addDays(cursor, 1) : i === 0 && c.edge_in === "prev_night" ? addDays(cursor, -1) : cursor;
     const check_out = addDays(check_in, Math.max(c.nights, 0));
     cursor = check_out;
     return { ...c, check_in, check_out };
@@ -2056,6 +2073,20 @@ export function isFreeDay(day: Pick<DraftDay, "title">): boolean {
   return day.title.trim() === FREE_DAY_TITLE;
 }
 
+export type ArrivalEdge = "prev_night" | "early_checkin" | "no_hotel";
+export type DepartureEdge = "no_hotel_day" | "late_checkout";
+
+/**
+ * The trip's nights the edges move off or onto the hotels: an arrival night or
+ * a last night spent without a hotel is still a night of the trip (+1 each),
+ * a night booked before the arrival is a hotel night outside it (−1).
+ */
+export function edgeNights(cities: Pick<DraftCity, "edge_in" | "edge_out">[]): number {
+  const first = cities[0];
+  const last = cities[cities.length - 1];
+  return (first?.edge_in === "no_hotel" ? 1 : 0) + (last?.edge_out === "no_hotel_day" ? 1 : 0) - (first?.edge_in === "prev_night" ? 1 : 0);
+}
+
 /** The nights spent on an overnight move between two cities, in no hotel (DraftCity.arrives_next_day). */
 export function travelNights(cities: DraftCity[]): number {
   return cities.filter((c, i) => i > 0 && c.arrives_next_day).length;
@@ -2067,7 +2098,7 @@ export function travelNights(cities: DraftCity[]): number {
  * cover its own nights only.
  */
 export function totalCityNights(cities: DraftCity[]): number {
-  return cities.reduce((sum, c) => sum + (Number.isFinite(c.nights) ? c.nights : 0), 0) + travelNights(cities);
+  return cities.reduce((sum, c) => sum + (Number.isFinite(c.nights) ? c.nights : 0), 0) + travelNights(cities) + edgeNights(cities);
 }
 
 export const BOARD_TYPES: BoardType[] = ["RO", "BB", "HB", "FB", "AI"];
