@@ -8,6 +8,7 @@ import { TraveliunShell } from "../TraveliunShell";
 import { useSafeTransition } from "../useSafeTransition";
 import { MuradPolicies } from "./MuradPolicies";
 import { ReceptionRoutes } from "./ReceptionRoutes";
+import { AutoOffers } from "./AutoOffers";
 import type { ReceptionSetup } from "@/lib/data/app-settings";
 
 /**
@@ -80,6 +81,7 @@ export function ClientCommsAdmin({
         ))}
         <GuidesEditor guides={guides} />
         <ReceptionRoutes setup={reception} />
+        {reception ? <AutoOffers initial={reception.offers} /> : null}
         <MuradPolicies initial={muradPolicies} />
       </div>
     </TraveliunShell>

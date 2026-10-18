@@ -9,6 +9,7 @@ import { FEATURES_SETTING_KEY, isFeature, type Feature } from "@/lib/features";
 import { intlPhone, listTeletelTeams } from "@/lib/providers/teletel";
 import { SETTING as MURAD_SETTING } from "@/lib/murad/core";
 import { parseDelay, parseHours, readRoutes, ROUTE_KEYS, type Routes } from "@/lib/murad/reception";
+import { readOffers, type OfferCountry } from "@/lib/murad/auto-offer";
 
 /**
  * Choices the administration makes once for everyone (app_settings, 0054).
@@ -174,6 +175,8 @@ export type ReceptionSetup = {
   hours: string;
   /** «20-60»: the seconds Murad waits before answering */
   delay: string;
+  /** «عروض آلية»: the countries Murad prices himself */
+  offers: OfferCountry[];
   scope: "test" | "all";
 };
 
@@ -184,12 +187,13 @@ export async function getReceptionSetup(): Promise<ReceptionSetup | null> {
     const service = createSupabaseServiceClient() as unknown as SupabaseClient;
     const [teams, { data }] = await Promise.all([
       listTeletelTeams(),
-      service.from("app_settings").select("key, value").in("key", [MURAD_SETTING.receptionRoutes, MURAD_SETTING.receptionHours, MURAD_SETTING.receptionScope, MURAD_SETTING.receptionDelay]),
+      service.from("app_settings").select("key, value").in("key", [MURAD_SETTING.receptionRoutes, MURAD_SETTING.receptionHours, MURAD_SETTING.receptionScope, MURAD_SETTING.receptionDelay, MURAD_SETTING.receptionOffers]),
     ]);
     const v = new Map(((data ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
     const hours = parseHours(v.get(MURAD_SETTING.receptionHours));
     const delay = parseDelay(v.get(MURAD_SETTING.receptionDelay));
     return {
+      offers: readOffers(v.get(MURAD_SETTING.receptionOffers)),
       delay: `${delay.min}-${delay.max}`,
       teams,
       routes: readRoutes(v.get(MURAD_SETTING.receptionRoutes), teams),
@@ -237,6 +241,45 @@ export async function setReceptionScope(scope: "test" | "all"): Promise<SetSetti
     const { error } = await service.from("app_settings").upsert({ key: MURAD_SETTING.receptionScope, value: scope, updated_at: new Date().toISOString() });
     if (error) return { ok: false, error: "err.db" };
     await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: MURAD_SETTING.receptionScope, meta: { scope } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/** «عروض آلية»: the countries Murad prices himself, their route, hotels and prices. settings.manage (or the developer); audited. */
+export async function setReceptionOffers(offers: OfferCountry[]): Promise<SetSettingResult> {
+  if (!(await currentCan("settings.manage")) && !(await currentCan("developer.access"))) return { ok: false, error: "err.forbidden" };
+  const num = (v: unknown, max: number) => (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= max ? v : null);
+  const clean: OfferCountry[] = [];
+  for (const o of Array.isArray(offers) ? offers.slice(0, 20) : []) {
+    const cities = (Array.isArray(o?.cities) ? o.cities : [])
+      .slice(0, 8)
+      .map((c) => ({ city: String(c?.city ?? "").trim().slice(0, 60), nights: num(c?.nights, 30) ?? 1, hotel: String(c?.hotel ?? "").trim().slice(0, 120) }))
+      .filter((c) => c.city);
+    const list = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean).slice(0, 12) : []);
+    const fields = [num(o?.carPerDay, 100000), num(o?.roomPerNight, 100000), num(o?.transfer, 100000), num(o?.marginPct, 100), num(o?.maxPeople, 20)];
+    if (!String(o?.country ?? "").trim() || !cities.length || fields.some((f) => f === null)) return { ok: false, error: "err.db" };
+    const [carPerDay, roomPerNight, transfer, marginPct, maxPeople] = fields as number[];
+    clean.push({
+      country: String(o.country).trim().slice(0, 60),
+      enabled: o.enabled === true,
+      cities,
+      carPerDay,
+      roomPerNight,
+      transfer,
+      currency: /^[A-Z]{3}$/.test(String(o.currency)) ? String(o.currency) : "USD",
+      marginPct,
+      maxPeople,
+      includes: list(o.includes),
+      excludes: list(o.excludes),
+    });
+  }
+  try {
+    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { error } = await service.from("app_settings").upsert({ key: MURAD_SETTING.receptionOffers, value: JSON.stringify(clean), updated_at: new Date().toISOString() });
+    if (error) return { ok: false, error: "err.db" };
+    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: MURAD_SETTING.receptionOffers, meta: { countries: clean.map((o) => `${o.country}${o.enabled ? "" : " (off)"}`) } });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };

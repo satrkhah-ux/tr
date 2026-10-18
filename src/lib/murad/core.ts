@@ -41,6 +41,7 @@ export const SETTING = {
   receptionRoutes: "murad_reception_routes",
   receptionHours: "murad_reception_hours",
   receptionDelay: "murad_reception_delay",
+  receptionOffers: "murad_reception_offers",
 } as const;
 
 // ---------- which conversations, which turn ----------

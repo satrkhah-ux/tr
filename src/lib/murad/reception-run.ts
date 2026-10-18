@@ -15,6 +15,9 @@ import {
   setTeletelTyping,
 } from "@/lib/providers/teletel";
 import { parseAssignment } from "@/lib/leads/auto";
+import { getRates } from "@/lib/data/rates-actions";
+import { emptyDraftData, normalizeDraftData, normalizeDraftHotel } from "@/lib/offer/draft-types";
+import { askText, holdToText, missing, offerText, outOfRule, priceOffer, readOffers, tripDays, type OfferAsk, type OfferCountry } from "./auto-offer";
 import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
@@ -75,17 +78,79 @@ export type ReceptionOutcome =
   | `routed:${RouteKey}`
   | "send_failed";
 
-export type ReceptionSettings = { scope: "test" | "all"; routesRaw: string | null; hours: string | null; delay: string | null };
+export type ReceptionSettings = { scope: "test" | "all"; routesRaw: string | null; hours: string | null; delay: string | null; offersRaw: string | null };
 
 export async function readReceptionSettings(service: SupabaseClient): Promise<ReceptionSettings> {
-  const { data } = await service.from("app_settings").select("key, value").in("key", [SETTING.receptionScope, SETTING.receptionRoutes, SETTING.receptionHours, SETTING.receptionDelay]);
+  const { data } = await service.from("app_settings").select("key, value").in("key", [SETTING.receptionScope, SETTING.receptionRoutes, SETTING.receptionHours, SETTING.receptionDelay, SETTING.receptionOffers]);
   const v = new Map(((data ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
   return {
     scope: v.get(SETTING.receptionScope) === "all" ? "all" : "test",
     routesRaw: v.get(SETTING.receptionRoutes) ?? null,
     hours: v.get(SETTING.receptionHours) ?? null,
     delay: v.get(SETTING.receptionDelay) ?? null,
+    offersRaw: v.get(SETTING.receptionOffers) ?? null,
   };
+}
+
+// ---------- «عرض آلي»: the trip's facts, from everything the client wrote ----------
+
+/**
+ * The name, dates, days and party from the client's own words — Arabic
+ * months, «شخصين», «انا وزوجتي» — by the model, with today's date to place a
+ * month in the right year. Null on any failure: the conversation then goes to
+ * a colleague like any other.
+ */
+async function readTrip(text: string): Promise<OfferAsk | null> {
+  if (!isOpenAIConfigured()) return null;
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+  try {
+    const raw = await openaiJson({
+      name: "trip_facts",
+      system: [
+        `Today is ${today} (Riyadh). A client writes to a travel company in Arabic. Extract only what the client actually said:`,
+        "name: the client's own name if they gave it (not a place); arrival_date / departure_date as YYYY-MM-DD in the future (a month without a year is the next one to come);",
+        "days: the trip's length in days if they said it («10 أيام», «اسبوع» = 7); adults and children counts («شخصين» = 2 adults, «انا وزوجتي» = 2 adults, «عائلة 4» unknown split = 4 adults only if no children are mentioned).",
+        "null for anything not said. Never invent.",
+      ].join(" "),
+      user: text.slice(0, 2000),
+      schema: {
+        type: "object",
+        properties: {
+          name: { type: ["string", "null"] },
+          arrival_date: { type: ["string", "null"] },
+          departure_date: { type: ["string", "null"] },
+          days: { type: ["integer", "null"] },
+          adults: { type: ["integer", "null"] },
+          children: { type: ["integer", "null"] },
+        },
+        required: ["name", "arrival_date", "departure_date", "days", "adults", "children"],
+        additionalProperties: false,
+      },
+      temperature: 0,
+      timeoutMs: 15000,
+    });
+    const r = JSON.parse(raw ?? "{}") as { name: string | null; arrival_date: string | null; departure_date: string | null; days: number | null; adults: number | null; children: number | null };
+    return holdToText(text, { name: r.name, arrival: r.arrival_date, departure: r.departure_date, days: r.days, adults: r.adults, children: r.children }, today);
+  } catch {
+    return null;
+  }
+}
+
+/** The proposal as a Basic file — the client, the dates, the route and its hotels, the price locked — for a colleague to confirm and issue. */
+async function offerDraft(service: SupabaseClient, i: { name: string; phone: string; c: OfferCountry; arrival: string; days: number; adults: number; price: ReturnType<typeof priceOffer> }): Promise<string | null> {
+  const base = emptyDraftData();
+  const data = normalizeDraftData({
+    ...base,
+    customer: { ...base.customer, customer_name: i.name, customer_phone: i.phone },
+    trip: { ...base.trip, country: i.c.country, destination: i.c.country, arrival_date: i.arrival, days: i.days, nights: i.price.nights, adults: i.adults, children: 0, meal_plan: "breakfast", default_board: "BB" },
+    cities: i.price.route.map((r) => ({ city_name: r.city, nights: r.nights, check_in: null, check_out: null })),
+    hotels: i.price.route.map((r) => normalizeDraftHotel({ city_name: r.city, hotel_name: r.hotel })),
+    services: { includes: i.c.includes, excludes: i.c.excludes, terms: [] },
+    // the owner's price, locked as a ready offer's is (pricing.final_total)
+    pricing: { items: [], display_currency: "SAR", final_total: i.price.totalSar },
+  } as unknown as Record<string, unknown>);
+  const { data: row } = await service.from("offer_drafts").insert({ data, title: `مُراد — ${i.name}` }).select("id").maybeSingle();
+  return (row as { id: string } | null)?.id ?? null;
 }
 
 /**
@@ -121,12 +186,25 @@ async function countryOf(service: SupabaseClient, text: string): Promise<string 
  * a conversation WhatsApp reopened days later takes its new kind and country,
  * never the last visit's (the evaluator: «اندونيسيا» from a former visit).
  */
-async function markLead(service: SupabaseClient, m: IncomingMessage, fields: { inquiry: string | null; destination: string | null; route: string; at: string; waitSec: number }): Promise<void> {
+async function markLead(
+  service: SupabaseClient,
+  m: IncomingMessage,
+  fields: { inquiry: string | null; destination: string | null; route: string; at: string; waitSec: number; draftId?: string; name?: string | null },
+): Promise<void> {
   const name = m.contactName.trim();
   const realName = name && !name.startsWith("#") && normalizePhone(name) !== normalizePhone(m.phone) ? name : null;
   const { data } = await service.from("client_leads").select("id, name, inquiry, destination, status, created_at, last_visit_at").eq("teletel_conversation_id", m.conversationId).maybeSingle();
   const had = data as { id: string; name: string | null; inquiry: string | null; destination: string | null; status: string; created_at: string; last_visit_at: string | null } | null;
-  const routed = { auto_route: fields.route, auto_routed_at: fields.at, auto_wait_sec: fields.waitSec, assigned_at: fields.at, assignee_reply_at: null, updated_at: fields.at };
+  const routed = {
+    auto_route: fields.route,
+    auto_routed_at: fields.at,
+    auto_wait_sec: fields.waitSec,
+    assigned_at: fields.at,
+    assignee_reply_at: null,
+    updated_at: fields.at,
+    ...(fields.draftId ? { draft_id: fields.draftId } : {}),
+    ...(fields.name ? { name: fields.name } : {}),
+  };
   if (had) {
     await service
       .from("client_leads")
@@ -185,7 +263,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
   try {
     const [thread, past, places, events] = await Promise.all([
       readThread(m.conversationId),
-      service.from("murad_log").select("mode, reason, reply_message_id, created_at").eq("conversation_id", m.conversationId),
+      service.from("murad_log").select("mode, reason, reply_message_id, created_at, intake").eq("conversation_id", m.conversationId),
       loadPlaces(service),
       conversationEvents(m.conversationId),
     ]);
@@ -194,7 +272,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       await finish({ reason: "unreadable", error: "teletel: the thread could not be read" });
       return "unreadable";
     }
-    const rows = (past.data ?? []) as { mode: string; reason: string | null; reply_message_id: number | null; created_at: string }[];
+    const rows = (past.data ?? []) as { mode: string; reason: string | null; reply_message_id: number | null; created_at: string; intake: { country?: string | null } | null }[];
     // this visit, not the conversation's whole life: WhatsApp reopens the same conversation when a client writes
     // again days later — a reception or a colleague's answer from back then is not this time's
     const thisVisit = (sec: number) => m.at - sec < VISIT_SEC;
@@ -203,17 +281,75 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     // everything the client wrote while Murad waited, read as one («ابغى» … «تأشيرة» … «الى لندن»)
     const said = thread.messages.filter((t) => t.fromClient && !t.isPrivate && t.at >= since).map((t) => t.text).join("\n").trim() || m.content;
     const request = readRequest(said, places);
-    const decision = decideReception({
-      routed: received.some((r) => r.reason?.startsWith("routed")),
-      asked: received.some((r) => r.reason === "asked"),
-      staffReplied: thread.messages.some((t) => thisVisit(t.at) && isHumanReply(t, ours)),
-      // handed to someone BY A PERSON while Murad waited — Teletel's own auto-assignment on arrival is no one taking it
-      handedByHand: (events ?? []).some((e) => e.kind === "activity" && e.at >= since && parseAssignment(e.text)?.by != null),
-      canReply: thread.canReply,
-      request,
-    });
     const waitSec = Math.max(0, Math.round(Date.now() / 1000 - since));
     const intake = { kind: request.kind, country: request.country, wants_human: request.wantsHuman, wait_sec: waitSec };
+    const staffReplied = thread.messages.some((t) => thisVisit(t.at) && isHumanReply(t, ours));
+    const handedByHand = (events ?? []).some((e) => e.kind === "activity" && e.at >= since && parseAssignment(e.text)?.by != null);
+
+    // «عرض آلي»: a trip to a country the company prices this way — asked for what is missing, then proposed
+    const offers = readOffers(reception.offersRaw);
+    const offerAsked = received.filter((r) => r.reason?.startsWith("offer:asked"));
+    const offerCountry = offerAsked[0]?.intake?.country ?? request.country;
+    const offer = offers.find((o) => o.enabled && offerCountry && fold(o.country) === fold(offerCountry));
+    const done = received.some((r) => r.reason?.startsWith("routed") || r.reason === "offer:sent");
+    // a trip to such a country that Murad does not price himself still goes to packages, never to «كيف نقدر نخدمك»
+    let routeAs = request;
+    if (offer && !done && !staffReplied && !handedByHand && thread.canReply && !request.wantsHuman && (offerAsked.length > 0 || request.kind === "بكج" || request.kind === null)) {
+      const visitSaid = thread.messages.filter((t) => t.fromClient && !t.isPrivate && thisVisit(t.at)).map((t) => t.text).join("\n");
+      const trip = await readTrip(visitSaid || said);
+      if (trip && !outOfRule(trip, offer)) {
+        const need = missing(trip);
+        if (need.length && offerAsked.length < 2) {
+          const text = askText(offer.country, need, offerAsked.length === 0);
+          const replyId = await sendTeletelMessage(m.conversationId, text);
+          await finish({ reason: replyId ? `offer:asked${offerAsked.length + 1}` : "send_failed", reply: text, reply_message_id: replyId, intake: { country: offer.country, ...trip } });
+          return replyId ? "asked" : "send_failed";
+        }
+        if (!need.length) {
+          const days = tripDays(trip) ?? 0;
+          const provisional = !trip.arrival;
+          const arrival = trip.arrival ?? new Date(Date.now() + 30 * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+          const rate = (await getRates().catch(() => null))?.sarPer[offer.currency] ?? (offer.currency === "USD" ? 3.75 : null);
+          if (rate) {
+            const price = priceOffer(offer, days, trip.adults ?? 2, rate);
+            const name = trip.name ?? firstName(m.contactName) ?? "";
+            const text = offerText({ name, country: offer.country, price, arrival, provisional, c: offer });
+            const replyId = await sendTeletelMessage(m.conversationId, text);
+            if (!replyId) {
+              await finish({ reason: "send_failed", reply: text, error: "send_failed" });
+              return "send_failed";
+            }
+            const draftId = await offerDraft(service, { name, phone: m.phone, c: offer, arrival, days, adults: trip.adults ?? 2, price });
+            const teams = await listTeletelTeams();
+            const teamId = teamFor(readRoutes(reception.routesRaw, teams), "بكج");
+            const team = teams.find((t) => t.id === teamId) ?? null;
+            const assigned = teamId ? await assignTeletelTeam(m.conversationId, teamId) : false;
+            const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
+            await addTeletelNote(
+              m.conversationId,
+              `🤖 عرض آلي: ${offer.country} ${days} أيام لـ${trip.adults ?? 2} — ${price.totalSar.toLocaleString("en-US")} ريال${provisional ? " (تواريخ مبدئية)" : ""}. ${draftId ? `الملف في بيسك: ${site}/basic/${draftId} — راجعه وأصدره.` : "تعذّر إنشاء ملف بيسك."} ${assigned && team ? `حُوّلت إلى «${team.name}».` : ""}`,
+            );
+            const at = new Date().toISOString();
+            await finish({ reason: "offer:sent", reply: text, reply_message_id: replyId, intake: { country: offer.country, ...trip, days, arrival, provisional, total_sar: price.totalSar, draft_id: draftId, team_id: teamId, assigned, wait_sec: waitSec } });
+            await markLead(service, m, { inquiry: "بكج", destination: offer.country, route: team?.name.trim() ?? DEPARTMENT["بكج"], at, waitSec, draftId: draftId ?? undefined, name: trip.name });
+            return "routed:بكج";
+          }
+        }
+      }
+      // not priced this way (more than four, children, a model that did not answer, still missing after two asks): a colleague's
+      routeAs = { ...request, kind: "بكج" };
+    }
+
+    const decision = decideReception({
+      routed: done,
+      asked: received.some((r) => r.reason === "asked"),
+      staffReplied,
+      // handed to someone BY A PERSON while Murad waited — Teletel's own auto-assignment on arrival is no one taking it
+      handedByHand,
+      canReply: thread.canReply,
+      request: routeAs,
+    });
+
 
     if (decision.act === "none") {
       await finish({ reason: `none:${decision.why}`, intake });
