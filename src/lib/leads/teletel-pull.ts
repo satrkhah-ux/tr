@@ -57,6 +57,8 @@ type Known = {
   contact_id: number | null;
   timeline_seen_at: number | null;
   auto_routed_at: string | null;
+  created_at: string;
+  last_visit_at: string | null;
 };
 
 /** an agent's Teletel name to an employee — by the Arabic name, else the English */
@@ -104,7 +106,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
     // ponytail: every Teletel row and every unmatched sheet row in one read; a date window when it grows past tens of thousands
     supabase
       .from("client_leads")
-      .select("id, phone, name, inquiry, destination, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at, auto_routed_at")
+      .select("id, phone, name, inquiry, destination, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at, auto_routed_at, created_at, last_visit_at")
       .or("teletel_conversation_id.not.is.null,and(source.eq.sheet,teletel_conversation_id.is.null)")
       .limit(20000),
   ]);
@@ -140,6 +142,11 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       // until its turns are read, the one holding it stands in as the receiver
       if (!had.received_by && holder && had.timeline_seen_at == null) patch.received_by = holder;
       if (Number(had.timeline_seen_at) !== c.lastActivityAt) timelines.push(c);
+      // the client came back (0104): the conversation had been closed, or they wrote over a day after the visit before
+      const visitStart = Date.parse(had.last_visit_at ?? had.created_at) / 1000;
+      if (c.waitingSince > 0 && c.waitingSince > visitStart && (had.status === "closed" || c.waitingSince - visitStart > 86_400)) {
+        patch.last_visit_at = iso(c.waitingSince);
+      }
       // the clock's own times, written once
       if (!had.first_message_at && c.createdAt) patch.first_message_at = iso(c.createdAt);
       if (!had.first_reply_at && c.firstReplyAt) patch.first_reply_at = iso(c.firstReplyAt);

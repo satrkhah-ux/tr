@@ -46,6 +46,8 @@ export type Lead = Omit<LeadRow, "sheet_key"> & {
   assignee_reply_at: string | null;
   /** every agent's turn with it, in order — the first is «الموظف المستلم» (0099) */
   handoffs: Stage[] | null;
+  /** the client came back to this conversation (0104) — counted a request on that day too */
+  last_visit_at: string | null;
   /** «المستقبل الآلي» handed it to this team, at this time (0103) */
   auto_route: string | null;
   auto_routed_at: string | null;
@@ -73,7 +75,7 @@ export type LeadsPage = {
 };
 
 const COLS =
-  "id, phone, name, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, draft_id, source, created_at, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, handoffs, auto_route, auto_routed_at";
+  "id, phone, name, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, draft_id, source, created_at, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, handoffs, auto_route, auto_routed_at, last_visit_at";
 const ROW_COLS =
   "id, phone, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, sheet_key";
 
@@ -135,7 +137,8 @@ export async function listLeads(): Promise<LeadsPage> {
     const file = r.draft_id
       ? { id: r.draft_id, destination: byPhone?.id === r.draft_id ? byPhone.destination : null, name: null, created_at: null }
       : byPhone;
-    const since = previousContact(r, byPhoneRows.get(r.phone) ?? [], byPhone?.created_at ?? null);
+    // a conversation the client came back to: its own first visit is the earlier contact (0104)
+    const since = r.last_visit_at ? r.created_at : previousContact(r, byPhoneRows.get(r.phone) ?? [], byPhone?.created_at ?? null);
     return { ...r, name: r.name || byPhone?.name || null, file, returning: since !== null, returning_since: since };
   });
   return { stats, leads, team: people, meId, pullError, twoWay, live };

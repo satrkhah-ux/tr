@@ -291,30 +291,30 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
   const scroller = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; left: number } | null>(null);
   const nameOf = useMemo(() => new Map(team.map((e) => [e.id, e.arabic_name])), [team]);
-  const dayOf = useMemo(() => new Map(leads.map((l) => [l.id, riyadhDay(l.created_at)])), [leads]);
+  // a conversation is a request on the day it opened and on the day the client came back (0104); it shows under the latest
+  const visitsOf = useMemo(() => new Map(leads.map((l) => [l.id, [...new Set([riyadhDay(l.created_at), ...(l.last_visit_at ? [riyadhDay(l.last_visit_at)] : [])])]])), [leads]);
+  const dayOf = useMemo(() => new Map([...visitsOf].map(([id, days]) => [id, days[days.length - 1]])), [visitsOf]);
+  const on = (l: Lead, d: string) => visitsOf.get(l.id)?.includes(d) ?? false;
   const receiver = (l: Lead) => nameOf.get(l.received_by ?? "") ?? l.received_by_name;
 
   // the daily classification: the chosen day's conversations by kind
-  const ofDay = leads.filter((l) => dayOf.get(l.id) === day);
+  const ofDay = leads.filter((l) => on(l, day));
   const dayCount = (label: string) => ofDay.filter((l) => l.inquiry === label).length;
   const dayReturning = ofDay.filter((l) => l.returning).length;
 
   // «رؤية للإعلانات»: the chosen range
-  const inRange = range === 0 ? leads : leads.filter((l) => (dayOf.get(l.id) ?? "") > shiftDay(today, -range));
+  const inRange = range === 0 ? leads : leads.filter((l) => (visitsOf.get(l.id) ?? []).some((d) => d > shiftDay(today, -range)));
   const phones = new Set(inRange.map((l) => l.phone));
   const returningPhones = new Set(inRange.filter((l) => l.returning).map((l) => l.phone));
   const withFile = inRange.filter((l) => l.file).length;
   const trend = Array.from({ length: 14 }, (_, i) => {
     const d = shiftDay(today, i - 13);
-    return { day: d, count: leads.filter((l) => dayOf.get(l.id) === d).length };
+    return { day: d, count: leads.filter((l) => on(l, d)).length };
   });
   const trendMax = Math.max(1, ...trend.map((t) => t.count));
 
   // «حصر عدد الطلبات اليومية»: today, this week (from Sunday), this month — each beside the one before
-  const countFrom = (from: string, to: string) => leads.filter((l) => {
-    const d = dayOf.get(l.id) ?? "";
-    return d >= from && d <= to;
-  }).length;
+  const countFrom = (from: string, to: string) => leads.reduce((n, l) => n + (visitsOf.get(l.id) ?? []).filter((d) => d >= from && d <= to).length, 0);
   const dow = new Date(`${today}T12:00:00Z`).getUTCDay();
   const weekStart = shiftDay(today, -dow);
   const monthStart = `${today.slice(0, 7)}-01`;
@@ -331,8 +331,8 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
   const kindsOf = INQUIRIES.map((i) => i.label).filter((k) => k !== "طلب");
 
   const list = leads.filter((l) => {
-    if (kind && (l.inquiry !== kind || dayOf.get(l.id) !== day)) return false;
-    if (returningOnly && (!l.returning || dayOf.get(l.id) !== day)) return false;
+    if (kind && (l.inquiry !== kind || !on(l, day))) return false;
+    if (returningOnly && (!l.returning || !on(l, day))) return false;
     if (tab === "open" && l.status !== "open") return false;
     if (tab === "closed" && l.status !== "closed") return false;
     if (tab === "mine" && l.assigned_to !== meId && l.received_by !== meId) return false;
@@ -552,7 +552,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
               </thead>
               <tbody>
                 {[...trend].reverse().map((t) => {
-                  const ofT = leads.filter((l) => dayOf.get(l.id) === t.day);
+                  const ofT = leads.filter((l) => on(l, t.day));
                   return (
                     <tr key={t.day} className={`border-t border-[#eef3f1] font-semibold text-[#185045] [&>td]:px-2 [&>td]:py-1 ${t.day === day ? "bg-[#eef6f2]" : ""}`}>
                       <td className="whitespace-nowrap">

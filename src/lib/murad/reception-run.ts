@@ -5,7 +5,8 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getFeatureFlags } from "@/lib/features-server";
 import { addTeletelNote, assignTeletelTeam, intlPhone, listOpenConversations, listTeletelTeams, sendTeletelMessage } from "@/lib/providers/teletel";
 import { loadPlaces } from "@/lib/leads/teletel-pull";
-import { normalizePhone } from "@/lib/leads/sheet";
+import { fold, normalizePhone } from "@/lib/leads/sheet";
+import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
 import { isHumanReply, maskPhone, SETTING } from "./core";
 import { readSettings, readThread } from "./run";
 import {
@@ -59,12 +60,44 @@ export async function readReceptionSettings(service: SupabaseClient): Promise<Re
   return { scope: v.get(SETTING.receptionScope) === "all" ? "all" : "test", routesRaw: v.get(SETTING.receptionRoutes) ?? null, hours: v.get(SETTING.receptionHours) ?? null };
 }
 
-/** The conversation's row in «العملاء», made or completed now — the pull fills the rest within five minutes. */
+/**
+ * The country a message names when the catalogue does not know the place
+ * («تأشيرة الى لندن» — no London among our cities): the model says it, and our
+ * own spelling of it wins when the countries table has it, else its own. Asked
+ * only after the client has been answered, so it never slows the reply; null
+ * on any failure.
+ */
+async function countryOf(service: SupabaseClient, text: string): Promise<string | null> {
+  if (!isOpenAIConfigured() || text.replace(/[^p{L}]/gu, "").length < 3) return null;
+  try {
+    const raw = await openaiJson({
+      name: "named_country",
+      system: "Return the country (in Arabic) of the destination the message names — a country, a city or a place (لندن → بريطانيا، دبي → الإمارات، أنطاليا → تركيا). null when it names none.",
+      user: text.slice(0, 500),
+      schema: { type: "object", properties: { country: { type: ["string", "null"] } }, required: ["country"], additionalProperties: false },
+      temperature: 0,
+      timeoutMs: 8000,
+    });
+    const country = (JSON.parse(raw ?? "{}") as { country?: string | null }).country?.trim();
+    if (!country) return null;
+    const { data } = await service.from("countries").select("arabic_name");
+    return ((data ?? []) as { arabic_name: string }[]).find((c) => fold(c.arabic_name) === fold(country))?.arabic_name ?? country;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The conversation's row in «العملاء», made or completed now — the pull fills
+ * the rest within five minutes. What the reception understood is this visit's:
+ * a conversation WhatsApp reopened days later takes its new kind and country,
+ * never the last visit's (the evaluator: «اندونيسيا» from a former visit).
+ */
 async function markLead(service: SupabaseClient, m: IncomingMessage, fields: { inquiry: string | null; destination: string | null; route: string; at: string }): Promise<void> {
   const name = m.contactName.trim();
   const realName = name && !name.startsWith("#") && normalizePhone(name) !== normalizePhone(m.phone) ? name : null;
-  const { data } = await service.from("client_leads").select("id, name, inquiry, destination").eq("teletel_conversation_id", m.conversationId).maybeSingle();
-  const had = data as { id: string; name: string | null; inquiry: string | null; destination: string | null } | null;
+  const { data } = await service.from("client_leads").select("id, name, inquiry, destination, status, created_at, last_visit_at").eq("teletel_conversation_id", m.conversationId).maybeSingle();
+  const had = data as { id: string; name: string | null; inquiry: string | null; destination: string | null; status: string; created_at: string; last_visit_at: string | null } | null;
   const routed = { auto_route: fields.route, auto_routed_at: fields.at, assigned_at: fields.at, assignee_reply_at: null, updated_at: fields.at };
   if (had) {
     await service
@@ -72,8 +105,12 @@ async function markLead(service: SupabaseClient, m: IncomingMessage, fields: { i
       .update({
         ...routed,
         ...(!had.name && realName ? { name: realName } : {}),
-        ...((!had.inquiry || had.inquiry === "يستفسر") && fields.inquiry ? { inquiry: fields.inquiry } : {}),
-        ...(!had.destination && fields.destination ? { destination: fields.destination } : {}),
+        ...(fields.inquiry ? { inquiry: fields.inquiry } : {}),
+        ...(fields.destination ? { destination: fields.destination } : {}),
+        // a conversation WhatsApp reopened: this message is a new visit (0104)
+        ...(had.status === "closed" || m.at - Date.parse(had.last_visit_at ?? had.created_at) / 1000 > 86_400
+          ? { last_visit_at: new Date(m.at * 1000).toISOString(), status: "open" }
+          : {}),
       })
       .eq("id", had.id);
     return;
@@ -182,7 +219,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     });
     await markLead(service, m, {
       inquiry: decision.to === "موظف" || decision.to === "غير واضح" ? null : decision.to,
-      destination: request.country,
+      destination: request.country ?? (await countryOf(service, m.content)),
       route: team?.name.trim() ?? DEPARTMENT[decision.to],
       at,
     });
