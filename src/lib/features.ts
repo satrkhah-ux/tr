@@ -23,6 +23,12 @@ export const FEATURES = [
   // morning run) asks the same AviationStack quota about travel-day landings.
   // Off: the job still runs and records its run, but asks nothing (trackFlights).
   "flight_tracking",
+  // «مُراد» (the owner, 2026-10-18): a client waiting five minutes with no human
+  // answer gets one from Murad (/api/murad/run, src/lib/murad). Two switches,
+  // because they fail differently: a suggestion is a private note staff may
+  // ignore; an auto-reply reaches the client (only the numbers on the auto list).
+  "murad_suggest",
+  "murad_auto",
 ] as const;
 
 export type Feature = (typeof FEATURES)[number];
@@ -38,6 +44,8 @@ export const FEATURE_DEFAULTS: FeatureFlags = {
   ai_itinerary: true,
   flight_lookup: true,
   flight_tracking: true,
+  murad_suggest: true,
+  murad_auto: true,
 };
 
 export const FEATURES_SETTING_KEY = "features";

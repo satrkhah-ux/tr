@@ -40,6 +40,7 @@ const SECRET_ENV = [
   "SUPABASE_SERVICE_ROLE_KEY",
   "TELETEL_API_TOKEN",
   "OPENAI_API_KEY",
+  "ANTHROPIC_API_KEY",
   "AVIATIONSTACK_API_KEY",
   "AZURE_DI_KEY",
   "TELEGRAM_EYE_BOT_TOKEN",
@@ -395,6 +396,21 @@ const CHECKS: Check[] = [
       key: "dev.d.leadsPullJob",
       params: { read: Number(s.read ?? 0), added: Number(s.added ?? 0), updated: Number(s.updated ?? 0) },
     })),
+  },
+  {
+    id: "job_murad",
+    group: "jobs",
+    label: "murad.check",
+    // the VPS crontab: every minute (api/murad/run/route.ts); the age rule is the shared one
+    run: cronCheck("murad_run", 60_000, (s): Msg => {
+      const n = (k: string) => Number(s[k] ?? 0);
+      if (s.skipped === "switched_off") return { key: "murad.check.off" };
+      if (s.skipped === "no_provider") return { key: "murad.check.noProvider" };
+      if (s.skipped === "not_configured") return { key: "dev.d.notConfigured", params: { env: "TELETEL_BASE_URL / TELETEL_API_TOKEN" } };
+      if (s.skipped === "busy") return { key: "murad.check.busy" };
+      if (s.capped) return { key: "murad.check.capped", params: { used: n("used"), cap: n("cap") } };
+      return { key: "murad.check.detail", params: { read: n("read"), auto: n("auto"), suggest: n("suggest"), used: n("used"), cap: n("cap") } };
+    }),
   },
 ];
 

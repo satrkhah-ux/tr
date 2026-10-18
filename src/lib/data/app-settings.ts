@@ -6,6 +6,7 @@ import { currentCan } from "@/lib/roles/current";
 import { logAudit } from "@/lib/data/audit";
 import { forgetFeatureFlags, getFeatureFlags } from "@/lib/features-server";
 import { FEATURES_SETTING_KEY, isFeature, type Feature } from "@/lib/features";
+import { intlPhone } from "@/lib/providers/teletel";
 
 /**
  * Choices the administration makes once for everyone (app_settings, 0054).
@@ -105,6 +106,56 @@ export async function setFeature(feature: Feature, on: boolean): Promise<SetSett
     if (error) return { ok: false, error: "err.db" };
     forgetFeatureFlags();
     await logAudit({ action: "feature.toggled", entity: "app_settings", entity_id: FEATURES_SETTING_KEY, meta: { feature, on } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+// ---------- «مُراد» (src/lib/murad) ----------
+
+/**
+ * The numbers Murad may answer on WhatsApp himself (murad_auto_phones), beside
+ * the owner's test number. developer.access only, audited: putting a number
+ * here lets a model write to that client.
+ */
+export async function setMuradAutoPhones(phones: string[]): Promise<SetSettingResult> {
+  if (!(await currentCan("developer.access"))) return { ok: false, error: "err.forbidden" };
+  if (!Array.isArray(phones) || phones.length > 20) return { ok: false, error: "err.db" };
+  const clean = phones.map((p) => (typeof p === "string" ? intlPhone(p) : null));
+  if (clean.some((p) => p === null)) return { ok: false, error: "err.db" };
+  const value = JSON.stringify([...new Set(clean)]);
+  try {
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { error } = await supabase.from("app_settings").upsert({ key: "murad_auto_phones", value, updated_at: new Date().toISOString() });
+    if (error) return { ok: false, error: "err.db" };
+    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: "murad_auto_phones", meta: { count: clean.length } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/** «سياسات الشركة» Murad answers policy questions from — empty: those go to staff. */
+export async function getMuradPolicies(): Promise<string> {
+  if (!(await currentCan("settings.manage"))) return "";
+  try {
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { data } = await supabase.from("app_settings").select("value").eq("key", "murad_policies").maybeSingle();
+    return (data as { value?: string } | null)?.value ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export async function setMuradPolicies(text: string): Promise<SetSettingResult> {
+  if (!(await currentCan("settings.manage"))) return { ok: false, error: "err.forbidden" };
+  if (typeof text !== "string" || text.length > 4000) return { ok: false, error: "err.db" };
+  try {
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { error } = await supabase.from("app_settings").upsert({ key: "murad_policies", value: text.trim(), updated_at: new Date().toISOString() });
+    if (error) return { ok: false, error: "err.db" };
+    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: "murad_policies", meta: { length: text.trim().length } });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
