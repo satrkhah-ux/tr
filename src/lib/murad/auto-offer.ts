@@ -13,7 +13,7 @@
  * offer. No flights.
  */
 
-import { emptyDraftData, normalizeDraftData, normalizeDraftHotel, type DraftData } from "@/lib/offer/draft-types";
+import { cityKeys, emptyDraftData, normalizeDraftData, normalizeDraftHotel, type DraftData } from "@/lib/offer/draft-types";
 
 export type OfferCity = { city: string; nights: number; hotel: string };
 
@@ -186,14 +186,16 @@ export function offerDraftData(i: { name: string; phone: string; c: OfferCountry
   const base = emptyDraftData();
   const car = { enabled: true, car_type: "سيارة خاصة مع سائق", cars: 1, note: "" };
   const room = { room_type_id: null, room_type_name: "غرفة مزدوجة", board_type: "BB", price: null };
+  // each hotel tied to ITS visit: Tbilisi twice (start and end) is two stays, not four (the manager, 2026-10-19: «فنادق مكرره»)
+  const keys = cityKeys(i.price.route.map((r) => ({ city_name: r.city })));
   return normalizeDraftData({
     ...base,
     customer: { ...base.customer, customer_name: i.name, customer_phone: i.phone },
     trip: { ...base.trip, country: i.c.country, destination: i.c.country, arrival_date: i.arrival, days: i.days, nights: i.price.nights, adults: i.adults, children: 0, rooms: i.price.rooms, meal_plan: "breakfast", default_board: "BB" },
     scope: { ...base.scope, flights_intl: false, flights_domestic: false, visas: false },
     transport_plan: { airport: car, tours: car, intercity: { ...car, mode: "car" } },
-    cities: i.price.route.map((r) => ({ city_name: r.city, nights: r.nights, check_in: null, check_out: null })),
-    hotels: i.price.route.map((r) => normalizeDraftHotel({ city_name: r.city, hotel_name: r.hotel, rooms: Array.from({ length: i.price.rooms }, () => room) })),
+    cities: i.price.route.map((r, k) => ({ key: keys[k], city_name: r.city, nights: r.nights, check_in: null, check_out: null })),
+    hotels: i.price.route.map((r, k) => normalizeDraftHotel({ city_key: keys[k], city_name: r.city, hotel_name: r.hotel, rooms: Array.from({ length: i.price.rooms }, () => room) })),
     // what the message said, said on the document too
     services: { includes: i.c.includes, excludes: i.c.excludes, terms: ["هذا عرض مبدئي، ويؤكد معك موظفنا التفاصيل قبل الحجز.", ...(i.provisional ? ["التواريخ مبدئية وتُحدَّد معك عند التأكيد."] : [])] },
     pricing: { items: [], display_currency: "SAR", final_total: i.price.totalSar },
