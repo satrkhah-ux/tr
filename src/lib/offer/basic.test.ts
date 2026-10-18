@@ -7,6 +7,7 @@ import {
   emptyDraftData,
   emptyFlight,
   hotelCoverage,
+  keepNightlyRates,
   normalizeDraftData,
   withRooms,
   type DraftData,
@@ -112,6 +113,24 @@ describe("النظام بيسك", () => {
     expect(next.hotels[0].rooms[0].price).toBe(1125);
     expect(next.cities[1].check_in).toBe("2026-11-14");
     expect((next.cities[0] as BasicCity).tours).toBe(1);
+  });
+
+  it("the city's nights down and up again, as the editor runs them (setCityNights, then commit's pass): the night stays (2026-10-18)", () => {
+    const data = malaysia();
+    // سيلانغور: 2 nights at 750 a night, the first time without a mark, then with one
+    data.hotels = data.hotels.map((h, i) => (i === 0 ? { ...h, rooms: h.rooms.map((r) => ({ ...r, price: 1500 })), manual_price: 1500 } : h));
+    const step = (d: DraftData, n: number) => {
+      const moved = { ...d, ...setCityNights(d, 0, n) };
+      return { ...moved, hotels: keepNightlyRates(moved.cities, moved.hotels) };
+    };
+    const night = (d: DraftData) => [d.hotels[0].rooms[0].price! / d.cities[0].nights, d.hotels[0].manual_price! / d.cities[0].nights];
+    const up = step(data, 3);
+    expect(night(up)).toEqual([750, 750]);
+    const down = step(up, 2);
+    expect(night(down)).toEqual([750, 750]);
+    const again = step(down, 3);
+    expect(night(again)).toEqual([750, 750]);
+    expect(again.hotels[0].rooms[0].price).toBe(2250);
   });
 
   it("splits a stay for a room change, each half at the same nightly rate, and joins it back", () => {

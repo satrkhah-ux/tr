@@ -50,6 +50,7 @@ import {
   type ServiceKind,
   type TourPick,
   type TransportLeg,
+  keepNightlyRates as keepNightlyRatesByMark,
 } from "./draft-types";
 import { roomRank, seatsFromName } from "@/lib/catalog/model";
 import { daysFromTours, departureDay, legInto } from "./itinerary";
@@ -309,17 +310,12 @@ export function withHotelLines(data: DraftData, currency: string): DraftHotel[] 
  * mistake this screen must not make.
  */
 function keepNightlyRates(prev: HotelStay[], hotels: DraftHotel[], cities: DraftCity[]): DraftHotel[] {
+  // ONE rule with the editor's (draft-types keepNightlyRates, run again on every commit): a line not
+  // yet marked is marked at its nights BEFORE the change, then rescaled by the mark — so the
+  // commit after it finds the mark moved and changes nothing (11 → 10 → 11 doubled 1.1 before)
   const was = new Map(prev.map((s) => [s.line.id, s.nights]));
-  const now = new Map(deriveHotelStays(cities, hotels).map((s) => [s.line.id, s.nights]));
-  return hotels.map((h) => {
-    const a = was.get(h.id);
-    const b = now.get(h.id);
-    if (h.sourcing || !a || !b || a === b) return h;
-    return withRooms(
-      h,
-      h.rooms.map((r) => (r.price == null ? r : { ...r, price: Math.round(((r.price * b) / a) * 100) / 100 })),
-    );
-  });
+  const marked = hotels.map((h) => (h.priced_nights || !was.get(h.id) ? h : { ...h, priced_nights: was.get(h.id) }));
+  return keepNightlyRatesByMark(cities, marked);
 }
 
 /** A city's nights changed: its stays keep their nightly rate, and a room change keeps a night after it. */
