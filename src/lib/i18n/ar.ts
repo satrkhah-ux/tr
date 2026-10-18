@@ -618,6 +618,7 @@ export const ar: Dictionary = {
   // ---------- partner companies (branding + resale) ----------
   "nav.partnerCompanies": "الشركات المتعاونة",
   "nav.dataSection": "قسم البيانات",
+  "nav.priceReview": "مراجعة الأسعار",
   "nav.adminSection": "قسم الإدارة",
   // ---------- view-as + developer accounts + forced password (2026-10-17) ----------
   "viewAs.label": "عرض النظام كـ",

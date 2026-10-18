@@ -620,6 +620,7 @@ export const en = {
   // ---------- partner companies (branding + resale) ----------
   "nav.partnerCompanies": "Partner companies",
   "nav.dataSection": "Data",
+  "nav.priceReview": "Price review",
   "nav.adminSection": "Administration",
   // ---------- view-as + developer accounts + forced password (2026-10-17) ----------
   "viewAs.label": "View the system as",

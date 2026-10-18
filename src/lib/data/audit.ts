@@ -35,6 +35,8 @@ export type AuditAction =
   | "data.deleted"
   | "data.verified"
   | "data.unverified"
+  // «مراجعة الأسعار»: a price set or kept (meta: kind, label, before, after)
+  | "price.reviewed"
   // operations
   | "operation.confirmed"
   | "operation.client_status"

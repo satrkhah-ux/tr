@@ -209,6 +209,8 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.transfers", href: "/cars/transfers" },
       { labelKey: "nav.tours", href: "/cars/tours" },
       { labelKey: "data.model.grid.title", href: "/price-grid" },
+      // what is still provisional or unpriced there, for several people at once, every change logged
+      { labelKey: "nav.priceReview", href: "/price-review" },
       { labelKey: "nav.tourPrograms", href: "/tour-programs" },
       { labelKey: "nav.drivers", href: "/drivers" },
       { labelKey: "nav.serviceTypes", href: "/services-types", captionKey: "nav.services" },
