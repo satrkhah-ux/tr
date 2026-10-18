@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
 import { getCurrentEmployeeId } from "./metrics";
+import { logAudit } from "./audit";
 import {
   addTeletelNote,
   assignTeletelTeam,
@@ -87,6 +88,8 @@ export type SlaBoard =
       rows: SlaRow[] | null;
       followups: Followup[];
       employees: { id: string; name: string }[];
+      /** the rules move nothing until a manager turns them on (app_settings sla_apply) */
+      applying: boolean;
       /** what «ينقل إلى» may name besides our «المتابعة» */
       teams: TeletelTeam[];
       /** «قواعد مقترحة بناء على محادثات النظام» — empty while Teletel cannot be read */
@@ -116,6 +119,29 @@ function teletelLink(): string | null {
   return c ? `${c.baseUrl}/app/accounts/${c.accountId}/conversations/` : null;
 }
 
+/**
+ * «لا تطبق اي قاعدة» (the owner, 2026-10-18, while the rules are reworked):
+ * the board still classifies and colours, but nothing moves — not to our
+ * «المتابعة», not to a Teletel team — until a manager turns the rules on.
+ * Off unless app_settings `sla_apply` is "on".
+ */
+const APPLY_KEY = "sla_apply";
+
+async function rulesApply(service: SupabaseClient): Promise<boolean> {
+  const { data } = await service.from("app_settings").select("value").eq("key", APPLY_KEY).maybeSingle();
+  return (data as { value?: string } | null)?.value === "on";
+}
+
+export async function setSlaApply(on: boolean): Promise<{ ok: true } | Fail> {
+  if (!(await isManager())) return { ok: false, error: "forbidden" };
+  const { error } = await db()
+    .from("app_settings")
+    .upsert({ key: APPLY_KEY, value: on ? "on" : "off", updated_at: new Date().toISOString() }, { onConflict: "key" });
+  if (error) return { ok: false, error: "failed" };
+  await logAudit({ action: "sla.rules_toggled", entity: "app_settings", entity_id: APPLY_KEY, meta: { on } });
+  return { ok: true };
+}
+
 async function loadRules(): Promise<SlaRule[]> {
   const { data } = await db().from("sla_rules").select("id, kind, name, amount, unit, color, to_followup, teletel_team_id, teletel_team_name, active").order("created_at");
   return (data ?? []) as SlaRule[];
@@ -133,13 +159,14 @@ const arWait = (minutes: number) => {
  * recent delay, not already there, not moved there by us this week (a colleague
  * who moves it back is not fought). Fifty a look at most.
  */
-async function moveToTeams(service: SupabaseClient, rows: SlaRow[], rules: SlaRule[]): Promise<void> {
+async function moveToTeams(service: SupabaseClient, rows: SlaRow[], rules: SlaRule[], apply: boolean): Promise<void> {
   const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const { data } = await service.from("sla_moves").select("conversation_id, team_id, team_name").gte("created_at", weekAgo).order("created_at");
   const moves = (data ?? []) as { conversation_id: number; team_id: number; team_name: string | null }[];
   const done = new Set(moves.map((m) => `${m.conversation_id}:${m.team_id}`));
   const last = new Map(moves.map((m) => [m.conversation_id, m.team_name]));
   for (const r of rows) r.movedTo = last.get(r.id) ?? null;
+  if (!apply) return;
 
   const ruleOf = new Map(rules.map((x) => [x.id, x]));
   // ponytail: 50 a look keeps a first switch-on from flooding Teletel; the rest follow on the next looks
@@ -177,7 +204,7 @@ function followupRow(c: SlaRow, rule: SlaRule | null) {
 export async function getSlaBoard(fresh = false): Promise<SlaBoard> {
   if (!(await isManager())) return { ok: false, error: "forbidden" };
   const service = db();
-  const [rules, fetched, teams] = await Promise.all([loadRules(), listOpenConversations(fresh), listTeletelTeams()]);
+  const [rules, fetched, teams, apply] = await Promise.all([loadRules(), listOpenConversations(fresh), listTeletelTeams(), rulesApply(service)]);
   const conversations = fetched?.rows ?? null;
   const now = Math.floor(Date.now() / 1000);
 
@@ -189,10 +216,10 @@ export async function getSlaBoard(fresh = false): Promise<SlaBoard> {
       const clock = slaClock(c, now);
       return { ...c, ...clock, tierId: tierFor(rules, clock.kind, clock.minutes)?.id ?? null, followupId: open.get(c.id) ?? null, movedTo: null };
     }) ?? null;
-  if (rows) await moveToTeams(service, rows, rules);
+  if (rows) await moveToTeams(service, rows, rules, apply);
 
   // the ones that reached a rule marked «إلى المتابعة» move there now — recent delays only (classify.ts)
-  const due = (rows ?? []).filter((r) => !r.followupId && autoFollowup(rules.find((x) => x.id === r.tierId), r.minutes));
+  const due = apply ? (rows ?? []).filter((r) => !r.followupId && autoFollowup(rules.find((x) => x.id === r.tierId), r.minutes)) : [];
   if (due.length > 0) {
     const made = await Promise.all(
       due.map((r) => service.from("sla_followups").insert(followupRow(r, rules.find((x) => x.id === r.tierId) ?? null)).select("id").maybeSingle()),
@@ -215,6 +242,7 @@ export async function getSlaBoard(fresh = false): Promise<SlaBoard> {
     rows,
     followups: ((fu ?? []) as unknown as RawFollowup[]).map(shape),
     employees: ((emps ?? []) as { id: string; arabic_name: string | null }[]).map((e) => ({ id: e.id, name: e.arabic_name ?? "—" })),
+    applying: apply,
     teams,
     suggestions: rows ? suggestRules(rows, teams, rules) : [],
     teletelLink: teletelLink(),

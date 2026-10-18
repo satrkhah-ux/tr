@@ -140,6 +140,8 @@ export type AuditAction =
   | "offer.cancelled"
   // Basic's «حذف» — the draft as it was kept in meta (file-status.ts deleteFiles)
   | "offer.deleted"
+  // «SLA»: the rules' moves turned on or off (data/sla.ts setSlaApply)
+  | "sla.rules_toggled"
   | "draft.deleted";
 
 export type AuditInput = {

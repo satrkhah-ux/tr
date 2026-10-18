@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ExternalLink, Lightbulb, Loader2, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
-import { assignFollowup, assignToTeletelHolders, deleteSlaRule, getSlaBoard, saveSlaRule, sendToFollowup, type SlaBoard as Board, type SlaRow } from "@/lib/data/sla";
+import { assignFollowup, assignToTeletelHolders, deleteSlaRule, getSlaBoard, saveSlaRule, sendToFollowup, setSlaApply, type SlaBoard as Board, type SlaRow } from "@/lib/data/sla";
 import { ruleMinutes, SLA_KINDS, SLA_UNITS, waitParts, type SlaKind, type SlaRule, type Suggestion } from "@/lib/sla/classify";
 import { useSlaLabels } from "./labels";
 
@@ -57,6 +57,17 @@ export function SlaBoard({ initial }: { initial: OkBoard }) {
     }
   }
 
+  async function toggleApply() {
+    if (!window.confirm(tx(board.applying ? "applyOffConfirm" : "applyOnConfirm"))) return;
+    setLoading(true);
+    try {
+      await setSlaApply(!board.applying);
+    } finally {
+      setLoading(false);
+    }
+    reload(false);
+  }
+
   const openFollowups = board.followups.filter((f) => f.status === "open").length;
   const tabs = [
     ["conv", tx("tabConversations"), board.rows?.length ?? 0],
@@ -79,6 +90,13 @@ export function SlaBoard({ initial }: { initial: OkBoard }) {
               {tx("refresh")}
             </button>
           </div>
+        </div>
+        {/* the rules act only when a manager says so (the owner, 2026-10-18) */}
+        <div className={`mt-3 flex flex-wrap items-center gap-2 rounded-[10px] border px-3 py-2 text-[12.5px] font-bold ${board.applying ? "border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]" : "border-[#f4d9a6] bg-[#fff8e8] text-[#a86a10]"}`}>
+          <span className="min-w-0 flex-1">{tx(board.applying ? "applyOn" : "applyOff")}</span>
+          <button type="button" disabled={loading} onClick={toggleApply} className={`${BTN} border bg-white ${board.applying ? "border-[#bfe5d4] text-[#0f7a52]" : "border-[#e0c48a] text-[#7a5a10]"}`}>
+            {tx(board.applying ? "applyStop" : "applyStart")}
+          </button>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5" role="tablist">
           {tabs.map(([key, label, n]) => (
