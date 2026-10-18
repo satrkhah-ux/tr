@@ -155,7 +155,6 @@ function usePinnedSidebar(): [boolean, (next: boolean) => void] {
 
 export const navGroups: NavGroup[] = [
   { labelKey: "nav.dashboard", href: "/dashboard", icon: BarChart3 },
-  { labelKey: "nav.intelligenceHub", href: "/travel-intelligence", icon: Calculator },
   // «النظام بيسك» — the company's one-page entry, and since the owner's order of
   // 2026-10-17 the home of everything «البكجات السياحية» held: same routes, same
   // pages, only the menu moved. The doing comes first, then what to do it from,

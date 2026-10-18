@@ -17,7 +17,6 @@ type TraveliunNotReadyProps = {
 const RELATED: { labelKey: TranslationKey; href: string; perm?: Permission }[] = [
   { labelKey: "nav.dashboard", href: "/dashboard" },
   { labelKey: "nav.basic", href: "/basic", perm: "offers.write" },
-  { labelKey: "nav.intelligenceHub", href: "/travel-intelligence" },
   { labelKey: "nav.kanban", href: "/kanban-board" },
   { labelKey: "nav.customers", href: "/customers" },
   { labelKey: "nav.issuedOffers", href: "/offers", perm: "offers.write" },
