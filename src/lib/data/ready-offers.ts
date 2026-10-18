@@ -4,30 +4,54 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { createDraft } from "./drafts";
-import type { DraftData } from "@/lib/offer/draft-types";
-import { parseSheet } from "@/lib/ready-offers/parse";
-import { buildSeed, type ParsedOffer, type ReadyOfferRecord, type SyncDiff, type Tier } from "@/lib/ready-offers/types";
+import { fold, parseWorkbook, TABS, tabsFromHtml } from "@/lib/ready-offers/parse";
+import { buildSeed, canStartFrom, type ParsedOffer, type ReadyOfferRecord, type SyncDiff } from "@/lib/ready-offers/types";
 import { currentCan } from "@/lib/roles/current";
+import { listEntityAudit, logAudit } from "./audit";
 import { getPartnerSession, type PartnerSession } from "@/lib/partners/session";
 import { partnerPrice, partnerSeed } from "@/lib/partners/pricing";
 
 /**
  * «العروض الجاهزة» — the company's prepared seasonal packages.
  *
- * Marketing maintains them in a Google Sheet (two tabs: economy / premium) and
- * broadcasts them to sales. `previewSync` reads the sheet and reports what would
- * change; `applySync` writes it. Rows that vanish from the sheet are deactivated
- * rather than deleted — a live draft may still point at one.
+ * The owner keeps them in a Google Sheet of two tabs, «العروض السياحية» and
+ * «العروض التفصيلية» (parseWorkbook). `previewSync` reads the sheet and reports
+ * what would change; `applySync` writes it. Rows that vanish from the sheet are
+ * deactivated rather than deleted — a live draft may still point at one.
+ *
+ * Which sheet: the link saved on /developer (app_settings ready_offers_sheet),
+ * else READY_OFFERS_SHEET_ID, else the owner's sheet of 2026-10-18.
  */
 
-const SHEET_ID = process.env.READY_OFFERS_SHEET_ID || "1Tq6pXH9hxjD4cuPC-W9YNf4-in9ncn8sP7avhSJHjNM";
-const GIDS: Record<Tier, string> = {
-  economy: process.env.READY_OFFERS_GID_ECONOMY || "800208440",
-  premium: process.env.READY_OFFERS_GID_PREMIUM || "0",
-};
+const SHEET_SETTING = "ready_offers_sheet";
+const DEFAULT_SHEET = "1qUeTaWBrCeQ_pogVJlG2QwBRftF7yces-mgHuMrC7TE";
 
 const SELECT =
-  "id, code, tier, title, country, variant, cities_summary, main_hotels, tours_text, domestic_flight, days, nights, price, currency, includes_text, excludes_text, validity_raw, valid_from, valid_to, design_url, status, active, seed, synced_at";
+  "id, code, tier, title, country, variant, cities_summary, main_hotels, tours_text, domestic_flight, days, nights, price, currency, includes_text, excludes_text, validity_raw, valid_from, valid_to, design_url, status, active, seed, synced_at, published, problems, price_basis, adults, children, notes";
+
+/** The sheet the sync reads, and where that choice came from. */
+export async function readyOffersSheet(): Promise<{ id: string; source: "settings" | "env" | "default" }> {
+  try {
+    const { data } = await (createSupabaseServiceClient() as unknown as SupabaseClient)
+      .from("app_settings")
+      .select("value")
+      .eq("key", SHEET_SETTING)
+      .maybeSingle();
+    const saved = (data as { value: string } | null)?.value?.trim();
+    if (saved) return { id: saved, source: "settings" };
+  } catch {
+    /* the env or the default still reads */
+  }
+  const env = process.env.READY_OFFERS_SHEET_ID?.trim();
+  return env ? { id: env, source: "env" } : { id: DEFAULT_SHEET, source: "default" };
+}
+
+/** A pasted link («…/spreadsheets/d/<id>/edit#gid=…») or the bare id → the id. */
+function sheetIdOf(input: string): string | null {
+  const t = input.trim();
+  const id = t.match(/\/spreadsheets\/d\/([A-Za-z0-9_-]{20,})/)?.[1] ?? (/^[A-Za-z0-9_-]{20,}$/.test(t) ? t : null);
+  return id;
+}
 
 async function db(): Promise<SupabaseClient> {
   return (await createSupabaseServerClient()) as unknown as SupabaseClient;
@@ -36,7 +60,7 @@ async function db(): Promise<SupabaseClient> {
 async function requireManage(): Promise<string | null> {
   const user = await getServerUser();
   if (!user) return "err.session";
-  return await currentCan("settings.manage") ? null : "ro.err.forbidden";
+  return (await currentCan("settings.manage")) || (await currentCan("developer.access")) ? null : "ro.err.forbidden";
 }
 
 /**
@@ -49,7 +73,8 @@ function forPartner() {
     .from("ready_offers")
     .select(SELECT)
     .eq("active", true)
-    .eq("partner_resell", true);
+    .eq("partner_resell", true)
+    .eq("published", true);
 }
 
 /** A ready offer as a partner sees it: the price at their terms, and no design (it prints ours). */
@@ -66,41 +91,92 @@ export async function listReadyOffers(includeInactive = false): Promise<ReadyOff
   try {
     const partner = await getPartnerSession();
     if (partner) {
-      const { data } = await forPartner().order("tier").order("price", { ascending: true });
-      return ((data ?? []) as unknown as ReadyOfferRecord[]).map((row) => partnerView(row, partner));
+      const { data } = await forPartner().order("price", { ascending: true });
+      // an offer the sheet contradicts itself on is ours to correct, never a partner's to sell
+      return ((data ?? []) as unknown as ReadyOfferRecord[]).filter((row) => !row.problems?.length).map((row) => partnerView(row, partner));
     }
     const supabase = await db();
-    let query = supabase.from("ready_offers").select(SELECT).order("tier").order("price", { ascending: true });
+    let query = supabase.from("ready_offers").select(SELECT).order("price", { ascending: true });
     if (!includeInactive) query = query.eq("active", true);
     const { data } = await query;
-    return (data ?? []) as unknown as ReadyOfferRecord[];
+    const rows = (data ?? []) as unknown as ReadyOfferRecord[];
+    // «لم يتم النشر»: imported for the ones who publish, never offered to sales
+    return (await currentCan("settings.manage")) ? rows : rows.filter((row) => row.published !== false);
   } catch {
     return [];
   }
 }
 
-/** Google publishes a 307 to googleusercontent; fetch follows it by default. */
-async function fetchTab(tier: Tier): Promise<string> {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GIDS[tier]}`;
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`sheet ${tier}: HTTP ${res.status}`);
+/**
+ * The sheet's tabs, name → gid, from its public page. The tabs are read by
+ * name: the owner may reorder or add tabs. Null when the sheet is not public
+ * (Google answers a sign-in page instead).
+ */
+async function sheetTabs(sheetId: string): Promise<{ name: string; gid: string }[] | null> {
+  const res = await fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/htmlview`, { cache: "no-store" });
+  if (!res.ok) return null;
+  const tabs = tabsFromHtml(await res.text());
+  return tabs.length ? tabs : null;
+}
+
+/**
+ * One tab as CSV, by gid — the export, not gviz: gviz types a column by its
+ * majority and drops the cells that differ («5,285.40 يورو …» in a price
+ * column of numbers), the very cells the owner needs to see.
+ */
+async function fetchTab(sheetId: string, gid: string, name: string): Promise<string> {
+  const res = await fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`«${name}»: HTTP ${res.status}`);
   const text = await res.text();
   // A permission-denied export returns an HTML sign-in page with HTTP 200.
-  if (/^\s*<(!doctype|html)/i.test(text)) throw new Error(`sheet ${tier}: not publicly readable`);
+  if (/^\s*<(!doctype|html)/i.test(text)) throw new Error(`«${name}»: not publicly readable`);
   return text;
+}
+
+type SheetRead = {
+  sheetId: string;
+  offers: ParsedOffer[];
+  errors: SyncDiff["errors"];
+  /** every tab the sheet has, and the rows of the two read */
+  tabs: string[];
+  rows: { summary: number | null; detail: number | null };
+};
+
+async function readSheet(): Promise<SheetRead> {
+  const { id: sheetId } = await readyOffersSheet();
+  const empty = { sheetId, offers: [], tabs: [], rows: { summary: null, detail: null } };
+  const tabs = await sheetTabs(sheetId);
+  if (!tabs) return { ...empty, errors: [{ row: 0, tab: "—", reason: "الورقة غير عامة أو الرابط غير صحيح" }] };
+  const tabOf = (name: string) => tabs.find((t) => fold(t.name) === fold(name));
+  const summary = tabOf(TABS.summary);
+  const detail = tabOf(TABS.detail);
+  const names = tabs.map((t) => t.name);
+  if (!summary) return { ...empty, tabs: names, errors: [{ row: 0, tab: TABS.summary, reason: `لا يوجد تبويب «${TABS.summary}»` }] };
+  try {
+    const [sCsv, dCsv] = await Promise.all([fetchTab(sheetId, summary.gid, summary.name), detail ? fetchTab(sheetId, detail.gid, detail.name) : Promise.resolve("")]);
+    const { offers, errors } = parseWorkbook(sCsv, dCsv, new Date().getUTCFullYear());
+    if (!detail) errors.unshift({ row: 0, tab: TABS.detail, reason: `لا يوجد تبويب «${TABS.detail}» — تُستورد بيانات الملخّص وحدها` });
+    const count = (csv: string) => Math.max(csv.split(/\r?\n/).filter((l) => l.replace(/[,"\s]/g, "")).length - 1, 0);
+    return { sheetId, offers, errors, tabs: names, rows: { summary: count(sCsv), detail: detail ? count(dCsv) : null } };
+  } catch (e) {
+    return { ...empty, tabs: names, errors: [{ row: 0, tab: "—", reason: e instanceof Error ? e.message : "fetch failed" }] };
+  }
 }
 
 /** Fields compared to decide whether a stored row is stale. */
 const COMPARED = [
   "title", "country", "variant", "cities_summary", "main_hotels", "tours_text",
   "domestic_flight", "days", "nights", "price", "includes_text", "excludes_text",
-  "validity_raw", "valid_from", "valid_to", "status",
+  "validity_raw", "valid_from", "valid_to", "status", "published", "problems",
+  "price_basis", "adults", "children", "notes",
 ] as const;
 
 function changedFields(parsed: ParsedOffer, stored: ReadyOfferRecord): string[] {
   const next = toRow(parsed, null) as Record<string, unknown>;
   const prev = stored as unknown as Record<string, unknown>;
-  return COMPARED.filter((f) => (next[f] ?? null) !== (prev[f] ?? null));
+  // a price comes back from numeric as a string, and the problems as an array
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null) || (a != null && b != null && Number(a) === Number(b));
+  return COMPARED.filter((f) => !same(next[f], prev[f]));
 }
 
 function toRow(offer: ParsedOffer, id: string | null): Record<string, unknown> {
@@ -124,28 +200,18 @@ function toRow(offer: ParsedOffer, id: string | null): Record<string, unknown> {
     valid_from: offer.valid_from,
     valid_to: offer.valid_to,
     status: offer.status,
+    published: offer.published,
+    problems: offer.problems,
+    price_basis: offer.price_basis || null,
+    adults: offer.adults,
+    children: offer.children,
+    notes: offer.notes || null,
     active: true,
     // the id is the seed's own anchor, so it can only be written once known
     seed: id ? buildSeed(offer, id) : null,
     source_row: offer.source_row,
     synced_at: new Date().toISOString(),
   };
-}
-
-async function readSheet(): Promise<{ offers: ParsedOffer[]; errors: SyncDiff["errors"] }> {
-  const year = new Date().getUTCFullYear();
-  const offers: ParsedOffer[] = [];
-  const errors: SyncDiff["errors"] = [];
-  for (const tier of ["economy", "premium"] as Tier[]) {
-    try {
-      const result = parseSheet(await fetchTab(tier), tier, year);
-      offers.push(...result.offers);
-      errors.push(...result.errors);
-    } catch (e) {
-      errors.push({ row: 0, tier, reason: e instanceof Error ? e.message : "fetch failed" });
-    }
-  }
-  return { offers, errors };
 }
 
 export type PreviewResult = { ok: true; diff: SyncDiff } | { ok: false; error: string };
@@ -170,6 +236,9 @@ export async function previewSync(): Promise<PreviewResult> {
       warnings: offers
         .filter((o) => o.warnings.length)
         .map((o) => ({ code: o.code, title: o.title, notes: o.warnings })),
+      problems: offers
+        .filter((o) => o.problems.length)
+        .map((o) => ({ code: o.code, title: o.title, reasons: o.problems })),
     };
     for (const offer of offers) {
       const existing = byCode.get(offer.code);
@@ -201,8 +270,8 @@ export async function applySync(): Promise<ApplyResult> {
   const denied = await requireManage();
   if (denied) return { ok: false, error: denied };
   try {
-    const { offers } = await readSheet();
-    if (!offers.length) return { ok: false, error: "err.db" };
+    const { offers, sheetId, errors } = await readSheet();
+    if (!offers.length) return { ok: false, error: errors[0]?.reason ?? "err.db" };
     // written past RLS only after requireManage: the table's own policy lets any staff write
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data } = await supabase.from("ready_offers").select("id, code, design_url");
@@ -235,6 +304,12 @@ export async function applySync(): Promise<ApplyResult> {
     for (const row of gone) {
       await supabase.from("ready_offers").update({ active: false }).eq("id", row.id);
     }
+    await logAudit({
+      action: "data.updated",
+      entity: "ready_offers",
+      entity_id: "sync",
+      meta: { sheet: sheetId, inserted, updated, deactivated: gone.length, problems: offers.filter((o) => o.problems.length).length },
+    });
     return { ok: true, inserted, updated, deactivated: gone.length };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "err.db" };
@@ -283,13 +358,97 @@ export async function startDraftFromReadyOffer(id: string): Promise<StartDraftRe
     const partner = await getPartnerSession();
     const { data } = partner
       ? await forPartner().eq("id", id).maybeSingle()
-      : await (await db()).from("ready_offers").select("id, seed, status, active").eq("id", id).maybeSingle();
-    const row = data as { id: string; seed: Partial<DraftData> | null; status: string | null; active: boolean } | null;
+      : await (await db()).from("ready_offers").select("id, seed, status, active, published, problems").eq("id", id).maybeSingle();
+    const row = data as (Pick<ReadyOfferRecord, "id" | "seed" | "active" | "published" | "problems"> & { status: ReadyOfferRecord["status"] }) | null;
     if (!row || !row.active) return { ok: false, error: "ro.err.notFound" };
     if (row.status === "coming_soon") return { ok: false, error: "ro.err.comingSoon" };
+    // the sheet contradicts itself, or it is not published: no price goes to a client from it
+    if (row.problems?.length) return { ok: false, error: "ro.err.hasProblems" };
+    if (!canStartFrom(row)) return { ok: false, error: "ro.err.unpublished" };
     if (!row.seed) return { ok: false, error: "ro.err.noSeed" };
     return createDraft((partner ? partnerSeed(row.seed, partner.terms) : row.seed) ?? undefined);
   } catch {
     return { ok: false, error: "err.db" };
   }
+}
+
+// ---------- /developer: the sheet's link, a check, the last sync ----------
+
+export type SheetCheck =
+  | { ok: true; sheetId: string; tabs: string[]; found: { summary: boolean; detail: boolean }; rows: SheetRead["rows"]; offers: number; problems: number; errors: SyncDiff["errors"] }
+  | { ok: false; error: string };
+
+/** «تحقق»: is the sheet public, which tabs it has, how many rows the two hold and parse to. Writes nothing. */
+export async function checkReadyOffersSheet(): Promise<SheetCheck> {
+  const denied = await requireManage();
+  if (denied) return { ok: false, error: denied };
+  const read = await readSheet();
+  const has = (name: string) => read.tabs.some((t) => fold(t) === fold(name));
+  return {
+    ok: true,
+    sheetId: read.sheetId,
+    tabs: read.tabs,
+    found: { summary: has(TABS.summary), detail: has(TABS.detail) },
+    rows: read.rows,
+    offers: read.offers.length,
+    problems: read.offers.filter((o) => o.problems.length).length,
+    errors: read.errors,
+  };
+}
+
+export type SetSheetResult = { ok: true; sheetId: string } | { ok: false; error: string };
+
+/** The sheet the sync reads from now on — the full link pasted, the id kept. Audited. */
+export async function setReadyOffersSheet(link: string): Promise<SetSheetResult> {
+  const denied = await requireManage();
+  if (denied) return { ok: false, error: denied };
+  const id = sheetIdOf(link);
+  if (!id) return { ok: false, error: "ro.err.badSheet" };
+  try {
+    const before = await readyOffersSheet();
+    const { error } = await (createSupabaseServiceClient() as unknown as SupabaseClient)
+      .from("app_settings")
+      .upsert({ key: SHEET_SETTING, value: id, updated_at: new Date().toISOString() });
+    if (error) return { ok: false, error: "err.db" };
+    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: SHEET_SETTING, meta: { from: before.id, to: id } });
+    return { ok: true, sheetId: id };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+export type ReadyOffersPanelData = {
+  sheetId: string;
+  source: "settings" | "env" | "default";
+  lastSync: { at: string; by: string | null; inserted: number; updated: number; deactivated: number } | null;
+  problems: number;
+  unpublished: number;
+};
+
+/** What /developer shows beside the link: the last sync (when, by whom) and the live offers «بها خطأ». */
+export async function readyOffersPanel(): Promise<ReadyOffersPanelData> {
+  const empty: ReadyOffersPanelData = { sheetId: "", source: "default", lastSync: null, problems: 0, unpublished: 0 };
+  // a server action anyone signed in could call: the panel's figures are the managers'
+  if (await requireManage()) return empty;
+  const [sheet, log] = await Promise.all([readyOffersSheet(), listEntityAudit("ready_offers", "sync", 1)]);
+  let problems = 0;
+  let unpublished = 0;
+  try {
+    const { data } = await (await db()).from("ready_offers").select("problems, published").eq("active", true);
+    for (const row of (data ?? []) as Pick<ReadyOfferRecord, "problems" | "published">[]) {
+      if (row.problems?.length) problems += 1;
+      if (row.published === false) unpublished += 1;
+    }
+  } catch {
+    /* the counts stay 0 */
+  }
+  const last = log[0];
+  const n = (v: unknown) => (typeof v === "number" ? v : 0);
+  return {
+    sheetId: sheet.id,
+    source: sheet.source,
+    lastSync: last ? { at: last.created_at, by: last.actor_email, inserted: n(last.meta.inserted), updated: n(last.meta.updated), deactivated: n(last.meta.deactivated) } : null,
+    problems,
+    unpublished,
+  };
 }

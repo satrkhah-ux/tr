@@ -1,5 +1,5 @@
 import { getServerUser } from "@/lib/supabase/server";
-import { listReadyOffers } from "@/lib/data/ready-offers";
+import { listReadyOffers, readyOffersSheet } from "@/lib/data/ready-offers";
 import { ReadyOffersCatalog } from "@/components/traveliun/ready-offers/ReadyOffersCatalog";
 import { guardPath } from "@/lib/roles/current";
 
@@ -20,6 +20,6 @@ export default async function ReadyOffersPage() {
   // a service the developer can switch off (features.ts) — a typed URL is refused too
   await guardPath("/ready-offers");
   const user = await getServerUser();
-  const offers = user ? await listReadyOffers(true) : [];
-  return <ReadyOffersCatalog offers={offers} sessionExpired={!user} />;
+  const [offers, sheet] = await Promise.all([user ? listReadyOffers(true) : [], readyOffersSheet()]);
+  return <ReadyOffersCatalog offers={offers} sheetId={sheet.id} sessionExpired={!user} />;
 }
