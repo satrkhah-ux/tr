@@ -62,11 +62,22 @@ export const BEFORE_INTL = 180;
 export const BEFORE_DOMESTIC = 120;
 /** A tour on the day the group lands sets off this long after the landing: met, driven, checked in. */
 export const TOUR_AFTER_LANDING = 180;
+/** A tour on the day the group flies out ends this long before the take-off: back, checked out, driven, checked in. */
+export const TOUR_BEFORE_TAKEOFF = 240;
+/**
+ * How long a tour is taken to last when it has to fit before a take-off.
+ * ponytail: one length for every tour — the programmes keep none; read the
+ * programme's own once tour_programs holds a duration.
+ */
+export const TOUR_MINUTES = 240;
+/** Never earlier than this, whatever the take-off — a 05:00 tour is no tour. */
+export const EARLIEST_TOUR = "07:00";
 /** The word a leg line puts before its landing — drivers.ts reads it back. */
 export const LANDS = "الوصول";
 /** The detail line that tells operations what the pull could not settle on its own. */
 export const NOTICE = "تنبيه";
 export const ARRIVAL_DAY_TOUR = "يوم الوصول — تبدأ الجولة بعد وصول المجموعة إلى الفندق";
+export const DEPARTURE_DAY_TOUR = "يوم المغادرة — تنتهي الجولة قبل الإقلاع بأربع ساعات";
 export const FAREWELL_UNSOLD = "التوديع إلى المطار — لم يكن بنداً مستقلاً في العرض (أُزيل أو صار جولة قبل المغادرة)";
 
 /** «YYYY-MM-DDTHH:mm» shifted by minutes, as the wall clock of the same place. */
@@ -135,6 +146,9 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
   // the flight that brings the group to `city` on `date` — by its landing, else its take-off
   const landsIn = (city: string, date: string) =>
     flights.find((f) => f.leg_order !== "inbound" && f.to_city?.trim() === city.trim() && (f.arrival_at ?? f.departure_at ?? "").slice(0, 10) === date);
+  // …and the one that takes it away on `date` — the earliest, if two leave that day
+  const leavesFrom = (city: string, date: string) =>
+    flights.find((f) => f.leg_order !== "outbound" && f.from_city?.trim() === city.trim() && (f.departure_at ?? "").slice(0, 10) === date);
   const buyOf = (ref: string) => {
     const item = data.pricing.items.find((i) => i.ref === ref);
     return item?.buy_price != null ? { price: item.buy_price * (item.quantity > 0 ? item.quantity : 1), currency: item.buy_currency || "SAR" } : null;
@@ -327,11 +341,22 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
           const after = f?.arrival_at && timed(f, f.arrival_at) ? shift(f.arrival_at, TOUR_AFTER_LANDING) : null;
           detail["وقت الانطلاق"] = after && after.date === pick.date ? after.time : LATER;
         }
+        // The day the group flies out the same way (AD-2-3599: «جولة قبل المغادرة» at 09:00
+        // on the day home): back TOUR_BEFORE_TAKEOFF before a known take-off — set off earlier
+        // when 09:00 would end too late, «يُحدَّد لاحقاً» when even EARLIEST_TOUR would.
+        const departure = !arrival && pick.date && (pick.date === city.check_out || leavesFrom(city.city_name, pick.date));
+        if (departure) {
+          const f = leavesFrom(city.city_name, pick.date!);
+          const latest = f?.departure_at && timed(f, f.departure_at) ? shift(f.departure_at, -(TOUR_BEFORE_TAKEOFF + TOUR_MINUTES)) : null;
+          const fits = latest && latest.date === pick.date && latest.time >= EARLIEST_TOUR;
+          detail["وقت الانطلاق"] = fits ? (latest.time < "09:00" ? latest.time : "09:00") : LATER;
+        }
         // the car and how many — «فان» and 2, read together as «فان × 2»
         putCar(detail, tourVehicle(pick, data.transport_plan.tours.car_type));
         detail["الركاب"] = String(people);
         if (pick.text.trim()) detail["البرنامج"] = pick.text.trim();
         if (arrival) detail[NOTICE] = ARRIVAL_DAY_TOUR;
+        else if (departure) detail[NOTICE] = DEPARTURE_DAY_TOUR;
         rows.push({
           origin_ref: `tour:${city.city_name}:${i}`,
           kind: "service",

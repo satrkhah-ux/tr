@@ -17,7 +17,7 @@ import {
   upsertTraveler,
 } from "@/lib/data/operation-travelers";
 import { VISA_STATUSES, type PassportRead, type TravelerKind, type TravelerListItem, type VisaStatus } from "@/lib/operations/traveler-dto";
-import { ageOn, isLatinName, sameName, takesPassportName, travelerReadiness } from "@/lib/operations/travelers";
+import { ageOn, isLatinName, OLDEST_BIRTH, sameName, takesPassportName, travelerInputError, travelerReadiness } from "@/lib/operations/travelers";
 import { trustedFields, type MrzCheckedField, type MrzFormField, type MrzPassport } from "@/lib/operations/mrz";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
@@ -247,6 +247,9 @@ function TravelerRow({
   function save() {
     if (!form) return;
     const number = form.number.trim();
+    // the server's own check (upsertTraveler), said before the round trip
+    const bad = travelerInputError({ birth_date: form.birth_date || null, passport_expiry: form.expiry || null, number }, today);
+    if (bad) return setError(t(`ops.trav.err.${bad}`));
     const input = {
       // the name as shown; an unnamed or planned one becomes the passport's on the server (savedName)
       display_name: form.display_name.trim(),
@@ -558,6 +561,8 @@ function TravelerRow({
             <input
               type="date"
               dir="ltr"
+              min={OLDEST_BIRTH}
+              max={today}
               value={form.birth_date}
               onChange={(e) => set({ birth_date: e.target.value })}
               className={`${field} tv-tnum ${manual("birth_date")}`}

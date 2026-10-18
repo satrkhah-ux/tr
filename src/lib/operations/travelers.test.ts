@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ageOn,
+  isCalendarDate,
   isLatinName,
   leadName,
   passportIssues,
@@ -8,7 +9,9 @@ import {
   planTravelers,
   sameName,
   savedName,
+  passportNumber,
   takesPassportName,
+  travelerInputError,
   travelerReadiness,
   visaFor,
 } from "./travelers";
@@ -82,6 +85,31 @@ describe("the traveller's name: the passport's, never the contact's (the owner, 
     expect(leadName([{ display_name: " " }, { display_name: ` ${PASSPORT} ` }])).toBe(PASSPORT);
     expect(leadName([{ display_name: "" }])).toBe("");
     expect(leadName([])).toBe("");
+  });
+});
+
+describe("travelerInputError — a passport typed by hand (AD-2-3599)", () => {
+  it("refuses a birth date in the future — it made a traveller «رضيع» at -1", () => {
+    expect(travelerInputError({ birth_date: "2026-10-30" }, "2026-10-18")).toBe("birthFuture");
+    expect(travelerInputError({ birth_date: "2026-10-18" }, "2026-10-18")).toBeNull();
+  });
+
+  it("refuses an implausible one, and a date that is no day", () => {
+    expect(travelerInputError({ birth_date: "1899-12-31" }, "2026-10-18")).toBe("birthOld");
+    expect(travelerInputError({ birth_date: "1985-02-30" }, "2026-10-18")).toBe("date");
+    expect(travelerInputError({ passport_expiry: "2031-13-01" }, "2026-10-18")).toBe("date");
+    expect(travelerInputError({ passport_expiry: "2031-06-31" }, "2026-10-18")).toBe("date");
+    expect(travelerInputError({ birth_date: "1985-04-12", passport_expiry: "2031-06-30" }, "2026-10-18")).toBeNull();
+    expect([isCalendarDate("2028-02-29"), isCalendarDate("2027-02-29"), isCalendarDate("12/04/1985")]).toEqual([true, false, false]);
+  });
+
+  it("takes a passport number in Latin letters and digits only — upper-cased, spaces dropped", () => {
+    expect(travelerInputError({ number: "سش" }, "2026-10-18")).toBe("passportNo");
+    expect(travelerInputError({ number: "A12-3456" }, "2026-10-18")).toBe("passportNo");
+    expect(travelerInputError({ number: "a12 345 67" }, "2026-10-18")).toBeNull();
+    expect(passportNumber(" a12 345 67 ")).toBe("A1234567");
+    // no number typed: nothing to check
+    expect(travelerInputError({ number: "" }, "2026-10-18")).toBeNull();
   });
 });
 

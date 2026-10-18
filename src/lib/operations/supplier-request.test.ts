@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assigneesFor,
   bookingCost,
   buildSupplierRequest,
   requestState,
@@ -113,6 +114,44 @@ describe("suppliersFor", () => {
   });
   it("offers everyone when nobody matches", () => {
     expect(suppliersFor([{ id: "a", categories: "فنادق" }], "transport").map((s) => s.id)).toEqual(["a"]);
+  });
+});
+
+describe("assigneesFor — «ينفّذه» (AD-2-3599: ~49 names for one hotel)", () => {
+  type A = { kind: "ops" | "employee" | "partner" | "supplier"; id: string | null; label: string; categories?: string | null };
+  // as company_suppliers holds them (2026-10-18), with the team and two partner companies
+  const list: A[] = [
+    { kind: "ops", id: null, label: "قسم العمليات" },
+    { kind: "employee", id: "e1", label: "سارة" },
+    { kind: "partner", id: "p1", label: "شركة الأفق للسفر والسياحة" },
+    { kind: "partner", id: "p2", label: "عالم الفخامة" },
+    { kind: "supplier", id: "tbo", label: "TBO Holidays", categories: "طيران، تنقلات، فنادق، خدمات" },
+    { kind: "supplier", id: "beds", label: "beds online", categories: "فنادق" },
+    { kind: "supplier", id: "novotel", label: "فندق نوفوتيل جاكرتا", categories: "فنادق" },
+    { kind: "supplier", id: "villas", label: "فلل الرمان", categories: "فنادق" },
+    { kind: "supplier", id: "qudra", label: "قدرة", categories: "تنقلات" },
+    { kind: "supplier", id: "flynas", label: "Flynas", categories: "طيران" },
+  ];
+  const ids = (kind: "hotel" | "transport" | "flight", title: string, holder: string | null = null, partner: string | null = null) =>
+    assigneesFor(list, { kind, title }, holder, partner).map((a) => a.id ?? a.kind);
+
+  it("a hotel: the team, the colleagues, the hotel sellers — never another hotel, nor a partner on our own file", () => {
+    expect(ids("hotel", "فندق اريادوتا بالي")).toEqual(["ops", "e1", "tbo", "beds"]);
+  });
+
+  it("offers a hotel listed as a supplier for a booking of that very hotel", () => {
+    expect(ids("hotel", "نوفوتيل جاكرتا - غرفة مزدوجة شامل الإفطار")).toEqual(["ops", "e1", "tbo", "beds", "novotel"]);
+  });
+
+  it("transport and flights by their own kinds", () => {
+    expect(ids("transport", "المطار ← فندق بالي")).toEqual(["ops", "e1", "tbo", "qudra"]);
+    expect(ids("flight", "طيران دولي JED ⇄ DPS")).toEqual(["ops", "e1", "tbo", "flynas"]);
+  });
+
+  it("a partner company only on its own file, and whoever holds the booking stays listed", () => {
+    expect(ids("hotel", "فندق اريادوتا بالي", null, "p2")).toEqual(["ops", "e1", "p2", "tbo", "beds"]);
+    expect(ids("hotel", "فندق اريادوتا بالي", "partner:p1")).toEqual(["ops", "e1", "p1", "tbo", "beds"]);
+    expect(ids("hotel", "فندق اريادوتا بالي", "supplier:qudra")).toEqual(["ops", "e1", "tbo", "beds", "qudra"]);
   });
 });
 

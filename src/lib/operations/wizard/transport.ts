@@ -1,8 +1,8 @@
 import type { OperationBooking } from "@/lib/data/operation-bookings";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
-import { DRV, driverServiceKind, meetTime, type ServiceKind } from "@/lib/operations/drivers";
+import { DRV, driverServiceKind, flightLegs, linkOf, meetTime, type ServiceKind } from "@/lib/operations/drivers";
 import type { RequestState } from "@/lib/operations/supplier-request";
-import { MEET_AFTER_LANDING, TOUR_AFTER_LANDING } from "@/lib/operations/seed-plan";
+import { shift, TOUR_AFTER_LANDING, TOUR_BEFORE_TAKEOFF, TOUR_MINUTES } from "@/lib/operations/seed-plan";
 import { notPulled } from "./pull";
 import type { ReadinessItem, StepState, WizardCase } from "./types";
 
@@ -107,20 +107,79 @@ export function transportCities(data: Pick<WizardCase, "bookings" | "supplierWor
     .sort((a, b) => when(a.trips[0]).localeCompare(when(b.trips[0])));
 }
 
-const minutesOf = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+/** A leg the case flies, as wall clocks («YYYY-MM-DDTHH:mm»): null while not timed; its days even then. */
+type CaseLeg = { from: string; to: string; departs: string | null; arrives: string | null; leaves: string | null; lands: string | null };
 
 /**
- * A tour on the day the group is met at the city's airport that may set off
- * before the group is at its hotel (AD-2-3599: two tours at 09:00 on a day
- * landing at an unknown hour): either time still unknown, or the tour less than
- * TOUR_AFTER_LANDING after the landing (the reception meets 45 min after it).
+ * Every leg of the case's flights: the ticket's (flight_legs) once read, else
+ * the plan's lines — whose day is known before their time («2026-10-07 يُحدَّد لاحقاً»).
  */
-export function tourBeforeArrival(trip: TransportTrip, city: TransportCity): boolean {
-  if (trip.kind !== "tour" || !trip.booking.start_date) return false;
-  const met = city.trips.find((t) => t.kind === "reception" && t.booking.start_date === trip.booking.start_date);
-  if (!met) return false;
-  if (!trip.time || !met.time) return true;
-  return minutesOf(trip.time) < minutesOf(met.time) + TOUR_AFTER_LANDING - MEET_AFTER_LANDING;
+function caseLegs(bookings: OperationBooking[]): CaseLeg[] {
+  const leg = (from: string, to: string, departs: string | null, arrives: string | null, day: string | null): CaseLeg => {
+    const leaves = departs?.slice(0, 10) ?? day;
+    return { from, to, departs, arrives, leaves, lands: arrives?.slice(0, 10) ?? leaves };
+  };
+  return bookings
+    .filter((b) => b.kind === "flight")
+    .flatMap((b) =>
+      b.flight_legs?.length
+        ? b.flight_legs.map((l) => leg(l.from, l.to, l.departs_at?.slice(0, 16) ?? null, l.arrives_at?.slice(0, 16) ?? null, null))
+        : flightLegs(b.detail ?? {}).map(({ key, leg: l }) =>
+            leg(l.from, l.to, l.departure, l.arrival, b.detail[key]?.split("·")[2]?.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null),
+          ),
+    );
+}
+
+const plus = (at: string, minutes: number) => {
+  const s = shift(at, minutes);
+  return `${s.date}T${s.time}`;
+};
+
+/** «تعارض مع الرحلة»: a tour set off before the group has landed and settled, or ending too near its take-off. */
+export type TourClash = "arrival" | "departure";
+
+/**
+ * The tours whose time fights their day's flight (AD-2-3599: tours pulled at
+ * 09:00 on the day the group lands, and on the day it flies home) — the rule a
+ * new pull keeps (seed-plan.ts), checked on what was pulled before it and never
+ * rewritten here:
+ *   - the day the group reaches the tour's city (a hotel there checks in, or its
+ *     reception): set off TOUR_AFTER_LANDING after the landing at the latest;
+ *   - the day it leaves (a hotel there checks out, or its farewell): back
+ *     TOUR_BEFORE_TAKEOFF before the take-off, a tour lasting TOUR_MINUTES.
+ * A flight that day whose time is not known yet clashes with any fixed time —
+ * the pull would have written «يُحدَّد لاحقاً». The city's airports are read off
+ * its receptions and farewells; a city without them takes any flight that day.
+ * Tour id → which clash.
+ */
+export function tourClashes(bookings: OperationBooking[]): Map<string, TourClash> {
+  const live = bookings.filter((b) => b.status !== "cancelled");
+  const legs = caseLegs(live);
+  const out = new Map<string, TourClash>();
+  if (legs.length === 0) return out;
+  for (const tour of live) {
+    const day = tour.start_date;
+    const time = meetTime(tour);
+    if (driverServiceKind(tour) !== "tour" || !day || !/^\d{2}:\d{2}$/.test(time)) continue;
+    const city = normalizeName(cityOf(tour));
+    const there = live.filter((b) => normalizeName(cityOf(b)) === city);
+    const kinds = there.map((b) => ({ b, kind: driverServiceKind(b), link: linkOf(b.detail?.[DRV.flight]) }));
+    const airports = new Set(kinds.flatMap(({ kind, link }) => (!link ? [] : kind === "reception" ? [link.to] : kind === "farewell" ? [link.from] : [])));
+    const here = (code: string) => airports.size === 0 || airports.has(code);
+    const starts = `${day}T${time}`;
+
+    const arriving = kinds.some(({ b, kind }) => b.start_date === day && (b.kind === "hotel" || kind === "reception"));
+    const landings = arriving ? legs.filter((l) => l.lands === day && here(l.to)) : [];
+    if (landings.some((l) => !l.arrives || starts < plus(l.arrives, TOUR_AFTER_LANDING))) {
+      out.set(tour.id, "arrival");
+      continue;
+    }
+    const leaving = kinds.some(({ b, kind }) => (b.kind === "hotel" && b.end_date === day) || (kind === "farewell" && b.start_date === day));
+    const takeoffs = leaving ? legs.filter((l) => l.leaves === day && here(l.from)) : [];
+    const ends = plus(starts, TOUR_MINUTES);
+    if (takeoffs.some((l) => !l.departs || ends > plus(l.departs, -TOUR_BEFORE_TAKEOFF))) out.set(tour.id, "departure");
+  }
+  return out;
 }
 
 /** A trip whose driver was set apart from the city's — shown, and kept when the city's driver changes. */
@@ -163,9 +222,12 @@ export function transportState(data: Pick<WizardCase, "bookings" | "supplierWork
 export function transportReadiness(data: Pick<WizardCase, "bookings" | "supplierWork">): ReadinessItem[] {
   const cities = transportCities(data);
   if (cities.length === 0) return notPulled(data, "transport") ? [{ step: "transport", key: "pulled", ok: false }] : [];
-  return [
+  const items: ReadinessItem[] = [
     { step: "transport", key: "supplier", ok: cities.every((c) => c.supplied) },
     { step: "transport", key: "confirmed", ok: cities.every((c) => c.confirmed) },
     { step: "transport", key: "driver", ok: cities.every((c) => c.trips.every((t) => t.driver.name)), optional: true },
   ];
+  // a warning, listed only while a tour's time fights its flight
+  if (tourClashes(data.bookings).size > 0) items.push({ step: "transport", key: "tour_times", ok: false, optional: true, warning: true });
+  return items;
 }

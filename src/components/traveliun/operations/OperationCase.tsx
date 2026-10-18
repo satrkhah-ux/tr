@@ -204,6 +204,7 @@ export function OperationCase({
           hasDays={hasDays}
           clientToken={clientToken}
           assignees={assignees}
+          partnerId={operation.partner_id}
           sentRequests={sentRequests}
           canBook={canBook}
           canManage={canManage}

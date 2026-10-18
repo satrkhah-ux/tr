@@ -16,7 +16,8 @@ import {
   type TravelerRow,
   type VisaStatus,
 } from "@/lib/operations/traveler-dto";
-import { planTravelers, savedName, visaFor, type DestinationVisa } from "@/lib/operations/travelers";
+import { passportNumber, planTravelers, savedName, travelerInputError, visaFor, type DestinationVisa } from "@/lib/operations/travelers";
+import { riyadhDate } from "@/lib/operations/payments";
 import { parseTd3, type MrzPassport } from "@/lib/operations/mrz";
 import { findLookupCountry, normalizeDraftData, type DraftData } from "@/lib/offer/draft-types";
 import { issuedDraftData } from "@/lib/data/issued-draft";
@@ -44,7 +45,6 @@ const VISA_BUCKET = "visas";
 /** Short on purpose: a copied URL to a passport scan is what you least want circulating. */
 const SIGNED_URL_TTL_SECONDS = 5 * 60;
 const MAX_SCAN_BYTES = 8 * 1024 * 1024;
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function db(): SupabaseClient {
   return createSupabaseServiceClient() as unknown as SupabaseClient;
@@ -127,20 +127,22 @@ export async function upsertTraveler(input: {
 }): Promise<{ ok: true; id: string } | Fail> {
   const denied = input.id ? await gateRow("operation_travelers", input.id) : await gateOperation(input.operation_id);
   if (denied) return { ok: false, error: denied };
-  if ([input.birth_date, input.passport_expiry].some((d) => d && !ISO_DATE.test(d))) {
-    return { ok: false, error: "ops.trav.err.date" };
-  }
+  // the form checks the same (travelerInputError) — this is the one that counts
+  const bad = travelerInputError({ ...input, number: input.passport?.number }, riyadhDate());
+  if (bad) return { ok: false, error: `ops.trav.err.${bad}` };
+  // stored as checked: «a 123 4567» is A1234567
+  const passport = input.passport ? { ...input.passport, number: passportNumber(input.passport.number) } : input.passport;
 
   // encryptJson THROWS when the key is missing (fail-closed, correct). Catch it
   // here so a misconfigured deploy reads as a config error rather than a DB outage.
   let cipher: string | null | undefined;
-  if (input.passport !== undefined) {
-    if (input.passport === null) {
+  if (passport !== undefined) {
+    if (passport === null) {
       cipher = null;
     } else {
       if (!isVaultConfigured()) return { ok: false, error: "ops.err.vault" };
       try {
-        cipher = encryptJson(input.passport);
+        cipher = encryptJson(passport);
       } catch {
         return { ok: false, error: "ops.err.vault" };
       }
@@ -156,7 +158,7 @@ export async function upsertTraveler(input: {
       const { data: prev } = await db().from("operation_travelers").select("*").eq("id", input.id).maybeSingle();
       before = (prev as TravelerRow | null) ?? null;
     }
-    const named = savedName(before, input.display_name, input.passport?.full_name || input.passport_name || "");
+    const named = savedName(before, input.display_name, passport?.full_name || input.passport_name || "");
 
     const patch: Record<string, unknown> = {
       display_name: named.display_name,

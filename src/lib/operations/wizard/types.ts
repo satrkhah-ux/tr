@@ -106,13 +106,18 @@ export type ReadinessCase = Pick<
 export const READINESS_KEYS = {
   passports: ["passports", "visas", "count"],
   flights: ["pulled", "tickets"],
-  hotels: ["pulled", "final"],
-  transport: ["pulled", "supplier", "confirmed", "driver"],
+  hotels: ["pulled", "final", "overlap"],
+  transport: ["pulled", "supplier", "confirmed", "driver", "tour_times"],
   payment: ["settled"],
   documents: ["documents", "link", "arrival_sign", "guide"],
 } as const satisfies Record<WizardStep, readonly string[]>;
 
-/** One readiness rule's answer before «جاهز للسفر» — `ok` false blocks it unless `optional`. */
+/**
+ * One readiness rule's answer before «جاهز للسفر» — `ok` false blocks it unless `optional`.
+ * `warning`: something to look at, listed only while it holds (two hotels on the
+ * same night, a tour against its flight) — never blocks, and says what it is
+ * instead of «(اختياري)».
+ */
 export type ReadinessItem = {
-  [S in WizardStep]: { step: S; key: (typeof READINESS_KEYS)[S][number]; ok: boolean; optional?: boolean };
+  [S in WizardStep]: { step: S; key: (typeof READINESS_KEYS)[S][number]; ok: boolean; optional?: boolean; warning?: boolean };
 }[WizardStep];

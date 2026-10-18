@@ -8,7 +8,7 @@ import { DirText } from "@/components/DirText";
 import type { TranslationKey } from "@/lib/i18n";
 import { setExecutionStatus } from "@/lib/data/operations";
 import { paidTotal } from "@/lib/operations/payments";
-import { firstOpenStep, readiness, readyLabel, readyToTravel, stepStates, stepTone, type StepTone } from "@/lib/operations/wizard/index";
+import { firstOpenStep, itemTone, readiness, readyLabel, readyToTravel, stepStates, stepTone, type StepTone } from "@/lib/operations/wizard/index";
 import { clientStatusUnbacked, paidState } from "@/lib/operations/wizard/payment";
 import { WIZARD_STEPS, type StepProps, type WizardCase, type WizardStep } from "@/lib/operations/wizard/types";
 import { TraveliunShell } from "../../TraveliunShell";
@@ -46,6 +46,9 @@ const TONE: Record<StepTone, string> = {
   green: "border-[#bfe5d4] bg-[#e9f7f0] text-[#0f7a52]",
   grey: "border-[#eef2f0] bg-[#f6f8f7] text-[#93aaa3]",
 };
+
+/** An item's own colour under its tile (index.ts itemTone) — a done one is green even under a red tile. */
+const ITEM_TONE: Record<ReturnType<typeof itemTone>, string> = { red: "text-[#c22850]", yellow: "text-[#a86a10]", green: "text-[#0f7a52]" };
 
 export function CaseWizardShell({ data, canManage, canReadMrz }: { data: WizardCase; canManage: boolean; canReadMrz: boolean }) {
   const { t } = useTraveliunUI();
@@ -211,17 +214,17 @@ export function ReadyGate({ data, step, onOpenStep }: { data: WizardCase; step?:
                 {own.length > 0 ? (
                   <ul className="grid gap-0.5 text-[11px] font-semibold leading-snug">
                     {own.map((i) => (
-                      <li key={i.key} className={`flex items-start gap-1 ${i.ok ? "opacity-70" : ""}`}>
+                      <li key={i.key} className={`flex items-start gap-1 ${ITEM_TONE[itemTone(i)]}`}>
                         {i.ok ? (
                           <CheckCircle2 className="mt-px size-3 shrink-0" />
-                        ) : i.optional ? (
+                        ) : i.optional && !i.warning ? (
                           <Circle className="mt-px size-3 shrink-0" />
                         ) : (
                           <CircleAlert className="mt-px size-3 shrink-0" />
                         )}
                         <span className="min-w-0">
                           {t(readyLabel(i))}
-                          {i.optional && !i.ok ? <span className="ms-1 opacity-80">{t("wz.ready.optional")}</span> : null}
+                          {i.optional && !i.ok && !i.warning ? <span className="ms-1 opacity-80">{t("wz.ready.optional")}</span> : null}
                         </span>
                       </li>
                     ))}

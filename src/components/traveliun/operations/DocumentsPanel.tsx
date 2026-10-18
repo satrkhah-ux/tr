@@ -81,6 +81,7 @@ export function DocumentsPanel({
   hasDays,
   clientToken,
   assignees,
+  partnerId,
   sentRequests,
   canBook,
   canManage,
@@ -91,6 +92,8 @@ export function DocumentsPanel({
   hasDays: boolean;
   clientToken: string | null;
   assignees: AssigneeOption[];
+  /** the file's partner company — «ينفّذه» offers it on its own file only. */
+  partnerId: string | null;
   sentRequests: SentRequest[];
   canBook: boolean;
   /** the manager's step on this case (access.ts gateCaseManager) — «تأكيد الكل» takes the net charged from it only. */
@@ -242,6 +245,7 @@ export function DocumentsPanel({
                 booking={b}
                 operationId={operationId}
                 assignees={assignees}
+                partnerId={partnerId}
                 canBook={canBook}
                 onDone={() => router.refresh()}
               />
@@ -673,12 +677,14 @@ function BookingRow({
   booking,
   operationId,
   assignees,
+  partnerId,
   canBook,
   onDone,
 }: {
   booking: OperationBooking;
   operationId: string;
   assignees: AssigneeOption[];
+  partnerId: string | null;
   canBook: boolean;
   onDone: () => void;
 }) {
@@ -820,7 +826,7 @@ function BookingRow({
         </div>
       </div>
 
-      <AssignBooking booking={booking} operationId={operationId} assignees={assignees} onDone={onDone} />
+      <AssignBooking booking={booking} operationId={operationId} assignees={assignees} partnerId={partnerId} onDone={onDone} />
 
       {/* Hotels only — TBO is a hotel API, and flights/visas stay manual. */}
       <SupplierBooking booking={booking} canBook={canBook} onDone={onDone} />

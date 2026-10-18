@@ -12,7 +12,7 @@ import {
   type RequestDraft,
 } from "@/lib/data/operation-assign";
 import type { OperationBooking } from "@/lib/data/operation-bookings";
-import { suppliersFor } from "@/lib/operations/supplier-request";
+import { assigneesFor } from "@/lib/operations/supplier-request";
 import { isUnassigned } from "@/lib/operations/wizard";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
@@ -33,6 +33,7 @@ export function AssignBooking({
   booking,
   operationId,
   assignees,
+  partnerId = null,
   onDone,
 }: {
   booking: OperationBooking & {
@@ -43,6 +44,8 @@ export function AssignBooking({
   };
   operationId: string;
   assignees: AssigneeOption[];
+  /** the file's partner company (offers.partner_company_id) — offered on its own file only. */
+  partnerId?: string | null;
   onDone: () => void;
 }) {
   const { t } = useTraveliunUI();
@@ -58,9 +61,8 @@ export function AssignBooking({
   // nobody chose yet (the column default, no assigned_at) reads as that — not as «قسم العمليات»
   const unset = isUnassigned(booking);
   const value = unset ? "" : `${booking.assignee_kind ?? "ops"}:${currentId ?? ""}`;
-  // our suppliers that sell this kind of booking — and whoever already has it
-  const matching = new Set(suppliersFor(assignees.filter((a) => a.kind === "supplier"), booking.kind).map((a) => a.id));
-  const listed = assignees.filter((a) => a.kind !== "supplier" || matching.has(a.id) || a.id === currentId);
+  // only who fits this booking's kind (supplier-request.ts assigneesFor) — and whoever already has it
+  const listed = assigneesFor(assignees, booking, unset ? null : value, partnerId);
   // Whoever holds it now, even when the list no longer offers them (a supplier set «Disabled»,
   // a partner made inactive): shown by name and marked — a value with no option of its own
   // made the browser show the first one, «قسم العمليات» (as TransportStep keeps its city's supplier).

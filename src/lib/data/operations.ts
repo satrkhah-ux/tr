@@ -72,6 +72,8 @@ export type OperationCard = OperationRow & {
   travelers_count: number;
   /** the partner company that sold this file, or null for our own sale. */
   partner_name: string | null;
+  /** its id (offers.partner_company_id) — «ينفّذه» offers that partner on its own file only. */
+  partner_id: string | null;
 };
 
 type OkId = { ok: true; id: string };
@@ -473,7 +475,7 @@ type OfferJoin = {
   infants: number | null;
   employee_id: string | null;
   customers: { arabic_name: string | null; mobile: string | null } | null;
-  booking_partners: { name: string | null } | { name: string | null }[] | null;
+  booking_partners: { id: string; name: string | null } | { id: string; name: string | null }[] | null;
 };
 
 /**
@@ -497,7 +499,7 @@ export async function listOperations(): Promise<OperationCard[]> {
     const { data } = await supabase
       .from("operations")
       .select(
-        "id, offer_id, render_id, client_status, execution_status, travel_start, travel_end, confirm_channel, confirmed_at, note, offers(serial, destination, total, currency, adults, children, infants, employee_id, customers(arabic_name, mobile), booking_partners(name))",
+        "id, offer_id, render_id, client_status, execution_status, travel_start, travel_end, confirm_channel, confirmed_at, note, offers(serial, destination, total, currency, adults, children, infants, employee_id, customers(arabic_name, mobile), booking_partners(id, name))",
       )
       .order("travel_start", { ascending: true, nullsFirst: false });
 
@@ -546,6 +548,7 @@ export async function listOperations(): Promise<OperationCard[]> {
         // the travellers entered, else the ones the offer was sold for — a new case is not «0»
         travelers_count: travelers.get(r.id) ?? (offer?.adults ?? 0) + (offer?.children ?? 0) + (offer?.infants ?? 0),
         partner_name: one(offer?.booking_partners)?.name ?? null,
+        partner_id: one(offer?.booking_partners)?.id ?? null,
       };
     });
   } catch {

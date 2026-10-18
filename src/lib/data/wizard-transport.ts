@@ -10,7 +10,7 @@ import { attachSupplierConfirmation, composeRequest } from "@/lib/data/supplier-
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { awaitingConfirmation } from "@/lib/operations/confirm-all";
 import { DRV, driverServiceKind } from "@/lib/operations/drivers";
-import { suppliersFor } from "@/lib/operations/supplier-request";
+import { assigneesFor } from "@/lib/operations/supplier-request";
 import { parseHotelConfirmation } from "@/lib/operations/wizard/hotels";
 import { uploadText } from "@/lib/repackage/extract/upload-text";
 
@@ -97,7 +97,8 @@ export async function transportSuppliers(operationId: string, cities: string[]):
   const none: TransportSetup = { suppliers: [], usual: {} };
   if (await gateOperation(operationId)) return none;
   try {
-    const suppliers = suppliersFor((await listAssignees()).filter((a) => a.kind === "supplier"), "transport");
+    // the one «ينفّذه» rule — the suppliers that sell transfers (a city's current one is kept by the card)
+    const suppliers = assigneesFor(await listAssignees(), { kind: "transport", title: "" }, null, null).filter((a) => a.kind === "supplier");
     const names = [...new Set(cities.map((c) => c.trim()).filter(Boolean))].slice(0, 30);
     if (names.length === 0) return { suppliers, usual: {} };
     const { data } = await service()
