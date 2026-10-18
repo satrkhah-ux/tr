@@ -384,6 +384,8 @@ export type OpenConversation = {
   id: number;
   inboxId: number;
   contactId: number | null;
+  /** «نوع الخدمة» the client picked in the WhatsApp menu (the contact's service_type_list: طيران، فنادق، بكج سياحي، تأشيره) */
+  serviceType: string | null;
   name: string;
   phone: string;
   assignee: string | null;
@@ -412,7 +414,7 @@ type RawConversation = {
   last_non_activity_message?: { content?: string | null } | null;
   labels?: string[];
   meta?: {
-    sender?: { id?: number; name?: string | null; phone_number?: string | null };
+    sender?: { id?: number; name?: string | null; phone_number?: string | null; custom_attributes?: Record<string, unknown> | null };
     assignee?: { name?: string | null } | null;
     team?: { id?: number; name?: string | null } | null;
   };
@@ -483,6 +485,7 @@ async function readOpen(): Promise<OpenList | null> {
       id: c.id,
       inboxId: c.inbox_id ?? 0,
       contactId: typeof sender?.id === "number" ? sender.id : null,
+      serviceType: [sender?.custom_attributes?.["service_type_list"], sender?.custom_attributes?.["service_type"]].find((v): v is string => typeof v === "string" && v.trim() !== "") ?? null,
       name: sender?.name?.trim() || sender?.phone_number || `#${c.id}`,
       phone: sender?.phone_number ?? "",
       assignee: c.meta?.assignee?.name ?? null,

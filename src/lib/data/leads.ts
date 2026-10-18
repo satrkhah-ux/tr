@@ -8,6 +8,7 @@ import { normalizeInquiry, normalizePhone } from "@/lib/leads/sheet";
 import { activeTeam, pullSheet, pushToSheet, type LeadRow } from "@/lib/leads/sync";
 import { pullTeletel } from "@/lib/leads/teletel-pull";
 import type { Stage } from "@/lib/leads/auto";
+import { currentCan } from "@/lib/roles/current";
 import { conversationForPhone, conversationThread, getTeletelConfig, type ThreadMessage } from "@/lib/providers/teletel";
 
 /**
@@ -50,7 +51,18 @@ export type Lead = Omit<LeadRow, "sheet_key"> & {
   auto_routed_at: string | null;
 };
 
+/** The administration's day (the owner's list, 2026-10-18): bookings confirmed and the follow-up queue. */
+export type LeadsStats = {
+  /** confirmations by Riyadh day — offers still confirmed, issued from the system */
+  bookings: { today: number; yesterday: number; week: number; month: number };
+  /** their value in riyals — pricing.internal only, else null */
+  value: { today: number; month: number } | null;
+  /** «المتابعة» (sla_followups) still open */
+  followups: number;
+};
+
 export type LeadsPage = {
+  stats: LeadsStats;
   leads: Lead[];
   team: { id: string; arabic_name: string }[];
   meId: string | null;
@@ -106,12 +118,13 @@ export async function listLeads(): Promise<LeadsPage> {
   const meId = await getCurrentEmployeeId();
   const twoWay = Boolean(process.env.LEADS_SHEET_WEBHOOK);
   const live = Boolean(getTeletelConfig());
-  if (!meId) return { leads: [], team: [], meId: null, pullError: null, twoWay, live };
+  if (!meId) return { stats: EMPTY_STATS, leads: [], team: [], meId: null, pullError: null, twoWay, live };
   // the sheet is quick enough to read on opening; Teletel is the crontab's (ten seconds for its 26 pages)
   const pullError = !live && Date.now() - lastPull > PULL_EVERY_MS ? await pullOnce(supabase) : null;
-  const [{ data }, people] = await Promise.all([
+  const [{ data }, people, stats] = await Promise.all([
     supabase.from("client_leads").select(COLS).order("created_at", { ascending: false }).limit(3000),
     activeTeam(supabase),
+    dayStats(),
   ]);
   const rows = (data ?? []) as Omit<Lead, "file" | "returning" | "returning_since">[];
   const files = await filesByPhone(new Set(rows.map((r) => r.phone)));
@@ -125,7 +138,55 @@ export async function listLeads(): Promise<LeadsPage> {
     const since = previousContact(r, byPhoneRows.get(r.phone) ?? [], byPhone?.created_at ?? null);
     return { ...r, name: r.name || byPhone?.name || null, file, returning: since !== null, returning_since: since };
   });
-  return { leads, team: people, meId, pullError, twoWay, live };
+  return { stats, leads, team: people, meId, pullError, twoWay, live };
+}
+
+const EMPTY_STATS: LeadsStats = { bookings: { today: 0, yesterday: 0, week: 0, month: 0 }, value: null, followups: 0 };
+
+/** a Riyadh day, «YYYY-MM-DD» */
+const riyadh = (iso: string | Date) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+
+/**
+ * The bookings confirmed today, yesterday, this week (from Sunday) and this
+ * month — counted from the status history, an offer counted once on the day it
+ * was confirmed and only while it still is — and the follow-up queue. Counts
+ * through the service role (a total, never a row); the value only for
+ * pricing.internal.
+ */
+async function dayStats(): Promise<LeadsStats> {
+  try {
+    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const since = new Date(Date.now() - 40 * 86_400_000).toISOString();
+    const [{ data: history }, { count: followups }, seesValue] = await Promise.all([
+      service.from("offer_status_history").select("offer_id, created_at, offers!inner(status, total, total_sar, currency)").eq("to_status", "confirmed").gte("created_at", since),
+      service.from("sla_followups").select("id", { count: "exact", head: true }).eq("status", "open"),
+      currentCan("pricing.internal"),
+    ]);
+    type Row = { offer_id: string; created_at: string; offers: { status: string; total: number | string | null; total_sar: number | string | null; currency: string | null } | null };
+    // the first confirmation of each offer still confirmed
+    const firstOf = new Map<string, Row>();
+    for (const r of (history ?? []) as unknown as Row[]) {
+      if (r.offers?.status !== "confirmed") continue;
+      const had = firstOf.get(r.offer_id);
+      if (!had || had.created_at > r.created_at) firstOf.set(r.offer_id, r);
+    }
+    const today = riyadh(new Date());
+    const yesterday = riyadh(new Date(Date.now() - 86_400_000));
+    const dow = new Date(`${today}T12:00:00Z`).getUTCDay(); // 0 = Sunday, the Saudi week's first day
+    const weekStart = riyadh(new Date(Date.parse(`${today}T12:00:00Z`) - dow * 86_400_000));
+    const monthStart = `${today.slice(0, 7)}-01`;
+    const rows = [...firstOf.values()].map((r) => ({ day: riyadh(r.created_at), sar: Number(r.offers?.total_sar ?? (r.offers?.currency === "SAR" || !r.offers?.currency ? r.offers?.total : 0)) || 0 }));
+    const sum = (xs: typeof rows) => Math.round(xs.reduce((n, x) => n + x.sar, 0));
+    const ofToday = rows.filter((r) => r.day === today);
+    const ofMonth = rows.filter((r) => r.day >= monthStart);
+    return {
+      bookings: { today: ofToday.length, yesterday: rows.filter((r) => r.day === yesterday).length, week: rows.filter((r) => r.day >= weekStart).length, month: ofMonth.length },
+      value: seesValue ? { today: sum(ofToday), month: sum(ofMonth) } : null,
+      followups: followups ?? 0,
+    };
+  } catch {
+    return EMPTY_STATS;
+  }
 }
 
 const DAY_MS = 24 * 3600_000;

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { BarChart3, ChevronLeft, ChevronRight, ExternalLink, Loader2, MessageCircle, Plus, RefreshCw, Search, Users, X } from "lucide-react";
@@ -60,6 +61,80 @@ function timing(l: Lead, now: number) {
     toAssign: Number.isNaN(assigned) || Number.isNaN(first) ? done("—") : done(span(assigned - first)),
     assigneeReply: Number.isNaN(assigned) ? done("—") : Number.isNaN(assigneeReply) ? awaited(assigned) : done(span(assigneeReply - assigned)),
   };
+}
+
+const WEEKDAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+const hourText = (h: number) => `${h % 12 || 12} ${h < 12 ? "ص" : "م"}`;
+
+/** the hour and weekday a conversation began, Riyadh time */
+function whenOf(l: Lead): { day: number; hour: number } {
+  const d = new Date(l.first_message_at ?? l.created_at);
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Riyadh", weekday: "short", hour: "numeric", hourCycle: "h23" }).formatToParts(d);
+  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parts.find((p) => p.type === "weekday")?.value ?? "Sun");
+  return { day: Math.max(wd, 0), hour: Number(parts.find((p) => p.type === "hour")?.value ?? 0) % 24 };
+}
+
+/**
+ * «وقت الذروة» (the owner's list, 2026-10-18 — to set the staff's shifts): when
+ * the conversations begin, by weekday and hour, over the chosen range; the
+ * busiest hours said in words.
+ */
+function PeakHours({ rows }: { rows: Lead[] }) {
+  const grid = Array.from({ length: 7 }, () => Array<number>(24).fill(0));
+  const byHour = Array<number>(24).fill(0);
+  for (const l of rows) {
+    const w = whenOf(l);
+    grid[w.day][w.hour] += 1;
+    byHour[w.hour] += 1;
+  }
+  const max = Math.max(1, ...grid.flat());
+  const top = byHour.map((n, h) => ({ h, n })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 3);
+  const quiet = byHour.map((n, h) => ({ h, n })).sort((a, b) => a.n - b.n).slice(0, 3).sort((a, b) => a.h - b.h);
+  return (
+    <div className="mt-3 rounded-[12px] border border-[#e3ece8] p-3">
+      <h3 className="text-[12px] font-extrabold text-[#185045]">وقت الذروة — متى تبدأ المحادثات (بتوقيت الرياض)</h3>
+      {top.length ? (
+        <p className="mt-1 text-[11.5px] font-semibold text-[#557d78]">
+          الأكثر ازدحاماً: {top.map((x) => `${hourText(x.h)} (${x.n})`).join("، ")} · الأهدأ: {quiet.map((x) => hourText(x.h)).join("، ")}
+        </p>
+      ) : null}
+      <div className="mt-2 overflow-x-auto">
+        <table className="min-w-[760px] border-separate border-spacing-[2px] text-[10px] font-semibold text-[#557d78]" dir="ltr">
+          <thead>
+            <tr>
+              <th />
+              {byHour.map((_, h) => (
+                <th key={h} className="w-7 text-center font-bold">{h % 3 === 0 ? hourText(h) : ""}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {grid.map((hours, d) => (
+              <tr key={d}>
+                <th className="pe-2 text-end font-bold" dir="rtl">{WEEKDAYS[d]}</th>
+                {hours.map((n, h) => (
+                  <td
+                    key={h}
+                    title={`${WEEKDAYS[d]} ${hourText(h)}: ${n}`}
+                    className="h-6 rounded-[3px] text-center"
+                    style={{ background: n ? `rgba(15,122,82,${0.12 + (n / max) * 0.88})` : "#f4f7f6", color: n / max > 0.55 ? "#fff" : "#185045" }}
+                  >
+                    {n || ""}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr>
+              <th className="pe-2 text-end font-extrabold text-[#185045]" dir="rtl">المجموع</th>
+              {byHour.map((n, h) => (
+                <td key={h} className="text-center font-extrabold text-[#185045]">{n || ""}</td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 /** a turn's span in epoch seconds */
@@ -199,7 +274,7 @@ function Bars({ title, rows, tone }: { title: string; rows: { label: string; cou
   );
 }
 
-export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: LeadsPage) {
+export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }: LeadsPage) {
   const router = useRouter();
   const today = riyadhDay(Date.now());
   const [day, setDay] = useState(today);
@@ -234,6 +309,26 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
     return { day: d, count: leads.filter((l) => dayOf.get(l.id) === d).length };
   });
   const trendMax = Math.max(1, ...trend.map((t) => t.count));
+
+  // «حصر عدد الطلبات اليومية»: today, this week (from Sunday), this month — each beside the one before
+  const countFrom = (from: string, to: string) => leads.filter((l) => {
+    const d = dayOf.get(l.id) ?? "";
+    return d >= from && d <= to;
+  }).length;
+  const dow = new Date(`${today}T12:00:00Z`).getUTCDay();
+  const weekStart = shiftDay(today, -dow);
+  const monthStart = `${today.slice(0, 7)}-01`;
+  const lastMonthStart = shiftDay(monthStart, -1).slice(0, 7) + "-01";
+  const sameDayLastMonth = shiftDay(lastMonthStart, Number(today.slice(8)) - 1);
+  const requests = {
+    today: countFrom(today, today),
+    yesterday: countFrom(shiftDay(today, -1), shiftDay(today, -1)),
+    week: countFrom(weekStart, today),
+    lastWeek: countFrom(shiftDay(weekStart, -7), shiftDay(today, -7)),
+    month: countFrom(monthStart, today),
+    lastMonth: countFrom(lastMonthStart, sameDayLastMonth < monthStart ? sameDayLastMonth : shiftDay(monthStart, -1)),
+  };
+  const kindsOf = INQUIRIES.map((i) => i.label).filter((k) => k !== "طلب");
 
   const list = leads.filter((l) => {
     if (kind && (l.inquiry !== kind || dayOf.get(l.id) !== day)) return false;
@@ -299,6 +394,35 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
   return (
     <TraveliunShell title="nav.customers">
       <div className="tv-fade-up space-y-4">
+        {/* ---------- «لوحة اليوم» (the owner's list, 2026-10-18): requests, bookings, the follow-up queue ---------- */}
+        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+          <h2 className="text-[15px] font-extrabold text-[#003c3a]">لوحة اليوم</h2>
+          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+            {(
+              [
+                ["طلبات اليوم", requests.today, `أمس ${requests.yesterday}`, "#0f7a52"],
+                ["طلبات هذا الأسبوع", requests.week, `الأسبوع الماضي حتى اليوم نفسه ${requests.lastWeek}`, "#0f7a52"],
+                ["طلبات هذا الشهر", requests.month, `الشهر الماضي حتى اليوم نفسه ${requests.lastMonth}`, "#0f7a52"],
+                ["حجوزات اليوم", stats.bookings.today, `أمس ${stats.bookings.yesterday}${stats.value ? ` · ${stats.value.today.toLocaleString("en-US")} ر.س` : ""}`, "#1e3a8a"],
+                ["حجوزات الشهر", stats.bookings.month, `هذا الأسبوع ${stats.bookings.week}${stats.value ? ` · ${stats.value.month.toLocaleString("en-US")} ر.س` : ""}`, "#1e3a8a"],
+                ["في قسم المتابعة", stats.followups, "عملاء لم تُغلق متابعتهم", "#a86a10"],
+              ] as const
+            ).map(([label, value, note, color]) => (
+              <div key={label} className="rounded-[12px] border border-[#e3ece8] bg-[#f8fbfa] p-3">
+                <div className="text-[11px] font-extrabold text-[#78948f]">{label}</div>
+                <div className="tv-tnum text-2xl font-extrabold" style={{ color }}>
+                  {value}
+                </div>
+                <div className="text-[10.5px] font-semibold text-[#93aaa3]">{note}</div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">
+            الطلب = محادثة واتساب جديدة. الحجز = عرض صدر من النظام وتأكّد في يومه (يُحسب مرة واحدة، وما أُلغي بعده لا يُحسب).{" "}
+            <Link href="/sla" className="font-bold text-[#185045] hover:underline">قسم المتابعة ←</Link>
+          </p>
+        </section>
+
         {/* ---------- the daily classification («اجماليات المحادثات») ---------- */}
         <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -414,6 +538,39 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
               ))}
             </div>
           </div>
+          <div className="mt-3 overflow-x-auto rounded-[12px] border border-[#e3ece8]">
+            <table className="w-full min-w-[640px] text-start text-[11.5px]">
+              <caption className="px-3 pt-2 text-start text-[12px] font-extrabold text-[#185045]">حصر الطلبات اليومية — آخر 14 يوماً حسب نوع الطلب</caption>
+              <thead className="text-[10.5px] font-extrabold text-[#78948f]">
+                <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start">
+                  <th>اليوم</th>
+                  <th>المجموع</th>
+                  {kindsOf.map((k) => (
+                    <th key={k}>{k}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[...trend].reverse().map((t) => {
+                  const ofT = leads.filter((l) => dayOf.get(l.id) === t.day);
+                  return (
+                    <tr key={t.day} className={`border-t border-[#eef3f1] font-semibold text-[#185045] [&>td]:px-2 [&>td]:py-1 ${t.day === day ? "bg-[#eef6f2]" : ""}`}>
+                      <td className="whitespace-nowrap">
+                        {WEEKDAYS[new Date(`${t.day}T12:00:00Z`).getUTCDay()]} <DirText>{t.day.slice(5)}</DirText>
+                      </td>
+                      <td className="tv-tnum font-extrabold">{t.count}</td>
+                      {kindsOf.map((k) => (
+                        <td key={k} className="tv-tnum">{ofT.filter((l) => l.inquiry === k).length || ""}</td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <PeakHours rows={inRange} />
+
           <h3 className="mt-4 text-[13px] font-extrabold text-[#003c3a]">أداء الموظفين</h3>
           <p className="text-[11px] font-semibold text-[#93aaa3]">
             لكل موظف: كم محادثة وصلته، وكم احتاج حتى ردّ عليها، وكم احتاج حتى أسندها لغيره — من سجل الإسناد في Teletel، للمدة المختارة أعلاه.

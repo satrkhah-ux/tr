@@ -132,7 +132,10 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       const patch: Record<string, unknown> = { ...live, teletel_conversation_id: c.id };
       // what nobody has set yet: the name above all, then the kind and the place
       if (!had.name && clientName(c)) patch.name = clientName(c);
-      if (!had.inquiry) patch.inquiry = classifyInquiry(c.labels, c.preview) || null;
+      // the service the client picked in the WhatsApp menu outranks a guess: it also settles an «يستفسر»
+      const picked = classifyInquiry([c.serviceType ?? ""], "");
+      if (picked && (!had.inquiry || had.inquiry === "يستفسر")) patch.inquiry = picked;
+      else if (!had.inquiry) patch.inquiry = classifyInquiry(c.labels, c.preview) || null;
       if (!had.destination) patch.destination = findPlace(c.labels, c.preview, places) || null;
       // until its turns are read, the one holding it stands in as the receiver
       if (!had.received_by && holder && had.timeline_seen_at == null) patch.received_by = holder;
@@ -153,7 +156,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
         ...live,
         phone,
         name: clientName(c),
-        inquiry: classifyInquiry(c.labels, c.preview) || null,
+        inquiry: classifyInquiry([c.serviceType ?? "", ...c.labels], c.preview) || null,
         destination: findPlace(c.labels, c.preview, places) || null,
         received_by: holder,
         received_by_name: c.assignee,
@@ -191,7 +194,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
         threadRead.add(c.id);
         const said = thread.messages.filter((m) => m.fromClient && !m.isPrivate).map((m) => m.text).join(" ");
         const patch: Record<string, unknown> = {};
-        const kind = classifyInquiry(c.labels, said);
+        const kind = classifyInquiry([c.serviceType ?? "", ...c.labels], said);
         if ((!inquiry || inquiry === "يستفسر") && kind && kind !== inquiry) patch.inquiry = kind;
         const place = destination ? "" : findPlace(c.labels, said, places);
         if (place) patch.destination = place;
