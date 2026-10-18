@@ -524,7 +524,8 @@ export async function receptionSweep(): Promise<number> {
   // a client waiting on us for under half an hour — a new conversation, or an old one the client reopened
   const fresh = list.rows.filter((c) => c.waitingSince > 0 && nowSec - c.waitingSince < 1800 && (reception.scope === "all" || settings.autoList.includes(intlPhone(c.phone) ?? "")));
   if (!fresh.length) return 0;
-  const held = await holdSweep(service, fresh, nowSec, reception.hours);
+  // where Murad's own five-minute answer runs (run.ts: murad_auto on the auto list) it answers the client's words — better than «وصلت رسالتك», and it comes next in this same run
+  const held = await holdSweep(service, fresh.filter((c) => !(flags.murad_auto && settings.autoList.includes(intlPhone(c.phone) ?? ""))), nowSec, reception.hours);
   const { data } = await service
     .from("murad_log")
     .select("conversation_id")
@@ -553,6 +554,8 @@ const HOLD_AFTER_SEC = 300;
  * Murad says it arrived and who answers it (holdText), and a note mentions
  * that colleague so Teletel notifies them. Claimed in murad_log as the
  * client message's NEGATIVE id (its own id is the reception's turn already).
+ * Not where run.ts answers the wait itself (the two test numbers while
+ * murad_auto is on): there the client hears an answer to what they wrote.
  * ponytail: the colleague only; their supervisor too when the teams name one.
  */
 async function holdSweep(service: SupabaseClient, fresh: OpenConversation[], nowSec: number, hoursRaw: string | null): Promise<number> {
