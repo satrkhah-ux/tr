@@ -27,6 +27,7 @@ import {
   newStayId,
   resizeRooms,
   roomFromName,
+  pickRoom,
   roomTypeNames,
   totalCityNights,
   transportRef,
@@ -77,10 +78,23 @@ export function remainingNights(data: Pick<DraftData, "trip" | "cities">): numbe
   return Math.max(data.trip.nights - totalCityNights(data.cities), 0);
 }
 
+/**
+ * The room a group usually takes, by how many sleep in each room: two people
+ * in one room is «غرفة مزدوجة» (the owner's review, 2026-10-18: picked by hand
+ * twice per file, and «ينقص» asked for it). The agent changes it when it differs.
+ */
+export function usualRoom(trip: Pick<DraftTrip, "adults" | "children" | "rooms">): ReturnType<typeof pickRoom> {
+  const perRoom = Math.ceil(Math.max(trip.adults + trip.children, 1) / Math.max(trip.rooms, 1));
+  const type = ["single", "double", "triple", "quadruple"][perRoom - 1] ?? "family";
+  return pickRoom({ room_type_code: type });
+}
+
 /** A city's hotel line, born with the trip's rooms and meals so the agent only picks the hotel. */
 export function hotelForCity(data: Pick<DraftData, "trip">, city: string, currency: string, cityKey?: string): DraftHotel {
   const board = data.trip.meal_plan ? MEAL_PLAN_BOARD[data.trip.meal_plan] : data.trip.default_board;
-  const room = { ...emptyRoomSpec(), ...roomFromName(data.trip.default_room_type_name), board_type: board };
+  // the trip's own room when it names one, else the usual one for the group
+  const named = data.trip.default_room_type_name?.trim();
+  const room = { ...emptyRoomSpec(), ...(named ? roomFromName(named) : usualRoom(data.trip)), board_type: board };
   return withRooms(
     {
       id: newStayId(),

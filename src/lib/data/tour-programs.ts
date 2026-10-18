@@ -59,18 +59,18 @@ export async function getTourPrices(countryNames: string[]): Promise<(TourPrice 
   try {
     const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
     const [{ data }, perCar] = await Promise.all([
-      supabase.from("tours").select("arabic_name, price, currency, countries(arabic_name)").not("price", "is", null),
+      supabase.from("tours").select("arabic_name, price, currency, countries(arabic_name), cities(arabic_name)").not("price", "is", null),
       // a tour's price per vehicle (0072); absent before it is applied — then the list is as it was
-      supabase.from("tour_prices").select("car_type, price, currency, tours!inner(arabic_name, program_id, countries(arabic_name))"),
+      supabase.from("tour_prices").select("car_type, price, currency, tours!inner(arabic_name, program_id, countries(arabic_name), cities(arabic_name))"),
     ]);
-    type Row = { arabic_name: string | null; price: number | string; currency: string | null; countries: { arabic_name: string } | null };
+    type Row = { arabic_name: string | null; price: number | string; currency: string | null; countries: { arabic_name: string } | null; cities?: { arabic_name: string } | null };
     type CarRow = { car_type: string; price: number | string; currency: string | null; tours: (Row & { program_id: string | null }) | null };
     const inTrip = (r: Row | null): r is Row => Boolean(r?.arabic_name?.trim() && r.countries && wanted.has(normAr(r.countries.arabic_name)));
     const currency = (c: string | null) => (c || "SAR").trim().toUpperCase();
     return [
       ...((data ?? []) as unknown as Row[])
         .filter(inTrip)
-        .map((r) => ({ name: r.arabic_name!.trim(), price: Number(r.price), currency: currency(r.currency), country: r.countries!.arabic_name })),
+        .map((r) => ({ name: r.arabic_name!.trim(), price: Number(r.price), currency: currency(r.currency), country: r.countries!.arabic_name, city: r.cities?.arabic_name ?? null })),
       ...(perCar.error ? [] : ((perCar.data ?? []) as unknown as CarRow[]))
         .filter((r) => inTrip(r.tours))
         .map((r) => ({
@@ -80,6 +80,7 @@ export async function getTourPrices(countryNames: string[]): Promise<(TourPrice 
           country: r.tours!.countries!.arabic_name,
           car_type: r.car_type,
           program_id: r.tours!.program_id,
+          city: r.tours!.cities?.arabic_name ?? null,
         })),
     ];
   } catch {
