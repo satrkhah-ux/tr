@@ -32,4 +32,30 @@ describe("tourChoices — what a tour field opens", () => {
       { value: "رحلة الشلالات", hint: "380 SAR" },
     ]);
   });
+
+  it("lists a tour the old list filed once per car (in its name) once — priced for the trip's car, else the nearest car, named", () => {
+    const old: TourCatalog = {
+      ...catalog(true),
+      programs: [],
+      prices: [
+        { name: "جولة البسفور (فيتو)", price: 100, currency: "SAR" },
+        { name: "جولة البسفور (فان مرسيدس)", price: 150, currency: "SAR" },
+        { name: "جولة البسفور (سيارة سبرانتر)", price: 150, currency: "SAR" },
+        { name: "حديقة سوي تين (Suoi Tien)", price: 90, currency: "SAR" },
+      ],
+      carTypes: [
+        { name: "سيارة صغيرة", pax: 2 },
+        { name: "فيتو", pax: 8 },
+        { name: "فان مرسيدس", pax: 8 },
+        { name: "سيارة سبرانتر", pax: 12 },
+      ],
+    };
+    expect(tourChoices({ ...old, tripCar: "فان مرسيدس" })).toEqual([
+      { value: "يوم حر" },
+      { value: "جولة البسفور", hint: "150 SAR" },
+      // brackets that are not a car stay part of the name
+      { value: "حديقة سوي تين (Suoi Tien)", hint: "90 SAR" },
+    ]);
+    expect(tourChoices({ ...old, tripCar: "سيارة صغيرة" })[1]).toEqual({ value: "جولة البسفور", hint: "100 SAR (فيتو)" });
+  });
 });

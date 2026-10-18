@@ -9,6 +9,7 @@ import { findTourPrice, listedTourPrice, tourCarPrice, type TourPrice } from "@/
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { SuggestInput, type Suggestion } from "../SuggestInput";
 import { basicField, typedNumber } from "../basic/styles";
+import { splitTourName } from "@/lib/catalog/model";
 
 /**
  * A city's tours, as both screens choose them — the basic screen's city card
@@ -51,8 +52,31 @@ export function tourChoices(catalog: TourCatalog): Suggestion[] {
     const title = programDayText(p).title;
     if (!p.is_free_day && !out.has(title)) out.set(title, priced(title, p.id));
   }
-  // one entry per tour: a tour priced per car is listed once, its price shown for the trip's car
-  for (const name of new Set(prices.map((t) => t.name))) if (!out.has(name)) out.set(name, priced(name));
+  // one entry per tour: a tour priced per car is listed once, its price shown for the trip's car — and so is
+  // one the old list filed once per car in its NAME («جولة البسفور (فيتو)»، «… (فان مرسيدس)»: three rows
+  // of every tour, the owner's review 2026-10-18). Only a fleet car in the brackets is a car.
+  const fleet = new Set(catalog.carTypes.map((c) => c.name.trim()));
+  const baseOf = (name: string) => {
+    const split = splitTourName(name);
+    return split && fleet.has(split.car) ? split.base : name;
+  };
+  for (const name of new Set(prices.map((t) => baseOf(t.name)))) {
+    if (out.has(name)) continue;
+    const entry = priced(name);
+    // the trip's car has no price for it: the nearest car that has one says what it costs, and says which car
+    if (!entry.hint && catalog.showPrice) {
+      // the smallest car that seats what the trip's car seats, else the biggest there is
+      const paxOf = (car: string) => catalog.carTypes.find((c) => c.name.trim() === car)?.pax ?? 0;
+      const need = paxOf(catalog.tripCar.trim());
+      const others = prices
+        .filter((t) => baseOf(t.name) === name && t.name !== name)
+        .sort((x, y) => paxOf(splitTourName(x.name)!.car) - paxOf(splitTourName(y.name)!.car));
+      const other = others.find((t) => paxOf(splitTourName(t.name)!.car) >= need) ?? others[others.length - 1];
+      const car = other ? splitTourName(other.name)?.car : null;
+      if (other && car) out.set(name, { value: name, hint: `${other.price} ${other.currency} (${car})` });
+      else out.set(name, entry);
+    } else out.set(name, entry);
+  }
   return [...out.values()];
 }
 
