@@ -510,7 +510,12 @@ export async function listTeletelTeams(): Promise<TeletelTeam[]> {
   return teams;
 }
 
-/** Hand a conversation to a team (its agent stays) — the SLA move «ينقل إلى فريق في Teletel». */
+/**
+ * Hand a conversation to a team — the SLA move «ينقل إلى فريق في Teletel».
+ * Teletel drops the agent when they are not in that team (tried 2026-10-18 on
+ * the owner's test conversation: «احمد القدسي» → none), so it lands in the
+ * team's queue unassigned unless the team auto-assigns.
+ */
 export async function assignTeletelTeam(conversationId: number, teamId: number): Promise<boolean> {
   const config = getTeletelConfig();
   if (!config) return false;
