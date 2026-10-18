@@ -213,3 +213,15 @@ it("masks a phone to its last four digits", () => {
   expect(maskPhone("+966551235050")).toBe("•••• 5050");
   expect(maskPhone(null)).toBe("—");
 });
+
+describe("the note reaches its colleague (the evaluator, 2026-10-19)", () => {
+  it("mentions the assignee so Teletel notifies them; the team by name when no one holds it", async () => {
+    const { autoNote, noteFor } = await import("./core");
+    const to = noteFor({ assignee: "احمد يوسف", assigneeId: 57, team: "المبيعات" });
+    expect(to).toBe("[@احمد يوسف](mention://user/57/%D8%A7%D8%AD%D9%85%D8%AF%20%D9%8A%D9%88%D8%B3%D9%81)");
+    expect(noteFor({ assignee: null, assigneeId: null, team: "المبيعات" })).toBe("فريق «المبيعات»");
+    expect(noteFor({ assignee: null, assigneeId: null, team: null })).toBe("");
+    const note = autoNote({ reply: "x", needsStaff: true, reason: "يشتكي من تكرار الفنادق", intake: null } as never, to);
+    expect(note.split("\n\n")[1]).toBe(`${to}\n⚠️ يحتاج موظفاً: يشتكي من تكرار الفنادق`);
+  });
+});

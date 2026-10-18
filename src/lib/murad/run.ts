@@ -20,6 +20,7 @@ import { paidState } from "@/lib/operations/wizard/payment";
 import { DOCUMENT_LABEL } from "@/lib/operations/voucher-dto";
 import {
   autoNote,
+  noteFor,
   capFor,
   clientTurn,
   decide,
@@ -360,7 +361,7 @@ async function answer(
     out.replyId = still ? await sendTeletelMessage(c.id, r.reply) : null;
     if (out.replyId === null) return { ...out, mode: "skipped", fault: still ? "send_failed" : again ? "turn_changed" : "recheck_failed" };
     muradIds.add(out.replyId);
-    await addTeletelNote(c.id, autoNote(r));
+    await addTeletelNote(c.id, autoNote(r, noteFor(c)));
     await addTeletelLabels(c.id, [MURAD_LABEL]);
     return out;
   } catch (error) {

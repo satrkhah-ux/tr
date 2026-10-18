@@ -29,7 +29,7 @@ import { askText, holdToText, missing, offerDraftData, offerText, outOfRule, pri
 import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
-import { isHumanReply, maskPhone, SETTING } from "./core";
+import { isHumanReply, maskPhone, noteFor, SETTING } from "./core";
 import { readSettings, readThread } from "./run";
 import {
   clarifyText,
@@ -587,9 +587,8 @@ async function holdSweep(service: SupabaseClient, fresh: OpenConversation[], now
     if (claim.error || !claim.data) continue;
     const text = holdText({ assignee: c.assignee, team: c.team, opensAt: isWorkingTime(new Date(), hours) ? null : hours.open });
     const replyId = await sendTeletelMessage(c.id, text);
-    if (replyId && c.assignee) {
-      const mention = c.assigneeId ? `[@${c.assignee}](mention://user/${c.assigneeId}/${encodeURIComponent(c.assignee)})` : c.assignee;
-      await addTeletelNote(c.id, `🤖 ${mention} العميل كتب بعد التحويل وينتظر منذ ${Math.round((nowSec - c.waitingSince) / 60)} دقائق بلا رد — طمأنه مُراد. ردّ عليه الآن.`);
+    if (replyId && (c.assignee || c.team)) {
+      await addTeletelNote(c.id, `🤖 ${noteFor(c)} العميل كتب بعد التحويل وينتظر منذ ${Math.round((nowSec - c.waitingSince) / 60)} دقائق بلا رد — طمأنه مُراد. ردّ عليه الآن.`);
     }
     await service
       .from("murad_log")

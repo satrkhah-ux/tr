@@ -377,8 +377,18 @@ export function suggestionNote(r: MuradResult): string {
 }
 
 /** What staff read under an automatic reply. */
-export function autoNote(r: MuradResult): string {
-  return [AUTO_NOTE, staffLines(r)].filter(Boolean).join("\n\n");
+export function autoNote(r: MuradResult, to = ""): string {
+  return [AUTO_NOTE, [to, staffLines(r)].filter(Boolean).join("\n")].filter(Boolean).join("\n\n");
+}
+
+/**
+ * Who a note is for: the colleague holding the conversation as a Teletel
+ * mention — Teletel notifies the one mentioned (the evaluator, 2026-10-19) —
+ * else the team by name, else no one.
+ */
+export function noteFor(c: { assignee: string | null; assigneeId: number | null; team: string | null }): string {
+  if (c.assignee && c.assigneeId) return `[@${c.assignee}](mention://user/${c.assigneeId}/${encodeURIComponent(c.assignee)})`;
+  return c.assignee ?? (c.team ? `فريق «${c.team}»` : "");
 }
 
 function staffLines(r: MuradResult): string {
