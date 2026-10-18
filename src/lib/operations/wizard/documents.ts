@@ -1,8 +1,8 @@
 import type { OperationBooking } from "@/lib/data/operation-bookings";
-import { hotelFinal } from "@/lib/operations/client-booking-state";
+import { flightTicketed, hotelFinal } from "@/lib/operations/client-booking-state";
 import { derivedExecution } from "@/lib/operations/progress";
 import { CLIENT_DOCUMENT_KINDS, type VoucherKind } from "@/lib/operations/voucher-dto";
-import type { ReadinessItem, StepState, WizardCase } from "./types";
+import type { ReadinessCase, ReadinessItem, StepState, WizardCase } from "./types";
 
 /**
  * Step 6 — «المستندات والإرسال»: no «إصدار» button per document. Each one
@@ -17,8 +17,8 @@ import type { ReadinessItem, StepState, WizardCase } from "./types";
  * ticket waits for every flight; the itinerary for the authored days; the
  * arrival sign for a transfer to meet the travellers. issueDocument keeps its
  * own checks: a voucher it refuses comes back as an error, never a blank page.
- * (A flight counts as final with its PNR, a ticket number or a confirmation
- * number — the flights step reads them off the uploaded ticket, 0084.)
+ * (A flight counts by the one flight-done rule, client-booking-state
+ * flightTicketed — the flights step's own.)
  */
 
 export type DocWhy = "hotel_final" | "flights" | "days" | "transfer";
@@ -36,10 +36,6 @@ export type DocLine = {
 type Docs = Pick<WizardCase, "bookings" | "documents" | "hasDays" | "travelers">;
 
 const live = (b: OperationBooking) => b.status !== "cancelled" && b.status !== "failed";
-
-/** A flight is ticketed once confirmed with a record locator, a ticket number or a confirmation number on it. */
-export const flightFinal = (b: Pick<OperationBooking, "status" | "confirmation_number" | "pnr" | "ticket_numbers">) =>
-  b.status === "confirmed" && Boolean(b.pnr?.trim() || b.ticket_numbers?.length || b.confirmation_number?.trim());
 
 export function documentPlan(data: Docs): DocLine[] {
   const docs = data.documents.filter((d) => !d.revoked_at);
@@ -59,7 +55,7 @@ export function documentPlan(data: Docs): DocLine[] {
   const lead = data.travelers[0]?.display_name.trim();
   return [
     ...bookings.filter((b) => b.kind === "hotel").map((h) => line("hotel_voucher", hotelFinal(h), "hotel_final", h)),
-    ...(flights.length ? [line("flight_ticket", flights.every(flightFinal), "flights")] : []),
+    ...(flights.length ? [line("flight_ticket", flights.every(flightTicketed), "flights")] : []),
     line("itinerary", data.hasDays, "days"),
     line("welcome_board", Boolean(lead) && bookings.some((b) => b.kind === "transport"), "transfer"),
   ];
@@ -117,7 +113,7 @@ export function documentsState(data: Docs & Pick<WizardCase, "clientToken">): St
   return clientDocumentsOut(data) && data.clientToken ? "done" : "todo";
 }
 
-export function documentsReadiness(data: WizardCase): ReadinessItem[] {
+export function documentsReadiness(data: ReadinessCase): ReadinessItem[] {
   return [
     { step: "documents", key: "documents", ok: clientDocumentsOut(data) },
     { step: "documents", key: "link", ok: Boolean(data.clientToken), optional: true },

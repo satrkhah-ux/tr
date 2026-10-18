@@ -8,7 +8,8 @@ import type { TranslationKey } from "@/lib/i18n";
 import type { OperationBooking } from "@/lib/data/operation-bookings";
 import { readBookingTicket, saveBookingTicket, type TicketRead } from "@/lib/data/wizard-tickets";
 import { MAX_TICKET_BYTES } from "@/lib/flights/ticket-parse";
-import { flightBookings, isTicketed, type LegInput, type NameCheck } from "@/lib/operations/wizard/flights";
+import { flightTicketed } from "@/lib/operations/client-booking-state";
+import { flightBookings, type LegInput, type NameCheck } from "@/lib/operations/wizard/flights";
 import type { StepProps } from "@/lib/operations/wizard/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { useSafeTransition } from "../../useSafeTransition";
@@ -158,7 +159,8 @@ export function FlightsStep({ data }: StepProps) {
 function FlightCard({ booking, travelers }: { booking: OperationBooking; travelers: number }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
-  const done = isTicketed(booking);
+  // the one flight-done rule — a flight confirmed by hand in «عرض الكل» is done here too
+  const done = flightTicketed(booking);
   const [form, setForm] = useState<Form | null>(null);
   const [read, setRead] = useState<TicketRead | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -220,14 +222,16 @@ function FlightCard({ booking, travelers }: { booking: OperationBooking; travele
       {done && !form ? (
         <div className="mt-2 grid gap-1.5 text-[12px] font-semibold text-[#185045]">
           <p>
-            {t("wz.flights.pnr")}: <DirText className="font-extrabold">{booking.pnr}</DirText>
+            {t("wz.flights.pnr")}: <DirText className="font-extrabold">{booking.pnr || booking.confirmation_number}</DirText>
           </p>
-          <p className="flex flex-wrap gap-x-3">
-            {t("wz.flights.tickets")}:
-            {booking.ticket_numbers.map((n) => (
-              <DirText key={n} className="tv-tnum">{n}</DirText>
-            ))}
-          </p>
+          {booking.ticket_numbers.length > 0 ? (
+            <p className="flex flex-wrap gap-x-3">
+              {t("wz.flights.tickets")}:
+              {booking.ticket_numbers.map((n) => (
+                <DirText key={n} className="tv-tnum">{n}</DirText>
+              ))}
+            </p>
+          ) : null}
           <ul className="grid gap-1">
             {booking.flight_legs.map((l, i) => (
               <li key={i} className="tv-tnum rounded-[8px] bg-[#f4f8f6] px-2.5 py-1">

@@ -1,4 +1,5 @@
 import { translate } from "@/lib/i18n";
+import { flightTicketed, hotelFinal } from "./client-booking-state";
 import { CLIENT_STATES, EXECUTION_STATES, type ClientStatus, type ExecutionStatus } from "./state";
 import type { TravelerListItem } from "./traveler-dto";
 import { ageOn, passportIssues } from "./travelers";
@@ -10,7 +11,15 @@ import { ageOn, passportIssues } from "./travelers";
  * (state.ts forward()), so a status set by hand ahead of this is never pulled back.
  */
 
-export type ProgressBooking = { kind: string; status: string };
+/** The columns the flight and hotel rungs read — the wizard's own done-rules (client-booking-state). */
+export type ProgressBooking = {
+  kind: string;
+  status: string;
+  confirmation_number: string | null;
+  company_ref?: string | null;
+  pnr?: string | null;
+  ticket_numbers?: string[] | null;
+};
 export type ProgressDocument = { kind: string };
 
 const live = (b: ProgressBooking) => b.status !== "cancelled" && b.status !== "failed";
@@ -18,7 +27,11 @@ const allConfirmed = (list: ProgressBooking[]) => list.every((b) => b.status ===
 
 /**
  * The furthest execution state whose condition — and every earlier one's —
- * holds. A package with no flights passes the flights step (nothing to book);
+ * holds. The flight and hotel rungs ask the wizard's own done-rules
+ * (flightTicketed, hotelFinal): a hotel holding only OUR number is not
+ * «hotels_booked» while its tile is red, and the client is not told «bookings
+ * confirmed» (MESSAGE_ON_STATE) on it. A package with no flights passes the
+ * flights step (nothing to book);
  * documents count once every client document its bookings need is out.
  * Never «ready_to_travel» or «travelled»: those wait for the checklist and the
  * calendar. Null when nothing is live yet (an empty case is not «booked»).
@@ -33,8 +46,8 @@ export function derivedExecution(bookings: ProgressBooking[], documents: Progres
   const has = (kind: string) => documents.some((d) => d.kind === kind);
 
   const steps: [ExecutionStatus, boolean][] = [
-    ["flights_booked", allConfirmed(flights)],
-    ["hotels_booked", allConfirmed(hotels)],
+    ["flights_booked", flights.every(flightTicketed)],
+    ["hotels_booked", hotels.every(hotelFinal)],
     ["transfers_booked", allConfirmed(ground) && allConfirmed(of("visa"))],
     ["vouchers_issued", (hotels.length === 0 || has("hotel_voucher")) && (flights.length === 0 || has("flight_ticket")) && has("itinerary")],
   ];
@@ -61,14 +74,7 @@ export function isAhead(order: readonly string[], from: string, to: string | nul
 export const aheadOfExecution = (from: ExecutionStatus, to: ExecutionStatus | null) => isAhead(EXECUTION_STATES, from, to);
 export const aheadOfClient = (from: ClientStatus, to: ClientStatus | null) => isAhead(CLIENT_STATES, from, to);
 
-// ---------- «جاهز للسفر» ----------
-
-export type ReadinessTraveler = Pick<
-  TravelerListItem,
-  "has_passport" | "passport_expiry" | "birth_date" | "age" | "traveler_kind" | "nationality" | "visa_status"
-> & { name: string };
-
-export type ReadinessItem = { key: "bookings" | "payment" | "documents" | "passports" | "visas"; ok: boolean; detail: string; anchor: string };
+// ---------- the daily passport alerts ----------
 
 export type AlertTraveler = Pick<TravelerListItem, "id" | "display_name" | "has_passport" | "passport_expiry" | "birth_date" | "age" | "traveler_kind">;
 
@@ -89,51 +95,3 @@ export function passportAlerts(travelers: AlertTraveler[], trip: { travel_start:
   );
 }
 
-/**
- * The checklist «جاهز للسفر» waits for — every line green. Each line says what
- * is missing in words the agent acts on, and where on the page to fix it.
- */
-export function readiness(input: {
-  bookings: ProgressBooking[];
-  documents: ProgressDocument[];
-  paid: number;
-  total: number | null;
-  travelers: ReadinessTraveler[];
-  travelStart: string | null;
-  travelEnd: string | null;
-  today: string;
-}): ReadinessItem[] {
-  const liveBookings = input.bookings.filter(live);
-  const open = liveBookings.filter((b) => b.status !== "confirmed").length;
-  const docsReached = derivedExecution(input.bookings, input.documents) === "vouchers_issued";
-  const owed = input.total != null ? Math.max(0, Math.round((input.total - input.paid) * 100) / 100) : null;
-  // the traveler row's own decision (travelers.ts), not a second copy of it
-  const trip = { travel_start: input.travelStart, travel_end: input.travelEnd };
-  const flagged = input.travelers
-    .map((t) => ({ t, issues: passportIssues(t, trip, input.today) }))
-    .filter((f) => f.issues.length > 0);
-  const age = (t: ReadinessTraveler) => ageOn(t.birth_date, input.travelStart ?? input.today) ?? "";
-  const visaPending = input.travelers.filter((t) => t.visa_status === "required" || t.visa_status === "submitted");
-  const visaCheck = input.travelers.filter((t) => t.visa_status === "check");
-  const visaDetail = [
-    visaPending.length ? `تأشيرة ${visaPending.map((t) => t.name).join("، ")} لم تصدر` : "",
-    ...visaCheck.map((t) => `${t.name}: ${translate("ar", "ops.trav.gap.visa_check", { nat: t.nationality || "—" })}`),
-  ].filter(Boolean);
-  return [
-    { key: "bookings", ok: liveBookings.length > 0 && open === 0, detail: liveBookings.length === 0 ? "لا حجوزات بعد" : open ? `${open} حجز غير مؤكد` : "كل الحجوزات مؤكدة", anchor: "bookings" },
-    { key: "payment", ok: owed === 0, detail: owed == null ? "الإجمالي غير معروف" : owed ? `متبقٍ ${owed.toLocaleString("en-US")}` : "مسدّد بالكامل", anchor: "payments" },
-    { key: "documents", ok: docsReached, detail: docsReached ? "مستندات العميل صادرة" : "مستندات العميل لم تصدر كلها", anchor: "bookings" },
-    {
-      key: "passports",
-      ok: input.travelers.length > 0 && flagged.length === 0,
-      detail:
-        input.travelers.length === 0
-          ? "لا مسافرين مسجّلين"
-          : flagged.length
-            ? flagged.map(({ t, issues }) => `${t.name}: ${issues.map((i) => translate("ar", `ops.trav.gap.${i}`, { n: age(t) })).join("، ")}`).join(" · ")
-            : "الجوازات صالحة",
-      anchor: "travelers",
-    },
-    { key: "visas", ok: visaDetail.length === 0, detail: visaDetail.join(" · ") || "التأشيرات جاهزة أو غير مطلوبة", anchor: "travelers" },
-  ];
-}

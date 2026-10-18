@@ -2,7 +2,7 @@ import type { PaymentKind } from "@/lib/data/operations";
 import { derivedClient } from "@/lib/operations/progress";
 import type { ClientStatus } from "@/lib/operations/state";
 import { defaultSchedule, installmentStates, paidTotal, remainingBalance, riyadhDate } from "@/lib/operations/payments";
-import type { ReadinessItem, StepState, WizardCase } from "./types";
+import type { ReadinessCase, ReadinessItem, StepState, WizardCase } from "./types";
 
 /**
  * Step 5 — «الدفع»: what the client pays next, already in the form. The money
@@ -37,7 +37,7 @@ export function paymentPrefill(data: Money): PaymentPrefill | null {
 }
 
 /** Settled = nothing left of a known total. */
-export function paymentSettled(data: Money): boolean {
+export function paymentSettled(data: Pick<ReadinessCase, "operation" | "payments">): boolean {
   const remaining = remainingBalance(data.operation.total, paidTotal(data.payments));
   return remaining != null && remaining <= 0;
 }
@@ -65,11 +65,23 @@ export function clientStatusUnbacked(status: ClientStatus, total: number | null,
   return (status === "paid_full" && state !== "paid") || (status === "paid_partial" && state === "unpaid");
 }
 
+/**
+ * The client track as every screen shows it: its paid rungs read off the
+ * recorded payments (operation-sync moves them; setClientStatus refuses them by
+ * hand since 2026-10-18), so a «مسدّد» picked by hand before that shows what
+ * the money says instead.
+ */
+export function shownClientStatus(status: ClientStatus, total: number | null, paid: number): ClientStatus {
+  if (status !== "paid_partial" && status !== "paid_full") return status;
+  const state = paidState(total, paid);
+  return state === "paid" ? "paid_full" : state === "partial" ? "paid_partial" : "confirmed";
+}
+
 export function paymentState(data: WizardCase): StepState {
   return paymentSettled(data) ? "done" : "todo";
 }
 
 /** Settled, or a manager let it travel before (operations.ready_exceptions.payment — gateCaseManager only). */
-export function paymentReadiness(data: WizardCase): ReadinessItem[] {
+export function paymentReadiness(data: ReadinessCase): ReadinessItem[] {
   return [{ step: "payment", key: "settled", ok: paymentSettled(data) || Boolean(data.readyExceptions.payment) }];
 }

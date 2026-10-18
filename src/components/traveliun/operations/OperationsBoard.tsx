@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import type { OperationCard } from "@/lib/data/operations";
 import { severityRank, type OperationSignal } from "@/lib/operations/signals";
 import { matchesFilters, matchesQuery, NO_FILTERS, type ListFilters } from "@/lib/operations/case-list";
+import { shownClientStatus } from "@/lib/operations/wizard/payment";
 import type { StaffOption } from "@/lib/data/operation-case";
 import { ArrivalsCalendar, OperationsFilters } from "./OperationsListControls";
 import { MoneyLinks } from "./MoneyReports";
@@ -195,7 +196,8 @@ function CaseCard({ op, owner }: { op: OperationCard & { signals: OperationSigna
 
       {/* both tracks, side by side — the whole point of not merging them */}
       <div className="mt-3 flex flex-wrap gap-1.5">
-        <Track label={t("ops.clientTrack")} value={t(CLIENT_KEY(op.client_status))} tone="brand" />
+        {/* the paid rungs as the recorded payments say, never a hand-picked «مسدّد» */}
+        <Track label={t("ops.clientTrack")} value={t(CLIENT_KEY(shownClientStatus(op.client_status, op.total, op.paid)))} tone="brand" />
         <Track label={t("ops.executionTrack")} value={t(EXEC_KEY(op.execution_status))} tone="muted" />
       </div>
 

@@ -1,19 +1,20 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { listOperationPayments, listOperations } from "@/lib/data/operations";
+import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
+import { listOperationPayments, listOperations, type OperationPayment } from "@/lib/data/operations";
 import { listInstallments } from "@/lib/data/operation-payments";
-import { listBookings, listDocuments } from "@/lib/data/operation-bookings";
+import { listBookings, listDocuments, type OperationBooking, type OperationDocument } from "@/lib/data/operation-bookings";
 import { listOrSeedTravelers } from "@/lib/data/operation-travelers";
 import { getSupplierWork } from "@/lib/data/supplier-work";
 import { getCaseGuide } from "@/lib/data/destination-guides";
 import { notifyOps } from "@/lib/data/ops-notify";
 import { translate, type TranslationKey } from "@/lib/i18n";
 import { riyadhDate } from "@/lib/operations/payments";
+import { toTravelerListItem, type TravelerRow } from "@/lib/operations/traveler-dto";
 import { ownStates, readiness, readyToTravel, staleWaits } from "@/lib/operations/wizard/index";
 import { followUpOf, readWaits, withoutWaits, type FollowUpItem, type FollowUpTone } from "@/lib/operations/wizard/followup";
 import { writeWaits } from "@/lib/data/wizard-sync";
-import type { ReadyExceptions, WizardCase } from "@/lib/operations/wizard/types";
+import type { ReadinessItem, ReadyExceptions, WizardCase } from "@/lib/operations/wizard/types";
 
 /**
  * «معالج الحجوزات» on the server: the one load every step reads (the case
@@ -79,6 +80,64 @@ export async function loadWizardCase(operationId: string): Promise<WizardCase | 
 export async function wizardReady(operationId: string): Promise<boolean> {
   const data = await loadWizardCase(operationId);
   return data !== null && readyToTravel(readiness(data));
+}
+
+/**
+ * What still blocks «جاهز للسفر» — the wizard's own mandatory items, for the
+ * morning's 7/3/1-day alerts (daily.ts). The cron has no session, so this
+ * loads with the service role exactly what the rules read (ReadinessCase);
+ * the caller must have a reason to see every case. The destination's guide is
+ * not looked up: it feeds an optional item only, and only blockers come back.
+ * null when the case could not be read.
+ */
+export async function travelBlockers(operationId: string): Promise<ReadinessItem[] | null> {
+  try {
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { data: op } = await supabase
+      .from("operations")
+      .select("offer_id, travel_start, travel_end, client_token, client_token_revoked_at, ready_exceptions, offers(total, adults, children, infants)")
+      .eq("id", operationId)
+      .maybeSingle();
+    type Offer = { total: number | string | null; adults: number | null; children: number | null; infants: number | null };
+    const row = op as unknown as {
+      offer_id: string;
+      travel_start: string | null;
+      travel_end: string | null;
+      client_token: string | null;
+      client_token_revoked_at: string | null;
+      ready_exceptions: unknown;
+      offers: Offer | Offer[] | null;
+    } | null;
+    if (!row) return null;
+    const offer = one(row.offers);
+    const [bookings, documents, payments, travelers, days] = await Promise.all([
+      supabase.from("operation_bookings").select("*").eq("operation_id", operationId),
+      supabase.from("operation_documents").select("id, kind, booking_id, version, token, revoked_at, created_at").eq("operation_id", operationId),
+      supabase.from("operation_payments").select("amount, kind").eq("operation_id", operationId),
+      supabase.from("operation_travelers").select("*").eq("operation_id", operationId).order("sort"),
+      supabase.from("offer_days").select("id", { count: "exact", head: true }).eq("offer_id", row.offer_id),
+    ]);
+    const exceptions = row.ready_exceptions;
+    const items = readiness({
+      operation: { total: offer?.total != null ? Number(offer.total) : null, travel_start: row.travel_start, travel_end: row.travel_end },
+      // every column, so a booking is the OperationBooking the rules read; the label is a screen's
+      bookings: ((bookings.data ?? []) as OperationBooking[]).map((b) => ({ ...b, assignee_label: null })),
+      documents: (documents.data ?? []) as OperationDocument[],
+      payments: ((payments.data ?? []) as { amount: number | string; kind: OperationPayment["kind"] }[]).map((p) => ({ amount: Number(p.amount) || 0, kind: p.kind })),
+      // redacted on the spot: the passport ciphertext only becomes a yes/no
+      travelers: ((travelers.data ?? []) as TravelerRow[]).map(toTravelerListItem),
+      supplierWork: null,
+      clientToken: row.client_token && !row.client_token_revoked_at ? row.client_token : null,
+      readyExceptions: exceptions && typeof exceptions === "object" ? (exceptions as ReadyExceptions) : {},
+      hasDays: (days.count ?? 0) > 0,
+      today: riyadhDate(),
+      sold: offer ? { adults: offer.adults ?? 0, children: offer.children ?? 0, infants: offer.infants ?? 0 } : null,
+      guide: null,
+    });
+    return items.filter((i) => !i.ok && !i.optional);
+  } catch {
+    return null;
+  }
 }
 
 // ---------- «قائمة متابعتك اليوم» ----------

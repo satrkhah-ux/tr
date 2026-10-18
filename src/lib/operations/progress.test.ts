@@ -1,19 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { aheadOfClient, aheadOfExecution, derivedClient, derivedExecution, passportAlerts, readiness, type AlertTraveler, type ReadinessTraveler } from "./progress";
+import { aheadOfClient, aheadOfExecution, derivedClient, derivedExecution, passportAlerts, type AlertTraveler, type ProgressBooking } from "./progress";
 
-const b = (kind: string, status = "confirmed") => ({ kind, status });
-const malaysia = [b("flight"), b("flight"), b("hotel"), b("hotel"), b("transport"), b("transport"), b("service")];
-const traveler = (name: string, patch: Partial<ReadinessTraveler> = {}): ReadinessTraveler => ({
-  name,
-  has_passport: true,
-  passport_expiry: null,
-  birth_date: null,
-  age: null,
-  traveler_kind: "adult",
-  nationality: "SAU",
-  visa_status: "not_required",
-  ...patch,
+// a confirmed booking carries its number — a hand confirmation refuses one without it
+const b = (kind: string, status = "confirmed", over: Partial<ProgressBooking> = {}): ProgressBooking => ({
+  kind,
+  status,
+  confirmation_number: status === "confirmed" ? "CONF-1" : null,
+  ...over,
 });
+const malaysia = [b("flight"), b("flight"), b("hotel"), b("hotel"), b("transport"), b("transport"), b("service")];
 
 describe("a case's progress, derived", () => {
   it("climbs as far as every earlier step holds", () => {
@@ -27,6 +22,16 @@ describe("a case's progress, derived", () => {
   it("passes the flights step for a package without flights, ignores cancelled bookings, and has nothing for an empty case", () => {
     expect(derivedExecution([b("hotel"), b("flight", "cancelled")], [])).toBe("transfers_booked");
     expect(derivedExecution([], [])).toBeNull();
+  });
+
+  it("climbs the flight and hotel rungs by the wizard's own done-rules, not by «confirmed» alone", () => {
+    // a hotel «confirmed» on OUR number only is not booked — its tile is red, the client is not told
+    const ours = b("hotel", "confirmed", { confirmation_number: "AD-2-7287-H1", company_ref: "AD-2-7287-H1" });
+    expect(derivedExecution([b("flight"), ours], [])).toBe("flights_booked");
+    // a flight confirmed by hand with its number in «عرض الكل» is booked, as everywhere
+    expect(derivedExecution([b("flight", "confirmed", { confirmation_number: "PNR6XK" }), b("hotel"), b("transport", "pending")], [])).toBe("hotels_booked");
+    // «confirmed» with nothing the airline issued is not
+    expect(derivedExecution([b("flight", "confirmed", { confirmation_number: null }), b("hotel")], [])).toBeNull();
   });
 
   it("moves the client from the money, forward only", () => {
@@ -60,46 +65,5 @@ describe("a case's progress, derived", () => {
     expect(alerts.map((a) => a.ref)).toEqual(["short", "expired", "none:passport", "no-expiry:passport_expiry", "grown:age_mismatch"]);
     expect(alerts[0].text).toBe("🛂 short: الجواز أقل من 6 أشهر بعد العودة (2027-05-27)");
     expect(alerts[4].text).toBe("🛂 grown: عمره يوم السفر 12 — لا يطابق العرض");
-  });
-
-  it("lists what «جاهز للسفر» still waits for", () => {
-    const items = readiness({
-      bookings: malaysia,
-      documents: [{ kind: "hotel_voucher" }, { kind: "flight_ticket" }, { kind: "itinerary" }],
-      paid: 10_635,
-      total: 21_270,
-      travelers: [traveler("أحمد", { passport_expiry: "2030-01-01" }), traveler("سارة", { passport_expiry: "2027-01-01", visa_status: "submitted" })],
-      travelStart: "2026-11-20",
-      travelEnd: "2026-11-27",
-      today: "2026-10-15",
-    });
-    expect(Object.fromEntries(items.map((i) => [i.key, i.ok]))).toEqual({ bookings: true, payment: false, documents: true, passports: false, visas: false });
-    expect(items.find((i) => i.key === "passports")?.detail).toContain("سارة");
-  });
-
-  it("reads the passports with the traveler row's own decision, and holds a nationality nobody checked", () => {
-    // the Indonesia case: an Iraqi with a good passport, a Syrian whose passport expired and whose birth date makes him a baby
-    const items = readiness({
-      bookings: malaysia,
-      documents: [],
-      paid: 0,
-      total: null,
-      travelers: [
-        traveler("علي", { passport_expiry: "2033-11-24", birth_date: "1991-02-08", nationality: "IRQ", visa_status: "check" }),
-        traveler("سامر", { passport_expiry: "2011-11-09", birth_date: "2026-01-01", nationality: "SYR", visa_status: "check" }),
-      ],
-      travelStart: "2026-10-31",
-      travelEnd: "2026-11-07",
-      today: "2026-10-15",
-    });
-    const passports = items.find((i) => i.key === "passports");
-    const visas = items.find((i) => i.key === "visas");
-    expect(passports?.ok).toBe(false);
-    expect(passports?.detail).toContain("سامر: الجواز منتهٍ يوم السفر");
-    expect(passports?.detail).toContain("لا يطابق العرض");
-    expect(passports?.detail).not.toContain("علي");
-    expect(visas?.ok).toBe(false);
-    expect(visas?.detail).toContain("علي: التأشيرة تحتاج تحقق — الجنسية IRQ");
-    expect(visas?.detail).toContain("SYR");
   });
 });

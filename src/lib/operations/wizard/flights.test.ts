@@ -20,14 +20,16 @@ describe("the step's state and «التذاكر»", () => {
     expect(flightsReadiness(wcase([]))).toEqual([]);
   });
 
-  it("is done only when every flight is confirmed with its PNR, a ticket number and its legs", () => {
+  it("is done when every flight is confirmed with the airline's reference — the one rule, client-booking-state flightTicketed", () => {
     const one = booking({ id: "a", ...TICKETED });
     expect(flightsState(wcase([one]))).toBe("done");
-    expect(flightsReadiness(wcase([one]))).toEqual([{ step: "flights", key: "wz.flights.ready", ok: true }]);
-    // confirmed under a PNR but no ticket issued yet — a held seat is not a ticket
-    const held = booking({ id: "b", ...TICKETED, ticket_numbers: [] });
-    expect(flightsState(wcase([one, held]))).toBe("todo");
-    expect(flightsReadiness(wcase([one, held]))[0].ok).toBe(false);
+    expect(flightsReadiness(wcase([one]))).toEqual([{ step: "flights", key: "tickets", ok: true }]);
+    // «تسجيل يدوي» in «عرض الكل»: confirmed with its number, no ticket uploaded — done here too (the owner, 2026-10-18)
+    const byHand = booking({ id: "b", status: "confirmed", confirmation_number: "6XK2QZ" });
+    expect(flightsState(wcase([one, byHand]))).toBe("done");
+    // not confirmed, or confirmed with nothing on it, is still open
+    expect(flightsState(wcase([one, booking({ id: "c", pnr: "M3TQ8Z" })]))).toBe("todo");
+    expect(flightsReadiness(wcase([one, booking({ id: "d", status: "confirmed", confirmation_number: null })]))[0].ok).toBe(false);
   });
 });
 

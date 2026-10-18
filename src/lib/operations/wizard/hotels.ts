@@ -24,7 +24,6 @@ export function hotelBookings(data: Pick<WizardCase, "bookings">): OperationBook
   return data.bookings.filter((b) => b.kind === "hotel" && b.status !== "cancelled");
 }
 
-/** The hotel's final number is on file: confirmed, with its confirmation number. */
 /** The hotel's OWN number is in — our company_ref alone is not final (the same rule as the voucher, client-booking-state.ts). */
 export function isFinal(b: Pick<OperationBooking, "status" | "confirmation_number" | "company_ref">): boolean {
   return hotelFinal(b);
@@ -36,10 +35,10 @@ export function hotelsState(data: Pick<WizardCase, "bookings">): StepState {
   return hotels.every(isFinal) ? "done" : "todo";
 }
 
-/** «التأكيد النهائي»: every hotel final — mandatory before «جاهز للسفر». `key` is the i18n key. */
-export function hotelsReadiness(data: WizardCase): ReadinessItem[] {
+/** «التأكيد النهائي»: every hotel final — mandatory before «جاهز للسفر». */
+export function hotelsReadiness(data: Pick<WizardCase, "bookings">): ReadinessItem[] {
   const hotels = hotelBookings(data);
-  return hotels.length === 0 ? [] : [{ step: "hotels", key: "wz.hotels.ready", ok: hotels.every(isFinal) }];
+  return hotels.length === 0 ? [] : [{ step: "hotels", key: "final", ok: hotels.every(isFinal) }];
 }
 
 // ---------------- reading a confirmation ----------------

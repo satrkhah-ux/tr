@@ -1,9 +1,10 @@
 /**
  * «تذاكر الطيران» — step 2 of «معالج الحجوزات».
  *
- * A flight booking is TICKETED when it is confirmed and holds its PNR, at least
- * one ticket number and the legs read off the ticket (0084). The legs are what
- * the drivers are timed from: each is stored with its airport's offset, and
+ * A flight booking is TICKETED by the one rule every screen asks
+ * (client-booking-state flightTicketed): confirmed, with its PNR, a ticket
+ * number or a hand confirmation's number. The legs read off the ticket (0084)
+ * are what the drivers are timed from: each is stored with its airport's offset, and
  * written back into the booking's leg lines so the readers that already parse
  * those lines (flight-follow, the tracker, the voucher, the client's page) all
  * get the ticketed numbers and times.
@@ -17,6 +18,7 @@
 import type { FlightLeg, OperationBooking } from "@/lib/data/operation-bookings";
 import type { TicketLeg } from "@/lib/flights/ticket-parse";
 import { toInstant } from "@/lib/offer/schedule";
+import { flightTicketed } from "@/lib/operations/client-booking-state";
 import { parseLeg } from "@/lib/operations/drivers";
 import { LANDS, LATER } from "@/lib/operations/seed-plan";
 import type { ReadinessItem, StepState, WizardCase } from "./types";
@@ -28,20 +30,16 @@ export function flightBookings(data: Pick<WizardCase, "bookings">): OperationBoo
   return data.bookings.filter((b) => b.kind === "flight" && b.status !== "cancelled");
 }
 
-export function isTicketed(b: OperationBooking): boolean {
-  return b.status === "confirmed" && Boolean(b.pnr?.trim()) && (b.ticket_numbers?.length ?? 0) > 0 && (b.flight_legs?.length ?? 0) > 0;
-}
-
 export function flightsState(data: Pick<WizardCase, "bookings">): StepState {
   const flights = flightBookings(data);
   if (flights.length === 0) return "na";
-  return flights.every(isTicketed) ? "done" : "todo";
+  return flights.every(flightTicketed) ? "done" : "todo";
 }
 
-/** «التذاكر»: every flight booking ticketed — mandatory before «جاهز للسفر». `key` is the i18n key. */
-export function flightsReadiness(data: WizardCase): ReadinessItem[] {
+/** «التذاكر»: every flight booking ticketed — mandatory before «جاهز للسفر». */
+export function flightsReadiness(data: Pick<WizardCase, "bookings">): ReadinessItem[] {
   const flights = flightBookings(data);
-  return flights.length === 0 ? [] : [{ step: "flights", key: "wz.flights.ready", ok: flights.every(isTicketed) }];
+  return flights.length === 0 ? [] : [{ step: "flights", key: "tickets", ok: flights.every(flightTicketed) }];
 }
 
 // ---------------- the legs, as stored ----------------

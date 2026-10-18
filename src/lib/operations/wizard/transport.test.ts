@@ -80,9 +80,9 @@ describe("«المواصلات» by city", () => {
     const half = [sup(tzReception, "agentTZ"), sup(tour1, "agentTZ"), sup(tour2, "agentTZ"), istReception, istTour];
     expect(transportState(wc(half))).toBe("todo");
     expect(transportReadiness(wc(half)).map((r) => [r.key, r.ok, r.optional ?? false])).toEqual([
-      ["wz.transport.ready.supplier", false, false],
-      ["wz.transport.ready.confirmed", false, false],
-      ["wz.transport.ready.driver", false, true],
+      ["supplier", false, false],
+      ["confirmed", false, false],
+      ["driver", false, true],
     ]);
     const done = [tzReception, tour1, tour2, istReception, istTour].map((b) => sup(b, b.city_name === "طرابزون" ? "agentTZ" : "agentIST", "confirmed"));
     expect(transportState(wc(done))).toBe("done");

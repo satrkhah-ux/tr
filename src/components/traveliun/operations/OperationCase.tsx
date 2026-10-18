@@ -15,7 +15,7 @@ import {
   type OperationCard,
   type OperationPayment,
 } from "@/lib/data/operations";
-import { CLIENT_STATES, EXECUTION_STATES, canAdvanceClient, canAdvanceExecution } from "@/lib/operations/state";
+import { CLIENT_STATES, canAdvanceClient, canAdvanceExecution } from "@/lib/operations/state";
 import type { TravelerListItem } from "@/lib/operations/traveler-dto";
 import type { TranslationKey } from "@/lib/i18n";
 import type { OperationBooking, OperationDocument } from "@/lib/data/operation-bookings";
@@ -31,7 +31,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 import { CasePresence } from "./CasePresence";
 import { UnbackedStatus } from "./wizard/PaymentStep";
-import { clientStatusUnbacked } from "@/lib/operations/wizard/payment";
+import { clientStatusUnbacked, shownClientStatus } from "@/lib/operations/wizard/payment";
 import { IssuesPanel } from "./IssuesPanel";
 import { ClientSend } from "./ClientSend";
 
@@ -92,7 +92,7 @@ export function OperationCase({
   supplierWork?: SupplierWork | null;
   /** order 11: «ربحية الحالة», built by the page for pricing.internal only. */
   money?: ReactNode;
-  /** «جاهز للسفر» — the wizard's own gate (wizard/CaseWizardShell ReadyGate), built by the page. */
+  /** «جاهز للسفر» — the wizard's six tiles and its gate (wizard/CaseWizardShell ReadyGate), built by the page. */
   ready?: ReactNode;
 }) {
   const { t } = useTraveliunUI();
@@ -167,12 +167,13 @@ export function OperationCase({
             </div>
           ) : null}
 
-          {/* the two tracks, advanced independently */}
+          {/* the two tracks, apart — the paid rungs and the whole execution ladder are DERIVED */}
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <TrackControl
               title={t("ops.clientTrack")}
-              current={operation.client_status}
-              states={canManage ? [...CLIENT_STATES, "cancelled"] : CLIENT_STATES}
+              current={shownClientStatus(operation.client_status, operation.total, operation.paid)}
+              // «مسدّد جزئياً / مسدّد» come from the recorded payments (operation-sync), never a click
+              states={(canManage ? [...CLIENT_STATES, "cancelled"] : CLIENT_STATES).filter((s) => s !== "paid_partial" && s !== "paid_full")}
               labelFor={(s) => t(CLIENT_KEY(s))}
               canAdvance={(to) => canAdvanceClient(operation.client_status, to as never)}
               onPick={async (to) => setClientStatus(operation.id, to as never)}
@@ -180,8 +181,11 @@ export function OperationCase({
             />
             <TrackControl
               title={t("ops.executionTrack")}
+              hint={t("ops.execTrackDerived")}
               current={operation.execution_status}
-              states={canManage ? [...EXECUTION_STATES, "cancelled"] : EXECUTION_STATES}
+              // each rung follows the steps (operation-sync), «جاهز للسفر» its gate below, «سافر» the
+              // calendar (daily.ts) — what is left by hand is the manager's cancel
+              states={canManage ? ["cancelled"] : []}
               labelFor={(s) => t(EXEC_KEY(s))}
               canAdvance={(to) => canAdvanceExecution(operation.execution_status, to as never)}
               onPick={async (to) => setExecutionStatus(operation.id, to as never)}
@@ -191,7 +195,7 @@ export function OperationCase({
         </section>
 
         <CasePresence operationId={operation.id} />
-        {ready}
+        {ready ? <section className={card}>{ready}</section> : null}
 
         <DocumentsPanel
           operationId={operation.id}
@@ -246,6 +250,7 @@ export function OperationRefused({ reason }: { reason: TranslationKey }) {
 /** Only legal next states are offered — an illegal move is not a click away. */
 function TrackControl({
   title,
+  hint,
   current,
   states,
   labelFor,
@@ -254,6 +259,8 @@ function TrackControl({
   onDone,
 }: {
   title: string;
+  /** said under the state — why there is nothing (or little) to pick. */
+  hint?: string;
   current: string;
   states: readonly string[];
   labelFor: (s: string) => string;
@@ -270,6 +277,7 @@ function TrackControl({
     <div className="rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
       <p className="text-[11.5px] font-bold text-[#93aaa3]">{title}</p>
       <p className="mt-1 text-[15px] font-extrabold text-[#0f3d38]">{labelFor(current)}</p>
+      {hint ? <p className="mt-0.5 text-[11px] font-semibold text-[#93aaa3]">{hint}</p> : null}
       {error ? <p className="mt-1 text-[11.5px] font-bold text-[#c22850]">{error}</p> : null}
       {next.length > 0 ? (
         <div className="mt-2.5 flex flex-wrap gap-1.5">
