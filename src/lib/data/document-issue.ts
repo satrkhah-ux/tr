@@ -9,7 +9,7 @@ import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, shownDetail, type VoucherBooking
 import { voucherStay, type StayError, type StayHotel } from "@/lib/operations/room-details";
 import { hotelFinal } from "@/lib/operations/client-booking-state";
 import { sameDocument, snapshotKey } from "@/lib/operations/wizard/documents";
-import { normalizeName } from "@/lib/offer/pricing-suggest";
+import { catalogHotelsFor } from "@/lib/data/hotel-match";
 
 /**
  * Freezing a document — the ONE write behind «إصدار» (issueDocument, gated)
@@ -182,14 +182,17 @@ export async function issueDocumentNow(input: IssueInput, issuedBy: string | nul
       return { ok: false, error: "ops.err.nothingToIssue" };
     }
 
-    // the hotel desk reads the hotel's name, address and phone — from /hotels, by its name; its
-    // city and country decide the language a hotel voucher prints the stay in
-    type HotelRow = { arabic_name: string; english_name: string | null; address: string | null; contact_number: string | null; google_maps: string | null; city_id: string | null; country_id: string | null };
+    // the hotel desk reads the hotel's name, address and phone — from /hotels: the booking's own
+    // hotel (its catalogue id, else its name in its city — hotel-match.ts); its city and country
+    // decide the language a hotel voucher prints the stay in
+    type HotelRow = { id: string; arabic_name: string; english_name: string | null; address: string | null; contact_number: string | null; google_maps: string | null; city_id: string | null; country_id: string | null };
     type CityRow = { id: string; arabic_name: string; english_name: string | null; country_id: string | null };
-    const hotelNames = [...new Set(scoped.filter((b) => b.kind === "hotel").map((b) => b.title.trim()).filter(Boolean))];
-    const hotelRows = hotelNames.length
-      ? (((await supabase.from("hotels").select("arabic_name, english_name, address, contact_number, google_maps, city_id, country_id").in("arabic_name", hotelNames)).data ?? []) as HotelRow[])
-      : [];
+    const catalog = await catalogHotelsFor<HotelRow>(
+      supabase,
+      scoped.filter((b) => b.kind === "hotel"),
+      "english_name, address, contact_number, google_maps, country_id",
+    );
+    const hotelRows = catalog.rows;
     const cityIds = [...new Set(hotelRows.map((h) => h.city_id).filter((c): c is string => Boolean(c)))];
     const cityRows = cityIds.length ? (((await supabase.from("cities").select("id, arabic_name, english_name, country_id").in("id", cityIds)).data ?? []) as CityRow[]) : [];
     const countryIds = [...new Set([...hotelRows.map((h) => h.country_id), ...cityRows.map((c) => c.country_id)].filter((c): c is string => Boolean(c)))];
@@ -199,14 +202,14 @@ export async function issueDocumentNow(input: IssueInput, issuedBy: string | nul
         : [],
     );
     const cityOf = new Map(cityRows.map((c) => [c.id, c]));
-    // two hotels may share a name: the one in the booking's city
-    const hotelFor = (b: VoucherBooking) => {
-      const same = hotelRows.filter((h) => h.arabic_name.trim() === b.title.trim());
-      const row = same.find((h) => h.city_id && normalizeName(cityOf.get(h.city_id)?.arabic_name) === normalizeName(b.city_name)) ?? same[0];
+    // two hotels may share a name: the booking's own (read from the raw row — its id is not printed)
+    const hotelFor = (raw: BookingRow) => {
+      const row = catalog.pick(raw);
       return row ? { row, city: row.city_id ? cityOf.get(row.city_id) : undefined } : null;
     };
-    const withHotel = (b: VoucherBooking): VoucherBooking => {
-      const h = b.kind === "hotel" ? hotelFor(b)?.row : undefined;
+    const withHotel = (raw: BookingRow): VoucherBooking => {
+      const b = toVoucherBooking(raw);
+      const h = b.kind === "hotel" ? hotelFor(raw)?.row : undefined;
       return h ? { ...b, name_en: h.english_name, address: h.address, phone: h.contact_number } : b;
     };
 
@@ -216,7 +219,7 @@ export async function issueDocumentNow(input: IssueInput, issuedBy: string | nul
     if (input.kind === "hotel_voucher") {
       for (const raw of scoped) {
         const b = toVoucherBooking(raw);
-        const found = hotelFor(b);
+        const found = hotelFor(raw);
         const city = found?.city;
         const hotel: StayHotel | null = found
           ? { ar: found.row.arabic_name, en: found.row.english_name, country: iso2.get(found.row.country_id ?? city?.country_id ?? "") ?? null }
@@ -258,7 +261,7 @@ export async function issueDocumentNow(input: IssueInput, issuedBy: string | nul
       destination: offer?.destination ?? null,
       customer: { name: customer?.arabic_name ?? "", phone: customer?.mobile ?? null },
       travelers: travelers.map((t) => ({ name: t.display_name, nationality: t.nationality })),
-      bookings: input.kind === "hotel_voucher" ? stays : scoped.map(toVoucherBooking).map(withHotel),
+      bookings: input.kind === "hotel_voucher" ? stays : scoped.map(withHotel),
       days: input.kind === "itinerary" ? days.map((d) => ({ ...d, activities: [...timedOn(d.date), ...d.activities] })) : [],
       notes: [],
       // a booking that chose Arabic keeps the bilingual voucher

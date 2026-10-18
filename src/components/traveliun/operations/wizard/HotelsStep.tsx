@@ -1,42 +1,83 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { AlertTriangle, BedDouble, CheckCircle2, ExternalLink, Loader2, Pencil, RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, BedDouble, CheckCircle2, ExternalLink, Loader2, Pencil, Plus, RefreshCw } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import type { TranslationKey } from "@/lib/i18n";
 import type { OperationBooking } from "@/lib/data/operation-bookings";
+import { listAssignees, type AssigneeOption } from "@/lib/data/operation-assign";
 import { readHotelConfirmation, saveHotelConfirmation, type HotelRead } from "@/lib/data/wizard-tickets";
 import { getSupplierConfirmationUrl } from "@/lib/data/supplier-work";
 import { refreshSupplierBooking } from "@/lib/data/supplier-booking";
 import { hotelBookings, isFinal, roomLines } from "@/lib/operations/wizard/hotels";
+import { notPulled } from "@/lib/operations/wizard/pull";
 import type { StepProps } from "@/lib/operations/wizard/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { useSafeTransition } from "../../useSafeTransition";
-import { NameRow, PaperReader, wzCard, wzField, wzLabel, wzPrimary, wzSecondary } from "./FlightsStep";
+import { AssignBooking } from "../AssignBooking";
+import { AddBooking } from "../DocumentsPanel";
+import { NameRow, PaperReader, PullNotice, wzCard, wzField, wzLabel, wzPrimary, wzSecondary } from "./FlightsStep";
 
 const HOW: Record<HotelRead["how"], TranslationKey> = { text: "fc.how.text", pdf: "fc.how.pdf", ocr: "fc.how.ocr", vision: "fc.how.vision" };
 
-/** «الفنادق» — a card per hotel booking: read its confirmation, see what differs, save the final number. */
+/**
+ * «الفنادق» — a card per hotel booking: who books it, read its confirmation,
+ * see what differs, save the final number; and «إضافة فندق» for a stay the
+ * offer did not hold (a second hotel in a city, a night added).
+ */
 export function HotelsStep({ data }: StepProps) {
   const { t } = useTraveliunUI();
+  const router = useRouter();
   const hotels = hotelBookings(data);
+  const operationId = data.operation.id;
   const filed = new Set((data.supplierWork?.bookings ?? []).filter((b) => b.has_confirmation).map((b) => b.booking_id));
+  const [adding, setAdding] = useState(false);
+  // «ينفّذه»: who each hotel can be handed to — loaded once for the step
+  const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
+  useEffect(() => {
+    let live = true;
+    listAssignees()
+      .then((list) => live && setAssignees(list))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+
   return (
     <section className={wzCard}>
-      <h2 className="flex items-center gap-1.5 text-sm font-extrabold text-[#185045]">
-        <BedDouble className="size-4" />
-        {t("wz.hotels.title")}
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-1.5 text-sm font-extrabold text-[#185045]">
+          <BedDouble className="size-4" />
+          {t("wz.hotels.title")}
+        </h2>
+        <button type="button" onClick={() => setAdding((v) => !v)} aria-expanded={adding} className={wzSecondary}>
+          <Plus className="size-3.5" />
+          {t("wz.hotels.add")}
+        </button>
+      </div>
       <p className="mb-3 mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("wz.hotels.hint")}</p>
-      {hotels.length === 0 ? (
-        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">{t("wz.hotels.none")}</p>
-      ) : (
+      {adding ? (
+        <AddBooking
+          operationId={operationId}
+          only="hotel"
+          onDone={() => {
+            setAdding(false);
+            router.refresh();
+          }}
+        />
+      ) : null}
+      {hotels.length > 0 ? (
         <ul className="grid gap-3">
           {hotels.map((b) => (
-            <HotelCard key={b.id} booking={b} hasFile={filed.has(b.id)} />
+            <HotelCard key={b.id} booking={b} hasFile={filed.has(b.id)} assignees={assignees} readsImages={data.readsImages ?? true} />
           ))}
         </ul>
+      ) : notPulled(data, "hotel") ? (
+        <PullNotice operationId={operationId} />
+      ) : (
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">{t("wz.hotels.none")}</p>
       )}
     </section>
   );
@@ -44,7 +85,17 @@ export function HotelsStep({ data }: StepProps) {
 
 type Form = { number: string; address: string; phone: string };
 
-function HotelCard({ booking, hasFile }: { booking: OperationBooking; hasFile: boolean }) {
+function HotelCard({
+  booking,
+  hasFile,
+  assignees,
+  readsImages,
+}: {
+  booking: OperationBooking;
+  hasFile: boolean;
+  assignees: AssigneeOption[];
+  readsImages: boolean;
+}) {
   const { t } = useTraveliunUI();
   const router = useRouter();
   const done = isFinal(booking);
@@ -131,6 +182,9 @@ function HotelCard({ booking, hasFile }: { booking: OperationBooking; hasFile: b
         </span>
       </div>
 
+      {/* «ينفّذه» — who books this hotel, and the request to them (as on «عرض الكل») */}
+      <AssignBooking booking={booking} operationId={booking.operation_id} assignees={assignees} onDone={() => undefined} />
+
       {done && !form ? (
         <div className="mt-2 grid gap-1.5 text-[12px] font-semibold text-[#185045]">
           <p>
@@ -165,6 +219,7 @@ function HotelCard({ booking, hasFile }: { booking: OperationBooking; hasFile: b
           <PaperReader
             labels={{ file: "wz.hotels.file", paste: "wz.hotels.paste", read: "wz.hotels.read", manual: "wz.hotels.manual" }}
             busy={pending}
+            readsImages={readsImages}
             onRead={onRead}
             onManual={() => setForm({ number: "", address: "", phone: "" })}
           />

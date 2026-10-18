@@ -10,6 +10,7 @@ import { buildSupplierRequest, type RequestLang, type SupplierBookingKind } from
 import { carFields, carText, DRV, driverServiceKind, driverStep, meetTime, type DriverStep, type ServiceKind } from "@/lib/operations/drivers";
 import { hotelMap } from "@/lib/operations/driver-programme";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
+import { catalogHotelsFor } from "@/lib/data/hotel-match";
 import { linkOpen, sameDriver, stepAllowed, stepDetail, supplierAnswer, type LinkKind, type SupplierAnswerInput } from "@/lib/operations/op-links";
 import type { TravelerKind } from "@/lib/operations/traveler-dto";
 
@@ -122,7 +123,13 @@ export async function getSupplierLinkView(token: string): Promise<SupplierLinkVi
       const cities = [...new Set([b.city_name, b.detail?.["المدينة"]].map((c) => c?.trim()).filter((c): c is string => !!c))];
       const [c, h] = await Promise.all([
         cities.length > 0 ? supabase.from("cities").select("arabic_name, english_name").in("arabic_name", cities) : Promise.resolve({ data: [] }),
-        b.kind === "hotel" ? supabase.from("hotels").select("arabic_name, english_name").eq("arabic_name", b.title.trim()).limit(1) : Promise.resolve({ data: [] }),
+        // the booking's own hotel, never a namesake in another city (hotel-match.ts)
+        b.kind === "hotel"
+          ? catalogHotelsFor<{ id: string; arabic_name: string; city_id: string | null; english_name: string | null }>(supabase, [b], "english_name").then((cat) => ({
+              // keyed by the booking's own title: that is the word the request prints
+              data: [cat.pick(b)].flatMap((h) => (h ? [{ arabic_name: b.title, english_name: h.english_name }] : [])),
+            }))
+          : Promise.resolve({ data: [] }),
       ]);
       for (const r of [...(c.data ?? []), ...(h.data ?? [])] as { arabic_name: string; english_name: string | null }[]) {
         if (r.english_name?.trim()) glossary[r.arabic_name.trim()] = r.english_name.trim();
@@ -304,18 +311,17 @@ export async function getDriverDay(token: string): Promise<DriverDay | null> {
     // the hotel a drive starts or ends at: the stay in the same city covering the day (as draftDriverMessage)
     const opIds = [...new Set(rows.map((r) => r.operation_id))];
     const { data: staysData } = opIds.length
-      ? await supabase.from("operation_bookings").select("operation_id, title, city_name, start_date, end_date").in("operation_id", opIds).eq("kind", "hotel").neq("status", "cancelled")
+      ? await supabase.from("operation_bookings").select("operation_id, title, city_name, start_date, end_date, detail").in("operation_id", opIds).eq("kind", "hotel").neq("status", "cancelled")
       : { data: [] };
-    const stays = (staysData ?? []) as { operation_id: string; title: string; city_name: string; start_date: string | null; end_date: string | null }[];
-    const names = [...new Set(stays.map((s) => s.title.trim()))];
+    const stays = (staysData ?? []) as { operation_id: string; title: string; city_name: string; start_date: string | null; end_date: string | null; detail: Record<string, string> | null }[];
     const cityNames = [...new Set(stays.map((s) => s.city_name.trim()).filter(Boolean))];
     // the map link as the driver's programme words it (driver-programme hotelMap): the hotel's own
-    // google_maps link, else its name around the city's coordinates — short, never percent-encoded Arabic
-    const [{ data: hotelsData }, { data: citiesData }] = await Promise.all([
-      names.length ? supabase.from("hotels").select("arabic_name, english_name, google_maps").in("arabic_name", names) : Promise.resolve({ data: [] }),
+    // google_maps link, else its name around the city's coordinates — short, never percent-encoded Arabic.
+    // The stay's own hotel (hotel-match.ts), never a namesake in another city.
+    const [hotels, { data: citiesData }] = await Promise.all([
+      catalogHotelsFor<{ id: string; arabic_name: string; city_id: string | null; english_name: string | null; google_maps: string | null }>(supabase, stays, "english_name, google_maps"),
       cityNames.length ? supabase.from("cities").select("arabic_name, lat, lng").in("arabic_name", cityNames) : Promise.resolve({ data: [] }),
     ]);
-    const hotels = new Map(((hotelsData ?? []) as { arabic_name: string; english_name: string | null; google_maps: string | null }[]).map((h) => [h.arabic_name.trim(), h]));
     const cities = (citiesData ?? []) as { arabic_name: string; lat: number | string | null; lng: number | string | null }[];
     const coordsOf = (city: string) => {
       const c = cities.find((x) => normalizeName(x.arabic_name) === normalizeName(city));
@@ -329,7 +335,7 @@ export async function getDriverDay(token: string): Promise<DriverDay | null> {
       const city = r.city_name.trim();
       const here = stays.filter((s) => s.operation_id === r.operation_id && s.city_name.trim() === city);
       const stay = here.find((s) => (s.start_date ?? "") <= day && day <= (s.end_date ?? s.start_date ?? "")) ?? here[0] ?? null;
-      const info = stay ? hotels.get(stay.title.trim()) : undefined;
+      const info = stay ? hotels.pick(stay) : null;
       const count = (offer?.adults ?? 0) + (offer?.children ?? 0) + (offer?.infants ?? 0);
       return {
         id: r.id,

@@ -36,7 +36,7 @@ import {
 } from "@/lib/data/operation-bookings";
 import { seedBookingsFromOffer } from "@/lib/data/operation-seed";
 import { ensureClientLink, revokeClientLink } from "@/lib/data/operation-hub";
-import { ROOM_SPEC_KEY, type VoucherKind } from "@/lib/operations/voucher-dto";
+import { HOTEL_ID_KEY, hotelIdOf, ROOM_SPEC_KEY, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { roomDetailsOpen } from "@/lib/operations/room-details";
 import { carFields, carText, DRV } from "@/lib/operations/drivers";
 import type { TranslationKey } from "@/lib/i18n";
@@ -44,6 +44,7 @@ import type { AssigneeOption, SentRequest } from "@/lib/data/operation-assign";
 import { BOARD_AR } from "@/components/offer-doc/labels";
 import { BOARD_LABEL_KEYS, BOARD_TYPES } from "@/lib/offer/draft-types";
 import { roomSuggestions } from "@/lib/offer/basic";
+import { normAr } from "@/lib/catalog/norm";
 import { awaitingConfirmation } from "@/lib/operations/confirm-all";
 import { isUnassigned } from "@/lib/operations/wizard";
 import type { BoardType } from "@/lib/types";
@@ -172,6 +173,8 @@ export function DocumentsPanel({
                   if (!res.ok) setError(t(res.error));
                   else {
                     setSeeded(res.added);
+                    // the rest was pulled; the ones the database refused are named, not lost in silence
+                    if (res.failed.length > 0) setError(t("ops.seedFailed", { list: res.failed.join("، ") }));
                     router.refresh();
                   }
                 })
@@ -228,9 +231,10 @@ export function DocumentsPanel({
           <ConfirmAllBookings operationId={operationId} bookings={waiting} canSetNet={canManage} onDone={() => router.refresh()} />
         ) : null}
 
+        {/* no booking at all is not «no booking API» — it is nothing pulled yet */}
         {bookings.length === 0 ? (
           <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[13px] text-[#93aaa3]">
-            {t("ops.booking.noApiHint")}
+            {t("ops.booking.none")}
           </p>
         ) : (
           <ul className="space-y-2">
@@ -246,6 +250,8 @@ export function DocumentsPanel({
             ))}
           </ul>
         )}
+        {/* said where it is true: an open booking no supplier API books (the API is TBO's, hotels only) */}
+        {outstanding.some((b) => b.kind !== "hotel") ? <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">{t("ops.booking.noApiHint")}</p> : null}
 
         {sentRequests.length > 0 ? (
           <div className="mt-3 border-t border-[#f0f4f2] pt-3">
@@ -478,9 +484,10 @@ function roomLine(room: string, board: BoardType | ""): string {
 
 const nightsBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 
-function AddBooking({ operationId, onDone }: { operationId: string; onDone: () => void }) {
+/** «إضافة حجز» — any kind here; one kind only where a step adds its own («إضافة فندق», HotelsStep). */
+export function AddBooking({ operationId, only, onDone }: { operationId: string; only?: BookingKind; onDone: () => void }) {
   const { t } = useTraveliunUI();
-  const [kind, setKind] = useState<BookingKind>("hotel");
+  const [kind, setKind] = useState<BookingKind>(only ?? "hotel");
   const [title, setTitle] = useState("");
   const [city, setCity] = useState("");
   const [from, setFrom] = useState("");
@@ -502,21 +509,25 @@ function AddBooking({ operationId, onDone }: { operationId: string; onDone: () =
     detail["عدد الغرف"] = String(rooms);
     const nights = from && to ? nightsBetween(from, to) : 0;
     if (nights > 0) detail["عدد الليالي"] = String(nights);
+    // the catalogue's hotel, so its address and map are this one's (hotel-match.ts)
+    if (hotelId) detail[HOTEL_ID_KEY] = hotelId;
     return detail;
   }
 
   return (
     <div className="mb-3 grid gap-2 rounded-[11px] border border-[#e2ebe7] bg-[#f8fbf9] p-3 sm:grid-cols-2">
-      <label className={label}>
-        {t("ops.booking.add")}
-        <select value={kind} onChange={(e) => setKind(e.target.value as BookingKind)} className={field}>
-          {BOOKING_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {t(`ops.booking.${k}` as TranslationKey)}
-            </option>
-          ))}
-        </select>
-      </label>
+      {only ? null : (
+        <label className={label}>
+          {t("ops.booking.add")}
+          <select value={kind} onChange={(e) => setKind(e.target.value as BookingKind)} className={field}>
+            {BOOKING_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {t(`ops.booking.${k}` as TranslationKey)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {hotel ? (
         <CatalogHotelPick
           catalog={catalog}
@@ -651,7 +662,7 @@ const KIND_FIELDS: Partial<Record<OperationBooking["kind"], string[]>> = {
 function detailForm(booking: OperationBooking): Record<string, string> {
   const d = { ...(booking.detail ?? {}), ...carFields(booking.detail) };
   // the room details are «تفاصيل الغرفة»'s, not a field to type JSON into
-  const keys = [...new Set([...Object.keys(d), ...(KIND_FIELDS[booking.kind] ?? [])])].filter((k) => k !== DRV.cars && k !== ROOM_SPEC_KEY);
+  const keys = [...new Set([...Object.keys(d), ...(KIND_FIELDS[booking.kind] ?? [])])].filter((k) => k !== DRV.cars && k !== ROOM_SPEC_KEY && k !== HOTEL_ID_KEY);
   const car = keys.indexOf(DRV.car);
   if (car >= 0) keys.splice(car + 1, 0, DRV.cars);
   return Object.fromEntries(keys.map((k) => [k, d[k] ?? ""]));
@@ -680,6 +691,8 @@ function BookingRow({
   // kept in this tab until sent — a reload after a deploy used to lose it
   const [ref, setRef, forgetRef] = useSessionField(`ref:${booking.id}`, booking.confirmation_number ?? "");
   const [form, setForm] = useState({
+    // the catalogue hotel it is — set by the picker, dropped when a name is typed over it
+    hotel_id: hotelIdOf(booking.detail),
     title: booking.title,
     city_name: booking.city_name,
     start_date: booking.start_date ?? "",
@@ -759,7 +772,8 @@ function BookingRow({
               title={held ? t("ops.booking.cancel") : undefined}
               onClick={() =>
                 startTransition(async () => {
-                  if (held && !window.confirm(t("ops.booking.cancelAsk"))) return;
+                  // asked first either way — a delete is gone for good, and the button sits beside «تعديل»
+                  if (!window.confirm(t(held ? "ops.booking.cancelAsk" : "ops.booking.deleteAsk", { title: booking.title }))) return;
                   const res = held ? await cancelBooking(booking.id, "") : await deleteBooking(booking.id);
                   if (!res.ok) setError(t(res.error));
                   else onDone();
@@ -828,15 +842,20 @@ function BookingRow({
           {booking.kind === "hotel" ? (
             <CatalogHotelPick
               catalog={catalog}
-              valueId={catalog?.hotels.find((h) => h.name === form.title.trim())?.id ?? null}
+              // its own catalogue hotel, else the one of that name IN its city — never a namesake elsewhere
+              valueId={
+                form.hotel_id ??
+                catalog?.hotels.find((h) => h.name === form.title.trim() && (!form.city_name.trim() || normAr(h.city) === normAr(form.city_name)))?.id ??
+                null
+              }
               onPick={(h) => {
-                if (h) setForm((f) => ({ ...f, title: h.name, city_name: h.city || f.city_name }));
+                if (h) setForm((f) => ({ ...f, title: h.name, city_name: h.city || f.city_name, hotel_id: h.id }));
               }}
             />
           ) : null}
           <label className={label}>
             {t("pg.desc")}
-            <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} className={field} />
+            <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value, hotel_id: null }))} className={field} />
           </label>
           <label className={label}>
             {booking.kind === "flight" ? t("ops.booking.route") : t("pg.city")}
@@ -898,6 +917,7 @@ function BookingRow({
                     detail: {
                       ...Object.fromEntries(Object.entries(form.detail).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()])),
                       ...(booking.detail?.[ROOM_SPEC_KEY] ? { [ROOM_SPEC_KEY]: booking.detail[ROOM_SPEC_KEY] } : {}),
+                      ...(form.hotel_id ? { [HOTEL_ID_KEY]: form.hotel_id } : {}),
                     },
                   });
                   if (!res.ok) setError(t(res.error));

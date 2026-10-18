@@ -9,6 +9,7 @@ import { notifyOperationConfirmed, notifyPartnerCase } from "@/lib/data/ops-noti
 import { getPartnerSession } from "@/lib/partners/session";
 import { raisePartnerInvoice } from "@/lib/partners/ledger-server";
 import { syncOperation } from "@/lib/data/operation-sync";
+import { pullBookingsFromOffer } from "@/lib/data/offer-pull";
 import { setOfferStatus } from "@/lib/data/offer-status";
 import {
   canAdvanceClient,
@@ -220,6 +221,17 @@ async function recordConfirmation(
       entity_id: id,
       meta: { offer_id: input.offer_id, channel: input.channel ?? "phone" },
     });
+
+    // The case opens holding what the offer books — a case opened empty showed its
+    // flights, hotels and transfers as «لا ينطبق» until someone found «اسحب» on
+    // «عرض الكل» (AD-2-3599). Every confirmation (the kanban, Basic, the partner's
+    // portal) lands here, after its own check. Best-effort: the case exists either
+    // way, and its wizard pulls again when it opens empty.
+    try {
+      await pullBookingsFromOffer(id);
+    } catch {
+      /* the wizard pulls when it opens */
+    }
 
     // Push it at the ops team rather than waiting for someone to open the board.
     // Best-effort: a failed notification must not undo a confirmation that has

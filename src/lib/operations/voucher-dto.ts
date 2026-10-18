@@ -54,9 +54,21 @@ export type VoucherBooking = {
  */
 export const ROOM_SPEC_KEY = "room_spec";
 
+/**
+ * The detail key holding a hotel booking's /hotels id — written by the pull
+ * (the offer line's hotel_id) and by the catalogue pickers, so the address, the
+ * phone and the map are the booking's own hotel's, never a namesake's in
+ * another city. Not a label: shownDetail drops it like ROOM_SPEC_KEY.
+ */
+export const HOTEL_ID_KEY = "hotel_id";
+
+/** The booking's /hotels id, or null when it was typed by name. */
+export const hotelIdOf = (detail: Record<string, string> | null | undefined): string | null => detail?.[HOTEL_ID_KEY]?.trim() || null;
+
 export function shownDetail(detail: Record<string, string> | null | undefined): Record<string, string> {
   const rest = { ...(detail ?? {}) };
   delete rest[ROOM_SPEC_KEY];
+  delete rest[HOTEL_ID_KEY];
   return rest;
 }
 

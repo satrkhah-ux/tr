@@ -19,6 +19,7 @@ import type { TicketLeg } from "@/lib/flights/ticket-parse";
 import { toInstant } from "@/lib/offer/schedule";
 import { parseLeg } from "@/lib/operations/drivers";
 import { LANDS, LATER } from "@/lib/operations/seed-plan";
+import { notPulled } from "./pull";
 import type { ReadinessItem, StepState, WizardCase } from "./types";
 
 // ---------------- the step's state ----------------
@@ -32,16 +33,17 @@ export function isTicketed(b: OperationBooking): boolean {
   return b.status === "confirmed" && Boolean(b.pnr?.trim()) && (b.ticket_numbers?.length ?? 0) > 0 && (b.flight_legs?.length ?? 0) > 0;
 }
 
-export function flightsState(data: Pick<WizardCase, "bookings">): StepState {
+export function flightsState(data: Pick<WizardCase, "bookings" | "offerKinds">): StepState {
   const flights = flightBookings(data);
-  if (flights.length === 0) return "na";
+  if (flights.length === 0) return notPulled(data, "flight") ? "todo" : "na";
   return flights.every(isTicketed) ? "done" : "todo";
 }
 
 /** «التذاكر»: every flight booking ticketed — mandatory before «جاهز للسفر». `key` is the i18n key. */
 export function flightsReadiness(data: WizardCase): ReadinessItem[] {
   const flights = flightBookings(data);
-  return flights.length === 0 ? [] : [{ step: "flights", key: "wz.flights.ready", ok: flights.every(isTicketed) }];
+  if (flights.length === 0) return notPulled(data, "flight") ? [{ step: "flights", key: "pulled", ok: false }] : [];
+  return [{ step: "flights", key: "wz.flights.ready", ok: flights.every(isTicketed) }];
 }
 
 // ---------------- the legs, as stored ----------------

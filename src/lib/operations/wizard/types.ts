@@ -33,6 +33,9 @@ export type ReadyExceptions = { payment?: { by: string | null; at: string; note?
 /** What the offer was SOLD for — the passports are counted against it. */
 export type SoldTravelers = { adults: number; children: number; infants: number };
 
+/** What the offer itself books, by step (offer-pull.ts offerBookingKinds). */
+export type OfferKinds = { flight: boolean; hotel: boolean; transport: boolean };
+
 /** The destination's emergency guide (/settings, destination_guides) — client-safe fields only. */
 export type CaseGuide = {
   country: string;
@@ -64,6 +67,14 @@ export type WizardCase = {
   sold: SoldTravelers | null;
   /** the destination's guide, or null when none is kept for its country. */
   guide: CaseGuide | null;
+  /**
+   * What the offer books. A step with no booking of its kind is «لا ينطبق» only
+   * when the offer has none either; otherwise the pull has not brought it yet.
+   * null (or absent) when it could not be read — the bookings alone decide.
+   */
+  offerKinds?: OfferKinds | null;
+  /** a photo or a scanned PDF can be read here (an OCR service or the vision model); pasted text always can. */
+  readsImages?: boolean;
 };
 
 /** What every step screen receives. `canManage`: the manager steps on THIS case (gateCaseManager). */
