@@ -1835,12 +1835,9 @@ export function BasicEditor({
     <TraveliunShell title="nav.basic">
       <FieldIssueProvider issues={[...validation.blocking, ...validation.warnings]} render={issueText}>
         <div className="tv-fade-up space-y-3">
-          {/* top bar */}
+          {/* top bar — no «كل الملفات» and no «فتح في المولّد الكامل»: both led staff astray (the owner, 2026-10-18);
+              the files list is the side menu's «النظام بيسك», the generator only answers a «أصلح» */}
           <div className="flex flex-wrap items-center gap-2">
-            <Link href="/basic" className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12px] font-bold text-[#557d78] hover:bg-[#f4f8f6]">
-              <ArrowRight className="size-4 ltr:rotate-180" />
-              {tx("back")}
-            </Link>
             <span
               role="status"
               className={`inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-bold ${
@@ -1867,15 +1864,6 @@ export function BasicEditor({
             >
               بكج متقدم{data.advanced?.on ? " ✓" : ""}
             </button>
-            {legacyOpen ? (
-            <Link
-              href={stageHref(draftId, "trip")}
-              onClick={() => void flush()}
-              className="inline-flex h-8 items-center rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] underline-offset-2 hover:underline"
-            >
-              {tx("fullGenerator")}
-            </Link>
-            ) : null}
           </div>
 
           {data.advanced?.on ? (
