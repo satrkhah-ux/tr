@@ -719,6 +719,12 @@ export type DraftHotel = {
   manual_price: number | null;
   manual_currency: string;
   /**
+   * The nights this stay's prices were set for (keepNightlyRates). The prices
+   * are whole-stay totals; when the stay's nights become anything else they are
+   * rescaled to the same rate a night and this follows. Absent on older lines.
+   */
+  priced_nights?: number;
+  /**
    * «مسترد / غير مسترد» — for a stay we price ourselves (a supplier rate carries
    * its own cancellation policy). Undefined/null = not said; nothing prints.
    */
@@ -842,6 +848,7 @@ export function normalizeDraftHotel(raw: unknown): DraftHotel {
       ? { refundable_until: h.refundable_until }
       : {}),
     ...(typeof h.supplier === "string" && h.supplier ? { supplier: h.supplier } : {}),
+    ...(typeof h.priced_nights === "number" && h.priced_nights > 0 ? { priced_nights: h.priced_nights } : {}),
     // deliberately NOT `sourcing: h.sourcing ?? null` — a seeded line must carry
     // no supplier key at all, and a null one still reads as "priced from a
     // supplier, expired" to anything checking for the property.
@@ -1943,27 +1950,25 @@ export function addStay(
 /**
  * A stay's prices are its whole stay's, but the rate the agent means is the
  * NIGHT's (the owner, 2026-10-18: 546.67 a night jumped to 1,202.67 when a
- * second hotel took six of the eleven nights, and fell to 248.49 when it was
- * removed again). So the night is what stays put: every stay whose nights
- * changed between `before` and `after` — split, merged, removed, the city's
- * nights changed — has its room prices and manual price scaled by
- * new / old nights. A stay with no nights before or after is left alone.
+ * second hotel took six of the eleven nights, fell to 248.49 when it was
+ * removed, and to 496.97 when the city went 11 → 10 — a before/after
+ * comparison ran twice on that path). So every stay remembers the nights its
+ * prices are for (`priced_nights`): when its nights are anything else — split,
+ * merged, removed, the city's nights changed — its room prices and manual price
+ * are scaled by nights / priced_nights and the mark follows. A line seen for
+ * the first time is marked at its nights, unchanged. Idempotent: running it
+ * twice, or on a slice that carries an older line, gives the same rate.
  * Basic runs it on every change (BasicEditor commit).
  */
-export function keepNightlyRates(
-  before: { cities: DraftCity[]; hotels: DraftHotel[] },
-  after: { cities: DraftCity[]; hotels: DraftHotel[] },
-): DraftHotel[] {
-  const nightsOf = (d: { cities: DraftCity[]; hotels: DraftHotel[] }) => new Map(deriveHotelStays(d.cities, d.hotels).map((s) => [s.line.id, s.nights]));
-  const was = nightsOf(before);
-  const now = nightsOf(after);
+export function keepNightlyRates(cities: DraftCity[], hotels: DraftHotel[]): DraftHotel[] {
+  const nights = new Map(deriveHotelStays(cities, hotels).map((s) => [s.line.id, s.nights]));
   const scale = (v: number | null, f: number) => (v == null ? v : Math.round(v * f * 100) / 100);
-  return after.hotels.map((h) => {
-    const a = was.get(h.id) ?? 0;
-    const b = now.get(h.id) ?? 0;
-    if (!a || !b || a === b) return h;
-    const f = b / a;
-    return { ...withRooms(h, h.rooms.map((r) => ({ ...r, price: scale(r.price, f) }))), manual_price: scale(h.manual_price, f) };
+  return hotels.map((h) => {
+    const now = nights.get(h.id) ?? 0;
+    if (!now || h.priced_nights === now) return h;
+    if (!h.priced_nights) return { ...h, priced_nights: now };
+    const f = now / h.priced_nights;
+    return { ...withRooms(h, h.rooms.map((r) => ({ ...r, price: scale(r.price, f) }))), manual_price: scale(h.manual_price, f), priced_nights: now };
   });
 }
 

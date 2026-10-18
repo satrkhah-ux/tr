@@ -339,7 +339,7 @@ export function BasicEditor({
     // a move by air becomes its planned domestic leg — the agent never types a route the cities already say
     const shaped = { ...merged, cities: chained, scope: nextScope, ...withDomesticFlights({ ...merged, flights, cities: chained, transport_plan }, lookups.airports) };
     // the night's rate stays what the agent typed whatever moves the nights — split, merge, removal, the city's nights
-    const hotels = keepNightlyRates(latest.current, { cities: chained, hotels: withHotelLines(shaped, BASE_CURRENCY) });
+    const hotels = keepNightlyRates(chained, withHotelLines(shaped, BASE_CURRENCY));
     // «بكج متقدم»: its dates follow Basic's until the agent types their own
     const advanced = merged.advanced?.on ? fillAdvanced(merged.advanced, advancedDefaults({ ...shaped, cities: chained })) : merged.advanced;
     const next = { ...shaped, hotels, advanced, days: basicDays({ ...shaped, hotels, advanced }) };
