@@ -16,7 +16,7 @@ import {
   type TravelerRow,
   type VisaStatus,
 } from "@/lib/operations/traveler-dto";
-import { planTravelers, visaFor, type DestinationVisa } from "@/lib/operations/travelers";
+import { planTravelers, savedName, visaFor, type DestinationVisa } from "@/lib/operations/travelers";
 import { parseTd3, type MrzPassport } from "@/lib/operations/mrz";
 import { findLookupCountry, normalizeDraftData, type DraftData } from "@/lib/offer/draft-types";
 import { issuedDraftData } from "@/lib/data/issued-draft";
@@ -111,7 +111,13 @@ export async function upsertTraveler(input: {
   operation_id: string;
   traveler_kind?: TravelerKind;
   sort?: number;
+  /** What the form shows; the saved name follows savedName (a read passport's may replace it). */
   display_name: string;
+  /**
+   * The name as in the passport for THIS save when it carries no new blob — the
+   * form's full name, «استبدال بالاسم من الجواز». A blob's own full_name wins.
+   */
+  passport_name?: string;
   /** Omit to leave the stored passport untouched; pass to replace it. */
   passport?: PassportView | null;
   passport_expiry?: string | null;
@@ -142,15 +148,18 @@ export async function upsertTraveler(input: {
   }
 
   try {
-    // the nationality BEFORE this save — a changed one is a new visa question (revisitVisa)
-    let before: Pick<TravelerRow, "nationality" | "visa_status"> | null = null;
-    if (input.id && input.nationality !== undefined) {
-      const { data: prev } = await db().from("operation_travelers").select("nationality, visa_status").eq("id", input.id).maybeSingle();
-      before = (prev as Pick<TravelerRow, "nationality" | "visa_status"> | null) ?? null;
+    // the row BEFORE this save: its name decides whether a passport's replaces it,
+    // and a changed nationality is a new visa question (revisitVisa). `*`: name_source
+    // is 0091's, and naming a column a database lacks fails the whole read.
+    let before: TravelerRow | null = null;
+    if (input.id) {
+      const { data: prev } = await db().from("operation_travelers").select("*").eq("id", input.id).maybeSingle();
+      before = (prev as TravelerRow | null) ?? null;
     }
+    const named = savedName(before, input.display_name, input.passport?.full_name || input.passport_name || "");
 
     const patch: Record<string, unknown> = {
-      display_name: input.display_name,
+      display_name: named.display_name,
       updated_at: new Date().toISOString(),
     };
     // Only on INSERT — an update must never rewrite the parent, and the edit
@@ -174,6 +183,11 @@ export async function upsertTraveler(input: {
 
     if (!input.id) {
       await logAudit({ action: "traveler.created", entity: "operation_travelers", entity_id: id, meta: { operation_id } });
+    }
+    // where the name came from — best-effort, after the save: 0091 adds the column,
+    // and a database without it keeps the name rather than failing the passport save
+    if (named.name_source !== (before?.name_source ?? null)) {
+      await db().from("operation_travelers").update({ name_source: named.name_source }).eq("id", id);
     }
     if (input.nationality !== undefined) await revisitVisa(id, operation_id, before, (patch.nationality as string | null) ?? null);
     if (cipher !== undefined) {
@@ -393,12 +407,11 @@ type OfferPax = {
   children: number | null;
   infants: number | null;
   destination: string | null;
-  customers: { arabic_name: string | null } | { arabic_name: string | null }[] | null;
 };
 
 /**
- * One traveler row per person the offer was sold for, the client first, the
- * children with their ages. Only into an EMPTY case — it never adds to a list
+ * One traveler row per person the offer was sold for, unnamed (planTravelers),
+ * the children with their ages. Only into an EMPTY case — it never adds to a list
  * someone has started.
  *
  * `auto` is the case opening by itself: it claims `operations.travelers_seeded_at`
@@ -418,12 +431,11 @@ async function seedFromOffer(operationId: string, auto: boolean): Promise<{ ok: 
     let claim = supabase.from("operations").update({ travelers_seeded_at: new Date().toISOString() }).eq("id", operationId);
     if (auto) claim = claim.is("travelers_seeded_at", null);
     const { data: claimed } = await claim
-      .select("offer_id, offers(serial, partner_company_id, adults, children, infants, destination, customers(arabic_name))")
+      .select("offer_id, offers(serial, partner_company_id, adults, children, infants, destination)")
       .maybeSingle();
     const op = claimed as { offer_id: string; offers: OfferPax | OfferPax[] | null } | null;
     if (!op) return auto ? { ok: true, added: 0 } : { ok: false, error: "ops.err.notFound" };
     const offer = Array.isArray(op.offers) ? (op.offers[0] ?? null) : op.offers;
-    const customer = Array.isArray(offer?.customers) ? (offer.customers[0] ?? null) : (offer?.customers ?? null);
 
     // The draft as ISSUED holds the children's ages and whether visas were sold
     // (issued-draft.ts — never one edited since); an offer without one
@@ -441,8 +453,6 @@ async function seedFromOffer(operationId: string, auto: boolean): Promise<{ ok: 
       infants: draft?.trip.infants ?? offer?.infants ?? 0,
       children_ages: draft?.trip.children_ages ?? [],
       infant_ages: draft?.trip.infant_ages ?? [],
-      // the customer record is the name on the case header; the draft's typed name otherwise
-      lead_name: customer?.arabic_name?.trim() || draft?.customer.customer_name || "",
       visa_required: visaFor(null, visa.destination, visa.sold) === "required",
     });
 

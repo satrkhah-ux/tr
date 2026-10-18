@@ -1,22 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { ageOn, isLatinName, passportIssues, passportNeedsUpdate, planTravelers, travelerReadiness, visaFor } from "./travelers";
+import {
+  ageOn,
+  isLatinName,
+  leadName,
+  passportIssues,
+  passportNeedsUpdate,
+  planTravelers,
+  sameName,
+  savedName,
+  takesPassportName,
+  travelerReadiness,
+  visaFor,
+} from "./travelers";
 
 const MALAYSIA = { travel_start: "2026-11-01", travel_end: "2026-11-08" };
 const TODAY = "2026-10-13";
 
 describe("planTravelers", () => {
-  it("makes the Malaysia case: two adults, children of 9 and 5, the client first", () => {
+  it("makes the Malaysia case: two adults, children of 9 and 5 — nobody named after the client's WhatsApp contact", () => {
     const rows = planTravelers({
       adults: 2,
       children: 2,
       infants: 0,
       children_ages: [9, 5],
       infant_ages: [],
-      lead_name: " ترافليون التقني ",
       visa_required: false,
     });
     expect(rows.map((r) => [r.traveler_kind, r.age, r.display_name, r.sort])).toEqual([
-      ["adult", null, "ترافليون التقني", 0],
+      ["adult", null, "", 0],
       ["adult", null, "", 1],
       ["child", 9, "", 2],
       ["child", 5, "", 3],
@@ -25,9 +36,52 @@ describe("planTravelers", () => {
   });
 
   it("marks everyone's visa required when the offer sold visas, and never plans nobody", () => {
-    const rows = planTravelers({ adults: 0, children: 0, infants: 1, children_ages: [], infant_ages: [1], lead_name: "", visa_required: true });
+    const rows = planTravelers({ adults: 0, children: 0, infants: 1, children_ages: [], infant_ages: [1], visa_required: true });
     expect(rows.map((r) => r.traveler_kind)).toEqual(["adult", "infant"]);
     expect(rows.every((r) => r.visa_status === "required")).toBe(true);
+  });
+});
+
+describe("the traveller's name: the passport's, never the contact's (the owner, 2026-10-18)", () => {
+  const PASSPORT = "MOHAMMED SAAD ALQAHTANI";
+  const seeded = { display_name: "al 3r18y", name_source: "seed" as const };
+  const typed = { display_name: "محمد القحطاني", name_source: "manual" as const };
+
+  it("a read passport replaces a seeded, an earlier passport's or an empty name", () => {
+    expect(savedName(seeded, "al 3r18y", PASSPORT)).toEqual({ display_name: PASSPORT, name_source: "passport" });
+    expect(savedName({ display_name: "MOHAMED ALQAHTANI", name_source: "passport" }, "MOHAMED ALQAHTANI", PASSPORT)).toEqual({ display_name: PASSPORT, name_source: "passport" });
+    expect(savedName({ display_name: "", name_source: "seed" }, "", PASSPORT)).toEqual({ display_name: PASSPORT, name_source: "passport" });
+    expect(savedName(null, "", PASSPORT)).toEqual({ display_name: PASSPORT, name_source: "passport" });
+  });
+
+  it("a typed name stays — and one of unknown source (before 0091) is asked about too", () => {
+    expect(savedName(typed, typed.display_name, PASSPORT)).toEqual(typed);
+    expect(savedName({ display_name: "al 3r18y" }, "al 3r18y", PASSPORT)).toEqual({ display_name: "al 3r18y", name_source: "manual" });
+    expect(takesPassportName(typed)).toBe(false);
+    expect(takesPassportName({ display_name: "x", name_source: null })).toBe(false);
+    expect(takesPassportName(seeded)).toBe(true);
+    expect(takesPassportName(null)).toBe(true);
+  });
+
+  it("a name changed in the save is the person's: the passport's when it is that, else typed", () => {
+    // «استبدال بالاسم من الجواز»
+    expect(savedName(typed, PASSPORT, PASSPORT)).toEqual({ display_name: PASSPORT, name_source: "passport" });
+    expect(savedName(seeded, "Mohammed  Saad Alqahtani", PASSPORT)).toEqual({ display_name: "Mohammed  Saad Alqahtani", name_source: "passport" });
+    expect(savedName(seeded, "أبو سعد", PASSPORT)).toEqual({ display_name: "أبو سعد", name_source: "manual" });
+    expect(savedName(null, "Sara", "")).toEqual({ display_name: "Sara", name_source: "manual" });
+    // a save without a passport leaves the name and its source alone
+    expect(savedName(seeded, "al 3r18y", "")).toEqual(seeded);
+  });
+
+  it("compares names case and spacing aside", () => {
+    expect(sameName(" mohammed  saad ", "MOHAMMED SAAD")).toBe(true);
+    expect(sameName("", "")).toBe(false);
+  });
+
+  it("the lead's name: the first traveller named, never a fallback", () => {
+    expect(leadName([{ display_name: " " }, { display_name: ` ${PASSPORT} ` }])).toBe(PASSPORT);
+    expect(leadName([{ display_name: "" }])).toBe("");
+    expect(leadName([])).toBe("");
   });
 });
 

@@ -26,13 +26,23 @@ export type TravelerKind = "adult" | "child" | "infant";
 export type VisaStatus = "check" | "not_required" | "required" | "submitted" | "issued";
 export const VISA_STATUSES: VisaStatus[] = ["check", "not_required", "required", "submitted", "issued"];
 
+/**
+ * Where `display_name` came from (0091, the owner 2026-10-18): planned from the
+ * offer (`seed`), read off the passport (`passport`), or typed by a person
+ * (`manual`). A passport read replaces the first two and asks before the third.
+ */
+export type NameSource = "seed" | "passport" | "manual";
+
 /** The DB row. SERVER ONLY — never returned from a server action. */
 export type TravelerRow = {
   id: string;
   operation_id: string;
   traveler_kind: TravelerKind;
   sort: number;
+  /** The traveller's name as in the passport — never the client's contact name (that is customers.arabic_name). */
   display_name: string;
+  /** 0091 — absent on a database without it. */
+  name_source?: NameSource | null;
   /** AES-256-GCM blob of {full_name, number, nationality}. */
   passport_encrypted: string | null;
   passport_expiry: string | null;
@@ -64,7 +74,7 @@ export type TravelerRow = {
  */
 export type TravelerListItem = Pick<
   TravelerRow,
-  "id" | "traveler_kind" | "sort" | "display_name" | "passport_expiry" | "birth_date" | "age" | "nationality" | "visa_status"
+  "id" | "traveler_kind" | "sort" | "display_name" | "name_source" | "passport_expiry" | "birth_date" | "age" | "nationality" | "visa_status"
 > & {
   has_passport: boolean;
   has_scan: boolean;
@@ -98,6 +108,7 @@ export function toTravelerListItem(row: TravelerRow): TravelerListItem {
     traveler_kind: row.traveler_kind,
     sort: row.sort,
     display_name: row.display_name,
+    name_source: row.name_source ?? null,
     passport_expiry: row.passport_expiry,
     birth_date: row.birth_date ?? null,
     age: row.age ?? null,

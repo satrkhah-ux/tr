@@ -2177,7 +2177,7 @@ export const ar: Dictionary = {
   "ops.signal.passport_expiring": "جواز على وشك الانتهاء",
   "ops.signal.cancellation_deadline_near": "الإلغاء المجاني ينتهي",
   "ops.traveler.add": "إضافة مسافر",
-  "ops.traveler.name": "الاسم كما في العرض",
+  "ops.traveler.name": "اسم المسافر كما في الجواز",
   "ops.traveler.kind": "النوع",
   "ops.traveler.adult": "بالغ",
   "ops.traveler.child": "طفل",
@@ -2198,7 +2198,11 @@ export const ar: Dictionary = {
   "ops.passport.audited": "كل فتح لجواز يُسجَّل باسمك.",
   // ---------- travelers from the offer, passport photo, visas (ops order 5) ----------
   "ops.trav.seed": "أنشئ المسافرين من العرض",
-  "ops.trav.seedHint": "بعدد البالغين والأطفال والرضّع في العرض، بأعمار الأطفال، والأول باسم العميل.",
+  "ops.trav.seedHint": "بعدد البالغين والأطفال والرضّع في العرض، بأعمار الأطفال — بلا أسماء حتى تُقرأ جوازاتهم.",
+  // the traveller's name is the passport's, never the client's WhatsApp name (the owner, 2026-10-18)
+  "ops.trav.unnamed": "مسافر {n}",
+  "ops.trav.usePassportName": "استبدال بالاسم من الجواز",
+  "ops.trav.nameKept": "بقي الاسم المكتوب «{name}» — في الجواز: {passport}",
   "ops.trav.edit": "البيانات",
   "ops.trav.birthDate": "تاريخ الميلاد",
   "ops.trav.soldAge": "{n} سنة في العرض",

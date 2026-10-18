@@ -65,7 +65,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   // same token, the same table and the same revoke button, which is what makes
   // it export alongside the vouchers instead of beside them.
   if (voucher.kind === "welcome_board") {
-    const source = await getWelcomeBoard(voucher.serial, { name: voucher.welcome_name ?? voucher.customer.name });
+    // the frozen name, else the board's own default — the lead traveller as in the passport, never the client's contact name
+    const source = await getWelcomeBoard(voucher.serial, { name: voucher.welcome_name });
     if (!source) return new NextResponse("Not found", { status: 404 });
     const boardHtml = await renderDocHtml(() => <WelcomeBoardDocument board={source.board} />, source.font);
     const boardPdf = await offerDocumentToPdf(boardHtml);

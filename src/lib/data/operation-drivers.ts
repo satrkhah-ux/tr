@@ -8,7 +8,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { listBookings } from "@/lib/data/operation-bookings";
-import { listTravelers } from "@/lib/data/operation-travelers";
+import { listTravelers, listTravelersByOperation } from "@/lib/data/operation-travelers";
 import { getWelcomeBoard } from "@/lib/data/welcome-board";
 import { conversationForPhone, sendTeletelAttachment, sendTeletelMessage } from "@/lib/providers/teletel";
 import { COMPANY } from "@/components/offer-doc/labels";
@@ -20,6 +20,7 @@ import { gateOps, gateRow, mayWork, opsAccess } from "@/lib/operations/access";
 import { carText, DRV, driverServiceKind, linkOf, meetTime, type ServiceKind } from "@/lib/operations/drivers";
 import { hotelsMessage, programmeMessage, programmeUpdate, recipientKey, type HotelGap, type ProgrammeInput } from "@/lib/operations/driver-programme";
 import { cityOf, transportCities } from "@/lib/operations/wizard/transport";
+import { leadName } from "@/lib/operations/travelers";
 
 /**
  * «السائقون والاستقبال» — what the driver (or the city's local agent) is sent,
@@ -41,7 +42,7 @@ type Fail = { ok: false; error: TranslationKey };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
 
-type OfferJoin = { serial: string; employee_id?: string | null; customers: { arabic_name: string | null } | { arabic_name: string | null }[] | null };
+type OfferJoin = { serial: string; employee_id?: string | null };
 type OpJoin = { execution_status?: string; offers: OfferJoin | OfferJoin[] | null };
 
 /** The driver's (or the local agent's) two messages, ready for review — and what changed since the last. */
@@ -58,7 +59,7 @@ export type ProgrammeDraft = {
   /** hotels missing an address or a phone — warned before sending, never printed as «—». */
   gaps: HotelGap[];
   serial: string;
-  /** the arrival sign's name, for sending it by hand. */
+  /** the arrival sign's name, for sending it by hand — the lead traveller's as in the passport (leadName). */
   customer: string;
 };
 
@@ -96,7 +97,7 @@ export async function draftDriverProgramme(bookingId: string): Promise<{ ok: tru
     const [bookings, travelers, opRes] = await Promise.all([
       listBookings(operationId),
       listTravelers(operationId),
-      supabase.from("operations").select("travel_start, travel_end, offers(serial, destination, customers(arabic_name))").eq("id", operationId).maybeSingle(),
+      supabase.from("operations").select("travel_start, travel_end, offers(serial, destination)").eq("id", operationId).maybeSingle(),
     ]);
     const cities = transportCities({ bookings, supplierWork: null });
     const mine = cities.find((c) => c.trips.some((t) => t.booking.id === bookingId));
@@ -107,8 +108,9 @@ export async function draftDriverProgramme(bookingId: string): Promise<{ ok: tru
     const stays = bookings.filter((b) => b.kind === "hotel" && b.status !== "cancelled" && keys.has(normalizeName(cityOf(b))));
 
     const op = opRes.data as unknown as { travel_start: string | null; travel_end: string | null; offers: unknown } | null;
-    const offer = one(op?.offers as { serial: string; destination: string | null; customers: unknown } | { serial: string; destination: string | null; customers: unknown }[] | null);
-    const customer = one(offer?.customers as { arabic_name: string | null } | { arabic_name: string | null }[] | null)?.arabic_name?.trim() ?? "";
+    const offer = one(op?.offers as { serial: string; destination: string | null } | { serial: string; destination: string | null }[] | null);
+    // the guest the driver looks for: the passport's name, never the client's WhatsApp one (2026-10-18)
+    const customer = leadName(travelers);
 
     // the catalogue: the hotels' names, addresses and links, the cities' places and countries, the airports' names
     const trips = covered.flatMap((c) => c.trips);
@@ -306,7 +308,7 @@ export async function listDriverSchedule(date: string): Promise<ScheduleRow[]> {
     const supabase = await db();
     const { data } = await supabase
       .from("operation_bookings")
-      .select("id, operation_id, kind, title, city_name, start_date, detail, status, operations(execution_status, offers(serial, employee_id, customers(arabic_name)))")
+      .select("id, operation_id, kind, title, city_name, start_date, detail, status, operations(execution_status, offers(serial, employee_id))")
       .eq("start_date", date)
       .in("kind", ["transport", "service"])
       .neq("status", "cancelled");
@@ -321,6 +323,10 @@ export async function listDriverSchedule(date: string): Promise<ScheduleRow[]> {
       status: string;
       operations: OpJoin | OpJoin[] | null;
     }[];
+    // each case's guest as in the passport (leadName) — this sheet is copied to the drivers;
+    // asked for the cases this holder may work only, the gate listTravelersByOperation keeps
+    const mine = [...new Set(rows.filter((r) => mayWork(access, one(one(r.operations)?.offers)?.employee_id)).map((r) => r.operation_id))];
+    const travelers = mine.length > 0 ? await listTravelersByOperation(mine) : {};
     return rows
       .flatMap((r): ScheduleRow[] => {
         const kind = driverServiceKind(r);
@@ -334,7 +340,7 @@ export async function listDriverSchedule(date: string): Promise<ScheduleRow[]> {
             id: r.id,
             operation_id: r.operation_id,
             serial: offer?.serial ?? "",
-            customer: one(offer?.customers)?.arabic_name ?? null,
+            customer: leadName(travelers[r.operation_id] ?? []) || null,
             kind,
             title: r.title,
             city: r.city_name.trim(),

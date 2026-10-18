@@ -36,10 +36,13 @@ export function useClientPassports(operationId: string, travelers: unknown): Rec
   return map;
 }
 
-/** The fields the traveller form opens with — `cpass` makes its Save an accept. */
+/**
+ * The fields the traveller form opens with — `cpass` makes its Save an accept.
+ * No name of the traveller's own: the form decides it from the passport's
+ * (TravelersPanel openEdit → savedName's rule), not from the name on the row.
+ */
 export type ClientPassportPrefill = {
   cpass: string;
-  display_name?: string;
   full_name?: string;
   number?: string;
   nationality?: string;
@@ -54,11 +57,9 @@ export type ClientPassportPrefill = {
  */
 export function ClientPassportReview({
   submission,
-  displayName,
   onReview,
 }: {
   submission: PendingClientPassport;
-  displayName: string;
   onReview: (prefill: ClientPassportPrefill, read: MrzPassport | null) => void;
 }) {
   const { t } = useTraveliunUI();
@@ -75,7 +76,7 @@ export function ClientPassportReview({
       const p = res.passport;
       // only what was really read — the rest stays empty, marked «أكمل يدوياً»
       const values = p ? trustedFields(p, new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" })).values : null;
-      onReview(values ? { cpass: submission.id, display_name: displayName || values.full_name, ...values } : { cpass: submission.id }, p);
+      onReview(values ? { cpass: submission.id, ...values } : { cpass: submission.id }, p);
     });
 
   const open = () =>

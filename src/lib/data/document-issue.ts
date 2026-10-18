@@ -10,6 +10,7 @@ import { voucherStay, type StayError, type StayHotel } from "@/lib/operations/ro
 import { hotelFinal } from "@/lib/operations/client-booking-state";
 import { sameDocument, snapshotKey } from "@/lib/operations/wizard/documents";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
+import { leadName } from "@/lib/operations/travelers";
 
 /**
  * Freezing a document — the ONE write behind «إصدار» (issueDocument, gated)
@@ -103,22 +104,24 @@ export async function issueDocumentNow(input: IssueInput, issuedBy: string | nul
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
 
+    // the client's phone only — their name is the WhatsApp contact, for greetings,
+    // never printed: a paper carries the travellers' names as in the passport (2026-10-18)
     const opRes = await supabase
       .from("operations")
-      .select("id, offer_id, offers(serial, destination, customers(arabic_name, mobile))")
+      .select("id, offer_id, offers(serial, destination, customers(mobile))")
       .eq("id", input.operation_id)
       .maybeSingle();
     if (!opRes.data) return { ok: false, error: "ops.err.notFound" };
     const op = opRes.data as unknown as {
       offer_id: string;
       offers:
-        | { serial: string; destination: string | null; customers: { arabic_name: string | null; mobile: string | null } | { arabic_name: string | null; mobile: string | null }[] | null }
+        | { serial: string; destination: string | null; customers: { mobile: string | null } | { mobile: string | null }[] | null }
         | { serial: string; destination: string | null; customers: unknown }[]
         | null;
     };
     const offer = Array.isArray(op.offers) ? op.offers[0] : op.offers;
     const cust = Array.isArray(offer?.customers) ? offer?.customers[0] : offer?.customers;
-    const customer = (cust ?? null) as { arabic_name: string | null; mobile: string | null } | null;
+    const customer = (cust ?? null) as { mobile: string | null } | null;
 
     const [bookingsRes, travelersRes, daysRes] = await Promise.all([
       supabase
@@ -139,6 +142,8 @@ export async function issueDocumentNow(input: IssueInput, issuedBy: string | nul
     ]);
     const allBookings = (bookingsRes.data ?? []) as BookingRow[];
     const travelers = (travelersRes.data ?? []) as { display_name: string; nationality: string | null }[];
+    // the lead guest, the sign's name — the passport's (travelers.ts leadName)
+    const lead = leadName(travelers);
 
     // Only confirmed bookings belong on a document handed to a traveller.
     const confirmed = allBookings.filter((b) => b.status === "confirmed");
@@ -256,22 +261,16 @@ export async function issueDocumentNow(input: IssueInput, issuedBy: string | nul
       // the company's day, not the server's UTC one
       issued_at: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }),
       destination: offer?.destination ?? null,
-      customer: { name: customer?.arabic_name ?? "", phone: customer?.mobile ?? null },
+      customer: { name: lead, phone: customer?.mobile ?? null },
       travelers: travelers.map((t) => ({ name: t.display_name, nationality: t.nationality })),
       bookings: input.kind === "hotel_voucher" ? stays : scoped.map(toVoucherBooking).map(withHotel),
       days: input.kind === "itinerary" ? days.map((d) => ({ ...d, activities: [...timedOn(d.date), ...d.activities] })) : [],
       notes: [],
       // a booking that chose Arabic keeps the bilingual voucher
       ...(input.kind === "hotel_voucher" && stays.every((s) => s.locale === "en") ? { lang: "en" as const } : {}),
-      // Falls back to the lead traveller, then the booking name — a sign that
-      // says nothing is worse than one with the wrong spelling.
-      welcome_name:
-        input.kind === "welcome_board"
-          ? (input.welcome_name ?? "").trim() ||
-            travelers[0]?.display_name ||
-            customer?.arabic_name ||
-            null
-          : null,
+      // Falls back to the lead traveller as in the passport — never the client's
+      // contact name: «al 3r18y» held up in arrivals helps nobody (AD-2-3599).
+      welcome_name: input.kind === "welcome_board" ? (input.welcome_name ?? "").trim() || lead || null : null,
     };
 
     // the case's papers of this kind: the next version, and whether this one is already out

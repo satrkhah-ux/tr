@@ -1,14 +1,14 @@
 /**
  * Travelers from the offer, and what each one still lacks before travel.
  *
- * The offer already says who travels — so many adults, children of these ages,
- * the client's name. The case starts from that instead of an empty list, and
- * `travelerReadiness` is the per-traveler half of «جاهز للسفر».
+ * The offer already says who travels — so many adults, children of these ages.
+ * The case starts from that instead of an empty list, and `travelerReadiness`
+ * is the per-traveler half of «جاهز للسفر».
  *
  * Pure: no React, no Supabase. Dates are YYYY-MM-DD strings; `today` is injected.
  */
 
-import { passportExpiringWithin, type TravelerKind, type TravelerListItem, type VisaStatus } from "./traveler-dto";
+import { passportExpiringWithin, type NameSource, type TravelerKind, type TravelerListItem, type VisaStatus } from "./traveler-dto";
 
 export type PlannedTraveler = {
   traveler_kind: TravelerKind;
@@ -19,10 +19,13 @@ export type PlannedTraveler = {
 };
 
 /**
- * One row per person the offer was sold for, the client first.
+ * One row per person the offer was sold for, the lead first.
  *
- * At least one adult: a case is never nobody, and the lead is the client. The
- * others start unnamed — a made-up «بالغ 2» would print on a voucher.
+ * At least one adult: a case is never nobody. Everyone starts UNNAMED — the
+ * screen shows «مسافر 1» — until a passport is read or a name typed. Not the
+ * client's name: that is the WhatsApp contact («al 3r18y», AD-2-3599), it was
+ * printed on the voucher, the sign and the supplier's list (the owner,
+ * 2026-10-18), and it stays on the customer for greetings only.
  */
 export function planTravelers(input: {
   adults: number;
@@ -30,14 +33,12 @@ export function planTravelers(input: {
   infants: number;
   children_ages: number[];
   infant_ages: number[];
-  lead_name: string;
   visa_required: boolean;
 }): PlannedTraveler[] {
   const count = (n: number) => Math.max(Math.trunc(Number(n)) || 0, 0);
   const visa_status: VisaStatus = input.visa_required ? "required" : "not_required";
   const out: PlannedTraveler[] = [];
-  const push = (traveler_kind: TravelerKind, age: number | null) =>
-    out.push({ traveler_kind, sort: out.length, display_name: out.length === 0 ? input.lead_name.trim() : "", age, visa_status });
+  const push = (traveler_kind: TravelerKind, age: number | null) => out.push({ traveler_kind, sort: out.length, display_name: "", age, visa_status });
 
   for (let i = 0; i < Math.max(count(input.adults), 1); i++) push("adult", null);
   for (let i = 0; i < count(input.children); i++) push("child", input.children_ages[i] ?? null);
@@ -139,4 +140,57 @@ export function visaFor(nationality: string | null, destination: DestinationVisa
 /** A name a passport could carry as written — the only kind worth pre-filling. */
 export function isLatinName(name: string): boolean {
   return /^[A-Za-z][A-Za-z .'-]*$/.test(name.trim());
+}
+
+// ---------- the traveller's name: as in the passport (the owner, 2026-10-18) ----------
+
+type Named = { display_name: string; name_source?: NameSource | null };
+
+const nameKey = (s: string) => s.normalize("NFKC").trim().replace(/\s+/g, " ").toUpperCase();
+
+/** The same name, case and spacing aside. */
+export function sameName(a: string, b: string): boolean {
+  return nameKey(a) !== "" && nameKey(a) === nameKey(b);
+}
+
+/**
+ * May a passport read replace this name without asking? Yes when there is none,
+ * or it was planned from the offer, or read off an earlier passport. A name a
+ * person typed is asked about («استبدال بالاسم من الجواز») — and so is one of
+ * unknown source (a database before 0091): asking is the safe side.
+ */
+export function takesPassportName(t: Named | null): boolean {
+  return !t || !t.display_name.trim() || t.name_source === "seed" || t.name_source === "passport";
+}
+
+/**
+ * The traveller's name after a save — THE rule, applied by upsertTraveler so
+ * every path (the wizard's bulk read, a row's photo, the client's upload
+ * accepted, the form) gets it.
+ *
+ * `typed` is the name the save carries; `prev` the row before it (null = new).
+ * A name changed in this save is the person's own choice — `passport` when it
+ * is the passport's name, else `manual`. An unchanged name gives way to the
+ * passport's when takesPassportName allows; a typed one stays.
+ */
+export function savedName(prev: Named | null, typed: string, passportName: string): { display_name: string; name_source: NameSource } {
+  const name = typed.trim();
+  const read = passportName.trim();
+  const before = prev?.display_name.trim() ?? "";
+  const fromPassport = { display_name: read, name_source: "passport" as const };
+  if (name !== before) {
+    if (!name) return read ? fromPassport : { display_name: "", name_source: "seed" };
+    return { display_name: name, name_source: sameName(name, read) ? "passport" : "manual" };
+  }
+  if (read && takesPassportName(prev)) return fromPassport;
+  return { display_name: before, name_source: prev?.name_source ?? (before ? "manual" : "seed") };
+}
+
+/**
+ * THE name on the arrival sign, the driver's «Guest» line and the documents'
+ * lead guest: the first named traveller's, as in the passport. "" while nobody
+ * is named — never the client's contact name instead.
+ */
+export function leadName(travelers: Named[]): string {
+  return travelers.find((t) => t.display_name.trim())?.display_name.trim() ?? "";
 }

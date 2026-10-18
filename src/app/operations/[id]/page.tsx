@@ -11,6 +11,7 @@ import { CaseProfitCard } from "@/components/traveliun/operations/CaseProfitCard
 import { gateCaseManager, gateOperation } from "@/lib/operations/access";
 import { loadWizardCase } from "@/lib/data/wizard-case";
 import { CaseWizardShell, ReadyGate } from "@/components/traveliun/operations/wizard/CaseWizardShell";
+import { leadName } from "@/lib/operations/travelers";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +73,7 @@ export default async function OperationCasePage({
       canBook={canBook}
       canManage={canManage}
       canReadMrz={isOpenAIConfigured()}
-      drivers={<DriversPanel serial={operation.serial} customerName={operation.customer_name} bookings={data.bookings} />}
+      drivers={<DriversPanel serial={operation.serial} guestName={leadName(data.travelers) || null} bookings={data.bookings} />}
       ready={<ReadyGate data={data} />}
       management={
         <CaseManagement

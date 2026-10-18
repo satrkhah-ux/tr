@@ -2179,7 +2179,7 @@ export const en = {
   "ops.signal.passport_expiring": "Passport expiring",
   "ops.signal.cancellation_deadline_near": "Free cancellation ending",
   "ops.traveler.add": "Add traveler",
-  "ops.traveler.name": "Name on the offer",
+  "ops.traveler.name": "Traveller's name, as in the passport",
   "ops.traveler.kind": "Type",
   "ops.traveler.adult": "Adult",
   "ops.traveler.child": "Child",
@@ -2200,7 +2200,11 @@ export const en = {
   "ops.passport.audited": "Every view of a passport is logged with your name.",
   // ---------- travelers from the offer, passport photo, visas (ops order 5) ----------
   "ops.trav.seed": "Create travelers from the offer",
-  "ops.trav.seedHint": "One per adult, child and infant in the offer, with the children's ages; the first takes the client's name.",
+  "ops.trav.seedHint": "One per adult, child and infant in the offer, with the children's ages — unnamed until their passports are read.",
+  // the traveller's name is the passport's, never the client's WhatsApp name (the owner, 2026-10-18)
+  "ops.trav.unnamed": "Traveller {n}",
+  "ops.trav.usePassportName": "Use the passport's name",
+  "ops.trav.nameKept": "The typed name “{name}” stayed — the passport says: {passport}",
   "ops.trav.edit": "Details",
   "ops.trav.birthDate": "Date of birth",
   "ops.trav.soldAge": "Age {n} in the offer",
