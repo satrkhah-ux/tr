@@ -557,11 +557,23 @@ export function BasicEditor({
     void getTransferCars(transferCountries.split("|")).then((names) => {
       if (!live) return;
       const priced = lookups.carTypes.filter((c) => names.includes(c.name));
+      const was = groupCars.current;
       groupCars.current = priced.length > 0 ? priced : lookups.carTypes;
+      // the cars were filled before the country was chosen (the add bar, a new file): every car the
+      // system chose — the group's size from the old set — becomes the country's; one the agent chose
+      // stays. A file already issued keeps what it was issued with (the owner's review, 2026-10-18).
+      const file = latest.current;
+      if (file.produced_serial) return;
+      const pax = file.trip.adults + file.trip.children;
+      const next = carForGroup(groupCars.current, pax);
+      let plan = file.transport_plan;
+      for (const before of [carForGroup(was, pax), carForGroup(lookups.carTypes, pax)]) plan = resizeGroupCars(plan, before, next);
+      if (plan !== file.transport_plan && JSON.stringify(plan) !== JSON.stringify(file.transport_plan)) commit({ transport_plan: plan });
     });
     return () => {
       live = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the trip's countries decide; commit and the file are read when the list arrives
   }, [transferCountries, lookups.carTypes]);
 
   // ---------- the tours price list of the trip's countries ----------
