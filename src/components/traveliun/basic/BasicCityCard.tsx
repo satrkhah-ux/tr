@@ -125,6 +125,7 @@ export function BasicCityCard({
   lookups,
   programs,
   tourPrices,
+  listPrices = {},
   hotelsOn,
   toursOn,
   transportOn,
@@ -155,6 +156,8 @@ export function BasicCityCard({
   programs: TourProgram[];
   /** the company's tours price list for the trip's countries — a pick fills its price. */
   tourPrices: TourPrice[];
+  /** each transfer's price in the company's list (by pricing ref) — shown before the pricing sheet is worked out. */
+  listPrices?: Record<string, { price: number; currency: string }>;
   hotelsOn: boolean;
   toursOn: boolean;
   transportOn: boolean;
@@ -469,6 +472,7 @@ export function BasicCityCard({
               city={city}
               programs={programs}
               tourPrices={tourPrices}
+              listPrices={listPrices}
               sarPer={lookups.sarPer ?? { SAR: 1 }}
               data={data}
               carTypes={lookups.carTypes}
@@ -835,6 +839,7 @@ function ServicesPanel({
   city,
   programs,
   tourPrices,
+  listPrices,
   sarPer,
   data,
   carTypes,
@@ -852,6 +857,7 @@ function ServicesPanel({
   city: BasicCity;
   programs: TourProgram[];
   tourPrices: TourPrice[];
+  listPrices: Record<string, { price: number; currency: string }>;
   sarPer: Record<string, number>;
   data: DraftData;
   carTypes: GeneratorLookups["carTypes"];
@@ -922,7 +928,9 @@ function ServicesPanel({
   const unitOf = (s: ServiceRow): { price: number; currency: string } | null => {
     if (s.price != null) return { price: s.price, currency: "SAR" };
     const line = data.pricing.items.find((i) => i.item_type === "transport" && i.ref === s.ref);
-    return line?.sell_price != null ? { price: line.sell_price, currency: line.sell_currency || "SAR" } : null;
+    if (line?.sell_price != null) return { price: line.sell_price, currency: line.sell_currency || "SAR" };
+    // not worked out on the sheet yet: the list's price for the road (the way back is the way there, reversed)
+    return listPrices[s.ref] ?? null;
   };
   const tours = picks.filter((p) => !p.free);
   const total = showPrice

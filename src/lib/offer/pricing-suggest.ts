@@ -96,7 +96,28 @@ export type PricingReference = {
  * vehicle (tour_prices): `car_type` names the vehicle; an entry without one is
  * the tour's own single price. `program_id` is the ready programme it is.
  */
-export type TourPrice = { name: string; price: number; currency: string; car_type?: string | null; program_id?: string | null };
+export type TourPrice = {
+  name: string;
+  price: number;
+  currency: string;
+  car_type?: string | null;
+  program_id?: string | null;
+  /** the tour's city in the price list (tours.city_id), when the data team set it. */
+  city?: string | null;
+};
+
+/**
+ * The list a city's tours are picked from. A tour is listed by COUNTRY, so
+ * Istanbul offered Trabzon's «هضبة هالديزين» and Trabzon «جولة البسفور» (the
+ * owner's review, 2026-10-18). A tour whose city is set shows in that city
+ * only; one without names no other city of the file. `fold` compares Arabic
+ * spellings (normAr).
+ */
+export function pricesForCity(list: TourPrice[], city: string, fileCities: string[], fold: (s: string) => string): TourPrice[] {
+  const here = fold(city);
+  const others = [...new Set(fileCities.map(fold))].filter((c) => c && c !== here);
+  return list.filter((t) => (t.city ? fold(t.city) === here : !others.some((o) => fold(t.name).includes(o))));
+}
 
 /**
  * The listed price of a tour — the programme it was picked from, else the same

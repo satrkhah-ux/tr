@@ -105,7 +105,8 @@ import {
 } from "@/lib/offer/basic";
 import { citiesWithoutHotel, validateDraft, type DraftIssue } from "@/lib/offer/draft-validation";
 import { computeOfferPricing, rebase } from "@/lib/offer/pricing";
-import { syncSuggestions, type TourPrice } from "@/lib/offer/pricing-suggest";
+import { pricesForCity, syncSuggestions, type TourPrice } from "@/lib/offer/pricing-suggest";
+import { normAr } from "@/lib/catalog/norm";
 import { syncDepartureDates } from "@/lib/offer/schedule";
 import { useRole } from "@/lib/roles/RoleContext";
 import { useCanOpen } from "@/lib/roles/useCanOpen";
@@ -587,7 +588,8 @@ export function BasicEditor({
   const nightsChoice = newNights || Math.max(left, 1);
   // the arrival day is spent arriving: four nights hold up to three tours (the city card allows more)
   const maxTours = Math.max(nightsChoice - 1, 0);
-  const toursChoice = newTours == null ? maxTours : Math.min(newTours, maxTours);
+  // one tour unless the agent asks for more — every night but the last was too many to undo (the owner's review, 2026-10-18)
+  const toursChoice = newTours == null ? Math.min(1, maxTours) : Math.min(newTours, maxTours);
   const roomsChoice = newRooms || Math.max(trip.rooms, 1);
   // the trip's country unless the group crosses into a neighbour
   const barCountry = findLookupCountry(lk.countries, newCountry || trip.country);
@@ -698,6 +700,32 @@ export function BasicEditor({
       ),
     [shownItems, display, lookups.sarPer],
   );
+
+  // the transfers' list prices, worked out as the sheet would (the way back from the way there) and shown on
+  // the city cards before anyone opens the sheet — the owner's review, 2026-10-18: four typed by hand
+  const [listPrices, setListPrices] = useState<Record<string, { price: number; currency: string }>>({});
+  const transferKey = JSON.stringify([plan, data.flights.map((f) => [f.from_airport, f.to_airport]), cities.map((c) => [c.city_name, c.nights, (c as BasicCity).services])]);
+  useEffect(() => {
+    if (!scope.transport) return;
+    let live = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        await flush();
+        const res = await suggestPricingForDraft(draftId, { hotel: t("pg.hotel"), airline: t("pg.airline") });
+        if (!live || !res.ok) return;
+        const next: Record<string, { price: number; currency: string }> = {};
+        for (const i of res.items) if (i.item_type === "transport" && i.ref && i.sell_price != null) next[i.ref] = { price: i.sell_price, currency: i.sell_currency || "SAR" };
+        setListPrices(next);
+      } catch {
+        /* offline: the cards keep what they had, the sheet still prices */
+      }
+    }, 1500);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the road, the cars and the flights decide; the rest of the file does not
+  }, [transferKey, scope.transport, draftId]);
 
   const [pricingError, setPricingError] = useState<string | null>(null);
   const [fareNote, setFareNote] = useState<string | null>(null);
@@ -1273,7 +1301,8 @@ export function BasicEditor({
                 data={data}
                 lookups={lk}
                 programs={programs.filter((p) => p.city_name === city.city_name)}
-                tourPrices={tourPrices}
+                tourPrices={pricesForCity(tourPrices, city.city_name, cities.map((c) => c.city_name), normAr)}
+                listPrices={listPrices}
                 hotelsOn={scope.hotels}
                 toursOn={toursOn}
                 transportOn={scope.transport}
