@@ -934,6 +934,8 @@ export const en = {
   "murad.f.suggest.hint": "A client waiting 5 minutes with no staff reply: Murad writes a suggested reply as a private note on the Teletel conversation; nothing reaches the client. Off: no suggestions.",
   "murad.f.auto": "Murad — automatic reply to the client",
   "murad.f.auto.hint": "Only for the auto-reply numbers (the test number and the «Murad» list below), and only within 24 hours of the client's last message. Off: they get a suggestion note like everyone else.",
+  "murad.f.reception": "Murad — automatic reception",
+  "murad.f.reception.hint": "Greets a new client by name the moment their message arrives and hands the conversation to the department's Teletel team (the table under «Client messages»). Scope in the «Murad» section below: the two test numbers only, or everyone.",
   "murad.title": "Murad — client-reply assistant",
   "murad.hint": "Murad steps in when 5 minutes pass after the client's last message with no staff reply: a suggested note for staff, or a reply to the client for the listed numbers only. Once per client message.",
   "murad.provider": "Model in use",

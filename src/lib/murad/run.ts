@@ -73,7 +73,7 @@ type RawConversation = { can_reply?: boolean; labels?: string[]; meta?: { sender
 export type FreshThread = { messages: TurnMessage[]; canReply: boolean; phone: string; name: string; labels: string[] };
 
 /** The latest messages (the API's last page) and the conversation itself — read now, not from the list's copy. */
-async function readThread(conversationId: number): Promise<FreshThread | null> {
+export async function readThread(conversationId: number): Promise<FreshThread | null> {
   const [list, conv] = await Promise.all([
     teletelGet<{ payload?: RawMessage[] }>(`/conversations/${conversationId}/messages`),
     teletelGet<RawConversation>(`/conversations/${conversationId}`),
@@ -92,7 +92,7 @@ async function readThread(conversationId: number): Promise<FreshThread | null> {
 
 type Settings = { clientWhatsapp: string | null; autoList: string[]; policies: string; cap: number };
 
-async function readSettings(service: SupabaseClient): Promise<Settings & { autoPhones: string[]; testPhone: string | null }> {
+export async function readSettings(service: SupabaseClient): Promise<Settings & { autoPhones: string[]; testPhone: string | null }> {
   const { data } = await service.from("app_settings").select("key, value").in("key", Object.values(SETTING));
   const v = new Map(((data ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
   const autoPhones = parseAutoPhones(v.get(SETTING.autoPhones));

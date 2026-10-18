@@ -45,6 +45,9 @@ export type Lead = Omit<LeadRow, "sheet_key"> & {
   assignee_reply_at: string | null;
   /** every agent's turn with it, in order — the first is «الموظف المستلم» (0099) */
   handoffs: Stage[] | null;
+  /** «المستقبل الآلي» handed it to this team, at this time (0103) */
+  auto_route: string | null;
+  auto_routed_at: string | null;
 };
 
 export type LeadsPage = {
@@ -58,7 +61,7 @@ export type LeadsPage = {
 };
 
 const COLS =
-  "id, phone, name, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, draft_id, source, created_at, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, handoffs";
+  "id, phone, name, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, draft_id, source, created_at, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, handoffs, auto_route, auto_routed_at";
 const ROW_COLS =
   "id, phone, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, sheet_key";
 

@@ -67,9 +67,16 @@ const secs = (from: number, to: number) => span((to - from) * 1000);
 
 /** «مسار المحادثة»: each agent's turn — how long to answer, how long before handing it on */
 function Turns({ l, now }: { l: Lead; now: number }) {
-  if (!l.handoffs?.length) return <span className="text-[#93aaa3]">—</span>;
+  const routed = l.auto_route && l.auto_routed_at ? (
+    <li className="whitespace-nowrap text-[#1e3a8a]">
+      🤖 حُوّل آلياً إلى <b>{l.auto_route}</b> ·{" "}
+      <DirText>{new Date(l.auto_routed_at).toLocaleTimeString("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit" })}</DirText>
+    </li>
+  ) : null;
+  if (!l.handoffs?.length) return routed ? <ol className="text-[11px] font-semibold leading-5">{routed}</ol> : <span className="text-[#93aaa3]">—</span>;
   return (
     <ol className="space-y-0.5 text-[11px] font-semibold leading-5" suppressHydrationWarning>
+      {routed}
       {l.handoffs.map((s, i) => (
         <li key={i} className="whitespace-nowrap">
           <b className="text-[#003c3a]">{s.agent}</b>

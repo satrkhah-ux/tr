@@ -36,6 +36,10 @@ export const SETTING = {
   clientWhatsapp: "client_whatsapp",
   policies: "murad_policies",
   cap: "murad_daily_cap",
+  // «المستقبل الآلي» (reception.ts): test numbers only or everyone, the department → team table, the working day
+  receptionScope: "murad_reception_scope",
+  receptionRoutes: "murad_reception_routes",
+  receptionHours: "murad_reception_hours",
 } as const;
 
 // ---------- which conversations, which turn ----------

@@ -119,6 +119,8 @@ const PUBLIC_PREFIXES = [
   "/api/leads/pull",
   // «مُراد»: the minute crontab, the same secret
   "/api/murad/run",
+  // «المستقبل الآلي»: Teletel's webhook — no cookie; the token in its URL is the secret's (route.ts)
+  "/api/teletel/webhook",
   "/b2b",
 ];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);

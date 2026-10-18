@@ -5,6 +5,10 @@ import { ConnectionsPanel, ConnectionsSkeleton } from "@/components/traveliun/de
 import { ServiceSwitches } from "@/components/traveliun/developer/ServiceSwitches";
 import { MuradPanel } from "@/components/traveliun/developer/MuradPanel";
 import { ReadyOffersSheetPanel } from "@/components/traveliun/developer/ReadyOffersSheetPanel";
+import { ReceptionPanel } from "@/components/traveliun/developer/ReceptionPanel";
+import { readReceptionSettings, receptionToday, webhookToken } from "@/lib/murad/reception-run";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { currentCan } from "@/lib/roles/current";
 import { getFeatureFlags } from "@/lib/features-server";
 import { FEATURES_SETTING_KEY } from "@/lib/features";
@@ -24,12 +28,16 @@ export const dynamic = "force-dynamic";
 export default async function DeveloperPage() {
   if (!(await currentCan("developer.access"))) redirect("/dashboard");
 
-  const [flags, log, murad, readyOffers] = await Promise.all([
+  const [flags, log, murad, readyOffers, receptionSettings, today] = await Promise.all([
     getFeatureFlags(),
     listEntityAudit("app_settings", FEATURES_SETTING_KEY, 10),
     muradPanel(),
     readyOffersPanel(),
+    readReceptionSettings(createSupabaseServiceClient() as unknown as SupabaseClient),
+    receptionToday(),
   ]);
+  const token = webhookToken();
+  const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
   const changes = log.map((row) => ({
     id: row.id,
     at: row.created_at,
@@ -47,6 +55,9 @@ export default async function DeveloperPage() {
         </Suspense>
         <ServiceSwitches flags={flags} changes={changes} />
         <MuradPanel data={murad} flags={{ suggest: flags.murad_suggest, auto: flags.murad_auto }} />
+        <ReceptionPanel
+          data={{ on: flags.murad_reception, scope: receptionSettings.scope, webhookUrl: token ? `${site}/api/teletel/webhook?token=${token}` : null, today }}
+        />
         <ReadyOffersSheetPanel data={readyOffers} />
       </div>
     </TraveliunShell>

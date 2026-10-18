@@ -6,7 +6,9 @@ import { currentCan } from "@/lib/roles/current";
 import { logAudit } from "@/lib/data/audit";
 import { forgetFeatureFlags, getFeatureFlags } from "@/lib/features-server";
 import { FEATURES_SETTING_KEY, isFeature, type Feature } from "@/lib/features";
-import { intlPhone } from "@/lib/providers/teletel";
+import { intlPhone, listTeletelTeams } from "@/lib/providers/teletel";
+import { SETTING as MURAD_SETTING } from "@/lib/murad/core";
+import { parseHours, readRoutes, ROUTE_KEYS, type Routes } from "@/lib/murad/reception";
 
 /**
  * Choices the administration makes once for everyone (app_settings, 0054).
@@ -156,6 +158,79 @@ export async function setMuradPolicies(text: string): Promise<SetSettingResult> 
     const { error } = await supabase.from("app_settings").upsert({ key: "murad_policies", value: text.trim(), updated_at: new Date().toISOString() });
     if (error) return { ok: false, error: "err.db" };
     await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: "murad_policies", meta: { length: text.trim().length } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+// ---------- «المستقبل الآلي» (src/lib/murad/reception.ts) ----------
+
+export type ReceptionSetup = {
+  teams: { id: number; name: string }[];
+  routes: Routes;
+  /** false: the table shown is the suggestion from the teams' names, nothing saved yet */
+  saved: boolean;
+  hours: string;
+  scope: "test" | "all";
+};
+
+/** The department → Teletel team table and the working day, for /settings/client-comms. */
+export async function getReceptionSetup(): Promise<ReceptionSetup | null> {
+  if (!(await currentCan("settings.manage")) && !(await currentCan("developer.access"))) return null;
+  try {
+    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const [teams, { data }] = await Promise.all([
+      listTeletelTeams(),
+      service.from("app_settings").select("key, value").in("key", [MURAD_SETTING.receptionRoutes, MURAD_SETTING.receptionHours, MURAD_SETTING.receptionScope]),
+    ]);
+    const v = new Map(((data ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
+    const hours = parseHours(v.get(MURAD_SETTING.receptionHours));
+    return {
+      teams,
+      routes: readRoutes(v.get(MURAD_SETTING.receptionRoutes), teams),
+      saved: v.has(MURAD_SETTING.receptionRoutes),
+      hours: `${hours.open}-${hours.close}`,
+      scope: v.get(MURAD_SETTING.receptionScope) === "all" ? "all" : "test",
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Saves the table and the working day. settings.manage (or the developer); audited. */
+export async function setReceptionRoutes(routes: Routes, hours: string): Promise<SetSettingResult> {
+  if (!(await currentCan("settings.manage")) && !(await currentCan("developer.access"))) return { ok: false, error: "err.forbidden" };
+  const clean: Routes = {};
+  for (const k of [...ROUTE_KEYS, "fallback"] as const) {
+    const v = routes?.[k];
+    clean[k] = typeof v === "number" && Number.isFinite(v) ? v : null;
+  }
+  const h = parseHours(hours);
+  try {
+    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const now = new Date().toISOString();
+    const { error } = await service.from("app_settings").upsert([
+      { key: MURAD_SETTING.receptionRoutes, value: JSON.stringify(clean), updated_at: now },
+      { key: MURAD_SETTING.receptionHours, value: `${h.open}-${h.close}`, updated_at: now },
+    ]);
+    if (error) return { ok: false, error: "err.db" };
+    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: MURAD_SETTING.receptionRoutes, meta: { routes: clean, hours: `${h.open}-${h.close}` } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/** The trial's two numbers, or every client — the owner's call, from /developer only; audited. */
+export async function setReceptionScope(scope: "test" | "all"): Promise<SetSettingResult> {
+  if (!(await currentCan("developer.access"))) return { ok: false, error: "err.forbidden" };
+  if (scope !== "test" && scope !== "all") return { ok: false, error: "err.db" };
+  try {
+    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { error } = await service.from("app_settings").upsert({ key: MURAD_SETTING.receptionScope, value: scope, updated_at: new Date().toISOString() });
+    if (error) return { ok: false, error: "err.db" };
+    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: MURAD_SETTING.receptionScope, meta: { scope } });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };

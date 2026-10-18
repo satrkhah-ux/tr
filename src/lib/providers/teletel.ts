@@ -528,7 +528,7 @@ export async function assignTeletelTeam(conversationId: number, teamId: number):
   return (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { team_id: teamId })) !== null;
 }
 
-export type ConversationEvent = { at: number; kind: "client" | "agent" | "activity"; text: string; sender: string | null; isPrivate: boolean };
+export type ConversationEvent = { id: number; at: number; kind: "client" | "agent" | "activity"; text: string; sender: string | null; isPrivate: boolean };
 
 /**
  * A thread with its activity lines («تم إسنادها إلى X بواسطة Y») — who held a
@@ -549,6 +549,7 @@ export async function conversationEvents(conversationId: number, pages = 1): Pro
     raw = [...older.payload, ...raw];
   }
   return raw.map((m) => ({
+    id: m.id ?? 0,
     at: m.created_at ?? 0,
     kind: m.message_type === 0 ? "client" : m.message_type === 2 ? "activity" : "agent",
     text: m.content?.trim() ?? "",

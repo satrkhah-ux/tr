@@ -74,15 +74,19 @@ export type Stage = { agent: string; from: number; reply: number | null; handed:
  * any hand-over, the first of ours to answer is the first receiver, their turn
  * starting with the client's first message (`start`). A
  * turn's reply is its agent's first public message — a private note, or a
- * colleague answering, is not theirs.
+ * colleague answering, is not theirs. `ignore`: our own automatic replies
+ * («مُراد», «المستقبل الآلي»), written in Teletel as the API token's user —
+ * never anyone's turn.
  */
 export function timelineFrom(
-  events: { at: number; kind: string; text: string; sender: string | null; isPrivate: boolean }[],
+  events: { id?: number; at: number; kind: string; text: string; sender: string | null; isPrivate: boolean }[],
   start: number,
   isTeam: (name: string) => boolean,
+  ignore: ReadonlySet<number> = new Set(),
 ): Stage[] {
   const stages: Stage[] = [];
   for (const e of [...events].sort((a, b) => a.at - b.at)) {
+    if (e.id != null && ignore.has(e.id)) continue;
     const last = stages[stages.length - 1];
     if (e.kind === "activity") {
       const a = parseAssignment(e.text);

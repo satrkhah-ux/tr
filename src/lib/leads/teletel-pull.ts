@@ -56,6 +56,7 @@ type Known = {
   assignee_reply_at: string | null;
   contact_id: number | null;
   timeline_seen_at: number | null;
+  auto_routed_at: string | null;
 };
 
 /** an agent's Teletel name to an employee — by the Arabic name, else the English */
@@ -77,7 +78,7 @@ function clientName(c: OpenConversation): string | null {
   return n;
 }
 
-async function loadPlaces(supabase: SupabaseClient): Promise<Place[]> {
+export async function loadPlaces(supabase: SupabaseClient): Promise<Place[]> {
   const [{ data: countries }, { data: cities }] = await Promise.all([
     supabase.from("countries").select("id, arabic_name"),
     supabase.from("cities").select("arabic_name, country_id"),
@@ -103,7 +104,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
     // ponytail: every Teletel row and every unmatched sheet row in one read; a date window when it grows past tens of thousands
     supabase
       .from("client_leads")
-      .select("id, phone, name, inquiry, destination, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at")
+      .select("id, phone, name, inquiry, destination, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at, auto_routed_at")
       .or("teletel_conversation_id.not.is.null,and(source.eq.sheet,teletel_conversation_id.is.null)")
       .limit(20000),
   ]);
@@ -207,18 +208,25 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
   if (toTrace.length) {
     const teams = new Set((await listTeletelTeams()).map((t) => fold(t.name)));
     const isTeam = (name: string) => name.trim().startsWith("قسم") || teams.has(fold(name));
+    // Murad's and the reception's replies are sent as the API token's user: no one's turn
+    const { data: ours } = await supabase.from("murad_log").select("reply_message_id").in("conversation_id", toTrace.map((c) => c.id)).not("reply_message_id", "is", null);
+    const ignore = new Set(((ours ?? []) as { reply_message_id: number }[]).map((r) => Number(r.reply_message_id)));
     for (let i = 0; i < toTrace.length; i += 5) {
       await Promise.all(
         toTrace.slice(i, i + 5).map(async (c) => {
           const events = await conversationEvents(c.id, TIMELINE_PAGES);
           if (!events) return;
-          const stages = timelineFrom(events, c.createdAt, isTeam);
+          const stages = timelineFrom(events, c.createdAt, isTeam, ignore);
           const [first, second] = stages;
           const patch: Record<string, unknown> = { handoffs: stages, timeline_seen_at: c.lastActivityAt };
           // «الموظف المستلم» is the first to receive it, never whoever holds it now
           if (first) Object.assign(patch, { received_by: employeeFor(first.agent, team), received_by_name: first.agent });
-          // the first hand-over, for the columns that time it
-          if (second) {
+          const routedAt = byConversation.get(c.id)?.auto_routed_at;
+          // handed over by «المستقبل الآلي» the moment it came: that is the hand-over, and the first colleague to answer receives it
+          if (routedAt) {
+            const reply = stages.find((s) => s.reply && s.reply >= Date.parse(routedAt) / 1000)?.reply;
+            if (reply) patch.assignee_reply_at = iso(reply);
+          } else if (second) {
             Object.assign(patch, { assigned_at: iso(second.from), assignee_reply_at: second.reply ? iso(second.reply) : null });
             const to = employeeFor(second.agent, team);
             if (to) patch.assigned_to = to;

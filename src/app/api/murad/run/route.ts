@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { runMurad } from "@/lib/murad/run";
+import { receptionSweep } from "@/lib/murad/reception-run";
 import { recordCronRun } from "@/lib/data/cron-runs";
 
 export const runtime = "nodejs";
@@ -24,6 +25,8 @@ function authorised(req: NextRequest): boolean {
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!authorised(req)) return NextResponse.json({ ok: false }, { status: 401 });
   // every run leaves its trace for /developer, answered anyone or not (cron-runs.ts)
+  // «المستقبل الآلي»: what the webhook missed, before Murad's own turns (no model, its turns claimed one by one)
+  const received = await receptionSweep().catch(() => 0);
   const summary = await recordCronRun("murad_run", runMurad);
-  return NextResponse.json({ ok: true, ...summary });
+  return NextResponse.json({ ok: true, received, ...summary });
 }

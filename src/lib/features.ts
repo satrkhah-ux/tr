@@ -29,6 +29,10 @@ export const FEATURES = [
   // ignore; an auto-reply reaches the client (only the numbers on the auto list).
   "murad_suggest",
   "murad_auto",
+  // «المستقبل الآلي» (the owner, 2026-10-18): a new conversation greeted by name and handed to its department's
+  // Teletel team the moment it arrives (api/teletel/webhook, src/lib/murad/reception.ts). Its scope — the two test
+  // numbers or everyone — is a separate setting on /developer, the test numbers by default.
+  "murad_reception",
 ] as const;
 
 export type Feature = (typeof FEATURES)[number];
@@ -46,6 +50,7 @@ export const FEATURE_DEFAULTS: FeatureFlags = {
   flight_tracking: true,
   murad_suggest: true,
   murad_auto: true,
+  murad_reception: true,
 };
 
 export const FEATURES_SETTING_KEY = "features";

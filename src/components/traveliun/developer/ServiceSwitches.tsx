@@ -26,6 +26,7 @@ const FEATURE_TEXT: Record<Feature, { label: TranslationKey; hint: TranslationKe
   flight_tracking: { label: "dev.f.flight_tracking", hint: "dev.f.flight_tracking.hint" },
   murad_suggest: { label: "murad.f.suggest", hint: "murad.f.suggest.hint" },
   murad_auto: { label: "murad.f.auto", hint: "murad.f.auto.hint" },
+  murad_reception: { label: "murad.f.reception", hint: "murad.f.reception.hint" },
 };
 
 export type FeatureChange = { id: string; at: string; who: string | null; feature: string; on: boolean };

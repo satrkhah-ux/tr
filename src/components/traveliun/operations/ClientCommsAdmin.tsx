@@ -7,6 +7,8 @@ import { CLIENT_MESSAGE_LABEL, WA_TEMPLATES, type WaTemplateKey } from "@/lib/op
 import { TraveliunShell } from "../TraveliunShell";
 import { useSafeTransition } from "../useSafeTransition";
 import { MuradPolicies } from "./MuradPolicies";
+import { ReceptionRoutes } from "./ReceptionRoutes";
+import type { ReceptionSetup } from "@/lib/data/app-settings";
 
 /**
  * What the traveller is told (operations order 11): the WhatsApp message at each
@@ -48,11 +50,14 @@ export function ClientCommsAdmin({
   guides,
   waStatus,
   muradPolicies,
+  reception,
 }: {
   templates: MessageTemplate[];
   guides: DestinationGuide[];
   /** «مُراد»: the policy text he answers from (murad_policies). */
   muradPolicies: string;
+  /** «المستقبل الآلي»: the department → team table (null: no permission, or Teletel unreadable) */
+  reception: ReceptionSetup | null;
   /** Meta template status by name (Teletel's sync); null when Teletel could not be read. */
   waStatus: Record<string, string> | null;
 }) {
@@ -74,6 +79,7 @@ export function ClientCommsAdmin({
           <TemplateRow key={t.key} template={t} waStatus={waStatus} />
         ))}
         <GuidesEditor guides={guides} />
+        <ReceptionRoutes setup={reception} />
         <MuradPolicies initial={muradPolicies} />
       </div>
     </TraveliunShell>
