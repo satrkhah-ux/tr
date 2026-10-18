@@ -1,5 +1,5 @@
 import { after, type NextRequest, NextResponse } from "next/server";
-import { receive, webhookToken } from "@/lib/murad/reception-run";
+import { schedule, webhookToken } from "@/lib/murad/reception-run";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -41,8 +41,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     contactName: sender?.name ?? body.sender?.name ?? "",
     content: String(body.content ?? ""),
   };
+  // «تأخير بشري»: marked read now, answered after a person's pause (reception-run.ts schedule)
   after(async () => {
-    await receive(message).catch(() => undefined);
+    await schedule(message).catch(() => undefined);
   });
   return NextResponse.json({ ok: true });
 }

@@ -28,6 +28,8 @@ export function ReceptionRoutes({ setup }: { setup: ReceptionSetup | null }) {
   const [routes, setRoutes] = useState<Routes>(setup?.routes ?? {});
   const [open, setOpen] = useState(setup?.hours.split("-")[0] ?? "09:00");
   const [close, setClose] = useState(setup?.hours.split("-")[1] ?? "23:00");
+  const [minWait, setMinWait] = useState(Number(setup?.delay.split("-")[0] ?? 20));
+  const [maxWait, setMaxWait] = useState(Number(setup?.delay.split("-")[1] ?? 60));
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<"saved" | "failed" | null>(null);
   if (!setup) return null;
@@ -38,7 +40,7 @@ export function ReceptionRoutes({ setup }: { setup: ReceptionSetup | null }) {
   async function save() {
     setSaving(true);
     setNote(null);
-    const res = await setReceptionRoutes(routes, `${open}-${close}`).catch(() => ({ ok: false }));
+    const res = await setReceptionRoutes(routes, `${open}-${close}`, `${minWait}-${maxWait}`).catch(() => ({ ok: false }));
     setSaving(false);
     setNote(res.ok ? "saved" : "failed");
   }
@@ -91,6 +93,20 @@ export function ReceptionRoutes({ setup }: { setup: ReceptionSetup | null }) {
           <input type="time" value={close} onChange={(e) => setClose(e.target.value)} className={`${field} w-32`} />
         </label>
         <span className="pb-2 text-[11.5px] font-semibold text-[#93aaa3]">بتوقيت الرياض — خارجه يُضاف «وسيتواصل معك الموظف عند بداية الدوام».</span>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <label className="grid gap-1">
+          <span className="text-[11.5px] font-bold text-[#557d78]">ينتظر قبل الرد من (ثانية)</span>
+          <input type="number" min={0} max={90} value={minWait} onChange={(e) => setMinWait(Number(e.target.value))} className={`${field} w-28`} />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-[11.5px] font-bold text-[#557d78]">إلى (ثانية)</span>
+          <input type="number" min={0} max={90} value={maxWait} onChange={(e) => setMaxWait(Number(e.target.value))} className={`${field} w-28`} />
+        </label>
+        <span className="pb-2 text-[11.5px] font-semibold text-[#93aaa3]">
+          «تأخير بشري»: مدة عشوائية بينهما. إن كتب العميل مرة ثانية أثناء الانتظار يُعاد العد مرة واحدة ويُقرأ كلامه كله، ولا يتجاوز الانتظار 90 ثانية. إن ردّ موظف أو أسندها أحد أثناء الانتظار يُلغى الرد الآلي.
+        </span>
       </div>
 
       <div className="mt-3 flex items-center gap-2">

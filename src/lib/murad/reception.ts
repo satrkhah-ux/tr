@@ -72,6 +72,27 @@ export function firstName(contactName: string): string | null {
   return KUNYA.test(first) && second ? `${first} ${second}` : first;
 }
 
+/**
+ * «تأخير بشري» (the owner, 2026-10-18: «ليس الرد بسرعة فائقة»): Murad answers
+ * after a random 20–60 seconds, not in one; a second message in that wait
+ * restarts the count once, never past 90 seconds from the first.
+ */
+export type Delay = { min: number; max: number };
+export const DEFAULT_DELAY: Delay = { min: 20, max: 60 };
+export const MAX_WAIT_SEC = 90;
+
+/** «20-60» → seconds, kept within 0–90 and min ≤ max; the default when it does not read. */
+export function parseDelay(raw: string | null | undefined): Delay {
+  const m = (raw ?? "").match(/^(\d{1,3})\s*-\s*(\d{1,3})$/);
+  if (!m) return DEFAULT_DELAY;
+  const min = Math.min(Number(m[1]), MAX_WAIT_SEC);
+  const max = Math.min(Math.max(Number(m[2]), min), MAX_WAIT_SEC);
+  return { min, max };
+}
+
+/** One wait, in seconds, somewhere in the range. */
+export const pickDelay = (d: Delay, random = Math.random()) => d.min + Math.round(random * (d.max - d.min));
+
 export type Hours = { open: string; close: string };
 export const DEFAULT_HOURS: Hours = { open: "09:00", close: "23:00" };
 
@@ -110,7 +131,7 @@ export function clarifyText(salam: boolean): string {
   return salam ? `وعليكم السلام ورحمة الله، ${CLARIFY_QUESTION}` : CLARIFY_QUESTION;
 }
 
-export type ReceptionDecision = { act: "none"; why: "routed" | "staff" | "window" } | { act: "ask" } | { act: "route"; to: RouteKey };
+export type ReceptionDecision = { act: "none"; why: "routed" | "staff" | "assigned" | "window" } | { act: "ask" } | { act: "route"; to: RouteKey };
 
 /**
  * The whole rule for one incoming message: nothing once the conversation was
@@ -118,9 +139,11 @@ export type ReceptionDecision = { act: "none"; why: "routed" | "staff" | "window
  * for, or a service named → hand over; otherwise one question, and after it
  * whatever the answer is goes to the general team.
  */
-export function decideReception(i: { routed: boolean; asked: boolean; staffReplied: boolean; canReply: boolean; request: Request }): ReceptionDecision {
+export function decideReception(i: { routed: boolean; asked: boolean; staffReplied: boolean; handedByHand?: boolean; canReply: boolean; request: Request }): ReceptionDecision {
   if (i.routed) return { act: "none", why: "routed" };
   if (i.staffReplied) return { act: "none", why: "staff" };
+  // someone took it in hand while Murad waited: theirs
+  if (i.handedByHand) return { act: "none", why: "assigned" };
   if (!i.canReply) return { act: "none", why: "window" };
   if (i.request.wantsHuman) return { act: "route", to: "موظف" };
   if (i.request.kind) return { act: "route", to: i.request.kind };

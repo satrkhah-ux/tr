@@ -16,12 +16,12 @@ export type ReceptionPanelData = {
   on: boolean;
   scope: "test" | "all";
   webhookUrl: string | null;
-  today: { routed: number; asked: number; other: number; recent: { at: string; phone: string; reason: string; reply: string }[] };
+  today: { routed: number; asked: number; other: number; recent: { at: string; phone: string; reason: string; reply: string; waitSec: number | null }[] };
 };
 
 const REASON: Record<string, string> = { asked: "سؤال توضيح", send_failed: "تعذّر الإرسال", unreadable: "تعذّرت القراءة", error: "خطأ" };
 const reasonText = (r: string) =>
-  r.startsWith("routed:") ? `حُوّل — ${r.slice(7)}` : r.startsWith("none:") ? { "none:routed": "حُوّل سابقاً", "none:staff": "ردّ موظف", "none:window": "خارج 24 ساعة" }[r] ?? r : REASON[r] ?? r;
+  r.startsWith("routed:") ? `حُوّل — ${r.slice(7)}` : r.startsWith("none:") ? { "none:routed": "حُوّل سابقاً", "none:staff": "أُلغي — ردّ موظف", "none:assigned": "أُلغي — أُسندت يدوياً", "none:window": "خارج 24 ساعة" }[r] ?? r : REASON[r] ?? r;
 
 export function ReceptionPanel({ data }: { data: ReceptionPanelData }) {
   const router = useRouter();
@@ -72,6 +72,7 @@ export function ReceptionPanel({ data }: { data: ReceptionPanelData }) {
               <span className="tv-tnum">{whenText(r.at, true)}</span>
               <span dir="ltr">{r.phone}</span>
               <span className="font-bold text-[#185045]">{reasonText(r.reason)}</span>
+              {r.waitSec != null ? <span>بعد {r.waitSec} ث</span> : null}
               {r.reply ? <span className="truncate text-[#93aaa3]">«{r.reply}»</span> : null}
             </li>
           ))}

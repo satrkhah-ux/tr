@@ -8,7 +8,7 @@ import { forgetFeatureFlags, getFeatureFlags } from "@/lib/features-server";
 import { FEATURES_SETTING_KEY, isFeature, type Feature } from "@/lib/features";
 import { intlPhone, listTeletelTeams } from "@/lib/providers/teletel";
 import { SETTING as MURAD_SETTING } from "@/lib/murad/core";
-import { parseHours, readRoutes, ROUTE_KEYS, type Routes } from "@/lib/murad/reception";
+import { parseDelay, parseHours, readRoutes, ROUTE_KEYS, type Routes } from "@/lib/murad/reception";
 
 /**
  * Choices the administration makes once for everyone (app_settings, 0054).
@@ -172,6 +172,8 @@ export type ReceptionSetup = {
   /** false: the table shown is the suggestion from the teams' names, nothing saved yet */
   saved: boolean;
   hours: string;
+  /** «20-60»: the seconds Murad waits before answering */
+  delay: string;
   scope: "test" | "all";
 };
 
@@ -182,11 +184,13 @@ export async function getReceptionSetup(): Promise<ReceptionSetup | null> {
     const service = createSupabaseServiceClient() as unknown as SupabaseClient;
     const [teams, { data }] = await Promise.all([
       listTeletelTeams(),
-      service.from("app_settings").select("key, value").in("key", [MURAD_SETTING.receptionRoutes, MURAD_SETTING.receptionHours, MURAD_SETTING.receptionScope]),
+      service.from("app_settings").select("key, value").in("key", [MURAD_SETTING.receptionRoutes, MURAD_SETTING.receptionHours, MURAD_SETTING.receptionScope, MURAD_SETTING.receptionDelay]),
     ]);
     const v = new Map(((data ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
     const hours = parseHours(v.get(MURAD_SETTING.receptionHours));
+    const delay = parseDelay(v.get(MURAD_SETTING.receptionDelay));
     return {
+      delay: `${delay.min}-${delay.max}`,
       teams,
       routes: readRoutes(v.get(MURAD_SETTING.receptionRoutes), teams),
       saved: v.has(MURAD_SETTING.receptionRoutes),
@@ -199,7 +203,7 @@ export async function getReceptionSetup(): Promise<ReceptionSetup | null> {
 }
 
 /** Saves the table and the working day. settings.manage (or the developer); audited. */
-export async function setReceptionRoutes(routes: Routes, hours: string): Promise<SetSettingResult> {
+export async function setReceptionRoutes(routes: Routes, hours: string, delay = "20-60"): Promise<SetSettingResult> {
   if (!(await currentCan("settings.manage")) && !(await currentCan("developer.access"))) return { ok: false, error: "err.forbidden" };
   const clean: Routes = {};
   for (const k of [...ROUTE_KEYS, "fallback"] as const) {
@@ -207,15 +211,17 @@ export async function setReceptionRoutes(routes: Routes, hours: string): Promise
     clean[k] = typeof v === "number" && Number.isFinite(v) ? v : null;
   }
   const h = parseHours(hours);
+  const d = parseDelay(delay);
   try {
     const service = createSupabaseServiceClient() as unknown as SupabaseClient;
     const now = new Date().toISOString();
     const { error } = await service.from("app_settings").upsert([
       { key: MURAD_SETTING.receptionRoutes, value: JSON.stringify(clean), updated_at: now },
       { key: MURAD_SETTING.receptionHours, value: `${h.open}-${h.close}`, updated_at: now },
+      { key: MURAD_SETTING.receptionDelay, value: `${d.min}-${d.max}`, updated_at: now },
     ]);
     if (error) return { ok: false, error: "err.db" };
-    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: MURAD_SETTING.receptionRoutes, meta: { routes: clean, hours: `${h.open}-${h.close}` } });
+    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: MURAD_SETTING.receptionRoutes, meta: { routes: clean, hours: `${h.open}-${h.close}`, delay: `${d.min}-${d.max}` } });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };

@@ -531,6 +531,18 @@ export async function assignTeletelTeam(conversationId: number, teamId: number):
   return (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { team_id: teamId })) !== null;
 }
 
+/** The conversation read by us (the agent's «last seen») — WhatsApp's blue ticks where Teletel passes them on. */
+export async function markTeletelSeen(conversationId: number): Promise<boolean> {
+  const config = getTeletelConfig();
+  return config ? (await api<unknown>(config, `/conversations/${conversationId}/update_last_seen`, {})) !== null : false;
+}
+
+/** «يكتب…» on or off, where the channel shows it. */
+export async function setTeletelTyping(conversationId: number, on: boolean): Promise<boolean> {
+  const config = getTeletelConfig();
+  return config ? (await api<unknown>(config, `/conversations/${conversationId}/toggle_typing_status`, { typing_status: on ? "on" : "off" })) !== null : false;
+}
+
 export type ConversationEvent = { id: number; at: number; kind: "client" | "agent" | "activity"; text: string; sender: string | null; isPrivate: boolean };
 
 /**

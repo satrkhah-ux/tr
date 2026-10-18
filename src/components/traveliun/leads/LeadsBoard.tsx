@@ -146,6 +146,7 @@ function Turns({ l, now }: { l: Lead; now: number }) {
     <li className="whitespace-nowrap text-[#1e3a8a]">
       🤖 حُوّل آلياً إلى <b>{l.auto_route}</b> ·{" "}
       <DirText>{new Date(l.auto_routed_at).toLocaleTimeString("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit" })}</DirText>
+      {l.auto_wait_sec != null ? <span className="text-[#557d78]"> · ردّ بعد {l.auto_wait_sec} ث من رسالته</span> : null}
     </li>
   ) : null;
   if (!l.handoffs?.length) return routed ? <ol className="text-[11px] font-semibold leading-5">{routed}</ol> : <span className="text-[#93aaa3]">—</span>;

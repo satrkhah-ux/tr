@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   clarifyText,
+  parseDelay,
+  pickDelay,
   decideReception,
   firstName,
   isWorkingTime,
@@ -66,6 +68,9 @@ describe("the rule for one message", () => {
     expect(decideReception({ ...base, asked: true, request: req({ kind: "بكج" }) })).toEqual({ act: "route", to: "بكج" });
     expect(decideReception({ ...base, asked: true, request: req() })).toEqual({ act: "route", to: "غير واضح" });
   });
+  it("a colleague who took it in hand while Murad waited keeps it", () => {
+    expect(decideReception({ ...base, handedByHand: true, request: req({ kind: "بكج" }) })).toEqual({ act: "none", why: "assigned" });
+  });
   it("never twice, never over a colleague, never outside the 24 hours", () => {
     expect(decideReception({ ...base, routed: true, request: req({ kind: "بكج" }) })).toEqual({ act: "none", why: "routed" });
     expect(decideReception({ ...base, staffReplied: true, request: req({ kind: "بكج" }) })).toEqual({ act: "none", why: "staff" });
@@ -99,5 +104,19 @@ describe("the department → team table", () => {
     expect(teamFor(routes, "تأشيرات")).toBe(1);
     expect(teamFor(routes, "فنادق")).toBe(25);
     expect(teamFor({}, "فنادق")).toBeNull();
+  });
+});
+
+describe("«تأخير بشري» (the owner, 2026-10-18)", () => {
+  it("20–60 seconds unless set, within 0–90, min never above max", () => {
+    expect(parseDelay("")).toEqual({ min: 20, max: 60 });
+    expect(parseDelay("30-45")).toEqual({ min: 30, max: 45 });
+    expect(parseDelay("50-20")).toEqual({ min: 50, max: 50 });
+    expect(parseDelay("10-300")).toEqual({ min: 10, max: 90 });
+  });
+  it("one wait somewhere in the range", () => {
+    expect(pickDelay({ min: 20, max: 60 }, 0)).toBe(20);
+    expect(pickDelay({ min: 20, max: 60 }, 1)).toBe(60);
+    expect(pickDelay({ min: 20, max: 60 }, 0.5)).toBe(40);
   });
 });

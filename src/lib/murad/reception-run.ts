@@ -3,7 +3,18 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getFeatureFlags } from "@/lib/features-server";
-import { addTeletelNote, assignTeletelTeam, intlPhone, listOpenConversations, listTeletelTeams, sendTeletelMessage } from "@/lib/providers/teletel";
+import {
+  addTeletelNote,
+  assignTeletelTeam,
+  conversationEvents,
+  intlPhone,
+  listOpenConversations,
+  listTeletelTeams,
+  markTeletelSeen,
+  sendTeletelMessage,
+  setTeletelTyping,
+} from "@/lib/providers/teletel";
+import { parseAssignment } from "@/lib/leads/auto";
 import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
@@ -15,7 +26,10 @@ import {
   DEPARTMENT,
   firstName,
   isWorkingTime,
+  MAX_WAIT_SEC,
+  parseDelay,
   parseHours,
+  pickDelay,
   readRequest,
   readRoutes,
   receptionText,
@@ -40,24 +54,38 @@ const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 /** how far back «this visit» reaches: a colleague's answer, or a reception, older than this belongs to an earlier one */
 const VISIT_SEC = 12 * 3600;
 
-export type IncomingMessage = { conversationId: number; messageId: number; at: number; phone: string; contactName: string; content: string };
+export type IncomingMessage = {
+  conversationId: number;
+  messageId: number;
+  at: number;
+  phone: string;
+  contactName: string;
+  content: string;
+  /** the first message of the burst Murad waited on — every client message since is read as one */
+  since?: number;
+};
 
 export type ReceptionOutcome =
   | "off"
   | "out_of_scope"
   | "duplicate"
   | "unreadable"
-  | `none:${"routed" | "staff" | "window"}`
+  | `none:${"routed" | "staff" | "assigned" | "window"}`
   | "asked"
   | `routed:${RouteKey}`
   | "send_failed";
 
-export type ReceptionSettings = { scope: "test" | "all"; routesRaw: string | null; hours: string | null };
+export type ReceptionSettings = { scope: "test" | "all"; routesRaw: string | null; hours: string | null; delay: string | null };
 
 export async function readReceptionSettings(service: SupabaseClient): Promise<ReceptionSettings> {
-  const { data } = await service.from("app_settings").select("key, value").in("key", [SETTING.receptionScope, SETTING.receptionRoutes, SETTING.receptionHours]);
+  const { data } = await service.from("app_settings").select("key, value").in("key", [SETTING.receptionScope, SETTING.receptionRoutes, SETTING.receptionHours, SETTING.receptionDelay]);
   const v = new Map(((data ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
-  return { scope: v.get(SETTING.receptionScope) === "all" ? "all" : "test", routesRaw: v.get(SETTING.receptionRoutes) ?? null, hours: v.get(SETTING.receptionHours) ?? null };
+  return {
+    scope: v.get(SETTING.receptionScope) === "all" ? "all" : "test",
+    routesRaw: v.get(SETTING.receptionRoutes) ?? null,
+    hours: v.get(SETTING.receptionHours) ?? null,
+    delay: v.get(SETTING.receptionDelay) ?? null,
+  };
 }
 
 /**
@@ -93,12 +121,12 @@ async function countryOf(service: SupabaseClient, text: string): Promise<string 
  * a conversation WhatsApp reopened days later takes its new kind and country,
  * never the last visit's (the evaluator: «اندونيسيا» from a former visit).
  */
-async function markLead(service: SupabaseClient, m: IncomingMessage, fields: { inquiry: string | null; destination: string | null; route: string; at: string }): Promise<void> {
+async function markLead(service: SupabaseClient, m: IncomingMessage, fields: { inquiry: string | null; destination: string | null; route: string; at: string; waitSec: number }): Promise<void> {
   const name = m.contactName.trim();
   const realName = name && !name.startsWith("#") && normalizePhone(name) !== normalizePhone(m.phone) ? name : null;
   const { data } = await service.from("client_leads").select("id, name, inquiry, destination, status, created_at, last_visit_at").eq("teletel_conversation_id", m.conversationId).maybeSingle();
   const had = data as { id: string; name: string | null; inquiry: string | null; destination: string | null; status: string; created_at: string; last_visit_at: string | null } | null;
-  const routed = { auto_route: fields.route, auto_routed_at: fields.at, assigned_at: fields.at, assignee_reply_at: null, updated_at: fields.at };
+  const routed = { auto_route: fields.route, auto_routed_at: fields.at, auto_wait_sec: fields.waitSec, assigned_at: fields.at, assignee_reply_at: null, updated_at: fields.at };
   if (had) {
     await service
       .from("client_leads")
@@ -145,7 +173,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
   // claimed before anything is read or sent — one answer per client message, whoever comes second
   const claim = await service
     .from("murad_log")
-    .insert({ conversation_id: m.conversationId, client_message_id: m.messageId, client_message_at: new Date(m.at * 1000).toISOString(), phone: m.phone, mode: "reception" })
+    .insert({ conversation_id: m.conversationId, client_message_id: m.messageId, client_message_at: new Date((m.since ?? m.at) * 1000).toISOString(), phone: m.phone, mode: "reception" })
     .select("id")
     .maybeSingle();
   if (claim.error || !claim.data) return "duplicate";
@@ -155,11 +183,13 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
   };
 
   try {
-    const [thread, past, places] = await Promise.all([
+    const [thread, past, places, events] = await Promise.all([
       readThread(m.conversationId),
       service.from("murad_log").select("mode, reason, reply_message_id, created_at").eq("conversation_id", m.conversationId),
       loadPlaces(service),
+      conversationEvents(m.conversationId),
     ]);
+    const since = m.since ?? m.at;
     if (!thread) {
       await finish({ reason: "unreadable", error: "teletel: the thread could not be read" });
       return "unreadable";
@@ -170,15 +200,20 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     const thisVisit = (sec: number) => m.at - sec < VISIT_SEC;
     const received = rows.filter((r) => r.mode === "reception" && thisVisit(Date.parse(r.created_at) / 1000));
     const ours = new Set(rows.filter((r) => r.reply_message_id != null).map((r) => Number(r.reply_message_id)));
-    const request = readRequest(m.content, places);
+    // everything the client wrote while Murad waited, read as one («ابغى» … «تأشيرة» … «الى لندن»)
+    const said = thread.messages.filter((t) => t.fromClient && !t.isPrivate && t.at >= since).map((t) => t.text).join("\n").trim() || m.content;
+    const request = readRequest(said, places);
     const decision = decideReception({
       routed: received.some((r) => r.reason?.startsWith("routed")),
       asked: received.some((r) => r.reason === "asked"),
       staffReplied: thread.messages.some((t) => thisVisit(t.at) && isHumanReply(t, ours)),
+      // handed to someone BY A PERSON while Murad waited — Teletel's own auto-assignment on arrival is no one taking it
+      handedByHand: (events ?? []).some((e) => e.kind === "activity" && e.at >= since && parseAssignment(e.text)?.by != null),
       canReply: thread.canReply,
       request,
     });
-    const intake = { kind: request.kind, country: request.country, wants_human: request.wantsHuman };
+    const waitSec = Math.max(0, Math.round(Date.now() / 1000 - since));
+    const intake = { kind: request.kind, country: request.country, wants_human: request.wantsHuman, wait_sec: waitSec };
 
     if (decision.act === "none") {
       await finish({ reason: `none:${decision.why}`, intake });
@@ -219,9 +254,10 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     });
     await markLead(service, m, {
       inquiry: decision.to === "موظف" || decision.to === "غير واضح" ? null : decision.to,
-      destination: request.country ?? (await countryOf(service, m.content)),
+      destination: request.country ?? (await countryOf(service, said)),
       route: team?.name.trim() ?? DEPARTMENT[decision.to],
       at,
+      waitSec,
     });
     return `routed:${decision.to}`;
   } catch (error) {
@@ -231,15 +267,68 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
 }
 
 /** Today's reception, for /developer: handed over, asked, held back — and the latest few. */
-export async function receptionToday(): Promise<{ routed: number; asked: number; other: number; recent: { at: string; phone: string; reason: string; reply: string }[] }> {
+// ---------- «تأخير بشري»: the wait before Murad answers ----------
+
+type Waiting = { first: number; extended: boolean; message: IncomingMessage; timer: ReturnType<typeof setTimeout> };
+// ponytail: one server process (the VPS), so the waits live in it; a restart drops them and the minute sweep answers instead
+const waiting = new Map<number, Waiting>();
+
+/**
+ * The webhook's entry: an incoming message in scope is marked read at once,
+ * and answered after a person's pause — 20–60 seconds unless set. A message
+ * that comes during the wait restarts the count once (never past 90 seconds
+ * from the first); the answer then reads every message of the burst.
+ */
+export async function schedule(m: IncomingMessage): Promise<"waiting" | "extended" | "off" | "out_of_scope" | "unreadable"> {
+  if (!m.conversationId || !m.messageId) return "unreadable";
+  const service = db();
+  const [flags, settings, reception] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service)]);
+  if (!flags.murad_reception || settings.clientWhatsapp === "off") return "off";
+  const phone = intlPhone(m.phone);
+  if (reception.scope !== "all" && (!phone || !settings.autoList.includes(phone))) return "out_of_scope";
+  void markTeletelSeen(m.conversationId);
+  const delay = parseDelay(reception.delay);
+  const now = Date.now();
+  const had = waiting.get(m.conversationId);
+  if (had) {
+    had.message = { ...m, since: had.first };
+    if (had.extended) return "extended";
+    had.extended = true;
+    clearTimeout(had.timer);
+    const until = Math.min(now + pickDelay(delay) * 1000, had.first * 1000 + MAX_WAIT_SEC * 1000);
+    had.timer = setTimeout(() => void answerNow(m.conversationId), Math.max(until - now, 1000));
+    return "extended";
+  }
+  const first = m.at || Math.floor(now / 1000);
+  waiting.set(m.conversationId, {
+    first,
+    extended: false,
+    message: { ...m, since: first },
+    timer: setTimeout(() => void answerNow(m.conversationId), pickDelay(delay) * 1000),
+  });
+  return "waiting";
+}
+
+/** The wait is over: «يكتب…» a moment, then the answer (receive() checks again that no colleague came in between). */
+async function answerNow(conversationId: number): Promise<void> {
+  const w = waiting.get(conversationId);
+  waiting.delete(conversationId);
+  if (!w) return;
+  await setTeletelTyping(conversationId, true).catch(() => false);
+  await new Promise((r) => setTimeout(r, 2500 + Math.round(Math.random() * 2000)));
+  await receive(w.message).catch(() => undefined);
+  await setTeletelTyping(conversationId, false).catch(() => false);
+}
+
+export async function receptionToday(): Promise<{ routed: number; asked: number; other: number; recent: { at: string; phone: string; reason: string; reply: string; waitSec: number | null }[] }> {
   const start = new Date(`${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" })}T00:00:00+03:00`).toISOString();
-  const { data } = await db().from("murad_log").select("created_at, phone, reason, reply").eq("mode", "reception").gte("created_at", start).order("created_at", { ascending: false }).limit(200);
-  const rows = (data ?? []) as { created_at: string; phone: string | null; reason: string | null; reply: string | null }[];
+  const { data } = await db().from("murad_log").select("created_at, phone, reason, reply, intake").eq("mode", "reception").gte("created_at", start).order("created_at", { ascending: false }).limit(200);
+  const rows = (data ?? []) as { created_at: string; phone: string | null; reason: string | null; reply: string | null; intake: { wait_sec?: number } | null }[];
   return {
     routed: rows.filter((r) => r.reason?.startsWith("routed")).length,
     asked: rows.filter((r) => r.reason === "asked").length,
     other: rows.filter((r) => !r.reason?.startsWith("routed") && r.reason !== "asked").length,
-    recent: rows.slice(0, 8).map((r) => ({ at: r.created_at, phone: maskPhone(r.phone), reason: r.reason ?? "", reply: (r.reply ?? "").slice(0, 90) })),
+    recent: rows.slice(0, 8).map((r) => ({ at: r.created_at, phone: maskPhone(r.phone), reason: r.reason ?? "", reply: (r.reply ?? "").slice(0, 90), waitSec: typeof r.intake?.wait_sec === "number" ? r.intake.wait_sec : null })),
   };
 }
 
@@ -266,7 +355,8 @@ export async function receptionSweep(): Promise<number> {
     .gte("created_at", new Date((nowSec - 1800) * 1000).toISOString());
   const seen = new Set(((data ?? []) as { conversation_id: number }[]).map((r) => Number(r.conversation_id)));
   let n = 0;
-  for (const c of fresh.filter((x) => !seen.has(x.id)).slice(0, 5)) {
+  // a conversation Murad is already waiting on is his to answer when the wait ends
+  for (const c of fresh.filter((x) => !seen.has(x.id) && !waiting.has(x.id)).slice(0, 5)) {
     const thread = await readThread(c.id);
     const last = [...(thread?.messages ?? [])].reverse().find((t) => t.fromClient && !t.isPrivate);
     if (!thread || !last) continue;
