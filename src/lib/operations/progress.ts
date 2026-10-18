@@ -19,6 +19,8 @@ export type ProgressBooking = {
   company_ref?: string | null;
   pnr?: string | null;
   ticket_numbers?: string[] | null;
+  /** «صدرت التذكرة» — a hand-confirmed flight counts as ticketed only with it (flightTicketed) */
+  is_paid?: boolean | null;
 };
 export type ProgressDocument = { kind: string };
 

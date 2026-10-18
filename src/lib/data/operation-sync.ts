@@ -46,7 +46,7 @@ export async function syncOperation(operationId: string): Promise<void> {
 
     const [bookings, documents, payments] = await Promise.all([
       // the columns the flight and hotel rungs read (the wizard's done-rules)
-      supabase.from("operation_bookings").select("kind, status, confirmation_number, company_ref, pnr, ticket_numbers").eq("operation_id", operationId),
+      supabase.from("operation_bookings").select("kind, status, confirmation_number, company_ref, pnr, ticket_numbers, is_paid").eq("operation_id", operationId),
       supabase.from("operation_documents").select("kind").eq("operation_id", operationId).is("revoked_at", null).in("kind", CLIENT_DOCUMENT_KINDS),
       supabase.from("operation_payments").select("amount, kind").eq("operation_id", operationId),
     ]);

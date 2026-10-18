@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { aheadOfClient, aheadOfExecution, derivedClient, derivedExecution, passportAlerts, type AlertTraveler, type ProgressBooking } from "./progress";
 
-// a confirmed booking carries its number — a hand confirmation refuses one without it
+// a confirmed booking carries its number — a hand confirmation refuses one without it;
+// a confirmed flight is a ticketed one here («صدرت التذكرة»), as the ladder needs
 const b = (kind: string, status = "confirmed", over: Partial<ProgressBooking> = {}): ProgressBooking => ({
   kind,
   status,
   confirmation_number: status === "confirmed" ? "CONF-1" : null,
+  ...(kind === "flight" && status === "confirmed" ? { is_paid: true } : {}),
   ...over,
 });
 const malaysia = [b("flight"), b("flight"), b("hotel"), b("hotel"), b("transport"), b("transport"), b("service")];
@@ -28,8 +30,10 @@ describe("a case's progress, derived", () => {
     // a hotel «confirmed» on OUR number only is not booked — its tile is red, the client is not told
     const ours = b("hotel", "confirmed", { confirmation_number: "AD-2-7287-H1", company_ref: "AD-2-7287-H1" });
     expect(derivedExecution([b("flight"), ours], [])).toBe("flights_booked");
-    // a flight confirmed by hand with its number in «عرض الكل» is booked, as everywhere
+    // a flight confirmed by hand with its number and «صدرت التذكرة» in «عرض الكل» is booked, as everywhere
     expect(derivedExecution([b("flight", "confirmed", { confirmation_number: "PNR6XK" }), b("hotel"), b("transport", "pending")], [])).toBe("hotels_booked");
+    // a seat the airline only holds — its number, no ticket — is not
+    expect(derivedExecution([b("flight", "confirmed", { confirmation_number: "PNR6XK", is_paid: false }), b("hotel")], [])).toBeNull();
     // «confirmed» with nothing the airline issued is not
     expect(derivedExecution([b("flight", "confirmed", { confirmation_number: null }), b("hotel")], [])).toBeNull();
   });

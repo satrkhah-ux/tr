@@ -24,9 +24,11 @@ describe("the step's state and «التذاكر»", () => {
     const one = booking({ id: "a", ...TICKETED });
     expect(flightsState(wcase([one]))).toBe("done");
     expect(flightsReadiness(wcase([one]))).toEqual([{ step: "flights", key: "tickets", ok: true }]);
-    // «تسجيل يدوي» in «عرض الكل»: confirmed with its number, no ticket uploaded — done here too (the owner, 2026-10-18)
-    const byHand = booking({ id: "b", status: "confirmed", confirmation_number: "6XK2QZ" });
+    // «تسجيل يدوي» in «عرض الكل» with «صدرت التذكرة»: done here too (the owner, 2026-10-18)
+    const byHand = booking({ id: "b", status: "confirmed", confirmation_number: "6XK2QZ", is_paid: true });
     expect(flightsState(wcase([one, byHand]))).toBe("done");
+    // the same with the seat only held (no ticket) is still open
+    expect(flightsState(wcase([one, booking({ id: "h", status: "confirmed", confirmation_number: "6XK2QZ", is_paid: false })]))).toBe("todo");
     // not confirmed, or confirmed with nothing on it, is still open
     expect(flightsState(wcase([one, booking({ id: "c", pnr: "M3TQ8Z" })]))).toBe("todo");
     expect(flightsReadiness(wcase([one, booking({ id: "d", status: "confirmed", confirmation_number: null })]))[0].ok).toBe(false);

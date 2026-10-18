@@ -316,7 +316,7 @@ describe("the tiles (2026-10-18): each step coloured by its own readiness", () =
 
 describe("one flight-done rule (2026-10-18)", () => {
   it("a flight confirmed by hand with its number in «عرض الكل» is done everywhere — the step, the ticket, the link, the ladder", () => {
-    const byHand = booking({ id: "f1", kind: "flight", status: "confirmed", confirmation_number: "6XK2QZ", title: "الرياض → إسطنبول" });
+    const byHand = booking({ id: "f1", kind: "flight", status: "confirmed", confirmation_number: "6XK2QZ", is_paid: true, title: "الرياض → إسطنبول" });
     const data = wizardCase({ bookings: [byHand] });
     expect(flightTicketed(byHand)).toBe(true);
     expect(stepStates(data).flights).toBe("done");
@@ -329,6 +329,8 @@ describe("one flight-done rule (2026-10-18)", () => {
   it("and nothing short of it is: not confirmed, or confirmed with no reference", () => {
     expect(flightTicketed({ status: "pending", confirmation_number: null, pnr: "X7K2QZ", ticket_numbers: ["065-1"] })).toBe(false);
     expect(flightTicketed({ status: "confirmed", confirmation_number: " ", pnr: null, ticket_numbers: [] })).toBe(false);
+    // a held seat: the airline's number, not marked «صدرت التذكرة»
+    expect(flightTicketed({ status: "confirmed", confirmation_number: "6XK2QZ", pnr: null, ticket_numbers: [], is_paid: false })).toBe(false);
     expect(flightTicketed({ status: "confirmed", confirmation_number: null, pnr: null, ticket_numbers: ["065-1"] })).toBe(true);
   });
 });

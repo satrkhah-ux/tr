@@ -73,9 +73,11 @@ describe("a flight on the client's link", () => {
     expect(clientFlight(flight({ status: "confirmed", ticket_numbers: ["0652400000001"] })).ticketed).toBe(true);
   });
 
-  it("a flight confirmed by hand («تسجيل يدوي»): ticketed with its number as the PNR, legs from its detail — paid or not", () => {
-    const f = clientFlight(flight({ status: "confirmed", confirmation_number: "PNR-6XK2QZ", is_paid: false }));
+  it("a flight confirmed by hand («تسجيل يدوي»): ticketed once marked «صدرت التذكرة», its number as the PNR, legs from its detail", () => {
+    const f = clientFlight(flight({ status: "confirmed", confirmation_number: "PNR-6XK2QZ", is_paid: true }));
     expect(f).toMatchObject({ ticketed: true, pnr: "PNR-6XK2QZ" });
+    // a held seat (its number, no ticket) stays «سيتم تأكيد الحجز»
+    expect(clientFlight(flight({ status: "confirmed", confirmation_number: "PNR-6XK2QZ", is_paid: false })).ticketed).toBe(false);
     expect(f.legs[0]).toMatchObject({ flight_no: "TK145", from: "RUH", to: "IST", departure: "2026-10-20T08:30" });
   });
 });
