@@ -199,7 +199,6 @@ export function BasicFileStatus({
         <span className="tv-tnum text-[12.5px] font-extrabold text-[#103f37]" dir="ltr">
           {serial}
         </span>
-        {view.version ? <span className="text-[12px] font-bold text-[#557d78]">· {tx("versionN", { n: view.version })}</span> : null}
         <FileStateChip state={view.state} version={view.version} sentVersion={view.sentVersion} stale={view.stale} />
         {view.canOpenCase && view.operationId ? (
           <Link

@@ -186,7 +186,11 @@ export function fillAdvanced(adv: DraftAdvanced, d: AdvancedDefaults): DraftAdva
   const order: AdvancedDateKey[] = ["arrive_date", "arrive_time", "checkin_date", "leave_date", "leave_time", "reception_date", "farewell_date", "farewell_time"];
   for (const k of order) {
     if (k === "reception_date") want[k] = out.arrive_date || want[k];
-    if (k === "farewell_date") want[k] = d.farewell_date || out.leave_date || want[k];
+    if (k === "farewell_date" || k === "farewell_time") {
+      const pickup = airportPickup(out.leave_date || d.leave_date || "", out.leave_time || d.leave_time || "");
+      if (k === "farewell_date") want[k] = d.farewell_date || pickup?.date || out.leave_date || want[k];
+      else want[k] = pickup?.time ?? "";
+    }
     const now = getDate(out, k);
     if ((now === "" || auto.has(k)) && want[k] && want[k] !== now) {
       out = putDate(out, k, want[k]);
@@ -209,11 +213,8 @@ export function advancedDefaults(data: Pick<DraftData, "trip" | "flights" | "cit
   const lastCity = chained[chained.length - 1];
   // «آخر يوم بدون فندق»: the farewell is the check-out day, at take-off − 3 h across midnight (22:30 for 01:30)
   const dayCar = lastCity?.edge_out === "no_hotel_day";
-  const takeOff = home?.departure_at?.slice(11, 16) ?? "";
-  const lead = /^\d{2}:\d{2}$/.test(takeOff) ? (Number(takeOff.slice(0, 2)) * 60 + Number(takeOff.slice(3)) - AIRPORT_LEAD_MINUTES + 1440) % 1440 : null;
   return {
     ...(dayCar && lastCity?.check_out ? { farewell_date: lastCity.check_out } : {}),
-    ...(dayCar && lead != null ? { farewell_time: `${String(Math.floor(lead / 60)).padStart(2, "0")}:${String(lead % 60).padStart(2, "0")}` } : {}),
     // a planned leg has only its day: the trip's arrival day, else the day it flies, until the ticket says
     arrive_date: out?.arrival_at?.slice(0, 10) || data.trip.arrival_date || out?.departure_at?.slice(0, 10) || "",
     arrive_time: out?.arrival_at?.slice(11, 16) || "",
@@ -221,6 +222,19 @@ export function advancedDefaults(data: Pick<DraftData, "trip" | "flights" | "cit
     leave_date: home?.departure_at?.slice(0, 10) || data.trip.departure_date || "",
     leave_time: home?.departure_at?.slice(11, 16) || "",
   };
+}
+
+/**
+ * When the car leaves for the airport: three hours before the take-off, as a
+ * moment — a 01:30 flight on the 13th is 22:30 on the 12th. Null without a
+ * take-off hour.
+ */
+export function airportPickup(date: string, time: string): { date: string; time: string } | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}/.test(time)) return null;
+  const at = new Date(`${date}T${time.slice(0, 5)}:00Z`);
+  at.setUTCMinutes(at.getUTCMinutes() - AIRPORT_LEAD_MINUTES);
+  const iso = at.toISOString();
+  return { date: iso.slice(0, 10), time: iso.slice(11, 16) };
 }
 
 /** the agent typed this date: it stops following Basic. */

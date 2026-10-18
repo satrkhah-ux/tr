@@ -55,14 +55,21 @@ describe("«بكج متقدم» — the trip's edges (the owner, 2026-10-18)", (
     expect(out.days[0].activities.join(" ")).toContain("الليلة الأولى بدون إقامة حسب طلبكم");
   });
 
-  it("1b. «بكج متقدم»'s farewell follows: the check-out day at 22:30, and back to the flight's day when undone", () => {
+  it("1b. «بكج متقدم»'s farewell is the take-off − 3 h in every mode: a 01:30 flight is 22:30 the evening before", () => {
     const d = trip("2026-12-07", 6, "2026-12-13T01:30");
     const out = apply(d, setEdge(d, "out", "no_hotel_day"));
     const adv = fillAdvanced({ ...emptyAdvanced(), on: true, parts: { arrival: false, departure: true } }, advancedDefaults(out));
     expect([adv.farewell.date, adv.farewell.time]).toEqual(["2026-12-12", "22:30"]);
+    // a full last night changes the hotel, not the driver: still the evening before
     const back = apply(out, setEdge(out, "out", null));
-    const again = fillAdvanced(adv, advancedDefaults(back));
-    expect([again.farewell.date, again.farewell.time]).toEqual(["2026-12-13", ""]);
+    expect([fillAdvanced(adv, advancedDefaults(back)).farewell.date, fillAdvanced(adv, advancedDefaults(back)).farewell.time]).toEqual(["2026-12-12", "22:30"]);
+    // the take-off typed here wins over Basic's flight (00:00 until the ticket is in)
+    const typed = fillAdvanced({ ...adv, leave_time: "05:00", auto: adv.auto.filter((k) => k !== "leave_time") }, advancedDefaults(back));
+    expect([typed.farewell.date, typed.farewell.time]).toEqual(["2026-12-13", "02:00"]);
+    // a daytime flight: the same day
+    const day = trip("2026-12-07", 6, "2026-12-13T15:00");
+    const noon = fillAdvanced({ ...emptyAdvanced(), on: true, parts: { arrival: false, departure: true } }, advancedDefaults(day));
+    expect([noon.farewell.date, noon.farewell.time]).toEqual(["2026-12-13", "12:00"]);
   });
 
   it("4. choosing «as Basic has it» again gives back the nights and the dates", () => {
