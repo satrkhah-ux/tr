@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookingProblem, cancelFeePct, loginEmail, outsideProgram, passwordProblem, profitOf, REQUEST_KINDS, serviceInstant, unitPrice } from "./rules";
+import { bookingProblem, cancelFeePct, loginEmail, outsideProgram, passwordProblem, profitOf, REQUEST_KINDS, REQUEST_REF, requestRefFor, serviceInstant, unitPrice } from "./rules";
 
 const th07 = { price_small: 215, price_medium: 335, price_van10: 280, tz: "Asia/Bangkok", valid_through: "2027-12-31" };
 const now = new Date("2026-10-18T12:00:00Z");
@@ -57,5 +57,12 @@ describe("almatar requests", () => {
     expect(outsideProgram("2026-11-01", "2026-11-07", "2026-11-08")).toBe(true);
     expect(outsideProgram("2026-11-01", "2026-11-07", "2026-11-03")).toBe(false);
     expect(outsideProgram("", "", "2026-11-03")).toBe(false);
+  });
+
+  it("numbers a request ALMATAR + the Riyadh day + four letters", () => {
+    // 22:30 UTC on the 17th is already the 18th in Riyadh
+    const ref = requestRefFor(new Date("2026-10-17T22:30:00Z"), [5, 6, 17, 30]);
+    expect(ref).toBe("ALMATAR261018FGRE");
+    expect(REQUEST_REF.test(ref)).toBe(true);
   });
 });

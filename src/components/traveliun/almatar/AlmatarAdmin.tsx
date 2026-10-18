@@ -131,7 +131,7 @@ export function AlmatarAdmin({
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-[#e2ebe7]">
-                    {["الرقم", "الخدمة", "الموعد (محلي)", "المركبة", "المسافر", "الرحلة / المكان", "المبلغ", "ربحنا", "الحالة", ""].map((h) => (
+                    {["الرقم", "الخدمة", "الموعد (محلي)", "المركبة", "العميل", "الرحلة / المكان", "المبلغ", "ربحنا", "الحالة", ""].map((h) => (
                       <th key={h} className={th}>
                         {h}
                       </th>
@@ -139,20 +139,26 @@ export function AlmatarAdmin({
                   </tr>
                 </thead>
                 <tbody>
-                  {bookings.map((b) => {
+                  {bookings.map((b, i) => {
+                    const firstOfRequest = Boolean(b.request_ref) && bookings[i - 1]?.request_ref !== b.request_ref;
                     const s = byId.get(b.service_id);
                     return (
                       <tr key={b.id} className="border-b border-[#f1f5f3] align-top">
                         <td className={td}>
                           <span dir="ltr">{b.ref}</span>
                           {b.request_ref ? (
-                            <div className="text-[11px] font-semibold text-[#93aaa3]">
-                              طلب {b.request_ref}
+                            <div className="max-w-[150px] whitespace-normal text-[11px] font-semibold text-[#93aaa3]">
+                              <span dir="ltr">{b.request_ref}</span>{" "}
+                              {firstOfRequest ? (
+                                <a href={`/b2b/transport-request/${b.request_ref}`} target="_blank" rel="noreferrer" className="font-bold text-[#185045] underline">
+                                  طباعة
+                                </a>
+                              ) : null}
                               {b.request_kind ? ` · ${REQUEST_KINDS.find((k) => k.id === b.request_kind)?.label ?? ""}` : ""}
                             </div>
                           ) : null}
                         </td>
-                        <td className={`${td} whitespace-normal`}>
+                        <td className={`${td} min-w-[200px] whitespace-normal`}>
                           {s ? `${s.name_ar} — ${s.scope_ar}` : b.service_id}
                           <div className="text-[11px] text-[#93aaa3]">{s?.country_ar}</div>
                         </td>
@@ -162,7 +168,7 @@ export function AlmatarAdmin({
                         <td className={td}>
                           {vehicleLabel(b.vehicle)} × {b.units}
                         </td>
-                        <td className={`${td} whitespace-normal`}>
+                        <td className={`${td} min-w-[130px] whitespace-normal`}>
                           {b.lead_name}
                           <div className="text-[11px] text-[#93aaa3]" dir="ltr">
                             {b.passengers} pax {b.lead_phone ?? ""}

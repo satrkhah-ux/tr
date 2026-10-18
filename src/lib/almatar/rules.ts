@@ -45,6 +45,18 @@ export const REQUEST_KINDS: { id: string; label: string; lines: LineKind[] }[] =
 ];
 export const MAX_LINES = 20;
 
+/**
+ * A request's booking number (the owner, 2026-10-18): ALMATAR + the day in
+ * Riyadh (yymmdd) + four letters, e.g. ALMATAR261018FGRE. `bytes` are random
+ * (4 of them) — passed in so the shape is testable.
+ */
+export function requestRefFor(now: Date, bytes: ArrayLike<number>): string {
+  const day = now.toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }).replace(/-/g, "").slice(2);
+  const letters = Array.from({ length: 4 }, (_, i) => String.fromCharCode(65 + (bytes[i] % 26))).join("");
+  return `ALMATAR${day}${letters}`;
+}
+export const REQUEST_REF = /^ALMATAR\d{6}[A-Z]{4}$/;
+
 /** A program's lines fall between its first and last day. */
 export function outsideProgram(from: string, to: string, date: string): boolean {
   return Boolean(from && to && date && (date < from || date > to));

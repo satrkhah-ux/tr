@@ -7,9 +7,9 @@ import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { db, getAlmatarCompany, getAlmatarSession, getMarginPct } from "./server";
-import { bookingProblem, cancelFeePct, loginEmail, MAX_LINES, passwordProblem, profitOf, REQUEST_KINDS, serviceInstant, unitPrice, type Vehicle } from "./rules";
+import { bookingProblem, cancelFeePct, loginEmail, MAX_LINES, passwordProblem, profitOf, REQUEST_KINDS, requestRefFor, serviceInstant, unitPrice, type Vehicle } from "./rules";
 
-type Result = { ok: true; message?: string } | { ok: false; message: string };
+type Result = { ok: true; message?: string; request_ref?: string } | { ok: false; message: string };
 
 const clean = (v: unknown, max = 200) => (typeof v === "string" ? v.trim().slice(0, max) || null : null);
 
@@ -74,7 +74,7 @@ export async function createAlmatarRequest(input: NewRequest): Promise<Result> {
     }
 
     const margin = await getMarginPct();
-    const requestRef = `R-${randomBytes(4).toString("hex").toUpperCase()}`;
+    const requestRef = requestRefFor(new Date(), randomBytes(4));
     const rows = checked.map(({ line, service }) => {
       const unit = unitPrice(service, shared.vehicle as Vehicle);
       const total = unit * shared.units;
@@ -112,7 +112,7 @@ export async function createAlmatarRequest(input: NewRequest): Promise<Result> {
       meta: { request_ref: requestRef, refs, kind, status: "pending", by: "partner" },
     });
     revalidatePath("/b2b");
-    return { ok: true, message: `أُرسل الطلب ${requestRef} (${refs.length} خدمة) — بانتظار تأكيد ترافليون.` };
+    return { ok: true, message: `أُرسل الطلب ${requestRef} (${refs.length} خدمة) — بانتظار تأكيد ترافليون.`, request_ref: requestRef };
   } catch {
     return { ok: false, message: "تعذّر حفظ الحجز." };
   }

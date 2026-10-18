@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, KeyRound, LogOut, X } from "lucide-react";
+import { FileText, KeyRound, LogOut, Printer, X } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cancelAlmatarBooking } from "@/lib/almatar/actions";
 import { cancelFeePct, REQUEST_KINDS, STATUS_LABEL, TERMS, vehicleLabel } from "@/lib/almatar/rules";
@@ -24,7 +24,7 @@ const STATUS_TONE: Record<string, string> = {
 export function AlmatarPortal({ session, services, bookings }: { session: AlmatarSession; services: AlmatarService[]; bookings: AlmatarBooking[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ ok: boolean; text: string; ref?: string } | null>(null);
   const [changeOpen, setChangeOpen] = useState(false);
   // the page's own clock, read once: a booking past its time offers no cancel
   const [now] = useState(() => Date.now());
@@ -78,7 +78,10 @@ export function AlmatarPortal({ session, services, bookings }: { session: Almata
       <div className="mx-auto grid max-w-6xl gap-4 px-4 pt-5">
         {notice ? (
           <p className={`${card} flex items-center justify-between text-[13px] font-bold ${notice.ok ? "text-[#17795a]" : "text-[#c22850]"}`}>
-            {notice.text}
+            <span className="flex flex-wrap items-center gap-3">
+              {notice.text}
+              {notice.ref ? <PrintLink requestRef={notice.ref} /> : null}
+            </span>
             <button type="button" aria-label="إغلاق" onClick={() => setNotice(null)}>
               <X className="size-4" />
             </button>
@@ -87,8 +90,8 @@ export function AlmatarPortal({ session, services, bookings }: { session: Almata
 
         <AlmatarRequestForm
           services={services}
-          onDone={(ok, text) => {
-            setNotice({ ok, text });
+          onDone={(ok, text, ref) => {
+            setNotice({ ok, text, ref });
             router.refresh();
           }}
         />
@@ -102,7 +105,7 @@ export function AlmatarPortal({ session, services, bookings }: { session: Almata
               <table className="w-full border-collapse text-[12.5px]">
                 <thead>
                   <tr className="border-b border-[#efeff2] text-start text-[11px] text-[#92939e]">
-                    {["الرقم", "الخدمة", "الموعد", "المركبة", "المسافر", "المبلغ", "الحالة", ""].map((h) => (
+                    {["الرقم", "الخدمة", "الموعد", "المركبة", "العميل", "المبلغ", "الحالة", ""].map((h) => (
                       <th key={h} className="whitespace-nowrap px-2 py-2 text-start font-bold">
                         {h}
                       </th>
@@ -110,7 +113,9 @@ export function AlmatarPortal({ session, services, bookings }: { session: Almata
                   </tr>
                 </thead>
                 <tbody>
-                  {bookings.map((b) => {
+                  {bookings.map((b, i) => {
+                    // a request's lines sit together: its print button on the first only
+                    const firstOfRequest = Boolean(b.request_ref) && bookings[i - 1]?.request_ref !== b.request_ref;
                     const s = byId.get(b.service_id);
                     const open = (b.status === "pending" || b.status === "confirmed") && new Date(b.service_at).getTime() > now;
                     return (
@@ -118,13 +123,13 @@ export function AlmatarPortal({ session, services, bookings }: { session: Almata
                         <td className="whitespace-nowrap px-2 py-2 font-bold">
                           <span dir="ltr">{b.ref}</span>
                           {b.request_ref ? (
-                            <div className="text-[11px] font-semibold text-[#92939e]">
-                              طلب {b.request_ref}
+                            <div className="max-w-[150px] whitespace-normal text-[11px] font-semibold text-[#92939e]">
+                              <span dir="ltr">{b.request_ref}</span> {firstOfRequest ? <PrintLink requestRef={b.request_ref} /> : null}
                               {b.request_kind ? ` · ${REQUEST_KINDS.find((k) => k.id === b.request_kind)?.label ?? ""}` : ""}
                             </div>
                           ) : null}
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="min-w-[200px] px-2 py-2">
                           {s ? `${s.name_ar} — ${s.scope_ar}` : b.service_id}
                           <div className="text-[11px] text-[#92939e]">{s?.country_ar}</div>
                         </td>
@@ -134,7 +139,7 @@ export function AlmatarPortal({ session, services, bookings }: { session: Almata
                         <td className="whitespace-nowrap px-2 py-2">
                           {vehicleLabel(b.vehicle)} × {b.units}
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="min-w-[130px] px-2 py-2">
                           {b.lead_name}
                           <div className="text-[11px] text-[#92939e]">{b.passengers} راكب{b.flight_no ? ` · ${b.flight_no}` : ""}</div>
                         </td>
@@ -184,5 +189,19 @@ export function AlmatarPortal({ session, services, bookings }: { session: Almata
         </details>
       </div>
     </main>
+  );
+}
+
+/** «طباعة الحجز» — the request as a PDF in Almatar's identity, for its client. */
+function PrintLink({ requestRef }: { requestRef: string }) {
+  return (
+    <a
+      href={`/b2b/transport-request/${requestRef}`}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex h-7 items-center gap-1 rounded-lg border border-[var(--am)] px-2 text-[11.5px] font-bold text-[var(--am)] hover:bg-[var(--am)]/5"
+    >
+      <Printer className="size-3.5" /> طباعة الحجز
+    </a>
   );
 }

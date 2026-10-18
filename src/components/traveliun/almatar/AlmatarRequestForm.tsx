@@ -28,7 +28,7 @@ let nextKey = 1;
  * one day to another) and more are added by hand. The group, the car and the
  * traveller are shared; each line has its own service, day, time and places.
  */
-export function AlmatarRequestForm({ services, onDone }: { services: AlmatarService[]; onDone: (ok: boolean, message: string) => void }) {
+export function AlmatarRequestForm({ services, onDone }: { services: AlmatarService[]; onDone: (ok: boolean, message: string, requestRef?: string) => void }) {
   const [pending, start] = useTransition();
   const countries = useMemo(() => [...new Map(services.map((s) => [s.country_code, s.country_ar])).entries()], [services]);
   const [country, setCountry] = useState(countries[0]?.[0] ?? "");
@@ -99,7 +99,7 @@ export function AlmatarRequestForm({ services, onDone }: { services: AlmatarServ
         setUnits(1);
         setFrom("");
         setTo("");
-        onDone(true, r.message ?? "");
+        onDone(true, r.message ?? "", r.request_ref);
       } catch {
         setError("تعذّر الاتصال بالخادم — حدّث الصفحة وأعد المحاولة.");
       }
@@ -253,11 +253,11 @@ export function AlmatarRequestForm({ services, onDone }: { services: AlmatarServ
               <input className={field} name="passengers" type="number" min={1} defaultValue={1} dir="ltr" />
             </label>
             <label className={label}>
-              اسم المسافر الرئيسي
+              اسم العميل
               <input className={field} name="lead_name" maxLength={120} />
             </label>
             <label className={label}>
-              جوال المسافر
+              جوال العميل
               <input className={field} name="lead_phone" type="tel" dir="ltr" maxLength={40} />
             </label>
             <label className={`${label} sm:col-span-2 lg:col-span-4`}>
