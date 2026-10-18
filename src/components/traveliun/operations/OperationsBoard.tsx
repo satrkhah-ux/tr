@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Search, Users } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, PlaneTakeoff, Search, Users, Wallet, type LucideIcon } from "lucide-react";
 import { DirText } from "@/components/DirText";
+import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { OperationCard } from "@/lib/data/operations";
 import { severityRank, type OperationSignal } from "@/lib/operations/signals";
@@ -92,11 +93,12 @@ export function OperationsBoard({
   );
   const destinations = useMemo(() => [...new Set(operations.map((o) => o.destination).filter((d): d is string => Boolean(d)))].sort(), [operations]);
 
-  const FILTERS: { key: Filter; labelKey: TranslationKey }[] = [
-    { key: "needs_action", labelKey: "ops.needsAction" },
-    { key: "travelling_soon", labelKey: "ops.signal.travel_approaching_incomplete" },
-    { key: "unpaid", labelKey: "ops.signal.unpaid_confirmed" },
-    { key: "all", labelKey: "all" },
+  // a card per list, in the colour of what it holds (the owner, 2026-10-18: «حولها الى بطاقات … يحتاج اجراء لون احمر»)
+  const FILTERS: { key: Filter; labelKey: TranslationKey; icon: LucideIcon; tone: string; ring: string }[] = [
+    { key: "needs_action", labelKey: "ops.needsAction", icon: AlertTriangle, tone: "border-[#f3c9c9] bg-[#fdf0f0] text-[#b42318]", ring: "ring-[#b42318]" },
+    { key: "travelling_soon", labelKey: "ops.signal.travel_approaching_incomplete", icon: PlaneTakeoff, tone: "border-[#f6d3b3] bg-[#fff4ea] text-[#b54708]", ring: "ring-[#b54708]" },
+    { key: "unpaid", labelKey: "ops.signal.unpaid_confirmed", icon: Wallet, tone: "border-[#efdc9f] bg-[#fdf8e6] text-[#8a6100]", ring: "ring-[#8a6100]" },
+    { key: "all", labelKey: "all", icon: ClipboardCheck, tone: "border-[#cfe0d9] bg-[#eef6f2] text-[#185045]", ring: "ring-[#185045]" },
   ];
 
   return (
@@ -107,24 +109,36 @@ export function OperationsBoard({
           <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("ops.subtitle")}</p>
           {canSeeMoney ? <MoneyLinks /> : null}
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            {FILTERS.map((f) => (
-              <button
-                key={f.key}
-                type="button"
-                onClick={() => setFilter(f.key)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-bold transition-colors ${
-                  filter === f.key
-                    ? "border-[#185045] bg-[#185045] text-white"
-                    : "border-[#dbe6e1] bg-white text-[#185045] hover:bg-[#f4f8f6]"
-                }`}
-              >
-                {t(f.labelKey)}
-                <span className={`tv-tnum text-[11px] ${filter === f.key ? "text-[#8fe3c4]" : "text-[#93aaa3]"}`}>
-                  <DirText dir="ltr">{String(counts[f.key])}</DirText>
-                </span>
-              </button>
-            ))}
+          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {FILTERS.map((f) => {
+              const Icon = f.icon;
+              const on = filter === f.key;
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setFilter(f.key)}
+                  className={cn(
+                    "flex min-w-0 items-center gap-3 rounded-2xl border p-3 text-start transition-shadow hover:shadow-[0_2px_10px_rgba(0,60,58,0.08)]",
+                    f.tone,
+                    on && `ring-2 ring-offset-1 ${f.ring}`,
+                  )}
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/70">
+                    <Icon className="size-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="tv-tnum block text-2xl font-extrabold leading-none">
+                      <DirText dir="ltr">{String(counts[f.key])}</DirText>
+                    </span>
+                    <span className="mt-1 block text-[12px] font-bold leading-snug">{t(f.labelKey)}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-3 flex">
             <div className="relative ms-auto">
               <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
               <input

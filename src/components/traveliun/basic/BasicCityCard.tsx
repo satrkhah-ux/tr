@@ -63,7 +63,7 @@ import {
   type BasicCity,
   type ServiceRow,
 } from "@/lib/offer/basic";
-import { arrivalLines, departureDay, departureLines, type TourProgram } from "@/lib/offer/itinerary";
+import { arrivalLines, autoTourPicks, departureDay, departureLines, type TourProgram } from "@/lib/offer/itinerary";
 import { BasicCityProgram } from "./BasicCityProgram";
 import { SuggestInput } from "../SuggestInput";
 import { DirText } from "@/components/DirText";
@@ -897,7 +897,8 @@ function ServicesPanel({
   // a tour put on the day home is «قبل المغادرة»; moved off it, a tour of the city's nights
   const onDay = (p: TourPick): TourPick => ({ ...p, departure: isLast && leaving !== null && p.date === leaving ? true : undefined });
   const setPick = (k: number, slice: Partial<TourPick>) => onPicks(picks.map((p, i) => (i === k ? onDay({ ...p, ...slice }) : p)));
-  const addOn = (date: string | null) => onPicks([...picks, onDay({ program_id: null, title: "", text: "", price: null, date, cars: plan.tours.cars })]);
+  // a tour added — by the count or on a day — arrives as the city's next programme, priced from the list
+  const addOn = (date: string | null) => onPicks(autoTourPicks([...picks, onDay({ program_id: null, title: "", text: "", price: null, date, cars: plan.tours.cars })], programs));
 
   // ---- the transfers: what changed on a row is the row's own; the trip's reception and farewell are the trip's car ----
   const cities = data.cities;
@@ -1022,7 +1023,7 @@ function ServicesPanel({
         {toursOn ? (
           <>
             <Field label={tx("toursCount")} className="w-24">
-              <select value={picks.length} onChange={(e) => onPicks(withTours(city, Number(e.target.value), plan.tours.cars, isLast))} className={`${basicField} px-1.5`}>
+              <select value={picks.length} onChange={(e) => onPicks(autoTourPicks(withTours(city, Number(e.target.value), plan.tours.cars, isLast), programs))} className={`${basicField} px-1.5`}>
                 {range(0, 15).map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}

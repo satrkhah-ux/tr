@@ -818,6 +818,25 @@ export function tourService(title: string, programs: TourProgram[]): Pick<TourPi
 }
 
 /**
+ * A city's empty tour rows, filled from its ready programmes in their order —
+ * none twice, none the city already has. The owner, 2026-10-18: «الجولات
+ * والاسعار تربط تلقائية و الموظف يبدا بتعديل الجولات او تغيرهن». A row with a
+ * service or a free day is the agent's and stays. No price is written: the
+ * list prices each in its car, as one picked by hand (tourCarPrice).
+ */
+export function autoTourPicks(picks: TourPick[], programs: TourProgram[]): TourPick[] {
+  const taken = new Set(picks.map((p) => p.title.trim()).filter(Boolean));
+  const queue = [...new Set(
+    [...programs]
+      .filter((p) => !p.is_free_day)
+      .sort((a, b) => (a.sort_order ?? 1e9) - (b.sort_order ?? 1e9))
+      .map((p) => programDayText(p).title),
+  )].filter((title) => !taken.has(title));
+  if (queue.length === 0 || !picks.some((p) => !p.free && !p.title.trim())) return picks;
+  return picks.map((p) => (p.free || p.title.trim() || queue.length === 0 ? p : { ...p, ...tourService(queue.shift()!, programs) }));
+}
+
+/**
  * «تعبئة أيام المدينة من البرامج الجاهزة» (and, without a city, every city's):
  * the rule of fillDaysFromPrograms — each city's programmes in order onto its
  * empty touring days, none twice — but each one a real tour of its day, in the

@@ -34,7 +34,7 @@ import {
 import { DirText } from "@/components/DirText";
 import { getCountryHotels, produceOfferFromDraft } from "@/lib/data/drafts";
 import { getTourPrices, getTourPrograms, getTransferCars } from "@/lib/data/tour-programs";
-import type { TourProgram } from "@/lib/offer/itinerary";
+import { autoTourPicks, withTours, type TourProgram } from "@/lib/offer/itinerary";
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
 import type { ProfitSettings } from "@/lib/data/app-settings";
 import {
@@ -104,7 +104,7 @@ import {
   type PriceGroup,
 } from "@/lib/offer/basic";
 import { citiesWithoutHotel, validateDraft, type DraftIssue } from "@/lib/offer/draft-validation";
-import { computeOfferPricing, rebase } from "@/lib/offer/pricing";
+import { computeOfferPricing, rebase, roundUpTotal } from "@/lib/offer/pricing";
 import { pricesForCity, syncSuggestions, type TourPrice } from "@/lib/offer/pricing-suggest";
 import { normAr } from "@/lib/catalog/norm";
 import { syncDepartureDates } from "@/lib/offer/schedule";
@@ -604,6 +604,23 @@ export function BasicEditor({
     };
   }, [cityKey]);
 
+  // a city's tours arrive filled: its empty rows take its programmes in order, priced from the list, and the
+  // agent edits or swaps them (the owner, 2026-10-18). A file already issued keeps what it was issued with.
+  useEffect(() => {
+    const file = latest.current;
+    if (programs.length === 0 || file.produced_serial || !file.transport_plan.tours.enabled) return;
+    let changed = false;
+    const next = file.cities.map((c, i) => {
+      const picks = withTours(c, c.tours ?? 0, file.transport_plan.tours.cars, i === file.cities.length - 1);
+      const filled = autoTourPicks(picks, programs.filter((p) => p.city_name === c.city_name));
+      if (filled === picks) return c;
+      changed = true;
+      return { ...c, tour_picks: filled, tours: filled.length };
+    });
+    if (changed) commit({ cities: next });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the programmes arriving (or another city) decide; commit and the file are read then
+  }, [programs, data.cities.length]);
+
   // ---------- the add bar ----------
   const left = remainingNights(data);
   const [newCity, setNewCity] = useState("");
@@ -713,23 +730,25 @@ export function BasicEditor({
     const asCost = data.pricing.items.map((i) => (i.buy_price == null ? { ...i, buy_price: i.sell_price, buy_currency: i.sell_currency } : i));
     return withPackageProfit(asCost, packageProfitFor(data.pricing, profitSettings.default_pct), rebase(lookups.sarPer ?? { SAR: 1 }, quote) ?? {}, quote);
   }, [data.pricing, profitSettings.default_pct, lookups.sarPer]);
-  const summary = useMemo(
-    () =>
-      computeOfferPricing(
-        shownItems.map((i) => ({
-          quantity: i.quantity,
-          buy_price: i.buy_price,
-          buy_currency: i.buy_currency || display,
-          sell_price: i.sell_price,
-          sell_currency: i.sell_currency || display,
-          profit_pct: i.profit_pct,
-          profit_amount: i.profit_amount,
-        })),
-        rebase(lookups.sarPer ?? { SAR: 1 }, display) ?? {},
-        display,
-      ),
-    [shownItems, display, lookups.sarPer],
-  );
+  const summary = useMemo(() => {
+    const raw = computeOfferPricing(
+      shownItems.map((i) => ({
+        quantity: i.quantity,
+        buy_price: i.buy_price,
+        buy_currency: i.buy_currency || display,
+        sell_price: i.sell_price,
+        sell_currency: i.sell_currency || display,
+        profit_pct: i.profit_pct,
+        profit_amount: i.profit_amount,
+      })),
+      rebase(lookups.sarPer ?? { SAR: 1 }, display) ?? {},
+      display,
+    );
+    // the total the client is sent: up to the whole unit, the difference is profit (offerTotals)
+    const total_sell = roundUpTotal(raw.total_sell);
+    const profit = Math.round((total_sell - raw.total_buy) * 100) / 100;
+    return { ...raw, total_sell, profit, margin_pct: total_sell ? Math.round((profit / total_sell) * 10000) / 100 : null };
+  }, [shownItems, display, lookups.sarPer]);
 
   // the transfers' list prices, worked out as the sheet would (the way back from the way there) and shown on
   // the city cards before anyone opens the sheet — the owner's review, 2026-10-18: four typed by hand

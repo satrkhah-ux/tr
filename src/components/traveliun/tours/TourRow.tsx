@@ -52,7 +52,7 @@ export function tourChoices(catalog: TourCatalog): Suggestion[] {
   };
   const priced = (value: string, programId?: string) => {
     const hit = catalog.showPrice ? findTourPrice(prices, value, catalog.tripCar, programId) : null;
-    return { value, ...(hit ? { hint: money(hit.price, hit.currency) } : {}) };
+    return { value, ...(hit ? { hint: `${money(hit.price, hit.currency)}${hit.provisional ? " · مؤقت" : ""}` } : {}) };
   };
   for (const p of catalog.programs) {
     const title = programDayText(p).title;
@@ -202,6 +202,8 @@ export function TourRow({
   const car = pick.car_type?.trim() || tripCar;
   const unit = tourCarPrice(pick, tripCar, prices, sarPer);
   const fromList = !pick.free && pick.price == null && unit != null;
+  // a placeholder price says so, until the real one is entered (0096)
+  const provisional = fromList && findTourPrice(prices, pick.title, car, pick.program_id)?.provisional;
   const cell = (label: string, control: ReactNode, wide = false) => (
     <label className={`grid min-w-0 gap-1 ${wide ? "col-span-full" : ""}`}>
       <span className={labelled ? caption : "sr-only"}>{label}</span>
@@ -274,7 +276,12 @@ export function TourRow({
                 onChange={(e) => onChange({ price: typedNumber(e.target) })}
                 className={`${field} tv-tnum text-center disabled:bg-[#f4f7f6]`}
               />
-              {fromList ? <span className="text-[10px] font-bold text-[#0f7a52]">{t("pg.tour.fromList")}</span> : null}
+              {fromList ? (
+                <span className={`text-[10px] font-bold ${provisional ? "text-[#b54708]" : "text-[#0f7a52]"}`}>
+                  {t("pg.tour.fromList")}
+                  {provisional ? ` · ${t("pg.tour.provisional")}` : ""}
+                </span>
+              ) : null}
             </span>,
           )
         : null}

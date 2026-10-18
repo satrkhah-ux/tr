@@ -78,8 +78,8 @@ export const ar: Dictionary = {
   // ---------- aria ----------
   "aria.openMenu": "فتح القائمة",
   "aria.closeMenu": "إغلاق القائمة",
-  "aria.pinSidebar": "تثبيت القائمة",
-  "aria.unpinSidebar": "إلغاء تثبيت القائمة",
+  "aria.pinSidebar": "إظهار القائمة",
+  "aria.unpinSidebar": "طيّ القائمة جانباً",
   "aria.swap": "تبديل العملات",
 
   // ---------- roles / view-as ----------
@@ -1744,6 +1744,7 @@ export const ar: Dictionary = {
   "pg.tour.carPrice": "سعر السيارة",
   "pg.tour.total": "الإجمالي",
   "pg.tour.fromList": "من قائمة الأسعار",
+  "pg.tour.provisional": "سعر مؤقت",
   "pg.tour.description": "الوصف (من البرنامج — قابل للتعديل)",
   "pg.tour.add": "جولة في هذا اليوم",
   "pg.tour.remove": "إزالة الجولة من اليوم",

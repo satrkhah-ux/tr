@@ -612,6 +612,13 @@ describe("data model 0072 — airport → city rows and per-car tours", () => {
     // the old per-car name still finds the grouped tour, at that car's price
     expect(findTourPrice(tours, "جولة كوالالمبور (فان)")?.price).toBe(450);
   });
+
+  it("a placeholder price (0096) prices the tour in any car until the real one is entered", () => {
+    const tours = [{ name: "جولة اوزنغول", price: 100, currency: "SAR", car_type: "سيارة صغيرة", program_id: "p9", provisional: true }];
+    expect(findTourPrice(tours, "جولة اوزنغول", "فيتو", "p9")).toMatchObject({ price: 100, provisional: true });
+    // a real price for one car is still that car's only
+    expect(findTourPrice([{ ...tours[0], provisional: false }], "جولة اوزنغول", "فيتو", "p9")).toBeNull();
+  });
 });
 
 describe("suggestPricing — two or more hotels in one city (order 1)", () => {

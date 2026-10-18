@@ -80,8 +80,8 @@ export const en = {
   // ---------- aria ----------
   "aria.openMenu": "Open menu",
   "aria.closeMenu": "Close menu",
-  "aria.pinSidebar": "Pin sidebar",
-  "aria.unpinSidebar": "Unpin sidebar",
+  "aria.pinSidebar": "Show menu",
+  "aria.unpinSidebar": "Fold menu aside",
   "aria.swap": "Swap currencies",
 
   // ---------- roles / view-as ----------
@@ -1746,6 +1746,7 @@ export const en = {
   "pg.tour.carPrice": "Price per car",
   "pg.tour.total": "Total",
   "pg.tour.fromList": "from the price list",
+  "pg.tour.provisional": "provisional price",
   "pg.tour.description": "Description (from the programme — editable)",
   "pg.tour.add": "Tour on this day",
   "pg.tour.remove": "Remove the tour from this day",

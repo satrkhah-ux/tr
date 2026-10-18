@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deriveCityDates, emptyDraftData, type DraftData, type DraftDay } from "./draft-types";
-import { draftDaySkeleton, fillDaysFromPrograms, isTouringDay, programDayText, withDayTour, type TourProgram } from "./itinerary";
+import { autoTourPicks, draftDaySkeleton, fillDaysFromPrograms, isTouringDay, programDayText, withDayTour, type TourProgram } from "./itinerary";
 
 const day = (n: number, city: string, title = ""): DraftDay => ({
   day_number: n,
@@ -108,5 +108,25 @@ describe("«اختر جولة جاهزة» writes a real tour (الأمر 3)", (
     ]);
     const noTours = { ...data, transport_plan: { ...data.transport_plan, tours: { ...data.transport_plan.tours, enabled: false } } };
     expect(withDayTour(noTours, 1, first)).toBeNull();
+  });
+});
+
+describe("autoTourPicks — a city's tours arrive filled (the owner, 2026-10-18)", () => {
+  const programs = [program("a", "طرابزون", 2, "جولة اوزنغول"), program("f", "طرابزون", 0, "يوم حر", true), program("b", "طرابزون", 1, "جولة حيدر نبي")];
+  const blank = { program_id: null, title: "", text: "", price: null };
+
+  it("fills the empty rows with the city's programmes in order, none twice, free days never", () => {
+    const out = autoTourPicks([blank, blank, blank], programs);
+    expect(out.map((p) => p.title)).toEqual(["جولة حيدر نبي", "جولة اوزنغول", ""]);
+    expect(out[0]).toMatchObject({ program_id: "b", price: null, free: false });
+  });
+  it("keeps the agent's rows and does not repeat what the city already has", () => {
+    const mine = { ...blank, program_id: "b", title: "جولة حيدر نبي" };
+    const free = { ...blank, title: "يوم حر", free: true };
+    expect(autoTourPicks([mine, free, blank], programs).map((p) => p.title)).toEqual(["جولة حيدر نبي", "يوم حر", "جولة اوزنغول"]);
+  });
+  it("nothing to fill → the same list", () => {
+    const picks = [{ ...blank, title: "جولة خاصة" }];
+    expect(autoTourPicks(picks, programs)).toBe(picks);
   });
 });

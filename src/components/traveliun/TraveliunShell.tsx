@@ -25,8 +25,7 @@ import {
   BadgePercent,
   Calculator,
   ChevronDown,
-  Pin,
-  PinOff,
+  ChevronLeft,
   ClipboardCheck,
   Database,
   FileText,
@@ -106,11 +105,11 @@ export type NavGroup = {
  * would go stale the first time a route is added here.
  */
 /**
- * Whether the sidebar is pinned open, remembered across page loads.
- *
- * It was component state, so every navigation un-pinned it and the menu went
- * back to sliding out over the page whenever the pointer crossed it — the
- * complaint this setting exists to answer.
+ * Whether the sidebar is open, remembered across page loads. It opens only on a
+ * click — an icon in the rail, or the arrow — and stays until the arrow folds it
+ * back to the rail of icons. It used to slide out on hover and push the page
+ * whenever the pointer crossed it (the owner, 2026-10-18: «عند مرور الماوس تفتح
+ * وتسبب اشكالية … عند الضغط على اي مكان تبقى ثابتة»).
  *
  * useSyncExternalStore rather than the hydrate-in-an-effect the theme provider
  * uses: localStorage does not exist on the server, so that version renders the
@@ -390,8 +389,7 @@ function isGroupActive(pathname: string, group: NavGroup) {
 export function TraveliunShell({ title, focus = false, children }: TraveliunShellProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [menuPinned, setMenuPinned] = usePinnedSidebar();
-  const [menuHovered, setMenuHovered] = useState(false);
+  const [menuOpen, setMenuOpen] = usePinnedSidebar();
   const [panel, setPanel] = useState<"guide" | "calculator" | "view" | "settings" | "profile" | null>(null);
   const { language, setLanguage, view, setView, theme, setTheme, dir, t } = useTraveliunUI();
   const partner = usePartnerBrand();
@@ -453,7 +451,6 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
 
   const activeGroup =
     visibleNavGroups.find((group) => group.labelKey === activeMenu) ?? visibleNavGroups[0];
-  const menuOpen = menuPinned || menuHovered;
   const displayTitle = t(title);
 
   return (
@@ -464,32 +461,17 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
         className={`fixed start-0 top-0 z-[90] hidden h-screen transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:block ${
           menuOpen ? "w-[260px]" : "w-[74px]"
         }`}
-        onMouseEnter={() => setMenuHovered(true)}
-        onMouseLeave={() => {
-          if (!menuPinned) {
-            setMenuHovered(false);
-          }
-        }}
       >
         <button
           type="button"
-          className={`absolute -end-4 top-5 z-[120] flex size-8 items-center justify-center rounded-full border shadow-[0_2px_8px_rgba(24,80,69,0.16)] transition-colors duration-200 ${
-            menuPinned
-              ? "border-[var(--tv-brand)] bg-[var(--tv-brand)] text-white hover:bg-[#0f4439]"
-              : "border-[#dce3df] bg-white text-[var(--tv-brand)] hover:bg-[#f4f8f6]"
-          }`}
-          aria-pressed={menuPinned}
-          title={menuPinned ? t("aria.unpinSidebar") : t("aria.pinSidebar")}
-          aria-label={menuPinned ? t("aria.unpinSidebar") : t("aria.pinSidebar")}
-          onClick={() => {
-            setMenuPinned(!menuPinned);
-            setMenuHovered(true);
-          }}
+          className="absolute -end-4 top-5 z-[120] flex size-8 items-center justify-center rounded-full border border-[#dce3df] bg-white text-[var(--tv-brand)] shadow-[0_2px_8px_rgba(24,80,69,0.16)] transition-colors duration-200 hover:bg-[#f4f8f6]"
+          aria-expanded={menuOpen}
+          title={menuOpen ? t("aria.unpinSidebar") : t("aria.pinSidebar")}
+          aria-label={menuOpen ? t("aria.unpinSidebar") : t("aria.pinSidebar")}
+          onClick={() => setMenuOpen(!menuOpen)}
         >
-          {/* A PIN, not a chevron. The arrow read as «طَيّ/فتح» — which hovering
-              already does — so nobody found the control that stops the menu
-              sliding out over their work. */}
-          {menuPinned ? <Pin className="size-4 fill-current" /> : <PinOff className="size-4" />}
+          {/* points the way the menu will move: in when open, out when folded */}
+          <ChevronLeft className={cn("size-4 transition-transform rtl:-scale-x-100", menuOpen ? "" : "rotate-180")} />
         </button>
 
         <aside className="absolute start-0 top-0 z-10 h-screen w-[74px] border-e border-[#c8d2cd] bg-white">
@@ -514,7 +496,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
                   }`}
                   onClick={() => {
                     setActiveMenu(group.labelKey);
-                    setMenuHovered(true);
+                    setMenuOpen(true);
                   }}
                 >
                   <span
@@ -534,11 +516,6 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
             activeGroup={activeGroup}
             pathname={pathname}
             setActiveMenu={setActiveMenu}
-            close={() => {
-              if (!menuPinned) {
-                setMenuHovered(false);
-              }
-            }}
           />
         ) : null}
       </div>
@@ -768,12 +745,10 @@ function SideMenu({
   activeGroup,
   pathname,
   setActiveMenu,
-  close,
 }: {
   activeGroup: NavGroup;
   pathname: string;
   setActiveMenu: (key: TranslationKey) => void;
-  close: () => void;
 }) {
   const { t } = useTraveliunUI();
   const partner = usePartnerBrand();
@@ -809,7 +784,6 @@ function SideMenu({
               ) : (
                 <Link
                   href={group.href}
-                  onClick={close}
                   className={`flex w-full items-center gap-3 px-4 py-[11px] text-start text-[13px] font-bold transition-colors duration-200 ${
                     active ? "bg-[var(--tv-brand)] text-white" : "text-[var(--tv-brand)] hover:bg-[#eef4f1]"
                   }`}
@@ -833,7 +807,6 @@ function SideMenu({
                       <Link
                         key={child.href}
                         href={child.href}
-                        onClick={close}
                         className={`relative mx-[10px] block rounded-[7px] px-6 py-[10px] text-[13px] transition-colors duration-200 ${
                           childActive
                             ? "bg-[#eef4f1] font-extrabold text-[var(--tv-brand)]"
