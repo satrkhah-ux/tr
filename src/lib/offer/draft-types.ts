@@ -1965,7 +1965,8 @@ export function keepNightlyRates(cities: DraftCity[], hotels: DraftHotel[]): Dra
   const scale = (v: number | null, f: number) => (v == null ? v : Math.round(v * f * 100) / 100);
   return hotels.map((h) => {
     const now = nights.get(h.id) ?? 0;
-    if (!now || h.priced_nights === now) return h;
+    // a supplier rate quoted these nights; another stay is sourcingFits' to flag, not a figure to stretch
+    if (h.sourcing || !now || h.priced_nights === now) return h;
     if (!h.priced_nights) return { ...h, priced_nights: now };
     const f = now / h.priced_nights;
     return { ...withRooms(h, h.rooms.map((r) => ({ ...r, price: scale(r.price, f) }))), manual_price: scale(h.manual_price, f), priced_nights: now };
