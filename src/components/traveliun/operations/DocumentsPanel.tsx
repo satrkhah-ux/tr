@@ -38,6 +38,7 @@ import { seedBookingsFromOffer } from "@/lib/data/operation-seed";
 import { ensureClientLink, revokeClientLink } from "@/lib/data/operation-hub";
 import { ROOM_SPEC_KEY, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { roomDetailsOpen } from "@/lib/operations/room-details";
+import { flightTicketed, hotelFinal } from "@/lib/operations/client-booking-state";
 import { carFields, carText, DRV } from "@/lib/operations/drivers";
 import type { TranslationKey } from "@/lib/i18n";
 import type { AssigneeOption, SentRequest } from "@/lib/data/operation-assign";
@@ -109,6 +110,9 @@ export function DocumentsPanel({
   const confirmed = bookings.filter((b) => b.status === "confirmed");
   const outstanding = bookings.filter((b) => b.status !== "confirmed" && b.status !== "cancelled");
   const waiting = bookings.filter((b) => awaitingConfirmation(b.status));
+  // what a hotel voucher and the ticket may print — the wizard's done-rules, the ones issueDocument enforces
+  const finalHotels = bookings.filter((b) => b.kind === "hotel" && hotelFinal(b));
+  const ticketed = bookings.filter((b) => b.kind === "flight" && flightTicketed(b));
 
   const live = documents.filter((d) => !d.revoked_at);
   const issuedKinds = new Set(live.map((d) => d.kind));
@@ -119,12 +123,7 @@ export function DocumentsPanel({
     // A welcome board needs nothing confirmed — it is a name on a sheet, and it
     // is wanted EARLY, often before the first hotel comes back.
     if (kind === "welcome_board") return { can: true, reason: null };
-    const pool =
-      kind === "hotel_voucher"
-        ? confirmed.filter((b) => b.kind === "hotel")
-        : kind === "flight_ticket"
-          ? confirmed.filter((b) => b.kind === "flight")
-          : confirmed;
+    const pool = kind === "hotel_voucher" ? finalHotels : kind === "flight_ticket" ? ticketed : confirmed;
     return pool.length > 0 ? { can: true, reason: null } : { can: false, reason: "ops.err.nothingToIssue" };
   }
 
@@ -138,8 +137,7 @@ export function DocumentsPanel({
     startTransition(async () => {
       setError(null);
       if (kind === "hotel_voucher" && perHotel) {
-        const hotels = confirmed.filter((b) => b.kind === "hotel");
-        for (const h of hotels) {
+        for (const h of finalHotels) {
           const res = await issueDocument({ operation_id: operationId, kind, booking_id: h.id });
           if (!res.ok) {
             setError(t(res.error, res.params));

@@ -48,16 +48,18 @@ export function hotelFinal(b: Pick<ClientBookingRow, "status" | "confirmation_nu
 }
 
 /**
- * The flight's ticket is in: the wizard's PNR or ticket numbers — or, for a
- * flight worked before the wizard, a confirmed booking marked ticketed
- * (is_paid, «صدرت التذكرة») whose reference is its PNR.
+ * THE flight-done rule (the owner, 2026-10-18) — the wizard's step, the ticket
+ * document, the client's link, the execution ladder and the readiness gate all
+ * ask this one: confirmed, AND ticketed — the uploaded ticket's PNR or ticket
+ * numbers, or a hand confirmation marked «صدرت التذكرة» (is_paid) with its
+ * reference. A seat the airline only HOLDS has a confirmation number too, and
+ * is not a ticket: counting it would issue the ticket document and prepare a
+ * «ticket issued» message for a client who has no ticket. Before, three rules
+ * disagreed; now one, and «تسجيل يدوي» with «صدرت التذكرة» counts everywhere.
  */
 export function flightTicketed(b: Pick<ClientBookingRow, "status" | "confirmation_number" | "pnr" | "ticket_numbers" | "is_paid">): boolean {
-  return (
-    text(b.pnr) !== null ||
-    (b.ticket_numbers?.length ?? 0) > 0 ||
-    (b.status === "confirmed" && Boolean(b.is_paid) && text(b.confirmation_number) !== null)
-  );
+  if (b.status !== "confirmed") return false;
+  return text(b.pnr) !== null || (b.ticket_numbers?.length ?? 0) > 0 || (b.is_paid === true && text(b.confirmation_number) !== null);
 }
 
 const flightPnr = (b: ClientBookingRow) => text(b.pnr) ?? (b.status === "confirmed" ? text(b.confirmation_number) : null);

@@ -69,6 +69,16 @@ describe("hotelAwaitingConfirmation", () => {
     });
     expect(hotelAwaitingConfirmation(op)).toEqual(["ح"]);
   });
+
+  it("counts a hotel «confirmed» on OUR number only — not final by the wizard's rule (hotelFinal)", () => {
+    const op = snap({
+      bookings: [
+        { id: "b1", kind: "hotel", title: "رقمنا فقط", status: "confirmed", cancellation_deadline: null, confirmation_number: "AD-1-H1", company_ref: "AD-1-H1" },
+        { id: "b2", kind: "hotel", title: "رقم الفندق", status: "confirmed", cancellation_deadline: null, confirmation_number: "554871203", company_ref: "AD-1-H2" },
+      ],
+    });
+    expect(hotelAwaitingConfirmation(op)).toEqual(["رقمنا فقط"]);
+  });
 });
 
 describe("vouchersPending", () => {

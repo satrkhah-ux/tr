@@ -1,6 +1,6 @@
 import type { TravelerKind, TravelerListItem } from "@/lib/operations/traveler-dto";
 import { ageOn, kindForAge, passportIssues, travelerReadiness } from "@/lib/operations/travelers";
-import type { ReadinessItem, SoldTravelers, StepState, WizardCase } from "./types";
+import type { ReadinessCase, ReadinessItem, SoldTravelers, StepState, WizardCase } from "./types";
 
 /**
  * Step 1 — «الجوازات»: who actually travels, read off the passports. The
@@ -45,7 +45,7 @@ export function soldCount(sold: SoldTravelers | null): KindCount | null {
   return { adult: Math.max(n(sold.adults), 1), child: n(sold.children), infant: n(sold.infants) };
 }
 
-export function passportSummary(data: Pick<WizardCase, "travelers" | "operation" | "sold" | "today">): PassportSummary {
+export function passportSummary(data: Pick<ReadinessCase, "travelers" | "operation" | "sold" | "today">): PassportSummary {
   const trip = data.operation;
   const sold = soldCount(data.sold);
   const actual = count(data.travelers.map((t) => kindOnTrip(t, trip, data.today)));
@@ -66,7 +66,7 @@ export function passportsState(data: WizardCase): StepState {
   return data.travelers.every((t) => travelerReadiness(t, data.operation, data.today).length === 0) ? "done" : "todo";
 }
 
-export function passportsReadiness(data: WizardCase): ReadinessItem[] {
+export function passportsReadiness(data: ReadinessCase): ReadinessItem[] {
   const trip = data.operation;
   return [
     // a valid passport for every traveller: on file, not expiring within six months of the return, the age as sold

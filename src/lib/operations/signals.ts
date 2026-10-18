@@ -12,6 +12,7 @@
  * house rule already used by both rate-expiry gates.
  */
 
+import { hotelFinal } from "./client-booking-state";
 import { passportExpiringWithin } from "./traveler-dto";
 import { installmentStates, type Installment } from "./payments";
 import type { ClientStatus, ExecutionStatus } from "./state";
@@ -53,6 +54,9 @@ export type OperationSnapshot = {
     cancellation_deadline: string | null;
     /** when the supplier's confirmation was recorded. Optional: unknown = lenient. */
     confirmed_at?: string | null;
+    /** a hotel's number and ours — what tells the hotel's FINAL confirmation (hotelFinal). Optional: unknown = lenient. */
+    confirmation_number?: string | null;
+    company_ref?: string | null;
   }[];
   documents: { kind: string; booking_id: string | null; created_at?: string | null }[];
   travelers: { display_name: string; passport_expiry: string | null }[];
@@ -77,10 +81,16 @@ export function unpaidConfirmed(op: OperationSnapshot): boolean {
   return op.paid < op.total;
 }
 
-/** Bookings that were requested or prebooked but never came back confirmed. */
+/**
+ * Hotels without their FINAL confirmation: requested or prebooked and never
+ * back — or «confirmed» on our own number only, which the wizard's hotels step,
+ * the voucher and the client's link do not count (client-booking-state hotelFinal).
+ */
 export function hotelAwaitingConfirmation(op: OperationSnapshot): string[] {
+  const provisional = (b: SnapshotBooking) =>
+    b.status === "confirmed" && b.confirmation_number !== undefined && !hotelFinal({ status: b.status, confirmation_number: b.confirmation_number, company_ref: b.company_ref });
   return op.bookings
-    .filter((b) => b.kind === "hotel" && (b.status === "pending" || b.status === "prebooked" || b.status === "in_flight"))
+    .filter((b) => b.kind === "hotel" && (b.status === "pending" || b.status === "prebooked" || b.status === "in_flight" || provisional(b)))
     .map((b) => b.title);
 }
 

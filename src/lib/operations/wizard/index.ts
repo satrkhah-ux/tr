@@ -5,10 +5,11 @@ import { hotelsReadiness, hotelsState } from "./hotels";
 import { passportsReadiness, passportsState } from "./passports";
 import { paymentReadiness, paymentState } from "./payment";
 import { transportReadiness, transportState } from "./transport";
-import { WIZARD_STEPS, type CaseWaits, type ReadinessItem, type StepState, type WizardCase, type WizardStep } from "./types";
+import type { TranslationKey } from "@/lib/i18n";
+import { WIZARD_STEPS, type CaseWaits, type ReadinessCase, type ReadinessItem, type StepState, type WizardCase, type WizardStep } from "./types";
 
 /** Each step's own rules, in one place for the progress bar and the readiness gate. */
-const RULES: Record<WizardStep, { state: (d: WizardCase) => StepState; readiness: (d: WizardCase) => ReadinessItem[] }> = {
+const RULES: Record<WizardStep, { state: (d: WizardCase) => StepState; readiness: (d: ReadinessCase) => ReadinessItem[] }> = {
   passports: { state: passportsState, readiness: passportsReadiness },
   flights: { state: flightsState, readiness: flightsReadiness },
   hotels: { state: hotelsState, readiness: hotelsReadiness },
@@ -62,11 +63,30 @@ export function firstOpenStep(data: WizardCase): WizardStep {
 }
 
 /** Everything «جاهز للسفر» needs; a mandatory item not ok blocks it. */
-export function readiness(data: WizardCase): ReadinessItem[] {
+export function readiness(data: ReadinessCase): ReadinessItem[] {
   return WIZARD_STEPS.flatMap((step) => RULES[step].readiness(data));
 }
 
 /** The gate itself — the button and setExecutionStatus("ready_to_travel") both ask this. */
 export function readyToTravel(items: ReadinessItem[]): boolean {
   return items.every((i) => i.ok || i.optional);
+}
+
+/** A readiness item's words — every key has them (readiness-keys.test.ts). */
+export const readyLabel = (i: ReadinessItem) => `wz.ready.${i.step}.${i.key}` as TranslationKey;
+
+/**
+ * A step tile's colour (the owner, 2026-10-18: «يتحول المربع بنفس لون الخطأ»):
+ *   red    — a mandatory item missing: exactly what blocks «جاهز للسفر», so
+ *            «no red tile» and readyToTravel are one rule;
+ *   yellow — only an optional item missing, or the step's own work not done
+ *            though nothing blocks (travelling unpaid on a manager's exception);
+ *   green  — complete;  grey — the file has none of it.
+ */
+export type StepTone = "red" | "yellow" | "green" | "grey";
+
+export function stepTone(state: StepState, items: ReadinessItem[]): StepTone {
+  if (items.some((i) => !i.ok && !i.optional)) return "red";
+  if (items.some((i) => !i.ok) || state === "todo" || state === "waiting") return "yellow";
+  return state === "na" ? "grey" : "green";
 }

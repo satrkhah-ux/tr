@@ -25,7 +25,7 @@ describe("the step's state and «التأكيد النهائي»", () => {
     const open = booking({ id: "b" });
     expect(hotelsState(wcase([done, booking({ id: "c", status: "cancelled" })]))).toBe("done");
     expect(hotelsState(wcase([done, open]))).toBe("todo");
-    expect(hotelsReadiness(wcase([done, open]))).toEqual([{ step: "hotels", key: "wz.hotels.ready", ok: false }]);
+    expect(hotelsReadiness(wcase([done, open]))).toEqual([{ step: "hotels", key: "final", ok: false }]);
   });
 });
 

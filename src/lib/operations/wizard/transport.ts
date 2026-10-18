@@ -142,12 +142,12 @@ export function transportState(data: Pick<WizardCase, "bookings" | "supplierWork
  * driver's name is asked for but does not block — it is often known only the
  * day before.
  */
-export function transportReadiness(data: WizardCase): ReadinessItem[] {
+export function transportReadiness(data: Pick<WizardCase, "bookings" | "supplierWork">): ReadinessItem[] {
   const cities = transportCities(data);
   if (cities.length === 0) return [];
   return [
-    { step: "transport", key: "wz.transport.ready.supplier", ok: cities.every((c) => c.supplied) },
-    { step: "transport", key: "wz.transport.ready.confirmed", ok: cities.every((c) => c.confirmed) },
-    { step: "transport", key: "wz.transport.ready.driver", ok: cities.every((c) => c.trips.every((t) => t.driver.name)), optional: true },
+    { step: "transport", key: "supplier", ok: cities.every((c) => c.supplied) },
+    { step: "transport", key: "confirmed", ok: cities.every((c) => c.confirmed) },
+    { step: "transport", key: "driver", ok: cities.every((c) => c.trips.every((t) => t.driver.name)), optional: true },
   ];
 }

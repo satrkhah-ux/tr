@@ -27,8 +27,9 @@ import { isIsoDate, riyadhDate } from "@/lib/operations/payments";
 /**
  * «العمليات» — the execution hub. A case's two statuses move in three places,
  * all through the transition rules in operations/state.ts:
- *   · here — setClientStatus / setExecutionStatus, an agent's hand
- *     (the case's gate in operations/access.ts, on their own session);
+ *   · here — setClientStatus / setExecutionStatus, an agent's hand, for what
+ *     no record says: the client's yes, «جاهز للسفر» (its gate), a manager's
+ *     cancel (the case's gate in operations/access.ts, on their own session);
  *   · operation-sync.ts — forward-only, derived from the bookings, documents
  *     and payments, after the gated action that changed them (service role);
  *   · operations/daily.ts — the morning cron: «سافر», then closed (service role).
@@ -272,6 +273,9 @@ export async function setClientStatus(
   to: ClientStatus,
   note?: string | null,
 ): Promise<{ ok: true } | Fail> {
+  // «مسدّد جزئياً / مسدّد» are the recorded payments' (operation-sync) — a click claiming money the
+  // payments do not show is what read «مسدّد جزئياً» on 0 SAR (2026-10-17)
+  if (to === "paid_partial" || to === "paid_full") return { ok: false, error: "ops.err.paidDerived" };
   // cancelling a case is the manager's step: operations.write, or manage_own on one's own file (access.ts)
   const denied = to === "cancelled" ? await gateCaseManager(operationId) : await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
@@ -312,6 +316,10 @@ export async function setExecutionStatus(
   to: ExecutionStatus,
   note?: string | null,
 ): Promise<{ ok: true } | Fail> {
+  // the ladder is DERIVED (the owner, 2026-10-18): each booking rung follows the wizard's steps
+  // (operation-sync), «سافر» the calendar (daily.ts) — by hand only «جاهز للسفر», behind its gate
+  // below, and a manager's cancel. No override: every rung is reached by recording what made it true.
+  if (to !== "ready_to_travel" && to !== "cancelled") return { ok: false, error: "ops.err.execDerived" };
   const denied = to === "cancelled" ? await gateCaseManager(operationId) : await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
   try {

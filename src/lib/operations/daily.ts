@@ -4,14 +4,15 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { notifyOps, notifyPartnerCase } from "@/lib/data/ops-notify";
 import { sendWeeklyDataQuality } from "@/lib/data/quality-weekly";
-import { readinessFor } from "@/lib/data/operation-sync";
 import { sendClientMessage } from "@/lib/data/client-messages";
 import { messagesDueToday } from "./client-messages";
 import { passportAlerts, type AlertTraveler } from "./progress";
 import { defaultSchedule, installmentStates, paidTotal } from "./payments";
 import { canAdvanceClient, canAdvanceExecution, type ClientStatus, type ExecutionStatus } from "./state";
 import { hotelAtRisk, type ClientBookingRow } from "./client-booking-state";
-import { notifyDueWaits } from "@/lib/data/wizard-case";
+import { notifyDueWaits, travelBlockers } from "@/lib/data/wizard-case";
+import { translate } from "@/lib/i18n";
+import { readyLabel } from "./wizard/index";
 
 /**
  * The operations day (operations order 6), run once a morning by the server's
@@ -108,9 +109,10 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
     const head = `${serialOf(op)}${name ? ` — ${name}` : ""}`;
 
     if ([7, 3, 1].includes(days)) {
-      const items = (await readinessFor(op.id)) ?? [];
-      const missing = items.filter((i) => !i.ok);
-      if (missing.length && (await alertOnce(supabase, op.id, "before_travel", String(days), [`⏰ السفر بعد ${days === 1 ? "يوم" : `${days} أيام`}: ${head}`, "", ...missing.map((i) => `• ${i.detail}`)].join("\n")))) {
+      // what still blocks «جاهز للسفر» — the wizard's own rules, in its tiles' words
+      const missing = (await travelBlockers(op.id)) ?? [];
+      const lines = missing.map((i) => `• ${translate("ar", `wz.step.${i.step}`)}: ${translate("ar", readyLabel(i))}`);
+      if (missing.length && (await alertOnce(supabase, op.id, "before_travel", String(days), [`⏰ السفر بعد ${days === 1 ? "يوم" : `${days} أيام`}: ${head}`, "", ...lines].join("\n")))) {
         result.alerts += 1;
       }
     }

@@ -30,6 +30,8 @@ type BookingRow = {
   status: string;
   cancellation_deadline: string | null;
   confirmed_at: string | null;
+  confirmation_number: string | null;
+  company_ref: string | null;
 };
 
 type DocRow = { operation_id: string; kind: string; booking_id: string | null; created_at: string };
@@ -72,7 +74,7 @@ async function load(): Promise<Loaded> {
     const [bookingsRes, docsRes, travelers, installmentsRes] = await Promise.all([
       supabase
         .from("operation_bookings")
-        .select("id, operation_id, kind, title, status, cancellation_deadline, confirmed_at")
+        .select("id, operation_id, kind, title, status, cancellation_deadline, confirmed_at, confirmation_number, company_ref")
         .in("operation_id", ids),
       // Revoked documents do not count as issued — that is the whole point of
       // revoking one. `created_at` is what tells a voucher printed BEFORE this
@@ -111,6 +113,8 @@ async function load(): Promise<Loaded> {
           status: b.status,
           cancellation_deadline: b.cancellation_deadline,
           confirmed_at: b.confirmed_at,
+          confirmation_number: b.confirmation_number,
+          company_ref: b.company_ref,
         })),
         documents: ds.map((d) => ({ kind: d.kind, booking_id: d.booking_id, created_at: d.created_at })),
         travelers: ts.map((t) => ({ display_name: t.display_name, passport_expiry: t.passport_expiry })),

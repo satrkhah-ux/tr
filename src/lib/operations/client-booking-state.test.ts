@@ -56,13 +56,13 @@ describe("a hotel on the client's link", () => {
 
 describe("a flight on the client's link", () => {
   it("before the ticket: «سيتم تأكيد الحجز» — our number, no PNR, no flight number, no time", () => {
-    const f = clientFlight(flight({ status: "confirmed", confirmation_number: "PNR-HOLD" }));
+    const f = clientFlight(flight({ status: "pending", pnr: "X7K2QZ" }));
     expect(f).toMatchObject({ ticketed: false, pnr: null, legs: [], ref: "AD-2-7287-20261012-F1" });
   });
 
   it("the wizard's ticket in: the PNR and the legs as read off the ticket", () => {
     const f = clientFlight(
-      flight({ pnr: "X7K2QZ", flight_legs: [{ flight_no: "TK145", from: "RUH", to: "IST", departs_at: "2026-10-20T08:30:00+03:00", arrives_at: "2026-10-20T12:40:00+03:00" }] }),
+      flight({ status: "confirmed", confirmation_number: "X7K2QZ", pnr: "X7K2QZ", flight_legs: [{ flight_no: "TK145", from: "RUH", to: "IST", departs_at: "2026-10-20T08:30:00+03:00", arrives_at: "2026-10-20T12:40:00+03:00" }] }),
     );
     expect(f.ticketed).toBe(true);
     expect(f.pnr).toBe("X7K2QZ");
@@ -70,12 +70,14 @@ describe("a flight on the client's link", () => {
   });
 
   it("ticket numbers alone count as the ticket", () => {
-    expect(clientFlight(flight({ ticket_numbers: ["0652400000001"] })).ticketed).toBe(true);
+    expect(clientFlight(flight({ status: "confirmed", ticket_numbers: ["0652400000001"] })).ticketed).toBe(true);
   });
 
-  it("a flight worked before the wizard: ticketed (is_paid) with its PNR in the confirmation, legs from its detail", () => {
+  it("a flight confirmed by hand («تسجيل يدوي»): ticketed once marked «صدرت التذكرة», its number as the PNR, legs from its detail", () => {
     const f = clientFlight(flight({ status: "confirmed", confirmation_number: "PNR-6XK2QZ", is_paid: true }));
     expect(f).toMatchObject({ ticketed: true, pnr: "PNR-6XK2QZ" });
+    // a held seat (its number, no ticket) stays «سيتم تأكيد الحجز»
+    expect(clientFlight(flight({ status: "confirmed", confirmation_number: "PNR-6XK2QZ", is_paid: false })).ticketed).toBe(false);
     expect(f.legs[0]).toMatchObject({ flight_no: "TK145", from: "RUH", to: "IST", departure: "2026-10-20T08:30" });
   });
 });
@@ -149,7 +151,7 @@ describe("the updates prepared for staff", () => {
   });
 
   it("a ticket in: the PNR and the flights — and again only for a new PNR", () => {
-    const ticketed = flight({ pnr: "X7K2QZ", flight_legs: [{ flight_no: "TK145", from: "RUH", to: "IST", departs_at: "2026-10-20T08:30:00+03:00", arrives_at: null }] });
+    const ticketed = flight({ status: "confirmed", pnr: "X7K2QZ", flight_legs: [{ flight_no: "TK145", from: "RUH", to: "IST", departs_at: "2026-10-20T08:30:00+03:00", arrives_at: null }] });
     const [m] = preparedMessages({ ...base, bookings: [ticketed], sent: new Set(["trip_link"]) });
     expect(m.key).toBe("flight:f1:X7K2QZ");
     expect(m.template).toBe("booking_update");

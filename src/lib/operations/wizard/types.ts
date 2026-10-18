@@ -74,7 +74,34 @@ export type StepProps = {
 };
 
 /**
- * One readiness rule's answer before «جاهز للسفر» — `ok` false blocks it unless `optional`.
- * The gate labels it with the i18n key `wz.ready.<step>.<key>` when one exists.
+ * What the readiness rules read. The case page passes its whole WizardCase; the
+ * morning alerts, with no session, load just this (wizard-case.ts travelBlockers)
+ * — so a rule reading anything else is a type error, not a silent «missing».
  */
-export type ReadinessItem = { step: WizardStep; key: string; ok: boolean; optional?: boolean };
+export type ReadinessCase = Pick<
+  WizardCase,
+  "travelers" | "bookings" | "documents" | "supplierWork" | "clientToken" | "readyExceptions" | "hasDays" | "today" | "sold" | "guide"
+> & {
+  operation: Pick<OperationCard, "total" | "travel_start" | "travel_end">;
+  payments: Pick<OperationPayment, "amount" | "kind">[];
+};
+
+/**
+ * Every key each step's readiness may return — ONE convention: a short key,
+ * labelled by the i18n key `wz.ready.<step>.<key>` (index.ts readyLabel). A key
+ * not listed here does not typecheck, and readiness-keys.test.ts checks each
+ * one has its Arabic and English words.
+ */
+export const READINESS_KEYS = {
+  passports: ["passports", "visas", "count"],
+  flights: ["tickets"],
+  hotels: ["final"],
+  transport: ["supplier", "confirmed", "driver"],
+  payment: ["settled"],
+  documents: ["documents", "link", "arrival_sign", "guide"],
+} as const satisfies Record<WizardStep, readonly string[]>;
+
+/** One readiness rule's answer before «جاهز للسفر» — `ok` false blocks it unless `optional`. */
+export type ReadinessItem = {
+  [S in WizardStep]: { step: S; key: (typeof READINESS_KEYS)[S][number]; ok: boolean; optional?: boolean };
+}[WizardStep];

@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { OperationBooking, OperationDocument } from "@/lib/data/operation-bookings";
 import type { OperationCard, OperationPayment } from "@/lib/data/operations";
 import type { TravelerListItem } from "@/lib/operations/traveler-dto";
+import { clientFlight, flightTicketed } from "@/lib/operations/client-booking-state";
+import { derivedExecution } from "@/lib/operations/progress";
 import { documentPlan, documentsReadiness, dueDocuments, sameDocument, snapshotKey } from "./documents";
 import { followUpOf, readWaits, withoutWaits } from "./followup";
-import { bookingStepStates, firstOpenStep, ownStates, readiness, readyToTravel, staleWaits, stepStates } from "./index";
+import { bookingStepStates, firstOpenStep, ownStates, readiness, readyToTravel, staleWaits, stepStates, stepTone } from "./index";
 import { kindOnTrip, matchPassport, passportSummary, passportsReadiness, passportsState } from "./passports";
 import { clientStatusUnbacked, paidState, paymentPrefill, paymentReadiness } from "./payment";
-import type { WizardCase } from "./types";
+import { WIZARD_STEPS, type WizardCase } from "./types";
 
 const TODAY = "2026-10-17";
 
@@ -272,6 +274,64 @@ describe("the shell", () => {
   it("opens «جاهز للسفر» only on every mandatory item", () => {
     expect(readyToTravel([{ step: "payment", key: "settled", ok: true }, { step: "documents", key: "link", ok: false, optional: true }])).toBe(true);
     expect(readyToTravel(readiness(wizardCase()))).toBe(false);
+  });
+});
+
+describe("the tiles (2026-10-18): each step coloured by its own readiness", () => {
+  const tones = (data: WizardCase) => {
+    const states = stepStates(data);
+    const items = readiness(data);
+    return Object.fromEntries(WIZARD_STEPS.map((s) => [s, stepTone(states[s], items.filter((i) => i.step === s))]));
+  };
+
+  it("red for a mandatory item missing, yellow for an optional one or a warning, green when complete, grey with none of it", () => {
+    expect(stepTone("todo", [{ step: "hotels", key: "final", ok: false }])).toBe("red");
+    // a wait does not soften a blocker — the tile stays the colour of the error
+    expect(stepTone("waiting", [{ step: "hotels", key: "final", ok: false }])).toBe("red");
+    expect(stepTone("done", [{ step: "documents", key: "documents", ok: true }, { step: "documents", key: "link", ok: false, optional: true }])).toBe("yellow");
+    // nothing blocks, the work is not done: travelling unpaid on a manager's exception
+    expect(stepTone("todo", [{ step: "payment", key: "settled", ok: true }])).toBe("yellow");
+    expect(stepTone("done", [{ step: "payment", key: "settled", ok: true }])).toBe("green");
+    expect(stepTone("na", [])).toBe("grey");
+  });
+
+  it("colours a whole case — and «جاهز للسفر» opens exactly when no tile is red", () => {
+    const open = wizardCase({ bookings: [booking({ id: "h1", status: "confirmed", confirmation_number: "AD-1", company_ref: "AD-1" })] });
+    expect(tones(open)).toEqual({ passports: "green", flights: "grey", hotels: "red", transport: "grey", payment: "red", documents: "red" });
+
+    const hotel = booking({ id: "h1", status: "confirmed", confirmation_number: "HX-1" });
+    const done = wizardCase({
+      bookings: [hotel],
+      payments: [pay(10000)],
+      documents: [doc({ kind: "hotel_voucher", booking_id: "h1" }), doc({ id: "d2", kind: "itinerary" })],
+    });
+    // the documents are out; the link, the sign and the guide are optional — yellow, not red
+    expect(tones(done)).toEqual({ passports: "green", flights: "grey", hotels: "green", transport: "grey", payment: "green", documents: "yellow" });
+
+    for (const data of [open, done, wizardCase(), wizardCase({ travelers: [] })]) {
+      expect(readyToTravel(readiness(data))).toBe(!Object.values(tones(data)).includes("red"));
+    }
+  });
+});
+
+describe("one flight-done rule (2026-10-18)", () => {
+  it("a flight confirmed by hand with its number in «عرض الكل» is done everywhere — the step, the ticket, the link, the ladder", () => {
+    const byHand = booking({ id: "f1", kind: "flight", status: "confirmed", confirmation_number: "6XK2QZ", is_paid: true, title: "الرياض → إسطنبول" });
+    const data = wizardCase({ bookings: [byHand] });
+    expect(flightTicketed(byHand)).toBe(true);
+    expect(stepStates(data).flights).toBe("done");
+    expect(readiness(data).find((i) => i.step === "flights")?.ok).toBe(true);
+    expect(documentPlan(data).find((l) => l.kind === "flight_ticket")?.state).toBe("due");
+    expect(clientFlight({ ...byHand, detail: {} })).toMatchObject({ ticketed: true, pnr: "6XK2QZ" });
+    expect(derivedExecution([byHand], [])).not.toBeNull();
+  });
+
+  it("and nothing short of it is: not confirmed, or confirmed with no reference", () => {
+    expect(flightTicketed({ status: "pending", confirmation_number: null, pnr: "X7K2QZ", ticket_numbers: ["065-1"] })).toBe(false);
+    expect(flightTicketed({ status: "confirmed", confirmation_number: " ", pnr: null, ticket_numbers: [] })).toBe(false);
+    // a held seat: the airline's number, not marked «صدرت التذكرة»
+    expect(flightTicketed({ status: "confirmed", confirmation_number: "6XK2QZ", pnr: null, ticket_numbers: [], is_paid: false })).toBe(false);
+    expect(flightTicketed({ status: "confirmed", confirmation_number: null, pnr: null, ticket_numbers: ["065-1"] })).toBe(true);
   });
 });
 
