@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignedAtFrom, classifyInquiry, delayText, findPlace, replyAfter } from "./auto";
+import { classifyInquiry, delayText, findPlace, parseAssignment, timelineFrom } from "./auto";
 
 const PLACES = [
   { name: "تركيا", country: "تركيا" },
@@ -35,26 +35,37 @@ describe("«العملاء» automatic classification", () => {
   });
 });
 
-describe("the hand-over times (0098)", () => {
-  const events = [
-    { at: 100, kind: "client", text: "السلام عليكم", sender: "عميل", isPrivate: false },
-    { at: 160, kind: "agent", text: "أهلاً", sender: "احمد", isPrivate: false },
-    { at: 300, kind: "activity", text: "Assigned to سارة by احمد", sender: null, isPrivate: false },
-    { at: 320, kind: "agent", text: "ملاحظة", sender: "سارة", isPrivate: true },
-    { at: 350, kind: "agent", text: "أبشر", sender: "احمد", isPrivate: false },
-    { at: 420, kind: "agent", text: "مرحباً، معك سارة", sender: "سارة", isPrivate: false },
-  ];
-
-  it("takes the hand-over's time from the activity line naming the new agent", () => {
-    expect(assignedAtFrom(events, "سارة", 600)).toBe(300);
-    expect(assignedAtFrom(events, "خالد", 600)).toBeNull();
-    expect(assignedAtFrom(events, null, 600)).toBeNull();
+describe("the conversation's turns (0099)", () => {
+  it("reads the account's activity lines", () => {
+    expect(parseAssignment("تم إسنادها إلى احمد القدسي بواسطة محمد اسكندر")).toEqual({ agent: "احمد القدسي", by: "محمد اسكندر" });
+    expect(parseAssignment("تم تعيينه إلى محمد صالح عبر قسم المبيعات  بواسطة محمد اسكندر")).toEqual({ agent: "محمد صالح", by: "محمد اسكندر" });
+    expect(parseAssignment("رشا تم تعيينه تلقائياً لهذه المحادثة")).toEqual({ agent: "رشا", by: null });
+    expect(parseAssignment("إلغاء التعيين من قسم المبيعات  بواسطة محمد اسكندر")).toBeNull();
   });
 
-  it("the new agent's first reply after it — never a private note, never someone else's", () => {
-    expect(replyAfter(events, 300, "سارة")).toBe(420);
-    // the agent's Teletel name unknown (handed over on the page): anyone of ours
-    expect(replyAfter(events, 300, null)).toBe(350);
-    expect(replyAfter(events, 500, "سارة")).toBeNull();
+  const isTeam = (n: string) => n.startsWith("قسم");
+  // conversation 40182 as Teletel holds it: رشا auto-assigned, the queue, محمد اسكندر, then اكرم الحريبي
+  const events = [
+    { at: 100, kind: "client", text: "السلام عليكم", sender: "عميل", isPrivate: false },
+    { at: 101, kind: "activity", text: "رشا تم تعيينه تلقائياً لهذه المحادثة", sender: null, isPrivate: false },
+    { at: 102, kind: "activity", text: "تم إسنادها إلى قسم الطلبات بواسطة رشا", sender: null, isPrivate: false },
+    { at: 160, kind: "agent", text: "أهلاً", sender: "رشا", isPrivate: false },
+    { at: 600, kind: "activity", text: "تم إسنادها إلى محمد اسكندر بواسطة رشا", sender: null, isPrivate: false },
+    { at: 650, kind: "agent", text: "ملاحظة", sender: "محمد اسكندر", isPrivate: true },
+    { at: 700, kind: "agent", text: "تفضل", sender: "رشا", isPrivate: false },
+    { at: 900, kind: "agent", text: "معك محمد", sender: "محمد اسكندر", isPrivate: false },
+    { at: 2000, kind: "activity", text: "تم إسنادها إلى اكرم الحريبي بواسطة محمد اسكندر", sender: null, isPrivate: false },
+  ];
+
+  it("one turn an agent: received, answered, handed on — a queue, a note or a colleague's reply is no turn", () => {
+    expect(timelineFrom(events, 100, isTeam)).toEqual([
+      { agent: "رشا", from: 101, reply: 160, handed: 600, by: null },
+      { agent: "محمد اسكندر", from: 600, reply: 900, handed: 2000, by: "رشا" },
+      { agent: "اكرم الحريبي", from: 2000, reply: null, handed: null, by: "محمد اسكندر" },
+    ]);
+  });
+
+  it("no hand-over: the first of ours to answer is the first receiver, from the client's first message", () => {
+    expect(timelineFrom(events.filter((e) => e.kind !== "activity"), 100, isTeam)).toEqual([{ agent: "رشا", from: 100, reply: 160, handed: null, by: null }]);
   });
 });

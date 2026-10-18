@@ -530,14 +530,25 @@ export async function assignTeletelTeam(conversationId: number, teamId: number):
 
 export type ConversationEvent = { at: number; kind: "client" | "agent" | "activity"; text: string; sender: string | null; isPrivate: boolean };
 
-/** A thread's latest page with its activity lines («Assigned to X by Y») — when a conversation was handed over, and answered. */
-export async function conversationEvents(conversationId: number): Promise<ConversationEvent[] | null> {
+/**
+ * A thread with its activity lines («تم إسنادها إلى X بواسطة Y») — who held a
+ * conversation and when they answered. `pages` reads that many pages back
+ * from the latest (twenty messages each), oldest first.
+ */
+export async function conversationEvents(conversationId: number, pages = 1): Promise<ConversationEvent[] | null> {
   const config = getTeletelConfig();
   if (!config) return null;
-  type Raw = { created_at?: number; content?: string | null; message_type?: number; private?: boolean; sender?: { name?: string | null } | null };
+  type Raw = { id?: number; created_at?: number; content?: string | null; message_type?: number; private?: boolean; sender?: { name?: string | null } | null };
   const list = await api<{ payload?: Raw[] }>(config, `/conversations/${conversationId}/messages`);
   if (!list) return null;
-  return (list.payload ?? []).map((m) => ({
+  let raw = list.payload ?? [];
+  for (let page = 1; page < pages && raw.length; page += 1) {
+    const oldest = Math.min(...raw.map((m) => m.id ?? Infinity));
+    const older = await api<{ payload?: Raw[] }>(config, `/conversations/${conversationId}/messages?before=${oldest}`);
+    if (!older?.payload?.length) break;
+    raw = [...older.payload, ...raw];
+  }
+  return raw.map((m) => ({
     at: m.created_at ?? 0,
     kind: m.message_type === 0 ? "client" : m.message_type === 2 ? "activity" : "agent",
     text: m.content?.trim() ?? "",
