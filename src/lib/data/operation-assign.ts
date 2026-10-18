@@ -57,7 +57,8 @@ export async function listAssignees(): Promise<AssigneeOption[]> {
     const supabase = await db();
     const [emps, partners, suppliers] = await Promise.all([
       supabase.from("employees").select("id, arabic_name, mobile").order("arabic_name").limit(200),
-      supabase.from("booking_partners").select("id, name, phone").eq("active", true).order("name"),
+      // «المطار» (0099) buys transport from us — a client, not someone we hand a booking to
+      supabase.from("booking_partners").select("id, name, phone").eq("active", true).neq("portal", "transport").order("name"),
       supabase.from("company_suppliers").select("id, arabic_name, mobile, whatsapp, categories").neq("status", "Disabled").order("arabic_name"),
     ]);
 

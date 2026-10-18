@@ -148,6 +148,7 @@ export const ar: Dictionary = {
   "nav.intelligenceHub": "مركز التشغيل الذكي",
   "nav.kanban": "لوح الباقات",
   "nav.commissions": "العمولات",
+  "nav.almatar": "حجوزات المطار",
   "nav.customers": "العملاء",
   "nav.people": "الأشخاص",
   "nav.companies": "الشركات",

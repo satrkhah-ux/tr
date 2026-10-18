@@ -23,6 +23,7 @@ import {
   BarChart3,
   Building2,
   BadgePercent,
+  Car,
   Calculator,
   ChevronDown,
   Pin,
@@ -183,6 +184,8 @@ export const navGroups: NavGroup[] = [
   // «العملاء» — every client conversation (the sheet pulled in), for every employee
   { labelKey: "nav.customers", href: "/clients", icon: Users },
   { labelKey: "nav.partnerCompanies", href: "/partner-companies", icon: Building2 },
+  // «المطار»: a transport-only partner's bookings (section-access.ts)
+  { labelKey: "nav.almatar", href: "/almatar-bookings", icon: Car },
   // Operations stays at the top level on purpose: it is the screen an ops agent
   // lives in all day. No `perm` of its own — section-access.ts opens it to
   // operations.write (every file) or operations.own (the files you issued).

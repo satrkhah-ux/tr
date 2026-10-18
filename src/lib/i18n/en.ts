@@ -150,6 +150,7 @@ export const en = {
   "nav.intelligenceHub": "Intelligence Hub",
   "nav.kanban": "Kanban Board",
   "nav.commissions": "Commissions",
+  "nav.almatar": "Almatar bookings",
   "nav.customers": "Customers",
   "nav.people": "People",
   "nav.companies": "Companies",

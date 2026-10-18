@@ -6,6 +6,8 @@ import { getMyStatement } from "@/lib/partners/ledger";
 import { getPartnerSession, isStaffSession } from "@/lib/partners/session";
 import { describeTerms } from "@/lib/partners/pricing";
 import { currentCanOpen } from "@/lib/roles/current";
+import { AlmatarPortal } from "@/components/traveliun/almatar/AlmatarPortal";
+import { getAlmatarSession, listPartnerBookings, listServices } from "@/lib/almatar/server";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,13 @@ export const metadata = {
  * exist, which is the least useful thing to tell someone standing at a door.
  */
 export default async function B2BPage() {
+  // a transport-only partner («المطار», 0099) books its transport here and sees nothing else
+  const transport = await getAlmatarSession();
+  if (transport) {
+    const [services, bookings] = await Promise.all([listServices(false), listPartnerBookings(transport.partner_id)]);
+    return <AlmatarPortal session={transport} services={services} bookings={bookings} />;
+  }
+
   const partner = await getPartnerSession();
 
   if (partner) {

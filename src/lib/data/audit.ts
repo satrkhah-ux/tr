@@ -116,6 +116,9 @@ export type AuditAction =
   | "partner.approved"
   | "partner.status_changed"
   | "partner.account_issued"
+  // «المطار» (0099): a transport booking taken, confirmed, refused or cancelled; the margin
+  | "almatar.booking_changed"
+  | "almatar.margin_changed"
   // staff logins — an employees row is a personnel record, the account is
   // separate, and who issued one is worth knowing
   | "employee.account_issued"

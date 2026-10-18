@@ -27,15 +27,27 @@ export function underAny(pathname: string, prefixes: string[]): boolean {
  * pages it saw before this redirect existed.
  */
 export function partnerIdFromToken(accessToken: string): string | null {
+  const id = tokenMetadata(accessToken)?.partner_id;
+  return typeof id === "string" && id ? id : null;
+}
+
+/** A transport-only partner («المطار», 0099) books on /b2b and nothing else. */
+export const TRANSPORT_PARTNER_PREFIXES = ["/b2b"];
+
+/** The prefixes this partner token may open — the same redirect-not-permission caveat as above. */
+export function partnerPrefixesFor(accessToken: string): string[] {
+  return tokenMetadata(accessToken)?.partner_portal === "transport" ? TRANSPORT_PARTNER_PREFIXES : PARTNER_PREFIXES;
+}
+
+function tokenMetadata(accessToken: string): Record<string, unknown> | null {
   try {
     const part = accessToken.split(".")[1] ?? "";
     const bytes = atob(part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "="));
     // atob gives Latin-1 bytes; the partner's Arabic name in the same payload needs a real UTF-8 decode
     const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(bytes, (c) => c.charCodeAt(0)))) as {
-      user_metadata?: { partner_id?: unknown };
+      user_metadata?: Record<string, unknown>;
     };
-    const id = payload.user_metadata?.partner_id;
-    return typeof id === "string" && id ? id : null;
+    return payload.user_metadata ?? null;
   } catch {
     return null;
   }

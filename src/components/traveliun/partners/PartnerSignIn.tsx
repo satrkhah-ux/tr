@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Building2, Loader2, LogIn } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { loginEmail } from "@/lib/almatar/rules";
 
 /**
  * The partner door.
@@ -32,7 +33,7 @@ export function PartnerSignIn() {
     if (loading) return;
     setError(null);
     if (!email.trim() || !password) {
-      setError("أدخل البريد وكلمة المرور.");
+      setError("أدخل البريد أو اسم المستخدم وكلمة المرور.");
       return;
     }
 
@@ -40,13 +41,14 @@ export function PartnerSignIn() {
     try {
       const supabase = createSupabaseBrowserClient();
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        // a login issued by username («almatar») signs in as that name at our partners domain
+        email: loginEmail(email),
         password,
       });
       if (signInError) {
         setError(
           signInError.message.toLowerCase().includes("invalid")
-            ? "البريد أو كلمة المرور غير صحيحة."
+            ? "بيانات الدخول أو كلمة المرور غير صحيحة."
             : "تعذّر تسجيل الدخول. حاول مرة أخرى.",
         );
         return;
@@ -75,11 +77,11 @@ export function PartnerSignIn() {
 
         <div className="grid gap-3">
           <label className="grid gap-1.5 text-[12px] font-bold text-[#185045]">
-            البريد الإلكتروني
+            البريد الإلكتروني أو اسم المستخدم
             <input
-              type="email"
+              type="text"
               dir="ltr"
-              autoComplete="email"
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className={`${field} text-start`}

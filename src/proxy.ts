@@ -5,7 +5,7 @@ import {
   getPublicSupabaseConfig,
   parseSessionCookie,
 } from "@/lib/supabase/constants";
-import { PARTNER_PREFIXES, partnerIdFromToken, underAny } from "@/lib/partners/route-guard";
+import { partnerIdFromToken, partnerPrefixesFor, underAny } from "@/lib/partners/route-guard";
 
 /**
  * Auth gate (Next 16 `proxy` convention — successor to `middleware`), and the
@@ -191,7 +191,7 @@ export async function proxy(request: NextRequest) {
     // A partner on one of OUR pages goes to its portal — a typed URL, an old
     // bookmark, or the sign-in's default /dashboard alike. (See route-guard.ts:
     // a redirect, not the permission — RLS is.)
-    if (partner && !isPublic(pathname) && !underAny(pathname, PARTNER_PREFIXES)) {
+    if (partner && session && !isPublic(pathname) && !underAny(pathname, partnerPrefixesFor(session.accessToken))) {
       return withCookie(NextResponse.redirect(new URL("/b2b", request.url)));
     }
 

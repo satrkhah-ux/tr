@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PARTNER_PREFIXES, partnerIdFromToken, underAny } from "./route-guard";
+import { PARTNER_PREFIXES, partnerIdFromToken, partnerPrefixesFor, underAny } from "./route-guard";
 
 const token = (payload: object) =>
   `h.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.sig`;
@@ -22,5 +22,13 @@ describe("the partner's way through the proxy", () => {
     for (const no of ["/dashboard", "/kanban-board", "/operations/1", "/customers", "/settings", "/partner-companies", "/b2bx", "/basics"]) {
       expect(underAny(no, PARTNER_PREFIXES)).toBe(false);
     }
+  });
+
+  it("keeps a transport-only partner on /b2b", () => {
+    const t = token({ user_metadata: { partner_id: "p-am", partner_portal: "transport" } });
+    expect(partnerIdFromToken(t)).toBe("p-am");
+    expect(underAny("/b2b", partnerPrefixesFor(t))).toBe(true);
+    expect(underAny("/basic", partnerPrefixesFor(t))).toBe(false);
+    expect(partnerPrefixesFor(token({ user_metadata: { partner_id: "p-1" } }))).toBe(PARTNER_PREFIXES);
   });
 });

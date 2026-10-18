@@ -71,7 +71,7 @@ async function loadPartnerSession(): Promise<PartnerSession | null> {
     const { data } = await db()
       .from("partner_users")
       .select(
-        "email, status, role, booking_partners!inner(id, name, name_latin, address, status, price_adjust_kind, price_adjust_pct, brand_color, accent_color, logo_path)",
+        "email, status, role, booking_partners!inner(id, name, name_latin, address, status, portal, price_adjust_kind, price_adjust_pct, brand_color, accent_color, logo_path)",
       )
       .eq("auth_user_id", user.id)
       .maybeSingle();
@@ -87,6 +87,7 @@ async function loadPartnerSession(): Promise<PartnerSession | null> {
             name_latin: string | null;
             address: string | null;
             status: string;
+            portal: string | null;
             price_adjust_kind: string;
             price_adjust_pct: number;
             brand_color: string;
@@ -99,6 +100,8 @@ async function loadPartnerSession(): Promise<PartnerSession | null> {
 
     const company = Array.isArray(row.booking_partners) ? row.booking_partners[0] : row.booking_partners;
     if (!company || company.status !== "approved") return null;
+    // a transport-only partner («المطار», 0099) has its own screen (lib/almatar), never the package portal
+    if (company.portal === "transport") return null;
 
     return {
       user_id: user.id,
