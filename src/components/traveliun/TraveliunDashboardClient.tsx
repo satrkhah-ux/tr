@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
+import type { ClientOffer } from "@/lib/data/offers";
 import { useRole } from "@/lib/roles/RoleContext";
 import type { Permission } from "@/lib/roles/roles";
 import { useCanOpen } from "@/lib/roles/useCanOpen";
@@ -49,10 +50,11 @@ import { OperationsSnapshot } from "./operations/OperationsSnapshot";
 import { MyDashboard } from "./MyDashboard";
 // SLA follow-ups a manager handed me — nothing when there are none
 import { MyFollowups } from "./sla/MyFollowups";
+import { LatestOfferPanel } from "./LatestOfferPanel";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import type { TranslationKey } from "@/lib/i18n";
 
-export function TraveliunDashboardClient({ opsSummary, mine }: { opsSummary: OpsSummary; mine: MyDashboardData }) {
+export function TraveliunDashboardClient({ opsSummary, mine, latest = null }: { opsSummary: OpsSummary; mine: MyDashboardData; latest?: ClientOffer | null }) {
   const { dashboardView } = useRole();
   const { t, dir } = useTraveliunUI();
 
@@ -67,7 +69,7 @@ export function TraveliunDashboardClient({ opsSummary, mine }: { opsSummary: Ops
     <TraveliunShell title="nav.dashboard">
       <div className="tv-fade-up" dir={dir}>
         {dashboardView === "admin" ? (
-          <AdminHome opsSummary={opsSummary} mine={mine} />
+          <AdminHome opsSummary={opsSummary} mine={mine} latest={latest} />
         ) : dashboardView === "employee" ? (
           <EmployeeHome opsSummary={opsSummary} mine={mine} />
         ) : (
@@ -235,7 +237,7 @@ function PreviousSections() {
  * administration too. So «لوحتي» is the first tab and the tabs lead the page;
  * the executive and team tabs are unchanged behind it.
  */
-function AdminHome({ opsSummary, mine }: { opsSummary: OpsSummary; mine: MyDashboardData }) {
+function AdminHome({ opsSummary, mine, latest }: { opsSummary: OpsSummary; mine: MyDashboardData; latest: ClientOffer | null }) {
   const { t } = useTraveliunUI();
   const { can } = useRole();
   const canExec = can("pricing.internal");
@@ -268,6 +270,7 @@ function AdminHome({ opsSummary, mine }: { opsSummary: OpsSummary; mine: MyDashb
       {/* live work before navigation: a case whose free-cancellation window
           closes tomorrow matters more than a link to the generator. */}
       <OperationsSnapshot summary={opsSummary} />
+      <LatestOfferPanel offer={latest} />
       <ReadySections />
       <PreviousSections />
     </div>

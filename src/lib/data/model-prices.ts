@@ -76,14 +76,14 @@ async function tourPrices(db: SupabaseClient, countryId: string): Promise<TourPr
   try {
     const { data, error } = await db
       .from("tour_prices")
-      .select("car_type, price, currency, tours!inner(arabic_name, program_id, country_id)")
+      .select("car_type, price, currency, provisional, tours!inner(arabic_name, program_id, country_id)")
       .eq("tours.country_id", countryId);
     if (error || !data) return [];
-    type Row = { car_type: string; price: number | string; currency: string | null; tours: { arabic_name: string | null; program_id: string | null } | null };
+    type Row = { car_type: string; price: number | string; currency: string | null; provisional?: boolean | null; tours: { arabic_name: string | null; program_id: string | null } | null };
     return (data as unknown as Row[]).flatMap((r) => {
       const currency = currencyCode(r.currency);
       const name = r.tours?.arabic_name?.trim();
-      return name && currency ? [{ name, price: Number(r.price), currency, car_type: r.car_type, program_id: r.tours?.program_id ?? null }] : [];
+      return name && currency ? [{ name, price: Number(r.price), currency, car_type: r.car_type, program_id: r.tours?.program_id ?? null, ...(r.provisional ? { provisional: true } : {}) }] : [];
     });
   } catch {
     return [];

@@ -34,7 +34,7 @@ import {
 import { DirText } from "@/components/DirText";
 import { getCountryHotels, produceOfferFromDraft } from "@/lib/data/drafts";
 import { getTourPrices, getTourPrograms, getTransferCars } from "@/lib/data/tour-programs";
-import type { TourProgram } from "@/lib/offer/itinerary";
+import { autoTourPicks, withTours, type TourProgram } from "@/lib/offer/itinerary";
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
 import type { ProfitSettings } from "@/lib/data/app-settings";
 import {
@@ -97,6 +97,7 @@ import {
   moveCity,
   replaceCity,
   setCityNights,
+  setEdge,
   withHotelLines,
   withTripDates,
   priceGroupOf,
@@ -104,7 +105,7 @@ import {
   type PriceGroup,
 } from "@/lib/offer/basic";
 import { citiesWithoutHotel, validateDraft, type DraftIssue } from "@/lib/offer/draft-validation";
-import { computeOfferPricing, rebase } from "@/lib/offer/pricing";
+import { computeOfferPricing, rebase, roundUpTotal } from "@/lib/offer/pricing";
 import { pricesForCity, syncSuggestions, type TourPrice } from "@/lib/offer/pricing-suggest";
 import { normAr } from "@/lib/catalog/norm";
 import { syncDepartureDates } from "@/lib/offer/schedule";
@@ -127,9 +128,11 @@ import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
 import { basicCard, basicField, basicLabel, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
+import { BasicEdges } from "./BasicEdges";
 import { AdvancedQuestions } from "./AdvancedQuestions";
 import { advancedDefaults, advancedTripDates, emptyAdvanced, fillAdvanced, isStation, type DraftAdvanced } from "@/lib/offer/advanced";
 import { IssueGuardNotice } from "../IssueGuardNotice";
+import { OfferVersions } from "../OfferVersions";
 import { ReissueOffer } from "../ReissueOffer";
 import { OverlandHopNotice } from "../OverlandHopNotice";
 
@@ -604,6 +607,23 @@ export function BasicEditor({
     };
   }, [cityKey]);
 
+  // a city's tours arrive filled: its empty rows take its programmes in order, priced from the list, and the
+  // agent edits or swaps them (the owner, 2026-10-18). A file already issued keeps what it was issued with.
+  useEffect(() => {
+    const file = latest.current;
+    if (programs.length === 0 || file.produced_serial || !file.transport_plan.tours.enabled) return;
+    let changed = false;
+    const next = file.cities.map((c, i) => {
+      const picks = withTours(c, c.tours ?? 0, file.transport_plan.tours.cars, i === file.cities.length - 1);
+      const filled = autoTourPicks(picks, programs.filter((p) => p.city_name === c.city_name));
+      if (filled === picks) return c;
+      changed = true;
+      return { ...c, tour_picks: filled, tours: filled.length };
+    });
+    if (changed) commit({ cities: next });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the programmes arriving (or another city) decide; commit and the file are read then
+  }, [programs, data.cities.length]);
+
   // ---------- the add bar ----------
   const left = remainingNights(data);
   const [newCity, setNewCity] = useState("");
@@ -713,23 +733,25 @@ export function BasicEditor({
     const asCost = data.pricing.items.map((i) => (i.buy_price == null ? { ...i, buy_price: i.sell_price, buy_currency: i.sell_currency } : i));
     return withPackageProfit(asCost, packageProfitFor(data.pricing, profitSettings.default_pct), rebase(lookups.sarPer ?? { SAR: 1 }, quote) ?? {}, quote);
   }, [data.pricing, profitSettings.default_pct, lookups.sarPer]);
-  const summary = useMemo(
-    () =>
-      computeOfferPricing(
-        shownItems.map((i) => ({
-          quantity: i.quantity,
-          buy_price: i.buy_price,
-          buy_currency: i.buy_currency || display,
-          sell_price: i.sell_price,
-          sell_currency: i.sell_currency || display,
-          profit_pct: i.profit_pct,
-          profit_amount: i.profit_amount,
-        })),
-        rebase(lookups.sarPer ?? { SAR: 1 }, display) ?? {},
-        display,
-      ),
-    [shownItems, display, lookups.sarPer],
-  );
+  const summary = useMemo(() => {
+    const raw = computeOfferPricing(
+      shownItems.map((i) => ({
+        quantity: i.quantity,
+        buy_price: i.buy_price,
+        buy_currency: i.buy_currency || display,
+        sell_price: i.sell_price,
+        sell_currency: i.sell_currency || display,
+        profit_pct: i.profit_pct,
+        profit_amount: i.profit_amount,
+      })),
+      rebase(lookups.sarPer ?? { SAR: 1 }, display) ?? {},
+      display,
+    );
+    // the total the client is sent: up to the whole unit, the difference is profit (offerTotals)
+    const total_sell = roundUpTotal(raw.total_sell);
+    const profit = Math.round((total_sell - raw.total_buy) * 100) / 100;
+    return { ...raw, total_sell, profit, margin_pct: total_sell ? Math.round((profit / total_sell) * 10000) / 100 : null };
+  }, [shownItems, display, lookups.sarPer]);
 
   // the transfers' list prices, worked out as the sheet would (the way back from the way there) and shown on
   // the city cards before anyone opens the sheet — the owner's review, 2026-10-18: four typed by hand
@@ -1728,7 +1750,8 @@ export function BasicEditor({
     // ---- 6. what is missing, and issuing — here ----
     finish: (
         <div>
-          {produced ? (
+          {/* an issued file: one panel, the steps in order (BasicFileStatus) — a partner keeps the plain line */}
+          {produced && partnerSession ? (
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-full bg-[#e9f7f0] px-3 py-1.5 text-[12.5px] font-extrabold text-[#0f7a52]">
                 <CheckCircle2 className="size-4" />
@@ -1786,10 +1809,7 @@ export function BasicEditor({
               {tx("allGood")}
             </p>
           )}
-          {produced ? (
-            // edited since it was issued: the next version, same serial (a partner's issued file is locked)
-            partnerSession ? null : <ReissueOffer draftId={draftId} serial={data.produced_serial} hotels={data.hotels} blocked={blocking.length > 0} flush={flush} onIssued={bumpStatus} className="mt-3" />
-          ) : (
+          {produced ? null : (
             <>
               <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} className="mt-2" />
               {produceError ? <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">{produceError}</p> : null}
@@ -1807,7 +1827,21 @@ export function BasicEditor({
               </div>
             </>
           )}
-          {produced && !partnerSession ? <BasicFileStatus draftId={draftId} serial={produced} variant="panel" refresh={statusTick} onChanged={bumpStatus} /> : null}
+          {produced && !partnerSession ? (
+            <BasicFileStatus
+              draftId={draftId}
+              serial={produced}
+              variant="panel"
+              refresh={statusTick}
+              onChanged={bumpStatus}
+              extras={{
+                // edited since it was issued: the next version, same serial
+                reissue: <ReissueOffer compact draftId={draftId} hotels={data.hotels} blocked={blocking.length > 0} flush={flush} onIssued={bumpStatus} />,
+                versions: <OfferVersions serial={produced} draftId={draftId} defaultOpen flush={flush} refreshKey={statusTick} />,
+                guard: <IssueGuardNotice compact hotels={data.hotels} />,
+              }}
+            />
+          ) : null}
         </div>
     ),
   };
@@ -1816,12 +1850,9 @@ export function BasicEditor({
     <TraveliunShell title="nav.basic">
       <FieldIssueProvider issues={[...validation.blocking, ...validation.warnings]} render={issueText}>
         <div className="tv-fade-up space-y-3">
-          {/* top bar */}
+          {/* top bar — no «كل الملفات» and no «فتح في المولّد الكامل»: both led staff astray (the owner, 2026-10-18);
+              the files list is the side menu's «النظام بيسك», the generator only answers a «أصلح» */}
           <div className="flex flex-wrap items-center gap-2">
-            <Link href="/basic" className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 text-[12px] font-bold text-[#557d78] hover:bg-[#f4f8f6]">
-              <ArrowRight className="size-4 ltr:rotate-180" />
-              {tx("back")}
-            </Link>
             <span
               role="status"
               className={`inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-bold ${
@@ -1843,22 +1874,20 @@ export function BasicEditor({
             {produced && !partnerSession ? <BasicFileStatus draftId={draftId} serial={produced} variant="chip" refresh={statusTick} /> : null}
             <button
               type="button"
-              onClick={() => commit({ advanced: { ...(data.advanced ?? emptyAdvanced()), on: !data.advanced?.on } })}
+              onClick={() => {
+                const on = !data.advanced?.on;
+                // switched off, the edges go with it: the nights and dates come back as Basic has them
+                let d = latest.current;
+                if (!on) for (const side of ["in", "out"] as const) d = { ...d, ...setEdge(d, side, null) };
+                commit({ advanced: { ...(data.advanced ?? emptyAdvanced()), on }, ...(on ? {} : { cities: d.cities, hotels: d.hotels }) });
+              }}
               className={`ms-auto inline-flex h-8 items-center gap-1 rounded-[8px] px-2.5 text-[11.5px] font-bold ${data.advanced?.on ? "bg-[#185045] text-white" : "border border-[#dbe6e1] bg-white text-[#185045] hover:bg-[#f4f8f6]"}`}
             >
               بكج متقدم{data.advanced?.on ? " ✓" : ""}
             </button>
-            {legacyOpen ? (
-            <Link
-              href={stageHref(draftId, "trip")}
-              onClick={() => void flush()}
-              className="inline-flex h-8 items-center rounded-[8px] px-2 text-[11.5px] font-bold text-[#557d78] underline-offset-2 hover:underline"
-            >
-              {tx("fullGenerator")}
-            </Link>
-            ) : null}
           </div>
 
+          {data.advanced?.on && cities.length > 0 ? <BasicEdges data={data} onEdge={(side, mode) => commit(setEdge(latest.current, side, mode))} /> : null}
           {data.advanced?.on ? (
             <AdvancedQuestions
               value={data.advanced}

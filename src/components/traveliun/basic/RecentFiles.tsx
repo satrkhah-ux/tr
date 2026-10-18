@@ -408,27 +408,31 @@ export function RecentFiles({
                                 {tx("actBookings")}
                               </Link>
                             ) : next === "send" || next === "confirm" ? (
-                              // waiting on the client: «العميل أكّد» is always in sight — it is how a file reaches its bookings
-                              <ClientConfirmedButton draftId={d.id} expired={state === "expired"} className="w-[7.5rem]" />
+                              // «أرسل للعميل» comes first, then «العميل أكّد» (the owner, 2026-10-18: «منطقياً») —
+                              // the send is the filled button until the file has gone out, the confirmation after
+                              <>
+                                {next === "send" ? (
+                                  <button
+                                    type="button"
+                                    aria-expanded={panel?.id === d.id && panel.kind === "status"}
+                                    onClick={() => toggle(d.id, "status")}
+                                    onMouseEnter={() => prefetchFileStatus(d.id)}
+                                    onFocus={() => prefetchFileStatus(d.id)}
+                                    className={`${PRIMARY} bg-[#1d5f8a] text-white hover:bg-[#174d70]`}
+                                  >
+                                    {tx("actSend")}
+                                  </button>
+                                ) : (
+                                  <span className="hidden w-[7.5rem] min-[1640px]:block" aria-hidden />
+                                )}
+                                <ClientConfirmedButton draftId={d.id} expired={state === "expired"} secondary={next === "send"} className="w-[7.5rem]" />
+                              </>
                             ) : (
                               <Link href={`/basic/${d.id}`} className={`${PRIMARY} border border-[#cfe0d9] bg-white text-[#185045] hover:bg-[#f4f8f6]`}>
                                 {tx("openFile")}
                               </Link>
                             )}
-                            {next === "send" ? (
-                              <button
-                                type="button"
-                                aria-expanded={panel?.id === d.id && panel.kind === "status"}
-                                onClick={() => toggle(d.id, "status")}
-                                onMouseEnter={() => prefetchFileStatus(d.id)}
-                                onFocus={() => prefetchFileStatus(d.id)}
-                                className={`${PRIMARY} bg-[#1d5f8a] text-white hover:bg-[#174d70]`}
-                              >
-                                {tx("actSend")}
-                              </button>
-                            ) : (
-                              <span className="hidden w-[7.5rem] min-[1640px]:block" aria-hidden />
-                            )}
+                            {next === "send" || next === "confirm" ? null : <span className="hidden w-[7.5rem] min-[1640px]:block" aria-hidden />}
                             {/* an issued or confirmed file is edited here — said in words, not a folder icon (the owner, 2026-10-18) */}
                             {d.produced_serial ? (
                               <Link

@@ -7,7 +7,7 @@ import { createDraft } from "./drafts";
 import { normalizeInquiry, normalizePhone } from "@/lib/leads/sheet";
 import { activeTeam, pullSheet, pushToSheet, type LeadRow } from "@/lib/leads/sync";
 import { pullTeletel } from "@/lib/leads/teletel-pull";
-import { getTeletelConfig } from "@/lib/providers/teletel";
+import { conversationForPhone, conversationThread, getTeletelConfig, type ThreadMessage } from "@/lib/providers/teletel";
 
 /**
  * «العملاء» — every client conversation, open to every employee (the owner,
@@ -28,8 +28,20 @@ export type Lead = Omit<LeadRow, "sheet_key"> & {
   created_at: string;
   /** the Basic file made for this client: by the link, else by the phone */
   file: { id: string; destination: string | null; name: string | null; created_at: string | null } | null;
-  /** «عميل سابق»: the same phone wrote before (an earlier conversation, or a file made before this one) */
+  /**
+   * «عميل سابق» (the owner, 2026-10-18): the same phone wrote before and that
+   * conversation was closed or is over 24 hours older — a client writing again
+   * inside an open day is the same conversation — or a file was made for them before.
+   */
   returning: boolean;
+  /** when they were last in touch before this conversation */
+  returning_since: string | null;
+  teletel_conversation_id: number | null;
+  /** the times the timing columns are computed from (0098) — never typed */
+  first_message_at: string | null;
+  first_reply_at: string | null;
+  assigned_at: string | null;
+  assignee_reply_at: string | null;
 };
 
 export type LeadsPage = {
@@ -43,7 +55,7 @@ export type LeadsPage = {
 };
 
 const COLS =
-  "id, phone, name, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, draft_id, source, created_at";
+  "id, phone, name, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, draft_id, source, created_at, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at";
 const ROW_COLS =
   "id, phone, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, sheet_key";
 
@@ -95,20 +107,52 @@ export async function listLeads(): Promise<LeadsPage> {
     supabase.from("client_leads").select(COLS).order("created_at", { ascending: false }).limit(3000),
     activeTeam(supabase),
   ]);
-  const rows = (data ?? []) as Omit<Lead, "file" | "returning">[];
+  const rows = (data ?? []) as Omit<Lead, "file" | "returning" | "returning_since">[];
   const files = await filesByPhone(new Set(rows.map((r) => r.phone)));
-  // the first time each phone wrote (rows come newest first, so the last seen is the first)
-  const firstSeen = new Map<string, string>();
-  for (const r of rows) firstSeen.set(r.phone, r.created_at);
+  const byPhoneRows = new Map<string, typeof rows>();
+  for (const r of rows) byPhoneRows.set(r.phone, [...(byPhoneRows.get(r.phone) ?? []), r]);
   const leads = rows.map((r): Lead => {
     const byPhone = files.get(r.phone) ?? null;
     const file = r.draft_id
       ? { id: r.draft_id, destination: byPhone?.id === r.draft_id ? byPhone.destination : null, name: null, created_at: null }
       : byPhone;
-    const returning = firstSeen.get(r.phone)! < r.created_at || Boolean(byPhone?.created_at && byPhone.created_at < r.created_at);
-    return { ...r, name: r.name || byPhone?.name || null, file, returning };
+    const since = previousContact(r, byPhoneRows.get(r.phone) ?? [], byPhone?.created_at ?? null);
+    return { ...r, name: r.name || byPhone?.name || null, file, returning: since !== null, returning_since: since };
   });
   return { leads, team: people, meId, pullError, twoWay, live };
+}
+
+const DAY_MS = 24 * 3600_000;
+
+/**
+ * When the client was last in touch before conversation `r` — an earlier
+ * conversation of the same phone that was closed or is more than a day older,
+ * else a Basic file made for them before it — or null: a first-time client.
+ */
+function previousContact(r: { id: string; created_at: string }, samePhone: { id: string; created_at: string; status: string }[], fileAt: string | null): string | null {
+  const at = Date.parse(r.created_at);
+  const earlier = samePhone
+    .filter((e) => e.id !== r.id && Date.parse(e.created_at) < at && (e.status === "closed" || at - Date.parse(e.created_at) > DAY_MS))
+    .map((e) => e.created_at);
+  if (fileAt && Date.parse(fileAt) < at) earlier.push(fileAt);
+  return earlier.length ? earlier.reduce((a, b) => (Date.parse(a) > Date.parse(b) ? a : b)) : null;
+}
+
+export type LeadThread = { ok: true; messages: ThreadMessage[]; link: string | null } | { ok: false; error: string };
+
+/** What the client wrote: their Teletel conversation (its last five pages), by its id, else found by the phone. */
+export async function leadThread(id: string): Promise<LeadThread> {
+  if (!(await getCurrentEmployeeId())) return { ok: false, error: "انتهت الجلسة — أعد تسجيل الدخول" };
+  const config = getTeletelConfig();
+  if (!config) return { ok: false, error: "Teletel غير مربوط" };
+  const { data } = await (await db()).from("client_leads").select("phone, teletel_conversation_id").eq("id", id).maybeSingle();
+  const row = data as { phone: string; teletel_conversation_id: number | null } | null;
+  if (!row) return { ok: false, error: "المحادثة غير موجودة" };
+  const conversation = Number(row.teletel_conversation_id) || (await conversationForPhone(row.phone));
+  if (!conversation) return { ok: false, error: "لا توجد محادثة لهذا الرقم في Teletel" };
+  const thread = await conversationThread(conversation, 5);
+  if (!thread) return { ok: false, error: "تعذّر الوصول إلى Teletel" };
+  return { ok: true, messages: thread.messages, link: `${config.baseUrl}/app/accounts/${config.accountId}/conversations/${conversation}` };
 }
 
 /** a pull now, whatever the clock says («تحديث من الشيت») */
@@ -149,7 +193,8 @@ export async function addLead(input: { phone: string; name?: string; inquiry?: s
   return sheetError ? { ok: true, error: `sheet: ${sheetError}` } : { ok: true };
 }
 
-const EDITABLE = ["name", "inquiry", "destination", "delay", "assigned_to", "sent_status", "done_text", "status", "next_action", "contact_owner", "result"] as const;
+// «تأخير المحادثة» is not here: the system computes it (0098), nobody types it
+const EDITABLE = ["name", "inquiry", "destination", "assigned_to", "sent_status", "done_text", "status", "next_action", "contact_owner", "result"] as const;
 export type LeadPatch = Partial<Record<(typeof EDITABLE)[number], string | null>>;
 
 export async function updateLead(id: string, patch: LeadPatch): Promise<{ ok: boolean; error?: string }> {
@@ -158,8 +203,12 @@ export async function updateLead(id: string, patch: LeadPatch): Promise<{ ok: bo
   for (const k of EDITABLE) if (k in patch) clean[k] = patch[k] === "" ? null : patch[k];
   if (clean.status !== undefined && clean.status !== "open" && clean.status !== "closed") return { ok: false, error: "status" };
   if (typeof clean.inquiry === "string") clean.inquiry = normalizeInquiry(clean.inquiry) || null;
-  // handing it over here: the sheet's handwritten name no longer applies
-  if ("assigned_to" in clean) clean.assigned_to_name = null;
+  // handing it over here: the sheet's handwritten name no longer applies, and the hand-over's clock starts now
+  if ("assigned_to" in clean) {
+    clean.assigned_to_name = null;
+    clean.assigned_at = clean.assigned_to ? new Date().toISOString() : null;
+    clean.assignee_reply_at = null;
+  }
   const supabase = await db();
   const { error } = await supabase.from("client_leads").update({ ...clean, updated_at: new Date().toISOString() }).eq("id", id);
   if (error) return { ok: false, error: error.message };

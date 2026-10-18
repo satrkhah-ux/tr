@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
-import { BarChart3, ChevronLeft, ChevronRight, Loader2, MessageCircle, Plus, RefreshCw, Search, Users } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, ExternalLink, Loader2, MessageCircle, Plus, RefreshCw, Search, Users, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
-import { addLead, pullLeadsNow, startProgramme, updateLead, type Lead, type LeadPatch, type LeadsPage } from "@/lib/data/leads";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { addLead, leadThread, pullLeadsNow, startProgramme, updateLead, type Lead, type LeadPatch, type LeadsPage, type LeadThread } from "@/lib/data/leads";
 import { fold, HEADERS, INQUIRIES, riyadhDay } from "@/lib/leads/sheet";
 import { TraveliunShell } from "../TraveliunShell";
 
@@ -28,6 +29,46 @@ const RANGES: [Range, string][] = [
 ];
 
 const CELL = "h-8 w-full rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12px] font-semibold text-[#185045]";
+
+/** «عميل سابق» — a colour none of the kinds wears */
+const RETURNING = { color: "#1e3a8a", ink: "#ffffff" };
+
+/** a span of time as the delay column always said it: minutes, hours, days */
+const span = (ms: number) => {
+  const m = Math.max(0, Math.round(ms / 60_000));
+  if (m < 60) return `${m} دقيقة`;
+  if (m < 1440) return `${Math.round(m / 60)} ساعة`;
+  return `${Math.round(m / 1440)} يوم`;
+};
+const ms = (iso: string | null) => (iso ? Date.parse(iso) : NaN);
+
+/**
+ * The three timing columns, computed from the times the system holds (0098) —
+ * never typed, the same for every role (the owner, 2026-10-18). Without the
+ * time: «—», or «ينتظر منذ …» while it is still awaited.
+ */
+function timing(l: Lead, now: number) {
+  const first = ms(l.first_message_at);
+  const open = l.status === "open";
+  const awaited = (from: number) => (open ? { text: `ينتظر منذ ${span(now - from)}`, waiting: true } : { text: "—", waiting: false });
+  const done = (text: string) => ({ text, waiting: false });
+  const reply = ms(l.first_reply_at);
+  const assigned = ms(l.assigned_at);
+  const assigneeReply = ms(l.assignee_reply_at);
+  return {
+    firstReply: Number.isNaN(first) ? done("—") : Number.isNaN(reply) ? awaited(first) : done(span(reply - first)),
+    toAssign: Number.isNaN(assigned) || Number.isNaN(first) ? done("—") : done(span(assigned - first)),
+    assigneeReply: Number.isNaN(assigned) ? done("—") : Number.isNaN(assigneeReply) ? awaited(assigned) : done(span(assigneeReply - assigned)),
+  };
+}
+
+function Timing({ value }: { value: { text: string; waiting: boolean } }) {
+  return (
+    <span suppressHydrationWarning className={`block whitespace-nowrap font-semibold ${value.waiting ? "text-[#a86a10]" : "text-[#185045]"}`}>
+      {value.text}
+    </span>
+  );
+}
 
 const shiftDay = (day: string, by: number) => {
   const d = new Date(`${day}T12:00:00Z`);
@@ -74,6 +115,9 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
   const today = riyadhDay(Date.now());
   const [day, setDay] = useState(today);
   const [kind, setKind] = useState<string | null>(null);
+  const [returningOnly, setReturningOnly] = useState(false);
+  const [thread, setThread] = useState<{ lead: Lead; result: LeadThread | null } | null>(null);
+  const now = Date.now();
   const [tab, setTab] = useState<Tab>("open");
   const [range, setRange] = useState<Range>(1);
   const [q, setQ] = useState("");
@@ -89,6 +133,7 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
   // the daily classification: the chosen day's conversations by kind
   const ofDay = leads.filter((l) => dayOf.get(l.id) === day);
   const dayCount = (label: string) => ofDay.filter((l) => l.inquiry === label).length;
+  const dayReturning = ofDay.filter((l) => l.returning).length;
 
   // «رؤية للإعلانات»: the chosen range
   const inRange = range === 0 ? leads : leads.filter((l) => (dayOf.get(l.id) ?? "") > shiftDay(today, -range));
@@ -103,6 +148,7 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
 
   const list = leads.filter((l) => {
     if (kind && (l.inquiry !== kind || dayOf.get(l.id) !== day)) return false;
+    if (returningOnly && (!l.returning || dayOf.get(l.id) !== day)) return false;
     if (tab === "open" && l.status !== "open") return false;
     if (tab === "closed" && l.status !== "closed") return false;
     if (tab === "mine" && l.assigned_to !== meId && l.received_by !== meId) return false;
@@ -135,7 +181,7 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
     }
   }
   const save = (l: Lead, patch: LeadPatch) => void run(l.id, () => updateLead(l.id, patch));
-  const text = (l: Lead, field: "name" | "destination" | "delay" | "done_text" | "next_action" | "contact_owner" | "result", placeholder = "") => (
+  const text = (l: Lead, field: "name" | "destination" | "done_text" | "next_action" | "contact_owner" | "result", placeholder = "") => (
     <input
       key={`${l.id}-${field}-${l[field] ?? ""}`}
       defaultValue={l[field] ?? ""}
@@ -144,6 +190,13 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
       className={CELL}
     />
   );
+
+  /** «ما كتبه العميل»: the conversation from Teletel, read-only */
+  async function readThread(l: Lead) {
+    setThread({ lead: l, result: null });
+    const result = await leadThread(l.id).catch((): LeadThread => ({ ok: false, error: "تعذّر الوصول إلى Teletel" }));
+    setThread((t) => (t?.lead.id === l.id ? { lead: l, result } : t));
+  }
 
   async function open(l: Lead) {
     if (l.file) return router.push(`/basic/${l.file.id}`);
@@ -191,7 +244,7 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
                 : "ما يُسجَّل في شيت المحادثات يظهر هنا وحده."}
           </p>
 
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-9">
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5 xl:grid-cols-10">
             <div className="rounded-[10px] border border-[#cfe0d9] bg-[#f6f9f8] px-2 py-2 text-center">
               <div className="text-[11px] font-extrabold text-[#557d78]">محادثات {day === today ? "اليوم" : day}</div>
               <div className="tv-tnum text-xl font-extrabold text-[#003c3a]">{ofDay.length}</div>
@@ -209,8 +262,20 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
                 <div className="tv-tnum text-xl font-extrabold">{dayCount(i.label)}</div>
               </button>
             ))}
+            <button
+              type="button"
+              aria-pressed={returningOnly}
+              onClick={() => setReturningOnly(!returningOnly)}
+              title="كتب من قبل: محادثته السابقة أُغلقت أو مضى عليها أكثر من 24 ساعة"
+              className={`rounded-[10px] px-2 py-2 text-center ${returningOnly ? "ring-2 ring-[#003c3a] ring-offset-1" : ""}`}
+              style={{ background: RETURNING.color, color: RETURNING.ink }}
+            >
+              <div className="text-[11px] font-extrabold">عميل سابق</div>
+              <div className="tv-tnum text-xl font-extrabold">{dayReturning}</div>
+            </button>
           </div>
           {kind ? <p className="mt-1.5 text-[11.5px] font-semibold text-[#78948f]">الجدول يعرض «{kind}» ليوم {day} — اضغط الخانة مرة أخرى للإلغاء.</p> : null}
+          {returningOnly ? <p className="mt-1.5 text-[11.5px] font-semibold text-[#78948f]">الجدول يعرض «عميل سابق» ليوم {day} — اضغط الخانة مرة أخرى للإلغاء.</p> : null}
         </section>
 
         {/* ---------- «رؤية للإعلانات» ---------- */}
@@ -341,18 +406,21 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
             onPointerUp={() => (drag.current = null)}
             onPointerLeave={() => (drag.current = null)}
           >
-            <table className="w-full min-w-[2050px] border-separate border-spacing-y-1 text-start text-[12px]">
+            <table className="w-full min-w-[2400px] border-separate border-spacing-y-1 text-start text-[12px]">
               <thead className="sticky top-0 z-20 bg-white text-[10.5px] font-extrabold text-[#78948f]">
                 <tr className="[&>th]:px-2 [&>th]:py-1 [&>th]:text-start">
+                  {/* the owner's order (2026-10-18); the three times are computed, never typed */}
                   <th className="sticky start-0 z-10 bg-white">اسم العميل</th>
-                  <th>{HEADERS.phone}</th>
+                  <th>رقم العميل</th>
+                  <th>{HEADERS.received_by}</th>
+                  <th title="من أول رسالة للعميل حتى أول رد منّا">تأخير أول رد</th>
                   <th>{HEADERS.inquiry}</th>
                   <th>{HEADERS.destination}</th>
-                  <th>{HEADERS.received_by}</th>
-                  <th>{HEADERS.delay}</th>
-                  <th>{HEADERS.sent_status}</th>
                   <th>{HEADERS.assigned_to}</th>
-                  <th>{HEADERS.done_text}</th>
+                  <th title="من أول رسالة للعميل حتى إسنادها لشخص آخر">كم احتاجت حتى أُسندت</th>
+                  <th title="من الإسناد حتى أول رد من الشخص المُسنَد إليه">كم الوقت حتى استلمها الشخص الآخر</th>
+                  <th>ماذا أُرسل للعميل؟</th>
+                  <th>ماذا تم للعميل</th>
                   <th>{HEADERS.status}</th>
                   <th>{HEADERS.next_action}</th>
                   <th>{HEADERS.contact_owner}</th>
@@ -363,21 +431,33 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
               <tbody>
                 {list.map((l) => {
                   const tone = TONE.get(l.inquiry ?? "");
+                  const times = timing(l, now);
                   return (
                     <tr key={l.id} className={`[&>td]:px-2 [&>td]:py-1.5 ${l.status === "closed" ? "bg-[#f5f7fa] text-[#78948f]" : "bg-[#f8fbfa]"}`}>
                       <td className="sticky start-0 z-10 w-44 min-w-[11rem] rounded-s-[10px] border-s-4 bg-inherit" style={{ borderInlineStartColor: tone?.color ?? "#cfe0d9" }}>
                         {text(l, "name", "اسم العميل")}
                       </td>
-                      <td className="min-w-[9rem]">
-                        <a href={`https://wa.me/${l.phone}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-[#0f7a52] hover:underline">
-                          <MessageCircle className="size-3" />
-                          <DirText>{l.phone}</DirText>
-                        </a>
+                      <td className="min-w-[10rem]">
+                        <span className="inline-flex items-center gap-1">
+                          <a href={`https://wa.me/${l.phone}`} target="_blank" rel="noreferrer" aria-label="واتساب" title="واتساب" className="text-[#0f7a52]">
+                            <MessageCircle className="size-3" />
+                          </a>
+                          {/* the number opens what the client wrote, from Teletel */}
+                          <button type="button" onClick={() => void readThread(l)} title="عرض المحادثة من Teletel" className="font-semibold text-[#0f7a52] hover:underline">
+                            <DirText>{l.phone}</DirText>
+                          </button>
+                        </span>
                         <span className="block text-[10px] font-semibold text-[#93aaa3]">
                           <DirText>{dayOf.get(l.id)}</DirText>
-                          {l.returning ? <span className="ms-1 rounded-full border border-[#f4d9a6] bg-[#fff8e8] px-1.5 font-bold text-[#a86a10]">عميل سابق</span> : null}
+                          {l.returning ? (
+                            <span className="ms-1 rounded-full px-1.5 font-bold" style={{ background: RETURNING.color, color: RETURNING.ink }}>
+                              عميل سابق{l.returning_since ? <> · <DirText>{l.returning_since.slice(0, 10)}</DirText></> : null}
+                            </span>
+                          ) : null}
                         </span>
                       </td>
+                      <td className="w-28 truncate font-semibold">{receiver(l) ?? "—"}</td>
+                      <td className="w-28"><Timing value={times.firstReply} /></td>
                       <td className="w-32">
                         <select value={l.inquiry ?? ""} onChange={(e) => save(l, { inquiry: e.target.value })} className={CELL} style={tone ? { background: tone.color, color: tone.ink } : undefined}>
                           <option value="">—</option>
@@ -385,18 +465,18 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
                         </select>
                       </td>
                       <td className="min-w-[9rem]">{text(l, "destination")}</td>
-                      <td className="w-28 truncate font-semibold">{receiver(l) ?? "—"}</td>
-                      <td className="w-28">{text(l, "delay")}</td>
-                      <td className="w-40">
-                        <select value={l.sent_status ?? ""} onChange={(e) => save(l, { sent_status: e.target.value })} className={CELL}>
-                          <option value="">لم يُرسل شيء</option>
-                          {[...new Set([...SENT, l.sent_status ?? ""])].filter(Boolean).map((s) => <option key={s}>{s}</option>)}
-                        </select>
-                      </td>
                       <td className="w-40">
                         <select value={l.assigned_to ?? ""} onChange={(e) => save(l, { assigned_to: e.target.value })} className={CELL}>
                           <option value="">{l.assigned_to_name ? `${l.assigned_to_name} (من الشيت)` : "لم يتم الإسناد"}</option>
                           {team.map((e) => <option key={e.id} value={e.id}>{e.arabic_name}</option>)}
+                        </select>
+                      </td>
+                      <td className="w-32"><Timing value={times.toAssign} /></td>
+                      <td className="w-36"><Timing value={times.assigneeReply} /></td>
+                      <td className="w-40">
+                        <select value={l.sent_status ?? ""} onChange={(e) => save(l, { sent_status: e.target.value })} className={CELL}>
+                          <option value="">لم يُرسل شيء</option>
+                          {[...new Set([...SENT, l.sent_status ?? ""])].filter(Boolean).map((s) => <option key={s}>{s}</option>)}
                         </select>
                       </td>
                       <td className="min-w-[10rem]">{text(l, "done_text")}</td>
@@ -437,6 +517,52 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
           </p>
         </section>
       </div>
+
+      <Dialog open={thread !== null} onOpenChange={(v) => !v && setThread(null)}>
+        <DialogContent className="max-h-[calc(85vh/var(--tv-zoom))] max-w-[560px] overflow-y-auto" showClose={false}>
+          <div className="mb-3 flex items-center justify-between gap-2 border-b border-[#e1e9e5] pb-3">
+            <h2 className="text-base font-extrabold text-[#003c3a]">
+              {thread?.lead.name || "العميل"} · <DirText>{thread?.lead.phone}</DirText>
+            </h2>
+            <button type="button" aria-label="إغلاق" onClick={() => setThread(null)} className="rounded-md p-2 text-[#557d78] hover:bg-[#edf3f0]">
+              <X className="size-5" />
+            </button>
+          </div>
+          {!thread?.result ? (
+            <p className="flex items-center justify-center gap-2 py-10 text-sm font-bold text-[#557d78]">
+              <Loader2 className="size-4 animate-spin" /> جاري جلب المحادثة من Teletel…
+            </p>
+          ) : !thread.result.ok ? (
+            <p className="rounded-[10px] border border-[#f4c9d4] bg-[#fdeef2] px-3 py-3 text-[13px] font-bold text-[#c22850]">{thread.result.error}</p>
+          ) : (
+            <>
+              <ul className="space-y-2">
+                {thread.result.messages.length === 0 ? <li className="py-6 text-center text-[12px] font-semibold text-[#93aaa3]">لا رسائل</li> : null}
+                {thread.result.messages.map((m) => (
+                  <li key={m.id} className={`flex ${m.fromClient ? "justify-start" : "justify-end"}`}>
+                    <div
+                      className={`max-w-[85%] rounded-[12px] px-3 py-2 text-[12.5px] leading-6 ${
+                        m.isPrivate ? "border border-dashed border-[#e6d39a] bg-[#fffbea] text-[#6b5a1e]" : m.fromClient ? "bg-[#f1f5f4] text-[#0f3d38]" : "bg-[#e3f3ec] text-[#0f3d38]"
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap">{m.text || "—"}</p>
+                      <p className="mt-1 text-[10px] font-semibold text-[#93aaa3]">
+                        {m.fromClient ? "العميل" : m.isPrivate ? `ملاحظة داخلية · ${m.sender ?? ""}` : (m.sender ?? "نحن")} ·{" "}
+                        <DirText>{new Date(m.at * 1000).toLocaleString("en-GB", { timeZone: "Asia/Riyadh", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</DirText>
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {thread.result.link ? (
+                <a href={thread.result.link} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1 text-[12px] font-bold text-[#185045] hover:underline">
+                  فتح في Teletel <ExternalLink className="size-3.5" />
+                </a>
+              ) : null}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </TraveliunShell>
   );
 }

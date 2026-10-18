@@ -43,6 +43,25 @@ export function findPlace(labels: string[], text: string, places: Place[]): stri
   return "";
 }
 
+/**
+ * When a conversation went to `assignee`: the latest activity line naming them
+ * («Assigned to X by Y», «تم التعيين إلى X») at or before `by` — null when the
+ * page holds none (the caller keeps the time it saw the change).
+ */
+export function assignedAtFrom(events: { at: number; kind: string; text: string }[], assignee: string | null, by: number): number | null {
+  if (!assignee) return null;
+  const name = fold(assignee);
+  const hits = events.filter((e) => e.kind === "activity" && e.at <= by && fold(e.text).includes(name));
+  return hits.length ? Math.max(...hits.map((e) => e.at)) : null;
+}
+
+/** The first reply to the client from `from` on — by `assignee` when their Teletel name is known, else by anyone of ours. A private note is no reply. */
+export function replyAfter(events: { at: number; kind: string; sender: string | null; isPrivate: boolean }[], from: number, assignee: string | null): number | null {
+  const name = assignee ? fold(assignee) : null;
+  const hits = events.filter((e) => e.kind === "agent" && !e.isPrivate && e.at >= from && (!name || (e.sender != null && fold(e.sender) === name)));
+  return hits.length ? Math.min(...hits.map((e) => e.at)) : null;
+}
+
 /** «تأخير المحادثة» as the clock says it: how long the client has waited, or how long the first reply took */
 export function delayText(c: { waitingSince: number; firstReplyAt: number | null; createdAt: number }, nowSec: number): string {
   const span = (sec: number) => {

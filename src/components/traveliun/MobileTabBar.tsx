@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   BarChart3,
-  Calculator,
   ClipboardCheck,
   Columns3,
   Contact,
@@ -46,7 +45,6 @@ const DESTINATIONS: TabDest[] = [
   { id: "customers", labelKey: "nav.customers", href: "/customers", icon: Contact },
   { id: "hotels", labelKey: "nav.hotels", href: "/hotels", icon: Hotel },
   { id: "countries", labelKey: "nav.countries", href: "/countries", icon: Globe2 },
-  { id: "intelligence", labelKey: "nav.intelligenceHub", href: "/travel-intelligence", icon: Calculator },
   { id: "employees", labelKey: "nav.employees", href: "/employees", icon: Users, perm: "employees.manage" },
 ];
 

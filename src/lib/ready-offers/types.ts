@@ -6,7 +6,7 @@
  * the server actions and the tests alike (mirrors lib/offer/draft-types.ts).
  */
 
-import { emptyDraftData, normalizeDraftHotel, type DraftData } from "@/lib/offer/draft-types";
+import { AGE_BANDS, emptyDraftData, normalizeDraftHotel, resizeAges, type DraftData } from "@/lib/offer/draft-types";
 
 export const TIERS = ["economy", "premium"] as const;
 export type Tier = (typeof TIERS)[number];
@@ -19,7 +19,8 @@ export type ParsedCity = { city_name: string; nights: number };
 export type ParsedOffer = {
   /** stable sync key — survives row reordering (the sheet's own `#` column repeats). */
   code: string;
-  tier: Tier;
+  /** the old sheet's tab; the owner's sheet of 2026-10-18 has none. */
+  tier: Tier | null;
   title: string;
   /** destination country, stripped of any variant label. */
   country: string;
@@ -52,6 +53,18 @@ export type ParsedOffer = {
   hotels_by_city: string[];
   /** non-fatal parse notes, surfaced in the sync preview. */
   warnings: string[];
+  /**
+   * Where the sheet contradicts itself — imported, shown red with these reasons,
+   * and starts no file until the sheet is corrected (the owner, 2026-10-18).
+   */
+  problems: string[];
+  /** «ملاحظات = لم يتم النشر» → false: imported, never offered to sales. */
+  published: boolean;
+  /** «أساس التسعير» as written, and the party it prices (null when it does not say). */
+  price_basis: string;
+  adults: number | null;
+  children: number | null;
+  notes: string;
   source_row: Record<string, string>;
 };
 
@@ -81,7 +94,18 @@ export type ReadyOfferRecord = {
   active: boolean;
   seed: Partial<DraftData> | null;
   synced_at: string | null;
+  published?: boolean | null;
+  problems?: string[] | null;
+  price_basis?: string | null;
+  adults?: number | null;
+  children?: number | null;
+  notes?: string | null;
 };
+
+/** A ready offer a file may start from: live, priced, published, and not contradicting itself. */
+export function canStartFrom(row: Pick<ReadyOfferRecord, "active" | "status" | "published" | "problems">): boolean {
+  return row.active && row.status !== "coming_soon" && row.published !== false && !row.problems?.length;
+}
 
 export type SyncChange = {
   code: string;
@@ -97,9 +121,11 @@ export type SyncDiff = {
   deactivated: { code: string; title: string }[];
   unchanged: number;
   /** rows that could not be parsed at all (skipped). */
-  errors: { row: number; tier: Tier; reason: string }[];
+  errors: { row: number; tab: string; reason: string }[];
   /** parse notes on rows that WERE imported (e.g. city nights didn't add up). */
   warnings: { code: string; title: string; notes: string[] }[];
+  /** offers imported «بها خطأ» — the sheet contradicts itself. */
+  problems: { code: string; title: string; reasons: string[] }[];
 };
 
 /**
@@ -121,7 +147,7 @@ export const READY_OFFER_TERMS = {
 export function hasDomesticFlight(raw: string): boolean {
   const t = raw.trim();
   if (!t) return false;
-  return !/لا\s*يوجد|لايوجد|^[❌✖—-]+$/u.test(t);
+  return !/لا\s*يوجد|لايوجد|^لا(?:\s|$|[–—-])|^[❌✖—-]+$/u.test(t);
 }
 
 /**
@@ -135,8 +161,8 @@ export function hasDomesticFlight(raw: string): boolean {
  *     hard-blocks on a stale `valid_until`. Hotels seed as name-only shells,
  *     exactly like copyProgramIntoDraft does for reused programs.
  *
- * `trip.adults` keeps the system default (2) rather than anything read from the
- * sheet: the sheet never states whether a price is per person or per couple.
+ * The party: the sheet's «أساس التسعير» when it says («لشخصين وطفلين»), else
+ * the system default (2 adults).
  */
 export function buildSeed(offer: ParsedOffer, readyOfferId: string): Partial<DraftData> {
   const cities = offer.cities ?? [];
@@ -153,6 +179,10 @@ export function buildSeed(offer: ParsedOffer, readyOfferId: string): Partial<Dra
       destination: offer.cities_summary || offer.country,
       days: offer.days ?? 0,
       nights: offer.nights ?? 0,
+      ...(offer.adults ? { adults: offer.adults } : {}),
+      ...(offer.children != null
+        ? { children: offer.children, children_ages: resizeAges([], offer.children, AGE_BANDS.children.fallback) }
+        : {}),
     },
     cities: cities.map((c) => ({ city_name: c.city_name, nights: c.nights, check_in: null, check_out: null })),
     hotels: cities.map((c, i) =>
@@ -166,7 +196,7 @@ export function buildSeed(offer: ParsedOffer, readyOfferId: string): Partial<Dra
     source: {
       ready_offer_id: readyOfferId,
       code: offer.code,
-      tier: offer.tier,
+      tier: offer.tier ?? "",
       title: offer.title,
       valid_from: offer.valid_from,
       valid_to: offer.valid_to,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,7 +12,7 @@ import {
   applySync, previewSync, setDesignUrl, setReadyOfferActive, startDraftFromReadyOffer,
 } from "@/lib/data/ready-offers";
 import type { TranslationKey, Translator } from "@/lib/i18n";
-import type { ReadyOfferRecord, SyncDiff, Tier } from "@/lib/ready-offers/types";
+import { canStartFrom, type ReadyOfferRecord, type SyncDiff } from "@/lib/ready-offers/types";
 import { parseList } from "@/lib/ready-offers/parse";
 import { draftHref } from "@/lib/offer/draft-types";
 import { useRole } from "@/lib/roles/RoleContext";
@@ -22,33 +22,46 @@ import { TraveliunShell } from "../TraveliunShell";
 const card = "rounded-[14px] border border-[#e2ebe7] bg-white p-4 shadow-[0_2px_10px_rgba(0,60,58,0.04)]";
 const chip = "rounded-full border px-2.5 py-1 text-[11.5px] font-bold";
 
-type Filter = Tier | "all";
+// the owner's sheet has no tiers: an offer is fine, «بها خطأ» (the sheet contradicts itself), or not published
+type Filter = "all" | "problems" | "unpublished";
+
+const sheetUrl = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;
 
 export function ReadyOffersCatalog({
   offers,
+  sheetId,
   sessionExpired = false,
 }: {
   offers: ReadyOfferRecord[];
+  sheetId: string;
   sessionExpired?: boolean;
 }) {
   const { t } = useTraveliunUI();
   // Display-only gate; the server actions enforce settings.manage for real.
   const canManage = useRole().can("settings.manage");
-  const [tier, setTier] = useState<Filter>("all");
+  const [filter, setFilter] = useState<Filter>("all");
   const [showSoon, setShowSoon] = useState(true);
   const [syncOpen, setSyncOpen] = useState(false);
 
   // Deactivated packages are hidden from everyone but an admin, who needs to
   // see them to switch one back on.
   const listed = useMemo(() => offers.filter((o) => o.active || canManage), [offers, canManage]);
+  const flagged = (o: ReadyOfferRecord) => Boolean(o.problems?.length);
   const visible = useMemo(
     () =>
       listed.filter(
-        (o) => (tier === "all" || o.tier === tier) && (showSoon || o.status !== "coming_soon"),
+        (o) =>
+          (filter === "all" || (filter === "problems" ? flagged(o) : o.published === false)) &&
+          (showSoon || o.status !== "coming_soon"),
       ),
-    [listed, tier, showSoon],
+    [listed, filter, showSoon],
   );
   const readyCount = listed.filter((o) => o.status !== "coming_soon").length;
+  const counts: Record<Filter, number> = {
+    all: listed.length,
+    problems: listed.filter((o) => o.active && flagged(o)).length,
+    unpublished: listed.filter((o) => o.published === false).length,
+  };
 
   return (
     <TraveliunShell title="nav.readyOffers">
@@ -72,20 +85,27 @@ export function ReadyOffersCatalog({
         </div>
 
         <div className="mt-4 mb-5 flex flex-wrap items-center gap-2">
-          {(["all", "economy", "premium"] as Filter[]).map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTier(key)}
-              className={`${chip} ${
-                tier === key
-                  ? "border-[#185045] bg-[#185045] text-white"
-                  : "border-[#dbe6e1] bg-white text-[#185045] hover:bg-[#f4f8f6]"
-              }`}
-            >
-              {t(key === "all" ? "ro.tier.all" : key === "economy" ? "ro.tier.economy" : "ro.tier.premium")}
-            </button>
-          ))}
+          {(["all", "problems", "unpublished"] as Filter[])
+            .filter((key) => key === "all" || counts[key] > 0 || filter === key)
+            .map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setFilter(key)}
+                className={`${chip} ${
+                  filter === key
+                    ? key === "problems"
+                      ? "border-[#c22850] bg-[#c22850] text-white"
+                      : "border-[#185045] bg-[#185045] text-white"
+                    : key === "problems"
+                      ? "border-[#f4c9d4] bg-[#fdeef2] text-[#c22850] hover:bg-[#fbe2e9]"
+                      : "border-[#dbe6e1] bg-white text-[#185045] hover:bg-[#f4f8f6]"
+                }`}
+              >
+                {t(key === "all" ? "ro.tier.all" : key === "problems" ? "ro.filter.problems" : "ro.filter.unpublished")}{" "}
+                <span className="tv-tnum opacity-80">{counts[key]}</span>
+              </button>
+            ))}
           <label className="ms-auto flex items-center gap-2 text-[12px] font-bold text-[#557d78]">
             <input type="checkbox" checked={showSoon} onChange={(e) => setShowSoon(e.target.checked)} />
             {t("ro.showComingSoon")}
@@ -116,7 +136,7 @@ export function ReadyOffersCatalog({
         )}
       </div>
 
-      <SyncDialog open={syncOpen} onOpenChange={setSyncOpen} />
+      <SyncDialog open={syncOpen} onOpenChange={setSyncOpen} sheetId={sheetId} />
     </TraveliunShell>
   );
 }
@@ -131,6 +151,8 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
   const [active, setActive] = useState(offer.active);
 
   const comingSoon = offer.status === "coming_soon";
+  const problems = offer.problems ?? [];
+  const startable = canStartFrom({ ...offer, active });
   const includes = parseList(offer.includes_text ?? "");
   const excludes = parseList(offer.excludes_text ?? "");
 
@@ -146,7 +168,7 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
   }
 
   return (
-    <div className={`${card} ${active ? "" : "opacity-60"} flex flex-col`}>
+    <div className={`${card} ${active ? "" : "opacity-60"} ${problems.length ? "border-[#f0a9bb] ring-1 ring-[#f4c9d4]" : ""} flex flex-col`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-[15px] font-extrabold text-[#003c3a]">{offer.country || offer.title}</h2>
@@ -156,16 +178,33 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
             </span>
           ) : null}
         </div>
-        <span
-          className={`${chip} shrink-0 ${
-            offer.tier === "premium"
-              ? "border-[#e6d9b8] bg-[#fbf6e9] text-[#8a6d1f]"
-              : "border-[#c9e6d8] bg-[#eef7f2] text-[#166b4c]"
-          }`}
-        >
-          {t(offer.tier === "premium" ? "ro.tier.premium" : "ro.tier.economy")}
-        </span>
+        {offer.published === false ? (
+          <span className={`${chip} shrink-0 border-[#dbe6e1] bg-[#f4f7f6] text-[#557d78]`}>{t("ro.filter.unpublished")}</span>
+        ) : offer.tier ? (
+          <span
+            className={`${chip} shrink-0 ${
+              offer.tier === "premium"
+                ? "border-[#e6d9b8] bg-[#fbf6e9] text-[#8a6d1f]"
+                : "border-[#c9e6d8] bg-[#eef7f2] text-[#166b4c]"
+            }`}
+          >
+            {t(offer.tier === "premium" ? "ro.tier.premium" : "ro.tier.economy")}
+          </span>
+        ) : null}
       </div>
+
+      {problems.length ? (
+        <div className="mt-3 rounded-[10px] border border-[#f4c9d4] bg-[#fdeef2] px-3 py-2 text-[12px] text-[#a3203f]">
+          <p className="flex items-center gap-1.5 font-extrabold">
+            <AlertTriangle className="size-4 shrink-0" /> {t("ro.problem.badge")}
+          </p>
+          <ul className="mt-1 space-y-0.5 font-semibold">
+            {problems.map((p, i) => (
+              <li key={i}>• {p}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="mt-3">
         {comingSoon ? (
@@ -178,7 +217,7 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
               {Number(offer.price).toLocaleString("en-US")}
             </span>
             <span className="text-[13px] font-bold text-[#557d78]">{offer.currency ?? "SAR"}</span>
-            <span className="text-[11px] font-semibold text-[#93aaa3]">{t("ro.priceNote")}</span>
+            <span className="text-[11px] font-semibold text-[#93aaa3]">{offer.price_basis || t("ro.priceNote")}</span>
           </div>
         )}
       </div>
@@ -216,12 +255,17 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
         <p className="mt-3 rounded-[9px] border border-[#f4c9d4] bg-[#fdeef2] px-3 py-2 text-[12px] font-bold text-[#c22850]">
           {error}
         </p>
+      ) : !startable && active && !comingSoon ? (
+        <p className="mt-3 text-[11.5px] font-bold text-[#a3203f]">
+          {problems.length ? t("ro.err.hasProblems") : t("ro.err.unpublished")}
+        </p>
       ) : null}
 
       <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
         <button
           type="button"
-          disabled={comingSoon || busy || !active}
+          disabled={!startable || busy}
+          title={problems.length ? t("ro.err.hasProblems") : offer.published === false ? t("ro.err.unpublished") : undefined}
           onClick={start}
           className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-[10px] bg-[#185045] px-3 text-[13px] font-bold text-white hover:bg-[#0f4439] disabled:cursor-not-allowed disabled:opacity-45"
         >
@@ -306,7 +350,8 @@ function durationLabel(offer: ReadyOfferRecord, t: Translator): string | null {
   return t("ro.duration", { days: String(offer.days ?? 0), nights: String(offer.nights ?? 0) });
 }
 
-function SyncDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+/** The sync's preview and its «اعتماد» — on /ready-offers and on /developer. */
+export function SyncDialog({ open, onOpenChange, sheetId }: { open: boolean; onOpenChange: (v: boolean) => void; sheetId: string }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
   const [state, setState] = useState<"idle" | "loading" | "ready" | "applying" | "done" | "error">("idle");
@@ -324,6 +369,15 @@ function SyncDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
       setState("error");
     }
   }
+
+  // the preview starts when the dialog opens — its own onOpenChange only fires on a close
+  // from inside it, never on the page opening it, so the dialog sat empty (the evaluator, 7a195c0)
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- opening the dialog is what starts the preview, once per opening */
+  useEffect(() => {
+    if (!open) return;
+    void load();
+  }, [open]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   async function apply() {
     setState("applying");
@@ -343,8 +397,7 @@ function SyncDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
       open={open}
       onOpenChange={(v) => {
         onOpenChange(v);
-        if (v) void load();
-        else {
+        if (!v) {
           setState("idle");
           setDiff(null);
         }
@@ -393,6 +446,21 @@ function SyncDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
             />
             <DiffList title={t("ro.diff.deactivated")} items={diff.deactivated.map((d) => d.title)} />
 
+            {diff.problems.length ? (
+              <div className="rounded-[10px] border border-[#f4c9d4] bg-[#fdeef2] p-3">
+                <p className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-extrabold text-[#c22850]">
+                  <AlertTriangle className="size-4" /> {t("ro.diff.problems")} ({diff.problems.length})
+                </p>
+                <ul className="space-y-1 text-[12px] text-[#a3203f]">
+                  {diff.problems.map((p) => (
+                    <li key={p.code}>
+                      <b>{p.title}</b> — {p.reasons.join("، ")}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
             {diff.warnings.length ? (
               <div className="rounded-[10px] border border-[#f0e2c4] bg-[#fdf9ee] p-3">
                 <p className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-extrabold text-[#8a6d1f]">
@@ -411,7 +479,7 @@ function SyncDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
             {diff.errors.length ? (
               <ul className="rounded-[10px] border border-[#f4c9d4] bg-[#fdeef2] p-3 text-[12px] font-bold text-[#c22850]">
                 {diff.errors.map((e, i) => (
-                  <li key={i}>{e.tier}: {e.reason}</li>
+                  <li key={i}>{e.tab}{e.row ? ` (${e.row})` : ""}: {e.reason}</li>
                 ))}
               </ul>
             ) : null}
@@ -434,7 +502,7 @@ function SyncDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: b
                 {t("cancel")}
               </button>
               <a
-                href="https://docs.google.com/spreadsheets/d/1Tq6pXH9hxjD4cuPC-W9YNf4-in9ncn8sP7avhSJHjNM/edit"
+                href={sheetUrl(sheetId)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="ms-auto inline-flex items-center gap-1 text-[12px] font-bold text-[#185045] hover:underline"

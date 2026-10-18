@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { BriefcaseBusiness, CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { BriefcaseBusiness, CheckCircle2, Copy, Eye, FileText, History, Loader2, XCircle } from "lucide-react";
 import { cancelFile, confirmFromBasic, getFileStatus, type FileError, type FileStatusView } from "@/lib/data/file-status";
 import { AWAITING_CLIENT, SENDABLE, type FileState, type TimelineEntry } from "@/lib/offer/file-state";
 import type { TranslationKey } from "@/lib/i18n";
@@ -69,6 +69,7 @@ export function BasicFileStatus({
   refresh = 0,
   onChanged,
   known,
+  extras,
 }: {
   draftId: string;
   serial: string;
@@ -77,6 +78,8 @@ export function BasicFileStatus({
   onChanged?: () => void;
   /** what the files list already knows — shown at once while the rest loads */
   known?: { state: FileState; version: number | null; sentVersion: number | null; stale: boolean; operationId: string | null };
+  /** the editor's own parts of the issued section: «إصدار نسخة محدّثة», «سجل النسخ», the hotel-data line */
+  extras?: { reissue?: ReactNode; versions?: ReactNode; guard?: ReactNode };
 }) {
   const tx = useBasicLabels();
   const { t, language } = useTraveliunUI();
@@ -89,6 +92,9 @@ export function BasicFileStatus({
   const [cancelling, setCancelling] = useState(false);
   const [reason, setReason] = useState("");
   const [all, setAll] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -181,9 +187,18 @@ export function BasicFileStatus({
     view.canAct && !view.partner && SENDABLE.includes(view.state) && (awaiting || view.sentVersion == null || (view.version ?? 0) > view.sentVersion);
   const shown = all ? view.timeline : view.timeline.slice(0, 6);
 
+  // the file's step decides the one filled button: the send until it has gone out, the confirmation after
+  const sentOnce = view.sentVersion != null;
+  const link = `/client-offer/${serial}`;
+  const quiet = "inline-flex items-center gap-1 text-[12px] font-bold text-[#185045] hover:underline";
+
   return (
     <div className="mt-3 space-y-3 rounded-[12px] border border-[#dbe6e1] bg-white p-3">
+      {/* ① where the file stands, one line */}
       <div className="flex flex-wrap items-center gap-2">
+        <span className="tv-tnum text-[12.5px] font-extrabold text-[#103f37]" dir="ltr">
+          {serial}
+        </span>
         <FileStateChip state={view.state} version={view.version} sentVersion={view.sentVersion} stale={view.stale} />
         {view.canOpenCase && view.operationId ? (
           <Link
@@ -196,70 +211,124 @@ export function BasicFileStatus({
         ) : null}
       </div>
 
-      {/* the programme to the client — only from this button, after a look */}
-      {sendable ? <OfferSend draftId={draftId} again={view.stale} onSent={changed} /> : null}
-      {view.partner ? <p className="text-[11.5px] font-bold text-[#557d78]">{tx("blocked_partner")}</p> : null}
-
-      {/* the client said yes: the file goes to operations */}
-      {view.canAct && awaiting ? (
-        <div className="flex flex-wrap items-center gap-2 border-t border-dashed border-[#DCE9E5] pt-3">
-          <label className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[#557d78]">
-            {tx("confirmChannel")}
-            <select
-              value={channel}
-              onChange={(e) => setChannel(e.target.value as typeof channel)}
-              className="h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12px] font-bold text-[#185045]"
+      {/* ② the steps, in their order: review → send → the client said yes (the owner, 2026-10-18) */}
+      <div className="flex flex-wrap items-center gap-2 max-sm:[&>a]:w-full max-sm:[&>button]:w-full">
+        <a
+          href={link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] border border-[#185045] bg-white px-3.5 text-[12.5px] font-extrabold text-[#185045] hover:bg-[#f0f7f4]"
+        >
+          <Eye className="size-4" />
+          {tx("reviewOffer")}
+        </a>
+        <a
+          href={`/offer/${serial}/pdf`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex h-9 items-center justify-center gap-1 rounded-[9px] px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045]"
+        >
+          <FileText className="size-3.5" />
+          PDF
+        </a>
+        {sendable ? <OfferSend draftId={draftId} again={view.stale} onSent={changed} filled={!sentOnce || view.stale} className="contents" /> : null}
+        {view.canAct && awaiting ? (
+          <>
+            <label className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[#557d78]">
+              {tx("confirmChannel")}
+              <select
+                value={channel}
+                onChange={(e) => setChannel(e.target.value as typeof channel)}
+                className="h-9 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12px] font-bold text-[#185045]"
+              >
+                <option value="whatsapp">{tx("channel_whatsapp")}</option>
+                <option value="phone">{tx("channel_phone")}</option>
+                <option value="office">{tx("channel_office")}</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => void confirm()}
+              disabled={busy !== null}
+              className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] px-4 text-[12.5px] font-extrabold disabled:opacity-60 ${
+                sentOnce && !view.stale ? "bg-[#185045] text-white hover:bg-[#0f4439]" : "border border-[#185045] bg-white text-[#185045] hover:bg-[#f0f7f4]"
+              }`}
             >
-              <option value="whatsapp">{tx("channel_whatsapp")}</option>
-              <option value="phone">{tx("channel_phone")}</option>
-              <option value="office">{tx("channel_office")}</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={() => void confirm()}
-            disabled={busy !== null}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white hover:bg-[#0f4439] disabled:opacity-60"
-          >
-            {busy === "confirm" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-            {tx("confirmTitle")}
-          </button>
-          {view.cancel === "ok" ? (
-            cancelling ? (
-              <span className="flex w-full flex-wrap items-center gap-2">
-                <input
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder={tx("cancelReason")}
-                  aria-label={tx("cancelReason")}
-                  className="h-9 min-w-48 flex-1 rounded-[8px] border border-[#f0c4cf] bg-white px-2.5 text-[12.5px] text-[#185045]"
-                />
-                <button
-                  type="button"
-                  onClick={() => void cancel()}
-                  disabled={busy !== null || !reason.trim()}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#c22850] px-3 text-[12px] font-bold text-white disabled:opacity-50"
-                >
-                  {busy === "cancel" ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
-                  {tx("cancelDo")}
-                </button>
-                <button type="button" onClick={() => setCancelling(false)} className="text-[12px] font-bold text-[#557d78]">
-                  {tx("cancelEdit")}
-                </button>
-              </span>
-            ) : (
-              <button type="button" onClick={() => setCancelling(true)} className="ms-auto text-[11.5px] font-bold text-[#c22850] hover:underline">
-                {tx("cancelFileBtn")}
-              </button>
-            )
-          ) : null}
-        </div>
-      ) : null}
+              {busy === "confirm" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+              {tx("confirmTitle")}
+            </button>
+          </>
+        ) : null}
+      </div>
+      {view.partner ? <p className="text-[11.5px] font-bold text-[#557d78]">{tx("blocked_partner")}</p> : null}
       {message ? <p role="status" className={`text-[12px] font-bold ${message.ok ? "text-[#0f7a52]" : "text-[#c22850]"}`}>{message.text}</p> : null}
 
-      {view.timeline.length > 0 ? (
-        <div className="border-t border-dashed border-[#DCE9E5] pt-2">
-          <h4 className="mb-1 text-[11px] font-extrabold text-[#557d78]">{tx("historyTitle")}</h4>
+      {/* a warning that blocks nothing: one line under the steps */}
+      {extras?.guard}
+
+      {/* ③ the rest, small */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-dashed border-[#DCE9E5] pt-2">
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard?.writeText(`${window.location.origin}${link}`).then(() => {
+              setCopied(true);
+              window.setTimeout(() => setCopied(false), 1600);
+            });
+          }}
+          className={quiet}
+        >
+          <Copy className="size-3.5" />
+          {copied ? tx("copiedClientLink") : tx("copyClientLink")}
+        </button>
+        {extras?.reissue}
+        {extras?.versions ? (
+          <button type="button" onClick={() => setShowVersions((v) => !v)} aria-expanded={showVersions} className={quiet}>
+            <History className="size-3.5" />
+            {tx("versionsHistory")}
+          </button>
+        ) : null}
+        {view.timeline.length > 0 ? (
+          <button type="button" onClick={() => setShowHistory((v) => !v)} aria-expanded={showHistory} className={quiet}>
+            <History className="size-3.5" />
+            {tx("historyTitle")}
+          </button>
+        ) : null}
+        {view.canAct && awaiting && view.cancel === "ok" && !cancelling ? (
+          <button type="button" onClick={() => setCancelling(true)} className="ms-auto text-[12px] font-bold text-[#c22850] hover:underline">
+            {tx("cancelFileBtn")}
+          </button>
+        ) : null}
+      </div>
+
+      {cancelling ? (
+        <span className="flex w-full flex-wrap items-center gap-2">
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={tx("cancelReason")}
+            aria-label={tx("cancelReason")}
+            className="h-9 min-w-48 flex-1 rounded-[8px] border border-[#f0c4cf] bg-white px-2.5 text-[12.5px] text-[#185045]"
+          />
+          <button
+            type="button"
+            onClick={() => void cancel()}
+            disabled={busy !== null || !reason.trim()}
+            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#c22850] px-3 text-[12px] font-bold text-white disabled:opacity-50"
+          >
+            {busy === "cancel" ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
+            {tx("cancelDo")}
+          </button>
+          <button type="button" onClick={() => setCancelling(false)} className="text-[12px] font-bold text-[#557d78]">
+            {tx("cancelEdit")}
+          </button>
+        </span>
+      ) : null}
+
+      {showVersions ? extras?.versions : null}
+
+      {showHistory && view.timeline.length > 0 ? (
+        <div>
           <ol className="space-y-0.5">
             {shown.map((e, i) => (
               <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-[11.5px]">

@@ -502,9 +502,16 @@ export function legInto(flights: DraftFlight[], city: string, date: string | nul
 /**
  * Resize a city's tour picks to its tour count, keeping what was chosen. A new
  * pick goes in `cars` cars when given (the trip's tour cars); without it, one.
+ * Fewer: the rows the screen filled go first, then the empty ones, and only then
+ * the last — a tour the agent chose is never the one dropped while another is.
  */
 export function withTourCount(picks: TourPick[] | undefined, count: number, cars?: number): TourPick[] {
-  const list = (picks ?? []).slice(0, count);
+  const list = [...(picks ?? [])];
+  while (list.length > Math.max(count, 0)) {
+    const auto = list.findLastIndex((p) => p.auto);
+    const empty = list.findLastIndex((p) => !p.free && !p.title.trim());
+    list.splice(auto >= 0 ? auto : empty >= 0 ? empty : list.length - 1, 1);
+  }
   while (list.length < count) list.push({ program_id: null, title: "", text: "", price: null, ...(cars ? { cars } : {}) });
   return list;
 }
@@ -708,6 +715,9 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
         activities = [...tours.map(line), ...car, ...activities];
       } else activities = [...activities, ...tours.map(line), ...car];
     }
+    // the trip's edges («بكج متقدم»): a night without a hotel, or one booked before the landing, said on its day
+    const edge = edgeLines(data, cities, day.date, kind);
+    if (edge.before.length > 0 || edge.after.length > 0) activities = [...edge.before, ...activities, ...edge.after];
     const extra = day.date ? (added.get(day.date) ?? []) : [];
     if (extra.length > 0) {
       // on the day home, before the way to the airport
@@ -724,6 +734,47 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
     if (day.ai_generated && day.title === title) return { ...day, auto_title: title };
     return { ...day, title, activities, auto_title: title, ai_generated: false };
   });
+}
+
+/** the lead before a flight's take-off to leave for the airport (as «بكج متقدم» checks it) */
+const AIRPORT_LEAD = 180;
+
+/**
+ * What the trip's edges add to a day (DraftCity.edge_in / edge_out — the
+ * owner, 2026-10-18): the arrival night spent elsewhere, a night booked before
+ * a small-hours landing, an early check-in asked for; and on the last city's
+ * check-out day before a small-hours flight, the noon check-out with the luggage
+ * in the car, the hour to leave for the airport, and the night without a hotel.
+ */
+export function edgeLines(
+  data: Pick<DraftData, "flights">,
+  cities: DraftCity[],
+  date: string | null,
+  kind: string,
+): { before: string[]; after: string[] } {
+  const none = { before: [] as string[], after: [] as string[] };
+  const first = cities[0];
+  const last = cities[cities.length - 1];
+  if (kind === "arrive" && first?.edge_in) {
+    if (first.edge_in === "no_hotel") return { before: [], after: [`الليلة الأولى بدون إقامة حسب طلبكم — الدخول إلى الفندق يوم ${first.check_in ?? ""}`.trim()] };
+    if (first.edge_in === "prev_night") return { before: [], after: [`الغرفة محجوزة من ليلة ${first.check_in ?? ""} ليكون الدخول عند الوصول مباشرة`] };
+    return { before: [], after: ["الدخول المبكر إلى الفندق حسب التوفر"] };
+  }
+  if (kind === "last" && last?.edge_out === "late_checkout") return { before: ["خروج متأخر من الفندق حسب التوفر"], after: [] };
+  if (last?.edge_out === "no_hotel_day" && kind !== "last" && date && date === last.check_out) {
+    const home = data.flights.find((f) => f.leg_order === "inbound");
+    const t = home?.departure_at?.slice(11, 16) ?? "";
+    let go = "";
+    if (/^\d{2}:\d{2}$/.test(t)) {
+      const m = (Number(t.slice(0, 2)) * 60 + Number(t.slice(3)) - AIRPORT_LEAD + 1440) % 1440;
+      go = `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    }
+    return {
+      before: ["تسجيل الخروج من الفندق الساعة 12:00 — الأمتعة معكم في السيارة طوال اليوم"],
+      after: [go ? `التوجه إلى المطار الساعة ${go}` : "التوجه إلى المطار", `ليلة ${date} بدون إقامة حسب طلبكم`],
+    };
+  }
+  return none;
 }
 
 /**
@@ -815,6 +866,25 @@ export function tourService(title: string, programs: TourProgram[]): Pick<TourPi
   return hit
     ? { program_id: hit.id, title, text: hit.description.trim(), free: false }
     : { program_id: null, title, text: "", free: false };
+}
+
+/**
+ * A city's empty tour rows, filled from its ready programmes in their order —
+ * none twice, none the city already has. The owner, 2026-10-18: «الجولات
+ * والاسعار تربط تلقائية و الموظف يبدا بتعديل الجولات او تغيرهن». A row with a
+ * service or a free day is the agent's and stays. No price is written: the
+ * list prices each in its car, as one picked by hand (tourCarPrice).
+ */
+export function autoTourPicks(picks: TourPick[], programs: TourProgram[]): TourPick[] {
+  const taken = new Set(picks.map((p) => p.title.trim()).filter(Boolean));
+  const queue = [...new Set(
+    [...programs]
+      .filter((p) => !p.is_free_day)
+      .sort((a, b) => (a.sort_order ?? 1e9) - (b.sort_order ?? 1e9))
+      .map((p) => programDayText(p).title),
+  )].filter((title) => !taken.has(title));
+  if (queue.length === 0 || !picks.some((p) => !p.free && !p.title.trim())) return picks;
+  return picks.map((p) => (p.free || p.title.trim() || queue.length === 0 ? p : { ...p, ...tourService(queue.shift()!, programs), auto: true }));
 }
 
 /**

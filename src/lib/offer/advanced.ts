@@ -42,7 +42,7 @@ export type ServicePoint = {
 export type BorderHop = { drivers: 1 | 2; crossing: string; side_from: string; side_to: string };
 
 /** the date fields Basic can fill. */
-export type AdvancedDateKey = "arrive_date" | "arrive_time" | "checkin_date" | "reception_date" | "farewell_date" | "leave_date" | "leave_time";
+export type AdvancedDateKey = "arrive_date" | "arrive_time" | "checkin_date" | "reception_date" | "farewell_date" | "farewell_time" | "leave_date" | "leave_time";
 
 export type DraftAdvanced = {
   on: boolean;
@@ -149,17 +149,19 @@ export function normalizeAdvanced(raw: unknown): DraftAdvanced | undefined {
 
 // ---------- dates that fill themselves ----------
 
-export type AdvancedDefaults = Partial<Record<"arrive_date" | "arrive_time" | "checkin_date" | "leave_date" | "leave_time", string>>;
+export type AdvancedDefaults = Partial<Record<"arrive_date" | "arrive_time" | "checkin_date" | "leave_date" | "leave_time" | "farewell_date" | "farewell_time", string>>;
 
 const getDate = (a: DraftAdvanced, k: AdvancedDateKey): string =>
-  k === "reception_date" ? a.reception.date : k === "farewell_date" ? a.farewell.date : a[k];
+  k === "reception_date" ? a.reception.date : k === "farewell_date" ? a.farewell.date : k === "farewell_time" ? a.farewell.time : a[k];
 
 const putDate = (a: DraftAdvanced, k: AdvancedDateKey, v: string): DraftAdvanced =>
   k === "reception_date"
     ? { ...a, reception: { ...a.reception, date: v } }
     : k === "farewell_date"
       ? { ...a, farewell: { ...a.farewell, date: v } }
-      : { ...a, [k]: v };
+      : k === "farewell_time"
+        ? { ...a, farewell: { ...a.farewell, time: v } }
+        : { ...a, [k]: v };
 
 /**
  * Basic's dates poured into the empty date fields, and kept in step with Basic
@@ -172,21 +174,31 @@ export function fillAdvanced(adv: DraftAdvanced, d: AdvancedDefaults): DraftAdva
     arrive_time: d.arrive_time ?? "",
     checkin_date: d.checkin_date ?? "",
     reception_date: d.arrive_date || d.checkin_date || "",
-    farewell_date: d.leave_date ?? "",
+    // a last day without a hotel: the car leaves the day before a small-hours flight (DraftCity.edge_out)
+    farewell_date: d.farewell_date || d.leave_date || "",
+    farewell_time: d.farewell_time ?? "",
     leave_date: d.leave_date ?? "",
     leave_time: d.leave_time ?? "",
   };
   let out = adv;
   const auto = new Set(adv.auto);
   // own dates first, then the ones that follow them: we meet the group the day it arrives, leave it the day it leaves
-  const order: AdvancedDateKey[] = ["arrive_date", "arrive_time", "checkin_date", "leave_date", "leave_time", "reception_date", "farewell_date"];
+  const order: AdvancedDateKey[] = ["arrive_date", "arrive_time", "checkin_date", "leave_date", "leave_time", "reception_date", "farewell_date", "farewell_time"];
   for (const k of order) {
     if (k === "reception_date") want[k] = out.arrive_date || want[k];
-    if (k === "farewell_date") want[k] = out.leave_date || want[k];
+    if (k === "farewell_date" || k === "farewell_time") {
+      const pickup = airportPickup(out.leave_date || d.leave_date || "", out.leave_time || d.leave_time || "");
+      if (k === "farewell_date") want[k] = d.farewell_date || pickup?.date || out.leave_date || want[k];
+      else want[k] = pickup?.time ?? "";
+    }
     const now = getDate(out, k);
     if ((now === "" || auto.has(k)) && want[k] && want[k] !== now) {
       out = putDate(out, k, want[k]);
       auto.add(k);
+    } else if (k === "farewell_time" && auto.has(k) && !want[k] && now) {
+      // the edge undone: the hour it wrote goes with it
+      out = putDate(out, k, "");
+      auto.delete(k);
     }
   }
   return auto.size === adv.auto.length && out === adv ? adv : { ...out, auto: [...auto] };
@@ -196,8 +208,13 @@ export function fillAdvanced(adv: DraftAdvanced, d: AdvancedDefaults): DraftAdva
 export function advancedDefaults(data: Pick<DraftData, "trip" | "flights" | "cities">): AdvancedDefaults {
   const out = data.flights.filter((f) => f.leg_order === "outbound").at(-1);
   const home = data.flights.find((f) => f.leg_order === "inbound");
-  const firstCity = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities)[0];
+  const chained = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
+  const firstCity = chained[0];
+  const lastCity = chained[chained.length - 1];
+  // «آخر يوم بدون فندق»: the farewell is the check-out day, at take-off − 3 h across midnight (22:30 for 01:30)
+  const dayCar = lastCity?.edge_out === "no_hotel_day";
   return {
+    ...(dayCar && lastCity?.check_out ? { farewell_date: lastCity.check_out } : {}),
     // a planned leg has only its day: the trip's arrival day, else the day it flies, until the ticket says
     arrive_date: out?.arrival_at?.slice(0, 10) || data.trip.arrival_date || out?.departure_at?.slice(0, 10) || "",
     arrive_time: out?.arrival_at?.slice(11, 16) || "",
@@ -205,6 +222,19 @@ export function advancedDefaults(data: Pick<DraftData, "trip" | "flights" | "cit
     leave_date: home?.departure_at?.slice(0, 10) || data.trip.departure_date || "",
     leave_time: home?.departure_at?.slice(11, 16) || "",
   };
+}
+
+/**
+ * When the car leaves for the airport: three hours before the take-off, as a
+ * moment — a 01:30 flight on the 13th is 22:30 on the 12th. Null without a
+ * take-off hour.
+ */
+export function airportPickup(date: string, time: string): { date: string; time: string } | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}/.test(time)) return null;
+  const at = new Date(`${date}T${time.slice(0, 5)}:00Z`);
+  at.setUTCMinutes(at.getUTCMinutes() - AIRPORT_LEAD_MINUTES);
+  const iso = at.toISOString();
+  return { date: iso.slice(0, 10), time: iso.slice(11, 16) };
 }
 
 /** the agent typed this date: it stops following Basic. */

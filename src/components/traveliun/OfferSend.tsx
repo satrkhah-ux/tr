@@ -39,7 +39,21 @@ const BLOCKED = {
  * records that they sent it themselves. Basic's finish step and the full
  * generator's preview use the same panel.
  */
-export function OfferSend({ draftId, again = false, onSent, className = "" }: { draftId: string; again?: boolean; onSent?: () => void; className?: string }) {
+export function OfferSend({
+  draftId,
+  again = false,
+  onSent,
+  className = "",
+  filled = true,
+}: {
+  draftId: string;
+  again?: boolean;
+  onSent?: () => void;
+  /** "contents" sets the button in its parent's row, the review taking the full width under it */
+  className?: string;
+  /** the file's current step is the filled button; otherwise a framed one */
+  filled?: boolean;
+}) {
   const tx = useBasicLabels();
   const [draft, setDraft] = useState<OfferMessageDraft | null>(null);
   const [body, setBody] = useState("");
@@ -91,7 +105,7 @@ export function OfferSend({ draftId, again = false, onSent, className = "" }: { 
   return (
     <div className={className}>
       {draft ? (
-        <div className="space-y-2 rounded-[12px] border border-[#cfe0d9] bg-[#f7fbf9] p-3">
+        <div className="w-full basis-full space-y-2 rounded-[12px] border border-[#cfe0d9] bg-[#f7fbf9] p-3">
           <div className="flex items-start justify-between gap-2">
             <p className="text-[11.5px] font-bold text-[#557d78]">{tx("sendReview")}</p>
             <button type="button" onClick={() => setDraft(null)} aria-label={tx("cancelEdit")} className="rounded-[7px] p-1 text-[#7a948f] hover:bg-white">
@@ -168,14 +182,14 @@ export function OfferSend({ draftId, again = false, onSent, className = "" }: { 
           type="button"
           onClick={() => void open()}
           disabled={busy !== null}
-          className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#1f8a5b] px-4 text-[13px] font-extrabold text-white hover:bg-[#18744c] disabled:opacity-60"
+          className={`inline-flex h-9 items-center gap-2 rounded-[9px] px-3.5 text-[12.5px] font-extrabold disabled:opacity-60 ${filled ? "bg-[#1f8a5b] text-white hover:bg-[#18744c]" : "border border-[#1f8a5b] bg-white text-[#1f8a5b] hover:bg-[#eef8f3]"}`}
         >
           {busy === "prepare" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           {again ? tx("sendAgain") : tx("sendTitle")}
         </button>
       )}
-      {error ? <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">{error}</p> : null}
-      {said ? <p role="status" className={`mt-2 text-[12px] font-bold ${said.ok ? "text-[#0f7a52]" : "text-[#a86a10]"}`}>{said.text}</p> : null}
+      {error ? <p role="alert" className="mt-2 basis-full text-[12px] font-bold text-[#c22850]">{error}</p> : null}
+      {said ? <p role="status" className={`mt-2 basis-full text-[12px] font-bold ${said.ok ? "text-[#0f7a52]" : "text-[#a86a10]"}`}>{said.text}</p> : null}
     </div>
   );
 }

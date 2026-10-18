@@ -1,9 +1,6 @@
-import { TraveliunIntelligenceHub } from "@/components/traveliun/TraveliunIntelligenceHub";
-import { getHubData } from "@/lib/data/offers";
-import { guardPath } from "@/lib/roles/current";
+import { redirect } from "next/navigation";
 
-export default async function TravelIntelligencePage() {
-  await guardPath("/travel-intelligence");
-  const data = await getHubData();
-  return <TraveliunIntelligenceHub data={data} />;
+/** «مركز التشغيل الذكي» merged into the home page (the owner, 2026-10-18) — an old link lands there. */
+export default function TravelIntelligencePage() {
+  redirect("/dashboard");
 }

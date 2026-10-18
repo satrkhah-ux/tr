@@ -528,10 +528,32 @@ export async function assignTeletelTeam(conversationId: number, teamId: number):
   return (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { team_id: teamId })) !== null;
 }
 
+export type ConversationEvent = { at: number; kind: "client" | "agent" | "activity"; text: string; sender: string | null; isPrivate: boolean };
+
+/** A thread's latest page with its activity lines («Assigned to X by Y») — when a conversation was handed over, and answered. */
+export async function conversationEvents(conversationId: number): Promise<ConversationEvent[] | null> {
+  const config = getTeletelConfig();
+  if (!config) return null;
+  type Raw = { created_at?: number; content?: string | null; message_type?: number; private?: boolean; sender?: { name?: string | null } | null };
+  const list = await api<{ payload?: Raw[] }>(config, `/conversations/${conversationId}/messages`);
+  if (!list) return null;
+  return (list.payload ?? []).map((m) => ({
+    at: m.created_at ?? 0,
+    kind: m.message_type === 0 ? "client" : m.message_type === 2 ? "activity" : "agent",
+    text: m.content?.trim() ?? "",
+    sender: m.sender?.name ?? null,
+    isPrivate: m.private === true,
+  }));
+}
+
 export type ThreadMessage = { id: number; at: number; text: string; fromClient: boolean; sender: string | null; isPrivate: boolean };
 
-/** A thread's latest messages, oldest first (the API's last page) — activity lines left out. */
-export async function conversationThread(conversationId: number): Promise<{ messages: ThreadMessage[]; canReply: boolean } | null> {
+/**
+ * A thread's latest messages, oldest first (the API's last page; `pages` more
+ * than one reads further back, «العملاء» reading what the client wrote) —
+ * activity lines left out.
+ */
+export async function conversationThread(conversationId: number, pages = 1): Promise<{ messages: ThreadMessage[]; canReply: boolean } | null> {
   const config = getTeletelConfig();
   if (!config) return null;
   type Raw = { id?: number; created_at?: number; content?: string | null; message_type?: number; private?: boolean; sender?: { name?: string | null } | null; attachments?: unknown[] };
@@ -540,7 +562,14 @@ export async function conversationThread(conversationId: number): Promise<{ mess
     api<{ can_reply?: boolean }>(config, `/conversations/${conversationId}`),
   ]);
   if (!list) return null;
-  const messages = (list.payload ?? [])
+  let raw = list.payload ?? [];
+  for (let page = 1; page < pages && raw.length; page += 1) {
+    const oldest = Math.min(...raw.map((m) => m.id ?? Infinity));
+    const older = await api<{ payload?: Raw[] }>(config, `/conversations/${conversationId}/messages?before=${oldest}`);
+    if (!older?.payload?.length) break;
+    raw = [...older.payload, ...raw];
+  }
+  const messages = raw
     .filter((m) => typeof m.id === "number" && m.message_type !== 2)
     .map((m) => ({
       id: m.id as number,

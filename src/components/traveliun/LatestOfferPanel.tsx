@@ -11,20 +11,14 @@ import {
   Copy,
   Download,
   FileText,
-  Gauge,
-  Link2,
   Send,
   Sparkles,
-  Users,
-  Wallet,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
-import { EmptyState } from "@/components/ui/EmptyState";
-import type { HubData } from "@/lib/data/offers";
+import type { ClientOffer } from "@/lib/data/offers";
 import { checkSummary, checkText, validateOffer, type CheckLevel } from "@/lib/offer-validation";
-import { TraveliunShell } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
 const CHECK_STYLE: Record<CheckLevel, { icon: LucideIcon; color: string; bg: string }> = {
@@ -37,9 +31,14 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
 }
 
-export function TraveliunIntelligenceHub({ data }: { data: HubData }) {
+/**
+ * The latest offer issued, as the old «مركز التشغيل الذكي» showed it — its
+ * details, the advisory smart check, the client link and PDF, its itinerary.
+ * On the home page since 2026-10-18 (the owner: «ادمج ما يناسب مركز التشغيل
+ * بالصفحة الرئيسية»); the hub's company KPIs live in the executive tab.
+ */
+export function LatestOfferPanel({ offer }: { offer: ClientOffer | null }) {
   const { t, dir } = useTraveliunUI();
-  const { kpis, offer } = data;
   const checks = offer ? validateOffer(offer) : [];
   const summary = checkSummary(checks);
   const [copied, setCopied] = useState(false);
@@ -56,68 +55,10 @@ export function TraveliunIntelligenceHub({ data }: { data: HubData }) {
     window.setTimeout(() => setCopied(false), 1500);
   }
 
-  const operations: { label: string; value: string; detail: string; icon: LucideIcon; color: string }[] = [
-    { label: t("hub.kpi.readiness"), value: `${kpis.readiness}%`, detail: t("hub.kpi.readinessDetail"), icon: Gauge, color: "#2aa87a" },
-    { label: t("hub.kpi.confirmed"), value: `${kpis.confirmed}/${kpis.offersCount}`, detail: t("hub.kpi.confirmedDetail"), icon: CheckCircle2, color: "#0e9bb5" },
-    { label: t("hub.kpi.sales"), value: formatNumber(kpis.revenue), detail: t("hub.kpi.salesDetail"), icon: Wallet, color: "#d99a00" },
-    { label: t("hub.kpi.avg"), value: formatNumber(kpis.average), detail: t("hub.kpi.avgDetail"), icon: Users, color: "#e0577f" },
-  ];
+  if (!offer) return null;
 
   return (
-    <TraveliunShell title="nav.intelligenceHub">
-      <div className="tv-fade-up space-y-[18px]" dir={dir}>
-        <section
-          className="flex flex-wrap items-center justify-between gap-[18px] rounded-[18px] px-[26px] py-6 text-white shadow-[0_10px_30px_rgba(18,63,55,0.28)]"
-          style={{ background: "linear-gradient(120deg,#123f37,#185045 55%,#1f6154)" }}
-        >
-          <div>
-            <p className="flex items-center gap-2 text-[12.5px] font-bold tracking-[0.03em] text-[#8fe3c4]">
-              <Sparkles className="size-[18px]" />
-              <DirText>TRAVELIUN INTELLIGENCE OS</DirText>
-            </p>
-            <h1 className="mt-2 text-[26px] font-extrabold">{t("hub.heading")}</h1>
-            <p className="mt-1.5 text-[13.5px] font-medium text-[#bfe0d6]">
-              {t("hub.sub")}
-            </p>
-          </div>
-          {offer ? (
-            <div className="flex flex-wrap gap-2.5">
-              <Link href={`/client-offer/${offer.serial}`} className="inline-flex h-[46px] items-center gap-2 rounded-[11px] border border-white/20 bg-white/10 px-[18px] text-[13.5px] font-bold text-white transition-colors hover:bg-white/20">
-                <Link2 className="size-4" /> {t("hub.clientLink")}
-              </Link>
-              {offer.pdf_url ? (
-                <a href={offer.pdf_url} download className="inline-flex h-[46px] items-center gap-2 rounded-[11px] bg-white px-[18px] text-[13.5px] font-extrabold text-[#185045] transition-transform active:translate-y-px">
-                  <Download className="size-4" /> {t("hub.downloadPdf")}
-                </a>
-              ) : null}
-            </div>
-          ) : null}
-        </section>
-
-        <section className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(210px,1fr))]">
-          {operations.map((item) => {
-            const Icon = item.icon;
-            return (
-              <article key={item.label} className="rounded-[15px] border border-[#e2ebe7] bg-white p-[18px] shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(0,60,58,0.09)]">
-                <div className="flex items-start justify-between">
-                  <p className="text-[12.5px] font-bold text-[#6f8f88]">{item.label}</p>
-                  <span className="flex size-[38px] items-center justify-center rounded-[11px]" style={{ color: item.color, background: `${item.color}1a` }}>
-                    <Icon className="size-5" />
-                  </span>
-                </div>
-                <p className="tv-tnum mt-2.5 text-[30px] font-extrabold text-[#003c3a]"><DirText>{item.value}</DirText></p>
-                <p className="mt-1.5 text-[11.5px] font-semibold text-[#93aaa3]">{item.detail}</p>
-              </article>
-            );
-          })}
-        </section>
-
-        {!offer ? (
-          <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-            <EmptyState title={t("hub.noOffer")} description={t("hub.noOfferDesc")} />
-          </section>
-        ) : (
-          <>
+    <div className="space-y-[18px]" dir={dir}>
             <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
               <article className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
                 <div className="flex items-center justify-between border-b border-[#eef2f0] px-5 py-4">
@@ -230,10 +171,7 @@ export function TraveliunIntelligenceHub({ data }: { data: HubData }) {
                 {offer.excludes.length > 0 ? <ListPanel title={t("hub.excludes")} items={offer.excludes} icon={FileText} /> : null}
               </section>
             ) : null}
-          </>
-        )}
-      </div>
-    </TraveliunShell>
+    </div>
   );
 }
 

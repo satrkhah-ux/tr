@@ -104,6 +104,8 @@ export type TourPrice = {
   program_id?: string | null;
   /** the tour's city in the price list (tours.city_id), when the data team set it. */
   city?: string | null;
+  /** a placeholder until the real price is entered (0096) — it stands for any car. */
+  provisional?: boolean;
 };
 
 /**
@@ -123,7 +125,9 @@ export function pricesForCity(list: TourPrice[], city: string, fileCities: strin
  * The listed price of a tour — the programme it was picked from, else the same
  * name however it was spelled — for the car it goes in. A tour priced per car
  * is only priced for a car it lists: a sedan's price is not the bus's. The old
- * per-car names («جولة X (فان)») still find the grouped tour.
+ * per-car names («جولة X (فان)») still find the grouped tour. A placeholder
+ * (0096: 100 SAR, put in for the small car) is no car's real price, so it
+ * prices the tour in whatever car it goes in until the real one is entered.
  */
 export function findTourPrice(
   list: TourPrice[] | undefined,
@@ -150,7 +154,7 @@ export function findTourPrice(
     car = car || baseVehicle(split.car);
   }
   const perCar = hits.filter((t) => t.car_type?.trim());
-  if (car && perCar.length > 0) return perCar.find((t) => baseVehicle(t.car_type) === car) ?? null;
+  if (car && perCar.length > 0) return perCar.find((t) => baseVehicle(t.car_type) === car) ?? (perCar.every((t) => t.provisional) ? perCar[0] : null);
   return hits.find((t) => !t.car_type?.trim()) ?? (perCar.length === 1 ? perCar[0] : null);
 }
 

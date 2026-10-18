@@ -152,6 +152,14 @@ export type OfferTotals = {
  * rate: the caller refuses to issue rather than print a sum that quietly left
  * them out.
  */
+/**
+ * The client's total, up to the next whole unit of its currency (7,371.5 →
+ * 7,372; 7,371.00 stays). The owner, 2026-10-18: «اعمل لأقرب ريال صعوداً» —
+ * the difference is profit, and it is the one figure the offer, the PDF, the
+ * link, operations and the payments all read.
+ */
+export const roundUpTotal = (n: number): number => Math.ceil(round2(n));
+
 export function offerTotals(
   lines: PricingLineInput[],
   sarPer: CurrencyRates,
@@ -168,7 +176,7 @@ export function offerTotals(
     rates,
     base,
   );
-  const total = finalTotal ?? summary.total_sell;
+  const total = finalTotal ?? roundUpTotal(summary.total_sell);
   return { total, buy_total: summary.total_buy, total_sar: inSar(total), missing_rates: summary.missing_rates };
 }
 

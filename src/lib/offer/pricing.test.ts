@@ -159,7 +159,12 @@ describe("offerTotals — the issued total converts every line", () => {
     expect(offerTotals(mixed, sarPer, "SAR", null).total).toBe(3320);
   });
   it("totals in the quote currency the client is sent", () => {
-    expect(offerTotals(mixed, sarPer, "USD", null).total).toBe(885.33);
+    expect(offerTotals(mixed, sarPer, "USD", null).total).toBe(886); // 885.33 up to the whole dollar
+  });
+  it("the client's total goes up to the whole riyal — the owner, 2026-10-18", () => {
+    expect(offerTotals([line(7371.5, "SAR")], sarPer, "SAR", null).total).toBe(7372);
+    expect(offerTotals([line(7371.01, "SAR")], sarPer, "SAR", null).total).toBe(7372);
+    expect(offerTotals([line(7371, "SAR")], sarPer, "SAR", null).total).toBe(7371);
   });
   it("a typed final total wins", () => {
     expect(offerTotals(mixed, sarPer, "SAR", 4599).total).toBe(4599);

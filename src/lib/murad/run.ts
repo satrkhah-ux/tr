@@ -250,14 +250,16 @@ async function readyOffersFor(service: SupabaseClient, destinations: string[]): 
   if (!words.length) return [];
   const { data } = await service
     .from("ready_offers")
-    .select("title, variant, nights, price, currency, includes_text, validity_raw, valid_to")
+    .select("title, variant, nights, price, currency, includes_text, validity_raw, valid_to, problems")
     .eq("active", true)
     .eq("status", "ready")
+    // never quote an offer that is not published or that the sheet contradicts itself on
+    .eq("published", true)
     .or(words.flatMap((w) => [`country.ilike.%${w}%`, `title.ilike.%${w}%`]).join(","))
     .limit(5);
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
-  return ((data ?? []) as { title: string; variant: string | null; nights: number | null; price: number | null; currency: string | null; includes_text: string | null; validity_raw: string | null; valid_to: string | null }[])
-    .filter((o) => !o.valid_to || o.valid_to >= today)
+  return ((data ?? []) as { title: string; variant: string | null; nights: number | null; price: number | null; currency: string | null; includes_text: string | null; validity_raw: string | null; valid_to: string | null; problems: string[] | null }[])
+    .filter((o) => (!o.valid_to || o.valid_to >= today) && !o.problems?.length)
     .slice(0, 3)
     .map((o) => ({
       title: [o.title, o.variant].filter(Boolean).join(" — "),

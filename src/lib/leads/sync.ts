@@ -53,7 +53,8 @@ function columnsFor(field: SheetField, value: string, people: Person[]): Record<
   return { [field]: value || null };
 }
 
-const FIELDS = (Object.keys(HEADERS) as SheetField[]).filter((f) => f !== "phone");
+// «تأخير المحادثة» is the system's own clock (0098) — the sheet only ever receives it
+const FIELDS = (Object.keys(HEADERS) as SheetField[]).filter((f) => f !== "phone" && f !== "delay");
 
 export type PullResult = { read: number; added: number; updated: number; error?: string };
 

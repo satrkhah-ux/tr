@@ -6,7 +6,6 @@ import { airlineLogoUrl } from "@/components/offer-doc/brand";
 import type { BoardType, PricingItemType } from "@/lib/types";
 import {
   computeOfferPricing,
-  offerSarTotal,
   rebase,
   type CurrencyRates,
   type PricingLineInput,
@@ -372,37 +371,14 @@ export async function getBuilderData(): Promise<BuilderData> {
   }
 }
 
-// ---------- intelligence hub ----------
-export type HubData = {
-  kpis: { readiness: number; confirmed: number; revenue: number; average: number; offersCount: number };
-  offer: ClientOffer | null;
-};
-
-export async function getHubData(): Promise<HubData> {
-  const empty: HubData = { kpis: { readiness: 0, confirmed: 0, revenue: 0, average: 0, offersCount: 0 }, offer: null };
+// ---------- the home page's latest offer (was «مركز التشغيل الذكي») ----------
+export async function getLatestOffer(): Promise<ClientOffer | null> {
   try {
-    const supabase = await db();
-    const [all, confirmed, latest] = await Promise.all([
-      supabase.from("offers").select("total, total_sar, currency"),
-      supabase.from("offers").select("total, total_sar, currency").eq("status", "confirmed"),
-      supabase.from("offers").select("serial").order("created_at", { ascending: false }).limit(1).maybeSingle(),
-    ]);
-
-    // In riyals: a USD or THB offer added in as its raw number inflated both.
-    const allRows = (all.data ?? []) as Parameters<typeof offerSarTotal>[0][];
-    const confirmedRows = (confirmed.data ?? []) as Parameters<typeof offerSarTotal>[0][];
-    const offersCount = allRows.length;
-    const confirmedCount = confirmedRows.length;
-    const revenue = confirmedRows.reduce((sum, r) => sum + offerSarTotal(r), 0);
-    const average = offersCount > 0 ? allRows.reduce((sum, r) => sum + offerSarTotal(r), 0) / offersCount : 0;
-    const readiness = offersCount > 0 ? Math.round((confirmedCount / offersCount) * 100) : 0;
-
-    const serial = latest.data?.serial;
-    const offer = serial ? await getOfferBySerial(serial) : null;
-
-    return { kpis: { readiness, confirmed: confirmedCount, revenue, average, offersCount }, offer };
+    const { data } = await (await db()).from("offers").select("serial").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const serial = (data as { serial: string } | null)?.serial;
+    return serial ? await getOfferBySerial(serial) : null;
   } catch {
-    return empty;
+    return null;
   }
 }
 

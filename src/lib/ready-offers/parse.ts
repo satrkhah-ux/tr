@@ -8,7 +8,7 @@
  * against real snapshots of both tabs in `__fixtures__/`.
  */
 
-import type { ParsedCity, ParsedOffer, Tier } from "./types";
+import type { ParsedCity, ParsedOffer } from "./types";
 
 // ---------- CSV ----------
 /**
@@ -86,9 +86,9 @@ export function parseDuration(raw: string): { days: number | null; nights: numbe
 }
 
 // ---------- price ----------
-/** «"4,599"» → 4599. Blank (an announced-but-unpriced row) → null. */
+/** «"4,599"» · «4٬444٫00» → 4599 · 4444. Blank (an announced-but-unpriced row) → null. */
 export function parsePrice(raw: string): number | null {
-  const t = normalizeDigits(clean(raw)).replace(/[,\s٬]/g, "");
+  const t = normalizeDigits(clean(raw)).replace(/٫/g, ".").replace(/[,\s٬]/g, "");
   const m = t.match(/\d+(?:\.\d+)?/);
   if (!m) return null;
   const value = Number(m[0]);
@@ -138,7 +138,7 @@ export function parseList(raw: string): string[] {
   if (!text) return [];
   return text
     .split("\n")
-    .flatMap((line) => stripMarks(line).split(/\s+\+\s+/u))
+    .flatMap((line) => stripMarks(line).split(/\s+\+\s+|\s*؛\s*/u))
     .map(stripMarks)
     .filter((v) => v.length > 1);
 }
@@ -209,19 +209,53 @@ export function matchHotelsToCities(raw: string, cities: ParsedCity[]): string[]
     if (byCity.some(Boolean)) return byCity.map((v) => v || text);
   }
 
-  const parts = text.split(/\s*[+/]\s*|\n/u).map(stripMarks).filter(Boolean);
+  const parts = text.split(/\s*[+/؛]\s*|\n/u).map(stripMarks).filter(Boolean);
   if (parts.length === cities.length) return parts;
+  // «KL 2 + Genting 2 + KL 3» with two hotels: one a city, in the order the cities first come
+  const order = [...new Set(cities.map((c) => c.city_name))];
+  if (parts.length === order.length) return cities.map((c) => parts[order.indexOf(c.city_name)]);
 
   return cities.map(() => text);
 }
 
-// ---------- row → offer ----------
-const HEADERS = {
+// ---------- the owner's sheet (2026-10-18): a summary tab and a details tab ----------
+
+/** The two tabs, by name — the sync finds them by these, wherever they sit in the sheet. */
+export const TABS = { summary: "العروض السياحية", detail: "العروض التفصيلية" } as const;
+
+/** The body of a JS string as Google writes it («\x3d», «\/») → its text; as written when it will not read. */
+function jsString(body: string): string {
+  try {
+    return JSON.parse(`"${body.replace(/\\x([0-9a-f]{2})/gi, "\\u00$1")}"`) as string;
+  } catch {
+    return body;
+  }
+}
+
+/** A public sheet's tabs, name → gid, from its /htmlview page («items.push({name: "…", … gid: "…"})»). */
+export function tabsFromHtml(html: string): { name: string; gid: string }[] {
+  return [...html.matchAll(/items\.push\(\{name: "((?:[^"\\]|\\.)*)"[^}]*?gid: "(\d+)"/g)].map((m) => ({ name: jsString(m[1]), gid: m[2] }));
+}
+
+const SUMMARY = {
+  no: "م",
+  country: "الدولة",
+  route: "المدن / المسار",
+  days: "الأيام",
+  nights: "الليالي",
+  price: "السعر",
+  currency: "العملة",
+  basis: "أساس التسعير",
+  notes: "ملاحظات",
+} as const;
+
+const DETAIL = {
+  no: "#",
   destination: "الوجهة",
-  validity: "امكانية الحجز والاقامة",
+  booking: "إمكانية الحجز والإقامة",
   cities: "المدن / الليالي",
   hotels: "الفنادق الرئيسية",
-  duration: "الأيام",
+  days: "الأيام",
   tours: "الجولات",
   domesticFlight: "الطيران الداخلي",
   price: "سعر البيع النهائي",
@@ -230,6 +264,67 @@ const HEADERS = {
   files: "الملفات",
 } as const;
 
+/** Arabic as people type it — hamza, ى/ي, ة/ه, diacritics, tatweel, case and spacing aside. */
+export function fold(value: string): string {
+  return clean(value)
+    .replace(/[ً-ْٰـ]/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function columns<K extends string>(header: string[], names: Record<K, string>): Record<K, number> {
+  const folded = header.map(fold);
+  return Object.fromEntries(Object.entries<string>(names).map(([k, name]) => [k, folded.indexOf(fold(name))])) as Record<K, number>;
+}
+
+/** «ريال سعودي» · «5,285.40 يورو …» · «1,463 دولار …» → its currency; `fallback` when the text names none. */
+export function currencyOf(raw: string, fallback = "SAR"): string {
+  const t = fold(raw);
+  if (/يورو|eur|€/.test(t)) return "EUR";
+  if (/دولار|usd|\$/.test(t)) return "USD";
+  if (/ريال|sar|ر\.س/.test(t)) return "SAR";
+  return fallback;
+}
+
+/** «سعر إجمالي لشخصين بالغين» → 2 adults; «لشخصين وطفلين» → 2 + 2; «للفرد» → 1. Null when it does not say. */
+export function parseParty(raw: string): { adults: number | null; children: number | null } {
+  const t = fold(raw);
+  const adults = /للفرد|لشخص واحد/.test(t) ? 1 : /شخصين|شخصان|بالغين/.test(t) ? 2 : null;
+  const children = /طفلين/.test(t) ? 2 : /طفل/.test(t) ? 1 : adults != null ? 0 : null;
+  return { adults, children };
+}
+
+const NIGHTS = "(?:ليال[ٍي]?|ليلة)";
+
+/**
+ * «هانوي 2 + سابا 3 + هانوي 2 = 7 ليالٍ» · «إسطنبول 6 ليالٍ» · «دبي – 4 ليالٍ» → each
+ * city's nights, and the total the cell states. Cities null when any lacks its
+ * nights («تيرانا + بريزرن + تيرانا = 7 ليالٍ», «جزيرة ياس – عدد الليالي غير محدد»).
+ */
+export function parseCityNights(raw: string): { cities: ParsedCity[] | null; total: number | null } {
+  const bare = normalizeDigits(clean(raw)).replace(/\([^)]*\)/g, " ").trim();
+  const stated = bare.match(/=\s*(\d+)/u);
+  const text = bare
+    .replace(new RegExp(`\\s*=\\s*\\d+\\s*${NIGHTS}?\\s*$`, "u"), "")
+    .replace(new RegExp(`(\\d+)\\s*${NIGHTS}`, "gu"), "$1")
+    .trim();
+  const single = text.includes("+") ? null : text.match(/^(.+?)\s*[–—-]\s*(\d+)$/u);
+  const cities = single ? [{ city_name: clean(single[1]), nights: Number(single[2]) }] : parseCities(text);
+  const total = stated ? Number(stated[1]) : cities ? cities.reduce((s, c) => s + c.nights, 0) : null;
+  return { cities, total };
+}
+
+const toCount = (raw: string): number | null => {
+  const n = Number.parseInt(normalizeDigits(clean(raw)), 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+/** «22,999 ريال» — a price the way the sheet's reader says it. */
+const said = (price: number, currency: string): string => `${price.toLocaleString("en-US")} ${currency === "SAR" ? "ريال" : currency}`;
+
 /** djb2 → base36. Deterministic, short, and stable across row reordering. */
 function fingerprint(input: string): string {
   let h = 5381;
@@ -237,65 +332,122 @@ function fingerprint(input: string): string {
   return h.toString(36).padStart(7, "0");
 }
 
-/**
- * The sheet's `#` column repeats (two rows numbered 4, two numbered 5, many
- * blank), so the sync key is a fingerprint of the row's identity instead.
- * The duration is part of it because جنوب افريقيا ships the same destination
- * and the same cities cell at two different lengths.
- */
-export function codeFor(tier: Tier, country: string, variant: string | null, citiesRaw: string, durationRaw: string): string {
-  const key = [country, variant ?? "", citiesRaw, normalizeDigits(durationRaw)]
-    .map((p) => clean(p).replace(/\s+/g, " "))
-    .join("|");
-  return `${tier === "economy" ? "eco" : "prm"}-${fingerprint(key)}`;
-}
-
-function indexHeaders(header: string[]): Record<keyof typeof HEADERS, number> {
-  const norm = header.map((h) => clean(h).replace(/\s+/g, " "));
-  const find = (needle: string): number => {
-    const exact = norm.findIndex((h) => h === needle);
-    return exact >= 0 ? exact : norm.findIndex((h) => h.startsWith(needle) || needle.startsWith(h.slice(0, 8)));
-  };
-  return Object.fromEntries(
-    (Object.keys(HEADERS) as (keyof typeof HEADERS)[]).map((k) => [k, find(HEADERS[k])]),
-  ) as Record<keyof typeof HEADERS, number>;
-}
-
-export type ParseSheetResult = {
+export type ParseWorkbookResult = {
   offers: ParsedOffer[];
-  errors: { row: number; tier: Tier; reason: string }[];
+  errors: { row: number; tab: string; reason: string }[];
 };
 
-/** Parse one tab. `year` is injected so the module stays clock-free (testable). */
-export function parseSheet(csv: string, tier: Tier, year: number): ParseSheetResult {
-  const rows = parseCsv(csv);
-  const errors: ParseSheetResult["errors"] = [];
-  if (!rows.length) return { offers: [], errors: [{ row: 0, tier, reason: "empty sheet" }] };
+type DetailRow = { row: number; no: string; destination: string; cells: string[]; extra: string[]; used: boolean };
 
-  const idx = indexHeaders(rows[0]);
-  if (idx.destination < 0) return { offers: [], errors: [{ row: 1, tier, reason: "missing الوجهة column" }] };
+/**
+ * The owner's sheet: «العروض السياحية» (one line an offer: its days, nights,
+ * price, who the price is for, whether it is published) and «العروض التفصيلية»
+ * (its cities and nights, hotels, tours, domestic flight, inclusions, design).
+ * A summary row is joined to its details by its number, else (the rows with
+ * none) by its country. Where the two disagree nothing is guessed: the offer
+ * is imported with the reasons (`problems`) and starts no file until the sheet
+ * is corrected — the next sync clears them on its own.
+ */
+export function parseWorkbook(summaryCsv: string, detailCsv: string, year: number): ParseWorkbookResult {
+  const errors: ParseWorkbookResult["errors"] = [];
+  const sRows = parseCsv(summaryCsv);
+  if (!sRows.length) return { offers: [], errors: [{ row: 0, tab: TABS.summary, reason: "empty sheet" }] };
+  const sc = columns(sRows[0], SUMMARY);
+  if (sc.country < 0) return { offers: [], errors: [{ row: 1, tab: TABS.summary, reason: `missing ${SUMMARY.country} column` }] };
+  const dRows = parseCsv(detailCsv);
+  const dc = columns(dRows[0] ?? [], DETAIL);
+  if (dRows.length && dc.destination < 0) errors.push({ row: 1, tab: TABS.detail, reason: `missing ${DETAIL.destination} column` });
+
+  // each detail row, with any line under it that carries no number or destination of its own
+  const details: DetailRow[] = [];
+  for (let r = 1; dc.destination >= 0 && r < dRows.length; r += 1) {
+    const cells = dRows[r];
+    const no = normalizeDigits(dc.no >= 0 ? clean(cells[dc.no]) : "");
+    const destination = clean(cells[dc.destination]);
+    if (!no && !destination) {
+      const rest = cells.map(clean).filter(Boolean).join(" · ");
+      if (rest && details.length) details[details.length - 1].extra.push(rest);
+      continue;
+    }
+    details.push({ row: r + 1, no, destination, cells, extra: [], used: false });
+  }
+  const cell = (d: DetailRow | undefined, k: keyof typeof DETAIL): string => (d && dc[k] >= 0 ? clean(d.cells[dc[k]]) : "");
+
+  const summaries = sRows
+    .slice(1)
+    .map((cells, i) => ({ row: i + 2, cells, at: (k: keyof typeof SUMMARY) => (sc[k] >= 0 ? clean(cells[sc[k]]) : "") }))
+    .filter((s) => s.at("country"));
+  // by number first, then the rows without one by their country among the details left
+  const link = new Map<number, DetailRow>();
+  for (const s of summaries) {
+    const no = normalizeDigits(s.at("no"));
+    const d = no ? details.find((x) => !x.used && x.no === no) : undefined;
+    if (d) {
+      d.used = true;
+      link.set(s.row, d);
+    }
+  }
+  for (const s of summaries) {
+    if (link.has(s.row)) continue;
+    const head = fold(s.at("country")).split(" ")[0];
+    const d = details.find((x) => !x.used && fold(x.destination).includes(head));
+    if (d) {
+      d.used = true;
+      link.set(s.row, d);
+    }
+  }
+  for (const d of details) if (!d.used) errors.push({ row: d.row, tab: TABS.detail, reason: `«${d.destination}» بلا صف في «${TABS.summary}»` });
 
   const offers: ParsedOffer[] = [];
   const seen = new Set<string>();
-
-  for (let r = 1; r < rows.length; r += 1) {
-    const row = rows[r];
-    const at = (k: keyof typeof HEADERS): string => (idx[k] >= 0 ? clean(row[idx[k]]) : "");
-    const destinationRaw = at("destination");
-
-    // skip blanks and the trailing «ملاحظات : ...» footer row
-    if (!destinationRaw) continue;
-    if (/^ملاحظ/u.test(destinationRaw)) continue;
-
-    const { country, variant } = parseDestination(destinationRaw);
-    const citiesRaw = at("cities");
-    const durationRaw = at("duration");
-    const { days, nights } = parseDuration(durationRaw);
-    const price = parsePrice(at("price"));
-    const validityRaw = at("validity");
+  for (const s of summaries) {
+    const d = link.get(s.row);
+    const country = s.at("country");
+    const route = s.at("route");
+    const basis = s.at("basis");
+    const notes = s.at("notes");
+    const duration = parseDuration(cell(d, "days"));
+    const days = toCount(s.at("days")) ?? duration.days;
+    const nights = toCount(s.at("nights")) ?? duration.nights;
+    const price = parsePrice(s.at("price"));
+    const currency = currencyOf(s.at("currency"));
+    const citiesRaw = cell(d, "cities");
+    const { cities: split, total } = parseCityNights(citiesRaw);
+    const validityRaw = cell(d, "booking");
     const window = parseValidity(validityRaw, year);
 
-    let code = codeFor(tier, country, variant, citiesRaw, durationRaw);
+    const problems: string[] = [];
+    const warnings: string[] = [];
+    if (!d) warnings.push(`لا صف له في «${TABS.detail}» — تُعرض بيانات الملخّص وحدها`);
+    else {
+      const head = fold(country).split(" ")[0];
+      if (!fold(d.destination).includes(head)) problems.push(`الدولة في الملخّص «${country}» وفي التفصيلي «${d.destination}»`);
+      // the places, when the detail names them after its country («تايلند – فوكيت»): most of the summary's must be there
+      if (route && /[–—-]/u.test(d.destination)) {
+        const hay = fold([d.destination, citiesRaw, cell(d, "hotels")].join(" "));
+        const places = route.split(/\s*[–—-]\s*/u).map(fold).filter(Boolean);
+        const found = places.filter((p) => p.split(" ").some((w) => w.length >= 3 && hay.includes(w))).length;
+        if (found * 2 < places.length) problems.push(`المسار في الملخّص «${route}» وفي التفصيلي «${d.destination}»`);
+      }
+      const detailPrice = cell(d, "price");
+      if (detailPrice && price != null) {
+        const dp = parsePrice(detailPrice);
+        const perPerson = (t: string) => fold(t).includes("للفرد");
+        if (dp == null || currencyOf(detailPrice, currency) !== currency || Math.abs(dp - price) >= 0.01 || perPerson(detailPrice) !== perPerson(basis)) {
+          problems.push(`السعر في الملخّص ${said(price, currency)} وفي التفصيلي «${detailPrice}»`);
+        }
+      }
+      const sum = split?.reduce((n, c) => n + c.nights, 0) ?? null;
+      if (nights != null && total != null && total !== nights) problems.push(`الليالي في الملخّص ${nights} وفي التفصيلي ${total}`);
+      else if (nights != null && sum != null && sum !== nights) problems.push(`الليالي في الملخّص ${nights} ومجموع ليالي المدن في التفصيلي ${sum}`);
+      else if (nights != null && !split) problems.push(`الليالي في الملخّص ${nights}، وفي التفصيلي لا تُحدَّد ليالي كل مدينة: «${citiesRaw || "—"}»`);
+      if (d.extra.length) warnings.push(`سطر بلا رقم تحت هذا العرض لم يُقرأ: «${d.extra.join(" ")}»`);
+    }
+    if (!price) warnings.push("بلا سعر — تظهر كـ«قيد الإعداد»");
+    // the nights the file is seeded with are only ever ones the two tabs agree on
+    const cities = split && !problems.some((p) => p.startsWith("الليالي")) ? split : null;
+
+    let code = `ro-${fingerprint([fold(country), fold(route), nights ?? ""].join("|"))}`;
     if (seen.has(code)) {
       let n = 2;
       while (seen.has(`${code}-${n}`)) n += 1;
@@ -303,51 +455,49 @@ export function parseSheet(csv: string, tier: Tier, year: number): ParseSheetRes
     }
     seen.add(code);
 
-    const warnings: string[] = [];
-    let cities = parseCities(citiesRaw);
-    if (cities && nights !== null && cities.reduce((s, c) => s + c.nights, 0) !== nights) {
-      warnings.push("مجموع ليالي المدن لا يطابق ليالي الرحلة — لن تُبذر المدن تلقائياً");
-      cities = null;
-    }
-    if (!cities && citiesRaw) warnings.push("تعذّر استخراج ليالي كل مدينة — يحدّدها الموظف يدوياً");
-    if (!price) warnings.push("بلا سعر — تظهر كـ«قيد الإعداد»");
-    if (!window && validityRaw) warnings.push(`تعذّر تحليل فترة الصلاحية «${validityRaw}»`);
-
     const source_row: Record<string, string> = {};
-    rows[0].forEach((h, i) => {
-      const key = clean(h);
-      if (key) source_row[key] = clean(row[i]);
+    sRows[0].forEach((h, i) => {
+      if (clean(h)) source_row[clean(h)] = clean(s.cells[i]);
     });
+    if (d) {
+      (dRows[0] ?? []).forEach((h, i) => {
+        if (clean(h)) source_row[`${TABS.detail}: ${clean(h)}`] = clean(d.cells[i]);
+      });
+    }
 
     offers.push({
       code,
-      tier,
-      title: variant ? `${country} — ${variant}` : citiesRaw ? `${country} — ${citiesRaw}` : country,
+      tier: null,
+      title: d && /[–—-]/u.test(d.destination) ? d.destination : route ? `${country} — ${route}` : country,
       country,
-      variant,
-      cities_summary: citiesRaw,
-      main_hotels: at("hotels"),
-      tours_text: at("tours"),
-      domestic_flight: at("domesticFlight"),
+      variant: null,
+      cities_summary: citiesRaw || route,
+      main_hotels: cell(d, "hotels"),
+      tours_text: cell(d, "tours"),
+      domestic_flight: cell(d, "domesticFlight"),
       days,
       nights,
       price,
-      currency: "SAR",
-      includes: parseList(at("includes")),
-      excludes: parseList(at("excludes")),
-      includes_text: at("includes"),
-      excludes_text: at("excludes"),
+      currency,
+      includes: parseList(cell(d, "includes")),
+      excludes: parseList(cell(d, "excludes")),
+      includes_text: cell(d, "includes"),
+      excludes_text: cell(d, "excludes"),
       validity_raw: validityRaw,
       valid_from: window?.from ?? null,
       valid_to: window?.to ?? null,
-      design_url: at("files") || null,
+      design_url: cell(d, "files") || null,
       status: price ? "ready" : "coming_soon",
       cities,
-      hotels_by_city: cities ? matchHotelsToCities(at("hotels"), cities) : [],
+      hotels_by_city: cities ? matchHotelsToCities(cell(d, "hotels"), cities) : [],
       warnings,
+      problems,
+      published: !fold(notes).includes("لم يتم النشر"),
+      price_basis: basis,
+      ...parseParty(basis),
+      notes,
       source_row,
     });
   }
-
   return { offers, errors };
 }
