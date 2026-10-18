@@ -197,9 +197,11 @@ export function BasicCityCard({
   // this stop's own stays — a city visited twice has two sets
   const lines = cityHotelLines(data.cities, data.hotels, index);
   const [main] = lines;
-  const domestic = data.flights.filter(
-    (f) => f.leg_order === "internal" && (f.to_city?.trim() === city.city_name || f.from_city?.trim() === city.city_name),
-  );
+  const touches = (c: { city_name: string }) => (f: DraftData["flights"][number]) =>
+    f.leg_order === "internal" && (f.to_city?.trim() === c.city_name || f.from_city?.trim() === c.city_name);
+  const domestic = data.flights.filter(touches(city));
+  // the domestic booking is ONE price for every leg: asked once, on the first city a leg touches
+  const domesticHome = data.cities.findIndex((c) => data.flights.some(touches(c)));
   // the visit's reception, farewell and transfers — on the tours tab, with the tours
   const services = transportOn ? cityServices(data, index) : [];
   // «البرنامج السياحي» opens once every tour of the city says what it is
@@ -242,6 +244,7 @@ export function BasicCityCard({
     // a tour the list prices is priced (the sheet takes the list's figure) — asked only of who sees the price
     showPrice && picks.some((p) => !tourPriced(p, tripCar, tourPrices)) && tx("tourPrice"),
     transportOn && isFirst && !plan.airport.car_type.trim() && tx("reception"),
+    data.scope.flights_domestic && index === domesticHome && !((data.flight_booking.dom_price ?? 0) > 0) && tx("domPrice"),
     transportOn && isLast && !(plan.farewell ?? plan.airport).car_type.trim() && tx("farewell"),
   ].filter((x): x is string => Boolean(x));
   const stayPrice = rooms.reduce((sum, r) => sum + (r.price ?? 0), 0);
@@ -518,7 +521,7 @@ export function BasicCityCard({
             </div>
           ) : null}
           {open === "domestic" ? (
-            <DomesticPanel legs={domestic} data={data} lookups={lookups} onSlice={onSlice} />
+            <DomesticPanel legs={domestic} data={data} lookups={lookups} onSlice={onSlice} priceCity={index === domesticHome ? null : (data.cities[domesticHome]?.city_name ?? null)} />
           ) : null}
           {/* «تمت <city>»: open only when the city has all it needs, and says what is missing until then */}
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-dashed border-[#DCE9E5] pt-2.5">
@@ -898,6 +901,15 @@ function ServicesPanel({
   // ---- the transfers: what changed on a row is the row's own; the trip's reception and farewell are the trip's car ----
   const cities = data.cities;
   const setSvc = (s: ServiceRow, slice: Partial<Omit<CityService, "id">>) => onSlice({ cities: setService(cities, index, s.id, slice) });
+  /**
+   * A reception's price is the farewell's too — the same road the other way, the same car — while the
+   * farewell has none of its own (the owner's review, 2026-10-18: 150 typed in, the way out left empty).
+   */
+  const setPrice = (s: ServiceRow, price: number | null) => {
+    const back = s.id === "in" ? services.find((o) => o.id === "out" && o.price == null && (o.car_type ?? "") === (s.car_type ?? "")) : undefined;
+    const next = setService(cities, index, s.id, { price });
+    onSlice({ cities: back && price != null ? setService(next, index, back.id, { price }) : next });
+  };
   const tripLeg = (s: ServiceRow): "airport" | "farewell" | null => (s.id === "in" && index === 0 ? "airport" : s.id === "out" && isLast ? "farewell" : null);
   const setCar = (s: ServiceRow, car: string) => {
     const leg = tripLeg(s);
@@ -964,7 +976,7 @@ function ServicesPanel({
           onText={(text) => setSvc(s, { text: text === s.auto_text ? undefined : text })}
           onCar={(car) => setCar(s, car)}
           onCars={(cars) => setCars(s, cars)}
-          onPrice={(price) => setSvc(s, { price })}
+          onPrice={(price) => setPrice(s, price)}
           onRemove={() => onSlice({ cities: removeService(cities, index, s.id) })}
         />
       ),
@@ -1296,11 +1308,14 @@ function DomesticPanel({
   data,
   lookups,
   onSlice,
+  priceCity,
 }: {
   legs: DraftData["flights"];
   data: DraftData;
   lookups: GeneratorLookups;
   onSlice: (slice: Partial<DraftData>) => void;
+  /** null: the price is asked here; else the city whose card asks it. */
+  priceCity: string | null;
 }) {
   const tx = useBasicLabels();
   const booking = data.flight_booking;
@@ -1404,9 +1419,13 @@ function DomesticPanel({
               </span>
             </div>
           ))}
-          {/* the domestic booking's one price — the same field as in the flights step and the pricing card */}
+          {/* the domestic booking's one price — asked once, naming every leg it pays for */}
+          {priceCity ? (
+            <p className="mt-1 text-[11.5px] font-bold text-[#557d78]">{tx("domPriceThere", { city: priceCity })}</p>
+          ) : (
+          <>
           <label className="mt-1 inline-flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#185045]">
-            {tx("domPrice")}
+            {tx("domPriceAll", { routes: data.flights.filter((f) => f.leg_order === "internal").map((f) => `${f.from_city || "—"} ← ${f.to_city || "—"}`).join("، ") })}
             <input
               type="number"
               min={0}
@@ -1421,6 +1440,8 @@ function DomesticPanel({
             <span className="text-[#557d78]">{booking.dom_currency || "SAR"}</span>
           </label>
           <FlightFare booking={booking} kind="dom" trip={data.trip} field={basicField} onChange={(flight_booking) => onSlice({ flight_booking })} />
+          </>
+          )}
         </>
       )}
     </div>

@@ -87,3 +87,23 @@ export async function getTourPrices(countryNames: string[]): Promise<(TourPrice 
     return [];
   }
 }
+
+/**
+ * The cars the company prices transfers in, for these countries — Turkey's list
+ * names «فيتو» and «فان مرسيدس», never «سيارة صغيرة». The group's default car is
+ * picked among them (BasicEditor), so the reception finds its price in the list
+ * (the owner's review, 2026-10-18: every transfer typed by hand). Names only; no price.
+ */
+export async function getTransferCars(countryNames: string[]): Promise<string[]> {
+  if (!(await currentCan("offers.write"))) return [];
+  const wanted = new Set(countryNames.map(normAr).filter(Boolean));
+  if (wanted.size === 0) return [];
+  try {
+    const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
+    const { data } = await supabase.from("transfers").select("car_type, countries(arabic_name)").not("car_type", "is", null);
+    type Row = { car_type: string | null; countries: { arabic_name: string } | null };
+    return [...new Set(((data ?? []) as unknown as Row[]).filter((r) => r.car_type?.trim() && r.countries && wanted.has(normAr(r.countries.arabic_name))).map((r) => r.car_type!.trim()))];
+  } catch {
+    return [];
+  }
+}

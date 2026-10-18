@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { getCountryHotels, produceOfferFromDraft } from "@/lib/data/drafts";
-import { getTourPrices, getTourPrograms } from "@/lib/data/tour-programs";
+import { getTourPrices, getTourPrograms, getTransferCars } from "@/lib/data/tour-programs";
 import type { TourProgram } from "@/lib/offer/itinerary";
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
 import type { ProfitSettings } from "@/lib/data/app-settings";
@@ -334,7 +334,7 @@ export function BasicEditor({
     const p = merged.transport_plan;
     const transport_plan = withGroupCars(
       { ...p, intercity: { ...p.intercity, enabled: chained.length > 1 } },
-      carForGroup(lookups.carTypes, merged.trip.adults + merged.trip.children),
+      carForGroup(groupCars.current, merged.trip.adults + merged.trip.children),
     );
     // a domestic flight is one of the ways between cities — the two switches are one fact
     const nextScope = { ...merged.scope, flights_domestic: intercityModes(transport_plan).includes("flight") };
@@ -371,7 +371,7 @@ export function BasicEditor({
     const next = withTripDates(trip, slice);
     const pax = (t: DraftTrip) => t.adults + t.children + t.infants;
     const visas = data.visas.map((v) => (v.count === pax(trip) ? { ...v, count: pax(next) } : v));
-    const seated = (t: DraftTrip) => carForGroup(lookups.carTypes, t.adults + t.children);
+    const seated = (t: DraftTrip) => carForGroup(groupCars.current, t.adults + t.children);
     commit({
       trip: next,
       ...(pax(next) !== pax(trip) ? { visas, transport_plan: resizeGroupCars(plan, seated(trip), seated(next)) } : {}),
@@ -546,6 +546,23 @@ export function BasicEditor({
       zones: Object.fromEntries(lk.countries.filter((c) => c.timezone).map((c) => [c.name, c.timezone!])),
     };
   }, [lk, trip.country, data.cities]);
+
+  // ---------- the cars a group's default is picked from: those the trip's countries price transfers in ----------
+  // (a ref: commit reads it; a country without a list keeps the whole fleet)
+  const groupCars = useRef(lookups.carTypes);
+  const transferCountries = tripCountries(data).sort().join("|");
+  useEffect(() => {
+    if (!transferCountries) return;
+    let live = true;
+    void getTransferCars(transferCountries.split("|")).then((names) => {
+      if (!live) return;
+      const priced = lookups.carTypes.filter((c) => names.includes(c.name));
+      groupCars.current = priced.length > 0 ? priced : lookups.carTypes;
+    });
+    return () => {
+      live = false;
+    };
+  }, [transferCountries, lookups.carTypes]);
 
   // ---------- the tours price list of the trip's countries ----------
   const [tourPrices, setTourPrices] = useState<TourPrice[]>([]);
