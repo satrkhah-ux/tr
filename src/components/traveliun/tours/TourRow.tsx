@@ -44,9 +44,15 @@ export function tourChoices(catalog: TourCatalog): Suggestion[] {
   // a listed tour of another city's programme is that city's, not this one's
   const prices = catalog.prices.filter((p) => !p.program_id || own.has(p.program_id));
   const out = new Map<string, Suggestion>([[FREE_DAY_TITLE, { value: FREE_DAY_TITLE }]]);
+  /** a listed price as the file reads it: riyals, and a foreign price said in riyals first (≈ 563 ر.س (150 USD · فان)) */
+  const money = (price: number, currency: string, car?: string) => {
+    const rate = currency === "SAR" ? 1 : catalog.sarPer[currency];
+    if (currency === "SAR" || !rate) return car ? `${price} ${currency} (${car})` : `${price} ${currency}`;
+    return `≈ ${Math.round(price * rate).toLocaleString("en-US")} ر.س (${price} ${currency}${car ? ` · ${car}` : ""})`;
+  };
   const priced = (value: string, programId?: string) => {
     const hit = catalog.showPrice ? findTourPrice(prices, value, catalog.tripCar, programId) : null;
-    return { value, ...(hit ? { hint: `${hit.price} ${hit.currency}` } : {}) };
+    return { value, ...(hit ? { hint: money(hit.price, hit.currency) } : {}) };
   };
   for (const p of catalog.programs) {
     const title = programDayText(p).title;
@@ -73,7 +79,7 @@ export function tourChoices(catalog: TourCatalog): Suggestion[] {
         .sort((x, y) => paxOf(splitTourName(x.name)!.car) - paxOf(splitTourName(y.name)!.car));
       const other = others.find((t) => paxOf(splitTourName(t.name)!.car) >= need) ?? others[others.length - 1];
       const car = other ? splitTourName(other.name)?.car : null;
-      if (other && car) out.set(name, { value: name, hint: `${other.price} ${other.currency} (${car})` });
+      if (other && car) out.set(name, { value: name, hint: money(other.price, other.currency, car) });
       else out.set(name, entry);
     } else out.set(name, entry);
   }

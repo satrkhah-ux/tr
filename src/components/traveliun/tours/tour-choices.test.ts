@@ -44,10 +44,10 @@ describe("tourChoices — what a tour field opens", () => {
         { name: "حديقة سوي تين (Suoi Tien)", price: 90, currency: "SAR" },
       ],
       carTypes: [
-        { name: "سيارة صغيرة", pax: 2 },
-        { name: "فيتو", pax: 8 },
-        { name: "فان مرسيدس", pax: 8 },
-        { name: "سيارة سبرانتر", pax: 12 },
+        { name: "سيارة صغيرة", name_en: null, pax: 2, luggage: null },
+        { name: "فيتو", name_en: null, pax: 8, luggage: null },
+        { name: "فان مرسيدس", name_en: null, pax: 8, luggage: null },
+        { name: "سيارة سبرانتر", name_en: null, pax: 12, luggage: null },
       ],
     };
     expect(tourChoices({ ...old, tripCar: "فان مرسيدس" })).toEqual([
@@ -57,5 +57,17 @@ describe("tourChoices — what a tour field opens", () => {
       { value: "حديقة سوي تين (Suoi Tien)", hint: "90 SAR" },
     ]);
     expect(tourChoices({ ...old, tripCar: "سيارة صغيرة" })[1]).toEqual({ value: "جولة البسفور", hint: "100 SAR (فيتو)" });
+  });
+
+  it("says a foreign price in the file's riyals first", () => {
+    const usd: TourCatalog = {
+      ...catalog(true),
+      programs: [],
+      prices: [{ name: "جولة البسفور (فان مرسيدس)", price: 150, currency: "USD" }],
+      sarPer: { SAR: 1, USD: 3.75 },
+      carTypes: [{ name: "سيارة صغيرة", name_en: null, pax: 2, luggage: null }, { name: "فان مرسيدس", name_en: null, pax: 8, luggage: null }],
+      tripCar: "سيارة صغيرة",
+    };
+    expect(tourChoices(usd)[1]).toEqual({ value: "جولة البسفور", hint: "≈ 563 ر.س (150 USD · فان مرسيدس)" });
   });
 });
