@@ -1937,24 +1937,28 @@ export function addStay(
     dates === "same" ? rooms.slice(0, 1) : rooms,
   );
   const at = from ? hotels.lastIndexOf(from) + 1 : hotels.length;
-  const next = [...hotels.slice(0, at), line, ...hotels.slice(at)];
-  return { hotels: keepNightlyRates(cities, hotels, next), id: line.id };
+  return { hotels: [...hotels.slice(0, at), line, ...hotels.slice(at)], id: line.id };
 }
 
 /**
- * A stay's prices are its whole stay's. When another stay takes some of its
- * nights (11 → 5), the price must follow the nights — the per-night rate is
- * what the agent typed (546.67 a night), not the total (the owner, 2026-10-18:
- * it jumped to 1,202.67 a night). Every stay whose nights changed between
- * `before` and `after` has its room prices and manual price scaled by
- * new / old nights; a stay with no nights before or after is left alone.
+ * A stay's prices are its whole stay's, but the rate the agent means is the
+ * NIGHT's (the owner, 2026-10-18: 546.67 a night jumped to 1,202.67 when a
+ * second hotel took six of the eleven nights, and fell to 248.49 when it was
+ * removed again). So the night is what stays put: every stay whose nights
+ * changed between `before` and `after` — split, merged, removed, the city's
+ * nights changed — has its room prices and manual price scaled by
+ * new / old nights. A stay with no nights before or after is left alone.
+ * Basic runs it on every change (BasicEditor commit).
  */
-export function keepNightlyRates(cities: DraftCity[], before: DraftHotel[], after: DraftHotel[]): DraftHotel[] {
-  const nightsOf = (hotels: DraftHotel[]) => new Map(deriveHotelStays(cities, hotels).map((s) => [s.line.id, s.nights]));
+export function keepNightlyRates(
+  before: { cities: DraftCity[]; hotels: DraftHotel[] },
+  after: { cities: DraftCity[]; hotels: DraftHotel[] },
+): DraftHotel[] {
+  const nightsOf = (d: { cities: DraftCity[]; hotels: DraftHotel[] }) => new Map(deriveHotelStays(d.cities, d.hotels).map((s) => [s.line.id, s.nights]));
   const was = nightsOf(before);
   const now = nightsOf(after);
   const scale = (v: number | null, f: number) => (v == null ? v : Math.round(v * f * 100) / 100);
-  return after.map((h) => {
+  return after.hotels.map((h) => {
     const a = was.get(h.id) ?? 0;
     const b = now.get(h.id) ?? 0;
     if (!a || !b || a === b) return h;

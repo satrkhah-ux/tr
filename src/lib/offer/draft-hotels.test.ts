@@ -5,6 +5,7 @@ import {
   deriveCityDates,
   deriveHotelStays,
   hotelCoverage,
+  keepNightlyRates,
   newCityKey,
   normalizeDraftData,
   normalizeDraftHotel,
@@ -140,17 +141,27 @@ describe("deriveHotelStays — after, same, custom", () => {
     expect(hotelCoverage(cities, added.hotels)[0]).toMatchObject({ needed: 5, covered: 5, extra: 0 });
   });
 
-  it("«فندق آخر ← بعده» keeps the first stay's per-night rate (the owner, 2026-10-18: 546.67 jumped to 1,202.67)", () => {
+  it("the night's rate stays put whichever way the nights move (the owner, 2026-10-18: 546.67 → 1,202.67, then 248.49)", () => {
     const cities = [city("كوالالمبور", 11, "2026-10-07")];
     const priced = { ...line({ hotel_name: "A" }), manual_price: 6013.37 };
     const a = { ...priced, rooms: priced.rooms.map((r) => ({ ...r, price: 6013.37 })) };
-    const { hotels } = addStay(cities, [a], 0, "after");
-    const [first] = deriveHotelStays(cities, hotels);
-    const kept = hotels.find((h) => h.id === a.id)!;
-    expect(first.nights).toBeGreaterThan(0);
-    expect(first.nights).toBeLessThan(11);
-    expect(Math.round((kept.rooms[0].price! / first.nights) * 100) / 100).toBeCloseTo(546.67, 1);
-    expect(Math.round((kept.manual_price! / first.nights) * 100) / 100).toBeCloseTo(546.67, 1);
+    const rate = (hotels: DraftHotel[], cs = cities) => {
+      const stay = deriveHotelStays(cs, hotels).find((s) => s.line.id === a.id)!;
+      const kept = hotels.find((h) => h.id === a.id)!;
+      return [Math.round((kept.rooms[0].price! / stay.nights) * 100) / 100, Math.round((kept.manual_price! / stay.nights) * 100) / 100, stay.nights];
+    };
+    // split: a second hotel after it takes some nights
+    const split = keepNightlyRates({ cities, hotels: [a] }, { cities, hotels: addStay(cities, [a], 0, "after").hotels });
+    const [r1, m1, n1] = rate(split);
+    expect(n1).toBeLessThan(11);
+    expect([r1, m1]).toEqual([546.67, 546.67]);
+    // the second removed: the eleven nights come back at the same rate (not 248.49)
+    const merged = keepNightlyRates({ cities, hotels: split }, { cities, hotels: split.filter((h) => h.id === a.id) });
+    expect(rate(merged)).toEqual([546.67, 546.67, 11]);
+    // the city's nights changed by hand: 11 → 8
+    const shorter = [{ ...cities[0], nights: 8 }];
+    const resized = keepNightlyRates({ cities, hotels: merged }, { cities: shorter, hotels: merged });
+    expect(rate(resized, shorter)).toEqual([546.67, 546.67, 8]);
   });
 
   it("A two rooms and B one on the same dates (acceptance ب): 4/4, not 8/4", () => {
