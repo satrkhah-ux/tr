@@ -4,7 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Car, Check, FileText, KeyRound, TriangleAlert, X } from "lucide-react";
 import { confirmAlmatarBooking, createAlmatarLogin, rejectAlmatarBooking, setAlmatarMargin } from "@/lib/almatar/actions";
-import { LOGIN_DOMAIN, STATUS_LABEL, vehicleLabel } from "@/lib/almatar/rules";
+import { LOGIN_DOMAIN, passwordProblem, STATUS_LABEL, vehicleLabel } from "@/lib/almatar/rules";
 import type { AlmatarService, AlmatarStaffBooking } from "@/lib/almatar/server";
 import { TraveliunShell } from "../TraveliunShell";
 import { card, danger, field, primary, sar, secondary, Stat, td, th } from "../commissions/ui";
@@ -37,6 +37,8 @@ export function AlmatarAdmin({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  // the login form answers under its own button — the page notice sits a screen above it
+  const [loginMsg, setLoginMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const byId = new Map(services.map((s) => [s.id, s]));
   const live = bookings.filter((b) => b.status === "confirmed");
   const run = (job: () => Promise<{ ok: boolean; message?: string }>, done = "تم.") =>
@@ -64,16 +66,30 @@ export function AlmatarAdmin({
   function makeLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
+    const username = String(f.get("username") ?? "").trim();
     const password = String(f.get("password") ?? "");
-    if (password !== String(f.get("confirm") ?? "")) {
-      setNotice({ ok: false, text: "كلمتا المرور غير متطابقتين." });
+    const problem = !username
+      ? "اكتب اسم المستخدم."
+      : password !== String(f.get("confirm") ?? "")
+        ? "كلمتا المرور غير متطابقتين."
+        : passwordProblem(password, username);
+    if (problem) {
+      setLoginMsg({ ok: false, text: problem });
       return;
     }
     const form = e.currentTarget;
-    run(async () => {
-      const r = await createAlmatarLogin({ username: String(f.get("username") ?? ""), password });
-      if (r.ok) form.reset();
-      return r;
+    setLoginMsg(null);
+    start(async () => {
+      try {
+        const r = await createAlmatarLogin({ username, password });
+        setLoginMsg({ ok: r.ok, text: r.message ?? "" });
+        if (r.ok) {
+          form.reset();
+          router.refresh();
+        }
+      } catch {
+        setLoginMsg({ ok: false, text: "تعذّر الاتصال بالخادم — حدّث الصفحة وأعد المحاولة." });
+      }
     });
   }
 
@@ -262,25 +278,31 @@ export function AlmatarAdmin({
                 ))}
               </ul>
             ) : null}
-            <form onSubmit={makeLogin} className="mt-3 grid gap-3 sm:grid-cols-4">
+            <form onSubmit={makeLogin} noValidate className="mt-3 grid gap-3 sm:grid-cols-4">
               <label className="grid gap-1 text-[11.5px] font-bold text-[#557d78]">
                 اسم المستخدم
                 <input name="username" defaultValue="almatar" required dir="ltr" autoComplete="off" className={field} />
               </label>
               <label className="grid gap-1 text-[11.5px] font-bold text-[#557d78]">
                 كلمة مرور مؤقتة
-                <input name="password" type="password" required minLength={10} dir="ltr" autoComplete="new-password" className={field} />
+                <input name="password" type="password" dir="ltr" autoComplete="new-password" className={field} />
               </label>
               <label className="grid gap-1 text-[11.5px] font-bold text-[#557d78]">
                 تأكيدها
-                <input name="confirm" type="password" required minLength={10} dir="ltr" autoComplete="new-password" className={field} />
+                <input name="confirm" type="password" dir="ltr" autoComplete="new-password" className={field} />
               </label>
               <div className="grid content-end">
                 <button type="submit" disabled={pending || !hasCompany} className={primary}>
-                  أنشئ الحساب
+                  {pending ? "جارٍ الإنشاء…" : "أنشئ الحساب"}
                 </button>
               </div>
             </form>
+            {!hasCompany ? <p className="mt-2 text-[12.5px] font-bold text-[#c22850]">شركة المطار غير موجودة — لا يمكن إنشاء الحساب.</p> : null}
+            {loginMsg ? (
+              <p role="status" className={`mt-3 rounded-[10px] px-3 py-2 text-[13px] font-bold ${loginMsg.ok ? "bg-[#e8f6ef] text-[#17795a]" : "bg-[#fff0f3] text-[#c22850]"}`}>
+                {loginMsg.text}
+              </p>
+            ) : null}
           </section>
         ) : null}
       </div>
