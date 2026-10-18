@@ -12,6 +12,7 @@ import { hotelMap } from "@/lib/operations/driver-programme";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { linkOpen, sameDriver, stepAllowed, stepDetail, supplierAnswer, type LinkKind, type SupplierAnswerInput } from "@/lib/operations/op-links";
 import type { TravelerKind } from "@/lib/operations/traveler-dto";
+import { leadName } from "@/lib/operations/travelers";
 
 /**
  * The pages behind «رابط المورد» and «رابط السائق» (operations order 11).
@@ -20,8 +21,8 @@ import type { TravelerKind } from "@/lib/operations/traveler-dto";
  * system user, so it is read here with the SERVICE role and refused once
  * expired, stopped, or — for a supplier — once the booking was handed to
  * someone else. Each page carries only what its reader already gets: the
- * supplier the request text order 8 sends him (names as typed on the case,
- * never decrypted from a passport); the driver his pick-ups. No price, no
+ * supplier the request text order 8 sends him (the names on the case — the
+ * passport's once read — never decrypted here); the driver his pick-ups. No price, no
  * other supplier, no passport, no internal note.
  */
 
@@ -112,9 +113,9 @@ export async function getSupplierLinkView(token: string): Promise<SupplierLinkVi
       .select("display_name, traveler_kind")
       .eq("operation_id", b.operation_id)
       .order("sort", { ascending: true });
+    // under «الأسماء كما في الجواز»: the travellers' own names, «تُرسل لاحقاً» while unnamed —
+    // never the client's WhatsApp contact name in their place (the owner, 2026-10-18)
     const travelers = ((trs ?? []) as { display_name: string; traveler_kind: TravelerKind }[]).map((t) => ({ name: t.display_name, kind: t.traveler_kind }));
-    const lead = one(offer?.customers)?.arabic_name;
-    if (travelers.length === 0 && lead) travelers.push({ name: lead, kind: "adult" });
 
     // the catalogue's English names, as composeRequest gives them (supplier-work.ts)
     const glossary: Record<string, string> = {};
@@ -247,7 +248,7 @@ export type DriverPickup = {
   id: string;
   kind: ServiceKind;
   serial: string;
-  /** the booking name — who to look for at the arrivals hall. */
+  /** who to look for at the arrivals hall — the lead traveller as in the passport (leadName), "" while unnamed. */
   lead: string;
   title: string;
   time: string;
@@ -307,6 +308,11 @@ export async function getDriverDay(token: string): Promise<DriverDay | null> {
       ? await supabase.from("operation_bookings").select("operation_id, title, city_name, start_date, end_date").in("operation_id", opIds).eq("kind", "hotel").neq("status", "cancelled")
       : { data: [] };
     const stays = (staysData ?? []) as { operation_id: string; title: string; city_name: string; start_date: string | null; end_date: string | null }[];
+    // the name on the sign, per case: the passport's, never the client's WhatsApp one (2026-10-18)
+    const { data: travData } = opIds.length
+      ? await supabase.from("operation_travelers").select("operation_id, display_name").in("operation_id", opIds).order("sort", { ascending: true })
+      : { data: [] };
+    const travelers = (travData ?? []) as { operation_id: string; display_name: string }[];
     const names = [...new Set(stays.map((s) => s.title.trim()))];
     const cityNames = [...new Set(stays.map((s) => s.city_name.trim()).filter(Boolean))];
     // the map link as the driver's programme words it (driver-programme hotelMap): the hotel's own
@@ -335,7 +341,7 @@ export async function getDriverDay(token: string): Promise<DriverDay | null> {
         id: r.id,
         kind: driverServiceKind(r) as ServiceKind,
         serial: offer?.serial ?? "",
-        lead: one(offer?.customers)?.arabic_name ?? "",
+        lead: leadName(travelers.filter((t) => t.operation_id === r.operation_id)),
         title: r.title,
         time: meetTime(r),
         flight: d[DRV.flight] ?? "",

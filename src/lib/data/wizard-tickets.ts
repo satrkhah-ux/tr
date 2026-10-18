@@ -15,7 +15,7 @@ import { uploadText, type UploadHow } from "@/lib/repackage/extract/upload-text"
 import { mergeTicket, parseTicketText, sanitizeTicket, ticketGaps, ticketNumbersIn, type TicketLeg } from "@/lib/flights/ticket-parse";
 import { readTicketText } from "@/lib/flights/ticket-ai";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
-import type { PassportView } from "@/lib/operations/traveler-dto";
+import type { PassportView, TravelerRow } from "@/lib/operations/traveler-dto";
 import { badLeg, checkNames, toFlightLegs, withTicketLines, type LegInput, type NameCheck, type TravelerNames } from "@/lib/operations/wizard/flights";
 import { hotelDiffs, parseHotelConfirmation, type HotelConfirmation, type HotelDiff } from "@/lib/operations/wizard/hotels";
 
@@ -61,20 +61,24 @@ async function bookingOf(db: SupabaseClient, id: string, kind: "flight" | "hotel
 }
 
 /**
- * The case's travellers as the name check sees them: the name on the case and,
- * for a viewer who may read passports, the passport's own (MRZ) name — each read
- * audited before it is decrypted, or not read at all.
+ * The case's travellers as the name check sees them: the passport's own (MRZ)
+ * name, for a viewer who may read passports — each read audited before it is
+ * decrypted, or not read at all — and the traveller's name on the case, in
+ * whichever script it was written (compareName hears Arabic against Latin).
+ * Not a planned name: before 0091's seeding stopped, that was the client's
+ * WhatsApp contact name, and it says nothing about who is on the ticket.
  */
 async function travelerNames(db: SupabaseClient, booking: BookingRow, purpose: string): Promise<TravelerNames[]> {
+  // `*`: name_source is 0091's — naming a column a database lacks fails the whole read
   const { data } = await db
     .from("operation_travelers")
-    .select("id, display_name, passport_encrypted")
+    .select("*")
     .eq("operation_id", booking.operation_id)
     .order("sort", { ascending: true });
-  const rows = (data ?? []) as { id: string; display_name: string; passport_encrypted: string | null }[];
+  const rows = (data ?? []) as Pick<TravelerRow, "id" | "display_name" | "name_source" | "passport_encrypted">[];
   const mayRead = isVaultConfigured() && (await currentCan("operations.passport"));
   return Promise.all(
-    rows.map(async (t) => {
+    rows.map(async (t, i) => {
       let full = "";
       if (mayRead && t.passport_encrypted) {
         const logged = await logAudit({
@@ -85,7 +89,9 @@ async function travelerNames(db: SupabaseClient, booking: BookingRow, purpose: s
         });
         full = logged ? (decryptJson<PassportView>(t.passport_encrypted)?.full_name?.trim() ?? "") : "";
       }
-      return { id: t.id, label: t.display_name, names: [t.display_name, full].filter((n) => n.trim()) };
+      const own = t.name_source === "seed" ? "" : t.display_name.trim();
+      // the label is what the browser shows — the case's name, never the decrypted one
+      return { id: t.id, label: own || `مسافر ${i + 1}`, names: [full, own].filter(Boolean) };
     }),
   );
 }

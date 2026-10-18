@@ -85,6 +85,10 @@ export type VoucherDTO = {
   serial: string;
   issued_at: string;
   destination: string | null;
+  /**
+   * `name`: the lead guest as in the passport (travelers.ts leadName) — not the
+   * client's WhatsApp contact name, which older snapshots still hold (2026-10-18).
+   */
   customer: { name: string; phone: string | null };
   /** name + nationality only. There is no passport-number field, by design. */
   travelers: { name: string; nationality: string | null }[];

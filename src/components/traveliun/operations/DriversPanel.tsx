@@ -34,8 +34,11 @@ const KIND_TONE: Record<ServiceKind, string> = {
  * and the client page all read the same facts. The reception's time is not
  * typed here first: the pull set it from the landing, and editing the flight
  * moves it (flight-follow.ts).
+ *
+ * `guestName`: the arrival sign's default — the lead traveller's as in the
+ * passport (travelers.ts leadName), never the client's WhatsApp contact name.
  */
-export function DriversPanel({ serial, customerName, bookings }: { serial: string; customerName: string | null; bookings: OperationBooking[] }) {
+export function DriversPanel({ serial, guestName, bookings }: { serial: string; guestName: string | null; bookings: OperationBooking[] }) {
   const { t } = useTraveliunUI();
   const rows = bookings
     .filter((b) => b.status !== "cancelled")
@@ -67,7 +70,7 @@ export function DriversPanel({ serial, customerName, bookings }: { serial: strin
       ) : (
         <ul className="grid gap-2.5 lg:grid-cols-2">
           {rows.map(({ b, kind }) => (
-            <DriverCard key={b.id} booking={b} kind={kind} serial={serial} customerName={customerName} />
+            <DriverCard key={b.id} booking={b} kind={kind} serial={serial} guestName={guestName} />
           ))}
         </ul>
       )}
@@ -89,12 +92,12 @@ function DriverCard({
   booking,
   kind,
   serial,
-  customerName,
+  guestName,
 }: {
   booking: OperationBooking;
   kind: ServiceKind;
   serial: string;
-  customerName: string | null;
+  guestName: string | null;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -220,7 +223,7 @@ function DriverCard({
             {t("ops.drv.schedule")}
           </Link>
         ) : null}
-        {kind === "reception" ? <WelcomeBoardButton serial={serial} defaultName={customerName} /> : null}
+        {kind === "reception" ? <WelcomeBoardButton serial={serial} defaultName={guestName} /> : null}
       </div>
     </li>
   );

@@ -328,7 +328,6 @@ export async function composeRequest(bookingId: string, alsoIds: string[] = []):
       operations: { offers: unknown } | { offers: unknown }[] | null;
     };
     const offer = one(one(row.operations)?.offers as { serial: string; customers: unknown } | { serial: string; customers: unknown }[] | null);
-    const customer = one(offer?.customers as { arabic_name: string | null } | { arabic_name: string | null }[] | null);
 
     // the other bookings of the message, in the order asked — this case's only
     type Extra = { id: string; operation_id: string; kind: SupplierBookingKind; title: string; city_name: string; start_date: string | null; end_date: string | null; detail: Record<string, string> | null };
@@ -374,8 +373,8 @@ export async function composeRequest(bookingId: string, alsoIds: string[] = []):
         return { name: full || t.display_name, kind: t.traveler_kind };
       }),
     );
-    // no travelers on the case yet: the booking name is better than none
-    if (named.length === 0 && customer?.arabic_name) named.push({ name: customer.arabic_name, kind: "adult" });
+    // no named traveller yet: «الأسماء تُرسل لاحقاً» — never the client's WhatsApp contact name
+    // under «الأسماء كما في الجواز» (the owner, 2026-10-18)
 
     // ---- the catalogue's English names, for a request in English ----
     const glossary: Record<string, string> = {};

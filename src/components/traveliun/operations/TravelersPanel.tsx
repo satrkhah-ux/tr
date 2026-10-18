@@ -17,7 +17,7 @@ import {
   upsertTraveler,
 } from "@/lib/data/operation-travelers";
 import { VISA_STATUSES, type PassportRead, type TravelerKind, type TravelerListItem, type VisaStatus } from "@/lib/operations/traveler-dto";
-import { ageOn, isLatinName, travelerReadiness } from "@/lib/operations/travelers";
+import { ageOn, isLatinName, sameName, takesPassportName, travelerReadiness } from "@/lib/operations/travelers";
 import { trustedFields, type MrzCheckedField, type MrzFormField, type MrzPassport } from "@/lib/operations/mrz";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
@@ -69,9 +69,9 @@ export function TravelersPanel({
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
   const clientPassports = useClientPassports(operationId, travelers);
 
-  // «بالغ 2» for a row nobody has named yet — shown, never stored (it would print on a voucher)
-  const seen: Partial<Record<TravelerKind, number>> = {};
-  const placeholders = travelers.map((tr) => `${t(KIND_KEY(tr.traveler_kind))} ${(seen[tr.traveler_kind] = (seen[tr.traveler_kind] ?? 0) + 1)}`);
+  // «مسافر 1» for a row nobody has named yet — until its passport is read or a name typed;
+  // shown, never stored (it would print on a voucher)
+  const placeholders = travelers.map((_, i) => t("ops.trav.unnamed", { n: i + 1 }));
 
   function run(action: () => Promise<{ ok: true } | Fail>, after?: () => void) {
     startTransition(async () => {
@@ -217,13 +217,18 @@ function TravelerRow({
 
   function openEdit(prefill: Partial<Form> = {}) {
     const known = passport?.state === "ok" ? passport.passport : null;
+    // a passport just read names the traveller — unless a person typed the name: then
+    // it stays and «استبدال بالاسم من الجواز» is offered (savedName decides the same on save)
+    const read = prefill.full_name?.trim() ?? "";
     setForm({
-      display_name: traveler.display_name,
+      display_name: read && takesPassportName(traveler) ? read : traveler.display_name,
       traveler_kind: traveler.traveler_kind,
       birth_date: traveler.birth_date ?? "",
       nationality: traveler.nationality ?? known?.nationality ?? "",
-      // the name already written, when it is in the passport's alphabet — not typed twice
-      full_name: known?.full_name ?? (isLatinName(traveler.display_name) ? traveler.display_name.trim().toUpperCase() : ""),
+      // the name already written, when it is in the passport's alphabet — not typed twice;
+      // never a planned one (before 0091's seeding stopped, that was the client's WhatsApp name)
+      full_name:
+        known?.full_name ?? (traveler.name_source !== "seed" && isLatinName(traveler.display_name) ? traveler.display_name.trim().toUpperCase() : ""),
       number: known?.number ?? "",
       expiry: traveler.passport_expiry ?? "",
       ...prefill,
@@ -243,8 +248,9 @@ function TravelerRow({
     if (!form) return;
     const number = form.number.trim();
     const input = {
-      // an unnamed companion takes the passport name — written once
-      display_name: form.display_name.trim() || form.full_name.trim(),
+      // the name as shown; an unnamed or planned one becomes the passport's on the server (savedName)
+      display_name: form.display_name.trim(),
+      passport_name: form.full_name.trim(),
       traveler_kind: form.traveler_kind,
       birth_date: form.birth_date || null,
       nationality: form.nationality.trim() || null,
@@ -272,7 +278,7 @@ function TravelerRow({
         const p = res.passport;
         const { values } = trustedFields(p, today);
         setMrz(p);
-        openEdit({ display_name: traveler.display_name || values.full_name, ...values });
+        openEdit(values);
         // the photo may have become the scan
         router.refresh();
       },
@@ -395,7 +401,6 @@ function TravelerRow({
       {clientPassport ? (
         <ClientPassportReview
           submission={clientPassport}
-          displayName={traveler.display_name}
           onReview={(prefill, read) => {
             setMrz(read);
             openEdit(prefill);
@@ -486,10 +491,23 @@ function TravelerRow({
               {checkFails.length > 0 ? <span className="text-[#c22850]">{t("ops.trav.mrzCheck", { fields: checkFails.join(" · ") })}</span> : null}
             </div>
           ) : null}
-          <label className={label}>
-            {t("ops.traveler.name")}
-            <input value={form.display_name} onChange={(e) => set({ display_name: e.target.value })} className={field} />
-          </label>
+          <div className="grid gap-1">
+            <label className={label}>
+              {t("ops.traveler.name")}
+              <input value={form.display_name} onChange={(e) => set({ display_name: e.target.value })} className={field} />
+            </label>
+            {/* the passport's name differs from the one written — offered, never forced; outside the
+                label, which would otherwise hand its clicks to the button */}
+            {form.full_name.trim() && form.display_name.trim() && !sameName(form.display_name, form.full_name) ? (
+              <button
+                type="button"
+                onClick={() => set({ display_name: form.full_name.trim() })}
+                className="justify-self-start rounded-[7px] border border-[#e0c58a] bg-[#fffaf0] px-2 py-0.5 text-[11px] font-bold text-[#a86a10] hover:bg-[#fff3dc]"
+              >
+                {t("ops.trav.usePassportName")}
+              </button>
+            ) : null}
+          </div>
           <label className={label}>
             {t("ops.traveler.kind")}
             <select value={form.traveler_kind} onChange={(e) => set({ traveler_kind: e.target.value as TravelerKind })} className={field}>

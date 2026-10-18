@@ -1,5 +1,6 @@
 import type { TravelerKind, TravelerListItem } from "@/lib/operations/traveler-dto";
 import { ageOn, kindForAge, passportIssues, travelerReadiness } from "@/lib/operations/travelers";
+import { compareName } from "./flights";
 import type { ReadinessItem, SoldTravelers, StepState, WizardCase } from "./types";
 
 /**
@@ -82,17 +83,18 @@ export function passportsReadiness(data: WizardCase): ReadinessItem[] {
 /** What a read gave, trusted fields only (mrz.ts trustedFields) — "" where it gave nothing. */
 export type ReadPassport = { full_name: string; birth_date: string; nationality: string };
 
-export type MatchRow = Pick<TravelerListItem, "id" | "display_name" | "traveler_kind" | "age" | "birth_date" | "nationality" | "has_passport">;
-
-const tokens = (s: string) => s.toUpperCase().replace(/[^A-Z ]/g, " ").split(/\s+/).filter(Boolean);
+export type MatchRow = Pick<TravelerListItem, "id" | "display_name" | "name_source" | "traveler_kind" | "age" | "birth_date" | "nationality" | "has_passport">;
 
 /**
  * The row a passport belongs to, or null for a traveller the case does not
  * have yet. In order: the same person read before (birth date + nationality —
  * a passport uploaded twice must not add a second traveller); the name already
- * written in Latin; then a row still without a passport — the same kind and
- * sold age, the same kind, any. A child's passport on an adult's row is what
- * the age check is for: it says so instead of hiding it.
+ * written, in either script — compareName, the tickets' check: «SARA ALI» and
+ * «سارة الأحمد» against the MRZ's Latin, the surest first; then a row still
+ * without a passport — the same kind and sold age, the same kind, any. A
+ * planned name says nothing about whose passport this is, so it is not matched
+ * on. A child's passport on an adult's row is what the age check is for: it
+ * says so instead of hiding it.
  */
 export function matchPassport(rows: MatchRow[], read: ReadPassport, trip: Trip, today: string, taken: ReadonlySet<string>): MatchRow | null {
   const open = rows.filter((r) => !taken.has(r.id));
@@ -100,12 +102,10 @@ export function matchPassport(rows: MatchRow[], read: ReadPassport, trip: Trip, 
     const same = open.find((r) => r.birth_date === read.birth_date && (!r.nationality || !read.nationality || r.nationality === read.nationality));
     if (same) return same;
   }
-  const name = tokens(read.full_name);
-  if (name.length) {
-    const named = open.find((r) => {
-      const own = tokens(r.display_name);
-      return own.length > 0 && own.every((w) => name.includes(w));
-    });
+  if (read.full_name.trim()) {
+    const by = (status: "ok" | "likely") =>
+      open.find((r) => r.name_source !== "seed" && r.display_name.trim() && compareName(r.display_name, read.full_name) === status);
+    const named = by("ok") ?? by("likely");
     if (named) return named;
   }
   const free = open.filter((r) => !r.has_passport);
