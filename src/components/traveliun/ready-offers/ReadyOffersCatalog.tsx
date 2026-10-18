@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -370,6 +370,15 @@ export function SyncDialog({ open, onOpenChange, sheetId }: { open: boolean; onO
     }
   }
 
+  // the preview starts when the dialog opens — its own onOpenChange only fires on a close
+  // from inside it, never on the page opening it, so the dialog sat empty (the evaluator, 7a195c0)
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- opening the dialog is what starts the preview, once per opening */
+  useEffect(() => {
+    if (!open) return;
+    void load();
+  }, [open]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+
   async function apply() {
     setState("applying");
     const res = await applySync();
@@ -388,8 +397,7 @@ export function SyncDialog({ open, onOpenChange, sheetId }: { open: boolean; onO
       open={open}
       onOpenChange={(v) => {
         onOpenChange(v);
-        if (v) void load();
-        else {
+        if (!v) {
           setState("idle");
           setDiff(null);
         }
