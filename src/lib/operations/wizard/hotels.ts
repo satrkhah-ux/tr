@@ -15,6 +15,7 @@
 import type { OperationBooking } from "@/lib/data/operation-bookings";
 import { hotelFinal } from "@/lib/operations/client-booking-state";
 import { datesOn, normalizeTicketText, passengersIn } from "@/lib/flights/ticket-parse";
+import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { nameTokens, type NameCheck } from "./flights";
 import { notPulled } from "./pull";
 import type { ReadinessItem, StepState, WizardCase } from "./types";
@@ -36,11 +37,41 @@ export function hotelsState(data: Pick<WizardCase, "bookings" | "offerKinds">): 
   return hotels.every(isFinal) ? "done" : "todo";
 }
 
-/** «التأكيد النهائي»: every hotel final — mandatory before «جاهز للسفر». */
+/**
+ * «التأكيد النهائي»: every hotel final — mandatory before «جاهز للسفر». Two
+ * hotels on the same night add a warning, listed only while they do.
+ */
 export function hotelsReadiness(data: Pick<WizardCase, "bookings">): ReadinessItem[] {
   const hotels = hotelBookings(data);
   if (hotels.length === 0) return notPulled(data, "hotel") ? [{ step: "hotels", key: "pulled", ok: false }] : [];
-  return [{ step: "hotels", key: "final", ok: hotels.every(isFinal) }];
+  const items: ReadinessItem[] = [{ step: "hotels", key: "final", ok: hotels.every(isFinal) }];
+  if (hotelOverlaps(hotels).size > 0) items.push({ step: "hotels", key: "overlap", ok: false, optional: true, warning: true });
+  return items;
+}
+
+type Stay = Pick<OperationBooking, "id" | "title" | "city_name" | "start_date" | "end_date" | "detail">;
+
+/**
+ * Hotels holding the same night (AD-2-3599: Jakarta 10→12 added inside Bali
+ * 7→18 — two hotels paid for three nights), in another city or the same one.
+ * Two rooms in one city — the family split over two bookings, each with its own
+ * room — is no overlap. A night is check-in up to the day before check-out.
+ * Each booking → the others it overlaps.
+ */
+export function hotelOverlaps(hotels: Stay[]): Map<string, Stay[]> {
+  const rooms = (b: Stay) => roomLines(b.detail).map((r) => normalizeName(r)).sort().join("|");
+  const out = new Map<string, Stay[]>();
+  const add = (a: Stay, b: Stay) => out.set(a.id, [...(out.get(a.id) ?? []), b]);
+  hotels.forEach((a, i) => {
+    for (const b of hotels.slice(i + 1)) {
+      if (!a.start_date || !a.end_date || !b.start_date || !b.end_date) continue;
+      if (!(a.start_date < b.end_date && b.start_date < a.end_date)) continue;
+      if (normalizeName(a.city_name) === normalizeName(b.city_name) && rooms(a) !== rooms(b)) continue;
+      add(a, b);
+      add(b, a);
+    }
+  });
+  return out;
 }
 
 // ---------------- reading a confirmation ----------------

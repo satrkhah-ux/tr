@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Car, Check, CheckCircle2, Copy, ExternalLink, Loader2, Mail, MapPin, Paperclip, Send, UserRound } from "lucide-react";
+import { AlertTriangle, Car, Check, CheckCircle2, Copy, ExternalLink, Loader2, Mail, MapPin, Paperclip, Send, UserRound } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import type { RequestDraft } from "@/lib/data/operation-assign";
+import { updateBooking } from "@/lib/data/operation-bookings";
 import { getSupplierConfirmationUrl } from "@/lib/data/supplier-work";
 import {
   assignCitySupplier,
@@ -16,15 +17,17 @@ import {
   transportSuppliers,
   type TransportSetup,
 } from "@/lib/data/wizard-transport";
-import { carText, waNumber } from "@/lib/operations/drivers";
+import { carText, timeKey, waNumber } from "@/lib/operations/drivers";
+import { LATER } from "@/lib/operations/seed-plan";
 import { hoursSince } from "@/lib/operations/supplier-request";
 import {
   driverDiffers,
   driverTargets,
   requestTrips,
-  tourBeforeArrival,
+  tourClashes,
   transportCities,
   type Driver,
+  type TourClash,
   type TransportCity,
   type TransportTrip,
 } from "@/lib/operations/wizard/transport";
@@ -56,6 +59,7 @@ type Result = { ok: true } | { ok: false; error: TranslationKey };
 export function TransportStep({ data }: StepProps) {
   const { t } = useTraveliunUI();
   const cities = transportCities(data);
+  const clashes = tourClashes(data.bookings);
   const operationId = data.operation.id;
   const names = cities.map((c) => c.name).join("|");
   const [setup, setSetup] = useState<TransportSetup | null>(null);
@@ -87,6 +91,7 @@ export function TransportStep({ data }: StepProps) {
         <CityCard
           key={c.key || "-"}
           city={c}
+          clashes={clashes}
           operationId={operationId}
           setup={setup}
           now={now}
@@ -99,12 +104,15 @@ export function TransportStep({ data }: StepProps) {
 
 function CityCard({
   city,
+  clashes,
   operationId,
   setup,
   now,
   filedId,
 }: {
   city: TransportCity;
+  /** the tours whose time fights their flight (transport.ts tourClashes). */
+  clashes: Map<string, TourClash>;
   operationId: string;
   setup: TransportSetup | null;
   now: Date;
@@ -225,7 +233,7 @@ function CityCard({
 
       <ul className="mt-3 space-y-1.5">
         {city.trips.map((trip) => (
-          <TripRow key={trip.booking.id} trip={trip} city={city} operationId={operationId} />
+          <TripRow key={trip.booking.id} trip={trip} city={city} clash={clashes.get(trip.booking.id) ?? null} operationId={operationId} />
         ))}
       </ul>
 
@@ -409,7 +417,7 @@ function DriverFields({ value, onChange }: { value: Driver; onChange: (d: Driver
 }
 
 /** One trip: when, what, where to where — and its own driver only when it differs from the city's. */
-function TripRow({ trip, city, operationId }: { trip: TransportTrip; city: TransportCity; operationId: string }) {
+function TripRow({ trip, city, clash, operationId }: { trip: TransportTrip; city: TransportCity; clash: TourClash | null; operationId: string }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
   const [pending, run] = useSafeTransition();
@@ -453,8 +461,27 @@ function TripRow({ trip, city, operationId }: { trip: TransportTrip; city: Trans
             {t("wz.transport.driverDiffers")}: {[trip.driver.name, trip.driver.phone].filter(Boolean).join(" · ")}
           </span>
         ) : null}
-        {tourBeforeArrival(trip, city) ? (
-          <span className="rounded-full bg-[#fdeef2] px-2 py-0.5 text-[10.5px] font-bold text-[#c22850]">{t("wz.transport.arrivalTour")}</span>
+        {clash ? (
+          <span className="inline-flex flex-wrap items-center gap-1.5 rounded-full bg-[#fff4e0] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">
+            <AlertTriangle className="size-3" />
+            <span title={t(`wz.transport.clash.${clash}`)}>{t("wz.transport.clash")}</span>
+            {/* the user's own act: the time is cleared through the usual edit, never rewritten silently */}
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                run(async () => {
+                  setError(null);
+                  const res = await updateBooking({ id: b.id, detail: { ...b.detail, [timeKey(trip.kind)]: LATER } });
+                  if (!res.ok) setError(t(res.error));
+                  else router.refresh();
+                })
+              }
+              className="rounded-full border border-[#e0c58a] bg-white px-2 text-[10.5px] font-bold text-[#185045] hover:bg-[#fffaf0] disabled:opacity-60"
+            >
+              {LATER}
+            </button>
+          </span>
         ) : null}
         <button
           type="button"
@@ -487,9 +514,9 @@ function TripRow({ trip, city, operationId }: { trip: TransportTrip; city: Trans
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
             {t("save")}
           </button>
-          {error ? <p className="text-[11.5px] font-bold text-[#c22850] sm:col-span-3">{error}</p> : null}
         </div>
       ) : null}
+      {error ? <p className="mt-1.5 text-[11.5px] font-bold text-[#c22850]">{error}</p> : null}
     </li>
   );
 }

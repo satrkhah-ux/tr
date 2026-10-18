@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { OperationBooking } from "@/lib/data/operation-bookings";
 import { checkNames } from "./flights";
-import { hotelDiffs, hotelsReadiness, hotelsState, isFinal, parseHotelConfirmation } from "./hotels";
+import { hotelDiffs, hotelOverlaps, hotelsReadiness, hotelsState, isFinal, parseHotelConfirmation } from "./hotels";
 import type { WizardCase } from "./types";
 
 const booking = (p: Partial<OperationBooking>): OperationBooking =>
@@ -120,5 +120,30 @@ describe("reading a hotel's confirmation", () => {
     ]);
     // the same room written the same way is no difference
     expect(hotelDiffs({ ...read, check_out: "2026-11-23", room: "غرفة ديلوكس" }, b, [])).toEqual([]);
+  });
+});
+
+describe("two hotels on the same night (AD-2-3599)", () => {
+  const stay = (id: string, city: string, start: string, end: string, room = "غرفة مزدوجة") =>
+    booking({ id, title: `فندق ${id}`, city_name: city, start_date: start, end_date: end, detail: { الغرفة: room } });
+  const bali = stay("bali", "بالي", "2026-10-07", "2026-10-18");
+  const jakarta = stay("jakarta", "جاكرتا", "2026-10-10", "2026-10-12");
+
+  it("finds Jakarta 10→12 inside Bali 7→18 — across cities — and warns on the tile, in yellow, without blocking", () => {
+    const found = hotelOverlaps([bali, jakarta]);
+    expect(found.get("bali")?.map((b) => b.id)).toEqual(["jakarta"]);
+    expect(found.get("jakarta")?.map((b) => b.id)).toEqual(["bali"]);
+    expect(hotelsReadiness(wcase([bali, jakarta]))).toEqual([
+      { step: "hotels", key: "final", ok: false },
+      { step: "hotels", key: "overlap", ok: false, optional: true, warning: true },
+    ]);
+  });
+
+  it("is no overlap: check-out on the next one's check-in, two rooms in one city, a cancelled stay", () => {
+    expect(hotelOverlaps([bali, stay("next", "جاكرتا", "2026-10-18", "2026-10-20")]).size).toBe(0);
+    expect(hotelOverlaps([bali, stay("second-room", "بالي", "2026-10-07", "2026-10-18", "غرفة ثلاثية")]).size).toBe(0);
+    // the same room twice in one city is a booking made twice
+    expect(hotelOverlaps([bali, stay("twin", "بالي", "2026-10-10", "2026-10-12")]).size).toBe(2);
+    expect(hotelsReadiness(wcase([bali, booking({ ...jakarta, status: "cancelled" })])).map((i) => i.key)).toEqual(["final"]);
   });
 });

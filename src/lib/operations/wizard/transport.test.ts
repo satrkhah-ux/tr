@@ -3,7 +3,7 @@ import type { OperationBooking } from "@/lib/data/operation-bookings";
 import type { SupplierWork } from "@/lib/data/supplier-work";
 import { buildSupplierRequest } from "@/lib/operations/supplier-request";
 import { isUnassigned } from "@/lib/operations/wizard";
-import { driverTargets, requestTrips, transportCities, transportReadiness, transportState } from "./transport";
+import { driverTargets, requestTrips, tourClashes, transportCities, transportReadiness, transportState } from "./transport";
 import type { WizardCase } from "./types";
 
 // AD-2-7287 as the pull wrote it: 2 receptions, 3 tours in two cities, a hotel that is not transport
@@ -138,5 +138,53 @@ describe("«بلا منفّذ»", () => {
     expect(isUnassigned({ assignee_kind: "ops", assigned_at: null })).toBe(true);
     expect(isUnassigned({ assignee_kind: "ops", assigned_at: "2026-10-17T10:00:00Z" })).toBe(false);
     expect(isUnassigned({ assignee_kind: "supplier", assigned_at: null })).toBe(false);
+  });
+});
+
+/**
+ * «تعارض مع الرحلة» on AD-2-3599 as it was pulled before the fix (2026-10-18):
+ * Bali 07→18, the flights planned with no time, tours at 09:00 on the day the
+ * group lands and on the day it flies home. Nothing is rewritten — flagged.
+ */
+describe("a tour against its day's flight", () => {
+  const flight = (detail: Record<string, string>, legs: OperationBooking["flight_legs"] = []) =>
+    booking({ kind: "flight", title: "طيران دولي JED ⇄ DPS", detail, flight_legs: legs });
+  const planned = flight({ الذهاب: "— · JED → DPS · 2026-10-07 يُحدَّد لاحقاً", العودة: "— · DPS → JED · 2026-10-18 يُحدَّد لاحقاً" });
+  const stay = booking({ kind: "hotel", title: "فندق اريادوتا بالي", city_name: "بالي", start_date: "2026-10-07", end_date: "2026-10-18" });
+  const met = booking({ title: "المطار ← فندق بالي", city_name: "بالي", start_date: "2026-10-07", detail: { الوقت: "يُحدَّد لاحقاً", الرحلة: "— JED → DPS" } });
+  const seenOff = booking({ title: "فندق بالي ← المطار", city_name: "بالي", start_date: "2026-10-18", detail: { الوقت: "يُحدَّد لاحقاً", الرحلة: "— DPS → JED" } });
+  const tour = (date: string, time: string) => booking({ kind: "service", title: "جولة: بالي", city_name: "بالي", start_date: date, detail: { "وقت الانطلاق": time } });
+
+  it("flags the 09:00 tours on the day of an untimed landing and of an untimed take-off — not the days between", () => {
+    const [first, second, mid, last] = [tour("2026-10-07", "09:00"), tour("2026-10-07", "09:00"), tour("2026-10-08", "09:00"), tour("2026-10-18", "09:00")];
+    const clashes = tourClashes([planned, stay, met, seenOff, first, second, mid, last]);
+    expect(Object.fromEntries(clashes)).toEqual({ [first.id]: "arrival", [second.id]: "arrival", [last.id]: "departure" });
+    // a warning on the tile — never a blocker
+    expect(transportReadiness(wc([planned, stay, met, seenOff, first]))).toContainEqual({ step: "transport", key: "tour_times", ok: false, optional: true, warning: true });
+    // «يُحدَّد لاحقاً» pressed: nothing fixed, nothing to clash
+    expect(tourClashes([planned, stay, met, tour("2026-10-07", "يُحدَّد لاحقاً")]).size).toBe(0);
+    expect(transportReadiness(wc([planned, stay, met, mid])).map((i) => i.key)).not.toContain("tour_times");
+  });
+
+  it("times it from the ticket once read: three hours after the landing, back four hours before the take-off", () => {
+    const ticketed = flight({}, [
+      { flight_no: "GA881", from: "JED", to: "DPS", departs_at: "2026-10-07T01:10:00+03:00", arrives_at: "2026-10-07T14:30:00+08:00" },
+      { flight_no: "GA880", from: "DPS", to: "JED", departs_at: "2026-10-18T19:00:00+08:00", arrives_at: "2026-10-18T23:55:00+03:00" },
+    ]);
+    const clash = (t: OperationBooking) => tourClashes([ticketed, stay, met, seenOff, t]).get(t.id) ?? null;
+    expect(clash(tour("2026-10-07", "16:00"))).toBe("arrival");
+    expect(clash(tour("2026-10-07", "17:30"))).toBeNull();
+    // a four-hour tour at 11:00 is back at 15:00 — four hours before 19:00
+    expect(clash(tour("2026-10-18", "11:00"))).toBeNull();
+    expect(clash(tour("2026-10-18", "12:00"))).toBe("departure");
+  });
+
+  it("reads only the flights of the tour's own airport when the city's drives name it", () => {
+    // the same day, another city's late landing (Jakarta, 23:00) is not Bali's
+    const other = flight({ رحلة: "GA410 · DPS → CGK · 2026-10-08 20:00 · الوصول 2026-10-08 23:00" });
+    const metDay2 = booking({ title: "المطار ← فندق بالي", city_name: "بالي", start_date: "2026-10-08", detail: { الرحلة: "GA9 JED → DPS" } });
+    const landed = flight({ الذهاب: "GA9 · JED → DPS · 2026-10-08 01:00 · الوصول 2026-10-08 06:00" });
+    const t = tour("2026-10-08", "10:00");
+    expect(tourClashes([landed, other, metDay2, t]).size).toBe(0);
   });
 });

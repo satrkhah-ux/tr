@@ -6,7 +6,7 @@ import { clientFlight, flightTicketed } from "@/lib/operations/client-booking-st
 import { derivedExecution } from "@/lib/operations/progress";
 import { documentPlan, documentsReadiness, dueDocuments, sameDocument, snapshotKey } from "./documents";
 import { followUpOf, readWaits, withoutWaits } from "./followup";
-import { bookingStepStates, firstOpenStep, ownStates, readiness, readyToTravel, staleWaits, stepStates, stepTone } from "./index";
+import { bookingStepStates, firstOpenStep, itemTone, ownStates, readiness, readyToTravel, staleWaits, stepStates, stepTone } from "./index";
 import { kindOnTrip, matchPassport, passportSummary, passportsReadiness, passportsState } from "./passports";
 import { clientStatusUnbacked, paidState, paymentPrefill, paymentReadiness } from "./payment";
 import { WIZARD_STEPS, type WizardCase } from "./types";
@@ -33,6 +33,7 @@ const op = (over: Partial<OperationCard> = {}): OperationCard => ({
   paid: 0,
   travelers_count: 2,
   partner_name: null,
+  partner_id: null,
   ...over,
 });
 
@@ -311,6 +312,18 @@ describe("the tiles (2026-10-18): each step coloured by its own readiness", () =
     for (const data of [open, done, wizardCase(), wizardCase({ travelers: [] })]) {
       expect(readyToTravel(readiness(data))).toBe(!Object.values(tones(data)).includes("red"));
     }
+  });
+
+  it("colours each item by its own state, not its tile's: a done link stays green under a red documents tile", () => {
+    const items = readiness(wizardCase({ clientToken: "tok" })).filter((i) => i.step === "documents");
+    expect(stepTone("todo", items)).toBe("red");
+    expect(Object.fromEntries(items.map((i) => [i.key, itemTone(i)]))).toMatchObject({ documents: "red", link: "green" });
+    expect(itemTone({ step: "documents", key: "guide", ok: false, optional: true })).toBe("yellow");
+    expect(itemTone({ step: "hotels", key: "overlap", ok: false, optional: true, warning: true })).toBe("yellow");
+    expect(itemTone({ step: "hotels", key: "final", ok: true })).toBe("green");
+    // a warning alone never turns a tile red, nor blocks «جاهز للسفر»
+    expect(stepTone("done", [{ step: "hotels", key: "final", ok: true }, { step: "hotels", key: "overlap", ok: false, optional: true, warning: true }])).toBe("yellow");
+    expect(readyToTravel([{ step: "transport", key: "tour_times", ok: false, optional: true, warning: true }])).toBe(true);
   });
 });
 

@@ -2,15 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AlertTriangle, BedDouble, CheckCircle2, ExternalLink, Loader2, Pencil, Plus, RefreshCw } from "lucide-react";
+import { AlertTriangle, BedDouble, CheckCircle2, ExternalLink, Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import type { TranslationKey } from "@/lib/i18n";
-import type { OperationBooking } from "@/lib/data/operation-bookings";
+import { deleteBooking, type OperationBooking } from "@/lib/data/operation-bookings";
 import { listAssignees, type AssigneeOption } from "@/lib/data/operation-assign";
 import { readHotelConfirmation, saveHotelConfirmation, type HotelRead } from "@/lib/data/wizard-tickets";
 import { getSupplierConfirmationUrl } from "@/lib/data/supplier-work";
 import { refreshSupplierBooking } from "@/lib/data/supplier-booking";
-import { hotelBookings, isFinal, roomLines } from "@/lib/operations/wizard/hotels";
+import { hotelBookings, hotelOverlaps, isFinal, roomLines } from "@/lib/operations/wizard/hotels";
 import { notPulled } from "@/lib/operations/wizard/pull";
 import type { StepProps } from "@/lib/operations/wizard/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
@@ -32,6 +32,7 @@ export function HotelsStep({ data }: StepProps) {
   const hotels = hotelBookings(data);
   const operationId = data.operation.id;
   const filed = new Set((data.supplierWork?.bookings ?? []).filter((b) => b.has_confirmation).map((b) => b.booking_id));
+  const overlaps = hotelOverlaps(hotels);
   const [adding, setAdding] = useState(false);
   // «ينفّذه»: who each hotel can be handed to — loaded once for the step
   const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
@@ -71,7 +72,15 @@ export function HotelsStep({ data }: StepProps) {
       {hotels.length > 0 ? (
         <ul className="grid gap-3">
           {hotels.map((b) => (
-            <HotelCard key={b.id} booking={b} hasFile={filed.has(b.id)} assignees={assignees} readsImages={data.readsImages ?? true} />
+            <HotelCard
+              key={b.id}
+              booking={b}
+              hasFile={filed.has(b.id)}
+              assignees={assignees}
+              partnerId={data.operation.partner_id}
+              overlaps={overlaps.get(b.id) ?? []}
+              readsImages={data.readsImages ?? true}
+            />
           ))}
         </ul>
       ) : notPulled(data, "hotel") ? (
@@ -89,11 +98,17 @@ function HotelCard({
   booking,
   hasFile,
   assignees,
+  partnerId,
+  overlaps,
   readsImages,
 }: {
   booking: OperationBooking;
   hasFile: boolean;
   assignees: AssigneeOption[];
+  /** the file's partner company (offers.partner_company_id) — the only one «ينفّذه» offers. */
+  partnerId: string | null;
+  /** the other hotels holding one of its nights (hotels.ts hotelOverlaps). */
+  overlaps: Pick<OperationBooking, "title" | "start_date" | "end_date">[];
   readsImages: boolean;
 }) {
   const { t } = useTraveliunUI();
@@ -153,6 +168,18 @@ function HotelCard({
     });
   }
 
+  // «عرض الكل»'s rule: what a supplier holds is cancelled there, never deleted (the server refuses it too)
+  const held = booking.status === "confirmed" || booking.status === "in_flight";
+  function remove() {
+    startTransition(async () => {
+      if (!window.confirm(t("ops.booking.deleteAsk", { title: booking.title }))) return;
+      setError(null);
+      const res = await deleteBooking(booking.id);
+      if (!res.ok) return setError(t(res.error));
+      router.refresh();
+    });
+  }
+
   function openFile() {
     startTransition(async () => {
       const res = await getSupplierConfirmationUrl(booking.id);
@@ -177,13 +204,40 @@ function HotelCard({
             {t("wz.hotels.ourRef")}: <DirText>{booking.company_ref ?? "—"}</DirText>
           </p>
         </div>
-        <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${done ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#fff4e0] text-[#a86a10]"}`}>
-          {done ? t("wz.hotels.final") : t("wz.hotels.waiting")}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${done ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#fff4e0] text-[#a86a10]"}`}>
+            {done ? t("wz.hotels.final") : t("wz.hotels.waiting")}
+          </span>
+          {held ? null : (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={remove}
+              aria-label={t("delete")}
+              className="inline-flex size-8 items-center justify-center rounded-[8px] border border-[#f2c7c7] text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
+      {overlaps.length > 0 ? (
+        <div className="mt-2 grid gap-0.5 rounded-[10px] border border-[#f1dfb8] bg-[#fff8ea] px-3 py-2 text-[11.5px] font-semibold text-[#7a4e0c]">
+          <p className="flex items-center gap-1.5 font-bold text-[#a86a10]">
+            <AlertTriangle className="size-3.5" />
+            {t("wz.hotels.overlap")}
+          </p>
+          {overlaps.map((o, i) => (
+            <p key={i} className="break-words">
+              {o.title} · <DirText className="tv-tnum">{`${o.start_date ?? "—"} → ${o.end_date ?? "—"}`}</DirText>
+            </p>
+          ))}
+        </div>
+      ) : null}
+
       {/* «ينفّذه» — who books this hotel, and the request to them (as on «عرض الكل») */}
-      <AssignBooking booking={booking} operationId={booking.operation_id} assignees={assignees} onDone={() => undefined} />
+      <AssignBooking booking={booking} operationId={booking.operation_id} assignees={assignees} partnerId={partnerId} onDone={() => undefined} />
 
       {done && !form ? (
         <div className="mt-2 grid gap-1.5 text-[12px] font-semibold text-[#185045]">

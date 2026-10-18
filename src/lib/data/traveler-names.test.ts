@@ -161,6 +161,24 @@ describe("a passport read names the traveller (upsertTraveler → savedName)", (
   });
 });
 
+describe("a passport typed by hand is checked on the server (AD-2-3599)", () => {
+  it("refuses a birth date in the future and an Arabic passport number, and saves nothing", async () => {
+    const before = { ...traveler("t1") };
+    expect(await upsertTraveler({ id: "t1", operation_id: "op1", display_name: "", birth_date: "2999-01-01" })).toEqual({ ok: false, error: "ops.trav.err.birthFuture" });
+    expect(await upsertTraveler({ id: "t1", operation_id: "op1", display_name: "", passport: { ...passport, number: "سش" } })).toEqual({
+      ok: false,
+      error: "ops.trav.err.passportNo",
+    });
+    expect(traveler("t1")).toEqual(before);
+  });
+
+  it("stores the number as checked: upper case, no spaces", async () => {
+    const { decryptJson } = await import("@/lib/crypto/secrets");
+    expect((await upsertTraveler({ id: "t1", operation_id: "op1", display_name: "", passport: { ...passport, number: "a12 345 67" } })).ok).toBe(true);
+    expect(decryptJson<{ number: string }>(traveler("t1").passport_encrypted as string)?.number).toBe("A1234567");
+  });
+});
+
 describe("every paper and message prints the passport's name, never the contact name", () => {
   const issued = () => state.tables.operation_documents.at(-1)!.snapshot_json as VoucherDTO;
 

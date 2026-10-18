@@ -86,7 +86,17 @@ export const readyLabel = (i: ReadinessItem) => `wz.ready.${i.step}.${i.key}` as
 export type StepTone = "red" | "yellow" | "green" | "grey";
 
 export function stepTone(state: StepState, items: ReadinessItem[]): StepTone {
-  if (items.some((i) => !i.ok && !i.optional)) return "red";
+  if (items.some((i) => itemTone(i) === "red")) return "red";
   if (items.some((i) => !i.ok) || state === "todo" || state === "waiting") return "yellow";
   return state === "na" ? "grey" : "green";
+}
+
+/**
+ * Each item under a tile in its OWN colour (the owner, 2026-10-18: a done
+ * «رابط الرحلة للعميل» printed in the tile's red read as missing): green done,
+ * yellow an optional item missing or a warning, red a mandatory one missing.
+ * The tile itself still takes its worst mandatory item (stepTone).
+ */
+export function itemTone(i: ReadinessItem): Exclude<StepTone, "grey"> {
+  return i.ok ? "green" : i.optional ? "yellow" : "red";
 }

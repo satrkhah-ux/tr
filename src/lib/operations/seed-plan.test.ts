@@ -4,6 +4,7 @@ import { BOARD_AR } from "@/components/offer-doc/labels";
 import { addCity, withTours } from "@/lib/offer/basic";
 import {
   ARRIVAL_DAY_TOUR,
+  DEPARTURE_DAY_TOUR,
   FAREWELL_UNSOLD,
   LATER,
   newBookings,
@@ -393,9 +394,22 @@ describe("the pull on AD-2-3599 — the owner's evaluation (2026-10-18)", () => 
     expect(tours.map((t) => [t.start_date, t.detail[DRV.start], t.detail[NOTICE] ?? null])).toEqual([
       ["2026-10-07", LATER, ARRIVAL_DAY_TOUR],
       ["2026-10-08", "09:00", null],
-      // «جولة قبل المغادرة» on the day home is no arrival day
-      ["2026-10-18", "09:00", null],
+      // «جولة قبل المغادرة» on the day home: no 09:00 either while the take-off is unknown
+      ["2026-10-18", LATER, DEPARTURE_DAY_TOUR],
     ]);
+  });
+
+  it("ends a tour on the day home four hours before a known take-off — earlier than 09:00 if it must, else «يُحدَّد لاحقاً»", () => {
+    const home = (departure_at: string) => {
+      const data = bali({ flights: [{}, { flight_no: "GA880", departure_at }] });
+      return planBookingsFromDraft(data, "").filter((r) => r.origin_ref.startsWith("tour:")).at(-1)!;
+    };
+    const late = home("2026-10-18T22:00");
+    expect([late.start_date, late.detail[DRV.start], late.detail[NOTICE]]).toEqual(["2026-10-18", "09:00", DEPARTURE_DAY_TOUR]);
+    // 15:30 take-off: back by 11:30, so off at 07:30
+    expect(home("2026-10-18T15:30").detail[DRV.start]).toBe("07:30");
+    // 13:00: it would have to leave at 05:00
+    expect(home("2026-10-18T13:00").detail[DRV.start]).toBe(LATER);
   });
 
   it("sets it off three hours after a known landing", () => {

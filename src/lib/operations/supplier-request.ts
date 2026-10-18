@@ -11,6 +11,7 @@
  * Pure: no React, no Supabase.
  */
 
+import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { shownDetail } from "./voucher-dto";
 
 export type RequestLang = "ar" | "en";
@@ -33,6 +34,52 @@ const CATEGORY: Record<SupplierBookingKind, string> = {
 export function suppliersFor<T extends { categories?: string | null }>(list: T[], kind: SupplierBookingKind): T[] {
   const matching = list.filter((s) => !(s.categories ?? "").trim() || (s.categories ?? "").includes(CATEGORY[kind]));
   return matching.length > 0 ? matching : list;
+}
+
+/** A property's own word before its name — «فندق نوفوتيل جاكرتا», «فلل الرمان», «منتجع وسبا بسيونا علم». */
+const PROPERTY = /^(?:فندق|منتجع|فيلا|فيلات|فلل|شاليه|شاليهات|نزل)\s+/u;
+
+/**
+ * A supplier that IS one hotel: it sells hotels only and is named as a property
+ * (the old system listed hotels it paid directly as suppliers). It books its
+ * own rooms and nobody else's.
+ */
+const isProperty = (s: { label: string; categories?: string | null }) => (s.categories ?? "").trim() === CATEGORY.hotel && PROPERTY.test(s.label.trim());
+
+/** The booking is of that very hotel: «فندق نوفوتيل جاكرتا» for «نوفوتيل جاكرتا - غرفة مزدوجة». */
+function namesProperty(property: string, title: string): boolean {
+  const core = (s: string) => normalizeName(s.split(/\s[-–—]\s/)[0].replace(PROPERTY, ""));
+  const [p, t] = [core(property), core(title)];
+  return p.length >= 3 && t.length >= 3 && (t.includes(p) || p.includes(t));
+}
+
+export type AssigneeLike = { kind: "ops" | "employee" | "partner" | "supplier"; id: string | null; label: string; categories?: string | null };
+
+/**
+ * «ينفّذه» — who a booking can be handed to (the owner, AD-2-3599: one hotel
+ * offered ~49 names, hotels among them). Only what fits its kind:
+ *   - «قسم العمليات» and the colleagues, always;
+ *   - our suppliers that sell the kind (company_suppliers.categories, suppliersFor),
+ *     a supplier that is itself a hotel only for a booking of that hotel;
+ *   - a partner company only on its own file (offers.partner_company_id).
+ * Whoever holds it now (`holder`, «kind:id») stays listed, fitting or not.
+ */
+export function assigneesFor<T extends AssigneeLike>(
+  list: T[],
+  booking: { kind: SupplierBookingKind; title: string },
+  holder: string | null,
+  filePartnerId: string | null,
+): T[] {
+  const suppliers = list.filter((a) => a.kind === "supplier" && !(isProperty(a) && !namesProperty(a.label, booking.title)));
+  const sellers = new Set(suppliersFor(suppliers, booking.kind));
+  return list.filter(
+    (a) =>
+      a.kind === "ops" ||
+      a.kind === "employee" ||
+      (a.kind === "partner" && a.id !== null && a.id === filePartnerId) ||
+      sellers.has(a) ||
+      `${a.kind}:${a.id ?? ""}` === holder,
+  );
 }
 
 // ---------- the request ----------

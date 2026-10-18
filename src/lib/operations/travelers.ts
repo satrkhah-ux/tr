@@ -56,6 +56,40 @@ export function ageOn(birth: string | null, on: string): number | null {
   return `${d[2]}${d[3]}` < `${b[2]}${b[3]}` ? years - 1 : years;
 }
 
+/** A real calendar day «YYYY-MM-DD» — not 2026-02-30, which the database would refuse after the form let it by. */
+export function isCalendarDate(s: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return false;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.toISOString().slice(0, 10) === s;
+}
+
+/** Nobody travelling was born before this — a year typed as 0199 or 1026 is a typo, not a guest. */
+export const OLDEST_BIRTH = "1900-01-01";
+
+/** A passport number as stored: upper case, the spaces a person types between groups gone. */
+export const passportNumber = (s: string) => s.replace(/\s+/g, "").toUpperCase();
+
+export type TravelerInputError = "date" | "birthFuture" | "birthOld" | "passportNo";
+
+/**
+ * What a person typed for a passport, checked before it is saved — on the
+ * server (upsertTraveler) and the same in the form (AD-2-3599: a birth date of
+ * 2026-10-30 was taken, the age on the travel day came out -1 and the traveller
+ * became «رضيع»; «سش» was taken as a passport number). null = fine. The number
+ * is checked as passportNumber writes it: Latin letters and digits only.
+ */
+export function travelerInputError(
+  input: { birth_date?: string | null; passport_expiry?: string | null; number?: string | null },
+  today: string,
+): TravelerInputError | null {
+  if ([input.birth_date, input.passport_expiry].some((d) => d && !isCalendarDate(d))) return "date";
+  if (input.birth_date && input.birth_date > today) return "birthFuture";
+  if (input.birth_date && input.birth_date < OLDEST_BIRTH) return "birthOld";
+  if (input.number != null && input.number.trim() && !/^[A-Z0-9]+$/.test(passportNumber(input.number))) return "passportNo";
+  return null;
+}
+
 /** The generator's bands (AGE_BANDS): an infant is under 2, a child 2–11. */
 export function kindForAge(age: number): TravelerKind {
   return age < 2 ? "infant" : age < 12 ? "child" : "adult";
