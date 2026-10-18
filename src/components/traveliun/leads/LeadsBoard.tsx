@@ -62,6 +62,88 @@ function timing(l: Lead, now: number) {
   };
 }
 
+/** a turn's span in epoch seconds */
+const secs = (from: number, to: number) => span((to - from) * 1000);
+
+/** «مسار المحادثة»: each agent's turn — how long to answer, how long before handing it on */
+function Turns({ l, now }: { l: Lead; now: number }) {
+  if (!l.handoffs?.length) return <span className="text-[#93aaa3]">—</span>;
+  return (
+    <ol className="space-y-0.5 text-[11px] font-semibold leading-5" suppressHydrationWarning>
+      {l.handoffs.map((s, i) => (
+        <li key={i} className="whitespace-nowrap">
+          <b className="text-[#003c3a]">{s.agent}</b>
+          {": "}
+          {s.reply ? (
+            <span className="text-[#185045]">ردّ بعد {secs(s.from, s.reply)}</span>
+          ) : l.status === "open" && s.handed == null ? (
+            <span className="text-[#a86a10]">لم يردّ — منذ {secs(s.from, now / 1000)}</span>
+          ) : (
+            <span className="text-[#93aaa3]">لم يردّ</span>
+          )}
+          {s.handed ? <span className="text-[#557d78]"> · أسندها بعد {secs(s.from, s.handed)}</span> : null}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * «أداء الموظفين» (the owner, 2026-10-18): per agent, over the chosen range —
+ * the conversations that reached them, how long they took to answer, and how
+ * long before they handed one on.
+ */
+function Performance({ rows }: { rows: Lead[] }) {
+  const per = new Map<string, { agent: string; received: number; replies: number[]; handed: number[]; waiting: number }>();
+  for (const l of rows) {
+    for (const s of l.handoffs ?? []) {
+      const p = per.get(fold(s.agent)) ?? { agent: s.agent, received: 0, replies: [], handed: [], waiting: 0 };
+      p.received += 1;
+      if (s.reply) p.replies.push(s.reply - s.from);
+      else if (l.status === "open" && s.handed == null) p.waiting += 1;
+      if (s.handed) p.handed.push(s.handed - s.from);
+      per.set(fold(s.agent), p);
+    }
+  }
+  const avg = (xs: number[]) => (xs.length ? span((xs.reduce((a, b) => a + b, 0) / xs.length) * 1000) : "—");
+  const list = [...per.values()].sort((a, b) => b.received - a.received);
+  return (
+    <div className="mt-3 overflow-x-auto rounded-[12px] border border-[#e3ece8]">
+      <table className="w-full min-w-[640px] text-start text-[12px]">
+        <thead className="bg-[#f8fbfa] text-[11px] font-extrabold text-[#78948f]">
+          <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-start">
+            <th>الموظف</th>
+            <th>وصلته</th>
+            <th>متوسط وقت الرد</th>
+            <th>لم يردّ بعد</th>
+            <th>أسندها لغيره</th>
+            <th>متوسط الوقت حتى الإسناد</th>
+          </tr>
+        </thead>
+        <tbody>
+          {list.length === 0 ? (
+            <tr>
+              <td colSpan={6} className="px-3 py-4 text-center font-semibold text-[#93aaa3]">
+                لا بيانات بعد — يُقرأ مسار كل محادثة من Teletel مع السحب
+              </td>
+            </tr>
+          ) : null}
+          {list.map((p) => (
+            <tr key={p.agent} className="border-t border-[#eef3f1] font-semibold text-[#185045] [&>td]:px-3 [&>td]:py-1.5">
+              <td className="font-extrabold text-[#003c3a]">{p.agent}</td>
+              <td className="tv-tnum">{p.received}</td>
+              <td>{avg(p.replies)}</td>
+              <td className={`tv-tnum ${p.waiting ? "text-[#a86a10]" : ""}`}>{p.waiting}</td>
+              <td className="tv-tnum">{p.handed.length}</td>
+              <td>{avg(p.handed)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function Timing({ value }: { value: { text: string; waiting: boolean } }) {
   return (
     <span suppressHydrationWarning className={`block whitespace-nowrap font-semibold ${value.waiting ? "text-[#a86a10]" : "text-[#185045]"}`}>
@@ -325,6 +407,11 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
               ))}
             </div>
           </div>
+          <h3 className="mt-4 text-[13px] font-extrabold text-[#003c3a]">أداء الموظفين</h3>
+          <p className="text-[11px] font-semibold text-[#93aaa3]">
+            لكل موظف: كم محادثة وصلته، وكم احتاج حتى ردّ عليها، وكم احتاج حتى أسندها لغيره — من سجل الإسناد في Teletel، للمدة المختارة أعلاه.
+          </p>
+          <Performance rows={inRange} />
           <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">
             {live ? "يوم المحادثة يوم بدئها في واتساب" : "يوم المحادثة يوم وصولها إلى النظام (الشيت لا يحمل تاريخاً)"}، والدولة من البرنامج المصدَر إن وُجد وإلا من خانة الدولة.
           </p>
@@ -406,7 +493,7 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
             onPointerUp={() => (drag.current = null)}
             onPointerLeave={() => (drag.current = null)}
           >
-            <table className="w-full min-w-[2400px] border-separate border-spacing-y-1 text-start text-[12px]">
+            <table className="w-full min-w-[2650px] border-separate border-spacing-y-1 text-start text-[12px]">
               <thead className="sticky top-0 z-20 bg-white text-[10.5px] font-extrabold text-[#78948f]">
                 <tr className="[&>th]:px-2 [&>th]:py-1 [&>th]:text-start">
                   {/* the owner's order (2026-10-18); the three times are computed, never typed */}
@@ -419,6 +506,7 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
                   <th>{HEADERS.assigned_to}</th>
                   <th title="من أول رسالة للعميل حتى إسنادها لشخص آخر">كم احتاجت حتى أُسندت</th>
                   <th title="من الإسناد حتى أول رد من الشخص المُسنَد إليه">كم الوقت حتى استلمها الشخص الآخر</th>
+                  <th title="كل موظف وصلته المحادثة بالترتيب: متى ردّ ومتى أسندها">مسار المحادثة</th>
                   <th>ماذا أُرسل للعميل؟</th>
                   <th>ماذا تم للعميل</th>
                   <th>{HEADERS.status}</th>
@@ -473,6 +561,7 @@ export function LeadsBoard({ leads, team, meId, pullError, twoWay, live }: Leads
                       </td>
                       <td className="w-32"><Timing value={times.toAssign} /></td>
                       <td className="w-36"><Timing value={times.assigneeReply} /></td>
+                      <td className="min-w-[14rem]"><Turns l={l} now={now} /></td>
                       <td className="w-40">
                         <select value={l.sent_status ?? ""} onChange={(e) => save(l, { sent_status: e.target.value })} className={CELL}>
                           <option value="">لم يُرسل شيء</option>

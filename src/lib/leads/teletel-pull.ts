@@ -1,8 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { conversationEvents, conversationThread, listOpenConversations, type OpenConversation } from "@/lib/providers/teletel";
-import { assignedAtFrom, classifyInquiry, delayText, findPlace, replyAfter, type Place } from "./auto";
-import { matchEmployee, normalizePhone } from "./sheet";
+import { conversationEvents, conversationThread, listOpenConversations, listTeletelTeams, type OpenConversation } from "@/lib/providers/teletel";
+import { classifyInquiry, delayText, findPlace, timelineFrom, type Place } from "./auto";
+import { fold, matchEmployee, normalizePhone } from "./sheet";
 
 /**
  * «العملاء» phase two (the owner, 2026-10-17: «كل شيء تلقائي، خاصة اسم العميل»):
@@ -10,15 +10,15 @@ import { matchEmployee, normalizePhone } from "./sheet";
  * its Teletel id, with nobody typing anything —
  *
  *  · the client's name and phone as Teletel holds them;
- *  · the agent holding it (received_by when it arrives; assigned_to once it
- *    moves to someone else);
+ *  · who received it first and every hand-over after (handoffs, 0099): its
+ *    history read from Teletel's «تم إسنادها إلى …» lines and the replies;
  *  · its real date (Teletel's created_at — the sheet never had one);
  *  · «تأخير المحادثة» from its clock; the kind and the place from its labels
  *    and the client's words (auto.ts), only while nobody has set them;
  *  · closed once it is no longer open in Teletel (resolved there);
  *  · the times «العملاء» computes its timing columns from (0098): the
- *    client's first message, our first reply, the hand-over to another
- *    agent (its activity line in the thread) and that agent's first reply.
+ *    client's first message, our first reply, the first hand-over and that
+ *    agent's first reply (from the turns).
  *
  * A sheet row for the same phone is taken over rather than counted twice.
  * Reads the SLA board's copy of the open list (listOpenConversations: kept in
@@ -31,8 +31,10 @@ export type TeletelPullResult = { read: number; added: number; updated: number; 
 const threadRead = new Set<number>();
 /** how many threads one run reads: two requests each, so a backlog of 600 is cleared in under an hour of 5-minute runs */
 const THREADS_PER_RUN = 40;
-/** hand-overs whose time or reply is looked up in the thread, a run */
-const HANDOVERS_PER_RUN = 20;
+/** conversations whose turns are read again, a run — the ones something happened in, latest first */
+const TIMELINES_PER_RUN = 15;
+// ponytail: ten pages (200 messages) back; a longer conversation's first receiver is the earliest turn those pages hold
+const TIMELINE_PAGES = 10;
 
 const iso = (sec: number) => new Date(sec * 1000).toISOString();
 
@@ -53,6 +55,7 @@ type Known = {
   assigned_at: string | null;
   assignee_reply_at: string | null;
   contact_id: number | null;
+  timeline_seen_at: number | null;
 };
 
 /** an agent's Teletel name to an employee — by the Arabic name, else the English */
@@ -100,7 +103,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
     // ponytail: every Teletel row and every unmatched sheet row in one read; a date window when it grows past tens of thousands
     supabase
       .from("client_leads")
-      .select("id, phone, name, inquiry, destination, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id")
+      .select("id, phone, name, inquiry, destination, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at")
       .or("teletel_conversation_id.not.is.null,and(source.eq.sheet,teletel_conversation_id.is.null)")
       .limit(20000),
   ]);
@@ -113,8 +116,8 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
   const updates: [string, Record<string, unknown>][] = [];
   // what each conversation is classified as after this run — the ones still vague get their thread read below
   const vague: { c: OpenConversation; inquiry: string | null; destination: string | null }[] = [];
-  // handed over and not yet answered by the new agent: the thread says when, and when they replied
-  const handovers: { id: string; c: OpenConversation; since: number; fresh: boolean; byName: string | null }[] = [];
+  // something happened since their turns were last read: read them again
+  const timelines: OpenConversation[] = [];
   for (const c of open) {
     const phone = normalizePhone(c.phone);
     const holder = employeeFor(c.assignee, team);
@@ -130,18 +133,9 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       if (!had.name && clientName(c)) patch.name = clientName(c);
       if (!had.inquiry) patch.inquiry = classifyInquiry(c.labels, c.preview) || null;
       if (!had.destination) patch.destination = findPlace(c.labels, c.preview, places) || null;
-      if (!had.received_by && holder) patch.received_by = holder;
-      // moved to someone else in Teletel: that is the hand-over — stamped now, its activity line refines it below
-      if (had.received_by && holder && holder !== had.received_by) patch.assigned_to = holder;
-      const handedNow = patch.assigned_to !== undefined && patch.assigned_to !== had.assigned_to;
-      if (handedNow) {
-        patch.assigned_at = iso(nowSec);
-        patch.assignee_reply_at = null;
-        handovers.push({ id: had.id, c, since: nowSec, fresh: true, byName: c.assignee });
-      } else if (had.assigned_at && !had.assignee_reply_at && nowSec - Date.parse(had.assigned_at) / 1000 < 3 * 86400) {
-        // the Teletel name is the reply's sender only when the hand-over was Teletel's own
-        handovers.push({ id: had.id, c, since: Math.floor(Date.parse(had.assigned_at) / 1000), fresh: false, byName: had.assigned_to === holder ? c.assignee : null });
-      }
+      // until its turns are read, the one holding it stands in as the receiver
+      if (!had.received_by && holder && had.timeline_seen_at == null) patch.received_by = holder;
+      if (Number(had.timeline_seen_at) !== c.lastActivityAt) timelines.push(c);
       // the clock's own times, written once
       if (!had.first_message_at && c.createdAt) patch.first_message_at = iso(c.createdAt);
       if (!had.first_reply_at && c.firstReplyAt) patch.first_reply_at = iso(c.firstReplyAt);
@@ -169,6 +163,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
         first_reply_at: c.firstReplyAt ? iso(c.firstReplyAt) : null,
         contact_id: c.contactId,
       });
+      timelines.push(c);
       const row = fresh[fresh.length - 1] as { inquiry: string | null; destination: string | null };
       if (!row.inquiry || row.inquiry === "يستفسر" || !row.destination) vague.push({ c, inquiry: row.inquiry, destination: row.destination });
     }
@@ -206,27 +201,32 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
     );
   }
 
-  // the hand-overs: when (the thread's activity line naming the new agent) and their first reply since
-  const toTrace = [...handovers.filter((h) => h.fresh), ...handovers.filter((h) => !h.fresh)].slice(0, HANDOVERS_PER_RUN);
-  for (let i = 0; i < toTrace.length; i += 5) {
-    await Promise.all(
-      toTrace.slice(i, i + 5).map(async (h) => {
-        const events = await conversationEvents(h.c.id);
-        if (!events) return;
-        const patch: Record<string, unknown> = {};
-        let since = h.since;
-        if (h.fresh) {
-          const at = assignedAtFrom(events, h.c.assignee, nowSec);
-          if (at && at !== since) {
-            patch.assigned_at = iso(at);
-            since = at;
+  // the turns (the owner, 2026-10-18): who received it first, how long each agent took to answer and to
+  // hand it on — read from the history whenever something happened, the latest first
+  const toTrace = timelines.sort((a, b) => b.lastActivityAt - a.lastActivityAt).slice(0, TIMELINES_PER_RUN);
+  if (toTrace.length) {
+    const teams = new Set((await listTeletelTeams()).map((t) => fold(t.name)));
+    const isTeam = (name: string) => name.trim().startsWith("قسم") || teams.has(fold(name));
+    for (let i = 0; i < toTrace.length; i += 5) {
+      await Promise.all(
+        toTrace.slice(i, i + 5).map(async (c) => {
+          const events = await conversationEvents(c.id, TIMELINE_PAGES);
+          if (!events) return;
+          const stages = timelineFrom(events, c.createdAt, isTeam);
+          const [first, second] = stages;
+          const patch: Record<string, unknown> = { handoffs: stages, timeline_seen_at: c.lastActivityAt };
+          // «الموظف المستلم» is the first to receive it, never whoever holds it now
+          if (first) Object.assign(patch, { received_by: employeeFor(first.agent, team), received_by_name: first.agent });
+          // the first hand-over, for the columns that time it
+          if (second) {
+            Object.assign(patch, { assigned_at: iso(second.from), assignee_reply_at: second.reply ? iso(second.reply) : null });
+            const to = employeeFor(second.agent, team);
+            if (to) patch.assigned_to = to;
           }
-        }
-        const reply = replyAfter(events, since, h.byName);
-        if (reply) patch.assignee_reply_at = iso(reply);
-        if (Object.keys(patch).length) await supabase.from("client_leads").update(patch).eq("id", h.id);
-      }),
-    );
+          await supabase.from("client_leads").update(patch).eq("teletel_conversation_id", c.id);
+        }),
+      );
+    }
   }
 
   // resolved in Teletel: no longer in the (complete) open list
