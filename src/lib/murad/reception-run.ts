@@ -36,6 +36,9 @@ import {
 
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 
+/** how far back «this visit» reaches: a colleague's answer, or a reception, older than this belongs to an earlier one */
+const VISIT_SEC = 12 * 3600;
+
 export type IncomingMessage = { conversationId: number; messageId: number; at: number; phone: string; contactName: string; content: string };
 
 export type ReceptionOutcome =
@@ -117,20 +120,24 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
   try {
     const [thread, past, places] = await Promise.all([
       readThread(m.conversationId),
-      service.from("murad_log").select("mode, reason, reply_message_id").eq("conversation_id", m.conversationId),
+      service.from("murad_log").select("mode, reason, reply_message_id, created_at").eq("conversation_id", m.conversationId),
       loadPlaces(service),
     ]);
     if (!thread) {
       await finish({ reason: "unreadable", error: "teletel: the thread could not be read" });
       return "unreadable";
     }
-    const rows = (past.data ?? []) as { mode: string; reason: string | null; reply_message_id: number | null }[];
+    const rows = (past.data ?? []) as { mode: string; reason: string | null; reply_message_id: number | null; created_at: string }[];
+    // this visit, not the conversation's whole life: WhatsApp reopens the same conversation when a client writes
+    // again days later — a reception or a colleague's answer from back then is not this time's
+    const thisVisit = (sec: number) => m.at - sec < VISIT_SEC;
+    const received = rows.filter((r) => r.mode === "reception" && thisVisit(Date.parse(r.created_at) / 1000));
     const ours = new Set(rows.filter((r) => r.reply_message_id != null).map((r) => Number(r.reply_message_id)));
     const request = readRequest(m.content, places);
     const decision = decideReception({
-      routed: rows.some((r) => r.mode === "reception" && r.reason?.startsWith("routed")),
-      asked: rows.some((r) => r.mode === "reception" && r.reason === "asked"),
-      staffReplied: thread.messages.some((t) => isHumanReply(t, ours)),
+      routed: received.some((r) => r.reason?.startsWith("routed")),
+      asked: received.some((r) => r.reason === "asked"),
+      staffReplied: thread.messages.some((t) => thisVisit(t.at) && isHumanReply(t, ours)),
       canReply: thread.canReply,
       request,
     });
@@ -201,18 +208,25 @@ export async function receptionToday(): Promise<{ routed: number; asked: number;
 
 /**
  * The minute job's fallback for what the webhook missed (not registered yet, a
- * restart, Teletel retrying late): a conversation opened in the last half hour,
- * in scope, with no reception turn yet — its latest client message is received
- * as if it had just arrived. Five a run; the claim keeps it to once.
+ * restart, Teletel retrying late): a conversation in scope whose client has
+ * waited on us under half an hour (a new one, or one the client reopened) and
+ * no reception turn in that half hour — its latest client message is received
+ * as if it had just arrived; receive() decides, its claim keeps it to once.
  */
 export async function receptionSweep(): Promise<number> {
   const service = db();
   const [flags, settings, reception, list] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service), listOpenConversations()]);
   if (!flags.murad_reception || !list) return 0;
   const nowSec = Math.floor(Date.now() / 1000);
-  const fresh = list.rows.filter((c) => nowSec - c.createdAt < 1800 && (reception.scope === "all" || settings.autoList.includes(intlPhone(c.phone) ?? "")));
+  // a client waiting on us for under half an hour — a new conversation, or an old one the client reopened
+  const fresh = list.rows.filter((c) => c.waitingSince > 0 && nowSec - c.waitingSince < 1800 && (reception.scope === "all" || settings.autoList.includes(intlPhone(c.phone) ?? "")));
   if (!fresh.length) return 0;
-  const { data } = await service.from("murad_log").select("conversation_id").eq("mode", "reception").in("conversation_id", fresh.map((c) => c.id));
+  const { data } = await service
+    .from("murad_log")
+    .select("conversation_id")
+    .eq("mode", "reception")
+    .in("conversation_id", fresh.map((c) => c.id))
+    .gte("created_at", new Date((nowSec - 1800) * 1000).toISOString());
   const seen = new Set(((data ?? []) as { conversation_id: number }[]).map((r) => Number(r.conversation_id)));
   let n = 0;
   for (const c of fresh.filter((x) => !seen.has(x.id)).slice(0, 5)) {
