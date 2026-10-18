@@ -141,6 +141,8 @@ export type AuditAction =
   | "feature.toggled"
   // the programme sent to its client by the employee («أرسل إلى العميل عبر واتساب», or «أرسلته يدوياً»)
   | "offer.client_sent"
+  // Murad's «عرض آلي» taken over by the first colleague to answer the client (teletel-pull claimAutoFile)
+  | "offer.claimed"
   // «إلغاء الملف» from Basic, before any booking or payment
   | "offer.cancelled"
   // Basic's «حذف» — the draft as it was kept in meta (file-status.ts deleteFiles)

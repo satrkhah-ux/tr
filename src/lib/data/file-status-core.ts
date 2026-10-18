@@ -100,9 +100,9 @@ export async function loadFileStatus(serial: string): Promise<FileStatusDetail |
   if (!offer) return null;
   // the operation, the trail, the versions and the offer's own audit rows side by side;
   // only the operation's audit rows wait for its id
-  const AUDITED = [SENT_ACTION, "operation.cancelled", "operation.client_status", "operation.execution_status"];
+  const AUDITED = [SENT_ACTION, "offer.claimed", "operation.cancelled", "operation.client_status", "operation.execution_status"];
   const auditsOf = (ids: string[]) =>
-    service.from("audit_logs").select("action, meta, created_at, actor_id").in("entity_id", ids).in("action", AUDITED).order("created_at", { ascending: false }).limit(60);
+    service.from("audit_logs").select("action, meta, created_at, actor_id, actor_email").in("entity_id", ids).in("action", AUDITED).order("created_at", { ascending: false }).limit(60);
   const [opRes, historyRes, rendersRes, offerAudits] = await Promise.all([
     service.from("operations").select("id, offer_id, client_status, execution_status").eq("offer_id", offer.id).maybeSingle(),
     service.from("offer_status_history").select("to_status, note, created_at, changed_by").eq("offer_id", offer.id),
@@ -115,14 +115,14 @@ export async function loadFileStatus(serial: string): Promise<FileStatusDetail |
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, 60);
   const history = (historyRes.data ?? []) as { to_status: string; note: string | null; created_at: string; changed_by: string | null }[];
-  const audits = (auditData ?? []) as { action: string; meta: Record<string, unknown> | null; created_at: string; actor_id: string | null }[];
+  const audits = (auditData ?? []) as { action: string; meta: Record<string, unknown> | null; created_at: string; actor_id: string | null; actor_email: string | null }[];
   // the people, by name
   const renders = (rendersRes.data ?? []) as { version: number; rendered_at: string; rendered_by: string | null }[];
   const people = [...new Set([...history.map((h) => h.changed_by), ...audits.map((a) => a.actor_id), ...renders.map((r) => r.rendered_by)].filter((x): x is string => Boolean(x)))];
   const { data: names } = people.length ? await service.from("employees").select("id, arabic_name").in("id", people) : { data: [] };
   const nameOf = new Map(((names ?? []) as { id: string; arabic_name: string | null }[]).map((e) => [e.id, e.arabic_name]));
   const historyRows: HistoryRow[] = history.map((h) => ({ to_status: h.to_status, note: h.note, created_at: h.created_at, by: h.changed_by ? (nameOf.get(h.changed_by) ?? null) : null }));
-  const auditRows: AuditRow[] = audits.map((a) => ({ action: a.action, meta: a.meta, created_at: a.created_at, by: a.actor_id ? (nameOf.get(a.actor_id) ?? null) : null }));
+  const auditRows: AuditRow[] = audits.map((a) => ({ action: a.action, meta: a.meta, created_at: a.created_at, by: a.actor_id ? (nameOf.get(a.actor_id) ?? null) : a.actor_email }));
   const version = Math.max(0, ...renders.map((r) => r.version)) || null;
   const sentVersion = lastSentVersion(auditRows);
   const facts = { serial: offer.serial, offerStatus: offer.status, validUntil: offer.valid_until, sentVersion, version, issuedAt: offer.created_at, op: operation, today: riyadhToday() };

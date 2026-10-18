@@ -81,3 +81,16 @@ describe("canCancelFile — only before operations hold the file", () => {
     expect(canCancelFile({ partner: false, hasCase: false, state: "cancelled" })).toBe("already");
   });
 });
+
+describe("«عرض آلي» in the file's history", () => {
+  it("Murad's send carries his name, and the colleague who took it over is a line of its own", () => {
+    const line = fileTimeline(
+      [],
+      [
+        { action: "offer.client_sent", meta: { result: "sent", version: 1 }, created_at: "2026-10-19T00:01:00Z", by: "مُراد (آلي)" },
+        { action: "offer.claimed", meta: { serial: "AD-1" }, created_at: "2026-10-19T00:20:00Z", by: "محمد" },
+      ],
+    );
+    expect(line.map((e) => `${e.key}:${e.by}`)).toEqual(["claimed:محمد", "sent:مُراد (آلي)"]);
+  });
+});

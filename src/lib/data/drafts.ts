@@ -147,7 +147,8 @@ export async function listDrafts(): Promise<DraftSummary[]> {
           updated_at: row.updated_at,
           created_at: row.created_at,
           created_by: row.created_by,
-          created_by_name: row.maker?.arabic_name ?? null,
+          // Murad's «عرض آلي» is his until a colleague answers the client (teletel-pull claimAutoFile)
+          created_by_name: row.maker?.arabic_name ?? (draft.source?.code === "murad" ? "مُراد" : null),
           country: draft.trip.country || null,
           services: (["hotels", "flights_intl", "flights_domestic", "transport", "visas"] as const).filter((k) => draft.scope[k]),
         };

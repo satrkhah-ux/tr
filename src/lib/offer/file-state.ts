@@ -82,7 +82,7 @@ export function canCancelFile(f: { partner: boolean; hasCase: boolean; state: Fi
 /** One line of the file's history. `key` is a Basic label; `status` names a track's state. */
 export type TimelineEntry = {
   at: string;
-  key: "issued" | "reissued" | "sent" | "sentTemplate" | "sentManual" | "sentWindow" | "sentFailed" | "confirmed" | "cancelled" | "client" | "execution";
+  key: "issued" | "reissued" | "sent" | "sentTemplate" | "sentManual" | "sentWindow" | "sentFailed" | "claimed" | "confirmed" | "cancelled" | "client" | "execution";
   by: string | null;
   version?: number | null;
   status?: string | null;
@@ -116,7 +116,8 @@ export function fileTimeline(history: HistoryRow[], audits: AuditRow[], renders:
       const key =
         result === "sent" ? "sent" : result === "template" ? "sentTemplate" : result === "manual" ? "sentManual" : result === "window" ? "sentWindow" : "sentFailed";
       out.push({ at: a.created_at, key, by: a.by, version });
-    } else if (a.action === "operation.client_status") out.push({ at: a.created_at, key: "client", by: a.by, status: String(m.to ?? m.status ?? "") || null });
+    } else if (a.action === "offer.claimed") out.push({ at: a.created_at, key: "claimed", by: a.by });
+    else if (a.action === "operation.client_status") out.push({ at: a.created_at, key: "client", by: a.by, status: String(m.to ?? m.status ?? "") || null });
     else if (a.action === "operation.execution_status") out.push({ at: a.created_at, key: "execution", by: a.by, status: String(m.to ?? m.status ?? "") || null });
   }
   return out.sort((a, b) => b.at.localeCompare(a.at));

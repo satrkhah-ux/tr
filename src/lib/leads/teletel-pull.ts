@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { conversationEvents, conversationThread, listOpenConversations, listTeletelTeams, type OpenConversation } from "@/lib/providers/teletel";
 import { classifyInquiry, delayText, findPlace, timelineFrom, type Place } from "./auto";
 import { fold, matchEmployee, normalizePhone } from "./sheet";
+import { logAudit } from "@/lib/data/audit";
 
 /**
  * «العملاء» phase two (the owner, 2026-10-17: «كل شيء تلقائي، خاصة اسم العميل»):
@@ -59,6 +60,8 @@ type Known = {
   auto_routed_at: string | null;
   created_at: string;
   last_visit_at: string | null;
+  /** «عرض آلي»: the Basic file Murad made for this conversation */
+  draft_id: string | null;
 };
 
 /** an agent's Teletel name to an employee — by the Arabic name, else the English */
@@ -106,7 +109,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
     // ponytail: every Teletel row and every unmatched sheet row in one read; a date window when it grows past tens of thousands
     supabase
       .from("client_leads")
-      .select("id, phone, name, inquiry, destination, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at, auto_routed_at, created_at, last_visit_at")
+      .select("id, phone, name, inquiry, destination, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at, auto_routed_at, created_at, last_visit_at, draft_id")
       .or("teletel_conversation_id.not.is.null,and(source.eq.sheet,teletel_conversation_id.is.null)")
       .limit(20000),
   ]);
@@ -234,8 +237,11 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
           const routedAt = byConversation.get(c.id)?.auto_routed_at;
           // handed over by «المستقبل الآلي» the moment it came: that is the hand-over, and the first colleague to answer receives it
           if (routedAt) {
-            const reply = stages.find((s) => s.reply && s.reply >= Date.parse(routedAt) / 1000)?.reply;
-            if (reply) patch.assignee_reply_at = iso(reply);
+            const answer = stages.find((s) => s.reply && s.reply >= Date.parse(routedAt) / 1000);
+            if (answer?.reply) patch.assignee_reply_at = iso(answer.reply);
+            const owner = answer ? employeeFor(answer.agent, team) : null;
+            const draftId = byConversation.get(c.id)?.draft_id;
+            if (owner && draftId) await claimAutoFile(supabase, draftId, owner, answer!.agent);
           } else if (second) {
             Object.assign(patch, { assigned_at: iso(second.from), assignee_reply_at: second.reply ? iso(second.reply) : null });
             const to = employeeFor(second.agent, team);
@@ -255,4 +261,26 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
     result.closed = gone.length;
   }
   return result;
+}
+
+/**
+ * Murad's «عرض آلي» becomes the file of the first colleague to answer the
+ * client after him — their «ملفاتي», their commission, their name on the
+ * offer — with «استلمه من مُراد» in its history (the evaluator, 2026-10-19).
+ * Once: only a file and an offer still nobody's are taken; a partner's never.
+ */
+async function claimAutoFile(supabase: SupabaseClient, draftId: string, employeeId: string, name: string): Promise<void> {
+  const { data } = await supabase
+    .from("offer_drafts")
+    .update({ created_by: employeeId })
+    .eq("id", draftId)
+    .is("created_by", null)
+    .is("partner_company_id", null)
+    .select("data")
+    .maybeSingle();
+  const serial = (data as { data: { produced_serial?: string | null } } | null)?.data?.produced_serial;
+  if (!serial) return;
+  const { data: offer } = await supabase.from("offers").update({ employee_id: employeeId }).eq("serial", serial).is("employee_id", null).select("id").maybeSingle();
+  const offerId = (offer as { id: string } | null)?.id;
+  if (offerId) await logAudit({ action: "offer.claimed", entity: "offers", entity_id: offerId, meta: { serial, from: "murad" }, actor: { id: employeeId, label: name } });
 }
