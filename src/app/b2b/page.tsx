@@ -7,7 +7,7 @@ import { getPartnerSession, isStaffSession } from "@/lib/partners/session";
 import { describeTerms } from "@/lib/partners/pricing";
 import { currentCanOpen } from "@/lib/roles/current";
 import { AlmatarPortal } from "@/components/traveliun/almatar/AlmatarPortal";
-import { getAlmatarSession, listPartnerBookings, listServices } from "@/lib/almatar/server";
+import { getAlmatarSession, listMessages, listPartnerBookings, listServices } from "@/lib/almatar/server";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +32,12 @@ export default async function B2BPage() {
   // a transport-only partner («المطار», 0100) books its transport here and sees nothing else
   const transport = await getAlmatarSession();
   if (transport) {
-    const [services, bookings] = await Promise.all([listServices(false), listPartnerBookings(transport.partner_id)]);
-    return <AlmatarPortal session={transport} services={services} bookings={bookings} />;
+    const [services, bookings, messages] = await Promise.all([
+      listServices(false),
+      listPartnerBookings(transport.partner_id),
+      listMessages(transport.partner_id, "partner"),
+    ]);
+    return <AlmatarPortal session={transport} services={services} bookings={bookings} messages={messages} />;
   }
 
   const partner = await getPartnerSession();

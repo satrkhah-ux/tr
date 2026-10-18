@@ -2,10 +2,11 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Car, Check, FileText, KeyRound, TriangleAlert, X } from "lucide-react";
-import { confirmAlmatarBooking, createAlmatarLogin, rejectAlmatarBooking, setAlmatarMargin } from "@/lib/almatar/actions";
+import { Car, Check, FileText, KeyRound, MessageSquare, TriangleAlert, X } from "lucide-react";
+import { confirmAlmatarBooking, createAlmatarLogin, rejectAlmatarBooking, replyAlmatarMessage, setAlmatarMargin } from "@/lib/almatar/actions";
 import { LOGIN_DOMAIN, passwordProblem, REQUEST_KINDS, STATUS_LABEL, vehicleLabel } from "@/lib/almatar/rules";
-import type { AlmatarService, AlmatarStaffBooking } from "@/lib/almatar/server";
+import type { AlmatarMessage, AlmatarService, AlmatarStaffBooking } from "@/lib/almatar/server";
+import { AlmatarThread } from "./AlmatarThread";
 import { TraveliunShell } from "../TraveliunShell";
 import { card, danger, field, primary, sar, secondary, Stat, td, th } from "../commissions/ui";
 
@@ -25,6 +26,7 @@ export function AlmatarAdmin({
   canConfirm,
   canAdmin,
   hasCompany,
+  messages,
 }: {
   services: AlmatarService[];
   bookings: AlmatarStaffBooking[];
@@ -33,6 +35,7 @@ export function AlmatarAdmin({
   canConfirm: boolean;
   canAdmin: boolean;
   hasCompany: boolean;
+  messages: AlmatarMessage[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -40,6 +43,7 @@ export function AlmatarAdmin({
   // the login form answers under its own button — the page notice sits a screen above it
   const [loginMsg, setLoginMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const byId = new Map(services.map((s) => [s.id, s]));
+  const unread = messages.filter((m) => m.sender === "partner" && !m.read_at).length;
   const live = bookings.filter((b) => b.status === "confirmed");
   const run = (job: () => Promise<{ ok: boolean; message?: string }>, done = "تم.") =>
     start(async () => {
@@ -214,6 +218,17 @@ export function AlmatarAdmin({
               </table>
             </div>
           )}
+        </section>
+
+        {/* «مخاطبة المورد» on Almatar's side: its thread with us (0102) */}
+        <section className={card}>
+          <h2 className="flex items-center gap-2 text-base font-extrabold text-[#003c3a]">
+            <MessageSquare className="size-4" /> رسائل المطار
+            {unread ? <span className="rounded-full bg-[#c22850] px-2 text-[11px] text-white">{unread} جديدة</span> : null}
+          </h2>
+          <div className="mt-3">
+            <AlmatarThread messages={messages} me="staff" theirName="المطار" send={(body) => replyAlmatarMessage(body)} mine="bg-[#185045] text-white" />
+          </div>
         </section>
 
         <section className={card}>

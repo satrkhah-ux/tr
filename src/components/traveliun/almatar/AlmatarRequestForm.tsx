@@ -22,6 +22,12 @@ const PLACES: Record<LineKind, [string, string]> = {
 
 let nextKey = 1;
 
+/** The opening line: an arrival, its service picked when the country has only one. */
+function firstArrival(services: AlmatarService[], country: string): Line {
+  const options = services.filter((s) => s.country_code === country && s.kind === "arrival");
+  return { key: nextKey++, kind: "arrival", service_id: options.length === 1 ? options[0].id : "", date: "", time: "", flight_no: "", pickup: "", dropoff: "" };
+}
+
 /**
  * «حجز جديد» — one request, several services (the owner, 2026-10-18): the kind
  * lays the lines out (arrival, departure, both, tours, transfers, a program from
@@ -32,8 +38,9 @@ export function AlmatarRequestForm({ services, onDone }: { services: AlmatarServ
   const [pending, start] = useTransition();
   const countries = useMemo(() => [...new Map(services.map((s) => [s.country_code, s.country_ar])).entries()], [services]);
   const [country, setCountry] = useState(countries[0]?.[0] ?? "");
-  const [kind, setKind] = useState("");
-  const [lines, setLines] = useState<Line[]>([]);
+  // the form opens ready (the owner, 2026-10-18): «استقبال» picked, its line laid out
+  const [kind, setKind] = useState("arrival");
+  const [lines, setLines] = useState<Line[]>(() => [firstArrival(services, countries[0]?.[0] ?? "")]);
   const [vehicle, setVehicle] = useState<Vehicle>("small");
   const [units, setUnits] = useState(1);
   const [from, setFrom] = useState("");
@@ -94,8 +101,8 @@ export function AlmatarRequestForm({ services, onDone }: { services: AlmatarServ
         });
         if (!r.ok) return setError(r.message ?? "تعذّر حفظ الحجز.");
         form.reset();
-        setKind("");
-        setLines([]);
+        setKind("arrival");
+        setLines([newLine("arrival")]);
         setUnits(1);
         setFrom("");
         setTo("");
@@ -115,7 +122,15 @@ export function AlmatarRequestForm({ services, onDone }: { services: AlmatarServ
         طلب واحد بعدة خدمات. كل خدمة تُحجز قبل 24 ساعة على الأقل من وقتها بتوقيت الوجهة. الأسعار بالريال السعودي، صافية، وسارية حتى ديسمبر 2027.
       </p>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,180px)_1fr]">
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <label className={label}>
+          اسم العميل
+          <input className={field} name="lead_name" maxLength={120} />
+        </label>
+        <label className={label}>
+          رقم العميل
+          <input className={field} name="lead_phone" type="tel" dir="ltr" maxLength={40} placeholder="+9665…" />
+        </label>
         <label className={label}>
           الدولة
           <select className={field} value={country} onChange={(e) => pickCountry(e.target.value)}>
@@ -126,8 +141,8 @@ export function AlmatarRequestForm({ services, onDone }: { services: AlmatarServ
             ))}
           </select>
         </label>
-        <div className="grid gap-1.5">
-          <span className="text-[12px] font-bold text-[#46455a]">نوع الحجز</span>
+        <div className="grid gap-1.5 sm:col-span-3">
+          <span className="text-[12px] font-bold text-[#46455a]">نوع الخدمة</span>
           <div className="flex flex-wrap gap-2">
             {REQUEST_KINDS.map((k) => (
               <button
@@ -252,15 +267,7 @@ export function AlmatarRequestForm({ services, onDone }: { services: AlmatarServ
               عدد الركاب
               <input className={field} name="passengers" type="number" min={1} defaultValue={1} dir="ltr" />
             </label>
-            <label className={label}>
-              اسم العميل
-              <input className={field} name="lead_name" maxLength={120} />
-            </label>
-            <label className={label}>
-              جوال العميل
-              <input className={field} name="lead_phone" type="tel" dir="ltr" maxLength={40} />
-            </label>
-            <label className={`${label} sm:col-span-2 lg:col-span-4`}>
+            <label className={`${label} sm:col-span-2`}>
               ملاحظات
               <textarea className={`${field} h-auto min-h-[56px] py-2`} name="notes" maxLength={1000} />
             </label>

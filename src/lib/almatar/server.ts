@@ -145,3 +145,24 @@ export async function listAlmatarLogins(partnerId: string): Promise<{ email: str
   const { data } = await db().from("partner_users").select("email, status, created_at").eq("partner_id", partnerId).order("created_at");
   return (data ?? []) as { email: string; status: string; created_at: string }[];
 }
+
+export type AlmatarMessage = { id: string; sender: "partner" | "staff"; body: string; request_ref: string | null; read_at: string | null; created_at: string };
+
+/**
+ * «مخاطبة المورد» (0102) — the thread with one partner, oldest first. `reader`
+ * marks the OTHER side's messages read: opening the thread is reading it.
+ */
+export async function listMessages(partnerId: string, reader: "partner" | "staff"): Promise<AlmatarMessage[]> {
+  const { data } = await db()
+    .from("almatar_messages")
+    .select("id, sender, body, request_ref, read_at, created_at")
+    .eq("partner_id", partnerId)
+    .order("created_at")
+    .limit(500);
+  const rows = (data ?? []) as AlmatarMessage[];
+  const other = reader === "partner" ? "staff" : "partner";
+  if (rows.some((m) => m.sender === other && !m.read_at)) {
+    await db().from("almatar_messages").update({ read_at: new Date().toISOString() }).eq("partner_id", partnerId).eq("sender", other).is("read_at", null);
+  }
+  return rows;
+}

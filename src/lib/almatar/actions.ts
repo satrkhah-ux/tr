@@ -149,7 +149,36 @@ export async function cancelAlmatarBooking(id: string): Promise<Result> {
   }
 }
 
+/** «مخاطبة المورد»: Almatar writes to us (0102). */
+export async function sendAlmatarMessage(body: string, requestRef?: string): Promise<Result> {
+  const session = await getAlmatarSession();
+  if (!session) return { ok: false, message: "انتهت الجلسة — سجّل الدخول مجدداً." };
+  const text = clean(body, 2000);
+  if (!text) return { ok: false, message: "اكتب الرسالة." };
+  const { error } = await db()
+    .from("almatar_messages")
+    .insert({ partner_id: session.partner_id, sender: "partner", body: text, request_ref: clean(requestRef, 40), author_user: session.user_id });
+  if (error) return { ok: false, message: "تعذّر الإرسال." };
+  revalidatePath("/b2b");
+  return { ok: true };
+}
+
 // ------------------------------------------------------------------- staff ----
+
+/** Our answer in Almatar's thread. */
+export async function replyAlmatarMessage(body: string): Promise<Result> {
+  if (!(await currentCan("operations.write")) && !(await currentCan("settings.manage"))) return { ok: false, message: "غير مصرّح لك بهذا الإجراء." };
+  const text = clean(body, 2000);
+  if (!text) return { ok: false, message: "اكتب الرد." };
+  const company = await getAlmatarCompany();
+  if (!company) return { ok: false, message: "شركة المطار غير موجودة." };
+  const { error } = await db()
+    .from("almatar_messages")
+    .insert({ partner_id: company.id, sender: "staff", body: text, author_employee: await getCurrentEmployeeId() });
+  if (error) return { ok: false, message: "تعذّر الإرسال." };
+  revalidatePath("/almatar-bookings");
+  return { ok: true };
+}
 
 /** Confirm a pending booking: what the voucher prints (driver, car, phone) and its link. */
 export async function confirmAlmatarBooking(id: string, driverInfo: string): Promise<Result> {
