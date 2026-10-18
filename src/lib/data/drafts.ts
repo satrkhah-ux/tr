@@ -67,7 +67,6 @@ import {
   type InsertDraftResult,
   type SaveDraftResult,
 } from "./draft-store";
-import { checkHotelIssueGuard } from "./quality-actions";
 
 /**
  * Package-generator drafts. One row per draft; each stage page auto-saves its
@@ -819,8 +818,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // A partner cannot read our supplier list, so it is not asked to name one.
     const validation = validateDraft(data, { partnerFile: issuer !== null });
     if (!validation.ok) return { ok: false, error: "pg.err.blockingLeft" };
-    // a hotel printed with a Latin «Arabic» name or no city is not issued (data order 11.1; a partner is only warned)
-    if ((await checkHotelIssueGuard(data.hotels)).issues.some((i) => i.blocking)) return { ok: false, error: "data.quality.guard.blocked" };
+    // a hotel's record never stops the issue (the owner, 2026-10-18) — IssueGuardNotice only warns
 
     // PreBook re-validation: a supplier rate must still be valid at CONFIRM time.
     // Never freeze/publish a rate whose validity has lapsed since selection.

@@ -9,9 +9,9 @@ import { useSafeTransition } from "./useSafeTransition";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
 /**
- * «حارس الإصدار» (data order 11.1) on the issue screens: a catalogue hotel whose
- * printed name is Latin, or that has no city, blocks the offer; one without an
- * address or phone is flagged for the voucher. Each line links to the record
+ * «حارس الإصدار» (data order 11.1) on the issue screens — a WARNING only since
+ * the owner's order of 2026-10-18: a Latin printed name, no city, no address or
+ * phone are listed, and the offer is issued all the same. Each line links to the record
  * (new tab — the draft stays open) and is checked again when the agent comes
  * back to this tab.
  */

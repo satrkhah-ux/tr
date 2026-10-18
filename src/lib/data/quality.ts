@@ -119,8 +119,11 @@ export function guardHotels(
     seen.add(record.id);
     const name = (line.hotel_name ?? "").trim() || (record.arabic_name ?? "");
     const add = (problem: GuardProblem, blocking: boolean) => out.push({ hotelId: record.id, name, problem, blocking });
-    if (!hasArabicLetter(name)) add("latin_name", true);
-    if (!record.city_id) add("no_city", true);
+    // nothing about a hotel's record stops an issue (the owner, 2026-10-18: «جعلنا بالإجبار نغيّر
+    // الفندق، وهذا الإجراء مرفوض») — a Latin name prints as it is, and the address and phone
+    // come with the hotel's confirmation in operations. Warnings only.
+    if (!hasArabicLetter(name)) add("latin_name", false);
+    if (!record.city_id) add("no_city", false);
     if (blank(record.address)) add("no_address", false);
     if (blank(record.contact_number)) add("no_phone", false);
   }

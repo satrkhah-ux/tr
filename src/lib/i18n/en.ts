@@ -1161,7 +1161,7 @@ export const en = {
   "data.quality.problem.no_phone": "No phone",
   "data.quality.guard.title": "Hotel data before issuing",
   "data.quality.guard.blocked": "The offer cannot be issued: a hotel's Arabic name is Latin, or it has no city. Fix the record, then pick the hotel again.",
-  "data.quality.guard.voucher": "Missing for the voucher",
+  "data.quality.guard.voucher": "A warning only, issuing goes ahead — completed from the hotel's confirmation in operations; a hotel without an Arabic name prints in English:",
   "data.quality.guard.reselect": "After fixing the name, pick the hotel again in the draft so the new name prints.",
   "data.quality.guard.askData": "Ask the data team to fix the record.",
   "data.quality.weekly.title": "📊 Weekly data-quality summary (and the change since last week)",

@@ -46,14 +46,14 @@ describe("hasArabicLetter", () => {
 const ok = { id: "h1", arabic_name: "فندق", city_id: "c1", stars: 4, address: "x", contact_number: "1" };
 
 describe("guardHotels", () => {
-  it("blocks a Latin printed name and a missing city, warns on contact", () => {
+  it("warns — never blocks — on a Latin printed name, a missing city and contact (the owner, 2026-10-18)", () => {
     const issues = guardHotels(
       [{ hotel_id: "h1", hotel_name: "Hilton" }],
       [{ ...ok, city_id: null, address: "", contact_number: null }],
     );
     expect(issues.map((i) => [i.problem, i.blocking])).toEqual([
-      ["latin_name", true],
-      ["no_city", true],
+      ["latin_name", false],
+      ["no_city", false],
       ["no_address", false],
       ["no_phone", false],
     ]);

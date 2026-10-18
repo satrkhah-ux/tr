@@ -140,6 +140,19 @@ describe("deriveHotelStays — after, same, custom", () => {
     expect(hotelCoverage(cities, added.hotels)[0]).toMatchObject({ needed: 5, covered: 5, extra: 0 });
   });
 
+  it("«فندق آخر ← بعده» keeps the first stay's per-night rate (the owner, 2026-10-18: 546.67 jumped to 1,202.67)", () => {
+    const cities = [city("كوالالمبور", 11, "2026-10-07")];
+    const priced = { ...line({ hotel_name: "A" }), manual_price: 6013.37 };
+    const a = { ...priced, rooms: priced.rooms.map((r) => ({ ...r, price: 6013.37 })) };
+    const { hotels } = addStay(cities, [a], 0, "after");
+    const [first] = deriveHotelStays(cities, hotels);
+    const kept = hotels.find((h) => h.id === a.id)!;
+    expect(first.nights).toBeGreaterThan(0);
+    expect(first.nights).toBeLessThan(11);
+    expect(Math.round((kept.rooms[0].price! / first.nights) * 100) / 100).toBeCloseTo(546.67, 1);
+    expect(Math.round((kept.manual_price! / first.nights) * 100) / 100).toBeCloseTo(546.67, 1);
+  });
+
   it("A two rooms and B one on the same dates (acceptance ب): 4/4, not 8/4", () => {
     const cities = [city("كوالالمبور", 4, "2026-10-20")];
     const a = resizeRooms(line({ hotel_name: "A", refundable: false }), 2);

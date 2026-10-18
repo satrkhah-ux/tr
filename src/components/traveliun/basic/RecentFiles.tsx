@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Copy, FolderOpen, History, Loader2, Search, Settings2, Trash2 } from "lucide-react";
+import { Copy, History, Loader2, Pencil, Search, Settings2, Trash2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import type { DraftSummary } from "@/lib/data/drafts";
@@ -34,7 +34,7 @@ const select = "h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12
  * 1640px, where the client's name still has room beside the buttons (body zoom
  * 1.12); below, a row stacks: its details on one line, the buttons under them
  */
-const COLS = "min-[1640px]:grid-cols-[minmax(0,1fr)_9.5rem_7.5rem_8.5rem_10rem_28rem]";
+const COLS = "min-[1640px]:grid-cols-[minmax(0,1fr)_9.5rem_7.5rem_8.5rem_10rem_31rem]";
 const PRIMARY = "inline-flex h-8 w-[7.5rem] items-center justify-center rounded-[8px] text-[11.5px] font-bold";
 const ICON = "inline-flex size-8 shrink-0 items-center justify-center rounded-[8px] border border-[#cfe0d9] bg-white text-[#185045] hover:bg-[#f4f8f6]";
 const DANGER_ICON = "inline-flex size-8 shrink-0 items-center justify-center rounded-[8px] border border-[#f2c9d4] bg-white text-[#c22850] hover:bg-[#fdf3f6] disabled:opacity-35";
@@ -429,12 +429,18 @@ export function RecentFiles({
                             ) : (
                               <span className="hidden w-[7.5rem] min-[1640px]:block" aria-hidden />
                             )}
+                            {/* an issued or confirmed file is edited here — said in words, not a folder icon (the owner, 2026-10-18) */}
                             {d.produced_serial ? (
-                              <Link href={`/basic/${d.id}`} title={tx("openFile")} aria-label={tx("openFile")} className={ICON}>
-                                <FolderOpen className="size-4" />
+                              <Link
+                                href={`/basic/${d.id}`}
+                                title={tx("openFile")}
+                                className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
+                              >
+                                <Pencil className="size-3.5" />
+                                {tx("editFile")}
                               </Link>
                             ) : (
-                              <span className="hidden size-8 min-[1640px]:block" aria-hidden />
+                              <span className="hidden h-8 w-[4.75rem] min-[1640px]:block" aria-hidden />
                             )}
                             {d.produced_serial && meId ? (
                               <button

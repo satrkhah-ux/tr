@@ -1159,7 +1159,7 @@ export const ar: Dictionary = {
   "data.quality.problem.no_phone": "بلا هاتف",
   "data.quality.guard.title": "بيانات الفنادق قبل الإصدار",
   "data.quality.guard.blocked": "لا يصدر العرض: فندق اسمه العربي لاتيني أو بلا مدينة. أصلح السجل ثم أعد اختيار الفندق.",
-  "data.quality.guard.voucher": "ينقص الفاوتشر",
+  "data.quality.guard.voucher": "تنبيه فقط، لا يمنع الإصدار — تكتمل من تأكيد الفندق في العمليات، وما لا اسم عربي له يُطبع بالإنجليزي:",
   "data.quality.guard.reselect": "بعد تصحيح الاسم أعد اختيار الفندق في المسودة ليُطبع الاسم الجديد.",
   "data.quality.guard.askData": "اطلب من فريق البيانات تصحيح السجل.",
   "data.quality.weekly.title": "📊 ملخص جودة البيانات الأسبوعي (والتغيّر عن الأسبوع الماضي)",
