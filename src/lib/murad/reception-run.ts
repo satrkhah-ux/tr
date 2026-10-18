@@ -274,8 +274,17 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     }
     const rows = (past.data ?? []) as { mode: string; reason: string | null; reply_message_id: number | null; created_at: string; intake: { country?: string | null } | null }[];
     // this visit, not the conversation's whole life: WhatsApp reopens the same conversation when a client writes
-    // again days later — a reception or a colleague's answer from back then is not this time's
-    const thisVisit = (sec: number) => m.at - sec < VISIT_SEC;
+    // again — a reception or a colleague's answer from back then is not this time's. A conversation closed
+    // (resolved) before this message starts a new visit here and now (the owner, 2026-10-18: «لكي يكون طلباً
+    // جديداً كاملاً»); an open one reaches back 12 hours, never before the visit it is in.
+    const { data: leadRow } = await service.from("client_leads").select("id, status, last_visit_at").eq("teletel_conversation_id", m.conversationId).maybeSingle();
+    const lead = leadRow as { id: string; status: string; last_visit_at: string | null } | null;
+    let visitStart = Math.max(m.at - VISIT_SEC, lead?.last_visit_at ? Date.parse(lead.last_visit_at) / 1000 : 0);
+    if (lead?.status === "closed") {
+      visitStart = since;
+      await service.from("client_leads").update({ status: "open", last_visit_at: new Date(since * 1000).toISOString(), updated_at: new Date().toISOString() }).eq("id", lead.id);
+    }
+    const thisVisit = (sec: number) => sec >= visitStart - 1;
     const received = rows.filter((r) => r.mode === "reception" && thisVisit(Date.parse(r.created_at) / 1000));
     const ours = new Set(rows.filter((r) => r.reply_message_id != null).map((r) => Number(r.reply_message_id)));
     // everything the client wrote while Murad waited, read as one («ابغى» … «تأشيرة» … «الى لندن»)
