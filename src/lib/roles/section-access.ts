@@ -75,6 +75,11 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   ["/operations/profitability", "operations.write"],
   ["/operations/suppliers", "operations.write"],
   ["/operations", ["operations.write", "operations.own"]],
+  // «العمولات» (0092): the month for everyone and its policy are the administration's;
+  // «عمولتي» is each holder's own — listed before /commissions, the first match wins
+  ["/commissions/cycles", ["commissions.manage", "commissions.approve"]],
+  ["/commissions/policy", ["commissions.manage", "commissions.approve"]],
+  ["/commissions", ["commissions.view", "commissions.manage", "commissions.approve"]],
   // «المطوّر»: service switches and external links' health
   ["/developer", "developer.access"],
   // «SLA»: the administration and the developer only (the owner, 2026-10-17);

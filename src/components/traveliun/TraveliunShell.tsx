@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   BarChart3,
   Building2,
+  BadgePercent,
   Calculator,
   ChevronDown,
   Pin,
@@ -186,6 +187,8 @@ export const navGroups: NavGroup[] = [
   // lives in all day. No `perm` of its own — section-access.ts opens it to
   // operations.write (every file) or operations.own (the files you issued).
   { labelKey: "nav.operations", href: "/operations", icon: ClipboardCheck },
+  // «العمولات» — each employee's own commission; the month and the policy inside (section-access.ts)
+  { labelKey: "nav.commissions", href: "/commissions", icon: BadgePercent },
 
   // ---------- «قسم البيانات» — the reference tables the generator reads ----------
   {

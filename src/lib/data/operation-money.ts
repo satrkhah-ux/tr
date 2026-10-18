@@ -112,11 +112,12 @@ type BookingRow = {
   origin_ref: string | null;
 };
 
-type FlowRow = { operation_id: string; amount: number; currency: string; kind: string };
+type FlowRow = { operation_id: string; amount: number; currency: string; kind: string; paid_at?: string | null };
 type InvoiceRow = { offer_id: string; partner_id: string; amount: number; currency: string; issued_at: string };
 
-type LoadedCase = {
+export type LoadedCase = {
   id: string;
+  client_status: string;
   offer_id: string | null;
   serial: string;
   destination: string | null;
@@ -133,10 +134,12 @@ type LoadedCase = {
   installments: Installment[];
   /** net client payments, all currencies — what PaymentsPanel settles its schedule with. */
   paid: number;
+  /** the Riyadh day of the client's last payment (refunds aside); null = none yet. */
+  last_paid_on: string | null;
 };
 
 /** Every case (or one), with the money facts the pure functions need. */
-async function loadCases(db: SupabaseClient, operationId?: string): Promise<LoadedCase[]> {
+export async function loadCases(db: SupabaseClient, operationId?: string): Promise<LoadedCase[]> {
   const ops = await paged<OpRow>((from, to) => {
     let q = db
       .from("operations")
@@ -152,7 +155,7 @@ async function loadCases(db: SupabaseClient, operationId?: string): Promise<Load
   const ids = ops.map((o) => o.id);
   const offerIds = ops.map((o) => one(o.offers)?.id).filter((x): x is string => !!x);
   const [payments, installments, bookings, supplierPays, pricings, items, invoices] = await Promise.all([
-    rowsIn<FlowRow>(db, "operation_payments", "id, operation_id, amount, currency, kind", "operation_id", ids),
+    rowsIn<FlowRow>(db, "operation_payments", "id, operation_id, amount, currency, kind, paid_at", "operation_id", ids),
     rowsIn<{ operation_id: string; due_date: string; amount: number }>(db, "operation_installments", "id, operation_id, due_date, amount", "operation_id", ids),
     rowsIn<BookingRow>(
       db,
@@ -222,8 +225,14 @@ async function loadCases(db: SupabaseClient, operationId?: string): Promise<Load
     const clientPayments = (paysBy.get(op.id) ?? []).map(flow);
     const confirmedOn = riyadhDate(op.confirmed_at);
 
+    const lastPaid = (paysBy.get(op.id) ?? [])
+      .filter((p) => p.kind !== "refund" && p.paid_at)
+      .reduce<string | null>((max, p) => (max && max > p.paid_at! ? max : p.paid_at!.slice(0, 10)), null);
+
     return {
       id: op.id,
+      client_status: op.client_status,
+      last_paid_on: lastPaid,
       offer_id: offer?.id ?? null,
       serial: offer?.serial ?? "",
       destination: offer?.destination ?? null,

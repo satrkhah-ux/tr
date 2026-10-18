@@ -82,6 +82,12 @@ export const ALL_PERMISSIONS = [
    * supplier accounts) stays operations.write.
    */
   "operations.manage_own",
+  /** «عمولتي»: your own commission — your paid-in-full files, their profit, your share (0092). */
+  "commissions.view",
+  /** run the month's commission cycle: calculate, adjust with a reason, send for approval. */
+  "commissions.manage",
+  /** approve and pay a cycle, approve the commission policy (never one you edited yourself). */
+  "commissions.approve",
   /** «مطوّر»: the developer page — external links' health, and turning system services on and off. */
   "developer.access",
 ] as const;
@@ -183,6 +189,14 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     items: [
       { key: "data.write", kind: "do" },
       { key: "settings.manage", kind: "do" },
+    ],
+  },
+  {
+    key: "perm.group.commissions",
+    items: [
+      { key: "commissions.view", kind: "view" },
+      { key: "commissions.manage", kind: "do", sensitive: true },
+      { key: "commissions.approve", kind: "do", sensitive: true },
     ],
   },
   {
