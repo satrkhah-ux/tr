@@ -10,10 +10,12 @@ import {
   issuePartnerAccount,
   partnerDocumentUrl,
   resendPartnerPasswordLink,
+  setPartnerPassword,
   setPartnerStatus,
 } from "@/lib/partners/registration";
 import { DOCUMENT_LABEL, type PartnerDocumentKind } from "@/lib/partners/registration-form";
 import { describeTerms } from "@/lib/partners/pricing";
+import { loginName, passwordProblem } from "@/lib/auth/password-rule";
 
 /**
  * Companies that asked to work with us, and the one screen that decides.
@@ -141,16 +143,21 @@ function PendingRow({ company }: { company: PartnerCompany }) {
 /**
  * Issuing the login, for a company already approved.
  *
- * No password is generated here or anywhere: Supabase sends a set-your-password
- * link and the only person who ever knows it is the one who chooses it.
+ * Normally Supabase sends a set-your-password link and the only person who ever
+ * knows it is the one who chooses it. When that mail never arrives (the owner,
+ * 2026-10-19), «كلمة مرور مؤقتة» sets one the administration hands over, which
+ * the company must change at its first sign-in. Nothing generates it, and it is
+ * cleared from this screen once set.
  */
 export function IssueAccount({ company }: { company: PartnerCompany }) {
   const [pending, startTransition] = useTransition();
   const [email, setEmail] = useState(company.contact_email ?? company.email ?? "");
   const [message, setMessage] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [temp, setTemp] = useState<string | null>(null);
 
   if (company.status !== "approved") return null;
+  const weak = temp ? passwordProblem(temp, loginName(email)) : null;
 
   return (
     <div className="mt-2 flex flex-wrap items-end gap-2 rounded-[10px] border border-[#e2ebe7] bg-[#f8fbf9] p-2.5">
@@ -200,6 +207,62 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
         إعادة إرسال كلمة المرور
       </button>
       ) : null}
+
+      {/* the mail never came: a password the administration hands over, changed at the first sign-in */}
+      {temp === null ? (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            setTemp("");
+            setMessage(null);
+          }}
+          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045] disabled:opacity-60"
+        >
+          <KeyRound className="size-3.5" />
+          كلمة مرور مؤقتة
+        </button>
+      ) : (
+        <span className="flex basis-full flex-wrap items-end gap-2">
+          <label className="grid min-w-52 flex-1 gap-1 text-[11px] font-bold text-[#185045]">
+            كلمة المرور المؤقتة (10 أحرف على الأقل، حروف وأرقام)
+            <input
+              dir="ltr"
+              value={temp}
+              onChange={(e) => setTemp(e.target.value)}
+              autoComplete="new-password"
+              spellCheck={false}
+              className={`${field} text-start`}
+            />
+          </label>
+          <button
+            type="button"
+            disabled={pending || !temp || Boolean(weak)}
+            title={weak ?? undefined}
+            onClick={() =>
+              startTransition(async () => {
+                setDone(false);
+                const res = await setPartnerPassword({ partner_id: company.id, email, password: temp });
+                if (res.ok) {
+                  setDone(true);
+                  setTemp(null);
+                  setMessage(
+                    `${res.created ? "أُنشئ حساب الشركة" : "عُيّنت كلمة المرور"} — أعطِ الشركة البريد وكلمة المرور، وتدخل من صفحة تسجيل الدخول، وسيُطلب منها تغييرها عند أول دخول.`,
+                  );
+                } else setMessage(res.message);
+              })
+            }
+            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+          >
+            {pending ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
+            {company.has_account ? "تعيين كلمة المرور" : "إصدار الحساب بكلمة المرور"}
+          </button>
+          <button type="button" onClick={() => setTemp(null)} className="h-9 px-2 text-[12px] font-bold text-[#557d78]">
+            إلغاء
+          </button>
+          {temp && weak ? <span className="basis-full text-[11px] font-bold text-[#a86a10]">{weak}</span> : null}
+        </span>
+      )}
 
       {message ? (
         <p className={`basis-full text-[11.5px] font-bold ${done ? "text-[#0f7a52]" : "text-[#c22850]"}`}>{message}</p>

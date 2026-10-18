@@ -6,8 +6,10 @@ import { DirText } from "@/components/DirText";
 import {
   issueEmployeeAccount,
   listEmployeeAccounts,
+  setEmployeePassword,
   type EmployeeAccount,
 } from "@/lib/data/employee-accounts";
+import { loginName, passwordProblem } from "@/lib/auth/password-rule";
 import { useRole } from "@/lib/roles/RoleContext";
 import { TraveliunShell } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
@@ -21,8 +23,9 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
  * remember to write the auth id back onto the employee.
  *
  * This screen is the join, stated. It shows the state per person and issues the
- * missing half in one press. Nobody types a password for anybody: the invitation
- * lets them set their own, and we never see it.
+ * missing half in one press. The invitation lets them set their own password;
+ * when it never arrives (the owner, 2026-10-19) «كلمة مرور مؤقتة» sets one to
+ * hand over, which they must change at their first sign-in.
  */
 export function EmployeeAccounts() {
   const { t, language } = useTraveliunUI();
@@ -33,6 +36,8 @@ export function EmployeeAccounts() {
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  /** the row whose temporary password is being typed, and what is typed */
+  const [temp, setTemp] = useState<{ id: string; value: string } | null>(null);
 
   async function load() {
     const result = await listEmployeeAccounts();
@@ -62,6 +67,23 @@ export function EmployeeAccounts() {
       }
       setError(null);
       setNote(t("emp.inviteSent", { email: result.email }));
+      await load();
+    });
+  }
+
+  function savePassword(row: EmployeeAccount, password: string) {
+    setBusy(row.id);
+    setNote(null);
+    startTransition(async () => {
+      const result = await setEmployeePassword(row.id, password);
+      setBusy(null);
+      if (!result.ok) {
+        setError(result.error ? t(result.error) : result.message);
+        return;
+      }
+      setError(null);
+      setTemp(null);
+      setNote(t("emp.tempPasswordSet", { email: result.email }));
       await load();
     });
   }
@@ -143,7 +165,27 @@ export function EmployeeAccounts() {
                       {row.active && !row.last_sign_in_at ? t("emp.neverSignedIn") : fmt(row.last_sign_in_at)}
                     </td>
                     <td className="px-4 py-3 text-end">
-                      {row.active ? null : row.developer && !isDeveloper ? (
+                      {temp?.id === row.id ? (
+                        <TempPassword
+                          email={row.email ?? ""}
+                          value={temp.value}
+                          busy={busy === row.id}
+                          onChange={(value) => setTemp({ id: row.id, value })}
+                          onSave={() => savePassword(row, temp.value)}
+                          onCancel={() => setTemp(null)}
+                        />
+                      ) : row.email && !(row.developer && !isDeveloper) ? (
+                        <button
+                          type="button"
+                          onClick={() => setTemp({ id: row.id, value: "" })}
+                          disabled={busy !== null}
+                          className="me-2 inline-flex h-9 items-center gap-1.5 rounded-[9px] px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045] disabled:opacity-50"
+                        >
+                          <KeyRound className="size-3.5" />
+                          {t("emp.tempPassword")}
+                        </button>
+                      ) : null}
+                      {temp?.id === row.id || row.active ? null : row.developer && !isDeveloper ? (
                         <span className="rounded-full bg-[#fff8e8] px-2.5 py-1 text-[11px] font-bold text-[#a86a10]">{t("team.developerOnly")}</span>
                       ) : (
                         <button
@@ -166,5 +208,53 @@ export function EmployeeAccounts() {
         </section>
       </div>
     </TraveliunShell>
+  );
+}
+
+/** The temporary password being typed for one person — checked as it is typed, by the server's own rule. */
+function TempPassword({
+  email,
+  value,
+  busy,
+  onChange,
+  onSave,
+  onCancel,
+}: {
+  email: string;
+  value: string;
+  busy: boolean;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  const { t } = useTraveliunUI();
+  const weak = value ? passwordProblem(value, loginName(email)) : null;
+  return (
+    <span className="inline-flex flex-wrap items-center justify-end gap-2">
+      <input
+        dir="ltr"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={t("emp.tempPasswordHint")}
+        aria-label={t("emp.tempPassword")}
+        autoComplete="new-password"
+        spellCheck={false}
+        className="h-9 w-56 rounded-[9px] border border-[#dbe6e1] bg-white px-2.5 text-start text-[12.5px] text-[#185045] outline-none focus:border-[#2aa87a]"
+      />
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={busy || !value || Boolean(weak)}
+        title={weak ?? undefined}
+        className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
+        {t("emp.tempPasswordSave")}
+      </button>
+      <button type="button" onClick={onCancel} className="h-9 px-1 text-[12px] font-bold text-[#557d78]">
+        {t("cancel")}
+      </button>
+      {value && weak ? <span className="basis-full text-end text-[11px] font-bold text-[#a86a10]">{weak}</span> : null}
+    </span>
   );
 }

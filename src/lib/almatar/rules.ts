@@ -146,10 +146,5 @@ export function loginEmail(typed: string): string {
   return t.includes("@") ? t : `${t}@${LOGIN_DOMAIN}`;
 }
 
-/** A password an employee types for a new login: long enough, letters and digits, not the username. */
-export function passwordProblem(password: string, username: string): string | null {
-  if (password.length < 10) return "كلمة المرور 10 أحرف على الأقل.";
-  if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) return "كلمة المرور تجمع حروفاً وأرقاماً.";
-  if (password.toLowerCase().includes(username.trim().toLowerCase())) return "كلمة المرور لا تحتوي اسم المستخدم.";
-  return null;
-}
+/** A password an employee types for a new login — one rule for every temporary password. */
+export { passwordProblem } from "@/lib/auth/password-rule";

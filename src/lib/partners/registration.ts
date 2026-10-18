@@ -15,6 +15,8 @@ import {
   readRegistration,
 } from "./registration-form";
 import { getPartnerSession } from "./session";
+import { loginName, passwordProblem } from "@/lib/auth/password-rule";
+import { setTemporaryPassword } from "@/lib/auth/temp-password";
 
 /**
  * A company asking to work with us, and what happens to that request.
@@ -327,6 +329,69 @@ export async function resendPartnerPasswordLink(input: {
 }
 
 /**
+ * A temporary password for the company's login, typed by the administration
+ * (the owner, 2026-10-19: the last company to register never received the
+ * set-your-password mail — «اجعل إمكانية عمل كلمة مرور من داخل النظام»).
+ *
+ * The account that exists (an invitation sent and never opened) gets the
+ * password; a company with no login yet gets one made with it — no mail at all.
+ * Either way the address is confirmed and the first sign-in forces a password
+ * of the company's own. The value is never stored, returned or logged.
+ */
+export async function setPartnerPassword(input: {
+  partner_id: string;
+  email: string;
+  password: string;
+}): Promise<{ ok: true; created: boolean } | { ok: false; message: string }> {
+  if (!(await currentCan("settings.manage"))) return { ok: false, message: "غير مصرّح لك بهذا الإجراء." };
+  const email = String(input.email ?? "").trim().toLowerCase();
+  if (!EMAIL.test(email)) return { ok: false, message: "البريد الإلكتروني غير صحيح." };
+  const password = String(input.password ?? "");
+  const weak = passwordProblem(password, loginName(email));
+  if (weak) return { ok: false, message: weak };
+
+  try {
+    const supabase = db();
+    const { data: company } = await supabase.from("booking_partners").select("id, name, status").eq("id", input.partner_id).maybeSingle();
+    const row = company as { id: string; name: string; status: string } | null;
+    if (!row) return { ok: false, message: "الشركة غير موجودة." };
+    if (row.status !== "approved") return { ok: false, message: "اعتمد الشركة أولاً ثم أصدر الحساب." };
+
+    // Only a login of THIS company — else the screen would set the password of any account at all.
+    const { data: linked } = await supabase
+      .from("partner_users")
+      .select("auth_user_id, status")
+      .eq("partner_id", row.id)
+      .ilike("email", email)
+      .maybeSingle();
+    const account = linked as { auth_user_id: string; status: string } | null;
+    if (account) {
+      if (account.status !== "active") return { ok: false, message: "هذا الحساب موقوف — فعّله قبل تعيين كلمة المرور." };
+      if (!(await setTemporaryPassword(supabase, account.auth_user_id, password))) return { ok: false, message: "تعذّر تعيين كلمة المرور." };
+      await logAudit({
+        action: "partner.account_issued",
+        entity: "booking_partners",
+        entity_id: row.id,
+        meta: { email, kind: "temp_password", must_change_password: true },
+      });
+      return { ok: true, created: false };
+    }
+
+    const made = await inviteToCompany(supabase, row, email, null, "owner", await getCurrentEmployeeId(), password);
+    if (!made.ok) return made;
+    await logAudit({
+      action: "partner.account_issued",
+      entity: "booking_partners",
+      entity_id: row.id,
+      meta: { email, kind: "temp_password_login", must_change_password: true },
+    });
+    return { ok: true, created: true };
+  } catch {
+    return { ok: false, message: "تعذّر تعيين كلمة المرور." };
+  }
+}
+
+/**
  * Open one of an applicant's documents — staff only, a five-minute signed URL
  * from the private bucket, and only a path that row actually lists (a crafted
  * path cannot reach another company's file).
@@ -348,7 +413,9 @@ export async function partnerDocumentUrl(partnerId: string, path: string): Promi
 /**
  * A login for a company — the one path, for our «إصدار حساب» and for the
  * company's own owner inviting a colleague. Supabase sends a set-your-password
- * link; no password is ever generated, stored or sent here.
+ * link; no password is ever generated, stored or sent here — except the
+ * administration's temporary one (`password`, setPartnerPassword): then the
+ * account is made with it, confirmed, no mail, and must change it at sign-in.
  */
 async function inviteToCompany(
   supabase: SupabaseClient,
@@ -357,6 +424,7 @@ async function inviteToCompany(
   name: string | null,
   role: "owner" | "sales",
   createdBy: string | null,
+  password?: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   // An employee's address must never become a partner login — that account
   // would pass is_staff() and the partner policies at the same time.
@@ -370,12 +438,15 @@ async function inviteToCompany(
   // nothing at all: the account exists and there is no way to give it a
   // password. /b2b/welcome is the other half of this button.
   const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
-  const { data: invite, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
-    data: { partner_id: company.id, partner_name: company.name },
-    redirectTo: `${site}/b2b/welcome`,
-  });
+  const metadata = { partner_id: company.id, partner_name: company.name };
+  const { data: invite, error: inviteError } = password
+    ? await supabase.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: metadata, app_metadata: { must_change_password: true } })
+    : await supabase.auth.admin.inviteUserByEmail(email, { data: metadata, redirectTo: `${site}/b2b/welcome` });
   if (inviteError || !invite?.user) {
-    return { ok: false, message: "تعذّر إنشاء الحساب — تأكد من إعدادات البريد لدى Supabase." };
+    if (password && inviteError?.message.toLowerCase().includes("already")) {
+      return { ok: false, message: "لهذا البريد حساب دخول ليس لهذه الشركة — استخدم بريداً آخر." };
+    }
+    return { ok: false, message: password ? "تعذّر إنشاء الحساب." : "تعذّر إنشاء الحساب — تأكد من إعدادات البريد لدى Supabase." };
   }
 
   const { error } = await supabase.from("partner_users").insert({
@@ -386,6 +457,11 @@ async function inviteToCompany(
     role,
     created_by: createdBy,
   });
+  if (error && password) {
+    // a login with a known password that belongs to no company is worse than none
+    await supabase.auth.admin.deleteUser(invite.user.id);
+    return { ok: false, message: "تعذّر ربط الحساب بالشركة." };
+  }
   return error ? { ok: false, message: "أُنشئ الحساب ولم يُربط بالشركة — راجع السجل." } : { ok: true };
 }
 

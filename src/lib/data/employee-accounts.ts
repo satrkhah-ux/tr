@@ -6,6 +6,8 @@ import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser 
 import { logAudit } from "./audit";
 import { currentCan, deniedForNonDeveloper } from "@/lib/roles/current";
 import { isDeveloperRole } from "@/lib/roles/roles";
+import { loginName, passwordProblem } from "@/lib/auth/password-rule";
+import { setTemporaryPassword } from "@/lib/auth/temp-password";
 
 /**
  * Issue a staff login from inside the system.
@@ -233,5 +235,71 @@ export async function issueEmployeeAccount(employeeId: string): Promise<IssueRes
     return { ok: true, email };
   } catch {
     return { ok: false, message: "تعذّر إصدار الحساب." };
+  }
+}
+
+/**
+ * A temporary password for an employee's login, typed by whoever manages the
+ * people (the owner, 2026-10-19: «اجعل إمكانية عمل كلمة مرور من داخل النظام»
+ * — an invitation that never arrives used to leave the person locked out).
+ *
+ * An employee with a login gets the password on it; one without gets a login
+ * made with it, linked at once — but only when no account holds the address
+ * (anything else is «إصدار حساب»'s careful linking, above). Either way the
+ * address is confirmed and the first sign-in forces their own password. The
+ * value is never stored, returned or logged.
+ */
+export async function setEmployeePassword(employeeId: string, password: string): Promise<IssueResult> {
+  const gate = await guard();
+  if (gate === "err.session") return { ok: false, message: "انتهت الجلسة." };
+  if (gate === "err.forbidden") return { ok: false, message: "لا تملك صلاحية إدارة الموظفين." };
+  // the developer's login is the developer's to set, as its invitation is
+  if (await deniedForNonDeveloper({ employeeId })) return { ok: false, message: "", error: "team.developerOnly" };
+
+  try {
+    const admin = createSupabaseServiceClient();
+    const { data } = await admin.from("employees").select("id, arabic_name, email, auth_user_id").eq("id", employeeId).maybeSingle();
+    const row = data as { id: string; arabic_name: string; email: string | null; auth_user_id: string | null } | null;
+    if (!row) return { ok: false, message: "لم يُعثر على الموظف." };
+    const email = row.email?.trim().toLowerCase();
+    if (!email) return { ok: false, message: "أضف بريد الموظف أولاً — هو اسم الدخول." };
+    const weak = passwordProblem(String(password ?? ""), loginName(email));
+    if (weak) return { ok: false, message: weak };
+
+    if (row.auth_user_id) {
+      const { data: user } = await admin.auth.admin.getUserById(row.auth_user_id);
+      // a self-registration still in the queue is decided there, not unlocked here
+      if (user.user?.banned_until && Date.parse(user.user.banned_until) > Date.now()) {
+        return { ok: false, message: "هذا الحساب موقوف — قرّر في طلب التسجيل أولاً." };
+      }
+      if (!(await setTemporaryPassword(admin as unknown as SupabaseClient, row.auth_user_id, password))) {
+        return { ok: false, message: "تعذّر تعيين كلمة المرور." };
+      }
+      await logAudit({ action: "employee.account_issued", entity: "employees", entity_id: row.id, meta: { email, kind: "temp_password", must_change_password: true } });
+      return { ok: true, email };
+    }
+
+    const { data: page } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if ((page?.users ?? []).some((u) => u.email?.toLowerCase() === email)) {
+      return { ok: false, message: "لهذا البريد حساب دخول غير مربوط — اضغط «إصدار حساب» أولاً ليُربط، ثم عيّن كلمة المرور." };
+    }
+    const { data: made, error } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { employee_id: row.id, employee_name: row.arabic_name },
+      app_metadata: { must_change_password: true },
+    });
+    if (error || !made.user) return { ok: false, message: "تعذّر إنشاء الحساب." };
+    const { error: linkError } = await admin.from("employees").update({ auth_user_id: made.user.id } as never).eq("id", row.id);
+    if (linkError) {
+      // a login with a known password that no employee holds is worse than none
+      await admin.auth.admin.deleteUser(made.user.id);
+      return { ok: false, message: "تعذّر ربط الحساب بالموظف." };
+    }
+    await logAudit({ action: "employee.account_issued", entity: "employees", entity_id: row.id, meta: { email, kind: "temp_password_login", must_change_password: true } });
+    return { ok: true, email };
+  } catch {
+    return { ok: false, message: "تعذّر تعيين كلمة المرور." };
   }
 }
