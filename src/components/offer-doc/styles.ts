@@ -23,6 +23,15 @@
  *   Atomic blocks (`break-inside: avoid` on cards, rows, list items, clauses)
  *   plus orphans/widows:2 and a repeating `thead` keep any continuation clean.
  */
+/**
+ * A phone narrower than the A4 sheet (210mm ≈ 794px) saw half a page, the rest
+ * clipped. On screen only, the whole document zooms down to the width — the
+ * print/PDF never sees this. Steps of 40px, each zoomed for its narrowest width.
+ */
+const FIT_SCREEN = Array.from({ length: 14 }, (_, i) => 840 - i * 40)
+  .map((w) => `@media screen and (max-width:${w}px){.od-root{zoom:${(Math.max(w - 40, 280) - 30) / 794};}}`)
+  .join("\n");
+
 export const OFFER_DOC_CSS = `
 .od-root{
   --od-green:#135549;--od-green-2:#1f7667;--od-ink:#263633;--od-muted:#6b7c78;
@@ -76,6 +85,7 @@ export const OFFER_DOC_CSS = `
   .od-root{background:#f5f7f4;padding:10px 0;}
   .od-page{margin:0 auto 12px;box-shadow:0 6px 22px rgba(20,54,48,.14);}
 }
+${FIT_SCREEN}
 
 /* ── cover ────────────────────────────────────────────────────────────────── */
 /* Company block on the READING side (right, in Arabic), logo opposite it. The
