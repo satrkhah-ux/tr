@@ -4,7 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Car, Check, FileText, KeyRound, TriangleAlert, X } from "lucide-react";
 import { confirmAlmatarBooking, createAlmatarLogin, rejectAlmatarBooking, setAlmatarMargin } from "@/lib/almatar/actions";
-import { LOGIN_DOMAIN, passwordProblem, STATUS_LABEL, vehicleLabel } from "@/lib/almatar/rules";
+import { LOGIN_DOMAIN, passwordProblem, REQUEST_KINDS, STATUS_LABEL, vehicleLabel } from "@/lib/almatar/rules";
 import type { AlmatarService, AlmatarStaffBooking } from "@/lib/almatar/server";
 import { TraveliunShell } from "../TraveliunShell";
 import { card, danger, field, primary, sar, secondary, Stat, td, th } from "../commissions/ui";
@@ -143,8 +143,14 @@ export function AlmatarAdmin({
                     const s = byId.get(b.service_id);
                     return (
                       <tr key={b.id} className="border-b border-[#f1f5f3] align-top">
-                        <td className={td} dir="ltr">
-                          {b.ref}
+                        <td className={td}>
+                          <span dir="ltr">{b.ref}</span>
+                          {b.request_ref ? (
+                            <div className="text-[11px] font-semibold text-[#93aaa3]">
+                              طلب {b.request_ref}
+                              {b.request_kind ? ` · ${REQUEST_KINDS.find((k) => k.id === b.request_kind)?.label ?? ""}` : ""}
+                            </div>
+                          ) : null}
                         </td>
                         <td className={`${td} whitespace-normal`}>
                           {s ? `${s.name_ar} — ${s.scope_ar}` : b.service_id}

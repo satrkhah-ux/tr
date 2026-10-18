@@ -25,6 +25,31 @@ export const KIND_LABEL: Record<string, string> = {
   hotel_transfer: "نقل بين فندقين",
 };
 
+/** A request's line, by what it is — each filters the list to its own kinds. */
+export const LINE_KINDS = {
+  arrival: { label: "استقبال", kinds: ["arrival"] },
+  departure: { label: "توديع", kinds: ["departure"] },
+  tour: { label: "جولة", kinds: ["tour_city", "tour_out"] },
+  transfer: { label: "تنقّل", kinds: ["intercity", "hotel_transfer"] },
+} as const;
+export type LineKind = keyof typeof LINE_KINDS;
+
+/** What Almatar books (0101): one request, its lines laid out from the kind, more added by hand. */
+export const REQUEST_KINDS: { id: string; label: string; lines: LineKind[] }[] = [
+  { id: "arrival", label: "استقبال", lines: ["arrival"] },
+  { id: "departure", label: "توديع", lines: ["departure"] },
+  { id: "both", label: "استقبال وتوديع", lines: ["arrival", "departure"] },
+  { id: "tours", label: "جولات", lines: ["tour"] },
+  { id: "transfers", label: "تنقلات", lines: ["transfer"] },
+  { id: "program", label: "برنامج من – إلى", lines: ["arrival", "tour", "departure"] },
+];
+export const MAX_LINES = 20;
+
+/** A program's lines fall between its first and last day. */
+export function outsideProgram(from: string, to: string, date: string): boolean {
+  return Boolean(from && to && date && (date < from || date > to));
+}
+
 export const STATUS_LABEL: Record<string, string> = {
   pending: "بانتظار تأكيد ترافليون",
   confirmed: "مؤكد",

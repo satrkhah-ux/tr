@@ -7,7 +7,7 @@ import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { db, getAlmatarCompany, getAlmatarSession, getMarginPct } from "./server";
-import { bookingProblem, cancelFeePct, loginEmail, passwordProblem, profitOf, serviceInstant, unitPrice, type Vehicle } from "./rules";
+import { bookingProblem, cancelFeePct, loginEmail, MAX_LINES, passwordProblem, profitOf, REQUEST_KINDS, serviceInstant, unitPrice, type Vehicle } from "./rules";
 
 type Result = { ok: true; message?: string } | { ok: false; message: string };
 
@@ -15,79 +15,104 @@ const clean = (v: unknown, max = 200) => (typeof v === "string" ? v.trim().slice
 
 // ----------------------------------------------------------------- Almatar ----
 
-export type NewBooking = {
+export type RequestLine = {
   service_id: string;
-  vehicle: string;
-  units: number;
   date: string;
   time: string;
-  passengers: number;
-  lead_name: string;
-  lead_phone?: string;
   flight_no?: string;
   pickup?: string;
   dropoff?: string;
-  notes?: string;
 };
 
-/** Almatar books a line of its list. Price and profit are computed here, never taken from the form. */
-export async function createAlmatarBooking(input: NewBooking): Promise<Result> {
+export type NewRequest = {
+  kind: string;
+  vehicle: string;
+  units: number;
+  passengers: number;
+  lead_name: string;
+  lead_phone?: string;
+  notes?: string;
+  lines: RequestLine[];
+};
+
+type ServiceRow = { id: string; tz: string; price_small: number; price_medium: number; price_van10: number; valid_through: string };
+
+/**
+ * Almatar books one REQUEST of several services (0101) — arrival, departure,
+ * tours, transfers, a whole program. Every line is checked against the list's
+ * rules; one bad line refuses the request, so nothing is half-booked. Prices and
+ * profit are computed here, never taken from the form, and the rows go in as one
+ * insert sharing request_ref.
+ */
+export async function createAlmatarRequest(input: NewRequest): Promise<Result> {
   const session = await getAlmatarSession();
   if (!session) return { ok: false, message: "انتهت الجلسة — سجّل الدخول مجدداً." };
+  const kind = REQUEST_KINDS.some((k) => k.id === input.kind) ? input.kind : null;
+  if (!kind) return { ok: false, message: "اختر نوع الحجز." };
+  const lines = Array.isArray(input.lines) ? input.lines : [];
+  if (lines.length === 0) return { ok: false, message: "أضف خدمة واحدة على الأقل." };
+  if (lines.length > MAX_LINES) return { ok: false, message: `الطلب الواحد حتى ${MAX_LINES} خدمة.` };
   try {
-    const { data } = await db()
-      .from("almatar_services")
-      .select("id, tz, price_small, price_medium, price_van10, valid_through")
-      .eq("id", String(input.service_id))
-      .eq("active", true)
-      .maybeSingle();
-    const service = data as { id: string; tz: string; price_small: number; price_medium: number; price_van10: number; valid_through: string } | null;
-    if (!service) return { ok: false, message: "اختر خدمة من القائمة." };
-
-    const form = {
+    const ids = [...new Set(lines.map((l) => String(l.service_id)))];
+    const { data } = await db().from("almatar_services").select("id, tz, price_small, price_medium, price_van10, valid_through").in("id", ids).eq("active", true);
+    const services = new Map(((data ?? []) as ServiceRow[]).map((s) => [s.id, s]));
+    const shared = {
       vehicle: String(input.vehicle),
       units: Number(input.units),
-      date: String(input.date),
-      time: String(input.time),
       passengers: Number(input.passengers),
       lead_name: String(input.lead_name ?? "").slice(0, 120),
     };
-    const problem = bookingProblem(service, form, new Date());
-    if (problem) return { ok: false, message: problem };
+    const now = new Date();
+    const checked: { line: RequestLine; service: ServiceRow }[] = [];
+    for (const [i, line] of lines.entries()) {
+      const service = services.get(String(line.service_id));
+      const at = `الخدمة ${i + 1}: `;
+      if (!service) return { ok: false, message: `${at}اختر الخدمة من القائمة.` };
+      const problem = bookingProblem(service, { ...shared, date: String(line.date), time: String(line.time) }, now);
+      if (problem) return { ok: false, message: at + problem };
+      checked.push({ line, service });
+    }
 
-    const unit = unitPrice(service, form.vehicle as Vehicle);
-    const total = unit * form.units;
     const margin = await getMarginPct();
-    const { data: made, error } = await db()
-      .from("almatar_bookings")
-      .insert({
+    const requestRef = `R-${randomBytes(4).toString("hex").toUpperCase()}`;
+    const rows = checked.map(({ line, service }) => {
+      const unit = unitPrice(service, shared.vehicle as Vehicle);
+      const total = unit * shared.units;
+      return {
         partner_id: session.partner_id,
+        request_ref: requestRef,
+        request_kind: kind,
         service_id: service.id,
-        vehicle: form.vehicle,
-        units: form.units,
-        service_date: form.date,
-        service_time: form.time.slice(0, 5),
-        service_at: serviceInstant(form.date, form.time, service.tz).toISOString(),
-        passengers: form.passengers,
-        lead_name: form.lead_name.trim(),
+        vehicle: shared.vehicle,
+        units: shared.units,
+        service_date: String(line.date),
+        service_time: String(line.time).slice(0, 5),
+        service_at: serviceInstant(String(line.date), String(line.time), service.tz).toISOString(),
+        passengers: shared.passengers,
+        lead_name: shared.lead_name.trim(),
         lead_phone: clean(input.lead_phone, 40),
-        flight_no: clean(input.flight_no, 40),
-        pickup: clean(input.pickup),
-        dropoff: clean(input.dropoff),
+        flight_no: clean(line.flight_no, 40),
+        pickup: clean(line.pickup),
+        dropoff: clean(line.dropoff),
         notes: clean(input.notes, 1000),
         unit_price: unit,
         total_sar: total,
         margin_pct: margin,
         profit_sar: profitOf(total, margin),
         created_by: session.user_id,
-      })
-      .select("id, ref")
-      .single();
-    if (error || !made) return { ok: false, message: "تعذّر حفظ الحجز." };
-    const row = made as { id: string; ref: string };
-    await logAudit({ action: "almatar.booking_changed", entity: "almatar_bookings", entity_id: row.id, meta: { ref: row.ref, status: "pending", by: "partner" } });
+      };
+    });
+    const { data: made, error } = await db().from("almatar_bookings").insert(rows).select("id, ref");
+    if (error || !made?.length) return { ok: false, message: "تعذّر حفظ الحجز." };
+    const refs = (made as { id: string; ref: string }[]).map((r) => r.ref);
+    await logAudit({
+      action: "almatar.booking_changed",
+      entity: "almatar_bookings",
+      entity_id: (made as { id: string }[])[0].id,
+      meta: { request_ref: requestRef, refs, kind, status: "pending", by: "partner" },
+    });
     revalidatePath("/b2b");
-    return { ok: true, message: `أُرسل الحجز ${row.ref} — بانتظار تأكيد ترافليون.` };
+    return { ok: true, message: `أُرسل الطلب ${requestRef} (${refs.length} خدمة) — بانتظار تأكيد ترافليون.` };
   } catch {
     return { ok: false, message: "تعذّر حفظ الحجز." };
   }

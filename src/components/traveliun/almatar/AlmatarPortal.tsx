@@ -1,17 +1,16 @@
 "use client";
 
-import { useMemo, useState, useTransition, type CSSProperties, type FormEvent } from "react";
+import { useState, useTransition, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { Car, FileText, KeyRound, Loader2, LogOut, X } from "lucide-react";
+import { FileText, KeyRound, LogOut, X } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { cancelAlmatarBooking, createAlmatarBooking } from "@/lib/almatar/actions";
-import { cancelFeePct, KIND_LABEL, MAX_UNITS, STATUS_LABEL, TERMS, unitPrice, VEHICLES, vehicleLabel, type Vehicle } from "@/lib/almatar/rules";
+import { cancelAlmatarBooking } from "@/lib/almatar/actions";
+import { cancelFeePct, REQUEST_KINDS, STATUS_LABEL, TERMS, vehicleLabel } from "@/lib/almatar/rules";
 import type { AlmatarBooking, AlmatarService, AlmatarSession } from "@/lib/almatar/server";
 import { ChangePasswordDialog } from "../ChangePasswordDialog";
+import { AlmatarRequestForm } from "./AlmatarRequestForm";
 
 const card = "rounded-2xl border border-[#e7e5ef] bg-white p-5 shadow-[0_1px_2px_rgba(27,26,31,0.04)]";
-const field = "h-10 w-full rounded-[10px] border border-[#d9d9de] bg-white px-3 text-[13px] text-[#1b1a1f] outline-none focus:border-[var(--am)]";
-const label = "grid gap-1.5 text-[12px] font-bold text-[#46455a]";
 const sar = (n: number) => `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(n)} ر.س`;
 
 const STATUS_TONE: Record<string, string> = {
@@ -30,45 +29,7 @@ export function AlmatarPortal({ session, services, bookings }: { session: Almata
   // the page's own clock, read once: a booking past its time offers no cancel
   const [now] = useState(() => Date.now());
 
-  const countries = useMemo(() => [...new Map(services.map((s) => [s.country_code, s.country_ar])).entries()], [services]);
-  const [country, setCountry] = useState(countries[0]?.[0] ?? "");
-  const inCountry = services.filter((s) => s.country_code === country);
-  const [serviceId, setServiceId] = useState("");
-  const service = services.find((s) => s.id === serviceId) ?? null;
-  const [vehicle, setVehicle] = useState<Vehicle>("small");
-  const [units, setUnits] = useState(1);
-  const total = service ? unitPrice(service, vehicle) * units : 0;
   const byId = new Map(services.map((s) => [s.id, s]));
-
-  function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const form = e.currentTarget;
-    const v = (k: string) => String(f.get(k) ?? "");
-    start(async () => {
-      const r = await createAlmatarBooking({
-        service_id: serviceId,
-        vehicle,
-        units,
-        date: v("date"),
-        time: v("time"),
-        passengers: Number(v("passengers")),
-        lead_name: v("lead_name"),
-        lead_phone: v("lead_phone"),
-        flight_no: v("flight_no"),
-        pickup: v("pickup"),
-        dropoff: v("dropoff"),
-        notes: v("notes"),
-      });
-      setNotice({ ok: r.ok, text: r.message ?? "" });
-      if (r.ok) {
-        form.reset();
-        setServiceId("");
-        setUnits(1);
-        router.refresh();
-      }
-    });
-  }
 
   function cancel(b: AlmatarBooking) {
     const fee = cancelFeePct(new Date(b.service_at), new Date());
@@ -124,125 +85,13 @@ export function AlmatarPortal({ session, services, bookings }: { session: Almata
           </p>
         ) : null}
 
-        <form onSubmit={submit} className={card}>
-          <h1 className="flex items-center gap-2 text-lg font-extrabold text-[#1b1a1f]">
-            <Car className="size-5 text-[var(--am)]" /> حجز جديد
-          </h1>
-          <p className="mt-1 text-[12px] font-semibold text-[#747583]">
-            الحجز قبل 24 ساعة على الأقل من وقت الخدمة بتوقيت الوجهة. الأسعار بالريال السعودي، صافية، وسارية حتى ديسمبر 2027.
-          </p>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label className={label}>
-              الدولة
-              <select className={field} value={country} onChange={(e) => {
-                  setCountry(e.target.value);
-                  setServiceId("");
-                }}>
-                {countries.map(([code, name]) => (
-                  <option key={code} value={code}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={`${label} sm:col-span-2 lg:col-span-3`}>
-              الخدمة
-              <select className={field} value={serviceId} onChange={(e) => setServiceId(e.target.value)} required>
-                <option value="">اختر الخدمة…</option>
-                {Object.entries(KIND_LABEL).map(([kind, kindLabel]) => {
-                  const list = inCountry.filter((s) => s.kind === kind);
-                  return list.length ? (
-                    <optgroup key={kind} label={kindLabel}>
-                      {list.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name_ar} — {s.scope_ar}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ) : null;
-                })}
-              </select>
-            </label>
-          </div>
-
-          <fieldset className="mt-3 grid gap-2 sm:grid-cols-3">
-            <legend className="mb-1.5 text-[12px] font-bold text-[#46455a]">فئة المركبة</legend>
-            {VEHICLES.map((v) => (
-              <label
-                key={v.id}
-                className={`flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-[13px] font-bold ${vehicle === v.id ? "border-[var(--am)] bg-[var(--am)]/5 text-[var(--am)]" : "border-[#d9d9de] text-[#46455a]"}`}
-              >
-                <span className="flex items-center gap-2">
-                  <input type="radio" name="vehicle" value={v.id} checked={vehicle === v.id} onChange={() => setVehicle(v.id)} className="accent-[var(--am)]" />
-                  {v.label}
-                </span>
-                <span className="tv-tnum">{service ? sar(unitPrice(service, v.id)) : "—"}</span>
-              </label>
-            ))}
-          </fieldset>
-
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label className={label}>
-              عدد المركبات
-              <input className={field} type="number" min={1} max={MAX_UNITS} value={units} onChange={(e) => setUnits(Math.max(1, Math.min(MAX_UNITS, Number(e.target.value) || 1)))} dir="ltr" />
-            </label>
-            <label className={label}>
-              عدد الركاب
-              <input className={field} name="passengers" type="number" min={1} defaultValue={1} required dir="ltr" />
-            </label>
-            <label className={label}>
-              تاريخ الخدمة
-              <input className={field} name="date" type="date" required dir="ltr" />
-            </label>
-            <label className={label}>
-              الوقت (بتوقيت الوجهة)
-              <input className={field} name="time" type="time" required dir="ltr" />
-            </label>
-            <label className={label}>
-              اسم المسافر الرئيسي
-              <input className={field} name="lead_name" required maxLength={120} />
-            </label>
-            <label className={label}>
-              جوال المسافر
-              <input className={field} name="lead_phone" type="tel" dir="ltr" maxLength={40} />
-            </label>
-            <label className={label}>
-              رقم الرحلة
-              <input className={field} name="flight_no" dir="ltr" maxLength={40} placeholder="SV 846" />
-            </label>
-            <div className="grid content-end">
-              <p className="text-[11.5px] font-semibold text-[#747583]">الانتظار المجاني 60 دقيقة في الاستقبال والتوديع.</p>
-            </div>
-            <label className={`${label} sm:col-span-2`}>
-              مكان الانطلاق
-              <input className={field} name="pickup" maxLength={200} placeholder="المطار / اسم الفندق" />
-            </label>
-            <label className={`${label} sm:col-span-2`}>
-              الوجهة
-              <input className={field} name="dropoff" maxLength={200} placeholder="اسم الفندق / المطار" />
-            </label>
-            <label className={`${label} sm:col-span-2 lg:col-span-4`}>
-              ملاحظات
-              <textarea className={`${field} h-auto min-h-[64px] py-2`} name="notes" maxLength={1000} />
-            </label>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#efeff2] pt-4">
-            <div className="text-[13px] font-bold text-[#46455a]">
-              الإجمالي: <span className="tv-tnum text-lg font-extrabold text-[#1b1a1f]">{service ? sar(total) : "—"}</span>
-              {units >= MAX_UNITS ? <span className="ms-2 text-[11.5px] text-[#a86a10]">8 مركبات أو أكثر = حجز جماعي باتفاق منفصل</span> : null}
-            </div>
-            <button
-              type="submit"
-              disabled={pending || !service}
-              className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[var(--am)] px-6 text-[13px] font-bold text-white hover:opacity-90 disabled:opacity-50"
-            >
-              {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-              إرسال الحجز
-            </button>
-          </div>
-        </form>
+        <AlmatarRequestForm
+          services={services}
+          onDone={(ok, text) => {
+            setNotice({ ok, text });
+            router.refresh();
+          }}
+        />
 
         <section className={card}>
           <h2 className="text-base font-extrabold text-[#1b1a1f]">حجوزاتي</h2>
@@ -266,7 +115,15 @@ export function AlmatarPortal({ session, services, bookings }: { session: Almata
                     const open = (b.status === "pending" || b.status === "confirmed") && new Date(b.service_at).getTime() > now;
                     return (
                       <tr key={b.id} className="border-b border-[#f4f4f6] align-top font-semibold text-[#1b1a1f]">
-                        <td className="whitespace-nowrap px-2 py-2 font-bold" dir="ltr">{b.ref}</td>
+                        <td className="whitespace-nowrap px-2 py-2 font-bold">
+                          <span dir="ltr">{b.ref}</span>
+                          {b.request_ref ? (
+                            <div className="text-[11px] font-semibold text-[#92939e]">
+                              طلب {b.request_ref}
+                              {b.request_kind ? ` · ${REQUEST_KINDS.find((k) => k.id === b.request_kind)?.label ?? ""}` : ""}
+                            </div>
+                          ) : null}
+                        </td>
                         <td className="px-2 py-2">
                           {s ? `${s.name_ar} — ${s.scope_ar}` : b.service_id}
                           <div className="text-[11px] text-[#92939e]">{s?.country_ar}</div>

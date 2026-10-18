@@ -74,6 +74,9 @@ export type AlmatarService = {
 export type AlmatarBooking = {
   id: string;
   ref: string;
+  /** the request this line came in with (0101); null for a single booking taken before */
+  request_ref: string | null;
+  request_kind: string | null;
   service_id: string;
   vehicle: string;
   units: number;
@@ -102,7 +105,7 @@ export type AlmatarStaffBooking = AlmatarBooking & { margin_pct: number; profit_
 
 const SERVICE_COLS = "id, country_code, country_ar, name_ar, scope_ar, kind, tz, price_small, price_medium, price_van10, valid_through";
 const BOOKING_COLS =
-  "id, ref, service_id, vehicle, units, service_date, service_time, service_at, passengers, lead_name, lead_phone, flight_no, pickup, dropoff, notes, unit_price, total_sar, status, status_note, cancel_fee_pct, cancel_fee_sar, driver_info, voucher_token, created_at";
+  "id, ref, request_ref, request_kind, service_id, vehicle, units, service_date, service_time, service_at, passengers, lead_name, lead_phone, flight_no, pickup, dropoff, notes, unit_price, total_sar, status, status_note, cancel_fee_pct, cancel_fee_sar, driver_info, voucher_token, created_at";
 
 export async function listServices(withReview: boolean): Promise<AlmatarService[]> {
   const { data } = await db()
