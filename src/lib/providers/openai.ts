@@ -174,3 +174,30 @@ export async function generateItineraryText(req: ItineraryRequest): Promise<Itin
     return { ok: false, error: "bad_response" };
   }
 }
+
+/**
+ * One JSON answer held to a strict schema, for callers other than the
+ * itinerary («مُراد», murad/model.ts). The raw JSON text, or null when the
+ * model said nothing; throws on a refused or failed request — the caller
+ * decides what a failure means.
+ */
+export async function openaiJson(req: { name: string; system: string; user: string; schema: Record<string, unknown>; temperature?: number; timeoutMs?: number }): Promise<string | null> {
+  const key = readEnv("OPENAI_API_KEY");
+  if (!key) throw new Error("not_configured");
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(req.timeoutMs ?? 45_000),
+    body: JSON.stringify({
+      model: readEnv("OPENAI_MODEL") ?? DEFAULT_MODEL,
+      temperature: req.temperature ?? 0.3,
+      messages: [
+        { role: "system", content: req.system },
+        { role: "user", content: req.user },
+      ],
+      response_format: { type: "json_schema", json_schema: { name: req.name, strict: true, schema: req.schema } },
+    }),
+  });
+  if (!res.ok) throw new Error(`openai ${res.status}`);
+  return ((await res.json()) as ChatResponse).choices?.[0]?.message?.content ?? null;
+}

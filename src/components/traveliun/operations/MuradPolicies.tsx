@@ -1,0 +1,59 @@
+"use client";
+
+import { useState } from "react";
+import { setMuradPolicies } from "@/lib/data/app-settings";
+import { useTraveliunUI } from "../TraveliunUIProvider";
+
+/**
+ * «سياسات الشركة لمُراد» — the only text Murad answers a policy question from
+ * (cancellation, refund, payment). Empty: he hands those to staff.
+ */
+export function MuradPolicies({ initial }: { initial: string }) {
+  const { t } = useTraveliunUI();
+  const [text, setText] = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const [note, setNote] = useState<"saved" | "failed" | null>(null);
+
+  async function save() {
+    setSaving(true);
+    setNote(null);
+    let ok = false;
+    try {
+      ok = (await setMuradPolicies(text)).ok;
+    } catch {
+      ok = false;
+    }
+    setSaving(false);
+    setNote(ok ? "saved" : "failed");
+  }
+
+  return (
+    <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
+      <h2 className="text-[15px] font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">{t("murad.policies.title")}</h2>
+      <p className="mt-1 text-[12.5px] font-semibold text-[#78948f]">{t("murad.policies.hint")}</p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        maxLength={4000}
+        rows={8}
+        aria-label={t("murad.policies.title")}
+        className="mt-3 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-2.5 py-2 text-[12.5px] font-semibold leading-6 text-[#185045] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]"
+      />
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={saving}
+          className="inline-flex h-9 items-center rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white disabled:opacity-60"
+        >
+          {t("murad.policies.save")}
+        </button>
+        {note ? (
+          <span role="status" className={`text-[12px] font-bold ${note === "saved" ? "text-[#0f7a52]" : "text-[#c22850]"}`}>
+            {t(note === "saved" ? "murad.policies.saved" : "murad.policies.failed")}
+          </span>
+        ) : null}
+      </div>
+    </section>
+  );
+}

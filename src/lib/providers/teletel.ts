@@ -73,6 +73,12 @@ async function api<T>(config: TeletelConfig, path: string, body?: unknown, timeo
   }
 }
 
+/** A plain read (GET only) for a caller that needs fields the helpers below leave out — «مُراد» (murad/run.ts). */
+export async function teletelGet<T>(path: string): Promise<T | null> {
+  const config = getTeletelConfig();
+  return config ? api<T>(config, path) : null;
+}
+
 /**
  * The most recent conversation with a contact, resolved at send time.
  *
