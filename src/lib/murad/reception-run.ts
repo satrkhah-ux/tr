@@ -11,12 +11,14 @@ import {
   listOpenConversations,
   listTeletelTeams,
   markTeletelSeen,
+  type OpenConversation,
   sendTeletelAttachment,
   sendTeletelMessage,
   setTeletelTyping,
 } from "@/lib/providers/teletel";
 import { asSystem } from "@/lib/supabase/system-actor";
 import { produceOfferFromDraft } from "@/lib/data/drafts";
+import { getTourPrograms } from "@/lib/data/tour-programs";
 import { offerMessage } from "@/lib/data/client-whatsapp";
 import { clientOfferPdf } from "@/lib/offer-doc/client-pdf";
 import { tidyWhatsapp } from "@/lib/operations/client-messages";
@@ -34,6 +36,7 @@ import {
   decideReception,
   DEPARTMENT,
   firstName,
+  holdText,
   isWorkingTime,
   MAX_WAIT_SEC,
   parseDelay,
@@ -150,8 +153,11 @@ async function readTrip(text: string): Promise<OfferAsk | null> {
  * employee's send is (offer.client_sent). Null when the file could not be
  * issued: the proposal already went, and the colleague issues it from Basic.
  */
+/** Murad doing an employee's part — system-actor.ts */
+const MURAD = { name: "مُراد (آلي)", can: ["offers.write"] } as const;
+
 async function issueAndSend(draftId: string, conversationId: number): Promise<{ serial: string; sent: boolean } | null> {
-  return asSystem({ name: "مُراد (آلي)", can: ["offers.write"] }, async () => {
+  return asSystem(MURAD, async () => {
     const issued = await produceOfferFromDraft(draftId).catch(() => null);
     if (!issued?.ok) return null;
     const { serial } = issued;
@@ -346,9 +352,11 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
               await finish({ reason: "send_failed", reply: text, error: "send_failed" });
               return "send_failed";
             }
+            // the cities' ready tours, read as Murad (getTourPrograms asks for a session)
+            const programs = await asSystem(MURAD, () => getTourPrograms(price.route.map((r) => r.city))).catch(() => []);
             const { data: draftRow } = await service
               .from("offer_drafts")
-              .insert({ data: offerDraftData({ name, phone: m.phone, c: offer, arrival, provisional, days, adults: trip.adults ?? 2, price }), title: `مُراد — ${name}` })
+              .insert({ data: offerDraftData({ name, phone: m.phone, c: offer, arrival, provisional, days, adults: trip.adults ?? 2, price, programs }), title: `مُراد — ${name}` })
               .select("id")
               .maybeSingle();
             const draftId = (draftRow as { id: string } | null)?.id ?? null;
@@ -516,6 +524,7 @@ export async function receptionSweep(): Promise<number> {
   // a client waiting on us for under half an hour — a new conversation, or an old one the client reopened
   const fresh = list.rows.filter((c) => c.waitingSince > 0 && nowSec - c.waitingSince < 1800 && (reception.scope === "all" || settings.autoList.includes(intlPhone(c.phone) ?? "")));
   if (!fresh.length) return 0;
+  const held = await holdSweep(service, fresh, nowSec, reception.hours);
   const { data } = await service
     .from("murad_log")
     .select("conversation_id")
@@ -531,6 +540,59 @@ export async function receptionSweep(): Promise<number> {
     if (!thread || !last) continue;
     const out = await receive({ conversationId: c.id, messageId: last.id, at: last.at, phone: c.phone, contactName: thread.name || c.name, content: last.text });
     if (out === "asked" || out.startsWith("routed")) n += 1;
+  }
+  return n + held;
+}
+
+/** how long a client may wait on the colleague Murad handed them to before Murad says it arrived */
+const HOLD_AFTER_SEC = 300;
+
+/**
+ * «وصلت رسالتك» (the evaluator, 2026-10-19): after Murad handed the visit over,
+ * the client wrote and no one has answered for five minutes — once a visit,
+ * Murad says it arrived and who answers it (holdText), and a note mentions
+ * that colleague so Teletel notifies them. Claimed in murad_log as the
+ * client message's NEGATIVE id (its own id is the reception's turn already).
+ * ponytail: the colleague only; their supervisor too when the teams name one.
+ */
+async function holdSweep(service: SupabaseClient, fresh: OpenConversation[], nowSec: number, hoursRaw: string | null): Promise<number> {
+  const late = fresh.filter((c) => c.canReply && nowSec - c.waitingSince >= HOLD_AFTER_SEC && !waiting.has(c.id));
+  if (!late.length) return 0;
+  const { data } = await service
+    .from("murad_log")
+    .select("conversation_id, reason, created_at")
+    .eq("mode", "reception")
+    .in("conversation_id", late.map((c) => c.id))
+    .gte("created_at", new Date((nowSec - VISIT_SEC) * 1000).toISOString());
+  const rows = (data ?? []) as { conversation_id: number; reason: string | null; created_at: string }[];
+  const hours = parseHours(hoursRaw);
+  let n = 0;
+  for (const c of late.slice(0, 5)) {
+    const mine = rows.filter((r) => Number(r.conversation_id) === c.id);
+    const handedAt = Math.max(0, ...mine.filter((r) => r.reason?.startsWith("routed") || r.reason === "offer:sent").map((r) => Date.parse(r.created_at) / 1000));
+    // not handed over by Murad, or the client has waited since before (the hand-over was the answer)
+    if (!handedAt || c.waitingSince < handedAt) continue;
+    if (mine.some((r) => r.reason === "hold" && Date.parse(r.created_at) / 1000 >= handedAt)) continue;
+    const thread = await readThread(c.id);
+    const last = [...(thread?.messages ?? [])].reverse().find((t) => t.fromClient && !t.isPrivate);
+    if (!last) continue;
+    const claim = await service
+      .from("murad_log")
+      .insert({ conversation_id: c.id, client_message_id: -last.id, client_message_at: new Date(c.waitingSince * 1000).toISOString(), phone: c.phone, mode: "reception" })
+      .select("id")
+      .maybeSingle();
+    if (claim.error || !claim.data) continue;
+    const text = holdText({ assignee: c.assignee, team: c.team, opensAt: isWorkingTime(new Date(), hours) ? null : hours.open });
+    const replyId = await sendTeletelMessage(c.id, text);
+    if (replyId && c.assignee) {
+      const mention = c.assigneeId ? `[@${c.assignee}](mention://user/${c.assigneeId}/${encodeURIComponent(c.assignee)})` : c.assignee;
+      await addTeletelNote(c.id, `🤖 ${mention} العميل كتب بعد التحويل وينتظر منذ ${Math.round((nowSec - c.waitingSince) / 60)} دقائق بلا رد — طمأنه مُراد. ردّ عليه الآن.`);
+    }
+    await service
+      .from("murad_log")
+      .update({ reason: replyId ? "hold" : "send_failed", reply: text, reply_message_id: replyId, acted_at: new Date().toISOString(), ...(replyId ? {} : { error: "send_failed" }) })
+      .eq("id", (claim.data as { id: string }).id);
+    if (replyId) n += 1;
   }
   return n;
 }

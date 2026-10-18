@@ -13,7 +13,9 @@
  * offer. No flights.
  */
 
-import { cityKeys, emptyDraftData, normalizeDraftData, normalizeDraftHotel, type DraftData } from "@/lib/offer/draft-types";
+import { cityKeys, deriveCityDates, emptyDraftData, normalizeDraftData, normalizeDraftHotel, type DraftData } from "@/lib/offer/draft-types";
+import { autoTourPicks, daysFromTours, programDayText, withTours, type TourProgram } from "@/lib/offer/itinerary";
+import { itineraryStartDate } from "@/lib/offer/schedule";
 
 export type OfferCity = { city: string; nights: number; hotel: string };
 
@@ -181,14 +183,19 @@ export function holdToText(text: string, a: OfferAsk, today: string): OfferAsk {
  * client, the dates, the route with a double room and breakfast in each hotel,
  * the car, no flights and no visa — and the price locked as a ready offer's is
  * (`source` + pricing.final_total), so no line asks for a price of its own.
+ *
+ * Its days are written as Basic writes them: each city's ready programmes
+ * (`programs`) on the days after the group arrives — a tour a day but the
+ * arrival, none twice in a city the route returns to — and the arrival, the
+ * moves and the way home around them; so the issue attaches their weather.
  */
-export function offerDraftData(i: { name: string; phone: string; c: OfferCountry; arrival: string; provisional: boolean; days: number; adults: number; price: OfferPrice }): DraftData {
+export function offerDraftData(i: { name: string; phone: string; c: OfferCountry; arrival: string; provisional: boolean; days: number; adults: number; price: OfferPrice; programs?: TourProgram[] }): DraftData {
   const base = emptyDraftData();
   const car = { enabled: true, car_type: "سيارة خاصة مع سائق", cars: 1, note: "" };
   const room = { room_type_id: null, room_type_name: "غرفة مزدوجة", board_type: "BB", price: null };
   // each hotel tied to ITS visit: Tbilisi twice (start and end) is two stays, not four (the manager, 2026-10-19: «فنادق مكرره»)
   const keys = cityKeys(i.price.route.map((r) => ({ city_name: r.city })));
-  return normalizeDraftData({
+  const draft = normalizeDraftData({
     ...base,
     customer: { ...base.customer, customer_name: i.name, customer_phone: i.phone },
     trip: { ...base.trip, country: i.c.country, destination: i.c.country, arrival_date: i.arrival, days: i.days, nights: i.price.nights, adults: i.adults, children: 0, rooms: i.price.rooms, meal_plan: "breakfast", default_board: "BB" },
@@ -196,11 +203,22 @@ export function offerDraftData(i: { name: string; phone: string; c: OfferCountry
     transport_plan: { airport: car, tours: car, intercity: { ...car, mode: "car" } },
     cities: i.price.route.map((r, k) => ({ key: keys[k], city_name: r.city, nights: r.nights, check_in: null, check_out: null })),
     hotels: i.price.route.map((r, k) => normalizeDraftHotel({ city_key: keys[k], city_name: r.city, hotel_name: r.hotel, rooms: Array.from({ length: i.price.rooms }, () => room) })),
-    // what the message said, said on the document too
-    services: { includes: i.c.includes, excludes: i.c.excludes, terms: ["هذا عرض مبدئي، ويؤكد معك موظفنا التفاصيل قبل الحجز.", ...(i.provisional ? ["التواريخ مبدئية وتُحدَّد معك عند التأكيد."] : [])] },
+    // the hotels, the breakfast and the airport are said by the file's own lines (withScopeLines, the meal plan) — not twice
+    services: { includes: i.c.includes.filter((l) => !/الفناد|الإقامة|الإفطار|المطار/.test(l)), excludes: i.c.excludes, terms: ["هذا عرض مبدئي، ويؤكد معك موظفنا التفاصيل قبل الحجز.", ...(i.provisional ? ["التواريخ مبدئية وتُحدَّد معك عند التأكيد."] : [])] },
     pricing: { items: [], display_currency: "SAR", final_total: i.price.totalSar },
     source: { ready_offer_id: "murad", code: "murad", tier: "", title: `عرض آلي — ${i.c.country}`, valid_from: null, valid_to: null },
   } as unknown as Record<string, unknown>);
+  const dated = deriveCityDates(itineraryStartDate(draft.trip, draft.flights), draft.cities);
+  const used = new Set<string>();
+  const cities = draft.cities.map((c, k) => {
+    const picks = withTours({ ...dated[k], tour_picks: [] }, Math.max(c.nights - 1, 0), 1, k === draft.cities.length - 1);
+    const fresh = (i.programs ?? []).filter((p) => p.city_name === c.city_name && !used.has(programDayText(p).title));
+    const filled = autoTourPicks(picks, fresh);
+    for (const p of filled) if (p.title) used.add(p.title);
+    return { ...c, tours: filled.length, tour_picks: filled };
+  });
+  const toured = { ...draft, cities };
+  return { ...toured, days: daysFromTours(toured, true) };
 }
 
 /** «15 نوفمبر» */

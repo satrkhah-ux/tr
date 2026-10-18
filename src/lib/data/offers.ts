@@ -572,11 +572,11 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
       supabase.from("offer_pricing_items").select("item_type, description, quantity, buy_price, buy_currency, sell_price, sell_currency").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_days").select("day_number, day_date, city_name, title, activities, temp_max, temp_min, rain_chance, weather_code, weather_source, transport_note").eq("offer_id", offer.id).order("day_number"),
       supabase.from("pricings").select("fx_rates").eq("offer_id", offer.id).limit(1).maybeSingle(),
-      supabase.from("offer_cities").select("city_name, hotel_name, check_out").eq("offer_id", offer.id).order("sort"),
+      supabase.from("offer_cities").select("city_name, hotel_name, check_in, check_out").eq("offer_id", offer.id).order("sort"),
     ]);
 
     const hotelRows = (hotelsRes.data ?? []) as HotelRow[];
-    const offerCities = (offerCitiesRes.data ?? []) as { city_name: string | null; hotel_name: string | null; check_out: string | null }[];
+    const offerCities = (offerCitiesRes.data ?? []) as { city_name: string | null; hotel_name: string | null; check_in: string | null; check_out: string | null }[];
     const flightRows = (flightsRes.data ?? []) as FlightRow[];
     const serviceRows = (servicesRes.data ?? []) as { label: string; kind: string }[];
     const termRows = (termsRes.data ?? []) as { text: string }[];
@@ -615,7 +615,12 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
 
     const hotels: InternalHotelLine[] = hotelRows.map((h) => ({
       // a hotel taken from a supplier is not in the catalogue: the offer's own city row names it
-      city_name: hotelCityName(h.hotel_id) ?? offerCities.find((c) => c.hotel_name && c.hotel_name === h.hotel_name)?.city_name ?? null,
+      // — the visit whose nights hold the stay; the hotel name alone missed a city of two hotels («Old Wall + 1»)
+      city_name:
+        hotelCityName(h.hotel_id) ??
+        offerCities.find((c) => h.check_in && c.check_in && c.check_out && c.check_in <= h.check_in && h.check_in < c.check_out)?.city_name ??
+        offerCities.find((c) => c.hotel_name && c.hotel_name === h.hotel_name)?.city_name ??
+        null,
       hotel_name: h.hotel_name,
       // prefer the cached content star rating (supplier-sourced) over the internal hotel's
       stars: h.content_star_rating ?? (h.hotel_id ? (hotelStars.get(h.hotel_id) ?? null) : null),

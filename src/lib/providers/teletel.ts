@@ -389,6 +389,8 @@ export type OpenConversation = {
   name: string;
   phone: string;
   assignee: string | null;
+  /** for a note that mentions them — Teletel notifies the one mentioned */
+  assigneeId: number | null;
   team: string | null;
   teamId: number | null;
   /** since when the client has waited for our reply — 0 when we spoke last */
@@ -415,7 +417,7 @@ type RawConversation = {
   labels?: string[];
   meta?: {
     sender?: { id?: number; name?: string | null; phone_number?: string | null; custom_attributes?: Record<string, unknown> | null };
-    assignee?: { name?: string | null } | null;
+    assignee?: { id?: number; name?: string | null } | null;
     team?: { id?: number; name?: string | null } | null;
   };
 };
@@ -489,6 +491,7 @@ async function readOpen(): Promise<OpenList | null> {
       name: sender?.name?.trim() || sender?.phone_number || `#${c.id}`,
       phone: sender?.phone_number ?? "",
       assignee: c.meta?.assignee?.name ?? null,
+      assigneeId: typeof c.meta?.assignee?.id === "number" ? c.meta.assignee.id : null,
       team: c.meta?.team?.name ?? null,
       teamId: typeof c.meta?.team?.id === "number" ? c.meta.team.id : null,
       waitingSince: c.waiting_since ?? 0,

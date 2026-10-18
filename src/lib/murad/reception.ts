@@ -126,6 +126,19 @@ export function receptionText(i: { name: string | null; salam: boolean; to: Rout
   return `${hello} ${welcome} ${move}${later}`;
 }
 
+/**
+ * After the hand-over, the client wrote and no one answered in five minutes:
+ * once a visit, that it arrived and who answers it (the evaluator, 2026-10-19:
+ * «فنادق مكرره… الوووو… ليش التاخير» went unanswered). The colleague by first
+ * name, their department, «خلال دقائق» — or the opening time out of hours.
+ */
+export function holdText(i: { assignee: string | null; team: string | null; opensAt: string | null }): string {
+  const who = i.assignee?.trim().split(/\s+/)[0] || "زميلنا";
+  const team = i.team?.trim();
+  const from = team ? ` من ${team.startsWith("قسم") ? team : `قسم ${team}`}` : "";
+  return `وصلت رسالتك، ${who}${from} سيرد عليك ${i.opensAt ? `عند بداية الدوام الساعة ${sayTime(i.opensAt)}` : "خلال دقائق"}.`;
+}
+
 /** The question when the first message names nothing — with the salam returned when it came with one. */
 export function clarifyText(salam: boolean): string {
   return salam ? `وعليكم السلام ورحمة الله، ${CLARIFY_QUESTION}` : CLARIFY_QUESTION;

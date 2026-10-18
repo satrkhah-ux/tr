@@ -120,3 +120,12 @@ describe("«تأخير بشري» (the owner, 2026-10-18)", () => {
     expect(pickDelay({ min: 20, max: 60 }, 0.5)).toBe(40);
   });
 });
+
+describe("after the hand-over: «وصلت رسالتك» (the evaluator, 2026-10-19)", () => {
+  it("names the colleague by first name and the department; the opening time out of hours; «زميلنا» with nobody yet", async () => {
+    const { holdText } = await import("./reception");
+    expect(holdText({ assignee: "احمد يوسف", team: "المبيعات", opensAt: null })).toBe("وصلت رسالتك، احمد من قسم المبيعات سيرد عليك خلال دقائق.");
+    expect(holdText({ assignee: null, team: "قسم فيزا", opensAt: "09:00" })).toBe("وصلت رسالتك، زميلنا من قسم فيزا سيرد عليك عند بداية الدوام الساعة 9:00 صباحاً.");
+    expect(holdText({ assignee: "خالد", team: null, opensAt: null })).toBe("وصلت رسالتك، خالد سيرد عليك خلال دقائق.");
+  });
+});
