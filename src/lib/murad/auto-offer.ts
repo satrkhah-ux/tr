@@ -13,6 +13,8 @@
  * offer. No flights.
  */
 
+import { emptyDraftData, normalizeDraftData, normalizeDraftHotel, type DraftData } from "@/lib/offer/draft-types";
+
 export type OfferCity = { city: string; nights: number; hotel: string };
 
 export type OfferCountry = {
@@ -167,6 +169,31 @@ export function holdToText(text: string, a: OfferAsk, today: string): OfferAsk {
   const name = a.name && !/^(null|none|غير معروف)$/i.test(a.name.trim()) ? a.name.trim() : null;
   const days = arrival && departure ? tripDays({ days: null, arrival, departure }) : a.days;
   return { ...a, name, arrival, departure, days };
+}
+
+/**
+ * The proposal as a Basic file, whole enough to issue (validateDraft): the
+ * client, the dates, the route with a double room and breakfast in each hotel,
+ * the car, no flights and no visa — and the price locked as a ready offer's is
+ * (`source` + pricing.final_total), so no line asks for a price of its own.
+ */
+export function offerDraftData(i: { name: string; phone: string; c: OfferCountry; arrival: string; provisional: boolean; days: number; adults: number; price: OfferPrice }): DraftData {
+  const base = emptyDraftData();
+  const car = { enabled: true, car_type: "سيارة خاصة مع سائق", cars: 1, note: "" };
+  const room = { room_type_id: null, room_type_name: "غرفة مزدوجة", board_type: "BB", price: null };
+  return normalizeDraftData({
+    ...base,
+    customer: { ...base.customer, customer_name: i.name, customer_phone: i.phone },
+    trip: { ...base.trip, country: i.c.country, destination: i.c.country, arrival_date: i.arrival, days: i.days, nights: i.price.nights, adults: i.adults, children: 0, rooms: i.price.rooms, meal_plan: "breakfast", default_board: "BB" },
+    scope: { ...base.scope, flights_intl: false, flights_domestic: false, visas: false },
+    transport_plan: { airport: car, tours: car, intercity: { ...car, mode: "car" } },
+    cities: i.price.route.map((r) => ({ city_name: r.city, nights: r.nights, check_in: null, check_out: null })),
+    hotels: i.price.route.map((r) => normalizeDraftHotel({ city_name: r.city, hotel_name: r.hotel, rooms: Array.from({ length: i.price.rooms }, () => room) })),
+    // what the message said, said on the document too
+    services: { includes: i.c.includes, excludes: i.c.excludes, terms: ["هذا عرض مبدئي، ويؤكد معك موظفنا التفاصيل قبل الحجز.", ...(i.provisional ? ["التواريخ مبدئية وتُحدَّد معك عند التأكيد."] : [])] },
+    pricing: { items: [], display_currency: "SAR", final_total: i.price.totalSar },
+    source: { ready_offer_id: "murad", code: "murad", tier: "", title: `عرض آلي — ${i.c.country}`, valid_from: null, valid_to: null },
+  } as unknown as Record<string, unknown>);
 }
 
 /** «15 نوفمبر» */

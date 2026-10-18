@@ -7,6 +7,7 @@ import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server
 import { grantedPermissions, isDeveloperRole, VIEW_AS_COOKIE, viewAsPermissions, type Permission, type Role } from "./roles";
 import { canOpenPath } from "./section-access";
 import { getFeatureFlags } from "@/lib/features-server";
+import { systemActor } from "@/lib/supabase/system-actor";
 
 /**
  * What the signed-in user may do — resolved from the ROLE their employee row
@@ -92,6 +93,8 @@ const loadViewAs = cache(async (): Promise<(ViewAs & { permissions: Permission[]
 const load = cache(async (): Promise<Permission[]> => (await loadViewAs())?.permissions ?? (await loadReal()));
 
 export async function currentPermissions(): Promise<Permission[]> {
+  const system = systemActor();
+  if (system) return [...system.can];
   return load();
 }
 
@@ -136,7 +139,7 @@ export async function deniedForNonDeveloper(target: {
 }
 
 export async function currentCan(permission: Permission): Promise<boolean> {
-  return (await load()).includes(permission);
+  return (await currentPermissions()).includes(permission);
 }
 
 /**

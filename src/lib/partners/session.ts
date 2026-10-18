@@ -2,6 +2,7 @@ import "server-only";
 import { ttlCache } from "@/lib/ttl-cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { systemActor } from "@/lib/supabase/system-actor";
 import { publicBrandLogoUrl } from "@/components/offer-doc/brand";
 import type { PartnerBrand } from "./PartnerContext";
 import type { PartnerTerms } from "./pricing";
@@ -145,6 +146,8 @@ export async function getPartnerBrand(): Promise<PartnerBrand | null> {
 
 /** True for a staff member — i.e. the app's mirror of the database's is_staff(). */
 export async function isStaffSession(): Promise<boolean> {
+  // a server job doing staff work (system-actor.ts)
+  if (systemActor()) return true;
   try {
     const user = await getServerUser();
     if (!user) return false;

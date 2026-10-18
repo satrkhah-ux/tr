@@ -11,13 +11,19 @@ import {
   listOpenConversations,
   listTeletelTeams,
   markTeletelSeen,
+  sendTeletelAttachment,
   sendTeletelMessage,
   setTeletelTyping,
 } from "@/lib/providers/teletel";
+import { asSystem } from "@/lib/supabase/system-actor";
+import { produceOfferFromDraft } from "@/lib/data/drafts";
+import { offerMessage } from "@/lib/data/client-whatsapp";
+import { clientOfferPdf } from "@/lib/offer-doc/client-pdf";
+import { tidyWhatsapp } from "@/lib/operations/client-messages";
+import { logAudit } from "@/lib/data/audit";
 import { parseAssignment } from "@/lib/leads/auto";
 import { getRates } from "@/lib/data/rates-actions";
-import { emptyDraftData, normalizeDraftData, normalizeDraftHotel } from "@/lib/offer/draft-types";
-import { askText, holdToText, missing, offerText, outOfRule, priceOffer, readOffers, tripDays, type OfferAsk, type OfferCountry } from "./auto-offer";
+import { askText, holdToText, missing, offerDraftData, offerText, outOfRule, priceOffer, readOffers, tripDays, type OfferAsk } from "./auto-offer";
 import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
@@ -136,21 +142,32 @@ async function readTrip(text: string): Promise<OfferAsk | null> {
   }
 }
 
-/** The proposal as a Basic file — the client, the dates, the route and its hotels, the price locked — for a colleague to confirm and issue. */
-async function offerDraft(service: SupabaseClient, i: { name: string; phone: string; c: OfferCountry; arrival: string; days: number; adults: number; price: ReturnType<typeof priceOffer> }): Promise<string | null> {
-  const base = emptyDraftData();
-  const data = normalizeDraftData({
-    ...base,
-    customer: { ...base.customer, customer_name: i.name, customer_phone: i.phone },
-    trip: { ...base.trip, country: i.c.country, destination: i.c.country, arrival_date: i.arrival, days: i.days, nights: i.price.nights, adults: i.adults, children: 0, meal_plan: "breakfast", default_board: "BB" },
-    cities: i.price.route.map((r) => ({ city_name: r.city, nights: r.nights, check_in: null, check_out: null })),
-    hotels: i.price.route.map((r) => normalizeDraftHotel({ city_name: r.city, hotel_name: r.hotel })),
-    services: { includes: i.c.includes, excludes: i.c.excludes, terms: [] },
-    // the owner's price, locked as a ready offer's is (pricing.final_total)
-    pricing: { items: [], display_currency: "SAR", final_total: i.price.totalSar },
-  } as unknown as Record<string, unknown>);
-  const { data: row } = await service.from("offer_drafts").insert({ data, title: `مُراد — ${i.name}` }).select("id").maybeSingle();
-  return (row as { id: string } | null)?.id ?? null;
+/**
+ * «الإصدار الآلي» (the owner, 2026-10-18): Murad issues the file it priced —
+ * the employee's own producer (produceOfferFromDraft), run as Murad
+ * (system-actor.ts: offers.write, no employee) — and sends the client the
+ * programme's link and its PDF in this conversation, recorded as the
+ * employee's send is (offer.client_sent). Null when the file could not be
+ * issued: the proposal already went, and the colleague issues it from Basic.
+ */
+async function issueAndSend(draftId: string, conversationId: number): Promise<{ serial: string; sent: boolean } | null> {
+  return asSystem({ name: "مُراد (آلي)", can: ["offers.write"] }, async () => {
+    const issued = await produceOfferFromDraft(draftId).catch(() => null);
+    if (!issued?.ok) return null;
+    const { serial } = issued;
+    const message = await offerMessage(serial, false);
+    if (!message) return { serial, sent: false };
+    const sent = (await sendTeletelMessage(conversationId, tidyWhatsapp(message.text))) !== null;
+    if (sent) {
+      // Chromium takes seconds; the client has the link meanwhile
+      const bytes = await clientOfferPdf(serial).catch(() => null);
+      if (bytes) await sendTeletelAttachment(conversationId, "📎 برنامج رحلتك", { name: message.pdfName, type: "application/pdf", bytes });
+      const { data: offer } = await db().from("offers").select("id").eq("serial", serial).maybeSingle();
+      const offerId = (offer as { id: string } | null)?.id;
+      if (offerId) await logAudit({ action: "offer.client_sent", entity: "offers", entity_id: offerId, meta: { result: "sent", version: 1, serial, by: "murad", pdf: Boolean(bytes) } });
+    }
+    return { serial, sent };
+  });
 }
 
 /**
@@ -329,7 +346,13 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
               await finish({ reason: "send_failed", reply: text, error: "send_failed" });
               return "send_failed";
             }
-            const draftId = await offerDraft(service, { name, phone: m.phone, c: offer, arrival, days, adults: trip.adults ?? 2, price });
+            const { data: draftRow } = await service
+              .from("offer_drafts")
+              .insert({ data: offerDraftData({ name, phone: m.phone, c: offer, arrival, provisional, days, adults: trip.adults ?? 2, price }), title: `مُراد — ${name}` })
+              .select("id")
+              .maybeSingle();
+            const draftId = (draftRow as { id: string } | null)?.id ?? null;
+            const issued = draftId ? await issueAndSend(draftId, m.conversationId) : null;
             const teams = await listTeletelTeams();
             const teamId = teamFor(readRoutes(reception.routesRaw, teams), "بكج");
             const team = teams.find((t) => t.id === teamId) ?? null;
@@ -337,10 +360,10 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
             const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
             await addTeletelNote(
               m.conversationId,
-              `🤖 عرض آلي: ${offer.country} ${days} أيام لـ${trip.adults ?? 2} — ${price.totalSar.toLocaleString("en-US")} ريال${provisional ? " (تواريخ مبدئية)" : ""}. ${draftId ? `الملف في بيسك: ${site}/basic/${draftId} — راجعه وأصدره.` : "تعذّر إنشاء ملف بيسك."} ${assigned && team ? `حُوّلت إلى «${team.name}».` : ""}`,
+              `🤖 عرض آلي: ${offer.country} ${days} أيام لـ${trip.adults ?? 2} — ${price.totalSar.toLocaleString("en-US")} ريال${provisional ? " (تواريخ مبدئية)" : ""}. ${issued ? `أُصدر العرض ${issued.serial}${issued.sent ? " وأُرسل للعميل رابطه وملف PDF" : " ولم يُرسل رابطه — أرسله من بيسك"}. الملف: ${site}/basic/${draftId} — تابع مع العميل للتأكيد.` : draftId ? `الملف في بيسك: ${site}/basic/${draftId} — راجعه وأصدره.` : "تعذّر إنشاء ملف بيسك."} ${assigned && team ? `حُوّلت إلى «${team.name}».` : ""}`,
             );
             const at = new Date().toISOString();
-            await finish({ reason: "offer:sent", reply: text, reply_message_id: replyId, intake: { country: offer.country, ...trip, days, arrival, provisional, total_sar: price.totalSar, draft_id: draftId, team_id: teamId, assigned, wait_sec: waitSec } });
+            await finish({ reason: "offer:sent", reply: text, reply_message_id: replyId, intake: { country: offer.country, ...trip, days, arrival, provisional, total_sar: price.totalSar, draft_id: draftId, serial: issued?.serial ?? null, link_sent: issued?.sent ?? false, team_id: teamId, assigned, wait_sec: waitSec } });
             await markLead(service, m, { inquiry: "بكج", destination: offer.country, route: team?.name.trim() ?? DEPARTMENT["بكج"], at, waitSec, draftId: draftId ?? undefined, name: trip.name });
             return "routed:بكج";
           }

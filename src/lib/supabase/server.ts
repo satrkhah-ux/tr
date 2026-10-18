@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types";
 import { AUTH_STORAGE_KEY, getSupabaseEnv, parseSessionCookie } from "./constants";
+import { systemActor, systemUser } from "./system-actor";
 
 /**
  * Server-side Supabase client for RSC / route handlers. Reads the session from
@@ -12,6 +13,8 @@ import { AUTH_STORAGE_KEY, getSupabaseEnv, parseSessionCookie } from "./constant
  * cookies (RSC cannot); token refresh happens on the browser.
  */
 export async function createSupabaseServerClient(): Promise<SupabaseClient<Database>> {
+  // a server job (system-actor.ts) has no session: its own gates stand for RLS
+  if (systemActor()) return createSupabaseServiceClient();
   const { url, anonKey } = getSupabaseEnv();
   const cookieStore = await cookies();
   const session = parseSessionCookie(cookieStore.get(AUTH_STORAGE_KEY)?.value);
@@ -48,6 +51,8 @@ export function createSupabaseServiceClient(): SupabaseClient<Database> {
 
 /** Returns the authenticated user (validated against Supabase Auth) or null. */
 export async function getServerUser(): Promise<User | null> {
+  const system = systemActor();
+  if (system) return systemUser(system);
   const cookieStore = await cookies();
   const session = parseSessionCookie(cookieStore.get(AUTH_STORAGE_KEY)?.value);
   if (!session) return null;
