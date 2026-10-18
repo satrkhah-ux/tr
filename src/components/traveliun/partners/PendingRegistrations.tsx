@@ -155,6 +155,9 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
   const [message, setMessage] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [temp, setTemp] = useState<string | null>(null);
+  /** a login made with the temporary password — no invitation to send any more */
+  const [made, setMade] = useState(false);
+  const router = useRouter();
 
   if (company.status !== "approved") return null;
   const weak = temp ? passwordProblem(temp, loginName(email)) : null;
@@ -165,7 +168,7 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
         بريد الدخول للشركة
         <input dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} className={`${field} text-start`} />
       </label>
-      {company.has_account ? null : (
+      {company.has_account || made ? null : (
       <button
         type="button"
         disabled={pending || done}
@@ -246,6 +249,10 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
                 if (res.ok) {
                   setDone(true);
                   setTemp(null);
+                  if (res.created) {
+                    setMade(true);
+                    router.refresh();
+                  }
                   setMessage(
                     `${res.created ? "أُنشئ حساب الشركة" : "عُيّنت كلمة المرور"} — أعطِ الشركة البريد وكلمة المرور، وتدخل من صفحة تسجيل الدخول، وسيُطلب منها تغييرها عند أول دخول.`,
                   );
@@ -255,7 +262,7 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
             className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-3 text-[12px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
           >
             {pending ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
-            {company.has_account ? "تعيين كلمة المرور" : "إصدار الحساب بكلمة المرور"}
+            {company.has_account || made ? "تعيين كلمة المرور" : "إصدار الحساب بكلمة المرور"}
           </button>
           <button type="button" onClick={() => setTemp(null)} className="h-9 px-2 text-[12px] font-bold text-[#557d78]">
             إلغاء

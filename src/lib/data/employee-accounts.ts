@@ -7,7 +7,7 @@ import { logAudit } from "./audit";
 import { currentCan, deniedForNonDeveloper } from "@/lib/roles/current";
 import { isDeveloperRole } from "@/lib/roles/roles";
 import { loginName, passwordProblem } from "@/lib/auth/password-rule";
-import { setTemporaryPassword } from "@/lib/auth/temp-password";
+import { discardLogin, setTemporaryPassword, TEMP_PASSWORD_REFUSAL } from "@/lib/auth/temp-password";
 
 /**
  * Issue a staff login from inside the system.
@@ -267,19 +267,20 @@ export async function setEmployeePassword(employeeId: string, password: string):
     if (weak) return { ok: false, message: weak };
 
     if (row.auth_user_id) {
-      const { data: user } = await admin.auth.admin.getUserById(row.auth_user_id);
+      const { data: user, error: userError } = await admin.auth.admin.getUserById(row.auth_user_id);
+      if (userError || !user.user) return { ok: false, message: "تعذّر تعيين كلمة المرور." };
       // a self-registration still in the queue is decided there, not unlocked here
-      if (user.user?.banned_until && Date.parse(user.user.banned_until) > Date.now()) {
+      if (user.user.banned_until && Date.parse(user.user.banned_until) > Date.now()) {
         return { ok: false, message: "هذا الحساب موقوف — قرّر في طلب التسجيل أولاً." };
       }
-      if (!(await setTemporaryPassword(admin as unknown as SupabaseClient, row.auth_user_id, password))) {
-        return { ok: false, message: "تعذّر تعيين كلمة المرور." };
-      }
+      const set = await setTemporaryPassword(admin as unknown as SupabaseClient, row.auth_user_id, password, "staff");
+      if (set !== "ok") return { ok: false, message: TEMP_PASSWORD_REFUSAL[set] };
       await logAudit({ action: "employee.account_issued", entity: "employees", entity_id: row.id, meta: { email, kind: "temp_password", must_change_password: true } });
       return { ok: true, email };
     }
 
-    const { data: page } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const { data: page, error: pageError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (pageError) return { ok: false, message: "تعذّر إنشاء الحساب." };
     if ((page?.users ?? []).some((u) => u.email?.toLowerCase() === email)) {
       return { ok: false, message: "لهذا البريد حساب دخول غير مربوط — اضغط «إصدار حساب» أولاً ليُربط، ثم عيّن كلمة المرور." };
     }
@@ -294,7 +295,7 @@ export async function setEmployeePassword(employeeId: string, password: string):
     const { error: linkError } = await admin.from("employees").update({ auth_user_id: made.user.id } as never).eq("id", row.id);
     if (linkError) {
       // a login with a known password that no employee holds is worse than none
-      await admin.auth.admin.deleteUser(made.user.id);
+      await discardLogin(admin as unknown as SupabaseClient, made.user.id);
       return { ok: false, message: "تعذّر ربط الحساب بالموظف." };
     }
     await logAudit({ action: "employee.account_issued", entity: "employees", entity_id: row.id, meta: { email, kind: "temp_password_login", must_change_password: true } });

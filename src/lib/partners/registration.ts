@@ -16,7 +16,7 @@ import {
 } from "./registration-form";
 import { getPartnerSession } from "./session";
 import { loginName, passwordProblem } from "@/lib/auth/password-rule";
-import { setTemporaryPassword } from "@/lib/auth/temp-password";
+import { discardLogin, setTemporaryPassword, TEMP_PASSWORD_REFUSAL } from "@/lib/auth/temp-password";
 
 /**
  * A company asking to work with us, and what happens to that request.
@@ -39,7 +39,14 @@ export type RegistrationResult = { ok: true; reference: string } | { ok: false; 
 const attemptsByOrigin = new Map<string, number[]>();
 const FAILED = "تعذّر إرسال الطلب. حاول مرة أخرى.";
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// «*» and «%» are ILIKE wildcards through PostgREST that no real address carries — refused outright
+const EMAIL = /^[^\s@*%]+@[^\s@*%]+\.[^\s@*%]{2,}$/;
+/**
+ * An address as an ILIKE pattern that matches only itself: «_» and «%» are
+ * legal in an address and wildcards to ILIKE — «a_b@x.sa» would also find
+ * «aXb@x.sa», another login's account.
+ */
+const exactly = (email: string) => email.replace(/[\\%_]/g, (c) => `\\${c}`);
 const BUCKET = "partner-documents";
 
 /**
@@ -282,7 +289,7 @@ export async function resendPartnerPasswordLink(input: {
       .from("partner_users")
       .select("id, status")
       .eq("partner_id", input.partner_id)
-      .ilike("email", email)
+      .ilike("email", exactly(email))
       .maybeSingle();
     const account = data as { id: string; status: string } | null;
     if (!account) return { ok: false, message: "لا يوجد حساب بهذا البريد لهذه الشركة — أصدر حساباً أولاً." };
@@ -358,16 +365,19 @@ export async function setPartnerPassword(input: {
     if (row.status !== "approved") return { ok: false, message: "اعتمد الشركة أولاً ثم أصدر الحساب." };
 
     // Only a login of THIS company — else the screen would set the password of any account at all.
-    const { data: linked } = await supabase
+    const { data: linked, error: lookupError } = await supabase
       .from("partner_users")
       .select("auth_user_id, status")
       .eq("partner_id", row.id)
-      .ilike("email", email)
+      .ilike("email", exactly(email))
       .maybeSingle();
+    // a failed lookup is a refusal, never «no account yet» (which would go on to make one)
+    if (lookupError) return { ok: false, message: "تعذّر تعيين كلمة المرور." };
     const account = linked as { auth_user_id: string; status: string } | null;
     if (account) {
       if (account.status !== "active") return { ok: false, message: "هذا الحساب موقوف — فعّله قبل تعيين كلمة المرور." };
-      if (!(await setTemporaryPassword(supabase, account.auth_user_id, password))) return { ok: false, message: "تعذّر تعيين كلمة المرور." };
+      const set = await setTemporaryPassword(supabase, account.auth_user_id, password, "partner");
+      if (set !== "ok") return { ok: false, message: TEMP_PASSWORD_REFUSAL[set] };
       await logAudit({
         action: "partner.account_issued",
         entity: "booking_partners",
@@ -428,11 +438,14 @@ async function inviteToCompany(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   // An employee's address must never become a partner login — that account
   // would pass is_staff() and the partner policies at the same time.
-  const { data: staff } = await supabase.from("employees").select("id").ilike("email", email).maybeSingle();
-  if (staff) return { ok: false, message: "هذا البريد يخصّ موظفاً — استخدم بريداً آخر للشركة." };
+  // A failed check refuses — it never reads as «nobody has it».
+  const { data: staff, error: staffError } = await supabase.from("employees").select("id").ilike("email", exactly(email)).limit(1);
+  if (staffError) return { ok: false, message: "تعذّر إنشاء الحساب." };
+  if ((staff ?? []).length > 0) return { ok: false, message: "هذا البريد يخصّ موظفاً — استخدم بريداً آخر للشركة." };
 
-  const { data: taken } = await supabase.from("partner_users").select("id").ilike("email", email).maybeSingle();
-  if (taken) return { ok: false, message: "هذا البريد مُصدر له حساب بالفعل." };
+  const { data: taken, error: takenError } = await supabase.from("partner_users").select("id").ilike("email", exactly(email)).limit(1);
+  if (takenError) return { ok: false, message: "تعذّر إنشاء الحساب." };
+  if ((taken ?? []).length > 0) return { ok: false, message: "هذا البريد مُصدر له حساب بالفعل." };
 
   // WITHOUT redirectTo the invitation lands on the site root, which does
   // nothing at all: the account exists and there is no way to give it a
@@ -459,7 +472,7 @@ async function inviteToCompany(
   });
   if (error && password) {
     // a login with a known password that belongs to no company is worse than none
-    await supabase.auth.admin.deleteUser(invite.user.id);
+    await discardLogin(supabase, invite.user.id);
     return { ok: false, message: "تعذّر ربط الحساب بالشركة." };
   }
   return error ? { ok: false, message: "أُنشئ الحساب ولم يُربط بالشركة — راجع السجل." } : { ok: true };

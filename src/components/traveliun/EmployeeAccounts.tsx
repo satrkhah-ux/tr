@@ -174,7 +174,8 @@ export function EmployeeAccounts() {
                           onSave={() => savePassword(row, temp.value)}
                           onCancel={() => setTemp(null)}
                         />
-                      ) : row.email && !(row.developer && !isDeveloper) ? (
+                      ) : row.email && !row.last_sign_in_at && !(row.developer && !isDeveloper) ? (
+                        // only a login nobody has used yet: once they sign in the password is theirs
                         <button
                           type="button"
                           onClick={() => setTemp({ id: row.id, value: "" })}
