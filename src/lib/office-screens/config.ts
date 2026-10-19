@@ -53,14 +53,9 @@ export function positionOf(cfg: ScreensConfig, n: number): number {
   return n >= 1 && n <= cfg.screens ? cfg.order.indexOf(n) : -1;
 }
 
-/** the screen's line for an event — destination and kind only, never a person */
-export function alertText(kind: string, country: string, test: boolean): string {
-  const line =
-    kind === "فنادق" ? `🏨 عميل جديد طلب فنادق ${country} الآن`
-    : kind === "طيران" ? `✈️ عميل جديد طلب طيران إلى ${country} الآن`
-    : kind === "تأشيرات" ? `🛂 عميل جديد طلب تأشيرة ${country} الآن`
-    : `✈️ عميل جديد طلب ${country} الآن`;
-  return test ? `تجربة — ${line}` : line;
+/** what the request is, under «عميل جديد الآن — إلى تركيا» — destination and kind only, never a person */
+export function kindWord(kind: string): string {
+  return kind === "فنادق" ? "حجز فنادق" : kind === "طيران" ? "تذاكر طيران" : kind === "تأشيرات" ? "تأشيرة" : "بكج سياحي";
 }
 
 const LRI = String.fromCharCode(0x2066);

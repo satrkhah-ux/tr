@@ -26,7 +26,7 @@ const RUNTIME = String.raw`
   function now() { return Date.now() + offset; }
   function $(id) { return document.getElementById(id); }
   var layers = [$("a0"), $("a1")], front = 0, shown = layers[0].getAttribute("src") || "", pending = "", failed = "", failedAt = 0, preloaded = "";
-  var box = $("alert"), boxImg = $("alertImg"), boxText = $("alertText"), shownAlert = "";
+  var box = $("alert"), boxImg = $("alertImg"), shownAlert = "";
   var band = $("band"), text = $("tick"), tag = $("alertTag"), scale = 1, bandUp = false;
   // the demo (while the TVs are set up): this load, on this screen only, one pass and then a «تجربة» alert
   var demo = S.demo, demoAt = Date.now();
@@ -77,14 +77,18 @@ const RUNTIME = String.raw`
   function drawAlert(t) {
     var i = alertAt(S.events, t, LEAD, SHOW), e = i < 0 ? null : S.events[i];
     var d = demo ? Date.now() - demoAt - passMs() - LEAD : -1;
-    if (!e && d >= 0 && d < SHOW) e = { at: -1, text: demo.text, src: demo.src };
-    var key = e ? e.at + "|" + e.text : "";
+    if (!e && d >= 0 && d < SHOW) e = { at: -1, country: demo.country, kind: demo.kind, test: true, src: demo.src };
+    var key = e ? e.at + "|" + e.country + "|" + e.kind : "";
     if (key === shownAlert) return;
     shownAlert = key;
     if (!e) { box.className = ""; return; }
-    tag.style.display = e.at === -1 ? "block" : "none";
-    boxText.textContent = e.text;
+    tag.style.display = e.test ? "block" : "none";
+    $("aDest").textContent = "إلى " + e.country;
+    $("aKind").textContent = e.kind;
     if (e.src) { boxImg.setAttribute("src", e.src); boxImg.style.display = "block"; } else boxImg.style.display = "none";
+    // from the start every time: off, a reflow, on — the animations run again
+    box.className = "";
+    void box.offsetWidth;
     box.className = "on";
   }
 
@@ -175,11 +179,41 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 .ad,#alert{position:absolute;left:0;top:0;width:100%;height:100%}
 .ad{object-fit:cover;opacity:0;-webkit-transition:opacity .9s;transition:opacity .9s}
 .ad.on{opacity:1}
-#alert{background:#000;opacity:0;-webkit-transition:opacity .6s;transition:opacity .6s}
-#alert.on{opacity:1}
-#alertImg{width:100%;height:100%;object-fit:cover;opacity:.4}
+#alert{background:#000;opacity:0;visibility:hidden;overflow:hidden;-webkit-transition:opacity .5s,visibility 0s .5s;transition:opacity .5s,visibility 0s .5s}
+#alert.on{opacity:1;visibility:visible;-webkit-transition:opacity .5s;transition:opacity .5s}
+#alertImg{width:100%;height:100%;object-fit:cover}
+#alert.on #alertImg{-webkit-animation:kb 9s ease-out both;animation:kb 9s ease-out both}
+#shade{position:absolute;left:0;top:0;width:100%;height:100%;background:-webkit-linear-gradient(bottom,rgba(4,30,26,.94) 0%,rgba(4,30,26,.6) 50%,rgba(4,30,26,.2) 100%);background:linear-gradient(to top,rgba(4,30,26,.94) 0%,rgba(4,30,26,.6) 50%,rgba(4,30,26,.2) 100%)}
+#flight{position:absolute;left:0;width:100%;top:26%;height:6vw}
+#trail{position:absolute;left:0;top:50%;width:100%;height:.35vw;margin-top:-.17vw;background:-webkit-linear-gradient(left,rgba(201,162,39,0),#e3bd3c);background:linear-gradient(to right,rgba(201,162,39,0),#e3bd3c);-webkit-transform-origin:left;transform-origin:left;-webkit-transform:scaleX(0);transform:scaleX(0)}
+#alert.on #trail{-webkit-animation:trail 1.7s .2s cubic-bezier(.3,.7,.2,1) both,fade .8s 2.4s both;animation:trail 1.7s .2s cubic-bezier(.3,.7,.2,1) both,fade .8s 2.4s both}
+#plane{position:absolute;top:0;left:0;width:6vw;height:6vw;fill:#fff;-webkit-transform:translateX(-8vw) rotate(90deg);transform:translateX(-8vw) rotate(90deg);-webkit-filter:drop-shadow(0 0 1vw rgba(227,189,60,.9));filter:drop-shadow(0 0 1vw rgba(227,189,60,.9))}
+#alert.on #plane{-webkit-animation:fly 1.7s .2s cubic-bezier(.3,.7,.2,1) both;animation:fly 1.7s .2s cubic-bezier(.3,.7,.2,1) both}
+#msg{position:absolute;left:0;right:0;top:42%;text-align:center;direction:rtl}
+#kicker{display:inline-block;font-size:2.8vw;font-weight:800;color:#e3bd3c;letter-spacing:.05em;opacity:0}
+#kicker i{position:relative;display:inline-block;width:1.3vw;height:1.3vw;margin-left:1vw;border-radius:50%;background:#e53950;vertical-align:middle}
+#kicker i:after{content:"";position:absolute;left:0;top:0;width:100%;height:100%;border-radius:50%;background:#e53950}
+#alert.on #kicker{-webkit-animation:rise .6s .6s both;animation:rise .6s .6s both}
+#alert.on #kicker i:after{-webkit-animation:ping 1.2s 1.1s infinite;animation:ping 1.2s 1.1s infinite}
+#aDest{font-size:10vw;font-weight:800;color:#fff;line-height:1.15;text-shadow:0 .4vw 2.4vw rgba(0,0,0,.6),0 0 3.5vw rgba(227,189,60,.5);opacity:0}
+#alert.on #aDest{-webkit-animation:pop .9s .9s cubic-bezier(.2,1.5,.4,1) both;animation:pop .9s .9s cubic-bezier(.2,1.5,.4,1) both}
+#aKind{display:inline-block;margin-top:1vw;font-size:2vw;font-weight:800;color:#0a3a33;background:#e3bd3c;border-radius:3vw;padding:.5vw 2.4vw;opacity:0}
+#alert.on #aKind{-webkit-animation:rise .5s 1.5s both;animation:rise .5s 1.5s both}
+@-webkit-keyframes kb{from{-webkit-transform:scale(1.18)}to{-webkit-transform:scale(1)}}
+@keyframes kb{from{transform:scale(1.18)}to{transform:scale(1)}}
+@-webkit-keyframes trail{from{-webkit-transform:scaleX(0)}to{-webkit-transform:scaleX(1)}}
+@keyframes trail{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@-webkit-keyframes fade{from{opacity:1}to{opacity:0}}
+@keyframes fade{from{opacity:1}to{opacity:0}}
+@-webkit-keyframes fly{from{-webkit-transform:translateX(-8vw) rotate(90deg)}to{-webkit-transform:translateX(104vw) rotate(90deg)}}
+@keyframes fly{from{transform:translateX(-8vw) rotate(90deg)}to{transform:translateX(104vw) rotate(90deg)}}
+@-webkit-keyframes rise{from{opacity:0;-webkit-transform:translateY(2vw)}to{opacity:1;-webkit-transform:none}}
+@keyframes rise{from{opacity:0;transform:translateY(2vw)}to{opacity:1;transform:none}}
+@-webkit-keyframes pop{from{opacity:0;-webkit-transform:scale(.6)}to{opacity:1;-webkit-transform:scale(1)}}
+@keyframes pop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+@-webkit-keyframes ping{from{opacity:.8;-webkit-transform:scale(1)}to{opacity:0;-webkit-transform:scale(3)}}
+@keyframes ping{from{opacity:.8;transform:scale(1)}to{opacity:0;transform:scale(3)}}
 #alertTag{display:none;position:absolute;top:3vh;right:3vh;z-index:2;font-size:1.8vw;font-weight:800;color:#0a3a33;background:#ffd54a;border-radius:1vw;padding:.6vw 1.4vw}
-#alertText{position:absolute;left:6%;right:6%;top:50%;-webkit-transform:translateY(-50%);transform:translateY(-50%);text-align:center;color:#fff;font-size:5vw;font-weight:800;line-height:1.4;direction:rtl;background:rgba(10,58,51,.88);border:.3vw solid #2aa87a;border-radius:2vw;padding:3vw 2vw}
 #band{position:absolute;left:0;right:0;bottom:0;height:9%;z-index:3;background:rgba(10,58,51,.92);border-top:.35vh solid #2aa87a;overflow:hidden;-webkit-transform:translateY(105%);transform:translateY(105%);-webkit-transition:-webkit-transform .7s;transition:transform .7s}
 #band.up{-webkit-transform:translateY(0);transform:translateY(0)}
 #tick{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;direction:rtl;color:#fff;font-weight:800;line-height:1.24;will-change:transform}
@@ -199,7 +233,10 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <body>
 <img id="a0" class="ad on" alt=""${src ? ` src="${esc(src)}"` : ""}>
 <img id="a1" class="ad" alt="">
-<div id="alert"><img id="alertImg" alt=""><div id="alertTag">تجربة</div><div id="alertText"></div></div>
+<div id="alert"><img id="alertImg" alt=""><div id="shade"></div>
+<div id="flight"><div id="trail"></div><svg id="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
+<div id="alertTag">تجربة</div>
+<div id="msg"><div id="kicker"><i></i>عميل جديد الآن</div><div id="aDest"></div><div id="aKind"></div></div></div>
 <div id="band"><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
 <script>window.__S__=${json(s)};window.__N__=${n};window.__M__=${monitor ? "true" : "false"};</script>
 <script>${SCREEN_CORE}${RUNTIME}</script>

@@ -6,7 +6,7 @@ import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { resolvePlace } from "@/lib/leads/places";
 import type { Place } from "@/lib/leads/auto";
 import { ttlCache } from "@/lib/ttl-cache";
-import { alertText, normalizeConfig, positionOf, riyadhDay, SCREENS_SETTING, tickerText, tickerWidth, topCountries, type ScreensConfig } from "./config";
+import { kindWord, normalizeConfig, positionOf, riyadhDay, SCREENS_SETTING, tickerText, tickerWidth, topCountries, type ScreensConfig } from "./config";
 
 /**
  * «الشاشات» — what a screen reads, every few seconds, with no login (the owner,
@@ -25,9 +25,10 @@ export type ScreenState = {
   ads: { src: string; name: string }[];
   /** the band: its words, their room, its speed, how often it comes up, and the extra pass when the words changed */
   ticker: { text: string; width: number; speed: number; periodMs: number; bumpAt: number } | null;
-  events: { at: number; text: string; src: string | null }[];
+  /** «عميل جديد الآن — إلى {country}», the request's kind in words, «تجربة» when it is one */
+  events: { at: number; country: string; kind: string; test: boolean; src: string | null }[];
   /** while the TVs are set up: on every load, one pass and then this alert, on that screen only — never stored, never counted */
-  demo: { text: string; src: string | null } | null;
+  demo: { country: string; kind: string; src: string | null } | null;
 };
 
 type Shared = Omit<ScreenState, "now" | "position"> & { cfg: ScreensConfig };
@@ -109,10 +110,10 @@ async function shared(now: number): Promise<Shared> {
       const country = countryOf(e.destination, list);
       if (!country) return [];
       const ad = ads[adCountry.indexOf(country)];
-      return [{ at: Date.parse(e.at), text: alertText(e.kind, country, e.test), src: ad?.src ?? null }];
+      return [{ at: Date.parse(e.at), country, kind: kindWord(e.kind), test: e.test, src: ad?.src ?? null }];
     });
     const demoCountry = tick.top ?? "تركيا";
-    const demo = now < Date.parse(cfg.demoUntil) ? { text: alertText("بكج", demoCountry, false), src: ads[adCountry.indexOf(demoCountry)]?.src ?? null } : null;
+    const demo = now < Date.parse(cfg.demoUntil) ? { country: demoCountry, kind: kindWord("بكج"), src: ads[adCountry.indexOf(demoCountry)]?.src ?? null } : null;
     return { cfg, build: String(process.env.NEXT_DEPLOYMENT_ID || ""), screens: cfg.screens, slotMs: cfg.slotSec * 1000, ads, ticker: tick.band, events, demo };
   });
 }

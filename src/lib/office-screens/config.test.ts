@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertText, normalizeConfig, positionOf, riyadhDay, tickerText } from "./config";
+import { kindWord, normalizeConfig, positionOf, riyadhDay, tickerText } from "./config";
 
 describe("«الشاشات» settings and words", () => {
   it("every screen exactly once in the hanging order, whatever was saved", () => {
@@ -11,8 +11,8 @@ describe("«الشاشات» settings and words", () => {
   });
 
   it("the alert names the destination and the kind, never a person", () => {
-    expect(alertText("بكج", "تركيا", false)).toBe("✈️ عميل جديد طلب تركيا الآن");
-    expect(alertText("تأشيرات", "إيطاليا", true)).toBe("تجربة — 🛂 عميل جديد طلب تأشيرة إيطاليا الآن");
+    expect(kindWord("بكج")).toBe("بكج سياحي");
+    expect(kindWord("تأشيرات")).toBe("تأشيرة");
   });
 
   it("the ticker: today's top countries by conversations, no counts; under three → yesterday's with its date", () => {
