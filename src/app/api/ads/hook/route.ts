@@ -1,8 +1,9 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { rowsFromPayload } from "@/lib/ads/payload";
+import { adsHookKey } from "@/lib/ads/key";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -13,14 +14,8 @@ export const maxDuration = 60;
  * clicks were, what was searched, the hour (lib/ads/payload.ts). Upserted by
  * day — today's partial rows are overwritten each hour, a closed day stays.
  *
- * The key is a hash of ADMIN_API_SECRET with its own label — never the secret,
- * never in the repo; the script holds it (`adsHookKey`, read on the server).
+ * The key is a hash of ADMIN_API_SECRET with its own label (lib/ads/key.ts).
  */
-export function adsHookKey(): string | null {
-  const secret = process.env["ADMIN_API_SECRET"];
-  return secret ? createHash("sha256").update(`ads-hook:${secret}`).digest("hex").slice(0, 40) : null;
-}
-
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
