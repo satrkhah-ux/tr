@@ -13,7 +13,8 @@ import { getCurrentRole } from "@/lib/data/metrics";
 import { currentPermissions, currentRealPermissions, currentViewAs } from "@/lib/roles/current";
 import { canSwitchRoles } from "@/lib/roles/roles";
 import { getPublicSupabaseConfig } from "@/lib/supabase/constants";
-import { getServerUser } from "@/lib/supabase/server";
+import { getServerUser, sessionGone } from "@/lib/supabase/server";
+import { SessionGone } from "@/components/traveliun/SessionGone";
 import { ChangePasswordDialog } from "@/components/traveliun/ChangePasswordDialog";
 
 const inter = Inter({
@@ -102,7 +103,7 @@ export default async function RootLayout({
   //    else (scripts/flag-password-change.mjs); app_metadata is not user-writable.
   //  · A partner wears their own colours, resolved here so the first paint is
   //    already theirs — a client-side swap would flash ours first.
-  const [realRole, permissions, realPermissions, viewAs, user, features, partnerBrand] = await Promise.all([
+  const [realRole, permissions, realPermissions, viewAs, user, features, partnerBrand, gone] = await Promise.all([
     getCurrentRole(),
     currentPermissions(),
     currentRealPermissions(),
@@ -110,6 +111,7 @@ export default async function RootLayout({
     getServerUser(),
     getFeatureFlags(),
     getPartnerBrand(),
+    sessionGone(),
   ]);
   const mustChangePassword = user?.app_metadata?.["must_change_password"] === true;
   // Public Supabase config, read at RUNTIME and injected so the browser gets it
@@ -148,6 +150,7 @@ export default async function RootLayout({
                 <TraveliunUIProvider>
                   {children}
                   {mustChangePassword ? <ChangePasswordDialog forced /> : null}
+                  {gone ? <SessionGone /> : null}
                   <NavigationLoader />
                 </TraveliunUIProvider>
               </PartnerProvider>

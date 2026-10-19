@@ -68,21 +68,36 @@ export async function getServerUser(): Promise<User | null> {
  */
 const usersByToken = ttlCache<string, User>(60_000);
 
-const userForToken = cache(async (accessToken: string): Promise<User | null> => {
+const checkToken = cache(async (accessToken: string): Promise<{ user: User | null; gone: boolean }> => {
   // across requests too: the token is a signed JWT valid ~1 h, and validating it
   // is a Frankfurt → Mumbai round trip on every navigation (lib/ttl-cache.ts)
   const known = usersByToken.get(accessToken);
-  if (known) return known;
+  if (known) return { user: known, gone: false };
   try {
     const { url, anonKey } = getSupabaseEnv();
     const supabase = createClient<Database>(url, anonKey, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
     const { data, error } = await supabase.auth.getUser(accessToken);
-    if (error) return null;
+    // signed out elsewhere, or the account deleted — never a network blip, which must not sign anyone out
+    if (error) return { user: null, gone: error.code === "session_not_found" || error.code === "user_not_found" };
     if (data.user) usersByToken.set(accessToken, data.user);
-    return data.user;
+    return { user: data.user, gone: false };
   } catch {
-    return null;
+    return { user: null, gone: false };
   }
 });
+
+const userForToken = async (accessToken: string): Promise<User | null> => (await checkToken(accessToken)).user;
+
+/**
+ * The browser holds a session Supabase no longer knows (signed out on another
+ * device, revoked). The proxy reads only the cookie, so without this every page
+ * sent such a person to /dashboard's «لا توجد صلاحية» as if their permissions
+ * had been taken; the root layout now clears it and opens the sign-in instead.
+ */
+export async function sessionGone(): Promise<boolean> {
+  if (systemActor()) return false;
+  const session = parseSessionCookie((await cookies()).get(AUTH_STORAGE_KEY)?.value);
+  return session ? (await checkToken(session.accessToken)).gone : false;
+}
