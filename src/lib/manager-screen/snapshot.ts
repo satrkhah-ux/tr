@@ -139,8 +139,8 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
       open?.rows
         .map((c) => ({ c, clock: slaClock(c, nowSec) }))
         .filter(({ clock }) => clock.kind !== "cold")
-        .map(({ c, clock }) => ({ minutes: clock.minutes, since: iso(now - clock.minutes * 60_000), agent: c.assignee, client: c.name })) ?? null,
-    open: open?.rows.map((c) => ({ agent: c.assignee, activeAt: iso((c.lastActivityAt || c.createdAt) * 1000) })) ?? null,
+        .map(({ c, clock }) => ({ minutes: clock.minutes, since: iso(now - clock.minutes * 60_000), agent: c.assignee?.trim() || null, client: c.name })) ?? null,
+    open: open?.rows.map((c) => ({ agent: c.assignee?.trim() || null, activeAt: iso((c.lastActivityAt || c.createdAt) * 1000) })) ?? null,
     agents,
     employees: team,
     audit: (audit.data as { action: string; actor_id: string | null; entity_id: string | null; created_at: string; meta: Record<string, unknown> | null }[]).map((a) => ({
