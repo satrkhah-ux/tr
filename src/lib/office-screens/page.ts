@@ -99,7 +99,8 @@ const RUNTIME = String.raw`
       var d = demo ? Date.now() - demoAt : -1;
       e = d >= 0 && d < passMs() ? d : tickerElapsed(t, k.periodMs, passMs(), k.bumpAt);
     }
-    if ((e >= 0) !== bandUp) { bandUp = e >= 0; band.className = bandUp ? "up" : ""; }
+    // the band never covers the ad (its price sits at the bottom): while it is up the ad moves above it, whole
+    if ((e >= 0) !== bandUp) { bandUp = e >= 0; band.className = bandUp ? "up" : ""; document.body.className = bandUp ? "band" : ""; }
     if (e < 0) return;
     var px = tickerLeft(e, k.speed, k.width, S.position, REF) * scale;
     var v = "translate3d(" + px.toFixed(1) + "px,0,0)";
@@ -177,7 +178,8 @@ const CSS = `
 html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}
 body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans Arabic",Tahoma,Arial,sans-serif}
 .ad,#alert{position:absolute;left:0;top:0;width:100%;height:100%}
-.ad{object-fit:cover;opacity:0;-webkit-transition:opacity .9s;transition:opacity .9s}
+.ad{object-fit:cover;opacity:0;-webkit-transition:opacity .9s,height .4s ease;transition:opacity .9s,height .4s ease}
+.band .ad{height:91%;object-fit:contain}
 .ad.on{opacity:1}
 #alert{background:#000;opacity:0;visibility:hidden;overflow:hidden;-webkit-transition:opacity .5s,visibility 0s .5s;transition:opacity .5s,visibility 0s .5s}
 #alert.on{opacity:1;visibility:visible;-webkit-transition:opacity .5s;transition:opacity .5s}
