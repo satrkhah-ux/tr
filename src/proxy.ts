@@ -121,6 +121,8 @@ const PUBLIC_PREFIXES = [
   "/api/murad/run",
   // «المستقبل الآلي»: Teletel's webhook — no cookie; the token in its URL is the secret's (route.ts)
   "/api/teletel/webhook",
+  // «رؤية للإعلانات»: the owner's Google Ads Script — no cookie; the key in its URL is the secret's hash (route.ts)
+  "/api/ads/hook",
   "/b2b",
 ];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
