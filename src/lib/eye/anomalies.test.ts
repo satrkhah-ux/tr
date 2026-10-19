@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anomalies, firstName, ticketMinutes, ticketsFromLeads, type LeadForTicket } from "./anomalies";
+import { anomalies, firstName, requestCounts, teletelEmployees, ticketMinutes, ticketsFromLeads, type LeadForTicket } from "./anomalies";
 import type { EyeSnapshot } from "./types";
 
 /**
@@ -299,5 +299,53 @@ describe("the conversations of «العملاء» as tickets (care_tickets is em
     expect(firstName("٠٥٠١٢٣")).toBeNull();
     expect(firstName("  سارة   القحطاني ")).toBe("سارة");
     expect(firstName(null)).toBeNull();
+  });
+});
+
+describe("absence, for those who work in the system only (the owner, 2026-10-19)", () => {
+  const person = (over: Partial<EyeSnapshot["employees"][number]> = {}) => ({
+    id: "e1",
+    name: "محمد",
+    active: true,
+    section: "مبيعات",
+    first_seen_at: null,
+    last_seen_at: null,
+    beats: 0,
+    actions_today: 0,
+    ...over,
+  });
+
+  it("says nothing about a Teletel agent who never opened the system", () => {
+    const notes = anomalies(snap({ employees: [person({ works_in_teletel: true }), person({ id: "e2", name: "ريم", section: "العمليات" })] }), NOW, DAY);
+    expect(notes.map((n) => n.title)).toEqual(["ريم ما فتح النظام اليوم"]);
+  });
+
+  it("counts «nobody opened it» among the system's own users only", () => {
+    const notes = anomalies(
+      snap({ employees: [person({ works_in_teletel: true }), person({ id: "e2", name: "ريم" }), person({ id: "e3", name: "هاني" })] }),
+      NOW,
+      DAY,
+    );
+    expect(notes.map((n) => n.title)).toEqual(["ما أحد فتح النظام اليوم"]);
+    expect(notes[0].detail).toContain("2 موظف");
+  });
+
+  it("knows a Teletel agent by their name, or its first words", () => {
+    const staff = [
+      { id: "a", arabic_name: "احمد يوسف" },
+      { id: "b", arabic_name: "رشا العتيبي" },
+      { id: "c", arabic_name: "هاني" },
+    ];
+    expect([...teletelEmployees(["احمد يوسف", "رشا", "مهندس خالد"], staff)].sort()).toEqual(["a", "b"]);
+  });
+});
+
+describe("the admin dashboard's request tiles (data/metrics.ts)", () => {
+  it("counts the answered, who has any, and who still owes a reply", () => {
+    const t = (id: string, employee_id: string | null, responded_at: string | null) => ({ id, subject: "بكج", customer: null, employee_id, employee_name: null, created_at: NOW, responded_at });
+    const c = requestCounts([t("1", "e1", NOW), t("2", "e1", null), t("3", "e2", NOW), t("4", null, null)]);
+    expect(c.answered).toBe(2);
+    expect([...c.assigned].sort()).toEqual(["e1", "e2"]);
+    expect([...c.pending]).toEqual(["e1"]);
   });
 });

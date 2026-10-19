@@ -4,7 +4,8 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { buildOpsDigest } from "@/lib/telegram/ops-digest";
 import { AUTO_FOLLOWUP_MAX_MINUTES } from "@/lib/sla/classify";
 import { allRows } from "@/lib/data/all-rows";
-import { anomalies, ticketMinutes, ticketsFromLeads, type LeadForTicket } from "./anomalies";
+import { getTeletelConfig, teletelGet } from "@/lib/providers/teletel";
+import { anomalies, LEAD_TICKET_COLS, teletelEmployees, ticketMinutes, ticketsFromLeads, type LeadForTicket } from "./anomalies";
 import type { EyeReport, EyeSnapshot, Note } from "./types";
 
 /**
@@ -41,14 +42,15 @@ type EmployeeRow = {
   roles: { arabic_name: string } | { arabic_name: string }[] | null;
 };
 
-const LEAD_COLS = "id, name, inquiry, status, assigned_to, assigned_to_name, received_by, received_by_name, first_message_at, first_reply_at";
 
 /**
  * `clientNames: false` — the same report without any client's name, for the
  * manager's office TV where visitors sit (lib/manager-screen); the bot's
- * briefing keeps them.
+ * briefing keeps them. `since` — the conversations the response figures read
+ * from: the bot's last week by default, the TV's today («شاشة المدير لمعالجة
+ * الأمور اليوم وليس للأيام السابقة», the owner, 2026-10-19).
  */
-export async function buildEyeReport({ clientNames = true }: { clientNames?: boolean } = {}): Promise<EyeReport> {
+export async function buildEyeReport({ clientNames = true, since }: { clientNames?: boolean; since?: string } = {}): Promise<EyeReport> {
   const now = new Date();
   const nowIso = now.toISOString();
   const { day } = riyadhParts(now);
@@ -56,24 +58,29 @@ export async function buildEyeReport({ clientNames = true }: { clientNames?: boo
   const dayStartIso = new Date(Date.parse(`${day}T00:00:00Z`) - RIYADH_OFFSET_MS).toISOString();
   // The last week's conversations only: Teletel keeps hundreds of months-old ones
   // open, and a backlog is not today's delay — the line the SLA rules draw too.
-  const leadsSince = new Date(now.getTime() - AUTO_FOLLOWUP_MAX_MINUTES * 60_000).toISOString();
+  const leadsSince = since ?? new Date(now.getTime() - AUTO_FOLLOWUP_MAX_MINUTES * 60_000).toISOString();
 
   const supabase = db();
 
-  const [empRes, attRes, leadRes, auditRes, offerRes, bookingRes, digest] = await Promise.all([
+  const [empRes, attRes, leadRes, auditRes, offerRes, bookingRes, digest, agents] = await Promise.all([
     supabase.from("employees").select("id, arabic_name, email, status, roles(arabic_name)").order("arabic_name"),
     supabase.from("attendance_days").select("employee_id, first_seen_at, last_seen_at, beats").eq("day", day),
     // «خدمة العملاء» went with the menu consolidation (the owner, 2026-10-19) and
     // care_tickets is empty: clients wait in «العملاء» now (ticketsFromLeads).
     // Every page — PostgREST stops at a thousand.
-    allRows((a, b) => supabase.from("client_leads").select(LEAD_COLS).gte("created_at", leadsSince).order("id").range(a, b)),
+    allRows((a, b) => supabase.from("client_leads").select(LEAD_TICKET_COLS).gte("created_at", leadsSince).order("id").range(a, b)),
     supabase.from("audit_logs").select("action, actor_id, actor_email, entity_id, created_at, meta").gte("created_at", dayStartIso).order("created_at"),
     supabase.from("offers").select("serial, status, total, currency, created_at").gte("created_at", dayStartIso),
     supabase.from("operation_bookings").select("id, operation_id, title, status, confirmed_at, confirmation_number").not("confirmed_at", "is", null),
     buildOpsDigest(5),
+    // who is a Teletel agent — their absence from the system is no absence (anomalies.ts)
+    teletelGet<{ name?: string | null }[]>("/agents"),
   ]);
 
   const employees = (empRes.data ?? []) as unknown as EmployeeRow[];
+  // Teletel configured but not answering: nobody can be told apart, so no absence is said for anyone
+  const unknownAgents = Boolean(getTeletelConfig()) && !Array.isArray(agents);
+  const inTeletel = teletelEmployees(Array.isArray(agents) ? agents.map((a) => a.name ?? "") : [], employees);
   const ops = clientNames ? digest : { ...digest, urgent: digest.urgent.map((u) => ({ ...u, customer: null })) };
   const attendance = new Map(
     ((attRes.data ?? []) as { employee_id: string; first_seen_at: string; last_seen_at: string; beats: number }[]).map((a) => [a.employee_id, a]),
@@ -111,6 +118,7 @@ export async function buildEyeReport({ clientNames = true }: { clientNames?: boo
         last_seen_at: att?.last_seen_at ?? null,
         beats: att?.beats ?? 0,
         actions_today: actionsByActor.get(e.id) ?? 0,
+        works_in_teletel: unknownAgents || inTeletel.has(e.id),
       };
     }),
     tickets: ticketsFromLeads(leadRes.data as LeadForTicket[], new Map(employees.map((e) => [e.id, e.arabic_name]))).map((t) =>

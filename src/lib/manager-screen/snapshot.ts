@@ -6,23 +6,31 @@ import { ttlCache } from "@/lib/ttl-cache";
 import { allRows } from "@/lib/data/all-rows";
 import { buildEyeReport, riyadhParts } from "@/lib/eye/report";
 import { textSummary } from "@/lib/eye/script";
+import { teletelEmployees } from "@/lib/eye/anomalies";
 import { buildOpsDigest } from "@/lib/telegram/ops-digest";
-import { listOpenConversations } from "@/lib/providers/teletel";
+import { listOpenConversations, teletelGet } from "@/lib/providers/teletel";
 import { slaClock } from "@/lib/sla/classify";
 import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { campaignDestination, resolvePlace } from "@/lib/leads/places";
 import { riyadhDay } from "@/lib/leads/sheet";
+import { parseHours } from "@/lib/murad/reception";
+import { SETTING } from "@/lib/murad/core";
 import type { Place, Stage } from "@/lib/leads/auto";
-import { buildScreen, normalizeManagerThresholds, TICKER_HOURS, type ManagerFacts, type ManagerSnapshot } from "./rules";
+import { buildScreen, dayStartMs, normalizeManagerThresholds, type AgentFact, type ManagerFacts, type ManagerSnapshot } from "./rules";
 
 export type { ManagerScreenFeed, ManagerSnapshot } from "./rules";
 
 /**
  * «قناة المدير»'s one snapshot (the owner, 2026-10-19): read in parallel with
  * the service role, judged by rules.ts, kept 60 seconds in this process — the
- * TVs poll, nobody computes from raw rows on a screen. Reads only: the SLA
- * board's own loader (getSlaBoard) moves conversations, so its clock is taken
- * from the same cached Teletel list instead (listOpenConversations + slaClock).
+ * TVs poll, nobody computes from raw rows on a screen. Today only: every read
+ * starts at 00:00 Riyadh («شاشة المدير لمعالجة الأمور اليوم وليس للأيام
+ * السابقة»), except the confirmations' history, which only tells a first
+ * confirmation from a repeated one.
+ *
+ * Reads only: the SLA board's own loader (getSlaBoard) moves conversations, so
+ * its clock is taken from the same cached Teletel list instead
+ * (listOpenConversations + slaClock), and the agents' status from GET /agents.
  */
 
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
@@ -61,6 +69,8 @@ const countryOf = (text: string | null, places: Place[]) => {
   return r.kind === "destination" ? r.country : null;
 };
 
+const PRESENCE = new Set(["online", "busy", "offline"]);
+
 /**
  * The snapshot itself, unchecked — the caller holds dashboard.admin
  * (managerSnapshot below), as buildEyeReport leaves its check to its callers.
@@ -69,49 +79,49 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
   const now = Date.now();
   const day = riyadhDay(now);
   const iso = (ms: number) => new Date(ms).toISOString();
-  const dayStart = Date.parse(`${day}T00:00:00+03:00`);
-  const since = iso(Math.min(dayStart, now - TICKER_HOURS * 3600_000));
-  const monthStart = iso(Math.min(Date.parse(`${day.slice(0, 7)}-01T00:00:00+03:00`), Date.parse(since)));
+  const since = iso(dayStartMs(day));
   const evening = riyadhParts(now).time >= DAY_END;
   const service = db();
 
-  const [settings, leads, open, employees, attendance, presence, audit, offers, confirms, unissued, filesToday, adRows, adLatest, murad, integrations, places, ops, eye] =
+  const [settings, leads, open, agentsRaw, employees, audit, offers, confirms, files, adRows, adLatest, murad, integrations, places, ops, eye] =
     await Promise.all([
-      service.from("app_settings").select("key, value").in("key", ["manager_screen", "pkg_backup"]),
+      service.from("app_settings").select("key, value").in("key", ["manager_screen", "pkg_backup", SETTING.receptionHours]),
       allRows<LeadRow>((a, b) => service.from("client_leads").select(LEAD_COLS).or(`created_at.gte.${since},last_visit_at.gte.${since}`).order("id").range(a, b)),
       // the SLA board's clocks, from the list the leads pull keeps warm (cached; a cold process waits ~10 s once)
       listOpenConversations(),
-      service.from("employees").select("id, arabic_name, status"),
-      service.from("attendance_days").select("employee_id, first_seen_at").eq("day", day),
-      service.from("presence").select("employee_id, last_seen_at"),
+      // each agent's status now — Teletel keeps no history of it (8 s, the client's own limit)
+      teletelGet<{ name?: string | null; availability_status?: string | null }[]>("/agents"),
+      service.from("employees").select("id, arabic_name"),
       allRows((a, b) => service.from("audit_logs").select("action, actor_id, entity_id, created_at, meta").gte("created_at", since).order("created_at").order("id").range(a, b)),
       // the staff's offers — the partners' portal is a test bed today
-      service.from("offers").select("id, serial, destination, created_at").is("partner_company_id", null).gte("created_at", monthStart),
-      // forty days back, as «العملاء»'s own count: an offer first confirmed last month is not this month's
+      service.from("offers").select("id, serial, destination, created_at").is("partner_company_id", null).gte("created_at", since),
+      // forty days back, as «العملاء»'s own count: only to tell today's FIRST confirmation from a repeated one
       service.from("offer_status_history").select("offer_id, created_at, offers!inner(status, destination, partner_company_id)").eq("to_status", "confirmed").gte("created_at", iso(now - 40 * DAY_MS)),
-      service.from("offer_drafts").select("created_at, created_by").is("partner_company_id", null).is("data->>produced_serial", null),
-      service.from("offer_drafts").select("created_at, serial:data->>produced_serial").is("partner_company_id", null).gte("created_at", iso(dayStart)),
+      service.from("offer_drafts").select("created_at, serial:data->>produced_serial").is("partner_company_id", null).gte("created_at", since),
       service.from("ad_stats").select("campaign, cost, clicks, conversions, currency, updated_at").eq("day", day),
       service.from("ad_stats").select("updated_at").order("updated_at", { ascending: false }).limit(1),
       service.from("murad_log").select("conversation_id, reason, error, reply_message_id, created_at").gte("created_at", since),
       service.from("integrations").select("name, fail_streak, alerted, last_error, last_error_at, renews_on").eq("unused", false),
       loadPlaces(service),
       buildOpsDigest(5),
-      // the eye's written summary, without client names (visitors sit in the office)
-      evening ? buildEyeReport({ clientNames: false }) : Promise.resolve(null),
+      // the eye's written summary of today, without client names (visitors sit in the office)
+      evening ? buildEyeReport({ clientNames: false, since }) : Promise.resolve(null),
     ]);
 
   const setting = new Map(rows<{ key: string; value: string | null }>(settings).map((s) => [s.key, s.value]));
-  const team = rows<{ id: string; arabic_name: string | null; status: string | null }>(employees);
-  const nameOf = new Map(team.map((e) => [e.id, e.arabic_name ?? "—"]));
-  const arrived = new Map(rows<{ employee_id: string; first_seen_at: string }>(attendance).map((a) => [a.employee_id, a.first_seen_at]));
-  const seen = new Map(rows<{ employee_id: string; last_seen_at: string }>(presence).map((p) => [p.employee_id, p.last_seen_at]));
+  const team = rows<{ id: string; arabic_name: string | null }>(employees).map((e) => ({ id: e.id, name: e.arabic_name ?? "—" }));
+  const agents: AgentFact[] | null = Array.isArray(agentsRaw)
+    ? agentsRaw
+        .filter((a) => a.name?.trim())
+        .map((a) => ({ name: a.name!.trim(), status: (PRESENCE.has(a.availability_status ?? "") ? a.availability_status : "offline") as AgentFact["status"] }))
+    : null;
   const nowSec = Math.floor(now / 1000);
 
   const facts: ManagerFacts = {
     now,
     day,
     thresholds: normalizeManagerThresholds(setting.get("manager_screen")),
+    hours: parseHours(setting.get(SETTING.receptionHours)),
     leads: leads.data.map((l) => ({
       id: l.id,
       name: l.name,
@@ -130,13 +140,9 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
         .map((c) => ({ c, clock: slaClock(c, nowSec) }))
         .filter(({ clock }) => clock.kind !== "cold")
         .map(({ c, clock }) => ({ minutes: clock.minutes, since: iso(now - clock.minutes * 60_000), agent: c.assignee, client: c.name })) ?? null,
-    employees: team.map((e) => ({
-      id: e.id,
-      name: e.arabic_name ?? "—",
-      active: (e.status ?? "Active") === "Active",
-      firstSeenAt: arrived.get(e.id) ?? null,
-      lastSeenAt: seen.get(e.id) ?? null,
-    })),
+    open: open?.rows.map((c) => ({ agent: c.assignee, activeAt: iso((c.lastActivityAt || c.createdAt) * 1000) })) ?? null,
+    agents,
+    employees: team,
     audit: (audit.data as { action: string; actor_id: string | null; entity_id: string | null; created_at: string; meta: Record<string, unknown> | null }[]).map((a) => ({
       action: a.action,
       actor_id: a.actor_id,
@@ -153,11 +159,7 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
     confirms: rows<{ offer_id: string; created_at: string; offers: { status: string; destination: string | null; partner_company_id: string | null } | null }>(confirms)
       .filter((c) => !c.offers?.partner_company_id)
       .map((c) => ({ offer_id: c.offer_id, at: c.created_at, still: c.offers?.status === "confirmed", country: countryOf(c.offers?.destination ?? null, places) })),
-    drafts: [
-      ...rows<{ created_at: string; created_by: string | null }>(unissued).map((d) => ({ created_at: d.created_at, issued: false, owner: d.created_by ? (nameOf.get(d.created_by) ?? null) : null })),
-      // today's issued ones; today's unissued are already above
-      ...rows<{ created_at: string; serial: string | null }>(filesToday).filter((d) => d.serial).map((d) => ({ created_at: d.created_at, issued: true, owner: null })),
-    ],
+    drafts: rows<{ created_at: string; serial: string | null }>(files).map((d) => ({ created_at: d.created_at, issued: Boolean(d.serial) })),
     ads: (() => {
       const today = rows<{ campaign: string; cost: number | string; clicks: number; conversions: number | string; currency: string | null; updated_at: string }>(adRows);
       return {
@@ -182,10 +184,27 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
     at: iso(now),
     day,
     ...buildScreen(facts),
-    // Telegram's HTML marks off — the screen draws its own
-    daily: eye ? textSummary({ ...eye, sales: { ...eye.sales, totalToday: null } }).replace(/<[^>]+>/g, "").split("\n") : null,
+    daily: eye ? dailyLines(eye, agents, team) : null,
     thresholds: facts.thresholds,
   };
+}
+
+/**
+ * The eye's written summary for the screen: today's, with no money (the sales
+ * total is not ads spend), none of the backlog's notes («بلا تسعير» is days old
+ * by definition), and nobody listed as absent who works in Teletel.
+ */
+function dailyLines(eye: Awaited<ReturnType<typeof buildEyeReport>>, agents: AgentFact[] | null, team: { id: string; name: string }[]): string[] {
+  const inTeletel = teletelEmployees(agents?.map((a) => a.name) ?? [], team.map((e) => ({ id: e.id, arabic_name: e.name })));
+  const teletelNames = new Set(team.filter((e) => inTeletel.has(e.id)).map((e) => e.name));
+  const today = {
+    ...eye,
+    attendance: { ...eye.attendance, absent: eye.attendance.absent.filter((n) => !teletelNames.has(n)) },
+    sales: { ...eye.sales, totalToday: null },
+    notes: eye.notes.filter((n) => n.code !== "offer_unpriced"),
+  };
+  // Telegram's HTML marks off — the screen draws its own
+  return textSummary(today).replace(/<[^>]+>/g, "").split("\n");
 }
 
 const screens = ttlCache<"screen", ManagerSnapshot>(60_000, 1);

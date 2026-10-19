@@ -6,6 +6,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
 import type { Role } from "@/lib/roles/roles";
 import { currentCan, currentRole } from "@/lib/roles/current";
+import { AUTO_FOLLOWUP_MAX_MINUTES } from "@/lib/sla/classify";
+import { requestCounts, ticketsFromLeads, LEAD_TICKET_COLS, type LeadForTicket } from "@/lib/eye/anomalies";
+import { allRows } from "./all-rows";
 
 /**
  * Dashboard metric queries — the ONLY place that reads metric data. Backend
@@ -124,20 +127,13 @@ export async function getAdminMetrics(employeeFilterId?: string): Promise<AdminM
     const onlineNow = presence.filter((p) => p.last_seen_at >= onlineCut).length;
     const activeToday = presence.filter((p) => p.last_seen_at >= today).length;
 
-    // «خدمة العملاء» went with the menu consolidation (the owner, 2026-10-19): care_tickets
-    // holds July's test rows only and is kept, unlisted — no requests counted from it
-    const tickets: { employee_id: string | null; responded_at: string | null }[] = [];
-
-    const assigned = new Set<string>();
-    const pending = new Set<string>();
-    let answered = 0;
-    for (const t of tickets) {
-      if (t.responded_at) answered += 1;
-      if (t.employee_id) {
-        assigned.add(t.employee_id);
-        if (!t.responded_at) pending.add(t.employee_id);
-      }
-    }
+    // «خدمة العملاء» went with the menu consolidation (the owner, 2026-10-19) and care_tickets
+    // is empty: the requests are the client conversations of «العملاء», measured as
+    // «عين الإدارة» measures them — the last week, our first reply (eye/anomalies.ts)
+    const since = new Date(Date.now() - AUTO_FOLLOWUP_MAX_MINUTES * 60_000).toISOString();
+    const { data: leads } = await allRows((a, b) => supabase.from("client_leads").select(LEAD_TICKET_COLS).gte("created_at", since).order("id").range(a, b));
+    const tickets = ticketsFromLeads(leads as LeadForTicket[], new Map()).filter((t) => !employeeFilterId || t.employee_id === employeeFilterId);
+    const { answered, assigned, pending } = requestCounts(tickets);
 
     let notRespondedNames: string[] = [];
     if (pending.size > 0) {
