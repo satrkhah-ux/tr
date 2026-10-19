@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { askText, DEFAULT_OFFERS, holdToText, missing, offerText, outOfRule, priceOffer, splitNights, tripDays } from "./auto-offer";
+import { askText, DEFAULT_OFFERS, holdToText, missing, offerText, outOfRule, priceOffer, splitNights, tripChanged, tripDays, tripSummary } from "./auto-offer";
 
 const georgia = DEFAULT_OFFERS[0];
 
@@ -60,8 +60,9 @@ describe("the model's dates held to what the client wrote", () => {
   it("a slipped year moves to the next to come; the departure only when two dates are named", () => {
     expect(holdToText("15 نوفمبر", { ...none, arrival: "2023-11-15", departure: "2023-11-25", days: 10 }, today)).toMatchObject({ arrival: "2026-11-15", departure: null, days: 10 });
   });
-  it("two dates: the days are counted from them, both days in", () => {
-    expect(holdToText("من 5 ديسمبر الى 12 ديسمبر", { ...none, arrival: "2026-12-05", departure: "2026-12-12", days: 7 }, today)).toMatchObject({ days: 8 });
+  it("two dates and no length said: the days are counted from them, both days in; a length said wins", () => {
+    expect(holdToText("من 5 ديسمبر الى 12 ديسمبر", { ...none, arrival: "2026-12-05", departure: "2026-12-12" }, today)).toMatchObject({ days: 8 });
+    expect(holdToText("بعد عشرة ايام مدة عشرة ايام من يوم 22/11/2026", { ...none, arrival: "2026-11-22", departure: "2026-12-02", days: 10 }, today)).toMatchObject({ days: 10 });
   });
   it("«null» as a name is no name", () => {
     expect(holdToText("x", { ...none, name: "null" }, today).name).toBeNull();
@@ -73,5 +74,33 @@ describe("the model's dates held to what the client wrote", () => {
     expect(missing(held)).toEqual(["name"]);
     for (const party of ["شخصين", "عائلتي", "أنا", "انا وابني", "نحن 3"]) expect(holdToText("x", { ...none, name: party }, today).name).toBeNull();
     for (const real of ["محمد", "عبدالله السالم", "Sara"]) expect(holdToText("x", { ...none, name: real }, today).name).toBe(real);
+  });
+});
+
+describe("the owner's order (2026-10-19): the whole visit, the newest word wins", () => {
+  const none = { name: null, arrival: null, departure: null, days: null, adults: null, children: null };
+  const today = "2026-10-19";
+  it("«بعد عشرة ايام» is a date, counted from today by the model", () => {
+    expect(holdToText("احمد الرفاعي\nتاريخ الوصول بعد عشرة ايام\nعدد الايام 8", { ...none, arrival: "2026-10-29", days: 8 }, today)).toMatchObject({ arrival: "2026-10-29", days: 8 });
+    expect(holdToText("الاسبوع الجاي", { ...none, arrival: "2026-10-26" }, today).arrival).toBe("2026-10-26");
+    expect(holdToText("من يوم 22/11/2026", { ...none, arrival: "2026-11-22" }, today).arrival).toBe("2026-11-22");
+  });
+  it("«المبيت فقط في تبليسي»: every night there, a room for every two at least, the same prices", () => {
+    const p = priceOffer(georgia, 8, 4, 3.75, { rooms: 2, onlyCity: "تبليسي" });
+    expect(p.route).toEqual([{ city: "تبليسي", nights: 7, hotel: "Old Wall Tbilisi 4★" }]);
+    expect(p.rooms).toBe(2);
+    expect(p.cost).toBe(100 * 8 + 120 * 7 * 2 + 25 * 2);
+    expect(priceOffer(georgia, 8, 4, 3.75, { rooms: 1 }).rooms).toBe(2);
+    expect(priceOffer(georgia, 8, 2, 3.75, { onlyCity: "موسكو" }).route).toHaveLength(4);
+  });
+  it("one line of what was understood", () => {
+    expect(tripSummary("جورجيا", { ...none, adults: 2, days: 10, only_city: "تبليسي", arrival: "2026-11-22" })).toBe("جورجيا، شخصين، 10 أيام، تبليسي فقط، من 22/11");
+    expect(tripSummary("جورجيا", { ...none, adults: 4, rooms: 2, days: 8 })).toBe("جورجيا، 4 أشخاص، غرفتين، 8 أيام");
+  });
+  it("a change after the offer: the party, the days, the city, the date — not a fact left unsaid", () => {
+    const sent = { name: "احمد الرفاعي", adults: 4, rooms: 2, days: 8, arrival: "2026-10-29", only_city: "تبليسي" };
+    expect(tripChanged(sent, { ...none, adults: 2, days: 10, only_city: "تبليسي", arrival: "2026-11-22" })).toBe(true);
+    expect(tripChanged(sent, { ...none, name: "احمد الرفاعي", adults: 4, days: 8 })).toBe(false);
+    expect(tripChanged(sent, { ...none })).toBe(false);
   });
 });

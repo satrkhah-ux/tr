@@ -127,6 +127,17 @@ export function receptionText(i: { name: string | null; salam: boolean; to: Rout
 }
 
 /**
+ * When the conversation was last closed before the client's message — Teletel's
+ * own «تم تحديث حالة المحادثة لـ"مغلقة"» line, 0 when none is read. The visit
+ * starts there: «العملاء»'s status is not a witness, the five-minute pull can
+ * rewrite it between two messages (40029, 2026-10-19: Murad's Georgia question
+ * fell out of the visit, and the client's answer met «كيف نقدر نخدمك؟»).
+ */
+export function lastClosedAt(events: { kind: string; at: number; text: string }[], before: number): number {
+  return Math.max(0, ...events.filter((e) => e.kind === "activity" && /مغلق|resolved/u.test(e.text) && e.at <= before).map((e) => e.at));
+}
+
+/**
  * After the hand-over, the client wrote and no one answered in five minutes:
  * once a visit, that it arrived and who answers it (the evaluator, 2026-10-19:
  * «فنادق مكرره… الوووو… ليش التاخير» went unanswered). The colleague by first

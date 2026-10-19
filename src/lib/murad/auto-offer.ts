@@ -16,6 +16,7 @@
 import { cityKeys, deriveCityDates, emptyDraftData, normalizeDraftData, normalizeDraftHotel, type DraftData } from "@/lib/offer/draft-types";
 import { autoTourPicks, daysFromTours, programDayText, withTours, type TourProgram } from "@/lib/offer/itinerary";
 import { itineraryStartDate } from "@/lib/offer/schedule";
+import { normAr } from "@/lib/catalog/norm";
 
 export type OfferCity = { city: string; nights: number; hotel: string };
 
@@ -90,7 +91,20 @@ export function splitNights(cities: OfferCity[], total: number): OfferCity[] {
   return cities.map((c, i) => ({ ...c, nights: out[i] }));
 }
 
-export type OfferAsk = { name: string | null; arrival: string | null; departure: string | null; days: number | null; adults: number | null; children: number | null };
+export type OfferAsk = {
+  name: string | null;
+  arrival: string | null;
+  departure: string | null;
+  days: number | null;
+  adults: number | null;
+  children: number | null;
+  /** the rooms the client asked for («4 أشخاص غرفتين») — never fewer than a room for every two */
+  rooms?: number | null;
+  /** «المبيت فقط في تبليسي»: every night in one city */
+  only_city?: string | null;
+  /** what the package as priced cannot honour («فندق 5 نجوم», «مع الطيران») — a colleague's */
+  special?: string | null;
+};
 
 /** What the trip still needs before a price: a name, its length, the party. A date is not needed — one is proposed. */
 export function missing(a: OfferAsk): ("name" | "days" | "people")[] {
@@ -119,12 +133,60 @@ export function outOfRule(a: OfferAsk, c: OfferCountry): boolean {
 export type OfferPrice = { days: number; nights: number; rooms: number; cost: number; total: number; totalSar: number; currency: string; route: OfferCity[] };
 
 /** The owner's price: car × days + room × nights × rooms + two transfers, the margin on top, riyals up to the whole one. */
-export function priceOffer(c: OfferCountry, days: number, adults: number, sarPer: number): OfferPrice {
+export function priceOffer(c: OfferCountry, days: number, adults: number, sarPer: number, opts: { rooms?: number | null; onlyCity?: string | null } = {}): OfferPrice {
   const nights = Math.max(days - 1, 1);
-  const rooms = Math.max(Math.ceil(adults / 2), 1);
+  const rooms = Math.max(Math.ceil(adults / 2), opts.rooms ?? 0, 1);
+  // «المبيت فقط في تبليسي»: every night in that city of the route, at the same prices
+  const only = opts.onlyCity ? routeCity(c, opts.onlyCity) : null;
   const cost = c.carPerDay * days + c.roomPerNight * nights * rooms + c.transfer * 2;
   const total = Math.round(cost * (1 + c.marginPct / 100) * 100) / 100;
-  return { days, nights, rooms, cost, total, totalSar: Math.ceil(Math.round(total * sarPer * 100) / 100), currency: c.currency, route: splitNights(c.cities, nights) };
+  const route = only ? [{ ...only, nights }] : splitNights(c.cities, nights);
+  return { days, nights, rooms, cost, total, totalSar: Math.ceil(Math.round(total * sarPer * 100) / 100), currency: c.currency, route };
+}
+
+/** The route's city by the name the client used («تبليسي», «تبيليسي»), or null when the route has none such. */
+export function routeCity(c: OfferCountry, name: string): OfferCity | null {
+  const key = normAr(name).replace(/^ال/, "");
+  return c.cities.find((x) => normAr(x.city).replace(/^ال/, "") === key) ?? null;
+}
+
+const peopleText = (n: number) => (n === 1 ? "شخص واحد" : n === 2 ? "شخصين" : n <= 10 ? `${n} أشخاص` : `${n} شخصاً`);
+const daysText = (n: number) => (n === 2 ? "يومين" : n <= 10 ? `${n} أيام` : `${n} يوماً`);
+
+/** «جورجيا، شخصين، 10 أيام، تبليسي فقط، من 22/11» — what was understood, in one line for the client. */
+export function tripSummary(country: string, a: OfferAsk): string {
+  const people = (a.adults ?? 0) + (a.children ?? 0);
+  const days = tripDays(a);
+  const [, m, d] = a.arrival?.split("-").map(Number) ?? [];
+  return [
+    country,
+    people ? peopleText(people) : null,
+    a.rooms && a.rooms > 1 ? (a.rooms === 2 ? "غرفتين" : `${a.rooms} غرف`) : null,
+    days ? daysText(days) : null,
+    a.only_city ? `${a.only_city} فقط` : null,
+    d && m ? `من ${d}/${m}` : null,
+  ]
+    .filter(Boolean)
+    .join("، ");
+}
+
+/**
+ * Whether what the client says now changes what the offer was priced on — the
+ * newest message wins (the owner, 2026-10-19: «شخصين، 10 أيام، تبليسي فقط،
+ * من 22/11» after an offer for four). A fact not said now is no change.
+ */
+export function tripChanged(sent: Partial<OfferAsk> & { days?: number | null }, now: OfferAsk): boolean {
+  const differs = <T>(a: T | null | undefined, b: T | null | undefined) => b != null && b !== (a ?? null);
+  const city = (s: string | null | undefined) => (s ? normAr(s).replace(/^ال/, "") : null);
+  return (
+    differs(sent.days ?? null, tripDays(now)) ||
+    differs(sent.adults, now.adults) ||
+    differs(sent.children ?? 0, now.children) ||
+    differs(sent.rooms, now.rooms) ||
+    differs(sent.arrival, now.arrival) ||
+    differs(city(sent.only_city), city(now.only_city)) ||
+    differs(sent.name, now.name)
+  );
 }
 
 /** The one question — the first time all of it, the second time only what is still missing. */
@@ -150,6 +212,9 @@ const roomsText = (n: number) => (n === 2 ? "غرفتان" : n <= 10 ? `${n} غ�
 
 const MONTHS = /(يناير|فبراير|مارس|ابريل|أبريل|مايو|يونيو|يوليو|اغسطس|أغسطس|سبتمبر|اكتوبر|أكتوبر|نوفمبر|ديسمبر|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)|\d{1,2}\s*[/.-]\s*\d{1,2}/giu;
 
+/** a date said relative to today — the model counts it from today in Riyadh (the owner's test, 2026-10-19: «بعد عشرة ايام») */
+const RELATIVE = /بعد\s+(\S+\s+)?(يوم|ايام|أيام|يومين|اسبوع|أسبوع|اسبوعين|أسبوعين|اسابيع|أسابيع|شهر|شهرين)|(الاسبوع|الأسبوع|الشهر)\s+(الجاي|الياي|القادم|الجاية)|(بداية|بدايه|اول|أول|نهاية|نهايه|اخر|آخر)\s+(الشهر|الاسبوع|الأسبوع)|بكر[ةه]|غدا|غداً/gu;
+
 /** words that describe who travels, never who the client is */
 const PARTY = /(^|\s)(انا|أنا|احنا|إحنا|نحن|مع)(\s|$)|زوج|عائل|عايل|طفل|أطفال|اطفال|شخص|اشخاص|أشخاص|نفر|ولد|بنت|عيال|اخو|أخو|اخت|أخت|صديق|ربع|\d/u;
 
@@ -161,8 +226,9 @@ const PARTY = /(^|\s)(انا|أنا|احنا|إحنا|نحن|مع)(\s|$)|زوج|
  * from them, both days in.
  */
 export function holdToText(text: string, a: OfferAsk, today: string): OfferAsk {
-  // «نووفمبر»: a letter typed twice still names the month
-  const said = (text.normalize("NFKC").replace(/(\p{L})\1+/gu, "$1").match(MONTHS) ?? []).length;
+  // «نووفمبر»: a letter typed twice still names the month; «بعد عشرة ايام» names a date too
+  const folded = text.normalize("NFKC").replace(/(\p{L})\1+/gu, "$1");
+  const said = (folded.match(MONTHS) ?? []).length + (folded.match(RELATIVE) ?? []).length;
   const future = (d: string | null) => {
     if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
     let iso = d;
@@ -174,8 +240,10 @@ export function holdToText(text: string, a: OfferAsk, today: string): OfferAsk {
   if (arrival && departure && departure < arrival) departure = `${Number(departure.slice(0, 4)) + 1}${departure.slice(4)}`;
   // «انا وزوجتي» is the party, not a name (the manager's test, 2026-10-19: «أهلاً انا وزوجتي»)
   const name = a.name && !/^(null|none|غير معروف)$/i.test(a.name.trim()) && !PARTY.test(a.name) ? a.name.trim() : null;
-  const days = arrival && departure ? tripDays({ days: null, arrival, departure }) : a.days;
-  return { ...a, name, arrival, departure, days };
+  // a length the client stated wins («مدة عشرة ايام» from 22/11 is 10 days, whatever date the model put after it); two dates without one count both days in
+  const days = a.days ?? (arrival && departure ? tripDays({ days: null, arrival, departure }) : null);
+  const clean = (s: string | null | undefined) => (s && !/^(null|none|لا يوجد|لا شيء)$/i.test(s.trim()) ? s.trim() : null);
+  return { ...a, name, arrival, departure, days, rooms: a.rooms && a.rooms > 0 ? a.rooms : null, only_city: clean(a.only_city), special: clean(a.special) };
 }
 
 /**

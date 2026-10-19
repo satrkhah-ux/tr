@@ -20,6 +20,7 @@ import { paidState } from "@/lib/operations/wizard/payment";
 import { DOCUMENT_LABEL } from "@/lib/operations/voucher-dto";
 import {
   autoNote,
+  muradMessageIds,
   noteFor,
   capFor,
   clientTurn,
@@ -135,6 +136,7 @@ type LogRow = {
   reply_message_id: number | null;
   acted_at: string | null;
   staff_replied_at: string | null;
+  intake: unknown;
 };
 
 async function callsToday(service: SupabaseClient): Promise<number> {
@@ -377,7 +379,7 @@ async function work(service: SupabaseClient, provider: MuradProvider, flags: { s
     // two days of log: a client turn older than a day is never answered, so older keys never matter
     service
       .from("murad_log")
-      .select("id, conversation_id, client_message_id, mode, reply_message_id, acted_at, staff_replied_at")
+      .select("id, conversation_id, client_message_id, mode, reply_message_id, acted_at, staff_replied_at, intake")
       .gte("created_at", new Date(Date.now() - 2 * 86_400_000).toISOString())
       .limit(5000),
     callsToday(service),
@@ -387,7 +389,7 @@ async function work(service: SupabaseClient, provider: MuradProvider, flags: { s
   const logs = (logsRes.data ?? []) as LogRow[];
 
   const logged = new Set(logs.map((l) => turnKey(l.conversation_id, Number(l.client_message_id))));
-  const muradIds = new Set(logs.filter((l) => l.reply_message_id != null).map((l) => Number(l.reply_message_id)));
+  const muradIds = muradMessageIds(logs);
   const lastActed = new Map<number, number>();
   // Murad's answers nobody has followed up yet: the first human reply after one is the quality metric
   const awaiting = new Map<number, number>();

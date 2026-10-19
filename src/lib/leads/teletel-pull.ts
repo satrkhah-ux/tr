@@ -4,6 +4,7 @@ import { conversationEvents, conversationThread, listOpenConversations, listTele
 import { classifyInquiry, delayText, findPlace, timelineFrom, type Place } from "./auto";
 import { fold, matchEmployee, normalizePhone } from "./sheet";
 import { logAudit } from "@/lib/data/audit";
+import { muradMessageIds } from "@/lib/murad/core";
 
 /**
  * «العملاء» phase two (the owner, 2026-10-17: «كل شيء تلقائي، خاصة اسم العميل»):
@@ -222,8 +223,8 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
     const teams = new Set((await listTeletelTeams()).map((t) => fold(t.name)));
     const isTeam = (name: string) => name.trim().startsWith("قسم") || teams.has(fold(name));
     // Murad's and the reception's replies are sent as the API token's user: no one's turn
-    const { data: ours } = await supabase.from("murad_log").select("reply_message_id").in("conversation_id", toTrace.map((c) => c.id)).not("reply_message_id", "is", null);
-    const ignore = new Set(((ours ?? []) as { reply_message_id: number }[]).map((r) => Number(r.reply_message_id)));
+    const { data: ours } = await supabase.from("murad_log").select("reply_message_id, intake").in("conversation_id", toTrace.map((c) => c.id));
+    const ignore = muradMessageIds((ours ?? []) as { reply_message_id: number | null; intake: unknown }[]);
     for (let i = 0; i < toTrace.length; i += 5) {
       await Promise.all(
         toTrace.slice(i, i + 5).map(async (c) => {

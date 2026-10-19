@@ -103,6 +103,22 @@ export function toTurnMessage(m: RawMessage): TurnMessage | null {
   };
 }
 
+/**
+ * Every message Murad wrote, from his log: each turn's reply, and the others
+ * one turn sent besides it (`intake.sent_ids` — the offer's link and its PDF).
+ * They go out as the API token's user, so without this they read as a
+ * colleague's answer (2026-10-19).
+ */
+export function muradMessageIds(rows: readonly { reply_message_id?: number | string | null; intake?: unknown }[]): Set<number> {
+  const ids = new Set<number>();
+  for (const r of rows) {
+    if (r.reply_message_id != null) ids.add(Number(r.reply_message_id));
+    const more = (r.intake as { sent_ids?: unknown } | null)?.sent_ids;
+    if (Array.isArray(more)) for (const id of more) if (typeof id === "number") ids.add(id);
+  }
+  return ids;
+}
+
 /** A human answer: outgoing, public, by an agent — not a template, not a bot, not Murad's own reply. */
 export function isHumanReply(m: TurnMessage, muradIds: ReadonlySet<number>): boolean {
   return !m.fromClient && !m.isPrivate && !m.template && !m.bot && !muradIds.has(m.id);

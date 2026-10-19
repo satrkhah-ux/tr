@@ -129,3 +129,18 @@ describe("after the hand-over: «وصلت رسالتك» (the evaluator, 2026-10
     expect(holdText({ assignee: "خالد", team: null, opensAt: null })).toBe("وصلت رسالتك، خالد سيرد عليك خلال دقائق.");
   });
 });
+
+describe("the visit, from Teletel's own closing line (40029, 2026-10-19)", () => {
+  it("the last «مغلقة» before the message, never one after it; 0 with none", async () => {
+    const { lastClosedAt } = await import("./reception");
+    const ev = [
+      { kind: "activity", at: 100, text: 'تم تحديث حالة المحادثة لـ"مغلقة" بواسطة محمد اسكندر' },
+      { kind: "client", at: 200, text: "السلام عليكم" },
+      { kind: "activity", at: 210, text: "تم إسنادها إلى قسم المبيعات بواسطة احمد الرفاعي" },
+      { kind: "activity", at: 400, text: 'تم تحديث حالة المحادثة لـ"مغلقة" بواسطة اسوار' },
+    ];
+    expect(lastClosedAt(ev, 300)).toBe(100);
+    expect(lastClosedAt(ev, 500)).toBe(400);
+    expect(lastClosedAt([], 300)).toBe(0);
+  });
+});
