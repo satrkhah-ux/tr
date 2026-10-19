@@ -625,6 +625,9 @@ export const ar: Dictionary = {
   "nav.dataSection": "قسم البيانات",
   "nav.priceReview": "مراجعة الأسعار",
   "nav.adminSection": "قسم الإدارة",
+  "nav.dataReview": "مراجعة البيانات",
+  "nav.transfersTours": "التوصيلات والجولات",
+  "nav.termsIncludes": "الشروط والمشمولات",
   // ---------- view-as + developer accounts + forced password (2026-10-17) ----------
   "viewAs.label": "عرض النظام كـ",
   "viewAs.mine": "حسابي",

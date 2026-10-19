@@ -124,9 +124,9 @@ export async function getAdminMetrics(employeeFilterId?: string): Promise<AdminM
     const onlineNow = presence.filter((p) => p.last_seen_at >= onlineCut).length;
     const activeToday = presence.filter((p) => p.last_seen_at >= today).length;
 
-    let ticketsQuery = supabase.from("care_tickets").select("employee_id, responded_at");
-    if (employeeFilterId) ticketsQuery = ticketsQuery.eq("employee_id", employeeFilterId);
-    const tickets = ((await ticketsQuery).data ?? []) as { employee_id: string | null; responded_at: string | null }[];
+    // «خدمة العملاء» went with the menu consolidation (the owner, 2026-10-19): care_tickets
+    // holds July's test rows only and is kept, unlisted — no requests counted from it
+    const tickets: { employee_id: string | null; responded_at: string | null }[] = [];
 
     const assigned = new Set<string>();
     const pending = new Set<string>();

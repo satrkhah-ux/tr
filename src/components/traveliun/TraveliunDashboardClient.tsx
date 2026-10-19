@@ -113,7 +113,6 @@ const PREPARED: { labelKey: TranslationKey; href: string; perm?: Permission }[] 
   { labelKey: "nav.countries", href: "/countries" },
   { labelKey: "nav.cities", href: "/cities" },
   { labelKey: "nav.airports", href: "/airports" },
-  { labelKey: "nav.roomTypes", href: "/rooms-types" },
   { labelKey: "nav.carTypes", href: "/cars-types" },
   { labelKey: "nav.roles", href: "/employees/roles", perm: "employees.manage" },
 ];

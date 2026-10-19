@@ -56,6 +56,7 @@ import { canOpenLink, type FeatureCheck } from "@/lib/roles/section-access";
 import { useCanOpen } from "@/lib/roles/useCanOpen";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { MobileTabBar } from "./MobileTabBar";
+import { SectionTabs } from "./SectionTabs";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { ViewAsBanner, ViewAsSwitcher } from "./ViewAsSwitcher";
 import { TraveliunLogo } from "./TraveliunLogo";
@@ -192,76 +193,47 @@ export const navGroups: NavGroup[] = [
   { labelKey: "nav.commissions", href: "/commissions", icon: BadgePercent },
 
   // ---------- «قسم البيانات» — the reference tables the generator reads ----------
+  // Fifty links of «البيانات» and «الإدارة» down to eighteen (the owner, 2026-10-19):
+  // merged pages hold the rest as tabs (lib/nav/consolidated.ts TAB_GROUPS), and a
+  // page that went sends its old link where it went (movedTo). No table dropped.
   {
     labelKey: "nav.dataSection",
     href: "/hotels",
     icon: Database,
     children: [
-      // what the tables below still lack, counted by the database (data order 3)
-      { labelKey: "data.quality.title", href: "/data-quality", perm: "data.write" },
-      { labelKey: "nav.hotels", href: "/hotels", captionKey: "nav.hotels" },
-      { labelKey: "nav.roomTypes", href: "/rooms-types" },
-      { labelKey: "nav.countries", href: "/countries", captionKey: "nav.countries" },
+      // «جودة البيانات» + «مراجعة الأسعار»
+      { labelKey: "nav.dataReview", href: "/data-quality" },
+      { labelKey: "nav.hotels", href: "/hotels" },
+      { labelKey: "nav.countries", href: "/countries" },
       { labelKey: "nav.cities", href: "/cities" },
-      { labelKey: "nav.airlines", href: "/airlines", captionKey: "nav.airlines" },
+      { labelKey: "nav.airlines", href: "/airlines" },
       { labelKey: "nav.airports", href: "/airports" },
-      { labelKey: "nav.ports", href: "/ports", captionKey: "nav.seaTravels" },
-      { labelKey: "nav.carTypes", href: "/cars-types", captionKey: "nav.transportation" },
-      { labelKey: "nav.cars", href: "/cars" },
-      { labelKey: "nav.transfers", href: "/cars/transfers" },
-      { labelKey: "nav.tours", href: "/cars/tours" },
-      { labelKey: "data.model.grid.title", href: "/price-grid" },
-      // what is still provisional or unpriced there, for several people at once, every change logged
-      { labelKey: "nav.priceReview", href: "/price-review" },
+      { labelKey: "nav.carTypes", href: "/cars-types" },
+      // the transfers, the tours and the grid they are typed in
+      { labelKey: "nav.transfersTours", href: "/cars/transfers" },
       { labelKey: "nav.tourPrograms", href: "/tour-programs" },
-      { labelKey: "nav.drivers", href: "/drivers" },
-      { labelKey: "nav.serviceTypes", href: "/services-types", captionKey: "nav.services" },
-      { labelKey: "nav.servicesByCountry", href: "/services" },
-      { labelKey: "nav.visaTypes", href: "/visas-types", captionKey: "nav.visas" },
+      // the service types and the services by country
+      { labelKey: "nav.services", href: "/services-types" },
       { labelKey: "nav.visas", href: "/visas" },
-      // Moved out of «البكجات السياحية»: the generator READS these, it does not
-      // live in them. They are maintained here with the other reference tables.
-      { labelKey: "nav.hotelSuppliers", href: "/settings/suppliers", captionKey: "nav.hotelSuppliers" },
       { labelKey: "nav.companySuppliers", href: "/company-suppliers" },
-      { labelKey: "nav.markupRules", href: "/markup-rules" },
-      { labelKey: "nav.offerIncludes", href: "/offers/offer-includes" },
-      { labelKey: "nav.offerExcludes", href: "/offers/offer-not-includes" },
-      { labelKey: "nav.terms", href: "/offers/terms-and-conditions" },
+      // «يشمل», «لا يشمل» and the terms — one table, by kind
+      { labelKey: "nav.termsIncludes", href: "/offers/offer-includes" },
+      { labelKey: "nav.climate", href: "/setting/climate" },
     ],
   },
 
-  // ---------- «قسم الإدارة» — people, configuration and the guide ----------
+  // ---------- «قسم الإدارة» — the team, the profit policy, what the client is sent, the guide ----------
   {
     labelKey: "nav.adminSection",
-    href: "/customers",
+    href: "/employees",
     icon: Settings2,
     children: [
-      { labelKey: "nav.people", href: "/customers", captionKey: "nav.customers" },
-      { labelKey: "nav.companies", href: "/companies" },
-      { labelKey: "nav.companiesVisits", href: "/companies-visits" },
-      { labelKey: "nav.visitStatuses", href: "/companies-visits-statuses" },
-      { labelKey: "nav.employees", href: "/employees", captionKey: "nav.employees" },
-      // The personnel record and the LOGIN are two different things;
-      // nine of twelve people had the first and not the second.
-      { labelKey: "nav.employeeAccounts", href: "/employees/accounts" },
-      { labelKey: "nav.dataTransfer", href: "/settings/data-transfer" },
-      { labelKey: "nav.roles", href: "/employees/roles" },
-      { labelKey: "nav.careDashboard", href: "/customers_care/dashboard", captionKey: "nav.customerCare" },
-      { labelKey: "nav.customerCare", href: "/customers_care" },
-      { labelKey: "nav.careServiceType", href: "/customers_care/services" },
-      { labelKey: "nav.profits", href: "/setting/profits", captionKey: "nav.settings" },
+      // the record, the logins and the roles
+      { labelKey: "nav.employees", href: "/employees" },
+      // the policy and the markup rules
       { labelKey: "nav.profitPolicy", href: "/settings/pricing" },
       { labelKey: "nav.clientComms", href: "/settings/client-comms" },
-      { labelKey: "nav.statusGroups", href: "/setting/statuses-groups" },
-      { labelKey: "nav.statuses", href: "/setting/statuses" },
-      { labelKey: "nav.currencies", href: "/setting/currencies" },
-      { labelKey: "nav.suppliers", href: "/setting/suppliers" },
-      { labelKey: "nav.supplierPreferences", href: "/setting/suppliers-preferences" },
-      { labelKey: "nav.supervisors", href: "/setting/supervisors" },
-      { labelKey: "nav.climate", href: "/setting/climate" },
-      { labelKey: "nav.guide", href: "/web-guide", captionKey: "nav.traveliunGuide" },
-      { labelKey: "nav.guideCategories", href: "/guide/categories" },
-      { labelKey: "nav.guideInfo", href: "/guide/informations" },
+      { labelKey: "nav.guide", href: "/web-guide" },
     ],
   },
 
@@ -639,6 +611,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
         <div className="px-4 py-4 pb-[calc(84px+env(safe-area-inset-bottom))] sm:px-5 lg:px-[30px] lg:pb-4">
           <ViewAsBanner />
           <ServerLostBanner />
+          <SectionTabs pathname={pathname} />
           {children}
         </div>
       </main>
@@ -912,13 +885,8 @@ const HeaderIcon = forwardRef<
   );
 });
 
-/** The header's guide shortcuts — «قسم الإدارة» pages, so they show only to whoever can open them. */
-const GUIDE_LINKS: { labelKey: TranslationKey; href: string }[] = [
-  { labelKey: "nav.guide", href: "/web-guide" },
-  { labelKey: "nav.guideCategories", href: "/guide/categories" },
-  { labelKey: "nav.guideInfo", href: "/guide/informations" },
-  { labelKey: "nav.customerCare", href: "/customers_care" },
-];
+/** The header's guide shortcut — a «قسم الإدارة» page, so it shows only to whoever can open it. */
+const GUIDE_LINKS: { labelKey: TranslationKey; href: string }[] = [{ labelKey: "nav.guide", href: "/web-guide" }];
 
 function GuidePanel({ links, close }: { links: typeof GUIDE_LINKS; close: () => void }) {
   const { t } = useTraveliunUI();

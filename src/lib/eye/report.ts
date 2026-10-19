@@ -51,9 +51,9 @@ export async function buildEyeReport(): Promise<EyeReport> {
   const [empRes, attRes, ticketRes, auditRes, offerRes, bookingRes, ops] = await Promise.all([
     supabase.from("employees").select("id, arabic_name, email, status, roles(arabic_name)").order("arabic_name"),
     supabase.from("attendance_days").select("employee_id, first_seen_at, last_seen_at, beats").eq("day", day),
-    // Open tickets of any age + everything touched today: the rules need both the
-    // backlog and the day's own performance.
-    supabase.from("care_tickets").select("id, subject, customer, employee_id, created_at, responded_at").order("created_at", { ascending: false }).limit(200),
+    // «خدمة العملاء» went with the menu consolidation (the owner, 2026-10-19): its
+    // table holds July's test rows only and is kept, unlisted — no tickets reported
+    Promise.resolve({ data: [] }),
     supabase.from("audit_logs").select("action, actor_id, actor_email, entity_id, created_at, meta").gte("created_at", dayStartIso).order("created_at"),
     supabase.from("offers").select("serial, status, total, currency, created_at").gte("created_at", dayStartIso),
     supabase.from("operation_bookings").select("id, operation_id, title, status, confirmed_at, confirmation_number").not("confirmed_at", "is", null),

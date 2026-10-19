@@ -26,9 +26,30 @@ describe("the sidebar", () => {
     expect(data).toContain("/hotels");
     expect(data).not.toContain("/markup-rules");
     expect(data).not.toContain("/settings/suppliers");
-    // the hidden vault's block heading moves to the next link shown
-    const links = navGroupsFor(SALES, on).find((g) => g.labelKey === "nav.dataSection")?.children ?? [];
-    expect(links.find((c) => c.href === "/company-suppliers")?.captionKey).toBe("nav.hotelSuppliers");
+    // «مناخ المدن» is settings.manage — not sales'
+    expect(data).not.toContain("/setting/climate");
+  });
+
+  it("holds «البيانات» to fourteen links and «الإدارة» to four (the owner, 2026-10-19)", () => {
+    const all = () => true;
+    const section = (key: string) => navGroupsFor(all, on).find((g) => g.labelKey === key)?.children?.map((c) => c.href) ?? [];
+    expect(section("nav.dataSection")).toEqual([
+      "/data-quality",
+      "/hotels",
+      "/countries",
+      "/cities",
+      "/airlines",
+      "/airports",
+      "/cars-types",
+      "/cars/transfers",
+      "/tour-programs",
+      "/services-types",
+      "/visas",
+      "/company-suppliers",
+      "/offers/offer-includes",
+      "/setting/climate",
+    ]);
+    expect(section("nav.adminSection")).toEqual(["/employees", "/settings/pricing", "/settings/client-comms", "/web-guide"]);
   });
 
   it("points a section whose home is closed at its first open link", () => {

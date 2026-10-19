@@ -1,7 +1,7 @@
-import { TraveliunTablePage } from "@/components/traveliun/TraveliunTablePage";
-import { guardPath } from "@/lib/roles/current";
+import { redirect } from "next/navigation";
+import { movedTo } from "@/lib/nav/consolidated";
 
-export default async function CustomersCarePage() {
-  await guardPath("/customers-care");
-  return <TraveliunTablePage route="/customers_care" />;
+/** «خدمة العملاء» went with the menu consolidation (the owner, 2026-10-19); care_tickets is kept, unlisted. */
+export default function CustomersCarePage() {
+  redirect(movedTo("/customers-care") ?? "/clients");
 }
