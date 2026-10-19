@@ -6,6 +6,10 @@ import { currentCan } from "@/lib/roles/current";
 import { logAudit } from "./audit";
 import { runIntegrationChecks } from "@/lib/developer/integrations-run";
 import { INTEGRATION_KINDS, looksLikeSecret, type IntegrationKind } from "@/lib/developer/integration-kinds";
+import { integrationLink, type IntegrationLink } from "@/lib/developer/integration-links";
+import { readyOffersSheet } from "./ready-offers";
+import { SHEET_ID as LEADS_SHEET_ID } from "@/lib/leads/sync";
+import { getTeletelConfig } from "@/lib/providers/teletel";
 
 /**
  * «الربط الخارجي» on «المطوّر» (the owner, 2026-10-19): every server, database,
@@ -33,6 +37,8 @@ export type Integration = {
   last_error_at: string | null;
   fail_streak: number;
   alerted: string | null;
+  /** where to open it — from the system's own settings (integration-links.ts); never a secret */
+  link?: IntegrationLink | null;
 };
 
 type Fail = { ok: false; error: string };
@@ -41,8 +47,14 @@ const COLS = "id, name, kind, used_by, secret_ref, account, plan, cost, renews_o
 
 export async function listIntegrations(): Promise<Integration[] | null> {
   if (!(await currentCan("settings.manage"))) return null;
-  const { data } = await db().from("integrations").select(COLS).order("sort").order("name");
-  return (data ?? []) as Integration[];
+  const [{ data }, ready] = await Promise.all([db().from("integrations").select(COLS).order("sort").order("name"), readyOffersSheet()]);
+  const ctx = {
+    site: (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, ""),
+    readySheet: ready.id || null,
+    leadsSheet: LEADS_SHEET_ID || null,
+    teletel: getTeletelConfig()?.baseUrl ?? null,
+  };
+  return ((data ?? []) as Integration[]).map((r) => ({ ...r, link: integrationLink(r, ctx) }));
 }
 
 export async function saveIntegration(input: Partial<Integration> & { name: string; kind: IntegrationKind }): Promise<{ ok: true; id: string } | Fail> {

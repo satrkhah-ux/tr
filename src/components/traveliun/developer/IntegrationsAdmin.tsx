@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Loader2, Plus, RefreshCw, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Plus, RefreshCw, XCircle } from "lucide-react";
 import { checkIntegrationsNow, saveIntegration, type Integration } from "@/lib/data/integrations";
 import { INTEGRATION_KINDS, KIND_AR, type IntegrationKind } from "@/lib/developer/integration-kinds";
 import { TraveliunShell } from "../TraveliunShell";
@@ -163,10 +163,10 @@ export function IntegrationsAdmin({ rows }: { rows: Integration[] }) {
           <section key={kind} className="rounded-[14px] border border-[#cfe0d9] bg-white p-3">
             <h3 className="mb-2 text-[13px] font-extrabold text-[#185045]">{KIND_AR[kind]}</h3>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-start text-[12px]">
+              <table className="w-full min-w-[1040px] text-start text-[12px]">
                 <thead className="text-[10.5px] font-extrabold text-[#78948f]">
                   <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start">
-                    <th>الاسم</th><th>يستعمله</th><th>مكان السر</th><th>الحساب</th><th>الخطة / التكلفة</th><th>التجديد</th><th>الحالة</th><th />
+                    <th>الاسم</th><th>الرابط</th><th>يستعمله</th><th>مكان السر</th><th>الحساب</th><th>الخطة / التكلفة</th><th>التجديد</th><th>الحالة</th><th />
                   </tr>
                 </thead>
                 <tbody>
@@ -175,7 +175,7 @@ export function IntegrationsAdmin({ rows }: { rows: Integration[] }) {
                     .map((r) =>
                       editing === r.id ? (
                         <tr key={r.id}>
-                          <td colSpan={8} className="py-2">
+                          <td colSpan={9} className="py-2">
                             <Editor value={r} onDone={() => setEditing(null)} />
                           </td>
                         </tr>
@@ -184,6 +184,16 @@ export function IntegrationsAdmin({ rows }: { rows: Integration[] }) {
                           <td className="font-extrabold">
                             {r.name}
                             {r.notes ? <div className="mt-0.5 text-[11px] font-semibold text-[#78948f]">{r.notes}</div> : null}
+                          </td>
+                          <td className="whitespace-nowrap">
+                            {r.link ? (
+                              <a href={r.link.url} target="_blank" rel="noopener noreferrer" dir="auto" className="inline-flex items-center gap-1 font-bold text-[#1d5f8a] hover:underline">
+                                <ExternalLink className="size-3.5" />
+                                {r.link.label}
+                              </a>
+                            ) : (
+                              <span className="text-[#93aaa3]">—</span>
+                            )}
                           </td>
                           <td className="max-w-[16rem]">{r.used_by ?? "—"}</td>
                           <td className="max-w-[14rem] break-words font-mono text-[11px]" dir="ltr">{r.secret_ref ?? "—"}</td>

@@ -26,7 +26,7 @@ import {
  *    its key, or a new one at the end.
  */
 
-const SHEET_ID = process.env.LEADS_SHEET_ID || "1jCwYe6c661ik3Az5RAu9X9jxQgOoY_TwNqGMg2YMi6s";
+export const SHEET_ID = process.env.LEADS_SHEET_ID || "1jCwYe6c661ik3Az5RAu9X9jxQgOoY_TwNqGMg2YMi6s";
 // no tab id: the sheet's first tab (the conversations)
 const SHEET_GID = process.env.LEADS_SHEET_GID || "";
 
