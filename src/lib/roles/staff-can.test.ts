@@ -12,6 +12,11 @@ const MIGRATION = readFileSync(
   fileURLToPath(new URL("../../../supabase/migrations/0073_role_write_policies.sql", import.meta.url)),
   "utf8",
 );
+// the live definition: 0106 added the colleague's own keys
+const LATEST = readFileSync(
+  fileURLToPath(new URL("../../../supabase/migrations/0106_employee_extra_permissions.sql", import.meta.url)),
+  "utf8",
+);
 
 describe("grantedPermissions — the app's side", () => {
   it("is the role's keys for an Active employee, unknown keys dropped", () => {
@@ -28,20 +33,29 @@ describe("grantedPermissions — the app's side", () => {
     expect(grantedPermissions({ status: "Active", permission_keys: null })).toEqual([]);
   });
 
+  it("adds the colleague's own keys to the role's (0106), even without a role", () => {
+    expect(grantedPermissions({ status: "Active", permission_keys: ["offers.write"], extra_permission_keys: ["data.write", "x"] })).toEqual([
+      "offers.write",
+      "data.write",
+    ]);
+    expect(grantedPermissions({ status: "Active", permission_keys: null, extra_permission_keys: ["data.write"] })).toEqual(["data.write"]);
+    expect(grantedPermissions({ status: "Suspended", permission_keys: null, extra_permission_keys: ["data.write"] })).toEqual([]);
+  });
+
   it("has no implicit administrator: «All Permissions» holds exactly what it lists", () => {
     const listed = ALL_PERMISSIONS.filter((p) => p !== "operations.book");
     expect(grantedPermissions({ status: "Active", permission_keys: listed })).not.toContain("operations.book");
   });
 });
 
-describe("staff_can — the database's side (0073)", () => {
-  const body = MIGRATION.match(/create or replace function public\.staff_can[\s\S]*?\$\$([\s\S]*?)\$\$/)?.[1] ?? "";
+describe("staff_can — the database's side (0073, 0106)", () => {
+  const body = LATEST.match(/create or replace function public\.staff_can[\s\S]*?\$\$([\s\S]*?)\$\$/)?.[1] ?? "";
 
   it("checks the same three things", () => {
     expect(body).toMatch(/e\.auth_user_id = auth\.uid\(\)/);
     expect(body).toMatch(/e\.status = 'Active'/);
-    expect(body).toMatch(/join public\.roles r on r\.id = e\.role_id/);
-    expect(body).toMatch(/p = any \(r\.permission_keys\)/);
+    expect(body).toMatch(/left join public\.roles r on r\.id = e\.role_id/);
+    expect(body).toMatch(/p = any \(coalesce\(r\.permission_keys, '\{\}'\) \|\| e\.extra_permission_keys\)/);
   });
 
   it("is only ever asked for a permission the app knows", () => {

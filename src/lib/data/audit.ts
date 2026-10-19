@@ -95,6 +95,7 @@ export type AuditAction =
   | "employee.created"
   | "employee.updated"
   | "employee.role_changed"
+  | "employee.extra_permissions"
   // «عين الإدارة» — what it said, and what management did about it
   | "eye.report_sent"
   | "eye.note_acked"

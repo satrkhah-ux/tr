@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Check, KeyRound, Loader2, Pencil, Plus, Search, ShieldCheck, UserPlus, X } from "lucide-react";
+import { Check, KeyRound, LayoutGrid, Loader2, Pencil, Plus, Search, ShieldCheck, UserPlus, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { saveMember, setMemberRole, suspendMember, type PendingRegistration, type TeamMember, type TeamRole } from "@/lib/data/team";
-import { ALL_PERMISSIONS, isDeveloperRole } from "@/lib/roles/roles";
+import { saveMember, setMemberExtraPermissions, setMemberRole, suspendMember, type PendingRegistration, type TeamMember, type TeamRole } from "@/lib/data/team";
+import { ALL_PERMISSIONS, isDeveloperRole, PERMISSION_GROUPS, type Permission } from "@/lib/roles/roles";
+import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
 import { PendingEmployees } from "./team/PendingEmployees";
 import { TraveliunShell } from "./TraveliunShell";
@@ -68,6 +69,7 @@ export function TeamMembers({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [extraFor, setExtraFor] = useState<string | null>(null);
   // The developer's section, and whoever sits in it, are the developer's to
   // change (team.ts refuses the rest): read-only here for everyone else.
   const { isDeveloper } = useRole();
@@ -260,7 +262,14 @@ export function TeamMembers({
                   </span>
 
                   {!m.has_login ? (
-                    <span className="rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11px] font-bold text-[#557d78]">{t("team.noLogin")}</span>
+                    // imported colleagues have a row but no sign-in yet: «حسابات الدخول» makes one
+                    <Link
+                      href="/employees/accounts"
+                      title={t("team.noLoginHint")}
+                      className="rounded-full bg-[#eef4f1] px-2.5 py-1 text-[11px] font-bold text-[#557d78] hover:underline"
+                    >
+                      {t("team.noLogin")}
+                    </Link>
                   ) : null}
                   {m.status !== "Active" ? (
                     <span className="rounded-full bg-[#fdeef2] px-2.5 py-1 text-[11px] font-bold text-[#c22850]">{t("team.suspended")}</span>
@@ -290,6 +299,18 @@ export function TeamMembers({
                     <>
                       <button
                         type="button"
+                        onClick={() => setExtraFor(extraFor === m.id ? null : m.id)}
+                        aria-expanded={extraFor === m.id}
+                        className={`inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold hover:bg-[#f4f8f6] ${
+                          m.extra_permission_keys.length > 0 ? "border-[#2aa87a] text-[#0f7a52]" : "border-[#dbe6e1] text-[#557d78]"
+                        }`}
+                      >
+                        <LayoutGrid className="size-3.5" />
+                        {t("team.extra")}
+                        {m.extra_permission_keys.length > 0 ? ` (${m.extra_permission_keys.length})` : ""}
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => { setError(null); setDraft(toDraft(m)); }}
                         className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6]"
                         aria-label={t("edit")}
@@ -305,6 +326,13 @@ export function TeamMembers({
                         {busyId === m.id ? <Loader2 className="size-3.5 animate-spin" /> : m.status === "Active" ? t("team.suspend") : t("team.reactivate")}
                       </button>
                     </>
+                  ) : null}
+                  {extraFor === m.id && canManage && !developerRole(m.role_id) ? (
+                    <ExtraSections
+                      member={m}
+                      roleKeys={roles.find((r) => r.id === m.role_id)?.permission_keys ?? []}
+                      onDone={() => { setExtraFor(null); router.refresh(); }}
+                    />
                   ) : null}
                 </li>
               ))}
@@ -329,6 +357,71 @@ function RoleSummary({ role }: { role?: TeamRole }) {
           ? t("team.grantsNone")
           : t("team.grants", { n: String(role.permission_keys.length), total: String(ALL_PERMISSIONS.length) })}
       </p>
+    </div>
+  );
+}
+
+/**
+ * «أقسام إضافية»: sections for this colleague alone, on top of their role (0106).
+ * What the role already gives shows ticked and fixed; what the actor does not
+ * hold is not offered (team.ts refuses it anyway).
+ */
+function ExtraSections({ member, roleKeys, onDone }: { member: TeamMember; roleKeys: Permission[]; onDone: () => void }) {
+  const { t } = useTraveliunUI();
+  const { can } = useRole();
+  const [keys, setKeys] = useState(() => new Set(member.extra_permission_keys));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    const res = await setMemberExtraPermissions(member.id, [...keys]);
+    setBusy(false);
+    if (!res.ok) setError(t(res.error));
+    else onDone();
+  }
+
+  return (
+    <div className="basis-full rounded-[10px] border border-[#e8efeb] bg-[#f8fbfa] p-3">
+      <p className="text-[11.5px] font-bold text-[#557d78]">{t("team.extraHint")}</p>
+      <div className="mt-2 grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
+        {PERMISSION_GROUPS.flatMap((g) => g.items)
+          .filter((i) => i.key !== "developer.access" && (can(i.key) || roleKeys.includes(i.key) || keys.has(i.key)))
+          .map((i) => {
+            const fromRole = roleKeys.includes(i.key);
+            return (
+              <label key={i.key} className="flex items-center gap-2 text-[12px] font-bold text-[#185045]">
+                <input
+                  type="checkbox"
+                  checked={fromRole || keys.has(i.key)}
+                  disabled={fromRole || busy}
+                  onChange={(e) => {
+                    const next = new Set(keys);
+                    if (e.target.checked) next.add(i.key);
+                    else next.delete(i.key);
+                    setKeys(next);
+                  }}
+                  className="size-4 accent-[#185045]"
+                />
+                {t(`perm.${i.key}` as TranslationKey)}
+                {fromRole ? <span className="text-[10.5px] font-semibold text-[#93aaa3]">({t("team.fromRole")})</span> : null}
+              </label>
+            );
+          })}
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void save()}
+          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-[#185045] px-4 text-[12px] font-extrabold text-white hover:bg-[#0f4439] disabled:opacity-60"
+        >
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+          {t("save")}
+        </button>
+        {error ? <span className="text-[12px] font-bold text-[#c22850]">{error}</span> : null}
+      </div>
     </div>
   );
 }

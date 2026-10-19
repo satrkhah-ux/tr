@@ -128,10 +128,11 @@ export function isPermission(value: unknown): value is Permission {
  * database's write policies and the app's gates answer alike.
  */
 export function grantedPermissions(
-  employee: { status: string | null; permission_keys: readonly string[] | null } | null,
+  employee: { status: string | null; permission_keys: readonly string[] | null; extra_permission_keys?: readonly string[] | null } | null,
 ): Permission[] {
   if (!employee || employee.status !== "Active") return [];
-  return (employee.permission_keys ?? []).filter(isPermission);
+  // the role's keys, plus what this one colleague was given on top (0106)
+  return [...new Set([...(employee.permission_keys ?? []), ...(employee.extra_permission_keys ?? [])])].filter(isPermission);
 }
 
 /**

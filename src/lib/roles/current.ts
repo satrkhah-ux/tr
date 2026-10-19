@@ -45,12 +45,17 @@ const loadReal = cache(async (): Promise<Permission[]> => {
     const supabase = await createSupabaseServerClient();
     const { data: emp } = await supabase
       .from("employees")
-      .select("id, status, roles(permission_keys)")
+      .select("id, status, extra_permission_keys, roles(permission_keys)")
       .eq("auth_user_id", user.id)
       .maybeSingle();
 
     const employee = emp as unknown as
-      | { id: string; status: string | null; roles: { permission_keys: string[] } | { permission_keys: string[] }[] | null }
+      | {
+          id: string;
+          status: string | null;
+          extra_permission_keys: string[] | null;
+          roles: { permission_keys: string[] } | { permission_keys: string[] }[] | null;
+        }
       | null;
 
     // No employee row → nothing. This used to fall through to "employee", which
@@ -58,7 +63,9 @@ const loadReal = cache(async (): Promise<Permission[]> => {
     // without anyone granting them. A suspended colleague keeps their row and
     // loses their access. Same rule as public.staff_can() (0073).
     const role = Array.isArray(employee?.roles) ? employee.roles[0] : employee?.roles;
-    const granted = grantedPermissions(employee ? { status: employee.status, permission_keys: role?.permission_keys ?? null } : null);
+    const granted = grantedPermissions(
+      employee ? { status: employee.status, permission_keys: role?.permission_keys ?? null, extra_permission_keys: employee.extra_permission_keys } : null,
+    );
     permissionsByUser.set(user.id, granted);
     return granted;
   } catch {
