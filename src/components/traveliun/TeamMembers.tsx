@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Check, KeyRound, LayoutGrid, Loader2, Pencil, Plus, Search, ShieldCheck, UserPlus, X } from "lucide-react";
+import { Check, KeyRound, LayoutGrid, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { saveMember, setMemberExtraPermissions, setMemberRole, suspendMember, type PendingRegistration, type TeamMember, type TeamRole } from "@/lib/data/team";
+import { deleteMember, saveMember, setMemberExtraPermissions, setMemberRole, suspendMember, type PendingRegistration, type TeamMember, type TeamRole } from "@/lib/data/team";
 import { ALL_PERMISSIONS, isDeveloperRole, PERMISSION_GROUPS, type Permission } from "@/lib/roles/roles";
 import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
@@ -109,6 +109,16 @@ export function TeamMembers({
     setBusyId(employeeId);
     await setMemberRole(employeeId, roleId || null);
     setBusyId(null);
+    router.refresh();
+  }
+
+  async function remove(m: TeamMember) {
+    if (!window.confirm(t("team.deleteConfirm", { name: m.arabic_name }))) return;
+    setBusyId(m.id);
+    setError(null);
+    const res = await deleteMember(m.id);
+    setBusyId(null);
+    if (!res.ok) window.alert(t(res.error));
     router.refresh();
   }
 
@@ -324,6 +334,16 @@ export function TeamMembers({
                         className="inline-flex h-9 items-center rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6] disabled:opacity-60"
                       >
                         {busyId === m.id ? <Loader2 className="size-3.5 animate-spin" /> : m.status === "Active" ? t("team.suspend") : t("team.reactivate")}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === m.id}
+                        onClick={() => void remove(m)}
+                        className="flex size-9 items-center justify-center rounded-[9px] border border-[#f0c4cf] text-[#c22850] hover:bg-[#fdf6f7] disabled:opacity-60"
+                        aria-label={t("team.delete")}
+                        title={t("team.delete")}
+                      >
+                        <Trash2 className="size-4" />
                       </button>
                     </>
                   ) : null}

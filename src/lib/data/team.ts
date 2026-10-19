@@ -266,6 +266,45 @@ export async function setMemberExtraPermissions(employeeId: string, keys: string
   }
 }
 
+/**
+ * Delete a colleague — only one who never held a file: their offers, drafts,
+ * cases, leads and commissions would otherwise lose who did them (the foreign
+ * keys null them). Anyone else is suspended instead. Their sign-in goes too.
+ */
+export async function deleteMember(employeeId: string): Promise<{ ok: true } | Fail> {
+  const denied = await requireManage();
+  if (denied) return { ok: false, error: denied };
+  if (await deniedForNonDeveloper({ employeeId })) return { ok: false, error: "team.developerOnly" };
+  if ((await getCurrentEmployeeId()) === employeeId) return { ok: false, error: "err.forbidden" };
+  try {
+    const supabase = service();
+    const uses: [string, string][] = [
+      ["offers", "employee_id"],
+      ["offer_drafts", "created_by"],
+      ["operations", "assignee_id"],
+      ["client_leads", "assigned_to"],
+      ["commission_adjustments", "employee_id"],
+    ];
+    for (const [table, column] of uses) {
+      const { count, error } = await supabase.from(table).select("id", { count: "exact", head: true }).eq(column, employeeId);
+      if (error) return { ok: false, error: "err.db" };
+      if ((count ?? 0) > 0) return { ok: false, error: "team.err.hasFiles" };
+    }
+    const { data: row } = await supabase.from("employees").select("arabic_name, email, auth_user_id").eq("id", employeeId).maybeSingle();
+    const emp = row as { arabic_name: string | null; email: string | null; auth_user_id: string | null } | null;
+    if (!emp) return { ok: false, error: "err.deleteFailed" };
+    const { error } = await supabase.from("employees").delete().eq("id", employeeId);
+    if (error) return { ok: false, error: "err.deleteFailed" };
+    if (emp.auth_user_id) await supabase.auth.admin.deleteUser(emp.auth_user_id);
+    await logAudit({ action: "employee.deleted", entity: "employees", entity_id: employeeId, meta: { name: emp.arabic_name, email: emp.email } });
+    forgetPermissions();
+    revalidatePath("/employees");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
 export async function saveMember(input: {
   id?: string;
   arabic_name: string;
