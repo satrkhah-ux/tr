@@ -10,7 +10,7 @@ import { fold } from "./sheet";
 /** the service a client names, first match wins — patterns are written folded (fold(): no spaces, no hamza, ه for ة) (a visa before a flight: «تأشيرة وتذكرة» is a visa file) */
 const KINDS: [string, RegExp][] = [
   ["بكج", /(بكج|باكج|باكدج|بكدج|باقه|باقات|برنامجسياحي|بكجات|package)/i],
-  ["تأشيرات", /(تاشير|فيزا|فيزه|visa)/i],
+  ["تأشيرات", /(تاشير|فيزا|فيزه|visa|شنغن|شينغن|schengen)/i],
   ["فنادق", /(فندق|فنادق|حجزغرف|hotel)/i],
   ["طيران", /(طيران|تذكره|تذاكر|حجزرحله|رحلهطيران|flight|ticket)/i],
   ["مواصلات", /(مواصلات|سياره|سائق|توصيل|استقبالمنالمطار|transfer)/i],

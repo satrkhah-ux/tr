@@ -49,6 +49,9 @@ const WANTED = new Set([
   "suppliers",
   "supplier_categories",
   "categories",
+  // the visa price list and its kinds (the owner, 2026-10-19: Murad answers visa requests from it)
+  "visas",
+  "visas_types",
 ]);
 
 /**

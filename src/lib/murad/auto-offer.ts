@@ -215,6 +215,12 @@ const MONTHS = /(يناير|فبراير|مارس|ابريل|أبريل|مايو
 /** a date said relative to today — the model counts it from today in Riyadh (the owner's test, 2026-10-19: «بعد عشرة ايام») */
 const RELATIVE = /بعد\s+(\S+\s+)?(يوم|ايام|أيام|يومين|اسبوع|أسبوع|اسبوعين|أسبوعين|اسابيع|أسابيع|شهر|شهرين)|(الاسبوع|الأسبوع|الشهر)\s+(الجاي|الياي|القادم|الجاية)|(بداية|بدايه|اول|أول|نهاية|نهايه|اخر|آخر)\s+(الشهر|الاسبوع|الأسبوع)|بكر[ةه]|غدا|غداً/gu;
 
+/** How many dates the text names — «نووفمبر» (a letter typed twice) still names the month, «بعد عشرة ايام» names one too. */
+export function datesSaid(text: string): number {
+  const folded = text.normalize("NFKC").replace(/(\p{L})\1+/gu, "$1");
+  return (folded.match(MONTHS) ?? []).length + (folded.match(RELATIVE) ?? []).length;
+}
+
 /** words that describe who travels, never who the client is */
 const PARTY = /(^|\s)(انا|أنا|احنا|إحنا|نحن|مع)(\s|$)|زوج|عائل|عايل|طفل|أطفال|اطفال|شخص|اشخاص|أشخاص|نفر|ولد|بنت|عيال|اخو|أخو|اخت|أخت|صديق|ربع|\d/u;
 
@@ -226,9 +232,7 @@ const PARTY = /(^|\s)(انا|أنا|احنا|إحنا|نحن|مع)(\s|$)|زوج|
  * from them, both days in.
  */
 export function holdToText(text: string, a: OfferAsk, today: string): OfferAsk {
-  // «نووفمبر»: a letter typed twice still names the month; «بعد عشرة ايام» names a date too
-  const folded = text.normalize("NFKC").replace(/(\p{L})\1+/gu, "$1");
-  const said = (folded.match(MONTHS) ?? []).length + (folded.match(RELATIVE) ?? []).length;
+  const said = datesSaid(text);
   const future = (d: string | null) => {
     if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
     let iso = d;
