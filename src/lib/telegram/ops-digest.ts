@@ -43,12 +43,15 @@ export type OpsDigest = {
   critical: number;
   openBookings: number;
   travelSoon: number;
+  /** the board's own two lists (OperationsBoard): travel near with bookings missing, confirmed and not paid in full */
+  travelIncomplete: number;
+  unpaid: number;
   urgent: DigestCase[];
 };
 
 export async function buildOpsDigest(limit = 5, access: OpsAccess = { all: true }): Promise<OpsDigest> {
   const today = new Date().toISOString().slice(0, 10);
-  const empty: OpsDigest = { today, own: !access.all, liveCases: 0, needsAction: 0, critical: 0, openBookings: 0, travelSoon: 0, urgent: [] };
+  const empty: OpsDigest = { today, own: !access.all, liveCases: 0, needsAction: 0, critical: 0, openBookings: 0, travelSoon: 0, travelIncomplete: 0, unpaid: 0, urgent: [] };
 
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
@@ -135,6 +138,7 @@ export async function buildOpsDigest(limit = 5, access: OpsAccess = { all: true 
     }
 
     const counts = summarizeOperations(cases, today);
+    const liveWith = (code: string) => cases.filter((c) => isLiveCase(c) && c.signals.some((s) => s.code === code)).length;
     const urgent = named
       .sort((a, b) => {
         const rank = severityRank(a.signals) - severityRank(b.signals);
@@ -156,6 +160,8 @@ export async function buildOpsDigest(limit = 5, access: OpsAccess = { all: true 
       critical: counts.critical,
       openBookings: counts.openBookings,
       travelSoon: counts.travelSoon,
+      travelIncomplete: liveWith("travel_approaching_incomplete"),
+      unpaid: liveWith("unpaid_confirmed"),
       urgent,
     };
   } catch {

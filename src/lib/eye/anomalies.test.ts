@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anomalies, ticketMinutes } from "./anomalies";
+import { anomalies, firstName, ticketMinutes, ticketsFromLeads, type LeadForTicket } from "./anomalies";
 import type { EyeSnapshot } from "./types";
 
 /**
@@ -244,5 +244,60 @@ describe("ordering", () => {
 describe("a quiet day", () => {
   it("says nothing at all", () => {
     expect(anomalies(snap(), NOW, DAY)).toEqual([]);
+  });
+});
+
+describe("the conversations of «العملاء» as tickets (care_tickets is empty since 2026-10-19)", () => {
+  const lead = (over: Partial<LeadForTicket> = {}): LeadForTicket => ({
+    id: "l1",
+    name: "محمد العتيبي",
+    inquiry: "بكج",
+    status: "open",
+    assigned_to: null,
+    assigned_to_name: null,
+    received_by: "e1",
+    received_by_name: "ريم",
+    first_message_at: "2026-07-30T06:00:00Z",
+    first_reply_at: null,
+    ...over,
+  });
+
+  it("measures the client's first message to our first reply", () => {
+    const [t] = ticketsFromLeads([lead({ first_reply_at: "2026-07-30T06:20:00Z" })], new Map());
+    expect(ticketMinutes(t, NOW)).toBe(20);
+    expect(t.subject).toBe("بكج");
+  });
+
+  it("raises the same note a ticket did, with the client's first name only", () => {
+    const notes = anomalies(snap({ tickets: ticketsFromLeads([lead()], new Map([["e1", "ريم الحربي"]])) }), NOW, DAY);
+    expect(notes[0].code).toBe("ticket_unanswered");
+    expect(notes[0].title).toBe("تذكرة بلا رد منذ 14 ساعة");
+    expect(notes[0].detail).toBe("بكج · محمد · ريم الحربي");
+  });
+
+  it("names whoever it was handed to before whoever received it", () => {
+    const [t] = ticketsFromLeads([lead({ assigned_to: "e2", assigned_to_name: "هاني" })], new Map());
+    expect(t.employee_id).toBe("e2");
+    expect(t.employee_name).toBe("هاني");
+  });
+
+  it("skips a row without the system's clock, one whose reply predates it, and one resolved without a reply", () => {
+    const rows = [
+      lead({ id: "sheet", first_message_at: null }),
+      lead({ id: "resolved", status: "closed" }),
+      // Teletel's «first reply» from an earlier conversation of the same client
+      lead({ id: "borrowed", first_reply_at: "2026-07-01T07:00:00Z" }),
+      lead({ id: "answered", status: "closed", first_reply_at: "2026-07-30T07:00:00Z" }),
+    ];
+    expect(ticketsFromLeads(rows, new Map()).map((t) => t.id)).toEqual(["answered"]);
+  });
+
+  it("never passes on a phone or Teletel's «#id» as a name", () => {
+    expect(firstName("966501234567")).toBeNull();
+    expect(firstName("+966 50")).toBeNull();
+    expect(firstName("#4521")).toBeNull();
+    expect(firstName("٠٥٠١٢٣")).toBeNull();
+    expect(firstName("  سارة   القحطاني ")).toBe("سارة");
+    expect(firstName(null)).toBeNull();
   });
 });

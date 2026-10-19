@@ -50,6 +50,58 @@ export function ticketMinutes(ticket: { created_at: string; responded_at: string
 }
 
 /**
+ * A client as a shared screen or a briefing may name them: the first word, and
+ * never a phone number or Teletel's «#123» stand-in (a contact without a name
+ * is listed by its number).
+ */
+export function firstName(name: string | null | undefined): string | null {
+  const word = (name ?? "").trim().split(/\s+/)[0] ?? "";
+  return word && !/[\d٠-٩۰-۹#+@]/.test(word) ? word : null;
+}
+
+/** A conversation of «العملاء» (client_leads), as much of it as the response rules read. */
+export type LeadForTicket = {
+  id: string;
+  name: string | null;
+  inquiry: string | null;
+  status: string;
+  assigned_to: string | null;
+  assigned_to_name: string | null;
+  received_by: string | null;
+  received_by_name: string | null;
+  first_message_at: string | null;
+  first_reply_at: string | null;
+};
+
+/**
+ * The client conversations as the «tickets» the response rules measure — since
+ * the menu consolidation (2026-10-19) care_tickets is empty and «العملاء» is
+ * where clients wait. The clock is the system's own (0098): the client's first
+ * message and our first reply, written by the Teletel pull. A row without them
+ * (the sheet's phase one) has no clock and is not measured; nor is one whose
+ * «first reply» came before the message (Teletel handed over an earlier
+ * conversation's — two such rows on 2026-10-19); a conversation closed without
+ * a reply was resolved in Teletel and keeps nobody waiting.
+ */
+export function ticketsFromLeads(leads: LeadForTicket[], nameOf: ReadonlyMap<string, string>): EyeSnapshot["tickets"] {
+  return leads
+    .filter((l) => l.first_message_at && (l.first_reply_at || l.status !== "closed"))
+    .filter((l) => !l.first_reply_at || Date.parse(l.first_reply_at) >= Date.parse(l.first_message_at!))
+    .map((l) => {
+      const employee = l.assigned_to ?? l.received_by;
+      return {
+        id: l.id,
+        subject: l.inquiry || "محادثة",
+        customer: firstName(l.name),
+        employee_id: employee,
+        employee_name: (employee ? nameOf.get(employee) : undefined) ?? l.assigned_to_name ?? l.received_by_name ?? null,
+        created_at: l.first_message_at!,
+        responded_at: l.first_reply_at,
+      };
+    });
+}
+
+/**
  * Every note the snapshot raises, worst first.
  *
  * `now` is a full ISO instant (not a date) because the ticket rules measure hours;

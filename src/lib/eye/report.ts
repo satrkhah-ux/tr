@@ -2,7 +2,9 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { buildOpsDigest } from "@/lib/telegram/ops-digest";
-import { anomalies, ticketMinutes } from "./anomalies";
+import { AUTO_FOLLOWUP_MAX_MINUTES } from "@/lib/sla/classify";
+import { allRows } from "@/lib/data/all-rows";
+import { anomalies, ticketMinutes, ticketsFromLeads, type LeadForTicket } from "./anomalies";
 import type { EyeReport, EyeSnapshot, Note } from "./types";
 
 /**
@@ -39,21 +41,32 @@ type EmployeeRow = {
   roles: { arabic_name: string } | { arabic_name: string }[] | null;
 };
 
-export async function buildEyeReport(): Promise<EyeReport> {
+const LEAD_COLS = "id, name, inquiry, status, assigned_to, assigned_to_name, received_by, received_by_name, first_message_at, first_reply_at";
+
+/**
+ * `clientNames: false` — the same report without any client's name, for the
+ * manager's office TV where visitors sit (lib/manager-screen); the bot's
+ * briefing keeps them.
+ */
+export async function buildEyeReport({ clientNames = true }: { clientNames?: boolean } = {}): Promise<EyeReport> {
   const now = new Date();
   const nowIso = now.toISOString();
   const { day } = riyadhParts(now);
   // The working day starts at Riyadh midnight, which is 21:00 UTC the day before.
   const dayStartIso = new Date(Date.parse(`${day}T00:00:00Z`) - RIYADH_OFFSET_MS).toISOString();
+  // The last week's conversations only: Teletel keeps hundreds of months-old ones
+  // open, and a backlog is not today's delay — the line the SLA rules draw too.
+  const leadsSince = new Date(now.getTime() - AUTO_FOLLOWUP_MAX_MINUTES * 60_000).toISOString();
 
   const supabase = db();
 
-  const [empRes, attRes, ticketRes, auditRes, offerRes, bookingRes, ops] = await Promise.all([
+  const [empRes, attRes, leadRes, auditRes, offerRes, bookingRes, digest] = await Promise.all([
     supabase.from("employees").select("id, arabic_name, email, status, roles(arabic_name)").order("arabic_name"),
     supabase.from("attendance_days").select("employee_id, first_seen_at, last_seen_at, beats").eq("day", day),
-    // «خدمة العملاء» went with the menu consolidation (the owner, 2026-10-19): its
-    // table holds July's test rows only and is kept, unlisted — no tickets reported
-    Promise.resolve({ data: [] }),
+    // «خدمة العملاء» went with the menu consolidation (the owner, 2026-10-19) and
+    // care_tickets is empty: clients wait in «العملاء» now (ticketsFromLeads).
+    // Every page — PostgREST stops at a thousand.
+    allRows((a, b) => supabase.from("client_leads").select(LEAD_COLS).gte("created_at", leadsSince).order("id").range(a, b)),
     supabase.from("audit_logs").select("action, actor_id, actor_email, entity_id, created_at, meta").gte("created_at", dayStartIso).order("created_at"),
     supabase.from("offers").select("serial, status, total, currency, created_at").gte("created_at", dayStartIso),
     supabase.from("operation_bookings").select("id, operation_id, title, status, confirmed_at, confirmation_number").not("confirmed_at", "is", null),
@@ -61,6 +74,7 @@ export async function buildEyeReport(): Promise<EyeReport> {
   ]);
 
   const employees = (empRes.data ?? []) as unknown as EmployeeRow[];
+  const ops = clientNames ? digest : { ...digest, urgent: digest.urgent.map((u) => ({ ...u, customer: null })) };
   const attendance = new Map(
     ((attRes.data ?? []) as { employee_id: string; first_seen_at: string; last_seen_at: string; beats: number }[]).map((a) => [a.employee_id, a]),
   );
@@ -99,10 +113,9 @@ export async function buildEyeReport(): Promise<EyeReport> {
         actions_today: actionsByActor.get(e.id) ?? 0,
       };
     }),
-    tickets: ((ticketRes.data ?? []) as { id: string; subject: string; customer: string | null; employee_id: string | null; created_at: string; responded_at: string | null }[]).map((t) => ({
-      ...t,
-      employee_name: employees.find((e) => e.id === t.employee_id)?.arabic_name ?? null,
-    })),
+    tickets: ticketsFromLeads(leadRes.data as LeadForTicket[], new Map(employees.map((e) => [e.id, e.arabic_name]))).map((t) =>
+      clientNames ? t : { ...t, customer: null },
+    ),
     audit: audit.map((a) => ({
       action: a.action,
       actor_id: a.actor_id,
