@@ -6,7 +6,7 @@ import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { resolvePlace } from "@/lib/leads/places";
 import type { Place } from "@/lib/leads/auto";
 import { ttlCache } from "@/lib/ttl-cache";
-import { alertText, normalizeConfig, positionOf, riyadhDay, SCREENS_SETTING, tickerText, tickerWidth, type ScreensConfig } from "./config";
+import { alertText, normalizeConfig, positionOf, riyadhDay, SCREENS_SETTING, tickerText, tickerWidth, topCountries, type ScreensConfig } from "./config";
 
 /**
  * «الشاشات» — what a screen reads, every few seconds, with no login (the owner,
@@ -26,6 +26,8 @@ export type ScreenState = {
   /** the band: its words, their room, its speed, how often it comes up, and the extra pass when the words changed */
   ticker: { text: string; width: number; speed: number; periodMs: number; bumpAt: number } | null;
   events: { at: number; text: string; src: string | null }[];
+  /** while the TVs are set up: on every load, one pass and then this alert, on that screen only — never stored, never counted */
+  demo: { text: string; src: string | null } | null;
 };
 
 type Shared = Omit<ScreenState, "now" | "position"> & { cfg: ScreensConfig };
@@ -64,8 +66,8 @@ let lastWords: string | null = null;
 let bumpAt = 0;
 
 /** today's and yesterday's conversations by destination (the ticker) */
-async function ticker(now: number, speed: number, periodMs: number): Promise<ScreenState["ticker"]> {
-  const text = await memo(slow, "ticker", async () => {
+async function ticker(now: number, speed: number, periodMs: number): Promise<{ band: ScreenState["ticker"]; top: string | null }> {
+  const { text, top } = await memo(slow, "ticker", async () => {
     const since = new Date(riyadhDay(now) - 86_400_000).toISOString();
     const [{ data }, list] = await Promise.all([
       db().from("client_leads").select("destination, created_at, last_visit_at").or(`created_at.gte.${since},last_visit_at.gte.${since}`).limit(1000),
@@ -77,14 +79,14 @@ async function ticker(now: number, speed: number, periodMs: number): Promise<Scr
       const days = [l.created_at, l.last_visit_at].filter((d): d is string => Boolean(d)).map((d) => riyadhDay(Date.parse(d)));
       return [{ country, days }];
     });
-    return tickerText(leads, now) ?? "";
+    return { text: tickerText(leads, now) ?? "", top: topCountries(leads, riyadhDay(now))[0] ?? null };
   });
   if (lastWords === null) lastWords = text;
   else if (text !== lastWords) {
     lastWords = text;
     if (now - bumpAt >= 120_000) bumpAt = now + 5_000;
   }
-  return text ? { text, width: tickerWidth(text), speed, periodMs, bumpAt } : null;
+  return { band: text ? { text, width: tickerWidth(text), speed, periodMs, bumpAt } : null, top };
 }
 
 async function shared(now: number): Promise<Shared> {
@@ -109,7 +111,9 @@ async function shared(now: number): Promise<Shared> {
       const ad = ads[adCountry.indexOf(country)];
       return [{ at: Date.parse(e.at), text: alertText(e.kind, country, e.test), src: ad?.src ?? null }];
     });
-    return { cfg, build: String(process.env.NEXT_DEPLOYMENT_ID || ""), screens: cfg.screens, slotMs: cfg.slotSec * 1000, ads, ticker: tick, events };
+    const demoCountry = tick.top ?? "تركيا";
+    const demo = now < Date.parse(cfg.demoUntil) ? { text: alertText("بكج", demoCountry, false), src: ads[adCountry.indexOf(demoCountry)]?.src ?? null } : null;
+    return { cfg, build: String(process.env.NEXT_DEPLOYMENT_ID || ""), screens: cfg.screens, slotMs: cfg.slotSec * 1000, ads, ticker: tick.band, events, demo };
   });
 }
 

@@ -27,7 +27,10 @@ const RUNTIME = String.raw`
   function $(id) { return document.getElementById(id); }
   var layers = [$("a0"), $("a1")], front = 0, shown = layers[0].getAttribute("src") || "", pending = "", failed = "", failedAt = 0, preloaded = "";
   var box = $("alert"), boxImg = $("alertImg"), boxText = $("alertText"), shownAlert = "";
-  var band = $("band"), text = $("tick"), scale = 1, bandUp = false;
+  var band = $("band"), text = $("tick"), tag = $("alertTag"), scale = 1, bandUp = false;
+  // the demo (while the TVs are set up): this load, on this screen only, one pass and then a «تجربة» alert
+  var demo = S.demo, demoAt = Date.now();
+  function passMs() { return S.ticker ? tickerPassMs(S.ticker.speed, S.ticker.width, S.screens, REF) : 0; }
   var pre = new Image();
 
   function measure() {
@@ -72,12 +75,14 @@ const RUNTIME = String.raw`
   }
 
   function drawAlert(t) {
-    var i = alertAt(S.events, t, LEAD, SHOW);
-    var key = i < 0 ? "" : S.events[i].at + "|" + S.events[i].text;
+    var i = alertAt(S.events, t, LEAD, SHOW), e = i < 0 ? null : S.events[i];
+    var d = demo ? Date.now() - demoAt - passMs() - LEAD : -1;
+    if (!e && d >= 0 && d < SHOW) e = { at: -1, text: demo.text, src: demo.src };
+    var key = e ? e.at + "|" + e.text : "";
     if (key === shownAlert) return;
     shownAlert = key;
-    if (i < 0) { box.className = ""; return; }
-    var e = S.events[i];
+    if (!e) { box.className = ""; return; }
+    tag.style.display = e.at === -1 ? "block" : "none";
     boxText.textContent = e.text;
     if (e.src) { boxImg.setAttribute("src", e.src); boxImg.style.display = "block"; } else boxImg.style.display = "none";
     box.className = "on";
@@ -86,7 +91,10 @@ const RUNTIME = String.raw`
   // the band is down until its pass: every period, and once more when its words changed (bumpAt)
   function drawTicker(t) {
     var k = S.ticker, e = -1;
-    if (k) e = tickerElapsed(t, k.periodMs, tickerPassMs(k.speed, k.width, S.screens, REF), k.bumpAt);
+    if (k) {
+      var d = demo ? Date.now() - demoAt : -1;
+      e = d >= 0 && d < passMs() ? d : tickerElapsed(t, k.periodMs, passMs(), k.bumpAt);
+    }
     if ((e >= 0) !== bandUp) { bandUp = e >= 0; band.className = bandUp ? "up" : ""; }
     if (e < 0) return;
     var px = tickerLeft(e, k.speed, k.width, S.position, REF) * scale;
@@ -170,6 +178,7 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #alert{background:#000;opacity:0;-webkit-transition:opacity .6s;transition:opacity .6s}
 #alert.on{opacity:1}
 #alertImg{width:100%;height:100%;object-fit:cover;opacity:.4}
+#alertTag{display:none;position:absolute;top:3vh;right:3vh;z-index:2;font-size:1.8vw;font-weight:800;color:#0a3a33;background:#ffd54a;border-radius:1vw;padding:.6vw 1.4vw}
 #alertText{position:absolute;left:6%;right:6%;top:50%;-webkit-transform:translateY(-50%);transform:translateY(-50%);text-align:center;color:#fff;font-size:5vw;font-weight:800;line-height:1.4;direction:rtl;background:rgba(10,58,51,.88);border:.3vw solid #2aa87a;border-radius:2vw;padding:3vw 2vw}
 #band{position:absolute;left:0;right:0;bottom:0;height:9%;z-index:3;background:rgba(10,58,51,.92);border-top:.35vh solid #2aa87a;overflow:hidden;-webkit-transform:translateY(105%);transform:translateY(105%);-webkit-transition:-webkit-transform .7s;transition:transform .7s}
 #band.up{-webkit-transform:translateY(0);transform:translateY(0)}
@@ -190,7 +199,7 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <body>
 <img id="a0" class="ad on" alt=""${src ? ` src="${esc(src)}"` : ""}>
 <img id="a1" class="ad" alt="">
-<div id="alert"><img id="alertImg" alt=""><div id="alertText"></div></div>
+<div id="alert"><img id="alertImg" alt=""><div id="alertTag">تجربة</div><div id="alertText"></div></div>
 <div id="band"><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
 <script>window.__S__=${json(s)};window.__N__=${n};window.__M__=${monitor ? "true" : "false"};</script>
 <script>${SCREEN_CORE}${RUNTIME}</script>

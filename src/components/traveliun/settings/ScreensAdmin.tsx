@@ -24,6 +24,9 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [adName, setAdName] = useState("");
   const [adFile, setAdFile] = useState<File | null>(null);
+  // the page's own moment, so a render stays pure; «إيقاف» writes a moment before it
+  const [openedAt] = useState(() => Date.now());
+  const demoOn = Date.parse(cfg.demoUntil) > openedAt;
   const [testDest, setTestDest] = useState(initial.ads[0]?.name ?? "تركيا");
   const origin = typeof window === "undefined" ? "https://pkg.traveliun.com" : window.location.origin;
   const active = cfg.ads.filter((a) => a.active).length;
@@ -201,6 +204,30 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
             >
               {busy === "upload" ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
               إضافة إعلان
+            </button>
+          </div>
+        </section>
+
+        <section className={CARD}>
+          <h2 className={`${H} mb-2`}>التجربة عند كل فتح</h2>
+          <p className="text-[12.5px] text-[#2f5752]">
+            {demoOn
+              ? `تعمل حتى ${new Date(cfg.demoUntil).toLocaleString("ar-SA-u-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "medium", timeStyle: "short" })}: كل شاشة تُفتح يمر عليها الشريط مرة، ثم يظهر «عميل جديد» عليه علامة «تجربة» — على تلك الشاشة فقط، ولا يُسجَّل.`
+              : "متوقفة — الشاشات تعرض الشريط في موعده والإشعارات الحقيقية فقط."}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {demoOn ? (
+              <button type="button" disabled={busy !== null} onClick={() => save({ ...cfg, demoUntil: new Date(openedAt - 1000).toISOString() }, "أُوقفت التجربة")} className="h-9 rounded-[9px] border border-[#f0c9d2] px-3 text-[12.5px] font-bold text-[#a3263f] hover:bg-[#fdecef] disabled:opacity-50">
+                إيقاف التجربة
+              </button>
+            ) : null}
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => save({ ...cfg, demoUntil: new Date(Math.max(Date.now(), Date.parse(cfg.demoUntil)) + 86_400_000).toISOString() }, "مُدّدت التجربة يوماً")}
+              className="h-9 rounded-[9px] border border-[#2aa87a] px-3 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50"
+            >
+              تمديد يوماً
             </button>
           </div>
         </section>

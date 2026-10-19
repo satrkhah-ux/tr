@@ -23,10 +23,12 @@ export type ScreensConfig = {
   tickerSpeed: number;
   /** the band comes up every this many minutes for one pass (the owner: «كل 10 دقائق»), and when its words change */
   tickerEveryMin: number;
+  /** until when every load of a screen runs the demo — one pass and a «تجربة» alert (the owner, 2026-10-19: while the TVs are set up) */
+  demoUntil: string;
   ads: ScreenAd[];
 };
 
-export const SCREENS_DEFAULT: ScreensConfig = { screens: 4, order: [1, 2, 3, 4], slotSec: 12, kinds: ["بكج"], tickerSpeed: 110, tickerEveryMin: 10, ads: [] };
+export const SCREENS_DEFAULT: ScreensConfig = { screens: 4, order: [1, 2, 3, 4], slotSec: 12, kinds: ["بكج"], tickerSpeed: 110, tickerEveryMin: 10, demoUntil: "2026-10-20T21:00:00.000Z", ads: [] };
 
 const clamp = (v: unknown, lo: number, hi: number, d: number) => {
   const n = Math.round(Number(v));
@@ -43,7 +45,7 @@ export function normalizeConfig(raw: unknown): ScreensConfig {
   const ads = (Array.isArray(r.ads) ? r.ads : [])
     .filter((a): a is ScreenAd => Boolean(a && typeof a.id === "string" && /^[a-z0-9-]{4,40}$/.test(a.id)))
     .map((a) => ({ id: a.id, name: String(a.name ?? "").slice(0, 60), active: a.active !== false }));
-  return { screens, order, slotSec: clamp(r.slotSec, 4, 120, SCREENS_DEFAULT.slotSec), kinds, tickerSpeed: clamp(r.tickerSpeed, 30, 400, SCREENS_DEFAULT.tickerSpeed), tickerEveryMin: clamp(r.tickerEveryMin, 2, 120, SCREENS_DEFAULT.tickerEveryMin), ads };
+  return { screens, order, slotSec: clamp(r.slotSec, 4, 120, SCREENS_DEFAULT.slotSec), kinds, tickerSpeed: clamp(r.tickerSpeed, 30, 400, SCREENS_DEFAULT.tickerSpeed), tickerEveryMin: clamp(r.tickerEveryMin, 2, 120, SCREENS_DEFAULT.tickerEveryMin), demoUntil: Number.isFinite(Date.parse(String(r.demoUntil))) ? new Date(String(r.demoUntil)).toISOString() : SCREENS_DEFAULT.demoUntil, ads };
 }
 
 /** where screen n hangs, 0 = the leftmost; −1 when the office has no screen n */
@@ -86,13 +88,16 @@ function dayLabel(dayStart: number): string {
  * top 8 by conversations, no counts. Fewer than 3 today → yesterday's, with its
  * own date. `days` maps a lead's countries to the Riyadh days it was active.
  */
+/** a Riyadh day's most requested countries, most first, eight at most */
+export function topCountries(leads: { country: string; days: number[] }[], day: number): string[] {
+  const count = new Map<string, number>();
+  for (const l of leads) if (l.days.includes(day)) count.set(l.country, (count.get(l.country) ?? 0) + 1);
+  return [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ar")).slice(0, 8).map(([c]) => c);
+}
+
 export function tickerText(leads: { country: string; days: number[] }[], now: number): string | null {
   const today = riyadhDay(now);
-  const top = (day: number) => {
-    const count = new Map<string, number>();
-    for (const l of leads) if (l.days.includes(day)) count.set(l.country, (count.get(l.country) ?? 0) + 1);
-    return [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ar")).slice(0, 8).map(([c]) => c);
-  };
+  const top = (day: number) => topCountries(leads, day);
   const t = top(today);
   if (t.length >= 3) return `الدول الأكثر طلباً اليوم — ${dayLabel(today)}: ${t.join(" · ")}`;
   const y = top(today - DAY_MS);
