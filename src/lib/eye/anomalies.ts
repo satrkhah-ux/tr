@@ -40,8 +40,16 @@ function sameDay(iso: string, day: string): boolean {
  * precisely when it is most urgent. Past two days this switches to days.
  */
 export function agePhrase(hours: number): string {
-  if (hours < 48) return `${Math.floor(hours)} ساعة`;
-  return `${Math.floor(hours / 24)} يوم`;
+  if (hours < 48) return arCount(Math.floor(hours), "ساعة", "ساعتين", "ساعات");
+  return arCount(Math.floor(hours / 24), "يوم", "يومين", "أيام");
+}
+
+/** Arabic counting with digits: 1 ساعة, ساعتين, 3–10 ساعات, 11+ ساعة (the evaluator, 2026-10-20: «منذ 9 ساعة» read wrong). */
+export function arCount(n: number, one: string, two: string, few: string): string {
+  if (n === 1) return one;
+  if (n === 2) return two;
+  if (n >= 3 && n <= 10) return `${n} ${few}`;
+  return `${n} ${one}`;
 }
 
 /** Minutes a ticket took, or is taking. */

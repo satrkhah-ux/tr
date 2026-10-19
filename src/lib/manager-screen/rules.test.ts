@@ -206,7 +206,7 @@ describe("«الفريق» — in Teletel", () => {
       }),
     );
     expect(tileOf(s, "team", "teletel")).toMatchObject({ value: "2 من 3", status: "green", reason: "رشا، هاني" });
-    expect(tileOf(s, "team", "agent:رشا")).toMatchObject({ value: "1 مفتوحة اليوم", presence: "online", status: "amber", reason: "متوسط ردّه الأول 8 دقيقة على 1 محادثة" });
+    expect(tileOf(s, "team", "agent:رشا")).toMatchObject({ value: "1 مفتوحة اليوم", presence: "online", status: "amber", reason: "متوسط ردّه الأول 8 دقائق على 1 محادثة" });
     expect(tileOf(s, "team", "agent:هاني").presence).toBe("busy");
     expect(tileOf(s, "team", "agent:قديم")).toBeUndefined();
     expect(panel(s, "team").tiles.some((t) => t.label === "لم يفتح النظام اليوم")).toBe(false);
