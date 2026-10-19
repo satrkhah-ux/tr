@@ -288,12 +288,31 @@ function legText(f: DraftData["flights"][number]): string {
  * It edits the same draft as the full generator, through the same auto-save, so
  * either screen can pick the file up where the other left it.
  */
+/**
+ * What the page loaded at once for the file as it opens (app/basic/[draftId]/page.tsx) — the
+ * hotels of its countries, the cars and tour prices they price, its cities' ready programmes,
+ * the transfers' list prices — so the editor asks the server only for a country or a city added
+ * later (the owner, 2026-10-19: «ثقيلة» — seven lookups one after another, 6.4 s before it settled).
+ */
+export type BasicPreload = {
+  hotelsByCountry: Record<string, Record<string, LookupHotel[]>>;
+  carsKey: string;
+  cars: string[];
+  pricesKey: string;
+  prices: TourPrice[];
+  programsKey: string;
+  programs: TourProgram[];
+  /** null: not loaded (an issued file — they are not needed to open it) */
+  listPrices: Record<string, { price: number; currency: string }> | null;
+};
+
 export function BasicEditor({
   draftId,
   initialData,
   savedAt,
   lookups,
   profitSettings,
+  preload,
 }: {
   draftId: string;
   initialData: DraftData;
@@ -302,6 +321,7 @@ export function BasicEditor({
   lookups: GeneratorLookups;
   /** who may set the package profit, and the margin a file starts with (settings, by the administration). */
   profitSettings: ProfitSettings;
+  preload?: BasicPreload;
 }) {
   const tx = useBasicLabels();
   const { t, language } = useTraveliunUI();
@@ -477,8 +497,8 @@ export function BasicEditor({
   // country arrive when the file first names it. Room types are the owner's
   // catalogue (src/lib/catalog), in the bundle — nothing to fetch.
   const [newCountry, setNewCountry] = useState("");
-  const [hotelsByCountry, setHotelsByCountry] = useState<Record<string, Record<string, LookupHotel[]>>>({});
-  const asked = useRef(new Set<string>());
+  const [hotelsByCountry, setHotelsByCountry] = useState<Record<string, Record<string, LookupHotel[]>>>(() => preload?.hotelsByCountry ?? {});
+  const asked = useRef(new Set<string>(Object.keys(preload?.hotelsByCountry ?? {})));
   const wantedCountries = [...new Set([trip.country, newCountry, ...cities.map((c) => c.country ?? "")])]
     .map((name) => findLookupCountry(lookups.countries, name)?.name ?? "")
     .filter(Boolean)
@@ -557,7 +577,8 @@ export function BasicEditor({
   useEffect(() => {
     if (!transferCountries) return;
     let live = true;
-    void getTransferCars(transferCountries.split("|")).then((names) => {
+    const loaded = preload && preload.carsKey === transferCountries ? Promise.resolve(preload.cars) : getTransferCars(transferCountries.split("|"));
+    void loaded.then((names) => {
       if (!live) return;
       const priced = lookups.carTypes.filter((c) => names.includes(c.name));
       const was = groupCars.current;
@@ -580,13 +601,16 @@ export function BasicEditor({
   }, [transferCountries, lookups.carTypes]);
 
   // ---------- the tours price list of the trip's countries ----------
-  const [tourPrices, setTourPrices] = useState<TourPrice[]>([]);
+  const [tourPrices, setTourPrices] = useState<TourPrice[]>(() => preload?.prices ?? []);
   const countryKey = tripCountries(data).sort().join("|");
+  const pricesFor = useRef(preload?.pricesKey ?? "");
   useEffect(() => {
-    if (!countryKey) return;
+    if (!countryKey || countryKey === pricesFor.current) return;
     let live = true;
     void getTourPrices(countryKey.split("|")).then((list) => {
-      if (live) setTourPrices(list);
+      if (!live) return;
+      pricesFor.current = countryKey;
+      setTourPrices(list);
     });
     return () => {
       live = false;
@@ -594,13 +618,16 @@ export function BasicEditor({
   }, [countryKey]);
 
   // ---------- the ready programmes (tour_programs) of the file's cities ----------
-  const [programs, setPrograms] = useState<TourProgram[]>([]);
+  const [programs, setPrograms] = useState<TourProgram[]>(() => preload?.programs ?? []);
   const cityKey = [...new Set(cities.map((c) => c.city_name))].sort().join("|");
+  const programsFor = useRef(preload?.programsKey ?? "");
   useEffect(() => {
-    if (!cityKey) return;
+    if (!cityKey || cityKey === programsFor.current) return;
     let live = true;
     void getTourPrograms(cityKey.split("|")).then((list) => {
-      if (live) setPrograms(list);
+      if (!live) return;
+      programsFor.current = cityKey;
+      setPrograms(list);
     });
     return () => {
       live = false;
@@ -755,10 +782,13 @@ export function BasicEditor({
 
   // the transfers' list prices, worked out as the sheet would (the way back from the way there) and shown on
   // the city cards before anyone opens the sheet — the owner's review, 2026-10-18: four typed by hand
-  const [listPrices, setListPrices] = useState<Record<string, { price: number; currency: string }>>({});
+  const [listPrices, setListPrices] = useState<Record<string, { price: number; currency: string }>>(() => preload?.listPrices ?? {});
   const transferKey = JSON.stringify([plan, data.flights.map((f) => [f.from_airport, f.to_airport]), cities.map((c) => [c.city_name, c.nights, (c as BasicCity).services])]);
+  // as it opened: priced by the page already, or an issued file that needs none — only a change prices again
+  const openedWith = useRef(preload && (preload.listPrices || initialData.produced_serial) ? transferKey : null);
   useEffect(() => {
-    if (!scope.transport) return;
+    if (!scope.transport || transferKey === openedWith.current) return;
+    openedWith.current = null;
     let live = true;
     const timer = window.setTimeout(async () => {
       try {

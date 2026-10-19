@@ -118,9 +118,9 @@ export type DraftSummary = {
 };
 
 export async function listDrafts(): Promise<DraftSummary[]> {
-  const { sarPer } = await getRates();
   try {
-    const rows = await listDraftRows();
+    // the rates and the rows at once — they were asked one after the other
+    const [{ sarPer }, rows] = await Promise.all([getRates(), listDraftRows()]);
     const { versions, statuses, totals } = await issuedState(rows.map((r) => normalizeDraftData(r.data).produced_serial).filter((s): s is string => Boolean(s)));
     return rows.map(
       (row) => {

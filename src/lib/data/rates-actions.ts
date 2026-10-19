@@ -101,7 +101,19 @@ export async function getRates(): Promise<RatesResult> {
   return { ...rates, sarPer: { ...rates.sarPer, USD: usd } };
 }
 
+// ten minutes: the feeds publish daily, and every page that prices asked them again (the owner, 2026-10-19: «ثقيلة»)
+const marketCache = ttlCache<"market", RatesResult>(10 * 60_000);
+
 async function marketRates(): Promise<RatesResult> {
+  const known = marketCache.get("market");
+  if (known) return known;
+  const fresh = await fetchMarketRates();
+  // the offline table is not kept: the next call tries the feeds again
+  if (fresh.source === "live") marketCache.set("market", fresh);
+  return fresh;
+}
+
+async function fetchMarketRates(): Promise<RatesResult> {
   const custom = process.env.RATES_API_URL;
   const sources = [
     ...(custom ? [() => fromRatesApi(`${custom}${custom.includes("?") ? "&" : "?"}base=SAR`)] : []),

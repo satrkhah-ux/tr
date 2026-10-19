@@ -38,6 +38,9 @@ const PANES = [
 ] as const;
 type Pane = (typeof PANES)[number][0];
 
+/** rows per page of the conversations table */
+const PAGE = 50;
+
 type Range = 1 | 7 | 30 | 0;
 const RANGES: [Range, string][] = [
   [1, "اليوم"],
@@ -401,6 +404,15 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
     const hay = [l.phone, l.name, l.inquiry, l.destination, l.file?.destination, receiver(l), l.assigned_to_name, nameOf.get(l.assigned_to ?? ""), l.contact_owner].join(" ");
     return hay.includes(q.trim());
   });
+  // fifty rows a page (the owner, 2026-10-19: «ثقيلة» — 724 rows of three selects each froze the browser);
+  // the search and the filters still cover the whole list, and a new filter starts again at the first page
+  const filterKey = [tab, q, kind, returningOnly, day].join("|");
+  const [paging, setPaging] = useState({ key: filterKey, page: 0 });
+  const pages = Math.max(1, Math.ceil(list.length / PAGE));
+  const page = paging.key === filterKey ? Math.min(paging.page, pages - 1) : 0;
+  const goPage = (p: number) => setPaging({ key: filterKey, page: Math.max(0, Math.min(p, pages - 1)) });
+  const shown = list.slice(page * PAGE, page * PAGE + PAGE);
+
   const count = (t: Tab) =>
     t === "all" ? leads.length
     : t === "open" ? leads.filter((l) => l.status === "open").length
@@ -923,7 +935,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                 </tr>
               </thead>
               <tbody>
-                {list.map((l) => {
+                {shown.map((l) => {
                   const tone = TONE.get(l.inquiry ?? "");
                   const times = timing(l, now);
                   return (
@@ -1009,9 +1021,22 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
             </table>
             {list.length === 0 ? <p className="py-8 text-center text-[12px] font-semibold text-[#93aaa3]">لا محادثات هنا.</p> : null}
           </div>
-          <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">
-            {list.length} من {leads.length}
-          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] font-semibold text-[#78948f]">
+            <span>
+              {list.length} من {leads.length}
+              {pages > 1 ? ` — الصفحة ${page + 1} من ${pages}` : ""}
+            </span>
+            {pages > 1 ? (
+              <span className="ms-auto inline-flex items-center gap-1">
+                <button type="button" disabled={page === 0} onClick={() => goPage(page - 1)} className="h-8 rounded-[8px] border border-[#cfe0d9] px-3 font-bold text-[#185045] disabled:opacity-40">
+                  السابق
+                </button>
+                <button type="button" disabled={page >= pages - 1} onClick={() => goPage(page + 1)} className="h-8 rounded-[8px] border border-[#cfe0d9] px-3 font-bold text-[#185045] disabled:opacity-40">
+                  التالي
+                </button>
+              </span>
+            ) : null}
+          </div>
         </section>
         ) : null}
       </div>
