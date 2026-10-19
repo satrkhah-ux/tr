@@ -31,7 +31,7 @@ const RUNTIME = String.raw`
   var PANEL_MS = 20000, SPEED = 90;
   var LRI = String.fromCharCode(0x2066), PDI = String.fromCharCode(0x2069);
   var DAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-  var CHIP = { green: "طبيعي", amber: "متابعة", red: "حرج" };
+  var CHIP = { green: "طبيعي", amber: "انتباه", red: "حرج" };
   var PCHIP = { green: "يسير جيداً", amber: "للمتابعة", red: "يحتاج تدخلك" };
   var PALETTE = ["#f0c419", "#e5636b", "#5aa0ff", "#9b8cff", "#f5a524", "#2fbf71"];
   var STATUS = { green: "#2fbf71", amber: "#f5a524", red: "#f0505a" };
@@ -46,9 +46,9 @@ const RUNTIME = String.raw`
     $("date").textContent = DAYS[d.getUTCDay()] + " " + LRI + two(d.getUTCDate()) + "-" + two(d.getUTCMonth() + 1) + "-" + d.getUTCFullYear() + PDI;
   }
 
-  // a long label keeps its room: the chip shrinks to its dot
-  function chip(status, words, dotOnly) {
-    return '<span class="chip s-' + esc(status) + (dotOnly ? " dot-only" : "") + '"><i></i>' + (dotOnly ? "" : esc(words[status] || "")) + "</span>";
+  // every chip says its word — a lone dot reads as nothing from across the room
+  function chip(status, words) {
+    return '<span class="chip s-' + esc(status) + '"><i></i>' + esc(words[status] || CHIP[status] || "") + "</span>";
   }
 
   // a target's ring: how much of it is used
@@ -67,7 +67,7 @@ const RUNTIME = String.raw`
   function kpi(k) {
     var n = String(k.num), size = n.length > 5 ? " n6" : n.length > 4 ? " n5" : n.length > 3 ? " n4" : "";
     var num = '<div class="num tnum' + size + '">' + esc(n) + (k.unit ? "<small>" + esc(k.unit) + "</small>" : "") + "</div>";
-    return '<div class="kpi s-' + esc(k.status) + '"><div class="head"><label>' + esc(k.label) + "</label>" + chip(k.status, CHIP, String(k.label).length + String(CHIP[k.status] || "").length > 15) + "</div>" +
+    return '<div class="kpi s-' + esc(k.status) + '"><div class="head"><label>' + esc(k.label) + "</label>" + chip(k.status, CHIP) + "</div>" +
       (k.ring ? '<div class="numrow">' + num + ring(k.ring, k.status) + "</div>" : num) +
       (k.split ? split(k.split) : "") +
       '<div class="sub">' + esc(k.sub) + "</div></div>";
@@ -239,7 +239,7 @@ const CSS = `
 @font-face{font-family:Tajawal;src:url(/fonts/Tajawal-Medium.ttf) format("truetype");font-weight:500;font-display:block}
 @font-face{font-family:Tajawal;src:url(/fonts/Tajawal-Bold.ttf) format("truetype");font-weight:700;font-display:block}
 @font-face{font-family:Tajawal;src:url(/fonts/Tajawal-ExtraBold.ttf) format("truetype");font-weight:800;font-display:block}
-:root{--card:rgba(255,255,255,.045);--line:rgba(255,255,255,.09);--text:#f2f7f5;--muted:#93b1aa;--dim:#5f7f78;--green:#2fbf71;--amber:#f5a524;--red:#f0505a;--gold:#f0ad22}
+:root{--card:rgba(255,255,255,.045);--line:rgba(255,255,255,.09);--text:#f2f7f5;--muted:#93b1aa;--dim:#5f7f78;--green:#2fbf71;--amber:#ff8f3a;--red:#f0505a;--gold:#f0ad22}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;cursor:none}
 body{height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans Arabic",Tahoma,Arial,sans-serif;font-weight:500;color:var(--text);
@@ -310,7 +310,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr) ${v(500)};gap:${v(32)};pad
 .row .dot{width:${v(14)};height:${v(14)};border-radius:50%;background:var(--c)}
 .dot.p-online{background:var(--green)}.dot.p-busy{background:var(--amber)}.dot.p-offline{background:var(--dim)}
 .row .n{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.row.s-red .n{color:#ff9aa1}.row.s-amber .n{color:#ffc768}
+.row.s-red .n{color:#ff9aa1}.row.s-amber .n{color:var(--amber)}
 .row .m{color:var(--muted);font-size:${v(21)};white-space:nowrap}
 .row .m.d{max-width:${v(300)};overflow:hidden;text-overflow:ellipsis}
 .empty{display:flex;align-items:center;justify-content:center;height:70%;font-size:${v(24)};color:var(--dim);text-align:center}

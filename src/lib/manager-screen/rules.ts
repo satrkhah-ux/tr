@@ -23,7 +23,7 @@
  * ads spend.
  */
 
-import { agePhrase, firstName } from "@/lib/eye/anomalies";
+import { agePhrase, arCount, firstName } from "@/lib/eye/anomalies";
 import { backupHealth } from "@/lib/developer/backup-health";
 import { fold, riyadhDay } from "@/lib/leads/sheet";
 import { isWorkingTime, type Hours } from "@/lib/murad/reception";
@@ -232,7 +232,7 @@ export const TICKER_HOURS = 6;
 const TICKER_MAX = 40;
 export const INQUIRY_KINDS = ["بكج", "فنادق", "طيران", "تأشيرات", "يستفسر"] as const;
 
-const minutesText = (m: number) => (m < 60 ? `${Math.round(m)} دقيقة` : agePhrase(m / 60));
+const minutesText = (m: number) => (m < 60 ? arCount(Math.round(m), "دقيقة", "دقيقتين", "دقائق") : agePhrase(m / 60));
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const money = (n: number, currency: string) => (currency === "USD" ? `$${n.toFixed(2)}` : `${n.toFixed(2)} ${currency}`);
 const names = (list: string[], n = 5) => list.slice(0, n).join("، ") + (list.length > n ? ` و${list.length - n} غيرهم` : "");
@@ -740,13 +740,13 @@ function system(f: ManagerFacts): Section {
   const b = backupHealth(f.backup, f.now);
   const backup =
     b.status === "ok"
-      ? tile("backup", "النسخة الاحتياطية", b.day, "green", `${b.mb} MB · ${b.objects} ملف · قبل ${b.hours} ساعة`)
+      ? tile("backup", "النسخة الاحتياطية", b.day, "green", `${b.mb} MB · ${b.objects} ملف · قبل ${minutesText(b.hours * 60)}`)
       : tile(
           "backup",
           "النسخة الاحتياطية",
           "متوقفة",
           "red",
-          { never: "لم تُسجَّل نسخة بعد", failed: `فشلت آخر نسخة (قبل ${b.hours} ساعة)`, stale: `آخر نسخة قبل ${b.hours} ساعة`, small: "آخر نسخة أصغر من المعتاد" }[b.reason],
+          { never: "لم تُسجَّل نسخة بعد", failed: `فشلت آخر نسخة (قبل ${minutesText((b.hours ?? 0) * 60)})`, stale: `آخر نسخة قبل ${minutesText((b.hours ?? 0) * 60)}`, small: "آخر نسخة أصغر من المعتاد" }[b.reason],
         );
 
   // the same limits as the «الربط الخارجي» check ads_fresh (developer/checks.ts): late after 2 hours, down after 6
@@ -771,7 +771,7 @@ function system(f: ManagerFacts): Section {
     tiles: [integrations, backup, feed],
     kpis: [
       kpi(integrations, okCount, integrations.reason, { unit: `من ${judged.length}` }),
-      kpi(backup, b.status === "ok" ? String(b.mb) : "—", b.status === "ok" ? `${b.day} · ${b.objects} ملف · قبل ${b.hours} ساعة` : backup.reason, { label: "آخر نسخة", ...(b.status === "ok" ? { unit: "MB" } : {}) }),
+      kpi(backup, b.status === "ok" ? String(b.mb) : "—", b.status === "ok" ? `${b.day} · ${b.objects} ملف · قبل ${minutesText(b.hours * 60)}` : backup.reason, { label: "آخر نسخة", ...(b.status === "ok" ? { unit: "MB" } : {}) }),
       kpi(feed, duration(age).num, feed.reason, { unit: duration(age).unit }),
       teletelKpi,
     ],
