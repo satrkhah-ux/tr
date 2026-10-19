@@ -21,10 +21,12 @@ export type ScreensConfig = {
   kinds: string[];
   /** the ticker's speed, in pixels a second of a 1920-wide screen */
   tickerSpeed: number;
+  /** the band comes up every this many minutes for one pass (the owner: «كل 10 دقائق»), and when its words change */
+  tickerEveryMin: number;
   ads: ScreenAd[];
 };
 
-export const SCREENS_DEFAULT: ScreensConfig = { screens: 4, order: [1, 2, 3, 4], slotSec: 12, kinds: ["بكج"], tickerSpeed: 110, ads: [] };
+export const SCREENS_DEFAULT: ScreensConfig = { screens: 4, order: [1, 2, 3, 4], slotSec: 12, kinds: ["بكج"], tickerSpeed: 110, tickerEveryMin: 10, ads: [] };
 
 const clamp = (v: unknown, lo: number, hi: number, d: number) => {
   const n = Math.round(Number(v));
@@ -41,7 +43,7 @@ export function normalizeConfig(raw: unknown): ScreensConfig {
   const ads = (Array.isArray(r.ads) ? r.ads : [])
     .filter((a): a is ScreenAd => Boolean(a && typeof a.id === "string" && /^[a-z0-9-]{4,40}$/.test(a.id)))
     .map((a) => ({ id: a.id, name: String(a.name ?? "").slice(0, 60), active: a.active !== false }));
-  return { screens, order, slotSec: clamp(r.slotSec, 4, 120, SCREENS_DEFAULT.slotSec), kinds, tickerSpeed: clamp(r.tickerSpeed, 30, 400, SCREENS_DEFAULT.tickerSpeed), ads };
+  return { screens, order, slotSec: clamp(r.slotSec, 4, 120, SCREENS_DEFAULT.slotSec), kinds, tickerSpeed: clamp(r.tickerSpeed, 30, 400, SCREENS_DEFAULT.tickerSpeed), tickerEveryMin: clamp(r.tickerEveryMin, 2, 120, SCREENS_DEFAULT.tickerEveryMin), ads };
 }
 
 /** where screen n hangs, 0 = the leftmost; −1 when the office has no screen n */
@@ -59,6 +61,8 @@ export function alertText(kind: string, country: string, test: boolean): string 
   return test ? `تجربة — ${line}` : line;
 }
 
+const LRI = String.fromCharCode(0x2066);
+const PDI = String.fromCharCode(0x2069);
 const DAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 const RIYADH_MS = 3 * 3600_000;
 const DAY_MS = 86_400_000;
@@ -72,7 +76,8 @@ function dayLabel(dayStart: number): string {
   const d = new Date(dayStart + RIYADH_MS);
   const dd = String(d.getUTCDate()).padStart(2, "0");
   const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  return `${DAYS[d.getUTCDay()]} ${dd}-${mm}-${d.getUTCFullYear()}`;
+  // the digits in a left-to-right isolate: inside Arabic text the bidi rules would otherwise print 19-10-2026 as 2026-10-19
+  return `${DAYS[d.getUTCDay()]} ${LRI}${dd}-${mm}-${d.getUTCFullYear()}${PDI}`;
 }
 
 /**

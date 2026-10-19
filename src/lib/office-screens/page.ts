@@ -8,9 +8,10 @@ import type { ScreenState } from "./server";
  * weak chip). The first paint is complete without the script: the current ad
  * and the ticker's words are in the HTML. The script then keeps it alive on the
  * SERVER's clock (an offset measured on every poll, so a drifting TV clock does
- * not matter): two image layers that cross-fade, the next ad preloaded a few
- * seconds before its turn (never all of them on office wifi), the ticker drawn
- * every frame, the alert, a reload when a new version is deployed or at 04:00.
+ * not matter): two image layers that cross-fade, filling the screen, the next ad
+ * preloaded a few seconds before its turn (never all of them on office wifi), the
+ * band that comes up for its pass, the alert, a reload when a new version is
+ * deployed or at 04:00, full screen on the first press of the remote.
  * Errors are swallowed into the picture on screen — never an error page.
  */
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -26,15 +27,13 @@ const RUNTIME = String.raw`
   function $(id) { return document.getElementById(id); }
   var layers = [$("a0"), $("a1")], front = 0, shown = layers[0].getAttribute("src") || "", pending = "", failed = "", failedAt = 0, preloaded = "";
   var box = $("alert"), boxImg = $("alertImg"), boxText = $("alertText"), shownAlert = "";
-  var band = $("band"), text = $("tick"), scale = 1;
+  var band = $("band"), text = $("tick"), scale = 1, bandUp = false;
   var pre = new Image();
 
   function measure() {
     var w = document.documentElement.clientWidth || window.innerWidth || REF;
     scale = w / REF;
-    if (!S.ticker) { band.style.display = "none"; document.body.className = MONITOR ? "monitor noband" : "noband"; return; }
-    band.style.display = "block";
-    document.body.className = MONITOR ? "monitor" : "";
+    if (!S.ticker) return;
     text.style.fontSize = (FONT * scale) + "px";
     var actual = text.offsetWidth / scale;
     if (actual > S.ticker.width) text.style.fontSize = (FONT * scale * S.ticker.width / actual) + "px";
@@ -84,9 +83,13 @@ const RUNTIME = String.raw`
     box.className = "on";
   }
 
+  // the band is down until its pass: every period, and once more when its words changed (bumpAt)
   function drawTicker(t) {
-    if (!S.ticker) return;
-    var px = tickerLeft(t, S.ticker.speed, S.ticker.width, S.screens, S.position, REF) * scale;
+    var k = S.ticker, e = -1;
+    if (k) e = tickerElapsed(t, k.periodMs, tickerPassMs(k.speed, k.width, S.screens, REF), k.bumpAt);
+    if ((e >= 0) !== bandUp) { bandUp = e >= 0; band.className = bandUp ? "up" : ""; }
+    if (e < 0) return;
+    var px = tickerLeft(e, k.speed, k.width, S.position, REF) * scale;
     var v = "translate3d(" + px.toFixed(1) + "px,0,0)";
     text.style.webkitTransform = v;
     text.style.transform = v;
@@ -134,18 +137,17 @@ const RUNTIME = String.raw`
   }
   document.addEventListener("visibilitychange", function () { if (!document.hidden) wake(); });
 
-  var fs = $("fs");
-  if (fs && !MONITOR) {
-    fs.onclick = function () {
-      var el = document.documentElement, go = el.requestFullscreen || el.webkitRequestFullscreen;
-      try { if (go) go.call(el); } catch (e) {}
-      wake();
-    };
-    var gone = function () { fs.style.display = (document.fullscreenElement || document.webkitFullscreenElement) ? "none" : ""; };
-    document.addEventListener("fullscreenchange", gone);
-    document.addEventListener("webkitfullscreenchange", gone);
-    try { fs.focus(); } catch (e) {}
+  // full screen always, no button (the owner): a page may only ask after a press, so the first
+  // press of any remote key or a click asks, silently
+  function full() {
+    if (MONITOR || document.fullscreenElement || document.webkitFullscreenElement) return;
+    var el = document.documentElement, go = el.requestFullscreen || el.webkitRequestFullscreen;
+    try { var p = go && go.call(el); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+    wake();
   }
+  document.addEventListener("keydown", full, true);
+  document.addEventListener("click", full, true);
+  document.addEventListener("pointerdown", full, true);
 
   window.addEventListener("resize", measure);
   measure();
@@ -156,22 +158,22 @@ const RUNTIME = String.raw`
 })();
 `;
 
+// Tajawal, the system's own face (public/fonts), «block» so the first paint never flashes another
 const CSS = `
+@font-face{font-family:Tajawal;src:url(/fonts/Tajawal-Bold.ttf) format("truetype");font-weight:700;font-display:block}
+@font-face{font-family:Tajawal;src:url(/fonts/Tajawal-ExtraBold.ttf) format("truetype");font-weight:800;font-display:block}
 html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}
-body{position:relative;height:100vh;height:100dvh;font-family:"Noto Sans Arabic","Noto Kufi Arabic","Segoe UI",Tahoma,Arial,sans-serif}
-.ad,#alert{position:absolute;left:0;top:0;width:100%;height:91%}
-.noband .ad,.noband #alert{height:100%}
-.ad{object-fit:contain;opacity:0;-webkit-transition:opacity .9s;transition:opacity .9s}
+body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans Arabic",Tahoma,Arial,sans-serif}
+.ad,#alert{position:absolute;left:0;top:0;width:100%;height:100%}
+.ad{object-fit:cover;opacity:0;-webkit-transition:opacity .9s;transition:opacity .9s}
 .ad.on{opacity:1}
 #alert{background:#000;opacity:0;-webkit-transition:opacity .6s;transition:opacity .6s}
 #alert.on{opacity:1}
-#alertImg{width:100%;height:100%;object-fit:contain;opacity:.4}
-#alertText{position:absolute;left:6%;right:6%;top:50%;-webkit-transform:translateY(-50%);transform:translateY(-50%);text-align:center;color:#fff;font-size:5vw;font-weight:800;line-height:1.35;direction:rtl;background:rgba(10,58,51,.88);border:.3vw solid #2aa87a;border-radius:2vw;padding:3vw 2vw}
-#band{position:absolute;left:0;right:0;bottom:0;height:9%;background:#0a3a33;border-top:.35vh solid #2aa87a;overflow:hidden}
-#tick{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;direction:rtl;color:#fff;font-weight:700;line-height:1.24;will-change:transform}
-#fs{position:absolute;top:2vh;left:2vh;z-index:5;font:700 2.2vh Tahoma,Arial,sans-serif;color:#fff;background:rgba(10,58,51,.75);border:.25vh solid #2aa87a;border-radius:1.2vh;padding:1.2vh 2.4vh;cursor:pointer}
-#fs:focus{outline:.5vh solid #ffd54a;outline-offset:.4vh}
-.monitor #fs{display:none}
+#alertImg{width:100%;height:100%;object-fit:cover;opacity:.4}
+#alertText{position:absolute;left:6%;right:6%;top:50%;-webkit-transform:translateY(-50%);transform:translateY(-50%);text-align:center;color:#fff;font-size:5vw;font-weight:800;line-height:1.4;direction:rtl;background:rgba(10,58,51,.88);border:.3vw solid #2aa87a;border-radius:2vw;padding:3vw 2vw}
+#band{position:absolute;left:0;right:0;bottom:0;height:9%;z-index:3;background:rgba(10,58,51,.92);border-top:.35vh solid #2aa87a;overflow:hidden;-webkit-transform:translateY(105%);transform:translateY(105%);-webkit-transition:-webkit-transform .7s;transition:transform .7s}
+#band.up{-webkit-transform:translateY(0);transform:translateY(0)}
+#tick{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;direction:rtl;color:#fff;font-weight:800;line-height:1.24;will-change:transform}
 `;
 
 export function screenPage(n: number, s: ScreenState, monitor: boolean): string {
@@ -182,13 +184,14 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
 <title>شاشة ${n} — ترافليون</title>
+<link rel="preload" href="/fonts/Tajawal-ExtraBold.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="/fonts/Tajawal-Bold.ttf" as="font" type="font/ttf" crossorigin>
 <style>${CSS}</style></head>
-<body class="${[monitor ? "monitor" : "", s.ticker ? "" : "noband"].join(" ").trim()}">
+<body>
 <img id="a0" class="ad on" alt=""${src ? ` src="${esc(src)}"` : ""}>
 <img id="a1" class="ad" alt="">
 <div id="alert"><img id="alertImg" alt=""><div id="alertText"></div></div>
-<div id="band"${s.ticker ? "" : ' style="display:none"'}><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
-<button id="fs" type="button" autofocus>ملء الشاشة</button>
+<div id="band"><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
 <script>window.__S__=${json(s)};window.__N__=${n};window.__M__=${monitor ? "true" : "false"};</script>
 <script>${SCREEN_CORE}${RUNTIME}</script>
 </body></html>`;
@@ -200,8 +203,9 @@ export function noScreenPage(n: number): string {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
 <title>ترافليون</title>
-<style>html,body{margin:0;height:100%;background:#0a3a33;color:#fff;font-family:Tahoma,Arial,sans-serif;cursor:none}
+<style>@font-face{font-family:Tajawal;src:url(/fonts/Tajawal-Bold.ttf) format("truetype");font-weight:700;font-display:block}
+html,body{margin:0;height:100%;background:#0a3a33;color:#fff;font-family:Tajawal,Tahoma,Arial,sans-serif;cursor:none}
 div{position:absolute;top:50%;left:8%;right:8%;-webkit-transform:translateY(-50%);transform:translateY(-50%);text-align:center;font-size:4vw;font-weight:700}
-small{display:block;margin-top:2vw;font-size:2vw;font-weight:400;opacity:.75}</style></head>
+small{display:block;margin-top:2vw;font-size:2vw;font-weight:700;opacity:.75}</style></head>
 <body><div>لا توجد شاشة بهذا الرقم (${n})<small>عدد الشاشات وترتيبها من «الإدارة ← الشاشات»</small></div></body></html>`;
 }

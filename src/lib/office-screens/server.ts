@@ -23,7 +23,8 @@ export type ScreenState = {
   position: number;
   slotMs: number;
   ads: { src: string; name: string }[];
-  ticker: { text: string; width: number; speed: number } | null;
+  /** the band: its words, their room, its speed, how often it comes up, and the extra pass when the words changed */
+  ticker: { text: string; width: number; speed: number; periodMs: number; bumpAt: number } | null;
   events: { at: number; text: string; src: string | null }[];
 };
 
@@ -57,8 +58,13 @@ const countryOf = (text: string | null | undefined, list: Place[]) => {
   return r.kind === "destination" ? r.country : null;
 };
 
+// «عند الخبر»: when the words change the band runs once more, from a moment every screen shares
+// (5 s ahead: each has polled by then), at most once in two minutes
+let lastWords: string | null = null;
+let bumpAt = 0;
+
 /** today's and yesterday's conversations by destination (the ticker) */
-async function ticker(now: number, speed: number): Promise<ScreenState["ticker"]> {
+async function ticker(now: number, speed: number, periodMs: number): Promise<ScreenState["ticker"]> {
   const text = await memo(slow, "ticker", async () => {
     const since = new Date(riyadhDay(now) - 86_400_000).toISOString();
     const [{ data }, list] = await Promise.all([
@@ -73,7 +79,12 @@ async function ticker(now: number, speed: number): Promise<ScreenState["ticker"]
     });
     return tickerText(leads, now) ?? "";
   });
-  return text ? { text, width: tickerWidth(text), speed } : null;
+  if (lastWords === null) lastWords = text;
+  else if (text !== lastWords) {
+    lastWords = text;
+    if (now - bumpAt >= 120_000) bumpAt = now + 5_000;
+  }
+  return text ? { text, width: tickerWidth(text), speed, periodMs, bumpAt } : null;
 }
 
 async function shared(now: number): Promise<Shared> {
@@ -82,7 +93,7 @@ async function shared(now: number): Promise<Shared> {
     const ads = cfg.ads.filter((a) => a.active).map((a) => ({ src: `/screen/ad/${a.id}.jpg`, name: a.name }));
     const [list, tick, { data: rows }] = await Promise.all([
       places(),
-      ticker(now, cfg.tickerSpeed),
+      ticker(now, cfg.tickerSpeed, cfg.tickerEveryMin * 60_000),
       db()
         .from("office_screen_events")
         .select("kind, destination, test, at")

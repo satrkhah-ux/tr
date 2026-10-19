@@ -21,8 +21,11 @@ describe("«الشاشات» settings and words", () => {
     const y = today - 86_400_000;
     const lead = (country: string, ...days: number[]) => ({ country, days });
     const busy = [lead("تركيا", today), lead("تركيا", today), lead("مصر", today), lead("اندونيسيا", today), lead("جورجيا", today)];
-    expect(tickerText(busy, now)).toBe("الدول الأكثر طلباً اليوم — الاثنين 19-10-2026: تركيا · اندونيسيا · جورجيا · مصر");
-    expect(tickerText([lead("تركيا", today, y), lead("مصر", y)], now)).toBe("الدول الأكثر طلباً أمس — الأحد 18-10-2026: تركيا · مصر");
+    const isolates = new RegExp(`[${String.fromCharCode(0x2066)}${String.fromCharCode(0x2069)}]`, "g");
+    const plain = (s: string | null) => (s ?? "").replace(isolates, "");
+    expect(tickerText(busy, now)).toContain(String.fromCharCode(0x2066) + "19-10-2026" + String.fromCharCode(0x2069));
+    expect(plain(tickerText(busy, now))).toBe("الدول الأكثر طلباً اليوم — الاثنين 19-10-2026: تركيا · اندونيسيا · جورجيا · مصر");
+    expect(plain(tickerText([lead("تركيا", today, y), lead("مصر", y)], now))).toBe("الدول الأكثر طلباً أمس — الأحد 18-10-2026: تركيا · مصر");
     expect(tickerText([], now)).toBeNull();
   });
 });

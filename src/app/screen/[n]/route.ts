@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
  * «الشاشات» — screen n of the office (pkg.traveliun.com/1 is rewritten here by
  * the proxy). Open, no login (the owner, 2026-10-19): it shows only ads, the
  * destinations asked for and their kind. ?state=1 is the JSON the page polls;
- * ?monitor=1 is the same page inside «الشاشات»'s monitor (no full-screen button,
- * no wake lock).
+ * ?monitor=1 is the same page inside «الشاشات»'s monitor (it never asks for full
+ * screen or a wake lock).
  *
  * The HTTP Refresh header is the third refresh layer: it reloads the page even
  * if the TV browser froze the script (the HTML engine keeps time when the JS

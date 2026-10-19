@@ -81,7 +81,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
 
         <section className={CARD}>
           <h2 className={`${H} mb-3`}>الإعدادات</h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <label className="grid gap-1 text-[11.5px] font-bold text-[#185045]">
               عدد الشاشات
               <input type="number" min={1} max={9} value={cfg.screens} onChange={(e) => setCfg({ ...cfg, screens: Number(e.target.value) })} className={FIELD} />
@@ -97,6 +97,10 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
             <label className="grid gap-1 text-[11.5px] font-bold text-[#185045]">
               سرعة الشريط (بكسل في الثانية)
               <input type="number" min={30} max={400} value={cfg.tickerSpeed} onChange={(e) => setCfg({ ...cfg, tickerSpeed: Number(e.target.value) })} className={FIELD} />
+            </label>
+            <label className="grid gap-1 text-[11.5px] font-bold text-[#185045]">
+              يظهر الشريط كل (دقيقة)
+              <input type="number" min={2} max={120} value={cfg.tickerEveryMin} onChange={(e) => setCfg({ ...cfg, tickerEveryMin: Number(e.target.value) })} className={FIELD} />
             </label>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-4 text-[12.5px] font-bold text-[#185045]">
@@ -122,7 +126,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
               {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : null}
               حفظ
             </button>
-            <span className="text-[11.5px] text-[#78948f]">بلا صوت — عرض فقط</span>
+            <span className="text-[11.5px] text-[#78948f]">بلا صوت — عرض فقط. الشريط السفلي يظهر مرة كل فترة لعبور واحد على كل الشاشات، ومرة فوراً حين تتغير الدول الأكثر طلباً</span>
           </div>
         </section>
 
@@ -248,7 +252,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
           <h2 className={`${H} mb-2`}>تشغيل التلفزيون (Android TV)</h2>
           <ol className="list-decimal space-y-1.5 ps-5 text-[12.5px] leading-6 text-[#2f5752]">
             <li>افتح متصفح التلفزيون واكتب رابط الشاشة، مثل: <code dir="ltr">pkg.traveliun.com/1</code> — والثانية <code dir="ltr">/2</code> وهكذا. يبدأ العرض وحده.</li>
-            <li>اختياري: اضغط زر «ملء الشاشة» بزر OK في الريموت ليختفي شريط المتصفح.</li>
+            <li>لملء الشاشة: اضغط أي زر في الريموت مرة واحدة بعد فتح الصفحة — أو شغّل وضع ملء الشاشة من قائمة متصفح التلفزيون إن وُجد.</li>
             <li>اترك الصفحة مفتوحة — أغلب متصفحات التلفزيون تعيد آخر صفحة عند التشغيل.</li>
             <li>أوقف شاشة التوقف والسكون: الإعدادات ← تفضيلات الجهاز ← شاشة التوقف (وكذلك الطاقة / السكون) ← «أبداً».</li>
             <li>رتّب أرقام الشاشات هنا كما هي معلّقة على الجدار من اليسار إلى اليمين، فتنتقل الإعلانات والشريط من شاشة إلى التي بجانبها.</li>
