@@ -5,8 +5,8 @@ import { navGroupsFor } from "./TraveliunShell";
 
 /** The owner's order of 2026-10-17: what each role's sidebar holds. */
 const role = (keys: Permission[]) => (p: Permission) => keys.includes(p);
-const SALES = role(["dashboard.employee", "offers.write", "data.write", "kanban.view", "guide.view", "pricing.view", "repackage.write", "pricing.internal", "operations.own"]);
-const OPS = role(["dashboard.employee", "data.write", "kanban.view", "guide.view", "operations.write", "operations.passport"]);
+const SALES = role(["dashboard.employee", "offers.write", "clients.view", "data.write", "kanban.view", "guide.view", "pricing.view", "repackage.write", "pricing.internal", "operations.own"]);
+const OPS = role(["dashboard.employee", "clients.view", "data.write", "kanban.view", "guide.view", "operations.write", "operations.passport"]);
 const on = (f: Feature) => FEATURE_DEFAULTS[f];
 const off = (feature: Feature) => (f: Feature) => f !== feature && FEATURE_DEFAULTS[f];
 

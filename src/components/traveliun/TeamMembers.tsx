@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { Check, KeyRound, LayoutGrid, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { deleteMember, saveMember, setMemberExtraPermissions, setMemberRole, suspendMember, type PendingRegistration, type TeamMember, type TeamRole } from "@/lib/data/team";
+import { deleteMember, saveMember, setMemberPermissions, setMemberRole, suspendMember, type PendingRegistration, type TeamMember, type TeamRole } from "@/lib/data/team";
 import { ALL_PERMISSIONS, isDeveloperRole, PERMISSION_GROUPS, type Permission } from "@/lib/roles/roles";
 import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
@@ -312,12 +312,14 @@ export function TeamMembers({
                         onClick={() => setExtraFor(extraFor === m.id ? null : m.id)}
                         aria-expanded={extraFor === m.id}
                         className={`inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold hover:bg-[#f4f8f6] ${
-                          m.extra_permission_keys.length > 0 ? "border-[#2aa87a] text-[#0f7a52]" : "border-[#dbe6e1] text-[#557d78]"
+                          m.extra_permission_keys.length + m.removed_permission_keys.length > 0 ? "border-[#2aa87a] text-[#0f7a52]" : "border-[#dbe6e1] text-[#557d78]"
                         }`}
                       >
                         <LayoutGrid className="size-3.5" />
                         {t("team.extra")}
-                        {m.extra_permission_keys.length > 0 ? ` (${m.extra_permission_keys.length})` : ""}
+                        {m.extra_permission_keys.length + m.removed_permission_keys.length > 0
+                          ? ` (+${m.extra_permission_keys.length} / −${m.removed_permission_keys.length})`
+                          : ""}
                       </button>
                       <button
                         type="button"
@@ -382,21 +384,29 @@ function RoleSummary({ role }: { role?: TeamRole }) {
 }
 
 /**
- * «أقسام إضافية»: sections for this colleague alone, on top of their role (0106).
- * What the role already gives shows ticked and fixed; what the actor does not
- * hold is not offered (team.ts refuses it anyway).
+ * This colleague's sections, by the menu's sections: everything their role gives
+ * shows ticked and can be taken (0107), anything else can be given (0106) — the
+ * role itself, and their colleagues, stay as they are. What the actor does not
+ * hold is shown but fixed (team.ts refuses it anyway).
  */
 function ExtraSections({ member, roleKeys, onDone }: { member: TeamMember; roleKeys: Permission[]; onDone: () => void }) {
   const { t } = useTraveliunUI();
   const { can } = useRole();
-  const [keys, setKeys] = useState(() => new Set(member.extra_permission_keys));
+  const [held, setHeld] = useState(
+    () => new Set<Permission>([...roleKeys, ...member.extra_permission_keys].filter((k) => !member.removed_permission_keys.includes(k))),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
     setBusy(true);
     setError(null);
-    const res = await setMemberExtraPermissions(member.id, [...keys]);
+    const all = PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i.key));
+    const res = await setMemberPermissions(
+      member.id,
+      all.filter((k) => held.has(k) && !roleKeys.includes(k)),
+      all.filter((k) => !held.has(k) && roleKeys.includes(k)),
+    );
     setBusy(false);
     if (!res.ok) setError(t(res.error));
     else onDone();
@@ -405,30 +415,40 @@ function ExtraSections({ member, roleKeys, onDone }: { member: TeamMember; roleK
   return (
     <div className="basis-full rounded-[10px] border border-[#e8efeb] bg-[#f8fbfa] p-3">
       <p className="text-[11.5px] font-bold text-[#557d78]">{t("team.extraHint")}</p>
-      <div className="mt-2 grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
-        {PERMISSION_GROUPS.flatMap((g) => g.items)
-          .filter((i) => i.key !== "developer.access" && (can(i.key) || roleKeys.includes(i.key) || keys.has(i.key)))
-          .map((i) => {
-            const fromRole = roleKeys.includes(i.key);
-            return (
-              <label key={i.key} className="flex items-center gap-2 text-[12px] font-bold text-[#185045]">
-                <input
-                  type="checkbox"
-                  checked={fromRole || keys.has(i.key)}
-                  disabled={fromRole || busy}
-                  onChange={(e) => {
-                    const next = new Set(keys);
-                    if (e.target.checked) next.add(i.key);
-                    else next.delete(i.key);
-                    setKeys(next);
-                  }}
-                  className="size-4 accent-[#185045]"
-                />
-                {t(`perm.${i.key}` as TranslationKey)}
-                {fromRole ? <span className="text-[10.5px] font-semibold text-[#93aaa3]">({t("team.fromRole")})</span> : null}
-              </label>
-            );
-          })}
+      <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {PERMISSION_GROUPS.filter((g) => g.key !== "perm.group.developer").map((g) => (
+          <div key={g.key} className="rounded-[9px] border border-[#e8efeb] bg-white p-2.5">
+            <p className="mb-1.5 text-[12px] font-extrabold text-[#103f37]">{t(g.key as TranslationKey)}</p>
+            {g.items.map((i) => {
+              const fromRole = roleKeys.includes(i.key);
+              const on = held.has(i.key);
+              return (
+                <label key={i.key} className="flex items-center gap-2 py-0.5 text-[12px] font-bold text-[#185045]">
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    disabled={busy || !can(i.key)}
+                    onChange={(e) => {
+                      const next = new Set(held);
+                      if (e.target.checked) next.add(i.key);
+                      else next.delete(i.key);
+                      setHeld(next);
+                    }}
+                    className="size-4 accent-[#185045]"
+                  />
+                  {t(`perm.${i.key}` as TranslationKey)}
+                  {fromRole && !on ? (
+                    <span className="text-[10.5px] font-bold text-[#c22850]">({t("team.removedFromRole")})</span>
+                  ) : fromRole ? (
+                    <span className="text-[10.5px] font-semibold text-[#93aaa3]">({t("team.fromRole")})</span>
+                  ) : on ? (
+                    <span className="text-[10.5px] font-bold text-[#0f7a52]">({t("team.addedForMember")})</span>
+                  ) : null}
+                </label>
+              );
+            })}
+          </div>
+        ))}
       </div>
       <div className="mt-3 flex items-center gap-2">
         <button

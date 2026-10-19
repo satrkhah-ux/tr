@@ -12,9 +12,9 @@ const MIGRATION = readFileSync(
   fileURLToPath(new URL("../../../supabase/migrations/0073_role_write_policies.sql", import.meta.url)),
   "utf8",
 );
-// the live definition: 0106 added the colleague's own keys
+// the live definition: 0106 added the colleague's own keys, 0107 the ones taken
 const LATEST = readFileSync(
-  fileURLToPath(new URL("../../../supabase/migrations/0106_employee_extra_permissions.sql", import.meta.url)),
+  fileURLToPath(new URL("../../../supabase/migrations/0107_employee_permission_overrides.sql", import.meta.url)),
   "utf8",
 );
 
@@ -42,13 +42,19 @@ describe("grantedPermissions — the app's side", () => {
     expect(grantedPermissions({ status: "Suspended", permission_keys: null, extra_permission_keys: ["data.write"] })).toEqual([]);
   });
 
+  it("takes what was removed from the colleague, even when the role gives it (0107)", () => {
+    expect(
+      grantedPermissions({ status: "Active", permission_keys: ["offers.write", "clients.view"], extra_permission_keys: ["data.write"], removed_permission_keys: ["clients.view"] }),
+    ).toEqual(["offers.write", "data.write"]);
+  });
+
   it("has no implicit administrator: «All Permissions» holds exactly what it lists", () => {
     const listed = ALL_PERMISSIONS.filter((p) => p !== "operations.book");
     expect(grantedPermissions({ status: "Active", permission_keys: listed })).not.toContain("operations.book");
   });
 });
 
-describe("staff_can — the database's side (0073, 0106)", () => {
+describe("staff_can — the database's side (0073, 0106, 0107)", () => {
   const body = LATEST.match(/create or replace function public\.staff_can[\s\S]*?\$\$([\s\S]*?)\$\$/)?.[1] ?? "";
 
   it("checks the same three things", () => {
@@ -56,6 +62,7 @@ describe("staff_can — the database's side (0073, 0106)", () => {
     expect(body).toMatch(/e\.status = 'Active'/);
     expect(body).toMatch(/left join public\.roles r on r\.id = e\.role_id/);
     expect(body).toMatch(/p = any \(coalesce\(r\.permission_keys, '\{\}'\) \|\| e\.extra_permission_keys\)/);
+    expect(body).toMatch(/not \(p = any \(e\.removed_permission_keys\)\)/);
   });
 
   it("is only ever asked for a permission the app knows", () => {

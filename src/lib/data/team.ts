@@ -61,6 +61,8 @@ export type TeamMember = {
   has_login: boolean;
   /** what this colleague holds beyond their role (0106). */
   extra_permission_keys: Permission[];
+  /** what was taken from them although the role gives it (0107). */
+  removed_permission_keys: Permission[];
 };
 
 export async function listTeamRoles(): Promise<TeamRole[]> {
@@ -99,12 +101,13 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
     const supabase = await createSupabaseServerClient();
     const { data } = await supabase
       .from("employees")
-      .select("id, arabic_name, english_name, email, mobile, status, role_id, auth_user_id, extra_permission_keys, roles(arabic_name)")
+      .select("id, arabic_name, english_name, email, mobile, status, role_id, auth_user_id, extra_permission_keys, removed_permission_keys, roles(arabic_name)")
       .order("arabic_name");
 
-    type Row = Omit<TeamMember, "role_name" | "has_login" | "extra_permission_keys"> & {
+    type Row = Omit<TeamMember, "role_name" | "has_login" | "extra_permission_keys" | "removed_permission_keys"> & {
       auth_user_id: string | null;
       extra_permission_keys: string[] | null;
+      removed_permission_keys: string[] | null;
       roles: { arabic_name: string } | { arabic_name: string }[] | null;
     };
     return ((data ?? []) as unknown as Row[]).map((e) => {
@@ -120,6 +123,7 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
         role_name: role?.arabic_name ?? null,
         has_login: Boolean(e.auth_user_id),
         extra_permission_keys: (e.extra_permission_keys ?? []).filter(isPermission),
+        removed_permission_keys: (e.removed_permission_keys ?? []).filter(isPermission),
       };
     });
   } catch {
@@ -236,27 +240,33 @@ export async function setMemberRole(employeeId: string, roleId: string | null): 
 }
 
 /**
- * A section for ONE colleague, on top of their role (0106) — «هذا الموظف يرى
- * البيانات» without the whole role getting it. The actor can only hand out what
- * they hold themselves, and developer.access is never handed out this way.
+ * ONE colleague's sections, on top of their role: given (0106) or taken (0107) —
+ * «هذا الموظف يرى البيانات» without the whole role changing. The actor hands
+ * out only what they hold (the administration and the developer hold it all),
+ * developer.access never moves this way, and nobody edits their own.
  */
-export async function setMemberExtraPermissions(employeeId: string, keys: string[]): Promise<{ ok: true } | Fail> {
+export async function setMemberPermissions(employeeId: string, extra: string[], removed: string[]): Promise<{ ok: true } | Fail> {
   const denied = await requireManage();
   if (denied) return { ok: false, error: denied };
   if (await deniedForNonDeveloper({ employeeId })) return { ok: false, error: "team.developerOnly" };
+  if ((await getCurrentEmployeeId()) === employeeId) return { ok: false, error: "err.forbidden" };
   const mine = await currentRealPermissions();
-  const wanted = [...new Set(keys.filter(isPermission))];
-  if (wanted.some((k) => k === "developer.access" || !mine.includes(k))) return { ok: false, error: "err.forbidden" };
+  const add = [...new Set(extra.filter(isPermission))];
+  const take = [...new Set(removed.filter(isPermission))].filter((k) => !add.includes(k));
+  if ([...add, ...take].some((k) => k === "developer.access" || !mine.includes(k))) return { ok: false, error: "err.forbidden" };
   try {
     const supabase = service();
-    const before = await supabase.from("employees").select("extra_permission_keys").eq("id", employeeId).maybeSingle();
-    const { error } = await supabase.from("employees").update({ extra_permission_keys: wanted }).eq("id", employeeId);
+    const before = await supabase.from("employees").select("extra_permission_keys, removed_permission_keys").eq("id", employeeId).maybeSingle();
+    const { error } = await supabase
+      .from("employees")
+      .update({ extra_permission_keys: add, removed_permission_keys: take })
+      .eq("id", employeeId);
     if (error) return { ok: false, error: "err.updateFailed" };
     await logAudit({
       action: "employee.extra_permissions",
       entity: "employees",
       entity_id: employeeId,
-      meta: { from: (before.data as { extra_permission_keys: string[] | null } | null)?.extra_permission_keys ?? [], to: wanted },
+      meta: { before: before.data ?? null, extra: add, removed: take },
     });
     forgetPermissions();
     revalidatePath("/employees");

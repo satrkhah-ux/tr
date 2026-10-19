@@ -45,7 +45,7 @@ const loadReal = cache(async (): Promise<Permission[]> => {
     const supabase = await createSupabaseServerClient();
     const { data: emp } = await supabase
       .from("employees")
-      .select("id, status, extra_permission_keys, roles(permission_keys)")
+      .select("id, status, extra_permission_keys, removed_permission_keys, roles(permission_keys)")
       .eq("auth_user_id", user.id)
       .maybeSingle();
 
@@ -54,6 +54,7 @@ const loadReal = cache(async (): Promise<Permission[]> => {
           id: string;
           status: string | null;
           extra_permission_keys: string[] | null;
+          removed_permission_keys: string[] | null;
           roles: { permission_keys: string[] } | { permission_keys: string[] }[] | null;
         }
       | null;
@@ -64,7 +65,14 @@ const loadReal = cache(async (): Promise<Permission[]> => {
     // loses their access. Same rule as public.staff_can() (0073).
     const role = Array.isArray(employee?.roles) ? employee.roles[0] : employee?.roles;
     const granted = grantedPermissions(
-      employee ? { status: employee.status, permission_keys: role?.permission_keys ?? null, extra_permission_keys: employee.extra_permission_keys } : null,
+      employee
+        ? {
+            status: employee.status,
+            permission_keys: role?.permission_keys ?? null,
+            extra_permission_keys: employee.extra_permission_keys,
+            removed_permission_keys: employee.removed_permission_keys,
+          }
+        : null,
     );
     permissionsByUser.set(user.id, granted);
     return granted;

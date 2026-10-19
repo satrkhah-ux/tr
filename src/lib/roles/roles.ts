@@ -90,6 +90,8 @@ export const ALL_PERMISSIONS = [
   "commissions.approve",
   /** «مطوّر»: the developer page — external links' health, and turning system services on and off. */
   "developer.access",
+  /** «العملاء» (/clients): every client conversation (0107 — every role got it; take it per role or colleague). */
+  "clients.view",
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
@@ -105,6 +107,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   employee: [
     "dashboard.employee",
     "offers.write",
+    "clients.view",
     "data.write",
     "kanban.view",
     "guide.view",
@@ -128,11 +131,19 @@ export function isPermission(value: unknown): value is Permission {
  * database's write policies and the app's gates answer alike.
  */
 export function grantedPermissions(
-  employee: { status: string | null; permission_keys: readonly string[] | null; extra_permission_keys?: readonly string[] | null } | null,
+  employee: {
+    status: string | null;
+    permission_keys: readonly string[] | null;
+    extra_permission_keys?: readonly string[] | null;
+    removed_permission_keys?: readonly string[] | null;
+  } | null,
 ): Permission[] {
   if (!employee || employee.status !== "Active") return [];
-  // the role's keys, plus what this one colleague was given on top (0106)
-  return [...new Set([...(employee.permission_keys ?? []), ...(employee.extra_permission_keys ?? [])])].filter(isPermission);
+  // the role's keys, plus what this one colleague was given (0106), minus what was taken from them (0107)
+  const removed = new Set(employee.removed_permission_keys ?? []);
+  return [...new Set([...(employee.permission_keys ?? []), ...(employee.extra_permission_keys ?? [])])].filter(
+    (k): k is Permission => isPermission(k) && !removed.has(k),
+  );
 }
 
 /**
@@ -175,6 +186,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "repackage.write", kind: "do" },
       { key: "kanban.view", kind: "view" },
     ],
+  },
+  {
+    key: "perm.group.clients",
+    items: [{ key: "clients.view", kind: "view" }],
   },
   {
     key: "perm.group.operations",
