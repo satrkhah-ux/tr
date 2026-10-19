@@ -4,6 +4,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { StoreProvider } from "@/lib/store";
 import { TraveliunUIProvider } from "@/components/traveliun/TraveliunUIProvider";
+import { NavigationLoader } from "@/components/traveliun/NavigationLoader";
 import { RoleProvider } from "@/lib/roles/RoleContext";
 import { getFeatureFlags } from "@/lib/features-server";
 import { PartnerProvider } from "@/lib/partners/PartnerContext";
@@ -147,6 +148,7 @@ export default async function RootLayout({
                 <TraveliunUIProvider>
                   {children}
                   {mustChangePassword ? <ChangePasswordDialog forced /> : null}
+                  <NavigationLoader />
                 </TraveliunUIProvider>
               </PartnerProvider>
             </RoleProvider>
