@@ -11,7 +11,8 @@
  * prices, no promises.
  */
 
-import { classifyInquiry, findPlace, type Place } from "@/lib/leads/auto";
+import { classifyInquiry, type Place } from "@/lib/leads/auto";
+import { resolvePlace } from "@/lib/leads/places";
 import { fold } from "@/lib/leads/sheet";
 
 /** where a request goes: the five services, a client asking for a person, and one we could not read */
@@ -49,11 +50,11 @@ export type Request = {
 export function readRequest(text: string, places: Place[]): Request {
   const folded = fold(text);
   const kind = classifyInquiry([], text);
-  const place = findPlace([], text, places);
-  const hit = place ? places.find((p) => p.name === place) : undefined;
+  // the destination by the one rule (lib/leads/places.ts): a Saudi place is where the client is, never where they go
+  const where = resolvePlace(text, places);
   return {
     kind: (ROUTE_KEYS as readonly string[]).includes(kind) ? (kind as RouteKey) : null,
-    country: hit ? hit.country || hit.name : place || null,
+    country: where.kind === "destination" ? where.country : null,
     wantsHuman: HUMAN.test(folded),
     salam: /سلام\s*عليكم/u.test(text),
   };

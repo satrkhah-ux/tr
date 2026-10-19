@@ -6,8 +6,9 @@ import { getCurrentEmployeeId } from "./metrics";
 import { createDraft } from "./drafts";
 import { normalizeInquiry, normalizePhone } from "@/lib/leads/sheet";
 import { activeTeam, pullSheet, pushToSheet, type LeadRow } from "@/lib/leads/sync";
-import { pullTeletel } from "@/lib/leads/teletel-pull";
-import type { Stage } from "@/lib/leads/auto";
+import { loadPlaces, pullTeletel } from "@/lib/leads/teletel-pull";
+import { adsData, type AdsData } from "./ads";
+import type { Place, Stage } from "@/lib/leads/auto";
 import { currentCan } from "@/lib/roles/current";
 import { conversationForPhone, conversationThread, getTeletelConfig, type ThreadMessage } from "@/lib/providers/teletel";
 
@@ -74,6 +75,10 @@ export type LeadsPage = {
   twoWay: boolean;
   /** phase two: the conversations come from Teletel, nobody types them */
   live: boolean;
+  /** the catalogue's countries and cities — what a destination is (lib/leads/places.ts), and the «الدولة» suggestions */
+  places: Place[];
+  /** «رؤية للإعلانات»: the Google Ads side, for dashboard.admin only (data/ads.ts) */
+  ads: AdsData | null;
 };
 
 const COLS =
@@ -122,13 +127,15 @@ export async function listLeads(): Promise<LeadsPage> {
   const meId = await getCurrentEmployeeId();
   const twoWay = Boolean(process.env.LEADS_SHEET_WEBHOOK);
   const live = Boolean(getTeletelConfig());
-  if (!meId) return { stats: EMPTY_STATS, leads: [], team: [], meId: null, pullError: null, twoWay, live };
+  if (!meId) return { stats: EMPTY_STATS, leads: [], team: [], meId: null, pullError: null, twoWay, live, places: [], ads: null };
   // the sheet is quick enough to read on opening; Teletel is the crontab's (ten seconds for its 26 pages)
   const pullError = !live && Date.now() - lastPull > PULL_EVERY_MS ? await pullOnce(supabase) : null;
-  const [{ data }, people, stats] = await Promise.all([
+  const [{ data }, people, stats, places, ads] = await Promise.all([
     supabase.from("client_leads").select(COLS).order("created_at", { ascending: false }).limit(3000),
     activeTeam(supabase),
     dayStats(),
+    loadPlaces(createSupabaseServiceClient() as unknown as SupabaseClient).catch((): Place[] => []),
+    adsData(),
   ]);
   const rows = (data ?? []) as Omit<Lead, "file" | "returning" | "returning_since">[];
   const files = await filesByPhone(new Set(rows.map((r) => r.phone)));
@@ -143,7 +150,7 @@ export async function listLeads(): Promise<LeadsPage> {
     const since = r.last_visit_at ? r.created_at : previousContact(r, byPhoneRows.get(r.phone) ?? [], byPhone?.created_at ?? null);
     return { ...r, name: r.name || byPhone?.name || null, file, returning: since !== null, returning_since: since };
   });
-  return { stats, leads, team: people, meId, pullError, twoWay, live };
+  return { stats, leads, team: people, meId, pullError, twoWay, live, places, ads };
 }
 
 const EMPTY_STATS: LeadsStats = { bookings: { today: 0, yesterday: 0, week: 0, month: 0 }, value: null, followups: 0 };

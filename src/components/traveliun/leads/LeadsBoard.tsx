@@ -10,6 +10,8 @@ import { addLead, leadThread, pullLeadsNow, startProgramme, updateLead, type Lea
 import { fold, HEADERS, INQUIRIES, riyadhDay } from "@/lib/leads/sheet";
 import { TraveliunShell } from "../TraveliunShell";
 import { useCanOpen } from "@/lib/roles/useCanOpen";
+import { campaignDestination, resolvePlace } from "@/lib/leads/places";
+import { SuggestInput } from "../SuggestInput";
 
 const SENT = ["تم إرسال التفاصيل", "تم إرسال البرنامج", "تم إرسال المعلومات"];
 const TONE = new Map<string, (typeof INQUIRIES)[number]>(INQUIRIES.map((i) => [i.label, i]));
@@ -290,7 +292,20 @@ function Bars({ title, rows, tone }: { title: string; rows: { label: string; cou
   );
 }
 
-export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }: LeadsPage) {
+/** «الدولة» — the catalogue's countries and cities as suggestions; any text still goes (the view resolves it) */
+function DestinationCell({ value, items, save }: { value: string; items: { value: string; hint?: string }[]; save: (v: string) => void }) {
+  const [text, setText] = useState(value);
+  const commit = (v: string) => v.trim() !== value.trim() && save(v.trim());
+  return (
+    <div onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && commit(text)}>
+      <SuggestInput value={text} items={items} arrow={false} ariaLabel="الدولة" className={CELL} onChange={(v, picked) => (setText(v), picked && commit(v))} />
+    </div>
+  );
+}
+
+const money = (v: number, currency: string) => (currency === "USD" ? "$" : "") + v.toLocaleString("en-US", { maximumFractionDigits: 2 }) + (currency === "USD" ? "" : ` ${currency}`);
+
+export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, places, ads }: LeadsPage) {
   const router = useRouter();
   const params = useSearchParams();
   const opens = useCanOpen();
@@ -332,6 +347,31 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
     return { day: d, count: leads.filter((l) => on(l, d)).length };
   });
   const trendMax = Math.max(1, ...trend.map((t) => t.count));
+
+  // what each conversation asks for: a destination (country, city), or a Saudi place — where the client is (lib/leads/places.ts)
+  const where = useMemo(() => new Map(leads.map((l) => [l.id, resolvePlace(l.file?.destination || l.destination, places)])), [leads, places]);
+  const destOf = (l: Lead) => where.get(l.id);
+  const unresolved = inRange.filter((l) => (l.file?.destination || l.destination)?.trim() && destOf(l)?.kind === "none").length;
+  const placeItems = useMemo(() => places.map((p) => ({ value: p.name, hint: p.country && p.country !== p.name ? p.country : undefined })), [places]);
+
+  // «رؤية للإعلانات» × Google Ads (dashboard.admin): spend beside the conversations, by day, campaign and destination
+  const adRows = !ads ? [] : range === 0 ? ads.rows : ads.rows.filter((r) => r.day > shiftDay(today, -range));
+  const adSum = (rows: typeof adRows) => rows.reduce((t, r) => ({ cost: t.cost + r.cost, clicks: t.clicks + r.clicks, conversions: t.conversions + r.conversions }), { cost: 0, clicks: 0, conversions: 0 });
+  const adTotal = adSum(adRows);
+  const adDays = [...new Set([...adRows.map((r) => r.day), ...(range === 0 ? [] : trend.map((t) => t.day).filter((d) => d > shiftDay(today, -range)))])].sort().reverse().slice(0, 60);
+  const campaigns = [...new Set(adRows.map((r) => r.campaign))]
+    .map((name) => ({ name, dest: campaignDestination(name, places), ...adSum(adRows.filter((r) => r.campaign === name)) }))
+    .filter((c) => c.cost > 0 || c.clicks > 0)
+    .sort((a, b) => b.cost - a.cost);
+  const byCountry = [...new Set([...campaigns.map((c) => c.dest), ...inRange.map((l) => (destOf(l)?.kind === "destination" ? (destOf(l) as { country: string }).country : null)).filter((x): x is string => Boolean(x))])]
+    .map((dest) => {
+      const convs = inRange.filter((l) => { const d = destOf(l); return d?.kind === "destination" && d.country === dest; });
+      const spent = adSum(campaigns.filter((c) => c.dest === dest).map((c) => ({ ...c, day: "", campaign: c.name, status: null, impressions: 0, final: true })));
+      return { dest, ...spent, convs: convs.length, files: convs.filter((l) => l.file).length };
+    })
+    .filter((r) => r.cost > 0 || r.convs > 0)
+    .sort((a, b) => b.cost - a.cost || b.convs - a.convs);
+  const adsStale = ads?.updatedAt ? Date.now() - Date.parse(ads.updatedAt) > 2 * 3600_000 : true;
 
   // «حصر عدد الطلبات اليومية»: today, this week (from Sunday), this month — each beside the one before
   const countFrom = (from: string, to: string) => leads.reduce((n, l) => n + (visitsOf.get(l.id) ?? []).filter((d) => d >= from && d <= to).length, 0);
@@ -570,7 +610,9 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
             ))}
           </div>
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <Bars title="الدول الأكثر طلباً" rows={top(inRange, (l) => l.file?.destination || l.destination)} />
+            <Bars title="الدول الأكثر طلباً" rows={top(inRange, (l) => { const d = destOf(l); return d?.kind === "destination" ? d.country : null; })} />
+            <Bars title="المدن الأكثر طلباً" rows={top(inRange, (l) => { const d = destOf(l); return d?.kind === "destination" ? d.city : null; })} tone={() => "#0f7a52"} />
+            <Bars title="من أين العملاء" rows={top(inRange, (l) => { const d = destOf(l); return d?.kind === "origin" ? d.place : null; })} tone={() => "#6b5bb5"} />
             <Bars title="نوع الاستفسار" rows={top(inRange, (l) => l.inquiry, 10)} tone={(label) => TONE.get(label)?.color} />
             <Bars title="المستلم" rows={top(inRange, receiver)} tone={() => "#2f7fc0"} />
             <Bars title="ما تم مع العميل" rows={top(inRange, (l) => l.result || l.sent_status)} tone={() => "#a86a10"} />
@@ -591,6 +633,132 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
               ))}
             </div>
           </div>
+          {unresolved ? <p className="mt-2 text-[11px] font-semibold text-[#93aaa3]">غير محدد: {unresolved} محادثة لم تُفهم وجهتها (أو «لم يحدد طلب»)، ولا تدخل في الدول والمدن.</p> : null}
+
+          {/* ---------- the Google Ads side (dashboard.admin) ---------- */}
+          {ads ? (
+            <div className="mt-4 space-y-3 border-t border-dashed border-[#DCE9E5] pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-[14px] font-extrabold text-[#003c3a]">إعلانات Google × المحادثات</h3>
+                <span className={`text-[11px] font-bold ${adsStale ? "text-[#c22850]" : "text-[#78948f]"}`}>
+                  {ads.updatedAt ? `آخر بيانات من Google: ${new Date(ads.updatedAt).toLocaleString("ar-SA-u-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" })}` : "لم تصل بيانات من Google بعد"}
+                  {adsStale ? " — متأخرة، تحقق من سكربت Google Ads" : ""}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+                {[
+                  ["الإنفاق", money(adTotal.cost, ads.currency)],
+                  ["النقرات", adTotal.clicks.toLocaleString("en-US")],
+                  ["تحويلات Google", Math.round(adTotal.conversions).toLocaleString("en-US")],
+                  ["المحادثات", inRange.length.toLocaleString("en-US")],
+                  ["تكلفة المحادثة", inRange.length ? money(adTotal.cost / inRange.length, ads.currency) : "—"],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-[12px] border border-[#e3ece8] bg-[#f8fbfa] p-3">
+                    <div className="text-[11px] font-extrabold text-[#78948f]">{label}</div>
+                    <div className="tv-tnum text-xl font-extrabold text-[#003c3a]">{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="overflow-x-auto rounded-[12px] border border-[#e3ece8]">
+                <table className="w-full min-w-[640px] text-start text-[11.5px]">
+                  <caption className="px-3 pt-2 text-start text-[12px] font-extrabold text-[#185045]">حسب الوجهة — أي دولة أكثر طلباً وكم كلّفت</caption>
+                  <thead className="text-[10.5px] font-extrabold text-[#78948f]">
+                    <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start">
+                      <th>الوجهة</th><th>الإنفاق</th><th>النقرات</th><th>المحادثات</th><th>تكلفة المحادثة</th><th>تحوّلت إلى برنامج</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byCountry.map((r) => (
+                      <tr key={r.dest} className="border-t border-[#eef3f1] font-semibold text-[#185045] [&>td]:px-2 [&>td]:py-1">
+                        <td className="font-extrabold">{r.dest}</td>
+                        <td className="tv-tnum">{r.cost ? money(r.cost, ads.currency) : "—"}</td>
+                        <td className="tv-tnum">{r.clicks || ""}</td>
+                        <td className="tv-tnum">{r.convs || ""}</td>
+                        <td className="tv-tnum">{r.cost && r.convs ? money(r.cost / r.convs, ads.currency) : "—"}</td>
+                        <td className="tv-tnum">{r.convs ? `${Math.round((r.files / r.convs) * 100)}%` : ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="overflow-x-auto rounded-[12px] border border-[#e3ece8]">
+                <table className="w-full min-w-[640px] text-start text-[11.5px]">
+                  <caption className="px-3 pt-2 text-start text-[12px] font-extrabold text-[#185045]">حسب اليوم</caption>
+                  <thead className="text-[10.5px] font-extrabold text-[#78948f]">
+                    <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start">
+                      <th>اليوم</th><th>الإنفاق</th><th>النقرات</th><th>تحويلات Google</th><th>المحادثات</th><th>تكلفة المحادثة</th><th>تحوّلت إلى برنامج</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adDays.map((d) => {
+                      const g = adSum(adRows.filter((r) => r.day === d));
+                      const convs = leads.filter((l) => on(l, d));
+                      return (
+                        <tr key={d} className="border-t border-[#eef3f1] font-semibold text-[#185045] [&>td]:px-2 [&>td]:py-1">
+                          <td className="whitespace-nowrap">{WEEKDAYS[new Date(`${d}T12:00:00Z`).getUTCDay()]} <DirText>{d.slice(5)}</DirText></td>
+                          <td className="tv-tnum">{g.cost ? money(g.cost, ads.currency) : "—"}</td>
+                          <td className="tv-tnum">{g.clicks || ""}</td>
+                          <td className="tv-tnum">{Math.round(g.conversions) || ""}</td>
+                          <td className="tv-tnum">{convs.length || ""}</td>
+                          <td className="tv-tnum">{g.cost && convs.length ? money(g.cost / convs.length, ads.currency) : "—"}</td>
+                          <td className="tv-tnum">{convs.length ? `${Math.round((convs.filter((l) => l.file).length / convs.length) * 100)}%` : ""}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="overflow-x-auto rounded-[12px] border border-[#e3ece8]">
+                <table className="w-full min-w-[640px] text-start text-[11.5px]">
+                  <caption className="px-3 pt-2 text-start text-[12px] font-extrabold text-[#185045]">حسب الحملة</caption>
+                  <thead className="text-[10.5px] font-extrabold text-[#78948f]">
+                    <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-start">
+                      <th>الحملة</th><th>الوجهة</th><th>الإنفاق</th><th>النقرات</th><th>تحويلات Google</th><th>تكلفة التحويل</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campaigns.map((c) => (
+                      <tr key={c.name} className="border-t border-[#eef3f1] font-semibold text-[#185045] [&>td]:px-2 [&>td]:py-1">
+                        <td>{c.name}</td>
+                        <td>{c.dest}</td>
+                        <td className="tv-tnum">{money(c.cost, ads.currency)}</td>
+                        <td className="tv-tnum">{c.clicks || ""}</td>
+                        <td className="tv-tnum">{Math.round(c.conversions) || ""}</td>
+                        <td className="tv-tnum">{c.conversions ? money(c.cost / c.conversions, ads.currency) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* phase 2 — the new script's: where the clicks were, what was searched, the hour (the last 30 days) */}
+              {ads.countries.length || ads.terms.length ? (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <Bars title="أين كان من نقر — الدول (30 يوماً)" rows={ads.countries.map((x) => ({ label: x.label, count: x.clicks }))} tone={() => "#2f7fc0"} />
+                  <Bars title="أين كان من نقر — المدن (30 يوماً)" rows={ads.cities.map((x) => ({ label: x.label, count: x.clicks }))} tone={() => "#2f7fc0"} />
+                  <Bars title="ماذا بحثوا (30 يوماً)" rows={ads.terms.map((x) => ({ label: x.label, count: x.clicks }))} tone={() => "#a86a10"} />
+                </div>
+              ) : (
+                <p className="text-[11px] font-semibold text-[#93aaa3]">أين كان من نقر، وماذا بحثوا، وساعات النقر: تظهر هنا بعد تفعيل سكربت Google Ads الجديد.</p>
+              )}
+              {ads.hours.some((h) => h > 0) ? (
+                <div className="rounded-[12px] border border-[#e3ece8] p-3">
+                  <h4 className="mb-2 text-[12px] font-extrabold text-[#185045]">النقرات حسب الساعة (30 يوماً، بتوقيت الحساب)</h4>
+                  <div className="flex h-24 items-end gap-0.5" dir="ltr">
+                    {ads.hours.map((h, i) => (
+                      <div key={i} title={`${i}:00 — ${h}`} className="flex h-full flex-1 flex-col items-center justify-end">
+                        <span className="w-full rounded-t-[3px] bg-[#2f7fc0]/70" style={{ height: `${(h / Math.max(1, ...ads.hours)) * 100}%`, minHeight: h ? 3 : 1 }} />
+                        <span className="tv-tnum text-[9px] text-[#93aaa3]">{i}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </section>
         ) : null}
 
@@ -788,7 +956,9 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
                           {[...new Set([...INQUIRIES.map((i) => i.label), l.inquiry ?? ""])].filter(Boolean).map((i) => <option key={i}>{i}</option>)}
                         </select>
                       </td>
-                      <td className="min-w-[9rem]">{text(l, "destination")}</td>
+                      <td className="min-w-[9rem]">
+                        <DestinationCell key={`${l.id}-${l.destination ?? ""}`} value={l.destination ?? ""} items={placeItems} save={(v) => save(l, { destination: v })} />
+                      </td>
                       <td className="w-40">
                         <select value={l.assigned_to ?? ""} onChange={(e) => save(l, { assigned_to: e.target.value })} className={CELL}>
                           <option value="">{l.assigned_to_name ? `${l.assigned_to_name} (من الشيت)` : "لم يتم الإسناد"}</option>
