@@ -9,6 +9,7 @@
  * "17 offers exist" is not a note. "A ticket has been open 14 hours" is.
  */
 
+import { matchEmployee } from "@/lib/leads/sheet";
 import type { EyeSnapshot, Note, NoteSeverity } from "./types";
 
 /** A ticket left this long without a reply is a complaint in the making. */
@@ -58,6 +59,31 @@ export function firstName(name: string | null | undefined): string | null {
   const word = (name ?? "").trim().split(/\s+/)[0] ?? "";
   return word && !/[\d٠-٩۰-۹#+@]/.test(word) ? word : null;
 }
+
+/**
+ * The admin dashboard's request tiles (data/metrics.ts) from the same tickets:
+ * how many were answered, who has any, and who has one still unanswered.
+ */
+export function requestCounts(tickets: EyeSnapshot["tickets"]): { answered: number; assigned: Set<string>; pending: Set<string> } {
+  const assigned = new Set<string>();
+  const pending = new Set<string>();
+  let answered = 0;
+  for (const t of tickets) {
+    if (t.responded_at) answered += 1;
+    if (!t.employee_id) continue;
+    assigned.add(t.employee_id);
+    if (!t.responded_at) pending.add(t.employee_id);
+  }
+  return { answered, assigned, pending };
+}
+
+/** The employees who are Teletel agents: an agent's name is theirs, or its first words are (sheet.ts matchEmployee). */
+export function teletelEmployees(agentNames: string[], employees: { id: string; arabic_name: string }[]): Set<string> {
+  return new Set(agentNames.map((n) => matchEmployee(n, employees)).filter((id): id is string => Boolean(id)));
+}
+
+/** The client_leads columns a LeadForTicket is read with. */
+export const LEAD_TICKET_COLS = "id, name, inquiry, status, assigned_to, assigned_to_name, received_by, received_by_name, first_message_at, first_reply_at";
 
 /** A conversation of «العملاء» (client_leads), as much of it as the response rules read. */
 export type LeadForTicket = {
@@ -148,7 +174,12 @@ export function anomalies(snapshot: EyeSnapshot, now: string, day: string): Note
   // Nobody at all is ONE fact, not twelve. A holiday, a weekend, or a server that
   // stopped recording produces twelve identical notes that bury every real one —
   // and twelve notes about one cause is how a report teaches people to skim it.
-  const expectedToday = snapshot.employees.filter((e) => e.active);
+  //
+  // Only for those who work IN the system: the sales team works in Teletel, and
+  // «X ما فتح النظام اليوم» about them was the misleading note of 2026-10-19.
+  // Teletel says who is online now, never who was there today — so for them
+  // nothing is said rather than something wrong (works_in_teletel, report.ts).
+  const expectedToday = snapshot.employees.filter((e) => e.active && !e.works_in_teletel);
   const absentToday = expectedToday.filter((e) => !e.first_seen_at);
   if (expectedToday.length > 1 && absentToday.length === expectedToday.length) {
     notes.push({
@@ -164,6 +195,7 @@ export function anomalies(snapshot: EyeSnapshot, now: string, day: string): Note
   for (const employee of snapshot.employees) {
     if (!employee.active) continue;
     if (!employee.first_seen_at) {
+      if (employee.works_in_teletel) continue;
       // already said collectively above
       if (absentToday.length === expectedToday.length && expectedToday.length > 1) continue;
       notes.push({

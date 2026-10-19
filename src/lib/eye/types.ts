@@ -43,6 +43,11 @@ export type EyeEmployee = {
   beats: number;
   /** entries in audit_logs attributed to them today. */
   actions_today: number;
+  /**
+   * An agent in Teletel, where the sales team works (the owner, 2026-10-19):
+   * not opening the system says nothing about their day, so no absence note.
+   */
+  works_in_teletel?: boolean;
 };
 
 export type EyeTicket = {

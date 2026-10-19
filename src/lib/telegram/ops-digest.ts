@@ -1,7 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { operationSignals, severityRank, type OperationSnapshot } from "@/lib/operations/signals";
+import { operationSignals, severityRank, type OperationSignal, type OperationSnapshot } from "@/lib/operations/signals";
+import { defaultSchedule, installmentStates, riyadhDate } from "@/lib/operations/payments";
 import { isLiveCase, summarizeOperations, type OpsCase } from "@/lib/operations/summary";
 import { isClientStatus, isExecutionStatus } from "@/lib/operations/state";
 import { mayWork, type OpsAccess } from "@/lib/operations/access";
@@ -30,6 +31,7 @@ const SIGNAL_AR: Record<string, string> = {
   hotel_awaiting_confirmation: "فندق بانتظار التأكيد",
   unpaid_confirmed: "مؤكّد وغير مسدّد",
   vouchers_pending: "فاوتشر لم يصدر",
+  installment_overdue: "قسط متأخر",
 };
 
 export type DigestCase = { id: string; serial: string; customer: string | null; worst: string };
@@ -47,35 +49,52 @@ export type OpsDigest = {
   travelIncomplete: number;
   unpaid: number;
   urgent: DigestCase[];
+  /** every live case with its signals and the dates its next steps fall on — what «قناة المدير» calls due today */
+  live: DigestLive[];
+};
+
+export type DigestLive = {
+  id: string;
+  serial: string;
+  customer: string | null;
+  travel_start: string | null;
+  signals: OperationSignal[];
+  /** the earliest free-cancellation deadline of a confirmed booking, from today on */
+  deadline: string | null;
+  /** the earliest installment still owed, from today on (an overdue one is the board's «قسط متأخر») */
+  payment: string | null;
 };
 
 export async function buildOpsDigest(limit = 5, access: OpsAccess = { all: true }): Promise<OpsDigest> {
-  const today = new Date().toISOString().slice(0, 10);
-  const empty: OpsDigest = { today, own: !access.all, liveCases: 0, needsAction: 0, critical: 0, openBookings: 0, travelSoon: 0, travelIncomplete: 0, unpaid: 0, urgent: [] };
+  // the company's day, as the board reads it (operations-work.ts) — the UTC date was yesterday until 03:00 Riyadh
+  const today = riyadhDate();
+  const empty: OpsDigest = { today, own: !access.all, liveCases: 0, needsAction: 0, critical: 0, openBookings: 0, travelSoon: 0, travelIncomplete: 0, unpaid: 0, urgent: [], live: [] };
 
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
 
     const { data: opsRows } = await supabase
       .from("operations")
-      .select("id, client_status, execution_status, travel_start, offers(serial, total, currency, employee_id, customers(arabic_name))");
+      .select("id, client_status, execution_status, travel_start, confirmed_at, offers(serial, total, currency, employee_id, customers(arabic_name))");
     const operations = (
       (opsRows ?? []) as unknown as {
         id: string;
         client_status: string;
         execution_status: string;
         travel_start: string | null;
+        confirmed_at: string | null;
         offers: { serial: string; total: number | null; currency: string | null; employee_id: string | null; customers: { arabic_name: string | null } | { arabic_name: string | null }[] | null } | null;
       }[]
     ).filter((o) => mayWork(access, (Array.isArray(o.offers) ? o.offers[0] : o.offers)?.employee_id));
     if (operations.length === 0) return empty;
 
     const ids = operations.map((o) => o.id);
-    const [bookingsRes, docsRes, paysRes, travRes] = await Promise.all([
+    const [bookingsRes, docsRes, paysRes, travRes, instRes] = await Promise.all([
       supabase.from("operation_bookings").select("id, operation_id, kind, title, status, cancellation_deadline, confirmed_at, confirmation_number, company_ref").in("operation_id", ids),
       supabase.from("operation_documents").select("operation_id, kind, booking_id, created_at").is("revoked_at", null).in("operation_id", ids),
       supabase.from("operation_payments").select("operation_id, amount, kind").in("operation_id", ids),
       supabase.from("operation_travelers").select("operation_id, display_name, passport_expiry").in("operation_id", ids),
+      supabase.from("operation_installments").select("operation_id, due_date, amount").in("operation_id", ids),
     ]);
 
     const group = <T extends { operation_id: string }>(rows: readonly T[] | null | undefined) => {
@@ -90,6 +109,7 @@ export async function buildOpsDigest(limit = 5, access: OpsAccess = { all: true 
     const bookings = group((bookingsRes.data ?? []) as unknown as { operation_id: string; id: string; kind: string; title: string; status: string; cancellation_deadline: string | null; confirmed_at: string | null; confirmation_number: string | null; company_ref: string | null }[]);
     const documents = group((docsRes.data ?? []) as unknown as { operation_id: string; kind: string; booking_id: string | null; created_at: string }[]);
     const travelers = group((travRes.data ?? []) as unknown as { operation_id: string; display_name: string; passport_expiry: string | null }[]);
+    const installments = group((instRes.data ?? []) as unknown as { operation_id: string; due_date: string | null; amount: number }[]);
 
     const paid = new Map<string, number>();
     for (const p of (paysRes.data ?? []) as { operation_id: string; amount: number; kind: string }[]) {
@@ -98,6 +118,7 @@ export async function buildOpsDigest(limit = 5, access: OpsAccess = { all: true 
     }
 
     const cases: OpsCase[] = [];
+    const live: DigestLive[] = [];
     const named: { id: string; serial: string; customer: string | null; signals: ReturnType<typeof operationSignals>; travel: string | null }[] = [];
 
     for (const op of operations) {
@@ -118,6 +139,10 @@ export async function buildOpsDigest(limit = 5, access: OpsAccess = { all: true 
         bookings: bs,
         documents: ds,
         travelers: ts,
+        // the schedule staff set, else the house terms — as the board checks «قسط متأخر» (operations-work.ts)
+        installments: installments.has(op.id)
+          ? (installments.get(op.id) ?? []).map((i) => ({ due_date: i.due_date, amount: Number(i.amount) }))
+          : defaultSchedule({ total: offer?.total != null ? Number(offer.total) : null, confirmed_on: riyadhDate(op.confirmed_at ?? undefined), travel_start: op.travel_start }),
       };
       const signals = operationSignals(snapshot, today);
 
@@ -132,6 +157,18 @@ export async function buildOpsDigest(limit = 5, access: OpsAccess = { all: true 
         signals,
       };
       cases.push(entry);
+      if (isLiveCase(entry)) {
+        const fromToday = (dates: (string | null | undefined)[]) => dates.map((d) => d?.slice(0, 10)).filter((d): d is string => Boolean(d) && d! >= today).sort()[0] ?? null;
+        live.push({
+          id: op.id,
+          serial: offer?.serial ?? "",
+          customer: customer?.arabic_name ?? null,
+          travel_start: op.travel_start,
+          signals,
+          deadline: fromToday(bs.filter((b) => b.status === "confirmed").map((b) => b.cancellation_deadline)),
+          payment: fromToday(installmentStates(snapshot.installments ?? [], snapshot.paid, today).filter((r) => r.state !== "paid").map((r) => r.due_date)),
+        });
+      }
       if (isLiveCase(entry) && signals.length > 0) {
         named.push({ id: op.id, serial: offer?.serial ?? "", customer: customer?.arabic_name ?? null, signals, travel: op.travel_start });
       }
@@ -163,6 +200,7 @@ export async function buildOpsDigest(limit = 5, access: OpsAccess = { all: true 
       travelIncomplete: liveWith("travel_approaching_incomplete"),
       unpaid: liveWith("unpaid_confirmed"),
       urgent,
+      live,
     };
   } catch {
     return empty;
