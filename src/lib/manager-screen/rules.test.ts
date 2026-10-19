@@ -149,7 +149,7 @@ describe("«المبيعات» — today only", () => {
 describe("«العمليات» — a step due today or tomorrow", () => {
   it("is red for a critical flag on a trip tomorrow, the client by first name", () => {
     const s = buildScreen(facts({ ops: { live: [file({ travel_start: "2026-10-20", signals: [flag("travel_approaching_incomplete", "critical")] })] } }));
-    expect(tileOf(s, "operations", "travel")).toMatchObject({ value: "1", status: "red", reason: "AD-9 نورة — السفر يقترب والحجوزات ناقصة غداً" });
+    expect(tileOf(s, "operations", "travel")).toMatchObject({ value: "1", status: "red", reason: "AD-9 نورة — سفر قريب وحجز ناقص غداً" });
   });
 
   it("keeps an ordinary flag amber — red only in the stricter colours", () => {
@@ -171,7 +171,7 @@ describe("«العمليات» — a step due today or tomorrow", () => {
       }),
     );
     expect(tileOf(s, "operations", "deadline")).toMatchObject({ value: "1", status: "red" });
-    expect(tileOf(s, "operations", "payment")).toMatchObject({ value: "1", status: "amber", reason: "AD-P — مؤكّد وغير مسدّد بالكامل غداً" });
+    expect(tileOf(s, "operations", "payment")).toMatchObject({ value: "1", status: "amber", reason: "AD-P — غير مسدّد بالكامل غداً" });
   });
 
   it("leaves next week's trip and an installment already overdue to the board and the eye", () => {
@@ -324,5 +324,57 @@ describe("the whole screen", () => {
     expect(s.urgent.map((u) => `${u.panel}/${u.key}`)).toEqual(["conversations/waiting"]);
     expect(s.hourly[0]).toBe("في آخر ساعة: 1 محادثة جديدة.");
     expect(s.hourly[1]).toBe("يحتاج تدخلك الآن — بانتظار الرد: 1 (أطولها منذ 30 دقيقة — رشا)");
+  });
+});
+
+describe("what the screen draws (the owner's design order, 2026-10-20)", () => {
+  const busy = facts({
+    agents: [{ name: "رشا", status: "online" }, { name: "هاني", status: "offline" }],
+    open: [{ agent: "رشا", activeAt: ago(5) }],
+    leads: [
+      lead({ first_message_at: ago(30), first_reply_at: ago(28), handoffs: [{ agent: "رشا", from: (NOW - 30 * 60_000) / 1000, reply: (NOW - 28 * 60_000) / 1000, handed: null, by: null }] }),
+      lead({ id: "l2", inquiry: "تأشيرات", status: "closed", taken: false }),
+      lead({ id: "l3", status: "open", taken: false }),
+    ],
+    waits: [{ minutes: 20, since: ago(20), agent: "رشا", client: null }],
+  });
+
+  it("gives every panel four cards and two boxes — a box with nothing says why", () => {
+    for (const s of [buildScreen(facts()), buildScreen(busy)]) {
+      for (const p of s.panels) {
+        expect(p.kpis, p.key).toHaveLength(4);
+        expect(p.boxes, p.key).toHaveLength(2);
+        for (const b of p.boxes) expect(b.items.length > 0 || b.empty.length > 0).toBe(true);
+      }
+    }
+  });
+
+  it("draws today's conversations as a split, the first reply against its target, kinds as bars and the team as rows", () => {
+    const s = buildScreen(busy);
+    const [today, waiting, first, unassigned] = panel(s, "conversations").kpis;
+    expect(today).toMatchObject({ num: "3", split: { a: 2, b: 1, aLabel: "مفتوحة", bLabel: "مغلقة" } });
+    expect(waiting).toMatchObject({ num: "1", status: "red" });
+    expect(first).toMatchObject({ num: "2", unit: "د", ring: { value: 2, target: 5 }, status: "green" });
+    expect(unassigned).toMatchObject({ num: "1", status: "amber" });
+    const [kinds, team] = panel(s, "conversations").boxes;
+    expect(kinds).toMatchObject({ kind: "bars", items: [{ label: "بكج", value: "2", share: 1 }, { label: "تأشيرات", value: "1", share: 0.5 }] });
+    expect(team).toMatchObject({ kind: "rows", note: "1 متصل من 2", items: [{ label: "رشا", presence: "online", value: "مفتوحة 1", detail: "أول رد 2 د", status: "green" }] });
+  });
+
+  it("tells what to do about each red item, and keeps the amber ones under «تحت المتابعة»", () => {
+    const s = buildScreen(busy);
+    expect(s.urgent.map((u) => [u.key, u.action])).toEqual([["waiting", "أسندها لموظف متصل"]]);
+    expect(s.watch.map((u) => u.key)).toContain("unassigned");
+    expect(s.watch.find((u) => u.key === "unassigned")?.action).toBe("وزّعها على الفريق");
+  });
+
+  it("lists what stumbled today and came back, beside what is down now", () => {
+    const s = buildScreen(
+      facts({ integrations: [{ name: "الطقس", fail_streak: 0, alerted: null, last_error: "503", last_error_at: ago(120), renews_on: null }, { name: "Teletel", fail_streak: 0, alerted: null, last_error: null, last_error_at: null, renews_on: null }] }),
+    );
+    expect(panel(s, "system").boxes[0].items).toEqual([
+      { label: "الطقس", value: "عاد يعمل", detail: "تعثّر 13:00", status: "green" },
+      { label: "كل الخدمات", value: "2 تعمل", status: "green" },
+    ]);
   });
 });

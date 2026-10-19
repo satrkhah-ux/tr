@@ -9,7 +9,7 @@
  * "17 offers exist" is not a note. "A ticket has been open 14 hours" is.
  */
 
-import { matchEmployee } from "@/lib/leads/sheet";
+import { fold, matchEmployee } from "@/lib/leads/sheet";
 import type { EyeSnapshot, Note, NoteSeverity } from "./types";
 
 /** A ticket left this long without a reply is a complaint in the making. */
@@ -77,9 +77,36 @@ export function requestCounts(tickets: EyeSnapshot["tickets"]): { answered: numb
   return { answered, assigned, pending };
 }
 
-/** The employees who are Teletel agents: an agent's name is theirs, or its first words are (sheet.ts matchEmployee). */
+/**
+ * The employees who are Teletel agents: an agent's name is theirs, or its first
+ * words are (sheet.ts matchEmployee) — or the shorter of the two names, two
+ * words at least, is the longer one's with words left out, for one employee
+ * only (Teletel's «احمد القدسي» is «احمد يوسف حيدر القدسي» in the system).
+ */
 export function teletelEmployees(agentNames: string[], employees: { id: string; arabic_name: string }[]): Set<string> {
-  return new Set(agentNames.map((n) => matchEmployee(n, employees)).filter((id): id is string => Boolean(id)));
+  const words = (s: string) => s.trim().split(/\s+/).map(fold).filter(Boolean);
+  // `small` read in order inside `big`
+  const within = (small: string[], big: string[]) => {
+    let i = 0;
+    for (const w of big) if (w === small[i]) i += 1;
+    return i === small.length;
+  };
+  const out = new Set<string>();
+  for (const name of agentNames) {
+    const exact = matchEmployee(name, employees);
+    if (exact) {
+      out.add(exact);
+      continue;
+    }
+    const a = words(name);
+    const loose = employees.filter((e) => {
+      const b = words(e.arabic_name);
+      const [small, big] = a.length <= b.length ? [a, b] : [b, a];
+      return small.length >= 2 && within(small, big);
+    });
+    if (loose.length === 1) out.add(loose[0].id);
+  }
+  return out;
 }
 
 /** The client_leads columns a LeadForTicket is read with. */

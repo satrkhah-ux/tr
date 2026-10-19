@@ -330,13 +330,15 @@ describe("absence, for those who work in the system only (the owner, 2026-10-19)
     expect(notes[0].detail).toContain("2 موظف");
   });
 
-  it("knows a Teletel agent by their name, or its first words", () => {
+  it("knows a Teletel agent by their name, its first words, or the same name with words left out", () => {
     const staff = [
       { id: "a", arabic_name: "احمد يوسف" },
       { id: "b", arabic_name: "رشا العتيبي" },
       { id: "c", arabic_name: "هاني" },
+      { id: "d", arabic_name: "احمد يوسف حيدر القدسي" },
+      { id: "e", arabic_name: "عبد الرزاق" },
     ];
-    expect([...teletelEmployees(["احمد يوسف", "رشا", "مهندس خالد"], staff)].sort()).toEqual(["a", "b"]);
+    expect([...teletelEmployees(["احمد يوسف", "رشا", "مهندس خالد", "احمد القدسي", "عبد الرزاق الزلب", "هاني سعيد"], staff)].sort()).toEqual(["a", "b", "d", "e"]);
   });
 });
 
