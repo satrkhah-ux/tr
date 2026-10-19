@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
+import { allRows } from "./all-rows";
 
 /**
  * «رؤية للإعلانات»: the Google Ads account's numbers (0108, posted hourly by
@@ -30,11 +31,12 @@ export async function adsData(): Promise<AdsData | null> {
   try {
     const db = createSupabaseServiceClient() as unknown as SupabaseClient;
     const since = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+    // every page of each (all-rows.ts): PostgREST stops at a thousand — the tab once showed July and none of this week
     const [stats, locs, terms, hours] = await Promise.all([
-      db.from("ad_stats").select("day, campaign, status, cost, clicks, impressions, conversions, final, currency, updated_at").gte("day", since(DAYS)).order("day").limit(20_000),
-      db.from("ad_locations").select("country, city, clicks").gte("day", since(30)).limit(20_000),
-      db.from("ad_search_terms").select("term, clicks").gte("day", since(30)).limit(20_000),
-      db.from("ad_hours").select("hour, clicks").gte("day", since(30)).limit(20_000),
+      allRows((a, b) => db.from("ad_stats").select("day, campaign, status, cost, clicks, impressions, conversions, final, currency, updated_at").gte("day", since(DAYS)).or("cost.gt.0,clicks.gt.0").order("day").order("campaign").range(a, b)),
+      allRows((a, b) => db.from("ad_locations").select("country, city, clicks").gte("day", since(30)).order("day").order("campaign").order("country").order("city").range(a, b)),
+      allRows((a, b) => db.from("ad_search_terms").select("term, clicks").gte("day", since(30)).order("day").order("campaign").order("term").range(a, b)),
+      allRows((a, b) => db.from("ad_hours").select("hour, clicks").gte("day", since(30)).order("day").order("campaign").order("hour").range(a, b)),
     ]);
     const raw = (stats.data ?? []) as (AdDay & { currency: string | null; updated_at: string })[];
     const sum = (list: { key: string; clicks: number }[]) => {

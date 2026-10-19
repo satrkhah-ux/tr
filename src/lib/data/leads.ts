@@ -8,6 +8,7 @@ import { normalizeInquiry, normalizePhone } from "@/lib/leads/sheet";
 import { activeTeam, pullSheet, pushToSheet, type LeadRow } from "@/lib/leads/sync";
 import { loadPlaces, pullTeletel } from "@/lib/leads/teletel-pull";
 import { adsData, type AdsData } from "./ads";
+import { allRows } from "./all-rows";
 import type { Place, Stage } from "@/lib/leads/auto";
 import { currentCan } from "@/lib/roles/current";
 import { conversationForPhone, conversationThread, getTeletelConfig, type ThreadMessage } from "@/lib/providers/teletel";
@@ -131,7 +132,8 @@ export async function listLeads(): Promise<LeadsPage> {
   // the sheet is quick enough to read on opening; Teletel is the crontab's (ten seconds for its 26 pages)
   const pullError = !live && Date.now() - lastPull > PULL_EVERY_MS ? await pullOnce(supabase) : null;
   const [{ data }, people, stats, places, ads] = await Promise.all([
-    supabase.from("client_leads").select(COLS).order("created_at", { ascending: false }).limit(3000),
+    // every page (all-rows.ts): PostgREST stops at a thousand
+    allRows((a, b) => supabase.from("client_leads").select(COLS).order("created_at", { ascending: false }).order("id").range(a, b)),
     activeTeam(supabase),
     dayStats(),
     loadPlaces(createSupabaseServiceClient() as unknown as SupabaseClient).catch((): Place[] => []),

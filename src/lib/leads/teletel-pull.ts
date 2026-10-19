@@ -5,6 +5,7 @@ import { classifyInquiry, delayText, findPlace, timelineFrom, type Place } from 
 import { fold, matchEmployee, normalizePhone } from "./sheet";
 import { logAudit } from "@/lib/data/audit";
 import { muradMessageIds } from "@/lib/murad/core";
+import { allRows } from "@/lib/data/all-rows";
 
 /**
  * «العملاء» phase two (the owner, 2026-10-17: «كل شيء تلقائي، خاصة اسم العميل»):
@@ -107,12 +108,15 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
   const [{ data: people }, places, { data: known }] = await Promise.all([
     supabase.from("employees").select("id, arabic_name, english_name").eq("status", "Active"),
     loadPlaces(supabase),
-    // ponytail: every Teletel row and every unmatched sheet row in one read; a date window when it grows past tens of thousands
-    supabase
-      .from("client_leads")
-      .select("id, phone, name, inquiry, destination, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at, auto_routed_at, created_at, last_visit_at, draft_id")
-      .or("teletel_conversation_id.not.is.null,and(source.eq.sheet,teletel_conversation_id.is.null)")
-      .limit(20000),
+    // ponytail: every Teletel row and every unmatched sheet row, a page at a time (PostgREST stops at a thousand); a date window when it grows past tens of thousands
+    allRows((a, b) =>
+      supabase
+        .from("client_leads")
+        .select("id, phone, name, inquiry, destination, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at, auto_routed_at, created_at, last_visit_at, draft_id")
+        .or("teletel_conversation_id.not.is.null,and(source.eq.sheet,teletel_conversation_id.is.null)")
+        .order("id")
+        .range(a, b),
+    ),
   ]);
   const team = (people ?? []) as Person[];
   const rows = (known ?? []) as Known[];

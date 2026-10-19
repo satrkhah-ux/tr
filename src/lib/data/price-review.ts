@@ -5,6 +5,7 @@ import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser 
 import { currentCan } from "@/lib/roles/current";
 import { normAr } from "@/lib/catalog/norm";
 import { logAudit } from "./audit";
+import { allRows } from "./all-rows";
 
 /**
  * «مراجعة الأسعار» (the owner, 2026-10-18) — the prices still waiting on a
@@ -70,9 +71,9 @@ export async function getPriceReview(): Promise<ReviewPage | Fail> {
       .from("airports")
       .select("id, arabic_name, code, status, kind, countries(arabic_name), cities(arabic_name)")
       .eq("status", "Active"),
-    db.from("transfers").select("id, from_city, to_city, car_type, price, currency, provisional, countries(arabic_name)").limit(20000),
+    allRows((a, b) => db.from("transfers").select("id, from_city, to_city, car_type, price, currency, provisional, countries(arabic_name)").order("id").range(a, b)),
     db.from("tour_prices").select("id, car_type, price, currency, provisional, tours!inner(arabic_name, countries(arabic_name), cities(arabic_name))").eq("provisional", true),
-    db.from("tours").select("id, arabic_name, price, currency, countries(arabic_name), cities(arabic_name)").not("price", "is", null).limit(20000),
+    allRows((a, b) => db.from("tours").select("id, arabic_name, price, currency, countries(arabic_name), cities(arabic_name)").not("price", "is", null).order("id").range(a, b)),
     service().from("audit_logs").select("entity, entity_id, actor_email, meta, created_at").eq("action", "price.reviewed").order("created_at", { ascending: false }).limit(300),
   ]);
 
