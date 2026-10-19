@@ -23,7 +23,7 @@ const ROWS = [
   // pkg is on Supabase CLOUD, not the stack on vps-new (fix-integrations-cloud-2026-10-19.mjs)
   R("قاعدة البيانات (Supabase Cloud)", "database", { used_by: "النظام كله", secret_ref: "SUPABASE_DB_URL، SUPABASE_SERVICE_ROLE_KEY، NEXT_PUBLIC_SUPABASE_ANON_KEY، NEXT_PUBLIC_SUPABASE_URL", check_key: "db" }),
   R("تسجيل الدخول (Supabase Auth)", "database", { used_by: "دخول الموظفين والشركاء", secret_ref: "SUPABASE_SERVICE_ROLE_KEY", check_key: "auth" }),
-  R("الملفات (Supabase Storage)", "database", { used_by: "الجوازات، الأدلة، المرفقات، تصاميم العروض الجاهزة (ready-designs)", secret_ref: "SUPABASE_SERVICE_ROLE_KEY", check_key: "storage" }),
+  R("الملفات (Supabase Storage)", "database", { used_by: "الجوازات، الأدلة، المرفقات، تصاميم العروض الجاهزة (ready-designs)، إعلانات الشاشات (office-screens)", secret_ref: "SUPABASE_SERVICE_ROLE_KEY", check_key: "storage" }),
   R("النسخ الاحتياطي الليلي لقاعدة النظام", "cron", {
     used_by: "قاعدة pkg السحابية (كل المخططات: public و auth و storage) وكل ملفات Storage",
     secret_ref: "crontab ‏deploy على vps-new 00:00 UTC — /home/deploy/bin/pkg-backup.py (deploy/pkg-backup.py) يقرأ SUPABASE_DB_URL و SUPABASE_SERVICE_ROLE_KEY من /home/deploy/apps/traveliun-app/.env",

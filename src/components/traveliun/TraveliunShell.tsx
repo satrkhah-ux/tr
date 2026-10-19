@@ -234,6 +234,8 @@ export const navGroups: NavGroup[] = [
       // the policy and the markup rules
       { labelKey: "nav.profitPolicy", href: "/settings/pricing" },
       { labelKey: "nav.clientComms", href: "/settings/client-comms" },
+      // the office screens and their monitor (the owner, 2026-10-19)
+      { labelKey: "nav.screens", href: "/settings/screens" },
       { labelKey: "nav.guide", href: "/web-guide" },
     ],
   },

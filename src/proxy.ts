@@ -123,6 +123,8 @@ const PUBLIC_PREFIXES = [
   "/api/teletel/webhook",
   // «رؤية للإعلانات»: the owner's Google Ads Script — no cookie; the key in its URL is the secret's hash (route.ts)
   "/api/ads/hook",
+  // «الشاشات»: the office screens — open by the owner's decision; ads, destinations and kinds only (screen/[n]/route.ts)
+  "/screen",
   "/b2b",
 ];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
@@ -140,6 +142,9 @@ export async function proxy(request: NextRequest) {
   // server-side (getServerUser + role checks), so content stays protected.
   try {
     const { pathname } = request.nextUrl;
+    // «الشاشات»: pkg.traveliun.com/1 … /99 is office screen n — short enough to type with a TV remote
+    const screen = /^\/(\d{1,2})$/.exec(pathname);
+    if (screen) return NextResponse.rewrite(new URL(`/screen/${screen[1]}${request.nextUrl.search}`, request.url));
     const session = parseSessionCookie(request.cookies.get(AUTH_STORAGE_KEY)?.value);
 
     // Spent, or close enough that this request could outlive it.

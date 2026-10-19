@@ -49,7 +49,7 @@ describe("the sidebar", () => {
       "/offers/offer-includes",
       "/setting/climate",
     ]);
-    expect(section("nav.adminSection")).toEqual(["/employees", "/settings/pricing", "/settings/client-comms", "/web-guide"]);
+    expect(section("nav.adminSection")).toEqual(["/employees", "/settings/pricing", "/settings/client-comms", "/settings/screens", "/web-guide"]);
   });
 
   it("points a section whose home is closed at its first open link", () => {
