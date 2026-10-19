@@ -77,14 +77,15 @@ const RUNTIME = String.raw`
   function drawAlert(t) {
     var i = alertAt(S.events, t, LEAD, SHOW), e = i < 0 ? null : S.events[i];
     var d = demo ? Date.now() - demoAt - passMs() - LEAD : -1;
-    if (!e && d >= 0 && d < SHOW) e = { at: -1, country: demo.country, kind: demo.kind, test: true, src: demo.src };
-    var key = e ? e.at + "|" + e.country + "|" + e.kind : "";
+    if (!e && d >= 0 && d < SHOW) e = { at: -1, country: demo.country, line: demo.line, name: demo.name, test: true, src: demo.src };
+    var key = e ? e.at + "|" + e.line + "|" + (e.name || "") : "";
     if (key === shownAlert) return;
     shownAlert = key;
     if (!e) { box.className = ""; return; }
     tag.style.display = e.test ? "block" : "none";
-    $("aDest").textContent = "إلى " + e.country;
-    $("aKind").textContent = e.kind;
+    $("aName").textContent = e.name || "";
+    $("aName").style.display = e.name ? "block" : "none";
+    $("aDest").textContent = e.line;
     if (e.src) { boxImg.setAttribute("src", e.src); boxImg.style.display = "block"; } else boxImg.style.display = "none";
     // from the start every time: off, a reflow, on — the animations run again
     box.className = "";
@@ -172,6 +173,8 @@ const RUNTIME = String.raw`
   measure();
   wake();
   loop();
+  // a browser that stops animation frames (a background or throttled page) still turns the ads and shows the alert
+  setInterval(frame, 1000);
   setInterval(poll, 4000);
   poll();
 })();
@@ -197,16 +200,16 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #alert.on #trail{-webkit-animation:trail 1.7s .2s cubic-bezier(.3,.7,.2,1) both,fade .8s 2.4s both;animation:trail 1.7s .2s cubic-bezier(.3,.7,.2,1) both,fade .8s 2.4s both}
 #plane{position:absolute;top:0;left:0;width:6vw;height:6vw;fill:#fff;-webkit-transform:translateX(-8vw) rotate(90deg);transform:translateX(-8vw) rotate(90deg);-webkit-filter:drop-shadow(0 0 1vw rgba(227,189,60,.9));filter:drop-shadow(0 0 1vw rgba(227,189,60,.9))}
 #alert.on #plane{-webkit-animation:fly 1.7s .2s cubic-bezier(.3,.7,.2,1) both;animation:fly 1.7s .2s cubic-bezier(.3,.7,.2,1) both}
-#msg{position:absolute;left:0;right:0;top:42%;text-align:center;direction:rtl}
+#msg{position:absolute;left:4%;right:4%;top:38%;text-align:center;direction:rtl}
 #kicker{display:inline-block;font-size:2.8vw;font-weight:800;color:#e3bd3c;letter-spacing:.05em;opacity:0}
 #kicker i{position:relative;display:inline-block;width:1.3vw;height:1.3vw;margin-left:1vw;border-radius:50%;background:#e53950;vertical-align:middle}
 #kicker i:after{content:"";position:absolute;left:0;top:0;width:100%;height:100%;border-radius:50%;background:#e53950}
 #alert.on #kicker{-webkit-animation:rise .6s .6s both;animation:rise .6s .6s both}
 #alert.on #kicker i:after{-webkit-animation:ping 1.2s 1.1s infinite;animation:ping 1.2s 1.1s infinite}
-#aDest{font-size:10vw;font-weight:800;color:#fff;line-height:1.15;text-shadow:0 .4vw 2.4vw rgba(0,0,0,.6),0 0 3.5vw rgba(227,189,60,.5);opacity:0}
-#alert.on #aDest{-webkit-animation:pop .9s .9s cubic-bezier(.2,1.5,.4,1) both;animation:pop .9s .9s cubic-bezier(.2,1.5,.4,1) both}
-#aKind{display:inline-block;margin-top:1vw;font-size:2vw;font-weight:800;color:#0a3a33;background:#e3bd3c;border-radius:3vw;padding:.5vw 2.4vw;opacity:0}
-#alert.on #aKind{-webkit-animation:rise .5s 1.5s both;animation:rise .5s 1.5s both}
+#aName{font-size:4.6vw;font-weight:800;color:#fff;line-height:1.2;margin-top:.8vw;opacity:0}
+#alert.on #aName{-webkit-animation:rise .6s 1s both;animation:rise .6s 1s both}
+#aDest{font-size:8.4vw;font-weight:800;color:#fff;line-height:1.15;text-shadow:0 .4vw 2.4vw rgba(0,0,0,.6),0 0 3.5vw rgba(227,189,60,.5);opacity:0}
+#alert.on #aDest{-webkit-animation:pop .9s 1.3s cubic-bezier(.2,1.5,.4,1) both;animation:pop .9s 1.3s cubic-bezier(.2,1.5,.4,1) both}
 @-webkit-keyframes kb{from{-webkit-transform:scale(1.18)}to{-webkit-transform:scale(1)}}
 @keyframes kb{from{transform:scale(1.18)}to{transform:scale(1)}}
 @-webkit-keyframes trail{from{-webkit-transform:scaleX(0)}to{-webkit-transform:scaleX(1)}}
@@ -260,7 +263,7 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="alert"><img id="alertImg" alt=""><div id="shade"></div>
 <div id="flight"><div id="trail"></div><svg id="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
 <div id="alertTag">تجربة</div>
-<div id="msg"><div id="kicker"><i></i>عميل جديد الآن</div><div id="aDest"></div><div id="aKind"></div></div></div>
+<div id="msg"><div id="kicker"><i></i>✨ مسافر جديد مع ترافليون</div><div id="aName"></div><div id="aDest"></div></div></div>
 <section id="countries"><div class="eyebrow">ترافليون · نبض السفر</div><h1>الدول الأكثر طلبًا اليوم</h1><p>الوجهات مرتّبة حسب طلبات العملاء اليوم · بتوقيت الرياض</p><div id="countryList"></div><footer>الوجهة القادمة تبدأ بسؤال · يتجدد العرض كل 10 دقائق</footer></section>
 <div id="band"><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
 <script>window.__S__=${json(s)};window.__N__=${n};window.__M__=${monitor ? "true" : "false"};</script>
