@@ -20,10 +20,11 @@ const ROWS = [
     notes: "crontab ‏deploy يستدعي /api/eye/daily 17:00 UTC (مكرر — محمي)؛ عليه supabase-backup.timer أيضاً؛ تحت المراجعة",
   }),
   // ---------- database ----------
-  R("قاعدة البيانات (Supabase ذاتية الاستضافة)", "database", { used_by: "النظام كله", secret_ref: "SUPABASE_DB_URL، SUPABASE_SERVICE_ROLE_KEY، NEXT_PUBLIC_SUPABASE_ANON_KEY، NEXT_PUBLIC_SUPABASE_URL", check_key: "db" }),
+  // pkg is on Supabase CLOUD, not the stack on vps-new (fix-integrations-cloud-2026-10-19.mjs)
+  R("قاعدة البيانات (Supabase Cloud)", "database", { used_by: "النظام كله", secret_ref: "SUPABASE_DB_URL، SUPABASE_SERVICE_ROLE_KEY، NEXT_PUBLIC_SUPABASE_ANON_KEY، NEXT_PUBLIC_SUPABASE_URL", check_key: "db" }),
   R("تسجيل الدخول (Supabase Auth)", "database", { used_by: "دخول الموظفين والشركاء", secret_ref: "SUPABASE_SERVICE_ROLE_KEY", check_key: "auth" }),
   R("الملفات (Supabase Storage)", "database", { used_by: "الجوازات، الأدلة، المرفقات، تصاميم العروض الجاهزة (ready-designs)", secret_ref: "SUPABASE_SERVICE_ROLE_KEY", check_key: "storage" }),
-  R("النسخ الاحتياطي اليومي (supabase-backup)", "cron", { used_by: "قاعدة البيانات", secret_ref: "systemd timer على vps-new 03:30 UTC", notes: "آخر تشغيل ناجح 2026-10-19 03:30 UTC — لا فحص آلي من النظام بعد" }),
+  R("النسخ الاحتياطي اليومي (supabase-backup)", "cron", { used_by: "Supabase الذاتية على vps-new فقط — ليست قاعدة pkg", secret_ref: "systemd timer على vps-new 03:30 UTC", notes: "آخر تشغيل ناجح 2026-10-19 03:30 UTC — لا فحص آلي من النظام بعد" }),
   // ---------- APIs ----------
   R("OpenAI", "api", { used_by: "مُراد، المستقبل الآلي، البرنامج اليومي، قراءة الجوازات/OCR", secret_ref: "OPENAI_API_KEY", check_key: "openai", notes: "ANTHROPIC_API_KEY غير مضبوط" }),
   R("AviationStack (الرحلات)", "api", { used_by: "بحث الرحلات ومتابعتها", secret_ref: "AVIATIONSTACK_API_KEY", check_key: "aviationstack" }),
