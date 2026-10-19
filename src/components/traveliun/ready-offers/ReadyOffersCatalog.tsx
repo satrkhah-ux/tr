@@ -9,11 +9,12 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
-  applySync, previewSync, setDesignUrl, setReadyOfferActive, startDraftFromReadyOffer,
+  applySync, previewSync, setDesignUrl, setReadyOfferActive, startDraftFromReadyOffer, uploadDesign,
 } from "@/lib/data/ready-offers";
 import type { TranslationKey, Translator } from "@/lib/i18n";
 import { canStartFrom, type ReadyOfferRecord, type SyncDiff } from "@/lib/ready-offers/types";
 import { parseList } from "@/lib/ready-offers/parse";
+import { designImageUrl } from "@/lib/ready-offers/design";
 import { draftHref } from "@/lib/offer/draft-types";
 import { useRole } from "@/lib/roles/RoleContext";
 import { useTraveliunUI } from "../TraveliunUIProvider";
@@ -149,6 +150,14 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
   const [designing, setDesigning] = useState(false);
   const [design, setDesign] = useState(offer.design_url ?? "");
   const [active, setActive] = useState(offer.active);
+  // the design as an image (lib/ready-offers/design.ts) — shown only once it has loaded, never a broken box
+  const img = designImageUrl(offer.design_url);
+  // the probe answers for one link: a new link is probed again, never shown unchecked
+  const [probe, setProbe] = useState<{ src: string; ok: boolean } | null>(null);
+  const imgOk = img && probe?.src === img ? probe.ok : null;
+  const [showInfo, setShowInfo] = useState(false);
+  const imageMode = Boolean(img) && imgOk === true;
+  const [uploading, setUploading] = useState(false);
 
   const comingSoon = offer.status === "coming_soon";
   const problems = offer.problems ?? [];
@@ -167,8 +176,8 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
     }
   }
 
-  return (
-    <div className={`${card} ${active ? "" : "opacity-60"} ${problems.length ? "border-[#f0a9bb] ring-1 ring-[#f4c9d4]" : ""} flex flex-col`}>
+  const details = (
+    <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-[15px] font-extrabold text-[#003c3a]">{offer.country || offer.title}</h2>
@@ -251,6 +260,47 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
         </p>
       ) : null}
 
+    </>
+  );
+
+  return (
+    <div className={`${card} ${active ? "" : "opacity-60"} ${problems.length ? "border-[#f0a9bb] ring-1 ring-[#f4c9d4]" : ""} flex flex-col`}>
+      {img && imgOk === null ? (
+        // the probe: the image loads out of sight; until it has, the card is the description, as without one
+        // eslint-disable-next-line @next/next/no-img-element -- a design from any host, no loader
+        <img src={img} alt="" aria-hidden className="hidden" onLoad={() => setProbe({ src: img, ok: true })} onError={() => setProbe({ src: img, ok: false })} />
+      ) : null}
+      {imageMode && img ? (
+        // the design, whole (object-contain — no text cut off a post), the description over it on hover,
+        // on keyboard focus, or on a tap (a phone has no hover: a first tap shows it, a second hides it)
+        <div
+          role="button"
+          tabIndex={0}
+          aria-expanded={showInfo}
+          aria-label={offer.country || offer.title || ""}
+          onClick={() => setShowInfo((v) => !v)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setShowInfo((v) => !v);
+            }
+          }}
+          className="group relative -mx-1 overflow-hidden rounded-[12px] bg-[#e9eeec] outline-none focus-visible:ring-2 focus-visible:ring-[#2aa87a]"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- a design from any host, no loader */}
+          <img src={img} alt={offer.title || offer.country || ""} className="block h-auto max-h-[560px] w-full object-contain" />
+          <div
+            className={`absolute inset-0 overflow-y-auto bg-white/95 p-4 transition-opacity duration-200 ${
+              showInfo ? "opacity-100" : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-visible:opacity-100"
+            }`}
+          >
+            {details}
+          </div>
+        </div>
+      ) : (
+        details
+      )}
+
       {error ? (
         <p className="mt-3 rounded-[9px] border border-[#f4c9d4] bg-[#fdeef2] px-3 py-2 text-[12px] font-bold text-[#c22850]">
           {error}
@@ -279,7 +329,7 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
             rel="noopener noreferrer"
             className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-[#dbe6e1] px-3 text-[13px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
           >
-            <ImageIcon className="size-4" /> {t("ro.design")}
+            <ImageIcon className="size-4" /> {t("ro.openDesign")}
           </a>
         ) : null}
         {canManage ? (
@@ -295,6 +345,31 @@ function OfferCard({ offer, canManage }: { offer: ReadyOfferRecord; canManage: b
 
       {canManage && designing ? (
         <div className="mt-3 grid gap-2 rounded-[10px] border border-[#e2ebe7] bg-[#f8fbfa] p-3">
+          <label className="grid gap-1 text-[12px] font-bold text-[#185045]">
+            {t("ro.uploadDesign")}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={uploading}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setUploading(true);
+                setError(null);
+                const form = new FormData();
+                form.append("file", file);
+                const res = await uploadDesign(offer.id, form);
+                setUploading(false);
+                if (res.ok) {
+                  setDesigning(false);
+                  router.refresh();
+                } else setError(t(res.error as TranslationKey));
+              }}
+              className="text-[12px]"
+            />
+          </label>
+          {uploading ? <Loader2 className="size-4 animate-spin text-[#185045]" /> : null}
+          <p className="text-[11.5px] font-bold text-[#78948f]">{t("ro.orLink")}</p>
           <input
             value={design}
             onChange={(e) => setDesign(e.target.value)}

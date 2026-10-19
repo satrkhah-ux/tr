@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { createDraft } from "./drafts";
 import { fold, parseWorkbook, TABS, tabsFromHtml } from "@/lib/ready-offers/parse";
+import { DESIGN_BUCKET, DESIGN_MAX_BYTES, DESIGN_TYPES } from "@/lib/ready-offers/design";
 import { buildSeed, canStartFrom, type ParsedOffer, type ReadyOfferRecord, type SyncDiff } from "@/lib/ready-offers/types";
 import { currentCan } from "@/lib/roles/current";
 import { listEntityAudit, logAudit } from "./audit";
@@ -329,6 +330,35 @@ export async function setDesignUrl(id: string, url: string): Promise<SimpleResul
       .from("ready_offers")
       .update({ design_url: trimmed || null })
       .eq("id", id);
+    return error ? { ok: false, error: "err.db" } : { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/**
+ * «إضافة صورة التصميم» — an image file for the card (the owner, 2026-10-19): jpg, png or
+ * webp up to 5 MB, into the public bucket `ready-designs` (made on first use — the designs
+ * are marketing, partners see them too), and the card's design link set to it.
+ */
+export async function uploadDesign(id: string, form: FormData): Promise<SimpleResult> {
+  const denied = await requireManage();
+  if (denied) return { ok: false, error: denied };
+  const file = form.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "ro.err.badImage" };
+  if (!(DESIGN_TYPES as readonly string[]).includes(file.type) || file.size > DESIGN_MAX_BYTES) return { ok: false, error: "ro.err.badImage" };
+  try {
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const bucket = await supabase.storage.getBucket(DESIGN_BUCKET);
+    if (bucket.error) {
+      await supabase.storage.createBucket(DESIGN_BUCKET, { public: true, fileSizeLimit: DESIGN_MAX_BYTES, allowedMimeTypes: [...DESIGN_TYPES] });
+    }
+    const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+    const path = `${id}/${Date.now()}.${ext}`;
+    const up = await supabase.storage.from(DESIGN_BUCKET).upload(path, new Uint8Array(await file.arrayBuffer()), { contentType: file.type, upsert: false });
+    if (up.error) return { ok: false, error: "err.db" };
+    const url = supabase.storage.from(DESIGN_BUCKET).getPublicUrl(path).data.publicUrl;
+    const { error } = await supabase.from("ready_offers").update({ design_url: url }).eq("id", id);
     return error ? { ok: false, error: "err.db" } : { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
