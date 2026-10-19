@@ -6,7 +6,7 @@ import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { resolvePlace } from "@/lib/leads/places";
 import type { Place } from "@/lib/leads/auto";
 import { ttlCache } from "@/lib/ttl-cache";
-import { kindWord, normalizeConfig, positionOf, riyadhDay, SCREENS_SETTING, tickerText, tickerWidth, topCountries, type ScreensConfig } from "./config";
+import { displayName, serviceLine, normalizeConfig, positionOf, riyadhDay, SCREENS_SETTING, tickerText, tickerWidth, topCountries, type ScreensConfig } from "./config";
 
 /**
  * «الشاشات» — what a screen reads, every few seconds, with no login (the owner,
@@ -25,10 +25,10 @@ export type ScreenState = {
   ads: { src: string; name: string }[];
   /** the band: its words, their room, its speed, how often it comes up, and the extra pass when the words changed */
   ticker: { text: string; width: number; speed: number; periodMs: number; bumpAt: number } | null;
-  /** «عميل جديد الآن — إلى {country}», the request's kind in words, «تجربة» when it is one */
-  events: { at: number; country: string; kind: string; test: boolean; src: string | null }[];
+  /** «بكج إلى تركيا» and the client's recorded name, three words at most (never a phone), «تجربة» when it is one */
+  events: { at: number; country: string; line: string; name: string | null; test: boolean; src: string | null }[];
   /** while the TVs are set up: on every load, one pass and then this alert, on that screen only — never stored, never counted */
-  demo: { country: string; kind: string; src: string | null } | null;
+  demo: { country: string; line: string; name: string; src: string | null } | null;
 };
 
 type Shared = Omit<ScreenState, "now" | "position"> & { cfg: ScreensConfig };
@@ -99,21 +99,26 @@ async function shared(now: number): Promise<Shared> {
       ticker(now, cfg.tickerSpeed, cfg.tickerEveryMin * 60_000),
       db()
         .from("office_screen_events")
-        .select("kind, destination, test, at")
+        .select("lead_id, kind, destination, test, at")
         .gte("at", new Date(now - 60_000).toISOString())
         .lte("at", new Date(now + 600_000).toISOString())
         .order("at"),
     ]);
     const adCountry = ads.map((a) => countryOf(a.name, list));
-    const events = ((rows ?? []) as { kind: string; destination: string; test: boolean; at: string }[]).flatMap((e) => {
+    const evs = (rows ?? []) as { lead_id: string | null; kind: string; destination: string; test: boolean; at: string }[];
+    // the client's name as recorded on «العملاء», three words at most (displayName) — never anything else about them
+    const ids = [...new Set(evs.map((e) => e.lead_id).filter((id): id is string => Boolean(id)))];
+    const { data: named } = ids.length ? await db().from("client_leads").select("id, name").in("id", ids) : { data: [] };
+    const nameOf = new Map(((named ?? []) as { id: string; name: string | null }[]).map((l) => [l.id, displayName(l.name)]));
+    const events = evs.flatMap((e) => {
       if (!e.test && !cfg.kinds.includes(e.kind)) return [];
       const country = countryOf(e.destination, list);
       if (!country) return [];
       const ad = ads[adCountry.indexOf(country)];
-      return [{ at: Date.parse(e.at), country, kind: kindWord(e.kind), test: e.test, src: ad?.src ?? null }];
+      return [{ at: Date.parse(e.at), country, line: serviceLine(e.kind, country), name: e.lead_id ? (nameOf.get(e.lead_id) ?? null) : null, test: e.test, src: ad?.src ?? null }];
     });
     const demoCountry = tick.top ?? "تركيا";
-    const demo = now < Date.parse(cfg.demoUntil) ? { country: demoCountry, kind: kindWord("بكج"), src: ads[adCountry.indexOf(demoCountry)]?.src ?? null } : null;
+    const demo = now < Date.parse(cfg.demoUntil) ? { country: demoCountry, line: serviceLine("بكج", demoCountry), name: "أحمد العتيبي", src: ads[adCountry.indexOf(demoCountry)]?.src ?? null } : null;
     return { cfg, build: String(process.env.NEXT_DEPLOYMENT_ID || ""), screens: cfg.screens, slotMs: cfg.slotSec * 1000, ads, ticker: tick.band, events, demo };
   });
 }

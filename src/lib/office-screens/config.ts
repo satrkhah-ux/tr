@@ -53,9 +53,12 @@ export function positionOf(cfg: ScreensConfig, n: number): number {
   return n >= 1 && n <= cfg.screens ? cfg.order.indexOf(n) : -1;
 }
 
-/** what the request is, under «عميل جديد الآن — إلى تركيا» — destination and kind only, never a person */
-export function kindWord(kind: string): string {
-  return kind === "فنادق" ? "حجز فنادق" : kind === "طيران" ? "تذاكر طيران" : kind === "تأشيرات" ? "تأشيرة" : "بكج سياحي";
+/** the alert's big line (the owner, 2026-10-20: encouragement, not «طلب»): «بكج إلى تركيا», «فندق في تركيا» … */
+export function serviceLine(kind: string, country: string): string {
+  if (kind === "فنادق") return `فندق في ${country}`;
+  if (kind === "طيران") return `طيران إلى ${country}`;
+  if (kind === "تأشيرات") return `تأشيرة إلى ${country}`;
+  return `بكج إلى ${country}`;
 }
 
 const LRI = String.fromCharCode(0x2066);
@@ -104,4 +107,24 @@ export function tickerText(leads: { country: string; days: number[] }[], now: nu
 export const TICKER_FONT_REF = 42;
 export function tickerWidth(text: string): number {
   return Math.ceil(text.length * TICKER_FONT_REF * 0.45 + TICKER_FONT_REF * 2);
+}
+
+const PLACEHOLDER = /^(عميل|زبون|unknown|customer|client|test|guest)$/i;
+const KEEP = /[ء-يA-Za-zً-ْ'-]/g;
+
+/**
+ * The client's name on the alert (the owner, 2026-10-20: «الاسم واللقب أو الاسم
+ * الذي مكتوب لدينا» — he chose it knowing the screens are open): the name as
+ * recorded on «العملاء», at most three words, Latin as written. A phone or a
+ * number, emoji, «#123» or a placeholder («عميل», «Unknown») is no name — the
+ * alert then says only «بكج إلى تركيا». Nothing else about the client is sent.
+ */
+export function displayName(raw: string | null | undefined): string | null {
+  const words = (raw ?? "")
+    .split(/\s+/)
+    .filter((w) => !w.startsWith("#") && !/\d{3,}/.test(w))
+    .map((w) => (w.match(KEEP) ?? []).join(""))
+    .filter((w) => w.length > 0 && w !== "-" && w !== "'");
+  if (!words.length || (words.length === 1 && PLACEHOLDER.test(words[0]))) return null;
+  return words.slice(0, 3).join(" ");
 }

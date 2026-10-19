@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { kindWord, normalizeConfig, positionOf, riyadhDay, tickerText } from "./config";
+import { displayName, normalizeConfig, positionOf, riyadhDay, serviceLine, tickerText } from "./config";
 
 describe("«الشاشات» settings and words", () => {
   it("every screen exactly once in the hanging order, whatever was saved", () => {
@@ -10,9 +10,23 @@ describe("«الشاشات» settings and words", () => {
     expect([positionOf(cfg, 1), positionOf(cfg, 2), positionOf(cfg, 5)]).toEqual([1, 0, -1]);
   });
 
-  it("the alert names the destination and the kind, never a person", () => {
-    expect(kindWord("بكج")).toBe("بكج سياحي");
-    expect(kindWord("تأشيرات")).toBe("تأشيرة");
+  it("the client's name as recorded, three words at most — never a phone, a number, emoji or a placeholder", () => {
+    expect(displayName("أحمد محمد العتيبي الزهراني")).toBe("أحمد محمد العتيبي");
+    expect(displayName("Saad")).toBe("Saad");
+    expect(displayName("سعد 🌴")).toBe("سعد");
+    expect(displayName("+966 55 123 4567")).toBeNull();
+    expect(displayName("😀😀")).toBeNull();
+    expect(displayName("#48213")).toBeNull();
+    expect(displayName("عميل")).toBeNull();
+    expect(displayName("Unknown")).toBeNull();
+    expect(displayName(null)).toBeNull();
+  });
+
+  it("the alert's line: the service and the destination, as encouragement", () => {
+    expect(serviceLine("بكج", "تركيا")).toBe("بكج إلى تركيا");
+    expect(serviceLine("طيران", "تركيا")).toBe("طيران إلى تركيا");
+    expect(serviceLine("تأشيرات", "بريطانيا")).toBe("تأشيرة إلى بريطانيا");
+    expect(serviceLine("فنادق", "تركيا")).toBe("فندق في تركيا");
   });
 
   it("the ticker: today's top countries by conversations, no counts; under three → yesterday's with its date", () => {
