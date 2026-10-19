@@ -129,7 +129,7 @@ export function ReadyOffersSheetPanel({ data }: { data: ReadyOffersPanelData }) 
               who: data.lastSync.by ?? "—",
               added: String(data.lastSync.inserted),
               updated: String(data.lastSync.updated),
-              off: String(data.lastSync.deactivated),
+              off: String(data.lastSync.deleted),
             })
           : t("dev.ro.never")}
       </p>

@@ -17,8 +17,10 @@ import { partnerPrice, partnerSeed } from "@/lib/partners/pricing";
  *
  * The owner keeps them in a Google Sheet of two tabs, «العروض السياحية» and
  * «العروض التفصيلية» (parseWorkbook). `previewSync` reads the sheet and reports
- * what would change; `applySync` writes it. Rows that vanish from the sheet are
- * deactivated rather than deleted — a live draft may still point at one.
+ * what would change; `applySync` writes it. An offer that vanishes from the sheet
+ * is deleted, with its uploaded design (the owner, 2026-10-19: «يحذف القديم ويبقى
+ * الجديد»); one a draft still points at stays, inactive and without its code, so
+ * it is hidden everywhere and the draft keeps its source.
  *
  * Which sheet: the link saved on /developer (app_settings ready_offers_sheet),
  * else READY_OFFERS_SHEET_ID, else the owner's sheet of 2026-10-18.
@@ -98,6 +100,7 @@ export async function listReadyOffers(includeInactive = false): Promise<ReadyOff
     }
     const supabase = await db();
     let query = supabase.from("ready_offers").select(SELECT).order("price", { ascending: true });
+    query = query.not("code", "is", null);
     if (!includeInactive) query = query.eq("active", true);
     const { data } = await query;
     const rows = (data ?? []) as unknown as ReadyOfferRecord[];
@@ -233,7 +236,7 @@ export async function previewSync(): Promise<PreviewResult> {
     const seen = new Set(offers.map((o) => o.code));
 
     const diff: SyncDiff = {
-      added: [], changed: [], deactivated: [], unchanged: 0, errors,
+      added: [], changed: [], removed: [], unchanged: 0, errors,
       warnings: offers
         .filter((o) => o.warnings.length)
         .map((o) => ({ code: o.code, title: o.title, notes: o.warnings })),
@@ -252,8 +255,8 @@ export async function previewSync(): Promise<PreviewResult> {
       else diff.unchanged += 1;
     }
     for (const row of stored) {
-      if (row.code && row.active && !seen.has(row.code)) {
-        diff.deactivated.push({ code: row.code, title: row.title });
+      if (row.code && !seen.has(row.code)) {
+        diff.removed.push({ code: row.code, title: row.title });
       }
     }
     return { ok: true, diff };
@@ -263,7 +266,7 @@ export async function previewSync(): Promise<PreviewResult> {
 }
 
 export type ApplyResult =
-  | { ok: true; inserted: number; updated: number; deactivated: number }
+  | { ok: true; inserted: number; updated: number; deleted: number }
   | { ok: false; error: string };
 
 /** Re-reads the sheet server-side (never trusts a client-supplied payload). */
@@ -300,21 +303,49 @@ export async function applySync(): Promise<ApplyResult> {
       }
     }
 
-    const seen = offers.map((o) => o.code);
-    const gone = stored.filter((r) => r.code && !seen.includes(r.code));
-    for (const row of gone) {
-      await supabase.from("ready_offers").update({ active: false }).eq("id", row.id);
+    const seen = new Set(offers.map((o) => o.code));
+    const gone = stored.filter((r) => r.code && !seen.has(r.code));
+    const pointed = await draftsPointAt(supabase, gone.map((r) => r.id));
+    const doomed = gone.filter((r) => !pointed.has(r.id));
+    if (doomed.length) {
+      const { error } = await supabase.from("ready_offers").delete().in("id", doomed.map((r) => r.id));
+      if (error) return { ok: false, error: "err.db" };
+      await removeDesigns(supabase, doomed, stored.filter((r) => !doomed.includes(r)));
+    }
+    // a draft still names it as its source: kept, but inactive and without a code — out of every list
+    for (const row of gone.filter((r) => pointed.has(r.id))) {
+      await supabase.from("ready_offers").update({ active: false, code: null }).eq("id", row.id);
     }
     await logAudit({
       action: "data.updated",
       entity: "ready_offers",
       entity_id: "sync",
-      meta: { sheet: sheetId, inserted, updated, deactivated: gone.length, problems: offers.filter((o) => o.problems.length).length },
+      meta: { sheet: sheetId, inserted, updated, deleted: doomed.length, kept_for_drafts: gone.length - doomed.length, problems: offers.filter((o) => o.problems.length).length },
     });
-    return { ok: true, inserted, updated, deactivated: gone.length };
+    return { ok: true, inserted, updated, deleted: doomed.length };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "err.db" };
   }
+}
+
+/** the ready offers a draft's data still names as its source (source.ready_offer_id) */
+async function draftsPointAt(supabase: SupabaseClient, ids: string[]): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  const { data, error } = await supabase.from("offer_drafts").select("ref:data->source->>ready_offer_id").in("data->source->>ready_offer_id", ids);
+  // unsure → keep them all: a wrong delete cannot be undone, a kept row only waits for the next sync
+  if (error) return new Set(ids);
+  return new Set(((data ?? []) as { ref: string | null }[]).map((r) => r.ref).filter((r): r is string => Boolean(r)));
+}
+
+/** a deleted offer's uploaded design goes with it, unless another offer shows the same file */
+async function removeDesigns(supabase: SupabaseClient, deleted: { design_url: string | null }[], remaining: { design_url: string | null }[]): Promise<void> {
+  const marker = `/object/public/${DESIGN_BUCKET}/`;
+  const inUse = new Set(remaining.map((r) => r.design_url));
+  const paths = deleted
+    .map((r) => r.design_url)
+    .filter((u): u is string => Boolean(u && u.includes(marker) && !inUse.has(u)))
+    .map((u) => decodeURIComponent(u.slice(u.indexOf(marker) + marker.length).split("?")[0]));
+  if (paths.length) await supabase.storage.from(DESIGN_BUCKET).remove(paths);
 }
 
 export type SimpleResult = { ok: true } | { ok: false; error: string };
@@ -450,7 +481,7 @@ export async function setReadyOffersSheet(link: string): Promise<SetSheetResult>
 export type ReadyOffersPanelData = {
   sheetId: string;
   source: "settings" | "env" | "default";
-  lastSync: { at: string; by: string | null; inserted: number; updated: number; deactivated: number } | null;
+  lastSync: { at: string; by: string | null; inserted: number; updated: number; deleted: number } | null;
   problems: number;
   unpublished: number;
 };
@@ -477,7 +508,7 @@ export async function readyOffersPanel(): Promise<ReadyOffersPanelData> {
   return {
     sheetId: sheet.id,
     source: sheet.source,
-    lastSync: last ? { at: last.created_at, by: last.actor_email, inserted: n(last.meta.inserted), updated: n(last.meta.updated), deactivated: n(last.meta.deactivated) } : null,
+    lastSync: last ? { at: last.created_at, by: last.actor_email, inserted: n(last.meta.inserted), updated: n(last.meta.updated), deleted: n(last.meta.deleted ?? last.meta.deactivated) } : null,
     problems,
     unpublished,
   };

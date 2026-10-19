@@ -117,8 +117,8 @@ export type SyncChange = {
 export type SyncDiff = {
   added: ParsedOffer[];
   changed: { offer: ParsedOffer; fields: string[] }[];
-  /** stored rows no longer present in the sheet — deactivated, never deleted. */
-  deactivated: { code: string; title: string }[];
+  /** stored rows no longer in the sheet — deleted on apply (the owner, 2026-10-19), unless a draft still points at one. */
+  removed: { code: string; title: string }[];
   unchanged: number;
   /** rows that could not be parsed at all (skipped). */
   errors: { row: number; tab: string; reason: string }[];

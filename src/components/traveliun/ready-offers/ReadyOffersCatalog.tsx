@@ -458,7 +458,7 @@ export function SyncDialog({ open, onOpenChange, sheetId }: { open: boolean; onO
     setState("applying");
     const res = await applySync();
     if (res.ok) {
-      setMessage(t("ro.syncDone", { added: String(res.inserted), updated: String(res.updated), off: String(res.deactivated) }));
+      setMessage(t("ro.syncDone", { added: String(res.inserted), updated: String(res.updated), off: String(res.deleted) }));
       setState("done");
       router.refresh();
     } else {
@@ -510,7 +510,7 @@ export function SyncDialog({ open, onOpenChange, sheetId }: { open: boolean; onO
             <div className="grid grid-cols-4 gap-2 text-center">
               <Stat label={t("ro.diff.added")} value={diff.added.length} tone="good" />
               <Stat label={t("ro.diff.changed")} value={diff.changed.length} tone="warn" />
-              <Stat label={t("ro.diff.deactivated")} value={diff.deactivated.length} tone="bad" />
+              <Stat label={t("ro.diff.deactivated")} value={diff.removed.length} tone="bad" />
               <Stat label={t("ro.diff.unchanged")} value={diff.unchanged} tone="mute" />
             </div>
 
@@ -519,7 +519,7 @@ export function SyncDialog({ open, onOpenChange, sheetId }: { open: boolean; onO
               title={t("ro.diff.changed")}
               items={diff.changed.map((c) => `${c.offer.title} — ${c.fields.join("، ")}`)}
             />
-            <DiffList title={t("ro.diff.deactivated")} items={diff.deactivated.map((d) => d.title)} />
+            <DiffList title={t("ro.diff.deactivated")} items={diff.removed.map((d) => d.title)} />
 
             {diff.problems.length ? (
               <div className="rounded-[10px] border border-[#f4c9d4] bg-[#fdeef2] p-3">
