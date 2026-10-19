@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { runMurad } from "@/lib/murad/run";
 import { receptionSweep } from "@/lib/murad/reception-run";
 import { recordCronRun } from "@/lib/data/cron-runs";
+import { runIntegrationChecks } from "@/lib/developer/integrations-run";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -27,6 +28,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // every run leaves its trace for /developer, answered anyone or not (cron-runs.ts)
   // «المستقبل الآلي»: what the webhook missed, before Murad's own turns (no model, its turns claimed one by one)
   const received = await receptionSweep().catch(() => 0);
+  // «الربط الخارجي»: every 30 minutes at most (integrations-run.ts) — the minute job is the clock, nothing new to schedule
+  await runIntegrationChecks().catch(() => null);
   const summary = await recordCronRun("murad_run", runMurad);
   return NextResponse.json({ ok: true, received, ...summary });
 }

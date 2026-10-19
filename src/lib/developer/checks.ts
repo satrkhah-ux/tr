@@ -9,6 +9,8 @@ import { pdfEngine } from "@/lib/offer-doc/pdf";
 import { eyeBotToken } from "@/lib/telegram/eye-bot";
 import { opsBotToken } from "@/lib/telegram/ops-bot";
 import { cronRunKey, type CronJob, type CronRun } from "@/lib/data/cron-runs";
+import { readyOffersSheet } from "@/lib/data/ready-offers";
+import { connect as tlsConnect } from "node:tls";
 import {
   ageStatus,
   CHECK_TIMEOUT_MS,
@@ -173,6 +175,48 @@ type SupplierRow = {
   credentials_encrypted: string | null;
   last_error: string | null;
 };
+
+// ---------- «الربط الخارجي» (the owner, 2026-10-19): what would have caught the dead IP and the dead token ----------
+
+/** Days until a date runs out: ok beyond 14, warn within, down within 3 or past. */
+function expiryOutcome(iso: string | null, key: TranslationKey): Outcome {
+  if (!iso) return { status: "warn", latencyMs: null, detail: { key: "dev.d.expiryUnknown" } };
+  const days = Math.floor((Date.parse(iso) - Date.now()) / 86_400_000);
+  const status: CheckStatus = days <= 3 ? "down" : days <= 14 ? "warn" : "ok";
+  return { status, latencyMs: null, detail: { key, params: { date: iso.slice(0, 10), days } } };
+}
+
+/** The certificate a host serves — its notAfter. */
+function tlsNotAfter(host: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const socket = tlsConnect({ host, port: 443, servername: host, timeout: CHECK_TIMEOUT_MS }, () => {
+      const cert = socket.getPeerCertificate();
+      socket.end();
+      resolve(cert?.valid_to ? new Date(cert.valid_to).toISOString() : null);
+    });
+    socket.on("error", () => resolve(null));
+    socket.on("timeout", () => {
+      socket.destroy();
+      resolve(null);
+    });
+  });
+}
+
+/** A domain's expiration, from its registry (RDAP). */
+async function rdapExpiry(domain: string): Promise<string | null> {
+  const res = await fetch(`https://rdap.org/domain/${domain}`, { cache: "no-store", signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) });
+  if (!res.ok) return null;
+  const json = (await res.json()) as { events?: { eventAction?: string; eventDate?: string }[] };
+  return json.events?.find((e) => e.eventAction === "expiration")?.eventDate ?? null;
+}
+
+/** A Google Sheet read as the system reads it (CSV export). */
+async function sheetOutcome(id: string): Promise<Outcome> {
+  const start = Date.now();
+  const res = await fetch(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv`, { cache: "no-store", redirect: "follow", signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) });
+  const ms = Date.now() - start;
+  return res.ok ? ok(ms, { key: "dev.d.sheetOk", params: { id: id.slice(0, 6) } }) : httpProblem(res.status, ms);
+}
 
 const CHECKS: Check[] = [
   {
@@ -412,6 +456,37 @@ const CHECKS: Check[] = [
       return { key: "murad.check.detail", params: { read: n("read"), auto: n("auto"), suggest: n("suggest"), used: n("used"), cap: n("cap") } };
     }),
   },
+  // pkg's certificate (acme.sh on vps-new renews it) and the company's domain
+  { id: "tls_pkg", group: "core", label: "dev.c.tls", run: async () => expiryOutcome(await tlsNotAfter("pkg.traveliun.com"), "dev.d.expiry") },
+  { id: "domain_traveliun", group: "core", label: "dev.c.domain", run: async () => expiryOutcome(await rdapExpiry("traveliun.com"), "dev.d.expiry") },
+  {
+    id: "bot_external",
+    group: "bots",
+    label: "dev.c.botExternal",
+    // the separate traveliun-bot container (@atraveliunbot) and its ads hook: a 404 on / is it answering
+    run: async () => {
+      const start = Date.now();
+      const res = await fetch("http://186.241.16.106:8787/", { cache: "no-store", signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) });
+      const ms = Date.now() - start;
+      return res.status === 404 ? ok(ms, { key: "dev.d.botExternal" }) : httpProblem(res.status, ms);
+    },
+  },
+  {
+    id: "ads_fresh",
+    group: "jobs",
+    label: "dev.c.adsFresh",
+    // the owner's hourly Google Ads Script → /api/ads/hook: the newest post
+    run: async () => {
+      const { data } = await (createSupabaseServiceClient() as unknown as SupabaseClient).from("ad_stats").select("updated_at").order("updated_at", { ascending: false }).limit(1).maybeSingle();
+      const at = (data as { updated_at?: string } | null)?.updated_at ?? null;
+      if (!at) return { status: "warn", latencyMs: null, detail: { key: "dev.d.cronNever" } };
+      const age = Date.now() - Date.parse(at);
+      const status: CheckStatus = age > 6 * 3600_000 ? "down" : age > 2 * 3600_000 ? "warn" : "ok";
+      return { status, latencyMs: null, detail: { key: "dev.d.adsFresh", params: { hours: Math.round(age / 360_000) / 10 } } };
+    },
+  },
+  { id: "sheet_ready_offers", group: "api", label: "dev.c.sheetReady", run: async () => sheetOutcome((await readyOffersSheet()).id) },
+  { id: "sheet_leads", group: "api", label: "dev.c.sheetLeads", run: () => sheetOutcome(process.env["LEADS_SHEET_ID"] || "1jCwYe6c661ik3Az5RAu9X9jxQgOoY_TwNqGMg2YMi6s") },
 ];
 
 async function settle(check: Check, run: () => Promise<Outcome> = check.run): Promise<CheckResult> {

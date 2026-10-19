@@ -64,6 +64,7 @@ scripts/            # Asset download scripts
 - When launching Claude Code agent teams, ALWAYS have each teammate work in their own worktree branch and merge everyone's work at the end, resolving any merge conflicts smartly since you are basically serving the orchestrator role and have full context to our goals, work given, work achieved, and desired outcomes.
 - After editing `AGENTS.md`, run `bash scripts/sync-agent-rules.sh` to regenerate platform-specific instruction files.
 - After editing `.claude/skills/clone-website/SKILL.md`, run `node scripts/sync-skills.mjs` to regenerate the skill for all platforms.
+- Any change that adds or changes something the system connects to outside itself — a token, an API key, an API, a subscription, a Google Sheet, a script, a bot, a server, a domain or a scheduled job (cron) — registers it in «الربط الخارجي» (`public.integrations`, page `/settings/integrations`) in the same change: name, kind, what uses it, where its secret lives (the env var NAME or the file path, never the value), account, and an automatic check (`src/lib/developer/checks.ts`) when one is possible.
 
 # Website Inspection Guide
 

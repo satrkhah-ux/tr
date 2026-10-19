@@ -35,8 +35,10 @@ const ALIASES: [string, string, string | null][] = [
   ["فوكو", "فيتنام", "فوكوك"],
   ["شنغن", "شنغن (أوروبا)", null],
   ["شينغن", "شنغن (أوروبا)", null],
-  ["اوروبا", "أوروبا", null],
-  ["اوربا", "أوروبا", null],
+  // a European campaign and a «شنغن» conversation are one destination (the walk of f3bfccf)
+  ["اوروبا", "شنغن (أوروبا)", null],
+  ["اوربا", "شنغن (أوروبا)", null],
+  ["البوسنه", "البوسنة والهرسك", null],
 ];
 
 const NOTHING = /^(لم يحدد|غير محدد|لا يوجد|-|—)/u;

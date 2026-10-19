@@ -91,6 +91,8 @@ export const TAB_GROUPS: SectionTab[][] = [
   // the hotel suppliers' API vault and the data transfer belong with the developer's tools
   [
     { href: "/developer", labelKey: "nav.developer" },
+    // everything the system leans on outside itself, with its health and end dates (the owner, 2026-10-19)
+    { href: "/settings/integrations", labelKey: "nav.integrations" },
     { href: "/settings/suppliers", labelKey: "nav.hotelSuppliers" },
     { href: "/settings/data-transfer", labelKey: "nav.dataTransfer" },
   ],

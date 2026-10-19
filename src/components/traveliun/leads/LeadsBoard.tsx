@@ -734,6 +734,8 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                 </table>
               </div>
 
+              <p className="text-[11px] font-semibold text-[#93aaa3]">«المحادثات» من كل المصادر (الإعلانات وغيرها)، فتكلفة المحادثة تقريبية — ووجهة الحملة من اسمها، و«عام» حملات بلا وجهة.</p>
+
               {/* phase 2 — the new script's: where the clicks were, what was searched, the hour (the last 30 days) */}
               {ads.countries.length || ads.terms.length ? (
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

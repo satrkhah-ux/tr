@@ -58,6 +58,8 @@ describe("a Google campaign's destination, by the same rule", () => {
     expect(campaignDestination("004 بحث اسطنبول تركيا 🟥 كامل", places)).toBe("تركيا");
     expect(campaignDestination("1 بحث عام صوري اتصال ✅ المدينة", places)).toBe("عام");
     expect(campaignDestination("بحث VISA", places)).toBe("تأشيرات");
+    expect(campaignDestination("بحث البوسنة 🍃🌳🍃", places)).toBe("البوسنة والهرسك");
+    expect(campaignDestination("بحث أوروبا", places)).toBe("شنغن (أوروبا)");
     expect(campaignDestination("VISA بريطانيا", places)).toBe("المملكة المتحدة");
   });
 });
