@@ -11,6 +11,7 @@ import { opsBotToken } from "@/lib/telegram/ops-bot";
 import { cronRunKey, type CronJob, type CronRun } from "@/lib/data/cron-runs";
 import { readyOffersSheet } from "@/lib/data/ready-offers";
 import { connect as tlsConnect } from "node:tls";
+import { backupHealth } from "./backup-health";
 import {
   ageStatus,
   CHECK_TIMEOUT_MS,
@@ -483,6 +484,18 @@ const CHECKS: Check[] = [
       const age = Date.now() - Date.parse(at);
       const status: CheckStatus = age > 6 * 3600_000 ? "down" : age > 2 * 3600_000 ? "warn" : "ok";
       return { status, latencyMs: null, detail: { key: "dev.d.adsFresh", params: { hours: Math.round(age / 360_000) / 10 } } };
+    },
+  },
+  {
+    id: "backup_pkg",
+    group: "jobs",
+    label: "dev.c.backupPkg",
+    // deploy/pkg-backup.py, nightly on vps-new: the database and every Storage bucket (backup-health.ts)
+    run: async (): Promise<Outcome> => {
+      const { data } = await (createSupabaseServiceClient() as unknown as SupabaseClient).from("app_settings").select("value").eq("key", "pkg_backup").maybeSingle();
+      const h = backupHealth((data as { value?: string } | null)?.value, Date.now());
+      if (h.status === "ok") return { status: "ok", latencyMs: null, detail: { key: "dev.d.backupOk", params: { day: h.day, mb: h.mb, objects: h.objects } } };
+      return { status: "down", latencyMs: null, detail: { key: `dev.d.backup.${h.reason}`, params: { hours: h.hours ?? 0, error: h.error ?? "" } } };
     },
   },
   { id: "sheet_ready_offers", group: "api", label: "dev.c.sheetReady", run: async () => sheetOutcome((await readyOffersSheet()).id) },
