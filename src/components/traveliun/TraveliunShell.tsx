@@ -54,6 +54,7 @@ import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { ROLE_LABEL_KEYS, type Permission } from "@/lib/roles/roles";
 import { canOpenLink, type FeatureCheck } from "@/lib/roles/section-access";
 import { useCanOpen } from "@/lib/roles/useCanOpen";
+import { TAB_GROUPS } from "@/lib/nav/consolidated";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { MobileTabBar } from "./MobileTabBar";
 import { SectionTabs } from "./SectionTabs";
@@ -294,9 +295,20 @@ export function navGroupsFor(can: (permission: Permission) => boolean, featureOn
   return filterGroups(navGroups, (link) => canOpenLink(link, can, featureOn));
 }
 
-function filterGroups(groups: NavGroup[], opens: (link: { href: string; perm?: Permission }) => boolean): NavGroup[] {
+function filterGroups(groups: NavGroup[], openRaw: (link: { href: string; perm?: Permission }) => boolean): NavGroup[] {
+  // a link to a merged page opens for whoever can open any of its tabs, and lands on their first one
+  // («المطوّر» for an admin without developer.access: the hotel suppliers' vault — the walk of 94c84a7)
+  const land = <T extends { href: string; perm?: Permission }>(link: T): T | null => {
+    if (openRaw(link)) return link;
+    const tab = TAB_GROUPS.find((g) => g.some((t) => t.href === link.href))?.find((t) => openRaw({ href: t.href }));
+    return tab && !link.perm ? { ...link, href: tab.href } : null;
+  };
+  const opens = (link: { href: string; perm?: Permission }) => land(link) !== null;
   return groups.flatMap((group) => {
-    if (!group.children) return opens(group) ? [group] : [];
+    if (!group.children) {
+      const landed = land(group);
+      return landed ? [landed] : [];
+    }
     // a hidden link's caption heads the next shown one, so a block whose first
     // link is closed (the supplier vault, for sales) keeps its heading
     const children: NavLink[] = [];
@@ -306,7 +318,8 @@ function filterGroups(groups: NavGroup[], opens: (link: { href: string; perm?: P
         caption = child.captionKey ?? caption;
         continue;
       }
-      children.push(caption && !child.captionKey ? { ...child, captionKey: caption } : child);
+      const landed = land(child) ?? child;
+      children.push(caption && !landed.captionKey ? { ...landed, captionKey: caption } : landed);
       caption = undefined;
     }
     if (children.length === 0) return [];
@@ -372,7 +385,8 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
   const visibleNavGroups = useNavGroups();
   const opens = useCanOpen();
   const guideLinks = GUIDE_LINKS.filter(opens);
-  const [activeMenu, setActiveMenu] = useState<TranslationKey>(() => {
+  // the open section — null: all folded (the owner, 2026-10-19: a second click on the open one closes it)
+  const [activeMenu, setActiveMenu] = useState<TranslationKey | null>(() => {
     return visibleNavGroups.find((group) => isGroupActive(pathname, group))?.labelKey ?? visibleNavGroups[0].labelKey;
   });
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -425,8 +439,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
   }, [pathname]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const activeGroup =
-    visibleNavGroups.find((group) => group.labelKey === activeMenu) ?? visibleNavGroups[0];
+  const activeGroup = activeMenu ? (visibleNavGroups.find((group) => group.labelKey === activeMenu) ?? null) : null;
   const displayTitle = t(title);
 
   return (
@@ -723,9 +736,9 @@ function SideMenu({
   pathname,
   setActiveMenu,
 }: {
-  activeGroup: NavGroup;
+  activeGroup: NavGroup | null;
   pathname: string;
-  setActiveMenu: (key: TranslationKey) => void;
+  setActiveMenu: (key: TranslationKey | null) => void;
 }) {
   const { t } = useTraveliunUI();
   const partner = usePartnerBrand();
@@ -742,14 +755,15 @@ function SideMenu({
       <nav className="h-[calc(100vh/var(--tv-zoom)_-_96px)] overflow-y-auto py-2 text-[var(--tv-brand)]">
         {groups.map((group) => {
           const Icon = group.icon;
-          const active = group.labelKey === activeGroup.labelKey;
+          const active = group.labelKey === activeGroup?.labelKey;
           const hasChildren = Boolean(group.children?.length);
           return (
             <div key={group.labelKey}>
               {hasChildren ? (
                 <button
                   type="button"
-                  onClick={() => setActiveMenu(group.labelKey)}
+                  onClick={() => setActiveMenu(active ? null : group.labelKey)}
+                  aria-expanded={active}
                   className={`flex w-full items-center gap-3 px-4 py-[11px] text-start text-[13px] font-bold transition-colors duration-200 ${
                     active ? "bg-[var(--tv-brand)] text-white" : "text-[var(--tv-brand)] hover:bg-[#eef4f1]"
                   }`}

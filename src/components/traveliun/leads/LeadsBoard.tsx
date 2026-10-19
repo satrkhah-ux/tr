@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { BarChart3, ChevronLeft, ChevronRight, ExternalLink, Loader2, MessageCircle, Plus, RefreshCw, Search, Users, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
@@ -9,6 +9,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { addLead, leadThread, pullLeadsNow, startProgramme, updateLead, type Lead, type LeadPatch, type LeadsPage, type LeadThread } from "@/lib/data/leads";
 import { fold, HEADERS, INQUIRIES, riyadhDay } from "@/lib/leads/sheet";
 import { TraveliunShell } from "../TraveliunShell";
+import { useCanOpen } from "@/lib/roles/useCanOpen";
 
 const SENT = ["تم إرسال التفاصيل", "تم إرسال البرنامج", "تم إرسال المعلومات"];
 const TONE = new Map<string, (typeof INQUIRIES)[number]>(INQUIRIES.map((i) => [i.label, i]));
@@ -21,6 +22,20 @@ const TABS: [Tab, string][] = [
   ["closed", "مغلقة"],
   ["all", "الكل"],
 ];
+/**
+ * The page's tabs (the owner, 2026-10-19: «الصفحة صارت طويلة»): the clients
+ * and their conversations first, each analysis on a tab of its own — all from
+ * the same leads, the chosen one in the address (?tab=) so a refresh keeps it.
+ */
+const PANES = [
+  ["clients", "العملاء"],
+  ["ads", "رؤية للإعلانات"],
+  ["daily", "حصر الطلبات اليومية"],
+  ["peak", "وقت الذروة"],
+  ["team", "أداء الموظفين"],
+] as const;
+type Pane = (typeof PANES)[number][0];
+
 type Range = 1 | 7 | 30 | 0;
 const RANGES: [Range, string][] = [
   [1, "اليوم"],
@@ -277,6 +292,10 @@ function Bars({ title, rows, tone }: { title: string; rows: { label: string; cou
 
 export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }: LeadsPage) {
   const router = useRouter();
+  const params = useSearchParams();
+  const opens = useCanOpen();
+  const pane: Pane = PANES.find(([k]) => k === params.get("tab"))?.[0] ?? "clients";
+  const goPane = (p: Pane) => router.replace(p === "clients" ? "/clients" : `/clients?tab=${p}`, { scroll: false });
   const today = riyadhDay(Date.now());
   const [day, setDay] = useState(today);
   const [kind, setKind] = useState<string | null>(null);
@@ -395,6 +414,40 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
   return (
     <TraveliunShell title="nav.customers">
       <div className="tv-fade-up space-y-4">
+        <nav className="flex gap-1 overflow-x-auto border-b border-[#dbe6e1]" aria-label="أقسام صفحة العملاء">
+          {PANES.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => goPane(key)}
+              aria-current={pane === key ? "page" : undefined}
+              className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-bold transition-colors ${
+                pane === key ? "border-[var(--tv-brand)] text-[var(--tv-brand)]" : "border-transparent text-[#6b7f7a] hover:text-[var(--tv-brand)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          {/* «الأشخاص» — the issued files' clients, a page of its own (settings.manage) */}
+          {opens({ href: "/customers" }) ? (
+            <Link href="/customers" className="-mb-px shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-[13px] font-bold text-[#6b7f7a] hover:text-[var(--tv-brand)]">
+              الأشخاص
+            </Link>
+          ) : null}
+        </nav>
+        {pane !== "clients" ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11.5px] font-bold text-[#78948f]">المدة:</span>
+            {RANGES.map(([r, label]) => (
+              <button key={r} type="button" onClick={() => setRange(r)} className={`h-7 rounded-full px-3 text-[11.5px] font-bold ${range === r ? "bg-[#185045] text-white" : "border border-[#cfe0d9] text-[#185045]"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {pane === "clients" ? (
+        <>
         {/* ---------- «لوحة اليوم» (the owner's list, 2026-10-18): requests, bookings, the follow-up queue ---------- */}
         <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
           <h2 className="text-[15px] font-extrabold text-[#003c3a]">لوحة اليوم</h2>
@@ -492,21 +545,16 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
           {returningOnly ? <p className="mt-1.5 text-[11.5px] font-semibold text-[#78948f]">الجدول يعرض «عميل سابق» ليوم {day} — اضغط الخانة مرة أخرى للإلغاء.</p> : null}
         </section>
 
-        {/* ---------- «رؤية للإعلانات» ---------- */}
+        </>
+        ) : null}
+
+        {/* ---------- «رؤية للإعلانات»: the range's clients, kinds, receivers and the 14-day trend ---------- */}
+        {pane === "ads" ? (
         <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="inline-flex items-center gap-2 text-[15px] font-extrabold text-[#003c3a]">
-              <BarChart3 className="size-4 text-[#0f7a52]" />
-              رؤية للإعلانات
-            </h2>
-            <div className="flex flex-wrap gap-1.5">
-              {RANGES.map(([r, label]) => (
-                <button key={r} type="button" onClick={() => setRange(r)} className={`h-7 rounded-full px-3 text-[11.5px] font-bold ${range === r ? "bg-[#185045] text-white" : "border border-[#cfe0d9] text-[#185045]"}`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <h2 className="inline-flex items-center gap-2 text-[15px] font-extrabold text-[#003c3a]">
+            <BarChart3 className="size-4 text-[#0f7a52]" />
+            رؤية للإعلانات
+          </h2>
           <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-5">
             {[
               ["عدد العملاء", phones.size],
@@ -531,7 +579,11 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
             <h3 className="mb-2 text-[12px] font-extrabold text-[#185045]">المحادثات يومياً — آخر 14 يوماً</h3>
             <div className="flex h-28 items-end gap-1" dir="ltr">
               {trend.map((t) => (
-                <button key={t.day} type="button" title={`${t.day}: ${t.count}`} onClick={() => setDay(t.day)} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+                <button key={t.day} type="button" title={`${t.day}: ${t.count}`} onClick={() => {
+                    // the day's conversations, on the clients' tab
+                    setDay(t.day);
+                    goPane("clients");
+                  }} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
                   <span className="tv-tnum text-[10px] font-bold text-[#557d78]">{t.count || ""}</span>
                   <span className={`w-full rounded-t-[4px] ${t.day === day ? "bg-[#003c3a]" : "bg-[#0f7a52]/70"}`} style={{ height: `${(t.count / trendMax) * 100}%`, minHeight: t.count ? 4 : 1 }} />
                   <span className="tv-tnum text-[9.5px] font-semibold text-[#93aaa3]">{t.day.slice(8)}</span>
@@ -539,6 +591,12 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
               ))}
             </div>
           </div>
+        </section>
+        ) : null}
+
+        {/* ---------- «حصر الطلبات اليومية»: the last 14 days by kind ---------- */}
+        {pane === "daily" ? (
+        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
           <div className="mt-3 overflow-x-auto rounded-[12px] border border-[#e3ece8]">
             <table className="w-full min-w-[640px] text-start text-[11.5px]">
               <caption className="px-3 pt-2 text-start text-[12px] font-extrabold text-[#185045]">حصر الطلبات اليومية — آخر 14 يوماً حسب نوع الطلب</caption>
@@ -570,8 +628,19 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
             </table>
           </div>
 
-          <PeakHours rows={inRange} />
+        </section>
+        ) : null}
 
+        {/* ---------- «وقت الذروة» ---------- */}
+        {pane === "peak" ? (
+        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
+          <PeakHours rows={inRange} />
+        </section>
+        ) : null}
+
+        {/* ---------- «أداء الموظفين» ---------- */}
+        {pane === "team" ? (
+        <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-4 sm:p-5">
           <h3 className="mt-4 text-[13px] font-extrabold text-[#003c3a]">أداء الموظفين</h3>
           <p className="text-[11px] font-semibold text-[#93aaa3]">
             لكل موظف: كم محادثة وصلته، وكم احتاج حتى ردّ عليها، وكم احتاج حتى أسندها لغيره — من سجل الإسناد في Teletel، للمدة المختارة أعلاه.
@@ -581,8 +650,10 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
             {live ? "يوم المحادثة يوم بدئها في واتساب" : "يوم المحادثة يوم وصولها إلى النظام (الشيت لا يحمل تاريخاً)"}، والدولة من البرنامج المصدَر إن وُجد وإلا من خانة الدولة.
           </p>
         </section>
+        ) : null}
 
         {/* ---------- a new conversation, and the conversations ---------- */}
+        {pane === "clients" ? (
         <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-3 sm:p-4">
           <form
             className="grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_9rem_minmax(0,1fr)_auto]"
@@ -770,6 +841,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live }
             {list.length} من {leads.length}
           </p>
         </section>
+        ) : null}
       </div>
 
       <Dialog open={thread !== null} onOpenChange={(v) => !v && setThread(null)}>

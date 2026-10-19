@@ -96,8 +96,12 @@ export const TAB_GROUPS: SectionTab[][] = [
   ],
 ];
 
+/** Pages that draw their own row — «العملاء» holds its analyses and «الأشخاص» in one (LeadsBoard). */
+const OWN_TABS = new Set(["/clients"]);
+
 /** The tabs over this page — the group whose tab matches it best — or null. */
 export function tabsFor(pathname: string): { tabs: SectionTab[]; active: string } | null {
+  if (OWN_TABS.has(pathname)) return null;
   let best: { tabs: SectionTab[]; active: string } | null = null;
   for (const tabs of TAB_GROUPS) {
     for (const tab of tabs) {

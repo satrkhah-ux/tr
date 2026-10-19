@@ -81,7 +81,7 @@ export function ClientCommsAdmin({
         ))}
         <GuidesEditor guides={guides} />
         <ReceptionRoutes setup={reception} />
-        {reception ? <AutoOffers initial={reception.offers} /> : null}
+        {reception ? <AutoOffers initial={reception.offers} usd={reception.usd} /> : null}
         <MuradPolicies initial={muradPolicies} />
       </div>
     </TraveliunShell>

@@ -59,3 +59,13 @@ describe("the sidebar", () => {
     expect(basic?.children?.map((c) => c.href)).toEqual(["/kanban-board"]);
   });
 });
+
+describe("a merged page's link (the walk of 94c84a7)", () => {
+  it("opens for whoever can open any of its tabs, on their first one: «المطوّر» without developer.access", () => {
+    const admin = role(["dashboard.admin", "settings.manage", "employees.manage", "data.write", "clients.view"]);
+    const dev = navGroupsFor(admin, on).find((g) => g.labelKey === "nav.developer");
+    expect(dev?.href).toBe("/settings/suppliers");
+    // a role that opens none of them sees no link
+    expect(navGroupsFor(SALES, on).find((g) => g.labelKey === "nav.developer")).toBeUndefined();
+  });
+});

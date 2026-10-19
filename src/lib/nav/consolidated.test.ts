@@ -23,5 +23,7 @@ describe("the menu consolidation (the owner, 2026-10-19)", () => {
     expect(tabsFor("/customers")?.active).toBe("/customers");
     expect(tabsFor("/services-types")?.active).toBe("/services-types");
     expect(tabsFor("/hotels")).toBeNull();
+    // «العملاء» draws its own row, «الأشخاص» in it
+    expect(tabsFor("/clients")).toBeNull();
   });
 });

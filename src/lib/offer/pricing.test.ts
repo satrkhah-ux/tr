@@ -251,3 +251,15 @@ describe("sarPerFromPerSar — the exchange-api feed", () => {
     expect(Object.keys(sarPerFromPerSar({ eur: 0, gbp: -1, try: "13", "1inch": 2, sar: 1 })).sort()).toEqual(["SAR"]);
   });
 });
+
+describe("the company's dollar (the owner, 2026-10-19)", () => {
+  it("3.80 until the administration sets another; a typo outside 3–5 is not a rate", async () => {
+    const { usdSarRate, USD_SAR_DEFAULT } = await import("./pricing");
+    expect(USD_SAR_DEFAULT).toBe(3.8);
+    expect(usdSarRate(null)).toBe(3.8);
+    expect(usdSarRate("")).toBe(3.8);
+    expect(usdSarRate("3.85")).toBe(3.85);
+    expect(usdSarRate("38")).toBe(3.8);
+    expect(usdSarRate("abc")).toBe(3.8);
+  });
+});

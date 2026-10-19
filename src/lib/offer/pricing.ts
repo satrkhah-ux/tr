@@ -101,6 +101,20 @@ export function convert(
 }
 
 /**
+ * The dollar at the company's rate, not the market's (the owner, 2026-10-19:
+ * «السعر 3.80 هو يعتمد كسعر الصرف بدل السعر الاصلي») — every price, profit and
+ * commission computed from now on; an issued file keeps the rates it was
+ * issued at. The administration changes it on «سياسة الربح» (app_settings
+ * `usd_sar_rate`); a value outside 3–5 riyals is a typo and falls back here.
+ */
+export const USD_SAR_DEFAULT = 3.8;
+
+export function usdSarRate(raw: string | null | undefined): number {
+  const n = Number(raw);
+  return raw != null && raw !== "" && Number.isFinite(n) && n >= 3 && n <= 5 ? n : USD_SAR_DEFAULT;
+}
+
+/**
  * «1 SAR = n X» → «SAR per 1 X», the shape every converter here uses.
  *
  * Keys in any case (the exchange-api feed is lower-case); anything that is

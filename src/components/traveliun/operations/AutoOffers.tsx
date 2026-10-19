@@ -12,7 +12,7 @@ import { priceOffer, type OfferCountry } from "@/lib/murad/auto-offer";
 
 const field = "h-8 w-full rounded-[7px] border border-[#dbe6e1] bg-white px-2 text-[12px] font-semibold text-[#185045] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]";
 
-export function AutoOffers({ initial }: { initial: OfferCountry[] }) {
+export function AutoOffers({ initial, usd }: { initial: OfferCountry[]; usd: number }) {
   const [offers, setOffers] = useState<OfferCountry[]>(initial);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<"saved" | "failed" | null>(null);
@@ -36,7 +36,7 @@ export function AutoOffers({ initial }: { initial: OfferCountry[] }) {
       </p>
 
       {offers.map((o, i) => {
-        const example = priceOffer(o, 10, 2, 3.75);
+        const example = priceOffer(o, 10, 2, usd);
         return (
           <div key={i} className="mt-3 rounded-[10px] border border-[#e3ece8] p-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -92,7 +92,7 @@ export function AutoOffers({ initial }: { initial: OfferCountry[] }) {
               </label>
             </div>
             <p className="mt-2 rounded-[8px] bg-[#f6faf8] px-2 py-1.5 text-[11.5px] font-bold text-[#185045]">
-              مثال: 10 أيام لشخصين = {example.cost.toLocaleString("en-US")} {o.currency} + {o.marginPct}% = {example.total.toLocaleString("en-US")} {o.currency} ≈ {example.totalSar.toLocaleString("en-US")} ريال (بسعر 3.75) — {example.route.map((r) => `${r.city} ${r.nights}`).join(" + ")}
+              مثال: 10 أيام لشخصين = {example.cost.toLocaleString("en-US")} {o.currency} + {o.marginPct}% = {example.total.toLocaleString("en-US")} {o.currency} ≈ {example.totalSar.toLocaleString("en-US")} ريال (بسعر {usd}) — {example.route.map((r) => `${r.city} ${r.nights}`).join(" + ")}
             </p>
           </div>
         );

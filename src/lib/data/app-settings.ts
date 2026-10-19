@@ -10,6 +10,7 @@ import { intlPhone, listTeletelTeams } from "@/lib/providers/teletel";
 import { SETTING as MURAD_SETTING } from "@/lib/murad/core";
 import { parseDelay, parseHours, readRoutes, ROUTE_KEYS, type Routes } from "@/lib/murad/reception";
 import { readOffers, type OfferCountry } from "@/lib/murad/auto-offer";
+import { usdSarRate } from "@/lib/offer/pricing";
 
 /**
  * Choices the administration makes once for everyone (app_settings, 0054).
@@ -96,6 +97,38 @@ export async function setProfitSettings(next: ProfitSettings): Promise<SetSettin
   }
 }
 
+/** The company's dollar (pricing.ts USD_SAR_DEFAULT) — what «سياسة الربح» shows. */
+export async function getUsdRate(): Promise<number> {
+  try {
+    const { data } = await (createSupabaseServiceClient() as unknown as SupabaseClient).from("app_settings").select("value").eq("key", "usd_sar_rate").maybeSingle();
+    return usdSarRate((data as { value?: string } | null)?.value);
+  } catch {
+    return usdSarRate(null);
+  }
+}
+
+/**
+ * «سعر صرف الدولار» on «سياسة الربح» (the owner, 2026-10-19): every new price,
+ * profit and commission takes it within a minute; issued files keep theirs.
+ * 3–5 riyals only. Audited — before and after.
+ */
+export async function setUsdRate(rate: number): Promise<SetSettingResult> {
+  if (!(await currentCan("settings.manage"))) return { ok: false, error: "err.forbidden" };
+  if (!Number.isFinite(rate) || rate < 3 || rate > 5) return { ok: false, error: "err.db" };
+  try {
+    const before = await getUsdRate();
+    const value = String(Math.round(rate * 10000) / 10000);
+    const { error } = await (createSupabaseServiceClient() as unknown as SupabaseClient)
+      .from("app_settings")
+      .upsert({ key: "usd_sar_rate", value, updated_at: new Date().toISOString() });
+    if (error) return { ok: false, error: "err.db" };
+    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: "usd_sar_rate", meta: { before, after: Number(value) } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
 /** «مطوّر»: switch one system service off or on (features.ts). Audited — who stopped what, and when. */
 export async function setFeature(feature: Feature, on: boolean): Promise<SetSettingResult> {
   if (!(await currentCan("developer.access"))) return { ok: false, error: "err.forbidden" };
@@ -177,6 +210,8 @@ export type ReceptionSetup = {
   delay: string;
   /** «عروض آلية»: the countries Murad prices himself */
   offers: OfferCountry[];
+  /** the company's dollar — the auto-offer example prices with it */
+  usd: number;
   scope: "test" | "all";
 };
 
@@ -194,6 +229,7 @@ export async function getReceptionSetup(): Promise<ReceptionSetup | null> {
     const delay = parseDelay(v.get(MURAD_SETTING.receptionDelay));
     return {
       offers: readOffers(v.get(MURAD_SETTING.receptionOffers)),
+      usd: await getUsdRate(),
       delay: `${delay.min}-${delay.max}`,
       teams,
       routes: readRoutes(v.get(MURAD_SETTING.receptionRoutes), teams),

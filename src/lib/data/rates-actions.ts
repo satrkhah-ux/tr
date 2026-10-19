@@ -1,6 +1,9 @@
 "use server";
 
-import { sarPerFromPerSar } from "@/lib/offer/pricing";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { sarPerFromPerSar, usdSarRate } from "@/lib/offer/pricing";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { ttlCache } from "@/lib/ttl-cache";
 
 /**
  * Currency rates as «SAR per 1 unit». The first source that answers wins:
@@ -70,7 +73,35 @@ async function fromRatesApi(url: string): Promise<RatesResult | null> {
   return { sarPer, source: "live", updatedAt: when.toISOString() };
 }
 
+// a minute: a changed rate reaches every new price within one
+const usdRates = ttlCache<"usd", number>(60_000);
+
+/** The company's dollar (pricing.ts usdSarRate) — app_settings `usd_sar_rate`, 3.80 until the administration sets another. */
+async function companyUsd(): Promise<number> {
+  const known = usdRates.get("usd");
+  if (known) return known;
+  try {
+    const { data } = await (createSupabaseServiceClient() as unknown as SupabaseClient).from("app_settings").select("value").eq("key", "usd_sar_rate").maybeSingle();
+    const rate = usdSarRate((data as { value?: string } | null)?.value);
+    usdRates.set("usd", rate);
+    return rate;
+  } catch {
+    return usdSarRate(null);
+  }
+}
+
+/**
+ * The rates every caller prices with — the feed for every currency but the
+ * dollar, which is the company's (the owner, 2026-10-19: 3.80 «بدل السعر
+ * الاصلي», profit and commissions included). The feed is SAR-based, so no
+ * other currency leans on the dollar.
+ */
 export async function getRates(): Promise<RatesResult> {
+  const [rates, usd] = await Promise.all([marketRates(), companyUsd()]);
+  return { ...rates, sarPer: { ...rates.sarPer, USD: usd } };
+}
+
+async function marketRates(): Promise<RatesResult> {
   const custom = process.env.RATES_API_URL;
   const sources = [
     ...(custom ? [() => fromRatesApi(`${custom}${custom.includes("?") ? "&" : "?"}base=SAR`)] : []),

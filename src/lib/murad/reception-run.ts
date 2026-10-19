@@ -25,6 +25,7 @@ import { tidyWhatsapp } from "@/lib/operations/client-messages";
 import { logAudit } from "@/lib/data/audit";
 import { parseAssignment } from "@/lib/leads/auto";
 import { getRates } from "@/lib/data/rates-actions";
+import { USD_SAR_DEFAULT } from "@/lib/offer/pricing";
 import { askText, datesSaid, holdToText, missing, offerDraftData, offerText, priceOffer, readOffers, routeCity, tripChanged, tripDays, tripSummary, type OfferAsk, type OfferCountry } from "./auto-offer";
 import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
@@ -582,7 +583,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
         const days = tripDays(merged) ?? (before.days as number | null) ?? 0;
         const provisional = !merged.arrival;
         const arrival = merged.arrival ?? (before.arrival as string | null) ?? new Date(Date.now() + 30 * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
-        const rate = (await getRates().catch(() => null))?.sarPer[offer.currency] ?? (offer.currency === "USD" ? 3.75 : null);
+        const rate = (await getRates().catch(() => null))?.sarPer[offer.currency] ?? (offer.currency === "USD" ? USD_SAR_DEFAULT : null);
         if (rate && days > 1 && merged.adults) {
           const price = priceOffer(offer, days, merged.adults, rate, { rooms: merged.rooms, onlyCity: merged.only_city });
           const name = merged.name ?? firstName(m.contactName) ?? "";
@@ -635,7 +636,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
           const days = tripDays(trip) ?? 0;
           const provisional = !trip.arrival;
           const arrival = trip.arrival ?? new Date(Date.now() + 30 * 86_400_000).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
-          const rate = (await getRates().catch(() => null))?.sarPer[offer.currency] ?? (offer.currency === "USD" ? 3.75 : null);
+          const rate = (await getRates().catch(() => null))?.sarPer[offer.currency] ?? (offer.currency === "USD" ? USD_SAR_DEFAULT : null);
           if (rate) {
             const price = priceOffer(offer, days, trip.adults ?? 2, rate, { rooms: trip.rooms, onlyCity: trip.only_city });
             const name = trip.name ?? firstName(m.contactName) ?? "";
