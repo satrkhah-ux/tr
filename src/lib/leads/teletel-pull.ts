@@ -6,6 +6,7 @@ import { fold, matchEmployee, normalizePhone } from "./sheet";
 import { logAudit } from "@/lib/data/audit";
 import { muradMessageIds } from "@/lib/murad/core";
 import { allRows } from "@/lib/data/all-rows";
+import { classifyConversationInquiry } from "./request-classification";
 import { inferConversationDestination } from "./destination";
 
 /**
@@ -215,15 +216,13 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
   for (let i = 0; i < toRead.length; i += 5) {
     await Promise.all(
       toRead.slice(i, i + 5).map(async ({ c, inquiry, destination, mutableDestination, visitAt }) => {
-        const thread = await conversationThread(c.id, 50, visitAt);
+        const thread = await conversationThread(c.id, 50, c.createdAt);
         if (!thread?.historyComplete) return;
         threadRead.set(c.id, c.lastActivityAt);
-        const clientMessages = thread.messages.filter((m) => m.fromClient && !m.isPrivate && m.at >= visitAt).sort((a, b) => b.at - a.at);
-        const said = clientMessages.map((m) => m.text).join("\n");
         const patch: Record<string, unknown> = {};
-        const inference = inferConversationDestination(thread.messages.filter((m) => m.at >= visitAt), places);
-        const verifiedDestination = inference.destination ?? (byConversation.get(c.id)?.destination_source === "manual" ? destination : null);
-        const kind = classifyInquiry([c.serviceType ?? "", ...c.labels], said, { destination: verifiedDestination }) || "طلب غير واضح";
+        const visitInference = inferConversationDestination(thread.messages.filter((m) => m.at >= visitAt), places);
+        const inference = visitInference.evidenceId !== null ? visitInference : inferConversationDestination(thread.messages, places);
+        const kind = classifyConversationInquiry(thread.messages, places, visitAt, [c.serviceType ?? "", ...c.labels], byConversation.get(c.id)?.destination_source === "manual" ? destination : null);
         const origin = byConversation.get(c.id)?.inquiry_source;
         if ((origin !== "manual" || inquiry === "طلب غير واضح") && (!inquiry || inquiry === "طلب غير واضح") && kind && kind !== inquiry) { patch.inquiry = kind; patch.inquiry_source = "auto"; }
         const place = inference.destination;

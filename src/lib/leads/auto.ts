@@ -9,6 +9,7 @@ import { mentionsPlace } from "./place-match";
 
 /** the service a client names, first match wins — patterns are written folded (fold(): no spaces, no hamza, ه for ة) (a visa before a flight: «تأشيرة وتذكرة» is a visa file) */
 const KINDS: [string, RegExp][] = [
+  ["رخص دولية", /(رخصهدوليه|رخصهقيادهدوليه|internationaldriving)/i],
   ["بكج", /(بكج|باكج|باكدج|بكدج|باقه|باقات|برنامجسياحي|بكجات|package)/i],
   ["تأشيرات", /(تاشير|فيزا|فيزه|visa|شنغن|شينغن|schengen)/i],
   ["فنادق", /(فندق|فنادق|حجزغرف|hotel)/i],
@@ -29,7 +30,7 @@ export function classifyInquiry(labels: string[], text: string, context: { desti
   // answers with just «فيتنام». Missing dates/party are booking details, not ambiguity.
   if (context.destination?.trim()) return "بكج";
   const travel = text.replace(NOT_WANTED, " ");
-  if (/(?:برنامج|رحلة|رحله|سفرة|سفره)\s*(?:سياحي|سياحية|سياحيه)|شهر\s*عسل|honeymoon|tour\s*package/iu.test(travel)) return "بكج";
+  if (/(?:برنامج|رحلة|رحله|سفرة|سفره)\s*(?:سياحي|سياحية|سياحيه)|شهر\s*عسل|(?:ال)?وجه[ةه]\s*[:：]?\s+[^\s؟?]+|honeymoon|tour\s*package/iu.test(travel)) return "بكج";
   return text.trim() ? "طلب غير واضح" : "";
 }
 

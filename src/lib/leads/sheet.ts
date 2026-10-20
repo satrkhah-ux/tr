@@ -31,6 +31,7 @@ export const INQUIRIES = [
   { label: "طيران", color: "#ff00ff", ink: "#4d004d" },
   { label: "مواصلات", color: "#00ffff", ink: "#004d4d" },
   { label: "فنادق", color: "#f6b26b", ink: "#5a3000" },
+  { label: "رخص دولية", color: "#d9ead3", ink: "#274e13" },
   { label: "طلب غير واضح", color: "#a64d79", ink: "#ffffff" },
 ] as const;
 

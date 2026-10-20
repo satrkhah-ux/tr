@@ -56,7 +56,7 @@ export function readRequest(text: string, places: Place[]): Request {
   const destination = inferConversationDestination([{ id: 1, at: 1, text, fromClient: true, isPrivate: false }], places).destination;
   const kind = classifyInquiry([], text, { destination: where.kind === "destination" ? destination : null });
   return {
-    kind: (ROUTE_KEYS as readonly string[]).includes(kind) ? (kind as RouteKey) : null,
+    kind: kind === "رخص دولية" ? "موظف" : (ROUTE_KEYS as readonly string[]).includes(kind) ? (kind as RouteKey) : null,
     country: where.kind === "destination" ? where.country : null,
     wantsHuman: HUMAN.test(folded),
     salam: /سلام\s*عليكم/u.test(text),
