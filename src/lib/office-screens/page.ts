@@ -139,11 +139,11 @@ const RUNTIME = String.raw`
     panel.className = active ? (elapsed >= 34800 ? "on departing" : "on") : "";
     if (!active) { spotlightKey = ""; return; }
     var slot = 36000 / countries.length, index = Math.min(countries.length - 1, Math.floor(elapsed / slot));
-    var remaining = Math.ceil((36000 - elapsed) / 1000);
     $("countryProgress").style.width = (100 * elapsed / 36000) + "%";
-    $("countryNext").textContent = N < S.screens
-      ? (remaining <= 6 ? "إلى الشاشة " + (N + 1) + " خلال " + remaining : "التالي · الشاشة " + (N + 1)) + " ←"
-      : "نلتقي في الجولة القادمة";
+    var date = new Date(t + 3 * 3600000);
+    var days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+    var months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    $("bulletinDate").textContent = days[date.getUTCDay()] + "، " + date.getUTCDate() + " " + months[date.getUTCMonth()] + " " + date.getUTCFullYear();
     var key = Math.floor(t / 600000) + "|" + countries.join("|");
     if (key !== spotlightKey) {
       spotlightKey = key;
@@ -156,9 +156,7 @@ const RUNTIME = String.raw`
         card.appendChild(photo); card.appendChild(rank); card.appendChild(name); html += card.outerHTML;
       }
       $("countryList").innerHTML = html;
-      var steps = "";
-      for (var step = 1; step <= S.screens; step++) steps += '<b class="' + (step === N ? "current" : (step < N ? "passed" : "")) + '">' + step + '</b>';
-      $("countryStep").innerHTML = steps;
+
     }
   }
 
@@ -284,7 +282,6 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 .motionTitle{position:absolute;right:5vw;top:6vh;display:flex;align-items:center;gap:1.2vw;font-size:2.5vw;font-weight:800}
 .motionTitle>span{width:3vw;height:2px;background:#d7bd86}
 .motionTitle small{font-size:1.1vw;color:#c6af7b;border-right:1px solid #c6af7b66;padding-right:1.2vw}
-.screenWordmark{position:absolute;left:5vw;top:8vh;font-size:1.1vw;letter-spacing:.35em;font-weight:800;color:#dce6e1}
 #countryList{position:absolute;right:5vw;left:5vw;top:19vh;bottom:12vh;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:1.1vw}
 .country{position:relative;min-width:0;min-height:0;overflow:hidden;background:#185766 url(/screen-landmarks/journey.svg) center/cover;isolation:isolate}
 .country:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(3,23,28,.96),rgba(3,23,28,.18) 55%,rgba(3,23,28,.1));z-index:1}
@@ -293,10 +290,8 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 .country b{position:absolute;right:1.4vw;top:1.5vh;z-index:2;font-size:1vw;font-weight:700;color:#fff;text-shadow:0 1px 6px #00171b}
 .country span{position:absolute;right:1.4vw;left:1.4vw;bottom:2vh;z-index:2;font-size:2.1vw;font-weight:800;line-height:1.15;text-shadow:0 2px 12px #00171b;overflow-wrap:break-word}
 .country:first-child:before{content:"";position:absolute;right:1.4vw;bottom:1.1vh;height:2px;width:3vw;background:#d7bd86;z-index:3}
-#countries footer{position:absolute;bottom:4.5vh;left:5vw;right:5vw;display:flex;align-items:center;justify-content:space-between;font-size:1.1vw;color:#b5c6c1}
-.relay{display:none}
-#countryNext{color:#d7bd86}
-.countryNote{font-size:1vw;opacity:.7}
+#countries footer{position:absolute;bottom:4.5vh;left:5vw;right:5vw;display:flex;align-items:center;justify-content:flex-start;font-size:1.1vw;color:#b5c6c1}
+.countryNote{font-size:1.2vw;color:#d7bd86}
 .countryTrack{position:absolute;bottom:0;left:0;right:0;height:2px;background:#ffffff12}
 #countryProgress{height:100%;background:#c7ad79;width:0}
 #alertProgress{position:absolute;bottom:0;right:0;height:.4vh;background:#e3bd3c}
@@ -324,9 +319,9 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="alertTag">تجربة</div>
 <div id="msg"><div id="kicker"><i></i>طلب سفر جديد</div><div id="aName"></div><div id="aDest"></div></div><div id="alertProgress"></div></div>
 <section id="countries">
-<div class="motionTitle"><span></span> الوجهات الأكثر طلبًا اليوم</div><div class="screenWordmark">TRAVELIUN</div>
+<div class="motionTitle"><span></span> الوجهات الأكثر طلبًا اليوم</div>
 <div id="countryList"></div>
-<footer><div class="relay"><span>جولة الشاشات</span><span id="countryStep"></span></div><span id="countryNext"></span><span class="countryNote">طلبات اليوم · بتوقيت الرياض</span></footer>
+<footer><span id="bulletinDate" class="countryNote"></span></footer>
 <div class="countryTrack"><div id="countryProgress"></div></div></section>
 <div id="band"><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
 <script>window.__LANDMARKS__=${json(LANDMARK_IDS)};window.__S__=${json(s)};window.__N__=${n};window.__M__=${monitor ? "true" : "false"};</script>
