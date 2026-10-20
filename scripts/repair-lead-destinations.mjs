@@ -65,7 +65,10 @@ try {
     and (destination_source in ('client','labels') or (source='teletel' and created_by is null))
     order by created_at desc`);
   const limitArg = process.argv.find((arg) => /^--limit=\d+$/.test(arg));
-  const rows = limitArg ? eligible.slice(0, Number(limitArg.split("=")[1])) : eligible;
+  const retryArg = process.argv.find((arg) => arg.startsWith("--retry-report="));
+  const retryIds = retryArg ? new Set(JSON.parse(fs.readFileSync(retryArg.slice("--retry-report=".length), "utf8")).changes.filter((row) => !row.applied).map((row) => row.id)) : null;
+  const selected = retryIds ? eligible.filter((row) => retryIds.has(row.id)) : eligible;
+  const rows = limitArg ? selected.slice(0, Number(limitArg.split("=")[1])) : selected;
   console.log("Eligible conversations:", rows.length);
   for (let start = 0; start < rows.length; start += 4) {
     await Promise.all(rows.slice(start, start + 4).map(async (row) => {
@@ -82,9 +85,9 @@ try {
         save();
         if (apply) {
           const result = await db.query(`update client_leads set destination=$1, destination_source='client', updated_at=now()
-            where id=$2 and updated_at=$3 and destination_source is distinct from 'manual'
+            where id=$2 and destination_source is not distinct from $3 and destination_source is distinct from 'manual'
             and destination is not distinct from $4 returning id`,
-          [change.after, row.id, row.updated_at, row.destination]);
+          [change.after, row.id, row.destination_source, row.destination]);
           change.applied = result.rowCount === 1;
           if (change.applied) report.applied++; else report.conflicts++;
         }
