@@ -20,11 +20,16 @@ const KINDS: [string, RegExp][] = [
 const NOT_WANTED = /(?:بدون|بلا|من غير|غير شامل|ما يحتاج|ماابي|ما ابي|مو محتاج)\s*(?:ال)?(?:طيران|تذاكر|تذكرة|تذكره|فندق|فنادق|سكن|تأشيرة|تاشيرة|تأشيره|فيزا|مواصلات|سيارة)/gu;
 
 /** «بكج» … from the labels first (staff put them), else the client's words; no recognized service is unclassified */
-export function classifyInquiry(labels: string[], text: string): string {
+export function classifyInquiry(labels: string[], text: string, context: { destination?: string | null } = {}): string {
   for (const source of [labels.join(" "), text.replace(NOT_WANTED, " ")]) {
     const f = fold(source);
     for (const [label, re] of KINDS) if (re.test(f)) return label;
   }
+  // A verified destination is already a travel request, even when the client
+  // answers with just «فيتنام». Missing dates/party are booking details, not ambiguity.
+  if (context.destination?.trim()) return "بكج";
+  const travel = text.replace(NOT_WANTED, " ");
+  if (/(?:برنامج|رحلة|رحله|سفرة|سفره)\s*(?:سياحي|سياحية|سياحيه)|شهر\s*عسل|honeymoon|tour\s*package/iu.test(travel)) return "بكج";
   return text.trim() ? "طلب غير واضح" : "";
 }
 

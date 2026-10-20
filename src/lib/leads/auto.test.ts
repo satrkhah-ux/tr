@@ -95,3 +95,20 @@ it("uses the requested service even when a retired label is present", () => {
   expect(classifyInquiry(["يستفسر"], "أريد حجز فندق")).toBe("فنادق");
   expect(classifyInquiry(["استفسار"], "تأشيرة مصر")).toBe("تأشيرات");
 });
+
+describe("clear travel requests do not require a service keyword", () => {
+  it.each(["رحلة فيتنام", "فيتنام\nاسبوع\n7 نوفمبر\nشخصين", "ممكن تفاصيل العروض الحالية\nفيتنام", "الى متى هذا العرض إلى فيتنام"])("classifies %s as packages", text => {
+    expect(classifyInquiry([], text, { destination: "فيتنام" })).toBe("بكج");
+  });
+  it("keeps specific services ahead of destination-based package inference", () => {
+    expect(classifyInquiry([], "تأشيرة فيتنام", { destination: "فيتنام" })).toBe("تأشيرات");
+    expect(classifyInquiry([], "تذاكر فيتنام", { destination: "فيتنام" })).toBe("طيران");
+    expect(classifyInquiry([], "فندق فقط في فيتنام", { destination: "فيتنام" })).toBe("فنادق");
+    expect(classifyInquiry([], "جورجيا بدون طيران", { destination: "جورجيا" })).toBe("بكج");
+  });
+  it("does not turn an origin or greeting into a package", () => {
+    expect(classifyInquiry([], "السلام عليكم")).toBe("طلب غير واضح");
+    expect(classifyInquiry([], "انا من الكويت", { destination: null })).toBe("طلب غير واضح");
+    expect(classifyInquiry([], "برنامج سياحي لمدة اسبوع")).toBe("بكج");
+  });
+});

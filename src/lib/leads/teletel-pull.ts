@@ -221,10 +221,11 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
         const clientMessages = thread.messages.filter((m) => m.fromClient && !m.isPrivate && m.at >= visitAt).sort((a, b) => b.at - a.at);
         const said = clientMessages.map((m) => m.text).join("\n");
         const patch: Record<string, unknown> = {};
-        const kind = classifyInquiry([c.serviceType ?? "", ...c.labels], said) || "طلب غير واضح";
+        const inference = inferConversationDestination(thread.messages.filter((m) => m.at >= visitAt), places);
+        const verifiedDestination = inference.destination ?? (byConversation.get(c.id)?.destination_source === "manual" ? destination : null);
+        const kind = classifyInquiry([c.serviceType ?? "", ...c.labels], said, { destination: verifiedDestination }) || "طلب غير واضح";
         const origin = byConversation.get(c.id)?.inquiry_source;
         if ((origin !== "manual" || inquiry === "طلب غير واضح") && (!inquiry || inquiry === "طلب غير واضح") && kind && kind !== inquiry) { patch.inquiry = kind; patch.inquiry_source = "auto"; }
-        const inference = inferConversationDestination(thread.messages.filter((m) => m.at >= visitAt), places);
         const place = inference.destination;
         if (mutableDestination && (place !== destination || byConversation.get(c.id)?.destination_source !== "client")) {
           patch.destination = place;

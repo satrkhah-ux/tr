@@ -144,3 +144,14 @@ describe("the visit, from Teletel's own closing line (40029, 2026-10-19)", () =>
     expect(lastClosedAt([], 300)).toBe(0);
   });
 });
+
+describe("destination-only travel requests", () => {
+  const catalog = [...places, { name: "فيتنام", country: "فيتنام" }, { name: "الكويت", country: "الكويت" }];
+  it.each(["فيتنام", "رحلة فيتنام", "فيتنام\nاسبوع\n7 نوفمبر\nشخصين"])("routes %s to packages", text => {
+    expect(readRequest(text, catalog).kind).toBe("بكج");
+  });
+  it("does not mistake the departure country for a package request", () => {
+    expect(readRequest("انا من الكويت", catalog).kind).toBeNull();
+    expect(readRequest("تذاكر إلى فيتنام", catalog).kind).toBe("طيران");
+  });
+});
