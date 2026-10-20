@@ -559,7 +559,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
           await addTeletelNote(
             m.conversationId,
             answer
-              ? `🤖 طلب تأشيرة: ${summary}${open.length ? ` — يسأل عن: ${open.join("، ")} (ليست في قائمة التأشيرات)` : ""}${per ? ` — ${per.toLocaleString("en-US")} ريال للشخص${known.applicants && known.applicants > 1 ? ` × ${known.applicants} = ${(per * known.applicants).toLocaleString("en-US")} ريال` : ""}` : ""}. أُرسل للعميل السعر والمتطلبات من قائمة التأشيرات${need2 !== "required" ? " (جنسية غير سعودية بين المتقدمين — تحقق من متطلباتها وسعرها)" : ""}، وينتظر المستندات.`
+              ? `🤖 طلب تأشيرة: ${summary}${open.length ? ` — يسأل عن: ${open.join("، ")} (ليست في قائمة التأشيرات)` : ""}${per ? ` — ${per.toLocaleString("en-US")} ريال للشخص${known.applicants && known.applicants > 1 ? ` × ${known.applicants} = ${(per * known.applicants).toLocaleString("en-US")} ريال` : ""}` : ""}. أُرسل للعميل ${settings.control.includePrice ? "السعر والمتطلبات" : "المتطلبات بدون السعر"} من قائمة التأشيرات${need2 !== "required" ? " (جنسية غير سعودية بين المتقدمين — تحقق من متطلباتها وسعرها)" : ""}، وينتظر المستندات.`
               : `🤖 طلب تأشيرة — يحتاج زميلاً (${reason}): ${summary}.`,
           );
           await finish({

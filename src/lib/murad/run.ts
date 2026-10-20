@@ -1,10 +1,12 @@
 import { parseControl, inMuradScope, type MuradControl } from "./control";
+import { readRequest } from "./reception";
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getFeatureFlags } from "@/lib/features-server";
 import {
   addTeletelLabels,
+  assignMuradHandoff,
   addTeletelNote,
   getTeletelConfig,
   inferDestinations,
@@ -370,12 +372,21 @@ async function answer(
     }
     // the model took seconds: never answer over a colleague who just did, nor past a client who just wrote more
     const again = await readThread(c.id);
-    const still = Boolean(again?.canReply) && clientTurn(again?.messages ?? [], Math.floor(Date.now() / 1000), muradIds)?.messageId === messageId;
+    const still = Boolean(again?.canReply) && inMuradScope(control, again?.inboxId ?? null, again?.teamId ?? null) && clientTurn(again?.messages ?? [], Math.floor(Date.now() / 1000), muradIds)?.messageId === messageId;
     out.replyId = still ? await sendTeletelMessage(c.id, r.reply) : null;
     if (out.replyId === null) return { ...out, mode: "skipped", fault: still ? "send_failed" : again ? "turn_changed" : "recheck_failed" };
     muradIds.add(out.replyId);
     await addTeletelNote(c.id, autoNote(r, noteFor(c)));
     await addTeletelLabels(c.id, [MURAD_LABEL]);
+    if (r.needsStaff) {
+      const lastClient = [...thread.messages].reverse().find((m) => m.fromClient && !m.isPrivate)?.text ?? "";
+      const route = readRequest(lastClient, []).kind ?? "موظف";
+      const handoff = control.handoffs[route];
+      if (handoff && (handoff.teamId || handoff.agentId)) {
+        const assigned = await assignMuradHandoff(c.id, handoff.teamId, handoff.agentId);
+        await addTeletelNote(c.id, assigned ? "تم تحويل الطلب حسب إعدادات مُراد." : "تعذّر التحويل حسب إعدادات مُراد — يرجى إسناد الطلب يدويًا.");
+      }
+    }
     return out;
   } catch (error) {
     return { mode: "skipped", fault: (error instanceof Error ? error.message : String(error)).slice(0, 300), replyId: null, reply: null, needsStaff: null, reason: null, intake: null };
