@@ -1,11 +1,12 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { conversationEvents, conversationThread, listOpenConversations, listTeletelTeams, type OpenConversation } from "@/lib/providers/teletel";
-import { classifyInquiry, delayText, findPlace, timelineFrom, type Place } from "./auto";
+import { classifyInquiry, delayText, timelineFrom, type Place } from "./auto";
 import { fold, matchEmployee, normalizePhone } from "./sheet";
 import { logAudit } from "@/lib/data/audit";
 import { muradMessageIds } from "@/lib/murad/core";
 import { allRows } from "@/lib/data/all-rows";
+import { inferConversationDestination } from "./destination";
 
 /**
  * «العملاء» phase two (the owner, 2026-10-17: «كل شيء تلقائي، خاصة اسم العميل»):
@@ -147,11 +148,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       const picked = classifyInquiry([c.serviceType ?? ""], "");
       if (picked && (!had.inquiry || had.inquiry === "يستفسر")) patch.inquiry = picked;
       else if (!had.inquiry) patch.inquiry = classifyInquiry(c.labels, c.preview) || null;
-      // A preview can be our own reply, so it must never determine a destination.
-      if (!had.destination && had.destination_source !== "manual") {
-        patch.destination = findPlace(c.labels, "", places) || null;
-        if (patch.destination) patch.destination_source = "labels";
-      }
+      // Neither staff previews nor stale labels establish a travel destination.
       // until its turns are read, the one holding it stands in as the receiver
       if (!had.received_by && holder && had.timeline_seen_at == null) patch.received_by = holder;
       if (Number(had.timeline_seen_at) !== c.lastActivityAt) timelines.push(c);
@@ -178,8 +175,8 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
         phone,
         name: clientName(c),
         inquiry: classifyInquiry([c.serviceType ?? "", ...c.labels], c.preview) || null,
-        destination: findPlace(c.labels, "", places) || null,
-        destination_source: "labels",
+        destination: null,
+        destination_source: "client",
         received_by: holder,
         received_by_name: c.assignee,
         source: "teletel",
@@ -211,23 +208,28 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
   for (let i = 0; i < toRead.length; i += 5) {
     await Promise.all(
       toRead.slice(i, i + 5).map(async ({ c, inquiry, destination, mutableDestination, visitAt }) => {
-        const thread = await conversationThread(c.id);
-        if (!thread) return;
+        const thread = await conversationThread(c.id, 50, visitAt);
+        if (!thread?.historyComplete) return;
         threadRead.set(c.id, c.lastActivityAt);
         const clientMessages = thread.messages.filter((m) => m.fromClient && !m.isPrivate && m.at >= visitAt).sort((a, b) => b.at - a.at);
         const said = clientMessages.map((m) => m.text).join("\n");
         const patch: Record<string, unknown> = {};
         const kind = classifyInquiry([c.serviceType ?? "", ...c.labels], said);
         if ((!inquiry || inquiry === "يستفسر") && kind && kind !== inquiry) patch.inquiry = kind;
-        const place = mutableDestination ? clientMessages.map((m) => findPlace([], m.text, places)).find(Boolean) : "";
-        if (place && (place !== destination || byConversation.get(c.id)?.destination_source !== "client")) { patch.destination = place; patch.destination_source = "client"; }
+        const inference = inferConversationDestination(thread.messages.filter((m) => m.at >= visitAt), places);
+        const place = inference.destination;
+        if (mutableDestination && (place !== destination || byConversation.get(c.id)?.destination_source !== "client")) {
+          patch.destination = place;
+          patch.destination_source = "client";
+        }
         if (!Object.keys(patch).length) return;
         let update = supabase.from("client_leads").update({ ...patch, updated_at: new Date().toISOString() }).eq("teletel_conversation_id", c.id);
         if (patch.destination_source) {
           update = update.or("destination_source.is.null,destination_source.in.(client,labels)");
           update = destination ? update.eq("destination", destination) : update.is("destination", null);
         }
-        await update;
+        const { error } = await update;
+        if (error) { threadRead.delete(c.id); return; }
         result.classified += 1;
       }),
     );

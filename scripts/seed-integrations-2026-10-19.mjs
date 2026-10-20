@@ -37,7 +37,7 @@ const ROWS = [
   R("Open-Meteo (الطقس)", "api", { used_by: "الطقس في البرنامج اليومي", secret_ref: "بلا مفتاح", check_key: "weather" }),
   R("أسعار العملات (exchange-api / open.er-api)", "api", { used_by: "التسعير — والدولار بسعر الشركة من «سياسة الربح»", secret_ref: "بلا مفتاح", check_key: "rates" }),
   R("Teletel (Chatwoot)", "api", {
-    used_by: "العملاء، مُراد، المستقبل الآلي، رسائل واتساب، SLA؛ إعدادات مُراد: صناديق الرد والأقسام وتحويل الطلب إلى موظف",
+    used_by: "العملاء، مُراد، المستقبل الآلي، رسائل واتساب، SLA؛ إعدادات مُراد: صناديق الرد والأقسام وتحويل الطلب إلى موظف؛ مراجعة وتصحيح الوجهات: scripts/repair-lead-destinations.mjs",
     secret_ref: "TELETEL_BASE_URL، TELETEL_API_TOKEN، TELETEL_ACCOUNT_ID",
     account: "توكن «احمد الرفاعي»",
     check_key: "teletel",
