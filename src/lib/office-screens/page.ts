@@ -93,16 +93,23 @@ const RUNTIME = String.raw`
     box.className = "on";
   }
 
-  // A legible full-screen bulletin, synchronized by server time every ten minutes.
+  // One screen at a time, in numeric order, on the shared server clock.
   var spotlightKey = "";
   function drawTicker(t) {
-    var countries = S.countries || [], elapsed = ((t % 600000) + 600000) % 600000;
-    var active = countries.length > 0 && elapsed < 36000;
+    var countries = S.countries || [], elapsed = countryBulletinElapsed(t, N, S.screens);
+    var active = countries.length > 0 && elapsed >= 0;
+    var panel = $("countries");
+    panel.className = active ? (elapsed >= 34800 ? "on departing" : "on") : "";
+    if (active) {
+      var remaining = Math.ceil((36000 - elapsed) / 1000);
+      $("countryNext").textContent = N < S.screens
+        ? "تابعوا العرض على الشاشة " + (N + 1) + " بعد " + remaining + " ثانية ←"
+        : "اكتملت الجولة · يعود العرض إلى الشاشة 1 في الموعد التالي";
+    }
     var key = active ? Math.floor(t / 600000) + "|" + countries.join("|") : "";
     if (key === spotlightKey) return;
     spotlightKey = key;
-    var panel = $("countries");
-    if (!active) { panel.className = ""; return; }
+    if (!active) return;
     var html = "";
     for (var i = 0; i < countries.length; i++) {
       var card = document.createElement("div");
@@ -112,7 +119,7 @@ const RUNTIME = String.raw`
       card.appendChild(rank); card.appendChild(name); html += card.outerHTML;
     }
     $("countryList").innerHTML = html;
-    panel.className = "on";
+    $("countryStep").textContent = "الشاشة " + N + " من " + S.screens + " · عرض متتابع كل 10 دقائق";
   }
 
   function frame() {
@@ -230,7 +237,10 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #tick{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;direction:rtl;color:#fff;font-weight:800;line-height:1.24;will-change:transform}
 #band{display:none}
 #countries{position:absolute;inset:0;z-index:2;display:none;background:radial-gradient(ellipse at top right,#245c50,#071e1a 70%);color:#fff;padding:5vh 6vw;box-sizing:border-box;text-align:right}
-#countries.on{display:block;animation:rise .7s ease-out both}
+#countries.on{display:block;animation:bulletinEnter 1.2s ease-out both}
+#countries.on.departing{animation:bulletinExit 1.2s ease-in both}
+@keyframes bulletinEnter{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes bulletinExit{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
 #countries h1{font-size:4.3vw;margin:1vh 0 0;font-weight:800}
 #countries p{font-size:1.8vw;color:#c7dbd3;margin:1vh 0 4vh}
 #countries .eyebrow{font-size:1.6vw;color:#e4c567;letter-spacing:.08em}
@@ -240,9 +250,9 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 .country span{font-size:2.9vw;font-weight:800}
 .country.c0{background:#e4c567;color:#102f27;border-color:#e4c567}.country.c0 b{color:#102f27}
 .country.c1{animation-delay:.1s}.country.c2{animation-delay:.2s}.country.c3{animation-delay:.3s}.country.c4{animation-delay:.4s}.country.c5{animation-delay:.5s}.country.c6{animation-delay:.6s}.country.c7{animation-delay:.7s}
-#countries footer{position:absolute;bottom:4vh;font-size:1.4vw;color:#c7dbd3}
+#countries footer{position:absolute;bottom:4vh;left:6vw;right:6vw;display:flex;justify-content:space-between;gap:2vw;font-size:1.6vw;color:#e4c567}
 #alert{z-index:4}
-@media(prefers-reduced-motion:reduce){#countries.on,.country{animation:none}}
+@media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,.country{animation:none}}
 
 `;
 
@@ -264,7 +274,7 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="flight"><div id="trail"></div><svg id="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
 <div id="alertTag">تجربة</div>
 <div id="msg"><div id="kicker"><i></i>✨ مسافر جديد مع ترافليون</div><div id="aName"></div><div id="aDest"></div></div></div>
-<section id="countries"><div class="eyebrow">ترافليون · نبض السفر</div><h1>الدول الأكثر طلبًا اليوم</h1><p>الوجهات مرتّبة حسب طلبات العملاء اليوم · بتوقيت الرياض</p><div id="countryList"></div><footer>الوجهة القادمة تبدأ بسؤال · يتجدد العرض كل 10 دقائق</footer></section>
+<section id="countries"><div class="eyebrow">ترافليون · نبض السفر</div><h1>الدول الأكثر طلبًا اليوم</h1><p>الوجهات مرتّبة حسب طلبات العملاء اليوم · بتوقيت الرياض</p><div id="countryList"></div><footer><span id="countryStep"></span><span id="countryNext"></span></footer></section>
 <div id="band"><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
 <script>window.__S__=${json(s)};window.__N__=${n};window.__M__=${monitor ? "true" : "false"};</script>
 <script>${SCREEN_CORE}${RUNTIME}</script>

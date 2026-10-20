@@ -20,6 +20,11 @@
  */
 export const SCREEN_CORE = String.raw`
 function mod(a, n) { return ((a % n) + n) % n; }
+function countryBulletinElapsed(now, screen, screens) {
+  if (screen < 1 || screen > screens) return -1;
+  var elapsed = mod(now, 600000) - (screen - 1) * 36000;
+  return elapsed >= 0 && elapsed < 36000 ? elapsed : -1;
+}
 function adIndexAt(now, slotMs, position, count) {
   if (!(count > 0) || !(slotMs > 0)) return -1;
   return mod(Math.floor(now / slotMs) - position, count);
@@ -46,6 +51,7 @@ function alertAt(events, now, lead, show) {
 `;
 
 export type ScreenCore = {
+  countryBulletinElapsed(now: number, screen: number, screens: number): number;
   adIndexAt(now: number, slotMs: number, position: number, count: number): number;
   tickerPassMs(speed: number, textRef: number, screens: number, refWidth: number): number;
   tickerElapsed(now: number, periodMs: number, passMs: number, bumpAt: number): number;
@@ -54,7 +60,7 @@ export type ScreenCore = {
 };
 
 // the same source the page runs, for the server's first paint and the tests
-export const core = new Function(`${SCREEN_CORE}; return { adIndexAt: adIndexAt, tickerPassMs: tickerPassMs, tickerElapsed: tickerElapsed, tickerLeft: tickerLeft, alertAt: alertAt };`)() as ScreenCore;
+export const core = new Function(`${SCREEN_CORE}; return { countryBulletinElapsed: countryBulletinElapsed, adIndexAt: adIndexAt, tickerPassMs: tickerPassMs, tickerElapsed: tickerElapsed, tickerLeft: tickerLeft, alertAt: alertAt };`)() as ScreenCore;
 
 /** the reference screen the ticker's speed and width are counted in */
 export const REF_WIDTH = 1920;
