@@ -126,7 +126,7 @@ const RUNTIME = String.raw`
   }
 
   // A single transparent motion layer travels through the numbered screens.
-  var spotlightKey = "", countryPhase = "";
+  var spotlightKey = "";
   function scenery(country) {
     var key = country.replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/[ً-ْ]/g, "").trim();
     return window.__LANDMARKS__[key] ? "/screen-landmarks/" + window.__LANDMARKS__[key] + ".webp" : "/screen-landmarks/journey.svg";
@@ -137,10 +137,9 @@ const RUNTIME = String.raw`
     var active = countries.length > 0 && elapsed >= 0;
     var panel = $("countries");
     panel.className = active ? (elapsed >= 34800 ? "on departing" : "on") : "";
-    if (!active) { spotlightKey = ""; countryPhase = ""; return; }
+    if (!active) { spotlightKey = ""; return; }
     var slot = 36000 / countries.length, index = Math.min(countries.length - 1, Math.floor(elapsed / slot));
     var remaining = Math.ceil((36000 - elapsed) / 1000);
-    $("countryRank").textContent = "الترتيب " + (index + 1);
     $("countryProgress").style.width = (100 * elapsed / 36000) + "%";
     $("countryNext").textContent = N < S.screens
       ? (remaining <= 6 ? "إلى الشاشة " + (N + 1) + " خلال " + remaining : "التالي · الشاشة " + (N + 1)) + " ←"
@@ -153,26 +152,13 @@ const RUNTIME = String.raw`
         var card = document.createElement("div"); card.className = "country";
         var rank = document.createElement("b"); rank.textContent = (i + 1 < 10 ? "0" : "") + (i + 1);
         var name = document.createElement("span"); name.textContent = countries[i];
-        card.appendChild(rank); card.appendChild(name); html += card.outerHTML;
+        var photo = document.createElement("img"); photo.src = scenery(countries[i]); photo.alt = ""; photo.onerror = function () { this.style.visibility = "hidden"; };
+        card.appendChild(photo); card.appendChild(rank); card.appendChild(name); html += card.outerHTML;
       }
       $("countryList").innerHTML = html;
       var steps = "";
       for (var step = 1; step <= S.screens; step++) steps += '<b class="' + (step === N ? "current" : (step < N ? "passed" : "")) + '">' + step + '</b>';
       $("countryStep").innerHTML = steps;
-    }
-    var nextPhase = key + "|" + index;
-    if (countryPhase !== nextPhase) {
-      countryPhase = nextPhase;
-      $("countryHero").textContent = countries[index];
-      var photo = $("countryPhoto");
-      photo.onerror = function () { photo.style.visibility = "hidden"; };
-      photo.onload = function () { photo.style.visibility = "visible"; };
-      photo.style.visibility = "hidden"; photo.src = scenery(countries[index]);
-      if (photo.complete && photo.naturalWidth) photo.style.visibility = "visible";
-      $("countryLabel").textContent = index === 0 ? "الوجهة الأكثر طلبًا" : "ضمن أكثر الوجهات طلبًا";
-      var items = $("countryList").children;
-      for (var j = 0; j < items.length; j++) items[j].className = j === index ? "country selected" : "country";
-      var spot = $("spotlight"); spot.className = ""; void spot.offsetWidth; spot.className = "active";
     }
   }
 
@@ -290,43 +276,32 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #band.up{-webkit-transform:translateY(0);transform:translateY(0)}
 #tick{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;direction:rtl;color:#fff;font-weight:800;line-height:1.24;will-change:transform}
 #band{display:none}
-#countries{position:absolute;inset:0;z-index:2;display:none;color:#fff;overflow:hidden;text-align:right;background:transparent}
+#countries{position:absolute;inset:0;z-index:2;display:none;color:#fff;overflow:hidden;text-align:right;background:linear-gradient(135deg,#123a3c,#071f25)}
 #countries.on{display:block;animation:bulletinEnter 1.2s cubic-bezier(.16,1,.3,1) both}
 #countries.on.departing{animation:bulletinExit 1.2s cubic-bezier(.6,0,.8,.4) both}
 @keyframes bulletinEnter{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes bulletinExit{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
-#spotlight{position:absolute;inset:0;background:#092c30;overflow:hidden}
-.destinationVisual{position:absolute;inset:0;background:#185766 url(/screen-landmarks/journey.svg) center/cover}
-.destinationVisual:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,28,31,.02) 20%,rgba(5,28,31,.18) 40%,rgba(5,28,31,.88) 76%,#092c30 100%),linear-gradient(0deg,#082a2e 0%,rgba(8,42,46,.8) 13%,transparent 48%,rgba(8,42,46,.25) 100%)}
-#countryPhoto{width:100%;height:100%;object-fit:cover;object-position:35% center}
-#spotlight.active #countryPhoto{animation:landmarkReveal 6s linear both}
-@keyframes landmarkReveal{from{transform:scale(1.045);opacity:.45}15%{opacity:1}to{transform:scale(1);opacity:1}}
-.motionTitle{position:absolute;right:7vw;top:7vh;z-index:2;display:flex;align-items:center;gap:1vw;font-size:1.35vw;font-weight:700;color:#e0e6e1}
-.motionTitle>span{height:1px;width:2.5vw;background:#d7bd86}
-.motionTitle small{font-size:1.05vw;color:#c6af7b;border-right:1px solid #c6af7b66;padding-right:1vw}
-.screenWordmark{position:absolute;left:5vw;top:7vh;z-index:2;font-size:1.1vw;letter-spacing:.35em;font-weight:800;color:#fff;text-shadow:0 1px 8px #153432}
-.heroCopy{position:absolute;z-index:1;right:7vw;top:31vh;width:48vw;min-height:40vh;display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
-.rankShell{font-size:1.05vw;font-weight:700;letter-spacing:.04em;color:#d7bd86;margin-bottom:2.8vh}
-#countryLabel{font-size:1.4vw;color:#c3d0ca;margin-bottom:1.5vh;font-weight:700}
-#countryHero{font-size:8.3vw;font-weight:800;line-height:1.08;letter-spacing:-.035em;max-width:100%;overflow-wrap:break-word;text-shadow:0 .15vw 2vw #082a2e55}
-#spotlight.active .heroCopy{animation:destinationIn 1.1s cubic-bezier(.16,1,.3,1) both}
-@keyframes destinationIn{from{opacity:0;transform:translateY(3vh)}to{opacity:1;transform:translateY(0)}}
-#countryList{position:absolute;right:7vw;left:5vw;bottom:10vh;display:flex;gap:1.6vw;z-index:2;border-top:1px solid #ffffff26;padding-top:2vh}
-.country{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;gap:.8vh;color:#a8bbb7;transition:color .7s;}
-.country b{font-size:.85vw;color:#b8a783;font-weight:700;direction:ltr;text-align:right}
-.country span{font-size:1.15vw;font-weight:700;line-height:1.2;overflow-wrap:anywhere}
-.country.selected{color:#fff}
-.country.selected:before{content:"";position:absolute;top:calc(-2vh - 1px);right:0;width:100%;height:2px;background:#d7bd86;animation:selectionLine .8s ease-out both;transform-origin:right}
-@keyframes selectionLine{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-#countries footer{position:absolute;bottom:3.6vh;left:5vw;right:7vw;display:flex;align-items:center;justify-content:space-between;font-size:1vw;color:#b5c6c1;z-index:2}
+.motionTitle{position:absolute;right:5vw;top:6vh;display:flex;align-items:center;gap:1.2vw;font-size:2.5vw;font-weight:800}
+.motionTitle>span{width:3vw;height:2px;background:#d7bd86}
+.motionTitle small{font-size:1.1vw;color:#c6af7b;border-right:1px solid #c6af7b66;padding-right:1.2vw}
+.screenWordmark{position:absolute;left:5vw;top:8vh;font-size:1.1vw;letter-spacing:.35em;font-weight:800;color:#dce6e1}
+#countryList{position:absolute;right:5vw;left:5vw;top:19vh;bottom:12vh;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:1.1vw}
+.country{position:relative;min-width:0;min-height:0;overflow:hidden;background:#185766 url(/screen-landmarks/journey.svg) center/cover;isolation:isolate}
+.country:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(3,23,28,.96),rgba(3,23,28,.18) 55%,rgba(3,23,28,.1));z-index:1}
+.country img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:sceneryDrift 36s linear both}
+@keyframes sceneryDrift{from{transform:scale(1.07)}to{transform:scale(1)}}
+.country b{position:absolute;right:1.4vw;top:1.5vh;z-index:2;font-size:1vw;font-weight:700;color:#fff;text-shadow:0 1px 6px #00171b}
+.country span{position:absolute;right:1.4vw;left:1.4vw;bottom:2vh;z-index:2;font-size:2.1vw;font-weight:800;line-height:1.15;text-shadow:0 2px 12px #00171b;overflow-wrap:break-word}
+.country:first-child:before{content:"";position:absolute;right:1.4vw;bottom:1.1vh;height:2px;width:3vw;background:#d7bd86;z-index:3}
+#countries footer{position:absolute;bottom:4.5vh;left:5vw;right:5vw;display:flex;align-items:center;justify-content:space-between;font-size:1.1vw;color:#b5c6c1}
 .relay{display:none}
-#countryNext{color:#d7bd86;font-size:1vw}
-.countryNote{font-size:.9vw;opacity:.7}
-.countryTrack{position:absolute;bottom:0;left:0;right:0;height:2px;background:#ffffff12;z-index:2}
+#countryNext{color:#d7bd86}
+.countryNote{font-size:1vw;opacity:.7}
+.countryTrack{position:absolute;bottom:0;left:0;right:0;height:2px;background:#ffffff12}
 #countryProgress{height:100%;background:#c7ad79;width:0}
 #alertProgress{position:absolute;bottom:0;right:0;height:.4vh;background:#e3bd3c}
 #alert{z-index:4}
-@media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,.country,#spotlight.active .heroCopy,#spotlight.active .rankShell,.motionRoute:after,#alert.on #alertImg,#spotlight.active #countryPhoto{animation:none}}
+@media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,.country img,#alert.on #alertImg{animation:none}}
 
 `;
 
@@ -349,8 +324,7 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="alertTag">تجربة</div>
 <div id="msg"><div id="kicker"><i></i>طلب سفر جديد</div><div id="aName"></div><div id="aDest"></div></div><div id="alertProgress"></div></div>
 <section id="countries">
-<div class="motionTitle"><span></span> الوجهات الأكثر طلبًا <small>اليوم</small></div><div class="screenWordmark">TRAVELIUN</div>
-<div id="spotlight"><div class="heroCopy"><div class="rankShell" id="countryRank">01</div><div id="countryLabel"></div><div id="countryHero"></div></div><div class="destinationVisual"><img id="countryPhoto" alt=""></div></div>
+<div class="motionTitle"><span></span> الوجهات الأكثر طلبًا اليوم</div><div class="screenWordmark">TRAVELIUN</div>
 <div id="countryList"></div>
 <footer><div class="relay"><span>جولة الشاشات</span><span id="countryStep"></span></div><span id="countryNext"></span><span class="countryNote">طلبات اليوم · بتوقيت الرياض</span></footer>
 <div class="countryTrack"><div id="countryProgress"></div></div></section>

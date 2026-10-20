@@ -97,7 +97,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
               ثوانٍ لكل إعلان
               <input type="number" min={4} max={120} value={cfg.slotSec} onChange={(e) => setCfg({ ...cfg, slotSec: Number(e.target.value) })} className={FIELD} />
             </label>
-            <p className="rounded-lg bg-[#f0f7f4] p-3 text-sm sm:col-span-2">الدول الأكثر طلبًا اليوم: جولة متتابعة كل 10 دقائق، تبدأ بالشاشة 1 ثم 2 ثم 3 ثم 4. مدة كل شاشة 36 ثانية، بأسماء وجهات متحركة وترتيب واضح دون إظهار أعداد الطلبات، مع تظليل خلف النص لمنع اختلاطه بالإعلان، ثم ينتقل العرض كاملًا إلى الشاشة التالية. تستمر الإعلانات على الشاشات الأخرى.</p>
+            <p className="rounded-lg bg-[#f0f7f4] p-3 text-sm sm:col-span-2">الدول الأكثر طلبًا اليوم: جولة متتابعة كل 10 دقائق، تبدأ بالشاشة 1 ثم 2 ثم 3 ثم 4. مدة كل شاشة 36 ثانية، بعرض يجمع الوجهات كلها مع صور معالمها وترتيبها في مشهد واحد دون إظهار أعداد الطلبات، ثم ينتقل العرض كاملًا إلى الشاشة التالية. تستمر الإعلانات على الشاشات الأخرى.</p>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-4 text-[12.5px] font-bold text-[#185045]">
             <span>ينبّه «عميل جديد» عند طلب:</span>

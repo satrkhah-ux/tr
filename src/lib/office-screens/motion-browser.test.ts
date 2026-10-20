@@ -50,10 +50,9 @@ it.skipIf(!existsSync("C:/Program Files/Google/Chrome/Application/chrome.exe"))(
     await writeFile("output/screen-review/motion-screen-2.html", screenPage(2, { ...state, position: 1 }, true));
     await page.screenshot({ path: "output/screen-review/motion-countries-1920.png" });
     await setTime(now + 6100);
-    expect(await page.$eval("#countryHero", (e) => e.textContent)).toBe("مصر");
-    expect(await page.$eval("#countryRank", (e) => e.textContent)).toBe("الترتيب 2");
-    await page.waitForFunction(() => { const img = document.getElementById("countryPhoto") as HTMLImageElement; return img.complete && img.naturalWidth > 0 && img.src.endsWith("/egypt.webp"); });
-    expect(await page.$$("#countryList .country")).toHaveLength(8);
+    expect(await page.$$eval("#countryList .country span", (items) => items.map((item) => item.textContent))).toEqual(countries);
+    expect(await page.$$("#countryList .country img")).toHaveLength(8);
+    await page.waitForFunction(() => Array.from(document.querySelectorAll<HTMLImageElement>("#countryList img")).every((img) => img.complete && img.naturalWidth > 0));
     expect(await page.$("#countLabel")).toBeNull();
     await page.setViewport({ width: 1280, height: 720 });
     await new Promise((r) => setTimeout(r, 1500));
