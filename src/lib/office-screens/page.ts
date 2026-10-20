@@ -27,6 +27,14 @@ const RUNTIME = String.raw`
   function $(id) { return document.getElementById(id); }
   var layers = [$("a0"), $("a1")], front = 0, shown = layers[0].getAttribute("src") || "", pending = "", failed = "", failedAt = 0, preloaded = "";
   var box = $("alert"), boxImg = $("alertImg"), shownAlert = "";
+  var activeAlert = null, alertElapsed = 0, alertTick = Date.now(), seen = {};
+  var storageKey = "traveliun-screen-completed-v1-" + N + (MONITOR ? "-preview" : "");
+  try { seen = JSON.parse(localStorage.getItem(storageKey) || "{}") || {}; } catch (err) {}
+  function completed(e, t) {
+    seen[e.id] = t;
+    for (var id in seen) if (seen[id] < t - 86400000) delete seen[id];
+    try { localStorage.setItem(storageKey, JSON.stringify(seen)); } catch (err) {}
+  }
   var text = $("tick"), tag = $("alertTag"), scale = 1;
   // the demo (while the TVs are set up): this load, on this screen only, one pass and then a «تجربة» alert
   var demo = S.demo, demoAt = Date.now();
@@ -75,10 +83,22 @@ const RUNTIME = String.raw`
   }
 
   function drawAlert(t) {
-    var i = alertAt(S.events, t, LEAD, SHOW), e = i < 0 ? null : S.events[i];
+    var tick = Date.now(), delta = Math.max(0, Math.min(1000, tick - alertTick));
+    alertTick = tick;
+    if (document.hidden) return;
+    if (activeAlert) {
+      alertElapsed += delta;
+      if (alertElapsed >= SHOW) { completed(activeAlert, t); activeAlert = null; }
+    }
+    if (!activeAlert) {
+      var i = nextScreenAlert(S.events, t, seen, LEAD);
+      if (i >= 0) { activeAlert = S.events[i]; alertElapsed = 0; }
+    }
+    var e = activeAlert;
     var d = demo ? Date.now() - demoAt - passMs() - LEAD : -1;
     if (!e && d >= 0 && d < SHOW) e = { at: -1, country: demo.country, line: demo.line, name: demo.name, test: true, src: demo.src };
-    var key = e ? e.at + "|" + e.line + "|" + (e.name || "") : "";
+    $("alertProgress").style.width = (100 * (1 - (activeAlert ? alertElapsed : Math.max(0, d)) / SHOW)) + "%";
+    var key = e ? (e.id || "demo") + "|" + e.line : "";
     if (key === shownAlert) return;
     shownAlert = key;
     if (!e) { box.className = ""; return; }
@@ -102,16 +122,18 @@ const RUNTIME = String.raw`
     panel.className = active ? (elapsed >= 34800 ? "on departing" : "on") : "";
     if (active) {
       var remaining = Math.ceil((36000 - elapsed) / 1000);
+      $("countryProgress").style.width = (100 * elapsed / 36000) + "%";
       $("countryNext").textContent = N < S.screens
-        ? "تابعوا العرض على الشاشة " + (N + 1) + " بعد " + remaining + " ثانية ←"
-        : "اكتملت الجولة · يعود العرض إلى الشاشة 1 في الموعد التالي";
+        ? (remaining <= 6 ? "ينتقل إلى الشاشة " + (N + 1) + " خلال " + remaining : "التالي · الشاشة " + (N + 1)) + " ←"
+        : "جولة جديدة كل 10 دقائق";
     }
     var key = active ? Math.floor(t / 600000) + "|" + countries.join("|") : "";
     if (key === spotlightKey) return;
     spotlightKey = key;
     if (!active) return;
     var html = "";
-    for (var i = 0; i < countries.length; i++) {
+    $("countryHero").textContent = countries[0];
+    for (var i = 1; i < countries.length; i++) {
       var card = document.createElement("div");
       card.className = "country c" + i;
       var rank = document.createElement("b"); rank.textContent = (i + 1 < 10 ? "0" : "") + (i + 1);
@@ -119,7 +141,9 @@ const RUNTIME = String.raw`
       card.appendChild(rank); card.appendChild(name); html += card.outerHTML;
     }
     $("countryList").innerHTML = html;
-    $("countryStep").textContent = "الشاشة " + N + " من " + S.screens + " · عرض متتابع كل 10 دقائق";
+    var steps = "";
+    for (var step = 1; step <= S.screens; step++) steps += '<b class="' + (step === N ? "current" : (step < N ? "passed" : "")) + '">' + step + '</b>';
+    $("countryStep").innerHTML = steps;
   }
 
   function frame() {
@@ -162,7 +186,7 @@ const RUNTIME = String.raw`
   function wake() {
     try { if (navigator.wakeLock && !MONITOR) navigator.wakeLock.request("screen").catch(function () {}); } catch (e) {}
   }
-  document.addEventListener("visibilitychange", function () { if (!document.hidden) wake(); });
+  document.addEventListener("visibilitychange", function () { alertTick = Date.now(); if (!document.hidden) { wake(); poll(); } });
 
   // full screen always, no button (the owner): a page may only ask after a press, so the first
   // press of any remote key or a click asks, silently
@@ -215,7 +239,7 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #alert.on #kicker i:after{-webkit-animation:ping 1.2s 1.1s infinite;animation:ping 1.2s 1.1s infinite}
 #aName{font-size:4.6vw;font-weight:800;color:#fff;line-height:1.2;margin-top:.8vw;opacity:0}
 #alert.on #aName{-webkit-animation:rise .6s 1s both;animation:rise .6s 1s both}
-#aDest{font-size:8.4vw;font-weight:800;color:#fff;line-height:1.15;text-shadow:0 .4vw 2.4vw rgba(0,0,0,.6),0 0 3.5vw rgba(227,189,60,.5);opacity:0}
+#aDest{font-size:6.5vw;font-weight:800;color:#fff;line-height:1.15;text-shadow:0 .4vw 2.4vw rgba(0,0,0,.6),0 0 3.5vw rgba(227,189,60,.5);opacity:0}
 #alert.on #aDest{-webkit-animation:pop .9s 1.3s cubic-bezier(.2,1.5,.4,1) both;animation:pop .9s 1.3s cubic-bezier(.2,1.5,.4,1) both}
 @-webkit-keyframes kb{from{-webkit-transform:scale(1.18)}to{-webkit-transform:scale(1)}}
 @keyframes kb{from{transform:scale(1.18)}to{transform:scale(1)}}
@@ -236,21 +260,42 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #band.up{-webkit-transform:translateY(0);transform:translateY(0)}
 #tick{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;direction:rtl;color:#fff;font-weight:800;line-height:1.24;will-change:transform}
 #band{display:none}
-#countries{position:absolute;inset:0;z-index:2;display:none;background:radial-gradient(ellipse at top right,#245c50,#071e1a 70%);color:#fff;padding:5vh 6vw;box-sizing:border-box;text-align:right}
-#countries.on{display:block;animation:bulletinEnter 1.2s ease-out both}
+#countries{position:absolute;inset:0;z-index:2;display:none;background:#f3f0e7;color:#173d36;padding:4.5vh 5vw;box-sizing:border-box;overflow:hidden;text-align:right}
+#countries.on{display:block;animation:bulletinEnter 1.2s cubic-bezier(.16,1,.3,1) both}
 #countries.on.departing{animation:bulletinExit 1.2s ease-in both}
 @keyframes bulletinEnter{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes bulletinExit{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
-#countries h1{font-size:4.3vw;margin:1vh 0 0;font-weight:800}
-#countries p{font-size:1.8vw;color:#c7dbd3;margin:1vh 0 4vh}
-#countries .eyebrow{font-size:1.6vw;color:#e4c567;letter-spacing:.08em}
-#countryList{display:flex;flex-wrap:wrap;gap:1.4vw}
-.country{width:calc(50% - .7vw);box-sizing:border-box;border:1px solid #476c5d;border-radius:1vw;padding:1.1vh 1.7vw;display:flex;align-items:center;gap:1.6vw;background:#163b32;animation:rise .8s both}
-.country b{font-size:3.2vw;color:#e4c567;font-weight:800;min-width:4vw}
-.country span{font-size:2.9vw;font-weight:800}
-.country.c0{background:#e4c567;color:#102f27;border-color:#e4c567}.country.c0 b{color:#102f27}
-.country.c1{animation-delay:.1s}.country.c2{animation-delay:.2s}.country.c3{animation-delay:.3s}.country.c4{animation-delay:.4s}.country.c5{animation-delay:.5s}.country.c6{animation-delay:.6s}.country.c7{animation-delay:.7s}
-#countries footer{position:absolute;bottom:4vh;left:6vw;right:6vw;display:flex;justify-content:space-between;gap:2vw;font-size:1.6vw;color:#e4c567}
+#countries header{display:flex;align-items:center;justify-content:space-between}
+#countries .eyebrow{font-size:1.5vw;font-weight:800;display:flex;align-items:center;gap:.7vw}
+.eyebrow i{width:.6vw;height:.6vw;border-radius:50%;background:#b38b44;box-shadow:0 0 0 .35vw #b38b4418}
+.screenBrand{font-size:1.9vw;font-weight:800;line-height:1;text-align:center}.screenBrand span{display:block;font-size:.65vw;letter-spacing:.3em;margin-top:.6vh}
+#countries h1{font-size:4.1vw;line-height:1.2;margin:3vh 0 .8vh;font-weight:800;letter-spacing:-.045em}
+#countries p{font-size:1.65vw;color:#61716a;margin:0}
+.ranking{display:flex;gap:4vw;height:56vh;margin-top:3vh}
+.winner{position:relative;width:46%;padding:3.5vh 2.6vw;box-sizing:border-box;overflow:hidden;background:#123e35;color:#fff;border-radius:.25vw;display:flex;flex-direction:column;justify-content:center;isolation:isolate}
+.orbit{position:absolute;left:-10vw;bottom:-18vh;width:45vw;height:45vw;color:#5b8c7e;opacity:.3;z-index:-1;transform:rotate(-22deg)}
+.winner:after{content:"";position:absolute;left:0;right:0;top:0;height:.4vh;background:#c8a569}
+.winnerLabel{display:flex;align-items:center;gap:1.3vw;font-size:1.4vw;color:#e6d2ab}
+.winnerLabel b{font-size:4.7vw;line-height:1;font-weight:700;direction:ltr}
+#countryHero{font-size:6vw;font-weight:800;line-height:1.22;margin:3vh 0;overflow-wrap:break-word}
+.winnerCaption{font-size:1.5vw;color:#bdcec6;margin-top:1vh}
+#countryList{flex:1;display:flex;flex-direction:column;justify-content:center;min-width:0}
+.country{flex:1;max-height:10vh;min-height:0;border-bottom:1px solid #d5dbd1;display:flex;align-items:center;gap:1.8vw;animation:rise .8s both}
+.country:last-child{border-bottom:0}
+.country b{font-size:1.5vw;color:#9d7d4d;font-weight:700;min-width:2.4vw;direction:ltr}
+.country span{font-size:2.45vw;font-weight:800;line-height:1.2}
+.country.c1{animation-delay:.12s}.country.c2{animation-delay:.24s}.country.c3{animation-delay:.36s}.country.c4{animation-delay:.48s}.country.c5{animation-delay:.6s}.country.c6{animation-delay:.72s}.country.c7{animation-delay:.84s}
+#countries footer{position:absolute;bottom:3.8vh;left:5vw;right:5vw;display:flex;align-items:center;justify-content:space-between;gap:2vw;font-size:1.2vw;color:#61716a}
+.relay{display:flex;align-items:center;gap:1vw}
+#countryStep{display:flex;direction:ltr;gap:.4vw}
+#countryStep b{display:flex;align-items:center;justify-content:center;width:1.8vw;height:1.8vw;border:1px solid #c8cec4;border-radius:50%;font-size:1vw}
+#countryStep b.current{background:#173d36;color:#fff;border-color:#173d36;box-shadow:0 0 0 .25vw #173d3610}
+#countryStep b.passed{color:#173d36;border-color:#173d36}
+#countryNext{color:#173d36;font-weight:800;min-width:20vw;text-align:center}
+.countryNote{font-size:1vw}
+.countryTrack{position:absolute;bottom:0;left:0;right:0;height:.55vh;background:#e1e2d7;direction:ltr}
+#countryProgress{height:100%;background:#b38b44;width:0}
+#alertProgress{position:absolute;bottom:0;right:0;height:.6vh;background:#e3bd3c}
 #alert{z-index:4}
 @media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,.country{animation:none}}
 
@@ -273,8 +318,18 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="alert"><img id="alertImg" alt=""><div id="shade"></div>
 <div id="flight"><div id="trail"></div><svg id="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
 <div id="alertTag">تجربة</div>
-<div id="msg"><div id="kicker"><i></i>✨ مسافر جديد مع ترافليون</div><div id="aName"></div><div id="aDest"></div></div></div>
-<section id="countries"><div class="eyebrow">ترافليون · نبض السفر</div><h1>الدول الأكثر طلبًا اليوم</h1><p>الوجهات مرتّبة حسب طلبات العملاء اليوم · بتوقيت الرياض</p><div id="countryList"></div><footer><span id="countryStep"></span><span id="countryNext"></span></footer></section>
+<div id="msg"><div id="kicker"><i></i>طلب سفر جديد</div><div id="aName"></div><div id="aDest"></div></div><div id="alertProgress"></div></div>
+<section id="countries">
+<header><div class="eyebrow"><i></i> وجهات اليوم</div><div class="screenBrand">ترافليون<span>TRAVELIUN</span></div></header>
+<h1>إلى أين يتجه المسافرون؟</h1><p>الدول الأكثر طلبًا اليوم</p>
+<div class="ranking">
+<div class="winner">
+<svg class="orbit" viewBox="0 0 500 500" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1"><circle cx="250" cy="250" r="210"/><ellipse cx="250" cy="250" rx="130" ry="210"/><ellipse cx="250" cy="250" rx="55" ry="210"/><ellipse cx="250" cy="250" rx="210" ry="80"/><ellipse cx="250" cy="250" rx="210" ry="155"/><path d="M40 250h420M250 40v420"/></g></svg>
+<div class="winnerLabel"><b>01</b> الوجهة الأكثر طلبًا</div><div id="countryHero"></div><div class="winnerCaption">تبدأ الرحلة من هنا</div>
+</div><div id="countryList"></div>
+</div>
+<footer><div class="relay"><span>جولة الشاشات</span><span id="countryStep"></span></div><span id="countryNext"></span><span class="countryNote">حسب استفسارات العملاء · بتوقيت الرياض</span></footer>
+<div class="countryTrack"><div id="countryProgress"></div></div></section>
 <div id="band"><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
 <script>window.__S__=${json(s)};window.__N__=${n};window.__M__=${monitor ? "true" : "false"};</script>
 <script>${SCREEN_CORE}${RUNTIME}</script>

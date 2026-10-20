@@ -12,7 +12,8 @@ import { displayName, serviceLine, normalizeConfig, positionOf, riyadhDay, SCREE
  * «الشاشات» — what a screen reads, every few seconds, with no login (the owner,
  * 2026-10-19: pkg.traveliun.com/1 just opens). So it carries only what is safe
  * to show anyone in the office window: the ads, the destinations asked for and
- * their kind — never a name, a phone or a count per client. One answer is built
+ * their kind and the owner's requested short display name — never a phone
+ * or other customer details. One answer is built
  * for all the screens and kept two seconds; the ticker is counted every three
  * minutes; the catalogue's places every ten.
  */
@@ -27,7 +28,7 @@ export type ScreenState = {
   /** the band: its words, their room, its speed, how often it comes up, and the extra pass when the words changed */
   ticker: { text: string; width: number; speed: number; periodMs: number; bumpAt: number } | null;
   /** «بكج إلى تركيا» and the client's recorded name, three words at most (never a phone), «تجربة» when it is one */
-  events: { at: number; country: string; line: string; name: string | null; test: boolean; src: string | null }[];
+  events: { id: string; at: number; country: string; line: string; name: string | null; test: boolean; src: string | null }[];
   /** while the TVs are set up: on every load, one pass and then this alert, on that screen only — never stored, never counted */
   demo: { country: string; line: string; name: string; src: string | null } | null;
 };
@@ -105,13 +106,13 @@ async function shared(now: number): Promise<Shared> {
       ticker(now, cfg.tickerSpeed, cfg.tickerEveryMin * 60_000),
       db()
         .from("office_screen_events")
-        .select("lead_id, kind, destination, test, at")
-        .gte("at", new Date(now - 60_000).toISOString())
+        .select("id, lead_id, kind, destination, test, at")
+        .gte("at", new Date(now - 300_000).toISOString())
         .lte("at", new Date(now + 600_000).toISOString())
         .order("at"),
     ]);
     const adCountry = ads.map((a) => countryOf(a.name, list));
-    const evs = (rows ?? []) as { lead_id: string | null; kind: string; destination: string; test: boolean; at: string }[];
+    const evs = (rows ?? []) as { id: number; lead_id: string | null; kind: string; destination: string; test: boolean; at: string }[];
     // the client's name as recorded on «العملاء», three words at most (displayName) — never anything else about them
     const ids = [...new Set(evs.map((e) => e.lead_id).filter((id): id is string => Boolean(id)))];
     const { data: named } = ids.length ? await db().from("client_leads").select("id, name").in("id", ids) : { data: [] };
@@ -121,7 +122,7 @@ async function shared(now: number): Promise<Shared> {
       const country = countryOf(e.destination, list);
       if (!country) return [];
       const ad = ads[adCountry.indexOf(country)];
-      return [{ at: Date.parse(e.at), country, line: serviceLine(e.kind, country), name: e.lead_id ? (nameOf.get(e.lead_id) ?? null) : null, test: e.test, src: ad?.src ?? null }];
+      return [{ id: String(e.id), at: Date.parse(e.at), country, line: serviceLine(e.kind, country), name: e.lead_id ? (nameOf.get(e.lead_id) ?? null) : null, test: e.test, src: ad?.src ?? null }];
     });
     const demoCountry = tick.top ?? "تركيا";
     const demo = now < Date.parse(cfg.demoUntil) ? { country: demoCountry, line: serviceLine("بكج", demoCountry), name: "أحمد العتيبي", src: ads[adCountry.indexOf(demoCountry)]?.src ?? null } : null;
