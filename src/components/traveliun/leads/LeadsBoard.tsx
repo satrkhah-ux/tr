@@ -978,8 +978,8 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                       </td>
                       <td className="w-40">
                         <select value={l.assigned_to ?? ""} onChange={(e) => save(l, { assigned_to: e.target.value })} className={CELL}>
-                          <option value="">{l.assigned_to_name ? `${l.assigned_to_name} (من الشيت)` : "لم يتم الإسناد"}</option>
-                          {team.map((e) => <option key={e.id} value={e.id}>{e.arabic_name}</option>)}
+                          <option value="">{l.assigned_to_name ? `${l.assigned_to_name} (${l.teletel_conversation_id ? "تليتيل" : "من الشيت"})` : "لم يتم الإسناد"}</option>
+                          {team.map((e) => <option key={e.id} value={e.id}>{e.id === l.assigned_to && l.teletel_conversation_id && l.assigned_to_name ? l.assigned_to_name : e.arabic_name}</option>)}
                         </select>
                       </td>
                       <td className="w-32"><Timing value={times.toAssign} /></td>
