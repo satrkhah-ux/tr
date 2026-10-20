@@ -1,5 +1,7 @@
 "use client";
 
+import { TransferToFollowup } from "../followups/FollowupEntry";
+
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
@@ -1051,6 +1053,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
               <X className="size-5" />
             </button>
           </div>
+          {thread?.lead.teletel_conversation_id && <TransferToFollowup key={thread.lead.id} conversationId={thread.lead.teletel_conversation_id} />}
           {!thread?.result ? (
             <p className="flex items-center justify-center gap-2 py-10 text-sm font-bold text-[#557d78]">
               <Loader2 className="size-4 animate-spin" /> جاري جلب المحادثة من Teletel…

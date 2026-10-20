@@ -5,6 +5,8 @@ import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/serve
 import { currentCan } from "@/lib/roles/current";
 import { getCurrentEmployeeId } from "./metrics";
 import { logAudit } from "./audit";
+import { enrollFollowup, followupPeople, followupRows } from "@/lib/followups/service";
+import { assignWork, recordFollowupResult } from "./followups";
 import {
   addTeletelNote,
   assignTeletelTeam,
@@ -12,7 +14,6 @@ import {
   getTeletelConfig,
   listOpenConversations,
   listTeletelTeams,
-  sendTeletelMessage,
   type OpenConversation,
   type TeletelTeam,
   type ThreadMessage,
@@ -188,6 +189,9 @@ async function moveToTeams(service: SupabaseClient, rows: SlaRow[], rules: SlaRu
 
 function followupRow(c: SlaRow, rule: SlaRule | null) {
   return {
+    request_started_at: new Date(c.createdAt * 1000).toISOString(),
+    source: "sla",
+    transfer_reason: rule?.name ?? "تحويل من SLA",
     conversation_id: c.id,
     contact_id: c.contactId,
     contact_name: c.name,
@@ -231,9 +235,9 @@ export async function getSlaBoard(fresh = false): Promise<SlaBoard> {
   }
 
   const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
-  const [{ data: fu }, { data: emps }] = await Promise.all([
+  const [{ data: fu }, people] = await Promise.all([
     service.from("sla_followups").select(FOLLOWUP_COLS).or(`status.eq.open,done_at.gte.${weekAgo}`).order("created_at", { ascending: false }).limit(300),
-    service.from("employees").select("id, arabic_name").eq("status", "Active").order("arabic_name"),
+    followupPeople(),
   ]);
 
   return {
@@ -241,7 +245,7 @@ export async function getSlaBoard(fresh = false): Promise<SlaBoard> {
     rules,
     rows,
     followups: ((fu ?? []) as unknown as RawFollowup[]).map(shape),
-    employees: ((emps ?? []) as { id: string; arabic_name: string | null }[]).map((e) => ({ id: e.id, name: e.arabic_name ?? "—" })),
+    employees: people,
     applying: apply,
     teams,
     suggestions: rows ? suggestRules(rows, teams, rules) : [],
@@ -305,54 +309,33 @@ export async function deleteSlaRule(id: string): Promise<{ ok: true } | Fail> {
 /** A manager sends a conversation there by hand, whatever its clock says. */
 export async function sendToFollowup(conversationId: number): Promise<{ ok: true; id: string } | Fail> {
   if (!(await isManager())) return { ok: false, error: "forbidden" };
-  const service = db();
-  const { data: existing } = await service.from("sla_followups").select("id").eq("conversation_id", conversationId).eq("status", "open").maybeSingle();
-  if (existing) return { ok: true, id: (existing as { id: string }).id };
-  const c = (await listOpenConversations())?.rows.find((x) => x.id === conversationId);
+  const c = (await listOpenConversations(true))?.rows.find((x) => x.id === conversationId);
   if (!c) return { ok: false, error: "notFound" };
-  const clock = slaClock(c, Math.floor(Date.now() / 1000));
-  const rules = await loadRules();
-  const rule = tierFor(rules, clock.kind, clock.minutes);
-  const { data, error } = await service
-    .from("sla_followups")
-    .insert(followupRow({ ...c, ...clock, tierId: rule?.id ?? null, followupId: null, movedTo: null }, rule))
-    .select("id")
-    .single();
-  return error || !data ? { ok: false, error: "failed" } : { ok: true, id: (data as { id: string }).id };
+  try { return { ok: true, id: await enrollFollowup(c, "manual", "تحويل من قسم العملاء SLA", await getCurrentEmployeeId()) }; }
+  catch { return { ok: false, error: "failed" }; }
 }
 
 export async function assignFollowup(id: string, employeeId: string | null): Promise<{ ok: true } | Fail> {
   if (!(await isManager())) return { ok: false, error: "forbidden" };
-  const me = await getCurrentEmployeeId();
-  const { error } = await db()
-    .from("sla_followups")
-    .update(employeeId ? { assigned_to: employeeId, assigned_by: me, assigned_at: new Date().toISOString() } : { assigned_to: null, assigned_by: null, assigned_at: null })
-    .eq("id", String(id))
-    .eq("status", "open");
-  return error ? { ok: false, error: "failed" } : { ok: true };
+  const result = await assignWork(id, employeeId);
+  return result.ok ? { ok: true } : { ok: false, error: "failed" };
 }
 
-/** Every open, unassigned follow-up to OUR employee of the same name as its Teletel holder — one press for a backlog. */
+/** Exact IDs only. Names never grant access. */
 export async function assignToTeletelHolders(): Promise<{ ok: true; assigned: number } | Fail> {
   if (!(await isManager())) return { ok: false, error: "forbidden" };
   const service = db();
-  const norm = (s: string | null | undefined) => (s ?? "").replace(/\s+/g, " ").trim();
-  const [{ data: open }, { data: emps }, me] = await Promise.all([
-    service.from("sla_followups").select("id, teletel_assignee").eq("status", "open").is("assigned_to", null),
-    service.from("employees").select("id, arabic_name").eq("status", "Active"),
-    getCurrentEmployeeId(),
+  const [{ data: open }, { data: mappings }, conversations] = await Promise.all([
+    followupRows((a,b) => service.from("sla_followups").select("id,conversation_id").eq("status", "open").is("assigned_to", null).order("id").range(a,b)),
+    service.from("followup_agent_map").select("agent_id,employee_id"), listOpenConversations(true),
   ]);
-  const byName = new Map(((emps ?? []) as { id: string; arabic_name: string | null }[]).map((e) => [norm(e.arabic_name), e.id]));
+  if (!conversations) return { ok: false, error: "unreachable" };
+  const holders = new Map(conversations.rows.map(c => [c.id,c.assigneeId]));
+  const map = new Map((mappings ?? []).map(m => [m.agent_id,m.employee_id]));
   let assigned = 0;
-  for (const f of (open ?? []) as { id: string; teletel_assignee: string | null }[]) {
-    const to = norm(f.teletel_assignee) ? byName.get(norm(f.teletel_assignee)) : undefined;
-    if (!to) continue;
-    const { error } = await service
-      .from("sla_followups")
-      .update({ assigned_to: to, assigned_by: me, assigned_at: new Date().toISOString() })
-      .eq("id", f.id)
-      .is("assigned_to", null);
-    if (!error) assigned += 1;
+  for (const row of open) {
+    const employee = map.get(holders.get(row.conversation_id));
+    if (employee && (await assignWork(row.id, employee, true)).ok) assigned++;
   }
   return { ok: true, assigned };
 }
@@ -364,7 +347,7 @@ async function followupFor(id: string): Promise<{ row: Followup; manager: boolea
   const { data } = await db().from("sla_followups").select(FOLLOWUP_COLS).eq("id", String(id)).maybeSingle();
   if (!data) return null;
   const row = shape(data as unknown as RawFollowup);
-  if (!manager && (!me || row.assigned_to !== me)) return null;
+  if (!manager && (!(await currentCan("followups.work")) || !me || row.assigned_to !== me)) return null;
   return { row, manager, me };
 }
 
@@ -376,41 +359,26 @@ export async function getFollowupThread(id: string): Promise<FollowupThread> {
   const f = await followupFor(id);
   if (!f) return { ok: false, error: "forbidden" };
   const thread = await conversationThread(f.row.conversation_id);
-  return { ok: true, followup: f.row, messages: thread?.messages ?? null, canReply: thread?.canReply ?? false, teletelLink: teletelLink(), manager: f.manager };
+  if (!(await followupFor(id))) return { ok: false, error: "forbidden" };
+  return { ok: true, followup: f.row, messages: thread?.messages.filter(m => !m.isPrivate) ?? null, canReply: thread?.canReply ?? false, teletelLink: teletelLink(), manager: f.manager };
 }
 
 /** The answer goes out on the client's own thread — only inside WhatsApp's 24 hours. */
 export async function replyFollowup(id: string, text: string): Promise<{ ok: true } | Fail> {
-  const f = await followupFor(id);
-  if (!f) return { ok: false, error: "forbidden" };
-  if (f.row.status !== "open") return { ok: false, error: "done" };
-  const body = String(text ?? "").trim().slice(0, 4000);
-  if (!body) return { ok: false, error: "invalid" };
-  const thread = await conversationThread(f.row.conversation_id);
-  if (!thread) return { ok: false, error: "unreachable" };
-  if (!thread.canReply) return { ok: false, error: "window" };
-  if ((await sendTeletelMessage(f.row.conversation_id, body)) === null) return { ok: false, error: "unreachable" };
-  await db().from("sla_followups").update({ replied_at: new Date().toISOString() }).eq("id", f.row.id);
-  return { ok: true };
+  // Old clients have no stable request key. Use the new workspace for sending.
+  void id; void text;
+  return { ok: false, error: "invalid" };
 }
 
-/** «تمت المتابعة» — with what was done, said once. */
 export async function closeFollowup(id: string, note: string): Promise<{ ok: true } | Fail> {
-  const f = await followupFor(id);
-  if (!f) return { ok: false, error: "forbidden" };
-  if (f.row.status !== "open") return { ok: false, error: "done" };
-  const { error } = await db()
-    .from("sla_followups")
-    .update({ status: "done", done_by: f.me, done_at: new Date().toISOString(), note: String(note ?? "").trim().slice(0, 500) || null })
-    .eq("id", f.row.id)
-    .eq("status", "open");
-  return error ? { ok: false, error: "failed" } : { ok: true };
+  const result = await recordFollowupResult(id, { outcome: "completed", note, dueAt: null, channel: "note" });
+  return result.ok ? { ok: true } : { ok: false, error: "failed" };
 }
 
 /** «لوحتي»: the open follow-ups handed to me — no Teletel call, the list only. */
 export async function myFollowups(): Promise<Followup[]> {
   const me = await getCurrentEmployeeId();
-  if (!me) return [];
-  const { data } = await db().from("sla_followups").select(FOLLOWUP_COLS).eq("assigned_to", me).eq("status", "open").order("assigned_at", { ascending: false }).limit(50);
+  if (!me || !(await currentCan("followups.work") || await currentCan("followups.manage") || await isManager())) return [];
+  const { data } = await db().from("sla_followups").select(FOLLOWUP_COLS).eq("assigned_to", me).eq("status", "open").order("request_started_at", { ascending: false }).limit(50);
   return ((data ?? []) as unknown as RawFollowup[]).map(shape);
 }

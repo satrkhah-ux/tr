@@ -3,6 +3,7 @@ import { runMurad } from "@/lib/murad/run";
 import { receptionSweep } from "@/lib/murad/reception-run";
 import { recordCronRun } from "@/lib/data/cron-runs";
 import { runIntegrationChecks } from "@/lib/developer/integrations-run";
+import { syncFollowups } from "@/lib/followups/service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -25,6 +26,7 @@ function authorised(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!authorised(req)) return NextResponse.json({ ok: false }, { status: 401 });
+  await recordCronRun("followups_sync", syncFollowups).catch(() => null);
   // every run leaves its trace for /developer, answered anyone or not (cron-runs.ts)
   // «المستقبل الآلي»: what the webhook missed, before Murad's own turns (no model, its turns claimed one by one)
   const received = await receptionSweep().catch(() => 0);
