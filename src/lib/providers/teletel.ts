@@ -647,3 +647,10 @@ export function inferDestinations(labels: string[], attributes: Record<string, u
   }
   return out.slice(0, 4);
 }
+
+/** Assign a configured handoff, optionally to a named Teletel agent. */
+export async function assignMuradHandoff(conversationId: number, teamId: number | null, agentId: number | null): Promise<boolean> {
+  const config = getTeletelConfig();
+  if (!config || (!teamId && !agentId)) return false;
+  return (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { team_id: teamId, assignee_id: agentId })) !== null;
+}

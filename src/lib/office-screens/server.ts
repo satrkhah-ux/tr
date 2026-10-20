@@ -17,6 +17,7 @@ import { kindWord, normalizeConfig, positionOf, riyadhDay, SCREENS_SETTING, tick
  * minutes; the catalogue's places every ten.
  */
 export type ScreenState = {
+  countries: string[];
   now: number;
   build: string;
   screens: number;
@@ -67,27 +68,32 @@ let lastWords: string | null = null;
 let bumpAt = 0;
 
 /** today's and yesterday's conversations by destination (the ticker) */
-async function ticker(now: number, speed: number, periodMs: number): Promise<{ band: ScreenState["ticker"]; top: string | null }> {
-  const { text, top } = await memo(slow, "ticker", async () => {
+async function ticker(now: number, speed: number, periodMs: number): Promise<{ band: ScreenState["ticker"]; top: string | null; countries: string[] }> {
+  const { text, top, countries } = await memo(slow, `ticker:${riyadhDay(now)}`, async () => {
     const since = new Date(riyadhDay(now) - 86_400_000).toISOString();
-    const [{ data }, list] = await Promise.all([
-      db().from("client_leads").select("destination, created_at, last_visit_at").or(`created_at.gte.${since},last_visit_at.gte.${since}`).limit(1000),
-      places(),
-    ]);
+    const data: { destination: string | null; created_at: string; last_visit_at: string | null }[] = [];
+    for (let from = 0; ; from += 1000) {
+      const page = await db().from("client_leads").select("destination, created_at, last_visit_at").or(`created_at.gte.${since},last_visit_at.gte.${since}`).order("id").range(from, from + 999);
+      if (page.error) throw new Error("screen countries unavailable");
+      data.push(...(page.data ?? []));
+      if ((page.data?.length ?? 0) < 1000) break;
+    }
+    const list = await places();
     const leads = ((data ?? []) as { destination: string | null; created_at: string; last_visit_at: string | null }[]).flatMap((l) => {
       const country = countryOf(l.destination, list);
       if (!country) return [];
       const days = [l.created_at, l.last_visit_at].filter((d): d is string => Boolean(d)).map((d) => riyadhDay(Date.parse(d)));
       return [{ country, days }];
     });
-    return { text: tickerText(leads, now) ?? "", top: topCountries(leads, riyadhDay(now))[0] ?? null };
+    const countries = topCountries(leads, riyadhDay(now));
+    return { text: tickerText(leads, now) ?? "", top: countries[0] ?? null, countries };
   });
   if (lastWords === null) lastWords = text;
   else if (text !== lastWords) {
     lastWords = text;
     if (now - bumpAt >= 120_000) bumpAt = now + 5_000;
   }
-  return { band: text ? { text, width: tickerWidth(text), speed, periodMs, bumpAt } : null, top };
+  return { band: text ? { text, width: tickerWidth(text), speed, periodMs, bumpAt } : null, top, countries };
 }
 
 async function shared(now: number): Promise<Shared> {
@@ -114,7 +120,7 @@ async function shared(now: number): Promise<Shared> {
     });
     const demoCountry = tick.top ?? "تركيا";
     const demo = now < Date.parse(cfg.demoUntil) ? { country: demoCountry, kind: kindWord("بكج"), src: ads[adCountry.indexOf(demoCountry)]?.src ?? null } : null;
-    return { cfg, build: String(process.env.NEXT_DEPLOYMENT_ID || ""), screens: cfg.screens, slotMs: cfg.slotSec * 1000, ads, ticker: tick.band, events, demo };
+    return { cfg, build: String(process.env.NEXT_DEPLOYMENT_ID || ""), screens: cfg.screens, slotMs: cfg.slotSec * 1000, ads, countries: tick.countries, ticker: tick.band, events, demo };
   });
 }
 

@@ -1,3 +1,4 @@
+import { parseControl, inMuradScope, type MuradControl } from "./control";
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
@@ -70,9 +71,9 @@ const riyadhDayStart = () => new Date(`${new Date().toLocaleDateString("en-CA", 
 
 // ---------- Teletel: one thread, with what the helpers in teletel.ts leave out ----------
 
-type RawConversation = { can_reply?: boolean; labels?: string[]; meta?: { sender?: { name?: string | null; phone_number?: string | null } } };
+type RawConversation = { inbox_id?: number; can_reply?: boolean; labels?: string[]; meta?: { team?: { id?: number }; sender?: { name?: string | null; phone_number?: string | null } } };
 
-export type FreshThread = { messages: TurnMessage[]; canReply: boolean; phone: string; name: string; labels: string[] };
+export type FreshThread = { inboxId?: number | null; teamId?: number | null; messages: TurnMessage[]; canReply: boolean; phone: string; name: string; labels: string[] };
 
 /** The latest messages (the API's last page) and the conversation itself — read now, not from the list's copy. */
 export async function readThread(conversationId: number): Promise<FreshThread | null> {
@@ -82,6 +83,8 @@ export async function readThread(conversationId: number): Promise<FreshThread | 
   ]);
   if (!list || !conv) return null;
   return {
+    inboxId: conv.inbox_id ?? null,
+    teamId: conv.meta?.team?.id ?? null,
     messages: (list.payload ?? []).map(toTurnMessage).filter((m): m is TurnMessage => m !== null),
     canReply: conv.can_reply === true,
     phone: conv.meta?.sender?.phone_number ?? "",
@@ -92,7 +95,7 @@ export async function readThread(conversationId: number): Promise<FreshThread | 
 
 // ---------- settings, lease, log ----------
 
-type Settings = { clientWhatsapp: string | null; autoList: string[]; policies: string; cap: number };
+type Settings = { control: MuradControl; clientWhatsapp: string | null; autoList: string[]; policies: string; cap: number };
 
 export async function readSettings(service: SupabaseClient): Promise<Settings & { autoPhones: string[]; testPhone: string | null }> {
   const { data } = await service.from("app_settings").select("key, value").in("key", Object.values(SETTING));
@@ -100,6 +103,7 @@ export async function readSettings(service: SupabaseClient): Promise<Settings & 
   const autoPhones = parseAutoPhones(v.get(SETTING.autoPhones));
   const testPhone = intlPhone(v.get(SETTING.testPhone) ?? "");
   return {
+    control: parseControl(v.get(SETTING.control)),
     clientWhatsapp: v.get(SETTING.clientWhatsapp) ?? null,
     // the auto list: the owner's test number (the client-WhatsApp trial's) and the developer's list
     autoList: [...new Set([...(testPhone ? [testPhone] : []), ...autoPhones])],
@@ -349,9 +353,16 @@ async function answer(
   messageId: number,
   muradIds: Set<number>,
   policies: string,
+  control: MuradControl,
 ): Promise<Answer> {
   try {
-    const r = await muradReply(await buildContext(service, c, thread, muradIds, policies));
+    const context = await buildContext(service, c, thread, muradIds, policies);
+    context.includePrice = control.includePrice;
+    if (!control.includePrice) {
+      context.files = context.files.map((f) => ({ ...f, total: null, trip: f.trip ? { ...f.trip, payment: "", link: null } : null }));
+      context.readyOffers = context.readyOffers.map((o) => ({ ...o, price: null }));
+    }
+    const r = await muradReply(context);
     const out: Answer = { mode, fault: r.error ?? null, replyId: null, reply: r.reply, needsStaff: r.needsStaff, reason: r.reason || null, intake: r.intake ?? null };
     if (mode === "suggest") {
       if (!(await addTeletelNote(c.id, suggestionNote(r)))) Object.assign(out, { mode: "skipped", fault: "note_failed" });
@@ -386,6 +397,7 @@ async function work(service: SupabaseClient, provider: MuradProvider, flags: { s
   ]);
   if (logsRes.error) throw new Error(`murad_log: ${logsRes.error.message}`);
   if (!list) throw new Error("teletel: the open conversations could not be read");
+  flags = { suggest: flags.suggest && settings.control.tasks.suggest, auto: flags.auto && settings.control.tasks.auto };
   const logs = (logsRes.data ?? []) as LogRow[];
 
   const logged = new Set(logs.map((l) => turnKey(l.conversation_id, Number(l.client_message_id))));
@@ -406,6 +418,7 @@ async function work(service: SupabaseClient, provider: MuradProvider, flags: { s
     return p !== null && settings.autoList.includes(p);
   };
   const queue = list.rows
+    .filter((c) => inMuradScope(settings.control, c.inboxId, c.teamId))
     .map((c) => ({
       c,
       turn: isCandidate(c, nowSec, lastActed.get(c.id) ?? null),
@@ -422,7 +435,7 @@ async function work(service: SupabaseClient, provider: MuradProvider, flags: { s
   for (const { c, turn, followUp } of queue) {
     if (Date.now() - started > RUN_BUDGET_MS) break;
     const thread = await readThread(c.id);
-    if (!thread) continue;
+    if (!thread || !inMuradScope(settings.control, thread.inboxId ?? null, thread.teamId ?? null)) continue;
     n.read += 1;
 
     if (followUp) {
@@ -477,7 +490,7 @@ async function work(service: SupabaseClient, provider: MuradProvider, flags: { s
     logged.add(turnKey(c.id, d.messageId));
     calls += 1;
 
-    const a = await answer(service, c, thread, d.mode, d.messageId, muradIds, settings.policies);
+    const a = await answer(service, c, thread, d.mode, d.messageId, muradIds, settings.policies, settings.control);
     n[a.mode === "skipped" ? "failed" : a.mode] += 1;
     await service
       .from("murad_log")

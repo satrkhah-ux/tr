@@ -180,10 +180,17 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
     ops,
   };
 
+  const built = buildScreen(facts);
+  const decisions = await db().from("management_decisions").select("title, due_on, status").neq("status", "done").order("due_on").limit(20);
+  const decisionTicker = (decisions.data ?? []).map((d: { title: string; due_on: string; status: string }) => ({
+    at: iso(now), red: d.due_on < day,
+    text: `قرار الإدارة: ${d.title} · ${d.status === "in_progress" ? "قيد التنفيذ" : "بانتظار التنفيذ"} · الموعد ${d.due_on}`,
+  }));
   return {
     at: iso(now),
     day,
-    ...buildScreen(facts),
+    ...built,
+    ticker: [...decisionTicker, ...built.ticker],
     daily: eye ? dailyLines(eye, agents, team) : null,
     thresholds: facts.thresholds,
   };
@@ -213,7 +220,7 @@ let computing: Promise<ManagerSnapshot> | null = null;
 
 /** The screen for a dashboard.admin session; null for anyone else. Computed at most once a minute. */
 export async function managerSnapshot(): Promise<ManagerSnapshot | null> {
-  if (!(await currentCan("dashboard.admin"))) return null;
+  if (!(await currentCan("dashboard.admin")) && !(await currentCan("developer.access"))) return null;
   const hit = screens.get("screen");
   if (hit) return hit;
   computing ??= computeManagerSnapshot()

@@ -1957,6 +1957,8 @@ export const en = {
   "nav.basic": "Basic system",
   // the menus' reorganisation (2026-10-17)
   "nav.legacyGenerator": "Package generator (legacy)",
+  "nav.managementDecisions": "Management decisions",
+  "nav.muradSettings": "Murad settings",
   "nav.developer": "Developer",
   "nav.sla": "SLA — response time",
   "rp.title": "Repackage a supplier program",

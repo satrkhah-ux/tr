@@ -97,14 +97,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
               ثوانٍ لكل إعلان
               <input type="number" min={4} max={120} value={cfg.slotSec} onChange={(e) => setCfg({ ...cfg, slotSec: Number(e.target.value) })} className={FIELD} />
             </label>
-            <label className="grid gap-1 text-[11.5px] font-bold text-[#185045]">
-              سرعة الشريط (بكسل في الثانية)
-              <input type="number" min={30} max={400} value={cfg.tickerSpeed} onChange={(e) => setCfg({ ...cfg, tickerSpeed: Number(e.target.value) })} className={FIELD} />
-            </label>
-            <label className="grid gap-1 text-[11.5px] font-bold text-[#185045]">
-              يظهر الشريط كل (دقيقة)
-              <input type="number" min={2} max={120} value={cfg.tickerEveryMin} onChange={(e) => setCfg({ ...cfg, tickerEveryMin: Number(e.target.value) })} className={FIELD} />
-            </label>
+            <p className="rounded-lg bg-[#f0f7f4] p-3 text-sm sm:col-span-2">الدول الأكثر طلبًا اليوم: لوحة موشن جرافيك واضحة لمدة 36 ثانية، كل 10 دقائق، على جميع الشاشات. لا تغطي أسعار الإعلانات؛ تعود الإعلانات بعدها تلقائيًا.</p>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-4 text-[12.5px] font-bold text-[#185045]">
             <span>ينبّه «عميل جديد» عند طلب:</span>
@@ -129,7 +122,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
               {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : null}
               حفظ
             </button>
-            <span className="text-[11.5px] text-[#78948f]">بلا صوت — عرض فقط. الشريط السفلي يظهر مرة كل فترة لعبور واحد على كل الشاشات، ومرة فوراً حين تتغير الدول الأكثر طلباً</span>
+            <span className="text-[11.5px] text-[#78948f]">بلا صوت — عرض فقط. عرض الدول الأكثر طلبًا يظهر مرة كل فترة لعبور واحد على كل الشاشات، ومرة فوراً حين تتغير الدول الأكثر طلباً</span>
           </div>
         </section>
 

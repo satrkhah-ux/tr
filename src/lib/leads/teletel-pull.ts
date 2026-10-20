@@ -31,7 +31,7 @@ import { allRows } from "@/lib/data/all-rows";
 export type TeletelPullResult = { read: number; added: number; updated: number; merged: number; closed: number; classified: number; error?: string };
 
 /** conversations whose client messages were already read this process (a restart reads them again, a few a run) */
-const threadRead = new Set<number>();
+const threadRead = new Map<number, number>();
 /** how many threads one run reads: two requests each, so a backlog of 600 is cleared in under an hour of 5-minute runs */
 const THREADS_PER_RUN = 40;
 /** conversations whose turns are read again, a run — the ones something happened in, latest first */
@@ -48,6 +48,7 @@ type Known = {
   name: string | null;
   inquiry: string | null;
   destination: string | null;
+  destination_source: "client" | "labels" | "manual" | null;
   received_by: string | null;
   assigned_to: string | null;
   delay: string | null;
@@ -112,7 +113,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
     allRows((a, b) =>
       supabase
         .from("client_leads")
-        .select("id, phone, name, inquiry, destination, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at, auto_routed_at, created_at, last_visit_at, draft_id")
+        .select("id, phone, name, inquiry, destination, destination_source, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at, auto_routed_at, created_at, last_visit_at, draft_id")
         .or("teletel_conversation_id.not.is.null,and(source.eq.sheet,teletel_conversation_id.is.null)")
         .order("id")
         .range(a, b),
@@ -126,7 +127,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
   const fresh: Record<string, unknown>[] = [];
   const updates: [string, Record<string, unknown>][] = [];
   // what each conversation is classified as after this run — the ones still vague get their thread read below
-  const vague: { c: OpenConversation; inquiry: string | null; destination: string | null }[] = [];
+  const vague: { c: OpenConversation; inquiry: string | null; destination: string | null; mutableDestination: boolean; visitAt: number }[] = [];
   // something happened since their turns were last read: read them again
   const timelines: OpenConversation[] = [];
   for (const c of open) {
@@ -146,7 +147,11 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       const picked = classifyInquiry([c.serviceType ?? ""], "");
       if (picked && (!had.inquiry || had.inquiry === "يستفسر")) patch.inquiry = picked;
       else if (!had.inquiry) patch.inquiry = classifyInquiry(c.labels, c.preview) || null;
-      if (!had.destination) patch.destination = findPlace(c.labels, c.preview, places) || null;
+      // A preview can be our own reply, so it must never determine a destination.
+      if (!had.destination && had.destination_source !== "manual") {
+        patch.destination = findPlace(c.labels, "", places) || null;
+        if (patch.destination) patch.destination_source = "labels";
+      }
       // until its turns are read, the one holding it stands in as the receiver
       if (!had.received_by && holder && had.timeline_seen_at == null) patch.received_by = holder;
       if (Number(had.timeline_seen_at) !== c.lastActivityAt) timelines.push(c);
@@ -165,14 +170,16 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       if (changed.length) updates.push([had.id, { ...Object.fromEntries(changed), updated_at: new Date().toISOString() }]);
       const inquiry = (patch.inquiry as string | null | undefined) ?? had.inquiry;
       const destination = (patch.destination as string | null | undefined) ?? had.destination;
-      if (!inquiry || inquiry === "يستفسر" || !destination) vague.push({ c, inquiry, destination });
+      const mutableDestination = had.destination_source !== "manual" && (!had.destination || had.destination_source === "client" || had.destination_source === "labels");
+      if (!inquiry || inquiry === "يستفسر" || mutableDestination) vague.push({ c, inquiry, destination, mutableDestination, visitAt: Date.parse(String(patch.last_visit_at ?? had.last_visit_at ?? had.created_at)) / 1000 });
     } else {
       fresh.push({
         ...live,
         phone,
         name: clientName(c),
         inquiry: classifyInquiry([c.serviceType ?? "", ...c.labels], c.preview) || null,
-        destination: findPlace(c.labels, c.preview, places) || null,
+        destination: findPlace(c.labels, "", places) || null,
+        destination_source: "labels",
         received_by: holder,
         received_by_name: c.assignee,
         source: "teletel",
@@ -184,7 +191,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       });
       timelines.push(c);
       const row = fresh[fresh.length - 1] as { inquiry: string | null; destination: string | null };
-      if (!row.inquiry || row.inquiry === "يستفسر" || !row.destination) vague.push({ c, inquiry: row.inquiry, destination: row.destination });
+      vague.push({ c, inquiry: row.inquiry, destination: row.destination, mutableDestination: true, visitAt: c.createdAt });
     }
   }
   for (let i = 0; i < updates.length; i += 10) {
@@ -200,21 +207,27 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
 
   // the list's preview is the LAST message — often ours. What the client wrote decides:
   // their own messages in the thread, newest conversations first, a few a run.
-  const toRead = vague.filter((v) => !threadRead.has(v.c.id)).sort((a, b) => b.c.createdAt - a.c.createdAt).slice(0, THREADS_PER_RUN);
+  const toRead = vague.filter((v) => threadRead.get(v.c.id) !== v.c.lastActivityAt).sort((a, b) => b.c.createdAt - a.c.createdAt).slice(0, THREADS_PER_RUN);
   for (let i = 0; i < toRead.length; i += 5) {
     await Promise.all(
-      toRead.slice(i, i + 5).map(async ({ c, inquiry, destination }) => {
+      toRead.slice(i, i + 5).map(async ({ c, inquiry, destination, mutableDestination, visitAt }) => {
         const thread = await conversationThread(c.id);
         if (!thread) return;
-        threadRead.add(c.id);
-        const said = thread.messages.filter((m) => m.fromClient && !m.isPrivate).map((m) => m.text).join(" ");
+        threadRead.set(c.id, c.lastActivityAt);
+        const clientMessages = thread.messages.filter((m) => m.fromClient && !m.isPrivate && m.at >= visitAt).sort((a, b) => b.at - a.at);
+        const said = clientMessages.map((m) => m.text).join("\n");
         const patch: Record<string, unknown> = {};
         const kind = classifyInquiry([c.serviceType ?? "", ...c.labels], said);
         if ((!inquiry || inquiry === "يستفسر") && kind && kind !== inquiry) patch.inquiry = kind;
-        const place = destination ? "" : findPlace(c.labels, said, places);
-        if (place) patch.destination = place;
+        const place = mutableDestination ? clientMessages.map((m) => findPlace([], m.text, places)).find(Boolean) : "";
+        if (place && (place !== destination || byConversation.get(c.id)?.destination_source !== "client")) { patch.destination = place; patch.destination_source = "client"; }
         if (!Object.keys(patch).length) return;
-        await supabase.from("client_leads").update({ ...patch, updated_at: new Date().toISOString() }).eq("teletel_conversation_id", c.id);
+        let update = supabase.from("client_leads").update({ ...patch, updated_at: new Date().toISOString() }).eq("teletel_conversation_id", c.id);
+        if (patch.destination_source) {
+          update = update.or("destination_source.is.null,destination_source.in.(client,labels)");
+          update = destination ? update.eq("destination", destination) : update.is("destination", null);
+        }
+        await update;
         result.classified += 1;
       }),
     );

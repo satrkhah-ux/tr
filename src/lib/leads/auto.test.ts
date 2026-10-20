@@ -10,6 +10,14 @@ const PLACES = [
 ];
 
 describe("«العملاء» automatic classification", () => {
+  it("does not invent Yalova from staff wording or Bali from part of a word", () => {
+    const places = [...PLACES, { name: "يلوا", country: "تركيا" }, { name: "بالي", country: "اندونيسيا" }, { name: "اندونيسيا", country: "اندونيسيا" }];
+    expect(findPlace([], "بالتفاصيل والبرنامج والاسعار", places)).toBe("");
+    expect(findPlace([], "ممكن تعطيني تفاصيل أكثر عن العروض الحالية", places)).toBe("");
+    expect(findPlace([], "اندونيسيا", places)).toBe("اندونيسيا");
+    expect(findPlace([], "أبي رحلة لتركيا", places)).toBe("تركيا");
+    expect(findPlace([], "باليوم كم؟", places)).toBe("");
+  });
   it("reads the kind from the labels first, then the client's words", () => {
     expect(classifyInquiry(["بكج"], "كم سعر التذكرة")).toBe("بكج");
     expect(classifyInquiry([], "ابغى باقة شهر عسل")).toBe("بكج");

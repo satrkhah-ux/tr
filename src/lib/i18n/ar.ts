@@ -1955,6 +1955,8 @@ export const ar: Dictionary = {
   "nav.basic": "النظام بيسك",
   // the menus' reorganisation (2026-10-17)
   "nav.legacyGenerator": "مولد البكجات (القديم)",
+  "nav.managementDecisions": "قرارات الإدارة",
+  "nav.muradSettings": "إعدادات مُراد",
   "nav.developer": "المطوّر",
   "nav.sla": "SLA — سرعة الرد",
   "rp.title": "إعادة تصميم بكج مورّد",

@@ -174,7 +174,7 @@ export async function setMuradAutoPhones(phones: string[]): Promise<SetSettingRe
 
 /** «سياسات الشركة» Murad answers policy questions from — empty: those go to staff. */
 export async function getMuradPolicies(): Promise<string> {
-  if (!(await currentCan("settings.manage"))) return "";
+  if (!(await currentCan("settings.manage")) && !(await currentCan("developer.access"))) return "";
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data } = await supabase.from("app_settings").select("value").eq("key", "murad_policies").maybeSingle();
@@ -185,7 +185,7 @@ export async function getMuradPolicies(): Promise<string> {
 }
 
 export async function setMuradPolicies(text: string): Promise<SetSettingResult> {
-  if (!(await currentCan("settings.manage"))) return { ok: false, error: "err.forbidden" };
+  if (!(await currentCan("settings.manage")) && !(await currentCan("developer.access"))) return { ok: false, error: "err.forbidden" };
   if (typeof text !== "string" || text.length > 4000) return { ok: false, error: "err.db" };
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;

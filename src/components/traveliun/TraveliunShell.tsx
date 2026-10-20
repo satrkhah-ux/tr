@@ -243,6 +243,8 @@ export const navGroups: NavGroup[] = [
   // «SLA» — how long Teletel conversations wait, and «المتابعة» (dashboard.admin / developer.access, section-access.ts)
   { labelKey: "nav.sla", href: "/sla", icon: Timer },
   // «المطوّر» — the service switches and the external links' health (developer.access, section-access.ts)
+  { labelKey: "nav.managementDecisions", href: "/management-decisions", icon: Wrench },
+  { labelKey: "nav.muradSettings", href: "/murad-settings", icon: Wrench },
   { labelKey: "nav.developer", href: "/developer", icon: Wrench },
 ];
 

@@ -27,10 +27,10 @@ const RUNTIME = String.raw`
   function $(id) { return document.getElementById(id); }
   var layers = [$("a0"), $("a1")], front = 0, shown = layers[0].getAttribute("src") || "", pending = "", failed = "", failedAt = 0, preloaded = "";
   var box = $("alert"), boxImg = $("alertImg"), shownAlert = "";
-  var band = $("band"), text = $("tick"), tag = $("alertTag"), scale = 1, bandUp = false;
+  var text = $("tick"), tag = $("alertTag"), scale = 1;
   // the demo (while the TVs are set up): this load, on this screen only, one pass and then a «تجربة» alert
   var demo = S.demo, demoAt = Date.now();
-  function passMs() { return S.ticker ? tickerPassMs(S.ticker.speed, S.ticker.width, S.screens, REF) : 0; }
+  function passMs() { return 36000; }
   var pre = new Image();
 
   function measure() {
@@ -92,20 +92,26 @@ const RUNTIME = String.raw`
     box.className = "on";
   }
 
-  // the band is down until its pass: every period, and once more when its words changed (bumpAt)
+  // A legible full-screen bulletin, synchronized by server time every ten minutes.
+  var spotlightKey = "";
   function drawTicker(t) {
-    var k = S.ticker, e = -1;
-    if (k) {
-      var d = demo ? Date.now() - demoAt : -1;
-      e = d >= 0 && d < passMs() ? d : tickerElapsed(t, k.periodMs, passMs(), k.bumpAt);
+    var countries = S.countries || [], elapsed = ((t % 600000) + 600000) % 600000;
+    var active = countries.length > 0 && elapsed < 36000;
+    var key = active ? Math.floor(t / 600000) + "|" + countries.join("|") : "";
+    if (key === spotlightKey) return;
+    spotlightKey = key;
+    var panel = $("countries");
+    if (!active) { panel.className = ""; return; }
+    var html = "";
+    for (var i = 0; i < countries.length; i++) {
+      var card = document.createElement("div");
+      card.className = "country c" + i;
+      var rank = document.createElement("b"); rank.textContent = (i + 1 < 10 ? "0" : "") + (i + 1);
+      var name = document.createElement("span"); name.textContent = countries[i];
+      card.appendChild(rank); card.appendChild(name); html += card.outerHTML;
     }
-    // the band never covers the ad (its price sits at the bottom): while it is up the ad moves above it, whole
-    if ((e >= 0) !== bandUp) { bandUp = e >= 0; band.className = bandUp ? "up" : ""; document.body.className = bandUp ? "band" : ""; }
-    if (e < 0) return;
-    var px = tickerLeft(e, k.speed, k.width, S.position, REF) * scale;
-    var v = "translate3d(" + px.toFixed(1) + "px,0,0)";
-    text.style.webkitTransform = v;
-    text.style.transform = v;
+    $("countryList").innerHTML = html;
+    panel.className = "on";
   }
 
   function frame() {
@@ -135,7 +141,7 @@ const RUNTIME = String.raw`
       if (s.build && S.build && s.build !== S.build) { location.reload(); return; }
       var words = S.ticker ? S.ticker.text : "", next = s.ticker ? s.ticker.text : "";
       S = s;
-      if (words !== next) { text.textContent = next; measure(); }
+      if (words !== next) { text.textContent = next; }
     };
     x.send();
   }
@@ -219,6 +225,22 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #band{position:absolute;left:0;right:0;bottom:0;height:9%;z-index:3;background:rgba(10,58,51,.92);border-top:.35vh solid #2aa87a;overflow:hidden;-webkit-transform:translateY(105%);transform:translateY(105%);-webkit-transition:-webkit-transform .7s;transition:transform .7s}
 #band.up{-webkit-transform:translateY(0);transform:translateY(0)}
 #tick{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;direction:rtl;color:#fff;font-weight:800;line-height:1.24;will-change:transform}
+#band{display:none}
+#countries{position:absolute;inset:0;z-index:2;display:none;background:radial-gradient(ellipse at top right,#245c50,#071e1a 70%);color:#fff;padding:5vh 6vw;box-sizing:border-box;text-align:right}
+#countries.on{display:block;animation:rise .7s ease-out both}
+#countries h1{font-size:4.3vw;margin:1vh 0 0;font-weight:800}
+#countries p{font-size:1.8vw;color:#c7dbd3;margin:1vh 0 4vh}
+#countries .eyebrow{font-size:1.6vw;color:#e4c567;letter-spacing:.08em}
+#countryList{display:flex;flex-wrap:wrap;gap:1.4vw}
+.country{width:calc(50% - .7vw);box-sizing:border-box;border:1px solid #476c5d;border-radius:1vw;padding:1.1vh 1.7vw;display:flex;align-items:center;gap:1.6vw;background:#163b32;animation:rise .8s both}
+.country b{font-size:3.2vw;color:#e4c567;font-weight:800;min-width:4vw}
+.country span{font-size:2.9vw;font-weight:800}
+.country.c0{background:#e4c567;color:#102f27;border-color:#e4c567}.country.c0 b{color:#102f27}
+.country.c1{animation-delay:.1s}.country.c2{animation-delay:.2s}.country.c3{animation-delay:.3s}.country.c4{animation-delay:.4s}.country.c5{animation-delay:.5s}.country.c6{animation-delay:.6s}.country.c7{animation-delay:.7s}
+#countries footer{position:absolute;bottom:4vh;font-size:1.4vw;color:#c7dbd3}
+#alert{z-index:4}
+@media(prefers-reduced-motion:reduce){#countries.on,.country{animation:none}}
+
 `;
 
 export function screenPage(n: number, s: ScreenState, monitor: boolean): string {
@@ -239,6 +261,7 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="flight"><div id="trail"></div><svg id="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
 <div id="alertTag">تجربة</div>
 <div id="msg"><div id="kicker"><i></i>عميل جديد الآن</div><div id="aDest"></div><div id="aKind"></div></div></div>
+<section id="countries"><div class="eyebrow">ترافليون · نبض السفر</div><h1>الدول الأكثر طلبًا اليوم</h1><p>الوجهات مرتّبة حسب طلبات العملاء اليوم · بتوقيت الرياض</p><div id="countryList"></div><footer>الوجهة القادمة تبدأ بسؤال · يتجدد العرض كل 10 دقائق</footer></section>
 <div id="band"><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
 <script>window.__S__=${json(s)};window.__N__=${n};window.__M__=${monitor ? "true" : "false"};</script>
 <script>${SCREEN_CORE}${RUNTIME}</script>

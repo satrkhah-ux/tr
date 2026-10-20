@@ -31,6 +31,7 @@ export const HOLDING_REPLY = "حيّاك الله، استلمنا طلبك وأ
 export const AUTO_NOTE = "🤖 مُراد ردّ تلقائياً — لم يُستلم الطلب خلال 5 دقائق";
 
 export const SETTING = {
+  control: "murad_control",
   autoPhones: "murad_auto_phones",
   testPhone: "client_whatsapp_test_phone",
   clientWhatsapp: "client_whatsapp",
@@ -339,6 +340,7 @@ export type MuradFile = {
 export type MuradReadyOffer = { title: string; nights: number | null; price: number | null; currency: string | null; includes: string; validity: string };
 
 export type MuradContext = {
+  includePrice?: boolean;
   now: string;
   /** no phone: the model never needs the client's number */
   contact: { name: string; labels: string[] };

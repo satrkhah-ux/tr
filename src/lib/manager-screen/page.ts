@@ -27,7 +27,7 @@ const v = (px: number) => `${+(px / 19.2).toFixed(3)}vw`;
 const RUNTIME = String.raw`
 (function () {
   var F = window.__F__;
-  var offset = F.now - Date.now(), born = Date.now(), lastRender = "", lastPanel = -1, lastTicker = "", lastSummary = "", lastNext = "";
+  var offset = F.now - Date.now(), born = Date.now(), lastRender = "", lastPanel = -1, lastSummary = "", lastNext = "";
   var PANEL_MS = 20000, SPEED = 90;
   var LRI = String.fromCharCode(0x2066), PDI = String.fromCharCode(0x2069);
   var DAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
@@ -150,22 +150,17 @@ const RUNTIME = String.raw`
     side.className = red ? "" : "calm";
     side.innerHTML = h;
 
-    var words = "";
-    for (var j = 0; j < F.ticker.length; j++) {
-      var e = F.ticker[j];
-      words += '<span class="' + (e.red ? "ti bad" : "ti") + '">' + esc(e.text) + "</span>";
-    }
-    if (words !== lastTicker) { lastTicker = words; $("tick").innerHTML = words || '<span class="ti">لا أحداث اليوم بعد</span>'; }
+
   }
 
-  // left to right, as an Arabic news ticker; the loop from the clock alone
+  // One complete item at a time: readable decisions and events, twelve seconds each.
   function drawTicker(t) {
-    var el = $("tick"), w = el.offsetWidth, box = $("rail").offsetWidth;
-    if (!w || !box) return;
-    var loop = w + box, x = ((t / 1000) * SPEED) % loop - w;
-    var tr = "translate3d(" + x.toFixed(1) + "px,0,0)";
-    el.style.webkitTransform = tr;
-    el.style.transform = tr;
+    var list = F.ticker || [], item = list.length ? list[Math.floor(t / 12000) % list.length] : null;
+    var value = item ? item.text : "قرارات الإدارة — سجّل الإجراء والمسؤول وموعد التنفيذ من لوحة التحكم";
+    var el = $("tick");
+    if (el.textContent !== value) el.textContent = value;
+    el.className = item && item.red ? "decision-line bad" : "decision-line";
+    el.style.webkitTransform = "none"; el.style.transform = "none";
   }
 
   // on the hour, 30 s: the day's summary once it exists, else the hour's
@@ -347,6 +342,9 @@ footer .now{position:relative;z-index:1;display:grid;place-items:center;padding:
 #summary.on{opacity:1}
 #stitle{font-size:${v(62)};font-weight:800;color:var(--gold);margin-bottom:${v(36)}}
 #slines{margin:0;padding:0 ${v(36)} 0 0;font-size:${v(34)};font-weight:700;line-height:1.7}
+#tick.decision-line.bad{color:#9b1c25}
+#tick.decision-line{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;white-space:normal;direction:rtl;text-align:center;padding:0 2vw;font-size:1.35vw;line-height:1.35;box-sizing:border-box;overflow:hidden}
+
 `;
 
 /** the logo mark, as the office screens draw it */

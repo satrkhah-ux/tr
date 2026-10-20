@@ -1,5 +1,6 @@
 import { fold } from "./sheet";
 import type { Place } from "./auto";
+import { mentionsPlace } from "./place-match";
 
 /**
  * «ما الوجهة؟» — one place decides it (the owner, 2026-10-19: «الدول الأكثر
@@ -29,9 +30,9 @@ const ALIASES: [string, string, string | null][] = [
   ["لندن", "المملكة المتحدة", "لندن"],
   ["امريكا", "الولايات المتحدة", null],
   ["تايلند", "تايلاند", null],
-  ["الشمالالتركي", "تركيا", "الشمال التركي"],
+  ["الشمال التركي", "تركيا", "الشمال التركي"],
   ["الخرطوم", "السودان", "الخرطوم"],
-  ["بورتسودان", "السودان", "بورتسودان"],
+  ["بورت سودان", "السودان", "بورتسودان"],
   ["فوكو", "فيتنام", "فوكوك"],
   ["شنغن", "شنغن (أوروبا)", null],
   ["شينغن", "شنغن (أوروبا)", null],
@@ -56,12 +57,12 @@ export function resolvePlace(text: string | null | undefined, places: Place[]): 
   type Hit = { name: string; country: string; city: string | null; len: number };
   const hits: Hit[] = [
     ...places
-      .filter((p) => fold(p.name).length >= 3 && (f.includes(fold(p.name)) || strip(p.name) === strip(raw)))
+      .filter((p) => fold(p.name).length >= 3 && (mentionsPlace(raw, p.name) || strip(p.name) === strip(raw)))
       .map((p) => {
         const country = p.country || p.name;
         return { name: p.name, country, city: strip(p.name) === strip(country) ? null : p.name, len: fold(p.name).length };
       }),
-    ...ALIASES.filter(([k]) => f.includes(fold(k))).map(([k, country, city]) => ({ name: city ?? country, country, city, len: fold(k).length })),
+    ...ALIASES.filter(([k]) => mentionsPlace(raw, k)).map(([k, country, city]) => ({ name: city ?? country, country, city, len: fold(k).length })),
   ].sort((x, y) => y.len - x.len);
   // a destination wins over where the client is: «انا من السعودية وابي لندن» asks for London
   const dest = hits.find((h) => !isSaudi(h.country));

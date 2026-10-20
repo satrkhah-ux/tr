@@ -134,6 +134,8 @@ export type AuditAction =
   // the reference catalogue was exported/imported as a whole
   // managers changing what the system says or shows (guides, message templates)
   | "settings.updated"
+  | "management.decision.created"
+  | "management.decision.updated"
   | "catalog.imported"
   // «استعادة نسخة سابقة»: an older version's draft put back and issued as the next version
   | "offer.version_restored"

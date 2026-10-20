@@ -1,3 +1,4 @@
+import { inMuradScope } from "./control";
 import "server-only";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -5,7 +6,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getFeatureFlags } from "@/lib/features-server";
 import {
   addTeletelNote,
-  assignTeletelTeam,
+  assignMuradHandoff,
   conversationEvents,
   intlPhone,
   listOpenConversations,
@@ -369,7 +370,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
   if (!m.conversationId || !m.messageId) return "unreadable";
   const service = db();
   const [flags, settings, reception] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service)]);
-  if (!flags.murad_reception || settings.clientWhatsapp === "off") return "off";
+  if (!flags.murad_reception || !settings.control.tasks.reception || settings.clientWhatsapp === "off") return "off";
   const phone = intlPhone(m.phone);
   // the trial: the owner's two numbers only, until they widen it from /developer
   if (reception.scope !== "all" && (!phone || !settings.autoList.includes(phone))) return "out_of_scope";
@@ -394,7 +395,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       conversationEvents(m.conversationId),
     ]);
     const since = m.since ?? m.at;
-    if (!thread) {
+    if (!thread || !inMuradScope(settings.control, thread.inboxId ?? null, thread.teamId ?? null)) {
       await finish({ reason: "unreadable", error: "teletel: the thread could not be read" });
       return "unreadable";
     }
@@ -431,7 +432,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     // «عرض آلي»: a trip to a country the company prices this way — asked for what is missing, then proposed. The
     // whole visit is read each time, the client's lines and Murad's between them, the newest word winning (the
     // owner, 2026-10-19: «فهم الرسائل والاعتماد على المحادثات السابقة»); a change after the offer re-issues it.
-    const offers = readOffers(reception.offersRaw);
+    const offers = settings.control.tasks.offers ? readOffers(reception.offersRaw) : [];
     const offerRows = received.filter((r) => r.reason?.startsWith("offer:"));
     const offerAsked = offerRows.filter((r) => r.reason?.startsWith("offer:asked"));
     const sentRow = [...offerRows].reverse().find((r) => r.reason === "offer:sent" || r.reason === "offer:updated");
@@ -463,9 +464,10 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
         return "send_failed";
       }
       const teams = await listTeletelTeams();
-      const teamId = teamFor(readRoutes(reception.routesRaw, teams), "بكج");
+      const handoff = settings.control.handoffs["بكج"];
+    const teamId = handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), "بكج");
       const team = teams.find((t) => t.id === teamId) ?? null;
-      const assigned = teamId ? await assignTeletelTeam(m.conversationId, teamId) : false;
+      const assigned = await assignMuradHandoff(m.conversationId, teamId, handoff?.agentId ?? null);
       await addTeletelNote(m.conversationId, `🤖 عرض آلي — يحتاج زميلاً${team ? ` من «${team.name}»` : ""}: ${special}. ما فُهم: ${summary}.`);
       await finish({ reason: "offer:handoff", reply: text, reply_message_id: replyId, intake: { country: c.country, ...trip, special, team_id: teamId, assigned, wait_sec: waitSec } });
       await markLead(service, m, { inquiry: "بكج", destination: c.country, route: team?.name.trim() ?? DEPARTMENT["بكج"], at: new Date().toISOString(), waitSec, name: trip.name });
@@ -482,7 +484,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     // Murad keeps the conversation (a follow-up «وإسبانيا؟», a question more) until a colleague answers the client.
     const visaRows = received.filter((r) => r.reason?.startsWith("visa:"));
     const visaAsked = visaRows.filter((r) => r.reason?.startsWith("visa:asked") || r.reason === "visa:info");
-    const visaOpen = free && routedTo.length === 0 && !sentRow && (request.kind === "تأشيرات" || visaRows.length > 0);
+    const visaOpen = settings.control.tasks.visas && free && routedTo.length === 0 && !sentRow && (request.kind === "تأشيرات" || visaRows.length > 0);
     let tripWithVisa = false;
     // with the trip, the visa in one line of the offer: needless for those passports, else the visa team's
     let visaLine: string | null = null;
@@ -533,7 +535,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
           const reason = step.act === "handoff" ? step.reason : !rate ? "السعر يحدده زميلنا بعد مراجعة الطلب" : null;
           const answer =
             !reason && row && rate && country
-              ? visaAnswerText({ country: country.arabic_name, row, applicants: known.applicants, sarPer: rate, check: need2 !== "required" || !known.nationality, topics: known.topics, need: step.act === "info" ? step.need : undefined })
+              ? visaAnswerText({ includePrice: settings.control.includePrice, country: country.arabic_name, row, applicants: known.applicants, sarPer: rate, check: need2 !== "required" || !known.nationality, topics: known.topics, need: step.act === "info" ? step.need : undefined })
               : null;
           const text = answer ?? visaHandoffText(reason ?? "السعر يحدده زميلنا بعد مراجعة الطلب", summary, opensAt ? sayTime(opensAt) : null);
           const replyId = await sendTeletelMessage(m.conversationId, text);
@@ -550,9 +552,10 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
             return "asked";
           }
           const teams = await listTeletelTeams();
-          const teamId = teamFor(readRoutes(reception.routesRaw, teams), "تأشيرات");
+          const handoff = settings.control.handoffs["تأشيرات"];
+    const teamId = handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), "تأشيرات");
           const team = teams.find((t) => t.id === teamId) ?? null;
-          const assigned = teamId ? await assignTeletelTeam(m.conversationId, teamId) : false;
+          const assigned = await assignMuradHandoff(m.conversationId, teamId, handoff?.agentId ?? null);
           await addTeletelNote(
             m.conversationId,
             answer
@@ -587,7 +590,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
         if (rate && days > 1 && merged.adults) {
           const price = priceOffer(offer, days, merged.adults, rate, { rooms: merged.rooms, onlyCity: merged.only_city });
           const name = merged.name ?? firstName(m.contactName) ?? "";
-          const text = `حدّثت الطلب: ${tripSummary(offer.country, { ...merged, days, arrival: provisional ? null : arrival })}\n\n${offerText({ name, country: offer.country, price, arrival, provisional, c: offer })}`;
+          const text = `حدّثت الطلب: ${tripSummary(offer.country, { ...merged, days, arrival: provisional ? null : arrival })}\n\n${offerText({ includePrice: settings.control.includePrice, name, country: offer.country, price, arrival, provisional, c: offer })}`;
           const replyId = await sendTeletelMessage(m.conversationId, text);
           if (!replyId) {
             await finish({ reason: "send_failed", reply: text, error: "send_failed" });
@@ -603,7 +606,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
             const { data: row } = await service.from("offer_drafts").insert({ data, title: `مُراد — ${name}` }).select("id").maybeSingle();
             draftId = (row as { id: string } | null)?.id ?? null;
           }
-          const issued = draftId ? await issueAndSend(draftId, m.conversationId, Boolean(serial)) : null;
+          const issued = draftId && settings.control.includePrice ? await issueAndSend(draftId, m.conversationId, Boolean(serial)) : null;
           await addTeletelNote(
             m.conversationId,
             `🤖 عرض آلي: العميل حدّث الطلب — ${tripSummary(offer.country, { ...merged, days })}، ${price.totalSar.toLocaleString("en-US")} ريال.${issued ? ` صدرت النسخة ${issued.version} من ${issued.serial}${issued.sent ? " وأُرسلت للعميل" : ""}.` : " تعذّر إصدار النسخة — أصدرها من بيسك."}`,
@@ -640,7 +643,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
           if (rate) {
             const price = priceOffer(offer, days, trip.adults ?? 2, rate, { rooms: trip.rooms, onlyCity: trip.only_city });
             const name = trip.name ?? firstName(m.contactName) ?? "";
-            const text = `${offerText({ name, country: offer.country, price, arrival, provisional, c: offer })}${visaLine ? `
+            const text = `${offerText({ includePrice: settings.control.includePrice, name, country: offer.country, price, arrival, provisional, c: offer })}${visaLine ? `
 ${visaLine}` : ""}`;
             const replyId = await sendTeletelMessage(m.conversationId, text);
             if (!replyId) {
@@ -655,11 +658,12 @@ ${visaLine}` : ""}`;
               .select("id")
               .maybeSingle();
             const draftId = (draftRow as { id: string } | null)?.id ?? null;
-            const issued = draftId ? await issueAndSend(draftId, m.conversationId) : null;
+            const issued = draftId && settings.control.includePrice ? await issueAndSend(draftId, m.conversationId) : null;
             const teams = await listTeletelTeams();
-            const teamId = teamFor(readRoutes(reception.routesRaw, teams), "بكج");
+            const handoff = settings.control.handoffs["بكج"];
+    const teamId = handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), "بكج");
             const team = teams.find((t) => t.id === teamId) ?? null;
-            const assigned = teamId ? await assignTeletelTeam(m.conversationId, teamId) : false;
+            const assigned = await assignMuradHandoff(m.conversationId, teamId, handoff?.agentId ?? null);
             const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
             await addTeletelNote(
               m.conversationId,
@@ -717,9 +721,10 @@ ${visaLine}` : ""}`;
       return "send_failed";
     }
     const teams = await listTeletelTeams();
-    const teamId = teamFor(readRoutes(reception.routesRaw, teams), decision.to);
+    const handoff = settings.control.handoffs[decision.to];
+    const teamId = handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), decision.to);
     const team = teams.find((t) => t.id === teamId) ?? null;
-    const assigned = teamId ? await assignTeletelTeam(m.conversationId, teamId) : false;
+    const assigned = await assignMuradHandoff(m.conversationId, teamId, handoff?.agentId ?? null);
     await addTeletelNote(
       m.conversationId,
       `🤖 المستقبل الآلي: ${decision.to}${request.country ? ` · ${request.country}` : ""} — ${assigned && team ? `حُوّلت إلى «${team.name}»` : "لا فريق لهذا القسم في الإعدادات — بانتظار من يستلمها"}`,
@@ -763,9 +768,14 @@ export async function schedule(m: IncomingMessage): Promise<"waiting" | "extende
   if (!m.conversationId || !m.messageId) return "unreadable";
   const service = db();
   const [flags, settings, reception] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service)]);
-  if (!flags.murad_reception || settings.clientWhatsapp === "off") return "off";
+  if (!flags.murad_reception || !settings.control.tasks.reception || settings.clientWhatsapp === "off") return "off";
   const phone = intlPhone(m.phone);
   if (reception.scope !== "all" && (!phone || !settings.autoList.includes(phone))) return "out_of_scope";
+  if (settings.control.inboxIds.length || settings.control.teamIds.length) {
+    const thread = await readThread(m.conversationId);
+    if (!thread) return "unreadable";
+    if (!inMuradScope(settings.control, thread.inboxId ?? null, thread.teamId ?? null)) return "out_of_scope";
+  }
   void markTeletelSeen(m.conversationId);
   const delay = parseDelay(reception.delay);
   const now = Date.now();
@@ -822,13 +832,13 @@ export async function receptionToday(): Promise<{ routed: number; asked: number;
 export async function receptionSweep(): Promise<number> {
   const service = db();
   const [flags, settings, reception, list] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service), listOpenConversations()]);
-  if (!flags.murad_reception || !list) return 0;
+  if (!flags.murad_reception || !settings.control.tasks.reception || !list) return 0;
   const nowSec = Math.floor(Date.now() / 1000);
   // a client waiting on us for under half an hour — a new conversation, or an old one the client reopened
-  const fresh = list.rows.filter((c) => c.waitingSince > 0 && nowSec - c.waitingSince < 1800 && (reception.scope === "all" || settings.autoList.includes(intlPhone(c.phone) ?? "")));
+  const fresh = list.rows.filter((c) => inMuradScope(settings.control, c.inboxId, c.teamId) && c.waitingSince > 0 && nowSec - c.waitingSince < 1800 && (reception.scope === "all" || settings.autoList.includes(intlPhone(c.phone) ?? "")));
   if (!fresh.length) return 0;
   // where Murad's own five-minute answer runs (run.ts: murad_auto on the auto list) it answers the client's words — better than «وصلت رسالتك», and it comes next in this same run
-  const held = await holdSweep(service, fresh.filter((c) => !(flags.murad_auto && settings.autoList.includes(intlPhone(c.phone) ?? ""))), nowSec, reception.hours);
+  const held = settings.control.tasks.holding ? await holdSweep(service, fresh.filter((c) => !(flags.murad_auto && settings.autoList.includes(intlPhone(c.phone) ?? ""))), nowSec, reception.hours) : 0;
   const { data } = await service
     .from("murad_log")
     .select("conversation_id")

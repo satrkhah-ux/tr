@@ -282,6 +282,7 @@ export async function updateLead(id: string, patch: LeadPatch): Promise<{ ok: bo
   if (!(await getCurrentEmployeeId())) return { ok: false, error: "err.session" };
   const clean: Record<string, unknown> = {};
   for (const k of EDITABLE) if (k in patch) clean[k] = patch[k] === "" ? null : patch[k];
+  if ("destination" in clean) clean.destination_source = "manual";
   if (clean.status !== undefined && clean.status !== "open" && clean.status !== "closed") return { ok: false, error: "status" };
   if (typeof clean.inquiry === "string") clean.inquiry = normalizeInquiry(clean.inquiry) || null;
   // handing it over here: the sheet's handwritten name no longer applies, and the hand-over's clock starts now

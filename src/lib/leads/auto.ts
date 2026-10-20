@@ -1,4 +1,5 @@
 import { fold } from "./sheet";
+import { mentionsPlace } from "./place-match";
 
 /**
  * «العملاء» phase two: what a Teletel conversation says about itself, with no
@@ -38,9 +39,8 @@ export type Place = { name: string; country: string };
 export function findPlace(labels: string[], text: string, places: Place[]): string {
   const sorted = [...places].filter((p) => fold(p.name).length >= 3).sort((a, b) => fold(b.name).length - fold(a.name).length);
   for (const source of [labels.join(" "), text]) {
-    const f = fold(source);
-    if (!f) continue;
-    const hit = sorted.find((p) => f.includes(fold(p.name)));
+    if (!source.trim()) continue;
+    const hit = sorted.find((p) => mentionsPlace(source, p.name));
     if (hit) return hit.name;
   }
   return "";
