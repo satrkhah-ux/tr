@@ -4,7 +4,7 @@ type Place = { name: string; country: string };
 type Message = { id: number; at: number; text: string; fromClient: boolean; isPrivate: boolean };
 const normalize = (s: string) => s.normalize("NFKC").replace(/[أإآ]/g, "ا").replace(/[ى]/g, "ي").replace(/[\u064b-\u065f\u0670ـ]/g, "").toLowerCase();
 const originQuestion = /(?:مدين[ةه]|مكان|دول[ةه])\s*(?:ال)?(?:اقلاع|مغادر[ةه]|انطلاق)|(?:من وين|من اين|مدينتك|الجنسي[ةه]|مكان التبصيم)|departure|departing from/i;
-const destinationQuestion = /(?:حدد|ما|ايش|وين|اي|ماهي|ما هي).{0,16}(?:وجه|دول|سفر)|(?:وين|اين).{0,12}(?:تسافر|تروح)|destination|where to/i;
+const destinationQuestion = /(?:^|[^\p{L}])(?:حدد|اختر|اي|ماهي|ما هي|ما|ايش)\s+(?:هي\s+)?(?:ال)?(?:وجه[ةهتك]|دول[ةه])|(?:^|[^\p{L}])(?:وين|اين)\s+.{0,12}(?:تسافر|تروح)|\b(?:destination|where to)\b/iu;
 
 /**
  * Read the visit chronologically. Staff text may identify a question, never

@@ -51,5 +51,6 @@ describe("destination intent across the conversation", () => {
   });
   it("does not treat discussion of another visa as a change of the request", () => {
     expect(read([["ابغى تأشيرة شنغن للتشيك", true], ["هل لازم يكون عندي تأشيرة للنمسا؟", true]]).destination).toBe("التشيك");
+    expect(read([["ابغى تأشيرة شنغن للتشيك", true], ["طالما هتدخل دوله التشيك لازم تكون تاشيرة التشيك", false], ["انا ناوي من التشيك اروح النمسا", true]]).destination).toBe("التشيك");
   });
 });
