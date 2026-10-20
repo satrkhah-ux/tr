@@ -25,7 +25,7 @@ describe("«العملاء» automatic classification", () => {
     expect(classifyInquiry([], "ابي حجز فندق في مكة")).toBe("فنادق");
     expect(classifyInquiry([], "عندكم تذاكر للرياض؟")).toBe("طيران");
     expect(classifyInquiry([], "ابي سيارة مع سائق")).toBe("مواصلات");
-    expect(classifyInquiry([], "السلام عليكم")).toBe("غير مصنف");
+    expect(classifyInquiry([], "السلام عليكم")).toBe("طلب غير واضح");
     expect(classifyInquiry([], "")).toBe("");
   });
 
@@ -80,13 +80,18 @@ describe("the conversation's turns (0099)", () => {
 
 describe("a service the client does not want is not their request", () => {
   it("«رحلة جورجيا 10 أيام بدون طيران» is no flight", () => {
-    expect(classifyInquiry([], "ابي رحلة جورجيا 10 أيام بدون طيران")).toBe("غير مصنف");
+    expect(classifyInquiry([], "ابي رحلة جورجيا 10 أيام بدون طيران")).toBe("طلب غير واضح");
     expect(classifyInquiry([], "بكج تركيا بدون طيران")).toBe("بكج");
     expect(classifyInquiry([], "ابي تذاكر طيران")).toBe("طيران");
   });
 });
-it("does not treat greetings as a confirmed inquiry, but preserves an explicit inquiry label", () => {
-  expect(classifyInquiry([], "السلام عليكم ممكن تفاصيل")).toBe("غير مصنف");
-  expect(classifyInquiry(["يستفسر"], "السلام عليكم")).toBe("يستفسر");
+it("does not treat greetings as a confirmed inquiry, and ignores a retired generic label", () => {
+  expect(classifyInquiry([], "السلام عليكم ممكن تفاصيل")).toBe("طلب غير واضح");
+  expect(classifyInquiry(["يستفسر"], "السلام عليكم")).toBe("طلب غير واضح");
   expect(classifyInquiry([], "أريد تأشيرة")).toBe("تأشيرات");
+});
+
+it("uses the requested service even when a retired label is present", () => {
+  expect(classifyInquiry(["يستفسر"], "أريد حجز فندق")).toBe("فنادق");
+  expect(classifyInquiry(["استفسار"], "تأشيرة مصر")).toBe("تأشيرات");
 });

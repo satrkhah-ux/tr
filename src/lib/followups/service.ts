@@ -64,11 +64,13 @@ export async function enrollFollowup(c: OpenConversation, source: "manual" | "te
 /** Read-only Teletel synchronization. No messages, team moves, or SLA activation. */
 export async function syncFollowups() {
   const db = followupDb();
-  const [teamId, fetched, { data: stored }] = await Promise.all([
+  const [teamId, fetched, { data: stored }, { data: unclear }] = await Promise.all([
     followupTeamId(), listOpenConversations(true),
     followupRows((a, b) => db.from("sla_followups").select(WORK_COLS).order("created_at").range(a, b)),
+    followupRows((a, b) => db.from("client_leads").select("teletel_conversation_id,last_visit_at,created_at").eq("inquiry", "طلب غير واضح").eq("status", "open").not("teletel_conversation_id", "is", null).order("id").range(a, b)),
   ]);
   if (!fetched) throw new Error("followup sync unavailable");
+  const unclearIds = new Map(unclear.map((r) => [Number(r.teletel_conversation_id), Date.parse(r.last_visit_at ?? r.created_at)]));
   const rows = (stored ?? []) as WorkRow[];
   const active = new Map(rows.filter((r) => r.status === "open").map((r) => [r.conversation_id, r]));
   const latestDone = new Map<number, WorkRow>();
@@ -80,10 +82,10 @@ export async function syncFollowups() {
   const now = new Date().toISOString();
   for (const c of fetched.rows) {
     const row = active.get(c.id);
-    if (!row && c.teamId === teamId) {
+    if (!row && (c.teamId === teamId || unclearIds.has(c.id))) {
       const done = latestDone.get(c.id);
-      if (done && c.waitingSince * 1000 <= Date.parse(done.done_at ?? done.created_at)) continue;
-      await enrollFollowup(c, "teletel", done ? "عودة العميل بطلب جديد" : "تحويل إلى فريق متابعة المبيعات");
+      if (done && Math.max(c.waitingSince * 1000, unclearIds.get(c.id) ?? 0) <= Date.parse(done.done_at ?? done.created_at)) continue;
+      await enrollFollowup(c, unclearIds.has(c.id) ? "sla" : "teletel", unclearIds.has(c.id) ? "طلب غير واضح — متابعة العميل لتحديد الخدمة المطلوبة" : done ? "عودة العميل بطلب جديد" : "تحويل إلى فريق متابعة المبيعات");
       added++;
     } else if (row) {
       const patch: Record<string, unknown> = { last_synced_at: now, external_status: "open" };
@@ -92,7 +94,7 @@ export async function syncFollowups() {
         patch.last_client_at = incomingAt;
         if (["waiting", "scheduled"].includes(row.stage)) { patch.stage = row.assigned_to ? "working" : "new"; patch.next_followup_at = null; awakened++; }
       }
-      if (row.source === "teletel" && c.teamId !== teamId && !row.send_lock) {
+      if (row.source === "teletel" && c.teamId !== teamId && !unclearIds.has(c.id) && !row.send_lock) {
         patch.external_status = "transferred";
         patch.status = "done"; patch.stage = "transferred"; patch.done_at = now;
         patch.outcome = "transferred"; patch.note = "نُقلت المحادثة إلى قسم آخر في Teletel";

@@ -230,7 +230,7 @@ const DAY_MS = 86_400_000;
 const RECENT_WAIT_MIN = 1440;
 export const TICKER_HOURS = 6;
 const TICKER_MAX = 40;
-export const INQUIRY_KINDS = ["بكج", "فنادق", "طيران", "تأشيرات", "يستفسر"] as const;
+export const INQUIRY_KINDS = ["بكج", "فنادق", "طيران", "تأشيرات", "مواصلات", "طلب غير واضح"] as const;
 
 const minutesText = (m: number) => (m < 60 ? arCount(Math.round(m), "دقيقة", "دقيقتين", "دقائق") : agePhrase(m / 60));
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);

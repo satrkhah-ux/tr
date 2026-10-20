@@ -4,7 +4,7 @@ import { mentionsPlace } from "./place-match";
 /**
  * «العملاء» phase two: what a Teletel conversation says about itself, with no
  * one typing it — the kind of request and the place, read from its labels and
- * the client's words. Rules, not guesses: nothing found → empty, and text with no recognized service remains «غير مصنف».
+ * the client's words. Rules, not guesses: nothing found → empty, and text with no recognized service remains «طلب غير واضح».
  */
 
 /** the service a client names, first match wins — patterns are written folded (fold(): no spaces, no hamza, ه for ة) (a visa before a flight: «تأشيرة وتذكرة» is a visa file) */
@@ -21,12 +21,11 @@ const NOT_WANTED = /(?:بدون|بلا|من غير|غير شامل|ما يحتا
 
 /** «بكج» … from the labels first (staff put them), else the client's words; no recognized service is unclassified */
 export function classifyInquiry(labels: string[], text: string): string {
-  if (labels.some((label) => ["يستفسر", "استفسار"].includes(fold(label)))) return "يستفسر";
   for (const source of [labels.join(" "), text.replace(NOT_WANTED, " ")]) {
     const f = fold(source);
     for (const [label, re] of KINDS) if (re.test(f)) return label;
   }
-  return text.trim() ? "غير مصنف" : "";
+  return text.trim() ? "طلب غير واضح" : "";
 }
 
 export type Place = { name: string; country: string };

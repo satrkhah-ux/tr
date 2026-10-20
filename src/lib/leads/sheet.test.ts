@@ -35,7 +35,7 @@ describe("leads sheet", () => {
     expect(normalizeInquiry("بكدج")).toBe("بكج");
     expect(normalizeInquiry("تاشيرات")).toBe("تأشيرات");
     expect(normalizeInquiry(" طلب غير واضح ")).toBe("طلب غير واضح");
-    expect(normalizeInquiry("شيء آخر")).toBe("شيء آخر");
+    expect(normalizeInquiry("شيء آخر")).toBe("طلب غير واضح");
     expect(normalizeInquiry("")).toBe("");
   });
 
@@ -55,4 +55,8 @@ describe("leads sheet", () => {
     expect(riyadhDay("2026-10-17T22:30:00Z")).toBe("2026-10-18");
     expect(riyadhDay("2026-10-17T20:30:00Z")).toBe("2026-10-17");
   });
+});
+
+it("maps retired imports into the follow-up category", () => {
+  for (const input of ["يستفسر", "استفسار", "غير مصنف", "طلب"]) expect(normalizeInquiry(input)).toBe("طلب غير واضح");
 });

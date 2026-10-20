@@ -739,7 +739,7 @@ ${visaLine}` : ""}`;
       ...(teamId && !assigned ? { error: "assign_failed" } : {}),
     });
     await markLead(service, m, {
-      inquiry: decision.to === "موظف" || decision.to === "غير واضح" ? null : decision.to,
+      inquiry: decision.to === "غير واضح" ? "طلب غير واضح" : decision.to === "موظف" ? null : decision.to,
       destination: request.country ?? (await countryOf(service, said)),
       route: team?.name.trim() ?? DEPARTMENT[decision.to],
       at,

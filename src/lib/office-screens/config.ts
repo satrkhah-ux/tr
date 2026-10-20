@@ -4,7 +4,7 @@
  */
 export const SCREENS_SETTING = "office_screens";
 export const SCREENS_BUCKET = "office-screens";
-export const SCREEN_KINDS = ["بكج", "فنادق", "طيران", "تأشيرات", "يستفسر"] as const;
+export const SCREEN_KINDS = ["بكج", "فنادق", "طيران", "تأشيرات"] as const;
 /** the screens' copy of an ad: 1920×1080 (TV browsers lay out at 1080p; a 4K decode stutters on their chips) */
 export const AD_WIDTH = 1920;
 export const AD_HEIGHT = 1080;
@@ -55,7 +55,6 @@ export function positionOf(cfg: ScreensConfig, n: number): number {
 
 /** the alert's big line (the owner, 2026-10-20: encouragement, not «طلب»): «بكج إلى تركيا», «فندق في تركيا» … */
 export function serviceLine(kind: string, country: string): string {
-  if (kind === "يستفسر") return `استفسار عن ${country}`;
   if (kind === "فنادق") return `فندق في ${country}`;
   if (kind === "طيران") return `طيران إلى ${country}`;
   if (kind === "تأشيرات") return `تأشيرة إلى ${country}`;

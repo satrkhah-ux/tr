@@ -145,10 +145,10 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       const patch: Record<string, unknown> = { ...live, teletel_conversation_id: c.id };
       // what nobody has set yet: the name above all, then the kind and the place
       if (!had.name && clientName(c)) patch.name = clientName(c);
-      // the service the client picked in the WhatsApp menu outranks a guess: it also settles an «يستفسر»
+      // the service the client picked in the WhatsApp menu outranks a guess: it also settles an unclear request
       const picked = classifyInquiry([c.serviceType ?? ""], "");
-      if (had.inquiry_source !== "manual" && (!had.inquiry || had.inquiry === "غير مصنف" || (had.inquiry_source === "auto" && had.inquiry === "يستفسر"))) {
-        patch.inquiry = picked || classifyInquiry(c.labels, "") || "غير مصنف";
+      if ((had.inquiry_source !== "manual" || had.inquiry === "طلب غير واضح") && (!had.inquiry || had.inquiry === "طلب غير واضح")) {
+        patch.inquiry = picked || classifyInquiry(c.labels, "") || had.inquiry;
         patch.inquiry_source = "auto";
       }
       // Neither staff previews nor stale labels establish a travel destination.
@@ -171,13 +171,13 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       const inquiry = (patch.inquiry as string | null | undefined) ?? had.inquiry;
       const destination = (patch.destination as string | null | undefined) ?? had.destination;
       const mutableDestination = had.destination_source !== "manual" && (!had.destination || had.destination_source === "client" || had.destination_source === "labels");
-      if (!inquiry || inquiry === "يستفسر" || inquiry === "غير مصنف" || mutableDestination) vague.push({ c, inquiry, destination, mutableDestination, visitAt: Date.parse(String(patch.last_visit_at ?? had.last_visit_at ?? had.created_at)) / 1000 });
+      if (!inquiry || inquiry === "طلب غير واضح" || mutableDestination) vague.push({ c, inquiry, destination, mutableDestination, visitAt: Date.parse(String(patch.last_visit_at ?? had.last_visit_at ?? had.created_at)) / 1000 });
     } else {
       fresh.push({
         ...live,
         phone,
         name: clientName(c),
-        inquiry: classifyInquiry([c.serviceType ?? "", ...c.labels], "") || "غير مصنف",
+        inquiry: classifyInquiry([c.serviceType ?? "", ...c.labels], "") || null,
         inquiry_source: "auto",
         destination: null,
         destination_source: "client",
@@ -198,7 +198,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
   for (let i = 0; i < updates.length; i += 10) {
     await Promise.all(updates.slice(i, i + 10).map(([id, patch]) => {
       const query = supabase.from("client_leads").update(patch).eq("id", id);
-      return patch.inquiry_source ? query.or("inquiry_source.is.null,inquiry_source.neq.manual") : query;
+      return patch.inquiry_source ? query.or("inquiry_source.is.null,inquiry_source.neq.manual,inquiry.eq.طلب غير واضح") : query;
     }));
   }
   result.updated = updates.length;
@@ -221,9 +221,9 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
         const clientMessages = thread.messages.filter((m) => m.fromClient && !m.isPrivate && m.at >= visitAt).sort((a, b) => b.at - a.at);
         const said = clientMessages.map((m) => m.text).join("\n");
         const patch: Record<string, unknown> = {};
-        const kind = classifyInquiry([c.serviceType ?? "", ...c.labels], said);
+        const kind = classifyInquiry([c.serviceType ?? "", ...c.labels], said) || "طلب غير واضح";
         const origin = byConversation.get(c.id)?.inquiry_source;
-        if (origin !== "manual" && (!inquiry || inquiry === "غير مصنف" || (origin === "auto" && inquiry === "يستفسر")) && kind && kind !== inquiry) { patch.inquiry = kind; patch.inquiry_source = "auto"; }
+        if ((origin !== "manual" || inquiry === "طلب غير واضح") && (!inquiry || inquiry === "طلب غير واضح") && kind && kind !== inquiry) { patch.inquiry = kind; patch.inquiry_source = "auto"; }
         const inference = inferConversationDestination(thread.messages.filter((m) => m.at >= visitAt), places);
         const place = inference.destination;
         if (mutableDestination && (place !== destination || byConversation.get(c.id)?.destination_source !== "client")) {
@@ -232,7 +232,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
         }
         if (!Object.keys(patch).length) return;
         let update = supabase.from("client_leads").update({ ...patch, updated_at: new Date().toISOString() }).eq("teletel_conversation_id", c.id);
-        if (patch.inquiry_source) update = update.or("inquiry_source.is.null,inquiry_source.neq.manual");
+        if (patch.inquiry_source) update = update.or("inquiry_source.is.null,inquiry_source.neq.manual,inquiry.eq.طلب غير واضح");
         if (patch.destination_source) {
           update = update.or("destination_source.is.null,destination_source.in.(client,labels)");
           update = destination ? update.eq("destination", destination) : update.is("destination", null);
