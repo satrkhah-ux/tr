@@ -153,8 +153,7 @@ const RUNTIME = String.raw`
         var card = document.createElement("div"); card.className = "country";
         var rank = document.createElement("b"); rank.textContent = (i + 1 < 10 ? "0" : "") + (i + 1);
         var name = document.createElement("span"); name.textContent = countries[i];
-        var thumb = document.createElement("img"); thumb.src = scenery(countries[i]); thumb.alt = ""; thumb.onerror = function () { this.style.visibility = "hidden"; };
-        card.appendChild(thumb); card.appendChild(rank); card.appendChild(name); html += card.outerHTML;
+        card.appendChild(rank); card.appendChild(name); html += card.outerHTML;
       }
       $("countryList").innerHTML = html;
       var steps = "";
@@ -291,53 +290,40 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #band.up{-webkit-transform:translateY(0);transform:translateY(0)}
 #tick{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;direction:rtl;color:#fff;font-weight:800;line-height:1.24;will-change:transform}
 #band{display:none}
-#countries{position:absolute;inset:0;z-index:2;display:none;color:#fff;overflow:hidden;text-align:right;background:linear-gradient(0deg,rgba(2,22,29,.92),rgba(2,22,29,.62) 43%,rgba(2,22,29,.14) 72%,transparent 90%);text-shadow:0 .15vw 1vw #00151b80}
-#countries:before{content:"";position:absolute;inset:18vh 4vw 9vh;border-radius:2vw;background:#0b302f;overflow:hidden;border:1px solid #f3d89c35;box-shadow:0 2vh 6vw #00171980}
-.destinationVisual{position:relative;flex:1;min-width:0;border-radius:1.2vw;overflow:hidden;background:#185766 url(/screen-landmarks/journey.svg) center/cover;box-shadow:0 1vh 3vw #00171766}
-#countryPhoto{width:100%;height:100%;object-fit:cover}
-#spotlight.active #countryPhoto{animation:landmarkReveal 5s ease-out both}
-@keyframes landmarkReveal{from{transform:scale(1.12);opacity:.25}20%{opacity:1}to{transform:scale(1);opacity:1}}
-.photoStamp{position:absolute;left:1.5vw;bottom:2vh;font-size:1vw;letter-spacing:.25em;font-weight:800;text-shadow:0 2px 8px #000;direction:ltr}
-.photoStamp span{display:block;letter-spacing:0;font-size:1.1vw;margin-top:.4vh}
-.heroSignature{display:flex;align-items:center;gap:1vw;font-size:1.1vw;color:#f3d89c;margin-top:3vh}
-.heroSignature span{display:block;width:3vw;height:1px;background:#f3d89c}
-.country img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
-.country:after{content:"";position:absolute;inset:0;background:linear-gradient(transparent,#031e21 95%);z-index:-1}
+#countries{position:absolute;inset:0;z-index:2;display:none;color:#fff;overflow:hidden;text-align:right;background:transparent}
 #countries.on{display:block;animation:bulletinEnter 1.2s cubic-bezier(.16,1,.3,1) both}
-#countries.on.departing{animation:bulletinExit 1.2s ease-in both}
+#countries.on.departing{animation:bulletinExit 1.2s cubic-bezier(.6,0,.8,.4) both}
 @keyframes bulletinEnter{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes bulletinExit{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
-.motionTitle{position:absolute;right:7vw;left:7vw;top:21.5vh;display:flex;align-items:center;gap:1vw;font-size:1.8vw;font-weight:800;letter-spacing:.02em}
-.motionTitle i{width:.6vw;height:.6vw;background:#f5d995;border-radius:50%;box-shadow:0 0 1.3vw #f5d995}
-.motionTitle small{font-size:1vw;opacity:.65;font-weight:700;border-right:1px solid #ffffff40;padding-right:1vw}
-#spotlight{position:absolute;left:6vw;right:6vw;top:29vh;height:40vh;display:flex;align-items:stretch;gap:2vw}
-.rankShell{font-size:1.15vw;font-weight:800;color:#f3d89c;border:1px solid #f3d89c55;border-radius:2vw;padding:.5vw 1vw;margin-bottom:2vh}
-.heroCopy{position:relative;width:43%;min-width:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:0 1vw;box-sizing:border-box}
-#countryLabel{font-size:1.3vw;color:#b9ceca;margin-bottom:1.3vh}
-#countryHero{font-size:5.5vw;font-weight:800;line-height:1.12;letter-spacing:-.03em;overflow-wrap:break-word;max-width:100%}
-#spotlight.active .heroCopy{animation:destinationIn .85s cubic-bezier(.16,1,.3,1) both}
-#spotlight.active .rankShell{animation:rankIn 1.1s cubic-bezier(.16,1,.3,1) both}
-@keyframes destinationIn{from{opacity:0;transform:translateX(-7vw)}to{opacity:1;transform:translateX(0)}}
-@keyframes rankIn{from{opacity:0;transform:translateY(7vh) scale(.65) rotate(-12deg)}to{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
-.motionRoute{position:absolute;left:7vw;right:7vw;top:72vh;height:1px;background:linear-gradient(90deg,transparent,#f3d89c66,transparent)}
-.motionRoute:after{content:"";position:absolute;width:14%;height:3px;top:-1px;background:linear-gradient(90deg,transparent,#f5deab,transparent);box-shadow:0 0 1vw #f5deab;animation:routeTravel 4.5s linear infinite}
-@keyframes routeTravel{from{transform:translateX(-20vw)}to{transform:translateX(140vw)}}
-#countryList{position:absolute;right:6vw;left:6vw;bottom:11vh;height:14vh;display:flex;gap:.8vw;align-items:stretch}
-.country{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;gap:.4vh;position:relative;padding:1vh .7vw;border:1px solid #ffffff26;border-radius:.8vw;overflow:hidden;background:#0c292a;opacity:.6;transition:opacity .5s,transform .5s,border-color .5s;isolation:isolate}
-.country b{position:relative;font-size:1vw;color:#f3d89c;direction:ltr;text-align:right;font-weight:800}
-.country span{position:relative;font-size:1.15vw;font-weight:800;line-height:1.15;overflow-wrap:anywhere;max-width:100%}
-.country.selected{opacity:1;transform:translateY(-.7vh);border-color:#f3d89c;box-shadow:0 0 1.5vw #f3d89c20}
-.country.selected:before{content:"";position:absolute;inset:0;background:linear-gradient(transparent,#031e21 95%);z-index:-1}
-#countries footer{position:absolute;bottom:4vh;left:6vw;right:6vw;display:flex;align-items:center;justify-content:space-between;gap:2vw;font-size:1.2vw;color:#c8d5d5}
-.relay{display:flex;align-items:center;gap:1vw}
-#countryStep{display:flex;direction:ltr;gap:.5vw}
-#countryStep b{display:flex;align-items:center;justify-content:center;width:2vw;height:2vw;border:1px solid #ffffff40;border-radius:50%;font-size:1vw}
-#countryStep b.current{background:#f3d89c;color:#163d3c;border-color:#f3d89c;box-shadow:0 0 2vw #f3d89c50}
-#countryStep b.passed{border-color:#f3d89c;color:#f3d89c}
-#countryNext{color:#f3d89c;font-weight:800;min-width:20vw;text-align:center}
-.countryNote{font-size:1vw}
-.countryTrack{position:absolute;bottom:0;left:0;right:0;height:.4vh;background:#ffffff12;direction:ltr}
-#countryProgress{height:100%;background:#f3d89c;width:0;box-shadow:0 0 1vw #f3d89c}
+#spotlight{position:absolute;inset:0;background:#092c30;overflow:hidden}
+.destinationVisual{position:absolute;inset:0;background:#185766 url(/screen-landmarks/journey.svg) center/cover}
+.destinationVisual:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,28,31,.02) 20%,rgba(5,28,31,.18) 40%,rgba(5,28,31,.88) 76%,#092c30 100%),linear-gradient(0deg,#082a2e 0%,rgba(8,42,46,.8) 13%,transparent 48%,rgba(8,42,46,.25) 100%)}
+#countryPhoto{width:100%;height:100%;object-fit:cover;object-position:35% center}
+#spotlight.active #countryPhoto{animation:landmarkReveal 6s linear both}
+@keyframes landmarkReveal{from{transform:scale(1.045);opacity:.45}15%{opacity:1}to{transform:scale(1);opacity:1}}
+.motionTitle{position:absolute;right:7vw;top:7vh;z-index:2;display:flex;align-items:center;gap:1vw;font-size:1.35vw;font-weight:700;color:#e0e6e1}
+.motionTitle>span{height:1px;width:2.5vw;background:#d7bd86}
+.motionTitle small{font-size:1.05vw;color:#c6af7b;border-right:1px solid #c6af7b66;padding-right:1vw}
+.screenWordmark{position:absolute;left:5vw;top:7vh;z-index:2;font-size:1.1vw;letter-spacing:.35em;font-weight:800;color:#fff;text-shadow:0 1px 8px #153432}
+.heroCopy{position:absolute;z-index:1;right:7vw;top:31vh;width:48vw;min-height:40vh;display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
+.rankShell{font-size:1.05vw;font-weight:700;letter-spacing:.04em;color:#d7bd86;margin-bottom:2.8vh}
+#countryLabel{font-size:1.4vw;color:#c3d0ca;margin-bottom:1.5vh;font-weight:700}
+#countryHero{font-size:8.3vw;font-weight:800;line-height:1.08;letter-spacing:-.035em;max-width:100%;overflow-wrap:break-word;text-shadow:0 .15vw 2vw #082a2e55}
+#spotlight.active .heroCopy{animation:destinationIn 1.1s cubic-bezier(.16,1,.3,1) both}
+@keyframes destinationIn{from{opacity:0;transform:translateY(3vh)}to{opacity:1;transform:translateY(0)}}
+#countryList{position:absolute;right:7vw;left:5vw;bottom:10vh;display:flex;gap:1.6vw;z-index:2;border-top:1px solid #ffffff26;padding-top:2vh}
+.country{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;gap:.8vh;color:#a8bbb7;transition:color .7s;}
+.country b{font-size:.85vw;color:#b8a783;font-weight:700;direction:ltr;text-align:right}
+.country span{font-size:1.15vw;font-weight:700;line-height:1.2;overflow-wrap:anywhere}
+.country.selected{color:#fff}
+.country.selected:before{content:"";position:absolute;top:calc(-2vh - 1px);right:0;width:100%;height:2px;background:#d7bd86;animation:selectionLine .8s ease-out both;transform-origin:right}
+@keyframes selectionLine{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+#countries footer{position:absolute;bottom:3.6vh;left:5vw;right:7vw;display:flex;align-items:center;justify-content:space-between;font-size:1vw;color:#b5c6c1;z-index:2}
+.relay{display:none}
+#countryNext{color:#d7bd86;font-size:1vw}
+.countryNote{font-size:.9vw;opacity:.7}
+.countryTrack{position:absolute;bottom:0;left:0;right:0;height:2px;background:#ffffff12;z-index:2}
+#countryProgress{height:100%;background:#c7ad79;width:0}
 #alertProgress{position:absolute;bottom:0;right:0;height:.4vh;background:#e3bd3c}
 #alert{z-index:4}
 @media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,.country,#spotlight.active .heroCopy,#spotlight.active .rankShell,.motionRoute:after,#alert.on #alertImg,#spotlight.active #countryPhoto{animation:none}}
@@ -363,9 +349,9 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="alertTag">تجربة</div>
 <div id="msg"><div id="kicker"><i></i>طلب سفر جديد</div><div id="aName"></div><div id="aDest"></div></div><div id="alertProgress"></div></div>
 <section id="countries">
-<div class="motionTitle"><i></i> الوجهات الأكثر طلبًا اليوم <small>ترافليون · نبض السفر</small></div>
-<div id="spotlight"><div class="heroCopy"><div class="rankShell" id="countryRank">01</div><div id="countryLabel"></div><div id="countryHero"></div><div class="heroSignature"><span></span> وجهات تلهم رحلتك القادمة</div></div><div class="destinationVisual"><img id="countryPhoto" alt=""><div class="photoStamp">TRAVELIUN <span>اكتشف العالم</span></div></div></div>
-<div class="motionRoute"></div><div id="countryList"></div>
+<div class="motionTitle"><span></span> الوجهات الأكثر طلبًا <small>اليوم</small></div><div class="screenWordmark">TRAVELIUN</div>
+<div id="spotlight"><div class="heroCopy"><div class="rankShell" id="countryRank">01</div><div id="countryLabel"></div><div id="countryHero"></div></div><div class="destinationVisual"><img id="countryPhoto" alt=""></div></div>
+<div id="countryList"></div>
 <footer><div class="relay"><span>جولة الشاشات</span><span id="countryStep"></span></div><span id="countryNext"></span><span class="countryNote">طلبات اليوم · بتوقيت الرياض</span></footer>
 <div class="countryTrack"><div id="countryProgress"></div></div></section>
 <div id="band"><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
