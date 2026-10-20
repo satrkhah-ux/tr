@@ -49,4 +49,7 @@ describe("destination intent across the conversation", () => {
   it("keeps the visa destination when answering about appointment location", () => {
     expect(read([["ابغى تأشيرة شنغن للتشيك", true], ["جده ولا الرياض وما هي الجنسيه؟", false], ["سعودي اقرب شي ليا جدة", true]]).destination).toBe("التشيك");
   });
+  it("does not treat discussion of another visa as a change of the request", () => {
+    expect(read([["ابغى تأشيرة شنغن للتشيك", true], ["هل لازم يكون عندي تأشيرة للنمسا؟", true]]).destination).toBe("التشيك");
+  });
 });

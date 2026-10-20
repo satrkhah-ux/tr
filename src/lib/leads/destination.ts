@@ -51,13 +51,14 @@ export function inferConversationDestination(messages: Message[], places: Place[
         || /(?:مدين[ةه]|دول[ةه])?\s*(?:الاقلاع|المغادر[ةه]|الانطلاق)\s*[:：]?\s*$/.test(clause)
         || /^\s*(?:هي\s*)?(?:مدين[ةه]\s*)?(?:الاقلاع|المغادر[ةه])/.test(after);
       const explicit = mention.directed || /(?:الى|ل|وجهتي|الوجه[ةه]|ابي|ابغى|اريد|نبي|رحل[ةه]|بكج|برنامج|زيارة|تاشيرة|تاشيره|فيزا|اسافر|نسافر|to|destination)\s*[:：]?\s*$/.test(clause);
+      const changeRequested = /(?:ابي|ابغى|اريد|نبي|نبغى|بدل|غيرت|خلها|غيرها|وجهتي|الوجه[ةه]).{0,25}$/.test(clause);
       if (excluded) {
         if (destination === place.name) { destination = null; evidenceId = message.id; ambiguous = true; }
         continue;
       }
       if (origin || (question === "origin" && !explicit)) continue;
       // A bare later place is not proof the client changed their destination.
-      if (destination && !explicit && question !== "destination") continue;
+      if (destination && !changeRequested && question !== "destination") continue;
       if (!candidates.some((c) => normalize(c.place.name).includes(name))) candidates.push({ place, explicit });
     }
     if (!candidates.length) continue;
