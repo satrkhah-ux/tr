@@ -60,7 +60,7 @@ export async function getFollowupWorkspace() {
   if (bookings?.error) throw new Error("تعذر تحميل الحجوزات المؤكدة");
   let lastSync: { at: string; ok: boolean } | null = null;
   try { lastSync = heartbeat ? JSON.parse(heartbeat.value) : null; } catch { /* unknown */ }
-  return { ...who, rows, people, teams, attempts, lastSync, confirmed: (bookings?.data ?? []) as { followup_id: string; serial: string }[] };
+  return { ...who, canManageTeam: await currentCan("employees.manage"), rows, people, teams, attempts, lastSync, confirmed: (bookings?.data ?? []) as { followup_id: string; serial: string }[] };
 }
 export type FollowupWorkspaceData = NonNullable<Awaited<ReturnType<typeof getFollowupWorkspace>>>;
 
@@ -163,14 +163,14 @@ export async function refreshFollowupSync(): Promise<WorkResult> {
   catch { return { ok: false, error: "unreachable" }; }
 }
 export async function getFollowupSettings() {
-  if (!(await access())?.manager) return null;
+  if (!(await currentCan("employees.manage"))) return null;
   const [teamId, teams, agents, people, { data: mappings }] = await Promise.all([
     followupTeamId(), listTeletelTeams(), listTeletelAgents(), followupPeople(), followupDb().from("followup_agent_map").select("agent_id,employee_id"),
   ]);
   return { teamId, teams, agents, people, mappings: (mappings ?? []) as { agent_id: number; employee_id: string }[] };
 }
 export async function saveFollowupMapping(agentId: number, employeeId: string | null): Promise<WorkResult> {
-  if (!(await access())?.manager) return { ok: false, error: "forbidden" };
+  if (!(await currentCan("employees.manage"))) return { ok: false, error: "forbidden" };
   if (!(await listTeletelAgents()).some((a) => a.id === agentId)) return { ok: false, error: "invalid" };
   if (employeeId && !(await followupPeople()).some((p) => p.id === employeeId)) return { ok: false, error: "invalid" };
   const query = employeeId ? followupDb().from("followup_agent_map").upsert({ agent_id: agentId, employee_id: employeeId }) : followupDb().from("followup_agent_map").delete().eq("agent_id", agentId);
@@ -179,7 +179,7 @@ export async function saveFollowupMapping(agentId: number, employeeId: string | 
   return error ? { ok: false, error: "failed" } : { ok: true };
 }
 export async function saveFollowupTeam(teamId: number): Promise<WorkResult> {
-  if (!(await access())?.manager) return { ok: false, error: "forbidden" };
+  if (!(await currentCan("employees.manage"))) return { ok: false, error: "forbidden" };
   if (!(await listTeletelTeams()).some((t) => t.id === teamId)) return { ok: false, error: "invalid" };
   const { error } = await followupDb().from("app_settings").upsert({ key: "followup_team_id", value: String(teamId), updated_at: new Date().toISOString() });
   if (!error) await logAudit({ action: "data.updated", entity: "followup_settings", entity_id: "followup_team_id", meta: { teamId } });

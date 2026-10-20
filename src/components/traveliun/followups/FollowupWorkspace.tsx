@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BellRing, CheckCircle2, Clock, Loader2, MessageCircle, Phone, RefreshCw, Search, Send, Settings, Users } from "lucide-react";
-import { assignWork, claimFollowup, getFollowupSettings, getFollowupWorkspace, getWorkDetail, recordFollowupResult, refreshFollowupSync, reviewFollowupSend, saveFollowupMapping, saveFollowupTeam, sendFollowupReply, transferFollowup, type FollowupWorkspaceData, type WorkDetail } from "@/lib/data/followups";
+import { assignWork, claimFollowup, getFollowupWorkspace, getWorkDetail, recordFollowupResult, refreshFollowupSync, reviewFollowupSend, sendFollowupReply, transferFollowup, type FollowupWorkspaceData, type WorkDetail } from "@/lib/data/followups";
 import { OUTCOMES, STAGES, type WorkResult, type WorkRow } from "@/lib/followups/rules";
 
 const button = "inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-900/15 bg-white px-3 py-2 text-sm font-bold text-emerald-950 disabled:opacity-40";
@@ -36,7 +36,7 @@ export function FollowupWorkspace({ initial, initialId }: { initial: FollowupWor
   const [selected, setSelected] = useState<string | null>(initialId ?? null);
   const [search, setSearch] = useState("");
   const [limit, setLimit] = useState(50);
-  const [mode, setMode] = useState<"work" | "report" | "settings">("work");
+  const [mode, setMode] = useState<"work" | "report">("work");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -60,12 +60,12 @@ export function FollowupWorkspace({ initial, initialId }: { initial: FollowupWor
     <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-emerald-900/10 bg-white p-5">
       <div><h1 className="flex items-center gap-2 text-2xl font-extrabold"><MessageCircle /> المتابعة</h1><p className="mt-1 text-sm text-slate-500">طلبات العملاء من الأحدث إلى الأقدم · المواعيد بتوقيت الرياض</p></div>
       <div className="flex flex-wrap gap-2"><button className={button} onClick={() => setMode("work")}><Users size={16} /> قائمة العمل</button>
-        {data.manager && <><button className={button} onClick={() => setMode("report")}>لوحة الإشراف</button><button className={button} onClick={() => setMode("settings")}><Settings size={16} /> إعداد الفريق</button><button disabled={busy} className={button} onClick={() => void sync()}><RefreshCw size={16} /> مزامنة</button></>}
+        {data.manager && <><button className={button} onClick={() => setMode("report")}>لوحة الإشراف</button>{data.canManageTeam && <Link className={button} href="/employees/roles#followup-team"><Settings size={16} /> إعداد الفريق والصلاحيات</Link>}<button disabled={busy} className={button} onClick={() => void sync()}><RefreshCw size={16} /> مزامنة</button></>}
       </div>
     </section>
     <div className="flex flex-wrap gap-3 text-xs text-slate-500"><span>آخر مزامنة: {when(data.lastSync?.at ?? null)}</span><span>{data.lastSync?.ok ? "الاتصال يعمل" : "لم تتأكد المزامنة الأخيرة؛ راجع المشرف"}</span><span>التحديث التلقائي كل 30 ثانية</span></div>
     {notice && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-950">{notice}</p>}
-    {mode === "settings" ? <TeamSettings /> : mode === "report" ? <Report data={data} now={now} /> : <>
+    {mode === "report" ? <Report data={data} now={now} /> : <>
       <div className="flex flex-wrap gap-2">{tabs.map(([key, label]) => <button key={key} onClick={() => { setTab(key); setLimit(50); }} className={`${button} ${tab === key ? "!bg-emerald-900 !text-white" : ""}`}>{label}<span>{filterRows(data.rows, key, data.employeeId, now).length}</span></button>)}</div>
       <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
         <section className="rounded-2xl border border-slate-200 bg-white p-3">
@@ -197,23 +197,4 @@ function Report({ data, now }: { data: FollowupWorkspaceData; now: number }) {
       return <tr key={p.id}><td className="p-3 font-bold">{p.name}</td><td className="p-3">{owned.filter((r) => r.status === "open").length}</td><td className="p-3">{attempts.length}</td><td className="p-3">{attempts.filter((a) => a.outcome === "interested").length}</td><td className="p-3">{attempts.filter((a) => a.outcome === "not_interested").length}</td><td className="p-3">{times.length ? `${Math.round(times.reduce((a, b) => a + b, 0) / times.length)} دقيقة` : "—"}</td></tr>;
     })}</tbody></table><p className="mt-3 text-xs text-slate-500">الحجز المؤكد مأخوذ من حالة العرض المرتبط فعليًا. إغلاق المتابعة أو إرسال رسالة لا يُحتسب حجزًا.</p></section>
   </div>;
-}
-
-function TeamSettings() {
-  const [data, setData] = useState<Awaited<ReturnType<typeof getFollowupSettings>>>(null);
-  const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState(false);
-  useEffect(() => { let live = true; void getFollowupSettings().then((v) => { if (live) setData(v); }).catch(() => { if (live) setNotice(errors.failed); }); return () => { live = false; }; }, []);
-  async function save(work: () => Promise<WorkResult>) {
-    setBusy(true);
-    try { const r = await work(); setNotice(r.ok ? "تم الحفظ." : errors[r.error] ?? r.error); if (r.ok) setData(await getFollowupSettings()); }
-    catch { setNotice(errors.failed); } finally { setBusy(false); }
-  }
-  if (!data) return <p>{notice || "تحميل إعدادات الفريق…"}</p>;
-  return <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5"><h2 className="text-lg font-extrabold">ربط فريق المتابعة</h2><p className="text-sm text-slate-500">امنح الموظف دور «موظف المتابعة» أو «مشرف المتابعة» من إدارة الموظفين أولًا. ربط الحسابات هنا يعتمد على معرّفاتها، ولا يمنح صلاحيات إضافية.</p>
-    <label className="block max-w-md text-sm">فريق Teletel الذي يستقبل التحويلات<select disabled={busy} className={input} value={data.teamId} onChange={(e) => void save(() => saveFollowupTeam(Number(e.target.value)))}>{data.teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
-    <h3 className="font-bold">ربط موظفي Teletel بموظفي النظام</h3><p className="text-xs text-slate-500">الحساب غير المربوط يدخل قائمة «غير مسند» حتى يستلمه الفريق أو يسنده المشرف.</p>
-    <div className="grid gap-3 md:grid-cols-2">{data.agents.map((a) => <label key={a.id} className="rounded-xl border border-slate-100 p-3 text-sm">{a.name} <span className="text-xs text-slate-400">#{a.id}</span><select disabled={busy} className={`${input} mt-2`} value={data.mappings.find((m) => m.agent_id === a.id)?.employee_id ?? ""} onChange={(e) => void save(() => saveFollowupMapping(a.id, e.target.value || null))}><option value="">غير مربوط</option>{data.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>)}</div>
-    {notice && <p role="status" className="text-sm">{notice}</p>}
-  </section>;
 }

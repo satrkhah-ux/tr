@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
+  keys: ["followups.work"],
   row: { id: "11111111-1111-4111-8111-111111111111", assigned_to: "worker", status: "open", conversation_id: 42 },
   rpc: vi.fn(), send: vi.fn(), thread: vi.fn(),
 }));
-vi.mock("@/lib/roles/current", () => ({ currentCan: async (key: string) => key === "followups.work" }));
+vi.mock("@/lib/roles/current", () => ({ currentCan: async (key: string) => mocks.keys.includes(key) }));
 vi.mock("@/lib/data/metrics", () => ({ getCurrentEmployeeId: async () => "worker" }));
 vi.mock("@/lib/data/audit", () => ({ logAudit: vi.fn() }));
 vi.mock("@/lib/data/cron-runs", () => ({ recordCronRun: vi.fn() }));
@@ -18,16 +19,23 @@ vi.mock("@/lib/providers/teletel", () => ({
   conversationThread: mocks.thread, sendTeletelMessage: mocks.send,
   teletelGet: vi.fn(), listTeletelTeams: vi.fn(), listOpenConversations: vi.fn(), assignTeletelTeam: vi.fn(),
 }));
-import { sendFollowupReply } from "@/lib/data/followups";
+import { getFollowupSettings, saveFollowupMapping, saveFollowupTeam, sendFollowupReply } from "@/lib/data/followups";
 const requestId = "22222222-2222-4222-8222-222222222222";
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.keys = ["followups.work"];
   mocks.row.assigned_to = "worker";
   mocks.thread.mockResolvedValue({ canReply: true });
   mocks.rpc.mockResolvedValue({ data: { ok: true } });
   mocks.send.mockResolvedValue(123);
 });
 describe("follow-up outbound safety", () => {
+  it("keeps team configuration under employee permissions, not follow-up supervision", async () => {
+    mocks.keys = ["followups.manage"];
+    expect(await getFollowupSettings()).toBeNull();
+    expect(await saveFollowupMapping(68, "worker")).toEqual({ ok: false, error: "forbidden" });
+    expect(await saveFollowupTeam(28)).toEqual({ ok: false, error: "forbidden" });
+  });
   it("cannot send into another employee's file", async () => {
     mocks.row.assigned_to = "someone-else";
     expect(await sendFollowupReply(mocks.row.id, "hello", requestId)).toEqual({ ok: false, error: "forbidden" });
