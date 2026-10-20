@@ -126,6 +126,11 @@ function WorkPanel({ row, data, refresh, next }: { row: WorkRow; data: FollowupW
     try {
       const result = await work();
       if (!result.ok) setNotice(errors[result.error] ?? result.error);
+      else if (result.duplicate && result.state === "failed") {
+        request.current = null;
+        transferRequest.current = null;
+        setNotice("تأكد عدم تنفيذ المحاولة السابقة. يمكنك تنفيذ محاولة جديدة الآن.");
+      }
       else if (result.duplicate && result.state !== "sent") setNotice(errors.uncertain);
       else { setNotice("تم حفظ العملية."); if (clearText) { setText(""); request.current = null; } if (advance) next(); }
       await Promise.all([refresh(), load()]);
