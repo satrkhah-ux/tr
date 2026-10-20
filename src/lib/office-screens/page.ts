@@ -40,6 +40,7 @@ const RUNTIME = String.raw`
   var demo = S.demo, demoAt = Date.now();
   function passMs() { return 36000; }
   var pre = new Image();
+  var alertPre = new Image(), alertPreSrc = "";
 
   function measure() {
     var w = document.documentElement.clientWidth || window.innerWidth || REF;
@@ -76,6 +77,12 @@ const RUNTIME = String.raw`
   }
 
   function preloadNext(t) {
+    for (var e = 0; e < S.events.length; e++) {
+      if (!seen[S.events[e].id] && S.events[e].at < t + 60000 && S.events[e].src) {
+        if (alertPreSrc !== S.events[e].src) { alertPreSrc = S.events[e].src; alertPre.src = alertPreSrc; }
+        break;
+      }
+    }
     var end = (Math.floor(t / S.slotMs) + 1) * S.slotMs;
     if (end - t > 5000) return;
     var next = srcAt(end + 1);
@@ -106,44 +113,62 @@ const RUNTIME = String.raw`
     $("aName").textContent = e.name || "";
     $("aName").style.display = e.name ? "block" : "none";
     $("aDest").textContent = e.line;
-    if (e.src) { boxImg.setAttribute("src", e.src); boxImg.style.display = "block"; } else boxImg.style.display = "none";
+    boxImg.style.display = "none";
+    boxImg.onload = function () { boxImg.style.display = "block"; };
+    boxImg.onerror = function () { boxImg.style.display = "none"; };
+    boxImg.setAttribute("src", e.src || "/screen-landmarks/journey.svg");
+    if (boxImg.complete && boxImg.naturalWidth) boxImg.style.display = "block";
     // from the start every time: off, a reflow, on — the animations run again
     box.className = "";
     void box.offsetWidth;
     box.className = "on";
   }
 
-  // One screen at a time, in numeric order, on the shared server clock.
-  var spotlightKey = "";
+  // A single transparent motion layer travels through the numbered screens.
+  var spotlightKey = "", countryPhase = "";
   function drawTicker(t) {
-    var countries = S.countries || [], elapsed = countryBulletinElapsed(t, N, S.screens);
+    var countries = S.countries || [], stats = S.countryStats || [];
+    var elapsed = countryBulletinElapsed(t, N, S.screens);
     var active = countries.length > 0 && elapsed >= 0;
     var panel = $("countries");
     panel.className = active ? (elapsed >= 34800 ? "on departing" : "on") : "";
-    if (active) {
-      var remaining = Math.ceil((36000 - elapsed) / 1000);
-      $("countryProgress").style.width = (100 * elapsed / 36000) + "%";
-      $("countryNext").textContent = N < S.screens
-        ? (remaining <= 6 ? "ينتقل إلى الشاشة " + (N + 1) + " خلال " + remaining : "التالي · الشاشة " + (N + 1)) + " ←"
-        : "جولة جديدة كل 10 دقائق";
+    if (!active) { spotlightKey = ""; countryPhase = ""; return; }
+    var slot = 36000 / countries.length, index = Math.min(countries.length - 1, Math.floor(elapsed / slot));
+    var phase = elapsed - index * slot, remaining = Math.ceil((36000 - elapsed) / 1000);
+    var progress = Math.min(1, phase / 1300), eased = 1 - Math.pow(1 - progress, 3);
+    var count = null;
+    for (var k = 0; k < stats.length; k++) if (stats[k].country === countries[index]) count = stats[k].count;
+    $("countryCount").textContent = count === null ? "" : String(Math.round(count * eased));
+    $("countLabel").textContent = count === null ? "" : "طلبًا اليوم";
+    $("countryRank").textContent = (index < 9 ? "0" : "") + Math.max(1, Math.round((index + 1) * eased));
+    $("countryProgress").style.width = (100 * elapsed / 36000) + "%";
+    $("countryNext").textContent = N < S.screens
+      ? (remaining <= 6 ? "إلى الشاشة " + (N + 1) + " خلال " + remaining : "التالي · الشاشة " + (N + 1)) + " ←"
+      : "نلتقي في الجولة القادمة";
+    var key = Math.floor(t / 600000) + "|" + countries.join("|");
+    if (key !== spotlightKey) {
+      spotlightKey = key;
+      var html = "";
+      for (var i = 0; i < countries.length; i++) {
+        var card = document.createElement("div"); card.className = "country";
+        var rank = document.createElement("b"); rank.textContent = (i + 1 < 10 ? "0" : "") + (i + 1);
+        var name = document.createElement("span"); name.textContent = countries[i];
+        card.appendChild(rank); card.appendChild(name); html += card.outerHTML;
+      }
+      $("countryList").innerHTML = html;
+      var steps = "";
+      for (var step = 1; step <= S.screens; step++) steps += '<b class="' + (step === N ? "current" : (step < N ? "passed" : "")) + '">' + step + '</b>';
+      $("countryStep").innerHTML = steps;
     }
-    var key = active ? Math.floor(t / 600000) + "|" + countries.join("|") : "";
-    if (key === spotlightKey) return;
-    spotlightKey = key;
-    if (!active) return;
-    var html = "";
-    $("countryHero").textContent = countries[0];
-    for (var i = 1; i < countries.length; i++) {
-      var card = document.createElement("div");
-      card.className = "country c" + i;
-      var rank = document.createElement("b"); rank.textContent = (i + 1 < 10 ? "0" : "") + (i + 1);
-      var name = document.createElement("span"); name.textContent = countries[i];
-      card.appendChild(rank); card.appendChild(name); html += card.outerHTML;
+    var nextPhase = key + "|" + index;
+    if (countryPhase !== nextPhase) {
+      countryPhase = nextPhase;
+      $("countryHero").textContent = countries[index];
+      $("countryLabel").textContent = index === 0 ? "الوجهة الأكثر طلبًا" : "ضمن أكثر الوجهات طلبًا";
+      var items = $("countryList").children;
+      for (var j = 0; j < items.length; j++) items[j].className = j === index ? "country selected" : "country";
+      var spot = $("spotlight"); spot.className = ""; void spot.offsetWidth; spot.className = "active";
     }
-    $("countryList").innerHTML = html;
-    var steps = "";
-    for (var step = 1; step <= S.screens; step++) steps += '<b class="' + (step === N ? "current" : (step < N ? "passed" : "")) + '">' + step + '</b>';
-    $("countryStep").innerHTML = steps;
   }
 
   function frame() {
@@ -221,17 +246,17 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 .ad{object-fit:cover;opacity:0;-webkit-transition:opacity .9s,height .4s ease;transition:opacity .9s,height .4s ease}
 .band .ad{height:91%;object-fit:contain}
 .ad.on{opacity:1}
-#alert{background:#000;opacity:0;visibility:hidden;overflow:hidden;-webkit-transition:opacity .5s,visibility 0s .5s;transition:opacity .5s,visibility 0s .5s}
+#alert{background:#185766 url(/screen-landmarks/journey.svg) center/cover;opacity:0;visibility:hidden;overflow:hidden;-webkit-transition:opacity .5s,visibility 0s .5s;transition:opacity .5s,visibility 0s .5s}
 #alert.on{opacity:1;visibility:visible;-webkit-transition:opacity .5s;transition:opacity .5s}
 #alertImg{width:100%;height:100%;object-fit:cover}
-#alert.on #alertImg{-webkit-animation:kb 9s ease-out both;animation:kb 9s ease-out both}
-#shade{position:absolute;left:0;top:0;width:100%;height:100%;background:-webkit-linear-gradient(bottom,rgba(4,30,26,.94) 0%,rgba(4,30,26,.6) 50%,rgba(4,30,26,.2) 100%);background:linear-gradient(to top,rgba(4,30,26,.94) 0%,rgba(4,30,26,.6) 50%,rgba(4,30,26,.2) 100%)}
+#alert.on #alertImg{-webkit-animation:kb 22s linear both;animation:kb 22s linear both}
+#shade{position:absolute;left:0;top:0;width:100%;height:100%;background:-webkit-linear-gradient(bottom,rgba(3,23,34,.82) 0%,rgba(3,23,34,.32) 48%,rgba(3,23,34,.04) 100%);background:linear-gradient(to top,rgba(3,23,34,.82) 0%,rgba(3,23,34,.32) 48%,rgba(3,23,34,.04) 100%)}
 #flight{position:absolute;left:0;width:100%;top:26%;height:6vw}
 #trail{position:absolute;left:0;top:50%;width:100%;height:.35vw;margin-top:-.17vw;background:-webkit-linear-gradient(left,rgba(201,162,39,0),#e3bd3c);background:linear-gradient(to right,rgba(201,162,39,0),#e3bd3c);-webkit-transform-origin:left;transform-origin:left;-webkit-transform:scaleX(0);transform:scaleX(0)}
 #alert.on #trail{-webkit-animation:trail 1.7s .2s cubic-bezier(.3,.7,.2,1) both,fade .8s 2.4s both;animation:trail 1.7s .2s cubic-bezier(.3,.7,.2,1) both,fade .8s 2.4s both}
 #plane{position:absolute;top:0;left:0;width:6vw;height:6vw;fill:#fff;-webkit-transform:translateX(-8vw) rotate(90deg);transform:translateX(-8vw) rotate(90deg);-webkit-filter:drop-shadow(0 0 1vw rgba(227,189,60,.9));filter:drop-shadow(0 0 1vw rgba(227,189,60,.9))}
 #alert.on #plane{-webkit-animation:fly 1.7s .2s cubic-bezier(.3,.7,.2,1) both;animation:fly 1.7s .2s cubic-bezier(.3,.7,.2,1) both}
-#msg{position:absolute;left:4%;right:4%;top:38%;text-align:center;direction:rtl}
+#msg{position:absolute;left:4%;right:4%;top:49%;text-align:center;direction:rtl}
 #kicker{display:inline-block;font-size:2.8vw;font-weight:800;color:#e3bd3c;letter-spacing:.05em;opacity:0}
 #kicker i{position:relative;display:inline-block;width:1.3vw;height:1.3vw;margin-left:1vw;border-radius:50%;background:#e53950;vertical-align:middle}
 #kicker i:after{content:"";position:absolute;left:0;top:0;width:100%;height:100%;border-radius:50%;background:#e53950}
@@ -239,7 +264,7 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #alert.on #kicker i:after{-webkit-animation:ping 1.2s 1.1s infinite;animation:ping 1.2s 1.1s infinite}
 #aName{font-size:4.6vw;font-weight:800;color:#fff;line-height:1.2;margin-top:.8vw;opacity:0}
 #alert.on #aName{-webkit-animation:rise .6s 1s both;animation:rise .6s 1s both}
-#aDest{font-size:6.5vw;font-weight:800;color:#fff;line-height:1.15;text-shadow:0 .4vw 2.4vw rgba(0,0,0,.6),0 0 3.5vw rgba(227,189,60,.5);opacity:0}
+#aDest{font-size:5.8vw;font-weight:800;color:#fff;line-height:1.15;text-shadow:0 .4vw 2.4vw rgba(0,0,0,.6),0 0 3.5vw rgba(227,189,60,.5);opacity:0}
 #alert.on #aDest{-webkit-animation:pop .9s 1.3s cubic-bezier(.2,1.5,.4,1) both;animation:pop .9s 1.3s cubic-bezier(.2,1.5,.4,1) both}
 @-webkit-keyframes kb{from{-webkit-transform:scale(1.18)}to{-webkit-transform:scale(1)}}
 @keyframes kb{from{transform:scale(1.18)}to{transform:scale(1)}}
@@ -260,44 +285,51 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #band.up{-webkit-transform:translateY(0);transform:translateY(0)}
 #tick{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;direction:rtl;color:#fff;font-weight:800;line-height:1.24;will-change:transform}
 #band{display:none}
-#countries{position:absolute;inset:0;z-index:2;display:none;background:#f3f0e7;color:#173d36;padding:4.5vh 5vw;box-sizing:border-box;overflow:hidden;text-align:right}
+#countries{position:absolute;inset:0;z-index:2;display:none;color:#fff;overflow:hidden;text-align:right;background:linear-gradient(0deg,rgba(2,22,29,.92),rgba(2,22,29,.62) 43%,rgba(2,22,29,.14) 72%,transparent 90%);text-shadow:0 .15vw 1vw #00151b80}
 #countries.on{display:block;animation:bulletinEnter 1.2s cubic-bezier(.16,1,.3,1) both}
 #countries.on.departing{animation:bulletinExit 1.2s ease-in both}
 @keyframes bulletinEnter{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes bulletinExit{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
-#countries header{display:flex;align-items:center;justify-content:space-between}
-#countries .eyebrow{font-size:1.5vw;font-weight:800;display:flex;align-items:center;gap:.7vw}
-.eyebrow i{width:.6vw;height:.6vw;border-radius:50%;background:#b38b44;box-shadow:0 0 0 .35vw #b38b4418}
-.screenBrand{font-size:1.9vw;font-weight:800;line-height:1;text-align:center}.screenBrand span{display:block;font-size:.65vw;letter-spacing:.3em;margin-top:.6vh}
-#countries h1{font-size:4.1vw;line-height:1.2;margin:3vh 0 .8vh;font-weight:800;letter-spacing:-.045em}
-#countries p{font-size:1.65vw;color:#61716a;margin:0}
-.ranking{display:flex;gap:4vw;height:56vh;margin-top:3vh}
-.winner{position:relative;width:46%;padding:3.5vh 2.6vw;box-sizing:border-box;overflow:hidden;background:#123e35;color:#fff;border-radius:.25vw;display:flex;flex-direction:column;justify-content:center;isolation:isolate}
-.orbit{position:absolute;left:-10vw;bottom:-18vh;width:45vw;height:45vw;color:#5b8c7e;opacity:.3;z-index:-1;transform:rotate(-22deg)}
-.winner:after{content:"";position:absolute;left:0;right:0;top:0;height:.4vh;background:#c8a569}
-.winnerLabel{display:flex;align-items:center;gap:1.3vw;font-size:1.4vw;color:#e6d2ab}
-.winnerLabel b{font-size:4.7vw;line-height:1;font-weight:700;direction:ltr}
-#countryHero{font-size:6vw;font-weight:800;line-height:1.22;margin:3vh 0;overflow-wrap:break-word}
-.winnerCaption{font-size:1.5vw;color:#bdcec6;margin-top:1vh}
-#countryList{flex:1;display:flex;flex-direction:column;justify-content:center;min-width:0}
-.country{flex:1;max-height:10vh;min-height:0;border-bottom:1px solid #d5dbd1;display:flex;align-items:center;gap:1.8vw;animation:rise .8s both}
-.country:last-child{border-bottom:0}
-.country b{font-size:1.5vw;color:#9d7d4d;font-weight:700;min-width:2.4vw;direction:ltr}
-.country span{font-size:2.45vw;font-weight:800;line-height:1.2}
-.country.c1{animation-delay:.12s}.country.c2{animation-delay:.24s}.country.c3{animation-delay:.36s}.country.c4{animation-delay:.48s}.country.c5{animation-delay:.6s}.country.c6{animation-delay:.72s}.country.c7{animation-delay:.84s}
-#countries footer{position:absolute;bottom:3.8vh;left:5vw;right:5vw;display:flex;align-items:center;justify-content:space-between;gap:2vw;font-size:1.2vw;color:#61716a}
+.motionTitle{position:absolute;right:6vw;top:32vh;display:flex;align-items:center;gap:1vw;font-size:1.8vw;font-weight:800;letter-spacing:.02em}
+.motionTitle i{width:.6vw;height:.6vw;background:#f5d995;border-radius:50%;box-shadow:0 0 1.3vw #f5d995}
+.motionTitle small{font-size:1vw;opacity:.65;font-weight:700;border-right:1px solid #ffffff40;padding-right:1vw}
+#spotlight{position:absolute;left:6vw;right:6vw;top:39vh;height:32vh;display:flex;align-items:center;gap:3vw}
+.rankShell{direction:ltr;position:relative;font-size:13vw;font-weight:800;line-height:1;color:#f3d89c;min-width:17vw;text-align:center;letter-spacing:-.08em;text-shadow:0 0 4vw #f3d89c30}
+.rankShell:after{content:"";position:absolute;right:-1vw;top:20%;height:60%;width:1px;background:linear-gradient(transparent,#f3d89c,transparent)}
+.heroCopy{flex:1;min-width:0}
+#countryLabel{font-size:1.3vw;color:#f3d89c;margin-bottom:1vh}
+#countryHero{font-size:5.5vw;font-weight:800;line-height:1.16;letter-spacing:-.03em;overflow-wrap:break-word}
+.requestCount{display:flex;flex-direction:column;align-items:center;min-width:13vw;padding:2vh 2vw;border:1px solid #ffffff26;border-radius:1.4vw;background:linear-gradient(130deg,#ffffff12,#ffffff03);box-shadow:inset 0 1px #ffffff19;transform:rotate(-3deg)}
+#countryCount{font-size:5.8vw;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+#countLabel{font-size:1.3vw;color:#d9e7e5;margin-top:1vh}
+#spotlight.active .heroCopy{animation:destinationIn .85s cubic-bezier(.16,1,.3,1) both}
+#spotlight.active .rankShell{animation:rankIn 1.1s cubic-bezier(.16,1,.3,1) both}
+#spotlight.active .requestCount{animation:countIn 1s .15s cubic-bezier(.16,1,.3,1) both}
+@keyframes destinationIn{from{opacity:0;transform:translateX(-7vw)}to{opacity:1;transform:translateX(0)}}
+@keyframes rankIn{from{opacity:0;transform:translateY(7vh) scale(.65) rotate(-12deg)}to{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
+@keyframes countIn{from{opacity:0;transform:translateY(-5vh) rotate(8deg)}to{opacity:1;transform:translateY(0) rotate(-3deg)}}
+.motionRoute{position:absolute;left:-10%;right:-10%;top:72vh;height:1px;background:linear-gradient(90deg,transparent,#f3d89c66,transparent);transform:rotate(-4deg)}
+.motionRoute:after{content:"";position:absolute;width:14%;height:3px;top:-1px;background:linear-gradient(90deg,transparent,#f5deab,transparent);box-shadow:0 0 1vw #f5deab;animation:routeTravel 4.5s linear infinite}
+@keyframes routeTravel{from{transform:translateX(-20vw)}to{transform:translateX(140vw)}}
+#countryList{position:absolute;right:6vw;left:6vw;bottom:12vh;display:flex;gap:1vw;align-items:stretch}
+.country{flex:1;min-width:0;display:flex;flex-direction:column;gap:.6vh;position:relative;padding:1vh .5vw;border-top:1px solid #ffffff30;opacity:.48;transition:opacity .5s,transform .5s,border-color .5s}
+.country b{font-size:1.2vw;color:#f3d89c;direction:ltr;text-align:right;font-weight:800}
+.country span{font-size:1.1vw;font-weight:800;line-height:1.3;overflow-wrap:anywhere;max-width:100%}
+.country.selected{opacity:1;transform:translateY(-1.5vh);border-color:#f3d89c}
+.country.selected:before{content:"";position:absolute;right:0;top:-2px;width:35%;height:3px;background:#f3d89c;box-shadow:0 0 1vw #f3d89c}
+#countries footer{position:absolute;bottom:4vh;left:6vw;right:6vw;display:flex;align-items:center;justify-content:space-between;gap:2vw;font-size:1.2vw;color:#c8d5d5}
 .relay{display:flex;align-items:center;gap:1vw}
-#countryStep{display:flex;direction:ltr;gap:.4vw}
-#countryStep b{display:flex;align-items:center;justify-content:center;width:1.8vw;height:1.8vw;border:1px solid #c8cec4;border-radius:50%;font-size:1vw}
-#countryStep b.current{background:#173d36;color:#fff;border-color:#173d36;box-shadow:0 0 0 .25vw #173d3610}
-#countryStep b.passed{color:#173d36;border-color:#173d36}
-#countryNext{color:#173d36;font-weight:800;min-width:20vw;text-align:center}
+#countryStep{display:flex;direction:ltr;gap:.5vw}
+#countryStep b{display:flex;align-items:center;justify-content:center;width:2vw;height:2vw;border:1px solid #ffffff40;border-radius:50%;font-size:1vw}
+#countryStep b.current{background:#f3d89c;color:#163d3c;border-color:#f3d89c;box-shadow:0 0 2vw #f3d89c50}
+#countryStep b.passed{border-color:#f3d89c;color:#f3d89c}
+#countryNext{color:#f3d89c;font-weight:800;min-width:20vw;text-align:center}
 .countryNote{font-size:1vw}
-.countryTrack{position:absolute;bottom:0;left:0;right:0;height:.55vh;background:#e1e2d7;direction:ltr}
-#countryProgress{height:100%;background:#b38b44;width:0}
-#alertProgress{position:absolute;bottom:0;right:0;height:.6vh;background:#e3bd3c}
+.countryTrack{position:absolute;bottom:0;left:0;right:0;height:.4vh;background:#ffffff12;direction:ltr}
+#countryProgress{height:100%;background:#f3d89c;width:0;box-shadow:0 0 1vw #f3d89c}
+#alertProgress{position:absolute;bottom:0;right:0;height:.4vh;background:#e3bd3c}
 #alert{z-index:4}
-@media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,.country{animation:none}}
+@media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,.country,#spotlight.active .heroCopy,#spotlight.active .rankShell,#spotlight.active .requestCount,.motionRoute:after,#alert.on #alertImg{animation:none}}
 
 `;
 
@@ -320,15 +352,10 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="alertTag">تجربة</div>
 <div id="msg"><div id="kicker"><i></i>طلب سفر جديد</div><div id="aName"></div><div id="aDest"></div></div><div id="alertProgress"></div></div>
 <section id="countries">
-<header><div class="eyebrow"><i></i> وجهات اليوم</div><div class="screenBrand">ترافليون<span>TRAVELIUN</span></div></header>
-<h1>إلى أين يتجه المسافرون؟</h1><p>الدول الأكثر طلبًا اليوم</p>
-<div class="ranking">
-<div class="winner">
-<svg class="orbit" viewBox="0 0 500 500" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1"><circle cx="250" cy="250" r="210"/><ellipse cx="250" cy="250" rx="130" ry="210"/><ellipse cx="250" cy="250" rx="55" ry="210"/><ellipse cx="250" cy="250" rx="210" ry="80"/><ellipse cx="250" cy="250" rx="210" ry="155"/><path d="M40 250h420M250 40v420"/></g></svg>
-<div class="winnerLabel"><b>01</b> الوجهة الأكثر طلبًا</div><div id="countryHero"></div><div class="winnerCaption">تبدأ الرحلة من هنا</div>
-</div><div id="countryList"></div>
-</div>
-<footer><div class="relay"><span>جولة الشاشات</span><span id="countryStep"></span></div><span id="countryNext"></span><span class="countryNote">حسب استفسارات العملاء · بتوقيت الرياض</span></footer>
+<div class="motionTitle"><i></i> الوجهات الأكثر طلبًا اليوم <small>ترافليون · نبض السفر</small></div>
+<div id="spotlight"><div class="rankShell" id="countryRank">01</div><div class="heroCopy"><div id="countryLabel"></div><div id="countryHero"></div></div><div class="requestCount"><b id="countryCount"></b><span id="countLabel"></span></div></div>
+<div class="motionRoute"></div><div id="countryList"></div>
+<footer><div class="relay"><span>جولة الشاشات</span><span id="countryStep"></span></div><span id="countryNext"></span><span class="countryNote">طلبات اليوم · بتوقيت الرياض</span></footer>
 <div class="countryTrack"><div id="countryProgress"></div></div></section>
 <div id="band"><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
 <script>window.__S__=${json(s)};window.__N__=${n};window.__M__=${monitor ? "true" : "false"};</script>

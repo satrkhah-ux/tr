@@ -6,7 +6,8 @@ import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { resolvePlace } from "@/lib/leads/places";
 import type { Place } from "@/lib/leads/auto";
 import { ttlCache } from "@/lib/ttl-cache";
-import { displayName, serviceLine, normalizeConfig, positionOf, riyadhDay, SCREENS_SETTING, tickerText, tickerWidth, topCountries, type ScreensConfig } from "./config";
+import { displayName, serviceLine, normalizeConfig, positionOf, riyadhDay, SCREENS_SETTING, tickerText, tickerWidth, countryRanking, type ScreensConfig } from "./config";
+import { landmarkFor } from "./landmarks";
 
 /**
  * «الشاشات» — what a screen reads, every few seconds, with no login (the owner,
@@ -19,6 +20,7 @@ import { displayName, serviceLine, normalizeConfig, positionOf, riyadhDay, SCREE
  */
 export type ScreenState = {
   countries: string[];
+  countryStats?: { country: string; count: number }[];
   now: number;
   build: string;
   screens: number;
@@ -69,8 +71,8 @@ let lastWords: string | null = null;
 let bumpAt = 0;
 
 /** today's and yesterday's conversations by destination (the ticker) */
-async function ticker(now: number, speed: number, periodMs: number): Promise<{ band: ScreenState["ticker"]; top: string | null; countries: string[] }> {
-  const { text, top, countries } = await memo(slow, `ticker:${riyadhDay(now)}`, async () => {
+async function ticker(now: number, speed: number, periodMs: number): Promise<{ band: ScreenState["ticker"]; top: string | null; countries: string[]; stats: NonNullable<ScreenState["countryStats"]> }> {
+  const { text, top, countries, stats } = await memo(slow, `ticker:${riyadhDay(now)}`, async () => {
     const since = new Date(riyadhDay(now) - 86_400_000).toISOString();
     const data: { destination: string | null; created_at: string; last_visit_at: string | null }[] = [];
     for (let from = 0; ; from += 1000) {
@@ -86,15 +88,16 @@ async function ticker(now: number, speed: number, periodMs: number): Promise<{ b
       const days = [l.created_at, l.last_visit_at].filter((d): d is string => Boolean(d)).map((d) => riyadhDay(Date.parse(d)));
       return [{ country, days }];
     });
-    const countries = topCountries(leads, riyadhDay(now));
-    return { text: tickerText(leads, now) ?? "", top: countries[0] ?? null, countries };
+    const stats = countryRanking(leads, riyadhDay(now));
+    const countries = stats.map((r) => r.country);
+    return { text: tickerText(leads, now) ?? "", top: countries[0] ?? null, countries, stats };
   });
   if (lastWords === null) lastWords = text;
   else if (text !== lastWords) {
     lastWords = text;
     if (now - bumpAt >= 120_000) bumpAt = now + 5_000;
   }
-  return { band: text ? { text, width: tickerWidth(text), speed, periodMs, bumpAt } : null, top, countries };
+  return { band: text ? { text, width: tickerWidth(text), speed, periodMs, bumpAt } : null, top, countries, stats };
 }
 
 async function shared(now: number): Promise<Shared> {
@@ -111,7 +114,6 @@ async function shared(now: number): Promise<Shared> {
         .lte("at", new Date(now + 600_000).toISOString())
         .order("at"),
     ]);
-    const adCountry = ads.map((a) => countryOf(a.name, list));
     const evs = (rows ?? []) as { id: number; lead_id: string | null; kind: string; destination: string; test: boolean; at: string }[];
     // the client's name as recorded on «العملاء», three words at most (displayName) — never anything else about them
     const ids = [...new Set(evs.map((e) => e.lead_id).filter((id): id is string => Boolean(id)))];
@@ -121,12 +123,11 @@ async function shared(now: number): Promise<Shared> {
       if (!e.test && !cfg.kinds.includes(e.kind)) return [];
       const country = countryOf(e.destination, list);
       if (!country) return [];
-      const ad = ads[adCountry.indexOf(country)];
-      return [{ id: String(e.id), at: Date.parse(e.at), country, line: serviceLine(e.kind, country), name: e.lead_id ? (nameOf.get(e.lead_id) ?? null) : null, test: e.test, src: ad?.src ?? null }];
+      return [{ id: String(e.id), at: Date.parse(e.at), country, line: serviceLine(e.kind, country), name: e.lead_id ? (nameOf.get(e.lead_id) ?? null) : null, test: e.test, src: landmarkFor(country) }];
     });
     const demoCountry = tick.top ?? "تركيا";
-    const demo = now < Date.parse(cfg.demoUntil) ? { country: demoCountry, line: serviceLine("بكج", demoCountry), name: "أحمد العتيبي", src: ads[adCountry.indexOf(demoCountry)]?.src ?? null } : null;
-    return { cfg, build: String(process.env.NEXT_DEPLOYMENT_ID || ""), screens: cfg.screens, slotMs: cfg.slotSec * 1000, ads, countries: tick.countries, ticker: tick.band, events, demo };
+    const demo = now < Date.parse(cfg.demoUntil) ? { country: demoCountry, line: serviceLine("بكج", demoCountry), name: "أحمد العتيبي", src: landmarkFor(demoCountry) } : null;
+    return { cfg, build: String(process.env.NEXT_DEPLOYMENT_ID || ""), screens: cfg.screens, slotMs: cfg.slotSec * 1000, ads, countries: tick.countries, countryStats: tick.stats, ticker: tick.band, events, demo };
   });
 }
 

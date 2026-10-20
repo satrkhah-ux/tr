@@ -89,9 +89,13 @@ function dayLabel(dayStart: number): string {
  */
 /** a Riyadh day's most requested countries, most first, eight at most */
 export function topCountries(leads: { country: string; days: number[] }[], day: number): string[] {
+  return countryRanking(leads, day).map((r) => r.country);
+}
+
+export function countryRanking(leads: { country: string; days: number[] }[], day: number): { country: string; count: number }[] {
   const count = new Map<string, number>();
   for (const l of leads) if (l.days.includes(day)) count.set(l.country, (count.get(l.country) ?? 0) + 1);
-  return [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ar")).slice(0, 8).map(([c]) => c);
+  return [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ar")).slice(0, 8).map(([country, count]) => ({ country, count }));
 }
 
 export function tickerText(leads: { country: string; days: number[] }[], now: number): string | null {
