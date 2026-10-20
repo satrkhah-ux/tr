@@ -5,7 +5,7 @@ import puppeteer from "puppeteer-core";
 import { screenPage } from "./page";
 import type { ScreenState } from "./server";
 
-it.skipIf(!existsSync("C:/Program Files/Google/Chrome/Application/chrome.exe"))("transparent motion, real counters, destination scenery and image-error fallback", async () => {
+it.skipIf(!existsSync("C:/Program Files/Google/Chrome/Application/chrome.exe"))("transparent motion, destination names without request counts, destination scenery and image-error fallback", async () => {
   const browser = await puppeteer.launch({ executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true });
   const now = 600000;
   const countries = ["جورجيا", "مصر", "تركيا", "إندونيسيا", "فيتنام", "المملكة المتحدة", "ماليزيا", "التشيك"];
@@ -40,10 +40,8 @@ it.skipIf(!existsSync("C:/Program Files/Google/Chrome/Application/chrome.exe"))(
     };
     await page.goto("http://motion-test.local");
     await setTime(now + 400);
-    const midway = Number(await page.$eval("#countryCount", (e) => e.textContent));
-    expect(midway).toBeGreaterThan(0); expect(midway).toBeLessThan(80);
+    expect(await page.$("#countryCount")).toBeNull();
     await setTime(now + 1600);
-    expect(await page.$eval("#countryCount", (e) => e.textContent)).toBe("80");
     expect(await page.$eval("#countries", (e) => getComputedStyle(e).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
     await page.evaluate(() => document.fonts.ready);
     await new Promise((r) => setTimeout(r, 1600));
@@ -53,8 +51,8 @@ it.skipIf(!existsSync("C:/Program Files/Google/Chrome/Application/chrome.exe"))(
     await page.screenshot({ path: "output/screen-review/motion-countries-1920.png" });
     await setTime(now + 6100);
     expect(await page.$eval("#countryHero", (e) => e.textContent)).toBe("مصر");
-    expect(await page.$eval("#countryRank", (e) => e.textContent)).toBe("02");
-    expect(await page.$eval("#countryCount", (e) => e.textContent)).toBe("73");
+    expect(await page.$eval("#countryRank", (e) => e.textContent)).toBe("الترتيب 2");
+    expect(await page.$("#countLabel")).toBeNull();
     await page.setViewport({ width: 1280, height: 720 });
     await new Promise((r) => setTimeout(r, 1500));
     await page.screenshot({ path: "output/screen-review/motion-countries-1280.png" });

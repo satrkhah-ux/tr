@@ -127,20 +127,15 @@ const RUNTIME = String.raw`
   // A single transparent motion layer travels through the numbered screens.
   var spotlightKey = "", countryPhase = "";
   function drawTicker(t) {
-    var countries = S.countries || [], stats = S.countryStats || [];
+    var countries = S.countries || [];
     var elapsed = countryBulletinElapsed(t, N, S.screens);
     var active = countries.length > 0 && elapsed >= 0;
     var panel = $("countries");
     panel.className = active ? (elapsed >= 34800 ? "on departing" : "on") : "";
     if (!active) { spotlightKey = ""; countryPhase = ""; return; }
     var slot = 36000 / countries.length, index = Math.min(countries.length - 1, Math.floor(elapsed / slot));
-    var phase = elapsed - index * slot, remaining = Math.ceil((36000 - elapsed) / 1000);
-    var progress = Math.min(1, phase / 1300), eased = 1 - Math.pow(1 - progress, 3);
-    var count = null;
-    for (var k = 0; k < stats.length; k++) if (stats[k].country === countries[index]) count = stats[k].count;
-    $("countryCount").textContent = count === null ? "" : String(Math.round(count * eased));
-    $("countLabel").textContent = count === null ? "" : "طلبًا اليوم";
-    $("countryRank").textContent = (index < 9 ? "0" : "") + Math.max(1, Math.round((index + 1) * eased));
+    var remaining = Math.ceil((36000 - elapsed) / 1000);
+    $("countryRank").textContent = "الترتيب " + (index + 1);
     $("countryProgress").style.width = (100 * elapsed / 36000) + "%";
     $("countryNext").textContent = N < S.screens
       ? (remaining <= 6 ? "إلى الشاشة " + (N + 1) + " خلال " + remaining : "التالي · الشاشة " + (N + 1)) + " ←"
@@ -286,28 +281,23 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #tick{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;direction:rtl;color:#fff;font-weight:800;line-height:1.24;will-change:transform}
 #band{display:none}
 #countries{position:absolute;inset:0;z-index:2;display:none;color:#fff;overflow:hidden;text-align:right;background:linear-gradient(0deg,rgba(2,22,29,.92),rgba(2,22,29,.62) 43%,rgba(2,22,29,.14) 72%,transparent 90%);text-shadow:0 .15vw 1vw #00151b80}
+#countries:before{content:"";position:absolute;inset:29vh 4vw 9vh;border-radius:2vw;background:linear-gradient(120deg,rgba(9,47,45,.98),rgba(10,39,43,.94));backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid #f3d89c25;box-shadow:0 2vh 6vw #00171966}
 #countries.on{display:block;animation:bulletinEnter 1.2s cubic-bezier(.16,1,.3,1) both}
 #countries.on.departing{animation:bulletinExit 1.2s ease-in both}
 @keyframes bulletinEnter{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes bulletinExit{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
-.motionTitle{position:absolute;right:6vw;top:32vh;display:flex;align-items:center;gap:1vw;font-size:1.8vw;font-weight:800;letter-spacing:.02em}
+.motionTitle{position:absolute;right:8vw;top:33vh;display:flex;align-items:center;gap:1vw;font-size:1.8vw;font-weight:800;letter-spacing:.02em}
 .motionTitle i{width:.6vw;height:.6vw;background:#f5d995;border-radius:50%;box-shadow:0 0 1.3vw #f5d995}
 .motionTitle small{font-size:1vw;opacity:.65;font-weight:700;border-right:1px solid #ffffff40;padding-right:1vw}
-#spotlight{position:absolute;left:6vw;right:6vw;top:39vh;height:32vh;display:flex;align-items:center;gap:3vw}
-.rankShell{direction:ltr;position:relative;font-size:13vw;font-weight:800;line-height:1;color:#f3d89c;min-width:17vw;text-align:center;letter-spacing:-.08em;text-shadow:0 0 4vw #f3d89c30}
-.rankShell:after{content:"";position:absolute;right:-1vw;top:20%;height:60%;width:1px;background:linear-gradient(transparent,#f3d89c,transparent)}
+#spotlight{position:absolute;left:8vw;right:8vw;top:39vh;height:32vh;display:flex;align-items:center;gap:3vw}
+.rankShell{font-size:1.5vw;font-weight:800;line-height:1.5;color:#f3d89c;min-width:8vw;text-align:center;white-space:nowrap;border:1px solid #f3d89c55;border-radius:2vw;padding:.6vw 1vw}
 .heroCopy{flex:1;min-width:0}
 #countryLabel{font-size:1.3vw;color:#f3d89c;margin-bottom:1vh}
-#countryHero{font-size:5.5vw;font-weight:800;line-height:1.16;letter-spacing:-.03em;overflow-wrap:break-word}
-.requestCount{display:flex;flex-direction:column;align-items:center;min-width:13vw;padding:2vh 2vw;border:1px solid #ffffff26;border-radius:1.4vw;background:linear-gradient(130deg,#ffffff12,#ffffff03);box-shadow:inset 0 1px #ffffff19;transform:rotate(-3deg)}
-#countryCount{font-size:5.8vw;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
-#countLabel{font-size:1.3vw;color:#d9e7e5;margin-top:1vh}
+#countryHero{font-size:7vw;font-weight:800;line-height:1.16;letter-spacing:-.03em;overflow-wrap:break-word}
 #spotlight.active .heroCopy{animation:destinationIn .85s cubic-bezier(.16,1,.3,1) both}
 #spotlight.active .rankShell{animation:rankIn 1.1s cubic-bezier(.16,1,.3,1) both}
-#spotlight.active .requestCount{animation:countIn 1s .15s cubic-bezier(.16,1,.3,1) both}
 @keyframes destinationIn{from{opacity:0;transform:translateX(-7vw)}to{opacity:1;transform:translateX(0)}}
 @keyframes rankIn{from{opacity:0;transform:translateY(7vh) scale(.65) rotate(-12deg)}to{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
-@keyframes countIn{from{opacity:0;transform:translateY(-5vh) rotate(8deg)}to{opacity:1;transform:translateY(0) rotate(-3deg)}}
 .motionRoute{position:absolute;left:-10%;right:-10%;top:72vh;height:1px;background:linear-gradient(90deg,transparent,#f3d89c66,transparent);transform:rotate(-4deg)}
 .motionRoute:after{content:"";position:absolute;width:14%;height:3px;top:-1px;background:linear-gradient(90deg,transparent,#f5deab,transparent);box-shadow:0 0 1vw #f5deab;animation:routeTravel 4.5s linear infinite}
 @keyframes routeTravel{from{transform:translateX(-20vw)}to{transform:translateX(140vw)}}
@@ -329,7 +319,7 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #countryProgress{height:100%;background:#f3d89c;width:0;box-shadow:0 0 1vw #f3d89c}
 #alertProgress{position:absolute;bottom:0;right:0;height:.4vh;background:#e3bd3c}
 #alert{z-index:4}
-@media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,.country,#spotlight.active .heroCopy,#spotlight.active .rankShell,#spotlight.active .requestCount,.motionRoute:after,#alert.on #alertImg{animation:none}}
+@media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,.country,#spotlight.active .heroCopy,#spotlight.active .rankShell,.motionRoute:after,#alert.on #alertImg{animation:none}}
 
 `;
 
@@ -353,7 +343,7 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="msg"><div id="kicker"><i></i>طلب سفر جديد</div><div id="aName"></div><div id="aDest"></div></div><div id="alertProgress"></div></div>
 <section id="countries">
 <div class="motionTitle"><i></i> الوجهات الأكثر طلبًا اليوم <small>ترافليون · نبض السفر</small></div>
-<div id="spotlight"><div class="rankShell" id="countryRank">01</div><div class="heroCopy"><div id="countryLabel"></div><div id="countryHero"></div></div><div class="requestCount"><b id="countryCount"></b><span id="countLabel"></span></div></div>
+<div id="spotlight"><div class="rankShell" id="countryRank">01</div><div class="heroCopy"><div id="countryLabel"></div><div id="countryHero"></div></div></div>
 <div class="motionRoute"></div><div id="countryList"></div>
 <footer><div class="relay"><span>جولة الشاشات</span><span id="countryStep"></span></div><span id="countryNext"></span><span class="countryNote">طلبات اليوم · بتوقيت الرياض</span></footer>
 <div class="countryTrack"><div id="countryProgress"></div></div></section>
