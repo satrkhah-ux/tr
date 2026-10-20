@@ -279,8 +279,15 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #countries.on.departing{animation:bulletinExit 1.2s cubic-bezier(.6,0,.8,.4) both}
 @keyframes bulletinEnter{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes bulletinExit{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
-.motionTitle{position:absolute;right:5vw;top:6vh;display:flex;align-items:center;gap:1.2vw;font-size:2.5vw;font-weight:800}
-.motionTitle>span{width:3vw;height:2px;background:#d7bd86}
+.motionTitle{position:absolute;left:5vw;right:5vw;top:6vh;display:flex;justify-content:center;align-items:center;gap:1.2vw;font-size:2.5vw;font-weight:800;text-align:center}
+.titleText{position:relative;display:inline-block;color:#fff;background:linear-gradient(110deg,#fff 35%,#e6cf9c 48%,#fff 61%);background-size:260% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+#countries.on .motionTitle{animation:titleReveal 1s .3s cubic-bezier(.16,1,.3,1) both}
+#countries.on .titleText{animation:titleShimmer 7s 1.3s ease-in-out infinite}
+.motionTitle:after{content:"";position:absolute;width:5vw;height:2px;background:#d7bd86;bottom:-1.2vh;left:50%;transform:translateX(-50%);transform-origin:center}
+#countries.on .motionTitle:after{animation:titleUnderline 1.1s .7s ease-out both}
+@keyframes titleReveal{from{opacity:0;transform:translateY(1.6vh)}to{opacity:1;transform:translateY(0)}}
+@keyframes titleShimmer{0%,20%{background-position:130% 0}65%,100%{background-position:-30% 0}}
+@keyframes titleUnderline{from{opacity:0;width:0}to{opacity:1;width:5vw}}
 .motionTitle small{font-size:1.1vw;color:#c6af7b;border-right:1px solid #c6af7b66;padding-right:1.2vw}
 #countryList{position:absolute;right:5vw;left:5vw;top:19vh;bottom:12vh;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:1.1vw}
 .country{position:relative;min-width:0;min-height:0;overflow:hidden;background:#185766 url(/screen-landmarks/journey.svg) center/cover;isolation:isolate}
@@ -296,7 +303,7 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #countryProgress{height:100%;background:#c7ad79;width:0}
 #alertProgress{position:absolute;bottom:0;right:0;height:.4vh;background:#e3bd3c}
 #alert{z-index:4}
-@media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,.country img,#alert.on #alertImg{animation:none}}
+@media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,.country img,#alert.on #alertImg,#countries.on .motionTitle,#countries.on .titleText,#countries.on .motionTitle:after{animation:none}}
 
 `;
 
@@ -319,7 +326,7 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="alertTag">تجربة</div>
 <div id="msg"><div id="kicker"><i></i>طلب سفر جديد</div><div id="aName"></div><div id="aDest"></div></div><div id="alertProgress"></div></div>
 <section id="countries">
-<div class="motionTitle"><span></span> الوجهات الأكثر طلبًا اليوم</div>
+<div class="motionTitle"><span class="titleText">الوجهات الأكثر طلبًا اليوم</span></div>
 <div id="countryList"></div>
 <footer><span id="bulletinDate" class="countryNote"></span></footer>
 <div class="countryTrack"><div id="countryProgress"></div></div></section>
