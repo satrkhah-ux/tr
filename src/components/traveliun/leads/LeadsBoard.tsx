@@ -339,7 +339,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
 
   // the daily classification: the chosen day's conversations by kind
   const ofDay = leads.filter((l) => on(l, day));
-  const dayCount = (label: string) => ofDay.filter((l) => l.inquiry === label).length;
+  const dayCount = (label: string) => ofDay.filter((l) => (l.inquiry || "غير مصنف") === label).length;
   const dayReturning = ofDay.filter((l) => l.returning).length;
 
   // «رؤية للإعلانات»: the chosen range
@@ -396,7 +396,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
   const kindsOf = INQUIRIES.map((i) => i.label).filter((k) => k !== "طلب");
 
   const list = leads.filter((l) => {
-    if (kind && (l.inquiry !== kind || !on(l, day))) return false;
+    if (kind && ((l.inquiry || "غير مصنف") !== kind || !on(l, day))) return false;
     if (returningOnly && (!l.returning || !on(l, day))) return false;
     if (tab === "open" && l.status !== "open") return false;
     if (tab === "closed" && l.status !== "closed") return false;
@@ -803,7 +803,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                       </td>
                       <td className="tv-tnum font-extrabold">{t.count}</td>
                       {kindsOf.map((k) => (
-                        <td key={k} className="tv-tnum">{ofT.filter((l) => l.inquiry === k).length || ""}</td>
+                        <td key={k} className="tv-tnum">{ofT.filter((l) => (l.inquiry || "غير مصنف") === k).length || ""}</td>
                       ))}
                     </tr>
                   );
@@ -968,9 +968,10 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                       <td className="w-28"><Timing value={times.firstReply} /></td>
                       <td className="w-32">
                         <select value={l.inquiry ?? ""} onChange={(e) => save(l, { inquiry: e.target.value })} className={CELL} style={tone ? { background: tone.color, color: tone.ink } : undefined}>
-                          <option value="">—</option>
+                          <option value="">غير مصنف</option>
                           {[...new Set([...INQUIRIES.map((i) => i.label), l.inquiry ?? ""])].filter(Boolean).map((i) => <option key={i}>{i}</option>)}
                         </select>
+                        <span className="mt-1 block text-[10px] text-[#647c76]">{l.inquiry_source === "manual" ? "اختيار موظف" : l.inquiry_source === "auto" ? "تصنيف تلقائي" : l.inquiry_source === "murad" ? "تصنيف مُراد" : l.inquiry_source === "sheet" ? "من الشيت" : l.inquiry ? "تصنيف سابق · المصدر غير موثّق" : "بانتظار التصنيف"}</span>
                       </td>
                       <td className="min-w-[9rem]">
                         <DestinationCell key={`${l.id}-${l.destination ?? ""}`} value={l.destination ?? ""} items={placeItems} save={(v) => save(l, { destination: v })} />

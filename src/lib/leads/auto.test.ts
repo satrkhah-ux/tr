@@ -25,7 +25,7 @@ describe("«العملاء» automatic classification", () => {
     expect(classifyInquiry([], "ابي حجز فندق في مكة")).toBe("فنادق");
     expect(classifyInquiry([], "عندكم تذاكر للرياض؟")).toBe("طيران");
     expect(classifyInquiry([], "ابي سيارة مع سائق")).toBe("مواصلات");
-    expect(classifyInquiry([], "السلام عليكم")).toBe("يستفسر");
+    expect(classifyInquiry([], "السلام عليكم")).toBe("غير مصنف");
     expect(classifyInquiry([], "")).toBe("");
   });
 
@@ -80,8 +80,13 @@ describe("the conversation's turns (0099)", () => {
 
 describe("a service the client does not want is not their request", () => {
   it("«رحلة جورجيا 10 أيام بدون طيران» is no flight", () => {
-    expect(classifyInquiry([], "ابي رحلة جورجيا 10 أيام بدون طيران")).toBe("يستفسر");
+    expect(classifyInquiry([], "ابي رحلة جورجيا 10 أيام بدون طيران")).toBe("غير مصنف");
     expect(classifyInquiry([], "بكج تركيا بدون طيران")).toBe("بكج");
     expect(classifyInquiry([], "ابي تذاكر طيران")).toBe("طيران");
   });
+});
+it("does not treat greetings as a confirmed inquiry, but preserves an explicit inquiry label", () => {
+  expect(classifyInquiry([], "السلام عليكم ممكن تفاصيل")).toBe("غير مصنف");
+  expect(classifyInquiry(["يستفسر"], "السلام عليكم")).toBe("يستفسر");
+  expect(classifyInquiry([], "أريد تأشيرة")).toBe("تأشيرات");
 });

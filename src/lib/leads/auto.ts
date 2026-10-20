@@ -4,8 +4,7 @@ import { mentionsPlace } from "./place-match";
 /**
  * «العملاء» phase two: what a Teletel conversation says about itself, with no
  * one typing it — the kind of request and the place, read from its labels and
- * the client's words. Rules, not guesses: nothing found → empty, and «يستفسر»
- * only for a conversation that says something without naming a service.
+ * the client's words. Rules, not guesses: nothing found → empty, and text with no recognized service remains «غير مصنف».
  */
 
 /** the service a client names, first match wins — patterns are written folded (fold(): no spaces, no hamza, ه for ة) (a visa before a flight: «تأشيرة وتذكرة» is a visa file) */
@@ -20,13 +19,14 @@ const KINDS: [string, RegExp][] = [
 /** a service the client says they do NOT want — «رحلة جورجيا بدون طيران» is no flight request */
 const NOT_WANTED = /(?:بدون|بلا|من غير|غير شامل|ما يحتاج|ماابي|ما ابي|مو محتاج)\s*(?:ال)?(?:طيران|تذاكر|تذكرة|تذكره|فندق|فنادق|سكن|تأشيرة|تاشيرة|تأشيره|فيزا|مواصلات|سيارة)/gu;
 
-/** «بكج» … from the labels first (staff put them), else the client's words; «يستفسر» when they wrote but named nothing */
+/** «بكج» … from the labels first (staff put them), else the client's words; no recognized service is unclassified */
 export function classifyInquiry(labels: string[], text: string): string {
+  if (labels.some((label) => ["يستفسر", "استفسار"].includes(fold(label)))) return "يستفسر";
   for (const source of [labels.join(" "), text.replace(NOT_WANTED, " ")]) {
     const f = fold(source);
     for (const [label, re] of KINDS) if (re.test(f)) return label;
   }
-  return text.trim() ? "يستفسر" : "";
+  return text.trim() ? "غير مصنف" : "";
 }
 
 export type Place = { name: string; country: string };

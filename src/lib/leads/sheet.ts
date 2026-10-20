@@ -26,6 +26,7 @@ export type SheetLead = Record<SheetField, string> & { key: string };
 
 /** the daily classification, in the sheet's own colours («اجماليات المحادثات») */
 export const INQUIRIES = [
+  { label: "غير مصنف", color: "#e7eeec", ink: "#3b6058" },
   { label: "بكج", color: "#ffff00", ink: "#4a4300" },
   { label: "تأشيرات", color: "#6d9eeb", ink: "#0b2f6b" },
   { label: "طيران", color: "#ff00ff", ink: "#4d004d" },

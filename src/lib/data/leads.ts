@@ -26,6 +26,7 @@ const PULL_EVERY_MS = 60_000;
 let lastPull = 0;
 
 export type Lead = Omit<LeadRow, "sheet_key"> & {
+  inquiry_source?: "manual" | "auto" | "sheet" | "murad" | null;
   name: string | null;
   draft_id: string | null;
   source: "manual" | "sheet";
@@ -83,7 +84,7 @@ export type LeadsPage = {
 };
 
 const COLS =
-  "id, phone, name, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, draft_id, source, created_at, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, handoffs, auto_route, auto_routed_at, auto_wait_sec, last_visit_at";
+  "id, phone, name, inquiry, inquiry_source, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, draft_id, source, created_at, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, handoffs, auto_route, auto_routed_at, auto_wait_sec, last_visit_at";
 const ROW_COLS =
   "id, phone, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, sheet_key";
 
@@ -262,6 +263,7 @@ export async function addLead(input: { phone: string; name?: string; inquiry?: s
       phone,
       name: input.name?.trim() || null,
       inquiry: normalizeInquiry(input.inquiry ?? "") || null,
+      inquiry_source: "manual",
       destination: input.destination?.trim() || null,
       // the one who logs it is the one who received it
       received_by: meId,
@@ -282,6 +284,7 @@ export async function updateLead(id: string, patch: LeadPatch): Promise<{ ok: bo
   if (!(await getCurrentEmployeeId())) return { ok: false, error: "err.session" };
   const clean: Record<string, unknown> = {};
   for (const k of EDITABLE) if (k in patch) clean[k] = patch[k] === "" ? null : patch[k];
+  if ("inquiry" in clean) clean.inquiry_source = "manual";
   if ("destination" in clean) clean.destination_source = "manual";
   if (clean.status !== undefined && clean.status !== "open" && clean.status !== "closed") return { ok: false, error: "status" };
   if (typeof clean.inquiry === "string") clean.inquiry = normalizeInquiry(clean.inquiry) || null;

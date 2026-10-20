@@ -48,7 +48,7 @@ function columnsFor(field: SheetField, value: string, people: Person[]): Record<
     return { assigned_to_name: who || null, assigned_to: matchEmployee(who, people) };
   }
   if (field === "status") return { status: sheetStatus(value) };
-  if (field === "inquiry") return { inquiry: normalizeInquiry(value) || null };
+  if (field === "inquiry") return { inquiry: normalizeInquiry(value) || null, inquiry_source: "sheet" };
   if (field === "phone") return {};
   return { [field]: value || null };
 }

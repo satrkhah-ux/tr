@@ -48,6 +48,7 @@ type Known = {
   phone: string;
   name: string | null;
   inquiry: string | null;
+  inquiry_source: string | null;
   destination: string | null;
   destination_source: "client" | "labels" | "manual" | null;
   received_by: string | null;
@@ -114,7 +115,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
     allRows((a, b) =>
       supabase
         .from("client_leads")
-        .select("id, phone, name, inquiry, destination, destination_source, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at, auto_routed_at, created_at, last_visit_at, draft_id")
+        .select("id, phone, name, inquiry, inquiry_source, destination, destination_source, received_by, assigned_to, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at, auto_routed_at, created_at, last_visit_at, draft_id")
         .or("teletel_conversation_id.not.is.null,and(source.eq.sheet,teletel_conversation_id.is.null)")
         .order("id")
         .range(a, b),
@@ -146,8 +147,10 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       if (!had.name && clientName(c)) patch.name = clientName(c);
       // the service the client picked in the WhatsApp menu outranks a guess: it also settles an «يستفسر»
       const picked = classifyInquiry([c.serviceType ?? ""], "");
-      if (picked && (!had.inquiry || had.inquiry === "يستفسر")) patch.inquiry = picked;
-      else if (!had.inquiry) patch.inquiry = classifyInquiry(c.labels, c.preview) || null;
+      if (had.inquiry_source !== "manual" && (!had.inquiry || had.inquiry === "غير مصنف" || (had.inquiry_source === "auto" && had.inquiry === "يستفسر"))) {
+        patch.inquiry = picked || classifyInquiry(c.labels, "") || "غير مصنف";
+        patch.inquiry_source = "auto";
+      }
       // Neither staff previews nor stale labels establish a travel destination.
       // until its turns are read, the one holding it stands in as the receiver
       if (!had.received_by && holder && had.timeline_seen_at == null) patch.received_by = holder;
@@ -168,13 +171,14 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       const inquiry = (patch.inquiry as string | null | undefined) ?? had.inquiry;
       const destination = (patch.destination as string | null | undefined) ?? had.destination;
       const mutableDestination = had.destination_source !== "manual" && (!had.destination || had.destination_source === "client" || had.destination_source === "labels");
-      if (!inquiry || inquiry === "يستفسر" || mutableDestination) vague.push({ c, inquiry, destination, mutableDestination, visitAt: Date.parse(String(patch.last_visit_at ?? had.last_visit_at ?? had.created_at)) / 1000 });
+      if (!inquiry || inquiry === "يستفسر" || inquiry === "غير مصنف" || mutableDestination) vague.push({ c, inquiry, destination, mutableDestination, visitAt: Date.parse(String(patch.last_visit_at ?? had.last_visit_at ?? had.created_at)) / 1000 });
     } else {
       fresh.push({
         ...live,
         phone,
         name: clientName(c),
-        inquiry: classifyInquiry([c.serviceType ?? "", ...c.labels], c.preview) || null,
+        inquiry: classifyInquiry([c.serviceType ?? "", ...c.labels], "") || "غير مصنف",
+        inquiry_source: "auto",
         destination: null,
         destination_source: "client",
         received_by: holder,
@@ -192,7 +196,10 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
     }
   }
   for (let i = 0; i < updates.length; i += 10) {
-    await Promise.all(updates.slice(i, i + 10).map(([id, patch]) => supabase.from("client_leads").update(patch).eq("id", id)));
+    await Promise.all(updates.slice(i, i + 10).map(([id, patch]) => {
+      const query = supabase.from("client_leads").update(patch).eq("id", id);
+      return patch.inquiry_source ? query.or("inquiry_source.is.null,inquiry_source.neq.manual") : query;
+    }));
   }
   result.updated = updates.length;
   if (fresh.length) {
@@ -215,7 +222,8 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
         const said = clientMessages.map((m) => m.text).join("\n");
         const patch: Record<string, unknown> = {};
         const kind = classifyInquiry([c.serviceType ?? "", ...c.labels], said);
-        if ((!inquiry || inquiry === "يستفسر") && kind && kind !== inquiry) patch.inquiry = kind;
+        const origin = byConversation.get(c.id)?.inquiry_source;
+        if (origin !== "manual" && (!inquiry || inquiry === "غير مصنف" || (origin === "auto" && inquiry === "يستفسر")) && kind && kind !== inquiry) { patch.inquiry = kind; patch.inquiry_source = "auto"; }
         const inference = inferConversationDestination(thread.messages.filter((m) => m.at >= visitAt), places);
         const place = inference.destination;
         if (mutableDestination && (place !== destination || byConversation.get(c.id)?.destination_source !== "client")) {
@@ -224,6 +232,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
         }
         if (!Object.keys(patch).length) return;
         let update = supabase.from("client_leads").update({ ...patch, updated_at: new Date().toISOString() }).eq("teletel_conversation_id", c.id);
+        if (patch.inquiry_source) update = update.or("inquiry_source.is.null,inquiry_source.neq.manual");
         if (patch.destination_source) {
           update = update.or("destination_source.is.null,destination_source.in.(client,labels)");
           update = destination ? update.eq("destination", destination) : update.is("destination", null);

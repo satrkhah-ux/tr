@@ -320,8 +320,8 @@ async function markLead(
 ): Promise<void> {
   const name = m.contactName.trim();
   const realName = name && !name.startsWith("#") && normalizePhone(name) !== normalizePhone(m.phone) ? name : null;
-  const { data } = await service.from("client_leads").select("id, name, inquiry, destination, status, created_at, last_visit_at").eq("teletel_conversation_id", m.conversationId).maybeSingle();
-  const had = data as { id: string; name: string | null; inquiry: string | null; destination: string | null; status: string; created_at: string; last_visit_at: string | null } | null;
+  const { data } = await service.from("client_leads").select("id, name, inquiry, inquiry_source, destination, status, created_at, last_visit_at").eq("teletel_conversation_id", m.conversationId).maybeSingle();
+  const had = data as { id: string; name: string | null; inquiry: string | null; inquiry_source: string | null; destination: string | null; status: string; created_at: string; last_visit_at: string | null } | null;
   const routed = {
     auto_route: fields.route,
     auto_routed_at: fields.at,
@@ -338,7 +338,7 @@ async function markLead(
       .update({
         ...routed,
         ...(!had.name && realName ? { name: realName } : {}),
-        ...(fields.inquiry ? { inquiry: fields.inquiry } : {}),
+        ...(fields.inquiry && had.inquiry_source !== "manual" ? { inquiry: fields.inquiry, inquiry_source: "murad" } : {}),
         ...(fields.destination ? { destination: fields.destination } : {}),
         // a conversation WhatsApp reopened: this message is a new visit (0104)
         ...(had.status === "closed" || m.at - Date.parse(had.last_visit_at ?? had.created_at) / 1000 > 86_400
@@ -355,6 +355,7 @@ async function markLead(
       phone: normalizePhone(m.phone),
       name: realName,
       inquiry: fields.inquiry,
+      inquiry_source: "murad",
       destination: fields.destination,
       status: "open",
       source: "teletel",
