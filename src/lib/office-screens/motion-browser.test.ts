@@ -52,6 +52,8 @@ it.skipIf(!existsSync("C:/Program Files/Google/Chrome/Application/chrome.exe"))(
     await setTime(now + 6100);
     expect(await page.$eval("#countryHero", (e) => e.textContent)).toBe("مصر");
     expect(await page.$eval("#countryRank", (e) => e.textContent)).toBe("الترتيب 2");
+    await page.waitForFunction(() => { const img = document.getElementById("countryPhoto") as HTMLImageElement; return img.complete && img.naturalWidth > 0 && img.src.endsWith("/egypt.webp"); });
+    expect(await page.$$("#countryList img")).toHaveLength(8);
     expect(await page.$("#countLabel")).toBeNull();
     await page.setViewport({ width: 1280, height: 720 });
     await new Promise((r) => setTimeout(r, 1500));

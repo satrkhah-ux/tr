@@ -1,5 +1,5 @@
 /** Local destination scenery; never depend on an advert or an external image host. */
-const IDS: Record<string, string> = {
+export const LANDMARK_IDS: Record<string, string> = {
   "جورجيا": "georgia", "مصر": "egypt", "تركيا": "turkey", "اندونيسيا": "indonesia",
   "فيتنام": "vietnam", "اذربيجان": "azerbaijan", "البحرين": "bahrain", "المملكه المتحده": "uk",
   "بريطانيا": "uk", "التشيك": "czechia", "البوسنه والهرسك": "bosnia", "تايلاند": "thailand",
@@ -19,6 +19,6 @@ const IDS: Record<string, string> = {
 
 export function landmarkFor(country: string): string {
   const key = country.normalize("NFKC").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/[ً-ْ]/g, "").trim();
-  const id = IDS[key];
+  const id = LANDMARK_IDS[key];
   return id ? `/screen-landmarks/${id}.webp` : "/screen-landmarks/journey.svg";
 }
