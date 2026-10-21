@@ -317,18 +317,20 @@ async function countryOf(service: SupabaseClient, text: string): Promise<string 
 async function markLead(
   service: SupabaseClient,
   m: IncomingMessage,
-  fields: { inquiry: string | null; destination: string | null; route: string; at: string; waitSec: number; draftId?: string; name?: string | null },
+  fields: { inquiry: string | null; destination: string | null; route: string; at: string; waitSec: number; draftId?: string; name?: string | null; intakeOnly?: boolean },
 ): Promise<void> {
   const name = m.contactName.trim();
   const realName = name && !name.startsWith("#") && normalizePhone(name) !== normalizePhone(m.phone) ? name : null;
   const { data } = await service.from("client_leads").select("id, name, inquiry, inquiry_source, destination, status, created_at, last_visit_at").eq("teletel_conversation_id", m.conversationId).maybeSingle();
   const had = data as { id: string; name: string | null; inquiry: string | null; inquiry_source: string | null; destination: string | null; status: string; created_at: string; last_visit_at: string | null } | null;
   const routed = {
+    ...(!fields.intakeOnly ? {
     auto_route: fields.route,
     auto_routed_at: fields.at,
     auto_wait_sec: fields.waitSec,
     assigned_at: fields.at,
     assignee_reply_at: null,
+    } : {}),
     updated_at: fields.at,
     ...(fields.draftId ? { draft_id: fields.draftId } : {}),
     ...(fields.name ? { name: fields.name } : {}),
@@ -516,7 +518,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
         const handoff = settings.control.handoffs["تأشيرات"];
         await assignMuradHandoff(m.conversationId, handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), "تأشيرات"), handoff?.agentId ?? null);
       }
-      await markLead(service, m, { inquiry: "تأشيرات", destination: result.country, route: DEPARTMENT["تأشيرات"], at: new Date().toISOString(), waitSec, name: null });
+      await markLead(service, m, { inquiry: "تأشيرات", destination: result.country, route: DEPARTMENT["تأشيرات"], at: new Date().toISOString(), waitSec, name: null, intakeOnly: true });
       return "answered";
     }
 
