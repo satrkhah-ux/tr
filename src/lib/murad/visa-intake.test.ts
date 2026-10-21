@@ -23,6 +23,14 @@ describe("visa intake", () => {
     expect(r.completed).toBe(false);
     expect(r.reply).toContain("نكمل الطلب");
   });
+  it("answers price and reports the finding even if the model repeats the broken promise", async () => {
+    call.mockResolvedValueOnce(JSON.stringify({ ...previous, country: "المغرب", reply: "سأقوم بمراجعة الصورة الآن", imageFinding: "صورة جواز السفر واضحة", nextQuestion: "" }));
+    const message = { id: 1, at: 100, text: "📎", fromClient: true, isPrivate: false, template: false, bot: false, images: ["https://chat.teletel.io/rails/active_storage/x"] };
+    const r = await visaIntakeReply({ messages: [message, { ...message, id: 2, at: 101, text: "وكم السعر؟", images: [] }], previous: null, catalog: [{ country: "المغرب", sell_price: null, sell_currency: "SAR" }], includePrice: true });
+    expect(r.reply).toContain("لا يوجد سعر معتمد");
+    expect(r.reply).toContain("صورة جواز السفر واضحة");
+    expect(r.reply).not.toContain("سأقوم");
+  });
   it("only sends client public images and applies no-price setting", async () => {
     call.mockResolvedValueOnce(JSON.stringify(previous));
     const message = { id: 1, at: 100, text: "صورة", fromClient: true, isPrivate: false, template: false, bot: false, images: ["https://chat.teletel.io/rails/active_storage/x"] };
