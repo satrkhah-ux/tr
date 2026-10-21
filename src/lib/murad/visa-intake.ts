@@ -39,7 +39,7 @@ export async function visaIntakeReply(input: { messages: TurnMessage[]; previous
     void price; void currency;
     return { ...details, ...(typeof details.arabic_requirements === "string" ? { arabic_requirements: withoutPrices(details.arabic_requirements) } : {}) };
   }) : input.catalog;
-  const user = JSON.stringify({ previous: input.previous, catalog, messages: input.messages.filter((m) => !m.isPrivate).map((m) => ({ role: m.fromClient ? "العميل" : "مُراد", text: m.text, images: m.images?.length ?? 0 })), imagesProvided: images.length, imagesNotReviewed: allImages.length - images.length });
+  const user = JSON.stringify({ today: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }), previous: input.previous, catalog, messages: input.messages.filter((m) => !m.isPrivate).map((m) => ({ role: m.fromClient ? "العميل" : "مُراد", text: m.text, images: m.images?.length ?? 0 })), imagesProvided: images.length, imagesNotReviewed: allImages.length - images.length });
   const system = VISA_INTAKE_PROMPT + (input.includePrice ? "" : "\nلا تذكر أي أسعار أو مبالغ أو رسوم. السؤال عن السعر يسجل للمختص.");
   let result: VisaIntake | null = null;
   try { result = parseVisaIntake(await openaiJson({ name: "visa_intake", system, user, images, schema, timeoutMs: 25000 })); } catch { /* An unreadable attachment never blocks intake. */ }

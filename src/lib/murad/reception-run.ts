@@ -513,7 +513,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       // Persist before notes/assignment: even if those fail the next turn knows this public reply is ours.
       await finish({ reason: "visa:intake", reply: result.reply, reply_message_id: replyId, intake: { ...intake, country: result.country, visa_intake: result } });
       await addTeletelNote(m.conversationId, `مُراد — ملف التأشيرة\n${result.summary}\nالنواقص: ${result.missing.join("، ") || "لا نواقص مسجلة؛ يلزم تدقيق المختص"}\nللمراجعة: ${result.review.join("، ") || "تدقيق المستندات قبل التقديم"}`);
-      if (result.completed) {
+      if (result.completed && !(previous as { completed?: boolean } | null)?.completed) {
         const teams = await listTeletelTeams();
         const handoff = settings.control.handoffs["تأشيرات"];
         await assignMuradHandoff(m.conversationId, handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), "تأشيرات"), handoff?.agentId ?? null);
