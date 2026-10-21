@@ -23,6 +23,7 @@ export function MuradSettings({ setup }: { setup: Setup }) {
       <div className="grid gap-3 sm:grid-cols-2">{Object.entries(TASK_LABELS).map(([key, label]) => <label key={key} className="flex items-center gap-3 rounded-xl bg-[#f0f7f4] p-4">
         <input type="checkbox" checked={c.tasks[key as keyof typeof c.tasks]} onChange={(e) => setC({ ...c, tasks: { ...c.tasks, [key]: e.target.checked } })} />{label}
       </label>)}</div>
+      <label className="flex items-center gap-3 font-bold"><input type="checkbox" checked={c.visaAll === true} onChange={(e) => setC({ ...c, visaAll: e.target.checked })} />استقبال التأشيرات لجميع العملاء ومتابعة النواقص والصور</label>
       <label className="flex items-center gap-3 font-bold"><input type="checkbox" checked={c.includePrice} onChange={(e) => setC({ ...c, includePrice: e.target.checked })} />تتضمن الإجابة السعر</label>
       <p className="text-sm">عند إلغاء السعر، تُرسل تفاصيل البرنامج فقط، ولا يُرسل ملف عرض أو رابط يحتوي على السعر.</p>
       {(["inboxIds", "teamIds"] as const).map((key) => <fieldset key={key} className="rounded-xl border p-4">

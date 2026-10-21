@@ -62,6 +62,7 @@ export function isCandidate(c: ConversationTimes, nowSec: number, lastActedSec: 
 }
 
 export type TurnMessage = {
+  images?: string[];
   id: number;
   /** unix seconds */
   at: number;
@@ -98,6 +99,10 @@ export function toTurnMessage(m: RawMessage): TurnMessage | null {
     text: m.content?.trim() || (m.attachments?.length ? "📎" : ""),
     fromClient: m.message_type === 0,
     isPrivate: m.private === true,
+    ...(m.attachments?.length ? { images: m.attachments.flatMap((a) => {
+      const file = a as { file_type?: unknown; data_url?: unknown };
+      return file?.file_type === "image" && typeof file.data_url === "string" ? [file.data_url] : [];
+    }) } : {}),
     template,
     // an agent bot, or an automation rule writing as the account
     bot: /bot/i.test(String(m.sender_type ?? m.sender?.type ?? "")) || m.content_attributes?.["automation_rule_id"] != null,

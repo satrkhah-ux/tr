@@ -11,6 +11,7 @@ export const TASK_LABELS = {
 } as const;
 export type MuradControl = {
   tasks: Record<keyof typeof TASK_LABELS, boolean>;
+  visaAll?: boolean;
   includePrice: boolean;
   inboxIds: number[];
   teamIds: number[];
@@ -18,13 +19,13 @@ export type MuradControl = {
 };
 export const defaultControl = (): MuradControl => ({
   tasks: { reception: true, suggest: true, auto: true, offers: true, visas: true, holding: true },
-  includePrice: true, inboxIds: [], teamIds: [], handoffs: {},
+  visaAll: false, includePrice: true, inboxIds: [], teamIds: [], handoffs: {},
 });
 const ids = (v: unknown): v is number[] => Array.isArray(v) && v.length <= 100 && v.every((n) => Number.isSafeInteger(n) && n > 0);
 export function validControl(v: unknown): v is MuradControl {
   if (!v || typeof v !== "object") return false;
   const c = v as MuradControl;
-  return typeof c.includePrice === "boolean" && ids(c.inboxIds) && ids(c.teamIds)
+  return (c.visaAll === undefined || typeof c.visaAll === "boolean") && typeof c.includePrice === "boolean" && ids(c.inboxIds) && ids(c.teamIds)
     && !!c.tasks && Object.keys(TASK_LABELS).every((k) => typeof c.tasks[k as keyof typeof TASK_LABELS] === "boolean")
     && !!c.handoffs && typeof c.handoffs === "object" && !Array.isArray(c.handoffs)
     && Object.entries(c.handoffs).every(([k, h]) => ROUTE_KEYS.includes(k as RouteKey) && !!h
