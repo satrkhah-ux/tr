@@ -1,3 +1,5 @@
+import { routeCompletedVisa, retryVisaHandoffs } from "./visa-routing";
+import type { MuradReceipt } from "./visa-assignment";
 import { visaIntakeReply } from "./visa-intake";
 import { inMuradScope } from "./control";
 import "server-only";
@@ -495,6 +497,10 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       (trip.only_city && !routeCity(c, trip.only_city) ? `المبيت في ${trip.only_city}` : null) ??
       ((trip.children ?? 0) > 0 ? "أطفال" : (trip.adults ?? 0) > c.maxPeople ? `أكثر من ${c.maxPeople} أشخاص` : null);
 
+    if (received.some((r) => r.intake?.visa_handoff)) {
+      await finish({ reason: "none:routed" });
+      return "none:routed";
+    }
     // Persistent visa intake: no two-question cutoff and no handoff on a damaged photo.
     if (settings.control.visaAll && settings.control.tasks.visas && await visaConversation(service, m) && !request.wantsHuman) {
       const latest = thread.messages.filter((t) => t.fromClient && !t.isPrivate).at(-1);
@@ -513,12 +519,17 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       // Persist before notes/assignment: even if those fail the next turn knows this public reply is ours.
       await finish({ reason: "visa:intake", reply: result.reply, reply_message_id: replyId, intake: { ...intake, country: result.country, visa_intake: result } });
       await addTeletelNote(m.conversationId, `مُراد — ملف التأشيرة\n${result.summary}\nالنواقص: ${result.missing.join("، ") || "لا نواقص مسجلة؛ يلزم تدقيق المختص"}\nللمراجعة: ${result.review.join("، ") || "تدقيق المستندات قبل التقديم"}`);
-      if (result.completed && !(previous as { completed?: boolean } | null)?.completed) {
-        const teams = await listTeletelTeams();
-        const handoff = settings.control.handoffs["تأشيرات"];
-        await assignMuradHandoff(m.conversationId, handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), "تأشيرات"), handoff?.agentId ?? null);
-      }
       await markLead(service, m, { inquiry: "تأشيرات", destination: result.country, route: DEPARTMENT["تأشيرات"], at: new Date().toISOString(), waitSec, name: null, intakeOnly: true });
+      const { data: savedLead } = await service.from("client_leads").select("id,murad_receipt").eq("teletel_conversation_id", m.conversationId).maybeSingle();
+      const savedReceipt = savedLead?.murad_receipt as MuradReceipt | null;
+      const receivedAt = new Date().toISOString();
+      const start = visitLines.find((t) => t.fromClient)?.at ?? since;
+      const receipt: MuradReceipt = savedReceipt && Date.parse(savedReceipt.receivedAt) / 1000 >= closedAt ? savedReceipt : { receivedAt, firstResponder: !staffReplied, waitSec: Math.max(0, Math.round(Date.parse(receivedAt) / 1000 - start)) };
+      if (savedLead) await service.from("client_leads").update({ murad_receipt: { ...receipt, pending: result.completed } }).eq("id", savedLead.id);
+      if (result.completed) {
+        await service.from("murad_log").update({ reason: "visa:handoff_pending" }).eq("id", logId);
+        await routeCompletedVisa(service, logId);
+      }
       return "answered";
     }
 
@@ -876,6 +887,7 @@ export async function receptionSweep(): Promise<number> {
   const service = db();
   const [flags, settings, reception, list] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service), listOpenConversations()]);
   if (!flags.murad_reception || !settings.control.tasks.reception || !list) return 0;
+  if (settings.control.visaAll && settings.control.tasks.visas) await retryVisaHandoffs(service);
   const nowSec = Math.floor(Date.now() / 1000);
   // a client waiting on us for under half an hour — a new conversation, or an old one the client reopened
   const { data: visaLeads } = settings.control.visaAll ? await service.from("client_leads").select("teletel_conversation_id").eq("inquiry", "تأشيرات").eq("status", "open") : { data: [] };

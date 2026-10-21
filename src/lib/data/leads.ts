@@ -1,5 +1,6 @@
 "use server";
 
+import type { MuradReceipt } from "@/lib/murad/visa-assignment";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "./metrics";
@@ -26,6 +27,7 @@ const PULL_EVERY_MS = 60_000;
 let lastPull = 0;
 
 export type Lead = Omit<LeadRow, "sheet_key"> & {
+  murad_receipt?: MuradReceipt | null;
   inquiry_source?: "manual" | "auto" | "sheet" | "murad" | null;
   name: string | null;
   draft_id: string | null;
@@ -84,7 +86,7 @@ export type LeadsPage = {
 };
 
 const COLS =
-  "id, phone, name, inquiry, inquiry_source, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, draft_id, source, created_at, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, handoffs, auto_route, auto_routed_at, auto_wait_sec, last_visit_at";
+  "id, phone, name, inquiry, inquiry_source, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, draft_id, source, created_at, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, handoffs, auto_route, auto_routed_at, auto_wait_sec, last_visit_at, murad_receipt";
 const ROW_COLS =
   "id, phone, inquiry, destination, received_by, received_by_name, delay, sent_status, assigned_to, assigned_to_name, done_text, status, next_action, contact_owner, result, sheet_key";
 

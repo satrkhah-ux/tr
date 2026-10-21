@@ -75,11 +75,11 @@ function timing(l: Lead, now: number) {
   const open = l.status === "open";
   const awaited = (from: number) => (open ? { text: `ينتظر منذ ${span(now - from)}`, waiting: true } : { text: "—", waiting: false });
   const done = (text: string) => ({ text, waiting: false });
-  const reply = ms(l.first_reply_at);
+  const reply = ms(l.first_reply_at ?? l.murad_receipt?.receivedAt ?? null);
   const assigned = ms(l.assigned_at);
   const assigneeReply = ms(l.assignee_reply_at);
   return {
-    firstReply: Number.isNaN(first) ? done("—") : Number.isNaN(reply) ? awaited(first) : done(span(reply - first)),
+    firstReply: l.murad_receipt?.firstResponder ? done(span(l.murad_receipt.waitSec * 1000)) : Number.isNaN(first) ? done("—") : Number.isNaN(reply) ? awaited(first) : done(span(reply - first)),
     toAssign: Number.isNaN(assigned) || Number.isNaN(first) ? done("—") : done(span(assigned - first)),
     assigneeReply: Number.isNaN(assigned) ? done("—") : Number.isNaN(assigneeReply) ? awaited(assigned) : done(span(assigneeReply - assigned)),
   };
@@ -164,7 +164,13 @@ const secs = (from: number, to: number) => span((to - from) * 1000);
 
 /** «مسار المحادثة»: each agent's turn — how long to answer, how long before handing it on */
 function Turns({ l, now }: { l: Lead; now: number }) {
-  const routed = l.auto_route && l.auto_routed_at ? (
+  const receipt = l.murad_receipt;
+  const routed = receipt ? (
+    <li className="text-[#185045]">
+      <b>مُراد — قسم الطلبات</b>: استلم خلال {span(receipt.waitSec * 1000)}
+      {receipt.assignedAt ? <> · أسنده إلى <b>{receipt.team}</b>{receipt.agent ? <> — {receipt.agent}</> : " — بانتظار موظف متاح"} · بعد {secs(Date.parse(receipt.receivedAt) / 1000, Date.parse(receipt.assignedAt) / 1000)} من الاستلام</> : receipt.pending ? " · اكتمل الجمع، جارٍ تأكيد الإسناد لقسم التأشيرات" : " · يجمع بيانات الطلب"}
+    </li>
+  ) : l.auto_route && l.auto_routed_at ? (
     <li className="whitespace-nowrap text-[#1e3a8a]">
       🤖 حُوّل آلياً إلى <b>{l.auto_route}</b> ·{" "}
       <DirText>{new Date(l.auto_routed_at).toLocaleTimeString("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit" })}</DirText>
@@ -335,7 +341,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
   const visitsOf = useMemo(() => new Map(leads.map((l) => [l.id, [...new Set([riyadhDay(l.created_at), ...(l.last_visit_at ? [riyadhDay(l.last_visit_at)] : [])])]])), [leads]);
   const dayOf = useMemo(() => new Map([...visitsOf].map(([id, days]) => [id, days[days.length - 1]])), [visitsOf]);
   const on = (l: Lead, d: string) => visitsOf.get(l.id)?.includes(d) ?? false;
-  const receiver = (l: Lead) => nameOf.get(l.received_by ?? "") ?? l.received_by_name;
+  const receiver = (l: Lead) => l.murad_receipt?.firstResponder ? "مُراد" : nameOf.get(l.received_by ?? "") ?? l.received_by_name;
 
   // the daily classification: the chosen day's conversations by kind
   const ofDay = leads.filter((l) => on(l, day));
