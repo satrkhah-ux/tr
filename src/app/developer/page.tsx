@@ -6,6 +6,8 @@ import { ServiceSwitches } from "@/components/traveliun/developer/ServiceSwitche
 import { MuradPanel } from "@/components/traveliun/developer/MuradPanel";
 import { ReadyOffersSheetPanel } from "@/components/traveliun/developer/ReadyOffersSheetPanel";
 import { ReceptionPanel } from "@/components/traveliun/developer/ReceptionPanel";
+import { StaffBotPanel } from "@/components/traveliun/developer/StaffBotPanel";
+import { staffBotPanel } from "@/lib/data/staff-bot-admin";
 import { readReceptionSettings, receptionToday, webhookToken } from "@/lib/murad/reception-run";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -22,19 +24,20 @@ export const dynamic = "force-dynamic";
 /**
  * «المطوّر» (owner's order, 2026-10-17): every external connection's health,
  * the switches that stop and restore system services, «مُراد» (his model,
- * his auto-reply numbers, what he did last), and the ready offers' sheet. developer.access
+ * his auto-reply numbers, what he did last), the staff bot's token, and the ready offers' sheet. developer.access
  * only — checked here, not just in the menu, because a URL can be typed.
  */
 export default async function DeveloperPage() {
   if (!(await currentCan("developer.access"))) redirect("/dashboard");
 
-  const [flags, log, murad, readyOffers, receptionSettings, today] = await Promise.all([
+  const [flags, log, murad, readyOffers, receptionSettings, today, staffBot] = await Promise.all([
     getFeatureFlags(),
     listEntityAudit("app_settings", FEATURES_SETTING_KEY, 10),
     muradPanel(),
     readyOffersPanel(),
     readReceptionSettings(createSupabaseServiceClient() as unknown as SupabaseClient),
     receptionToday(),
+    staffBotPanel(),
   ]);
   const token = webhookToken();
   const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
@@ -58,6 +61,7 @@ export default async function DeveloperPage() {
         <ReceptionPanel
           data={{ on: flags.murad_reception, scope: receptionSettings.scope, webhookUrl: token ? `${site}/api/teletel/webhook?token=${token}` : null, today }}
         />
+        {staffBot ? <StaffBotPanel data={staffBot} /> : null}
         <ReadyOffersSheetPanel data={readyOffers} />
       </div>
     </TraveliunShell>

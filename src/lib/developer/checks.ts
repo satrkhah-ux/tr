@@ -8,6 +8,7 @@ import { getOcrProvider } from "@/lib/repackage/extract/ocr";
 import { pdfEngine } from "@/lib/offer-doc/pdf";
 import { eyeBotToken } from "@/lib/telegram/eye-bot";
 import { opsBotToken } from "@/lib/telegram/ops-bot";
+import { staffBotToken } from "@/lib/telegram/staff-bot";
 import { cronRunKey, type CronJob, type CronRun } from "@/lib/data/cron-runs";
 import { readyOffersSheet } from "@/lib/data/ready-offers";
 import { connect as tlsConnect } from "node:tls";
@@ -49,6 +50,7 @@ const SECRET_ENV = [
   "TELEGRAM_EYE_BOT_TOKEN",
   "TELEGRAM_OPS_BOT_TOKEN",
   "TELEGRAM_WEBAPP_BOT_TOKEN",
+  "TELEGRAM_STAFF_BOT_TOKEN",
 ];
 
 const HOUR = 3_600_000;
@@ -104,9 +106,9 @@ async function telegram<T>(token: string, method: string): Promise<TgReply<T>> {
 }
 
 /** getMe names the bot; a bot that lives on a webhook also has its webhook read (the first thing to check when a bot goes quiet). */
-function botCheck(token: () => string | undefined, envName: string, webhook: boolean): () => Promise<Outcome> {
+function botCheck(token: () => string | undefined | Promise<string | undefined>, envName: string, webhook: boolean): () => Promise<Outcome> {
   return async () => {
-    const value = token();
+    const value = await token();
     if (!value) return unconfigured(envName);
     const [me, ms] = await timed(() => telegram<{ username?: string }>(value, "getMe"));
     if (!me.ok) return failed(new Error(me.description ?? "getMe"));
@@ -375,6 +377,8 @@ const CHECKS: Check[] = [
   },
   { id: "bot_eye", group: "bots", label: "dev.c.botEye", run: botCheck(eyeBotToken, "TELEGRAM_EYE_BOT_TOKEN", true) },
   { id: "bot_ops", group: "bots", label: "dev.c.botOps", run: botCheck(opsBotToken, "TELEGRAM_OPS_BOT_TOKEN", true) },
+  // the vault's token first (replaced on this page), the env var only as the fallback
+  { id: "bot_staff", group: "bots", label: "dev.c.botStaff", run: botCheck(async () => (await staffBotToken()).token ?? undefined, "TELEGRAM_STAFF_BOT_TOKEN", true) },
   {
     id: "bot_app",
     group: "bots",

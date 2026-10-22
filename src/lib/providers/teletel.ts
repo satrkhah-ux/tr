@@ -507,6 +507,30 @@ async function readOpen(): Promise<OpenList | null> {
   return openCache;
 }
 
+export type TeletelAgent = { id: number; name: string; email: string | null };
+let agentsCache: { at: number; agents: TeletelAgent[] } | null = null;
+
+/**
+ * Every agent who can take the client inbox, with their email, which is how an
+ * employee is matched to an agent (employees.teletel_agent_id). For our token
+ * /agents answers 404 (measured 2026-10-22) and /assignable_agents does not.
+ * Inbox 11 is the client WhatsApp when the inbox list itself is closed too.
+ * Kept ten minutes.
+ */
+export async function listTeletelAgents(): Promise<TeletelAgent[]> {
+  if (agentsCache && Date.now() - agentsCache.at < 10 * 60_000) return agentsCache.agents;
+  const config = getTeletelConfig();
+  if (!config) return [];
+  const inbox = (await whatsappInbox(config)) ?? 11;
+  const res = await api<{ payload?: { id?: number; name?: string; email?: string | null }[] }>(config, `/assignable_agents?inbox_ids[]=${inbox}`);
+  if (!res?.payload) return agentsCache?.agents ?? [];
+  const agents = res.payload
+    .filter((a) => typeof a.id === "number")
+    .map((a) => ({ id: a.id as number, name: (a.name ?? "").trim() || `#${a.id}`, email: a.email?.trim().toLowerCase() || null }));
+  agentsCache = { at: Date.now(), agents };
+  return agents;
+}
+
 export type TeletelTeam = { id: number; name: string };
 let teamsCache: { at: number; teams: TeletelTeam[] } | null = null;
 

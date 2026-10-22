@@ -95,6 +95,12 @@ export type AuditAction =
   | "employee.created"
   | "employee.updated"
   | "employee.role_changed"
+  // «تنبيهاتي» (staff bot, 2026-10-22): the Telegram link, the Teletel agent, the test message, the bot's token
+  | "employee.telegram_changed"
+  | "employee.teletel_agent_changed"
+  | "employee.telegram_test"
+  | "bot.token_changed"
+  | "bot.webhook_registered"
   | "employee.extra_permissions"
   | "employee.deleted"
   // «عين الإدارة» — what it said, and what management did about it

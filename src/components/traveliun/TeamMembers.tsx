@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Check, KeyRound, LayoutGrid, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus, X } from "lucide-react";
+import { Bell, Check, KeyRound, LayoutGrid, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { deleteMember, saveMember, setMemberPermissions, setMemberRole, suspendMember, type PendingRegistration, type TeamMember, type TeamRole } from "@/lib/data/team";
@@ -11,6 +11,7 @@ import { ALL_PERMISSIONS, isDeveloperRole, PERMISSION_GROUPS, type Permission } 
 import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
 import { PendingEmployees } from "./team/PendingEmployees";
+import { TelegramLink } from "./team/TelegramLink";
 import { TempPassword } from "./EmployeeAccounts";
 import { setEmployeePassword } from "@/lib/data/employee-accounts";
 import { TraveliunShell } from "./TraveliunShell";
@@ -72,6 +73,7 @@ export function TeamMembers({
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [extraFor, setExtraFor] = useState<string | null>(null);
+  const [tgFor, setTgFor] = useState<string | null>(null);
   // «كلمة مرور جديدة» on a colleague's row: what is typed, and what to tell the administrator after
   const [pw, setPw] = useState<{ id: string; value: string } | null>(null);
   const [pwDone, setPwDone] = useState<{ id: string; text: string; ok: boolean } | null>(null);
@@ -301,6 +303,25 @@ export function TeamMembers({
                     <span className="rounded-full bg-[#fdeef2] px-2.5 py-1 text-[11px] font-bold text-[#c22850]">{t("team.suspended")}</span>
                   ) : null}
 
+                  {/* «تنبيهاتي»: linked or not, for everyone; the ID and the test message for employees.manage */}
+                  {canManage && !developerRole(m.role_id) ? (
+                    <button
+                      type="button"
+                      onClick={() => setTgFor(tgFor === m.id ? null : m.id)}
+                      aria-expanded={tgFor === m.id}
+                      className={`inline-flex h-9 items-center gap-1.5 rounded-[9px] border px-3 text-[11.5px] font-bold hover:bg-[#f4f8f6] ${
+                        m.telegram_linked ? "border-[#2aa87a] text-[#0f7a52]" : "border-[#dbe6e1] text-[#93aaa3]"
+                      }`}
+                    >
+                      <Bell className="size-3.5" />
+                      {m.telegram_linked ? t("team.tg.linked") : t("team.tg.notLinkedShort")}
+                    </button>
+                  ) : (
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${m.telegram_linked ? "bg-[#e7f6ef] text-[#0f7a52]" : "bg-[#eef4f1] text-[#93aaa3]"}`}>
+                      {m.telegram_linked ? t("team.tg.linked") : t("team.tg.notLinkedShort")}
+                    </span>
+                  )}
+
                   {canManage && !developerRole(m.role_id) ? (
                     <select
                       value={m.role_id ?? ""}
@@ -391,6 +412,7 @@ export function TeamMembers({
                   {pwDone?.id === m.id ? (
                     <p className={`basis-full text-end text-[12px] font-bold ${pwDone.ok ? "text-[#0f7a52]" : "text-[#c22850]"}`}>{pwDone.text}</p>
                   ) : null}
+                  {tgFor === m.id && canManage && !developerRole(m.role_id) ? <TelegramLink member={m} /> : null}
                   {extraFor === m.id && canManage && !developerRole(m.role_id) ? (
                     <ExtraSections
                       member={m}

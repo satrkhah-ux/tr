@@ -63,6 +63,12 @@ export type TeamMember = {
   extra_permission_keys: Permission[];
   /** what was taken from them although the role gives it (0107). */
   removed_permission_keys: Permission[];
+  /** «تنبيهاتي»: their Telegram account is linked */
+  telegram_linked: boolean;
+  /** the account's ID itself, for employees.manage only (null for everyone else) */
+  telegram_chat_id: string | null;
+  /** their agent in Teletel (employees.teletel_agent_id) */
+  teletel_agent_id: number | null;
 };
 
 export async function listTeamRoles(): Promise<TeamRole[]> {
@@ -99,13 +105,17 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
     const user = await getServerUser();
     if (!user) return [];
     const supabase = await createSupabaseServerClient();
-    const { data } = await supabase
-      .from("employees")
-      .select("id, arabic_name, english_name, email, mobile, status, role_id, auth_user_id, extra_permission_keys, removed_permission_keys, roles(arabic_name)")
-      .order("arabic_name");
+    const [{ data }, manage] = await Promise.all([
+      supabase
+        .from("employees")
+        .select("id, arabic_name, english_name, email, mobile, status, role_id, auth_user_id, extra_permission_keys, removed_permission_keys, telegram_chat_id, teletel_agent_id, roles(arabic_name)")
+        .order("arabic_name"),
+      currentCan("employees.manage"),
+    ]);
 
-    type Row = Omit<TeamMember, "role_name" | "has_login" | "extra_permission_keys" | "removed_permission_keys"> & {
+    type Row = Omit<TeamMember, "role_name" | "has_login" | "extra_permission_keys" | "removed_permission_keys" | "telegram_linked" | "telegram_chat_id"> & {
       auth_user_id: string | null;
+      telegram_chat_id: number | string | null;
       extra_permission_keys: string[] | null;
       removed_permission_keys: string[] | null;
       roles: { arabic_name: string } | { arabic_name: string }[] | null;
@@ -124,6 +134,9 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
         has_login: Boolean(e.auth_user_id),
         extra_permission_keys: (e.extra_permission_keys ?? []).filter(isPermission),
         removed_permission_keys: (e.removed_permission_keys ?? []).filter(isPermission),
+        telegram_linked: e.telegram_chat_id != null,
+        telegram_chat_id: manage && e.telegram_chat_id != null ? String(e.telegram_chat_id) : null,
+        teletel_agent_id: e.teletel_agent_id ?? null,
       };
     });
   } catch {
@@ -233,6 +246,57 @@ export async function setMemberRole(employeeId: string, roleId: string | null): 
       meta: { from: (before.data as { role_id: string | null } | null)?.role_id ?? null, to: roleId },
     });
     forgetPermissions();
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/**
+ * «تنبيهاتي»: the colleague's Telegram account (its numeric ID; empty unlinks).
+ * The bot speaks only to a linked account, and /tg signs a linked account in,
+ * so this is a permission-like field: employees.manage, audited before → after.
+ */
+export async function setMemberTelegram(employeeId: string, chatId: string): Promise<{ ok: true } | Fail> {
+  const denied = await requireManage();
+  if (denied) return { ok: false, error: denied };
+  if (await deniedForNonDeveloper({ employeeId })) return { ok: false, error: "team.developerOnly" };
+  const value = chatId.trim();
+  if (value && !/^\d{5,15}$/.test(value)) return { ok: false, error: "team.tg.badId" };
+  try {
+    const supabase = service();
+    const before = await supabase.from("employees").select("telegram_chat_id").eq("id", employeeId).maybeSingle();
+    const { error } = await supabase.from("employees").update({ telegram_chat_id: value || null }).eq("id", employeeId);
+    if (error) return { ok: false, error: error.code === "23505" ? "team.tg.taken" : "err.updateFailed" };
+    await logAudit({
+      action: "employee.telegram_changed",
+      entity: "employees",
+      entity_id: employeeId,
+      meta: { from: (before.data as { telegram_chat_id: number | string | null } | null)?.telegram_chat_id ?? null, to: value || null },
+    });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/** The colleague's Teletel agent (null unlinks) — whose conversations the bot tells them about. One agent, one employee. */
+export async function setMemberTeletelAgent(employeeId: string, agentId: number | null): Promise<{ ok: true } | Fail> {
+  const denied = await requireManage();
+  if (denied) return { ok: false, error: denied };
+  if (await deniedForNonDeveloper({ employeeId })) return { ok: false, error: "team.developerOnly" };
+  if (agentId !== null && !(Number.isInteger(agentId) && agentId > 0)) return { ok: false, error: "err.updateFailed" };
+  try {
+    const supabase = service();
+    const before = await supabase.from("employees").select("teletel_agent_id").eq("id", employeeId).maybeSingle();
+    const { error } = await supabase.from("employees").update({ teletel_agent_id: agentId }).eq("id", employeeId);
+    if (error) return { ok: false, error: error.code === "23505" ? "team.tg.agentTaken" : "err.updateFailed" };
+    await logAudit({
+      action: "employee.teletel_agent_changed",
+      entity: "employees",
+      entity_id: employeeId,
+      meta: { from: (before.data as { teletel_agent_id: number | null } | null)?.teletel_agent_id ?? null, to: agentId },
+    });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
