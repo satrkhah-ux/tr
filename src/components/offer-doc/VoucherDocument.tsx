@@ -4,6 +4,7 @@ import { TRAVELIUN_BRAND, type DocBrand } from "./brand";
 import { OFFER_DOC_CSS } from "./styles";
 import { DEFAULT_OFFER_DOC_ASSETS, type OfferDocAssets } from "./assets";
 import type { VoucherBooking, VoucherDTO, VoucherKind } from "@/lib/operations/voucher-dto";
+import { FlightTicket, HotelVoucher } from "./VoucherSheets";
 // the country's name, not «SAU» (the owner, 2026-10-22) — said at print time, so issued snapshots get it too
 import { nationalityName } from "@/lib/operations/nationality";
 
@@ -24,7 +25,7 @@ import { nationalityName } from "@/lib/operations/nationality";
 // «فوتشر» is what the Gulf trade actually calls this, on both sides of the desk.
 // «قسيمة» is a translation nobody uses, and a document titled in words the hotel
 // does not recognise is a document the guest has to explain.
-const KIND_TITLE: Record<VoucherKind, string> = {
+export const KIND_TITLE: Record<VoucherKind, string> = {
   hotel_voucher: "فوتشر الفنادق",
   flight_ticket: "تذكرة الطيران",
   itinerary: "الجدول السياحي",
@@ -35,7 +36,7 @@ const KIND_TITLE: Record<VoucherKind, string> = {
   welcome_board: "لوحة الاستقبال",
 };
 
-const KIND_NOTE: Record<VoucherKind, string> = {
+export const KIND_NOTE: Record<VoucherKind, string> = {
   hotel_voucher: "يُقدَّم هذا الفوتشر عند الوصول إلى الفندق مع إثبات هوية كل نزيل.",
   flight_ticket: "يُرجى الحضور إلى المطار قبل موعد الإقلاع بثلاث ساعات للرحلات الدولية. تُراجَع مواعيد الرحلات مع شركة الطيران قبل السفر بـ٢٤ ساعة.",
   itinerary: "المواعيد استرشادية وقد تتغيّر حسب حركة السير والطقس.",
@@ -58,8 +59,8 @@ const SUMMARY_PER_PAGE = 18;
  * The hotel desk and the airline counter abroad read English: the voucher and
  * the ticket say every label in both. The itinerary and the summary stay Arabic.
  */
-const BILINGUAL = new Set<VoucherKind>(["hotel_voucher", "flight_ticket"]);
-const KIND_TITLE_EN: Record<VoucherKind, string> = {
+export const BILINGUAL = new Set<VoucherKind>(["hotel_voucher", "flight_ticket"]);
+export const KIND_TITLE_EN: Record<VoucherKind, string> = {
   hotel_voucher: "Hotel Voucher",
   flight_ticket: "Flight Ticket",
   itinerary: "Itinerary",
@@ -88,27 +89,27 @@ const KEY_EN: Record<string, string> = {
   العنوان: "Address",
   الهاتف: "Phone",
 };
-const keyEn = (key: string) =>
+export const keyEn = (key: string) =>
   KEY_EN[key] ??
   key
     .replace(/^الغرفة (\d+)$/, "Room $1")
     .replace(/^الذهاب (\d+)$/, "Outbound $1")
     .replace(/^العودة (\d+)$/, "Return $1")
     .replace(/^رحلة (\d+)$/, "Flight $1");
-const both = (bilingual: boolean, ar: string, en: string) => (bilingual && en && en !== ar ? `${ar} · ${en}` : ar);
+export const both = (bilingual: boolean, ar: string, en: string) => (bilingual && en && en !== ar ? `${ar} · ${en}` : ar);
 /** English only on a voucher issued in English (VoucherDTO.lang), else as before. */
-const say = (english: boolean, bilingual: boolean, ar: string, en: string) => (english ? en : both(bilingual, ar, en));
+export const say = (english: boolean, bilingual: boolean, ar: string, en: string) => (english ? en : both(bilingual, ar, en));
 
-const KIND_NOTE_EN: Partial<Record<VoucherKind, string>> = {
+export const KIND_NOTE_EN: Partial<Record<VoucherKind, string>> = {
   hotel_voucher: "Please present this voucher at check-in, with a valid ID for every guest.",
 };
 /** OFFER_DOC_CSS is drawn right to left: its one-sided borders, mirrored. */
-const LTR_CSS = `.od-root[dir="ltr"] .od-table td{border-left:0;border-right:1px solid var(--od-line-2);}.od-root[dir="ltr"] .od-table td:last-child{border-right:0;}.od-root[dir="ltr"] .od-notice{border-right:0;border-left:3px solid var(--od-notice);}`;
+export const LTR_CSS = `.od-root[dir="ltr"] .od-table td{border-left:0;border-right:1px solid var(--od-line-2);}.od-root[dir="ltr"] .od-table td:last-child{border-right:0;}.od-root[dir="ltr"] .od-notice{border-right:0;border-left:3px solid var(--od-notice);}`;
 /** Only a real web link becomes a link on the paper. */
-const mapLink = (url: string | null | undefined) => (url && /^https?:\/\//i.test(url.trim()) ? url.trim() : null);
+export const mapLink = (url: string | null | undefined) => (url && /^https?:\/\//i.test(url.trim()) ? url.trim() : null);
 const LATER = "يُحدَّد لاحقاً";
 /** A planned leg's «00:00» is not a time: say it is still to be set. */
-const cleanValue = (v: string) => v.replace(/ 00:00$/, ` — ${LATER}`);
+export const cleanValue = (v: string) => v.replace(/ 00:00$/, ` — ${LATER}`);
 
 /** The two date labels a booking reads with — a stay checks in and out, a ticket goes and comes back, a drive is one day. */
 function dateLabels(kind: string, bilingual: boolean, english = false): [string, string | null] {
@@ -127,12 +128,18 @@ export function VoucherDocument({
   voucher,
   assets = DEFAULT_OFFER_DOC_ASSETS,
   brand = TRAVELIUN_BRAND,
+  logos = {},
 }: {
   voucher: VoucherDTO;
   assets?: OfferDocAssets;
   /** whose file it is: a partner's client carries the partner's documents, not ours. */
   brand?: DocBrand;
+  /** the carriers' marks by IATA, already inlined — the ticket's cards print them. */
+  logos?: Record<string, string>;
 }) {
+  // the two papers a traveller hands over abroad are sheets of their own (the user, 2026-10-22)
+  if (voucher.kind === "hotel_voucher") return <HotelVoucher voucher={voucher} assets={assets} brand={brand} />;
+  if (voucher.kind === "flight_ticket" && voucher.bookings.some((b) => b.legs?.length)) return <FlightTicket voucher={voucher} assets={assets} brand={brand} logos={logos} />;
   const pages: ReactNode[] = [];
   const summary = voucher.kind === "booking_summary";
   const bookingSheets = summary
@@ -200,11 +207,11 @@ export function VoucherDocument({
   );
 }
 
-function Page({ children, cover }: { children: ReactNode; cover?: boolean }) {
+export function Page({ children, cover }: { children: ReactNode; cover?: boolean }) {
   return <section className={`od-page${cover ? " od-cover" : ""}`}>{children}</section>;
 }
 
-function Ltr({ children }: { children: ReactNode }) {
+export function Ltr({ children }: { children: ReactNode }) {
   return <bdi dir="ltr">{children}</bdi>;
 }
 

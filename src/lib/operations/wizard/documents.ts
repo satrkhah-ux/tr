@@ -11,9 +11,11 @@ import type { ReadinessCase, ReadinessItem, StepState, WizardCase } from "./type
  * autoIssueDocuments, run by operation-sync) — and this file says which are
  * due, which are out, and what each of the rest still waits for.
  *
- * A hotel voucher waits for the hotel's FINAL confirmation — confirmed AND the
- * hotel's own number, not ours (client-booking-state hotelFinal, the rule
- * issueDocument enforces) — one voucher per hotel (the owner, 2026-10-17); the
+ * The hotel voucher is ONE file with every hotel, issued once all of them hold
+ * their FINAL confirmation — confirmed AND the hotel's own number, not ours
+ * (client-booking-state hotelFinal, the rule issueDocument enforces). The user,
+ * 2026-10-22: «يفضل الفنادق تكون بملف واحد بعد التأكيد الكلي» — it was one
+ * voucher per hotel as each came back (the owner, 2026-10-17). The
  * ticket waits for every flight; the itinerary for the authored days; the
  * arrival sign for a transfer to meet the travellers. issueDocument keeps its
  * own checks: a voucher it refuses comes back as an error, never a blank page.
@@ -25,7 +27,7 @@ export type DocWhy = "hotel_final" | "flights" | "days" | "transfer";
 export type DocLine = {
   kind: VoucherKind;
   booking_id: string | null;
-  /** the hotel's name, for a per-hotel voucher */
+  /** the hotel's name, for a per-hotel voucher (none is planned now; the type keeps the field for the screens) */
   title: string | null;
   state: "issued" | "due" | "waiting";
   why?: DocWhy;
@@ -39,8 +41,8 @@ const live = (b: OperationBooking) => b.status !== "cancelled" && b.status !== "
 
 export function documentPlan(data: Docs): DocLine[] {
   const docs = data.documents.filter((d) => !d.revoked_at);
-  const out = (kind: VoucherKind, bookingId: string | null = null) =>
-    docs.find((d) => d.kind === kind && (bookingId === null || d.booking_id === bookingId));
+  // the whole-file paper only: an older single-hotel voucher is not the file's voucher
+  const out = (kind: VoucherKind, bookingId: string | null = null) => docs.find((d) => d.kind === kind && (d.booking_id ?? null) === bookingId);
   const line = (kind: VoucherKind, ready: boolean, why: DocWhy, booking: OperationBooking | null = null): DocLine => {
     const doc = out(kind, booking?.id ?? null);
     return {
@@ -52,9 +54,10 @@ export function documentPlan(data: Docs): DocLine[] {
   };
   const bookings = data.bookings.filter(live);
   const flights = bookings.filter((b) => b.kind === "flight");
+  const hotels = bookings.filter((b) => b.kind === "hotel");
   const lead = data.travelers[0]?.display_name.trim();
   return [
-    ...bookings.filter((b) => b.kind === "hotel").map((h) => line("hotel_voucher", hotelFinal(h), "hotel_final", h)),
+    ...(hotels.length ? [line("hotel_voucher", hotels.every(hotelFinal), "hotel_final")] : []),
     ...(flights.length ? [line("flight_ticket", flights.every(flightTicketed), "flights")] : []),
     line("itinerary", data.hasDays, "days"),
     line("welcome_board", Boolean(lead) && bookings.some((b) => b.kind === "transport"), "transfer"),
@@ -99,7 +102,7 @@ export function sameDocument<T extends IssuedDoc>(docs: readonly T[], bookingId:
 /**
  * Every client document is out: progress.ts's rule (the one that moves the case
  * to «vouchers_issued» — it also wants every booking of every kind confirmed)
- * AND a voucher for each hotel, which that rule counts as one.
+ * AND the one hotel voucher printing every hotel.
  */
 export function clientDocumentsOut(data: Docs): boolean {
   const docs = data.documents.filter((d) => !d.revoked_at && CLIENT_DOCUMENT_KINDS.includes(d.kind));

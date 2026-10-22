@@ -45,6 +45,27 @@ export type VoucherBooking = {
   notes?: string[];
   /** a hotel's location (hotels.google_maps) — «Open in Google Maps» on the voucher. */
   map?: string | null;
+  /**
+   * A flight, issued after 2026-10-22: its legs, its booking reference and the
+   * ticket numbers — the ticket prints them as boarding-pass cards. Older
+   * tickets carry only the detail lines and print as they were.
+   */
+  legs?: VoucherLeg[];
+  pnr?: string | null;
+  tickets?: string[];
+};
+
+/** A leg as the ticket prints it: codes, the places' names, the carrier, and the local times as saved. */
+export type VoucherLeg = {
+  flight_no: string;
+  airline: string | null;
+  airline_iata: string | null;
+  from: string;
+  from_name: string | null;
+  to: string;
+  to_name: string | null;
+  departs_at: string | null;
+  arrives_at: string | null;
 };
 
 /**

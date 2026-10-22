@@ -19,6 +19,7 @@ import {
   plannedLine,
   skeleton,
   toFlightLegs,
+  uniqueLegs,
   withTicketLines,
 } from "./flights";
 import type { WizardCase } from "./types";
@@ -263,5 +264,22 @@ describe("the names on the ticket against the passports", () => {
       { name: "OMAR TESTOV", traveler_id: null, traveler: null, status: "mismatch" },
     ]);
     expect(missing).toEqual(["OMAR TESTOVV", ""]);
+  });
+});
+
+describe("each flight once (AD-5-3269, 2026-10-22)", () => {
+  const leg = (flight_no: string, from: string, to: string, departs_at: string | null) => ({ flight_no, from, to, departs_at, arrives_at: null });
+  it("keeps the carrier's «XY309» over the plan's «309», and a numbered leg over a blank one", () => {
+    const legs = [
+      leg("XY309", "RUH", "TBS", "2026-10-30T07:05:00+03:00"),
+      leg("XY310", "TBS", "RUH", "2026-11-08T13:10:00+04:00"),
+      leg("309", "RUH", "TBS", "2026-10-30T07:05:00+03:00"),
+      leg("", "TBS", "RUH", "2026-11-08T00:00:00+04:00"),
+    ];
+    expect(uniqueLegs(legs).map((l) => l.flight_no)).toEqual(["XY309", "XY310"]);
+    expect(uniqueLegs([leg("309", "RUH", "TBS", "2026-10-30T07:05"), leg("XY309", "RUH", "TBS", "2026-10-30T07:05")]).map((l) => l.flight_no)).toEqual(["XY309"]);
+  });
+  it("keeps two real flights on the same route and day", () => {
+    expect(uniqueLegs([leg("SV1020", "RUH", "JED", "2026-10-30T07:00"), leg("SV1030", "RUH", "JED", "2026-10-30T19:00")])).toHaveLength(2);
   });
 });

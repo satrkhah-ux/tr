@@ -181,21 +181,21 @@ describe("payment", () => {
 });
 
 describe("documents", () => {
-  it("issues a hotel voucher only after the hotel's FINAL confirmation — confirmed and its number", () => {
+  it("issues ONE hotel voucher, once every hotel holds its FINAL confirmation — confirmed and its number (2026-10-22)", () => {
     const bookings = [
       booking({ id: "h1", status: "confirmed", confirmation_number: "HX-1" }),
       booking({ id: "h2", status: "confirmed", confirmation_number: " " }),
       booking({ id: "h3", status: "pending" }),
       booking({ id: "h4", status: "cancelled", confirmation_number: "C" }),
     ];
-    const plan = documentPlan(wizardCase({ bookings }));
-    expect(plan.filter((l) => l.kind === "hotel_voucher").map((l) => [l.booking_id, l.state])).toEqual([
-      ["h1", "due"],
-      ["h2", "waiting"],
-      ["h3", "waiting"],
-    ]);
-    const issued = documentPlan(wizardCase({ bookings, documents: [doc({ kind: "hotel_voucher", booking_id: "h1", token: "v1" })] }));
-    expect(issued[0]).toMatchObject({ state: "issued", token: "v1" });
+    const vouchers = (b: typeof bookings, documents: ReturnType<typeof doc>[] = []) =>
+      documentPlan(wizardCase({ bookings: b, documents })).filter((l) => l.kind === "hotel_voucher").map((l) => [l.booking_id, l.state, l.token]);
+    expect(vouchers(bookings)).toEqual([[null, "waiting", undefined]]);
+    const final = bookings.map((b) => (b.id === "h4" ? b : { ...b, status: "confirmed" as const, confirmation_number: `HX-${b.id}` }));
+    expect(vouchers(final)).toEqual([[null, "due", undefined]]);
+    // an older single-hotel voucher is not the file's voucher
+    expect(vouchers(final, [doc({ kind: "hotel_voucher", booking_id: "h1", token: "v1" })])).toEqual([[null, "due", undefined]]);
+    expect(vouchers(final, [doc({ kind: "hotel_voucher", token: "v2" })])).toEqual([[null, "issued", "v2"]]);
   });
 
   it("issues the ticket once every flight is confirmed, the itinerary with its days, the sign with a transfer", () => {
@@ -233,12 +233,12 @@ describe("documents", () => {
     expect(sameDocument([later, { ...issued, id: "d3", created_at: "2026-10-17T09:00:00+00:00" }], null, again)?.id).toBe("d3");
   });
 
-  it("counts the documents out only with a voucher for EACH hotel", () => {
+  it("counts the documents out only with the one voucher printing every hotel", () => {
     const bookings = [booking({ id: "h1", status: "confirmed", confirmation_number: "1" }), booking({ id: "h2", status: "confirmed", confirmation_number: "2" })];
-    const one = [doc({ kind: "hotel_voucher", booking_id: "h1" }), doc({ id: "d2", kind: "itinerary" })];
-    expect(documentsReadiness(wizardCase({ bookings, documents: one }))[0].ok).toBe(false);
-    const both = [...one, doc({ id: "d3", kind: "hotel_voucher", booking_id: "h2" })];
-    expect(documentsReadiness(wizardCase({ bookings, documents: both }))[0].ok).toBe(true);
+    const perHotel = [doc({ kind: "hotel_voucher", booking_id: "h1" }), doc({ id: "d3", kind: "hotel_voucher", booking_id: "h2" }), doc({ id: "d2", kind: "itinerary" })];
+    expect(documentsReadiness(wizardCase({ bookings, documents: perHotel }))[0].ok).toBe(false);
+    const whole = [doc({ kind: "hotel_voucher" }), doc({ id: "d2", kind: "itinerary" })];
+    expect(documentsReadiness(wizardCase({ bookings, documents: whole }))[0].ok).toBe(true);
   });
 });
 
@@ -304,7 +304,7 @@ describe("the tiles (2026-10-18): each step coloured by its own readiness", () =
     const done = wizardCase({
       bookings: [hotel],
       payments: [pay(10000)],
-      documents: [doc({ kind: "hotel_voucher", booking_id: "h1" }), doc({ id: "d2", kind: "itinerary" })],
+      documents: [doc({ kind: "hotel_voucher" }), doc({ id: "d2", kind: "itinerary" })],
     });
     // the documents are out; the link, the sign and the guide are optional — yellow, not red
     expect(tones(done)).toEqual({ passports: "green", flights: "grey", hotels: "green", transport: "grey", payment: "green", documents: "yellow" });

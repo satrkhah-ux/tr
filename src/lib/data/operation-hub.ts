@@ -7,6 +7,7 @@ import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/s
 import { logAudit } from "@/lib/data/audit";
 import { CLIENT_DOCUMENT_KINDS, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { voucherLive, type ClientBookingRow, type StayKey } from "@/lib/operations/client-booking-state";
+import { pickPackDocuments } from "@/lib/operations/travel-pack";
 import { gateOperation } from "@/lib/operations/access";
 import { resolveDocBrand } from "@/lib/data/doc-brand";
 import { getPartnerSession } from "@/lib/partners/session";
@@ -157,7 +158,7 @@ export async function getClientHub(token: string): Promise<ClientHub | null> {
       supabase
         .from("operation_documents")
         // a hotel voucher's stays: whether its confirmation still holds (voucherLive)
-        .select("kind, version, token, created_at, stays:snapshot_json->bookings")
+        .select("kind, version, token, booking_id, created_at, stays:snapshot_json->bookings")
         .eq("operation_id", op.id)
         // the booking summary (suppliers, what is unpaid) and the welcome board are ours, never the client's
         .in("kind", CLIENT_DOCUMENT_KINDS)
@@ -171,10 +172,12 @@ export async function getClientHub(token: string): Promise<ClientHub | null> {
     ]);
 
     const bookings = (bookingsRes.data ?? []) as Pick<ClientBookingRow, "kind" | "title" | "start_date" | "status" | "confirmation_number" | "company_ref">[];
-    const documents = ((docsRes.data ?? []) as { kind: VoucherKind; version: number; token: string; created_at: string; stays: StayKey[] | null }[])
+    const live = ((docsRes.data ?? []) as { kind: VoucherKind; version: number; token: string; booking_id: string | null; created_at: string; stays: StayKey[] | null }[])
       // the paper shown at the hotel desk only while the hotel's own confirmation it prints holds
-      .filter((d) => d.kind !== "hotel_voucher" || voucherLive(d.stays, bookings))
-      .map((d) => ({ kind: d.kind, version: d.version, token: d.token, issued_at: d.created_at.slice(0, 10) }));
+      .filter((d) => d.kind !== "hotel_voucher" || voucherLive(d.stays, bookings));
+    // the latest paper of each kind, in the trip's order — not every version, and not a
+    // single-hotel voucher the one hotels file already holds (2026-10-22)
+    const documents = pickPackDocuments(live).map((d) => ({ kind: d.kind, version: d.version, token: d.token, issued_at: d.created_at.slice(0, 10) }));
 
     // Only "still being worked on" — never a price, never a supplier name.
     const pending = bookings

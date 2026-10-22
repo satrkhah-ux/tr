@@ -92,6 +92,25 @@ export function toFlightLegs(legs: LegInput[], zoneOf: (code: string) => string 
   }));
 }
 
+/**
+ * Each flight once. The plan's «309» and the ticket's «XY309» — the same
+ * airports on the same day — were both saved, and the ticket printed four
+ * flights for two (AD-5-3269, 2026-10-22). The twin kept is the one with the
+ * carrier's code; a leg with no number yields to a numbered one.
+ */
+export function uniqueLegs<T extends Pick<FlightLeg, "flight_no" | "from" | "to" | "departs_at">>(legs: T[]): T[] {
+  const num = (l: T) => l.flight_no.match(/\d+$/)?.[0]?.replace(/^0+/, "") ?? "";
+  const out: T[] = [];
+  for (const l of legs) {
+    const twin = out.findIndex(
+      (o) => o.from === l.from && o.to === l.to && (o.departs_at ?? "").slice(0, 10) === (l.departs_at ?? "").slice(0, 10) && (!num(o) || !num(l) || num(o) === num(l)),
+    );
+    if (twin < 0) out.push(l);
+    else if (l.flight_no.length > out[twin].flight_no.length) out[twin] = l;
+  }
+  return out;
+}
+
 /** A landing more than this after its take-off is a mistyped date, not a flight. */
 const LONGEST_LEG_MINUTES = 3 * 24 * 60;
 

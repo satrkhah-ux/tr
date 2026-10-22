@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { VoucherDocument } from "./VoucherDocument";
+import { packSheets } from "./VoucherSheets";
 import { partnerBrand } from "./brand";
 import { COMPANY } from "./labels";
 import type { VoucherBooking, VoucherDTO } from "@/lib/operations/voucher-dto";
@@ -80,7 +81,7 @@ describe("the operational documents", () => {
       lang: "en",
     });
     expect(out).toContain('dir="ltr"');
-    for (const s of ["Hotel Voucher", "Check-in", "Check-out", "Confirmation no.", "Lead guest", "TRAVELIUN TECH", "Open in Google Maps", "https://maps.google.com/?q=Pullman+KL"]) expect(out).toContain(s);
+    for (const s of ["Hotel Voucher", "Check-in", "Check-out", "Confirmation no.", "Guests", "TRAVELIUN TECH", "Open in Google Maps", "https://maps.google.com/?q=Pullman+KL"]) expect(out).toContain(s);
     // Arabic only in the hotel's own Arabic name, printed small
     expect(out.replace("بولمان سيتي سنتر", "").replace(/<style[\s\S]*?<\/style>/g, "")).not.toMatch(/[؀-ۿ]/);
     expect(out).not.toContain("مورّد داخلي");
@@ -130,5 +131,31 @@ describe("the operational documents", () => {
     expect(out).not.toContain(COMPANY.nameAr);
     expect(out).not.toContain(COMPANY.phone);
     expect(out).toContain("#123456");
+  });
+
+  it("prints the ticket's flights as cards, each once, with the booking reference — not the detail lines (2026-10-22)", () => {
+    const out = html(
+      voucher("flight_ticket", [
+        booking({
+          kind: "flight",
+          title: "طيران دولي RUH → TBS → RUH",
+          detail: { "رحلة 1": "XY309 · RUH → TBS", الدرجة: "سياحية", الأمتعة: "20 كجم" },
+          pnr: "C98TNC",
+          legs: [
+            { flight_no: "XY309", airline: "طيران ناس", airline_iata: "XY", from: "RUH", from_name: "الرياض", to: "TBS", to_name: "تبليسي", departs_at: "2026-10-30T07:05:00+03:00", arrives_at: "2026-10-30T12:00:00+04:00" },
+          ],
+        }),
+      ]),
+    );
+    for (const s of ["E-Ticket", "C98TNC", "XY309", "طيران ناس", "تبليسي", "07:05", "12:00", "20 كجم"]) expect(out).toContain(s);
+    expect(out).not.toContain("رحلة 1");
+    expect(out).not.toContain("غير مُصدر");
+  });
+
+  it("packs blocks onto sheets: a block that does not fit what is left starts the next sheet, never splits", () => {
+    expect(packSheets([50, 60, 70], 200, 250)).toEqual([[0, 1, 2]]);
+    expect(packSheets([90, 90, 90, 30], 200, 250)).toEqual([[0, 1], [2, 3]]);
+    // a block taller than a sheet still goes somewhere — alone
+    expect(packSheets([300, 10], 200, 250)).toEqual([[0], [1]]);
   });
 });

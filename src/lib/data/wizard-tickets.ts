@@ -16,7 +16,7 @@ import { mergeTicket, parseTicketText, sanitizeTicket, ticketGaps, ticketNumbers
 import { readTicketText } from "@/lib/flights/ticket-ai";
 import type { PassportView, TravelerRow } from "@/lib/operations/traveler-dto";
 import { catalogHotelsFor } from "@/lib/data/hotel-match";
-import { badLeg, checkNames, toFlightLegs, withTicketLines, type LegInput, type NameCheck, type TravelerNames } from "@/lib/operations/wizard/flights";
+import { badLeg, checkNames, toFlightLegs, uniqueLegs, withTicketLines, type LegInput, type NameCheck, type TravelerNames } from "@/lib/operations/wizard/flights";
 import { hotelDiffs, parseHotelConfirmation, type HotelConfirmation, type HotelDiff } from "@/lib/operations/wizard/hotels";
 import { ticketTitle } from "@/lib/operations/seed-plan";
 
@@ -190,7 +190,7 @@ export async function saveBookingTicket(input: {
     const codes = [...new Set(clean.legs.flatMap((l) => [l.from_iata, l.to_iata]).filter(Boolean))];
     const { data: airports } = codes.length ? await db.from("airports").select("code, iana_timezone").in("code", codes) : { data: [] };
     const zone = new Map(((airports ?? []) as { code: string; iana_timezone: string | null }[]).map((a) => [a.code.toUpperCase(), a.iana_timezone]));
-    const legs = toFlightLegs(clean.legs, (code) => zone.get(code) ?? null);
+    const legs = uniqueLegs(toFlightLegs(clean.legs, (code) => zone.get(code) ?? null));
     // the drivers' messages print these numbers and times: a leg they cannot be timed from is not saved
     if (legs.some(badLeg)) return { ok: false, error: "wz.flights.err.legs" };
 
