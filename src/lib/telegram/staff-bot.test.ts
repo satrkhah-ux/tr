@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { riyadhDayStart, secondsText, waitText } from "./staff-numbers";
 import { assignmentText } from "./staff-events";
 import { ruleTips, teamAverages, type Facts } from "./staff-report";
+import { dashboardText, light } from "./staff-screen";
+import { broadcastText } from "./staff-broadcast";
 
 describe("«تنبيهاتي» numbers", () => {
   it("starts the day at 00:00 Riyadh (21:00 UTC the day before)", () => {
@@ -73,5 +75,31 @@ describe("«تنبيهاتي» tips stand on the employee's numbers", () => {
       ]),
     );
     expect(team).toEqual({ firstResponseSec: 200, replySec: 60 });
+  });
+});
+
+describe("«🖥️ شاشتي»", () => {
+  it("lights red for a client never answered or a 30-minute wait, yellow for a short wait, green otherwise", () => {
+    expect(light({ waiting: 0, neverAnswered: 1, oldestWaitMin: null }).icon).toBe("🔴");
+    expect(light({ waiting: 2, neverAnswered: 0, oldestWaitMin: 45 }).icon).toBe("🔴");
+    expect(light({ waiting: 1, neverAnswered: 0, oldestWaitMin: 10 }).icon).toBe("🟡");
+    expect(light({ waiting: 0, neverAnswered: 0, oldestWaitMin: null }).icon).toBe("🟢");
+  });
+
+  it("shows the employee's own numbers beside the team mean, and the time it was refreshed", () => {
+    const f = day({ open: 18, waiting: 3, oldestWaitMin: 12 });
+    const text = dashboardText("رهف", f.numbers, f.team, { issued: 2, botReplies: 0 }, Date.parse("2026-10-22T11:05:00Z"));
+    expect(text).toContain("مفتوحة لك: <b>18</b>");
+    expect(text).toContain("الأقدم منذ 12 د");
+    expect(text).toContain("أول رد: <b>2 د</b> 🟢 (الفريق 5 د)");
+    expect(text).toContain("ملفات أصدرتها: <b>2</b>");
+    expect(text).toContain("02:05");
+    expect(text).not.toContain("ردود من البوت");
+  });
+});
+
+describe("«📢 إعلان عام»", () => {
+  it("escapes the manager's text and signs it", () => {
+    expect(broadcastText("اجتماع <الساعة 5>", "أدمن")).toBe("📢 <b>إعلان من الإدارة</b>\n\nاجتماع &lt;الساعة 5&gt;\n\n— أدمن");
   });
 });

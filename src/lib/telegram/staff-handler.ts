@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { conversationThread, getTeletelConfig, teletelConversationUrl, teletelGet } from "@/lib/providers/teletel";
 import { escapeHtml, staffCall, staffForChat, staffSend, staffSendAudio, type StaffMember } from "./staff-bot";
 import { buildReport } from "./staff-report";
-import { myNumbers, openFor, secondsText, waitText } from "./staff-numbers";
+import { openFor, waitText } from "./staff-numbers";
 import { linkTeletelToken, promptReply, rememberThread, sendReply, threadOf, TOKEN_HELP } from "./staff-replies";
+import { openList, openScreen, screenView, unansweredList, weekView } from "./staff-screen";
+import { BROADCAST_PROMPT, canBroadcast, confirmBroadcast, draftBroadcast, promptBroadcast } from "./staff-broadcast";
 import type { InlineButton } from "./ops-bot";
 
 /**
@@ -13,10 +15,13 @@ import type { InlineButton } from "./ops-bot";
  * linked to an ACTIVE employee. An unlinked account gets its own ID back, so
  * the administration can link it from «الموظفين», and nothing else.
  *
- * The panel («لوحتي») is one message whose text the buttons replace, so the
- * chat stays the employee's notifications and is not filled with menus. Every
- * answer is about the employee's own Teletel agent. A conversation that is not
- * theirs is refused, even when someone asks for it by number.
+ * Two kinds of buttons:
+ *   - the keyboard under the chat (always there, the employee's menu). Each key
+ *     arrives as its own text and gets a fresh answer;
+ *   - the buttons on a message, which replace that message's text in place, so
+ *     going through lists does not fill the chat.
+ * Every answer is about the employee's own Teletel agent. A conversation that is
+ * not theirs is refused, even when someone asks for it by number.
  */
 
 export type StaffUpdate = {
@@ -25,76 +30,63 @@ export type StaffUpdate = {
     chat?: { id?: number; type?: string };
     from?: { id?: number; first_name?: string };
     text?: string;
-    reply_to_message?: { message_id: number };
+    reply_to_message?: { message_id: number; text?: string };
   };
   callback_query?: { id: string; from?: { id?: number }; data?: string; message?: { message_id: number; chat?: { id?: number; type?: string } } };
 };
 
 type Screen = { text: string; buttons: InlineButton[][] };
 
-const BACK: InlineButton = { text: "↩️ لوحتي", callback_data: "m" };
+const BACK: InlineButton = { text: "↩️ شاشتي", callback_data: "s" };
 
-function teletelHome(): InlineButton[] {
-  const config = getTeletelConfig();
-  return config ? [{ text: "🌐 فتح تيلي تيل", url: `${config.baseUrl}/app/accounts/${config.accountId}/dashboard` }] : [];
-}
+/** The keyboard's keys, by what they open. The labels are what Telegram sends back as text. */
+const KEYS = {
+  screen: "🖥️ شاشتي",
+  waiting: "⏳ بانتظار ردي",
+  open: "📂 محادثاتي المفتوحة",
+  unanswered: "🆕 بلا رد",
+  today: "📈 أدائي اليوم",
+  week: "📅 أدائي الأسبوع",
+  token: "🔑 الرد باسمي",
+  tone: "🎵 النغمة",
+  teletel: "🌐 تيلي تيل",
+  broadcast: "📢 إعلان عام",
+} as const;
+type Key = keyof typeof KEYS;
 
-function menu(me: StaffMember): Screen {
+function keyboard(manager: boolean): Record<string, unknown> {
+  const rows: string[][] = [
+    [KEYS.screen, KEYS.waiting],
+    [KEYS.open, KEYS.unanswered],
+    [KEYS.today, KEYS.week],
+    [KEYS.token, KEYS.tone, KEYS.teletel],
+  ];
+  if (manager) rows.push([KEYS.broadcast]);
   return {
-    text: [`🔔 <b>لوحتي</b> — ${escapeHtml(me.name)}`, "", "اختر ما تريد:"].join("\n"),
-    buttons: [
-      [{ text: "📊 أرقامي", callback_data: "n" }, { text: "⏳ بانتظار ردي", callback_data: "w" }],
-      [{ text: "📈 تقرير اليوم", callback_data: "d" }, { text: "🎵 نغمة التنبيه", callback_data: "t" }],
-      [{ text: "🔑 الرد باسمي من هنا", callback_data: "k" }],
-      teletelHome(),
-    ].filter((row) => row.length > 0),
+    keyboard: rows.map((row) => row.map((text) => ({ text }))),
+    resize_keyboard: true,
+    is_persistent: true,
+    input_field_placeholder: "اختر من القائمة، أو اسحب رسالة العميل لترد",
   };
 }
 
 const NO_AGENT: Screen = {
   text: "حسابك في تيلي تيل غير مربوط بعد — اطلب من الإدارة ربطه من صفحة «الموظفين» لتصلك محادثاتك وأرقامك.",
-  buttons: [[BACK]],
+  buttons: [],
 };
 const UNREACHABLE: Screen = { text: "تعذّر الوصول إلى تيلي تيل الآن — جرّب بعد دقيقة.", buttons: [[BACK]] };
-
-async function numbers(me: StaffMember): Promise<Screen> {
-  if (!me.agentId) return NO_AGENT;
-  const n = await myNumbers(me.agentId);
-  if (!n) return UNREACHABLE;
-  const r = n.today.report;
-  return {
-    text: [
-      "📊 <b>أرقامك</b>",
-      "",
-      "<b>الآن</b>",
-      `• محادثات مفتوحة لك: <b>${n.open}</b>`,
-      `• بانتظار ردك: <b>${n.waiting}</b>${n.oldestWaitMin != null ? ` (أقدمها منذ ${waitText(n.oldestWaitMin)})` : ""}`,
-      `• لم يُرد عليها أبداً: <b>${n.neverAnswered}</b>`,
-      "",
-      "<b>الإجمالي في تيلي تيل</b>",
-      `• كل ما أُسند إليك: <b>${n.total ?? "—"}</b>`,
-      `• المغلقة: <b>${n.closed ?? "—"}</b>`,
-      "",
-      "<b>اليوم</b>",
-      `• تحويلات وصلتك: <b>${n.today.assigned}</b>`,
-      `• محادثات اليوم: <b>${r?.conversations ?? "—"}</b> · أغلقت: <b>${r?.resolved ?? "—"}</b>`,
-      `• متوسط أول رد: <b>${secondsText(r?.firstResponseSec)}</b> · متوسط الرد: <b>${secondsText(r?.replySec)}</b>`,
-    ].join("\n"),
-    buttons: [[{ text: "⏳ بانتظار ردي", callback_data: "w" }, { text: "🔄 تحديث", callback_data: "n" }], [BACK]],
-  };
-}
 
 async function waiting(me: StaffMember): Promise<Screen> {
   if (!me.agentId) return NO_AGENT;
   const open = await openFor(me.agentId);
   if (!open) return UNREACHABLE;
   const now = Date.now() / 1000;
-  const list = open.filter((c) => c.waitingSince > 0).slice(0, 8);
-  if (!list.length) return { text: "✅ لا أحد ينتظر ردك الآن.", buttons: [[{ text: "📊 أرقامي", callback_data: "n" }], [BACK]] };
+  const all = open.filter((c) => c.waitingSince > 0);
+  if (!all.length) return { text: "✅ لا أحد ينتظر ردك الآن.", buttons: [[BACK]] };
   return {
-    text: [`⏳ <b>بانتظار ردك</b> — ${open.filter((c) => c.waitingSince > 0).length}`, "", "الأقدم أولاً. اضغط على العميل لترى آخر رسائله."].join("\n"),
+    text: [`⏳ <b>بانتظار ردك</b> — ${all.length}`, "", "الأقدم أولاً. اضغط على العميل لترى آخر رسائله وترد."].join("\n"),
     buttons: [
-      ...list.map((c) => [{ text: `${c.name.slice(0, 28)} — منذ ${waitText(Math.max(0, Math.floor((now - c.waitingSince) / 60)))}`, callback_data: `c:${c.id}` }]),
+      ...all.slice(0, 10).map((c) => [{ text: `${c.name.slice(0, 28)} — منذ ${waitText(Math.max(0, Math.floor((now - c.waitingSince) / 60)))}`, callback_data: `c:${c.id}` }]),
       [{ text: "🔄 تحديث", callback_data: "w" }, BACK],
     ],
   };
@@ -113,7 +105,12 @@ async function conversation(me: StaffMember, id: number): Promise<Screen> {
     .map((m) => `${m.fromClient ? "👤" : "🟢"} ${escapeHtml(m.text.slice(0, 300))}`);
   const url = teletelConversationUrl(id);
   return {
-    text: [`💬 <b>${escapeHtml(conv.meta?.sender?.name?.trim() || `#${id}`)}</b>`, "", ...(lines.length ? lines : ["— لا رسائل —"]), "", thread?.canReply ? "" : "⚠️ مرّ أكثر من ٢٤ ساعة على آخر رسالة من العميل — لا يصله إلا قالب معتمد."]
+    text: [
+      `💬 <b>${escapeHtml(conv.meta?.sender?.name?.trim() || `#${id}`)}</b>`,
+      "",
+      ...(lines.length ? lines : ["— لا رسائل —"]),
+      thread?.canReply ? "" : "\n⚠️ مرّ أكثر من ٢٤ ساعة على آخر رسالة من العميل — لا يصله إلا قالب معتمد من تيلي تيل.",
+    ]
       .join("\n")
       .trim(),
     buttons: [
@@ -123,10 +120,10 @@ async function conversation(me: StaffMember, id: number): Promise<Screen> {
   };
 }
 
-async function report(me: StaffMember): Promise<Screen> {
+async function today(me: StaffMember): Promise<Screen> {
   if (!me.agentId) return NO_AGENT;
   const r = await buildReport(me);
-  return r ? { text: r.text, buttons: [[{ text: "🔄 تحديث", callback_data: "d" }, BACK]] } : UNREACHABLE;
+  return r ? { text: r.text, buttons: [[{ text: "📅 أدائي الأسبوع", callback_data: "wk" }, BACK]] } : UNREACHABLE;
 }
 
 const TONE_STEPS = [
@@ -146,16 +143,26 @@ async function sendTone(chatId: number): Promise<void> {
   }
 }
 
-async function screenFor(me: StaffMember, data: string): Promise<Screen> {
-  if (data === "n") return numbers(me);
-  if (data === "w") return waiting(me);
-  if (data.startsWith("c:")) return conversation(me, Number(data.slice(2)));
-  if (data === "k") return { text: TOKEN_HELP, buttons: [[BACK]] };
-  if (data === "d") return report(me);
-  return menu(me);
+function teletelLink(): Screen {
+  const config = getTeletelConfig();
+  return config
+    ? { text: "🌐 تيلي تيل", buttons: [[{ text: "افتح تيلي تيل", url: `${config.baseUrl}/app/accounts/${config.accountId}/dashboard` }]] }
+    : UNREACHABLE;
 }
 
-/** Replace the panel's text in place, or post a new one when it is too old to edit (Telegram's 48 hours). */
+/** What a message button opens, in place. */
+async function screenFor(me: StaffMember, data: string): Promise<Screen> {
+  if (data === "w") return waiting(me);
+  if (data === "u") return (await unansweredList(me)) ?? (me.agentId ? UNREACHABLE : NO_AGENT);
+  if (data.startsWith("o:")) return (await openList(me, Number(data.slice(2)) || 0)) ?? (me.agentId ? UNREACHABLE : NO_AGENT);
+  if (data.startsWith("c:")) return conversation(me, Number(data.slice(2)));
+  if (data === "d") return today(me);
+  if (data === "wk") return (await weekView(me)) ?? (me.agentId ? UNREACHABLE : NO_AGENT);
+  if (data === "k") return { text: TOKEN_HELP, buttons: [[BACK]] };
+  return (await screenView(me)) ?? (me.agentId ? UNREACHABLE : NO_AGENT);
+}
+
+/** Replace a message's text in place, or post a new one when it can no longer be edited. */
 async function show(chatId: number, screen: Screen, editId?: number): Promise<void> {
   if (editId) {
     const edited = await staffCall("editMessageText", {
@@ -169,7 +176,48 @@ async function show(chatId: number, screen: Screen, editId?: number): Promise<vo
     // «message is not modified» (🔄 with nothing new) is a success, not a reason to post again
     if (edited.ok || /not modified/i.test(edited.description ?? "")) return;
   }
-  await staffSend(chatId, screen.text, screen.buttons);
+  await staffSend(chatId, screen.text, screen.buttons.length ? screen.buttons : undefined);
+}
+
+async function onKey(me: StaffMember, chatId: number, key: Key): Promise<void> {
+  if (key === "screen") return openScreen(me, chatId, NO_AGENT);
+  if (key === "tone") return sendTone(chatId);
+  if (key === "broadcast") return promptBroadcast(me, chatId);
+  if (key === "teletel") return show(chatId, teletelLink());
+  const data: Record<Exclude<Key, "screen" | "tone" | "broadcast" | "teletel">, string> = { waiting: "w", open: "o:0", unanswered: "u", today: "d", week: "wk", token: "k" };
+  return show(chatId, await screenFor(me, data[key]));
+}
+
+const COMMANDS: Record<string, Key> = {
+  "/screen": "screen",
+  "/menu": "screen",
+  "/numbers": "screen",
+  "/waiting": "waiting",
+  "/open": "open",
+  "/unanswered": "unanswered",
+  "/report": "today",
+  "/week": "week",
+  "/token": "token",
+  "/tone": "tone",
+  "/broadcast": "broadcast",
+};
+
+async function welcome(me: StaffMember, chatId: number): Promise<void> {
+  await staffSend(
+    chatId,
+    [
+      `🔔 أهلاً ${escapeHtml(me.name)}`,
+      "",
+      "حسابك مربوط بنظام ترافليون ✅",
+      me.agentId
+        ? "ستصلك هنا كل محادثة تُسند إليك في تيلي تيل لحظة إسنادها، ورسائل عملائك لترد عليهم من هنا، وتذكير إذا انتظرك عميل."
+        : "حسابك في تيلي تيل غير مربوط بعد — اطلب من الإدارة ربطه من «الموظفين» لتصلك تنبيهات محادثاتك.",
+      "",
+      "القائمة أسفل المحادثة دائماً — ابدأ بـ «🖥️ شاشتي» وثبّتها أعلى المحادثة، تتحدّث وحدها كل ٥ دقائق.",
+    ].join("\n"),
+    undefined,
+    { reply_markup: keyboard(await canBroadcast(me.id)) },
+  );
 }
 
 export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
@@ -179,9 +227,9 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
     const me = chatId && callback.message?.chat?.type === "private" ? await staffForChat(chatId) : null;
     await staffCall("answerCallbackQuery", { callback_query_id: callback.id });
     if (!me || !chatId) return;
-    const data = callback.data ?? "m";
+    const data = callback.data ?? "s";
     if (data.startsWith("r:")) return promptReply(me, chatId, Number(data.slice(2)));
-    if (data === "t") return sendTone(chatId);
+    if (data.startsWith("b:")) return confirmBroadcast(me, chatId, callback.message?.message_id, data);
     await show(chatId, await screenFor(me, data), callback.message?.message_id);
     // a conversation's card can be answered with a Telegram «reply», like the client's own messages
     if (data.startsWith("c:") && callback.message) await rememberThread(chatId, callback.message.message_id, Number(data.slice(2)));
@@ -203,14 +251,17 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
         `رقم حسابك: <code>${chatId}</code>`,
         "أرسل هذا الرقم للإدارة لتربطه من صفحة «الموظفين»، ثم اضغط /start مرة أخرى.",
       ].join("\n"),
+      undefined,
+      { reply_markup: { remove_keyboard: true } },
     );
     return;
   }
 
   const text = (message.text ?? "").trim();
 
-  // a Telegram «reply» to a message about a conversation is the employee's answer to that client
+  // a Telegram «reply»: to the announcement prompt it is the announcement, to anything about a conversation it is the answer to that client
   if (message.reply_to_message && text && !text.startsWith("/")) {
+    if (message.reply_to_message.text?.startsWith(BROADCAST_PROMPT)) return draftBroadcast(me, chatId, text);
     const conversationId = await threadOf(chatId, message.reply_to_message.message_id);
     if (conversationId) return sendReply(me, chatId, conversationId, text);
     await staffSend(chatId, "لا أعرف لأي عميل هذا الرد — اضغط «✍️ رد» تحت رسالة العميل ثم اكتب ردك.");
@@ -218,24 +269,12 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
   }
   // a pasted Teletel access token: one word of letters AND digits, nothing else (an English word alone is not one)
   if (/^(?=.*\d)(?=.*[A-Za-z])[A-Za-z0-9_-]{20,64}$/.test(text)) return linkTeletelToken(me, chatId, message.message_id, text);
-  if (text.startsWith("/token")) return show(chatId, { text: TOKEN_HELP, buttons: [[BACK]] });
-  if (text.startsWith("/report") || text.includes("تقرير")) return show(chatId, await report(me));
-  if (text.startsWith("/tone") || text.includes("نغمة")) return sendTone(chatId);
 
-  if (text.startsWith("/start")) {
-    await staffSend(
-      chatId,
-      [
-        `🔔 أهلاً ${escapeHtml(me.name)}`,
-        "",
-        "حسابك مربوط بنظام ترافليون ✅",
-        me.agentId
-          ? "ستصلك هنا كل محادثة تُسند إليك في تيلي تيل لحظة إسنادها، وأرقامك من «لوحتي»."
-          : "حسابك في تيلي تيل غير مربوط بعد — اطلب من الإدارة ربطه من «الموظفين» لتصلك تنبيهات محادثاتك.",
-      ].join("\n"),
-    );
-  }
-  if (text.startsWith("/numbers") || text.includes("أرقامي")) return show(chatId, await numbers(me));
-  if (text.startsWith("/waiting") || text.includes("بانتظار")) return show(chatId, await waiting(me));
-  await show(chatId, menu(me));
+  if (text.startsWith("/start")) return welcome(me, chatId);
+  const key = (Object.keys(KEYS) as Key[]).find((k) => KEYS[k] === text) ?? COMMANDS[text.split(/[\s@]/)[0]];
+  if (key) return onKey(me, chatId, key);
+  // anything else typed: the keyboard again, with a word on how to answer a client
+  await staffSend(chatId, "اختر من القائمة أسفل المحادثة.\nللرد على عميل: اسحب رسالته (Reply) واكتب ردك، أو اضغط «✍️ رد».", undefined, {
+    reply_markup: keyboard(await canBroadcast(me.id)),
+  });
 }

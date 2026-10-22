@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { agentSummaries, type AgentSummary } from "@/lib/providers/teletel";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
-import { myNumbers, riyadhDayStart, secondsText, waitText, type MyNumbers } from "./staff-numbers";
+import { myNumbers, riyadhDayStart, secondsText, systemCounts, waitText, type MyNumbers } from "./staff-numbers";
 import { escapeHtml, staffSend, type StaffMember } from "./staff-bot";
 
 /**
@@ -92,26 +92,14 @@ async function voiced(name: string, facts: string[]): Promise<string[] | null> {
   }
 }
 
-async function counts(me: StaffMember, since: number): Promise<{ issued: number; botReplies: number }> {
-  const iso = new Date(since * 1000).toISOString();
-  const [offers, replies] = await Promise.all([
-    db().from("offers").select("id", { count: "exact", head: true }).eq("employee_id", me.id).neq("status", "draft").gte("created_at", iso),
-    db().from("staff_bot_replies").select("id", { count: "exact", head: true }).eq("employee_id", me.id).gte("created_at", iso),
-  ]);
-  return { issued: offers.count ?? 0, botReplies: replies.count ?? 0 };
-}
-
 export type Report = { text: string; facts: Facts; tips: string[] };
 
 /** One employee's report for Riyadh's day so far. Null without a Teletel agent, or when Teletel cannot be read. */
 export async function buildReport(me: StaffMember, nowMs = Date.now(), summaries?: Map<number, AgentSummary> | null): Promise<Report | null> {
   if (!me.agentId) return null;
   const since = riyadhDayStart(nowMs);
-  const [numbers, all, extra] = await Promise.all([
-    myNumbers(me.agentId, nowMs),
-    summaries === undefined ? agentSummaries(since, Math.floor(nowMs / 1000)) : Promise.resolve(summaries),
-    counts(me, since),
-  ]);
+  const all = summaries === undefined ? await agentSummaries(since, Math.floor(nowMs / 1000)) : summaries;
+  const [numbers, extra] = await Promise.all([myNumbers(me.agentId, nowMs, all), systemCounts(me.id, since)]);
   if (!numbers) return null;
   const facts: Facts = { numbers, team: teamAverages(all), ...extra };
   const rules = ruleTips(facts);

@@ -100,12 +100,14 @@ export async function registerStaffWebhook(token?: string): Promise<TgReply<bool
   if (hook.ok) {
     await tgCall(use, "setMyCommands", {
       commands: [
-        { command: "menu", description: "لوحتي" },
-        { command: "numbers", description: "أرقامي" },
+        { command: "screen", description: "شاشتي" },
         { command: "waiting", description: "بانتظار ردي" },
-        { command: "report", description: "تقرير اليوم" },
-        { command: "tone", description: "نغمة التنبيه" },
+        { command: "open", description: "محادثاتي المفتوحة" },
+        { command: "unanswered", description: "بلا رد" },
+        { command: "report", description: "أدائي اليوم" },
+        { command: "week", description: "أدائي الأسبوع" },
         { command: "token", description: "الرد باسمي من هنا" },
+        { command: "tone", description: "نغمة التنبيه" },
       ],
     });
   }

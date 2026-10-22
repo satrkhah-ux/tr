@@ -105,6 +105,7 @@ export type AuditAction =
   | "staff_bot.token_linked"
   | "staff_bot.token_refused"
   | "staff_bot.reply_sent"
+  | "staff_bot.broadcast_sent"
   | "employee.extra_permissions"
   | "employee.deleted"
   // «عين الإدارة» — what it said, and what management did about it

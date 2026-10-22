@@ -5,6 +5,7 @@ import { listOpenConversations, teletelConversationUrl } from "@/lib/providers/t
 import { escapeHtml, staffForAgent, staffSend } from "./staff-bot";
 import type { InlineButton } from "./ops-bot";
 import { sendDailyReports } from "./staff-report";
+import { refreshScreens, remindWaiting } from "./staff-screen";
 import { forwardClientMessage, onMessageUpdated, refreshDeliveries, rememberThread, type TeletelMessageEvent } from "./staff-replies";
 
 /**
@@ -144,8 +145,8 @@ export async function staffSweep(): Promise<{ seen: number; announced: number; b
   return { seen: rows.length, announced };
 }
 
-/** The minute job's share of «تنبيهاتي» (inside /api/murad/run, after the follow-ups sync refreshed the open list): the sweep, the delivery statuses, and from 23:00 Riyadh the evening reports. */
+/** The minute job's share of «تنبيهاتي» (inside /api/murad/run, after the follow-ups sync refreshed the open list): the sweep, the delivery statuses, the waiting reminders, the live screens (every fifth minute), and from 23:00 Riyadh the evening reports. */
 export async function staffTick(): Promise<Record<string, unknown>> {
-  const [sweep, deliveries, reports] = await Promise.all([staffSweep(), refreshDeliveries(), sendDailyReports()]);
-  return { sweep, deliveries, ...(reports ? { reports } : {}) };
+  const [sweep, deliveries, reminders, screens, reports] = await Promise.all([staffSweep(), refreshDeliveries(), remindWaiting(), refreshScreens(), sendDailyReports()]);
+  return { sweep, deliveries, ...(reminders ? { reminders } : {}), ...(screens ? { screens } : {}), ...(reports ? { reports } : {}) };
 }

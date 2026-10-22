@@ -43,13 +43,14 @@ export async function openFor(agentId: number): Promise<OpenConversation[] | nul
     .sort((a, b) => (a.waitingSince || Infinity) - (b.waitingSince || Infinity));
 }
 
-export async function myNumbers(agentId: number, nowMs = Date.now()): Promise<MyNumbers | null> {
+/** `summaries`: today's report when the caller already read it for everyone (the evening round, the live screens). */
+export async function myNumbers(agentId: number, nowMs = Date.now(), summaries?: Map<number, AgentSummary> | null): Promise<MyNumbers | null> {
   const since = riyadhDayStart(nowMs);
   const [open, total, closed, report, assigned] = await Promise.all([
     openFor(agentId),
     countAgentConversations(agentId, "all"),
     countAgentConversations(agentId, "resolved"),
-    agentSummaries(since, Math.floor(nowMs / 1000)),
+    summaries === undefined ? agentSummaries(since, Math.floor(nowMs / 1000)) : Promise.resolve(summaries),
     db()
       .from("staff_bot_assignments")
       .select("id", { count: "exact", head: true })
@@ -68,6 +69,20 @@ export async function myNumbers(agentId: number, nowMs = Date.now()): Promise<My
     closed,
     today: { assigned: assigned.count ?? 0, report: report?.get(agentId) ?? null },
   };
+}
+
+/** In the system since `sinceSec`: the files they issued (offers past draft), and the replies they sent from the bot. */
+export async function systemCounts(employeeId: string, sinceSec: number, untilSec?: number): Promise<{ issued: number; botReplies: number }> {
+  const from = new Date(sinceSec * 1000).toISOString();
+  const to = untilSec ? new Date(untilSec * 1000).toISOString() : null;
+  let offers = db().from("offers").select("id", { count: "exact", head: true }).eq("employee_id", employeeId).neq("status", "draft").gte("created_at", from);
+  let replies = db().from("staff_bot_replies").select("id", { count: "exact", head: true }).eq("employee_id", employeeId).gte("created_at", from);
+  if (to) {
+    offers = offers.lt("created_at", to);
+    replies = replies.lt("created_at", to);
+  }
+  const [o, r] = await Promise.all([offers, replies]);
+  return { issued: o.count ?? 0, botReplies: r.count ?? 0 };
 }
 
 /** «١٢ د»، «٢ س ٥ د»، «٣ ي» with Latin digits, as the rest of the system writes times. */
