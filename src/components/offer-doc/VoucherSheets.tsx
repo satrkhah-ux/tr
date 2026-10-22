@@ -21,10 +21,11 @@ import { BILINGUAL, KIND_NOTE, KIND_NOTE_EN, KIND_TITLE, KIND_TITLE_EN, LTR_CSS,
 
 /**
  * What a sheet holds under its top padding, in mm: A4's 297 less 13 at the top
- * and 21 kept clear above the footer rule. The heights below were measured in
- * Chromium on real papers (2026-10-22), a block's spacing included.
+ * and 17 kept clear above the footer (a sheet runs over past 284). The heights
+ * below were measured in Chromium on real papers (2026-10-22), a block's
+ * spacing included, and set a millimetre or two high.
  */
-const SHEET_MM = 263;
+const SHEET_MM = 267;
 const RUNNING_MM = 12.5;
 
 /**
@@ -182,7 +183,7 @@ function Top({ voucher, assets, brand }: { voucher: VoucherDTO; assets: OfferDoc
 
 const GUESTS_PER_BLOCK = 16;
 const LINE_MM = 9;
-const guestsMm = (n: number, contact: boolean) => 16.5 + Math.ceil(n / 2) * 10.2 + (contact ? LINE_MM : 0);
+const guestsMm = (n: number, contact: boolean) => 16.5 + Math.ceil(n / 2) * 9.6 + (contact ? LINE_MM : 0);
 
 /** The travellers two to a line — the desk and the counter match them to the passports. */
 function Guests({ voucher, travelers, from, contact, extra }: { voucher: VoucherDTO; travelers: VoucherDTO["travelers"]; from: number; contact: boolean; extra?: ReactNode }) {
@@ -235,14 +236,14 @@ function guestBlocks(voucher: VoucherDTO, extra: { node: ReactNode; mm: number }
   return out;
 }
 
-function notesBlock(voucher: VoucherDTO, brand: DocBrand, more: string[] = []): Block {
+/** The paper's notes — the company's numbers are in its header already, so they are not said again here. */
+function notesBlock(voucher: VoucherDTO, more: string[] = []): Block {
   const english = voucher.lang === "en";
   const notes = [...(english ? [KIND_NOTE_EN[voucher.kind] ?? "", ...voucher.notes] : [KIND_NOTE[voucher.kind], ...voucher.notes]), ...more].filter(Boolean);
-  const contact = [english ? brand.nameLatin : brand.nameAr, brand.phone, brand.email].filter(Boolean);
   // a note box is 15mm for its first line and 5 for each line it wraps to (about 100 characters a line)
   const box = (text: string) => 15 + 5 * (Math.ceil(text.length / 100) - 1);
   return {
-    mm: 4.5 + [...notes, contact.join(" · ")].reduce((sum, n) => sum + box(n), 0),
+    mm: notes.length ? 4.5 + notes.reduce((sum, n) => sum + box(n), 0) : 0,
     node: (
       <div className="vs-notes">
         {notes.map((n, i) => (
@@ -250,14 +251,6 @@ function notesBlock(voucher: VoucherDTO, brand: DocBrand, more: string[] = []): 
             {n}
           </p>
         ))}
-        <p className="od-note">
-          {contact.map((part, i) => (
-            <span key={i}>
-              {i > 0 ? " · " : null}
-              {i > 0 ? <Ltr>{part}</Ltr> : part}
-            </span>
-          ))}
-        </p>
       </div>
     ),
   };
@@ -412,7 +405,7 @@ export function HotelVoucher({ voucher, assets, brand }: { voucher: VoucherDTO; 
       blocks={[
         ...guestBlocks(voucher),
         ...voucher.bookings.map((b, i) => ({ mm: stayMm(b, english, shared), node: <StayCard key={i} booking={b} english={english} shared={shared} /> })),
-        notesBlock(voucher, brand, shared ? [shared] : []),
+        notesBlock(voucher, shared ? [shared] : []),
       ]}
     />
   );
@@ -528,7 +521,7 @@ export function FlightTicket({ voucher, assets, brand, logos }: { voucher: Vouch
               }
             : null,
         ),
-        notesBlock(voucher, brand),
+        notesBlock(voucher),
       ]}
     />
   );

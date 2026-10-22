@@ -5,7 +5,8 @@ import { getWelcomeBoard } from "@/lib/data/welcome-board";
 import { renderDocHtml } from "@/lib/offer-doc/html";
 import { inlineImage } from "@/lib/offer-doc/assets";
 import { resolveDocBrand } from "@/lib/data/doc-brand";
-import { TRAVELIUN_BRAND, airlineLogoUrl } from "@/components/offer-doc/brand";
+import { TRAVELIUN_BRAND } from "@/components/offer-doc/brand";
+import { carrierMarks, withLegs } from "@/lib/data/ticket-legs";
 import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { VoucherDTO } from "@/lib/operations/voucher-dto";
@@ -84,20 +85,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   const resolved = voucher.kind === "booking_summary" ? TRAVELIUN_BRAND : (await resolveDocBrand({ serial: voucher.serial })).brand;
   // Chromium prints offline: a storage logo URL must be inlined or it prints a broken box
   const brand = resolved.logoUrl ? { ...resolved, logoUrl: (await inlineImage(resolved.logoUrl)) ?? null } : resolved;
-  // the ticket's cards carry each carrier's mark, looked up here by IATA and inlined — as /repackage's flight card
-  const iatas = [...new Set(voucher.bookings.flatMap((b) => b.legs ?? []).map((l) => l.airline_iata).filter((c): c is string => Boolean(c)))];
-  const logos: Record<string, string> = {};
-  if (iatas.length) {
-    const { data: airlines } = await supabase.from("airlines").select("iata, logo_path").in("iata", iatas);
-    await Promise.all(
-      ((airlines ?? []) as { iata: string; logo_path: string | null }[]).map(async (a) => {
-        const url = airlineLogoUrl(a.logo_path);
-        const inlined = url ? await inlineImage(url) : null;
-        if (inlined) logos[a.iata.toUpperCase()] = inlined;
-      }),
-    );
-  }
-  const html = await renderDocHtml((assets) => <VoucherDocument voucher={voucher} assets={assets} brand={brand} logos={logos} />, brand.font);
+  // a ticket prints its flights as cards, each carrier's mark beside it — an older ticket's read back from its lines
+  const paper = await withLegs(supabase, voucher);
+  const logos = await carrierMarks(supabase, paper);
+  const html = await renderDocHtml((assets) => <VoucherDocument voucher={paper} assets={assets} brand={brand} logos={logos} />, brand.font);
   const pdf = await offerDocumentToPdf(html);
 
   return new NextResponse(new Uint8Array(pdf), {

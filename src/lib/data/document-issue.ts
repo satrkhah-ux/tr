@@ -5,12 +5,12 @@ import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { notifyPartnerCase } from "@/lib/data/ops-notify";
-import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, shownDetail, type VoucherBooking, type VoucherDTO, type VoucherKind, type VoucherLeg } from "@/lib/operations/voucher-dto";
+import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, shownDetail, type VoucherBooking, type VoucherDTO, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { voucherStay, type StayError, type StayHotel } from "@/lib/operations/room-details";
 import { hotelFinal } from "@/lib/operations/client-booking-state";
 import { sameDocument, snapshotKey } from "@/lib/operations/wizard/documents";
-import { uniqueLegs } from "@/lib/operations/wizard/flights";
 import type { FlightLeg } from "@/lib/data/operation-bookings";
+import { namedLegs } from "@/lib/data/ticket-legs";
 import { leadName } from "@/lib/operations/travelers";
 import { catalogHotelsFor } from "@/lib/data/hotel-match";
 
@@ -64,9 +64,6 @@ type BookingRow = {
   ticket_numbers: string[] | null;
   flight_legs: FlightLeg[] | null;
 };
-
-/** The carrier's code at the head of a flight number: «XY309» → XY. */
-const carrierOf = (flightNo: string) => flightNo.match(/^([A-Z]{2}|[A-Z]\d|\d[A-Z])(?=\d)/)?.[1] ?? null;
 
 function toVoucherBooking(b: BookingRow): VoucherBooking {
   return {
@@ -262,38 +259,8 @@ export async function issueDocumentNow(input: IssueInput, issuedBy: string | nul
     // اعادة تصميم لهوية الشركة»)
     const flights: VoucherBooking[] = [];
     if (input.kind === "flight_ticket") {
-      const legsOf = new Map(scoped.map((b) => [b.id, uniqueLegs(b.flight_legs ?? [])]));
-      const all = [...legsOf.values()].flat();
-      const codes = [...new Set(all.flatMap((l) => [l.from, l.to]).filter(Boolean))];
-      const carriers = [...new Set(all.map((l) => carrierOf(l.flight_no)).filter((c): c is string => Boolean(c)))];
-      const [airportsRes, airlinesRes] = await Promise.all([
-        codes.length ? supabase.from("airports").select("code, arabic_name, cities(arabic_name)").in("code", codes) : null,
-        carriers.length ? supabase.from("airlines").select("iata, arabic_name").in("iata", carriers) : null,
-      ]);
-      type AirportRow = { code: string; arabic_name: string; cities: { arabic_name: string } | { arabic_name: string }[] | null };
-      const placeOf = new Map(
-        ((airportsRes?.data ?? []) as AirportRow[]).map((a) => {
-          const city = Array.isArray(a.cities) ? a.cities[0] : a.cities;
-          return [a.code.toUpperCase(), city?.arabic_name || a.arabic_name] as const;
-        }),
-      );
-      const airlineOf = new Map(((airlinesRes?.data ?? []) as { iata: string; arabic_name: string }[]).map((a) => [a.iata.toUpperCase(), a.arabic_name]));
       for (const raw of scoped) {
-        const legs: VoucherLeg[] = (legsOf.get(raw.id) ?? []).map((l) => {
-          const iata = carrierOf(l.flight_no);
-          return {
-            flight_no: l.flight_no,
-            airline: (iata && airlineOf.get(iata)) || null,
-            airline_iata: iata,
-            from: l.from,
-            from_name: placeOf.get(l.from) ?? null,
-            to: l.to,
-            to_name: placeOf.get(l.to) ?? null,
-            departs_at: l.departs_at,
-            arrives_at: l.arrives_at,
-          };
-        });
-        flights.push({ ...withHotel(raw), legs, pnr: raw.pnr || raw.confirmation_number, tickets: raw.ticket_numbers ?? [] });
+        flights.push({ ...withHotel(raw), legs: await namedLegs(supabase, raw.flight_legs ?? []), pnr: raw.pnr || raw.confirmation_number, tickets: raw.ticket_numbers ?? [] });
       }
     }
 

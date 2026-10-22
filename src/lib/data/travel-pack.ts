@@ -6,6 +6,7 @@ import { getClientTrip, type ClientTrip } from "@/lib/data/client-trip";
 import { getTripGuide } from "@/lib/data/destination-guides";
 import { getReceiptByToken, listTripReceipts } from "@/lib/data/payment-receipt";
 import { pickPackDocuments, type PackDocRow } from "@/lib/operations/travel-pack";
+import { withLegs } from "@/lib/data/ticket-legs";
 import type { VoucherDTO } from "@/lib/operations/voucher-dto";
 import type { ReceiptDTO } from "@/lib/operations/payments";
 
@@ -31,13 +32,16 @@ export async function getTravelPack(token: string): Promise<TravelPack | null> {
 
   // the hub already chose which documents are the client's; the pack needs their snapshots
   const tokens = hub.documents.map((d) => d.token);
+  const db = createSupabaseServiceClient() as unknown as SupabaseClient;
   const rows = tokens.length
-    ? (((await (createSupabaseServiceClient() as unknown as SupabaseClient)
+    ? (((await db
         .from("operation_documents")
         .select("kind, booking_id, created_at, snapshot_json")
         .in("token", tokens)).data ?? []) as (PackDocRow & { snapshot_json: VoucherDTO })[])
     : [];
 
   const receipts = (await Promise.all(listed.map((r) => getReceiptByToken(r.token)))).filter((r): r is ReceiptDTO => r !== null);
-  return { hub, trip, guide, documents: pickPackDocuments(rows).map((r) => r.snapshot_json), receipts };
+  // an older ticket prints its flights as cards too, read back from its lines
+  const documents = await Promise.all(pickPackDocuments(rows).map((r) => withLegs(db, r.snapshot_json)));
+  return { hub, trip, guide, documents, receipts };
 }
