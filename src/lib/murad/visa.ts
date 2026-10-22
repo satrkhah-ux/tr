@@ -82,8 +82,17 @@ export function visaNeed(f: VisaFacts): VisaNeed[] {
 export function visaAskText(f: VisaFacts, need: VisaNeed[], schengen: string[] = []): string {
   const word = (n: VisaNeed) =>
     n === "country" && f.schengen ? `دولة الشنغن التي ستدخلها أولاً أو تقيم فيها أطول مدة${schengen.length ? ` (عندنا ${schengen.join(" و")})` : ""}` : WORDS[n];
-  return `حياك الله، عشان أجهز لك تفاصيل ${f.country ? `تأشيرة ${f.country}` : "التأشيرة"}: تكرماً ${need.map(word).join("، و")}؟`;
+  // «تعملون تأشيرات؟» is a question: answered before the asking (the owner's test, 2026-10-22)
+  if (!f.country) return `أكيد نخدمك في التأشيرات، عشان أجهز لك التفاصيل: تكرماً ${need.map(word).join("، و")}؟`;
+  return `حياك الله، عشان أجهز لك تفاصيل تأشيرة ${f.country}: تكرماً ${need.map(word).join("، و")}؟`;
 }
+
+/** A country off the list whose entry the catalogue marks visa-free for a Saudi passport («ماليزيا بدون تأشيرة للسعودي»). */
+export function visaFreeText(country: string): string {
+  return `الجواز السعودي ما يحتاج تأشيرة مسبقة لـ${country} 👍
+وإذا تحب نجهز لك برنامج رحلة لها، قل لي وأحولك لزميلنا في البكجات.`;
+}
+export const isSaudi = (nationality: string | null) => Boolean(nationality && /سعود|saudi/i.test(nationality));
 
 export const VISA_CLOSING = "سيتواصل معك زميلنا في قسم التأشيرات لإكمال الطلب.";
 

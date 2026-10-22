@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { repeatsMurad, VISA_CLOSING, visaAskText, visaFlowNote, visaFlowText, visaNeed, visaRowFor, type VisaFacts, type VisaRow } from "./visa";
+import { isSaudi, repeatsMurad, visaFreeText, VISA_CLOSING, visaAskText, visaFlowNote, visaFlowText, visaNeed, visaRowFor, type VisaFacts, type VisaRow } from "./visa";
 
 const france: VisaRow = {
   country: "فرنسا",
@@ -18,6 +18,13 @@ describe("Murad's visa flow — the owner's decision, 2026-10-22", () => {
     expect(visaNeed({ ...full, nationality: null, applicants: null })).toEqual(["nationality", "applicants"]);
     expect(visaAskText({ ...full, nationality: null, applicants: null }, ["nationality", "applicants"])).toBe("حياك الله، عشان أجهز لك تفاصيل تأشيرة فرنسا: تكرماً الجنسية، وعدد المتقدمين؟");
     expect(visaAskText({ country: null, nationality: null, applicants: null, travelDate: null, schengen: true }, ["country"], ["فرنسا", "إسبانيا"])).toContain("(عندنا فرنسا وإسبانيا)");
+  });
+  it("«تعملون تأشيرات؟» is answered before the asking; a visa-free country is said so (the owner's test, 2026-10-22)", () => {
+    expect(visaAskText({ country: null, nationality: null, applicants: null, travelDate: null }, ["country", "nationality", "applicants"])).toBe("أكيد نخدمك في التأشيرات، عشان أجهز لك التفاصيل: تكرماً الدولة المطلوبة، والجنسية، وعدد المتقدمين؟");
+    expect(visaFreeText("ماليزيا")).toContain("ما يحتاج تأشيرة مسبقة لـماليزيا");
+    expect(isSaudi("سعودي")).toBe(true);
+    expect(isSaudi("يمني")).toBe(false);
+    expect(isSaudi(null)).toBe(false);
   });
 
   it("step 2: the list's price for the party and the requirements VERBATIM, then the hand-over line", () => {

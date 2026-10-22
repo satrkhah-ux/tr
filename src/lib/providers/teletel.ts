@@ -816,5 +816,10 @@ export async function assignMuradHandoff(conversationId: number, teamId: number 
   // one field per call: Teletel (Chatwoot) reads assignee_id whenever the key is sent — null unassigns the
   // agent and team_id is ignored (2026-10-22: «بكج جورجيا» stayed with «قسم فيزا», nobody on it)
   if (teamId && (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { team_id: teamId })) === null) return false;
-  return !agentId || (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { assignee_id: agentId })) !== null;
+  // a team with no named agent: whoever held it lets go, so the department's own takes it (the reply is empty, not a failure)
+  if (!agentId) {
+    await api<unknown>(config, `/conversations/${conversationId}/assignments`, { assignee_id: null });
+    return true;
+  }
+  return (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { assignee_id: agentId })) !== null;
 }

@@ -35,7 +35,7 @@ import { returnedToEmployee } from "@/lib/leads/lifecycle";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
 import { isHumanReply, maskPhone, muradMessageIds, noteFor, SETTING, type TurnMessage } from "./core";
-import { repeatsMurad, SCHENGEN, visaAskText, visaFlowNote, visaFlowText, visaNeed, visaRowFor, type VisaAsk, type VisaFacts, type VisaRow } from "./visa";
+import { isSaudi, repeatsMurad, SCHENGEN, visaFreeText, visaAskText, visaFlowNote, visaFlowText, visaNeed, visaRowFor, type VisaAsk, type VisaFacts, type VisaRow } from "./visa";
 import { readSettings, readThread } from "./run";
 import {
   clarifyText,
@@ -74,6 +74,8 @@ const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 
 /** how far back «this visit» reaches: a colleague's answer, or a reception, older than this belongs to an earlier one */
 const VISIT_SEC = 12 * 3600;
+/** spelling-blind: «فتنام» and «فيتنام», «ماليزيا» and «مالیزیا» — the long vowels and hamzas dropped */
+const loose = (t: string) => fold(t).replace(/[اأإآىيوءئؤةه\s]/gu, "");
 
 export type IncomingMessage = {
   conversationId: number;
@@ -433,7 +435,7 @@ async function visaConversation(service: SupabaseClient, m: IncomingMessage): Pr
 /** the company's visa list and the countries it hangs on */
 async function visaList(service: SupabaseClient) {
   const [{ data: countries }, { data: rows }] = await Promise.all([
-    service.from("countries").select("id, arabic_name, iso2"),
+    service.from("countries").select("id, arabic_name, iso2, visa_required"),
     service.from("visas").select("country, country_id, visa_type, sell_price, sell_currency, arabic_requirements, status").eq("status", "Active"),
   ]);
   return {
@@ -569,7 +571,9 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       await finish({ reason: "unreadable", error: "teletel: the thread could not be read" });
       return "unreadable";
     }
-    const rows = (past.data ?? []) as { mode: string; reason: string | null; reply_message_id: number | null; created_at: string; intake: Record<string, unknown> | null }[];
+    // in order: «the last facts», «the last hand-over» read the newest row (the owner's test, 2026-10-22: the nationality
+    // already given was asked again — PostgREST returns rows unordered)
+    const rows = ((past.data ?? []) as { mode: string; reason: string | null; reply_message_id: number | null; created_at: string; intake: Record<string, unknown> | null }[]).sort((x, y) => Date.parse(x.created_at) - Date.parse(y.created_at));
     // this visit, not the conversation's whole life: WhatsApp reopens the same conversation when a client writes
     // again — a reception or a colleague's answer from back then is not this time's. The visit starts where Teletel
     // last closed the conversation before this message (the owner, 2026-10-18: «لكي يكون طلباً جديداً كاملاً»),
@@ -692,7 +696,10 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
         const asked = flowRows.filter((r) => r.intake?.visa_flow);
         const earlier = (received.filter((r) => r.intake?.visa_flow).at(-1)?.intake?.visa_flow ?? null) as VisaFacts | null;
         const before = (asked.at(-1)?.intake?.visa_flow as VisaFacts | undefined) ?? (earlier ? { ...earlier, country: null } : null);
-        const named = a?.country ?? (handoffRow ? readRequest(flowLines.filter((t) => t.fromClient).map((t) => t.text).join("\n"), places).country : request.country) ?? before?.country ?? null;
+        // a country the client did not write is the model's guess («أسهل تأشيرة لأي دولة» became ماليزيا, 2026-10-22)
+        const flowText = flowLines.filter((t) => t.fromClient).map((t) => t.text).join("\n");
+        const written = (c: string) => Boolean(readRequest(flowText, places).country) || loose(flowText).includes(loose(c));
+        const named = (a?.country && written(a.country) ? a.country : null) ?? (handoffRow ? readRequest(flowLines.filter((t) => t.fromClient).map((t) => t.text).join("\n"), places).country : request.country) ?? before?.country ?? null;
         const facts: VisaFacts = {
           country: (named && list.countries.find((c) => fold(c.arabic_name) === fold(named))?.arabic_name) ?? named,
           nationality: a?.nationality_ar ?? before?.nationality ?? null,
@@ -721,7 +728,16 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
           return "asked";
         }
         const country = list.countries.find((c) => facts.country && fold(c.arabic_name) === fold(facts.country));
-        return await visaAnswer(service, { m, logId, facts, row: visaRowFor(list.rows, country?.id ?? null, facts.country), salam, includePrice: settings.control.includePrice, visit: visitLines, intake, waitSec, closedAt, start });
+        const row = visaRowFor(list.rows, country?.id ?? null, facts.country);
+        // off the list, and the catalogue says a Saudi passport enters without one: said so, no hand-over to visas
+        if (!row && country && (country as { visa_required?: boolean | null }).visa_required === false && isSaudi(facts.nationality)) {
+          const text = `${salam ? "وعليكم السلام ورحمة الله، " : ""}${visaFreeText(country.arabic_name)}`;
+          const replyId = await sendTeletelMessage(m.conversationId, text);
+          if (!replyId) { await finish({ reason: "send_failed", reply: text, error: "send_failed" }); return "send_failed"; }
+          await finish({ reason: "visa:not_needed", reply: text, reply_message_id: replyId, intake: { ...intake, country: facts.country, visa_flow: { ...facts, done: true, listed: false } } });
+          return "answered";
+        }
+        return await visaAnswer(service, { m, logId, facts, row, salam, includePrice: settings.control.includePrice, visit: visitLines, intake, waitSec, closedAt, start });
       }
     }
 
