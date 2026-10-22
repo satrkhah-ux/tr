@@ -10,7 +10,7 @@ import type { OperationBooking } from "@/lib/data/operation-bookings";
 import { normalizeTicketText, parseTicketText } from "@/lib/flights/ticket-parse";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { plannedLegs } from "./flights";
-import { parseHotelConfirmation } from "./hotels";
+import { parseHotelConfirmation, sameHotel } from "./hotels";
 
 /**
  * The money papers too (the owner, 2026-10-23: «فاتورة الفنادق و التذكرة و كم
@@ -83,6 +83,27 @@ export function amountIn(text: string): { amount: number | null; currency: strin
   return { amount: amount > 0 ? amount : null, currency: currencyOf(text) };
 }
 
+export type StayTarget = { id: string; names: (string | null)[]; start_date: string | null; end_date: string | null; city?: string | null };
+
+/**
+ * A stay read off an outside paper → its hotel booking. By the hotel's NAME
+ * first (sameHotel: the booking's title and its catalogue names, either
+ * script) — a paper naming another hotel is never put on the file's only one
+ * (the owner's samples, 2026-10-23); among those, the check-in day. A paper
+ * that names no hotel goes by its check-in day alone. `other`: the paper names
+ * a hotel the file does not have.
+ */
+export function placeStay(stay: { hotel_name: string; check_in: string; check_out: string }, bookings: StayTarget[]): { target: string | null; other: boolean } {
+  if (stay.hotel_name.trim()) {
+    const named = bookings.filter((b) => sameHotel(stay.hotel_name, b.names, [b.city, "city" in stay ? (stay as { city?: string }).city : null]));
+    if (named.length === 0) return { target: null, other: true };
+    const day = named.find((b) => stay.check_in && b.start_date === stay.check_in) ?? named.find((b) => stay.check_in && b.start_date && b.end_date && stay.check_in >= b.start_date && stay.check_in < b.end_date);
+    return { target: (day ?? named[0]).id, other: false };
+  }
+  const day = bookings.find((b) => stay.check_in && b.start_date === stay.check_in && (!stay.check_out || b.end_date === stay.check_out));
+  return { target: day?.id ?? null, other: false };
+}
+
 const HOTEL_HEAD = /^(?:HOTEL(?:\s*NAME)?|PROPERTY(?:\s*NAME)?|ACCOMMODATION|اسم\s*الفندق|الفندق|الفندق\s*المحجوز)\s*[:：]/iu;
 const CHECK_IN_LINE = /CHECK[\s-]?IN|تاريخ\s*الوصول|تسجيل\s*الدخول/iu;
 
@@ -138,16 +159,18 @@ export function matchSupplier<T extends { id: string; arabic_name: string; engli
 }
 
 type Leg = { from_iata: string; to_iata: string; dep_date: string };
-type FlightBooking = Pick<OperationBooking, "id" | "start_date" | "end_date" | "detail">;
+type FlightBooking = Pick<OperationBooking, "id" | "start_date" | "end_date"> & { detail: OperationBooking["detail"] | null };
 
 /**
  * A ticket's flight booking: the one whose planned legs it flies — the same
- * airports (2 a leg), on the same day (1 more) — else the one whose dates hold
- * its first take-off. A case with one flight booking takes it. null: the
+ * airports (2 a leg), on the same day (1 more) — else, when a booking plans no
+ * legs, the one whose dates hold its first take-off. A case with one flight
+ * booking takes a ticket that says nothing against it — never one flying
+ * elsewhere (a domestic hop on its own ticket, the owner's samples). null: the
  * employee places it.
  */
 export function matchTicket(legs: Leg[], flights: FlightBooking[]): string | null {
-  if (flights.length === 1) return flights[0].id;
+  if (flights.length === 1 && (legs.length === 0 || (plannedLegs(flights[0].detail ?? {}).length === 0 && !flights[0].start_date))) return flights[0].id;
   let best: { id: string; score: number } | null = null;
   for (const f of flights) {
     const planned = plannedLegs(f.detail ?? {});
@@ -157,7 +180,7 @@ export function matchTicket(legs: Leg[], flights: FlightBooking[]): string | nul
       if (hit) score += 2 + (hit.dep_date && hit.dep_date === l.dep_date ? 1 : 0);
     }
     const first = legs[0]?.dep_date;
-    if (first && f.start_date && f.end_date && first >= f.start_date && first <= f.end_date) score += 1;
+    if ((score > 0 || planned.length === 0) && first && f.start_date && f.end_date && first >= f.start_date && first <= f.end_date) score += 1;
     if (score > 0 && (!best || score > best.score)) best = { id: f.id, score };
   }
   return best?.id ?? null;

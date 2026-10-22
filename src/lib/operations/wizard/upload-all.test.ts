@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountIn, matchHotel, matchSupplier, matchTicket, paperKind, splitStays, supplierInText, ticketInvoice } from "./upload-all";
+import { amountIn, matchHotel, matchSupplier, matchTicket, paperKind, placeStay, splitStays, supplierInText, ticketInvoice } from "./upload-all";
 
 const PASSPORT = `KINGDOM OF SAUDI ARABIA
 PASSPORT
@@ -41,8 +41,10 @@ describe("«ارفع كل الملفات» — where a paper goes", () => {
     expect(matchTicket([{ from_iata: "RUH", to_iata: "TBS", dep_date: "2026-10-30" }], flights)).toBe("intl");
     expect(matchTicket([{ from_iata: "TBS", to_iata: "BUS", dep_date: "2026-11-02" }], flights)).toBe("dom");
     expect(matchTicket([{ from_iata: "JED", to_iata: "IST", dep_date: "2027-01-01" }], flights)).toBeNull();
-    // one flight booking takes every ticket
+    // one flight booking takes a ticket that says nothing against it — not a hop it does not plan
     expect(matchTicket([], [flights[1]])).toBe("intl");
+    expect(matchTicket([{ from_iata: "BKK", to_iata: "HKT", dep_date: "2026-11-01" }], [flights[1]])).toBeNull();
+    expect(matchTicket([{ from_iata: "BKK", to_iata: "HKT", dep_date: "2026-11-01" }], [{ id: "bare", detail: null, start_date: null, end_date: null }])).toBe("bare");
   });
 
   it("puts a confirmation on its hotel by the stay's days and the hotel's name", () => {
@@ -136,5 +138,13 @@ describe("«ارفع كل الملفات» — the suppliers' own papers (2026-1
     expect(supplierInText("TBO Holidays — Itinerary voucher", suppliers)?.id).toBe("tbo");
     expect(supplierInText("Booked via agoda.com", suppliers)?.id).toBe("ag");
     expect(supplierInText("Hotel direct booking", suppliers)).toBeNull();
+  });
+});
+
+describe("«ارفع كل الملفات» — an outside paper's stays (the owner's samples, 2026-10-23)", () => {
+  const bali = { id: "ariaduta", names: ["فندق اريادوتا بالي", null, "Aryaduta Bali"], start_date: "2026-10-07", end_date: "2026-10-18", city: "بالي" };
+  it("never takes the city in both names for the same hotel", () => {
+    expect(placeStay({ hotel_name: "The Anvaya Beach Resort Bali", check_in: "2026-10-15", check_out: "2026-10-18" }, [bali])).toEqual({ target: null, other: true });
+    expect(placeStay({ hotel_name: "Aryaduta Bali", check_in: "2026-10-07", check_out: "2026-10-18" }, [bali]).target).toBe("ariaduta");
   });
 });

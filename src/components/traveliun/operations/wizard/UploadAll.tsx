@@ -6,7 +6,8 @@ import { AlertTriangle, CheckCircle2, FileUp, Loader2, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import type { TranslationKey } from "@/lib/i18n";
 import { readPassportPhoto } from "@/lib/data/operation-travelers";
-import { paperSupplier, readMoney, sortPaper, type PaperSupplier } from "@/lib/data/upload-sort";
+import { hotelsOnPaper, paperSupplier, readMoney, sortPaper, type PaperSupplier, type PlacedStay, type SortedPaper } from "@/lib/data/upload-sort";
+import { addBooking } from "@/lib/data/operation-bookings";
 import { attachBookingInvoice, attachSupplierConfirmation, createSupplierFromInvoice, recordSupplierPayment, setBookingCost } from "@/lib/data/supplier-work";
 import { assignBooking } from "@/lib/data/operation-assign";
 import { recordPayment } from "@/lib/data/operations";
@@ -18,7 +19,7 @@ import { parseTicketText } from "@/lib/flights/ticket-parse";
 import { trustedFields, type MrzPassport } from "@/lib/operations/mrz";
 import { hotelBookings } from "@/lib/operations/wizard/hotels";
 import { matchPassport, type MatchRow } from "@/lib/operations/wizard/passports";
-import { matchHotel, matchTicket, splitStays, ticketInvoice, type PaperKind } from "@/lib/operations/wizard/upload-all";
+import { matchHotel, matchTicket, placeStay, ticketInvoice, type PaperKind } from "@/lib/operations/wizard/upload-all";
 import type { WizardCase } from "@/lib/operations/wizard/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { savePassport } from "./passport-save";
@@ -34,7 +35,7 @@ const NO_MONEY: MoneyFields = { money: null, amount: "", currency: "", checked: 
 /** a client's slip says transfer/cash/pos/link; a supplier's payment is booked as bank_transfer/cash/card/other */
 const SUPPLIER_METHOD: Record<string, string> = { transfer: "bank_transfer", cash: "cash", pos: "card", link: "other", "": "bank_transfer" };
 /** Files read at once — a vision read is slow, and one slow file must not hold the rest. */
-const AT_ONCE = 2;
+const AT_ONCE = 4;
 
 type Item = MoneyFields & {
   key: number;
@@ -55,6 +56,10 @@ type Item = MoneyFields & {
   ref: string;
   /** a ticket's or a hotel paper's supplier, named on it, beside the booking's — `supplier` holds the pick */
   paperSup: PaperSupplier | null;
+  /** a hotel paper's stay as read off it (an outside paper: the model's), and whether its hotel is not the file's */
+  stay: PlacedStay | null;
+  /** an outside paper as read off the file whole (sortPaper) — handed to the readers, never read again */
+  read: SortedPaper["read"] | null;
   error?: string;
 };
 
@@ -112,15 +117,35 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
     items.filter((s) => s.kind === "ticket" && s.status !== "dropped" && s.target === item.target && s.ticket && s.ref.trim().toUpperCase() === item.ref.trim().toUpperCase());
   const flights = data.bookings.filter((b) => b.kind === "flight" && b.status !== "cancelled");
   const hotels = hotelBookings(data);
+  const hotelTargets = hotels.map((h) => ({ id: h.id, names: [h.title], start_date: h.start_date, end_date: h.end_date }));
+
+  /** «أضف كفندق جديد في الملف»: the paper's hotel and dates as a booking of the file, then the line placed on it. */
+  async function addStayHotel(item: Item) {
+    if (!item.stay) return;
+    patch(item.key, { status: "reading", error: undefined });
+    const res = await addBooking({
+      operation_id: op.id,
+      kind: "hotel",
+      title: item.stay.hotel_name,
+      city_name: item.stay.city,
+      start_date: item.stay.check_in || null,
+      end_date: item.stay.check_out || null,
+    });
+    if (!res.ok) return patch(item.key, { status: "ready", error: t(res.error) });
+    router.refresh();
+    patch(item.key, { status: "ready", target: res.id, stay: { ...item.stay, target: res.id, other: false }, ...(await readFor({ ...item, stay: { ...item.stay, target: res.id, other: false } }, "hotel", res.id)) });
+  }
 
   const patch = (key: number, next: Partial<Item>) => setItems((list) => list.map((i) => (i.key === key ? { ...i, ...next } : i)));
 
   /** A ticket or a confirmation read again for the booking it is placed on — from its words, not the file again. */
-  async function readFor(item: Pick<Item, "key" | "file" | "text">, kind: PaperKind, target: string): Promise<Partial<Item>> {
+  async function readFor(item: Pick<Item, "key" | "file" | "text" | "stay" | "read">, kind: PaperKind, target: string): Promise<Partial<Item>> {
     const fd = new FormData();
     fd.append("booking_id", target);
+    const given = kind === "hotel" ? item.stay : kind === "ticket" ? item.read?.ticket : null;
+    if (given) fd.append(kind === "hotel" ? "stay" : "read", JSON.stringify(given));
     if (item.text) fd.append("text", item.text);
-    else fd.append("file", item.file);
+    else if (!given) fd.append("file", item.file);
     // the supplier the paper names becomes the booking's only when the booking has none — else the employee picks
     const sup = await paperSupplier(op.id, target, item.text).catch(() => null);
     const supplier = sup?.supplier && !sup.onFile ? sup.supplier.id : "";
@@ -138,8 +163,8 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
     matchTicket(parseTicketText(text).legs, flights);
 
   /** A money paper's figures for the place it is put — an invoice beside the booking's cost and supplier. */
-  async function moneyFor(text: string, kind: MoneyKind, target: string): Promise<Partial<Item>> {
-    const res = await readMoney(op.id, { kind, text, ...(kind !== "payment" && target ? { booking_id: target } : {}) });
+  async function moneyFor(text: string, kind: MoneyKind, target: string, read?: Item["read"]): Promise<Partial<Item>> {
+    const res = await readMoney(op.id, { kind, text, ...(kind !== "payment" && target ? { booking_id: target } : {}), ...(read?.money ? { paper: read.money } : {}) });
     if (!res.ok) return { money: null, error: t(res.error) };
     const m = res.read;
     const currency = m.currency || (kind === "payment" ? caseCurrency : (m.cost?.currency ?? caseCurrency));
@@ -161,6 +186,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
     const sorted = await sortPaper(op.id, fd);
     if (!sorted.ok) return patch(item.key, { status: "failed", error: t(sorted.error) });
     const { kind, text, image } = sorted.paper;
+    const read = sorted.paper.read ?? null;
     if (kind === "passport") {
       const picture = image ? fileOf(image, item.file.name) : item.file;
       let passport: MrzPassport | null = null;
@@ -177,27 +203,54 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
       if (target !== "new") placed.add(target);
       return patch(item.key, { status: "ready", kind, picture, passport, target, error });
     }
-    if (kind === "unknown") return patch(item.key, { status: "ready", kind, text });
+    if (kind === "unknown") return patch(item.key, { status: "ready", kind, text, read });
     if (isMoney(kind)) {
       // cost is pricing.internal's: an invoice is sorted, never read, without it
-      if (kind !== "payment" && !canSeeCost) return patch(item.key, { status: "ready", kind, text, error: t("wz.up.err.costOnly") });
-      const target = kind === "payment" ? "case" : ((kind === "hotel_invoice" ? matchHotel(text, hotels) : flightFor(text)) ?? "");
-      return patch(item.key, { status: "ready", kind, text, target, ...(target ? await moneyFor(text, kind, target) : {}) });
+      if (kind !== "payment" && !canSeeCost) return patch(item.key, { status: "ready", kind, text, read, error: t("wz.up.err.costOnly") });
+      if (kind === "payment") return patch(item.key, { status: "ready", kind, text, read, target: "case", ...(await moneyFor(text, kind, "case", read)) });
+      // read off the file whole: placed by the hotel or the flight it names, checked on the server (placeOutside)
+      if (read?.money) {
+        const target = read.money.target ?? "";
+        return patch(item.key, { status: "ready", kind, text, read, target, ...(await moneyFor(text, kind, target, read)) });
+      }
+      // read first: an invoice naming a hotel is that hotel's, whatever its words looked like (the owner's
+      // «Smart Booking» invoice for Tanadewa went to the flight) — placed by the hotel's name, never by a guess
+      const first = await moneyFor(text, kind, "");
+      const hotel = first.money?.hotel?.trim();
+      const as: MoneyKind = hotel ? "hotel_invoice" : kind;
+      const target = as === "hotel_invoice" ? (hotel ? (placeStay({ hotel_name: hotel, check_in: "", check_out: "" }, hotelTargets).target ?? "") : (matchHotel(text, hotels) ?? "")) : (flightFor(text) ?? "");
+      return patch(item.key, { status: "ready", kind: as, text, target, ...(target ? await moneyFor(text, as, target) : first) });
     }
     if (kind === "hotel") {
-      // a voucher holding several hotels (a TBO itinerary): one line per hotel, the same paper filed on each
-      const [own, ...more] = splitStays(text);
-      const extra = more.map((stay) => ({ ...item, key: seq.current++, kind, status: "reading" as const, text: stay }));
-      if (extra.length) setItems((list) => [...list, ...extra]);
-      for (const one of [{ ...item, text: own }, ...extra]) {
-        const target = matchHotel(one.text, hotels) ?? "";
-        patch(one.key, { status: "ready", kind, text: one.text, target, ...(target ? await readFor(one, kind, target) : {}) });
+      // each stay on the paper (a TBO itinerary holds several), each on its own booking by the hotel's name —
+      // a stay of a hotel the file does not have stays unplaced, offered as a new hotel of the file
+      const { stays } = read ? read : await hotelsOnPaper(op.id, text);
+      if (stays.length === 0) {
+        const target = matchHotel(text, hotels) ?? "";
+        return patch(item.key, { status: "ready", kind, text, target, ...(target ? await readFor({ ...item, text }, kind, target) : {}) });
+      }
+      const lines = stays.map((stay, i) => ({ ...item, key: i === 0 ? item.key : seq.current++, kind, status: "reading" as const, text, stay, read }));
+      if (lines.length > 1) setItems((list) => [...list, ...lines.slice(1)]);
+      for (const one of lines) {
+        const target = one.stay.target ?? "";
+        patch(one.key, { status: "ready", kind, text, stay: one.stay, read, target, ...(target ? await readFor(one, kind, target) : {}) });
       }
       return;
     }
-    const target = (kind === "ticket" ? flightFor(text) : matchHotel(text, hotels)) ?? "";
-    const read = target ? await readFor({ ...item, text }, kind, target) : {};
-    patch(item.key, { status: "ready", kind, text, target, ...read });
+    let target: string;
+    if (read?.ticket) {
+      // read off the file whole: placed by its booking, its PNR or the flights it flies (placeOutside) — a ticket of
+      // flights the file does not hold waits for the employee
+      target = read.ticket.target ?? "";
+      patch(item.key, { status: "ready", kind, text, read, target, ref: read.ticket.pnr, ...(target ? await readFor({ ...item, text, read }, kind, target) : {}) });
+    } else {
+      // our own ticket, or no model: read first, then placed by its PNR or the flights it flies
+      const byPnr = flights.find((f) => [f.pnr, f.confirmation_number].some((ref) => ref && ref.length >= 5 && text.toUpperCase().includes(ref.toUpperCase())))?.id;
+      if (flights.length === 0) return patch(item.key, { status: "ready", kind, text });
+      const got = await readFor({ ...item, text }, kind, byPnr ?? flights[0].id);
+      target = byPnr ?? matchTicket(got.ticket?.legs ?? [], flights) ?? "";
+      patch(item.key, { status: "ready", kind, text, target, ...got });
+    }
     // an e-ticket's PDF with its invoice in it: the invoice is a line of its own (cost — pricing.internal)
     if (kind === "ticket" && canSeeCost && ticketInvoice(text)) {
       const extra: Item = { ...item, key: seq.current++, kind: "ticket_invoice", status: "ready", text, target, ...NO_MONEY };
@@ -208,7 +261,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
 
   function add(files: File[]) {
     if (!files.length) return;
-    const fresh: Item[] = files.map((file) => ({ key: seq.current++, file, status: "sorting", kind: "unknown", target: "", text: "", picture: null, passport: null, ticket: null, hotel: null, ref: "", paperSup: null, ...NO_MONEY }));
+    const fresh: Item[] = files.map((file) => ({ key: seq.current++, file, status: "sorting", kind: "unknown", target: "", text: "", picture: null, passport: null, ticket: null, hotel: null, ref: "", paperSup: null, stay: null, read: null, ...NO_MONEY }));
     setItems((list) => [...list, ...fresh]);
     setBusy(true);
     const queue = [...fresh];
@@ -466,6 +519,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
                       caseCurrency={caseCurrency}
                       inCase={item.kind === "payment" ? inCase(Number(item.amount), item.currency) : null}
                       onMoney={(next) => patch(item.key, next)}
+                      onAddHotel={() => void addStayHotel(item)}
                       places={places} onPlace={(v) => void place(item, v)} onRef={(ref) => patch(item.key, { ref })} onApprove={() => void approve(item).then((ok) => ok && router.refresh())} onDrop={() => patch(item.key, { status: "dropped" })} />
                   ))}
                 </ul>
@@ -525,6 +579,7 @@ function verdict(i: Item, today: string, field: (f: string) => string): { ok: bo
 
 function Line({
   item,
+  onAddHotel,
   groupMissing,
   today,
   caseCurrency,
@@ -537,6 +592,8 @@ function Line({
   onDrop,
 }: {
   item: Item;
+  /** «أضف كفندق جديد في الملف» for a stay of a hotel the file does not have */
+  onAddHotel: () => void;
   /** a ticket's travellers no paper of its PNR names — one PDF per passenger names one each */
   groupMissing: string[];
   today: string;
@@ -623,6 +680,16 @@ function Line({
               />
             ) : null}
           </div>
+          {item.kind === "hotel" && item.stay?.other && !item.target ? (
+            // a paper of a hotel the file does not have: said, never put on the file's only hotel
+            <p className="flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#a86a10] sm:col-span-2">
+              {t("wz.up.otherHotel", { name: item.stay.hotel_name })}
+              {[item.stay.check_in, item.stay.check_out].filter(Boolean).length ? <DirText className="tv-tnum">{`${item.stay.check_in || "—"} → ${item.stay.check_out || "—"}`}</DirText> : null}
+              <button type="button" disabled={working} onClick={onAddHotel} className="inline-flex h-8 items-center rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]">
+                {t("wz.up.addHotel")}
+              </button>
+            </p>
+          ) : null}
           {(item.kind === "ticket" || item.kind === "hotel") && sup?.supplier && sup.supplier.id !== sup.onFile?.id ? (
             // the supplier the paper names, beside the file's — the employee picks (never replaced by itself)
             <label className="flex flex-wrap items-center gap-2 text-[11.5px] font-semibold text-[#557d78] sm:col-span-2">

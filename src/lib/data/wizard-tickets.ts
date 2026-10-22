@@ -12,12 +12,12 @@ import { currentCan } from "@/lib/roles/current";
 import { decryptJson, isVaultConfigured } from "@/lib/crypto/secrets";
 import { isOpenAIConfigured } from "@/lib/providers/openai";
 import { uploadText, type UploadHow } from "@/lib/repackage/extract/upload-text";
-import { mergeTicket, parseTicketText, sanitizeTicket, ticketGaps, ticketNumbersIn, type TicketLeg } from "@/lib/flights/ticket-parse";
-import { readTicketText } from "@/lib/flights/ticket-ai";
+import { mergeTicket, parseTicketText, sanitizeTicket, ticketGaps, ticketNumbersIn, type ParsedTicket, type TicketLeg } from "@/lib/flights/ticket-parse";
+import { readHotelPaper, readTicketText, type PaperStay } from "@/lib/flights/ticket-ai";
 import type { PassportView, TravelerRow } from "@/lib/operations/traveler-dto";
 import { catalogHotelsFor } from "@/lib/data/hotel-match";
 import { badLeg, checkNames, ownLegs, toFlightLegs, uniqueLegs, withTicketLines, type LegInput, type NameCheck, type TravelerNames } from "@/lib/operations/wizard/flights";
-import { hotelDiffs, parseHotelConfirmation, type HotelConfirmation, type HotelDiff } from "@/lib/operations/wizard/hotels";
+import { hotelDiffs, parseHotelConfirmation, sameHotel, type HotelConfirmation, type HotelDiff } from "@/lib/operations/wizard/hotels";
 import { ticketTitle } from "@/lib/operations/seed-plan";
 
 /**
@@ -122,7 +122,9 @@ export async function readBookingTicket(formData: FormData): Promise<{ ok: true;
     const db = service();
     const booking = await bookingOf(db, bookingId, "flight");
     if (!booking) return { ok: false, error: "ops.err.notFound" };
-    const text = await uploadText(formData, "flight ticket");
+    const given = givenTicket(formData.get("read"));
+    const typed = String(formData.get("text") ?? "");
+    const text = given && !typed.trim() ? { ok: true as const, text: "", how: "vision" as const } : await uploadText(formData, "flight ticket");
     if (!text.ok) return { ok: false, error: `fc.err.${text.error}` };
 
     let ticket = parseTicketText(text.text);
@@ -130,16 +132,34 @@ export async function readBookingTicket(formData: FormData): Promise<{ ok: true;
     const own = ownLegs(text.text);
     if (own.length) ticket = { ...ticket, legs: own };
     let ai = false;
-    // the model only fills what the parser left empty — and only sees the ticket
-    if (isOpenAIConfigured() && ticketGaps(ticket).length > 0) {
+    if (given) {
+      // the uploader's whole-file reading (sortPaper → readPaperFile): its flights, passengers and PNR
+      const legs = soundLegs(given.legs);
+      ticket = { ...ticket, pnr: given.pnr || ticket.pnr, ...(legs.length ? { legs } : {}), ...(given.passengers.length ? { passengers: given.passengers } : {}) };
+      ai = true;
+    } else if (!own.length && isOpenAIConfigured()) {
+      // an airline's or an agency's own layout (the owner's samples, 2026-10-23: «A321 JET→» read as a flight,
+      // a middle name as an airport, the directions reversed, «Seats: eTicket Receipt(s)» as a passenger): the
+      // model reads it whole and its flights, passengers and PNR win where it found them; the parser fills the
+      // rest. Only the ticket is sent.
       try {
-        ticket = mergeTicket(ticket, await readTicketText(text.text));
+        const read = await readTicketText(text.text);
+        const legs = soundLegs(read.legs);
+        const pnr = read.pnr && text.text.toUpperCase().includes(read.pnr) ? read.pnr : ticket.pnr;
+        ticket = mergeTicket({ ...ticket, pnr, ...(legs.length ? { legs } : {}), ...(read.passengers.length ? { passengers: read.passengers } : {}) }, read);
         ai = true;
       } catch {
         /* the parser's reading stands; the employee fills the rest */
       }
+    } else if (isOpenAIConfigured() && ticketGaps(ticket).length > 0) {
+      try {
+        ticket = mergeTicket(ticket, await readTicketText(text.text));
+        ai = true;
+      } catch {
+        /* the parser's reading stands */
+      }
     }
-    const ticket_numbers = ticketNumbersIn(text.text);
+    const ticket_numbers = [...new Set([...ticketNumbersIn(text.text), ...(given?.ticket_numbers ?? []).flatMap((n) => ticketNumbersIn(n))])];
     if (ticket.legs.length === 0 && !ticket.pnr && ticket_numbers.length === 0) return { ok: false, error: "fc.err.nothing" };
 
     const travelers = ticket.passengers.length > 0 ? await travelerNames(db, booking, "ticket_check") : [];
@@ -237,12 +257,60 @@ type HotelRow = { id: string; address: string | null; contact_number: string | n
  * (hotel-match.ts); none when unsure: this row's empty address is FILLED from the
  * paper, and a namesake in another city must never be the one written.
  */
-async function hotelOf(db: SupabaseClient, booking: BookingRow): Promise<HotelRow | null> {
+async function hotelOf(db: SupabaseClient, booking: BookingRow): Promise<(HotelRow & { arabic_name: string; english_name: string | null }) | null> {
   if (!booking.title.trim()) return null;
-  const { pick } = await catalogHotelsFor<HotelRow & { arabic_name: string; city_id: string | null }>(db, [booking], "address, contact_number");
+  const { pick } = await catalogHotelsFor<HotelRow & { arabic_name: string; english_name: string | null; city_id: string | null }>(db, [booking], "address, contact_number, english_name");
   const hit = pick(booking);
-  return hit ? { id: hit.id, address: hit.address, contact_number: hit.contact_number } : null;
+  return hit ? { id: hit.id, address: hit.address, contact_number: hit.contact_number, arabic_name: hit.arabic_name, english_name: hit.english_name } : null;
 }
+
+/** A model's flights, only those that are flights: a number (never «A321»), two airports, a day — each once. */
+function soundLegs<T extends { flight_no: string; from_iata: string; to_iata: string; dep_date: string }>(legs: T[]): T[] {
+  const seen = new Set<string>();
+  return legs.filter((l) => {
+    const sound = /^[A-Z0-9]{2}\d{1,4}[A-Z]?$/.test(l.flight_no) && /^[A-Z]{3}$/.test(l.from_iata) && /^[A-Z]{3}$/.test(l.to_iata) && l.from_iata !== l.to_iata && /^\d{4}-\d{2}-\d{2}$/.test(l.dep_date);
+    const key = `${l.flight_no}|${l.dep_date}`;
+    if (!sound || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** A ticket the uploader read off the file (JSON), cut to its shape like any typed one. */
+function givenTicket(raw: FormDataEntryValue | null): (ParsedTicket & { ticket_numbers: string[] }) | null {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    const r = JSON.parse(raw) as Record<string, unknown>;
+    const numbers = Array.isArray(r.ticket_numbers) ? r.ticket_numbers.filter((n): n is string => typeof n === "string").slice(0, 40) : [];
+    return { ...sanitizeTicket(r), ticket_numbers: numbers };
+  } catch {
+    return null;
+  }
+}
+
+/** A stay the uploader read (JSON), cut to its shape — the browser's word is checked like any other. */
+function givenStay(raw: FormDataEntryValue | null): PaperStay | null {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    const r = JSON.parse(raw) as Record<string, unknown>;
+    const str = (v: unknown, n = 120) => (typeof v === "string" ? v.trim().slice(0, n) : "");
+    const day = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "");
+    return {
+      hotel_name: str(r.hotel_name),
+      city: str(r.city, 60),
+      check_in: day(r.check_in),
+      check_out: day(r.check_out),
+      confirmation: str(r.confirmation, 40),
+      room: str(r.room),
+      guests: (Array.isArray(r.guests) ? r.guests : []).map((g) => str(g, 80)).filter(Boolean).slice(0, 20),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Of a paper's stays, this booking's: its check-in day, else the first. */
+const pickStay = (stays: PaperStay[], booking: BookingRow): PaperStay | null => stays.find((s) => s.check_in && s.check_in === booking.start_date) ?? stays[0] ?? null;
 
 const empty = (v: string | null) => !v?.trim();
 
@@ -265,20 +333,37 @@ export async function readHotelConfirmation(formData: FormData): Promise<{ ok: t
     const db = service();
     const booking = await bookingOf(db, bookingId, "hotel");
     if (!booking) return { ok: false, error: "ops.err.notFound" };
-    const text = await uploadText(formData, "hotel booking confirmation");
+    const given = givenStay(formData.get("stay"));
+    const typed = String(formData.get("text") ?? "");
+    const text = given && !typed.trim() ? { ok: true as const, text: "", how: "vision" as const } : await uploadText(formData, "hotel booking confirmation");
     if (!text.ok) return { ok: false, error: `wz.hotels.err.${text.error}` };
 
-    const read = parseHotelConfirmation(text.text);
+    let read = parseHotelConfirmation(text.text);
+    // the stay the uploader already read off the paper (hotelsOnPaper); else an outside paper, read whole by the
+    // model — chain websites and suppliers print shapes no label list holds (the owner's samples, 2026-10-23)
+    const stay = given ?? (isOpenAIConfigured() && !/HOTEL CONFIRMATION NO:/.test(text.text) ? pickStay((await readHotelPaper(text.text).catch(() => null))?.hotels ?? [], booking) : null);
+    if (stay) {
+      read = {
+        ...read,
+        confirmation: stay.confirmation || read.confirmation,
+        check_in: stay.check_in || read.check_in,
+        check_out: stay.check_out || read.check_out,
+        room: stay.room || read.room,
+        guests: stay.guests.length ? stay.guests : read.guests,
+      };
+    }
     if (!read.confirmation && !read.check_in && read.guests.length === 0) return { ok: false, error: "wz.hotels.err.nothing" };
     const travelers = read.guests.length > 0 ? await travelerNames(db, booking, "hotel_check") : [];
     const { names } = checkNames(read.guests, travelers);
     const hotel = await hotelOf(db, booking);
+    // the hotel the paper names, when it is not this booking's — said first, in yellow
+    const other = stay?.hotel_name && !sameHotel(stay.hotel_name, [booking.title, hotel?.arabic_name, hotel?.english_name]);
     return {
       ok: true,
       result: {
         read,
         names,
-        diffs: hotelDiffs(read, booking, names),
+        diffs: [...(other ? [{ key: "hotel" as const, ours: booking.title, theirs: stay!.hotel_name }] : []), ...hotelDiffs(read, booking, names)],
         fill: { address: Boolean(hotel && empty(hotel.address)), phone: Boolean(hotel && empty(hotel.contact_number)) },
         how: text.how,
       },

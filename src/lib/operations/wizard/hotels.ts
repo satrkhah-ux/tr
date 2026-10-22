@@ -16,7 +16,7 @@ import type { OperationBooking } from "@/lib/data/operation-bookings";
 import { hotelFinal } from "@/lib/operations/client-booking-state";
 import { datesOn, normalizeTicketText, passengersIn } from "@/lib/flights/ticket-parse";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
-import { nameTokens, type NameCheck } from "./flights";
+import { nameTokens, skeleton, type NameCheck } from "./flights";
 import { notPulled } from "./pull";
 import type { ReadinessItem, StepState, WizardCase } from "./types";
 
@@ -205,7 +205,28 @@ export function parseHotelConfirmation(input: string, now: Date = new Date()): H
 
 // ---------------- against the booking ----------------
 
-export type HotelDiff = { key: "checkIn" | "checkOut" | "room" | "guest"; ours: string; theirs: string };
+export type HotelDiff = { key: "checkIn" | "checkOut" | "room" | "guest" | "hotel"; ours: string; theirs: string };
+
+/** Words every hotel's name may hold — «Crystal Hotel & SPA» is not «… Resort & Spa». */
+const GENERIC_HOTEL = new Set("HOTEL HOTELS RESORT RESORTS SPA SUITES SUITE INN THE AND BY APARTMENTS VILLA VILLAS BEACH GRAND فندق منتجع سبا اجنحه شقق فيلا فلل".split(" "));
+
+/**
+ * A paper's hotel and a booking's are the same hotel when most of the paper's
+ * own words are the booking's name or its catalogue names — in either script,
+ * by their consonants («ARIADUTA» is «اريادوتا»). The owner's samples
+ * (2026-10-23): two other villas' vouchers went onto the file's only hotel.
+ */
+export function sameHotel(paper: string, names: (string | null | undefined)[], places: (string | null | undefined)[] = []): boolean {
+  // a city or a country in both names says where, not which hotel («… Resort Bali» / «فندق اريادوتا بالي»)
+  // (by its skeleton across the scripts — BALI / بالي — a short one too: a place word only takes evidence away)
+  const where = new Set(places.flatMap((p) => (p ? nameTokens(p) : [])).filter((w) => w.length > 2).map((w) => skeleton(w)).filter((k) => k.length >= 2));
+  const own = (s: string) => nameTokens(s).filter((t) => t.length > 2 && !GENERIC_HOTEL.has(t) && !where.has(skeleton(t)));
+  const p = own(paper);
+  const pool = names.flatMap((n) => (n ? own(n) : []));
+  if (p.length === 0 || pool.length === 0) return false;
+  const same = (a: string, b: string) => a === b || (skeleton(a).length >= 3 && skeleton(a) === skeleton(b));
+  return p.filter((t) => pool.some((q) => same(t, q))).length / p.length >= 0.5 || pool.filter((q) => p.some((t) => same(t, q))).length / pool.length >= 0.5;
+}
 
 /** The booking's room lines («الغرفة», «الغرفة 2») as the plan wrote them. */
 export function roomLines(detail: Record<string, string> | null): string[] {
