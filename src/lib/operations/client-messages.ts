@@ -261,14 +261,22 @@ export function defaultMessageBody(key: ClientMessageKey): string {
  * follow the bookings only once the client confirms (the «رابط الرحلة»
  * prepared on the case). «حدّثنا» when the client already had a version.
  */
-export function programmeMessage(input: { hello: string; destination: string | null; duration: string | null; serial: string; updated: boolean }): string {
+export function programmeMessage(input: {
+  hello: string;
+  destination: string | null;
+  duration: string | null;
+  serial: string;
+  updated: boolean;
+  /** the client already confirmed: his link went then, so the line promising it is left out */
+  confirmed?: boolean;
+}): string {
   const where = [input.destination?.trim(), input.duration?.trim() ? `(${input.duration.trim()})` : ""].filter(Boolean).join(" ");
   const to = where ? ` إلى ${where}` : "";
   return [
     input.hello,
     input.updated ? `حدّثنا برنامج رحلتك${to}، والنسخة المحدَّثة في الملف المرفق.` : `برنامج رحلتك${to} جاهز، وتجده في الملف المرفق.`,
     `رقم الملف: ${input.serial}`,
-    "راجعه وأخبرنا بأي تعديل، وبعد تأكيدك نرسل لك رابط متابعة حجوزاتك.",
+    input.confirmed ? "راجعه وأخبرنا بأي تعديل." : "راجعه وأخبرنا بأي تعديل، وبعد تأكيدك نرسل لك رابط متابعة حجوزاتك.",
     SIGN,
   ].join("\n\n");
 }

@@ -107,6 +107,12 @@ describe("the issued programme's WhatsApp text", () => {
     expect(text).not.toMatch(/https?:\/\//);
   });
 
+  it("promises no link to a client who already confirmed — his went then", () => {
+    const text = programmeMessage({ hello: "عميلنا العزيز،", destination: "تركيا", duration: null, serial: "AD-1", updated: true, confirmed: true });
+    expect(text).toContain("راجعه وأخبرنا بأي تعديل.");
+    expect(text).not.toContain("بعد تأكيدك");
+  });
+
   it("says «حدّثنا» for a newer version, and stays whole without a destination", () => {
     expect(programmeMessage({ hello: "عميلنا العزيز،", destination: "تركيا", duration: null, serial: "AD-1", updated: true })).toContain("حدّثنا برنامج رحلتك إلى تركيا، والنسخة المحدَّثة في الملف المرفق.");
     expect(programmeMessage({ hello: "عميلنا العزيز،", destination: null, duration: null, serial: "AD-1", updated: false })).toContain("برنامج رحلتك جاهز، وتجده في الملف المرفق.");

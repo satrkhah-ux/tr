@@ -88,7 +88,8 @@ const site = () => (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliu
  */
 async function prepared(service: SupabaseClient, operationId: string, c: CaseClient): Promise<PreparedMessage[]> {
   const [sentRes, docsRes] = await Promise.all([
-    service.from("operation_dispatches").select("template").eq("operation_id", operationId).eq("audience", "client"),
+    // only a delivered one is gone: a text left as a note outside WhatsApp's 24 hours is offered again
+    service.from("operation_dispatches").select("template").eq("operation_id", operationId).eq("audience", "client").eq("status", "sent"),
     service.from("operation_documents").select("stays:snapshot_json->bookings").eq("operation_id", operationId).eq("kind", "hotel_voucher").is("revoked_at", null),
   ]);
   return preparedMessages({
@@ -107,6 +108,8 @@ export type PreparedList = {
   to_phone: string;
   blocked: TranslationKey | null;
   items: PreparedMessage[];
+  /** the prepared keys already delivered — «أُرسل ✓» where the button was */
+  delivered: string[];
   /** red: hotels still on our number alone from the day before travel (the morning alert says the same). */
   risks: string[];
 };
@@ -122,9 +125,11 @@ export async function listPreparedMessages(operationId: string): Promise<{ ok: t
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
     const phone = c.offer.customer?.mobile?.trim() ?? "";
     const gate = await clientWhatsappAllowed(c.offer);
+    const { data: went } = await service.from("operation_dispatches").select("template").eq("operation_id", operationId).eq("audience", "client").eq("status", "sent");
     return {
       ok: true,
       list: {
+        delivered: [...new Set(((went ?? []) as { template: string }[]).map((d) => d.template))],
         to_name: c.offer.customer?.arabic_name ?? "",
         to_phone: phone,
         blocked: gate && gate in BLOCKED ? BLOCKED[gate as keyof typeof BLOCKED] : null,

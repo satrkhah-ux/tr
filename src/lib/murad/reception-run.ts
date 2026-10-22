@@ -22,7 +22,7 @@ import {
 import { asSystem } from "@/lib/supabase/system-actor";
 import { produceOfferFromDraft } from "@/lib/data/drafts";
 import { getTourPrograms } from "@/lib/data/tour-programs";
-import { offerMessage } from "@/lib/data/client-whatsapp";
+import { offerMessage, pdfMissedNote } from "@/lib/data/client-whatsapp";
 import { clientOfferPdf } from "@/lib/offer-doc/client-pdf";
 import { tidyWhatsapp } from "@/lib/operations/client-messages";
 import { logAudit } from "@/lib/data/audit";
@@ -294,7 +294,7 @@ async function readTravel(transcript: string): Promise<{ destination: string | n
 /** Murad doing an employee's part — system-actor.ts */
 const MURAD = { name: "مُراد (آلي)", can: ["offers.write"] } as const;
 
-async function issueAndSend(draftId: string, conversationId: number, updated = false): Promise<{ serial: string; sent: boolean; version: number; ids: number[] } | null> {
+async function issueAndSend(draftId: string, conversationId: number, updated = false): Promise<{ serial: string; sent: boolean; pdf: boolean; version: number; ids: number[] } | null> {
   return asSystem(MURAD, async () => {
     const issued = await produceOfferFromDraft(draftId).catch(() => null);
     if (!issued?.ok) return null;
@@ -302,7 +302,7 @@ async function issueAndSend(draftId: string, conversationId: number, updated = f
     const version = issued.version ?? 1;
     // a re-issue («حدّثت الطلب») goes out as «تم تحديث ملفك», the same serial's next version
     const message = await offerMessage(serial, updated);
-    if (!message) return { serial, sent: false, version, ids: [] };
+    if (!message) return { serial, sent: false, pdf: false, version, ids: [] };
     // the link and the PDF are Murad's too (core.ts muradMessageIds) — never a colleague's answer
     const ids: number[] = [];
     const linkId = await sendTeletelMessage(conversationId, tidyWhatsapp(message.text));
@@ -313,11 +313,13 @@ async function issueAndSend(draftId: string, conversationId: number, updated = f
       const bytes = await clientOfferPdf(serial).catch(() => null);
       const pdfId = bytes ? await sendTeletelAttachment(conversationId, "📎 برنامج رحلتك", { name: message.pdfName, type: "application/pdf", bytes }) : null;
       if (pdfId) ids.push(pdfId);
+      // the text says the programme is attached and carries no link: a PDF that did not go is the colleague's to send
+      else await addTeletelNote(conversationId, pdfMissedNote(serial)).catch(() => false);
       const { data: offer } = await db().from("offers").select("id").eq("serial", serial).maybeSingle();
       const offerId = (offer as { id: string } | null)?.id;
       if (offerId) await logAudit({ action: "offer.client_sent", entity: "offers", entity_id: offerId, meta: { result: "sent", version, serial, by: "murad", pdf: Boolean(bytes) } });
     }
-    return { serial, sent, version, ids };
+    return { serial, sent, pdf: ids.length > 1, version, ids };
   });
 }
 
@@ -814,7 +816,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
             const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
             await addTeletelNote(
               m.conversationId,
-              `🤖 عرض آلي: ${tripSummary(offer.country, { ...trip, days })} — ${price.totalSar.toLocaleString("en-US")} ريال${provisional ? " (تواريخ مبدئية)" : ""}. ${issued ? `أُصدر العرض ${issued.serial}${issued.sent ? " وأُرسل للعميل رابطه وملف PDF" : " ولم يُرسل رابطه — أرسله من بيسك"}. الملف: ${site}/basic/${draftId} — تابع مع العميل للتأكيد.` : draftId ? `الملف في بيسك: ${site}/basic/${draftId} — راجعه وأصدره.` : "تعذّر إنشاء ملف بيسك."} ${assigned && team ? `حُوّلت إلى «${team.name}».` : ""}`,
+              `🤖 عرض آلي: ${tripSummary(offer.country, { ...trip, days })} — ${price.totalSar.toLocaleString("en-US")} ريال${provisional ? " (تواريخ مبدئية)" : ""}. ${issued ? `أُصدر العرض ${issued.serial}${issued.sent ? (issued.pdf ? " وأُرسل للعميل مع ملف PDF" : " وأُرسل نصّه للعميل وتعذّر ملف PDF — أرسله له يدوياً") : " ولم يُرسل للعميل — أرسله من بيسك"}. الملف: ${site}/basic/${draftId} — تابع مع العميل للتأكيد.` : draftId ? `الملف في بيسك: ${site}/basic/${draftId} — راجعه وأصدره.` : "تعذّر إنشاء ملف بيسك."} ${assigned && team ? `حُوّلت إلى «${team.name}».` : ""}`,
             );
             const at = new Date().toISOString();
             await finish({ reason: "offer:sent", reply: text, reply_message_id: replyId, intake: { country: offer.country, ...trip, days, arrival, provisional, total_sar: price.totalSar, draft_id: draftId, serial: issued?.serial ?? null, version: issued?.version ?? null, link_sent: issued?.sent ?? false, sent_ids: issued?.ids ?? [], team_id: teamId, assigned, wait_sec: waitSec } });

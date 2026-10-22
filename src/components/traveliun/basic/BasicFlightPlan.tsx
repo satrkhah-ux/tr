@@ -181,7 +181,8 @@ export function BasicFlightPlan({
     const nextDay = Boolean(day && leg.arrival_at && localDatePart(leg.arrival_at)! > day);
     return (
       <div key={id} className="space-y-1">
-        <div className={`grid grid-cols-2 items-center gap-2 sm:grid-cols-4 ${COLS}`}>
+        {/* below the wide row some cells carry a caption: bottom-aligned, so the fields line up */}
+        <div className={`grid grid-cols-2 items-end gap-2 sm:grid-cols-4 xl:items-center ${COLS}`}>
           <span className="text-[11.5px] font-extrabold text-[#0f3d38] max-xl:col-span-full">{name}</span>
           {/* the number first: «جلب» fills the rest */}
           <span className="flex items-center gap-1">

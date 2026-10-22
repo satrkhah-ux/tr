@@ -164,7 +164,9 @@ export async function messageClient(
       try {
         after(async () => {
           const bytes = await clientOfferPdf(serial).catch(() => null);
-          if (bytes) await sendTeletelAttachment(conversationId, "📎 برنامج رحلتك", { name, type: "application/pdf", bytes });
+          const pdfId = bytes ? await sendTeletelAttachment(conversationId, "📎 برنامج رحلتك", { name, type: "application/pdf", bytes }).catch(() => null) : null;
+          // the text says «في الملف المرفق» and carries no link (2026-10-22): a PDF that did not go is the agent's to send
+          if (pdfId === null) await addTeletelNote(conversationId, pdfMissedNote(serial)).catch(() => false);
         });
       } catch {
         // outside a request (a script): the text went, the PDF waits for the link
@@ -174,6 +176,12 @@ export async function messageClient(
   } catch {
     return "unreachable";
   }
+}
+
+/** For the agent, on the thread, when the programme's PDF did not follow its text — the client was told it is attached. */
+export function pdfMissedNote(serial: string): string {
+  const base = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
+  return `تعذّر إرسال ملف PDF للعميل (العرض ${serial}) — أرسله له يدوياً، أو أرسل له رابط البرنامج: ${base}/client-offer/${serial}`;
 }
 
 /** An issued programme's message to its client, as the employee reviews it before sending. */
@@ -200,11 +208,12 @@ export async function offerMessage(serial: string, updated: boolean): Promise<Of
   try {
     const { data } = await db()
       .from("offers")
-      .select("serial, destination, duration, total, currency, employee_id, partner_company_id, customers(arabic_name, mobile), employees(arabic_name)")
+      .select("serial, status, destination, duration, total, currency, employee_id, partner_company_id, customers(arabic_name, mobile), employees(arabic_name)")
       .eq("serial", serial)
       .maybeSingle();
     const row = data as unknown as {
       serial: string;
+      status: string | null;
       destination: string | null;
       duration: string | null;
       total: number | null;
@@ -222,7 +231,14 @@ export async function offerMessage(serial: string, updated: boolean): Promise<Of
     const link = `${base}/client-offer/${row.serial}`;
     const destination = row.destination?.trim() || "";
     // short, and no link: the PDF follows, the bookings' link comes once the client confirms (client-messages.ts)
-    const text = programmeMessage({ hello: greeting(customer?.arabic_name), destination: row.destination, duration: row.duration, serial: row.serial, updated });
+    const text = programmeMessage({
+      hello: greeting(customer?.arabic_name),
+      destination: row.destination,
+      duration: row.duration,
+      serial: row.serial,
+      updated,
+      confirmed: row.status === "confirmed",
+    });
     const note = [
       `${updated ? "أُعيد إصدار" : "أُصدر"} العرض ${row.serial}${where ? ` — ${where}` : ""}`,
       row.total != null ? `الإجمالي: ${Number(row.total).toLocaleString("en-US")} ${row.currency ?? ""}`.trim() : null,

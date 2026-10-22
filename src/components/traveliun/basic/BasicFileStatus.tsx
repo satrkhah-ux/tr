@@ -145,8 +145,9 @@ export function BasicFileStatus({
     try {
       const r = await confirmFromBasic(draftId, channel);
       if (!r.ok) return fail(r.error);
-      // stay here: the next step is the bookings' link to the client (step ③), the case one click away
-      setMessage({ text: r.canOpen ? tx("confirmDoneNext") : tx("confirmDoneTeam"), ok: true });
+      // stay here: the next step is the bookings' link to the client (step ③), the case one click away;
+      // a partner's client hears from the partner, and without the case's door the team takes it on
+      setMessage({ text: r.canOpen && !view?.partner ? tx("confirmDoneNext") : tx("confirmDoneTeam"), ok: true });
       changed();
     } catch {
       fail("failed");
@@ -186,6 +187,29 @@ export function BasicFileStatus({
 
   // the file's step decides the one filled button: the send until it has gone out, the confirmation after
   const sentOnce = view.sentVersion != null;
+  // one current step: ① and ② are behind once the programme went (or the client said yes), ③ is the yes and then its link
+  const confirmed = !awaiting;
+  const sentNow = sentOnce && !view.stale;
+  const linkHere = Boolean(view.operationId) && view.canAct && !view.partner;
+  const step2: "done" | "now" | "off" = view.partner || !view.canAct ? "off" : sentNow || (confirmed && !view.stale) ? "done" : "now";
+  const step2Hint = view.partner
+    ? tx("blocked_partner")
+    : !view.canAct
+      ? tx("colleagueFile")
+      : sentNow
+        ? tx("stepSendDone")
+        : confirmed && !view.stale
+          ? tx("stepSendAfterConfirm")
+          : tx("stepSendHint");
+  const step3Hint = awaiting
+    ? view.canAct
+      ? tx("stepConfirmHint")
+      : tx("colleagueFile")
+    : view.partner
+      ? tx("partnerFollows")
+      : linkHere
+        ? tx("stepConfirmedHint")
+        : tx("confirmDoneTeam");
   const link = `/client-offer/${serial}`;
   const quiet = "inline-flex items-center gap-1 text-[12px] font-bold text-[#185045] hover:underline";
 
@@ -211,7 +235,7 @@ export function BasicFileStatus({
       {/* ② three numbered steps, each with what it is for (the owner, 2026-10-22: «تظهر الخيارات عشوائية ولا يعرف الموظف ماذا يختار») */}
       {view.state === "cancelled" ? null : (
       <ol className="space-y-2">
-        <Step n={1} title={tx("stepReview")} hint={tx("stepReviewHint")} status={sentOnce && !view.stale ? "done" : "now"}>
+        <Step n={1} title={tx("stepReview")} hint={tx("stepReviewHint")} status={step2 === "now" ? "now" : "done"}>
           <div className="flex flex-wrap items-center gap-2">
             <a
               href={link}
@@ -236,16 +260,17 @@ export function BasicFileStatus({
         <Step
           n={2}
           title={tx("stepSend")}
-          hint={view.partner ? tx("blocked_partner") : sentOnce && !view.stale ? tx("stepSendDone") : tx("stepSendHint")}
-          status={view.partner ? "off" : sentOnce && !view.stale ? "done" : "now"}
+          hint={step2Hint}
+          status={step2}
         >
-          {sendable ? <OfferSend draftId={draftId} again={view.stale} onSent={changed} filled={!sentOnce || view.stale} /> : null}
+          {/* the filled button is the current step's only: framed once the file is past it */}
+          {sendable ? <OfferSend draftId={draftId} again={view.stale} onSent={changed} filled={step2 === "now"} /> : null}
         </Step>
         <Step
           n={3}
           title={awaiting ? tx("stepConfirm") : tx("stepConfirmed")}
-          hint={awaiting ? tx("stepConfirmHint") : tx("stepConfirmedHint")}
-          status={awaiting ? (sentOnce && !view.stale ? "now" : "next") : "done"}
+          hint={step3Hint}
+          status={awaiting ? (!view.canAct ? "off" : sentNow ? "now" : "next") : linkHere ? "now" : "done"}
         >
           {view.canAct && awaiting ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -273,7 +298,7 @@ export function BasicFileStatus({
                 {tx("confirmTitle")}
               </button>
             </div>
-          ) : view.operationId && view.canAct && !view.partner ? (
+          ) : linkHere && view.operationId ? (
             <TripLinkSend operationId={view.operationId} />
           ) : null}
         </Step>
@@ -377,15 +402,16 @@ function Step({ n, title, hint, status, children }: { n: number; title: string; 
   const badge =
     status === "done" ? "bg-[#0f7a52] text-white" : status === "now" ? "bg-[#185045] text-white" : "bg-[#eef3f1] text-[#93aaa3]";
   return (
-    <li className={`flex gap-3 rounded-[11px] border p-2.5 ${status === "now" ? "border-[#b9d6cb] bg-[#f7fbf9]" : "border-[#edf3f0]"}`}>
-      <span className={`grid size-7 shrink-0 place-items-center rounded-full text-[12.5px] font-extrabold ${badge}`}>{status === "done" ? "✓" : n}</span>
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <div>
+    <li className={`space-y-2 rounded-[11px] border p-2.5 max-sm:p-2 ${status === "now" ? "border-[#b9d6cb] bg-[#f7fbf9]" : "border-[#edf3f0]"}`}>
+      <div className="flex gap-2.5">
+        <span className={`grid size-7 shrink-0 place-items-center rounded-full text-[12.5px] font-extrabold ${badge}`}>{status === "done" ? "✓" : n}</span>
+        <div className="min-w-0">
           <p className={`text-[13px] font-extrabold ${status === "next" || status === "off" ? "text-[#7a948f]" : "text-[#103f37]"}`}>{title}</p>
           <p className="text-[11.5px] font-semibold text-[#7a948f]">{hint}</p>
         </div>
-        {children}
       </div>
+      {/* the controls take the card's full width — on a phone the review box keeps its room */}
+      {children ? <div className="sm:ps-9">{children}</div> : null}
     </li>
   );
 }

@@ -36,8 +36,15 @@ export function TripLinkSend({ operationId }: { operationId: string }) {
   }, [operationId, tick]);
 
   const item = list?.items.find((m) => m.key === "trip_link");
-  if (said?.ok) return <p className="text-[12px] font-bold text-[#0f7a52]">{said.text}</p>;
-  if (!item) return null;
+  // what happened stays said — a send held outside the 24 hours included, after the list reloads
+  if (said && !item) return <p role="status" className={`text-[12px] font-bold ${said.ok ? "text-[#0f7a52]" : "text-[#a86a10]"}`}>{said.text}</p>;
+  if (!item) {
+    // no button: say why, so step ③ never asks for a link it cannot offer
+    if (!list) return null;
+    const went = list.delivered.includes("trip_link");
+    const why = went ? tx("tripLinkSent") : !list.to_phone ? t("ops.err.clientNoPhone") : tx("tripLinkPending");
+    return <p className={`text-[12px] font-bold ${went ? "text-[#0f7a52]" : "text-[#7a948f]"}`}>{why}</p>;
+  }
 
   async function send() {
     if (!item) return;
