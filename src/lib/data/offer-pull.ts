@@ -14,7 +14,7 @@ import { logAudit } from "@/lib/data/audit";
 import { BOARD_AR } from "@/components/offer-doc/labels";
 import type { BoardType } from "@/lib/types";
 import { normalizeDraftData } from "@/lib/offer/draft-types";
-import { LATER, newBookings, offerHotelCity, oldPullStays, planBookingsFromDraft, type ExistingBooking } from "@/lib/operations/seed-plan";
+import { flightRefresh, LATER, newBookings, offerHotelCity, oldPullStays, planBookingsFromDraft, type ExistingBooking, type HeldFlight } from "@/lib/operations/seed-plan";
 import { issuedDraftData } from "@/lib/data/issued-draft";
 import { roomsJson, seededSpec } from "@/lib/operations/room-details";
 import { HOTEL_ID_KEY, ROOM_SPEC_KEY } from "@/lib/operations/voucher-dto";
@@ -268,6 +268,15 @@ export async function pullBookingsFromOffer(operationId: string): Promise<SeedRe
 
     const { fresh, links } = newBookings(rows, existing);
     const writer = service();
+    // the flights already on the case follow the newest issue until their ticket is in (flightRefresh)
+    const held = await writer
+      .from("operation_bookings")
+      .select("id, origin_ref, status, title, start_date, end_date, detail, pnr, flight_legs, note")
+      .eq("operation_id", operationId)
+      .in("origin_ref", ["flight:intl", "flight:dom"]);
+    for (const { id, patch } of flightRefresh(rows, (held.data ?? []) as HeldFlight[])) {
+      await writer.from("operation_bookings").update(patch).eq("id", id).eq("operation_id", operationId);
+    }
     // a booking typed by hand that IS a planned one takes its ref — the next pull matches it outright
     let linked = 0;
     for (const link of links) {

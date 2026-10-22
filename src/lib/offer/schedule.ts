@@ -123,7 +123,10 @@ export function autoDepartureDate(trip: ScheduleTrip, leg: FlightLegOrder): IsoD
 
 /**
  * Re-apply trip-driven departure dates to every leg the agent hasn't manually
- * date-edited (`date_user_set`). Only the DATE part moves; the time is preserved.
+ * date-edited (`date_user_set`). Only the DATE part moves; the time is preserved —
+ * and the landing moves the same number of days, keeping the flight's length
+ * (the evaluator, 2026-10-22: AD-9-6363's return left on 11-03 and still landed
+ * on the old day, before it took off).
  */
 export function syncDepartureDates<T extends ScheduleFlight>(trip: ScheduleTrip, flights: T[]): T[] {
   return flights.map((flight) => {
@@ -131,7 +134,13 @@ export function syncDepartureDates<T extends ScheduleFlight>(trip: ScheduleTrip,
     const auto = autoDepartureDate(trip, flight.leg_order);
     if (!auto) return flight;
     const next = withDatePart(flight.departure_at, auto);
-    return next === flight.departure_at ? flight : { ...flight, departure_at: next };
+    if (next === flight.departure_at) return flight;
+    const was = localDatePart(flight.departure_at);
+    const landed = localDatePart(flight.arrival_at);
+    const days = was ? Math.round((Date.parse(`${auto}T00:00:00Z`) - Date.parse(`${was}T00:00:00Z`)) / 86_400_000) : 0;
+    const arrival_at =
+      landed && days ? withDatePart(flight.arrival_at, new Date(Date.parse(`${landed}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)) : flight.arrival_at;
+    return { ...flight, departure_at: next, arrival_at };
   });
 }
 

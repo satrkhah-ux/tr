@@ -89,6 +89,11 @@ describe("auto-fill + user-set", () => {
     expect(synced[1].departure_at).toBe("2026-06-20T00:00");
   });
 
+  it("moves the landing with the take-off, keeping the flight's length (the evaluator, 2026-10-22)", () => {
+    const [back] = syncDepartureDates(trip, [leg({ leg_order: "inbound", departure_at: "2026-06-18T23:00", arrival_at: "2026-06-19T03:00" })]);
+    expect([back.departure_at, back.arrival_at]).toEqual(["2026-06-20T23:00", "2026-06-21T03:00"]);
+  });
+
   it("a MANUAL edit is never auto-overwritten (date_user_set)", () => {
     const flights = [leg({ leg_order: "outbound", departure_at: "2026-06-09T23:45", date_user_set: true })];
     const synced = syncDepartureDates(trip, flights);

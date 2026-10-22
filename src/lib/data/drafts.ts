@@ -56,6 +56,7 @@ import { validateDraft } from "@/lib/offer/draft-validation";
 import { getPublishedClientOffer, publishOffer, type CreateOfferInput, type OfferHotelInput, type OfferPricingItemInput } from "./offers";
 import { insertOffer, replaceOffer } from "./offer-insert";
 import { reissueLocked } from "./issued-draft";
+import { pullBookingsFromOffer } from "./offer-pull";
 import { logAudit } from "./audit";
 import { offerChanges, type OfferChange } from "@/lib/offer/version-diff";
 import { typedAsCost, keepDraftCost, redactDraftCost } from "@/lib/offer/draft-cost";
@@ -1136,6 +1137,15 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         entity_id: result.id,
         meta: { serial: result.serial, version: published.version, draft_id: draftId, changes },
       });
+      // a confirmed file's case books from the newest issue: what it adds is pulled, and its flights not
+      // ticketed yet follow it (the evaluator, 2026-10-22: «a re-issue never reaches ops»). Best-effort —
+      // the issue stands either way, and the case's «اسحب الحجوزات» does the same.
+      try {
+        const { data: cases } = await (createSupabaseServiceClient() as unknown as SupabaseClient).from("operations").select("id").eq("offer_id", result.id);
+        for (const c of (cases ?? []) as { id: string }[]) await pullBookingsFromOffer(c.id);
+      } catch {
+        /* the case pulls again from its own page */
+      }
     }
     // Nothing reaches the client here: the employee reviews the issued programme and
     // sends it with «أرسل إلى العميل عبر واتساب» (offer-send.ts) — the owner, 2026-10-17.

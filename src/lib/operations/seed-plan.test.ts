@@ -7,6 +7,8 @@ import {
   DEPARTURE_DAY_TOUR,
   FAREWELL_UNSOLD,
   FLIGHT_NEEDED,
+  flightRefresh,
+  OFFER_FLIGHT_CHANGED,
   LATER,
   newBookings,
   NOTICE,
@@ -16,6 +18,7 @@ import {
   planBookingsFromDraft,
   ticketTitle,
   type ExistingBooking,
+  type HeldFlight,
 } from "./seed-plan";
 import { carText, DRV } from "./drivers";
 import { HOTEL_ID_KEY } from "./voucher-dto";
@@ -556,5 +559,38 @@ describe("a ticket names its booking (the evaluator, 2026-10-22)", () => {
     expect(ticketTitle("flight:intl", [{ from: "JED", to: "IST" }, { from: "TZX", to: "JED" }])).toBe("طيران دولي JED → IST · TZX → JED");
     expect(ticketTitle("flight:dom", [{ from: "IST", to: "TZX" }])).toBe("طيران داخلي IST → TZX");
     expect(ticketTitle("flight:abc", [{ from: "IST", to: "TZX" }])).toBe("طيران IST → TZX");
+  });
+});
+
+describe("a re-issue reaches the flights on the case (the evaluator, 2026-10-22)", () => {
+  const plan = [{ origin_ref: "flight:intl", title: "طيران دولي RUH ⇄ IST", start_date: "2026-11-17", end_date: "2026-11-24", detail: { الذهاب: "TK1 · RUH → IST" } }];
+  const held = (over: Partial<HeldFlight>): HeldFlight => ({
+    id: "b1",
+    origin_ref: "flight:intl",
+    status: "pending",
+    title: "طيران دولي MED ⇄ IST",
+    start_date: "2026-11-03",
+    end_date: "2026-11-10",
+    detail: {},
+    pnr: null,
+    flight_legs: [],
+    note: null,
+    ...over,
+  });
+
+  it("brings an unticketed flight up to the newest issue", () => {
+    expect(flightRefresh(plan, [held({})])).toEqual([{ id: "b1", patch: { title: plan[0].title, start_date: "2026-11-17", end_date: "2026-11-24", detail: plan[0].detail } }]);
+    expect(flightRefresh(plan, [held({ title: plan[0].title, start_date: "2026-11-17", end_date: "2026-11-24", detail: plan[0].detail })])).toEqual([]);
+  });
+
+  it("leaves a ticketed one alone and says the change on its note, once", () => {
+    const [{ patch }] = flightRefresh(plan, [held({ pnr: "ABC123", note: "مقعد نافذة" })]);
+    expect(patch).toEqual({ note: `${OFFER_FLIGHT_CHANGED} 2026-11-17 → 2026-11-24\nمقعد نافذة` });
+    expect(flightRefresh(plan, [held({ pnr: "ABC123", note: patch.note! })])).toEqual([]);
+    expect(flightRefresh(plan, [held({ pnr: "ABC123", start_date: "2026-11-17", end_date: "2026-11-24" })])).toEqual([]);
+  });
+
+  it("never touches a cancelled booking or another kind of ref", () => {
+    expect(flightRefresh(plan, [held({ status: "cancelled" }), held({ origin_ref: "stay:x" })])).toEqual([]);
   });
 });

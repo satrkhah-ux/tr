@@ -127,6 +127,54 @@ export function ticketTitle(ref: string | null, legs: { from: string; to: string
   return `${label} ${chains.map((c) => c.join(" → ")).join(" · ")}`.trim();
 }
 
+/** Said on a ticketed flight's (internal) note when the offer issued again flies other days. */
+export const OFFER_FLIGHT_CHANGED = "تغيّرت رحلة العرض بعد إعادة الإصدار — راجع التذكرة:";
+
+/** A flight booking on the case, as the refresh reads it. */
+export type HeldFlight = {
+  id: string;
+  origin_ref: string | null;
+  status: string;
+  title: string;
+  start_date: string | null;
+  end_date: string | null;
+  detail: Record<string, string> | null;
+  pnr: string | null;
+  flight_legs: unknown;
+  note: string | null;
+};
+
+type FlightPatch = { id: string; patch: Partial<Pick<HeldFlight, "title" | "start_date" | "end_date" | "detail" | "note">> };
+
+/**
+ * What a pull changes on the flights already on the case (the evaluator, 2026-10-22:
+ * «a re-issue never reaches ops» — newBookings only adds refs it has not seen). A
+ * flight not ticketed yet takes the newest issue's title, days and lines; a ticketed
+ * one is the ticket's and stays, but a plan that now flies other days is said on its
+ * note, once. A plan that only says «طيران مطلوب» has no days of its own to compare.
+ */
+export function flightRefresh(
+  plan: Pick<PlannedBooking, "origin_ref" | "title" | "start_date" | "end_date" | "detail">[],
+  held: HeldFlight[],
+): FlightPatch[] {
+  const day = (v: string | null) => v?.slice(0, 10) ?? null;
+  return held.flatMap((b): FlightPatch[] => {
+    const p = plan.find((r) => r.origin_ref === b.origin_ref && (r.origin_ref === "flight:intl" || r.origin_ref === "flight:dom"));
+    if (!p || b.status === "cancelled") return [];
+    const ticketed = Boolean(b.pnr?.trim()) || (Array.isArray(b.flight_legs) && b.flight_legs.length > 0);
+    if (!ticketed) {
+      const same =
+        b.title === p.title && day(b.start_date) === p.start_date && day(b.end_date) === p.end_date && JSON.stringify(b.detail ?? {}) === JSON.stringify(p.detail);
+      return same ? [] : [{ id: b.id, patch: { title: p.title, start_date: p.start_date, end_date: p.end_date, detail: p.detail } }];
+    }
+    if (p.title.endsWith(FLIGHT_NEEDED)) return [];
+    const moved = (p.start_date && p.start_date !== day(b.start_date)) || (p.end_date && p.end_date !== day(b.end_date));
+    if (!moved) return [];
+    const flag = `${OFFER_FLIGHT_CHANGED} ${[p.start_date, p.end_date].filter(Boolean).join(" → ")}`;
+    return (b.note ?? "").includes(flag) ? [] : [{ id: b.id, patch: { note: [flag, b.note?.trim()].filter(Boolean).join("\n") } }];
+  });
+}
+
 function travellers(trip: DraftData["trip"]): string {
   return [
     `${trip.adults} بالغ`,
