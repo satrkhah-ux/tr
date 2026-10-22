@@ -1,9 +1,10 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 import { runMurad } from "@/lib/murad/run";
 import { receptionSweep } from "@/lib/murad/reception-run";
 import { recordCronRun } from "@/lib/data/cron-runs";
 import { runIntegrationChecks } from "@/lib/developer/integrations-run";
 import { syncFollowups } from "@/lib/followups/service";
+import { staffTick } from "@/lib/telegram/staff-events";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -27,6 +28,8 @@ function authorised(req: NextRequest): boolean {
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!authorised(req)) return NextResponse.json({ ok: false }, { status: 401 });
   await recordCronRun("followups_sync", syncFollowups).catch(() => null);
+  // «تنبيهاتي»: assignments the webhook missed, on the list the sync just refreshed — after the answer, so Murad never waits on it
+  after(() => recordCronRun("staff_tick", staffTick).catch(() => null));
   // every run leaves its trace for /developer, answered anyone or not (cron-runs.ts)
   // «المستقبل الآلي»: what the webhook missed, before Murad's own turns (no model, its turns claimed one by one)
   const received = await receptionSweep().catch(() => 0);

@@ -91,11 +91,22 @@ export async function registerStaffWebhook(token?: string): Promise<TgReply<bool
   const secret = staffWebhookSecret();
   const use = token ?? (await staffBotToken()).token;
   if (!use || !secret) return { ok: false, description: "not_configured" };
-  return tgCall<boolean>(use, "setWebhook", {
+  const hook = await tgCall<boolean>(use, "setWebhook", {
     url: staffWebhookUrl(),
     secret_token: secret,
     allowed_updates: ["message", "callback_query"],
   });
+  // the «/» menu in the chat, set with the webhook so a new token gets it too
+  if (hook.ok) {
+    await tgCall(use, "setMyCommands", {
+      commands: [
+        { command: "menu", description: "لوحتي" },
+        { command: "numbers", description: "أرقامي" },
+        { command: "waiting", description: "بانتظار ردي" },
+      ],
+    });
+  }
+  return hook;
 }
 
 export type Sent = { ok: true; messageId: number } | { ok: false; reason: "not_configured" | "not_started" | "failed"; description?: string };

@@ -869,6 +869,8 @@ export const en = {
   "dev.c.botEye": "«Eye of management» bot",
   "dev.c.botOps": "Operations bot",
   "dev.c.botStaff": "Staff bot «تنبيهاتي»",
+  "dev.c.staffTick": "Staff bot — the minute sweep",
+  "dev.d.staffTick": "{seen} open conversations checked, {announced} assignments announced",
   "dev.sb.title": "Staff bot «تنبيهاتي - ترافليون»",
   "dev.sb.hint": "Each employee's own notifications on Telegram. Replace the token here and the bot keeps working: it is checked with Telegram, stored encrypted, and the webhook is registered again in the same step.",
   "dev.sb.username": "Bot",

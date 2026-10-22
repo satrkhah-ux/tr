@@ -462,6 +462,10 @@ const CHECKS: Check[] = [
     }),
   },
   {
+    id: "job_staff_tick", group: "bots", label: "dev.c.staffTick",
+    run: cronCheck("staff_tick", 60_000, (s): Msg => ({ key: "dev.d.staffTick", params: { seen: Number((s.sweep as { seen?: number } | undefined)?.seen ?? 0), announced: Number((s.sweep as { announced?: number } | undefined)?.announced ?? 0) } })),
+  },
+  {
     id: "followups_sync", group: "core", label: "dev.c.followups",
     run: cronCheck("followups_sync", 60_000, (s): Msg => ({ key: "dev.d.followups", params: { read: Number(s.scanned ?? 0), added: Number(s.added ?? 0), awakened: Number(s.awakened ?? 0) } })),
   },

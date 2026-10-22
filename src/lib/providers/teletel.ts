@@ -531,6 +531,107 @@ export async function listTeletelAgents(): Promise<TeletelAgent[]> {
   return agents;
 }
 
+/** How many conversations an agent holds, by status. Teletel counts them itself (filter meta.all_count). Null when unreachable. */
+export async function countAgentConversations(agentId: number, status: "open" | "resolved" | "all"): Promise<number | null> {
+  const config = getTeletelConfig();
+  if (!config) return null;
+  const payload: Record<string, unknown>[] = [{ attribute_key: "assignee_id", filter_operator: "equal_to", values: [agentId], query_operator: status === "all" ? null : "and" }];
+  if (status !== "all") payload.push({ attribute_key: "status", filter_operator: "equal_to", values: [status], query_operator: null });
+  const res = await api<{ meta?: { all_count?: number } }>(config, "/conversations/filter?page=1", { payload });
+  return typeof res?.meta?.all_count === "number" ? res.meta.all_count : null;
+}
+
+/** One agent's line of Teletel's own report for a period: conversations, resolved, average first response and reply (seconds). */
+export type AgentSummary = { id: number; conversations: number; resolved: number; firstResponseSec: number | null; replySec: number | null };
+
+/** Teletel's per-agent report between two unix times (v2 summary_reports), for every agent at once, by agent id. Null when unreachable. */
+export async function agentSummaries(since: number, until: number): Promise<Map<number, AgentSummary> | null> {
+  const config = getTeletelConfig();
+  if (!config) return null;
+  try {
+    const res = await fetch(`${config.baseUrl}/api/v2/accounts/${config.accountId}/summary_reports/agent?since=${since}&until=${until}`, {
+      headers: { api_access_token: config.token },
+      signal: AbortSignal.timeout(15_000),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    type Raw = { id?: number; conversations_count?: number; resolved_conversations_count?: number; avg_first_response_time?: number | null; avg_reply_time?: number | null };
+    const rows = (await res.json()) as Raw[];
+    if (!Array.isArray(rows)) return null;
+    return new Map(
+      rows
+        .filter((r) => typeof r.id === "number")
+        .map((r) => [
+          r.id as number,
+          {
+            id: r.id as number,
+            conversations: r.conversations_count ?? 0,
+            resolved: r.resolved_conversations_count ?? 0,
+            firstResponseSec: r.avg_first_response_time ?? null,
+            replySec: r.avg_reply_time ?? null,
+          },
+        ]),
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whose access token this is: the Teletel agent id behind it, or null.
+ *
+ * /profile is closed for these tokens, so the id is read from what the token
+ * itself is allowed to see: a conversation assigned to «me», or else one of its
+ * own notifications. A token that sees neither cannot be told apart, and is
+ * refused (null).
+ */
+export async function teletelAgentOfToken(token: string): Promise<number | null> {
+  const base = getTeletelConfig();
+  if (!base) return null;
+  const config = { ...base, token };
+  for (const status of ["open", "all"]) {
+    const res = await api<{ data?: { payload?: { meta?: { assignee?: { id?: number } | null } }[] } }>(config, `/conversations?assignee_type=me&status=${status}&page=1`);
+    const id = res?.data?.payload?.find((c) => typeof c.meta?.assignee?.id === "number")?.meta?.assignee?.id;
+    if (typeof id === "number") return id;
+    if (!res) return null; // refused or unreachable: no point asking again
+  }
+  const notes = await api<{ data?: { payload?: { user?: { id?: number } | null }[] } }>(config, "/notifications?page=1");
+  const id = notes?.data?.payload?.find((n) => typeof n.user?.id === "number")?.user?.id;
+  return typeof id === "number" ? id : null;
+}
+
+/** A message into an existing conversation, sent with an employee's OWN token, so Teletel and the client see it from them. */
+export async function sendTeletelMessageAs(token: string, conversationId: number, content: string): Promise<number | null> {
+  const base = getTeletelConfig();
+  if (!base || !content.trim()) return null;
+  const res = await api<{ id?: number }>({ ...base, token }, `/conversations/${conversationId}/messages`, {
+    content,
+    message_type: "outgoing",
+    private: false,
+  });
+  return typeof res?.id === "number" ? res.id : null;
+}
+
+export type DeliveryStatus = "sent" | "delivered" | "read" | "failed";
+
+/** WhatsApp's status of one message, as Teletel recorded it (the conversation's latest page). Null when it cannot be read. */
+export async function teletelMessageStatus(conversationId: number, messageId: number): Promise<{ status: DeliveryStatus; error: string | null } | null> {
+  const config = getTeletelConfig();
+  if (!config) return null;
+  type Raw = { id?: number; status?: string; content_attributes?: { external_error?: string | null } | null };
+  const list = await api<{ payload?: Raw[] }>(config, `/conversations/${conversationId}/messages`);
+  const m = list?.payload?.find((x) => x.id === messageId);
+  if (!m) return null;
+  const status = (["sent", "delivered", "read", "failed"] as const).find((s) => s === m.status) ?? "sent";
+  return { status, error: m.content_attributes?.external_error ?? null };
+}
+
+/** The conversation's page in Teletel, for an «افتح» button. */
+export function teletelConversationUrl(conversationId: number): string | null {
+  const config = getTeletelConfig();
+  return config ? `${config.baseUrl}/app/accounts/${config.accountId}/conversations/${conversationId}` : null;
+}
+
 export type TeletelTeam = { id: number; name: string };
 let teamsCache: { at: number; teams: TeletelTeam[] } | null = null;
 
