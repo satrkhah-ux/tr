@@ -136,7 +136,7 @@ const TONE_STEPS = [
   "٣. اختر «نغمة ترافليون».",
 ].join("\n");
 
-/** The brand tone (public/sounds, 2.4 s, under Telegram's 5 s / 300 KB for a notification sound) with the steps. */
+/** The brand tone (public/sounds: the chime's three notes, then the owner's traveliun.mp3, 4.9 s / 78 KB, under Telegram's 5 s / 300 KB for a notification sound) with the steps. */
 async function sendTone(chatId: number): Promise<void> {
   const bytes = await readFile(join(process.cwd(), "public", "sounds", "traveliun-tone.mp3")).catch(() => null);
   if (!bytes || !(await staffSendAudio(chatId, { bytes, name: "traveliun-tone.mp3", title: "نغمة ترافليون" }, TONE_STEPS))) {
