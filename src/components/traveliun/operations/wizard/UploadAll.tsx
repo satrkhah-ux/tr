@@ -7,7 +7,7 @@ import { DirText } from "@/components/DirText";
 import type { TranslationKey } from "@/lib/i18n";
 import { readPassportPhoto } from "@/lib/data/operation-travelers";
 import { hotelsOnPaper, paperSupplier, readMoney, sortPaper, type PaperSupplier, type PlacedStay, type SortedPaper } from "@/lib/data/upload-sort";
-import { addBooking } from "@/lib/data/operation-bookings";
+import { addBooking, deleteBooking } from "@/lib/data/operation-bookings";
 import { attachBookingInvoice, attachSupplierConfirmation, createSupplierFromInvoice, recordSupplierPayment, setBookingCost } from "@/lib/data/supplier-work";
 import { assignBooking } from "@/lib/data/operation-assign";
 import { recordPayment } from "@/lib/data/operations";
@@ -61,6 +61,8 @@ type Item = MoneyFields & {
   stay: PlacedStay | null;
   /** an outside paper as read off the file whole (sortPaper) — handed to the readers, never read again */
   read: SortedPaper["read"] | null;
+  /** the booking this line added to the file («أضف كفندق / كرحلة») — removed again from here until approved */
+  added?: boolean;
   error?: string;
 };
 
@@ -134,7 +136,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
     });
     if (!res.ok) return patch(item.key, { status: "ready", error: t(res.error) });
     router.refresh();
-    patch(item.key, { status: "ready", target: res.id, stay: { ...item.stay, target: res.id, other: false }, ...(await readFor({ ...item, stay: { ...item.stay, target: res.id, other: false } }, "hotel", res.id)) });
+    patch(item.key, { status: "ready", target: res.id, added: true, stay: { ...item.stay, target: res.id, other: false }, ...(await readFor({ ...item, stay: { ...item.stay, target: res.id, other: false } }, "hotel", res.id)) });
   }
 
   /** «أضفها كرحلة في الملف»: a ticket's flights the file does not have, as a flight booking of it, then the line placed on it. */
@@ -151,7 +153,16 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
     });
     if (!res.ok) return patch(item.key, { status: "ready", error: t(res.error) });
     router.refresh();
-    patch(item.key, { status: "ready", target: res.id, ...(await readFor(item, "ticket", res.id)) });
+    patch(item.key, { status: "ready", target: res.id, added: true, ...(await readFor(item, "ticket", res.id)) });
+  }
+
+  /** A booking added here by mistake: deleted (deleteBooking — audited, never a confirmed one), the line unplaced again. */
+  async function undoAdded(item: Item) {
+    patch(item.key, { status: "reading", error: undefined });
+    const res = await deleteBooking(item.target);
+    if (!res.ok) return patch(item.key, { status: "ready", error: t(res.error) });
+    router.refresh();
+    patch(item.key, { status: "ready", target: "", added: false, ticket: null, hotel: null, paperSup: null, stay: item.stay ? { ...item.stay, target: null, other: true } : null });
   }
 
   const patch = (key: number, next: Partial<Item>) => setItems((list) => list.map((i) => (i.key === key ? { ...i, ...next } : i)));
@@ -539,6 +550,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
                       onMoney={(next) => patch(item.key, next)}
                       onAddHotel={() => void addStayHotel(item)}
                       onAddFlight={() => void addTicketFlight(item)}
+                      onUndoAdded={() => void undoAdded(item)}
                       places={places} onPlace={(v) => void place(item, v)} onRef={(ref) => patch(item.key, { ref })} onApprove={() => void approve(item).then((ok) => ok && router.refresh())} onDrop={() => patch(item.key, { status: "dropped" })} />
                   ))}
                 </ul>
@@ -600,6 +612,7 @@ function Line({
   item,
   onAddHotel,
   onAddFlight,
+  onUndoAdded,
   groupMissing,
   today,
   caseCurrency,
@@ -615,6 +628,7 @@ function Line({
   /** «أضف كفندق جديد في الملف» for a stay of a hotel the file does not have */
   onAddHotel: () => void;
   onAddFlight: () => void;
+  onUndoAdded: () => void;
   /** a ticket's travellers no paper of its PNR names — one PDF per passenger names one each */
   groupMissing: string[];
   today: string;
@@ -735,13 +749,18 @@ function Line({
               <MoneyFieldsRow kind={item.kind} fields={item} caseCurrency={caseCurrency} inCase={inCase} onChange={onMoney} disabled={working} />
             </div>
           ) : null}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button type="button" disabled={working || !canApprove(item)} onClick={onApprove} className={`${wzPrimary} h-9`}>
               {t("wz.up.approve")}
             </button>
             <button type="button" disabled={working} onClick={onDrop} className={`${wzSecondary} h-9`}>
               {t("wz.up.remove")}
             </button>
+            {item.added && item.target ? (
+              <button type="button" disabled={working} onClick={onUndoAdded} className={`${wzSecondary} h-9 text-[#c22850]`}>
+                {t("wz.up.undoAdded")}
+              </button>
+            ) : null}
           </div>
         </div>
       )}

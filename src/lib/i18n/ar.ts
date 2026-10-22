@@ -2852,6 +2852,7 @@ export const ar: Dictionary = {
   "wz.up.addHotel": "أضف كفندق جديد في الملف",
   "wz.up.otherFlights": "رحلات غير موجودة في الملف",
   "wz.up.addFlight": "أضفها كرحلة في الملف",
+  "wz.up.undoAdded": "احذف الحجز المضاف",
   "wz.hotels.title": "الفنادق",
   "wz.hotels.add": "إضافة فندق",
   "wz.hotels.none": "لا فنادق في هذا الملف.",

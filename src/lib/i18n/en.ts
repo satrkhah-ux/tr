@@ -2854,6 +2854,7 @@ export const en = {
   "wz.up.addHotel": "Add it as a new hotel of the file",
   "wz.up.otherFlights": "Flights the file does not have",
   "wz.up.addFlight": "Add them as a flight of the file",
+  "wz.up.undoAdded": "Remove the added booking",
   "wz.hotels.title": "Hotels",
   "wz.hotels.add": "Add a hotel",
   "wz.hotels.none": "This file has no hotels.",
