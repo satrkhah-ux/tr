@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountIn, matchHotel, matchSupplier, matchTicket, paperKind, ticketInvoice } from "./upload-all";
+import { amountIn, matchHotel, matchSupplier, matchTicket, paperKind, splitStays, supplierInText, ticketInvoice } from "./upload-all";
 
 const PASSPORT = `KINGDOM OF SAUDI ARABIA
 PASSPORT
@@ -101,5 +101,40 @@ Total amount: 1,250.00 USD`;
     expect(matchSupplier("WITHIN EARTH TOURISM LLC", suppliers)?.id).toBe("we");
     expect(matchSupplier("ويذن ايرث", suppliers)?.id).toBe("we");
     expect(matchSupplier("Booking.com", suppliers)).toBeNull();
+  });
+});
+
+describe("«ارفع كل الملفات» — the suppliers' own papers (2026-10-23)", () => {
+  it("splits a voucher holding several hotels into one paper each, the booking reference with each", () => {
+    const tbo = [
+      "TBO Holidays — Itinerary voucher",
+      "Booking ref: TBO-77812",
+      "Lead guest: MOHAMMED TESTER",
+      "Hotel: Marjan Plaza Hotel",
+      "Check-in: 2026-10-30 Check-out: 2026-10-31",
+      "Confirmation no: 4561",
+      "Hotel: Episode Tbilisi",
+      "Check-in: 2026-11-06 Check-out: 2026-11-08",
+      "Confirmation no: 545",
+    ].join("\n");
+    const stays = splitStays(tbo);
+    expect(stays).toHaveLength(2);
+    expect(stays[0]).toContain("TBO-77812");
+    expect(stays[0]).toContain("4561");
+    expect(stays[0]).not.toContain("545\n");
+    expect(stays[1]).toContain("Episode Tbilisi");
+    expect(stays[1]).toContain("TBO-77812");
+    expect(splitStays(HOTEL)).toEqual([HOTEL]);
+  });
+
+  it("names the supplier the paper names — the longest of ours found", () => {
+    const suppliers = [
+      { id: "tbo", arabic_name: "تي بي او", english_name: "TBO Holidays" },
+      { id: "ag", arabic_name: "اجودا", english_name: "Agoda" },
+      { id: "x", arabic_name: "تي", english_name: "TB" },
+    ];
+    expect(supplierInText("TBO Holidays — Itinerary voucher", suppliers)?.id).toBe("tbo");
+    expect(supplierInText("Booked via agoda.com", suppliers)?.id).toBe("ag");
+    expect(supplierInText("Hotel direct booking", suppliers)).toBeNull();
   });
 });

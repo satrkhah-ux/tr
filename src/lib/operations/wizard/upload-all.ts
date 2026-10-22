@@ -83,6 +83,46 @@ export function amountIn(text: string): { amount: number | null; currency: strin
   return { amount: amount > 0 ? amount : null, currency: currencyOf(text) };
 }
 
+const HOTEL_HEAD = /^(?:HOTEL(?:\s*NAME)?|PROPERTY(?:\s*NAME)?|ACCOMMODATION|اسم\s*الفندق|الفندق|الفندق\s*المحجوز)\s*[:：]/iu;
+const CHECK_IN_LINE = /CHECK[\s-]?IN|تاريخ\s*الوصول|تسجيل\s*الدخول/iu;
+
+/**
+ * A supplier's voucher that holds several hotels (a TBO itinerary, the
+ * owner's evaluator, 2026-10-23) as one paper per hotel: split where a hotel's
+ * own block begins — its «Hotel:» line, else a check-in again, taking the two
+ * lines over it (the hotel's name) — each block with the paper's head (the
+ * booking reference, the lead guest) before it. One hotel: the paper whole.
+ */
+export function splitStays(text: string): string[] {
+  const lines = normalizeTicketText(text).split("\n");
+  let starts = lines.flatMap((l, i) => (HOTEL_HEAD.test(l.trim()) ? [i] : []));
+  if (starts.length < 2) {
+    const checks = lines.flatMap((l, i) => (CHECK_IN_LINE.test(l) ? [i] : []));
+    if (checks.length < 2) return [text];
+    starts = checks.map((c, k) => Math.max(c - 2, k === 0 ? 0 : checks[k - 1] + 1));
+  }
+  const head = lines.slice(0, starts[0]).join("\n");
+  return starts.map((s, k) => [head, ...lines.slice(s, starts[k + 1] ?? lines.length)].join("\n").trim());
+}
+
+/**
+ * A supplier our list knows, named on the paper (the owner, 2026-10-23:
+ * «الموردين يتم تسجيلهم وفق الفواتير») — the longest name found wins («Within
+ * Earth Travel» over «Earth»). Folded, Arabic or Latin; a name under four
+ * letters is too short to tell.
+ */
+export function supplierInText<T extends { id: string; arabic_name: string; english_name: string | null }>(text: string, suppliers: T[]): T | null {
+  const fold = (v: string | null) => normalizeName(v).replace(/[^\p{L}\p{N}]+/gu, "");
+  const paper = fold(text);
+  let best: { s: T; n: number } | null = null;
+  for (const s of suppliers) {
+    for (const name of [fold(s.arabic_name), fold(s.english_name)]) {
+      if (name.length >= 4 && paper.includes(name) && (!best || name.length > best.n)) best = { s, n: name.length };
+    }
+  }
+  return best?.s ?? null;
+}
+
 /**
  * The invoice's issuer among our suppliers: the same name folded — Arabic or
  * Latin, case, spaces and marks aside («Within Earth» is «within earth») — or

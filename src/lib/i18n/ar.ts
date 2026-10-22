@@ -2847,6 +2847,7 @@ export const ar: Dictionary = {
   "data.search.guideYes": "دليل الوجهة ✓",
   "data.search.guideNo": "لا دليل للوجهة",
   "data.search.servicesNamed": "خدمات بهذا الاسم، حسب الدولة",
+  "wz.up.paperSupplier": "في الورقة",
   "wz.hotels.title": "الفنادق",
   "wz.hotels.add": "إضافة فندق",
   "wz.hotels.none": "لا فنادق في هذا الملف.",

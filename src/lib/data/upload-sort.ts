@@ -12,7 +12,7 @@ import { getOcrProvider } from "@/lib/repackage/extract/ocr";
 import { extractPdfText } from "@/lib/repackage/extract/pdf-text";
 import { normalizeImage, pdfPageImages } from "@/lib/repackage/extract/page-images";
 import { sniff } from "@/lib/repackage/extract/upload-text";
-import { amountIn, matchSupplier, paperKind, type PaperKind } from "@/lib/operations/wizard/upload-all";
+import { amountIn, matchSupplier, paperKind, supplierInText, type PaperKind } from "@/lib/operations/wizard/upload-all";
 
 /**
  * «ارفع كل الملفات» — one file → which paper it is, and its words for the
@@ -142,5 +142,32 @@ export async function readMoney(
     };
   } catch {
     return { ok: false, error: "wz.up.err.unreadable" };
+  }
+}
+
+export type PaperSupplier = { onFile: { id: string; name: string } | null; supplier: { id: string; name: string } | null };
+
+/**
+ * The supplier an airline's or a hotel supplier's paper names, beside the one
+ * the booking has (the owner, 2026-10-23: «الموردين يتم تسجيلهم وفق
+ * الفواتير») — offered on the line, set only when the employee approves it.
+ */
+export async function paperSupplier(operationId: string, bookingId: string, text: string): Promise<PaperSupplier> {
+  const none: PaperSupplier = { onFile: null, supplier: null };
+  if (!text.trim() || (await gateOperation(operationId)) || (await gateRow("operation_bookings", bookingId))) return none;
+  try {
+    const db = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const [{ data: suppliers }, { data: booking }] = await Promise.all([
+      db.from("company_suppliers").select("id, arabic_name, english_name").neq("status", "Disabled"),
+      db.from("operation_bookings").select("operation_id, assignee_supplier_id").eq("id", bookingId).maybeSingle(),
+    ]);
+    const list = (suppliers ?? []) as { id: string; arabic_name: string; english_name: string | null }[];
+    const row = booking as { operation_id: string; assignee_supplier_id: string | null } | null;
+    if (!row || row.operation_id !== operationId) return none;
+    const own = row.assignee_supplier_id ? list.find((s) => s.id === row.assignee_supplier_id) : null;
+    const hit = supplierInText(text, list);
+    return { onFile: own ? { id: own.id, name: own.arabic_name } : null, supplier: hit ? { id: hit.id, name: hit.arabic_name } : null };
+  } catch {
+    return none;
   }
 }

@@ -2849,6 +2849,7 @@ export const en = {
   "data.search.guideYes": "Destination guide ✓",
   "data.search.guideNo": "No destination guide",
   "data.search.servicesNamed": "Services by that name, by country",
+  "wz.up.paperSupplier": "On the paper",
   "wz.hotels.title": "Hotels",
   "wz.hotels.add": "Add a hotel",
   "wz.hotels.none": "This file has no hotels.",

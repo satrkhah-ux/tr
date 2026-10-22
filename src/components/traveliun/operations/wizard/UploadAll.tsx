@@ -6,8 +6,8 @@ import { AlertTriangle, CheckCircle2, FileUp, Loader2, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import type { TranslationKey } from "@/lib/i18n";
 import { readPassportPhoto } from "@/lib/data/operation-travelers";
-import { readMoney, sortPaper } from "@/lib/data/upload-sort";
-import { attachBookingInvoice, createSupplierFromInvoice, recordSupplierPayment, setBookingCost } from "@/lib/data/supplier-work";
+import { paperSupplier, readMoney, sortPaper, type PaperSupplier } from "@/lib/data/upload-sort";
+import { attachBookingInvoice, attachSupplierConfirmation, createSupplierFromInvoice, recordSupplierPayment, setBookingCost } from "@/lib/data/supplier-work";
 import { assignBooking } from "@/lib/data/operation-assign";
 import { recordPayment } from "@/lib/data/operations";
 import { uploadPaymentProof } from "@/lib/data/operation-payments";
@@ -18,7 +18,7 @@ import { parseTicketText } from "@/lib/flights/ticket-parse";
 import { trustedFields, type MrzPassport } from "@/lib/operations/mrz";
 import { hotelBookings } from "@/lib/operations/wizard/hotels";
 import { matchPassport, type MatchRow } from "@/lib/operations/wizard/passports";
-import { matchHotel, matchTicket, ticketInvoice, type PaperKind } from "@/lib/operations/wizard/upload-all";
+import { matchHotel, matchTicket, splitStays, ticketInvoice, type PaperKind } from "@/lib/operations/wizard/upload-all";
 import type { WizardCase } from "@/lib/operations/wizard/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { savePassport } from "./passport-save";
@@ -53,6 +53,8 @@ type Item = MoneyFields & {
   hotel: HotelRead | null;
   /** the PNR / the hotel's number, as the employee leaves it */
   ref: string;
+  /** a ticket's or a hotel paper's supplier, named on it, beside the booking's — `supplier` holds the pick */
+  paperSup: PaperSupplier | null;
   error?: string;
 };
 
@@ -103,6 +105,11 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
   // the case's travellers as this page knows them — savePassport keeps it current between approvals
   const rows = useRef<MatchRow[]>(data.travelers.map((r) => ({ ...r })));
   const given = useRef(new Set<string>());
+  /** lines saved along with another (a passenger's ticket with its PNR's) */
+  const done = useRef(new Set<number>());
+  /** the tickets of one PNR on one flight booking — a PDF per passenger */
+  const siblings = (item: Item) =>
+    items.filter((s) => s.kind === "ticket" && s.status !== "dropped" && s.target === item.target && s.ticket && s.ref.trim().toUpperCase() === item.ref.trim().toUpperCase());
   const flights = data.bookings.filter((b) => b.kind === "flight" && b.status !== "cancelled");
   const hotels = hotelBookings(data);
 
@@ -114,12 +121,15 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
     fd.append("booking_id", target);
     if (item.text) fd.append("text", item.text);
     else fd.append("file", item.file);
+    // the supplier the paper names becomes the booking's only when the booking has none — else the employee picks
+    const sup = await paperSupplier(op.id, target, item.text).catch(() => null);
+    const supplier = sup?.supplier && !sup.onFile ? sup.supplier.id : "";
     if (kind === "ticket") {
       const res = await readBookingTicket(fd);
-      return res.ok ? { ticket: res.read, ref: res.read.pnr, error: undefined } : { ticket: null, error: t(res.error) };
+      return res.ok ? { ticket: res.read, ref: res.read.pnr, error: undefined, paperSup: sup, supplier } : { ticket: null, error: t(res.error) };
     }
     const res = await readHotelConfirmation(fd);
-    return res.ok ? { hotel: res.result, ref: res.result.read.confirmation, error: undefined } : { hotel: null, error: t(res.error) };
+    return res.ok ? { hotel: res.result, ref: res.result.read.confirmation, error: undefined, paperSup: sup, supplier } : { hotel: null, error: t(res.error) };
   }
 
   /** A flight booking whose PNR the paper prints, else the one its legs fly. */
@@ -174,6 +184,17 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
       const target = kind === "payment" ? "case" : ((kind === "hotel_invoice" ? matchHotel(text, hotels) : flightFor(text)) ?? "");
       return patch(item.key, { status: "ready", kind, text, target, ...(target ? await moneyFor(text, kind, target) : {}) });
     }
+    if (kind === "hotel") {
+      // a voucher holding several hotels (a TBO itinerary): one line per hotel, the same paper filed on each
+      const [own, ...more] = splitStays(text);
+      const extra = more.map((stay) => ({ ...item, key: seq.current++, kind, status: "reading" as const, text: stay }));
+      if (extra.length) setItems((list) => [...list, ...extra]);
+      for (const one of [{ ...item, text: own }, ...extra]) {
+        const target = matchHotel(one.text, hotels) ?? "";
+        patch(one.key, { status: "ready", kind, text: one.text, target, ...(target ? await readFor(one, kind, target) : {}) });
+      }
+      return;
+    }
     const target = (kind === "ticket" ? flightFor(text) : matchHotel(text, hotels)) ?? "";
     const read = target ? await readFor({ ...item, text }, kind, target) : {};
     patch(item.key, { status: "ready", kind, text, target, ...read });
@@ -187,7 +208,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
 
   function add(files: File[]) {
     if (!files.length) return;
-    const fresh: Item[] = files.map((file) => ({ key: seq.current++, file, status: "sorting", kind: "unknown", target: "", text: "", picture: null, passport: null, ticket: null, hotel: null, ref: "", ...NO_MONEY }));
+    const fresh: Item[] = files.map((file) => ({ key: seq.current++, file, status: "sorting", kind: "unknown", target: "", text: "", picture: null, passport: null, ticket: null, hotel: null, ref: "", paperSup: null, ...NO_MONEY }));
     setItems((list) => [...list, ...fresh]);
     setBusy(true);
     const queue = [...fresh];
@@ -205,7 +226,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
   async function place(item: Item, value: string) {
     const [kind, target] = value.split(":") as [PaperKind, string];
     // a file that failed to sort is placed by hand too
-    patch(item.key, { kind, target, ticket: null, hotel: null, ...NO_MONEY, error: undefined, status: "ready" });
+    patch(item.key, { kind, target, ticket: null, hotel: null, paperSup: null, ...NO_MONEY, error: undefined, status: "ready" });
     if (isMoney(kind)) {
       patch(item.key, { status: "reading" });
       patch(item.key, { status: "ready", ...(await moneyFor(item.text, kind, target)) });
@@ -233,14 +254,29 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
       error = out.error;
     } else if (item.kind === "ticket" && item.ticket) {
       const pnr = item.ref.trim().toUpperCase();
+      // the airlines send one PDF per passenger under one PNR: one booking, every passenger's number added to
+      // what it already holds — never a later paper taking the earlier one's place
+      const twins = siblings(item);
+      const booking = flights.find((f) => f.id === item.target);
       const res = await saveBookingTicket({
         booking_id: item.target,
         pnr,
-        ticket_numbers: item.ticket.ticket_numbers,
+        ticket_numbers: [...new Set([...(booking?.ticket_numbers ?? []), ...twins.flatMap((s) => s.ticket?.ticket_numbers ?? [])])],
         legs: item.ticket.legs.map((l) => ({ ...l, pnr: l.pnr?.trim().toUpperCase() === pnr ? "" : l.pnr })),
         baggage: item.ticket.baggage,
       });
       if (!res.ok) error = res.error;
+      else {
+        // the airline's own paper is the booking's confirmation file — «عرض ملف التأكيد» opens it
+        const fd = new FormData();
+        fd.append("booking_ids", item.target);
+        fd.append("file", item.file);
+        await attachSupplierConfirmation(fd).catch(() => null);
+        for (const s of twins) if (s.key !== item.key) {
+          done.current.add(s.key);
+          patch(s.key, { status: "saved" });
+        }
+      }
     } else if (item.kind === "hotel" && item.hotel) {
       const fd = new FormData();
       fd.append("booking_id", item.target);
@@ -253,6 +289,11 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
     } else if (isMoney(item.kind) && item.money) {
       error = await saveMoney(item);
     } else error = "wz.up.err.unplaced";
+    // the supplier the paper names, when the employee kept it on the line
+    if (!error && (item.kind === "ticket" || item.kind === "hotel") && item.supplier && item.supplier !== item.paperSup?.onFile?.id) {
+      const res = await assignBooking({ booking_id: item.target, kind: "supplier", assignee_id: item.supplier });
+      if (!res.ok) error = res.error;
+    }
     patch(item.key, error ? { status: "ready", error: t(error) } : { status: "saved" });
     return !error;
   }
@@ -329,7 +370,8 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
 
   async function approveAll(list: Item[]) {
     setBusy(true);
-    for (const item of list) await approve(item);
+    // a ticket's twins are saved with it
+    for (const item of list) if (!done.current.has(item.key)) await approve(item);
     setBusy(false);
     router.refresh();
   }
@@ -419,6 +461,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
                     <Line
                       key={item.key}
                       item={item}
+                      groupMissing={item.kind === "ticket" && item.ticket ? siblings(item).reduce<string[]>((acc, s) => acc.filter((m) => s.ticket?.missing.includes(m)), item.ticket.missing) : []}
                       today={data.today}
                       caseCurrency={caseCurrency}
                       inCase={item.kind === "payment" ? inCase(Number(item.amount), item.currency) : null}
@@ -482,6 +525,7 @@ function verdict(i: Item, today: string, field: (f: string) => string): { ok: bo
 
 function Line({
   item,
+  groupMissing,
   today,
   caseCurrency,
   inCase,
@@ -493,6 +537,8 @@ function Line({
   onDrop,
 }: {
   item: Item;
+  /** a ticket's travellers no paper of its PNR names — one PDF per passenger names one each */
+  groupMissing: string[];
   today: string;
   caseCurrency: string;
   inCase: { amount: number; rate: number } | null;
@@ -504,7 +550,8 @@ function Line({
   onDrop: () => void;
 }) {
   const { t } = useTraveliunUI();
-  const { ok, note } = verdict(item, today, (f) => t(`wz.up.field.${f}` as TranslationKey));
+  const { ok, note } = verdict(item.kind === "ticket" && item.ticket ? { ...item, ticket: { ...item.ticket, missing: groupMissing } } : item, today, (f) => t(`wz.up.field.${f}` as TranslationKey));
+  const sup = item.paperSup;
   const saved = item.status === "saved";
   const working = item.status === "saving" || item.status === "reading";
   const read =
@@ -576,6 +623,16 @@ function Line({
               />
             ) : null}
           </div>
+          {(item.kind === "ticket" || item.kind === "hotel") && sup?.supplier && sup.supplier.id !== sup.onFile?.id ? (
+            // the supplier the paper names, beside the file's — the employee picks (never replaced by itself)
+            <label className="flex flex-wrap items-center gap-2 text-[11.5px] font-semibold text-[#557d78] sm:col-span-2">
+              {t("wz.up.money.supplierOnFile")}: {sup.onFile?.name ?? "—"} · {t("wz.up.paperSupplier")}: {sup.supplier.name}
+              <select value={item.supplier} onChange={(e) => onMoney({ supplier: e.target.value })} disabled={working} className="h-8 rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-[12px] font-bold text-[#185045]">
+                <option value="">{sup.onFile ? t("wz.up.money.keep", { name: sup.onFile.name }) : t("wz.up.money.noSupplier")}</option>
+                <option value={sup.supplier.id}>{t("wz.up.money.use", { name: sup.supplier.name })}</option>
+              </select>
+            </label>
+          ) : null}
           {isMoney(item.kind) ? (
             <div className="sm:col-span-2">
               <MoneyFieldsRow kind={item.kind} fields={item} caseCurrency={caseCurrency} inCase={inCase} onChange={onMoney} disabled={working} />
