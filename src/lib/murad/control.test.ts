@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defaultControl, inMuradScope, parseControl, validControl } from "./control";
 import { canOpenPath } from "@/lib/roles/section-access";
-import { visaAnswerText } from "./visa";
+import { visaFlowText } from "./visa";
 
 describe("Murad controls", () => {
   it("preserves existing behavior until a control is saved and fails closed on corruption", () => {
@@ -25,9 +25,9 @@ describe("Murad controls", () => {
     expect(canOpenPath("/murad-settings", (p) => p === "settings.manage")).toBe(true);
   });
   it("keeps visa requirements but omits the quote when prices are disabled", () => {
-    const text = visaAnswerText({
-      includePrice: false, country: "بريطانيا", row: { country: "بريطانيا", visa_type: "سياحية", sell_price: 1357, sell_currency: "SAR", status: "Active", arabic_requirements: "جواز سفر" },
-      applicants: 2, sarPer: 1, check: false,
+    const text = visaFlowText({
+      includePrice: false, row: { country: "بريطانيا", visa_type: "سياحية", sell_price: 1357, sell_currency: "SAR", status: "Active", arabic_requirements: "جواز سفر" },
+      facts: { country: "بريطانيا", nationality: null, applicants: 2, travelDate: null }, salam: false,
     });
     expect(text).toContain("بريطانيا");
     expect(text).not.toContain("1,357");

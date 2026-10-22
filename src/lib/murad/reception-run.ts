@@ -1,7 +1,6 @@
 import { routeCompletedVisa, retryVisaHandoffs } from "./visa-routing";
 import type { MuradReceipt } from "./visa-assignment";
-import { repeatsMurad, visaIntakeReply } from "./visa-intake";
-import { inMuradScope, visaForAll } from "./control";
+import { inMuradScope, visaForAll, type MuradControl } from "./control";
 import "server-only";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -34,9 +33,8 @@ import { askText, datesSaid, holdToText, missing, offerDraftData, offerText, pri
 import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
-import { isHumanReply, maskPhone, muradMessageIds, noteFor, SETTING } from "./core";
-import { notNeededText, SCHENGEN, uncoveredTopics, visaAnswerText, visaAskText, visaHandoffText, visaStep, visaSummary, type VisaAsk, type VisaRow } from "./visa";
-import { visaFor } from "@/lib/operations/travelers";
+import { isHumanReply, maskPhone, muradMessageIds, noteFor, SETTING, type TurnMessage } from "./core";
+import { repeatsMurad, SCHENGEN, visaAskText, visaFlowNote, visaFlowText, visaNeed, visaRowFor, type VisaAsk, type VisaFacts, type VisaRow } from "./visa";
 import { readSettings, readThread } from "./run";
 import {
   clarifyText,
@@ -384,6 +382,114 @@ async function visaConversation(service: SupabaseClient, m: IncomingMessage): Pr
   return latest ? latest === "تأشيرات" : lead?.inquiry === "تأشيرات";
 }
 
+// ---------- the visa flow (visa.ts): the list, the answer and the hand-over ----------
+
+/** the company's visa list and the countries it hangs on */
+async function visaList(service: SupabaseClient) {
+  const [{ data: countries }, { data: rows }] = await Promise.all([
+    service.from("countries").select("id, arabic_name, iso2"),
+    service.from("visas").select("country, country_id, visa_type, sell_price, sell_currency, arabic_requirements, status").eq("status", "Active"),
+  ]);
+  return {
+    countries: (countries ?? []) as { id: string; arabic_name: string; iso2: string | null }[],
+    rows: ((rows ?? []) as (VisaRow & { country_id: string | null })[]).map((r) => ({ ...r, sell_price: r.sell_price == null ? null : Number(r.sell_price) })),
+  };
+}
+
+/** Murad answered first in this visit — «العملاء» and visa-routing.ts read it (a receipt from this visit is kept). */
+async function visaReceipt(service: SupabaseClient, conversationId: number, closedAt: number, startSec: number): Promise<void> {
+  const { data } = await service.from("client_leads").select("id, murad_receipt").eq("teletel_conversation_id", conversationId).maybeSingle();
+  const lead = data as { id: string; murad_receipt: MuradReceipt | null } | null;
+  if (!lead || (lead.murad_receipt && Date.parse(lead.murad_receipt.receivedAt) / 1000 >= closedAt)) return;
+  const receivedAt = new Date().toISOString();
+  await service.from("client_leads").update({ murad_receipt: { receivedAt, firstResponder: true, waitSec: Math.max(0, Math.round(Date.parse(receivedAt) / 1000 - startSec)) } }).eq("id", lead.id);
+}
+
+/**
+ * Steps 2–3: the one message (price + requirements verbatim + «سيتواصل معك…»),
+ * the private note, then «قسم فيزا» takes it (visa-routing.ts, retried by the
+ * minute job until it holds). The row it ends on carries visa_flow.done: the
+ * rest of the visit is silence.
+ */
+async function visaAnswer(
+  service: SupabaseClient,
+  i: { m: IncomingMessage; logId: string; facts: VisaFacts; row: VisaRow | null; salam: boolean; includePrice: boolean; visit: TurnMessage[]; intake: Record<string, unknown>; waitSec: number; closedAt: number; start: number },
+): Promise<ReceptionOutcome> {
+  const finish = (patch: Record<string, unknown>) => service.from("murad_log").update({ ...patch, acted_at: new Date().toISOString() }).eq("id", i.logId);
+  const text = visaFlowText({ row: i.row, facts: i.facts, includePrice: i.includePrice, salam: i.salam });
+  // said already in this visit (9e8d7d5: never the same line twice): only the hand-over is done
+  const repeat = repeatsMurad(text, i.visit);
+  const replyId = repeat ? null : await sendTeletelMessage(i.m.conversationId, text);
+  if (!repeat && !replyId) {
+    await finish({ reason: "send_failed", reply: text, error: "send_failed" });
+    return "send_failed";
+  }
+  await finish({ reason: "visa:handoff_pending", reply: replyId ? text : null, reply_message_id: replyId, intake: { ...i.intake, country: i.facts.country, visa_flow: { ...i.facts, done: true, listed: Boolean(i.row) } } });
+  await addTeletelNote(i.m.conversationId, visaFlowNote({ facts: i.facts, row: i.row, includePrice: i.includePrice }));
+  await markLead(service, i.m, { inquiry: "تأشيرات", destination: i.facts.country, route: DEPARTMENT["تأشيرات"], at: new Date().toISOString(), waitSec: i.waitSec, intakeOnly: true });
+  await visaReceipt(service, i.m.conversationId, i.closedAt, i.start);
+  await routeCompletedVisa(service, i.logId);
+  return "routed:تأشيرات";
+}
+
+/** step 1's «if unanswered»: how long the one question waits before the flow goes on with what is known */
+const VISA_ASK_WAIT_SEC = 600;
+
+/**
+ * The minute job: a visa question nobody answered in ten minutes — no client
+ * line, no colleague, no later turn — goes on to steps 2–3 with the facts the
+ * question was asked with. Claimed as the question's NEGATIVE message id (a
+ * Murad message, so never a client turn's own id).
+ */
+async function visaFollowThrough(service: SupabaseClient, control: MuradControl, autoList: string[]): Promise<number> {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const { data } = await service
+    .from("murad_log")
+    .select("conversation_id, phone, reply_message_id, created_at, intake")
+    .eq("mode", "reception")
+    .eq("reason", "visa:asked1")
+    .gte("created_at", new Date((nowSec - VISIT_SEC) * 1000).toISOString())
+    .lte("created_at", new Date((nowSec - VISA_ASK_WAIT_SEC) * 1000).toISOString())
+    .limit(20);
+  const rows = (data ?? []) as { conversation_id: number; phone: string | null; reply_message_id: number | null; created_at: string; intake: { visa_flow?: VisaFacts } | null }[];
+  let n = 0;
+  for (const r of rows) {
+    const phone = intlPhone(r.phone ?? "");
+    // the switch may have changed since the question: the same rule as receive()
+    if (!r.reply_message_id || !r.intake?.visa_flow || !(visaForAll(control) || (control.tasks.visas && phone && autoList.includes(phone)))) continue;
+    const { count } = await service.from("murad_log").select("id", { count: "exact", head: true }).eq("conversation_id", r.conversation_id).gt("created_at", r.created_at);
+    if (count) continue;
+    const askedAt = Date.parse(r.created_at) / 1000;
+    const thread = await readThread(r.conversation_id);
+    if (!thread?.canReply || thread.messages.some((t) => !t.isPrivate && t.at >= askedAt && t.id !== Number(r.reply_message_id))) continue;
+    const claim = await service
+      .from("murad_log")
+      .insert({ conversation_id: r.conversation_id, client_message_id: -Number(r.reply_message_id), client_message_at: r.created_at, phone: r.phone, mode: "reception" })
+      .select("id")
+      .maybeSingle();
+    if (claim.error || !claim.data) continue;
+    const facts = r.intake.visa_flow;
+    const list = await visaList(service);
+    const country = list.countries.find((c) => facts.country && fold(c.arabic_name) === fold(facts.country));
+    const m: IncomingMessage = { conversationId: r.conversation_id, messageId: -Number(r.reply_message_id), at: askedAt, phone: r.phone ?? "", contactName: thread.name, content: "" };
+    const out = await visaAnswer(service, {
+      m,
+      logId: (claim.data as { id: string }).id,
+      facts,
+      row: visaRowFor(list.rows, country?.id ?? null, facts.country),
+      salam: false,
+      includePrice: control.includePrice,
+      visit: thread.messages,
+      intake: { follow_through: true },
+      waitSec: 0,
+      closedAt: askedAt - VISA_ASK_WAIT_SEC,
+      start: askedAt,
+    }).catch(() => "unreadable" as const);
+    if (out === "routed:تأشيرات") n += 1;
+  }
+  return n;
+}
+
 export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
   if (!m.conversationId || !m.messageId) return "unreadable";
   const service = db();
@@ -497,144 +603,59 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       (trip.only_city && !routeCity(c, trip.only_city) ? `المبيت في ${trip.only_city}` : null) ??
       ((trip.children ?? 0) > 0 ? "أطفال" : (trip.adults ?? 0) > c.maxPeople ? `أكثر من ${c.maxPeople} أشخاص` : null);
 
-    if (received.some((r) => r.intake?.visa_handoff)) {
+    // step 4 of the visa flow: handed to «قسم فيزا» in this visit — silence, whatever the client asks
+    if (received.some((r) => r.intake?.visa_handoff || (r.intake?.visa_flow as { done?: boolean } | undefined)?.done)) {
       await finish({ reason: "none:routed" });
       return "none:routed";
     }
-    // Persistent visa intake: no two-question cutoff and no handoff on a damaged photo.
-    if ((visaForAll(settings.control) || (settings.control.tasks.visas && phone && settings.autoList.includes(phone))) && await visaConversation(service, m) && !request.wantsHuman) {
+    // «مُراد» on visas — the owner's short fixed flow (visa.ts): asked once, one answer, «قسم فيزا», then silence. Every
+    // client only with visaForAll; until then the two test numbers (the user, 2026-10-22: «للرقمين التجريبيين فقط أولاً»).
+    const visaOn = visaForAll(settings.control) || (settings.control.tasks.visas && Boolean(phone && settings.autoList.includes(phone)));
+    if (visaOn && !request.wantsHuman && (await visaConversation(service, m))) {
       const latest = thread.messages.filter((t) => t.fromClient && !t.isPrivate).at(-1);
       if (!thread.canReply || !latest || Date.now() / 1000 - latest.at > 24 * 3600) { await finish({ reason: "none:window" }); return "none:window"; }
       // a colleague answered or took it in this visit, or the client asked for a person: Murad stays out (21 Oct, 40347: he
       // answered between a colleague's replies and after «حوّلني لموظف»)
       if (staffReplied || handedByHand || routedTo.includes("موظف") || thread.messages.some((t) => t.at >= latest.at && isHumanReply(t, ours))) { await finish({ reason: "none:staff" }); return "none:staff"; }
-      const previous = rows.filter((r) => Date.parse(r.created_at) / 1000 >= closedAt).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).find((r) => r.intake?.visa_intake)?.intake?.visa_intake ?? null;
-      const { data: catalog, error: catalogError } = await service.from("visas").select("country, visa_type, sell_price, sell_currency, arabic_requirements").eq("status", "Active");
-      const result = await visaIntakeReply({ messages: visitLines, previous, catalog: catalogError ? [] : catalog, includePrice: settings.control.includePrice });
-      const again = await readThread(m.conversationId);
-      const lastNow = again?.messages.filter((t) => t.fromClient && !t.isPrivate).at(-1);
-      if (!again?.canReply || lastNow?.id !== latest.id || again.messages.some((t) => t.at >= latest.at && isHumanReply(t, ours))) {
-        await finish({ reason: "none:staff", error: "turn_changed" }); return "none:staff";
-      }
-      // the hand-over line already said in this visit: not again, only the routing is retried
-      if (repeatsMurad(result.reply, visitLines)) {
-        await finish({ reason: "visa:handoff_pending", intake: { ...intake, country: result.country, visa_intake: result } });
-        await routeCompletedVisa(service, logId);
-        return "answered";
-      }
-      const replyId = await sendTeletelMessage(m.conversationId, result.reply);
-      if (!replyId) { await finish({ reason: "send_failed", error: "send_failed" }); return "send_failed"; }
-      // Persist before notes/assignment: even if those fail the next turn knows this public reply is ours.
-      await finish({ reason: "visa:intake", reply: result.reply, reply_message_id: replyId, intake: { ...intake, country: result.country, visa_intake: result } });
-      await addTeletelNote(m.conversationId, `مُراد — ملف التأشيرة\n${result.summary}\nالنواقص: ${result.missing.join("، ") || "لا نواقص مسجلة؛ يلزم تدقيق المختص"}\nللمراجعة: ${result.review.join("، ") || "تدقيق المستندات قبل التقديم"}`);
-      await markLead(service, m, { inquiry: "تأشيرات", destination: result.country, route: DEPARTMENT["تأشيرات"], at: new Date().toISOString(), waitSec, name: null, intakeOnly: true });
-      const { data: savedLead } = await service.from("client_leads").select("id,murad_receipt").eq("teletel_conversation_id", m.conversationId).maybeSingle();
-      const savedReceipt = savedLead?.murad_receipt as MuradReceipt | null;
-      const receivedAt = new Date().toISOString();
-      const start = visitLines.find((t) => t.fromClient)?.at ?? since;
-      const receipt: MuradReceipt = savedReceipt && Date.parse(savedReceipt.receivedAt) / 1000 >= closedAt ? savedReceipt : { receivedAt, firstResponder: !staffReplied, waitSec: Math.max(0, Math.round(Date.parse(receivedAt) / 1000 - start)) };
-      if (savedLead) await service.from("client_leads").update({ murad_receipt: { ...receipt, pending: result.completed } }).eq("id", savedLead.id);
-      if (result.completed) {
-        await service.from("murad_log").update({ reason: "visa:handoff_pending" }).eq("id", logId);
-        await routeCompletedVisa(service, logId);
-      }
-      return "answered";
-    }
-
-    // «موظف التأشيرات» (the owner, 2026-10-19): a visa request is answered from the company's visa list — or said to be
-    // needless for those passports — asked only for what is missing, and handed to the visa team with what was heard.
-    // Murad keeps the conversation (a follow-up «وإسبانيا؟», a question more) until a colleague answers the client.
-    const visaRows = received.filter((r) => r.reason?.startsWith("visa:"));
-    const visaAsked = visaRows.filter((r) => r.reason?.startsWith("visa:asked") || r.reason === "visa:info");
-    const visaOpen = settings.control.tasks.visas && free && routedTo.length === 0 && !sentRow && (request.kind === "تأشيرات" || visaRows.length > 0);
-    let tripWithVisa = false;
-    // with the trip, the visa in one line of the offer: needless for those passports, else the visa team's
-    let visaLine: string | null = null;
-    if (visaOpen) {
-      const { data: countryRows } = await service.from("countries").select("id, arabic_name, iso2, visa_required");
-      const countries = (countryRows ?? []) as { id: string; arabic_name: string; iso2: string | null; visa_required: boolean | null }[];
-      const a = await readVisa(transcript, clientText, countries.map((c) => c.arabic_name));
-      const country = a?.country ? (countries.find((c) => fold(c.arabic_name) === fold(a.country!)) ?? null) : null;
-      // a trip to a country Murad prices, with a visa question beside it: the offer answers both (the owner's case 11)
-      tripWithVisa = Boolean(a?.wants_trip && country && offers.some((o) => o.enabled && fold(o.country) === fold(country.arabic_name)));
-      if (tripWithVisa && a && country) {
-        const passports = [a.nationality, ...(a.others ?? []).map((o) => o.nationality)].filter((n): n is string => Boolean(n));
-        const exempt = passports.length > 0 && passports.every((n) => visaFor(n, { iso2: country.iso2, visa_required: country.visa_required }, false) === "not_required");
-        visaLine = exempt ? `🛂 التأشيرة: لا تحتاج تأشيرة مسبقة لـ${country.arabic_name} بجوازك.` : `🛂 التأشيرة: يؤكدها لك زميلنا في قسم التأشيرات حسب الجنسية.`;
-      }
-      if (a && !tripWithVisa) {
-        const known: VisaAsk = { ...a, country: country?.arabic_name ?? a.country };
-        const { data: listRows } = await service.from("visas").select("country, country_id, visa_type, sell_price, sell_currency, arabic_requirements, status").eq("status", "Active");
-        const listAll = (listRows ?? []) as (VisaRow & { country_id: string | null })[];
-        const list = country ? listAll.filter((v) => v.country_id === country.id) : [];
-        const row = list.find((v) => v.visa_type?.includes("سياح")) ?? list[0] ?? null;
-        // every passport among the applicants: no visa only when none needs one; another passport is «check»
-        const statuses = [known.nationality, ...(known.others ?? []).map((o) => o.nationality)]
-          .filter((n): n is string => Boolean(n))
-          .map((n) => (country ? visaFor(n, { iso2: country.iso2, visa_required: country.visa_required }, false) : "check"));
-        const need2 = !country ? "check" : statuses.length === 0 ? visaFor(null, { iso2: country.iso2, visa_required: country.visa_required }, false) : statuses.every((x) => x === "not_required") ? "not_required" : statuses.includes("check") ? "check" : "required";
-        const step = visaStep(known, { known: Boolean(country), required: country?.visa_required ?? null, status: need2, row, asks: visaAsked.length });
-        const summary = visaSummary(known);
-        // the same request answered already in this visit, nothing new said: no second answer (the decision below stays silent)
-        const said = visaRows.filter((r) => r.reason === "visa:answered" || r.reason === "visa:handoff" || r.reason === "visa:not_needed").map((r) => r.intake?.summary);
-        if (!said.includes(summary) || step.act === "ask") {
-          // «شنغن» alone: the Schengen countries the list prices are named
-          const schengen = known.schengen && !known.country ? listAll.filter((v) => SCHENGEN.has(countries.find((c) => c.id === v.country_id)?.iso2 ?? "")).map((v) => v.country) : null;
-          if (step.act === "ask") {
-            const text = `${request.salam && received.length === 0 ? "وعليكم السلام ورحمة الله، " : ""}${visaAskText(known.country, step.need, visaAsked.length === 0, schengen)}`;
-            const replyId = await sendTeletelMessage(m.conversationId, text);
-            await finish({ reason: replyId ? `visa:asked${visaAsked.length + 1}` : "send_failed", reply: text, reply_message_id: replyId, intake: { ...intake, country: known.country, visa: known, summary } });
-            return replyId ? "asked" : "send_failed";
-          }
-          if (step.act === "not_needed" && country) {
-            const text = notNeededText(country.arabic_name, [known.nationality_ar, ...(known.others ?? []).map((o) => o.nationality_ar)].filter(Boolean).join(" و") || null);
-            const replyId = await sendTeletelMessage(m.conversationId, text);
-            await finish({ reason: replyId ? "visa:not_needed" : "send_failed", reply: text, reply_message_id: replyId, intake: { ...intake, country: country.arabic_name, visa: known, summary } });
-            await markLead(service, m, { inquiry: "تأشيرات", destination: country.arabic_name, route: "مُراد", at: new Date().toISOString(), waitSec });
-            return replyId ? "answered" : "send_failed";
-          }
-          const rate = row?.sell_currency && row.sell_currency !== "SAR" ? ((await getRates().catch(() => null))?.sarPer[row.sell_currency] ?? null) : 1;
-          const reason = step.act === "handoff" ? step.reason : !rate ? "السعر يحدده زميلنا بعد مراجعة الطلب" : null;
-          const answer =
-            !reason && row && rate && country
-              ? visaAnswerText({ includePrice: settings.control.includePrice, country: country.arabic_name, row, applicants: known.applicants, sarPer: rate, check: need2 !== "required" || !known.nationality, topics: known.topics, need: step.act === "info" ? step.need : undefined })
-              : null;
-          const text = answer ?? visaHandoffText(reason ?? "السعر يحدده زميلنا بعد مراجعة الطلب", summary, opensAt ? sayTime(opensAt) : null);
-          const replyId = await sendTeletelMessage(m.conversationId, text);
-          if (!replyId) {
-            await finish({ reason: "send_failed", reply: text, error: "send_failed" });
-            return "send_failed";
-          }
-          const per = row?.sell_price && rate ? Math.ceil(row.sell_price * rate) : null;
-          // «info» answers a question and keeps the request open; an answer or a hand-over goes to the visa team — and so does
-          // a question the list does not answer (a refund, the visa's validity): never invented, the colleague answers it
-          const open = uncoveredTopics(known.topics, row?.arabic_requirements ?? null);
-          if (step.act === "info" && !open.length) {
-            await finish({ reason: "visa:info", reply: text, reply_message_id: replyId, intake: { ...intake, country: known.country, visa: known, summary, price_per: per } });
-            return "asked";
-          }
-          const teams = await listTeletelTeams();
-          const handoff = settings.control.handoffs["تأشيرات"];
-    const teamId = handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), "تأشيرات");
-          const team = teams.find((t) => t.id === teamId) ?? null;
-          const assigned = await assignMuradHandoff(m.conversationId, teamId, handoff?.agentId ?? null);
-          await addTeletelNote(
-            m.conversationId,
-            answer
-              ? `🤖 طلب تأشيرة: ${summary}${open.length ? ` — يسأل عن: ${open.join("، ")} (ليست في قائمة التأشيرات)` : ""}${per ? ` — ${per.toLocaleString("en-US")} ريال للشخص${known.applicants && known.applicants > 1 ? ` × ${known.applicants} = ${(per * known.applicants).toLocaleString("en-US")} ريال` : ""}` : ""}. أُرسل للعميل ${settings.control.includePrice ? "السعر والمتطلبات" : "المتطلبات بدون السعر"} من قائمة التأشيرات${need2 !== "required" ? " (جنسية غير سعودية بين المتقدمين — تحقق من متطلباتها وسعرها)" : ""}، وينتظر المستندات.`
-              : `🤖 طلب تأشيرة — يحتاج زميلاً (${reason}): ${summary}.`,
-          );
-          await finish({
-            reason: answer ? "visa:answered" : "visa:handoff",
-            reply: text,
-            reply_message_id: replyId,
-            intake: { ...intake, country: country?.arabic_name ?? known.country, visa: known, summary, price_per: per, handoff: answer ? null : reason, team_id: teamId, assigned },
-          });
-          await markLead(service, m, { inquiry: "تأشيرات", destination: country?.arabic_name ?? known.country, route: team?.name.trim() ?? DEPARTMENT["تأشيرات"], at: new Date().toISOString(), waitSec });
-          return "routed:تأشيرات";
+      const list = await visaList(service);
+      const a = await readVisa(transcript, clientText, list.countries.map((c) => c.arabic_name));
+      // a trip in the same breath is a sales request (the order's A.2): the reception below hands it to packages
+      if (a?.wants_trip) routeAs = { ...request, kind: "بكج" };
+      else {
+        // the one question already asked in this visit: whatever came back, the flow goes on with what is known
+        const asked = received.filter((r) => r.intake?.visa_flow);
+        const before = (asked.at(-1)?.intake?.visa_flow ?? null) as VisaFacts | null;
+        const named = a?.country ?? request.country ?? before?.country ?? null;
+        const facts: VisaFacts = {
+          country: (named && list.countries.find((c) => fold(c.arabic_name) === fold(named))?.arabic_name) ?? named,
+          nationality: a?.nationality_ar ?? before?.nationality ?? null,
+          applicants: a?.applicants ?? before?.applicants ?? null,
+          travelDate: a?.travel_date ?? before?.travelDate ?? null,
+          ...(a?.schengen && !a.country ? { schengen: true } : {}),
+        };
+        // the model took seconds: never over a colleague who just came in, nor past a client who just wrote more
+        const again = await readThread(m.conversationId);
+        const lastNow = again?.messages.filter((t) => t.fromClient && !t.isPrivate).at(-1);
+        if (!again?.canReply || lastNow?.id !== latest.id || again.messages.some((t) => t.at >= latest.at && isHumanReply(t, ours))) {
+          await finish({ reason: "none:staff", error: "turn_changed" });
+          return "none:staff";
         }
+        const salam = request.salam && received.length === 0;
+        const start = visitLines.find((t) => t.fromClient)?.at ?? since;
+        const need = visaNeed(facts);
+        if (need.length && !asked.length) {
+          const schengen = facts.schengen ? list.rows.filter((v) => SCHENGEN.has(list.countries.find((c) => c.id === v.country_id)?.iso2 ?? "")).map((v) => v.country) : [];
+          const text = `${salam ? "وعليكم السلام ورحمة الله، " : ""}${visaAskText(facts, need, schengen)}`;
+          const replyId = await sendTeletelMessage(m.conversationId, text);
+          if (!replyId) { await finish({ reason: "send_failed", reply: text, error: "send_failed" }); return "send_failed"; }
+          await finish({ reason: "visa:asked1", reply: text, reply_message_id: replyId, intake: { ...intake, country: facts.country, visa_flow: facts } });
+          await markLead(service, m, { inquiry: "تأشيرات", destination: facts.country, route: DEPARTMENT["تأشيرات"], at: new Date().toISOString(), waitSec, intakeOnly: true });
+          await visaReceipt(service, m.conversationId, closedAt, start);
+          return "asked";
+        }
+        const country = list.countries.find((c) => facts.country && fold(c.arabic_name) === fold(facts.country));
+        return await visaAnswer(service, { m, logId, facts, row: visaRowFor(list.rows, country?.id ?? null, facts.country), salam, includePrice: settings.control.includePrice, visit: visitLines, intake, waitSec, closedAt, start });
       }
-      // the model did not answer, or nothing new: the decision below (the visa team, or quiet when already handed over)
     }
 
     // after the offer: the client changed the trip — the same file, its next version («حدّثت الطلب»)
@@ -684,7 +705,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       }
     }
 
-    if ((offerOpen || tripWithVisa) && offer) {
+    if (offerOpen && offer) {
       const trip = await readTrip(transcript, clientText, offer);
       if (trip) {
         const special = specialOf(offer, trip);
@@ -705,8 +726,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
           if (rate) {
             const price = priceOffer(offer, days, trip.adults ?? 2, rate, { rooms: trip.rooms, onlyCity: trip.only_city });
             const name = trip.name ?? firstName(m.contactName) ?? "";
-            const text = `${offerText({ includePrice: settings.control.includePrice, name, country: offer.country, price, arrival, provisional, c: offer })}${visaLine ? `
-${visaLine}` : ""}`;
+            const text = offerText({ includePrice: settings.control.includePrice, name, country: offer.country, price, arrival, provisional, c: offer });
             const replyId = await sendTeletelMessage(m.conversationId, text);
             if (!replyId) {
               await finish({ reason: "send_failed", reply: text, error: "send_failed" });
@@ -895,7 +915,10 @@ export async function receptionSweep(): Promise<number> {
   const service = db();
   const [flags, settings, reception, list] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service), listOpenConversations()]);
   if (!flags.murad_reception || !settings.control.tasks.reception || !list) return 0;
-  if (settings.control.tasks.visas) await retryVisaHandoffs(service);
+  if (settings.control.tasks.visas) {
+    await retryVisaHandoffs(service);
+    await visaFollowThrough(service, settings.control, settings.autoList);
+  }
   const nowSec = Math.floor(Date.now() / 1000);
   // a client waiting on us for under half an hour — a new conversation, or an old one the client reopened
   const { data: visaLeads } = visaForAll(settings.control) ? await service.from("client_leads").select("teletel_conversation_id").eq("inquiry", "تأشيرات").eq("status", "open") : { data: [] };

@@ -42,7 +42,7 @@ export async function routeCompletedVisa(service: SupabaseClient, logId: string)
     const updated: MuradReceipt = { ...receipt, assignedAt, team: team.name, agent: agent?.name ?? null, pending: false };
     const { error } = await service.from("client_leads").update({ ...assignment, murad_receipt: updated, assigned_at: assignedAt, assignee_reply_at: null, auto_route: team.name, auto_routed_at: assignedAt, auto_wait_sec: receipt.waitSec, updated_at: assignedAt }).eq("id", lead.id);
     if (error) throw Error("visa_receipt_save_failed");
-    await service.from("murad_log").update({ reason: "visa:intake", error: null, intake: { ...data.intake, visa_handoff: { teamId: team.id, agentId: agent?.id ?? null, assignedAt } } }).eq("id", logId);
+    await service.from("murad_log").update({ reason: "visa:handoff", error: null, intake: { ...data.intake, visa_handoff: { teamId: team.id, agentId: agent?.id ?? null, assignedAt } } }).eq("id", logId);
     await addTeletelNote(id, `مُراد: استلم الطلب خلال ${receipt.waitSec} ثانية، وأكمل جمعه وأسنده إلى ${team.name}${agent ? ` — ${agent.name}` : " — بانتظار موظف متاح في القسم"}.`);
     return true;
   } catch (error) {
@@ -52,6 +52,6 @@ export async function routeCompletedVisa(service: SupabaseClient, logId: string)
 }
 export async function retryVisaHandoffs(service: SupabaseClient): Promise<void> {
   await service.from("murad_log").update({ reason: "visa:handoff_pending" }).eq("reason", "visa:handoff_working").lt("acted_at", new Date(Date.now() - 180000).toISOString());
-  const { data } = await service.from("murad_log").select("id").eq("reason", "visa:handoff_pending").order("created_at").limit(3);
+  const { data } = await service.from("murad_log").select("id").eq("reason", "visa:handoff_pending").order("acted_at").limit(3);
   for (const row of data ?? []) await routeCompletedVisa(service, row.id);
 }
