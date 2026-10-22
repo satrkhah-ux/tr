@@ -36,6 +36,7 @@ export const SETTING = {
   testPhone: "client_whatsapp_test_phone",
   clientWhatsapp: "client_whatsapp",
   policies: "murad_policies",
+  visaFaq: "murad_visa_faq",
   cap: "murad_daily_cap",
   // «المستقبل الآلي» (reception.ts): test numbers only or everyone, the department → team table, the working day
   receptionScope: "murad_reception_scope",

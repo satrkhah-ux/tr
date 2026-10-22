@@ -82,3 +82,42 @@ export async function readVisa(transcript: string, clientText: string, countryNa
     return null;
   }
 }
+
+/**
+ * A visa question the price list does not answer, from the company's own
+ * «أسئلة وأجوبة التأشيرات» (/murad-settings, the owner's file of 2026-10-23:
+ * where to give fingerprints, the fastest Schengen embassy, the balance, why
+ * not Japan from Jeddah) — the answer said as that text says it, or null when
+ * the text does not say it. Never a fact from anywhere else.
+ */
+const PRICE_ASK = /(كم|بكم)\s*(ال)?(سعر|تكلف|كلف)|بكم\s*(ال)?(تا|تأ)شير|بكم\s*(ال)?فيز|كم\s*(ال)?سعر|السعر\s*كم/u;
+
+export async function visaFaqAnswer(i: { faq: string; transcript: string; country: string | null; nationality: string | null }): Promise<string | null> {
+  if (!i.faq.trim() || !isOpenAIConfigured()) return null;
+  try {
+    const raw = await openaiJson({
+      name: "visa_faq",
+      system: [
+        "You answer for a travel company in Saudi Arabia on WhatsApp. Below is the company's own visa Q&A, then one visit of a client's conversation (oldest first, «العميل» = the client, «مُراد» = us).",
+        "answer: reply to what the client's LATEST lines ask that the Q&A answers — only facts written in the Q&A, in its numbers and names, never anything else you know. A question about a country takes that country's section only («شنجن» covers the Schengen states). When the answer depends on whether the client is Saudi or a resident and that is not known, give both as the Q&A does.",
+        "Give the Q&A's WHOLE answer — every figure, fee, period, condition and exception it states (the fingerprint fee, the six months the officer reads) — never a part of it. Short Saudi Arabic, one to four lines, no greeting, no question back. A «ملاحظة» line is an answer too, and so is an answer that says there is no fixed figure («غير مذكور رصيد معين…») — say it with the rest of what it says. null when the Q&A does not answer it, and ALWAYS null for the visa's price or cost («كم سعر», «بكم», «كم التكلفة») — the price list answers it; what a fee INCLUDES («وش تشمل الرسوم») and any one paper's details (the balance, a sponsor, where to give fingerprints) are the Q&A's.",
+        "",
+        "## أسئلة وأجوبة الشركة",
+        i.faq.slice(0, 20000),
+        "",
+        `## ما نعرفه: الدولة: ${i.country ?? "غير معروفة"} · الجنسية: ${i.nationality ?? "غير معروفة"}`,
+      ].join("\n"),
+      user: withoutAd(i.transcript).slice(-3000),
+      schema: { type: "object", properties: { answer: { type: ["string", "null"] } }, required: ["answer"], additionalProperties: false },
+      temperature: 0,
+      timeoutMs: 15000,
+    });
+    const a = (JSON.parse(raw ?? "{}") as { answer?: string | null }).answer?.trim();
+    // the price is the list's, never the Q&A's fees («كم سعر تأشيرة فرنسا» got the office's 350 and Medina's 1100)
+    const last = i.transcript.split("\n").filter((l) => l.startsWith("العميل")).at(-1) ?? "";
+    if (PRICE_ASK.test(last) && !/تشمل|يشمل/u.test(last)) return null;
+    return a && a !== "null" ? a : null;
+  } catch {
+    return null;
+  }
+}

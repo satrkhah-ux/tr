@@ -97,7 +97,7 @@ export async function readThread(conversationId: number): Promise<FreshThread | 
 
 // ---------- settings, lease, log ----------
 
-type Settings = { control: MuradControl; clientWhatsapp: string | null; autoList: string[]; policies: string; cap: number };
+type Settings = { control: MuradControl; clientWhatsapp: string | null; autoList: string[]; policies: string; visaFaq: string; cap: number };
 
 export async function readSettings(service: SupabaseClient): Promise<Settings & { autoPhones: string[]; testPhone: string | null }> {
   const { data } = await service.from("app_settings").select("key, value").in("key", Object.values(SETTING));
@@ -112,6 +112,7 @@ export async function readSettings(service: SupabaseClient): Promise<Settings & 
     autoPhones,
     testPhone,
     policies: v.get(SETTING.policies) ?? "",
+    visaFaq: v.get(SETTING.visaFaq) ?? "",
     cap: capFor(v.get(SETTING.cap)),
   };
 }

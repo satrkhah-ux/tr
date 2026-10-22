@@ -129,10 +129,11 @@ export function quoteText(per: number, applicants: number | null): string {
  * as the list writes them — `row` null: a country not on the list, only the
  * hand-over line. `includePrice` off («إعدادات مُراد»): no figure anywhere.
  */
-export function visaFlowText(i: { row: VisaRow | null; facts: VisaFacts; includePrice: boolean; salam: boolean }): string {
+export function visaFlowText(i: { row: VisaRow | null; facts: VisaFacts; includePrice: boolean; salam: boolean; faq?: string | null }): string {
   const hello = i.salam ? "وعليكم السلام ورحمة الله، " : "";
   const asked = openTopics(i.facts);
-  const closing = asked ? `${VISA_CLOSING}\nوسؤالك عن ${asked} يجاوبك عليه زميلنا.` : VISA_CLOSING;
+  // the client's question answered from the company's visa Q&A (visa-read.ts visaFaqAnswer); else said back for the colleague
+  const closing = i.faq ? `${i.faq}\n\n${VISA_CLOSING}` : asked ? `${VISA_CLOSING}\nوسؤالك عن ${asked} يجاوبك عليه زميلنا.` : VISA_CLOSING;
   if (!i.row) return `${hello}${closing}`;
   const per = listPrice(i.row);
   const requirements = (i.row.arabic_requirements ?? "").trim();

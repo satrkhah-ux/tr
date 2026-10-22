@@ -35,7 +35,7 @@ import { returnedToEmployee } from "@/lib/leads/lifecycle";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
 import { isHumanReply, maskPhone, muradMessageIds, noteFor, SETTING, type TurnMessage } from "./core";
-import { readVisa } from "./visa-read";
+import { readVisa, visaFaqAnswer } from "./visa-read";
 import { repeatsMurad, SCHENGEN, VISA_FREE_ASK, visaFacts, visaFreeText, visaFlowNote, visaFlowText, visaStep, type VisaCountry, type VisaFacts, type VisaRow } from "./visa";
 import { readSettings, readThread } from "./run";
 import {
@@ -390,10 +390,10 @@ async function visaReceipt(service: SupabaseClient, conversationId: number, clos
  */
 async function visaAnswer(
   service: SupabaseClient,
-  i: { m: IncomingMessage; logId: string; facts: VisaFacts; row: VisaRow | null; salam: boolean; includePrice: boolean; visit: TurnMessage[]; intake: Record<string, unknown>; waitSec: number; closedAt: number; start: number },
+  i: { m: IncomingMessage; logId: string; facts: VisaFacts; row: VisaRow | null; faq?: string | null; salam: boolean; includePrice: boolean; visit: TurnMessage[]; intake: Record<string, unknown>; waitSec: number; closedAt: number; start: number },
 ): Promise<ReceptionOutcome> {
   const finish = (patch: Record<string, unknown>) => service.from("murad_log").update({ ...patch, acted_at: new Date().toISOString() }).eq("id", i.logId);
-  const text = visaFlowText({ row: i.row, facts: i.facts, includePrice: i.includePrice, salam: i.salam });
+  const text = visaFlowText({ row: i.row, facts: i.facts, includePrice: i.includePrice, salam: i.salam, faq: i.faq });
   // said already in this visit (9e8d7d5: never the same line twice): only the hand-over is done
   const repeat = repeatsMurad(text, i.visit);
   const replyId = repeat ? null : await sendTeletelMessage(i.m.conversationId, text);
@@ -593,16 +593,33 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     // after «الهند» went unanswered — «يستمع إلى الأخير ويقف الرد عند تدخل موظف»)
     const handoffRow = [...received].reverse().find((r) => r.intake?.visa_handoff || (r.intake?.visa_flow as { done?: boolean } | undefined)?.done);
     const sinceHandoff = handoffRow ? Date.parse(handoffRow.created_at) / 1000 : 0;
+    // «مُراد» on visas — the owner's short fixed flow (visa.ts): asked once, one answer, «قسم فيزا», then silence. Every
+    // client only with visaForAll; until then the two test numbers (the user, 2026-10-22: «للرقمين التجريبيين فقط أولاً»).
+    const visaOn = visaForAll(settings.control) || (settings.control.tasks.visas && Boolean(phone && settings.autoList.includes(phone)));
+    const lineText = (lines: TurnMessage[]) => lines.map((t) => `${t.fromClient ? "العميل" : "مُراد"}: ${t.text}`).join("\n");
     if (handoffRow) {
-      const fresh = visitLines.filter((t) => t.fromClient && t.at > sinceHandoff).map((t) => t.text).join("\n");
-      if (staffReplied || handedByHand || !fresh || readRequest(fresh, places).kind !== "تأشيرات") {
+      // what the client wrote since the hand-over, or since Murad's last answer from the company's visa Q&A
+      const lastFaq = received.filter((r) => r.reason === "visa:faq").at(-1);
+      const after = Math.max(sinceHandoff, lastFaq ? Date.parse(lastFaq.created_at) / 1000 : 0);
+      const fresh = visitLines.filter((t) => t.fromClient && t.at > after).map((t) => t.text).join("\n");
+      // a question the Q&A answers — «وين التبصيم؟», «كم الرصيد؟» — while no colleague has come in (the owner, 2026-10-23)
+      if (visaOn && fresh && !staffReplied && !handedByHand && thread.canReply && settings.visaFaq) {
+        const known = handoffRow.intake?.visa_flow as VisaFacts | undefined;
+        const answer = await visaFaqAnswer({ faq: settings.visaFaq, transcript: lineText(visitLines), country: known?.country ?? null, nationality: known?.nationality ?? null });
+        if (answer && !repeatsMurad(answer, visitLines)) {
+          const replyId = await sendTeletelMessage(m.conversationId, answer);
+          if (!replyId) { await finish({ reason: "send_failed", reply: answer, error: "send_failed" }); return "send_failed"; }
+          await finish({ reason: "visa:faq", reply: answer, reply_message_id: replyId, intake: { ...intake, country: known?.country ?? null } });
+          return "answered";
+        }
+      }
+      // another visa, named («وتأشيرة فيتنام؟»): the flow again; anything else waits for the team
+      const next = readRequest(fresh, places);
+      if (staffReplied || handedByHand || !fresh || next.kind !== "تأشيرات" || !next.country) {
         await finish({ reason: "none:routed" });
         return "none:routed";
       }
     }
-    // «مُراد» on visas — the owner's short fixed flow (visa.ts): asked once, one answer, «قسم فيزا», then silence. Every
-    // client only with visaForAll; until then the two test numbers (the user, 2026-10-22: «للرقمين التجريبيين فقط أولاً»).
-    const visaOn = visaForAll(settings.control) || (settings.control.tasks.visas && Boolean(phone && settings.autoList.includes(phone)));
     if (visaOn && !request.wantsHuman && (await visaConversation(service, m))) {
       const latest = thread.messages.filter((t) => t.fromClient && !t.isPrivate).at(-1);
       if (!thread.canReply || !latest || Date.now() / 1000 - latest.at > 24 * 3600) { await finish({ reason: "none:window" }); return "none:window"; }
@@ -613,11 +630,11 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       // after a hand-over, the new request is read from the lines after it; the passports and the count carry over
       const flowLines = visitLines.filter((t) => t.at > sinceHandoff);
       const flowRows = received.filter((r) => Date.parse(r.created_at) / 1000 > sinceHandoff);
-      const a = await readVisa(
-        flowLines.map((t) => `${t.fromClient ? "العميل" : "مُراد"}: ${t.text}`).join("\n"),
-        flowLines.filter((t) => t.fromClient).map((t) => t.text).join("\n") || clientText,
-        list.countries.map((c) => c.arabic_name),
-      );
+      const known = (received.filter((r) => r.intake?.visa_flow).at(-1)?.intake?.visa_flow ?? null) as VisaFacts | null;
+      const [a, faq] = await Promise.all([
+        readVisa(lineText(flowLines), flowLines.filter((t) => t.fromClient).map((t) => t.text).join("\n") || clientText, list.countries.map((c) => c.arabic_name)),
+        visaFaqAnswer({ faq: settings.visaFaq, transcript: lineText(flowLines), country: request.country ?? known?.country ?? null, nationality: known?.nationality ?? null }),
+      ]);
       // a trip in the same breath is a sales request (the order's A.2): the reception below hands it to packages
       if (a?.wants_trip) routeAs = { ...request, kind: "بكج" };
       else {
@@ -640,7 +657,8 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
         const schengen = facts.schengen ? list.rows.filter((v) => SCHENGEN.has(list.countries.find((c) => c.id === v.country_id)?.iso2 ?? "")).map((v) => v.country) : [];
         const step = visaStep({ a, facts, asked: asked.length > 0, countries: list.countries, rows: list.rows, includePrice: settings.control.includePrice, schengen, clientText: flowText });
         if (step.do === "ask") {
-          const text = `${salam ? "وعليكم السلام ورحمة الله، " : ""}${step.text}`;
+          // the client's own question first, from the company's Q&A, then the one question
+          const text = `${salam ? "وعليكم السلام ورحمة الله، " : ""}${faq ? `${faq}\n\n` : ""}${step.text}`;
           const replyId = await sendTeletelMessage(m.conversationId, text);
           if (!replyId) { await finish({ reason: "send_failed", reply: text, error: "send_failed" }); return "send_failed"; }
           await finish({ reason: "visa:asked1", reply: text, reply_message_id: replyId, intake: { ...intake, country: facts.country, visa_flow: facts } });
@@ -657,7 +675,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
           return "answered";
         }
         const row = step.row;
-        return await visaAnswer(service, { m, logId, facts, row, salam, includePrice: settings.control.includePrice, visit: visitLines, intake, waitSec, closedAt, start });
+        return await visaAnswer(service, { m, logId, facts, row, faq, salam, includePrice: settings.control.includePrice, visit: visitLines, intake, waitSec, closedAt, start });
       }
     }
 

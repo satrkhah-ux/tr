@@ -10,6 +10,6 @@ import { getMuradPolicies, getReceptionSetup } from "@/lib/data/app-settings";
 export default async function MuradSettingsPage() {
   const setup = await getMuradControl();
   if (!setup) redirect("/dashboard");
-  const [reception, policies] = await Promise.all([getReceptionSetup(), getMuradPolicies()]);
-  return <TraveliunShell title="nav.muradSettings"><div className="space-y-5"><MuradSettings setup={setup} /><ReceptionRoutes setup={reception} />{reception && <AutoOffers initial={reception.offers} usd={reception.usd} />}<MuradPolicies initial={policies} /></div></TraveliunShell>;
+  const [reception, policies, visaFaq] = await Promise.all([getReceptionSetup(), getMuradPolicies(), getMuradPolicies("murad_visa_faq")]);
+  return <TraveliunShell title="nav.muradSettings"><div className="space-y-5"><MuradSettings setup={setup} /><ReceptionRoutes setup={reception} />{reception && <AutoOffers initial={reception.offers} usd={reception.usd} />}<MuradPolicies initial={visaFaq} setting="murad_visa_faq" /><MuradPolicies initial={policies} /></div></TraveliunShell>;
 }

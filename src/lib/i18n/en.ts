@@ -1056,6 +1056,8 @@ export const en = {
   "murad.policies.save": "Save",
   "murad.policies.saved": "Saved.",
   "murad.policies.failed": "Could not save.",
+  "murad.visaFaq.title": "Visa questions and answers for Murad",
+  "murad.visaFaq.hint": "Murad answers visa questions the price list does not (fingerprint centres, timing, required balance, easiest embassy…) from this text only, before the hand-over and after it until a colleague steps in. Write the country on a line, then its questions: س: … ج: … — anything not here goes to the visa team.",
 
   // ---------- intelligence hub ----------
   "hub.heading": "Offers & customers operations center",

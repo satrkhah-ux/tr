@@ -172,26 +172,29 @@ export async function setMuradAutoPhones(phones: string[]): Promise<SetSettingRe
   }
 }
 
-/** «سياسات الشركة» Murad answers policy questions from — empty: those go to staff. */
-export async function getMuradPolicies(): Promise<string> {
+/** Murad's two texts: «سياسات الشركة» and «أسئلة وأجوبة التأشيرات» (2026-10-23) — empty: those questions go to staff. */
+export type MuradTextKey = "murad_policies" | "murad_visa_faq";
+const MURAD_TEXT_MAX: Record<MuradTextKey, number> = { murad_policies: 4000, murad_visa_faq: 20000 };
+
+export async function getMuradPolicies(key: MuradTextKey = "murad_policies"): Promise<string> {
   if (!(await currentCan("settings.manage")) && !(await currentCan("developer.access"))) return "";
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
-    const { data } = await supabase.from("app_settings").select("value").eq("key", "murad_policies").maybeSingle();
+    const { data } = await supabase.from("app_settings").select("value").eq("key", key).maybeSingle();
     return (data as { value?: string } | null)?.value ?? "";
   } catch {
     return "";
   }
 }
 
-export async function setMuradPolicies(text: string): Promise<SetSettingResult> {
+export async function setMuradPolicies(text: string, key: MuradTextKey = "murad_policies"): Promise<SetSettingResult> {
   if (!(await currentCan("settings.manage")) && !(await currentCan("developer.access"))) return { ok: false, error: "err.forbidden" };
-  if (typeof text !== "string" || text.length > 4000) return { ok: false, error: "err.db" };
+  if (!(key in MURAD_TEXT_MAX) || typeof text !== "string" || text.length > MURAD_TEXT_MAX[key]) return { ok: false, error: "err.db" };
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
-    const { error } = await supabase.from("app_settings").upsert({ key: "murad_policies", value: text.trim(), updated_at: new Date().toISOString() });
+    const { error } = await supabase.from("app_settings").upsert({ key, value: text.trim(), updated_at: new Date().toISOString() });
     if (error) return { ok: false, error: "err.db" };
-    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: "murad_policies", meta: { length: text.trim().length } });
+    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: key, meta: { length: text.trim().length } });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };

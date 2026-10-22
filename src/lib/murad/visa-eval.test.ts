@@ -11,7 +11,7 @@ import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { readRequest } from "./reception";
-import { readVisa } from "./visa-read";
+import { readVisa, visaFaqAnswer } from "./visa-read";
 import { VISA_FREE_ASK, visaFacts, visaStep, type VisaCountry, type VisaFacts, type VisaRow } from "./visa";
 
 type Want = "ask" | "advice" | "answer" | "handoff" | "free" | "trip";
@@ -140,6 +140,46 @@ describe.skipIf(!process.env["VISA_EVAL"])("Murad visa — real openings", () =>
         const ok = (entered || got === "trip") && wants.includes(got) && countryOk;
         const said = step.do === "ask" ? step.text : step.do === "free" ? `(معفاة) ${step.country}` : step.do === "answer" ? (step.row ? `(قائمة) ${step.row.country}` : "(تحويل)") : "(مبيعات)";
         return { ok, line: `${ok ? "✓" : "✗"} ${client.at(-1)!.slice(0, 60)} → ${got}${entered ? "" : " [لم يدخل مسار التأشيرات]"} · ${facts.country ?? "—"} | ${said.replace(/\n/g, " ⏎ ").slice(0, 220)}` };
+      }),
+    );
+    for (const r of results) console.log(r.line);
+    const score = results.filter((r) => r.ok).length / results.length;
+    console.log(`\nالنتيجة: ${results.filter((r) => r.ok).length}/${results.length} = ${(score * 100).toFixed(1)}%`);
+    expect(score).toBeGreaterThanOrEqual(0.95);
+  });
+});
+
+// the company's own visa Q&A (/murad-settings, the owner's file of 2026-10-23): said when it says it, never otherwise
+const FAQ: { t: string; country: string | null; has: RegExp | null }[] = [
+  { t: "وين اماكن التبصيم لتأشيرة الشنغن؟", country: null, has: /جد[ةه][\s\S]*الرياض|الرياض[\s\S]*جد[ةه]/u },
+  { t: "فيه تبصيم في المدينة لفيزا فرنسا؟", country: "فرنسا", has: /1100/u },
+  { t: "اي سفارة شنغن اسرع؟", country: null, has: /[اإ]سبانيا/u },
+  { t: "انا سعودي وش اسهل سفارة شنغن؟", country: null, has: /فرنسا/u },
+  { t: "مقيم مصري، وش اسهل سفارة اوروبية في الاجراءات؟", country: null, has: /[اإ]سبانيا|البرتغال/u },
+  { t: "كم لازم يكون الرصيد في كشف الحساب لتأشيرة سويسرا؟", country: "سويسرا", has: /25/u },
+  { t: "كم الرصيد المطلوب لفيزا فرنسا؟", country: "فرنسا", has: /10/u },
+  { t: "تأشيرة اسبانيا بس ما عندي تعريف راتب وش اسوي؟", country: "إسبانيا", has: /قريب|يكفل/u },
+  { t: "ليش ما تقدمون تأشيرة اليابان؟ انا ساكن في جدة", country: "اليابان", has: /ترفض|رفض/u },
+  { t: "كم لازم يكون رصيدي لتأشيرة بريطانيا؟", country: "المملكة المتحدة", has: /6|ست/u },
+  { t: "وش تشمل رسوم مكتبكم في الشنغن؟", country: null, has: /350/u },
+  { t: "اقدر استفسر من سفارة تركيا عن طريقكم عن طلبي؟", country: "تركيا", has: /بنفسك|بنفسه/u },
+  { t: "كم نسبة القبول في تأشيرة فرنسا؟", country: "فرنسا", has: null },
+  { t: "تأشيرة الهند كم تاخذ وقت؟", country: "الهند", has: null },
+  { t: "كم سعر تأشيرة فرنسا؟", country: "فرنسا", has: null },
+];
+
+describe.skipIf(!process.env["VISA_EVAL"])("Murad visa — the company's Q&A", () => {
+  it("≥ 95% answered from the Q&A, or left to the team", { timeout: 600_000 }, async () => {
+    env();
+    const db = createClient(process.env["NEXT_PUBLIC_SUPABASE_URL"]!, process.env["SUPABASE_SERVICE_ROLE_KEY"]!);
+    const { data } = await db.from("app_settings").select("value").eq("key", "murad_visa_faq").maybeSingle();
+    const faq = (data as { value?: string } | null)?.value ?? "";
+    expect(faq).not.toBe("");
+    const results = await Promise.all(
+      FAQ.map(async (k) => {
+        const answer = await visaFaqAnswer({ faq, transcript: `العميل: ${k.t}`, country: k.country, nationality: null });
+        const ok = k.has ? Boolean(answer && k.has.test(answer)) : answer === null;
+        return { ok, line: `${ok ? "✓" : "✗"} ${k.t} → ${answer?.replace(/\n/g, " ⏎ ") ?? "(للفريق)"}` };
       }),
     );
     for (const r of results) console.log(r.line);
