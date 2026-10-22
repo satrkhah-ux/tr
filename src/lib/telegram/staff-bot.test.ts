@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { riyadhDayStart, secondsText, waitText } from "./staff-numbers";
+import { riyadhDayStart, secondsText, speedText, waitText } from "./staff-numbers";
 import { assignmentText } from "./staff-events";
 import { ruleTips, teamAverages, type Facts } from "./staff-report";
 import { dashboardText, light } from "./staff-screen";
@@ -55,9 +55,12 @@ describe("«تنبيهاتي» tips stand on the employee's numbers", () => {
     expect(tips[1]).toContain("3 عميل ينتظر ردك، أقدمهم منذ 1 س 35 د");
   });
 
-  it("compares speed with the team only when clearly slower", () => {
-    expect(ruleTips(day({}, { firstResponseSec: 900 })).join(" ")).toContain("15 د مقابل 5 د للفريق");
-    expect(ruleTips(day({}, { firstResponseSec: 330 })).join(" ")).not.toContain("للفريق");
+  it("measures speed against the administration's targets, not against a slow team", () => {
+    expect(ruleTips(day({}, { firstResponseSec: 900 })).join(" ")).toContain("أول رد عندك اليوم 15 د والهدف 5 د");
+    expect(ruleTips(day({}, { firstResponseSec: 240 })).join(" ")).not.toContain("أول رد عندك");
+    // the screenshot of 2026-10-22: a 35-minute reply beside a team mean of 1 h 28 — still slower than the 15-minute target
+    const slowTeam = { ...day({}, { replySec: 2100 }), team: { firstResponseSec: 300, replySec: 5280 } };
+    expect(ruleTips(slowTeam).join(" ")).toContain("ردّك أثناء المحادثة 35 د والهدف 15 د");
   });
 
   it("praises a clean day instead of inventing a problem, and never says more than three", () => {
@@ -86,15 +89,23 @@ describe("«🖥️ شاشتي»", () => {
     expect(light({ waiting: 0, neverAnswered: 0, oldestWaitMin: null }).icon).toBe("🟢");
   });
 
-  it("shows the employee's own numbers beside the team mean, and the time it was refreshed", () => {
+  it("says each number in plain words, judged against the target, and when it was refreshed", () => {
     const f = day({ open: 18, waiting: 3, oldestWaitMin: 12 });
     const text = dashboardText("رهف", f.numbers, f.team, { issued: 2, botReplies: 0 }, Date.parse("2026-10-22T11:05:00Z"));
-    expect(text).toContain("مفتوحة لك: <b>18</b>");
-    expect(text).toContain("الأقدم منذ 12 د");
-    expect(text).toContain("أول رد: <b>2 د</b> 🟢 (الفريق 5 د)");
-    expect(text).toContain("ملفات أصدرتها: <b>2</b>");
+    expect(text).toContain("محادثات مفتوحة لك: <b>18</b>");
+    expect(text).toContain("أقدمهم منذ 12 د");
+    expect(text).toContain("محادثات أُسندت إليك: <b>3</b>");
+    expect(text).toContain("أول رد للعميل: <b>2 د</b> — 🟢 ضمن الهدف (5 د)");
+    expect(text).toContain("ملفات أصدرتها في النظام: <b>2</b>");
     expect(text).toContain("02:05");
-    expect(text).not.toContain("ردود من البوت");
+    expect(text).not.toContain("ردود أرسلتها من البوت");
+  });
+
+  it("marks a speed green, yellow or red by the two SLA limits", () => {
+    expect(speedText(2100, [15, 120])).toBe("<b>35 د</b> — 🟡 أبطأ من الهدف (15 د)");
+    expect(speedText(600, [15, 120])).toContain("🟢 ضمن الهدف");
+    expect(speedText(9000, [15, 120])).toContain("🔴 متأخر كثيراً");
+    expect(speedText(null, [15, 120])).toBe("— لا يوجد بعد");
   });
 });
 

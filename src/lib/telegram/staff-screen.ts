@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { agentSummaries, listOpenConversations, type AgentSummary, type OpenConversation } from "@/lib/providers/teletel";
 import { escapeHtml, staffCall, staffSend, type StaffMember } from "./staff-bot";
-import { myNumbers, openFor, riyadhDayStart, secondsText, systemCounts, waitText, type MyNumbers } from "./staff-numbers";
+import { DEFAULT_TARGETS, loadTargets, myNumbers, openFor, riyadhDayStart, secondsText, speedText, systemCounts, waitText, type MyNumbers, type Targets } from "./staff-numbers";
 import { teamAverages, type Team } from "./staff-report";
 import { rememberThread, replyButtons } from "./staff-replies";
 import type { InlineButton } from "./ops-bot";
@@ -36,10 +36,14 @@ export function light(n: Pick<MyNumbers, "waiting" | "neverAnswered" | "oldestWa
   return { icon: "🟢", words: "ممتاز — لا أحد ينتظرك" };
 }
 
-/** Faster than the team (time) — a mark beside the number, not a score. */
-const pace = (mine: number | null | undefined, team: number | null) => (mine && team ? (mine <= team ? " 🟢" : mine > team * 1.5 ? " 🔴" : " 🟡") : "");
-
-export function dashboardText(name: string, n: MyNumbers, team: Team, extra: { issued: number; botReplies: number }, nowMs: number): string {
+export function dashboardText(
+  name: string,
+  n: MyNumbers,
+  team: Team,
+  extra: { issued: number; botReplies: number },
+  nowMs: number,
+  targets: Targets = DEFAULT_TARGETS,
+): string {
   const r = n.today.report;
   const status = light(n);
   const at = new Date(nowMs).toLocaleTimeString("ar-SA-u-nu-latn", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit" });
@@ -48,22 +52,27 @@ export function dashboardText(name: string, n: MyNumbers, team: Team, extra: { i
     `${status.icon} ${status.words}`,
     "",
     "<b>━━ الآن ━━</b>",
-    `📂 مفتوحة لك: <b>${n.open}</b>`,
-    `⏳ بانتظار ردك: <b>${n.waiting}</b>${n.oldestWaitMin != null ? ` · الأقدم منذ ${waitText(n.oldestWaitMin)}` : ""}`,
-    `🆕 لم يُرد عليها أبداً: <b>${n.neverAnswered}</b>`,
+    `📂 محادثات مفتوحة لك: <b>${n.open}</b>`,
+    `⏳ عملاء ينتظرون ردك: <b>${n.waiting}</b>${n.oldestWaitMin != null ? ` · أقدمهم منذ ${waitText(n.oldestWaitMin)}` : ""}`,
+    `🆕 محادثات لم ترد عليها أبداً: <b>${n.neverAnswered}</b>`,
     "",
     "<b>━━ اليوم ━━</b>",
-    `📥 تحويلات وصلتك: <b>${n.today.assigned}</b>`,
-    `💬 محادثات: <b>${r?.conversations ?? 0}</b> · ✅ أغلقت: <b>${r?.resolved ?? 0}</b>`,
-    `⚡ أول رد: <b>${secondsText(r?.firstResponseSec)}</b>${pace(r?.firstResponseSec, team.firstResponseSec)} (الفريق ${secondsText(team.firstResponseSec)})`,
-    `↩️ الرد: <b>${secondsText(r?.replySec)}</b>${pace(r?.replySec, team.replySec)} (الفريق ${secondsText(team.replySec)})`,
-    `📄 ملفات أصدرتها: <b>${extra.issued}</b>${extra.botReplies ? ` · ردود من البوت: <b>${extra.botReplies}</b>` : ""}`,
+    `📥 محادثات أُسندت إليك: <b>${n.today.assigned}</b>`,
+    `✅ محادثات أغلقتها: <b>${r?.resolved ?? 0}</b>`,
+    `⚡ أول رد للعميل: ${speedText(r?.firstResponseSec, targets.firstReply)}`,
+    `↩️ ردّك أثناء المحادثة: ${speedText(r?.replySec, targets.reply)}`,
+    `👥 متوسط الفريق اليوم: أول رد ${secondsText(team.firstResponseSec)} · الرد ${secondsText(team.replySec)}`,
+    extra.issued ? `📄 ملفات أصدرتها في النظام: <b>${extra.issued}</b>` : null,
+    extra.botReplies ? `🤖 ردود أرسلتها من البوت: <b>${extra.botReplies}</b>` : null,
     "",
-    "<b>━━ الإجمالي ━━</b>",
-    `🗂️ كل محادثاتك: <b>${n.total ?? "—"}</b> · مغلقة: <b>${n.closed ?? "—"}</b>`,
+    "<b>━━ منذ البداية ━━</b>",
+    `🗂️ كل محادثاتك: <b>${n.total ?? "—"}</b> · المغلقة منها: <b>${n.closed ?? "—"}</b>`,
     "",
+    `<i>الهدف من إعدادات «SLA»: أول رد خلال ${waitText(targets.firstReply[0])}، والرد خلال ${waitText(targets.reply[0])}</i>`,
     `<i>يتحدّث تلقائياً كل ٥ دقائق · آخر تحديث ${at}</i>`,
-  ].join("\n");
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
 }
 
 export const SCREEN_BUTTONS: InlineButton[][] = [
@@ -77,8 +86,8 @@ export async function screenView(me: StaffMember, nowMs = Date.now(), summaries?
   if (!me.agentId) return null;
   const since = riyadhDayStart(nowMs);
   const all = summaries === undefined ? await agentSummaries(since, Math.floor(nowMs / 1000)) : summaries;
-  const [n, extra] = await Promise.all([myNumbers(me.agentId, nowMs, all), systemCounts(me.id, since)]);
-  return n ? { text: dashboardText(me.name, n, teamAverages(all), extra, nowMs), buttons: SCREEN_BUTTONS } : null;
+  const [n, extra, targets] = await Promise.all([myNumbers(me.agentId, nowMs, all), systemCounts(me.id, since), loadTargets()]);
+  return n ? { text: dashboardText(me.name, n, teamAverages(all), extra, nowMs, targets), buttons: SCREEN_BUTTONS } : null;
 }
 
 /** «🖥️ شاشتي» from the keyboard: a fresh screen, pinned silently. The previous one is removed, and the minute job keeps the new one current. */
@@ -186,17 +195,19 @@ export async function weekView(me: StaffMember, nowMs = Date.now()): Promise<Scr
   const a = thisWeek.get(me.agentId);
   const b = lastWeek?.get(me.agentId);
   const team = teamAverages(thisWeek);
+  const targets = await loadTargets();
   return {
     text: [
       "📅 <b>أداؤك آخر ٧ أيام</b>",
-      "<i>بين قوسين: الأسبوع الذي قبله</i>",
+      "<i>بين قوسين: الأيام السبعة التي قبلها</i>",
       "",
-      `💬 محادثات: <b>${a?.conversations ?? 0}</b> (${b?.conversations ?? 0})${trend(a?.conversations, b?.conversations)}`,
-      `✅ أغلقت: <b>${a?.resolved ?? 0}</b> (${b?.resolved ?? 0})${trend(a?.resolved, b?.resolved)}`,
-      `⚡ أول رد: <b>${secondsText(a?.firstResponseSec)}</b> (${secondsText(b?.firstResponseSec)})${trend(a?.firstResponseSec, b?.firstResponseSec, true)} — الفريق ${secondsText(team.firstResponseSec)}`,
-      `↩️ الرد: <b>${secondsText(a?.replySec)}</b> (${secondsText(b?.replySec)})${trend(a?.replySec, b?.replySec, true)} — الفريق ${secondsText(team.replySec)}`,
-      `📄 ملفات أصدرتها: <b>${mine.issued}</b> (${before.issued})${trend(mine.issued, before.issued)}`,
-      mine.botReplies ? `🤖 ردود من البوت: <b>${mine.botReplies}</b>` : null,
+      `💬 محادثات جديدة أُسندت إليك: <b>${a?.conversations ?? 0}</b> (${b?.conversations ?? 0})${trend(a?.conversations, b?.conversations)}`,
+      `✅ محادثات أغلقتها: <b>${a?.resolved ?? 0}</b> (${b?.resolved ?? 0})${trend(a?.resolved, b?.resolved)}`,
+      `⚡ أول رد للعميل: ${speedText(a?.firstResponseSec, targets.firstReply)} (${secondsText(b?.firstResponseSec)})${trend(a?.firstResponseSec, b?.firstResponseSec, true)}`,
+      `↩️ ردّك أثناء المحادثة: ${speedText(a?.replySec, targets.reply)} (${secondsText(b?.replySec)})${trend(a?.replySec, b?.replySec, true)}`,
+      `👥 متوسط الفريق: أول رد ${secondsText(team.firstResponseSec)} · الرد ${secondsText(team.replySec)}`,
+      `📄 ملفات أصدرتها في النظام: <b>${mine.issued}</b> (${before.issued})${trend(mine.issued, before.issued)}`,
+      mine.botReplies ? `🤖 ردود أرسلتها من البوت: <b>${mine.botReplies}</b>` : null,
     ]
       .filter((line): line is string => line !== null)
       .join("\n"),

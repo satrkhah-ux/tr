@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { agentSummaries, type AgentSummary } from "@/lib/providers/teletel";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
-import { myNumbers, riyadhDayStart, secondsText, systemCounts, waitText, type MyNumbers } from "./staff-numbers";
+import { DEFAULT_TARGETS, loadTargets, myNumbers, riyadhDayStart, secondsText, speedText, systemCounts, waitText, type MyNumbers, type Targets } from "./staff-numbers";
 import { escapeHtml, staffSend, type StaffMember } from "./staff-bot";
 
 /**
@@ -39,7 +39,8 @@ export function teamAverages(all: Map<number, AgentSummary> | null): Team {
   return { firstResponseSec: mean((r) => r.firstResponseSec), replySec: mean((r) => r.replySec) };
 }
 
-export type Facts = { numbers: MyNumbers; team: Team; issued: number; botReplies: number };
+/** `targets`: the administration's minutes from «SLA» (loadTargets); the defaults when absent. */
+export type Facts = { numbers: MyNumbers; team: Team; targets?: Targets; issued: number; botReplies: number };
 
 /** Every tip is one of the employee's numbers, said as something to do tomorrow. The worst first, at most three. */
 export function ruleTips(f: Facts): string[] {
@@ -48,14 +49,16 @@ export function ruleTips(f: Facts): string[] {
   const tips: string[] = [];
   if (n.neverAnswered > 0) tips.push(`عندك ${n.neverAnswered} محادثة لم يُرد عليها أبداً — ابدأ بها غداً قبل أي شيء، فالعميل الذي لا يجد رداً يذهب لغيرنا.`);
   if (n.waiting > 0) tips.push(`${n.waiting} عميل ينتظر ردك${n.oldestWaitMin != null ? `، أقدمهم منذ ${waitText(n.oldestWaitMin)}` : ""} — ردّ عليهم أول الدوام ولو برسالة قصيرة تطمئنهم.`);
-  if (r?.firstResponseSec && f.team.firstResponseSec && r.firstResponseSec > f.team.firstResponseSec * 1.2) {
-    tips.push(`متوسط أول رد عندك ${secondsText(r.firstResponseSec)} مقابل ${secondsText(f.team.firstResponseSec)} للفريق — أول رد خلال 5 دقائق يرفع فرصة الحجز.`);
+  // against the administration's own targets («SLA»), with the team mean as context, never as the bar
+  const t = f.targets ?? DEFAULT_TARGETS;
+  if (r?.firstResponseSec && r.firstResponseSec / 60 > t.firstReply[0]) {
+    tips.push(`أول رد عندك اليوم ${secondsText(r.firstResponseSec)} والهدف ${waitText(t.firstReply[0])} (متوسط الفريق ${secondsText(f.team.firstResponseSec)}) — ردّ أولاً برسالة ترحيب قصيرة ثم أكمل التفاصيل.`);
   }
-  if (r?.replySec && f.team.replySec && r.replySec > f.team.replySec * 1.2) {
-    tips.push(`متوسط ردك أثناء المحادثة ${secondsText(r.replySec)} مقابل ${secondsText(f.team.replySec)} للفريق — فعّل تنبيهات البوت لتعرف فور كتابة العميل.`);
+  if (r?.replySec && r.replySec / 60 > t.reply[0]) {
+    tips.push(`ردّك أثناء المحادثة ${secondsText(r.replySec)} والهدف ${waitText(t.reply[0])} (متوسط الفريق ${secondsText(f.team.replySec)}) — تنبيهات البوت تخبرك فور كتابة العميل.`);
   }
   if (n.open > 25 && (r?.resolved ?? 0) < 3) tips.push(`لديك ${n.open} محادثة مفتوحة — أغلق ما انتهى منها في تيلي تيل حتى تبقى قائمتك لمن ينتظرك فعلاً.`);
-  if (!tips.length) tips.push("يومك ممتاز — لا أحد ينتظرك وردودك أسرع من متوسط الفريق. حافظ على نفس الإيقاع غداً 👏");
+  if (!tips.length) tips.push("يومك ممتاز — لا أحد ينتظرك وردودك ضمن الهدف. حافظ على نفس الإيقاع غداً 👏");
   return tips.slice(0, 3);
 }
 
@@ -99,9 +102,9 @@ export async function buildReport(me: StaffMember, nowMs = Date.now(), summaries
   if (!me.agentId) return null;
   const since = riyadhDayStart(nowMs);
   const all = summaries === undefined ? await agentSummaries(since, Math.floor(nowMs / 1000)) : summaries;
-  const [numbers, extra] = await Promise.all([myNumbers(me.agentId, nowMs, all), systemCounts(me.id, since)]);
+  const [numbers, extra, targets] = await Promise.all([myNumbers(me.agentId, nowMs, all), systemCounts(me.id, since), loadTargets()]);
   if (!numbers) return null;
-  const facts: Facts = { numbers, team: teamAverages(all), ...extra };
+  const facts: Facts = { numbers, team: teamAverages(all), targets, ...extra };
   const rules = ruleTips(facts);
   const tips = (await voiced(me.name, rules)) ?? rules;
   const r = numbers.today.report;
@@ -109,14 +112,15 @@ export async function buildReport(me: StaffMember, nowMs = Date.now(), summaries
   const text = [
     `📈 <b>تقريرك اليوم</b> — ${escapeHtml(day)}`,
     "",
-    `• محادثات اليوم: <b>${r?.conversations ?? 0}</b> · أغلقت: <b>${r?.resolved ?? 0}</b>`,
-    `• تحويلات وصلتك: <b>${numbers.today.assigned}</b>`,
-    `• متوسط أول رد: <b>${secondsText(r?.firstResponseSec)}</b> (الفريق: ${secondsText(facts.team.firstResponseSec)})`,
-    `• متوسط الرد: <b>${secondsText(r?.replySec)}</b> (الفريق: ${secondsText(facts.team.replySec)})`,
-    `• ملفات أصدرتها في النظام: <b>${extra.issued}</b>`,
-    extra.botReplies ? `• ردود أرسلتها من البوت: <b>${extra.botReplies}</b>` : null,
+    `📥 محادثات أُسندت إليك: <b>${numbers.today.assigned}</b>`,
+    `✅ محادثات أغلقتها: <b>${r?.resolved ?? 0}</b>`,
+    `⚡ أول رد للعميل: ${speedText(r?.firstResponseSec, targets.firstReply)}`,
+    `↩️ ردّك أثناء المحادثة: ${speedText(r?.replySec, targets.reply)}`,
+    `👥 متوسط الفريق اليوم: أول رد ${secondsText(facts.team.firstResponseSec)} · الرد ${secondsText(facts.team.replySec)}`,
+    extra.issued ? `📄 ملفات أصدرتها في النظام: <b>${extra.issued}</b>` : null,
+    extra.botReplies ? `🤖 ردود أرسلتها من البوت: <b>${extra.botReplies}</b>` : null,
     "",
-    `• مفتوحة لك الآن: <b>${numbers.open}</b> — بانتظار ردك: <b>${numbers.waiting}</b> — لم يُرد عليها: <b>${numbers.neverAnswered}</b>`,
+    `📂 مفتوحة لك الآن: <b>${numbers.open}</b> · ⏳ ينتظرون ردك: <b>${numbers.waiting}</b> · 🆕 لم ترد عليها أبداً: <b>${numbers.neverAnswered}</b>`,
     "",
     "💡 <b>لغدٍ أفضل</b>",
     ...tips.map((t, i) => `${i + 1}. ${escapeHtml(t)}`),

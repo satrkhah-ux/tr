@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { agentSummaries, countAgentConversations, listOpenConversations, type AgentSummary, type OpenConversation } from "@/lib/providers/teletel";
+import { ruleMinutes, type SlaUnit } from "@/lib/sla/classify";
 
 /**
  * One employee's numbers, from Teletel itself. They are the employee's own
@@ -51,11 +52,7 @@ export async function myNumbers(agentId: number, nowMs = Date.now(), summaries?:
     countAgentConversations(agentId, "all"),
     countAgentConversations(agentId, "resolved"),
     summaries === undefined ? agentSummaries(since, Math.floor(nowMs / 1000)) : Promise.resolve(summaries),
-    db()
-      .from("staff_bot_assignments")
-      .select("id", { count: "exact", head: true })
-      .eq("agent_id", agentId)
-      .gte("created_at", new Date(since * 1000).toISOString()),
+    db().from("staff_bot_assignments").select("conversation_id").eq("agent_id", agentId).gte("created_at", new Date(since * 1000).toISOString()),
   ]);
   if (!open) return null;
   const waiting = open.filter((c) => c.waitingSince > 0);
@@ -67,7 +64,8 @@ export async function myNumbers(agentId: number, nowMs = Date.now(), summaries?:
     oldestWaitMin: oldest ? Math.max(0, Math.floor((nowMs / 1000 - oldest) / 60)) : null,
     total,
     closed,
-    today: { assigned: assigned.count ?? 0, report: report?.get(agentId) ?? null },
+    // each conversation once, however many times it came back today
+    today: { assigned: new Set(((assigned.data ?? []) as { conversation_id: number }[]).map((a) => a.conversation_id)).size, report: report?.get(agentId) ?? null },
   };
 }
 
@@ -94,3 +92,33 @@ export function waitText(minutes: number): string {
 
 /** Seconds of Teletel's averages → the same words; «—» for none. */
 export const secondsText = (sec: number | null | undefined): string => (sec == null ? "—" : waitText(Math.max(1, Math.round(sec / 60))));
+
+/**
+ * The administration's own targets, from «SLA» (sla_rules): first reply in its
+ * «first_reply» limits, a reply during the conversation in its «waiting» ones.
+ * The first limit is the target and the second is late. The rules are read
+ * whether or not they are switched on (the switch is about moving
+ * conversations, the minutes are the owner's). Defaults are the owner's numbers
+ * as of 2026-10-22: 5 and 30 minutes, 15 minutes and 2 hours.
+ */
+export type Targets = { firstReply: [number, number]; reply: [number, number] };
+export const DEFAULT_TARGETS: Targets = { firstReply: [5, 30], reply: [15, 120] };
+
+export async function loadTargets(): Promise<Targets> {
+  const { data } = await db().from("sla_rules").select("kind, amount, unit").in("kind", ["first_reply", "waiting"]);
+  const rows = (data ?? []) as { kind: string; amount: number; unit: SlaUnit }[];
+  const pair = (kind: string, fallback: [number, number]): [number, number] => {
+    const m = rows.filter((r) => r.kind === kind).map(ruleMinutes).sort((a, b) => a - b);
+    return m.length >= 2 ? [m[0], m[1]] : m.length === 1 ? [m[0], Math.max(m[0] * 4, fallback[1])] : fallback;
+  };
+  return { firstReply: pair("first_reply", DEFAULT_TARGETS.firstReply), reply: pair("waiting", DEFAULT_TARGETS.reply) };
+}
+
+/** A speed against the target: «4 د — 🟢 ضمن الهدف (5 د)». Nothing to judge → «لا يوجد اليوم». */
+export function speedText(sec: number | null | undefined, [target, late]: [number, number]): string {
+  if (sec == null) return "— لا يوجد بعد";
+  const min = sec / 60;
+  const mark = min <= target ? "🟢 ضمن الهدف" : min <= late ? "🟡 أبطأ من الهدف" : "🔴 متأخر كثيراً";
+  return `<b>${secondsText(sec)}</b> — ${mark} (${waitText(target)})`;
+}
+
