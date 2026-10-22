@@ -39,6 +39,14 @@ export function parseControl(raw: string | null | undefined): MuradControl {
   for (const k of Object.keys(c.tasks) as (keyof typeof c.tasks)[]) c.tasks[k] = false;
   return c;
 }
+/**
+ * Murad answers visa questions for EVERY client (not only the test numbers) —
+ * one rule for every place that asks (the evaluator, 2026-10-22: on 21 Oct
+ * visaAll was on while «الإجابة عن التأشيرات» was off, the minute sweep read
+ * visaAll alone, and 62 real clients got visa replies). Both must be on.
+ */
+export const visaForAll = (c: MuradControl): boolean => c.tasks.visas && c.visaAll === true;
+
 export function inMuradScope(c: MuradControl, inbox: number | null, team: number | null): boolean {
   return (!c.inboxIds.length || (inbox !== null && c.inboxIds.includes(inbox)))
     && (!c.teamIds.length || (team !== null && c.teamIds.includes(team)));

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { saveMuradControl, type getMuradControl } from "@/lib/data/murad-control";
-import { TASK_LABELS } from "@/lib/murad/control";
+import { TASK_LABELS, visaForAll } from "@/lib/murad/control";
 import { ROUTE_KEYS, DEPARTMENT } from "@/lib/murad/reception";
 
 type Setup = NonNullable<Awaited<ReturnType<typeof getMuradControl>>>;
@@ -23,7 +23,14 @@ export function MuradSettings({ setup }: { setup: Setup }) {
       <div className="grid gap-3 sm:grid-cols-2">{Object.entries(TASK_LABELS).map(([key, label]) => <label key={key} className="flex items-center gap-3 rounded-xl bg-[#f0f7f4] p-4">
         <input type="checkbox" checked={c.tasks[key as keyof typeof c.tasks]} onChange={(e) => setC({ ...c, tasks: { ...c.tasks, [key]: e.target.checked } })} />{label}
       </label>)}</div>
+      {/* what is in force now, said plainly (visaForAll: both switches) — the form below may differ until saved */}
+      {visaForAll(setup.control) ? (
+        <p role="status" className="rounded-xl border border-[#f0c4cf] bg-[#fdeef2] p-4 font-bold text-[#a3263f]">مُراد يرد الآن على أسئلة التأشيرات لجميع العملاء الحقيقيين — وليس أرقام التجربة فقط.</p>
+      ) : (
+        <p role="status" className="rounded-xl bg-[#f0f7f4] p-4 text-sm font-bold">ردود التأشيرات الآن: أرقام التجربة فقط.</p>
+      )}
       <label className="flex items-center gap-3 font-bold"><input type="checkbox" checked={c.visaAll === true} onChange={(e) => setC({ ...c, visaAll: e.target.checked })} />استقبال التأشيرات لجميع العملاء ومتابعة النواقص والصور</label>
+      {c.visaAll && !c.tasks.visas ? <p className="text-sm font-bold text-[#a86a10]">لا يعمل ما دامت «{TASK_LABELS.visas}» متوقفة — يلزم المفتاحان معاً.</p> : null}
       <label className="flex items-center gap-3 font-bold"><input type="checkbox" checked={c.includePrice} onChange={(e) => setC({ ...c, includePrice: e.target.checked })} />تتضمن الإجابة السعر</label>
       <p className="text-sm">عند إلغاء السعر، تُرسل تفاصيل البرنامج فقط، ولا يُرسل ملف عرض أو رابط يحتوي على السعر.</p>
       {(["inboxIds", "teamIds"] as const).map((key) => <fieldset key={key} className="rounded-xl border p-4">
