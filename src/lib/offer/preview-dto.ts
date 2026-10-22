@@ -26,6 +26,8 @@ import {
   stayCancellation,
   type DraftData,
   type GeneratorLookups,
+  flightsLater,
+  FLIGHTS_LATER_LINE,
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
 import { draftTransportNote } from "./itinerary";
@@ -122,7 +124,8 @@ export function draftToPreviewOffer(
         facilities: h.sourcing?.facilities ?? [],
       };
     }),
-    flights: data.flights.map((f) => ({
+    // as the issue prints them: a part «أضف لاحقاً» is said, not shown (drafts.ts produce)
+    flights: data.flights.filter((f) => !(f.leg_order === "internal" ? data.flight_booking.later_dom : data.flight_booking.later_intl)).map((f) => ({
       airline: f.airline || null,
       airline_iata: f.airline_iata || null,
       airline_logo_url: airlines.find((a) => a.iata === f.airline_iata)?.logo_url ?? null,
@@ -148,6 +151,7 @@ export function draftToPreviewOffer(
       // what the issued offer drops (withScopeLines), the preview drops too
       ...data.services.includes.filter((l) => !(meetsElsewhere(data.advanced) && l === AIRPORT_TRANSFER_LINE)),
       ...(mealPlanIncludeLine(data.trip) ? [mealPlanIncludeLine(data.trip)!] : []),
+      ...(flightsLater(data) && !data.services.includes.includes(FLIGHTS_LATER_LINE) ? [FLIGHTS_LATER_LINE] : []),
     ],
     excludes: [...route.excludes, ...data.services.excludes],
     terms: data.services.terms,

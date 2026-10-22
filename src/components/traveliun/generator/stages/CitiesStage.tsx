@@ -244,7 +244,8 @@ export function CitiesStage({ draftId, data, patch, replace, flush, lookups }: S
   const differsFromFlights = Boolean(fromFlights && data.cities.length > 0 && !citiesMatchFlights(data.cities, fromFlights));
   function takeCitiesFromFlights() {
     if (!fromFlights) return;
-    const nights = fromFlights.reduce((sum, c) => sum + c.nights, 0);
+    // a night in the air between two cities is one of the trip's nights too
+    const nights = totalCityNights(fromFlights);
     patch({
       cities: deriveCityDates(start, fromFlights),
       trip: { ...data.trip, nights, days: nights + 1 },

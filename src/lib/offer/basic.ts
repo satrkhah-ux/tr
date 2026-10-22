@@ -17,6 +17,8 @@ import {
   deriveHotelStays,
   emptyFlight,
   emptyRoomSpec,
+  flightsLater,
+  FLIGHTS_LATER_LINE,
   hopKey,
   hopMode,
   inCityTransferText,
@@ -63,6 +65,7 @@ export { cityDates, WELCOME, withTourCount, withTours } from "./itinerary";
 import { AIRPORT_TRANSFER_LINE, meetsElsewhere } from "./advanced";
 import { autoDepartureDate, finalOutbound, itineraryStartDate } from "./schedule";
 import { withTypedTotal } from "./flight-fare";
+import { normAr } from "@/lib/catalog/norm";
 
 /**
  * A city as this screen holds it. The extra answer rides on the draft's own
@@ -253,7 +256,8 @@ export function moveCity(data: DraftData, from: number, to: number): Pick<DraftD
   if (from === to || !keyed[from] || to < 0 || to >= keyed.length) return same;
   const list = [...keyed];
   const [city] = list.splice(from, 1);
-  list.splice(to, 0, city);
+  // put somewhere by hand: the flights no longer place it (withCitiesFromFlights)
+  list.splice(to, 0, { ...city, from_flight: undefined });
   if (repeatsNeighbour(keyed, list)) return same;
   const prevOf = new Map(keyed.map((c, i) => [c.key, keyed[i - 1]?.key]));
   const nextOf = new Map(keyed.map((c, i) => [c.key, keyed[i + 1]?.key]));
@@ -292,6 +296,7 @@ export function replaceCity(data: DraftData, index: number, next: { name: string
       services: undefined,
       city_name: name,
       country,
+      from_flight: undefined,
       tour_picks: c.tour_picks?.map((p) => (p.free ? p : { ...p, program_id: null, title: "", text: "", price: null })),
     };
   });
@@ -372,7 +377,8 @@ export function setCityNights(data: DraftData, index: number, nights: number): P
   const prev = deriveHotelStays(data.cities, data.hotels);
   const cities = chainCities(
     data,
-    withCityKeys(data.cities).map((c, i) => (i === index ? { ...c, nights } : c)),
+    // nights set by hand are the agent's: «التالي» from the flights leaves this stop alone
+    withCityKeys(data.cities).map((c, i) => (i === index ? { ...c, nights, from_flight: undefined } : c)),
   );
   // the stays that run one after another give way; a same-dates stay follows its own (deriveHotelStays)
   const mine = new Set(cityHotelLines(cities, data.hotels, index).filter((h) => (h.dates ?? "after") === "after"));
@@ -534,7 +540,7 @@ export function priceAtSource(
   data: DraftData,
   item: Pick<DraftPricingItem, "item_type" | "ref">,
   change: { price?: number | null; currency?: string },
-): Partial<Pick<DraftData, "hotels" | "cities" | "flight_booking">> | null {
+): Partial<Pick<DraftData, "hotels" | "cities" | "flight_booking" | "flights">> | null {
   const ref = item.ref ?? "";
   if (item.item_type === "flight" && (ref === "flight:intl" || ref === "flight:dom")) {
     // a total typed on the sheet is a total: a «للفرد» booking becomes «إجمالي» at that figure
@@ -544,7 +550,9 @@ export function priceAtSource(
       return { flight_booking: { ...priced, intl_currency: change.currency ?? b.intl_currency } };
     }
     const priced = change.price !== undefined ? withTypedTotal(b, "dom", change.price) : b;
-    return { flight_booking: { ...priced, dom_currency: change.currency ?? b.dom_currency } };
+    // the legs' own prices no longer add up to it: the total typed here is the booking's now
+    const flights = change.price !== undefined ? data.flights.map((f) => (f.leg_order === "internal" && f.price != null ? { ...f, price: undefined } : f)) : data.flights;
+    return { flight_booking: { ...priced, dom_currency: change.currency ?? b.dom_currency }, ...(flights !== data.flights ? { flights } : {}) };
   }
   // a transfer is typed on its row of the city card, per car in riyals like a tour — only its figure goes back.
   // ponytail: a list line in another currency (MYR) typed over here is riyals on the next sync, as a tour's is;
@@ -737,12 +745,24 @@ export const withPicks = (cities: DraftCity[], index: number, picks: TourPick[])
 /** «name (CODE)» — what the airport list shows and what a leg stores. */
 export const airportDisplay = (a: LookupAirport) => (a.code ? `${a.name} (${a.code})` : a.name);
 
-/** The airport a typed value names — the list's own text first, then its (CODE). */
+/**
+ * The airport a typed value names — the list's own text first, then its (CODE),
+ * then a bare code («TZX»), then its name, its English name or its city as
+ * typed (hamza and ta-marbuta folded: «طرابزون», «Trabzon Airport») — the first
+ * airport of that city when the city has several.
+ */
 export function findAirport(value: string, airports: LookupAirport[]): LookupAirport | null {
   const v = value.trim();
   if (!v) return null;
-  const code = v.match(/\(([A-Za-z0-9]{3,4})\)/)?.[1]?.toUpperCase();
-  return airports.find((a) => airportDisplay(a) === v) ?? (code ? (airports.find((a) => a.code?.toUpperCase() === code) ?? null) : null);
+  const code = (v.match(/\(([A-Za-z0-9]{3,4})\)/)?.[1] ?? v.match(/^[A-Za-z]{3}$/)?.[0])?.toUpperCase();
+  const key = normAr(v);
+  return (
+    airports.find((a) => airportDisplay(a) === v) ??
+    (code ? airports.find((a) => a.code?.toUpperCase() === code) : undefined) ??
+    airports.find((a) => normAr(a.name) === key || (a.name_en && normAr(a.name_en) === key)) ??
+    airports.find((a) => a.city && normAr(a.city) === key) ??
+    null
+  );
 }
 
 // ---------- which airports come first ----------
@@ -827,17 +847,23 @@ export function planInternational(
   const leg = (order: "outbound" | "inbound", from: string, to: string, date: string): DraftFlight => {
     const a = findAirport(from, airports);
     const b = findAirport(to, airports);
+    // the leg already there keeps what was typed on it — its number, its id, its clocks (moved with its day)
+    const was = data.flights.find((f) => f.leg_order === order);
+    const departure_at = date ? `${date}T${was?.departure_at?.slice(11, 16) || "00:00"}` : null;
+    const shift = was?.departure_at && date ? daysFrom(was.departure_at.slice(0, 10), date) : 0;
+    const arrival_at = was?.arrival_at && departure_at ? `${addDaysIso(was.arrival_at.slice(0, 10), shift)}${was.arrival_at.slice(10)}` : null;
     return {
-      ...emptyFlight(order, data.trip),
+      ...(was ?? emptyFlight(order, data.trip)),
       from_airport: from,
       to_airport: to,
       from_tz: a?.timezone ?? null,
       to_tz: b?.timezone ?? null,
       from_city: a?.city ?? "",
       to_city: b?.city ?? "",
-      departure_at: date ? `${date}T00:00` : null,
+      departure_at,
+      arrival_at,
       date_user_set: Boolean(date) && date !== autoDepartureDate(data.trip, order),
-      cabin_class: data.flight_booking.cabin,
+      cabin_class: was?.cabin_class || data.flight_booking.cabin,
     };
   };
   const legs =
@@ -903,8 +929,11 @@ export function withDomesticFlights(data: DraftData, airports: LookupAirport[]):
 
   const ticketed = (f: DraftFlight) => Boolean(f.flight_no.trim());
   const taken = new Set<DraftFlight>();
+  // a city the agent's own domestic flights land in is reached by them — a connection through another
+  // airport included — and never planned a second time (the flights step enters them, 2026-10-22)
+  const flownByAgent = (city: string) => old.some((f) => !f.auto && f.to_city?.trim() === city);
   const legs = real
-    .filter((m) => hopMode(transport_plan, m.from.city, m.to.city) === "flight" && m.from.airport && m.to.airport)
+    .filter((m) => hopMode(transport_plan, m.from.city, m.to.city) === "flight" && m.from.airport && m.to.airport && !flownByAgent(m.to.city))
     .map((m): DraftFlight => {
       const mine = old.find((f) => !taken.has(f) && f.from_city?.trim() === m.from.city && f.to_city?.trim() === m.to.city);
       if (mine) taken.add(mine);
@@ -948,6 +977,8 @@ const SCOPE_LINES: { text: string; on: (d: DraftData) => boolean; otherwiseExclu
   { text: "الجولات السياحية", on: (d) => d.transport_plan.tours.enabled },
   // «بكج متقدم» that meets or leaves the group elsewhere never promises «من المطار»
   { text: AIRPORT_TRANSFER_LINE, on: (d) => d.scope.transport && !meetsElsewhere(d.advanced) },
+  // «أضف لاحقاً»: the document prints it where the flights would be (OfferDocument)
+  { text: FLIGHTS_LATER_LINE, on: flightsLater },
 ];
 
 /**

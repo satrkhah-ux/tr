@@ -9,6 +9,8 @@ import { generateItineraryText, isOpenAIConfigured, type ItineraryPromptDay } fr
 import { isFlightLookupConfigured, lookupFlight, type FlightLookupHit } from "@/lib/providers/flight-lookup";
 import { getDraft, saveDraftStages } from "./drafts";
 import { getFeatureFlags } from "@/lib/features-server";
+import { currentCan } from "@/lib/roles/current";
+import { getPartnerSession } from "@/lib/partners/session";
 
 /**
  * The itinerary stage's three assisted actions: fetch real weather, draft the
@@ -154,6 +156,8 @@ export type FlightLookupActionResult =
 export async function lookupFlightNumber(input: string): Promise<FlightLookupActionResult> {
   const user = await getServerUser();
   if (!user) return { ok: false, error: "err.session" };
+  // gated like the screens that ask it (/basic, the generator): our agents, or a partner on its own files
+  if (!(await currentCan("offers.write")) && !(await getPartnerSession())) return { ok: false, error: "err.forbidden" };
   if (!(await getFeatureFlags()).flight_lookup) return { ok: false, error: "dev.err.serviceOff" };
   const result = await lookupFlight(input);
   if (result.ok) return result;

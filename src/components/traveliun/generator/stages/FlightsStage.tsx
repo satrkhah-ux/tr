@@ -10,6 +10,7 @@ import {
   deriveCityDates,
   emptyFlight,
   findLookupCountry,
+  totalCityNights,
   type DraftCity,
   type DraftData,
   type DraftFlight,
@@ -190,7 +191,8 @@ export function FlightsStage({
     const derived = citiesFromFlights(synced);
     const followFlights = derived && (data.cities.length === 0 || data.cities.every((c) => c.from_flight));
     const cities: DraftCity[] = followFlights ? derived : data.cities;
-    const nights = cities.reduce((sum, c) => sum + c.nights, 0);
+    // a night in the air between two cities is one of the trip's nights too
+    const nights = totalCityNights(cities);
     patch({
       ...slice,
       flights: synced,

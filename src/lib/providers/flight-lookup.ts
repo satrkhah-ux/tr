@@ -79,7 +79,7 @@ type StackFlight = {
   departure?: StackEndpoint;
   arrival?: StackEndpoint;
   airline?: { name?: string | null; iata?: string | null };
-  flight?: { iata?: string | null; number?: string | null };
+  flight?: { iata?: string | null; icao?: string | null; number?: string | null };
 };
 
 type StackResponse = { data?: StackFlight[]; error?: { message?: string; info?: string } };
@@ -121,6 +121,17 @@ export function dedupeRoutes(hits: FlightLookupHit[]): FlightLookupHit[] {
   return [...byRoute.values()];
 }
 
+/**
+ * The flight itself, before the airlines selling a seat on it: asked for TK1,
+ * the feed answers with fifteen codeshares (WB1379, TG9410…) and TK1 among
+ * them — taking the first put another airline's number and name on the leg.
+ * Only codeshares (the number asked is one): they all fly the same plane.
+ */
+export function operatingRows<T extends { flight?: { iata?: string | null; icao?: string | null } }>(rows: T[], parsed: ParsedFlightNumber): T[] {
+  const own = rows.filter((f) => (parsed.kind === "icao" ? f.flight?.icao : f.flight?.iata)?.trim().toUpperCase() === parsed.code);
+  return own.length > 0 ? own : rows;
+}
+
 /** Look a flight number up. Never throws — every failure is a typed result. */
 export async function lookupFlight(input: string): Promise<FlightLookupResult> {
   const key = readEnv("AVIATIONSTACK_API_KEY");
@@ -146,7 +157,7 @@ export async function lookupFlight(input: string): Promise<FlightLookupResult> {
 
   if (data.error) return { ok: false, error: "request_failed", detail: data.error.info ?? data.error.message };
   const rows = Array.isArray(data.data) ? data.data : [];
-  const hits = dedupeRoutes(rows.map((f) => toHit(f, parsed.code)).filter((h): h is FlightLookupHit => Boolean(h)));
+  const hits = dedupeRoutes(operatingRows(rows, parsed).map((f) => toHit(f, parsed.code)).filter((h): h is FlightLookupHit => Boolean(h)));
   if (hits.length === 0) return { ok: false, error: "not_found" };
   return { ok: true, hits };
 }

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
-  ArrowRight,
   Building2,
   BusFront,
   Camera,
@@ -68,7 +67,9 @@ import {
   type TransportMode,
   roomPickName,
   keepNightlyRates,
+  flightsLater,
 } from "@/lib/offer/draft-types";
+import { withCitiesFromFlights } from "@/lib/offer/basic-flights";
 import { ROOM_TYPES } from "@/lib/catalog/room-catalog";
 import {
   addCity,
@@ -114,7 +115,6 @@ import { useCanOpen } from "@/lib/roles/useCanOpen";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { FieldIssueProvider } from "../generator/FieldIssue";
-import { FlightsStage } from "../generator/stages/FlightsStage";
 import { ServicesStage } from "../generator/stages/ServicesStage";
 import { TermsStage } from "../generator/stages/TermsStage";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -715,16 +715,6 @@ export function BasicEditor({
   }
 
   const used = totalCityNights(data.cities);
-  // the domestic flights live on each city's card (its «الرحلات الداخلية» tab) — one place for them
-  const domesticNote = scope.flights_domestic ? (
-    <p className="flex flex-wrap items-center gap-2 border-t border-dashed border-[#DCE9E5] pt-2 text-[11.5px] font-bold text-[#557d78]">
-      <Plane className="size-3.5" />
-      {tx("domesticInCities")}
-      <button type="button" onClick={() => show("cities")} className="text-[#185045] underline-offset-2 hover:underline">
-        {tx("goCities")}
-      </button>
-    </p>
-  ) : null;
   // over first: `left` is clamped at 0, so a file one night too long also has none left
   const nightsNote =
     used > trip.nights ? tx("over", { n: used - trip.nights }) : trip.nights > 0 && left === 0 ? tx("complete") : tx("remaining", { n: left });
@@ -941,8 +931,13 @@ export function BasicEditor({
     back: trip.departure_date ?? "",
     round: data.flight_booking.mode !== "oneway",
   };
-  const hasTickets = data.flights.some((f) => f.leg_order !== "internal" && f.flight_no.trim());
-  const [flightView, setFlightView] = useState<"plan" | "final">(() => (hasTickets ? "final" : "plan"));
+  // the international legs first; «التالي» folds them and the domestic ones follow in the same step
+  const [flightPart, setFlightPart] = useState<"intl" | "dom">("intl");
+  const booking = data.flight_booking;
+  const innerNext = flightPart === "intl" && scope.flights_intl && !booking.later_intl && scope.flights_domestic && !booking.later_dom;
+  // «التالي» to the cities built them from the flights — said once over the cities
+  const [citiesNote, setCitiesNote] = useState<BasicLabel | null>(null);
+  const countryOfCity = (name: string) => lk.countries.find((c) => c.cities.some((x) => x.name === name))?.name;
 
   // ---------- the steps: one open at a time ----------
   // the cities whose stay still lacks a hotel, a room type, a board or a price — «إكمال» opens only these
@@ -1002,8 +997,9 @@ export function BasicEditor({
       trip.nights <= 0 && tx("nights"),
       !trip.meal_plan && tx("meals"),
     ].filter((x): x is string => Boolean(x)),
-    // what stops the flights, in words — «سعر الطيران الداخلي», not just «الطيران»
-    flights: [...new Set(blocking.filter((i) => i.stage === "flights").map(issueText))],
+    // what stops the flights, in words — «سعر الطيران الداخلي», not just «الطيران»; the flights and the
+    // cities disagreeing is what «التالي» itself mends (the cities are built from the flights), never a stop here
+    flights: [...new Set(blocking.filter((i) => i.stage === "flights" && i.key !== "pg.err.domesticMismatch").map(issueText))],
     cities: [
       cities.length === 0 && tx("city"),
       cities.length > 0 && used !== trip.nights && nightsNote,
@@ -1042,6 +1038,13 @@ export function BasicEditor({
   }
 
   function next(from: Step) {
+    // the cities from the flights' dates (the owner, 2026-10-22: «الإدخال التلقائي وفق التواريخ يقلل الأخطاء») —
+    // a part left for later leaves the cities to the agent, as before
+    if (from === "flights" && scope.flights_intl && !flightsLater(latest.current)) {
+      const built = withCitiesFromFlights(latest.current, countryOfCity);
+      if (built) commit(built);
+      setCitiesNote(built ? "flightCities" : "noFlightCities");
+    }
     const to = steps[steps.indexOf(from) + 1] ?? "finish";
     if (STEP_ORDER.indexOf(to) > STEP_ORDER.indexOf(reached)) setReached(to);
     show(to);
@@ -1064,7 +1067,7 @@ export function BasicEditor({
     ]
       .filter(Boolean)
       .join(" · "),
-    flights: data.flights.map(legText).join(" · "),
+    flights: [flightsLater(data) ? tx("flightsLater") : "", ...data.flights.filter((f) => !(f.leg_order === "internal" ? booking.later_dom : booking.later_intl)).map(legText)].filter(Boolean).join(" · "),
     cities: cities
       .map((c, i) => {
         // each visit of a city with its own hotels
@@ -1100,7 +1103,12 @@ export function BasicEditor({
             </button>
           </div>
         ) : (
-          <NextButton missing={missingOf[step]} onNext={() => next(step)} onPrev={steps.indexOf(step) > 0 ? () => show(steps[steps.indexOf(step) - 1]) : undefined} />
+          // the flights' «التالي» first folds the international legs and opens the domestic ones (one thing at a time)
+          <NextButton
+            missing={step === "flights" && innerNext ? [] : missingOf[step]}
+            onNext={() => (step === "flights" && innerNext ? setFlightPart("dom") : next(step))}
+            onPrev={steps.indexOf(step) > 0 ? () => show(steps[steps.indexOf(step) - 1]) : undefined}
+          />
         )}
       </Fold>
     ) : null;
@@ -1314,38 +1322,29 @@ export function BasicEditor({
       </>
     ),
 
-    // ---- 2. the flights — the generator's own card, with the trip's dates already in it ----
-    // first the route as planned (cities, days, a rough price); the tickets later, under «الرحلة النهائية»
-    flights:
-      flightView === "final" || !scope.flights_intl ? (
-        <div className="space-y-2">
-          {scope.flights_intl && !hasTickets ? (
-            <button
-              type="button"
-              onClick={() => setFlightView("plan")}
-              className="inline-flex h-7 items-center gap-1 text-[11.5px] font-bold text-[#557d78] hover:text-[#185045]"
-            >
-              <ArrowRight className="size-3.5 ltr:rotate-180" />
-              {tx("backToPlan")}
-            </button>
-          ) : null}
-          {scope.flights_intl ? (
-            <div className="-mx-3 -mb-1 [&>section]:border-0 [&>section]:p-3 [&>section]:shadow-none [&_h2]:hidden">
-              <FlightsStage draftId={draftId} data={data} patch={commit} replace={replace} flush={flush} lookups={lk} compact only="intl" />
-            </div>
-          ) : null}
-          {domesticNote}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <BasicFlightPlan data={data} lookups={lk} defaults={planDefaults} onChange={commit} onFinal={() => setFlightView("final")} />
-          {domesticNote}
-        </div>
-      ),
+    // ---- 2. the flights: the number first, fetched; the domestic ones after the international; or «أضف لاحقاً» ----
+    flights: (
+      <BasicFlightPlan
+        data={data}
+        lookups={lk}
+        defaults={planDefaults}
+        part={flightPart}
+        onPart={setFlightPart}
+        onChange={commit}
+        current={() => latest.current}
+      />
+    ),
 
     // ---- 3. the cities, each with its hotel, and the bar that adds them ----
     cities: (
       <div className="space-y-3">
+        {citiesNote && !focus ? (
+          <p role="status" className={`flex items-center gap-2 rounded-[10px] px-3 py-1.5 text-[12px] font-bold ${citiesNote === "flightCities" ? "bg-[#eef6f2] text-[#185045]" : "bg-[#fff8e8] text-[#a86a10]"}`}>
+            <Plane className="size-4 shrink-0" />
+            <span className="flex-1">{tx(citiesNote)}</span>
+            <button type="button" onClick={() => setCitiesNote(null)} aria-label={tx("dismiss")} className="text-[#557d78]">×</button>
+          </p>
+        ) : null}
         {/* how the group moves between cities — the transport step's only question left */}
         {cities.length > 1 && !focus ? (
           <div className="flex flex-wrap items-center gap-1.5">
@@ -1941,6 +1940,13 @@ export function BasicEditor({
               </button>
             ) : null}
             {produced && !partnerSession ? <BasicFileStatus draftId={draftId} serial={produced} variant="chip" refresh={statusTick} /> : null}
+            {/* «أضف لاحقاً»: said on the file until the flights are in */}
+            {flightsLater(data) ? (
+              <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#fff4dc] px-2.5 text-[11.5px] font-bold text-[#a86a10]">
+                <Plane className="size-3.5" />
+                {tx("flightsLater")}
+              </span>
+            ) : null}
             <button
               type="button"
               onClick={() => {

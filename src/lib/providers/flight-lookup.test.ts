@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dedupeRoutes, parseFlightNumber, toWallClock, type FlightLookupHit } from "./flight-lookup";
+import { dedupeRoutes, operatingRows, parseFlightNumber, toWallClock, type FlightLookupHit } from "./flight-lookup";
 
 function hit(over: Partial<FlightLookupHit>): FlightLookupHit {
   return {
@@ -84,5 +84,19 @@ describe("dedupeRoutes", () => {
 
   it("returns nothing for an empty feed", () => {
     expect(dedupeRoutes([])).toEqual([]);
+  });
+});
+
+describe("operatingRows", () => {
+  // what the feed answered for TK1 on 2026-10-22: the codeshares first, TK1 among them
+  const rows = [{ flight: { iata: "WB1379" } }, { flight: { iata: "TG9410" } }, { flight: { iata: "TK1", icao: "THY1" } }];
+
+  it("keeps the flight asked for, not the airlines selling seats on it", () => {
+    expect(operatingRows(rows, parseFlightNumber("tk1")!)).toEqual([{ flight: { iata: "TK1", icao: "THY1" } }]);
+    expect(operatingRows(rows, parseFlightNumber("THY1")!)).toHaveLength(1);
+  });
+
+  it("keeps them all when the number asked is itself a codeshare's absent row", () => {
+    expect(operatingRows(rows.slice(0, 2), parseFlightNumber("TK1")!)).toHaveLength(2);
   });
 });

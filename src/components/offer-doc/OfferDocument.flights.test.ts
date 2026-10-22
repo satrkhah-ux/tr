@@ -6,6 +6,7 @@ import { computeOfferPricing } from "@/lib/offer/pricing";
 import { toClientOfferDTO, type InternalOfferDTO } from "@/lib/offer/dto";
 import type { InternalFlightLine } from "@/lib/offer/dto";
 import { AR } from "./labels";
+import { FLIGHTS_LATER_LINE } from "@/lib/offer/draft-types";
 
 /**
  * The printed document must separate INTERNATIONAL legs (outbound/inbound) from
@@ -109,5 +110,14 @@ describe("OfferDocument — flight sections", () => {
     const html = renderClient([flight({ flight_no: "", departure_at: "2026-08-01T00:00", arrival_at: null })]);
     expect(html).toContain(AR.flightPlanned);
     expect(html).not.toContain(">00:00<");
+  });
+
+  it("«أضف لاحقاً»: says the flights are confirmed later where they would be, not as an included line", () => {
+    const client = toClientOfferDTO({ ...offerWith([]), includes: ["الفنادق", FLIGHTS_LATER_LINE] });
+    const html = renderToStaticMarkup(createElement(OfferDocument, { variant: "client", offer: client }));
+    expect(html.split(FLIGHTS_LATER_LINE)).toHaveLength(2);
+    expect(html).toContain(AR.flights);
+    expect(html).toContain("الفنادق");
+    expect(html).not.toContain(`. ${FLIGHTS_LATER_LINE}`);
   });
 });

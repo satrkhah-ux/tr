@@ -370,6 +370,9 @@ export function RecentFiles({
                               {d.destination && d.produced_serial ? " · " : ""}
                               {d.produced_serial ? <DirText>{d.produced_serial}</DirText> : null}
                             </span>
+                            {d.flights_later ? (
+                              <span className="mt-1 inline-flex rounded-full bg-[#fff4dc] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">{tx("flightsLater")}</span>
+                            ) : null}
                             {/* a confirmed file: its services as operations holds them */}
                             {svc.length > 0 && opId ? (
                               <span className="mt-1 flex flex-wrap gap-1">

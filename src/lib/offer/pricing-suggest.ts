@@ -544,7 +544,8 @@ export function suggestPricing(
     },
   ];
   for (const b of bookings) {
-    if (b.legs.length === 0) continue;
+    // «أضف لاحقاً»: not priced now — the offer says the flights are confirmed later
+    if (b.legs.length === 0 || (b.ref === "flight:intl" ? data.flight_booking.later_intl : data.flight_booking.later_dom)) continue;
     const numbers = b.legs
       .map((f) => `${f.airline || labels.airline} ${f.flight_no}`.trim())
       .filter(Boolean)

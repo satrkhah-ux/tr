@@ -19,6 +19,7 @@ import {
   roomTypesText,
   emptyTermLibrary,
   findLookupCountry,
+  flightsLater,
   libraryForCountry,
   mealPlanIncludeLine,
   MEAL_PLAN_AR,
@@ -115,6 +116,8 @@ export type DraftSummary = {
   country: string | null;
   /** what the file covers — the scope switches that are on */
   services: ("hotels" | "flights_intl" | "flights_domestic" | "transport" | "visas")[];
+  /** «الطيران: يُضاف لاحقاً» — a part of the flights left for later (FlightBooking.later_*). */
+  flights_later: boolean;
 };
 
 export async function listDrafts(): Promise<DraftSummary[]> {
@@ -152,6 +155,7 @@ export async function listDrafts(): Promise<DraftSummary[]> {
           created_by_name: row.maker?.arabic_name ?? (draft.source?.code === "murad" ? "مُراد" : null),
           country: draft.trip.country || null,
           services: (["hotels", "flights_intl", "flights_domestic", "transport", "visas"] as const).filter((k) => draft.scope[k]),
+          flights_later: flightsLater(draft),
         };
       },
     );
@@ -446,7 +450,7 @@ export async function getGeneratorLookups(options: { catalog?: boolean } = {}): 
         : Promise.resolve({ data: [] }),
       withCatalog ? roomTypeRows(supabase) : Promise.resolve({ data: [] }),
       // the city an airport serves turns «landed at LGK» into «the next city is لنكاوي»
-      supabase.from("airports").select("id, arabic_name, code, iana_timezone, status, cities(arabic_name), countries(arabic_name)").order("code"),
+      supabase.from("airports").select("id, arabic_name, english_name, code, iana_timezone, status, cities(arabic_name), countries(arabic_name)").order("code"),
       service
         .from("transportation_types")
         .select("arabic_name, english_name, category, vehicle_class, pax_capacity, luggage_capacity, status")
@@ -539,6 +543,7 @@ export async function getGeneratorLookups(options: { catalog?: boolean } = {}): 
       airports: ((airportsRes.data ?? []) as unknown as {
         id: string;
         arabic_name: string;
+        english_name: string | null;
         code: string | null;
         iana_timezone: string | null;
         status: string | null;
@@ -553,6 +558,7 @@ export async function getGeneratorLookups(options: { catalog?: boolean } = {}): 
           timezone: a.iana_timezone,
           city: a.cities?.arabic_name ?? null,
           country: a.countries?.arabic_name ?? null,
+          name_en: a.english_name?.trim() || null,
         })),
       companySuppliers: ((suppliersRes.data ?? []) as { id: string; arabic_name: string; categories: string | null; status: string | null }[])
         .filter((s) => active(s.status))
@@ -1055,7 +1061,8 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
             : null,
         };
       }),
-      flights: data.flights.map((f) => ({
+      // «أضف لاحقاً»: a part left for later is not printed — the offer says FLIGHTS_LATER_LINE there
+      flights: data.flights.filter((f) => !(f.leg_order === "internal" ? data.flight_booking.later_dom : data.flight_booking.later_intl)).map((f) => ({
         carrier: f.airline || null,
         from_airport: f.from_airport || null,
         to_airport: f.to_airport || null,

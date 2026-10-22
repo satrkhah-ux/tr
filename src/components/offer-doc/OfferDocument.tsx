@@ -13,7 +13,7 @@ import {
   fmtNum,
   stars,
 } from "./labels";
-import { isFreeDay } from "@/lib/offer/draft-types";
+import { FLIGHTS_LATER_LINE, isFreeDay } from "@/lib/offer/draft-types";
 import { TOUR_CAR_LINE } from "@/lib/offer/itinerary";
 import {
   formatRainAr,
@@ -266,7 +266,8 @@ function withLists<T extends ClientOfferDTO>(offer: T): T {
     flights: list(offer.flights),
     transport: list(offer.transport),
     visas: list(offer.visas),
-    includes: list(offer.includes),
+    // «أضف لاحقاً» is said where the flights would be, not as something the price includes
+    includes: list(offer.includes).filter((l) => l !== FLIGHTS_LATER_LINE),
     excludes: list(offer.excludes),
     terms: list(offer.terms),
     climate: list(offer.climate),
@@ -275,6 +276,8 @@ function withLists<T extends ClientOfferDTO>(offer: T): T {
 
 export function OfferDocument(props: OfferDocumentProps) {
   const offer = withLists(props.offer); // union — shared (sell-side) fields only
+  // issued with a part of its flights «أضف لاحقاً» (drafts.ts produce writes the line)
+  const flightsLater = (props.offer.includes ?? []).includes(FLIGHTS_LATER_LINE);
   const assets = props.assets ?? DEFAULT_OFFER_DOC_ASSETS;
   const brand = props.brand ?? TRAVELIUN_BRAND;
   // The internal document exists to show buy/sell/profit — hiding money there
@@ -324,6 +327,15 @@ export function OfferDocument(props: OfferDocumentProps) {
           <FlightCards flights={domestic} />
         </>
       ),
+    });
+  }
+  if (flightsLater) {
+    blocks.push({
+      group: "flights",
+      title: AR.flights,
+      heightMm: 18,
+      kind: "node",
+      node: <p className="od-note">{FLIGHTS_LATER_LINE}</p>,
     });
   }
   // The note is about prices moving until ticketing; with no price printed it

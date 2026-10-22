@@ -925,7 +925,18 @@ export type DraftFlight = {
   leg_order: FlightLegOrder;
   /** a domestic leg the cities wrote (a hop made by air) — rewritten or dropped with them. */
   auto?: boolean;
+  /**
+   * The leg's own identity — what an edit finds it by, so changing its airports
+   * never makes it a new leg (or a second one). Filled by normalizeDraftData for
+   * a leg saved before it existed.
+   */
+  id?: string;
+  /** A domestic leg's own price, the whole leg for every traveller; the legs add up to `dom_price`. */
+  price?: number | null;
 };
+
+/** Ids only have to be unique inside one draft. */
+export const newLegId = () => `leg-${Math.random().toString(36).slice(2, 10)}`;
 
 /**
  * What most of our tickets allow, written into every new leg so the agent only
@@ -947,6 +958,7 @@ export const FLIGHT_BAGGAGE = {
 export function emptyFlight(legOrder: FlightLegOrder, trip?: DraftTrip): DraftFlight {
   const dom = legOrder === "internal";
   return {
+    id: newLegId(),
     airline: "",
     airline_iata: "",
     flight_no: "",
@@ -1007,7 +1019,22 @@ export type FlightBooking = {
    * airports and its date; the tickets («الرحلة النهائية») come later.
    */
   estimate?: boolean;
+  /**
+   * «أضف لاحقاً» (the owner, 2026-10-22): this part of the flights is not in
+   * the file yet — not asked to go on, not priced, and the offer says
+   * FLIGHTS_LATER_LINE where its flights would be. Operations still needs its
+   * tickets before «جاهز للسفر» (seed-plan).
+   */
+  later_intl?: boolean;
+  later_dom?: boolean;
 };
+
+/** What the offer says, where its flights would be, while a part of them is «أضف لاحقاً». */
+export const FLIGHTS_LATER_LINE = "سيتم تأكيد الطيران لاحقاً";
+
+/** True while a part of the flights the sale includes is left for later. */
+export const flightsLater = (d: Pick<DraftData, "scope" | "flight_booking">) =>
+  Boolean((d.scope.flights_intl && d.flight_booking.later_intl) || (d.scope.flights_domestic && d.flight_booking.later_dom));
 
 export function emptyFlightBooking(): FlightBooking {
   return {
@@ -1055,6 +1082,8 @@ function normalizeFlightBooking(raw: unknown): FlightBooking {
     dom_supplier: str(b.dom_supplier, ""),
     dom_fare: fare(b.dom_fare),
     ...(b.estimate === true ? { estimate: true } : {}),
+    ...(b.later_intl === true ? { later_intl: true } : {}),
+    ...(b.later_dom === true ? { later_dom: true } : {}),
   };
 }
 
@@ -1575,9 +1604,11 @@ function normalizeDraftDay(raw: unknown, index: number): DraftDay {
 }
 
 /** Backfill tz/user-set fields on flights persisted before prompt-5 (old drafts have none). */
-function normalizeDraftFlight(raw: unknown): DraftFlight {
+function normalizeDraftFlight(raw: unknown, index: number): DraftFlight {
   const f = (raw && typeof raw === "object" ? raw : {}) as Partial<DraftFlight>;
   return {
+    // made from its place, not random, so a draft read twice before it is saved ids the same
+    id: typeof f.id === "string" && f.id ? f.id : `leg-${index}`,
     airline: typeof f.airline === "string" ? f.airline : "",
     airline_iata: typeof f.airline_iata === "string" ? f.airline_iata.toUpperCase() : "",
     flight_no: typeof f.flight_no === "string" ? f.flight_no : "",
@@ -1597,6 +1628,7 @@ function normalizeDraftFlight(raw: unknown): DraftFlight {
     cabin_baggage_kg: typeof f.cabin_baggage_kg === "number" ? f.cabin_baggage_kg : null,
     leg_order: f.leg_order === "inbound" || f.leg_order === "internal" ? f.leg_order : "outbound",
     ...(f.auto === true ? { auto: true } : {}),
+    ...(typeof f.price === "number" && Number.isFinite(f.price) ? { price: f.price } : {}),
   };
 }
 
@@ -1701,7 +1733,10 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
  * A stop's services as the screen may read them: rows with an id, a known kind
  * and at least one car. A stop without any — every older file — is left as it was.
  */
-function withCleanServices(city: DraftCity): DraftCity {
+function withCleanServices(raw: DraftCity): DraftCity {
+  // `from_flight` is a mark, true or absent: «تحديث من الرحلات» rewrites only the stops carrying it
+  const { from_flight, ...rest } = raw ?? ({} as DraftCity);
+  const city = !raw ? raw : from_flight === true ? raw : (rest as DraftCity);
   if (!city || !Array.isArray(city.services)) return city;
   const services = city.services.flatMap((s): CityService[] => {
     if (!s || typeof s !== "object" || typeof s.id !== "string" || !s.id) return [];
@@ -2164,7 +2199,8 @@ export type LookupCountry = {
 };
 export type LookupRoomType = { id: string; name: string; hotel_id: string | null; default_board: BoardType | null };
 /** `city` — the catalogue city the airport serves (airports.city_id), or null. */
-export type LookupAirport = { id: string; name: string; code: string | null; timezone: string | null; city: string | null; country?: string | null };
+/** `name_en`: the airport's English name — found by it too («Trabzon»). */
+export type LookupAirport = { id: string; name: string; code: string | null; timezone: string | null; city: string | null; country?: string | null; name_en?: string | null };
 
 /**
  * One approved line from the `terms` table — the company's master lists behind

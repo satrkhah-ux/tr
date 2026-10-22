@@ -201,21 +201,22 @@ export function validateDraft(data: DraftData, opts: ValidateOptions = {}): Draf
   const intl = data.flights.filter((f) => f.leg_order !== "internal");
   const dom = data.flights.filter((f) => f.leg_order === "internal");
   const booking = data.flight_booking;
-  if (data.scope.flights_intl) {
+  // «أضف لاحقاً»: a part left for later is not asked for (operations still asks its tickets)
+  if (data.scope.flights_intl && !booking.later_intl) {
     if (intl.length === 0) need("flights", "flights", "pg.err.noIntlFlights");
     else if (intl.some((f) => !intlDone(f))) need("flights", "flights", "pg.err.flightIncomplete");
     if (intl.length > 0 && !isFixedPrice(data)) {
       if (booking.intl_price == null || booking.intl_price <= 0) need("flights", "flights", "pg.err.flightUnpriced");
     }
   }
-  if (data.scope.flights_domestic && dom.length > 0) {
+  if (data.scope.flights_domestic && dom.length > 0 && !booking.later_dom) {
     if (dom.some((f) => !intlDone(f))) need("flights", "flights", "pg.err.flightIncomplete");
     if (!isFixedPrice(data)) {
       if (booking.dom_price == null || booking.dom_price <= 0) need("flights", "flights", "pg.err.domFlightUnpriced");
     }
   }
   // The booking and the programme must agree on where the group sleeps.
-  if (domesticMismatches(data.flights, cities).length > 0) need("flights", "flights", "pg.err.domesticMismatch");
+  if (!booking.later_dom && domesticMismatches(data.flights, cities).length > 0) need("flights", "flights", "pg.err.domesticMismatch");
 
   // A day with no title is a day the client reads as missing. «يوم حر» is a
   // title, so a deliberately empty day is one press away.

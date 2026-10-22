@@ -161,6 +161,25 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
     ["flight:intl", intl, "طيران دولي"],
     ["flight:dom", dom, "طيران داخلي"],
   ] as const) {
+    // «أضف لاحقاً» (the owner, 2026-10-22): issued without its flights, still booked — the case asks its
+    // tickets before «جاهز للسفر» like any other flight (flightsReadiness)
+    const later = ref === "flight:intl" ? data.scope.flights_intl && data.flight_booking.later_intl : data.scope.flights_domestic && data.flight_booking.later_dom;
+    if (later) {
+      rows.push({
+        origin_ref: ref,
+        kind: "flight",
+        title: `${label} — ${LATER}`,
+        city_name: "",
+        start_date: ref === "flight:intl" ? data.trip.arrival_date : null,
+        end_date: ref === "flight:intl" ? data.trip.departure_date : null,
+        detail: { الركاب: pax },
+        supplier_name: "",
+        cancellation_policy: null,
+        quoted_net: null,
+        currency: "SAR",
+      });
+      continue;
+    }
     if (legs.length === 0) continue;
     const out = legs.filter((f) => f.leg_order === "outbound");
     const back = legs.filter((f) => f.leg_order === "inbound");

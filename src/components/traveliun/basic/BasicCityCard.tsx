@@ -48,16 +48,11 @@ import {
   EXTRA_BED,
   roomChangeLine,
   addService,
-  airportDisplay,
   cityDates,
   cityServices,
-  findAirport,
   newServiceId,
-  rankAirports,
   removeService,
-  setCityNights,
   setService,
-  tripCountries,
   withPicks,
   withTours,
   type BasicCity,
@@ -65,7 +60,6 @@ import {
 } from "@/lib/offer/basic";
 import { arrivalLines, autoTourPicks, departureDay, departureLines, type TourProgram } from "@/lib/offer/itinerary";
 import { BasicCityProgram } from "./BasicCityProgram";
-import { SuggestInput } from "../SuggestInput";
 import { DirText } from "@/components/DirText";
 import { useRole } from "@/lib/roles/RoleContext";
 import { tourPriced, toursTotal, type TourPrice } from "@/lib/offer/pricing-suggest";
@@ -73,8 +67,6 @@ import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { suppliersFor } from "../generator/SupplierPrice";
 import { AddStayMenu, StayDatesLine } from "../generator/hotels/StayDates";
-import { FlightFare } from "../generator/flights/FlightFare";
-import { withTypedTotal } from "@/lib/offer/flight-fare";
 import { basicField, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
 import { RefundControl } from "../generator/hotels/RefundControl";
@@ -92,7 +84,7 @@ const span = (c: { check_in: string | null; check_out: string | null }) =>
 /** «الأربعاء، 11 نوفمبر» */
 const dayLabel = (iso: string) => DAY.format(new Date(`${iso}T00:00:00Z`));
 
-type Tab = "hotel" | "tours" | "domestic" | "program";
+type Tab = "hotel" | "tours" | "program";
 
 /**
  * The card's tables share one look: a row of small headings once, then rows of
@@ -205,11 +197,6 @@ export function BasicCityCard({
   // this stop's own stays — a city visited twice has two sets
   const lines = cityHotelLines(data.cities, data.hotels, index);
   const [main] = lines;
-  const touches = (c: { city_name: string }) => (f: DraftData["flights"][number]) =>
-    f.leg_order === "internal" && (f.to_city?.trim() === c.city_name || f.from_city?.trim() === c.city_name);
-  const domestic = data.flights.filter(touches(city));
-  // the domestic booking is ONE price for every leg: asked once, on the first city a leg touches
-  const domesticHome = data.cities.findIndex((c) => data.flights.some(touches(c)));
   // the visit's reception, farewell and transfers — on the tours tab, with the tours
   const services = transportOn ? cityServices(data, index) : [];
   // «البرنامج السياحي» opens once every tour of the city says what it is
@@ -221,7 +208,6 @@ export function BasicCityCard({
     ...(toursOn || services.length > 0
       ? [{ key: "tours" as const, label: toursOn ? tx("tours") : tx("transfersTab"), icon: toursOn ? Camera : UserRound }]
       : []),
-    ...(domestic.length > 0 || (data.scope.flights_domestic && index > 0) ? [{ key: "domestic" as const, label: tx("domesticTab"), icon: Plane }] : []),
     { key: "program" as const, label: tx("programTab"), icon: ListChecks, locked: programLocked },
   ];
   // a stay already complete (picked from the add bar, or a file reopened) is not asked again: the card opens on what is left
@@ -252,7 +238,6 @@ export function BasicCityCard({
     // a tour the list prices is priced (the sheet takes the list's figure) — asked only of who sees the price
     showPrice && picks.some((p) => !tourPriced(p, tripCar, tourPrices)) && tx("tourPrice"),
     transportOn && isFirst && !plan.airport.car_type.trim() && tx("reception"),
-    data.scope.flights_domestic && index === domesticHome && !((data.flight_booking.dom_price ?? 0) > 0) && tx("domPrice"),
     transportOn && isLast && !(plan.farewell ?? plan.airport).car_type.trim() && tx("farewell"),
   ].filter((x): x is string => Boolean(x));
   const stayPrice = rooms.reduce((sum, r) => sum + (r.price ?? 0), 0);
@@ -527,9 +512,6 @@ export function BasicCityCard({
             <div className="mt-2">
               <DayLines label={tx("farewellText")} date={departureDay(city)} lines={data.departure_lines} fallback={departureLines(data)} onChange={(departure_lines) => onSlice({ departure_lines })} />
             </div>
-          ) : null}
-          {open === "domestic" ? (
-            <DomesticPanel legs={domestic} data={data} lookups={lookups} onSlice={onSlice} priceCity={index === domesticHome ? null : (data.cities[domesticHome]?.city_name ?? null)} />
           ) : null}
           {/* «تمت <city>»: open only when the city has all it needs, and says what is missing until then */}
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-dashed border-[#DCE9E5] pt-2.5">
@@ -1314,158 +1296,6 @@ function DayLines({
           ) : null}
         </div>
       ))}
-    </div>
-  );
-}
-
-/**
- * The city's domestic flights — the one place they are entered: the airports
- * (from the cities, the package's own first), the day (the move's), and once
- * the tickets are in the flight number and the two clocks. A landing earlier
- * than the take-off is the next day («+1»): the city it lands in then starts a
- * day later and gives back the night spent flying (arrives_next_day).
- */
-function DomesticPanel({
-  legs,
-  data,
-  lookups,
-  onSlice,
-  priceCity,
-}: {
-  legs: DraftData["flights"];
-  data: DraftData;
-  lookups: GeneratorLookups;
-  onSlice: (slice: Partial<DraftData>) => void;
-  /** null: the price is asked here; else the city whose card asks it. */
-  priceCity: string | null;
-}) {
-  const tx = useBasicLabels();
-  const booking = data.flight_booking;
-  const ranked = rankAirports(lookups.airports, tripCountries(data), data.cities.map((c) => c.city_name)).map((a) => ({
-    value: airportDisplay(a),
-    hint: a.city ?? a.country ?? undefined,
-    keywords: [a.city, a.country, a.code].filter(Boolean).join(" "),
-  }));
-  const setLeg = (leg: DraftData["flights"][number], slice: Partial<DraftData["flights"][number]>) =>
-    onSlice({ flights: data.flights.map((f) => (f === leg ? { ...f, ...slice } : f)) });
-  const airport = (leg: DraftData["flights"][number], side: "from" | "to", value: string) => {
-    const a = findAirport(value, lookups.airports);
-    setLeg(leg, side === "from" ? { from_airport: value, from_tz: a?.timezone ?? null, from_city: a?.city ?? "" } : { to_airport: value, to_tz: a?.timezone ?? null, to_city: a?.city ?? "" });
-  };
-  // «MH1430» names its carrier: the first two letters are the airline's code
-  const flightNo = (leg: DraftData["flights"][number], value: string) => {
-    const no = value.toUpperCase().replace(/\s+/g, "");
-    const carrier = lookups.airlines.find((a) => a.iata && no.startsWith(a.iata.toUpperCase()));
-    setLeg(leg, { flight_no: no, ...(carrier ? { airline: carrier.name, airline_iata: carrier.iata } : {}) });
-  };
-  const day = (iso: string | null) => (iso ?? "").slice(0, 10);
-  const time = (iso: string | null) => {
-    const t = (iso ?? "").slice(11, 16);
-    return t === "00:00" ? "" : t;
-  };
-  const cols = "xl:grid-cols-[minmax(11rem,1.4fr)_minmax(11rem,1.4fr)_9.5rem_7rem_6.5rem_8.5rem]";
-  const addDay = (iso: string) => new Date(Date.parse(`${iso}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
-  const nextDay = (leg: DraftData["flights"][number]) => Boolean(leg.arrival_at && leg.departure_at && day(leg.arrival_at) > day(leg.departure_at));
-  // the stop the leg lands in — the one that starts a day later after a night in the air
-  const stopOf = (leg: DraftData["flights"][number]) =>
-    data.cities.findIndex((c, k) => k > 0 && c.city_name === leg.to_city?.trim() && data.cities[k - 1]?.city_name === leg.from_city?.trim());
-  const setTimes = (leg: DraftData["flights"][number], dep: string, arr: string) => {
-    const date = day(leg.departure_at) || data.trip.arrival_date || "";
-    const next = Boolean(dep && arr && arr < dep);
-    const flights = data.flights.map((f) =>
-      f === leg ? { ...f, departure_at: `${date}T${dep || "00:00"}`, arrival_at: arr ? `${next ? addDay(date) : date}T${arr}` : null } : f,
-    );
-    const at = stopOf(leg);
-    const city = data.cities[at];
-    if (!city || Boolean(city.arrives_next_day) === next) return onSlice({ flights });
-    // the night now spent flying comes off the city it lands in — and goes back when it no longer is
-    const resized = setCityNights({ ...data, flights }, at, Math.max(city.nights + (next ? -1 : 1), 1));
-    onSlice({ flights, hotels: resized.hotels, cities: resized.cities.map((c, k) => (k === at ? { ...c, arrives_next_day: next || undefined } : c)) });
-  };
-
-  return (
-    <div className="space-y-1.5">
-      {legs.length === 0 ? (
-        <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noDomestic")}</p>
-      ) : (
-        <>
-          <div className={`hidden gap-2 px-0.5 text-[10.5px] font-bold text-[#7a948f] xl:grid ${cols}`}>
-            <span>{tx("domFrom")}</span>
-            <span>{tx("domTo")}</span>
-            <span>{tx("domDate")}</span>
-            <span>{tx("domFlightNo")}</span>
-            <span>{tx("domDep")}</span>
-            <span>{tx("domArr")}</span>
-          </div>
-          {legs.map((leg, k) => (
-            <div key={k} className={`grid grid-cols-2 items-center gap-2 ${cols}`}>
-              <SuggestInput ariaLabel={tx("domFrom")} items={ranked} value={leg.from_airport} onChange={(v) => airport(leg, "from", v)} className={basicField} />
-              <SuggestInput ariaLabel={tx("domTo")} items={ranked} value={leg.to_airport} onChange={(v) => airport(leg, "to", v)} className={basicField} />
-              <input
-                type="date"
-                dir="ltr"
-                aria-label={tx("domDate")}
-                value={day(leg.departure_at)}
-                onChange={(e) =>
-                  setLeg(leg, {
-                    departure_at: e.target.value ? `${e.target.value}T${time(leg.departure_at) || "00:00"}` : null,
-                    arrival_at: leg.arrival_at && e.target.value ? `${nextDay(leg) ? addDay(e.target.value) : e.target.value}T${leg.arrival_at.slice(11, 16)}` : leg.arrival_at,
-                    date_user_set: true,
-                  })
-                }
-                className={`${basicField} tv-tnum px-2`}
-              />
-              <input dir="ltr" aria-label={tx("domFlightNo")} value={leg.flight_no} placeholder="MH1432" onChange={(e) => flightNo(leg, e.target.value)} className={`${basicField} tv-tnum text-center`} />
-              <input
-                type="time"
-                dir="ltr"
-                aria-label={tx("domDep")}
-                value={time(leg.departure_at)}
-                onChange={(e) => setTimes(leg, e.target.value, time(leg.arrival_at))}
-                className={`${basicField} tv-tnum px-2`}
-              />
-              <span className="flex items-center gap-1">
-                <input
-                  type="time"
-                  dir="ltr"
-                  aria-label={tx("domArr")}
-                  value={time(leg.arrival_at)}
-                  onChange={(e) => setTimes(leg, time(leg.departure_at), e.target.value)}
-                  className={`${basicField} tv-tnum px-2`}
-                />
-                {nextDay(leg) ? (
-                  <span title={tx("nextDayHint", { city: leg.to_city ?? "" })} className="tv-tnum shrink-0 rounded-full bg-[#fff4dc] px-1.5 py-0.5 text-[10.5px] font-extrabold text-[#a86a10]">
-                    {tx("nextDay")}
-                  </span>
-                ) : null}
-              </span>
-            </div>
-          ))}
-          {/* the domestic booking's one price — asked once, naming every leg it pays for */}
-          {priceCity ? (
-            <p className="mt-1 text-[11.5px] font-bold text-[#557d78]">{tx("domPriceThere", { city: priceCity })}</p>
-          ) : (
-          <>
-          <label className="mt-1 inline-flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#185045]">
-            {tx("domPriceAll", { routes: data.flights.filter((f) => f.leg_order === "internal").map((f) => `${f.from_city || "—"} ← ${f.to_city || "—"}`).join("، ") })}
-            <input
-              type="number"
-              min={0}
-              dir="ltr"
-              value={booking.dom_price ?? ""}
-              placeholder="0"
-              onChange={(e) =>
-                onSlice({ flight_booking: { ...withTypedTotal(booking, "dom", typedNumber(e.target)), dom_currency: booking.dom_currency || "SAR" } })
-              }
-              className={`${basicField} tv-tnum w-32 text-center ${booking.dom_price == null ? "border-[#f0b4c2] bg-[#fff5f7]" : ""}`}
-            />
-            <span className="text-[#557d78]">{booking.dom_currency || "SAR"}</span>
-          </label>
-          <FlightFare booking={booking} kind="dom" trip={data.trip} field={basicField} onChange={(flight_booking) => onSlice({ flight_booking })} />
-          </>
-          )}
-        </>
-      )}
     </div>
   );
 }

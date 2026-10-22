@@ -21,35 +21,76 @@ const byDeparture = (a: DraftFlight, b: DraftFlight) => (a.departure_at ?? "").l
 
 /**
  * The city chain the flights describe, or null while they cannot say it yet —
- * an airport not linked to a city, a time not entered, or legs out of order.
+ * an airport not linked to a city, a date not entered, or legs out of order.
  * Null means «leave the cities as the agent has them», never «no cities».
+ *
+ * The owner's rules (2026-10-22): the first stop is where the international
+ * flight lands, on the day it lands (a 02:00 landing is that day's); each
+ * domestic flight ends a stop on the day it leaves and starts the next on the
+ * day it lands — a landing past midnight spends that night in the air
+ * (`arrives_next_day`, no hotel); the last stop runs to the flight home. A
+ * flight home from another city than the last one reached adds that city at
+ * the end, reached by road, with one night taken from the stop before it.
+ * A leg with no time yet (only planned) lands the day it leaves.
+ *
+ * `end`: where the trip ends when there is no flight home (one way) — the trip's own departure.
  */
-export function citiesFromFlights(flights: DraftFlight[]): DraftCity[] | null {
+export function citiesFromFlights(flights: DraftFlight[], end?: string | null): DraftCity[] | null {
   const outbound = flights.filter((f) => f.leg_order === "outbound").sort(byDeparture);
   const inbound = flights.filter((f) => f.leg_order === "inbound").sort(byDeparture);
   const domestic = flights.filter((f) => f.leg_order === "internal").sort(byDeparture);
   // A transit outbound is two legs; the group arrives where the LAST one lands.
   const landing = outbound[outbound.length - 1];
   const leaving = inbound[0];
-  if (!landing || !leaving) return null;
+  if (!landing) return null;
+  const lands = (f: DraftFlight) => localDatePart(f.arrival_at) ?? localDatePart(f.departure_at);
 
-  const stops: { city: string; from: string | null }[] = [
-    { city: landing.to_city?.trim() ?? "", from: localDatePart(landing.arrival_at) },
-    ...domestic.map((f) => ({ city: f.to_city?.trim() ?? "", from: localDatePart(f.arrival_at) })),
+  // each stop from the day the group gets there to the day it leaves
+  const stops: { city: string; from: string | null; until: string | null; overnight: boolean }[] = [
+    { city: landing.to_city?.trim() ?? "", from: lands(landing), until: null, overnight: false },
   ];
-  const end = localDatePart(leaving.departure_at);
-  if (!end || stops.some((s) => !s.city || !s.from)) return null;
+  for (const f of domestic) {
+    stops[stops.length - 1].until = localDatePart(f.departure_at);
+    const from = lands(f);
+    stops.push({ city: f.to_city?.trim() ?? "", from, until: null, overnight: Boolean(from && from > (localDatePart(f.departure_at) ?? from)) });
+  }
+  stops[stops.length - 1].until = (leaving ? localDatePart(leaving.departure_at) : null) ?? end ?? null;
+  if (stops.some((s) => !s.city || !s.from || !s.until)) return null;
 
   const cities: DraftCity[] = [];
-  for (const [i, stop] of stops.entries()) {
-    const until = i < stops.length - 1 ? stops[i + 1].from! : end;
-    const nights = daysBetween(stop.from!, until);
+  for (const stop of stops) {
+    const nights = daysBetween(stop.from!, stop.until!);
     if (nights < 0) return null;
     // a same-day hop leaves no night in the city it passed through
     if (nights === 0) continue;
-    cities.push({ city_name: stop.city, nights, check_in: null, check_out: null, from_flight: true });
+    cities.push({
+      city_name: stop.city,
+      nights,
+      check_in: null,
+      check_out: null,
+      from_flight: true,
+      // never on the first city: its day is the landing's own
+      ...(stop.overnight && cities.length > 0 ? { arrives_next_day: true } : {}),
+    });
+  }
+  // home from another city than the last one reached: that city closes the trip, by road
+  const home = leaving?.from_city?.trim();
+  const last = cities[cities.length - 1];
+  if (home && last && home !== stops[stops.length - 1].city && last.nights > 1) {
+    cities[cities.length - 1] = { ...last, nights: last.nights - 1 };
+    cities.push({ city_name: home, nights: 1, check_in: null, check_out: null, from_flight: true });
   }
   return cities.length > 0 ? cities : null;
+}
+
+/**
+ * How the group moves into stop `index` of a chain the flights built: by air
+ * when a domestic flight lands there (a same-day connection through another
+ * airport included), else by road — the city a flight home leaves from.
+ */
+export function flownInto(flights: DraftFlight[], cities: Pick<DraftCity, "city_name">[], index: number): boolean {
+  const to = cities[index]?.city_name.trim();
+  return index > 0 && Boolean(to) && flights.some((f) => f.leg_order === "internal" && f.to_city?.trim() === to && f.from_city?.trim() !== to);
 }
 
 /** True when the cities on the draft are the ones the flights describe (names and nights, in order). */
