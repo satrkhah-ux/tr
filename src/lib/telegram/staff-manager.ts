@@ -33,9 +33,9 @@ export async function isBotManager(employeeId: string): Promise<boolean> {
 const REFUSED = "هذا للإدارة فقط.";
 const PENDING_MINUTES = 10;
 
-type Colleague = { id: string; name: string; chatId: number | null; agentId: number | null };
+export type Colleague = { id: string; name: string; chatId: number | null; agentId: number | null };
 
-async function colleagues(): Promise<Colleague[]> {
+export async function colleagues(): Promise<Colleague[]> {
   const { data } = await db().from("employees").select("id, arabic_name, telegram_chat_id, teletel_agent_id").eq("status", "Active");
   return ((data ?? []) as { id: string; arabic_name: string; telegram_chat_id: number | string | null; teletel_agent_id: number | null }[]).map((e) => ({
     id: e.id,
@@ -137,11 +137,13 @@ export async function promptFor(me: StaffMember, chatId: number, kind: "broadcas
 }
 
 /** A pending prompt for this chat, taken (used once). Null when none, or older than ten minutes. */
-export async function takePending(chatId: number): Promise<{ kind: "broadcast" | "alert"; targetId: string | null } | null> {
-  const { data } = await db().from("staff_bot_pending").delete().eq("chat_id", chatId).select("kind, target_id, created_at").maybeSingle();
-  const row = data as { kind: "broadcast" | "alert"; target_id: string | null; created_at: string } | null;
+export type Pending = { kind: "broadcast" | "alert" | "decision"; targetId: string | null; sourceKey: string | null };
+
+export async function takePending(chatId: number): Promise<Pending | null> {
+  const { data } = await db().from("staff_bot_pending").delete().eq("chat_id", chatId).select("kind, target_id, source_key, created_at").maybeSingle();
+  const row = data as { kind: Pending["kind"]; target_id: string | null; source_key: string | null; created_at: string } | null;
   if (!row || Date.now() - Date.parse(row.created_at) > PENDING_MINUTES * 60_000) return null;
-  return { kind: row.kind, targetId: row.target_id };
+  return { kind: row.kind, targetId: row.target_id, sourceKey: row.source_key };
 }
 
 export function broadcastText(content: string, senderName: string, alert = false): string {

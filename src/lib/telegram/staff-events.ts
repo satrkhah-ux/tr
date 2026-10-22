@@ -6,6 +6,7 @@ import { escapeHtml, staffForAgent, staffSend } from "./staff-bot";
 import type { InlineButton } from "./ops-bot";
 import { sendDailyReports } from "./staff-report";
 import { refreshScreens, remindWaiting } from "./staff-screen";
+import { pushDecisions } from "./staff-decisions";
 import { forwardClientMessage, onMessageUpdated, refreshDeliveries, rememberThread, type TeletelMessageEvent } from "./staff-replies";
 
 /**
@@ -147,6 +148,13 @@ export async function staffSweep(): Promise<{ seen: number; announced: number; b
 
 /** The minute job's share of «تنبيهاتي» (inside /api/murad/run, after the follow-ups sync refreshed the open list): the sweep, the delivery statuses, the waiting reminders, the live screens (every fifth minute), and from 23:00 Riyadh the evening reports. */
 export async function staffTick(): Promise<Record<string, unknown>> {
-  const [sweep, deliveries, reminders, screens, reports] = await Promise.all([staffSweep(), refreshDeliveries(), remindWaiting(), refreshScreens(), sendDailyReports()]);
-  return { sweep, deliveries, ...(reminders ? { reminders } : {}), ...(screens ? { screens } : {}), ...(reports ? { reports } : {}) };
+  const [sweep, deliveries, reminders, screens, reports, decisions] = await Promise.all([
+    staffSweep(),
+    refreshDeliveries(),
+    remindWaiting(),
+    refreshScreens(),
+    sendDailyReports(),
+    pushDecisions(),
+  ]);
+  return { sweep, deliveries, ...(reminders ? { reminders } : {}), ...(screens ? { screens } : {}), ...(reports ? { reports } : {}), ...(decisions ? { decisions } : {}) };
 }

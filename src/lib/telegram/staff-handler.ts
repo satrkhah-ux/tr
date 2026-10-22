@@ -8,6 +8,7 @@ import { openFor, waitText } from "./staff-numbers";
 import { linkTeletelToken, promptReply, rememberThread, sendReply, threadOf, TOKEN_HELP } from "./staff-replies";
 import { openList, openScreen, screenView, unansweredList, weekView } from "./staff-screen";
 import { confirmDraft, draft, isBotManager, memberView, promptFor, remindDraft, takePending, teamView } from "./staff-manager";
+import { decisionStep, decisionsView, decisionText, decisionView, interventionView, promptDecision, setDecisionStatus, signalView } from "./staff-decisions";
 import type { InlineButton } from "./ops-bot";
 
 /**
@@ -52,6 +53,8 @@ const KEYS = {
   teletel: "🌐 تيلي تيل",
   team: "👥 الفريق",
   broadcast: "📢 إعلان عام",
+  urgent: "🚨 يحتاج تدخلك",
+  decisions: "📋 قرارات الإدارة",
 } as const;
 type Key = keyof typeof KEYS;
 
@@ -62,7 +65,7 @@ function keyboard(manager: boolean): Record<string, unknown> {
     [KEYS.today, KEYS.week],
     [KEYS.token, KEYS.tone, KEYS.teletel],
   ];
-  if (manager) rows.push([KEYS.team, KEYS.broadcast]);
+  if (manager) rows.push([KEYS.urgent, KEYS.decisions], [KEYS.team, KEYS.broadcast]);
   return {
     keyboard: rows.map((row) => row.map((text) => ({ text }))),
     resize_keyboard: true,
@@ -185,8 +188,10 @@ async function onKey(me: StaffMember, chatId: number, key: Key): Promise<void> {
   if (key === "tone") return sendTone(chatId);
   if (key === "broadcast") return promptFor(me, chatId, "broadcast", null);
   if (key === "team") return show(chatId, await teamView(me));
+  if (key === "urgent") return show(chatId, await interventionView(me));
+  if (key === "decisions") return show(chatId, await decisionsView(me));
   if (key === "teletel") return show(chatId, teletelLink());
-  const data: Record<Exclude<Key, "screen" | "tone" | "broadcast" | "team" | "teletel">, string> = { waiting: "w", open: "o:0", unanswered: "u", today: "d", week: "wk", token: "k" };
+  const data: Record<Exclude<Key, "screen" | "tone" | "broadcast" | "team" | "urgent" | "decisions" | "teletel">, string> = { waiting: "w", open: "o:0", unanswered: "u", today: "d", week: "wk", token: "k" };
   return show(chatId, await screenFor(me, data[key]));
 }
 
@@ -203,6 +208,8 @@ const COMMANDS: Record<string, Key> = {
   "/tone": "tone",
   "/broadcast": "broadcast",
   "/team": "team",
+  "/urgent": "urgent",
+  "/decisions": "decisions",
 };
 
 async function welcome(me: StaffMember, chatId: number): Promise<void> {
@@ -238,6 +245,16 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
     if (data.startsWith("q:")) return remindDraft(me, chatId, data.slice(2));
     if (data === "team") return show(chatId, await teamView(me), callback.message?.message_id);
     if (data.startsWith("e:")) return show(chatId, await memberView(me, data.slice(2)), callback.message?.message_id);
+    // «قرارات الإدارة»: the screen's items and the decisions (staff-decisions.ts, each step checks the manager again)
+    const at = callback.message?.message_id;
+    if (data === "si" || data === "sw") return show(chatId, await interventionView(me, data === "sw"), at);
+    if (data.startsWith("sg:")) return show(chatId, await signalView(me, data.slice(3)), at);
+    if (data.startsWith("sd:")) return promptDecision(me, chatId, data.slice(3));
+    if (data === "dn") return promptDecision(me, chatId, null);
+    if (/^d[odx]:/.test(data)) return show(chatId, await decisionStep(me, chatId, data), at);
+    if (data === "dl") return show(chatId, await decisionsView(me), at);
+    if (data.startsWith("dc:")) return show(chatId, await decisionView(me, data.slice(3)), at);
+    if (data.startsWith("ds:")) return show(chatId, await setDecisionStatus(me, data), at);
     await show(chatId, await screenFor(me, data), callback.message?.message_id);
     // a conversation's card can be answered with a Telegram «reply», like the client's own messages
     if (data.startsWith("c:") && callback.message) await rememberThread(chatId, callback.message.message_id, Number(data.slice(2)));
@@ -270,6 +287,7 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
   // after «📢 إعلان عام» / «🔔 تنبيه له», the next text (reply or not) is the draft; the preview still asks before anything goes
   if (text && !text.startsWith("/") && !(Object.values(KEYS) as string[]).includes(text)) {
     const pending = await takePending(chatId);
+    if (pending?.kind === "decision") return decisionText(me, chatId, text, pending.sourceKey);
     if (pending) return draft(me, chatId, text, pending.kind === "alert" ? pending.targetId : null);
   }
   // a Telegram «reply» to anything about a conversation is the answer to that client
