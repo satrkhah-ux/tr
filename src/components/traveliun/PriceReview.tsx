@@ -6,6 +6,8 @@ import { CheckCircle2, History, Loader2, Search } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { saveReviewPrice, type ReviewKind, type ReviewPage, type ReviewRow } from "@/lib/data/price-review";
 import { TraveliunShell } from "./TraveliunShell";
+import { DuplicatesPanel } from "./DuplicatesPanel";
+import type { Duplicates } from "@/lib/data/dedupe";
 
 /** «مراجعة الأسعار» — the prices waiting on a person, edited in place, every change in «آخر التحديثات». */
 
@@ -30,7 +32,7 @@ const ago = (iso: string) => {
 };
 const whoOf = (email: string) => email.split("@")[0];
 
-export function PriceReview({ rows, history }: ReviewPage) {
+export function PriceReview({ rows, history, duplicates }: ReviewPage & { duplicates?: Duplicates }) {
   const router = useRouter();
   const [tab, setTab] = useState<ReviewKind>("airport");
   const [country, setCountry] = useState("");
@@ -203,6 +205,9 @@ export function PriceReview({ rows, history }: ReviewPage) {
             {list.length === 0 ? <p className="py-8 text-center text-[12.5px] font-semibold text-[#93aaa3]">لا بنود هنا — كلها مراجَعة.</p> : null}
           </div>
         </section>
+
+        {/* the same thing held twice — the owner keeps one (2026-10-22) */}
+        {duplicates ? <DuplicatesPanel data={duplicates} /> : null}
 
         {/* who changed what — the audit trail of this page */}
         <section className="rounded-[16px] border border-[#d8e6e0] bg-white p-3 sm:p-4">
