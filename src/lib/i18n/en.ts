@@ -632,6 +632,7 @@ export const en = {
   "nav.termsIncludes": "Terms & inclusions",
   "nav.integrations": "External integrations",
   "nav.screens": "Screens",
+  "nav.conversations": "Conversations",
   // ---------- view-as + developer accounts + forced password (2026-10-17) ----------
   "viewAs.label": "View the system as",
   "viewAs.mine": "My account",

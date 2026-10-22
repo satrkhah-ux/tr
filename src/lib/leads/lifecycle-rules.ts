@@ -38,8 +38,22 @@ export function decideReturn(closure: { closed_by_kind: ClosedBy; closed_by_agen
   return { act: "assign", agentId: closure.closed_by_agent_id };
 }
 
-/** The system closes only what nobody is waiting on: idle `days` and WE spoke last — the oldest first. */
-export function staleToClose<T extends { lastActivityAt: number; waitingSince: number }>(rows: readonly T[], nowSec: number, days: number): T[] {
-  if (!(days > 0)) return [];
-  return rows.filter((c) => c.waitingSince === 0 && c.lastActivityAt > 0 && c.lastActivityAt <= nowSec - days * 86_400).sort((a, b) => a.lastActivityAt - b.lastActivityAt);
+/** «إدارة المحادثات»: how long without a reply before the system closes one (app_settings), null = off */
+export const AUTOCLOSE_SETTING = "conversation_autoclose_hours";
+export const readAutocloseHours = (raw: string | null | undefined): number | null => {
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 1 && n <= 24 * 90 ? Math.round(n) : null;
+};
+
+/** The system closes only what nobody is waiting on: idle `hours` and WE spoke last — the oldest first. */
+export function staleToClose<T extends { lastActivityAt: number; waitingSince: number }>(rows: readonly T[], nowSec: number, hours: number): T[] {
+  if (!(hours > 0)) return [];
+  return rows.filter((c) => c.waitingSince === 0 && c.lastActivityAt > 0 && c.lastActivityAt <= nowSec - hours * 3600).sort((a, b) => a.lastActivityAt - b.lastActivityAt);
+}
+
+/** «3 أيام»، «36 ساعة» */
+export function durationText(hours: number): string {
+  if (hours % 24) return hours === 1 ? "ساعة" : hours === 2 ? "ساعتين" : `${hours} ${hours <= 10 ? "ساعات" : "ساعة"}`;
+  const d = hours / 24;
+  return d === 1 ? "يوم" : d === 2 ? "يومين" : `${d} ${d <= 10 ? "أيام" : "يوماً"}`;
 }

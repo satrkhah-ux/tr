@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closerOf, decideReturn, staleToClose } from "./lifecycle-rules";
+import { closerOf, decideReturn, durationText, readAutocloseHours, staleToClose } from "./lifecycle-rules";
 
 const agents = [
   { id: 30, name: "محمد الحبيب ", email: "m.habib@traveliun.com" },
@@ -32,7 +32,13 @@ describe("the conversation's life in Teletel (order 2, part C)", () => {
       { id: 3, lastActivityAt: now - 30 * day, waitingSince: now - 30 * day },
       { id: 4, lastActivityAt: now - 2 * day, waitingSince: 0 },
     ];
-    expect(staleToClose(rows, now, 7).map((r) => r.id)).toEqual([2, 1]);
+    expect(staleToClose(rows, now, 7 * 24).map((r) => r.id)).toEqual([2, 1]);
     expect(staleToClose(rows, now, 0)).toEqual([]);
+  });
+
+  it("the setting: whole hours from 1 to 90 days, anything else is off; said in words", () => {
+    expect(readAutocloseHours("168")).toBe(168);
+    for (const raw of [null, "", "0", "-5", "abc", String(24 * 91)]) expect(readAutocloseHours(raw)).toBeNull();
+    expect([24, 48, 168, 36, 1].map(durationText)).toEqual(["يوم", "يومين", "7 أيام", "36 ساعة", "ساعة"]);
   });
 });

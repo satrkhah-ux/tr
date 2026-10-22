@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { addTeletelNote, assignMuradHandoff, conversationEvents, listAssignableAgents, listOpenConversations, setTeletelStatus, teletelGet, unassignTeletel } from "@/lib/providers/teletel";
-import { closerOf, decideReturn, staleToClose, type ClosedBy } from "./lifecycle-rules";
+import { closerOf, decideReturn, durationText, staleToClose, type ClosedBy } from "./lifecycle-rules";
 
 // always the service role: the in-app «تحديث» runs the pull with a staff session, and closures are written by the system only
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
@@ -113,24 +113,24 @@ export async function returnedToEmployee(conversationId: number, sinceSec: numbe
 }
 
 /**
- * The system's closing (off until app_settings.conversation_autoclose_days is
- * set): open conversations idle that many days where WE spoke last — never one
+ * The system's closing (off until «إدارة المحادثات» sets conversation_autoclose_hours):
+ * open conversations idle that long where WE spoke last — never one
  * whose client is waiting on us. Recorded before Teletel is asked, so the pull
  * reads it as the system's. A few a run.
  */
-export async function closeStale(days: number, limit = 20): Promise<number> {
+export async function closeStale(hours: number, limit = 20): Promise<number> {
   const service = db();
   const list = await listOpenConversations(true);
   if (!list) return 0;
   let n = 0;
-  for (const c of staleToClose(list.rows, Math.floor(Date.now() / 1000), days).slice(0, limit)) {
+  for (const c of staleToClose(list.rows, Math.floor(Date.now() / 1000), hours).slice(0, limit)) {
     const { data, error } = await service
       .from("conversation_closures")
-      .insert({ conversation_id: c.id, closed_at: new Date().toISOString(), closed_by_kind: "system", closed_by_name: "النظام", assignee_agent_id: c.assigneeId, reason: `لا نشاط منذ ${days} أيام ولا ينتظر العميل رداً` })
+      .insert({ conversation_id: c.id, closed_at: new Date().toISOString(), closed_by_kind: "system", closed_by_name: "النظام", assignee_agent_id: c.assigneeId, reason: `لا رد منذ ${durationText(hours)} وآخر رسالة منّا` })
       .select("id")
       .maybeSingle();
     if (error || !data) continue;
-    await addTeletelNote(c.id, `🤖 أُغلقت آلياً: لا نشاط منذ ${days} أيام ولا ينتظر العميل رداً. إذا كتب العميل تعود طلباً جديداً.`);
+    await addTeletelNote(c.id, `🤖 أُغلقت آلياً («إدارة المحادثات»): لا رد منذ ${durationText(hours)} وآخر رسالة منّا. إذا كتب العميل تعود طلباً جديداً.`);
     if (!(await setTeletelStatus(c.id, "resolved"))) {
       await service.from("conversation_closures").delete().eq("id", (data as { id: string }).id);
       continue;

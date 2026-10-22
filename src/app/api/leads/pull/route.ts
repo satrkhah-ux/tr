@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { pullSheet } from "@/lib/leads/sync";
 import { pullTeletel } from "@/lib/leads/teletel-pull";
 import { closeStale } from "@/lib/leads/lifecycle";
+import { AUTOCLOSE_SETTING, readAutocloseHours } from "@/lib/leads/lifecycle-rules";
 import { getTeletelConfig } from "@/lib/providers/teletel";
 import { recordCronRun } from "@/lib/data/cron-runs";
 
@@ -33,10 +34,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // phase two: Teletel's conversations; the sheet only where Teletel is not configured
     const result = getTeletelConfig() ? await pullTeletel(service) : await pullSheet(service);
     if (result.error) throw new Error(result.error);
-    // the system's closing (leads/lifecycle.ts): off until the owner sets how many idle days close a conversation
-    const { data: setting } = await service.from("app_settings").select("value").eq("key", "conversation_autoclose_days").maybeSingle();
-    const days = Number((setting as { value: string } | null)?.value);
-    return days > 0 && getTeletelConfig() ? { ...result, autoClosed: await closeStale(days) } : result;
+    // the system's closing (leads/lifecycle.ts): off until «إدارة المحادثات» sets how long without a reply closes one
+    const { data: setting } = await service.from("app_settings").select("value").eq("key", AUTOCLOSE_SETTING).maybeSingle();
+    const hours = readAutocloseHours((setting as { value: string } | null)?.value);
+    return hours && getTeletelConfig() ? { ...result, autoClosed: await closeStale(hours) } : result;
   });
   return NextResponse.json({ ok: true, ...summary });
 }

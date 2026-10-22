@@ -239,6 +239,8 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.clientComms", href: "/settings/client-comms" },
       // the office screens and their monitor (the owner, 2026-10-19)
       { labelKey: "nav.screens", href: "/settings/screens" },
+      // when Teletel conversations close on their own, and who closed what (the user, 2026-10-22)
+      { labelKey: "nav.conversations", href: "/settings/conversations" },
       { labelKey: "nav.guide", href: "/web-guide" },
     ],
   },
