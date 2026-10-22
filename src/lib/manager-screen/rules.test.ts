@@ -378,3 +378,27 @@ describe("what the screen draws (the owner's design order, 2026-10-20)", () => {
     ]);
   });
 });
+
+describe("the channel's view (the user, 2026-10-22: «9 محادثات لم يرد عليها … من المحادثات وعند اي موظف»)", () => {
+  it("lays the waiting out lane by lane under who holds them, the longest first, a red name in letters only", () => {
+    const { channel } = buildScreen(
+      facts({
+        agents: [{ name: "رشا", status: "online" }, { name: "باسل", status: "offline" }],
+        waits: [
+          { minutes: 7, since: ago(7), agent: "رشا", client: "سعد" },
+          { minutes: 44, since: ago(44), agent: "رشا", client: "Z🍉" },
+          { minutes: 20, since: ago(20), agent: "باسل", client: "نورة" },
+          { minutes: 9, since: ago(9), agent: null, client: "x" },
+          { minutes: 2, since: ago(2), agent: "رشا", client: "ليس بعد" },
+        ],
+      }),
+    );
+    expect(channel.waiting).toMatchObject({ known: true, total: 4, longest: 44 });
+    expect(channel.waiting.lanes.map((l) => [l.agent, l.presence, l.waits.map((w) => [w.minutes, w.status, w.client])])).toEqual([
+      ["رشا", "online", [[44, "red", "Z"], [7, "amber", null]]],
+      ["باسل", "offline", [[20, "red", "نورة"]]],
+      ["بلا موظف", null, [[9, "amber", null]]],
+    ]);
+    expect(channel.index.map((i) => i.key)).toEqual(["today", "waiting", "first_reply", "issued", "confirmed", "spend", "online"]);
+  });
+});

@@ -72,6 +72,34 @@ export type Panel = { key: PanelKey; title: string; short: string; status: Statu
 export type UrgentItem = Tile & { panel: PanelKey; panelTitle: string; /** what to do about it — the screen's gold «← …» */ action: string };
 export type TickerItem = { at: string; text: string; red: boolean };
 
+/**
+ * «قناة المدير» as an economic news channel (the user, 2026-10-22: «اعتبرها شاشة
+ * قناة فضائية و تنقل بيانات كاملة مثلا 9 محادثات لم يرد عليها توضح بطريقة بصرية
+ * من المحادثات وعند اي موظف»): the structured facts each segment draws — every
+ * number with the whole of it behind it, never a number alone.
+ */
+export type ChannelWait = { minutes: number; status: Status; /** a first name, and only on red */ client: string | null };
+export type ChannelLane = { agent: string; presence: Presence | null; waits: ChannelWait[] };
+export type ChannelAgent = { name: string; presence: Presence; open: number; replies: number; avg: number | null; status: Status };
+export type ChannelIndex = { key: string; label: string; value: string; unit?: string; note: string; status: Status };
+export type ManagerChannel = {
+  /** the market strip across the top: today's headline figures */
+  index: ChannelIndex[];
+  /** who is waiting for a reply now, lane by lane — by the colleague who holds them */
+  waiting: { known: boolean; total: number; longest: number | null; lanes: ChannelLane[] };
+  /** conversations that began in each Riyadh hour of today, up to the current hour */
+  hours: number[];
+  /** today's conversations by kind of request, the most first */
+  kinds: [string, number][];
+  agents: { known: boolean; present: number; total: number; list: ChannelAgent[] };
+  /** today's destinations: conversations, offers issued, confirmations */
+  destinations: { country: string; requests: number; issued: number; confirmed: number }[];
+  /** live files with a step today or tomorrow */
+  ops: { serial: string; when: string; what: string; status: Status }[];
+  campaigns: { name: string; spend: number; conversions: number; status: Status }[];
+  currency: string;
+};
+
 export type ManagerSnapshot = {
   /** when it was computed (ISO) */
   at: string;
@@ -91,6 +119,7 @@ export type ManagerSnapshot = {
   /** «ملخص اليوم» — the eye's own written summary of today, from the evening on; null before */
   daily: string[] | null;
   thresholds: ManagerThresholds;
+  channel: ManagerChannel;
 };
 
 /** What GET /api/manager-screen answers: the snapshot and the server's clock. */
@@ -909,7 +938,90 @@ const ACTIONS: Record<string, string> = {
 };
 const actionFor = (key: string) => ACTIONS[key] ?? (key.startsWith("agent:") ? "راجع محادثاته المفتوحة" : "راجع القسم");
 
-export function buildScreen(f: ManagerFacts): Pick<ManagerSnapshot, "overall" | "panels" | "urgent" | "watch" | "ticker" | "hourly"> {
+/** a first name as letters only — «Z🍉» → «Z» — or nothing */
+const lettersOnly = (name: string | null): string | null => (name?.match(/[ء-يA-Za-z]+/g) ?? [])[0] ?? null;
+
+/** The channel's own view of the same facts and judgements (ManagerChannel). */
+function channelData(f: ManagerFacts, today: LeadFact[], crew: TeamToday, panels: Panel[]): ManagerChannel {
+  const t = f.thresholds;
+  const tileOf = (panel: PanelKey, key: string) => panels.find((p) => p.key === panel)?.tiles.find((x) => x.key === key);
+  const began = (l: LeadFact) => l.first_message_at ?? l.created_at;
+  const lastHour = today.filter((l) => f.now - Date.parse(began(l)) < 3600_000).length;
+
+  // the waiting, lane by lane — past red is critical, so it stays red (the owner's rule)
+  const presenceOf = new Map((f.agents ?? []).map((a) => [fold(a.name), a.status] as const));
+  const lanes = new Map<string, ChannelLane>();
+  for (const w of recentWaits(f)) {
+    const name = w.agent ?? "بلا موظف";
+    const lane = lanes.get(name) ?? { agent: name, presence: w.agent ? (presenceOf.get(fold(w.agent)) ?? null) : null, waits: [] };
+    const status = level(w.minutes, t.waitAmberMin, t.waitRedMin);
+    lane.waits.push({ minutes: Math.round(w.minutes), status, client: status === "red" ? lettersOnly(firstName(w.client)) : null });
+    lanes.set(name, lane);
+  }
+  const laneList = [...lanes.values()]
+    .map((l) => ({ ...l, waits: l.waits.sort((a, b) => b.minutes - a.minutes) }))
+    .sort((a, b) => b.waits.length - a.waits.length || b.waits[0].minutes - a.waits[0].minutes);
+  const waitCount = laneList.reduce((n, l) => n + l.waits.length, 0);
+
+  const hour = new Date(f.now + 3 * 3600_000).getUTCHours();
+  const hours = Array.from({ length: hour + 1 }, () => 0);
+  for (const l of today) {
+    const at = Date.parse(began(l));
+    if (riyadhDay(new Date(at).toISOString()) !== f.day) continue;
+    const h = new Date(at + 3 * 3600_000).getUTCHours();
+    if (h <= hour) hours[h] += 1;
+  }
+
+  const ofDay = (iso: string) => riyadhDay(iso) === f.day;
+  const issued = f.offers.filter((o) => ofDay(o.created_at));
+  const confirmed = firstConfirmations(f.confirms).filter((c) => ofDay(c.at));
+  const destinations = countBy(today, (l) => l.country)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([country, requests]) => ({
+      country,
+      requests,
+      issued: issued.filter((o) => o.country === country).length,
+      confirmed: confirmed.filter((c) => c.country === country).length,
+    }));
+
+  const opsPanel = panels.find((p) => p.key === "operations");
+  const ops = (opsPanel?.boxes[0]?.items ?? []).map((i) => ({ serial: i.label, when: i.value, what: i.detail ?? "", status: i.status ?? "green" }));
+
+  const campaigns = f.ads.rows
+    .filter((r) => r.cost > 0)
+    .sort((a, b) => b.cost - a.cost)
+    .slice(0, 6)
+    .map((r) => ({ name: r.campaign, spend: r.cost, conversions: Math.round(r.conversions), status: (r.conversions >= 0.5 ? "green" : "amber") as Status }));
+
+  const idx = (panel: PanelKey, key: string, label: string, note?: string): ChannelIndex | null => {
+    const x = tileOf(panel, key);
+    return x ? { key, label, value: x.value, note: note ?? x.reason, status: x.status } : null;
+  };
+  const index = [
+    idx("conversations", "today", "محادثات اليوم", lastHour ? `+${lastHour} في آخر ساعة` : "لا جديد في آخر ساعة"),
+    idx("conversations", "waiting", "بانتظار الرد"),
+    idx("conversations", "first_reply", "متوسط أول رد"),
+    idx("sales", "issued", "عروض صدرت"),
+    idx("sales", "confirmed", "تأكدت اليوم"),
+    idx("ads", "spend", "إنفاق الإعلانات"),
+    { key: "online", label: "متصلون على تليتيل", value: f.agents === null ? "—" : `${crew.present}/${crew.total}`, note: f.agents === null ? "تليتيل لا يرد" : "الآن", status: (f.agents === null ? "amber" : "green") as Status },
+  ].filter((x): x is ChannelIndex => x != null);
+
+  return {
+    index,
+    waiting: { known: f.waits !== null, total: waitCount, longest: laneList[0]?.waits[0]?.minutes ?? null, lanes: laneList },
+    hours,
+    kinds: countBy(today, (l) => l.inquiry || "غير مصنّف").sort((a, b) => b[1] - a[1]),
+    agents: { known: f.agents !== null, present: crew.present, total: crew.total, list: crew.agents.slice(0, 12).map((a) => ({ ...a, avg: a.avg == null ? null : Math.round(a.avg) })) },
+    destinations,
+    ops,
+    campaigns,
+    currency: f.ads.currency,
+  };
+}
+
+export function buildScreen(f: ManagerFacts): Pick<ManagerSnapshot, "overall" | "panels" | "urgent" | "watch" | "ticker" | "hourly" | "channel"> {
   const today = f.leads.filter((l) => visitedOn(l, f.day));
   const crew = teamToday(f);
   const sections: Record<PanelKey, Section> = {
@@ -929,5 +1041,5 @@ export function buildScreen(f: ManagerFacts): Pick<ManagerSnapshot, "overall" | 
   }));
   const flagged = (status: Status) =>
     panels.flatMap((p) => p.tiles.filter((x) => x.status === status).map((x) => ({ ...x, panel: p.key, panelTitle: p.title, action: actionFor(x.key) })));
-  return { overall: worst(panels.map((p) => p.status)), panels, urgent: flagged("red"), watch: flagged("amber"), ticker: ticker(f), hourly: hourly(f, panels) };
+  return { overall: worst(panels.map((p) => p.status)), panels, urgent: flagged("red"), watch: flagged("amber"), ticker: ticker(f), hourly: hourly(f, panels), channel: channelData(f, today, crew, panels) };
 }
