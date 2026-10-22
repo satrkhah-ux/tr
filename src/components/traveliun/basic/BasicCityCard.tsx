@@ -1028,6 +1028,7 @@ function ServicesPanel({
           className={`${rowGap} ${cols}`}
           kind={<ServiceKindSelect value="tour" kinds={kinds} onChange={(kind) => tourKind(k, kind)} className={basicField} />}
           onRemove={() => onPicks(picks.filter((_, j) => j !== k))}
+          compact
         />
       ),
     })),

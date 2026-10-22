@@ -1,7 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { X } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { ChevronDown, X } from "lucide-react";
 import { FREE_DAY_TITLE, tourCars, type GeneratorLookups, type ServiceKind, type TourPick } from "@/lib/offer/draft-types";
 import type { TranslationKey } from "@/lib/i18n";
 import { programDayText, tourService, type TourProgram } from "@/lib/offer/itinerary";
@@ -10,6 +10,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
 import { SuggestInput, type Suggestion } from "../SuggestInput";
 import { basicField, typedNumber } from "../basic/styles";
 import { splitTourName } from "@/lib/catalog/model";
+import { tourGist, tourKey } from "@/lib/offer/tour-gist";
 
 /**
  * A city's tours, as both screens choose them — the basic screen's city card
@@ -50,9 +51,12 @@ export function tourChoices(catalog: TourCatalog): Suggestion[] {
     if (currency === "SAR" || !rate) return car ? `${price} ${currency} (${car})` : `${price} ${currency}`;
     return `≈ ${Math.round(price * rate).toLocaleString("en-US")} ر.س (${price} ${currency}${car ? ` · ${car}` : ""})`;
   };
+  // a tour without a price says so, at the end of the list (the owner, 2026-10-22) — never «≈ 0 ر.س»
+  const NO_PRICE = "بدون سعر";
   const priced = (value: string, programId?: string) => {
     const hit = catalog.showPrice ? findTourPrice(prices, value, catalog.tripCar, programId) : null;
-    return { value, ...(hit ? { hint: `${money(hit.price, hit.currency)}${hit.provisional ? " · مؤقت" : ""}` } : {}) };
+    const hint = !catalog.showPrice ? undefined : hit && hit.price > 0 ? `${money(hit.price, hit.currency)}${hit.provisional ? " · مؤقت" : ""}` : hit ? NO_PRICE : undefined;
+    return { value, ...tourGist(value), ...(hint ? { hint } : {}) };
   };
   for (const p of catalog.programs) {
     const title = programDayText(p).title;
@@ -79,11 +83,20 @@ export function tourChoices(catalog: TourCatalog): Suggestion[] {
         .sort((x, y) => paxOf(splitTourName(x.name)!.car) - paxOf(splitTourName(y.name)!.car));
       const other = others.find((t) => paxOf(splitTourName(t.name)!.car) >= need) ?? others[others.length - 1];
       const car = other ? splitTourName(other.name)?.car : null;
-      if (other && car) out.set(name, { value: name, hint: money(other.price, other.currency, car) });
-      else out.set(name, entry);
+      if (other && car && other.price > 0) out.set(name, { ...entry, hint: money(other.price, other.currency, car) });
+      else out.set(name, { ...entry, ...(catalog.showPrice ? { hint: NO_PRICE } : {}) });
     } else out.set(name, entry);
   }
-  return [...out.values()];
+  // each tour once: the same paragraph with «ثم التوصيل الى …» or without its dashes is the one already listed
+  const seen = new Set<string>();
+  const once = [...out.values()].filter((s) => {
+    // the same words, or the same title and places as the list shows them
+    const keys = [tourKey(s.value), s.label ? `${s.label}|${s.sub ?? ""}` : ""].filter(Boolean);
+    if (keys.some((k) => seen.has(k))) return false;
+    keys.forEach((k) => seen.add(k));
+    return true;
+  });
+  return [...once.filter((s) => s.hint !== NO_PRICE), ...once.filter((s) => s.hint === NO_PRICE)];
 }
 
 /** The company's cars, and a car typed elsewhere that the list does not hold. */
@@ -178,6 +191,7 @@ export function TourRow({
   className,
   onRemove,
   kind,
+  compact = false,
 }: {
   pick: TourPick;
   catalog: TourCatalog;
@@ -196,8 +210,16 @@ export function TourRow({
   onRemove?: () => void;
   /** «نوع الخدمة» before the service — the basic screen's services table (ServiceKindSelect). */
   kind?: ReactNode;
+  /**
+   * The car and the cars as one line that opens («البيسك», the owner,
+   * 2026-10-22: «دون فقد المميزات») — the trip's car until this tour has its
+   * own — and the tour's whole wording one press away.
+   */
+  compact?: boolean;
 }) {
   const { t } = useTraveliunUI();
+  const [carOpen, setCarOpen] = useState(false);
+  const [textOpen, setTextOpen] = useState(false);
   const { tripCar, prices, sarPer, showPrice } = catalog;
   const car = pick.car_type?.trim() || tripCar;
   const unit = tourCarPrice(pick, tripCar, prices, sarPer);
@@ -244,7 +266,23 @@ export function TourRow({
           className={`${field} ${pick.free ? "text-[#7a948f]" : ""}`}
         />,
       )}
-      {cell(
+      {compact && !carOpen && !pick.free ? (
+        <>
+          {cell(
+            t("pg.tour.car"),
+            <button
+              type="button"
+              onClick={() => setCarOpen(true)}
+              className={`${field} inline-flex items-center justify-between gap-1 text-start ${pick.car_type?.trim() && pick.car_type.trim() !== tripCar ? "font-extrabold" : "text-[#557d78]"}`}
+            >
+              <span className="min-w-0 truncate">{`${car || t("pg.tour.car")} × ${tourCars(pick)}`}</span>
+              <ChevronDown className="size-3.5 shrink-0" />
+            </button>,
+          )}
+          <span className="max-xl:hidden" />
+        </>
+      ) : null}
+      {compact && !carOpen && !pick.free ? null : cell(
         t("pg.tour.car"),
         <select
           value={car}
@@ -261,7 +299,7 @@ export function TourRow({
           <CarOptions carTypes={catalog.carTypes} placeholder={t("pg.tour.car")} current={car} />
         </select>,
       )}
-      {cell(t("pg.tour.cars"), <CarCountSelect value={tourCars(pick)} disabled={pick.free} onChange={(cars) => onChange({ cars })} label={t("pg.tour.cars")} className={field} />)}
+      {compact && !carOpen && !pick.free ? null : cell(t("pg.tour.cars"), <CarCountSelect value={tourCars(pick)} disabled={pick.free} onChange={(cars) => onChange({ cars })} label={t("pg.tour.cars")} className={field} />)}
       {showPrice
         ? cell(
             t("pg.tour.carPrice"),
@@ -318,6 +356,22 @@ export function TourRow({
         >
           <X className="size-4" />
         </button>
+      ) : null}
+      {compact && !describe && pick.text.trim() && !pick.free ? (
+        <div className="col-span-full">
+          <button type="button" onClick={() => setTextOpen((v) => !v)} aria-expanded={textOpen} className="inline-flex items-center gap-1 text-[11px] font-bold text-[#557d78] hover:text-[#185045]">
+            {t("pg.tour.description")}
+            <ChevronDown className={`size-3 transition-transform ${textOpen ? "rotate-180" : ""}`} />
+          </button>
+          {textOpen ? (
+            <textarea
+              value={pick.text}
+              onChange={(e) => onChange({ text: e.target.value })}
+              rows={3}
+              className="mt-1 w-full rounded-[10px] border border-[#dbe6e1] bg-white p-2.5 text-[12.5px] leading-6 text-[#185045] outline-none focus:border-[#2aa87a]"
+            />
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

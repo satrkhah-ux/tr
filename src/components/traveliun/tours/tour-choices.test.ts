@@ -70,4 +70,26 @@ describe("tourChoices — what a tour field opens", () => {
     };
     expect(tourChoices(usd)[1]).toEqual({ value: "جولة البسفور", hint: "≈ 563 ر.س (150 USD · فان مرسيدس)" });
   });
+
+  it("says «بدون سعر» at the end of the list, shows a long tour short, and lists one tour once however it was written (2026-10-22)", () => {
+    const long = "جولة يوم كامل بسيارة مرسيدس Vito - زيارة ميدان طرابزون زيارة مول الفورم - متحف آيا صوفيا";
+    const list = tourChoices({
+      ...catalog(true),
+      programs: [],
+      prices: [
+        { name: "جولة اوزنغول", price: 0, currency: "SAR", car_type: "سيدان", program_id: null },
+        { name: long, price: 450, currency: "SAR", car_type: "سيدان", program_id: null },
+        { name: "مرتفعات آيدر - شلالات اسكيت اوغلو", price: 500, currency: "SAR", car_type: "سيدان", program_id: null },
+        { name: "مرتفعات آيدر شلالات اسكيت اوغلو ثم التوصيل الى طرابزون", price: 500, currency: "SAR", car_type: "سيدان", program_id: null },
+      ],
+    });
+    expect(list.map((s) => [s.label ?? s.value, s.hint])).toEqual([
+      ["يوم حر", undefined],
+      ["ميدان طرابزون", "450 SAR"],
+      ["مرتفعات آيدر - شلالات اسكيت اوغلو", "500 SAR"],
+      ["جولة اوزنغول", "بدون سعر"],
+    ]);
+    // what is picked is the tour's own name, whole
+    expect(list[1].value).toBe(long);
+  });
 });

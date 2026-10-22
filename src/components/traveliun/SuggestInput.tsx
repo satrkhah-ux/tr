@@ -11,7 +11,8 @@ import { unzoomedRoot, ZOOMED_POPUP } from "@/components/ui/overlay-root";
  * One suggestion: the text it puts in the field, a hint beside it (a price, a
  * city), and other words it is found by (an airport by its city: «جدة»).
  */
-export type Suggestion = { value: string; hint?: string; keywords?: string };
+/** `label`/`sub`: what the list shows when the value is long (a tour's paragraph) — the value is still what is picked. */
+export type Suggestion = { value: string; hint?: string; keywords?: string; label?: string; sub?: string };
 
 /**
  * A free-text field with its list — what `<input list>` + `<datalist>` was
@@ -96,7 +97,10 @@ export function SuggestInput({
                   value={s}
                   className="flex cursor-pointer select-none items-center gap-2 rounded-[7px] px-2 py-1.5 text-[12.5px] outline-none data-[highlighted]:bg-[#f2f7f5] dark:data-[highlighted]:bg-[#1b2d27]"
                 >
-                  <span className="min-w-0 flex-1">{s.value}</span>
+                  <span className="min-w-0 flex-1">
+                    {s.label ?? s.value}
+                    {s.sub ? <span className="block text-[11px] font-semibold text-[#7a948f]">{s.sub}</span> : null}
+                  </span>
                   {s.hint ? <span className="tv-tnum shrink-0 text-[11px] font-bold text-[#557d78]">{s.hint}</span> : null}
                 </Autocomplete.Item>
               )}
