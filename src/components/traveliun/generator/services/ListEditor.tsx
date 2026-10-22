@@ -75,39 +75,40 @@ function MarkButton({ kind, label, onClick }: { kind: "add" | "remove"; label: s
   );
 }
 
-/** The ready lines not used yet, each with its ✓. Open by default — they are the fast path. */
+/** The ready lines not used yet, each with its ✓ — inside «+ إضافة», so the box stays short until the agent asks. */
 function Picker({ label, entries, onPick }: { label: string; entries: string[]; onPick: (text: string) => void }) {
   const { t } = useTraveliunUI();
-  const [open, setOpen] = useState(true);
   if (entries.length === 0) return null;
   return (
-    <div className="mb-2">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#185045] hover:underline"
-      >
-        <ListPlus className="size-4" />
+    <div className="mt-2">
+      <p className="mb-1 inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[#185045]">
+        <ListPlus className="size-3.5" />
         {label}
-      </button>
-      {open ? (
-        <ul className="mt-1.5 max-h-[180px] divide-y divide-[#eef3f1] overflow-y-auto rounded-[10px] border border-[#e2ebe7] bg-white">
-          {entries.map((text) => (
-            <li key={text} className="flex items-center gap-2 px-2 py-1 hover:bg-[#f4f8f6]">
-              <MarkButton kind="add" label={t("pg.addLine")} onClick={() => onPick(text)} />
-              <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-[#41615b]">{text}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      </p>
+      <ul className="max-h-[150px] divide-y divide-[#eef3f1] overflow-y-auto rounded-[10px] border border-[#e2ebe7] bg-white">
+        {entries.map((text) => (
+          <li key={text} className="flex items-center gap-2 px-2 py-1 hover:bg-[#f4f8f6]">
+            <MarkButton kind="add" label={t("pg.addLine")} onClick={() => onPick(text)} />
+            <span className="min-w-0 flex-1 text-[12.5px] leading-snug text-[#41615b]">{text}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-/** One editable string list (includes / excludes / terms) with add + remove. */
+/**
+ * One editable string list (includes / excludes / terms) with add + remove.
+ *
+ * Short by default (the evaluator, 2026-10-22: «يشمل / لا يشمل» took 650–750 px
+ * because the ready lines stood open): the chosen lines as compact chips — ✓ in,
+ * ✗ out — and one «+ إضافة» that opens the ready lines, the country's services
+ * and a line of one's own. Terms keep their numbered rows: they are sentences.
+ */
 export function ListEditor({ titleKey, variant, items, library, countryServices, onChange }: ListEditorProps) {
   const { t } = useTraveliunUI();
   const [value, setValue] = useState("");
+  const [adding, setAdding] = useState(false);
 
   // ready lines the agent has not used yet — the only ones worth offering
   const unused = useMemo(
@@ -131,16 +132,55 @@ export function ListEditor({ titleKey, variant, items, library, countryServices,
     onChange(items.filter((_, i) => i !== index));
   }
 
+  const chips = variant !== "terms";
+
   return (
     <div className="flex h-full flex-col rounded-[12px] border border-[#e2ebe7] bg-[#f8fbf9] p-3">
-      <h3 className="mb-2 text-[13px] font-extrabold text-[#185045]">{t(titleKey)}</h3>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="text-[13px] font-extrabold text-[#185045]">
+          {t(titleKey)}
+          {items.length ? <span className="tv-tnum ms-1.5 text-[11.5px] font-bold text-[#78948f]">({items.length})</span> : null}
+        </h3>
+        <button
+          type="button"
+          onClick={() => setAdding((o) => !o)}
+          aria-expanded={adding}
+          className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-[8px] border px-2.5 text-[12px] font-bold ${
+            adding ? "border-[#185045] bg-[#185045] text-white" : "border-[#cfe0d9] bg-white text-[#185045] hover:border-[#2aa87a]"
+          }`}
+        >
+          {adding ? <X className="size-3.5" /> : <Plus className="size-3.5" />}
+          {adding ? t("close") : t("pg.addItem")}
+        </button>
+      </div>
 
       {items.length === 0 ? (
-        <p className="mb-2 rounded-[10px] border border-dashed border-[#cfe0d9] px-3 py-3 text-center text-[12.5px] text-[#93aaa3]">
-          {t("pg.docNoContent")}
-        </p>
+        <p className="rounded-[10px] border border-dashed border-[#cfe0d9] px-3 py-2 text-center text-[12px] text-[#93aaa3]">{t("pg.docNoContent")}</p>
+      ) : chips ? (
+        <ul className="flex flex-wrap gap-1.5">
+          {items.map((item, index) => (
+            <li
+              key={index}
+              className={`inline-flex max-w-full items-center gap-1 rounded-full border py-0.5 pe-1 ps-1.5 text-[12px] font-semibold leading-snug ${
+                variant === "includes" ? "border-[#bfe5d3] bg-[#f1faf5] text-[#185045]" : "border-[#f0c9c9] bg-[#fdf5f5] text-[#7a2b2b]"
+              }`}
+            >
+              {variant === "includes" ? <Check className="size-3 shrink-0 text-[#0f7a52]" /> : <X className="size-3 shrink-0 text-[#c43d3d]" />}
+              <span className="min-w-0 break-words">{item}</span>
+              <button
+                type="button"
+                onClick={() => removeItem(index)}
+                aria-label={t("pg.removeRow")}
+                title={t("pg.removeRow")}
+                className="flex size-5 shrink-0 items-center justify-center rounded-full text-[#93aaa3] hover:bg-white hover:text-[#c43d3d]"
+              >
+                <X className="size-3" />
+              </button>
+            </li>
+          ))}
+        </ul>
       ) : (
-        <ul className="mb-2 divide-y divide-[#eef3f1] overflow-hidden rounded-[10px] border border-[#e2ebe7] bg-white">
+        <ul className="divide-y divide-[#eef3f1] overflow-hidden rounded-[10px] border border-[#e2ebe7] bg-white">
           {items.map((item, index) => (
             <li key={index} className="flex items-center gap-2 px-2.5 py-1.5">
               <Bullet variant={variant} index={index} />
@@ -151,35 +191,35 @@ export function ListEditor({ titleKey, variant, items, library, countryServices,
         </ul>
       )}
 
-      <Picker
-        label={t("pg.fromLibrary", { count: String(unused.length) })}
-        entries={unused}
-        onPick={(text) => onChange([...items, text])}
-      />
-      <Picker
-        label={t("pg.countryServices", { count: String(unusedServices.length) })}
-        entries={unusedServices}
-        onPick={(text) => onChange([...items, text])}
-      />
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          addItem();
-        }}
-        className="mt-auto flex items-center gap-2"
-      >
-        <input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={t("pg.itemPlaceholder")}
-          className={fieldClass}
-        />
-        <button type="submit" className={`${addButtonClass} shrink-0`}>
-          <Plus className="size-4" />
-          {t("pg.addItem")}
-        </button>
-      </form>
+      {adding ? (
+        <div className="mt-2 rounded-[10px] border border-[#cfe0d9] bg-white p-2">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              addItem();
+            }}
+            className="flex items-center gap-2"
+          >
+            <input
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder={t("pg.itemPlaceholder")}
+              autoFocus
+              className={fieldClass}
+            />
+            <button type="submit" className={`${addButtonClass} shrink-0`}>
+              <Plus className="size-4" />
+              {t("pg.addItem")}
+            </button>
+          </form>
+          <Picker label={t("pg.fromLibrary", { count: String(unused.length) })} entries={unused} onPick={(text) => onChange([...items, text])} />
+          <Picker
+            label={t("pg.countryServices", { count: String(unusedServices.length) })}
+            entries={unusedServices}
+            onPick={(text) => onChange([...items, text])}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
