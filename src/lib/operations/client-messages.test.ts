@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { arabicDay, defaultMessageBody, fillTemplate, messagesDueToday, tidyWhatsapp, WA_TEMPLATES, waParams, waPreview } from "./client-messages";
+import { arabicDay, defaultMessageBody, fillTemplate, messagesDueToday, programmeMessage, tidyWhatsapp, WA_TEMPLATES, waParams, waPreview } from "./client-messages";
 
 const fields = { name: "أحمد", destination: "ماليزيا", serial: "AD-6-3056", link: "https://pkg.traveliun.com/trip/x", rate_link: "https://pkg.traveliun.com/trip/x/rate" };
 
@@ -89,5 +89,26 @@ describe("the WhatsApp templates", () => {
       waPreview(WA_TEMPLATES.bookings_confirmed, waParams("bookings_confirmed", fields)),
     );
     expect(defaultMessageBody("rate_trip")).toContain("{rate_link}");
+  });
+});
+
+describe("the issued programme's WhatsApp text", () => {
+  it("is short, carries no link, and says the bookings' link comes after the client confirms", () => {
+    const text = programmeMessage({ hello: "عميلنا Ahmed Alrifaie،", destination: "جورجيا", duration: "7 أيام / 6 ليالي", serial: "AD-9-7801-20261022", updated: false });
+    expect(text).toBe(
+      [
+        "عميلنا Ahmed Alrifaie،",
+        "برنامج رحلتك إلى جورجيا (7 أيام / 6 ليالي) جاهز، وتجده في الملف المرفق.",
+        "رقم الملف: AD-9-7801-20261022",
+        "راجعه وأخبرنا بأي تعديل، وبعد تأكيدك نرسل لك رابط متابعة حجوزاتك.",
+        "فريق ترافليون للسفر والسياحة",
+      ].join("\n\n"),
+    );
+    expect(text).not.toMatch(/https?:\/\//);
+  });
+
+  it("says «حدّثنا» for a newer version, and stays whole without a destination", () => {
+    expect(programmeMessage({ hello: "عميلنا العزيز،", destination: "تركيا", duration: null, serial: "AD-1", updated: true })).toContain("حدّثنا برنامج رحلتك إلى تركيا، والنسخة المحدَّثة في الملف المرفق.");
+    expect(programmeMessage({ hello: "عميلنا العزيز،", destination: null, duration: null, serial: "AD-1", updated: false })).toContain("برنامج رحلتك جاهز، وتجده في الملف المرفق.");
   });
 });

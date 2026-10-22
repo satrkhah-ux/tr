@@ -13,7 +13,7 @@ import {
   sendTeletelTemplate,
   whatsappTemplateStatus,
 } from "@/lib/providers/teletel";
-import { tidyWhatsapp, WA_TEMPLATES, waParams, waPreview, type WaTemplateKey } from "@/lib/operations/client-messages";
+import { programmeMessage, tidyWhatsapp, WA_TEMPLATES, waParams, waPreview, type WaTemplateKey } from "@/lib/operations/client-messages";
 import { clientOfferPdf } from "@/lib/offer-doc/client-pdf";
 
 /**
@@ -221,17 +221,8 @@ export async function offerMessage(serial: string, updated: boolean): Promise<Of
     const where = [row.destination, row.duration ? `(${row.duration})` : ""].filter(Boolean).join(" ");
     const link = `${base}/client-offer/${row.serial}`;
     const destination = row.destination?.trim() || "";
-    // the owner's layout (2026-10-17): every line apart, the link alone, the signature last
-    const text = [
-      greeting(customer?.arabic_name),
-      updated
-        ? `تم تحديث ملفك، وهذا برنامج رحلتك المحدَّث${where ? ` إلى ${where}` : ""}`
-        : `تم إعداد برنامج رحلتك${where ? ` إلى ${where}` : ""}`,
-      `(رقم الملف ${row.serial})`,
-      "تفاصيل البرنامج كاملة من هنا، وتصلك نسخة PDF في الرسالة التالية:",
-      link,
-      "فريق ترافليون للسفر والسياحة",
-    ].join("\n\n");
+    // short, and no link: the PDF follows, the bookings' link comes once the client confirms (client-messages.ts)
+    const text = programmeMessage({ hello: greeting(customer?.arabic_name), destination: row.destination, duration: row.duration, serial: row.serial, updated });
     const note = [
       `${updated ? "أُعيد إصدار" : "أُصدر"} العرض ${row.serial}${where ? ` — ${where}` : ""}`,
       row.total != null ? `الإجمالي: ${Number(row.total).toLocaleString("en-US")} ${row.currency ?? ""}`.trim() : null,

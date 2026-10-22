@@ -356,3 +356,22 @@
 .min-h-screen { min-height: calc(100vh / var(--tv-zoom)); }
 .h-screen { height: calc(100vh / var(--tv-zoom)); }
 .min-h-dvh { min-height: calc(100dvh / var(--tv-zoom)); }
+
+/*
+  iOS Safari gives a date or time field a width of its own («25 Oct 2026» and
+  its padding) that no grid cell can shrink: on the owner's phone (2026-10-22)
+  the arrival date ran under the nights and the return date out of the card.
+  Without the native look it takes its cell's width like any input; its value
+  sits at the start, as the typed fields' do.
+*/
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  text-align: start;
+}

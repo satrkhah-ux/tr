@@ -60,9 +60,9 @@ export function BasicPhoneLookup({
       {label}
       <span className="relative">
         {searching ? (
-          <Loader2 className="absolute end-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-[#8aa29b]" />
+          <Loader2 className="absolute left-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-[#8aa29b]" />
         ) : (
-          <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
         )}
         <input
           dir="ltr"
@@ -76,7 +76,8 @@ export function BasicPhoneLookup({
           onFocus={() => hits.length > 0 && setOpen(true)}
           onBlur={() => window.setTimeout(() => setOpen(false), 150)}
           placeholder="05…"
-          className={`${basicField} pe-9`}
+          // the number is left to right whatever the page's direction: the icon and its room both on the left
+          className={`${basicField} pl-9`}
         />
       </span>
       {open && query.trim().length >= 2 ? (

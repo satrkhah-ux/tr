@@ -18,6 +18,8 @@ import { basicField, typedNumber } from "./styles";
 import { useBasicLabels } from "./labels";
 
 /** the leg rows' columns: its name, the number and «جلب», the two airports, the day, the two clocks, the price */
+/** a field's name above it where the wide row has no room for one */
+const SMALL_CAPTION = "text-[10px] font-bold text-[#7a948f]";
 const COLS = "xl:grid-cols-[4rem_minmax(8rem,0.9fr)_minmax(11rem,1.4fr)_minmax(11rem,1.4fr)_9.5rem_6.5rem_8rem_7rem_2rem]";
 
 type Look = { busy?: boolean; note?: string; hits?: FlightLookupHit[] };
@@ -210,15 +212,25 @@ export function BasicFlightPlan({
           <span className="contents" onBlur={() => settle(id, "to_airport", leg.to_airport)}>
             <SuggestInput ariaLabel={tx("planTo")} placeholder={tx("planTo")} items={items.to} value={leg.to_airport} onChange={(v) => edit(id, { to_airport: v })} className={basicField} />
           </span>
-          <input type="date" dir="ltr" aria-label={tx("domDate")} value={day} onChange={(e) => edit(id, { date: e.target.value })} className={`${basicField} tv-tnum px-2`} />
-          <input type="time" dir="ltr" aria-label={tx("domDep")} value={time(leg.departure_at)} disabled={!day} onChange={(e) => edit(id, { dep: e.target.value })} className={`${basicField} tv-tnum px-2`} />
-          <span className="flex items-center gap-1">
+          {/* under the wide row a phone shows an empty time as a blank box: each says what it is there */}
+          <label className="grid gap-0.5">
+            <span className={`${SMALL_CAPTION} xl:hidden`}>{tx("domDate")}</span>
+            <input type="date" dir="ltr" aria-label={tx("domDate")} value={day} onChange={(e) => edit(id, { date: e.target.value })} className={`${basicField} tv-tnum px-2`} />
+          </label>
+          <label className="grid gap-0.5">
+            <span className={`${SMALL_CAPTION} xl:hidden`}>{tx("domDep")}</span>
+            <input type="time" dir="ltr" aria-label={tx("domDep")} value={time(leg.departure_at)} disabled={!day} onChange={(e) => edit(id, { dep: e.target.value })} className={`${basicField} tv-tnum px-2`} />
+          </label>
+          <span className="grid gap-0.5">
+            <span className={`${SMALL_CAPTION} xl:hidden`}>{tx("domArr")}</span>
+            <span className="flex items-center gap-1">
             <input type="time" dir="ltr" aria-label={tx("domArr")} value={time(leg.arrival_at)} disabled={!day} onChange={(e) => edit(id, { arr: e.target.value })} className={`${basicField} tv-tnum px-2`} />
             {nextDay ? (
               <span title={tx("nextDayHint", { city: leg.to_city ?? "" })} className="tv-tnum shrink-0 rounded-full bg-[#fff4dc] px-1.5 py-0.5 text-[10.5px] font-extrabold text-[#a86a10]">
                 {tx("nextDay")}
               </span>
             ) : null}
+            </span>
           </span>
           {isDom ? (
             <input

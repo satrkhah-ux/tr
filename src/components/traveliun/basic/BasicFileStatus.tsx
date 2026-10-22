@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { BriefcaseBusiness, CheckCircle2, Copy, Eye, FileText, History, Loader2, XCircle } from "lucide-react";
 import { cancelFile, confirmFromBasic, getFileStatus, type FileError, type FileStatusView } from "@/lib/data/file-status";
@@ -9,6 +8,7 @@ import { AWAITING_CLIENT, SENDABLE, type FileState, type TimelineEntry } from "@
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { OfferSend } from "../OfferSend";
+import { TripLinkSend } from "./TripLinkSend";
 import { FileStateChip } from "./FileStateChip";
 import { useBasicLabels } from "./labels";
 
@@ -83,7 +83,6 @@ export function BasicFileStatus({
 }) {
   const tx = useBasicLabels();
   const { t, language } = useTraveliunUI();
-  const router = useRouter();
   const [view, setView] = useState<FileStatusView | null>(() => loaded.get(draftId) ?? null);
   const [tick, setTick] = useState(0);
   const [channel, setChannel] = useState<"whatsapp" | "phone" | "office">("whatsapp");
@@ -146,10 +145,8 @@ export function BasicFileStatus({
     try {
       const r = await confirmFromBasic(draftId, channel);
       if (!r.ok) return fail(r.error);
-      if (r.canOpen) {
-        setMessage({ text: tx("confirmDone"), ok: true });
-        router.push(`/operations/${r.operationId}`);
-      } else setMessage({ text: tx("confirmDoneTeam"), ok: true });
+      // stay here: the next step is the bookings' link to the client (step ③), the case one click away
+      setMessage({ text: r.canOpen ? tx("confirmDoneNext") : tx("confirmDoneTeam"), ok: true });
       changed();
     } catch {
       fail("failed");
@@ -211,63 +208,85 @@ export function BasicFileStatus({
         ) : null}
       </div>
 
-      {/* ② the steps, in their order: review → send → the client said yes (the owner, 2026-10-18) */}
-      <div className="flex flex-wrap items-center gap-2 max-sm:[&>a]:w-full max-sm:[&>button]:w-full">
-        <a
-          href={link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] border border-[#185045] bg-white px-3.5 text-[12.5px] font-extrabold text-[#185045] hover:bg-[#f0f7f4]"
-        >
-          <Eye className="size-4" />
-          {tx("reviewOffer")}
-        </a>
-        <a
-          href={`/offer/${serial}/pdf`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex h-9 items-center justify-center gap-1 rounded-[9px] px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045]"
-        >
-          <FileText className="size-3.5" />
-          PDF
-        </a>
-        {sendable ? <OfferSend draftId={draftId} again={view.stale} onSent={changed} filled={!sentOnce || view.stale} className="contents" /> : null}
-        {view.canAct && awaiting ? (
-          <>
-            <label className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[#557d78]">
-              {tx("confirmChannel")}
-              <select
-                value={channel}
-                onChange={(e) => setChannel(e.target.value as typeof channel)}
-                className="h-9 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12px] font-bold text-[#185045]"
-              >
-                <option value="whatsapp">{tx("channel_whatsapp")}</option>
-                <option value="phone">{tx("channel_phone")}</option>
-                <option value="office">{tx("channel_office")}</option>
-              </select>
-            </label>
-            <button
-              type="button"
-              onClick={() => void confirm()}
-              disabled={busy !== null}
-              className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] px-4 text-[12.5px] font-extrabold disabled:opacity-60 ${
-                sentOnce && !view.stale ? "bg-[#185045] text-white hover:bg-[#0f4439]" : "border border-[#185045] bg-white text-[#185045] hover:bg-[#f0f7f4]"
-              }`}
+      {/* ② three numbered steps, each with what it is for (the owner, 2026-10-22: «تظهر الخيارات عشوائية ولا يعرف الموظف ماذا يختار») */}
+      {view.state === "cancelled" ? null : (
+      <ol className="space-y-2">
+        <Step n={1} title={tx("stepReview")} hint={tx("stepReviewHint")} status={sentOnce && !view.stale ? "done" : "now"}>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] border border-[#185045] bg-white px-3.5 text-[12.5px] font-extrabold text-[#185045] hover:bg-[#f0f7f4] max-sm:flex-1"
             >
-              {busy === "confirm" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-              {tx("confirmTitle")}
-            </button>
-          </>
-        ) : null}
-      </div>
-      {view.partner ? <p className="text-[11.5px] font-bold text-[#557d78]">{tx("blocked_partner")}</p> : null}
+              <Eye className="size-4" />
+              {tx("reviewOffer")}
+            </a>
+            <a
+              href={`/offer/${serial}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-9 items-center justify-center gap-1 rounded-[9px] border border-[#dbe6e1] px-3 text-[12px] font-bold text-[#557d78] hover:text-[#185045]"
+            >
+              <FileText className="size-3.5" />
+              PDF
+            </a>
+          </div>
+        </Step>
+        <Step
+          n={2}
+          title={tx("stepSend")}
+          hint={view.partner ? tx("blocked_partner") : sentOnce && !view.stale ? tx("stepSendDone") : tx("stepSendHint")}
+          status={view.partner ? "off" : sentOnce && !view.stale ? "done" : "now"}
+        >
+          {sendable ? <OfferSend draftId={draftId} again={view.stale} onSent={changed} filled={!sentOnce || view.stale} /> : null}
+        </Step>
+        <Step
+          n={3}
+          title={awaiting ? tx("stepConfirm") : tx("stepConfirmed")}
+          hint={awaiting ? tx("stepConfirmHint") : tx("stepConfirmedHint")}
+          status={awaiting ? (sentOnce && !view.stale ? "now" : "next") : "done"}
+        >
+          {view.canAct && awaiting ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[#557d78]">
+                {tx("confirmChannel")}
+                <select
+                  value={channel}
+                  onChange={(e) => setChannel(e.target.value as typeof channel)}
+                  className="h-9 rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12px] font-bold text-[#185045]"
+                >
+                  <option value="whatsapp">{tx("channel_whatsapp")}</option>
+                  <option value="phone">{tx("channel_phone")}</option>
+                  <option value="office">{tx("channel_office")}</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => void confirm()}
+                disabled={busy !== null}
+                className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-[9px] px-4 text-[12.5px] font-extrabold disabled:opacity-60 max-sm:flex-1 ${
+                  sentOnce && !view.stale ? "bg-[#185045] text-white hover:bg-[#0f4439]" : "border border-[#185045] bg-white text-[#185045] hover:bg-[#f0f7f4]"
+                }`}
+              >
+                {busy === "confirm" ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                {tx("confirmTitle")}
+              </button>
+            </div>
+          ) : view.operationId && view.canAct && !view.partner ? (
+            <TripLinkSend operationId={view.operationId} />
+          ) : null}
+        </Step>
+      </ol>
+      )}
       {message ? <p role="status" className={`text-[12px] font-bold ${message.ok ? "text-[#0f7a52]" : "text-[#c22850]"}`}>{message.text}</p> : null}
 
       {/* a warning that blocks nothing: one line under the steps */}
       {extras?.guard}
 
-      {/* ③ the rest, small */}
+      {/* ③ the rest, small, under its name */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-dashed border-[#DCE9E5] pt-2">
+        <span className="w-full text-[10.5px] font-extrabold text-[#93aaa3] sm:w-auto">{tx("otherTools")}</span>
         <button
           type="button"
           onClick={() => {
@@ -347,5 +366,26 @@ export function BasicFileStatus({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * One numbered step of the issued section: its number (a tick once done), what
+ * it is for in a line, and its controls. «now» is the step the file is on.
+ */
+function Step({ n, title, hint, status, children }: { n: number; title: string; hint: string; status: "done" | "now" | "next" | "off"; children?: ReactNode }) {
+  const badge =
+    status === "done" ? "bg-[#0f7a52] text-white" : status === "now" ? "bg-[#185045] text-white" : "bg-[#eef3f1] text-[#93aaa3]";
+  return (
+    <li className={`flex gap-3 rounded-[11px] border p-2.5 ${status === "now" ? "border-[#b9d6cb] bg-[#f7fbf9]" : "border-[#edf3f0]"}`}>
+      <span className={`grid size-7 shrink-0 place-items-center rounded-full text-[12.5px] font-extrabold ${badge}`}>{status === "done" ? "✓" : n}</span>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <div>
+          <p className={`text-[13px] font-extrabold ${status === "next" || status === "off" ? "text-[#7a948f]" : "text-[#103f37]"}`}>{title}</p>
+          <p className="text-[11.5px] font-semibold text-[#7a948f]">{hint}</p>
+        </div>
+        {children}
+      </div>
+    </li>
   );
 }
