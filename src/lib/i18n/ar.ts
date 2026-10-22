@@ -1298,6 +1298,8 @@ export const ar: Dictionary = {
   "data.quality.guard.oneLine": "بيانات {n} فنادق تنقص الفاوتشر — تكتمل من العمليات، ولا تمنع شيئاً",
   "data.quality.guard.show": "عرض",
   "data.quality.guard.blocked": "لا يصدر العرض: فندق اسمه العربي لاتيني أو بلا مدينة. أصلح السجل ثم أعد اختيار الفندق.",
+  "data.quality.guard.opsTitle": "أكمل بيانات الفندق",
+  "data.quality.guard.opsVoucher": "تُكمَل من تأكيد الفندق — لا تمنع شيئاً، وما لا اسم عربي له يُطبع بالإنجليزي في الفاوتشر:",
   "data.quality.guard.voucher": "تنبيه فقط، لا يمنع الإصدار — تكتمل من تأكيد الفندق في العمليات، وما لا اسم عربي له يُطبع بالإنجليزي:",
   "data.quality.guard.reselect": "بعد تصحيح الاسم أعد اختيار الفندق في المسودة ليُطبع الاسم الجديد.",
   "data.quality.guard.askData": "اطلب من فريق البيانات تصحيح السجل.",

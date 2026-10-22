@@ -548,7 +548,7 @@ function ProduceBar({
           {producing ? t("pg.producing") : t("pg.produce")}
         </button>
       </div>
-      <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} className="mt-2" />
+      <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} only="blocking" className="mt-2" />
       {error ? (
         <p role="alert" className="mt-2 text-[12.5px] font-semibold text-[#c22850]">
           {error}

@@ -50,7 +50,7 @@ export async function loadWizardCase(operationId: string): Promise<WizardCase | 
   const operation = (await listOperations()).find((o) => o.id === operationId);
   if (!operation) return null;
   const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
-  const [travelers, payments, installments, bookings, documents, supplierWork, guide, days, op, offer, offerKinds] = await Promise.all([
+  const [travelers, payments, installments, bookings, documents, supplierWork, guide, days, op, offer, offerKinds, offerHotels] = await Promise.all([
     // a new case starts with the travelers the offer was sold for
     listOrSeedTravelers(operationId),
     listOperationPayments(operationId),
@@ -64,6 +64,8 @@ export async function loadWizardCase(operationId: string): Promise<WizardCase | 
     supabase.from("offers").select("adults, children, infants").eq("id", operation.offer_id).maybeSingle(),
     // what the offer books — «لا ينطبق» only for a kind it has none of (the caller sees this case: listOperations)
     offerBookingKinds(operationId),
+    // the hotels the offer sold, by catalogue id: their missing address/phone/English name is a job here, not in sales
+    supabase.from("offer_hotels").select("hotel_id, hotel_name").eq("offer_id", operation.offer_id),
   ]);
   const row = op.data as { client_token: string | null; client_token_revoked_at: string | null; waits: unknown; ready_exceptions: unknown } | null;
   const pax = offer.data as { adults: number | null; children: number | null; infants: number | null } | null;
@@ -84,6 +86,7 @@ export async function loadWizardCase(operationId: string): Promise<WizardCase | 
     sold: pax ? { adults: pax.adults ?? 0, children: pax.children ?? 0, infants: pax.infants ?? 0 } : null,
     guide,
     offerKinds,
+    offerHotels: ((offerHotels.data ?? []) as { hotel_id: string | null; hotel_name: string | null }[]).map((h) => ({ hotel_id: h.hotel_id, hotel_name: h.hotel_name ?? "" })),
     // the readers upload-text.ts tries for a picture; without either, only text reads
     readsImages: isOpenAIConfigured() || getOcrProvider().isConfigured(),
   };

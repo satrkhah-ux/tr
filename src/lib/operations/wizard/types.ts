@@ -75,6 +75,8 @@ export type WizardCase = {
   offerKinds?: OfferKinds | null;
   /** a photo or a scanned PDF can be read here (an OCR service or the vision model); pasted text always can. */
   readsImages?: boolean;
+  /** the offer's hotels as the catalogue knows them — what «أكمل بيانات الفندق» checks */
+  offerHotels?: { hotel_id: string | null; hotel_name: string }[];
 };
 
 /** What every step screen receives. `canManage`: the manager steps on THIS case (gateCaseManager). */

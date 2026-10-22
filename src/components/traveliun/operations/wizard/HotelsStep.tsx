@@ -18,6 +18,7 @@ import { useSafeTransition } from "../../useSafeTransition";
 import { AssignBooking } from "../AssignBooking";
 import { AddBooking } from "../DocumentsPanel";
 import { NameRow, PaperReader, PullNotice, wzCard, wzField, wzLabel, wzPrimary, wzSecondary } from "./FlightsStep";
+import { IssueGuardNotice } from "../../IssueGuardNotice";
 
 const HOW: Record<HotelRead["how"], TranslationKey> = { text: "fc.how.text", pdf: "fc.how.pdf", ocr: "fc.how.ocr", vision: "fc.how.vision" };
 
@@ -59,6 +60,8 @@ export function HotelsStep({ data }: StepProps) {
         </button>
       </div>
       <p className="mb-3 mt-1 text-[11.5px] font-semibold text-[#93aaa3]">{t("wz.hotels.hint")}</p>
+      {/* «أكمل بيانات الفندق»: what the voucher lacks (address, phone, English name), with «أصلح» — never blocks */}
+      {data.offerHotels?.length ? <IssueGuardNotice hotels={data.offerHotels} only="voucher" className="mb-3" /> : null}
       {adding ? (
         <AddBooking
           operationId={operationId}

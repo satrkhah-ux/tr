@@ -1858,7 +1858,7 @@ export function BasicEditor({
           )}
           {produced ? null : (
             <>
-              <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} className="mt-2" />
+              <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} only="blocking" className="mt-2" />
               {produceError ? <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">{produceError}</p> : null}
               <div className="mt-3 flex justify-end">
                 <button
@@ -1885,7 +1885,8 @@ export function BasicEditor({
                 // edited since it was issued: the next version, same serial
                 reissue: <ReissueOffer compact draftId={draftId} hotels={data.hotels} blocked={blocking.length > 0} flush={flush} onIssued={bumpStatus} />,
                 versions: <OfferVersions serial={produced} draftId={draftId} defaultOpen flush={flush} refreshKey={statusTick} />,
-                guard: <IssueGuardNotice compact hotels={data.hotels} />,
+                // the voucher's missing hotel details are operations' to complete, not the sales agent's
+                guard: null,
               }}
             />
           ) : null}

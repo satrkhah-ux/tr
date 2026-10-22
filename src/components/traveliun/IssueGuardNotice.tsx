@@ -14,18 +14,27 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
  * phone are listed, and the offer is issued all the same. Each line links to the record
  * (new tab — the draft stays open) and is checked again when the agent comes
  * back to this tab.
+ *
+ * Where (the owner, 2026-10-22: «هذه لا يفضل أن تظهر في الإصدار بينما تظهر بالعمليات»):
+ * `only="blocking"` on the sales screens says only what stops the issue (a Latin
+ * printed name, no city); the missing address, phone or English name is an
+ * operations job — `only="voucher"` on the case's hotels step, as «أكمل بيانات
+ * الفندق», done from the hotel's confirmation. Neither blocks anything new.
  */
 export function IssueGuardNotice({
   hotels,
   onBlocked,
   className = "",
   compact = false,
+  only,
 }: {
   hotels: readonly { hotel_id: string | null; hotel_name: string }[];
   onBlocked?: (blocked: boolean) => void;
   className?: string;
   /** an issued file: one line that opens — a warning that blocks nothing takes no room (the owner, 2026-10-18) */
   compact?: boolean;
+  /** «blocking»: only what stops the issue (sales); «voucher»: only what the voucher lacks (operations) */
+  only?: "blocking" | "voucher";
 }) {
   const [open, setOpen] = useState(!compact);
   const { t } = useTraveliunUI();
@@ -51,7 +60,8 @@ export function IssueGuardNotice({
     return () => window.removeEventListener("focus", check);
   }, [check]);
 
-  if (result.issues.length === 0) return null;
+  const shown = result.issues.filter((i) => (only === "blocking" ? i.blocking : only === "voucher" ? !i.blocking : true));
+  if (shown.length === 0) return null;
   if (compact && !open) {
     return (
       <button
@@ -60,13 +70,13 @@ export function IssueGuardNotice({
         className={`flex w-full items-center gap-2 rounded-[10px] border border-[#f3dfb0] bg-[#fff8e6] px-3 py-1.5 text-start text-[12px] font-bold text-[#8a5a00] hover:bg-[#fdf0d2] ${className}`}
       >
         <AlertTriangle className="size-3.5 shrink-0" />
-        {t("data.quality.guard.oneLine", { n: new Set(result.issues.map((i) => i.hotelId)).size })}
+        {t("data.quality.guard.oneLine", { n: new Set(shown.map((i) => i.hotelId)).size })}
         <span className="ms-auto text-[11.5px] underline">{t("data.quality.guard.show")}</span>
       </button>
     );
   }
-  const blocking = result.issues.filter((i) => i.blocking);
-  const voucher = result.issues.filter((i) => !i.blocking);
+  const blocking = shown.filter((i) => i.blocking);
+  const voucher = shown.filter((i) => !i.blocking);
 
   const item = (issue: GuardResult["issues"][number]) => (
     <li key={`${issue.hotelId}-${issue.problem}`} className="flex flex-wrap items-center gap-x-2">
@@ -83,7 +93,7 @@ export function IssueGuardNotice({
     <section className={`rounded-2xl border border-[#f3dfb0] bg-[#fff8e6] p-4 text-[12.5px] font-semibold text-[#8a5a00] ${className}`}>
       <div className="mb-2 flex items-center gap-2">
         <AlertTriangle className="size-4" />
-        <p className="font-extrabold">{t("data.quality.guard.title")}</p>
+        <p className="font-extrabold">{t(only === "voucher" ? "data.quality.guard.opsTitle" : "data.quality.guard.title")}</p>
         <button
           type="button"
           onClick={check}
@@ -102,7 +112,7 @@ export function IssueGuardNotice({
       ) : null}
       {voucher.length > 0 ? (
         <>
-          <p className="mb-1 font-bold">{t("data.quality.guard.voucher")}</p>
+          <p className="mb-1 font-bold">{t(only === "voucher" ? "data.quality.guard.opsVoucher" : "data.quality.guard.voucher")}</p>
           <ul className="space-y-0.5">{voucher.map(item)}</ul>
         </>
       ) : null}

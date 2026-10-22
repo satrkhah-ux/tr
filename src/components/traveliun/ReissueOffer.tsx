@@ -134,7 +134,7 @@ export function ReissueOffer({
           {busy ? t("pg.reissuing") : t("pg.reissue.button")}
         </button>
       </div>
-      <IssueGuardNotice hotels={hotels} onBlocked={setGuardBlocked} className="mt-2" />
+      <IssueGuardNotice hotels={hotels} onBlocked={setGuardBlocked} only="blocking" className="mt-2" />
       {error ? (
         <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">
           {error}

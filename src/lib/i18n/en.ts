@@ -1300,6 +1300,8 @@ export const en = {
   "data.quality.guard.oneLine": "{n} hotels miss voucher data — completed from operations, nothing blocked",
   "data.quality.guard.show": "Show",
   "data.quality.guard.blocked": "The offer cannot be issued: a hotel's Arabic name is Latin, or it has no city. Fix the record, then pick the hotel again.",
+  "data.quality.guard.opsTitle": "Complete the hotel's details",
+  "data.quality.guard.opsVoucher": "From the hotel's confirmation — nothing waits on it; a hotel with no Arabic name prints in English on the voucher:",
   "data.quality.guard.voucher": "A warning only, issuing goes ahead — completed from the hotel's confirmation in operations; a hotel without an Arabic name prints in English:",
   "data.quality.guard.reselect": "After fixing the name, pick the hotel again in the draft so the new name prints.",
   "data.quality.guard.askData": "Ask the data team to fix the record.",

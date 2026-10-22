@@ -112,7 +112,7 @@ export function PreviewStage({ draftId, data, patch, flush, lookups }: StageForm
         </section>
       ) : null}
 
-      {!produced ? <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} /> : null}
+      {!produced ? <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} only="blocking" /> : null}
 
       {error ? (
         <p role="alert" className="rounded-[10px] border border-[#f4c9d4] bg-[#fdeef2] px-4 py-3 text-[13px] font-semibold text-[#c22850]">
