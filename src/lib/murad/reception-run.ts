@@ -653,10 +653,17 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       await finish({ reason: "none:assigned" });
       return "none:assigned";
     }
-    // step 4 of the visa flow: handed to «قسم فيزا» in this visit — silence, whatever the client asks
-    if (received.some((r) => r.intake?.visa_handoff || (r.intake?.visa_flow as { done?: boolean } | undefined)?.done)) {
-      await finish({ reason: "none:routed" });
-      return "none:routed";
+    // step 4 of the visa flow: handed to «قسم فيزا» in this visit — silence, unless the client's newest lines ask for
+    // another visa and no colleague has come in yet: Murad listens to the latest (the owner, 2026-10-22: «تأشيرة فيتنام»
+    // after «الهند» went unanswered — «يستمع إلى الأخير ويقف الرد عند تدخل موظف»)
+    const handoffRow = [...received].reverse().find((r) => r.intake?.visa_handoff || (r.intake?.visa_flow as { done?: boolean } | undefined)?.done);
+    const sinceHandoff = handoffRow ? Date.parse(handoffRow.created_at) / 1000 : 0;
+    if (handoffRow) {
+      const fresh = visitLines.filter((t) => t.fromClient && t.at > sinceHandoff).map((t) => t.text).join("\n");
+      if (staffReplied || handedByHand || !fresh || readRequest(fresh, places).kind !== "تأشيرات") {
+        await finish({ reason: "none:routed" });
+        return "none:routed";
+      }
     }
     // «مُراد» on visas — the owner's short fixed flow (visa.ts): asked once, one answer, «قسم فيزا», then silence. Every
     // client only with visaForAll; until then the two test numbers (the user, 2026-10-22: «للرقمين التجريبيين فقط أولاً»).
@@ -668,14 +675,22 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       // answered between a colleague's replies and after «حوّلني لموظف»)
       if (staffReplied || handedByHand || routedTo.includes("موظف") || thread.messages.some((t) => t.at >= latest.at && isHumanReply(t, ours))) { await finish({ reason: "none:staff" }); return "none:staff"; }
       const list = await visaList(service);
-      const a = await readVisa(transcript, clientText, list.countries.map((c) => c.arabic_name));
+      // after a hand-over, the new request is read from the lines after it; the passports and the count carry over
+      const flowLines = visitLines.filter((t) => t.at > sinceHandoff);
+      const flowRows = received.filter((r) => Date.parse(r.created_at) / 1000 > sinceHandoff);
+      const a = await readVisa(
+        flowLines.map((t) => `${t.fromClient ? "العميل" : "مُراد"}: ${t.text}`).join("\n"),
+        flowLines.filter((t) => t.fromClient).map((t) => t.text).join("\n") || clientText,
+        list.countries.map((c) => c.arabic_name),
+      );
       // a trip in the same breath is a sales request (the order's A.2): the reception below hands it to packages
       if (a?.wants_trip) routeAs = { ...request, kind: "بكج" };
       else {
         // the one question already asked in this visit: whatever came back, the flow goes on with what is known
-        const asked = received.filter((r) => r.intake?.visa_flow);
-        const before = (asked.at(-1)?.intake?.visa_flow ?? null) as VisaFacts | null;
-        const named = a?.country ?? request.country ?? before?.country ?? null;
+        const asked = flowRows.filter((r) => r.intake?.visa_flow);
+        const earlier = (received.filter((r) => r.intake?.visa_flow).at(-1)?.intake?.visa_flow ?? null) as VisaFacts | null;
+        const before = (asked.at(-1)?.intake?.visa_flow as VisaFacts | undefined) ?? (earlier ? { ...earlier, country: null } : null);
+        const named = a?.country ?? (handoffRow ? readRequest(flowLines.filter((t) => t.fromClient).map((t) => t.text).join("\n"), places).country : request.country) ?? before?.country ?? null;
         const facts: VisaFacts = {
           country: (named && list.countries.find((c) => fold(c.arabic_name) === fold(named))?.arabic_name) ?? named,
           nationality: a?.nationality_ar ?? before?.nationality ?? null,
