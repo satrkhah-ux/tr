@@ -647,8 +647,9 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       (trip.only_city && !routeCity(c, trip.only_city) ? `المبيت في ${trip.only_city}` : null) ??
       ((trip.children ?? 0) > 0 ? "أطفال" : (trip.adults ?? 0) > c.maxPeople ? `أكثر من ${c.maxPeople} أشخاص` : null);
 
-    // an employee closed it and the client came back: it went back to them (leads/lifecycle.ts) — theirs, not a new request
-    if (await returnedToEmployee(m.conversationId, visitStart)) {
+    // an employee closed it and the client came back: it went back to them (leads/lifecycle.ts) — theirs, not a new
+    // request. Not on the two test numbers: the owner closes his own test thread to try Murad again (2026-10-22)
+    if (!(phone && settings.autoList.includes(phone)) && (await returnedToEmployee(m.conversationId, visitStart))) {
       await finish({ reason: "none:assigned" });
       return "none:assigned";
     }

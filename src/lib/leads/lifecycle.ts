@@ -24,12 +24,14 @@ type Closure = { id: string; conversation_id: number; closed_at: string; closed_
  * Teletel's own «تم تحديث حالة المحادثة لـ"مغلقة" بواسطة X». A closing the
  * system recorded itself (closeStale) is already there and stays the system's.
  */
-export async function recordClosed(conversationId: number, assigneeId: number | null, inboxId: number | null): Promise<ClosedBy | null> {
+export async function recordClosed(conversationId: number, assigneeId: number | null, inboxId: number | null, requireCloser = false): Promise<ClosedBy | null> {
   const service = db();
   const { data: open } = await service.from("conversation_closures").select("closed_by_kind").eq("conversation_id", conversationId).is("reopened_at", null).maybeSingle();
   if (open) return (open as { closed_by_kind: ClosedBy }).closed_by_kind;
   const [events, agents] = await Promise.all([conversationEvents(conversationId), listAssignableAgents(inboxId)]);
   const closer = closerOf(events ?? [], Math.floor(Date.now() / 1000), agents);
+  // the webhook may come before Teletel writes its «…مغلقة بواسطة X» line: no guess then, the pull decides
+  if (!closer && requireCloser) return null;
   const kind: ClosedBy = closer ? "employee" : "system";
   const closedAt = new Date((closer?.at ?? Math.floor(Date.now() / 1000)) * 1000).toISOString();
   const { error } = await service.from("conversation_closures").insert({
@@ -102,6 +104,19 @@ export async function onClientReturn(conversationId: number, atSec: number, byCl
         : `🔁 عاد العميل — أُعيدت المحادثة إلى ${closure.closed_by_name ?? "الموظف"} الذي أغلقها${failed}.`,
   );
   return action;
+}
+
+/**
+ * The webhook's «conversation_status_changed» (api/teletel/webhook): resolved now —
+ * the closer kept at once, so a client writing a minute later already goes back
+ * to them. A few seconds first: Teletel writes its activity line after the change.
+ */
+export async function conversationResolved(body: Record<string, unknown>): Promise<void> {
+  const id = Number(body["id"]);
+  if (!id || body["status"] !== "resolved") return;
+  const meta = (body["meta"] ?? {}) as { assignee?: { id?: number } | null };
+  await new Promise((r) => setTimeout(r, 5000));
+  await recordClosed(id, meta.assignee?.id ?? null, typeof body["inbox_id"] === "number" ? (body["inbox_id"] as number) : null, true);
 }
 
 /** The webhook's entry: an incoming client message (api/teletel/webhook). */

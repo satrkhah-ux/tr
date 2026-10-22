@@ -1,6 +1,6 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 import { wakeFollowup } from "@/lib/followups/service";
-import { clientWrote } from "@/lib/leads/lifecycle";
+import { clientWrote, conversationResolved } from "@/lib/leads/lifecycle";
 import { schedule, webhookToken } from "@/lib/murad/reception-run";
 import { staffOnTeletel, type TeletelEvent } from "@/lib/telegram/staff-events";
 
@@ -34,6 +34,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = (await req.json().catch(() => null)) as Payload | null;
   // «تنبيهاتي»: every event, before the filter below — assignments reach the employee's Telegram (staff-events.ts)
   if (body) after(() => staffOnTeletel(body as TeletelEvent).catch(() => undefined));
+  // a conversation resolved: who closed it, kept at once (leads/lifecycle.ts) — not five minutes later at the pull
+  if (body?.event === "conversation_status_changed") after(() => conversationResolved(body as Record<string, unknown>).catch(() => undefined));
   const incoming = body?.message_type === "incoming" || body?.message_type === 0;
   if (!body || body.event !== "message_created" || !incoming || body.private) return NextResponse.json({ ok: true, ignored: true });
   const at = typeof body.created_at === "number" ? body.created_at : Math.floor(Date.parse(String(body.created_at ?? "")) / 1000) || Math.floor(Date.now() / 1000);
