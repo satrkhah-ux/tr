@@ -1,7 +1,7 @@
 import { routeCompletedVisa, retryVisaHandoffs } from "./visa-routing";
 import type { MuradReceipt } from "./visa-assignment";
 import { repeatsMurad, visaIntakeReply } from "./visa-intake";
-import { inMuradScope } from "./control";
+import { inMuradScope, visaForAll } from "./control";
 import "server-only";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -391,7 +391,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
   if (!flags.murad_reception || !settings.control.tasks.reception || settings.clientWhatsapp === "off") return "off";
   const phone = intlPhone(m.phone);
   // the trial: the owner's two numbers only, until they widen it from /developer
-  if (reception.scope !== "all" && (!phone || !settings.autoList.includes(phone)) && !(settings.control.visaAll && settings.control.tasks.visas && await visaConversation(service, m))) return "out_of_scope";
+  if (reception.scope !== "all" && (!phone || !settings.autoList.includes(phone)) && !(visaForAll(settings.control) && await visaConversation(service, m))) return "out_of_scope";
 
   // claimed before anything is read or sent — one answer per client message, whoever comes second
   const claim = await service
@@ -502,7 +502,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       return "none:routed";
     }
     // Persistent visa intake: no two-question cutoff and no handoff on a damaged photo.
-    if ((settings.control.visaAll || (phone && settings.autoList.includes(phone))) && settings.control.tasks.visas && await visaConversation(service, m) && !request.wantsHuman) {
+    if ((visaForAll(settings.control) || (settings.control.tasks.visas && phone && settings.autoList.includes(phone))) && await visaConversation(service, m) && !request.wantsHuman) {
       const latest = thread.messages.filter((t) => t.fromClient && !t.isPrivate).at(-1);
       if (!thread.canReply || !latest || Date.now() / 1000 - latest.at > 24 * 3600) { await finish({ reason: "none:window" }); return "none:window"; }
       // a colleague answered or took it in this visit, or the client asked for a person: Murad stays out (21 Oct, 40347: he
@@ -832,7 +832,7 @@ export async function schedule(m: IncomingMessage): Promise<"waiting" | "extende
   const [flags, settings, reception] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service)]);
   if (!flags.murad_reception || !settings.control.tasks.reception || settings.clientWhatsapp === "off") return "off";
   const phone = intlPhone(m.phone);
-  if (reception.scope !== "all" && (!phone || !settings.autoList.includes(phone)) && !(settings.control.visaAll && settings.control.tasks.visas && await visaConversation(service, m))) return "out_of_scope";
+  if (reception.scope !== "all" && (!phone || !settings.autoList.includes(phone)) && !(visaForAll(settings.control) && await visaConversation(service, m))) return "out_of_scope";
   if (settings.control.inboxIds.length || settings.control.teamIds.length) {
     const thread = await readThread(m.conversationId);
     if (!thread) return "unreadable";
@@ -898,9 +898,9 @@ export async function receptionSweep(): Promise<number> {
   if (settings.control.tasks.visas) await retryVisaHandoffs(service);
   const nowSec = Math.floor(Date.now() / 1000);
   // a client waiting on us for under half an hour — a new conversation, or an old one the client reopened
-  const { data: visaLeads } = settings.control.visaAll ? await service.from("client_leads").select("teletel_conversation_id").eq("inquiry", "تأشيرات").eq("status", "open") : { data: [] };
+  const { data: visaLeads } = visaForAll(settings.control) ? await service.from("client_leads").select("teletel_conversation_id").eq("inquiry", "تأشيرات").eq("status", "open") : { data: [] };
   const visaIds = new Set((visaLeads ?? []).map((l) => Number(l.teletel_conversation_id)));
-  const fresh = list.rows.filter((c) => inMuradScope(settings.control, c.inboxId, c.teamId) && c.waitingSince > 0 && nowSec - c.waitingSince < 1800 && (reception.scope === "all" || (settings.control.visaAll && visaIds.has(c.id)) || settings.autoList.includes(intlPhone(c.phone) ?? "")));
+  const fresh = list.rows.filter((c) => inMuradScope(settings.control, c.inboxId, c.teamId) && c.waitingSince > 0 && nowSec - c.waitingSince < 1800 && (reception.scope === "all" || (visaForAll(settings.control) && visaIds.has(c.id)) || settings.autoList.includes(intlPhone(c.phone) ?? "")));
   if (!fresh.length) return 0;
   // where Murad's own five-minute answer runs (run.ts: murad_auto on the auto list) it answers the client's words — better than «وصلت رسالتك», and it comes next in this same run
   const held = settings.control.tasks.holding && reception.scope === "all" ? await holdSweep(service, fresh.filter((c) => !(flags.murad_auto && settings.autoList.includes(intlPhone(c.phone) ?? ""))), nowSec, reception.hours) : 0;

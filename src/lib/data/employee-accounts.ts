@@ -267,6 +267,8 @@ export async function setEmployeePassword(employeeId: string, password: string):
     if (weak) return { ok: false, message: weak };
 
     if (row.auth_user_id) {
+      // your own password is changed with «تغيير كلمة المرور», which asks for the current one
+      if (row.auth_user_id === (await getServerUser())?.id) return { ok: false, message: "هذا حسابك — غيّر كلمة مرورك من «تغيير كلمة المرور»." };
       const { data: user, error: userError } = await admin.auth.admin.getUserById(row.auth_user_id);
       if (userError || !user.user) return { ok: false, message: "تعذّر تعيين كلمة المرور." };
       // a self-registration still in the queue is decided there, not unlocked here
@@ -275,7 +277,13 @@ export async function setEmployeePassword(employeeId: string, password: string):
       }
       const set = await setTemporaryPassword(admin as unknown as SupabaseClient, row.auth_user_id, password, "staff");
       if (set !== "ok") return { ok: false, message: TEMP_PASSWORD_REFUSAL[set] };
-      await logAudit({ action: "employee.account_issued", entity: "employees", entity_id: row.id, meta: { email, kind: "temp_password", must_change_password: true } });
+      // a login already used is a reset: the old password and every session on it are gone (never the value)
+      await logAudit({
+        action: user.user.last_sign_in_at ? "employee.password_reset" : "employee.account_issued",
+        entity: "employees",
+        entity_id: row.id,
+        meta: { email, kind: "temp_password", must_change_password: true, sessions_revoked: true },
+      });
       return { ok: true, email };
     }
 

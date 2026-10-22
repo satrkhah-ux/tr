@@ -223,7 +223,7 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
           className="inline-flex h-9 items-center gap-1.5 rounded-[9px] px-2 text-[12px] font-bold text-[#557d78] hover:text-[#185045] disabled:opacity-60"
         >
           <KeyRound className="size-3.5" />
-          كلمة مرور مؤقتة
+          كلمة مرور جديدة
         </button>
       ) : (
         <span className="flex basis-full flex-wrap items-end gap-2">
@@ -254,7 +254,7 @@ export function IssueAccount({ company }: { company: PartnerCompany }) {
                     router.refresh();
                   }
                   setMessage(
-                    `${res.created ? "أُنشئ حساب الشركة" : "عُيّنت كلمة المرور"} — أعطِ الشركة البريد وكلمة المرور، وتدخل من صفحة تسجيل الدخول، وسيُطلب منها تغييرها عند أول دخول.`,
+                    `${res.created ? "أُنشئ حساب الشركة" : "عُيّنت كلمة مرور جديدة وأُخرج الحساب من كل أجهزته"} — أعطِ الشركة البريد ${email} وكلمة المرور، وتدخل من صفحة تسجيل الدخول، وسيُطلب منها تغييرها عند دخولها.`,
                   );
                 } else setMessage(res.message);
               })

@@ -127,6 +127,9 @@ export type AuditAction =
   // separate, and who issued one is worth knowing
   | "employee.account_issued"
   | "employee.account_linked"
+  // a new temporary password on a login already in use — every session ended (temp-password.ts)
+  | "employee.password_reset"
+  | "partner.password_reset"
   // staff self-registration: who asked, and who let them in (or didn't)
   | "staff_registration.submitted"
   | "staff_registration.approved"

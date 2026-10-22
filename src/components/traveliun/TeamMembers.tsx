@@ -11,6 +11,8 @@ import { ALL_PERMISSIONS, isDeveloperRole, PERMISSION_GROUPS, type Permission } 
 import type { TranslationKey } from "@/lib/i18n";
 import { useRole } from "@/lib/roles/RoleContext";
 import { PendingEmployees } from "./team/PendingEmployees";
+import { TempPassword } from "./EmployeeAccounts";
+import { setEmployeePassword } from "@/lib/data/employee-accounts";
 import { TraveliunShell } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
@@ -70,6 +72,20 @@ export function TeamMembers({
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [extraFor, setExtraFor] = useState<string | null>(null);
+  // «كلمة مرور جديدة» on a colleague's row: what is typed, and what to tell the administrator after
+  const [pw, setPw] = useState<{ id: string; value: string } | null>(null);
+  const [pwDone, setPwDone] = useState<{ id: string; text: string; ok: boolean } | null>(null);
+
+  async function savePassword(m: TeamMember, value: string) {
+    setBusyId(m.id);
+    const r = await setEmployeePassword(m.id, value);
+    setBusyId(null);
+    if (r.ok) {
+      setPw(null);
+      setPwDone({ id: m.id, ok: true, text: t("emp.tempPasswordSet", { email: r.email }) });
+      router.refresh();
+    } else setPwDone({ id: m.id, ok: false, text: r.error ? t(r.error) : r.message });
+  }
   // The developer's section, and whoever sits in it, are the developer's to
   // change (team.ts refuses the rest): read-only here for everyone else.
   const { isDeveloper } = useRole();
@@ -321,6 +337,17 @@ export function TeamMembers({
                           ? ` (+${m.extra_permission_keys.length} / −${m.removed_permission_keys.length})`
                           : ""}
                       </button>
+                      {m.email ? (
+                        <button
+                          type="button"
+                          onClick={() => { setPwDone(null); setPw(pw?.id === m.id ? null : { id: m.id, value: "" }); }}
+                          aria-expanded={pw?.id === m.id}
+                          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#dbe6e1] px-3 text-[11.5px] font-bold text-[#557d78] hover:bg-[#f4f8f6]"
+                        >
+                          <KeyRound className="size-3.5" />
+                          {t("emp.tempPassword")}
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => { setError(null); setDraft(toDraft(m)); }}
@@ -348,6 +375,21 @@ export function TeamMembers({
                         <Trash2 className="size-4" />
                       </button>
                     </>
+                  ) : null}
+                  {pw?.id === m.id && canManage && !developerRole(m.role_id) ? (
+                    <div className="basis-full">
+                      <TempPassword
+                        email={m.email ?? ""}
+                        value={pw.value}
+                        busy={busyId === m.id}
+                        onChange={(value) => setPw({ id: m.id, value })}
+                        onSave={() => void savePassword(m, pw.value)}
+                        onCancel={() => setPw(null)}
+                      />
+                    </div>
+                  ) : null}
+                  {pwDone?.id === m.id ? (
+                    <p className={`basis-full text-end text-[12px] font-bold ${pwDone.ok ? "text-[#0f7a52]" : "text-[#c22850]"}`}>{pwDone.text}</p>
                   ) : null}
                   {extraFor === m.id && canManage && !developerRole(m.role_id) ? (
                     <ExtraSections
