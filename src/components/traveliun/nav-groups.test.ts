@@ -30,10 +30,12 @@ describe("the sidebar", () => {
     expect(data).not.toContain("/setting/climate");
   });
 
-  it("holds «البيانات» to fourteen links and «الإدارة» to four (the owner, 2026-10-19)", () => {
+  // fourteen, and «ابحث عن دولة أو خدمة» first — the owner's own order of 2026-10-22
+  it("holds «البيانات» to fifteen links and «الإدارة» to four (the owner, 2026-10-19, 2026-10-22)", () => {
     const all = () => true;
     const section = (key: string) => navGroupsFor(all, on).find((g) => g.labelKey === key)?.children?.map((c) => c.href) ?? [];
     expect(section("nav.dataSection")).toEqual([
+      "/data-search",
       "/data-quality",
       "/hotels",
       "/countries",

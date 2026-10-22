@@ -66,6 +66,7 @@ import { tourPriced, toursTotal, type TourPrice } from "@/lib/offer/pricing-sugg
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { suppliersFor } from "../generator/SupplierPrice";
+import { countryInName } from "@/lib/operations/supplier-request";
 import { AddStayMenu, StayDatesLine } from "../generator/hotels/StayDates";
 import { basicField, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
@@ -93,7 +94,9 @@ type Tab = "hotel" | "tours" | "program";
  */
 const head = "hidden px-0.5 text-[10.5px] font-bold text-[#7a948f] xl:grid";
 const rowGap = "grid grid-cols-2 items-start gap-2";
-const HOTEL_COLS = "xl:grid-cols-[minmax(12rem,1.6fr)_minmax(10rem,1.4fr)_minmax(7.5rem,0.9fr)_7rem_minmax(7rem,0.8fr)_2rem]";
+// the hotel, its room type, the board, the price (the owner, 2026-10-22) — the rest under «المزيد»
+const HOTEL_COLS = "xl:grid-cols-[minmax(12rem,1.6fr)_minmax(10rem,1.4fr)_minmax(7.5rem,0.9fr)_minmax(7rem,0.8fr)_2rem]";
+const chip = "inline-flex w-fit items-center rounded-full bg-[#eef6f3] px-2 py-0.5 text-[10.5px] font-bold text-[#185045]";
 /** the services table: day · type · service · car · cars · price per car · total · remove */
 const SVC_COLS = "xl:grid-cols-[minmax(9rem,1fr)_6.5rem_minmax(13rem,2fr)_minmax(8.5rem,1fr)_4.5rem_minmax(6.5rem,0.7fr)_minmax(6.5rem,0.7fr)_2.25rem]";
 /** the same rows without the price per car and the total — for a viewer without pricing.view. */
@@ -563,8 +566,19 @@ export function HotelPanel({
   // the same hotel, another room after some nights — it follows the first stay's hotel and rooms
   const change = roomChangeLine(lines);
   const mainNights = Math.max(stays[0]?.nights ?? city.nights, 1);
-  const hotels =
-    findLookupCountry(lookups.countries, city.country || data.trip.country)?.cities.find((c) => c.name === city.city_name)?.hotels ?? [];
+  const country = findLookupCountry(lookups.countries, city.country || data.trip.country);
+  const hotels = country?.cities.find((c) => c.name === city.city_name)?.hotels ?? [];
+  // the currency: the destination's, the riyal and the dollar — every other behind «أخرى…»
+  const [allCurrencies, setAllCurrencies] = useState(false);
+  const shortCurrencies = [...new Set([country?.default_currency, "SAR", "USD", main.manual_currency].map((c) => c?.trim().toUpperCase()).filter((c): c is string => Boolean(c)))];
+  // the suppliers who sell rooms here: not one whose name puts it in another country — a villa in Bali is not Istanbul's supplier
+  const placeOf = (name: string) =>
+    countryInName(
+      name,
+      lookups.countries.map((c) => c.name),
+      lookups.countries.flatMap((c) => c.cities.map((ci) => ({ name: ci.name, country: c.name }))),
+    );
+  const hotelSuppliers = suppliersFor(lookups, "فنادق").filter((s) => s.name === main.supplier || !country || [null, country.name].includes(placeOf(s.name)));
 
   /** The same answer for every stay of this city — the currency, the supplier. */
   const allLines = (fn: (line: DraftHotel) => DraftHotel) => onLines(lines.map(fn));
@@ -601,7 +615,6 @@ export function HotelPanel({
         <span>{tx("hotel")}</span>
         <span>{tx("roomType")}</span>
         <span>{tx("board")}</span>
-        <span>{tx("extraBed")}</span>
         <span>{tx("stayPrice", { n: nightsText(mainNights, language) })}</span>
         <span />
       </div>
@@ -659,13 +672,30 @@ export function HotelPanel({
                     </span>
                   )}
                   {/* the owner's catalogue: type, category, suite type — the extra bed rides on the name as before */}
-                  <RoomTypePicker
-                    room={{ ...r, room_type_name: baseRoomName(r.room_type_name) }}
-                    onPick={(slice) =>
-                      onLines([setRoom(line, j, { ...slice, room_type_name: slice.room_type_name && extra ? slice.room_type_name + EXTRA_BED : slice.room_type_name })])
-                    }
-                    selectClass={basicField}
-                  />
+                  <span className="grid gap-1">
+                    <RoomTypePicker
+                      room={{ ...r, room_type_name: baseRoomName(r.room_type_name) }}
+                      onPick={(slice) =>
+                        onLines([setRoom(line, j, { ...slice, room_type_name: slice.room_type_name && extra ? slice.room_type_name + EXTRA_BED : slice.room_type_name })])
+                      }
+                      selectClass={basicField}
+                      extras={more}
+                    />
+                    {/* the extra bed: under «المزيد», and said here once it is on */}
+                    {more ? (
+                      <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-[11.5px] font-bold text-[#185045]">
+                        <input
+                          type="checkbox"
+                          checked={extra}
+                          onChange={(e) => onLines([setRoom(line, j, { room_type_name: baseRoomName(r.room_type_name) + (e.target.checked ? EXTRA_BED : "") })])}
+                          className="size-3.5 accent-[#185045]"
+                        />
+                        {tx("extraBed")}
+                      </label>
+                    ) : extra ? (
+                      <span className={chip}>{tx("extraBed")}</span>
+                    ) : null}
+                  </span>
                   <select
                     aria-label={tx("board")}
                     value={r.board_type ?? ""}
@@ -677,15 +707,6 @@ export function HotelPanel({
                       <option key={b} value={b}>{t(BOARD_LABEL_KEYS[b])}</option>
                     ))}
                   </select>
-                  <label className="inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-[11.5px] font-bold text-[#185045]">
-                    <input
-                      type="checkbox"
-                      checked={extra}
-                      onChange={(e) => onLines([setRoom(line, j, { room_type_name: baseRoomName(r.room_type_name) + (e.target.checked ? EXTRA_BED : "") })])}
-                      className="size-3.5 accent-[#185045]"
-                    />
-                    {tx("extraBed")}
-                  </label>
                   {priceField(r.price, nights, line.manual_currency, (price) => onLines([setRoom(line, j, { price })]), priceTitle)}
                   {line.rooms.length > 1 ? (
                     <button
@@ -703,9 +724,9 @@ export function HotelPanel({
               );
             })}
             {/* refundable — part of the price, so under the price column (a supplier rate states its own) */}
-            {!line.sourcing ? (
+            {!line.sourcing && more ? (
               <div className={`${rowGap} ${HOTEL_COLS}`}>
-                <span className="max-xl:hidden xl:col-span-4" />
+                <span className="max-xl:hidden xl:col-span-3" />
                 <div className="col-span-2">
                   <RefundControl
                     refundable={line.refundable}
@@ -715,6 +736,12 @@ export function HotelPanel({
                   />
                 </div>
               </div>
+            ) : !line.sourcing && line.refundable != null ? (
+              // under «المزيد», and said once it is set
+              <span className={chip}>
+                {line.refundable ? tx("refundable") : tx("nonRefundable")}
+                {line.refundable && line.refundable_until ? ` · ${line.refundable_until}` : ""}
+              </span>
             ) : null}
             <div className="flex flex-wrap items-center gap-3 pt-0.5">
               {/* a new room is a room of its own: its type and price are asked, the board follows */}
@@ -747,6 +774,12 @@ export function HotelPanel({
           {tx("moreInfo")}
           <ChevronDown className={`size-3.5 transition-transform ${more ? "rotate-180" : ""}`} />
         </button>
+        {!more && (main.supplier || main.manual_currency !== (country?.default_currency || main.manual_currency)) ? (
+          <span className="flex flex-wrap gap-1">
+            {main.supplier ? <span className={chip}>{main.supplier}</span> : null}
+            <span className={chip}>{main.manual_currency}</span>
+          </span>
+        ) : null}
         {more ? (
           <span className="tv-tnum text-[11px] font-bold text-[#7a948f]">
             {tx("dayRange", { from: dayFrom, to: dayFrom + city.nights })}
@@ -759,17 +792,22 @@ export function HotelPanel({
       {more ? (
         <div className="flex flex-wrap items-end gap-2 rounded-[10px] bg-[#f8fbf9] p-2">
           <Field label={tx("currency")} className="w-24">
-            <select value={main.manual_currency} onChange={(e) => allLines((line) => ({ ...line, manual_currency: e.target.value }))} className={basicField}>
-              {currencyOptions(lookups.countries, main.manual_currency).map((c) => (
+            <select
+              value={main.manual_currency}
+              onChange={(e) => (e.target.value === "__all" ? setAllCurrencies(true) : allLines((line) => ({ ...line, manual_currency: e.target.value })))}
+              className={basicField}
+            >
+              {(allCurrencies ? currencyOptions(lookups.countries, main.manual_currency) : shortCurrencies).map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
+              {allCurrencies ? null : <option value="__all">{tx("otherCurrency")}</option>}
             </select>
           </Field>
           {/* who the room was bought from — internal, never on the client document */}
           <Field label={t("pg.supplierLabel")} className="w-48">
             <select value={main.supplier ?? ""} onChange={(e) => allLines((line) => ({ ...line, supplier: e.target.value }))} className={basicField}>
               <option value="">{tx("choose")}</option>
-              {suppliersFor(lookups, "فنادق").map((s) => (
+              {hotelSuppliers.map((s) => (
                 <option key={s.id} value={s.name}>{s.name}</option>
               ))}
             </select>

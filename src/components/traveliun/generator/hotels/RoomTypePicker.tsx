@@ -17,11 +17,18 @@ export function RoomTypePicker({
   room,
   onPick,
   selectClass,
+  extras = true,
 }: {
   room: Pick<DraftRoomSpec, "room_type_name" | "room_type_code" | "room_category_code" | "suite_subtype_code">;
   /** the codes and the Arabic name they make — merged into the room as one slice. */
   onPick: (slice: ReturnType<typeof pickRoom>) => void;
   selectClass: string;
+  /**
+   * The category and the suite type as selects (the default). Off: the type
+   * alone — «البيسك» keeps them under «المزيد» (the owner, 2026-10-22: «دون
+   * فقد المميزات») — and a chosen one is said under it, never lost.
+   */
+  extras?: boolean;
 }) {
   const { t, language } = useTraveliunUI();
   const locale: RoomLocale = language === "en" ? "en" : "ar";
@@ -44,7 +51,17 @@ export function RoomTypePicker({
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
-      {codes.room_type_code ? (
+      {!extras && (codes.room_category_code || codes.suite_subtype_code) ? (
+        <span className="text-[10.5px] font-bold text-[#557d78]">
+          {[
+            ROOM_CATEGORIES.find((c) => c.id === codes.room_category_code)?.label[locale],
+            SUITE_SUBTYPES.find((c) => c.id === codes.suite_subtype_code)?.label[locale],
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      ) : null}
+      {extras && codes.room_type_code ? (
         <select
           aria-label={t("pg.roomCategory")}
           value={codes.room_category_code ?? ""}
@@ -57,7 +74,7 @@ export function RoomTypePicker({
           ))}
         </select>
       ) : null}
-      {codes.room_type_code === "suite" ? (
+      {extras && codes.room_type_code === "suite" ? (
         <select
           aria-label={t("pg.suiteSubtype")}
           value={codes.suite_subtype_code ?? ""}
