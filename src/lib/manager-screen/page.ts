@@ -126,6 +126,11 @@ const RUNTIME = String.raw`
     } else {
       body = '<div class="calm big"><b>✓</b>' + esc(w.known ? "كل العملاء تلقّوا رداً" : "سنعرض الانتظار حين يرد تليتيل") + "</div>";
     }
+    // today's closings in Teletel, and where the returning clients went (order 2's lifecycle)
+    var cl = F.channel.closures;
+    if (cl && cl.employee + cl.system + cl.murad + cl.returned + cl.unassigned > 0) {
+      body += '<div class="closed"><span>أُغلقت اليوم: <b class="tnum">' + (cl.employee + cl.system + cl.murad) + '</b></span><span>موظف ' + cl.employee + '</span><span>النظام ' + cl.system + '</span>' + (cl.murad ? '<span>مُراد ' + cl.murad + '</span>' : '') + '<span class="back">عادت لموظفها ' + cl.returned + '</span><span class="back">عادت طلباً جديداً ' + cl.unassigned + '</span></div>';
+    }
     var kinds = F.channel.kinds.slice(0, 6);
     var side = box("حركة المحادثات اليوم بالساعة", "حتى الآن", hoursChart(F.channel.hours)) + box("حسب نوع الطلب", "اليوم", bars(kinds));
     return { head: head, body: '<div class="split"><div class="main">' + box("بانتظار الرد — لدى كل موظف", "الأحمر تجاوز الحد", '<div class="lanes">' + body + "</div>") + '</div><div class="aside">' + side + "</div></div>" };
@@ -427,6 +432,10 @@ main{display:grid;grid-template-columns:minmax(0,1fr) ${v(450)};gap:${v(26)};pad
 .wc small{font-size:${v(18)};font-weight:700;color:#ffd0d5}
 .wc.more{border-style:dashed;border-color:var(--muted);background:transparent;color:var(--muted);font-weight:800;font-size:${v(22)}}
 .rest{margin:${v(6)} 0 0;color:var(--muted);font-size:${v(19)};font-weight:700}
+.closed{display:flex;flex-wrap:wrap;gap:${v(10)};margin-top:auto;padding-top:${v(12)};border-top:1px solid var(--line);font-size:${v(20)};font-weight:700;color:var(--muted)}
+.closed span{background:#061722;border-radius:${v(8)};padding:${v(6)} ${v(14)}}
+.closed b{color:#fff}
+.closed .back{color:#8fd0ff}
 
 /* today by the hour */
 .hours{flex:1;display:flex;align-items:flex-end;gap:0;min-height:${v(160)};padding-top:${v(26)};padding-bottom:${v(28)};direction:ltr}

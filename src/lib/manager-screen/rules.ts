@@ -98,6 +98,8 @@ export type ManagerChannel = {
   ops: { serial: string; when: string; what: string; status: Status }[];
   campaigns: { name: string; spend: number; conversions: number; status: Status }[];
   currency: string;
+  /** today's closings in Teletel, by who closed them, and the returns when the client wrote again */
+  closures: { employee: number; system: number; murad: number; returned: number; unassigned: number };
 };
 
 export type ManagerSnapshot = {
@@ -217,6 +219,8 @@ export type ConfirmFact = { offer_id: string; at: string; still: boolean; countr
 export type DraftFact = { created_at: string; issued: boolean };
 export type AdFact = { campaign: string; dest: string; cost: number; clicks: number; conversions: number; updated_at: string };
 export type MuradFact = { conversation_id: number; reason: string | null; error: string | null; replied: boolean; at: string };
+/** a closing in Teletel (order 2's conversation_closures): who closed it, and where it went when the client wrote again */
+export type ClosureFact = { closed_at: string; kind: "employee" | "system" | "murad"; reopened_at: string | null; action: "returned_to_employee" | "unassigned" | "kept" | null };
 export type IntegrationFact = { name: string; fail_streak: number; alerted: string | null; last_error: string | null; last_error_at: string | null; renews_on: string | null };
 
 export type ManagerFacts = {
@@ -244,6 +248,8 @@ export type ManagerFacts = {
   /** app_settings pkg_backup, as stored */
   backup: string | null;
   ops: { live: DigestLive[] };
+  /** today's closings and returns (absent: not read) */
+  closures?: ClosureFact[];
 };
 
 // ------------------------------------------------------------------- helpers ----
@@ -709,6 +715,7 @@ function muradDid(m: MuradFact): string | null {
   if (r === "offer:sent" || r === "offer:updated") return "أصدر عرضاً وأرسله";
   if (r === "offer:handoff") return "سلّم بكج لزميل";
   if (r === "visa:handoff") return "سلّم تأشيرة لزميل";
+  if (r === "visa:handoff_pending") return "يحوّل تأشيرة لزميل";
   if (VISA_DONE.has(r)) return "أجاب عن تأشيرة";
   if (r.startsWith("routed:")) return `حوّل إلى ${r.slice(7)}`;
   if (r === "asked" || r.startsWith("offer:asked") || r.startsWith("visa:asked")) return "سأل العميل عن طلبه";
@@ -985,6 +992,9 @@ function channelData(f: ManagerFacts, today: LeadFact[], crew: TeamToday, panels
       confirmed: confirmed.filter((c) => c.country === country).length,
     }));
 
+  const closedToday = (f.closures ?? []).filter((c) => ofDay(c.closed_at));
+  const reopenedToday = (f.closures ?? []).filter((c) => c.reopened_at != null && ofDay(c.reopened_at));
+
   const opsPanel = panels.find((p) => p.key === "operations");
   const ops = (opsPanel?.boxes[0]?.items ?? []).map((i) => ({ serial: i.label, when: i.value, what: i.detail ?? "", status: i.status ?? "green" }));
 
@@ -1018,6 +1028,13 @@ function channelData(f: ManagerFacts, today: LeadFact[], crew: TeamToday, panels
     ops,
     campaigns,
     currency: f.ads.currency,
+    closures: {
+      employee: closedToday.filter((c) => c.kind === "employee").length,
+      system: closedToday.filter((c) => c.kind === "system").length,
+      murad: closedToday.filter((c) => c.kind === "murad").length,
+      returned: reopenedToday.filter((c) => c.action === "returned_to_employee").length,
+      unassigned: reopenedToday.filter((c) => c.action === "unassigned").length,
+    },
   };
 }
 
