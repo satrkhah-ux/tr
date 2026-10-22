@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, Pencil, Plus, Search, X } from "lucide-react";
 import { emptyFlight, type DraftData, type DraftFlight, type GeneratorLookups } from "@/lib/offer/draft-types";
-import { airportDisplay, planInternational, rankAirports, tripCountries, type FlightPlan } from "@/lib/offer/basic";
+import { airportDisplay, findAirport, planInternational, rankAirports, tripCountries, type FlightPlan } from "@/lib/offer/basic";
 import { applyFlightHit, changeLeg, domesticTotal, newDomesticLeg, type LegChange } from "@/lib/offer/basic-flights";
 import { parseFlightNumber } from "@/lib/offer/flight-number";
 import { withTypedTotal } from "@/lib/offer/flight-fare";
@@ -83,6 +83,16 @@ export function BasicFlightPlan({
     list.map((a) => ({ value: airportDisplay(a), hint: a.city ?? a.country ?? undefined, keywords: [a.city, a.country, a.code, a.name_en].filter(Boolean).join(" ") }));
   const homeFirst = asItems(rankAirports(lookups.airports, "home"));
   const destFirst = asItems(rankAirports(lookups.airports, tripCountries(data), data.cities.map((c) => c.city_name)));
+
+  /**
+   * A city or a code typed and left becomes its airport («طرابزون» → «مطار طرابزون (TZX)»): free
+   * text has no zone and no city, so the cities could not be built from it (the evaluator, 2026-10-22).
+   * On leaving the field, never while typing — «IST» would jump before «Istanbul» is finished.
+   */
+  function settle(id: string, field: "from_airport" | "to_airport", typed: string) {
+    const a = findAirport(typed, lookups.airports);
+    if (a && airportDisplay(a) !== typed.trim()) edit(id, { [field]: airportDisplay(a) });
+  }
 
   /** one leg changed, on the file as it is now; a domestic price adds up into the booking's */
   function edit(id: string, change: LegChange) {
@@ -194,8 +204,12 @@ export function BasicFlightPlan({
               </button>
             ) : null}
           </span>
-          <SuggestInput ariaLabel={tx("planFrom")} placeholder={tx("planFrom")} items={items.from} value={leg.from_airport} onChange={(v) => edit(id, { from_airport: v })} className={basicField} />
-          <SuggestInput ariaLabel={tx("planTo")} placeholder={tx("planTo")} items={items.to} value={leg.to_airport} onChange={(v) => edit(id, { to_airport: v })} className={basicField} />
+          <span className="contents" onBlur={() => settle(id, "from_airport", leg.from_airport)}>
+            <SuggestInput ariaLabel={tx("planFrom")} placeholder={tx("planFrom")} items={items.from} value={leg.from_airport} onChange={(v) => edit(id, { from_airport: v })} className={basicField} />
+          </span>
+          <span className="contents" onBlur={() => settle(id, "to_airport", leg.to_airport)}>
+            <SuggestInput ariaLabel={tx("planTo")} placeholder={tx("planTo")} items={items.to} value={leg.to_airport} onChange={(v) => edit(id, { to_airport: v })} className={basicField} />
+          </span>
           <input type="date" dir="ltr" aria-label={tx("domDate")} value={day} onChange={(e) => edit(id, { date: e.target.value })} className={`${basicField} tv-tnum px-2`} />
           <input type="time" dir="ltr" aria-label={tx("domDep")} value={time(leg.departure_at)} disabled={!day} onChange={(e) => edit(id, { dep: e.target.value })} className={`${basicField} tv-tnum px-2`} />
           <span className="flex items-center gap-1">

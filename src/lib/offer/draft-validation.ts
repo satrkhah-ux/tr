@@ -210,7 +210,9 @@ export function validateDraft(data: DraftData, opts: ValidateOptions = {}): Draf
     }
   }
   if (data.scope.flights_domestic && dom.length > 0 && !booking.later_dom) {
-    if (dom.some((f) => !intlDone(f))) need("flights", "flights", "pg.err.flightIncomplete");
+    // a domestic leg is sold on its airports and its day; its number and clocks are often not known at
+    // the sale (the evaluator, 2026-10-22) — operations reads them off the ticket («يُحدَّد لاحقاً» till then)
+    if (dom.some((f) => !(f.from_airport.trim() && f.to_airport.trim() && f.departure_at))) need("flights", "flights", "pg.err.domFlightIncomplete");
     if (!isFixedPrice(data)) {
       if (booking.dom_price == null || booking.dom_price <= 0) need("flights", "flights", "pg.err.domFlightUnpriced");
     }

@@ -1661,6 +1661,7 @@ export const en = {
   "pg.lastSavedNight": "Last saved nightly rate:",
   "pg.stayDone": "This hotel is done",
   "pg.err.noIntlFlights": "Add the international flights.",
+  "pg.err.domFlightIncomplete": "Complete every domestic flight: both airports and the date (number and times are optional).",
   "pg.err.flightIncomplete": "Complete every flight: both airports, the flight number, departure and arrival.",
   "pg.err.flightUnpriced": "Enter the international flight booking price.",
   "pg.err.domFlightUnpriced": "Enter the domestic flight booking price.",

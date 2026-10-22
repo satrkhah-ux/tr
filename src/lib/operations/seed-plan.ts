@@ -56,6 +56,8 @@ export type PlannedBooking = {
 export const PLANNED_PREFIXES = ["flight:intl", "flight:dom", "stay:", "transfer:", "tour:", "sim"];
 
 export const LATER = "يُحدَّد لاحقاً";
+/** A flight the package sold whose legs are only a plan — booked, with nothing on it to print. */
+export const FLIGHT_NEEDED = "طيران مطلوب — بدون تفاصيل";
 /** Minutes between a landing and the driver at the arrivals hall; a hotel pick-up before a flight. */
 export const MEET_AFTER_LANDING = 45;
 export const BEFORE_INTL = 180;
@@ -87,15 +89,42 @@ export function shift(at: string, minutes: number): { date: string; time: string
   return { date: iso.slice(0, 10), time: iso.slice(11, 16) };
 }
 
-/** A leg's departure has a real time only once it is ticketed — a planned leg says midnight. */
-const timed = (f: DraftFlight, at: string | null) => Boolean(at && (f.flight_no.trim() || at.slice(11, 16) !== "00:00"));
+/**
+ * A clock is real once it is not midnight — what a leg holds until its time is known, numbered
+ * or not (a domestic number may come before its times; that 00:00 was printed and timed drives).
+ */
+const timed = (at: string | null | undefined) => Boolean(at && at.slice(11, 16) !== "00:00");
+/**
+ * A leg only planned, never flown as written (the evaluator, 2026-10-22: «طيران دولي MED ⇄ IST»
+ * booked from Basic's default MED → gateway at midnight): one the cities wrote (`auto`), or one
+ * with neither a number nor a real time (a number makes it real). Ops books its flight; no route, day line or clock of it
+ * is printed, and no drive is timed from it.
+ */
+export const plannedLeg = (f: DraftFlight) => !f.flight_no.trim() && (f.auto === true || !timed(f.departure_at));
 const code = (airport: string) => airport.match(/\(([A-Za-z0-9]{3,5})\)\s*$/)?.[1] ?? airport;
 
 function legText(f: DraftFlight): string {
-  const when = f.departure_at ? `${f.departure_at.slice(0, 10)} ${timed(f, f.departure_at) ? f.departure_at.slice(11, 16) : LATER}` : LATER;
+  const when = f.departure_at ? `${f.departure_at.slice(0, 10)} ${timed(f.departure_at) ? f.departure_at.slice(11, 16) : LATER}` : LATER;
   // the landing too: the reception is timed from it, and follows it when the airline moves the flight
-  const lands = f.arrival_at && timed(f, f.arrival_at) ? ` · ${LANDS} ${f.arrival_at.slice(0, 10)} ${f.arrival_at.slice(11, 16)}` : "";
+  const lands = f.arrival_at && timed(f.arrival_at) ? ` · ${LANDS} ${f.arrival_at.slice(0, 10)} ${f.arrival_at.slice(11, 16)}` : "";
   return `${f.flight_no.trim() || "—"} · ${code(f.from_airport)} → ${code(f.to_airport)} · ${when}${lands}`;
+}
+
+/**
+ * A flight booking's title once its ticket is in — the route the ticket flies, not
+ * the one the offer planned (the evaluator, 2026-10-22: the card and the client's
+ * page kept «MED ⇄ IST» after an RUH ticket was saved). Connected legs read as one
+ * chain (RUH → IST → TZX), a break starts another («· TZX → RUH»).
+ */
+export function ticketTitle(ref: string | null, legs: { from: string; to: string }[]): string {
+  const label = ref === "flight:intl" ? "طيران دولي" : ref === "flight:dom" ? "طيران داخلي" : "طيران";
+  const chains: string[][] = [];
+  for (const l of legs) {
+    const chain = chains.at(-1);
+    if (chain && chain.at(-1) === l.from) chain.push(l.to);
+    else chains.push([l.from, l.to]);
+  }
+  return `${label} ${chains.map((c) => c.join(" → ")).join(" · ")}`.trim();
 }
 
 function travellers(trip: DraftData["trip"]): string {
@@ -142,7 +171,8 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
   const cities = data.cities.every((c) => c.check_in) ? data.cities : deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);
   const pax = travellers(data.trip);
   const people = data.trip.adults + data.trip.children + data.trip.infants;
-  const flights = [...data.flights].sort(byDeparture);
+  // the legs actually flown as written — what the drives are timed from (a planned leg is not)
+  const flights = data.flights.filter((f) => !plannedLeg(f)).sort(byDeparture);
   // the flight that brings the group to `city` on `date` — by its landing, else its take-off
   const landsIn = (city: string, date: string) =>
     flights.find((f) => f.leg_order !== "inbound" && f.to_city?.trim() === city.trim() && (f.arrival_at ?? f.departure_at ?? "").slice(0, 10) === date);
@@ -156,11 +186,13 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
 
   // ---- the flights: one booking per ticket ----
   const intl = flights.filter((f) => f.leg_order !== "internal");
-  const dom = flights.filter((f) => f.leg_order === "internal");
-  for (const [ref, legs, label] of [
-    ["flight:intl", intl, "طيران دولي"],
-    ["flight:dom", dom, "طيران داخلي"],
+  const sold = [...data.flights].sort(byDeparture);
+  for (const [ref, legs, label, inScope] of [
+    ["flight:intl", sold.filter((f) => f.leg_order !== "internal"), "طيران دولي", data.scope.flights_intl],
+    ["flight:dom", sold.filter((f) => f.leg_order === "internal"), "طيران داخلي", data.scope.flights_domestic],
   ] as const) {
+    // a flight the package did not sell is not booked (the evaluator, 2026-10-22) — its legs only date the trip
+    if (!inScope) continue;
     // «أضف لاحقاً» (the owner, 2026-10-22): issued without its flights, still booked — the case asks its
     // tickets before «جاهز للسفر» like any other flight (flightsReadiness)
     const later = ref === "flight:intl" ? data.scope.flights_intl && data.flight_booking.later_intl : data.scope.flights_domestic && data.flight_booking.later_dom;
@@ -181,19 +213,44 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       continue;
     }
     if (legs.length === 0) continue;
+    const price = ref === "flight:intl" ? data.flight_booking.intl_price : data.flight_booking.dom_price;
+    const currency = (ref === "flight:intl" ? data.flight_booking.intl_currency : data.flight_booking.dom_currency) || "SAR";
+    const supplier = (ref === "flight:intl" ? data.flight_booking.intl_supplier : data.flight_booking.dom_supplier) ?? "";
+    const real = legs.filter((f) => !plannedLeg(f));
+    if (real.length === 0) {
+      // only a plan: one booking that says a flight is needed — no route, no day line, no clock
+      rows.push({
+        origin_ref: ref,
+        kind: "flight",
+        title: `${label} — ${FLIGHT_NEEDED}`,
+        city_name: "",
+        start_date: ref === "flight:intl" ? data.trip.arrival_date : (legs[0].departure_at?.slice(0, 10) ?? null),
+        end_date: ref === "flight:intl" ? data.trip.departure_date : (legs.at(-1)?.departure_at?.slice(0, 10) ?? null),
+        detail: { الركاب: pax },
+        supplier_name: supplier,
+        cancellation_policy: null,
+        quoted_net: price,
+        currency,
+      });
+      continue;
+    }
     const out = legs.filter((f) => f.leg_order === "outbound");
     const back = legs.filter((f) => f.leg_order === "inbound");
     const detail: Record<string, string> = {};
     if (ref === "flight:intl") {
-      out.forEach((f, k) => (detail[out.length > 1 ? `الذهاب ${k + 1}` : "الذهاب"] = legText(f)));
-      back.forEach((f, k) => (detail[back.length > 1 ? `العودة ${k + 1}` : "العودة"] = legText(f)));
-    } else legs.forEach((f, k) => (detail[`رحلة ${k + 1}`] = legText(f)));
+      // a leg still only planned beside a real one: said as to be set, never its planned route or clock
+      out.forEach((f, k) => (detail[out.length > 1 ? `الذهاب ${k + 1}` : "الذهاب"] = plannedLeg(f) ? LATER : legText(f)));
+      back.forEach((f, k) => (detail[back.length > 1 ? `العودة ${k + 1}` : "العودة"] = plannedLeg(f) ? LATER : legText(f)));
+    } else legs.forEach((f, k) => (detail[`رحلة ${k + 1}`] = plannedLeg(f) ? LATER : legText(f)));
     const cabin = [...new Set(legs.map((f) => f.cabin_class).filter(Boolean))].join("، ");
     if (cabin) detail["الدرجة"] = cabin;
     detail["الركاب"] = pax;
-    const price = ref === "flight:intl" ? data.flight_booking.intl_price : data.flight_booking.dom_price;
-    const currency = (ref === "flight:intl" ? data.flight_booking.intl_currency : data.flight_booking.dom_currency) || "SAR";
-    const route = ref === "flight:intl" && back.length > 0 ? `${code(out[0]?.from_airport ?? "")} ⇄ ${code(out.at(-1)?.to_airport ?? "")}` : legs.map((f) => `${code(f.from_airport)} → ${code(f.to_airport)}`).join(" · ");
+    // the route of the legs actually written; the ticket rewrites it (wizard-tickets ticketTitle)
+    const realOut = real.filter((f) => f.leg_order === "outbound");
+    const route =
+      ref === "flight:intl" && realOut.length > 0 && real.some((f) => f.leg_order === "inbound")
+        ? `${code(realOut[0].from_airport)} ⇄ ${code(realOut.at(-1)!.to_airport)}`
+        : real.map((f) => `${code(f.from_airport)} → ${code(f.to_airport)}`).join(" · ");
     rows.push({
       origin_ref: ref,
       kind: "flight",
@@ -203,7 +260,7 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       start_date: legs[0].departure_at?.slice(0, 10) ?? null,
       end_date: legs.at(-1)?.departure_at?.slice(0, 10) ?? null,
       detail,
-      supplier_name: (ref === "flight:intl" ? data.flight_booking.intl_supplier : data.flight_booking.dom_supplier) || [...new Set(legs.map((f) => f.airline).filter(Boolean))].join("، "),
+      supplier_name: supplier || [...new Set(real.map((f) => f.airline).filter(Boolean))].join("، "),
       cancellation_policy: null,
       quoted_net: price,
       currency,
@@ -288,7 +345,8 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
     const last = cities.at(-1)?.city_name.trim();
     const seenOff = data.transport.some((tr) => tr.to_place === TRANSPORT_AIRPORT && tr.from_place.replace(TRANSPORT_HOTEL_PREFIX, "").trim() === last);
     const unsold: DraftTransport[] =
-      last && !seenOff && data.transport_plan.airport.enabled && intl.some((f) => f.leg_order === "inbound")
+      // a flight home planned but not yet ticketed still takes the group to the airport
+      last && !seenOff && data.transport_plan.airport.enabled && data.flights.some((f) => f.leg_order === "inbound")
         ? [{ from_place: `${TRANSPORT_HOTEL_PREFIX}${last}`, to_place: TRANSPORT_AIRPORT, car_type: vehicleText(data.transport_plan.farewell ?? data.transport_plan.airport), date: null, note: "" }]
         : [];
     for (const tr of [...data.transport, ...unsold]) {
@@ -303,14 +361,14 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
         flight = lastIn(city, tr.date);
         // the driver waits from the landing; a leg with no landing time yet is timed later
         const at = flight?.arrival_at ?? null;
-        if (flight && at && timed(flight, at)) ({ date, time } = shift(at, MEET_AFTER_LANDING));
+        if (flight && at && timed(at)) ({ date, time } = shift(at, MEET_AFTER_LANDING));
         else if (flight?.departure_at) date = flight.departure_at.slice(0, 10);
         meet = `صالة القادمين — ${flight ? code(flight.to_airport) : "المطار"}`;
       } else if (tr.to_place === TRANSPORT_AIRPORT && tr.from_place.startsWith(TRANSPORT_HOTEL_PREFIX)) {
         const city = tr.from_place.slice(TRANSPORT_HOTEL_PREFIX.length).trim();
         flight = firstOut(city, tr.date);
         const at = flight?.departure_at ?? null;
-        if (flight && at && timed(flight, at)) ({ date, time } = shift(at, -(flight.leg_order === "internal" ? BEFORE_DOMESTIC : BEFORE_INTL)));
+        if (flight && at && timed(at)) ({ date, time } = shift(at, -(flight.leg_order === "internal" ? BEFORE_DOMESTIC : BEFORE_INTL)));
         else if (at) date = at.slice(0, 10);
         meet = "بهو الفندق";
       } else {
@@ -357,7 +415,7 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
         const arrival = pick.date && (pick.date === city.check_in || landsIn(city.city_name, pick.date));
         if (arrival) {
           const f = landsIn(city.city_name, pick.date!);
-          const after = f?.arrival_at && timed(f, f.arrival_at) ? shift(f.arrival_at, TOUR_AFTER_LANDING) : null;
+          const after = f?.arrival_at && timed(f.arrival_at) ? shift(f.arrival_at, TOUR_AFTER_LANDING) : null;
           detail["وقت الانطلاق"] = after && after.date === pick.date ? after.time : LATER;
         }
         // The day the group flies out the same way (AD-2-3599: «جولة قبل المغادرة» at 09:00
@@ -366,7 +424,7 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
         const departure = !arrival && pick.date && (pick.date === city.check_out || leavesFrom(city.city_name, pick.date));
         if (departure) {
           const f = leavesFrom(city.city_name, pick.date!);
-          const latest = f?.departure_at && timed(f, f.departure_at) ? shift(f.departure_at, -(TOUR_BEFORE_TAKEOFF + TOUR_MINUTES)) : null;
+          const latest = f?.departure_at && timed(f.departure_at) ? shift(f.departure_at, -(TOUR_BEFORE_TAKEOFF + TOUR_MINUTES)) : null;
           const fits = latest && latest.date === pick.date && latest.time >= EARLIEST_TOUR;
           detail["وقت الانطلاق"] = fits ? (latest.time < "09:00" ? latest.time : "09:00") : LATER;
         }

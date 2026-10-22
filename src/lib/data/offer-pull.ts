@@ -192,8 +192,11 @@ async function planFor(operationId: string): Promise<{ ok: true; rows: SeedRow[]
     if (f.flight_no) detail["رقم الرحلة"] = f.flight_no;
     if (f.from_airport) detail["من"] = f.from_airport;
     if (f.to_airport) detail["إلى"] = f.to_airport;
-    if (f.departure_at) detail["الإقلاع"] = f.departure_at.replace("T", " ").slice(0, 16);
-    if (f.arrival_at) detail["الوصول"] = f.arrival_at.replace("T", " ").slice(0, 16);
+    // a midnight on an unticketed leg is no time at all — it was printed on a client's ticket page as
+    // «الإقلاع 2026-11-27 00:00» (the evaluator, 2026-10-22)
+    const at = (v: string) => (!f.flight_no?.trim() && v.slice(11, 16) === "00:00" ? `${v.slice(0, 10)} ${LATER}` : v.replace("T", " ").slice(0, 16));
+    if (f.departure_at) detail["الإقلاع"] = at(f.departure_at);
+    if (f.arrival_at) detail["الوصول"] = at(f.arrival_at);
     if (f.cabin_class) detail["الدرجة"] = f.cabin_class;
     if (f.baggage_allowance) detail["الأمتعة"] = f.baggage_allowance;
 

@@ -231,7 +231,9 @@ function TravelerRow({
         known?.full_name ?? (traveler.name_source !== "seed" && isLatinName(traveler.display_name) ? traveler.display_name.trim().toUpperCase() : ""),
       number: known?.number ?? "",
       expiry: traveler.passport_expiry ?? "",
-      ...prefill,
+      // only what the read vouched for: a field it failed comes back "" and must never erase what is
+      // on file (the evaluator, 2026-10-22: a re-read wiped a stored birth date) — the bulk path's rule
+      ...Object.fromEntries(Object.entries(prefill).filter(([, v]) => v !== "" && v != null)),
     });
   }
 

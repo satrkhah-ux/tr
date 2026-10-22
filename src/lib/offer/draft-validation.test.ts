@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   deriveCityDates,
   emptyDraftData,
+  emptyFlight,
   normalizeDraftData,
   normalizeDraftHotel,
   withRooms,
@@ -394,5 +395,24 @@ describe("a stay priced under 50 (the evaluator, 2026-10-22)", () => {
     expect(warned(priced(2))).toBe(true);
     expect(priced(2).blocking.some((b) => b.key === "pg.warn.stayPriceLow")).toBe(false);
     expect(warned(priced(2000))).toBe(false);
+  });
+});
+
+describe("a domestic leg at the sale (the evaluator, 2026-10-22)", () => {
+  const withDomestic = (over: Partial<DraftData["flights"][number]>) => {
+    const data = completeDraft();
+    data.scope = { ...data.scope, flights_domestic: true };
+    data.flight_booking = { ...data.flight_booking, dom_price: 900 };
+    data.flights = [...data.flights, { ...emptyFlight("internal"), from_airport: "مطار إسطنبول (IST)", to_airport: "مطار طرابزون (TZX)", departure_at: "2026-11-08T00:00", ...over }];
+    return validateDraft(data).blocking.map((i) => i.key);
+  };
+
+  it("needs only its airports and its day — the number and the clocks come with the ticket", () => {
+    expect(withDomestic({})).not.toContain("pg.err.domFlightIncomplete");
+  });
+
+  it("still needs its day and its airports", () => {
+    expect(withDomestic({ departure_at: null })).toContain("pg.err.domFlightIncomplete");
+    expect(withDomestic({ to_airport: "" })).toContain("pg.err.domFlightIncomplete");
   });
 });

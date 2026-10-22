@@ -6,6 +6,7 @@ import {
   ARRIVAL_DAY_TOUR,
   DEPARTURE_DAY_TOUR,
   FAREWELL_UNSOLD,
+  FLIGHT_NEEDED,
   LATER,
   newBookings,
   NOTICE,
@@ -13,6 +14,7 @@ import {
   offerHotelFor,
   oldPullStays,
   planBookingsFromDraft,
+  ticketTitle,
   type ExistingBooking,
 } from "./seed-plan";
 import { carText, DRV } from "./drivers";
@@ -510,5 +512,49 @@ describe("the offer's own hotel line (owner's order B2, B5)", () => {
     expect(offerHotelFor({ ...b, start_date: "2026-11-04" }, lines)).toBeNull();
     // two lines it could be: refused as well
     expect(offerHotelFor(b, [...lines, { ...lines[1], rate_key: "RATE-B2" }])).toBeNull();
+  });
+});
+
+describe("flights the package did not sell, or only planned (the evaluator, 2026-10-22)", () => {
+  it("books no flight whose scope is off", () => {
+    const data = malaysia();
+    data.scope = { ...data.scope, flights_intl: false, flights_domestic: false };
+    expect(planBookingsFromDraft(data, "").filter((r) => r.kind === "flight")).toEqual([]);
+  });
+
+  it("turns a planned-only booking into one «طيران مطلوب» with no route and no clock", () => {
+    const data = malaysia();
+    // the Basic default: MED to the gateway at midnight, no number
+    data.flights = [
+      { ...emptyFlight("outbound"), from_airport: "مطار المدينة (MED)", to_airport: "مطار إسطنبول (IST)", to_city: "إسطنبول", departure_at: "2026-11-20T00:00" },
+      { ...emptyFlight("inbound"), from_airport: "مطار إسطنبول (IST)", to_airport: "مطار المدينة (MED)", from_city: "إسطنبول", departure_at: "2026-11-27T00:00" },
+      { ...emptyFlight("internal"), auto: true, from_airport: "KUL", to_airport: "LGK", departure_at: "2026-11-24T00:00" },
+    ];
+    const rows = planBookingsFromDraft(data, "");
+    const intl = rows.find((r) => r.origin_ref === "flight:intl")!;
+    expect(intl.title).toBe(`طيران دولي — ${FLIGHT_NEEDED}`);
+    expect([intl.start_date, intl.end_date]).toEqual(["2026-11-20", data.trip.departure_date]);
+    expect(Object.keys(intl.detail)).toEqual(["الركاب"]);
+    expect(rows.find((r) => r.origin_ref === "flight:dom")!.title).toBe(`طيران داخلي — ${FLIGHT_NEEDED}`);
+    // no drive is timed from a planned flight
+    expect(JSON.stringify(rows)).not.toMatch(/00:00|MED/);
+  });
+
+  it("keeps the real legs and says a planned one is to be set", () => {
+    const data = malaysia();
+    const back = data.flights.findIndex((f) => f.leg_order === "inbound");
+    data.flights[back] = { ...data.flights[back], flight_no: "", departure_at: "2026-11-27T00:00", arrival_at: null };
+    const intl = planBookingsFromDraft(data, "").find((r) => r.origin_ref === "flight:intl")!;
+    expect(intl.detail["العودة"]).toBe(LATER);
+    expect(intl.title).toBe("طيران دولي RUH → KUL");
+  });
+});
+
+describe("a ticket names its booking (the evaluator, 2026-10-22)", () => {
+  it("chains connected legs and breaks at a gap", () => {
+    expect(ticketTitle("flight:intl", [{ from: "RUH", to: "IST" }, { from: "IST", to: "TZX" }, { from: "TZX", to: "RUH" }])).toBe("طيران دولي RUH → IST → TZX → RUH");
+    expect(ticketTitle("flight:intl", [{ from: "JED", to: "IST" }, { from: "TZX", to: "JED" }])).toBe("طيران دولي JED → IST · TZX → JED");
+    expect(ticketTitle("flight:dom", [{ from: "IST", to: "TZX" }])).toBe("طيران داخلي IST → TZX");
+    expect(ticketTitle("flight:abc", [{ from: "IST", to: "TZX" }])).toBe("طيران IST → TZX");
   });
 });

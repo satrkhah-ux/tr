@@ -1659,6 +1659,7 @@ export const ar: Dictionary = {
   "pg.lastSavedNight": "آخر سعر محفوظ لليلة:",
   "pg.stayDone": "تمّ هذا الفندق",
   "pg.err.noIntlFlights": "أضف رحلات الطيران الدولي.",
+  "pg.err.domFlightIncomplete": "أكمل كل رحلة داخلية: المطاران والتاريخ (الرقم والمواعيد اختيارية).",
   "pg.err.flightIncomplete": "أكمل كل رحلة: المطاران ورقم الرحلة وموعدا المغادرة والوصول.",
   "pg.err.flightUnpriced": "أدخل سعر حجز الطيران الدولي.",
   "pg.err.domFlightUnpriced": "أدخل سعر حجز الطيران الداخلي.",

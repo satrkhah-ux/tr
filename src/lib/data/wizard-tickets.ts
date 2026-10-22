@@ -18,6 +18,7 @@ import type { PassportView, TravelerRow } from "@/lib/operations/traveler-dto";
 import { catalogHotelsFor } from "@/lib/data/hotel-match";
 import { badLeg, checkNames, toFlightLegs, withTicketLines, type LegInput, type NameCheck, type TravelerNames } from "@/lib/operations/wizard/flights";
 import { hotelDiffs, parseHotelConfirmation, type HotelConfirmation, type HotelDiff } from "@/lib/operations/wizard/hotels";
+import { ticketTitle } from "@/lib/operations/seed-plan";
 
 /**
  * «معالج الحجوزات» — the flight tickets (step 2) and the hotels' confirmations
@@ -39,6 +40,7 @@ const service = () => createSupabaseServiceClient() as unknown as SupabaseClient
 
 type BookingRow = {
   id: string;
+  origin_ref: string | null;
   operation_id: string;
   kind: string;
   title: string;
@@ -53,7 +55,7 @@ async function bookingOf(db: SupabaseClient, id: string, kind: "flight" | "hotel
   if (!id) return null;
   const { data } = await db
     .from("operation_bookings")
-    .select("id, operation_id, kind, title, city_name, status, start_date, end_date, detail")
+    .select("id, origin_ref, operation_id, kind, title, city_name, status, start_date, end_date, detail")
     .eq("id", id)
     .maybeSingle();
   const row = data as BookingRow | null;
@@ -194,9 +196,12 @@ export async function saveBookingTicket(input: {
 
     const baggage = input.baggage.replace(/\s+/g, " ").trim().slice(0, 80);
     const detail = withTicketLines(booking.detail ?? {}, legs, baggage);
+    // the route the ticket flies — the planned one stayed on the card and the client's page
+    const title = ticketTitle(booking.origin_ref, legs);
     const { error } = await db
       .from("operation_bookings")
       .update({
+        title,
         pnr: clean.pnr,
         ticket_numbers: tickets,
         flight_legs: legs,
@@ -207,7 +212,7 @@ export async function saveBookingTicket(input: {
       })
       .eq("id", booking.id);
     if (error) return { ok: false, error: "err.updateFailed" };
-    await followFlight(db, { id: booking.id, operation_id: booking.operation_id, title: booking.title, detail }, booking.detail);
+    await followFlight(db, { id: booking.id, operation_id: booking.operation_id, title, detail }, booking.detail);
     await logAudit({
       action: "booking.ticketed",
       entity: "operation_bookings",
