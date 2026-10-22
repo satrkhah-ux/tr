@@ -1,4 +1,5 @@
 import { getFilterOptions } from "@/lib/data/actions";
+import { withPresentOptions } from "@/lib/data/present-values";
 import { isCostColumn, resolveTableConfig } from "@/lib/data/table-config";
 import { currentCan } from "@/lib/roles/current";
 import type { FilterOptions } from "@/lib/data/types";
@@ -19,6 +20,7 @@ export async function TraveliunTablePage({ route, initialSearch }: { route: stri
 
   const needsOptions = Boolean(config.filters?.length) || Boolean(config.isOffers) || config.columns.some((c) => c.source);
   const filterOptions = needsOptions ? await getFilterOptions() : EMPTY_OPTIONS;
+  const filters = config.filters?.some((f) => f.present) ? await withPresentOptions(config.table, config.filters, filterOptions) : config.filters;
 
-  return <TraveliunTable config={config} filterOptions={filterOptions} initialSearch={initialSearch} />;
+  return <TraveliunTable config={{ ...config, filters }} filterOptions={filterOptions} initialSearch={initialSearch} />;
 }

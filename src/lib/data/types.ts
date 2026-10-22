@@ -51,6 +51,8 @@ export type FilterDef = {
   column?: string;
   /** a country filter applied through the row's city (city_id in that country's cities). */
   viaCity?: boolean;
+  /** only the values the table holds, each with its count (present-values.ts); a city's follow the chosen country */
+  present?: boolean;
 };
 
 export type Sort = { column: string; ascending: boolean };

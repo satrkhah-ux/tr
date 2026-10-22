@@ -26,6 +26,8 @@ import { featureForPath, type Feature } from "@/lib/features";
 const SECTIONS: readonly (readonly [prefix: string, permission: Permission | readonly Permission[]])[] = [
   // «البيانات» — the reference tables the generator reads
   ["/data-quality", "data.write"],
+  // «ابحث عن دولة أو خدمة» — what the data holds for a place or a service
+  ["/data-search", "data.write"],
   ["/hotels", "data.write"],
   ["/rooms-types", "data.write"],
   ["/countries", "data.write"],

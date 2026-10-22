@@ -2,6 +2,9 @@ import { OperationsBoard } from "@/components/traveliun/operations/OperationsBoa
 import { listOperationWork } from "@/lib/data/operations-work";
 import { listCaseOwners } from "@/lib/data/operation-case";
 import { currentCan } from "@/lib/roles/current";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { loadPlaces } from "@/lib/leads/teletel-pull";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +16,11 @@ export const dynamic = "force-dynamic";
  * which case is urgent.
  */
 export default async function OperationsPage() {
-  const [{ items, today }, { owners, staff }, canSeeMoney] = await Promise.all([
+  const [{ items, today }, { owners, staff }, canSeeMoney, places] = await Promise.all([
     listOperationWork(),
     listCaseOwners(),
     currentCan("pricing.internal"),
+    createSupabaseServerClient().then((db) => loadPlaces(db as unknown as SupabaseClient)).catch(() => []),
   ]);
-  return <OperationsBoard operations={items} today={today} owners={owners} staff={staff} canSeeMoney={canSeeMoney} />;
+  return <OperationsBoard operations={items} today={today} owners={owners} staff={staff} canSeeMoney={canSeeMoney} places={places} />;
 }

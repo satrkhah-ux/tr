@@ -19,6 +19,8 @@ export type ListedCase = {
   client_status: ClientStatus;
   execution_status: ExecutionStatus;
   assignee_id?: string | null;
+  /** the destination as the catalogue's country (resolvePlace) — «تايلند» is «تايلاند»; the filter reads it */
+  destination_key?: string | null;
 };
 
 /** "" means "any". status "" = the live cases only; assignee "none" = nobody owns it. */
@@ -48,7 +50,7 @@ export function matchesFilters(op: ListedCase, f: ListFilters, includeClosed = f
   } else if (!includeClosed && !isLiveCase(op)) return false;
   if (f.from && (!op.travel_start || op.travel_start < f.from)) return false;
   if (f.to && (!op.travel_start || op.travel_start > f.to)) return false;
-  if (f.destination && op.destination !== f.destination) return false;
+  if (f.destination && (op.destination_key ?? op.destination) !== f.destination) return false;
   if (f.assignee === "none" ? Boolean(op.assignee_id) : Boolean(f.assignee) && op.assignee_id !== f.assignee) return false;
   return true;
 }

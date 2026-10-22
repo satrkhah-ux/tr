@@ -17,6 +17,8 @@ import { MoneyLinks } from "./MoneyReports";
 import type { TranslationKey } from "@/lib/i18n";
 import { TraveliunShell } from "../TraveliunShell";
 import { SuggestInput } from "../SuggestInput";
+import { resolvePlace } from "@/lib/leads/places";
+import type { Place } from "@/lib/leads/auto";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
 /**
@@ -35,12 +37,15 @@ const SIGNAL_KEY = (c: string) => `ops.signal.${c}` as TranslationKey;
 
 type Filter = "needs_action" | "all" | "unpaid" | "travelling_soon";
 
+const NO_PLACES: Place[] = [];
+
 export function OperationsBoard({
   operations,
   today,
   owners,
   staff,
   canSeeMoney,
+  places = NO_PLACES,
 }: {
   /**
    * ONLY confirmed cases. The board deliberately does not list unconfirmed
@@ -55,13 +60,23 @@ export function OperationsBoard({
   staff?: StaffOption[];
   /** pricing.internal: links to the money pages (order 11). Courtesy — each page checks again. */
   canSeeMoney?: boolean;
+  /** the catalogue's countries and cities — «الوجهة» lists each country once, however the case spelled it */
+  places?: Place[];
 }) {
   const { t } = useTraveliunUI();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("needs_action");
   const [filters, setFilters] = useState<ListFilters>(NO_FILTERS);
 
-  const listed = useMemo(() => operations.map((op) => ({ ...op, assignee_id: owners?.[op.id] ?? null })), [operations, owners]);
+  const listed = useMemo(
+    () =>
+      operations.map((op) => {
+        // «تايلند» and «تايلاند» are one destination (the evaluator, 2026-10-23): the catalogue's country, else the text
+        const place = op.destination ? resolvePlace(op.destination, places) : null;
+        return { ...op, assignee_id: owners?.[op.id] ?? null, destination_key: place?.kind === "destination" ? place.country : (op.destination?.trim() ?? null) };
+      }),
+    [operations, owners, places],
+  );
   // the default list: live cases only — cancelled and travelled ones do not crowd it
   const base = useMemo(() => listed.filter((op) => matchesFilters(op, filters)), [listed, filters]);
   const staffName = useMemo(() => new Map((staff ?? []).map((s) => [s.id, s.label])), [staff]);
@@ -93,7 +108,7 @@ export function OperationsBoard({
     }),
     [base],
   );
-  const destinations = useMemo(() => [...new Set(operations.map((o) => o.destination).filter((d): d is string => Boolean(d)))].sort(), [operations]);
+  const destinations = useMemo(() => [...new Set(listed.map((o) => o.destination_key).filter((d): d is string => Boolean(d)))].sort(), [listed]);
 
   // a card per list, in the colour of what it holds (the owner, 2026-10-18: «حولها الى بطاقات … يحتاج اجراء لون احمر»)
   const FILTERS: { key: Filter; labelKey: TranslationKey; icon: LucideIcon; tone: string; ring: string }[] = [

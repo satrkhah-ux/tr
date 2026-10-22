@@ -207,6 +207,8 @@ export const navGroups: NavGroup[] = [
     href: "/hotels",
     icon: Database,
     children: [
+      // a country, a city or a service — what the data holds for it, each figure a link (2026-10-22)
+      { labelKey: "nav.dataSearch", href: "/data-search" },
       // «جودة البيانات» + «مراجعة الأسعار»
       { labelKey: "nav.dataReview", href: "/data-quality" },
       { labelKey: "nav.hotels", href: "/hotels" },

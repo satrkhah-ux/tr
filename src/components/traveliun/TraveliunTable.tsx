@@ -85,9 +85,13 @@ export function TraveliunTable({
   const { view, t } = useTraveliunUI();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSizeState] = useState(25);
-  const [search, setSearch] = useState(initialSearch);
-  const [debounced, setDebounced] = useState(initialSearch.trim());
-  const [filterValues, setFilterValuesState] = useState<Record<string, string>>({});
+  // a link's search and filters (?q=…&country_id=…, from «ابحث عن دولة أو خدمة») open the page on them
+  const startParams = useSearchParams();
+  const [search, setSearch] = useState(initialSearch || startParams.get("q") || "");
+  const [debounced, setDebounced] = useState((initialSearch || startParams.get("q") || "").trim());
+  const [filterValues, setFilterValuesState] = useState<Record<string, string>>(() =>
+    Object.fromEntries((config.filters ?? []).map((f) => [f.key, startParams.get(f.key) ?? ""]).filter(([, v]) => v)),
+  );
   const [dateFrom, setDateFromState] = useState("");
   const [dateTo, setDateToState] = useState("");
   const [offersMode, setOffersModeState] = useState<OffersMode>("confirmed");
@@ -711,9 +715,9 @@ function FilterBar({
         ) : null}
         {(config.filters ?? []).map((def) => {
           let options: FilterOption[] = def.source ? filterOptions[def.source] : (def.options ?? []);
-          // with a country chosen, the city list is that country's cities
+          // with a country chosen, a city list is that country's cities
           const country = filterValues["country_id"];
-          if (def.source === "cities" && country && config.filters?.some((f) => f.viaCity)) {
+          if (country && def.key !== "country_id" && options.some((o) => o.parent)) {
             options = options.filter((o) => o.parent === country);
           }
           return (
@@ -724,7 +728,8 @@ function FilterBar({
                 onChange={(e) => {
                   const value = e.target.value;
                   // a new country clears a city of the old one
-                  setFilterValues((prev) => ({ ...prev, [def.key]: value, ...(def.viaCity ? { city_id: "" } : {}) }));
+                  const cities = def.key === "country_id" ? (config.filters ?? []).filter((f) => f.key !== def.key && (f.source === "cities" || (f.options ?? []).some((o) => o.parent))) : [];
+                  setFilterValues((prev) => ({ ...prev, [def.key]: value, ...Object.fromEntries(cities.map((f) => [f.key, ""])) }));
                 }}
                 className={fieldClass}
               >

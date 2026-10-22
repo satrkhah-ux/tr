@@ -97,7 +97,7 @@ const CONFIGS: TableConfig[] = [
       { key: "status", labelKey: "col.status", type: "status" },
     ],
     searchable: ["arabic_name", "english_name", "address"],
-    filters: [{ ...COUNTRY_FILTER, viaCity: true }, CITY_FILTER],
+    filters: [{ ...COUNTRY_FILTER, viaCity: true, present: true }, { ...CITY_FILTER, present: true }],
     defaultSort: { column: "arabic_name", ascending: true },
   },
   {
@@ -117,6 +117,8 @@ const CONFIGS: TableConfig[] = [
   {
     route: "/services", table: "services", titleKey: "nav.services",
     columns: [
+      // the same service is listed per country: without it «استقبال بالورد» read five times the same (2026-10-22)
+      { key: "country_id", labelKey: "filter.country", source: "countries" },
       { key: "arabic_name", labelKey: "col.arabicName" },
       { key: "english_name", labelKey: "col.englishName" },
       { key: "service_type", labelKey: "col.serviceType" },
@@ -125,7 +127,7 @@ const CONFIGS: TableConfig[] = [
       { key: "sell_currency", labelKey: "col.currency" },
     ],
     searchable: ["arabic_name", "english_name", "service_type"],
-    filters: [COUNTRY_FILTER],
+    filters: [{ ...COUNTRY_FILTER, present: true }, { key: "service_type", labelKey: "col.serviceType", kind: "select", present: true }],
     defaultSort: { column: "created_at", ascending: false },
   },
   {
@@ -367,6 +369,7 @@ const CONFIGS: TableConfig[] = [
   {
     route: "/cars/tours", table: "tours", titleKey: "nav.tours",
     columns: [
+      { key: "country_id", labelKey: "filter.country", source: "countries" },
       { key: "arabic_name", labelKey: "col.arabicName" },
       { key: "english_name", labelKey: "col.englishName" },
       // one tour, its city and length; its price per car is on /cars/transfers/quick (tour_prices, 0072)
@@ -376,12 +379,13 @@ const CONFIGS: TableConfig[] = [
       { key: "currency", labelKey: "col.currency" },
     ],
     searchable: ["arabic_name", "english_name"],
-    filters: [COUNTRY_FILTER],
+    filters: [{ ...COUNTRY_FILTER, present: true }, { ...CITY_FILTER, present: true }],
     defaultSort: { column: "arabic_name", ascending: true },
   },
   {
     route: "/cars/transfers", table: "transfers", titleKey: "nav.transfers",
     columns: [
+      { key: "country_id", labelKey: "filter.country", source: "countries" },
       { key: "from_city", labelKey: "col.fromCity" },
       { key: "to_city", labelKey: "col.toCity" },
       // what each end IS (0072) — set by the quick price grid and data-transfers, never typed
@@ -392,7 +396,7 @@ const CONFIGS: TableConfig[] = [
       { key: "currency", labelKey: "col.currency" },
     ],
     searchable: ["from_city", "to_city", "car_type"],
-    filters: [COUNTRY_FILTER],
+    filters: [{ ...COUNTRY_FILTER, present: true }, { key: "from_city", labelKey: "col.fromCity", kind: "select", present: true }, { key: "car_type", labelKey: "col.carType", kind: "select", present: true }],
     defaultSort: { column: "created_at", ascending: false },
   },
   {
