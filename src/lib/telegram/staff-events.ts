@@ -4,6 +4,8 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { listOpenConversations, teletelConversationUrl } from "@/lib/providers/teletel";
 import { escapeHtml, staffForAgent, staffSend } from "./staff-bot";
 import type { InlineButton } from "./ops-bot";
+import { sendDailyReports } from "./staff-report";
+import { forwardClientMessage, onMessageUpdated, refreshDeliveries, rememberThread, type TeletelMessageEvent } from "./staff-replies";
 
 /**
  * «تنبيهاتي»: a conversation assigned to an employee in Teletel reaches their
@@ -38,8 +40,10 @@ export type TeletelEvent = {
   } | null;
 };
 
-/** Every Teletel webhook event goes through here. Conversation events are handled, and the rest are ignored. */
+/** Every Teletel webhook event goes through here: assignments, the client's messages (forwarded), and our replies' WhatsApp status. */
 export async function staffOnTeletel(body: TeletelEvent): Promise<void> {
+  if (body.event === "message_created") return forwardClientMessage(body as TeletelMessageEvent);
+  if (body.event === "message_updated") return onMessageUpdated(body as TeletelMessageEvent);
   if (body.event !== "conversation_created" && body.event !== "conversation_updated") return;
   const id = Number(body.id);
   if (!Number.isInteger(id) || id <= 0) return;
@@ -67,6 +71,7 @@ async function claimAndAnnounce(conversationId: number, agent: number | null, so
   const member = await staffForAgent(agent);
   if (!member) return false;
   const sent = await staffSend(member.chatId, assignmentText(card), assignmentButtons(conversationId));
+  if (sent.ok) await rememberThread(member.chatId, sent.messageId, conversationId);
   return sent.ok;
 }
 
@@ -84,7 +89,10 @@ export function assignmentText(c: Announced): string {
 
 export function assignmentButtons(conversationId: number): InlineButton[][] {
   const url = teletelConversationUrl(conversationId);
-  return [[...(url ? [{ text: "💬 افتح في تيلي تيل", url }] : []), { text: "📄 آخر الرسائل", callback_data: `c:${conversationId}` }]];
+  return [
+    [{ text: "✍️ رد", callback_data: `r:${conversationId}` }, { text: "📄 آخر الرسائل", callback_data: `c:${conversationId}` }],
+    ...(url ? [[{ text: "💬 افتح في تيلي تيل", url }]] : []),
+  ];
 }
 
 /**
@@ -136,7 +144,8 @@ export async function staffSweep(): Promise<{ seen: number; announced: number; b
   return { seen: rows.length, announced };
 }
 
-/** The minute job's share of «تنبيهاتي» (inside /api/murad/run, after the follow-ups sync has refreshed the open list). */
+/** The minute job's share of «تنبيهاتي» (inside /api/murad/run, after the follow-ups sync refreshed the open list): the sweep, the delivery statuses, and from 23:00 Riyadh the evening reports. */
 export async function staffTick(): Promise<Record<string, unknown>> {
-  return { sweep: await staffSweep() };
+  const [sweep, deliveries, reports] = await Promise.all([staffSweep(), refreshDeliveries(), sendDailyReports()]);
+  return { sweep, deliveries, ...(reports ? { reports } : {}) };
 }

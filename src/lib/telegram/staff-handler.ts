@@ -1,7 +1,11 @@
 import "server-only";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { conversationThread, getTeletelConfig, teletelConversationUrl, teletelGet } from "@/lib/providers/teletel";
-import { escapeHtml, staffCall, staffForChat, staffSend, type StaffMember } from "./staff-bot";
+import { escapeHtml, staffCall, staffForChat, staffSend, staffSendAudio, type StaffMember } from "./staff-bot";
+import { buildReport } from "./staff-report";
 import { myNumbers, openFor, secondsText, waitText } from "./staff-numbers";
+import { linkTeletelToken, promptReply, rememberThread, sendReply, threadOf, TOKEN_HELP } from "./staff-replies";
 import type { InlineButton } from "./ops-bot";
 
 /**
@@ -16,7 +20,13 @@ import type { InlineButton } from "./ops-bot";
  */
 
 export type StaffUpdate = {
-  message?: { message_id: number; chat?: { id?: number; type?: string }; from?: { id?: number; first_name?: string }; text?: string };
+  message?: {
+    message_id: number;
+    chat?: { id?: number; type?: string };
+    from?: { id?: number; first_name?: string };
+    text?: string;
+    reply_to_message?: { message_id: number };
+  };
   callback_query?: { id: string; from?: { id?: number }; data?: string; message?: { message_id: number; chat?: { id?: number; type?: string } } };
 };
 
@@ -34,6 +44,8 @@ function menu(me: StaffMember): Screen {
     text: [`🔔 <b>لوحتي</b> — ${escapeHtml(me.name)}`, "", "اختر ما تريد:"].join("\n"),
     buttons: [
       [{ text: "📊 أرقامي", callback_data: "n" }, { text: "⏳ بانتظار ردي", callback_data: "w" }],
+      [{ text: "📈 تقرير اليوم", callback_data: "d" }, { text: "🎵 نغمة التنبيه", callback_data: "t" }],
+      [{ text: "🔑 الرد باسمي من هنا", callback_data: "k" }],
       teletelHome(),
     ].filter((row) => row.length > 0),
   };
@@ -104,14 +116,42 @@ async function conversation(me: StaffMember, id: number): Promise<Screen> {
     text: [`💬 <b>${escapeHtml(conv.meta?.sender?.name?.trim() || `#${id}`)}</b>`, "", ...(lines.length ? lines : ["— لا رسائل —"]), "", thread?.canReply ? "" : "⚠️ مرّ أكثر من ٢٤ ساعة على آخر رسالة من العميل — لا يصله إلا قالب معتمد."]
       .join("\n")
       .trim(),
-    buttons: [[...(url ? [{ text: "💬 افتح في تيلي تيل", url }] : [])], [{ text: "⏳ بانتظار ردي", callback_data: "w" }, BACK]].filter((row) => row.length > 0),
+    buttons: [
+      [{ text: "✍️ رد", callback_data: `r:${id}` }, ...(url ? [{ text: "💬 افتح في تيلي تيل", url }] : [])],
+      [{ text: "⏳ بانتظار ردي", callback_data: "w" }, BACK],
+    ],
   };
+}
+
+async function report(me: StaffMember): Promise<Screen> {
+  if (!me.agentId) return NO_AGENT;
+  const r = await buildReport(me);
+  return r ? { text: r.text, buttons: [[{ text: "🔄 تحديث", callback_data: "d" }, BACK]] } : UNREACHABLE;
+}
+
+const TONE_STEPS = [
+  "🎵 <b>نغمة ترافليون للتنبيهات</b>",
+  "",
+  "لتسمعها كلما وصلك تنبيه من هذا البوت:",
+  "١. اضغط مطوّلاً على الملف الصوتي ← «حفظ للإشعارات» (Save for Notifications).",
+  "٢. افتح اسم البوت أعلى المحادثة ← «الإشعارات» ← «الصوت».",
+  "٣. اختر «نغمة ترافليون».",
+].join("\n");
+
+/** The brand tone (public/sounds, 2.4 s, under Telegram's 5 s / 300 KB for a notification sound) with the steps. */
+async function sendTone(chatId: number): Promise<void> {
+  const bytes = await readFile(join(process.cwd(), "public", "sounds", "traveliun-tone.mp3")).catch(() => null);
+  if (!bytes || !(await staffSendAudio(chatId, { bytes, name: "traveliun-tone.mp3", title: "نغمة ترافليون" }, TONE_STEPS))) {
+    await staffSend(chatId, "تعذّر إرسال النغمة الآن — جرّب بعد دقيقة.");
+  }
 }
 
 async function screenFor(me: StaffMember, data: string): Promise<Screen> {
   if (data === "n") return numbers(me);
   if (data === "w") return waiting(me);
   if (data.startsWith("c:")) return conversation(me, Number(data.slice(2)));
+  if (data === "k") return { text: TOKEN_HELP, buttons: [[BACK]] };
+  if (data === "d") return report(me);
   return menu(me);
 }
 
@@ -138,7 +178,13 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
     const chatId = callback.message?.chat?.id;
     const me = chatId && callback.message?.chat?.type === "private" ? await staffForChat(chatId) : null;
     await staffCall("answerCallbackQuery", { callback_query_id: callback.id });
-    if (me && chatId) await show(chatId, await screenFor(me, callback.data ?? "m"), callback.message?.message_id);
+    if (!me || !chatId) return;
+    const data = callback.data ?? "m";
+    if (data.startsWith("r:")) return promptReply(me, chatId, Number(data.slice(2)));
+    if (data === "t") return sendTone(chatId);
+    await show(chatId, await screenFor(me, data), callback.message?.message_id);
+    // a conversation's card can be answered with a Telegram «reply», like the client's own messages
+    if (data.startsWith("c:") && callback.message) await rememberThread(chatId, callback.message.message_id, Number(data.slice(2)));
     return;
   }
 
@@ -162,6 +208,20 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
   }
 
   const text = (message.text ?? "").trim();
+
+  // a Telegram «reply» to a message about a conversation is the employee's answer to that client
+  if (message.reply_to_message && text && !text.startsWith("/")) {
+    const conversationId = await threadOf(chatId, message.reply_to_message.message_id);
+    if (conversationId) return sendReply(me, chatId, conversationId, text);
+    await staffSend(chatId, "لا أعرف لأي عميل هذا الرد — اضغط «✍️ رد» تحت رسالة العميل ثم اكتب ردك.");
+    return;
+  }
+  // a pasted Teletel access token: one word of letters AND digits, nothing else (an English word alone is not one)
+  if (/^(?=.*\d)(?=.*[A-Za-z])[A-Za-z0-9_-]{20,64}$/.test(text)) return linkTeletelToken(me, chatId, message.message_id, text);
+  if (text.startsWith("/token")) return show(chatId, { text: TOKEN_HELP, buttons: [[BACK]] });
+  if (text.startsWith("/report") || text.includes("تقرير")) return show(chatId, await report(me));
+  if (text.startsWith("/tone") || text.includes("نغمة")) return sendTone(chatId);
+
   if (text.startsWith("/start")) {
     await staffSend(
       chatId,

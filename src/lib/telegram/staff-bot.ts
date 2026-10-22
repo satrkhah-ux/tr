@@ -103,6 +103,9 @@ export async function registerStaffWebhook(token?: string): Promise<TgReply<bool
         { command: "menu", description: "لوحتي" },
         { command: "numbers", description: "أرقامي" },
         { command: "waiting", description: "بانتظار ردي" },
+        { command: "report", description: "تقرير اليوم" },
+        { command: "tone", description: "نغمة التنبيه" },
+        { command: "token", description: "الرد باسمي من هنا" },
       ],
     });
   }
@@ -134,6 +137,25 @@ export async function staffSend(
   if (reply.description === "not_configured") return { ok: false, reason: "not_configured" };
   const refused = reply.error_code === 403 || /chat not found|bot can't initiate|blocked/i.test(reply.description ?? "");
   return { ok: false, reason: refused ? "not_started" : "failed", description: reply.description };
+}
+
+/** An audio file (the notification tone), uploaded as a file: Telegram offers «Save for notifications» on a short one. */
+export async function staffSendAudio(chatId: number, file: { bytes: Uint8Array; name: string; title: string }, caption: string): Promise<boolean> {
+  const { token } = await staffBotToken();
+  if (!token) return false;
+  try {
+    const form = new FormData();
+    form.set("chat_id", String(chatId));
+    form.set("audio", new Blob([new Uint8Array(file.bytes)], { type: "audio/mpeg" }), file.name);
+    form.set("title", file.title);
+    form.set("performer", "Traveliun");
+    form.set("caption", caption.slice(0, 1000));
+    form.set("parse_mode", "HTML");
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendAudio`, { method: "POST", body: form, signal: AbortSignal.timeout(30_000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 /** The bot's @username, for the «ابدأ» link: what was stored with the token, else getMe (and «traveliunbot» only if both fail). */

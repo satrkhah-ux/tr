@@ -101,6 +101,10 @@ export type AuditAction =
   | "employee.telegram_test"
   | "bot.token_changed"
   | "bot.webhook_registered"
+  // «تنبيهاتي» stage c: an employee's own Teletel token linked or refused, and every reply sent from the bot
+  | "staff_bot.token_linked"
+  | "staff_bot.token_refused"
+  | "staff_bot.reply_sent"
   | "employee.extra_permissions"
   | "employee.deleted"
   // «عين الإدارة» — what it said, and what management did about it
