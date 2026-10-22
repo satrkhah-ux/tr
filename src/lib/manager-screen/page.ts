@@ -128,8 +128,8 @@ const RUNTIME = String.raw`
     }
     // today's closings in Teletel, and where the returning clients went (order 2's lifecycle)
     var cl = F.channel.closures;
-    if (cl && cl.employee + cl.system + cl.murad + cl.returned + cl.unassigned > 0) {
-      body += '<div class="closed"><span>أُغلقت اليوم: <b class="tnum">' + (cl.employee + cl.system + cl.murad) + '</b></span><span>موظف ' + cl.employee + '</span><span>النظام ' + cl.system + '</span>' + (cl.murad ? '<span>مُراد ' + cl.murad + '</span>' : '') + '<span class="back">عادت لموظفها ' + cl.returned + '</span><span class="back">عادت طلباً جديداً ' + cl.unassigned + '</span></div>';
+    if (cl && cl.employee + cl.system + cl.murad + cl.travelling + cl.returned + cl.unassigned > 0) {
+      body += '<div class="closed"><span>أُغلقت اليوم: <b class="tnum">' + (cl.employee + cl.system + cl.murad) + '</b></span><span>موظف ' + cl.employee + '</span><span>النظام ' + cl.system + '</span>' + (cl.murad ? '<span>مُراد ' + cl.murad + '</span>' : '') + (cl.travelling ? '<span>مسافرون ' + cl.travelling + '</span>' : '') + '<span class="back">عادت لموظفها ' + cl.returned + '</span><span class="back">عادت طلباً جديداً ' + cl.unassigned + '</span></div>';
     }
     var kinds = F.channel.kinds.slice(0, 6);
     var side = box("حركة المحادثات اليوم بالساعة", "حتى الآن", hoursChart(F.channel.hours)) + box("حسب نوع الطلب", "اليوم", bars(kinds));

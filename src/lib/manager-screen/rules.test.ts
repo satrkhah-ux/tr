@@ -402,3 +402,26 @@ describe("the channel's view (the user, 2026-10-22: «9 محادثات لم ير
     expect(channel.index.map((i) => i.key)).toEqual(["today", "waiting", "first_reply", "issued", "confirmed", "spend", "online"]);
   });
 });
+
+describe("travellers on the channel (order 2, «مؤكد — مسافر قريباً»)", () => {
+  it("counts the closings as travelling and the returns to the trip's owner, and puts outside trips on the departures board", () => {
+    const { channel } = buildScreen(
+      facts({
+        closures: [
+          { closed_at: ago(90), kind: "system", reopened_at: null, action: null, travel: true },
+          { closed_at: ago(80), kind: "employee", reopened_at: ago(20), action: "returned_to_file_owner", travel: false },
+        ],
+        externalTrips: [
+          { travel_start: DAY, destination: "جورجيا", status: "paid_partial" },
+          { travel_start: "2026-10-20", destination: "تركيا", status: "paid_full" },
+          { travel_start: DAY, destination: "مصر", status: "cancelled" },
+        ],
+      }),
+    );
+    expect(channel.closures).toMatchObject({ system: 1, employee: 1, travelling: 1, returned: 1 });
+    expect(channel.ops.filter((o) => o.serial === "خارج النظام").map((o) => [o.when, o.what, o.status])).toEqual([
+      ["اليوم", "سفر إلى جورجيا · لم يُسدَّد بالكامل", "amber"],
+      ["غداً", "سفر إلى تركيا", "green"],
+    ]);
+  });
+});

@@ -99,7 +99,7 @@ export type ManagerChannel = {
   campaigns: { name: string; spend: number; conversions: number; status: Status }[];
   currency: string;
   /** today's closings in Teletel, by who closed them, and the returns when the client wrote again */
-  closures: { employee: number; system: number; murad: number; returned: number; unassigned: number };
+  closures: { employee: number; system: number; murad: number; travelling: number; returned: number; unassigned: number };
 };
 
 export type ManagerSnapshot = {
@@ -220,7 +220,16 @@ export type DraftFact = { created_at: string; issued: boolean };
 export type AdFact = { campaign: string; dest: string; cost: number; clicks: number; conversions: number; updated_at: string };
 export type MuradFact = { conversation_id: number; reason: string | null; error: string | null; replied: boolean; at: string };
 /** a closing in Teletel (order 2's conversation_closures): who closed it, and where it went when the client wrote again */
-export type ClosureFact = { closed_at: string; kind: "employee" | "system" | "murad"; reopened_at: string | null; action: "returned_to_employee" | "unassigned" | "kept" | null };
+export type ClosureFact = {
+  closed_at: string;
+  kind: "employee" | "system" | "murad";
+  reopened_at: string | null;
+  action: "returned_to_employee" | "returned_to_file_owner" | "unassigned" | "kept" | null;
+  /** closed as «مؤكد — مسافر قريباً» (it has a travel_until) */
+  travel: boolean;
+};
+/** a confirmed trip entered by hand («المؤكدون خارج النظام») — destination and state only, never the phone */
+export type ExternalTripFact = { travel_start: string; destination: string; status: string };
 export type IntegrationFact = { name: string; fail_streak: number; alerted: string | null; last_error: string | null; last_error_at: string | null; renews_on: string | null };
 
 export type ManagerFacts = {
@@ -250,6 +259,8 @@ export type ManagerFacts = {
   ops: { live: DigestLive[] };
   /** today's closings and returns (absent: not read) */
   closures?: ClosureFact[];
+  /** confirmed trips from outside the system leaving today or tomorrow */
+  externalTrips?: ExternalTripFact[];
 };
 
 // ------------------------------------------------------------------- helpers ----
@@ -997,6 +1008,14 @@ function channelData(f: ManagerFacts, today: LeadFact[], crew: TeamToday, panels
 
   const opsPanel = panels.find((p) => p.key === "operations");
   const ops = (opsPanel?.boxes[0]?.items ?? []).map((i) => ({ serial: i.label, when: i.value, what: i.detail ?? "", status: i.status ?? "green" }));
+  // confirmed trips entered by hand leave with the operations files (order 2, «المؤكدون خارج النظام»)
+  const tomorrow = nextDay(f.day);
+  for (const trip of f.externalTrips ?? []) {
+    const day = trip.travel_start.slice(0, 10);
+    if (trip.status === "cancelled" || (day !== f.day && day !== tomorrow)) continue;
+    const paid = trip.status === "paid_full";
+    ops.push({ serial: "خارج النظام", when: day === f.day ? "اليوم" : "غداً", what: `سفر إلى ${trip.destination}${paid ? "" : " · لم يُسدَّد بالكامل"}`, status: paid ? "green" : "amber" });
+  }
 
   const campaigns = f.ads.rows
     .filter((r) => r.cost > 0)
@@ -1032,7 +1051,9 @@ function channelData(f: ManagerFacts, today: LeadFact[], crew: TeamToday, panels
       employee: closedToday.filter((c) => c.kind === "employee").length,
       system: closedToday.filter((c) => c.kind === "system").length,
       murad: closedToday.filter((c) => c.kind === "murad").length,
-      returned: reopenedToday.filter((c) => c.action === "returned_to_employee").length,
+      travelling: closedToday.filter((c) => c.travel).length,
+      // back to whoever owns the client: the employee who closed it, or the trip's owner
+      returned: reopenedToday.filter((c) => c.action === "returned_to_employee" || c.action === "returned_to_file_owner").length,
       unassigned: reopenedToday.filter((c) => c.action === "unassigned").length,
     },
   };
