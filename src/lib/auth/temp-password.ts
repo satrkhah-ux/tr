@@ -1,22 +1,23 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type TempPasswordResult = "ok" | "in_use" | "wrong_kind" | "failed";
+export type TempPasswordResult = "ok" | "wrong_kind" | "sessions_kept" | "failed";
 
 /**
- * Give a login that has NEVER been used a temporary password an administrator
- * typed (the owner, 2026-10-19: «اجعل إمكانية عمل كلمة مرور من داخل النظام» —
- * the set-your-password email did not reach a company). The address is marked
- * confirmed (an invitation nobody opened left it unconfirmed, and an
- * unconfirmed account cannot sign in), and the first page load forces a new
- * password of the person's own (the root layout's ChangePasswordDialog).
+ * Give a login a temporary password an administrator typed — a new login or
+ * one used for months (the owner, 2026-10-19: «اجعل إمكانية عمل كلمة مرور من
+ * داخل النظام»; 2026-10-22: «حل مشكلة إصدار كلمة سر جديدة للموظف» — the
+ * forgot-password email does not reach staff, so a forgotten password locked
+ * them out). The address is marked confirmed (an invitation nobody opened left
+ * it unconfirmed, and an unconfirmed account cannot sign in), the next sign-in
+ * forces a new password of the person's own (the root layout's
+ * ChangePasswordDialog), and every session on the old one is ended
+ * (revoke_user_sessions) — nobody stays in on a password that was replaced.
  *
- * Refused («in_use») once the account has signed in: then the password is the
- * person's, and replacing it from a screen would hand their working account to
- * whoever typed it — a forgotten password is the recovery link's job.
  * Refused («wrong_kind») when the login is the other kind's: a partner screen
  * never sets a staff password (nor the developer's), a staff screen never a
- * partner's.
+ * partner's. «sessions_kept»: the password changed but the old sessions could
+ * not be ended — the administrator is told to try again.
  *
  * The password is never stored, returned or logged — callers audit the fact,
  * not the value. `admin` is a service-role client; callers gate first.
@@ -29,7 +30,6 @@ export async function setTemporaryPassword(
 ): Promise<TempPasswordResult> {
   const { data, error } = await admin.auth.admin.getUserById(userId);
   if (error || !data.user) return "failed";
-  if (data.user.last_sign_in_at) return "in_use";
 
   // an employee's login (the developer's included) is never a partner screen's; a partner's never a staff screen's
   const [staff, partner] = await Promise.all([
@@ -45,7 +45,9 @@ export async function setTemporaryPassword(
     email_confirm: true,
     app_metadata: { ...data.user.app_metadata, must_change_password: true },
   });
-  return updateError ? "failed" : "ok";
+  if (updateError) return "failed";
+  const { error: revokeError } = await admin.rpc("revoke_user_sessions", { target: userId });
+  return revokeError ? "sessions_kept" : "ok";
 }
 
 /**
@@ -60,7 +62,7 @@ export async function discardLogin(admin: SupabaseClient, userId: string): Promi
 
 /** What each refusal tells the administrator. */
 export const TEMP_PASSWORD_REFUSAL: Record<Exclude<TempPasswordResult, "ok">, string> = {
-  in_use: "هذا الحساب دخل النظام من قبل — كلمة مروره لصاحبه، فلا تُستبدل من هنا. أرسل له رابط إعادة التعيين بدلاً من ذلك.",
   wrong_kind: "هذا الحساب ليس من هذا النوع — لا تُعيَّن كلمة مروره من هذه الشاشة.",
+  sessions_kept: "تغيّرت كلمة المرور، لكن تعذّر إخراجه من أجهزته الأخرى — أعد المحاولة.",
   failed: "تعذّر تعيين كلمة المرور.",
 };

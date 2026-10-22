@@ -24,8 +24,9 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
  *
  * This screen is the join, stated. It shows the state per person and issues the
  * missing half in one press. The invitation lets them set their own password;
- * when it never arrives (the owner, 2026-10-19) «كلمة مرور مؤقتة» sets one to
- * hand over, which they must change at their first sign-in.
+ * when it never arrives (the owner, 2026-10-19) — or someone forgot theirs
+ * (2026-10-22) — «كلمة مرور جديدة» sets one to hand over: every session on the
+ * old one ends, and they must change it at their next sign-in.
  */
 export function EmployeeAccounts() {
   const { t, language } = useTraveliunUI();
@@ -174,8 +175,8 @@ export function EmployeeAccounts() {
                           onSave={() => savePassword(row, temp.value)}
                           onCancel={() => setTemp(null)}
                         />
-                      ) : row.email && !row.last_sign_in_at && !(row.developer && !isDeveloper) ? (
-                        // only a login nobody has used yet: once they sign in the password is theirs
+                      ) : row.email && !(row.developer && !isDeveloper) ? (
+                        // any login, used or not: the forgot-password email does not reach staff (temp-password.ts)
                         <button
                           type="button"
                           onClick={() => setTemp({ id: row.id, value: "" })}
@@ -213,7 +214,7 @@ export function EmployeeAccounts() {
 }
 
 /** The temporary password being typed for one person — checked as it is typed, by the server's own rule. */
-function TempPassword({
+export function TempPassword({
   email,
   value,
   busy,

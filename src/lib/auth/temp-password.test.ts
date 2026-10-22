@@ -5,9 +5,11 @@ vi.mock("server-only", () => ({}));
 const { setTemporaryPassword } = await import("./temp-password");
 
 /** auth.admin and the two link tables, as setTemporaryPassword reads them. */
-function fakeAdmin(user: { last_sign_in_at: string | null; app_metadata?: Record<string, unknown> }, links: { employee?: boolean; partner?: boolean } = {}) {
+function fakeAdmin(user: { last_sign_in_at: string | null; app_metadata?: Record<string, unknown> }, links: { employee?: boolean; partner?: boolean } = {}, revokeFails = false) {
   const updates: Record<string, unknown>[] = [];
+  const revoked: unknown[] = [];
   const admin = {
+    rpc: async (fn: string, args: unknown) => (revoked.push({ fn, args }), { data: 1, error: revokeFails ? { message: "x" } : null }),
     auth: {
       admin: {
         getUserById: async () => ({ data: { user: { id: "u1", app_metadata: {}, ...user } }, error: null }),
@@ -22,20 +24,26 @@ function fakeAdmin(user: { last_sign_in_at: string | null; app_metadata?: Record
       }),
     }),
   };
-  return { admin: admin as unknown as SupabaseClient, updates };
+  return { admin: admin as unknown as SupabaseClient, updates, revoked };
 }
 
-describe("a temporary password only for a login nobody has used", () => {
+describe("a new temporary password for any login (the owner, 2026-10-22)", () => {
   it("sets it on a never-used login, confirmed, with the first sign-in forced to change it", async () => {
     const { admin, updates } = fakeAdmin({ last_sign_in_at: null, app_metadata: { provider: "email" } }, { partner: true });
     expect(await setTemporaryPassword(admin, "u1", "Rq7-mountain-42", "partner")).toBe("ok");
     expect(updates[0]).toMatchObject({ password: "Rq7-mountain-42", email_confirm: true, app_metadata: { provider: "email", must_change_password: true } });
   });
 
-  it("refuses a login already in use — its password is its owner's", async () => {
-    const { admin, updates } = fakeAdmin({ last_sign_in_at: "2026-10-18T09:00:00Z" }, { employee: true });
-    expect(await setTemporaryPassword(admin, "u1", "Rq7-mountain-42", "staff")).toBe("in_use");
-    expect(updates).toEqual([]);
+  it("resets a login already in use and signs it out of every device", async () => {
+    const { admin, updates, revoked } = fakeAdmin({ last_sign_in_at: "2026-10-18T09:00:00Z" }, { employee: true });
+    expect(await setTemporaryPassword(admin, "u1", "Rq7-mountain-42", "staff")).toBe("ok");
+    expect(updates[0]).toMatchObject({ password: "Rq7-mountain-42", app_metadata: { must_change_password: true } });
+    expect(revoked).toEqual([{ fn: "revoke_user_sessions", args: { target: "u1" } }]);
+  });
+
+  it("says so when the old sessions could not be ended", async () => {
+    const { admin } = fakeAdmin({ last_sign_in_at: "2026-10-18T09:00:00Z" }, { employee: true }, true);
+    expect(await setTemporaryPassword(admin, "u1", "Rq7-mountain-42", "staff")).toBe("sessions_kept");
   });
 
   it("never sets a staff login's password from the partner screen, nor a partner's from the staff screen", async () => {

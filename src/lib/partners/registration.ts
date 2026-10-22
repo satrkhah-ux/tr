@@ -378,11 +378,12 @@ export async function setPartnerPassword(input: {
       if (account.status !== "active") return { ok: false, message: "هذا الحساب موقوف — فعّله قبل تعيين كلمة المرور." };
       const set = await setTemporaryPassword(supabase, account.auth_user_id, password, "partner");
       if (set !== "ok") return { ok: false, message: TEMP_PASSWORD_REFUSAL[set] };
+      // the same rule as staff: a login already in use gets a new password and loses every session
       await logAudit({
-        action: "partner.account_issued",
+        action: "partner.password_reset",
         entity: "booking_partners",
         entity_id: row.id,
-        meta: { email, kind: "temp_password", must_change_password: true },
+        meta: { email, kind: "temp_password", must_change_password: true, sessions_revoked: true },
       });
       return { ok: true, created: false };
     }
