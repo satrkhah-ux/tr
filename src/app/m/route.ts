@@ -24,5 +24,5 @@ export async function GET(): Promise<Response> {
   }
   const snapshot = await managerSnapshot();
   if (!snapshot) return html(managerDeniedPage(), 403);
-  return html(managerPage({ ...snapshot, now: Date.now() }), 200, { Refresh: "21600" });
+  return html(managerPage({ ...snapshot, now: Date.now(), build: String(process.env.NEXT_DEPLOYMENT_ID || "") }), 200, { Refresh: "21600" });
 }

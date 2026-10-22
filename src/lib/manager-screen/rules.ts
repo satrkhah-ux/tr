@@ -126,8 +126,8 @@ export type ManagerSnapshot = {
   channel: ManagerChannel;
 };
 
-/** What GET /api/manager-screen answers: the snapshot and the server's clock. */
-export type ManagerScreenFeed = ManagerSnapshot & { now: number };
+/** What GET /api/manager-screen answers: the snapshot, the server's clock and the deploy it runs (the TV reloads on a new one). */
+export type ManagerScreenFeed = ManagerSnapshot & { now: number; build: string };
 
 // ---------------------------------------------------------------- thresholds ----
 
@@ -1079,7 +1079,7 @@ function channelData(f: ManagerFacts, today: LeadFact[], crew: TeamToday, panels
     waiting: { known: f.waits !== null, total: waitCount, longest: laneList[0]?.waits[0]?.minutes ?? null, lanes: laneList },
     hours,
     kinds: countBy(today, (l) => l.inquiry || "غير مصنّف").sort((a, b) => b[1] - a[1]),
-    agents: { known: f.agents !== null, present: crew.present, total: crew.total, list: crew.agents.slice(0, 12).map((a) => ({ ...a, avg: a.avg == null ? null : Math.round(a.avg) })) },
+    agents: { known: f.agents !== null, present: crew.present, total: crew.total, list: crew.agents.map((a) => ({ ...a, avg: a.avg == null ? null : Math.round(a.avg) })) },
     destinations,
     ops,
     campaigns,

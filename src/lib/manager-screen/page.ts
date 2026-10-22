@@ -48,6 +48,21 @@ const RUNTIME = String.raw`
   function count(n, one, two_, few) { return n === 1 ? one : n === 2 ? two_ : n <= 10 ? n + " " + few : n + " " + one; }
   function panel(key) { for (var i = 0; i < F.panels.length; i++) if (F.panels[i].key === key) return F.panels[i]; return null; }
   function riyadh(t) { return new Date(t + 10800000); }
+  // the rows the room holds, the rest counted under them: measured on the TV, not reckoned from the
+  // design (a fixed 8 left the team table four names short over a third of an empty box, 2026-10-22)
+  function fit(root) {
+    var boxes = root.querySelectorAll("[data-more]");
+    for (var i = 0; i < boxes.length; i++) {
+      var el = boxes[i], rows = el.querySelectorAll(".row"), hidden = 0, rest = null;
+      if (el.scrollHeight > el.clientHeight + 1) el.className += " dense";
+      while (el.scrollHeight > el.clientHeight + 1 && hidden < rows.length) {
+        rows[rows.length - 1 - hidden].style.display = "none";
+        hidden++;
+        if (!rest) { rest = document.createElement("div"); rest.className = "rest"; el.insertBefore(rest, el.querySelector(".closed")); }
+        rest.textContent = "و" + hidden + " " + el.getAttribute("data-more");
+      }
+    }
+  }
 
   function drawClock(t) {
     var d = riyadh(t);
@@ -112,17 +127,15 @@ const RUNTIME = String.raw`
     else if (!w.total) head = "لا أحد ينتظر رداً الآن";
     else head = count(w.total, "محادثة واحدة", "محادثتان", "محادثات") + " بانتظار الرد — أطولها " + mins(longest) + " عند " + at;
     if (w.known && w.total) {
-      var shownLanes = lanes.slice(0, 6);
-      for (var j = 0; j < shownLanes.length; j++) {
-        var l = shownLanes[j], chips = "";
+      for (var j = 0; j < lanes.length; j++) {
+        var l = lanes[j], chips = "";
         for (var c = 0; c < l.waits.length && c < 10; c++) {
           var x = l.waits[c];
           chips += '<span class="wc s-' + esc(x.status) + '"><b class="tnum">' + esc(mins(x.minutes)) + "</b>" + (x.client ? "<small>" + esc(x.client) + "</small>" : "") + "</span>";
         }
         if (l.waits.length > 10) chips += '<span class="wc more">+' + (l.waits.length - 10) + "</span>";
-        body += '<div class="lane"><div class="who"><i class="pd ' + (l.presence ? "p-" + esc(l.presence) : "p-none") + '"></i><b>' + esc(l.agent) + '</b><em class="tnum">' + l.waits.length + '</em></div><div class="chips">' + chips + "</div></div>";
+        body += '<div class="lane row"><div class="who"><i class="pd ' + (l.presence ? "p-" + esc(l.presence) : "p-none") + '"></i><b>' + esc(l.agent) + '</b><em class="tnum">' + l.waits.length + '</em></div><div class="chips">' + chips + "</div></div>";
       }
-      if (lanes.length > 6) body += '<p class="rest">و' + (lanes.length - 6) + " موظفين آخرين لديهم محادثات بانتظار الرد</p>";
     } else {
       body = '<div class="calm big"><b>✓</b>' + esc(w.known ? "كل العملاء تلقّوا رداً" : "سنعرض الانتظار حين يرد تليتيل") + "</div>";
     }
@@ -133,7 +146,7 @@ const RUNTIME = String.raw`
     }
     var kinds = F.channel.kinds.slice(0, 6);
     var side = box("حركة المحادثات اليوم بالساعة", "حتى الآن", hoursChart(F.channel.hours)) + box("حسب نوع الطلب", "اليوم", bars(kinds));
-    return { head: head, body: '<div class="split"><div class="main">' + box("بانتظار الرد — لدى كل موظف", "الأحمر تجاوز الحد", '<div class="lanes">' + body + "</div>") + '</div><div class="aside">' + side + "</div></div>" };
+    return { head: head, body: '<div class="split"><div class="main">' + box("بانتظار الرد — لدى كل موظف", "الأحمر تجاوز الحد", '<div class="lanes" data-more="موظفين آخرين لديهم محادثات بانتظار الرد">' + body + "</div>") + '</div><div class="aside">' + side + "</div></div>" };
   }
 
   function segSales() {
@@ -142,9 +155,9 @@ const RUNTIME = String.raw`
     for (var i = 0; i < d.length; i++) if (d[i].requests > max) max = d[i].requests;
     for (var j = 0; j < d.length; j++) {
       var x = d[j];
-      rows += '<div class="tr"><span class="c">' + esc(x.country) + '</span><span class="g"><i><u style="width:' + Math.max(4, Math.round(x.requests / max * 100)) + '%"></u></i><b class="tnum">' + x.requests + '</b></span><span class="n tnum">' + x.issued + '</span><span class="n tnum ok">' + (x.confirmed ? "✓ " + x.confirmed : "—") + "</span></div>";
+      rows += '<div class="tr row"><span class="c">' + esc(x.country) + '</span><span class="g"><i><u style="width:' + Math.max(4, Math.round(x.requests / max * 100)) + '%"></u></i><b class="tnum">' + x.requests + '</b></span><span class="n tnum">' + x.issued + '</span><span class="n tnum ok">' + (x.confirmed ? "✓ " + x.confirmed : "—") + "</span></div>";
     }
-    var table = d.length ? '<div class="tbl"><div class="th"><span>الوجهة</span><span>محادثات اليوم</span><span>عروض صدرت</span><span>تأكدت</span></div>' + rows + "</div>" : '<div class="calm">لا وجهة محددة في محادثات اليوم بعد</div>';
+    var table = d.length ? '<div class="tbl" data-more="وجهات أخرى"><div class="th"><span>الوجهة</span><span>محادثات اليوم</span><span>عروض صدرت</span><span>تأكدت</span></div>' + rows + "</div>" : '<div class="calm">لا وجهة محددة في محادثات اليوم بعد</div>';
     var top = d.length ? "الوجهة الأولى اليوم: " + d[0].country + " — " + d[0].requests + " محادثة" : "لا وجهة محددة بعد";
     return { head: top, body: figures(p) + box("لوحة الوجهات", "اليوم منذ منتصف الليل", table) };
   }
@@ -153,22 +166,21 @@ const RUNTIME = String.raw`
     var p = panel("operations"), ops = F.channel.ops, rows = "";
     for (var i = 0; i < ops.length; i++) {
       var x = ops[i];
-      rows += '<div class="dep s-' + esc(x.status) + '"><span class="sn tnum">' + esc(x.serial) + '</span><span class="when">' + esc(x.when) + '</span><span class="what">' + esc(x.what) + '</span><span class="lamp"><i></i>' + esc(WORD[x.status]) + "</span></div>";
+      rows += '<div class="dep row s-' + esc(x.status) + '"><span class="sn tnum">' + esc(x.serial) + '</span><span class="when">' + esc(x.when) + '</span><span class="what">' + esc(x.what) + '</span><span class="lamp"><i></i>' + esc(WORD[x.status]) + "</span></div>";
     }
-    var board = ops.length ? '<div class="deps"><div class="dh"><span>الملف</span><span>الموعد</span><span>الخطوة</span><span>الحالة</span></div>' + rows + "</div>" : '<div class="calm big"><b>✓</b>لا خطوة مستحقة اليوم أو غداً</div>';
+    var board = ops.length ? '<div class="deps" data-more="ملفات أخرى"><div class="dh"><span>الملف</span><span>الموعد</span><span>الخطوة</span><span>الحالة</span></div>' + rows + "</div>" : '<div class="calm big"><b>✓</b>لا خطوة مستحقة اليوم أو غداً</div>';
     var head = ops.length ? count(ops.length, "ملف واحد", "ملفان", "ملفات") + " عليها خطوة اليوم أو غداً" : "العمليات جاهزة لليوم وغداً";
     return { head: head, body: figures(p) + box("لوحة الخطوات — اليوم وغداً", "مثل لوحة المغادرة", board) };
   }
 
   function segTeam() {
-    var a = F.channel.agents, rows = "", maxOpen = 1, list = a.list.slice(0, 8);
+    var a = F.channel.agents, rows = "", maxOpen = 1, list = a.list;
     for (var i = 0; i < list.length; i++) if (list[i].open > maxOpen) maxOpen = list[i].open;
     for (var j = 0; j < list.length; j++) {
       var x = list[j];
-      rows += '<div class="tr t5"><span class="c"><i class="pd p-' + esc(x.presence) + '"></i>' + esc(x.name) + '</span><span class="g"><i><u style="width:' + Math.max(4, Math.round(x.open / maxOpen * 100)) + '%"></u></i><b class="tnum">' + x.open + '</b></span><span class="n tnum">' + x.replies + '</span><span class="n tnum s-' + esc(x.status) + '">' + esc(mins(x.avg)) + "</span></div>";
+      rows += '<div class="tr t5 row"><span class="c"><i class="pd p-' + esc(x.presence) + '"></i>' + esc(x.name) + '</span><span class="g"><i><u style="width:' + Math.max(4, Math.round(x.open / maxOpen * 100)) + '%"></u></i><b class="tnum">' + x.open + '</b></span><span class="n tnum">' + x.replies + '</span><span class="n tnum s-' + esc(x.status) + '">' + esc(mins(x.avg)) + "</span></div>";
     }
-    if (a.list.length > list.length) rows += '<p class="rest">و' + (a.list.length - list.length) + " غيرهم تحركت محادثاتهم اليوم</p>";
-    var table = a.list.length ? '<div class="tbl"><div class="th t5"><span>الموظف</span><span>مفتوحة اليوم</span><span>ردود اليوم</span><span>متوسط أول رد</span></div>' + rows + "</div>" : '<div class="calm">' + esc(a.known ? "لا أحد متصل ولا محادثة تحركت اليوم" : "تليتيل لا يرد") + "</div>";
+    var table = a.list.length ? '<div class="tbl" data-more="غيرهم تحركت محادثاتهم اليوم"><div class="th t5"><span>الموظف</span><span>مفتوحة اليوم</span><span>ردود اليوم</span><span>متوسط أول رد</span></div>' + rows + "</div>" : '<div class="calm">' + esc(a.known ? "لا أحد متصل ولا محادثة تحركت اليوم" : "تليتيل لا يرد") + "</div>";
     var head = a.known ? a.present + " متصلون على تليتيل من " + a.total : "تليتيل لا يرد — حالة الفريق غير معروفة";
     return { head: head, body: box("الفريق على تليتيل — اليوم", "الأخضر متصل · البرتقالي مشغول · الرمادي غير متصل", table) };
   }
@@ -180,9 +192,9 @@ const RUNTIME = String.raw`
     for (var i = 0; i < c.length; i++) if (c[i].spend > max) max = c[i].spend;
     for (var j = 0; j < c.length; j++) {
       var x = c[j];
-      rows += '<div class="tr t4"><span class="c">' + esc(x.name) + '</span><span class="g"><i><u style="width:' + Math.max(4, Math.round(x.spend / max * 100)) + '%"></u></i><b class="tnum">' + esc(money(x.spend)) + '</b></span><span class="n tnum s-' + esc(x.status) + '">' + (x.conversions ? x.conversions + " تحويل" : "بلا تحويل") + "</span></div>";
+      rows += '<div class="tr t4 row"><span class="c">' + esc(x.name) + '</span><span class="g"><i><u style="width:' + Math.max(4, Math.round(x.spend / max * 100)) + '%"></u></i><b class="tnum">' + esc(money(x.spend)) + '</b></span><span class="n tnum s-' + esc(x.status) + '">' + (x.conversions ? x.conversions + " تحويل" : "بلا تحويل") + "</span></div>";
     }
-    var table = c.length ? '<div class="tbl"><div class="th t4"><span>الحملة</span><span>الإنفاق اليوم</span><span>تحويلات Google</span></div>' + rows + "</div>" : '<div class="calm">لم تصل أرقام الحملات لهذا اليوم بعد</div>';
+    var table = c.length ? '<div class="tbl" data-more="حملات أخرى"><div class="th t4"><span>الحملة</span><span>الإنفاق اليوم</span><span>تحويلات Google</span></div>' + rows + "</div>" : '<div class="calm">لم تصل أرقام الحملات لهذا اليوم بعد</div>';
     var spend = panel("ads") ? panel("ads").tiles[0] : null;
     return { head: spend ? "إنفاق الإعلانات اليوم: " + spend.value : "الإعلانات", body: figures(p) + box("الحملات اليوم", "حسب الإنفاق", table) };
   }
@@ -192,9 +204,9 @@ const RUNTIME = String.raw`
     var b = p.boxes[1] && p.boxes[1].items.length ? p.boxes[1] : p.boxes[0];
     for (var i = 0; b && i < b.items.length; i++) {
       var x = b.items[i];
-      rows += '<div class="li s-' + esc(x.status || "green") + '"><i></i><b>' + esc(x.label) + "</b><span>" + esc(x.detail || "") + '</span><em class="tnum">' + esc(x.value) + "</em></div>";
+      rows += '<div class="li row s-' + esc(x.status || "green") + '"><i></i><b>' + esc(x.label) + "</b><span>" + esc(x.detail || "") + '</span><em class="tnum">' + esc(x.value) + "</em></div>";
     }
-    return { head: headOf(p), body: figures(p) + box(b ? b.title : p.title, b ? b.note : "", rows ? '<div class="list">' + rows + "</div>" : '<div class="calm">' + esc(b ? b.empty : "") + "</div>") };
+    return { head: headOf(p), body: figures(p) + box(b ? b.title : p.title, b ? b.note : "", rows ? '<div class="list" data-more="غيرها">' + rows + "</div>" : '<div class="calm">' + esc(b ? b.empty : "") + "</div>") };
   }
 
   var SEGMENTS = [
@@ -227,6 +239,7 @@ const RUNTIME = String.raw`
     $("segNext").textContent = "التالي: " + SEGMENTS[(i + 1) % n].title;
     var body = $("segBody");
     body.innerHTML = out.body;
+    fit(body);
     body.className = "";
     void body.offsetWidth;
     body.className = "in";
@@ -244,10 +257,11 @@ const RUNTIME = String.raw`
     }
     if (!F.urgent.length) h = '<div class="calm rail"><b>✓</b>لا شيء يحتاج تدخلك الآن</div>';
     var wch = "";
-    for (var j = 0; j < F.watch.length && j < 5; j++) wch += "<li>" + esc(F.watch[j].label) + ": " + esc(F.watch[j].value) + "</li>";
+    for (var j = 0; j < F.watch.length; j++) wch += '<li class="row">' + esc(F.watch[j].label) + ": " + esc(F.watch[j].value) + "</li>";
     $("ucount").textContent = F.urgent.length ? String(F.urgent.length) : "";
     $("urgent").innerHTML = h;
-    $("watch").innerHTML = wch ? "<h4>تحت المتابعة · " + F.watch.length + "</h4><ul>" + wch + "</ul>" : "";
+    $("watch").innerHTML = wch ? "<h4>تحت المتابعة · " + F.watch.length + '</h4><ul data-more="غيرها">' + wch + "</ul>" : "";
+    fit($("watch"));
   }
 
   function drawBreaking(t) {
@@ -317,7 +331,9 @@ const RUNTIME = String.raw`
       if (x.status !== 200) return;
       var f;
       try { f = JSON.parse(x.responseText); } catch (e) { return; }
-      offset = f.now + (Date.now() - t0) / 2 - Date.now();
+      // a new version: load it (else the TV kept this morning's page until 04:00, 2026-10-22)
+      if (f.build && F.build && f.build !== F.build) { location.reload(); return; }
+      offset =f.now + (Date.now() - t0) / 2 - Date.now();
       F = f;
       drawIndex();
       drawRail();
@@ -339,10 +355,20 @@ const RUNTIME = String.raw`
   document.addEventListener("click", full, true);
   try { if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(function () {}); } catch (e) {}
 
+  // the TV crops its edges (overscan: the clock, the first figure and the crawl were cut, 2026-10-22),
+  // so the page shrinks into the safe area — ?safe=N is N% a side (0 for a screen that shows it all),
+  // kept by this browser
+  var safe = (location.search.match(/safe=([0-9.]+)/) || [])[1];
+  try { if (safe != null) localStorage.setItem("managerSafe", safe); else safe = localStorage.getItem("managerSafe"); } catch (e) {}
+  safe = safe == null || isNaN(+safe) ? 3 : Math.min(10, +safe);
+  document.body.style.webkitTransform = document.body.style.transform = "scale(" + (1 - safe / 50) + ")";
+
   drawClock(now());
   drawIndex();
   drawRail();
   loop();
+  // measured again in the real font (Tajawal's rows are taller than the fallback's)
+  try { document.fonts.ready.then(function () { shown.seg = shown.rail = ""; drawRail(); }); } catch (e) {}
   // a throttled page still turns the segments
   setInterval(frame, 1000);
   setInterval(poll, 30000);
@@ -418,6 +444,8 @@ main{display:grid;grid-template-columns:minmax(0,1fr) ${v(450)};gap:${v(26)};pad
 .split .main,.split .aside{display:flex;flex-direction:column;gap:${v(16)};min-height:0}
 .split .main .box{flex:1}
 .split .aside .box:first-child{flex:1.2}.split .aside .box:last-child{flex:1}
+#segBody>.box:last-child{flex:1 1 0}
+[data-more]{flex:1 1 auto;min-height:0;overflow:hidden}
 
 /* the waiting, lane by lane */
 .lanes{display:flex;flex-direction:column;gap:${v(14)};overflow:hidden}
@@ -481,8 +509,12 @@ main{display:grid;grid-template-columns:minmax(0,1fr) ${v(450)};gap:${v(26)};pad
 .li b{font-weight:800;white-space:nowrap}
 .li span{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .li em{font-style:normal;font-weight:800}
+/* more rows than the room: tighter first, then the rest counted (fit) */
+.dense{gap:${v(4)};line-height:1.3}
+.dense>.tr,.dense>.dep,.dense>.li,.dense>.lane{padding-top:${v(4)};padding-bottom:${v(4)};font-size:${v(21)}}
 .calm{display:flex;align-items:center;justify-content:center;gap:${v(14)};padding:${v(26)};color:#7ee2a8;font-size:${v(26)};font-weight:800;text-align:center}
 .calm b{font-size:${v(40)}}
+.box>.calm{flex:1}
 .calm.big{flex:1;flex-direction:column;font-size:${v(32)}}
 .calm.big b{font-size:${v(80)}}
 
@@ -498,6 +530,7 @@ aside.rail h2{margin:0;display:flex;justify-content:space-between;align-items:ce
 .uc em{display:block;margin-top:${v(6)};font-style:normal;font-size:${v(19)};font-weight:800;color:var(--gold)}
 .calm.rail{flex-direction:column;flex:1;border-radius:${v(10)};background:rgba(34,197,94,.08);font-size:${v(28)}}
 .calm.rail b{font-size:${v(72)}}
+#watch{flex:1;min-height:0;display:flex;flex-direction:column}
 #watch h4{margin:${v(6)} 0;font-size:${v(20)};color:#ffbf6b;font-weight:800}
 #watch ul{margin:0;padding:0 ${v(22)} 0 0;font-size:${v(18)};color:var(--muted);line-height:1.5}
 

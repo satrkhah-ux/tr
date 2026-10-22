@@ -15,6 +15,6 @@ const NO_STORE = { "Cache-Control": "no-store" };
 export async function GET(): Promise<NextResponse> {
   const snapshot = await managerSnapshot();
   if (!snapshot) return NextResponse.json({ ok: false }, { status: 403, headers: NO_STORE });
-  const feed: ManagerScreenFeed = { ...snapshot, now: Date.now() };
+  const feed: ManagerScreenFeed = { ...snapshot, now: Date.now(), build: String(process.env.NEXT_DEPLOYMENT_ID || "") };
   return NextResponse.json(feed, { headers: NO_STORE });
 }
