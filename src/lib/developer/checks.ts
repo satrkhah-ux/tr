@@ -457,6 +457,10 @@ const CHECKS: Check[] = [
       return { key: "murad.check.detail", params: { read: n("read"), auto: n("auto"), suggest: n("suggest"), used: n("used"), cap: n("cap") } };
     }),
   },
+  {
+    id: "followups_sync", group: "core", label: "dev.c.followups",
+    run: cronCheck("followups_sync", 60_000, (s): Msg => ({ key: "dev.d.followups", params: { read: Number(s.scanned ?? 0), added: Number(s.added ?? 0), awakened: Number(s.awakened ?? 0) } })),
+  },
   // pkg's certificate (acme.sh on vps-new renews it) and the company's domain
   { id: "tls_pkg", group: "core", label: "dev.c.tls", run: async () => expiryOutcome(await tlsNotAfter("pkg.traveliun.com"), "dev.d.expiry") },
   { id: "domain_traveliun", group: "core", label: "dev.c.domain", run: async () => expiryOutcome(await rdapExpiry("traveliun.com"), "dev.d.expiry") },

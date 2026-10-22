@@ -69,6 +69,7 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   ["/almatar-bookings", ["operations.write", "settings.manage"]],
   // «العملاء» (0107): a section like the others, so it can be taken from a role or a colleague
   ["/clients", "clients.view"],
+  ["/followups", ["followups.work", "followups.manage", "dashboard.admin", "developer.access"]],
   // the team and its roles
   ["/employees", "employees.manage"],
   // «مركز التشغيل الذكي»: company-wide revenue, conversion and average offer —
@@ -87,6 +88,8 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   ["/commissions/policy", ["commissions.manage", "commissions.approve"]],
   ["/commissions", ["commissions.view", "commissions.manage", "commissions.approve"]],
   // «المطوّر»: service switches and external links' health
+  ["/murad-settings", ["settings.manage", "developer.access"]],
+  ["/management-decisions", ["dashboard.admin", "developer.access"]],
   ["/developer", "developer.access"],
   // «SLA»: the administration and the developer only (the owner, 2026-10-17);
   // a follow-up's own page (/followups) opens to its assignee too (data/sla.ts)

@@ -1,3 +1,5 @@
+import { withoutPrices } from "./price-visibility";
+
 /**
  * Murad as a visa clerk (the owner, 2026-10-19: «كأن مراد موظف تأشيرات لأي
  * عميل يطلب التأشيرة لأي دولة»). Pure: what is still to ask, whether the
@@ -173,14 +175,14 @@ export function uncoveredTopics(topics: VisaTopic[] | undefined, text: string | 
 const peopleText = (n: number) => (n === 1 ? "شخص واحد" : n === 2 ? "شخصين" : n <= 10 ? `${n} أشخاص` : `${n} شخصاً`);
 
 /** The answer: the price for the party, what the list says about it, the documents — and the embassy decides. */
-export function visaAnswerText(i: { country: string; row: VisaRow; applicants: number | null; sarPer: number; check: boolean; topics?: VisaTopic[]; need?: VisaNeed[] }): string {
+export function visaAnswerText(i: { includePrice?: boolean; country: string; row: VisaRow; applicants: number | null; sarPer: number; check: boolean; topics?: VisaTopic[]; need?: VisaNeed[] }): string {
   const per = Math.ceil((i.row.sell_price ?? 0) * i.sarPer);
   const { docs, notes } = splitRequirements(i.row.arabic_requirements, i.country);
   const n = i.applicants ?? 0;
   const open = uncoveredTopics(i.topics, i.row.arabic_requirements);
   const lines = [
     `تأشيرة ${i.country} ${i.row.visa_type?.includes("سياح") || !i.row.visa_type ? "السياحية" : `(${i.row.visa_type})`}:`,
-    `💰 السعر: ${per.toLocaleString("en-US")} ريال للشخص${n > 1 ? ` × ${peopleText(n)} = ${(per * n).toLocaleString("en-US")} ريال` : ""}`,
+    ...(i.includePrice === false ? [] : [`💰 السعر: ${per.toLocaleString("en-US")} ريال للشخص${n > 1 ? ` × ${peopleText(n)} = ${(per * n).toLocaleString("en-US")} ريال` : ""}`]),
     ...notes.map((x) => `• ${x}`),
     ...(docs.length ? ["", "📄 المطلوب لكل متقدم:", ...docs.map((d, k) => `${k + 1}- ${d}`)] : []),
     "",
@@ -189,7 +191,7 @@ export function visaAnswerText(i: { country: string; row: VisaRow; applicants: n
     "القبول قرار السفارة، ولا يوجد ضمان للقبول.",
     i.need?.length ? `وللبدء بطلبك تكرماً: ${i.need.map((x) => WORDS[x]).join("، و")}؟` : "أرسل المستندات هنا ويكمل معك زميلنا.",
   ];
-  return lines.join("\n");
+  return i.includePrice === false ? withoutPrices(lines.join("\n")) : lines.join("\n");
 }
 
 /** A passport that needs no visa there: said plainly, no visa sold — and a package offered instead. */

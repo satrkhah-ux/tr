@@ -92,6 +92,8 @@ export const ALL_PERMISSIONS = [
   "developer.access",
   /** «العملاء» (/clients): every client conversation (0107 — every role got it; take it per role or colleague). */
   "clients.view",
+  "followups.work",
+  "followups.manage",
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
@@ -189,7 +191,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
   },
   {
     key: "perm.group.clients",
-    items: [{ key: "clients.view", kind: "view" }],
+    items: [{ key: "clients.view", kind: "view" }, { key: "followups.work", kind: "do" }, { key: "followups.manage", kind: "do", sensitive: true }],
   },
   {
     key: "perm.group.operations",

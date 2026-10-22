@@ -12,6 +12,7 @@
  */
 
 import { classifyInquiry, type Place } from "@/lib/leads/auto";
+import { inferConversationDestination } from "@/lib/leads/destination";
 import { resolvePlace } from "@/lib/leads/places";
 import { fold } from "@/lib/leads/sheet";
 
@@ -49,11 +50,13 @@ export type Request = {
 /** What one message asks for — the same rules «العملاء» classifies by (auto.ts), nothing guessed. */
 export function readRequest(text: string, places: Place[]): Request {
   const folded = fold(text);
-  const kind = classifyInquiry([], text);
+
   // the destination by the one rule (lib/leads/places.ts): a Saudi place is where the client is, never where they go
   const where = resolvePlace(text, places);
+  const destination = inferConversationDestination([{ id: 1, at: 1, text, fromClient: true, isPrivate: false }], places).destination;
+  const kind = classifyInquiry([], text, { destination: where.kind === "destination" ? destination : null });
   return {
-    kind: (ROUTE_KEYS as readonly string[]).includes(kind) ? (kind as RouteKey) : null,
+    kind: kind === "رخص دولية" ? "موظف" : (ROUTE_KEYS as readonly string[]).includes(kind) ? (kind as RouteKey) : null,
     country: where.kind === "destination" ? where.country : null,
     wantsHuman: HUMAN.test(folded),
     salam: /سلام\s*عليكم/u.test(text),

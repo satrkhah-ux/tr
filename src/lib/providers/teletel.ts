@@ -583,7 +583,7 @@ export type ThreadMessage = { id: number; at: number; text: string; fromClient: 
  * than one reads further back, «العملاء» reading what the client wrote) —
  * activity lines left out.
  */
-export async function conversationThread(conversationId: number, pages = 1): Promise<{ messages: ThreadMessage[]; canReply: boolean } | null> {
+export async function conversationThread(conversationId: number, pages = 1, since?: number): Promise<{ messages: ThreadMessage[]; canReply: boolean; historyComplete: boolean } | null> {
   const config = getTeletelConfig();
   if (!config) return null;
   type Raw = { id?: number; created_at?: number; content?: string | null; message_type?: number; private?: boolean; sender?: { name?: string | null } | null; attachments?: unknown[] };
@@ -593,11 +593,15 @@ export async function conversationThread(conversationId: number, pages = 1): Pro
   ]);
   if (!list) return null;
   let raw = list.payload ?? [];
+  let historyComplete = raw.length === 0 || (since !== undefined && raw.some((m) => (m.created_at ?? Infinity) <= since));
   for (let page = 1; page < pages && raw.length; page += 1) {
+    if (since !== undefined && historyComplete) break;
     const oldest = Math.min(...raw.map((m) => m.id ?? Infinity));
     const older = await api<{ payload?: Raw[] }>(config, `/conversations/${conversationId}/messages?before=${oldest}`);
-    if (!older?.payload?.length) break;
+    if (!older) return null;
+    if (!older.payload?.length) { historyComplete = true; break; }
     raw = [...older.payload, ...raw];
+    if (since !== undefined && raw.some((m) => (m.created_at ?? Infinity) <= since)) historyComplete = true;
   }
   const messages = raw
     .filter((m) => typeof m.id === "number" && m.message_type !== 2)
@@ -609,7 +613,7 @@ export async function conversationThread(conversationId: number, pages = 1): Pro
       sender: m.sender?.name ?? null,
       isPrivate: m.private === true,
     }));
-  return { messages, canReply: conv?.can_reply === true };
+  return { messages, canReply: conv?.can_reply === true, historyComplete };
 }
 
 // ---------- pure destination inference (unit-tested) ----------
@@ -646,4 +650,11 @@ export function inferDestinations(labels: string[], attributes: Record<string, u
     }
   }
   return out.slice(0, 4);
+}
+
+/** Assign a configured handoff, optionally to a named Teletel agent. */
+export async function assignMuradHandoff(conversationId: number, teamId: number | null, agentId: number | null): Promise<boolean> {
+  const config = getTeletelConfig();
+  if (!config || (!teamId && !agentId)) return false;
+  return (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { team_id: teamId, assignee_id: agentId })) !== null;
 }

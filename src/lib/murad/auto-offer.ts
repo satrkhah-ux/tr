@@ -1,3 +1,5 @@
+import { withoutPrices } from "./price-visibility";
+
 /**
  * «عرض آلي» (the owner, 2026-10-18): a client asking for a trip to a country
  * the company prices this way («ابي رحلة جورجيا 10 أيام») gets one question for
@@ -299,19 +301,19 @@ export function sayDate(iso: string): string {
 }
 
 /** The proposal, in one WhatsApp message. */
-export function offerText(i: { name: string; country: string; price: OfferPrice; arrival: string; provisional: boolean; c: OfferCountry }): string {
+export function offerText(i: { includePrice?: boolean; name: string; country: string; price: OfferPrice; arrival: string; provisional: boolean; c: OfferCountry }): string {
   const lines = [
     `أهلاً ${i.name}، هذا برنامج ${i.country} المقترح لك:`,
     `🗓️ ${i.price.days} أيام / ${nightsText(i.price.nights)} — الوصول ${sayDate(i.arrival)}${i.provisional ? " (التواريخ مبدئية)" : ""}`,
     "",
     ...i.price.route.map((r) => `📍 ${r.city}: ${nightsText(r.nights)} — ${r.hotel}`),
     "",
-    `💰 الإجمالي: ${i.price.totalSar.toLocaleString("en-US")} ريال${i.price.rooms > 1 ? ` (${roomsText(i.price.rooms)})` : ""}`,
+    ...(i.includePrice === false ? [] : [`💰 الإجمالي: ${i.price.totalSar.toLocaleString("en-US")} ريال${i.price.rooms > 1 ? ` (${roomsText(i.price.rooms)})` : ""}`]),
     "",
     `✅ يشمل: ${i.c.includes.join("، ")}`,
     `❌ لا يشمل: ${i.c.excludes.join("، ")}`,
     "",
     "هذا عرض مبدئي، ويتواصل معك موظفنا لتأكيد التفاصيل والحجز.",
   ];
-  return lines.join("\n");
+  return i.includePrice === false ? withoutPrices(lines.join("\n")) : lines.join("\n");
 }

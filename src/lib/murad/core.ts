@@ -31,6 +31,7 @@ export const HOLDING_REPLY = "حيّاك الله، استلمنا طلبك وأ
 export const AUTO_NOTE = "🤖 مُراد ردّ تلقائياً — لم يُستلم الطلب خلال 5 دقائق";
 
 export const SETTING = {
+  control: "murad_control",
   autoPhones: "murad_auto_phones",
   testPhone: "client_whatsapp_test_phone",
   clientWhatsapp: "client_whatsapp",
@@ -61,6 +62,7 @@ export function isCandidate(c: ConversationTimes, nowSec: number, lastActedSec: 
 }
 
 export type TurnMessage = {
+  images?: string[];
   id: number;
   /** unix seconds */
   at: number;
@@ -97,6 +99,10 @@ export function toTurnMessage(m: RawMessage): TurnMessage | null {
     text: m.content?.trim() || (m.attachments?.length ? "📎" : ""),
     fromClient: m.message_type === 0,
     isPrivate: m.private === true,
+    ...(m.attachments?.length ? { images: m.attachments.flatMap((a) => {
+      const file = a as { file_type?: unknown; data_url?: unknown };
+      return file?.file_type === "image" && typeof file.data_url === "string" ? [file.data_url] : [];
+    }) } : {}),
     template,
     // an agent bot, or an automation rule writing as the account
     bot: /bot/i.test(String(m.sender_type ?? m.sender?.type ?? "")) || m.content_attributes?.["automation_rule_id"] != null,
@@ -339,6 +345,7 @@ export type MuradFile = {
 export type MuradReadyOffer = { title: string; nights: number | null; price: number | null; currency: string | null; includes: string; validity: string };
 
 export type MuradContext = {
+  includePrice?: boolean;
   now: string;
   /** no phone: the model never needs the client's number */
   contact: { name: string; labels: string[] };

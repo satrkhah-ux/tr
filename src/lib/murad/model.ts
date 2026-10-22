@@ -1,4 +1,5 @@
 import "server-only";
+import { withoutPrices } from "./price-visibility";
 import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_MODEL, isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
 import { holding, MURAD_OUTPUT_SCHEMA, MURAD_SYSTEM_PROMPT, parseMuradOutput, renderContext, type MuradContext, type MuradResult } from "./core";
@@ -48,12 +49,16 @@ export async function muradReply(context: MuradContext): Promise<MuradResult & {
   const p = muradProvider();
   if (!p) return { ...holding("no_provider"), error: "no_provider" };
   try {
-    const user = renderContext(context);
+    const user = context.includePrice === false ? withoutPrices(renderContext(context)) : renderContext(context);
+    const system = MURAD_SYSTEM_PROMPT + (context.includePrice === false
+      ? "\nتعليمات الإدارة الملزمة: أجب عن تفاصيل الطلب بدون أي أسعار أو مبالغ أو رسوم أو تقديرات مالية، بالأرقام أو الكلمات، وبدون روابط أو مرفقات. أي سؤال عن السعر يحال إلى الموظف. لا تعِد بإرسال عرض مسعّر."
+      : "");
     const raw =
       p.provider === "claude"
-        ? await claudeJson(MURAD_SYSTEM_PROMPT, user)
-        : await openaiJson({ name: "murad_reply", system: MURAD_SYSTEM_PROMPT, user, schema: MURAD_OUTPUT_SCHEMA as unknown as Record<string, unknown>, timeoutMs: MODEL_TIMEOUT_MS });
+        ? await claudeJson(system, user)
+        : await openaiJson({ name: "murad_reply", system, user, schema: MURAD_OUTPUT_SCHEMA as unknown as Record<string, unknown>, timeoutMs: MODEL_TIMEOUT_MS });
     const { result, ok } = parseMuradOutput(raw);
+    if (context.includePrice === false) result.reply = withoutPrices(result.reply) || holding("prices_disabled").reply;
     return ok ? result : { ...result, error: "invalid_output" };
   } catch (error) {
     return { ...holding("model_error"), error: (error instanceof Error ? error.message : String(error)).slice(0, 300) };

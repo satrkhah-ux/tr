@@ -1,4 +1,5 @@
 import { after, type NextRequest, NextResponse } from "next/server";
+import { wakeFollowup } from "@/lib/followups/service";
 import { schedule, webhookToken } from "@/lib/murad/reception-run";
 
 export const runtime = "nodejs";
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   };
   // «تأخير بشري»: marked read now, answered after a person's pause (reception-run.ts schedule)
   after(async () => {
-    await schedule(message).catch(() => undefined);
+    await Promise.allSettled([wakeFollowup(message.conversationId, message.at), schedule(message)]);
   });
   return NextResponse.json({ ok: true });
 }

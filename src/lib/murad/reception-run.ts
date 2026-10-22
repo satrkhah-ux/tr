@@ -1,3 +1,7 @@
+import { routeCompletedVisa, retryVisaHandoffs } from "./visa-routing";
+import type { MuradReceipt } from "./visa-assignment";
+import { repeatsMurad, visaIntakeReply } from "./visa-intake";
+import { inMuradScope } from "./control";
 import "server-only";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -5,7 +9,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getFeatureFlags } from "@/lib/features-server";
 import {
   addTeletelNote,
-  assignTeletelTeam,
+  assignMuradHandoff,
   conversationEvents,
   intlPhone,
   listOpenConversations,
@@ -315,18 +319,20 @@ async function countryOf(service: SupabaseClient, text: string): Promise<string 
 async function markLead(
   service: SupabaseClient,
   m: IncomingMessage,
-  fields: { inquiry: string | null; destination: string | null; route: string; at: string; waitSec: number; draftId?: string; name?: string | null },
+  fields: { inquiry: string | null; destination: string | null; route: string; at: string; waitSec: number; draftId?: string; name?: string | null; intakeOnly?: boolean },
 ): Promise<void> {
   const name = m.contactName.trim();
   const realName = name && !name.startsWith("#") && normalizePhone(name) !== normalizePhone(m.phone) ? name : null;
-  const { data } = await service.from("client_leads").select("id, name, inquiry, destination, status, created_at, last_visit_at").eq("teletel_conversation_id", m.conversationId).maybeSingle();
-  const had = data as { id: string; name: string | null; inquiry: string | null; destination: string | null; status: string; created_at: string; last_visit_at: string | null } | null;
+  const { data } = await service.from("client_leads").select("id, name, inquiry, inquiry_source, destination, status, created_at, last_visit_at").eq("teletel_conversation_id", m.conversationId).maybeSingle();
+  const had = data as { id: string; name: string | null; inquiry: string | null; inquiry_source: string | null; destination: string | null; status: string; created_at: string; last_visit_at: string | null } | null;
   const routed = {
+    ...(!fields.intakeOnly ? {
     auto_route: fields.route,
     auto_routed_at: fields.at,
     auto_wait_sec: fields.waitSec,
     assigned_at: fields.at,
     assignee_reply_at: null,
+    } : {}),
     updated_at: fields.at,
     ...(fields.draftId ? { draft_id: fields.draftId } : {}),
     ...(fields.name ? { name: fields.name } : {}),
@@ -337,7 +343,7 @@ async function markLead(
       .update({
         ...routed,
         ...(!had.name && realName ? { name: realName } : {}),
-        ...(fields.inquiry ? { inquiry: fields.inquiry } : {}),
+        ...(fields.inquiry && had.inquiry_source !== "manual" ? { inquiry: fields.inquiry, inquiry_source: "murad" } : {}),
         ...(fields.destination ? { destination: fields.destination } : {}),
         // a conversation WhatsApp reopened: this message is a new visit (0104)
         ...(had.status === "closed" || m.at - Date.parse(had.last_visit_at ?? had.created_at) / 1000 > 86_400
@@ -354,6 +360,7 @@ async function markLead(
       phone: normalizePhone(m.phone),
       name: realName,
       inquiry: fields.inquiry,
+      inquiry_source: "murad",
       destination: fields.destination,
       status: "open",
       source: "teletel",
@@ -365,14 +372,26 @@ async function markLead(
   );
 }
 
+/** Widen only visa intake; other services retain their current trial scope. */
+async function visaConversation(service: SupabaseClient, m: IncomingMessage): Promise<boolean> {
+  const explicit = readRequest(m.content, []);
+  if (explicit.kind) return explicit.kind === "تأشيرات";
+  const [{ data: lead }, thread] = await Promise.all([
+    service.from("client_leads").select("inquiry").eq("teletel_conversation_id", m.conversationId).maybeSingle(),
+    readThread(m.conversationId),
+  ]);
+  const latest = [...(thread?.messages ?? [])].reverse().filter((t) => t.fromClient && !t.isPrivate).map((t) => readRequest(t.text, []).kind).find(Boolean);
+  return latest ? latest === "تأشيرات" : lead?.inquiry === "تأشيرات";
+}
+
 export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
   if (!m.conversationId || !m.messageId) return "unreadable";
   const service = db();
   const [flags, settings, reception] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service)]);
-  if (!flags.murad_reception || settings.clientWhatsapp === "off") return "off";
+  if (!flags.murad_reception || !settings.control.tasks.reception || settings.clientWhatsapp === "off") return "off";
   const phone = intlPhone(m.phone);
   // the trial: the owner's two numbers only, until they widen it from /developer
-  if (reception.scope !== "all" && (!phone || !settings.autoList.includes(phone))) return "out_of_scope";
+  if (reception.scope !== "all" && (!phone || !settings.autoList.includes(phone)) && !(settings.control.visaAll && settings.control.tasks.visas && await visaConversation(service, m))) return "out_of_scope";
 
   // claimed before anything is read or sent — one answer per client message, whoever comes second
   const claim = await service
@@ -394,7 +413,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       conversationEvents(m.conversationId),
     ]);
     const since = m.since ?? m.at;
-    if (!thread) {
+    if (!thread || !inMuradScope(settings.control, thread.inboxId ?? null, thread.teamId ?? null)) {
       await finish({ reason: "unreadable", error: "teletel: the thread could not be read" });
       return "unreadable";
     }
@@ -431,7 +450,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     // «عرض آلي»: a trip to a country the company prices this way — asked for what is missing, then proposed. The
     // whole visit is read each time, the client's lines and Murad's between them, the newest word winning (the
     // owner, 2026-10-19: «فهم الرسائل والاعتماد على المحادثات السابقة»); a change after the offer re-issues it.
-    const offers = readOffers(reception.offersRaw);
+    const offers = settings.control.tasks.offers ? readOffers(reception.offersRaw) : [];
     const offerRows = received.filter((r) => r.reason?.startsWith("offer:"));
     const offerAsked = offerRows.filter((r) => r.reason?.startsWith("offer:asked"));
     const sentRow = [...offerRows].reverse().find((r) => r.reason === "offer:sent" || r.reason === "offer:updated");
@@ -463,9 +482,10 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
         return "send_failed";
       }
       const teams = await listTeletelTeams();
-      const teamId = teamFor(readRoutes(reception.routesRaw, teams), "بكج");
+      const handoff = settings.control.handoffs["بكج"];
+    const teamId = handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), "بكج");
       const team = teams.find((t) => t.id === teamId) ?? null;
-      const assigned = teamId ? await assignTeletelTeam(m.conversationId, teamId) : false;
+      const assigned = await assignMuradHandoff(m.conversationId, teamId, handoff?.agentId ?? null);
       await addTeletelNote(m.conversationId, `🤖 عرض آلي — يحتاج زميلاً${team ? ` من «${team.name}»` : ""}: ${special}. ما فُهم: ${summary}.`);
       await finish({ reason: "offer:handoff", reply: text, reply_message_id: replyId, intake: { country: c.country, ...trip, special, team_id: teamId, assigned, wait_sec: waitSec } });
       await markLead(service, m, { inquiry: "بكج", destination: c.country, route: team?.name.trim() ?? DEPARTMENT["بكج"], at: new Date().toISOString(), waitSec, name: trip.name });
@@ -477,12 +497,56 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       (trip.only_city && !routeCity(c, trip.only_city) ? `المبيت في ${trip.only_city}` : null) ??
       ((trip.children ?? 0) > 0 ? "أطفال" : (trip.adults ?? 0) > c.maxPeople ? `أكثر من ${c.maxPeople} أشخاص` : null);
 
+    if (received.some((r) => r.intake?.visa_handoff)) {
+      await finish({ reason: "none:routed" });
+      return "none:routed";
+    }
+    // Persistent visa intake: no two-question cutoff and no handoff on a damaged photo.
+    if (settings.control.visaAll && settings.control.tasks.visas && await visaConversation(service, m) && !request.wantsHuman) {
+      const latest = thread.messages.filter((t) => t.fromClient && !t.isPrivate).at(-1);
+      if (!thread.canReply || !latest || Date.now() / 1000 - latest.at > 24 * 3600) { await finish({ reason: "none:window" }); return "none:window"; }
+      // a colleague answered or took it in this visit, or the client asked for a person: Murad stays out (21 Oct, 40347: he
+      // answered between a colleague's replies and after «حوّلني لموظف»)
+      if (staffReplied || handedByHand || routedTo.includes("موظف") || thread.messages.some((t) => t.at >= latest.at && isHumanReply(t, ours))) { await finish({ reason: "none:staff" }); return "none:staff"; }
+      const previous = rows.filter((r) => Date.parse(r.created_at) / 1000 >= closedAt).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).find((r) => r.intake?.visa_intake)?.intake?.visa_intake ?? null;
+      const { data: catalog, error: catalogError } = await service.from("visas").select("country, visa_type, sell_price, sell_currency, arabic_requirements").eq("status", "Active");
+      const result = await visaIntakeReply({ messages: visitLines, previous, catalog: catalogError ? [] : catalog, includePrice: settings.control.includePrice });
+      const again = await readThread(m.conversationId);
+      const lastNow = again?.messages.filter((t) => t.fromClient && !t.isPrivate).at(-1);
+      if (!again?.canReply || lastNow?.id !== latest.id || again.messages.some((t) => t.at >= latest.at && isHumanReply(t, ours))) {
+        await finish({ reason: "none:staff", error: "turn_changed" }); return "none:staff";
+      }
+      // the hand-over line already said in this visit: not again, only the routing is retried
+      if (repeatsMurad(result.reply, visitLines)) {
+        await finish({ reason: "visa:handoff_pending", intake: { ...intake, country: result.country, visa_intake: result } });
+        await routeCompletedVisa(service, logId);
+        return "answered";
+      }
+      const replyId = await sendTeletelMessage(m.conversationId, result.reply);
+      if (!replyId) { await finish({ reason: "send_failed", error: "send_failed" }); return "send_failed"; }
+      // Persist before notes/assignment: even if those fail the next turn knows this public reply is ours.
+      await finish({ reason: "visa:intake", reply: result.reply, reply_message_id: replyId, intake: { ...intake, country: result.country, visa_intake: result } });
+      await addTeletelNote(m.conversationId, `مُراد — ملف التأشيرة\n${result.summary}\nالنواقص: ${result.missing.join("، ") || "لا نواقص مسجلة؛ يلزم تدقيق المختص"}\nللمراجعة: ${result.review.join("، ") || "تدقيق المستندات قبل التقديم"}`);
+      await markLead(service, m, { inquiry: "تأشيرات", destination: result.country, route: DEPARTMENT["تأشيرات"], at: new Date().toISOString(), waitSec, name: null, intakeOnly: true });
+      const { data: savedLead } = await service.from("client_leads").select("id,murad_receipt").eq("teletel_conversation_id", m.conversationId).maybeSingle();
+      const savedReceipt = savedLead?.murad_receipt as MuradReceipt | null;
+      const receivedAt = new Date().toISOString();
+      const start = visitLines.find((t) => t.fromClient)?.at ?? since;
+      const receipt: MuradReceipt = savedReceipt && Date.parse(savedReceipt.receivedAt) / 1000 >= closedAt ? savedReceipt : { receivedAt, firstResponder: !staffReplied, waitSec: Math.max(0, Math.round(Date.parse(receivedAt) / 1000 - start)) };
+      if (savedLead) await service.from("client_leads").update({ murad_receipt: { ...receipt, pending: result.completed } }).eq("id", savedLead.id);
+      if (result.completed) {
+        await service.from("murad_log").update({ reason: "visa:handoff_pending" }).eq("id", logId);
+        await routeCompletedVisa(service, logId);
+      }
+      return "answered";
+    }
+
     // «موظف التأشيرات» (the owner, 2026-10-19): a visa request is answered from the company's visa list — or said to be
     // needless for those passports — asked only for what is missing, and handed to the visa team with what was heard.
     // Murad keeps the conversation (a follow-up «وإسبانيا؟», a question more) until a colleague answers the client.
     const visaRows = received.filter((r) => r.reason?.startsWith("visa:"));
     const visaAsked = visaRows.filter((r) => r.reason?.startsWith("visa:asked") || r.reason === "visa:info");
-    const visaOpen = free && routedTo.length === 0 && !sentRow && (request.kind === "تأشيرات" || visaRows.length > 0);
+    const visaOpen = settings.control.tasks.visas && free && routedTo.length === 0 && !sentRow && (request.kind === "تأشيرات" || visaRows.length > 0);
     let tripWithVisa = false;
     // with the trip, the visa in one line of the offer: needless for those passports, else the visa team's
     let visaLine: string | null = null;
@@ -533,7 +597,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
           const reason = step.act === "handoff" ? step.reason : !rate ? "السعر يحدده زميلنا بعد مراجعة الطلب" : null;
           const answer =
             !reason && row && rate && country
-              ? visaAnswerText({ country: country.arabic_name, row, applicants: known.applicants, sarPer: rate, check: need2 !== "required" || !known.nationality, topics: known.topics, need: step.act === "info" ? step.need : undefined })
+              ? visaAnswerText({ includePrice: settings.control.includePrice, country: country.arabic_name, row, applicants: known.applicants, sarPer: rate, check: need2 !== "required" || !known.nationality, topics: known.topics, need: step.act === "info" ? step.need : undefined })
               : null;
           const text = answer ?? visaHandoffText(reason ?? "السعر يحدده زميلنا بعد مراجعة الطلب", summary, opensAt ? sayTime(opensAt) : null);
           const replyId = await sendTeletelMessage(m.conversationId, text);
@@ -550,13 +614,14 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
             return "asked";
           }
           const teams = await listTeletelTeams();
-          const teamId = teamFor(readRoutes(reception.routesRaw, teams), "تأشيرات");
+          const handoff = settings.control.handoffs["تأشيرات"];
+    const teamId = handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), "تأشيرات");
           const team = teams.find((t) => t.id === teamId) ?? null;
-          const assigned = teamId ? await assignTeletelTeam(m.conversationId, teamId) : false;
+          const assigned = await assignMuradHandoff(m.conversationId, teamId, handoff?.agentId ?? null);
           await addTeletelNote(
             m.conversationId,
             answer
-              ? `🤖 طلب تأشيرة: ${summary}${open.length ? ` — يسأل عن: ${open.join("، ")} (ليست في قائمة التأشيرات)` : ""}${per ? ` — ${per.toLocaleString("en-US")} ريال للشخص${known.applicants && known.applicants > 1 ? ` × ${known.applicants} = ${(per * known.applicants).toLocaleString("en-US")} ريال` : ""}` : ""}. أُرسل للعميل السعر والمتطلبات من قائمة التأشيرات${need2 !== "required" ? " (جنسية غير سعودية بين المتقدمين — تحقق من متطلباتها وسعرها)" : ""}، وينتظر المستندات.`
+              ? `🤖 طلب تأشيرة: ${summary}${open.length ? ` — يسأل عن: ${open.join("، ")} (ليست في قائمة التأشيرات)` : ""}${per ? ` — ${per.toLocaleString("en-US")} ريال للشخص${known.applicants && known.applicants > 1 ? ` × ${known.applicants} = ${(per * known.applicants).toLocaleString("en-US")} ريال` : ""}` : ""}. أُرسل للعميل ${settings.control.includePrice ? "السعر والمتطلبات" : "المتطلبات بدون السعر"} من قائمة التأشيرات${need2 !== "required" ? " (جنسية غير سعودية بين المتقدمين — تحقق من متطلباتها وسعرها)" : ""}، وينتظر المستندات.`
               : `🤖 طلب تأشيرة — يحتاج زميلاً (${reason}): ${summary}.`,
           );
           await finish({
@@ -587,7 +652,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
         if (rate && days > 1 && merged.adults) {
           const price = priceOffer(offer, days, merged.adults, rate, { rooms: merged.rooms, onlyCity: merged.only_city });
           const name = merged.name ?? firstName(m.contactName) ?? "";
-          const text = `حدّثت الطلب: ${tripSummary(offer.country, { ...merged, days, arrival: provisional ? null : arrival })}\n\n${offerText({ name, country: offer.country, price, arrival, provisional, c: offer })}`;
+          const text = `حدّثت الطلب: ${tripSummary(offer.country, { ...merged, days, arrival: provisional ? null : arrival })}\n\n${offerText({ includePrice: settings.control.includePrice, name, country: offer.country, price, arrival, provisional, c: offer })}`;
           const replyId = await sendTeletelMessage(m.conversationId, text);
           if (!replyId) {
             await finish({ reason: "send_failed", reply: text, error: "send_failed" });
@@ -603,7 +668,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
             const { data: row } = await service.from("offer_drafts").insert({ data, title: `مُراد — ${name}` }).select("id").maybeSingle();
             draftId = (row as { id: string } | null)?.id ?? null;
           }
-          const issued = draftId ? await issueAndSend(draftId, m.conversationId, Boolean(serial)) : null;
+          const issued = draftId && settings.control.includePrice ? await issueAndSend(draftId, m.conversationId, Boolean(serial)) : null;
           await addTeletelNote(
             m.conversationId,
             `🤖 عرض آلي: العميل حدّث الطلب — ${tripSummary(offer.country, { ...merged, days })}، ${price.totalSar.toLocaleString("en-US")} ريال.${issued ? ` صدرت النسخة ${issued.version} من ${issued.serial}${issued.sent ? " وأُرسلت للعميل" : ""}.` : " تعذّر إصدار النسخة — أصدرها من بيسك."}`,
@@ -640,7 +705,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
           if (rate) {
             const price = priceOffer(offer, days, trip.adults ?? 2, rate, { rooms: trip.rooms, onlyCity: trip.only_city });
             const name = trip.name ?? firstName(m.contactName) ?? "";
-            const text = `${offerText({ name, country: offer.country, price, arrival, provisional, c: offer })}${visaLine ? `
+            const text = `${offerText({ includePrice: settings.control.includePrice, name, country: offer.country, price, arrival, provisional, c: offer })}${visaLine ? `
 ${visaLine}` : ""}`;
             const replyId = await sendTeletelMessage(m.conversationId, text);
             if (!replyId) {
@@ -655,11 +720,12 @@ ${visaLine}` : ""}`;
               .select("id")
               .maybeSingle();
             const draftId = (draftRow as { id: string } | null)?.id ?? null;
-            const issued = draftId ? await issueAndSend(draftId, m.conversationId) : null;
+            const issued = draftId && settings.control.includePrice ? await issueAndSend(draftId, m.conversationId) : null;
             const teams = await listTeletelTeams();
-            const teamId = teamFor(readRoutes(reception.routesRaw, teams), "بكج");
+            const handoff = settings.control.handoffs["بكج"];
+    const teamId = handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), "بكج");
             const team = teams.find((t) => t.id === teamId) ?? null;
-            const assigned = teamId ? await assignTeletelTeam(m.conversationId, teamId) : false;
+            const assigned = await assignMuradHandoff(m.conversationId, teamId, handoff?.agentId ?? null);
             const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
             await addTeletelNote(
               m.conversationId,
@@ -717,9 +783,10 @@ ${visaLine}` : ""}`;
       return "send_failed";
     }
     const teams = await listTeletelTeams();
-    const teamId = teamFor(readRoutes(reception.routesRaw, teams), decision.to);
+    const handoff = settings.control.handoffs[decision.to];
+    const teamId = handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), decision.to);
     const team = teams.find((t) => t.id === teamId) ?? null;
-    const assigned = teamId ? await assignTeletelTeam(m.conversationId, teamId) : false;
+    const assigned = await assignMuradHandoff(m.conversationId, teamId, handoff?.agentId ?? null);
     await addTeletelNote(
       m.conversationId,
       `🤖 المستقبل الآلي: ${decision.to}${request.country ? ` · ${request.country}` : ""} — ${assigned && team ? `حُوّلت إلى «${team.name}»` : "لا فريق لهذا القسم في الإعدادات — بانتظار من يستلمها"}`,
@@ -733,7 +800,7 @@ ${visaLine}` : ""}`;
       ...(teamId && !assigned ? { error: "assign_failed" } : {}),
     });
     await markLead(service, m, {
-      inquiry: decision.to === "موظف" || decision.to === "غير واضح" ? null : decision.to,
+      inquiry: decision.to === "غير واضح" ? "طلب غير واضح" : decision.to === "موظف" ? null : decision.to,
       destination: request.country ?? (await countryOf(service, said)),
       route: team?.name.trim() ?? DEPARTMENT[decision.to],
       at,
@@ -763,9 +830,14 @@ export async function schedule(m: IncomingMessage): Promise<"waiting" | "extende
   if (!m.conversationId || !m.messageId) return "unreadable";
   const service = db();
   const [flags, settings, reception] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service)]);
-  if (!flags.murad_reception || settings.clientWhatsapp === "off") return "off";
+  if (!flags.murad_reception || !settings.control.tasks.reception || settings.clientWhatsapp === "off") return "off";
   const phone = intlPhone(m.phone);
-  if (reception.scope !== "all" && (!phone || !settings.autoList.includes(phone))) return "out_of_scope";
+  if (reception.scope !== "all" && (!phone || !settings.autoList.includes(phone)) && !(settings.control.visaAll && settings.control.tasks.visas && await visaConversation(service, m))) return "out_of_scope";
+  if (settings.control.inboxIds.length || settings.control.teamIds.length) {
+    const thread = await readThread(m.conversationId);
+    if (!thread) return "unreadable";
+    if (!inMuradScope(settings.control, thread.inboxId ?? null, thread.teamId ?? null)) return "out_of_scope";
+  }
   void markTeletelSeen(m.conversationId);
   const delay = parseDelay(reception.delay);
   const now = Date.now();
@@ -822,13 +894,16 @@ export async function receptionToday(): Promise<{ routed: number; asked: number;
 export async function receptionSweep(): Promise<number> {
   const service = db();
   const [flags, settings, reception, list] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service), listOpenConversations()]);
-  if (!flags.murad_reception || !list) return 0;
+  if (!flags.murad_reception || !settings.control.tasks.reception || !list) return 0;
+  if (settings.control.visaAll && settings.control.tasks.visas) await retryVisaHandoffs(service);
   const nowSec = Math.floor(Date.now() / 1000);
   // a client waiting on us for under half an hour — a new conversation, or an old one the client reopened
-  const fresh = list.rows.filter((c) => c.waitingSince > 0 && nowSec - c.waitingSince < 1800 && (reception.scope === "all" || settings.autoList.includes(intlPhone(c.phone) ?? "")));
+  const { data: visaLeads } = settings.control.visaAll ? await service.from("client_leads").select("teletel_conversation_id").eq("inquiry", "تأشيرات").eq("status", "open") : { data: [] };
+  const visaIds = new Set((visaLeads ?? []).map((l) => Number(l.teletel_conversation_id)));
+  const fresh = list.rows.filter((c) => inMuradScope(settings.control, c.inboxId, c.teamId) && c.waitingSince > 0 && nowSec - c.waitingSince < 1800 && (reception.scope === "all" || (settings.control.visaAll && visaIds.has(c.id)) || settings.autoList.includes(intlPhone(c.phone) ?? "")));
   if (!fresh.length) return 0;
   // where Murad's own five-minute answer runs (run.ts: murad_auto on the auto list) it answers the client's words — better than «وصلت رسالتك», and it comes next in this same run
-  const held = await holdSweep(service, fresh.filter((c) => !(flags.murad_auto && settings.autoList.includes(intlPhone(c.phone) ?? ""))), nowSec, reception.hours);
+  const held = settings.control.tasks.holding && reception.scope === "all" ? await holdSweep(service, fresh.filter((c) => !(flags.murad_auto && settings.autoList.includes(intlPhone(c.phone) ?? ""))), nowSec, reception.hours) : 0;
   const { data } = await service
     .from("murad_log")
     .select("conversation_id")

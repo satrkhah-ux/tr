@@ -29,11 +29,10 @@ export const INQUIRIES = [
   { label: "بكج", color: "#ffff00", ink: "#4a4300" },
   { label: "تأشيرات", color: "#6d9eeb", ink: "#0b2f6b" },
   { label: "طيران", color: "#ff00ff", ink: "#4d004d" },
-  { label: "يستفسر", color: "#cc0000", ink: "#ffffff" },
   { label: "مواصلات", color: "#00ffff", ink: "#004d4d" },
   { label: "فنادق", color: "#f6b26b", ink: "#5a3000" },
+  { label: "رخص دولية", color: "#d9ead3", ink: "#274e13" },
   { label: "طلب غير واضح", color: "#a64d79", ink: "#ffffff" },
-  { label: "طلب", color: "#00ff00", ink: "#0a4a00" },
 ] as const;
 
 /** one spelling for comparing Arabic: no spaces, hamzas or tā' marbūṭa, no tatweel */
@@ -50,14 +49,17 @@ const INQUIRY_ALIASES: Record<string, string> = {
   [fold("تاشيرة")]: "تأشيرات",
   [fold("فيزا")]: "تأشيرات",
   [fold("فندق")]: "فنادق",
-  [fold("استفسار")]: "يستفسر",
+  [fold("استفسار")]: "طلب غير واضح",
+  [fold("يستفسر")]: "طلب غير واضح",
+  [fold("غير مصنف")]: "طلب غير واضح",
+  [fold("طلب")]: "طلب غير واضح",
 };
 
 /** the sheet's wording → the classification's («باكدج» → «بكج», «تاشيرات» → «تأشيرات») */
 export function normalizeInquiry(raw: string): string {
   const f = fold(raw);
   if (!f) return "";
-  return INQUIRY_ALIASES[f] ?? INQUIRIES.find((i) => fold(i.label) === f)?.label ?? raw.trim();
+  return INQUIRY_ALIASES[f] ?? INQUIRIES.find((i) => fold(i.label) === f)?.label ?? "طلب غير واضح";
 }
 
 /** «لم يتم الاسناد» is the sheet's «nobody» */

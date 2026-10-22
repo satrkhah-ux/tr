@@ -1,5 +1,7 @@
 "use client";
 
+import { TransferToFollowup } from "../followups/FollowupEntry";
+
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
@@ -73,11 +75,11 @@ function timing(l: Lead, now: number) {
   const open = l.status === "open";
   const awaited = (from: number) => (open ? { text: `ينتظر منذ ${span(now - from)}`, waiting: true } : { text: "—", waiting: false });
   const done = (text: string) => ({ text, waiting: false });
-  const reply = ms(l.first_reply_at);
+  const reply = ms(l.first_reply_at ?? l.murad_receipt?.receivedAt ?? null);
   const assigned = ms(l.assigned_at);
   const assigneeReply = ms(l.assignee_reply_at);
   return {
-    firstReply: Number.isNaN(first) ? done("—") : Number.isNaN(reply) ? awaited(first) : done(span(reply - first)),
+    firstReply: l.murad_receipt?.firstResponder ? done(span(l.murad_receipt.waitSec * 1000)) : Number.isNaN(first) ? done("—") : Number.isNaN(reply) ? awaited(first) : done(span(reply - first)),
     toAssign: Number.isNaN(assigned) || Number.isNaN(first) ? done("—") : done(span(assigned - first)),
     assigneeReply: Number.isNaN(assigned) ? done("—") : Number.isNaN(assigneeReply) ? awaited(assigned) : done(span(assigneeReply - assigned)),
   };
@@ -162,7 +164,13 @@ const secs = (from: number, to: number) => span((to - from) * 1000);
 
 /** «مسار المحادثة»: each agent's turn — how long to answer, how long before handing it on */
 function Turns({ l, now }: { l: Lead; now: number }) {
-  const routed = l.auto_route && l.auto_routed_at ? (
+  const receipt = l.murad_receipt;
+  const routed = receipt ? (
+    <li className="text-[#185045]">
+      <b>مُراد — قسم الطلبات</b>: استلم خلال {span(receipt.waitSec * 1000)}
+      {receipt.assignedAt ? <> · أسنده إلى <b>{receipt.team}</b>{receipt.agent ? <> — {receipt.agent}</> : " — بانتظار موظف متاح"} · بعد {secs(Date.parse(receipt.receivedAt) / 1000, Date.parse(receipt.assignedAt) / 1000)} من الاستلام</> : receipt.pending ? " · اكتمل الجمع، جارٍ تأكيد الإسناد لقسم التأشيرات" : " · يجمع بيانات الطلب"}
+    </li>
+  ) : l.auto_route && l.auto_routed_at ? (
     <li className="whitespace-nowrap text-[#1e3a8a]">
       🤖 حُوّل آلياً إلى <b>{l.auto_route}</b> ·{" "}
       <DirText>{new Date(l.auto_routed_at).toLocaleTimeString("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit" })}</DirText>
@@ -333,11 +341,11 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
   const visitsOf = useMemo(() => new Map(leads.map((l) => [l.id, [...new Set([riyadhDay(l.created_at), ...(l.last_visit_at ? [riyadhDay(l.last_visit_at)] : [])])]])), [leads]);
   const dayOf = useMemo(() => new Map([...visitsOf].map(([id, days]) => [id, days[days.length - 1]])), [visitsOf]);
   const on = (l: Lead, d: string) => visitsOf.get(l.id)?.includes(d) ?? false;
-  const receiver = (l: Lead) => nameOf.get(l.received_by ?? "") ?? l.received_by_name;
+  const receiver = (l: Lead) => l.murad_receipt?.firstResponder ? "مُراد" : nameOf.get(l.received_by ?? "") ?? l.received_by_name;
 
   // the daily classification: the chosen day's conversations by kind
   const ofDay = leads.filter((l) => on(l, day));
-  const dayCount = (label: string) => ofDay.filter((l) => l.inquiry === label).length;
+  const dayCount = (label: string) => ofDay.filter((l) => (l.inquiry || "طلب غير واضح") === label).length;
   const dayReturning = ofDay.filter((l) => l.returning).length;
 
   // «رؤية للإعلانات»: the chosen range
@@ -391,10 +399,10 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
     month: countFrom(monthStart, today),
     lastMonth: countFrom(lastMonthStart, sameDayLastMonth < monthStart ? sameDayLastMonth : shiftDay(monthStart, -1)),
   };
-  const kindsOf = INQUIRIES.map((i) => i.label).filter((k) => k !== "طلب");
+  const kindsOf = INQUIRIES.map((i) => i.label);
 
   const list = leads.filter((l) => {
-    if (kind && (l.inquiry !== kind || !on(l, day))) return false;
+    if (kind && ((l.inquiry || "طلب غير واضح") !== kind || !on(l, day))) return false;
     if (returningOnly && (!l.returning || !on(l, day))) return false;
     if (tab === "open" && l.status !== "open") return false;
     if (tab === "closed" && l.status !== "closed") return false;
@@ -801,7 +809,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                       </td>
                       <td className="tv-tnum font-extrabold">{t.count}</td>
                       {kindsOf.map((k) => (
-                        <td key={k} className="tv-tnum">{ofT.filter((l) => l.inquiry === k).length || ""}</td>
+                        <td key={k} className="tv-tnum">{ofT.filter((l) => (l.inquiry || "طلب غير واضح") === k).length || ""}</td>
                       ))}
                     </tr>
                   );
@@ -966,17 +974,18 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
                       <td className="w-28"><Timing value={times.firstReply} /></td>
                       <td className="w-32">
                         <select value={l.inquiry ?? ""} onChange={(e) => save(l, { inquiry: e.target.value })} className={CELL} style={tone ? { background: tone.color, color: tone.ink } : undefined}>
-                          <option value="">—</option>
+                          <option value="" disabled>جارٍ قراءة الطلب</option>
                           {[...new Set([...INQUIRIES.map((i) => i.label), l.inquiry ?? ""])].filter(Boolean).map((i) => <option key={i}>{i}</option>)}
                         </select>
+                        <span className="mt-1 block text-[10px] text-[#647c76]">{l.inquiry_source === "manual" ? "اختيار موظف" : l.inquiry_source === "auto" ? "تصنيف تلقائي" : l.inquiry_source === "murad" ? "تصنيف مُراد" : l.inquiry_source === "sheet" ? "من الشيت" : l.inquiry ? "تصنيف سابق · المصدر غير موثّق" : "بانتظار التصنيف"}</span>
                       </td>
                       <td className="min-w-[9rem]">
                         <DestinationCell key={`${l.id}-${l.destination ?? ""}`} value={l.destination ?? ""} items={placeItems} save={(v) => save(l, { destination: v })} />
                       </td>
                       <td className="w-40">
                         <select value={l.assigned_to ?? ""} onChange={(e) => save(l, { assigned_to: e.target.value })} className={CELL}>
-                          <option value="">{l.assigned_to_name ? `${l.assigned_to_name} (من الشيت)` : "لم يتم الإسناد"}</option>
-                          {team.map((e) => <option key={e.id} value={e.id}>{e.arabic_name}</option>)}
+                          <option value="">{l.assigned_to_name ? `${l.assigned_to_name} (${l.teletel_conversation_id ? "تليتيل" : "من الشيت"})` : "لم يتم الإسناد"}</option>
+                          {team.map((e) => <option key={e.id} value={e.id}>{e.id === l.assigned_to && l.teletel_conversation_id && l.assigned_to_name ? l.assigned_to_name : e.arabic_name}</option>)}
                         </select>
                       </td>
                       <td className="w-32"><Timing value={times.toAssign} /></td>
@@ -1051,6 +1060,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
               <X className="size-5" />
             </button>
           </div>
+          {thread?.lead.teletel_conversation_id && <TransferToFollowup key={thread.lead.id} conversationId={thread.lead.teletel_conversation_id} />}
           {!thread?.result ? (
             <p className="flex items-center justify-center gap-2 py-10 text-sm font-bold text-[#557d78]">
               <Loader2 className="size-4 animate-spin" /> جاري جلب المحادثة من Teletel…

@@ -10,6 +10,14 @@ const PLACES = [
 ];
 
 describe("«العملاء» automatic classification", () => {
+  it("does not invent Yalova from staff wording or Bali from part of a word", () => {
+    const places = [...PLACES, { name: "يلوا", country: "تركيا" }, { name: "بالي", country: "اندونيسيا" }, { name: "اندونيسيا", country: "اندونيسيا" }];
+    expect(findPlace([], "بالتفاصيل والبرنامج والاسعار", places)).toBe("");
+    expect(findPlace([], "ممكن تعطيني تفاصيل أكثر عن العروض الحالية", places)).toBe("");
+    expect(findPlace([], "اندونيسيا", places)).toBe("اندونيسيا");
+    expect(findPlace([], "أبي رحلة لتركيا", places)).toBe("تركيا");
+    expect(findPlace([], "باليوم كم؟", places)).toBe("");
+  });
   it("reads the kind from the labels first, then the client's words", () => {
     expect(classifyInquiry(["بكج"], "كم سعر التذكرة")).toBe("بكج");
     expect(classifyInquiry([], "ابغى باقة شهر عسل")).toBe("بكج");
@@ -17,7 +25,7 @@ describe("«العملاء» automatic classification", () => {
     expect(classifyInquiry([], "ابي حجز فندق في مكة")).toBe("فنادق");
     expect(classifyInquiry([], "عندكم تذاكر للرياض؟")).toBe("طيران");
     expect(classifyInquiry([], "ابي سيارة مع سائق")).toBe("مواصلات");
-    expect(classifyInquiry([], "السلام عليكم")).toBe("يستفسر");
+    expect(classifyInquiry([], "السلام عليكم")).toBe("طلب غير واضح");
     expect(classifyInquiry([], "")).toBe("");
   });
 
@@ -72,8 +80,35 @@ describe("the conversation's turns (0099)", () => {
 
 describe("a service the client does not want is not their request", () => {
   it("«رحلة جورجيا 10 أيام بدون طيران» is no flight", () => {
-    expect(classifyInquiry([], "ابي رحلة جورجيا 10 أيام بدون طيران")).toBe("يستفسر");
+    expect(classifyInquiry([], "ابي رحلة جورجيا 10 أيام بدون طيران")).toBe("طلب غير واضح");
     expect(classifyInquiry([], "بكج تركيا بدون طيران")).toBe("بكج");
     expect(classifyInquiry([], "ابي تذاكر طيران")).toBe("طيران");
+  });
+});
+it("does not treat greetings as a confirmed inquiry, and ignores a retired generic label", () => {
+  expect(classifyInquiry([], "السلام عليكم ممكن تفاصيل")).toBe("طلب غير واضح");
+  expect(classifyInquiry(["يستفسر"], "السلام عليكم")).toBe("طلب غير واضح");
+  expect(classifyInquiry([], "أريد تأشيرة")).toBe("تأشيرات");
+});
+
+it("uses the requested service even when a retired label is present", () => {
+  expect(classifyInquiry(["يستفسر"], "أريد حجز فندق")).toBe("فنادق");
+  expect(classifyInquiry(["استفسار"], "تأشيرة مصر")).toBe("تأشيرات");
+});
+
+describe("clear travel requests do not require a service keyword", () => {
+  it.each(["رحلة فيتنام", "فيتنام\nاسبوع\n7 نوفمبر\nشخصين", "ممكن تفاصيل العروض الحالية\nفيتنام", "الى متى هذا العرض إلى فيتنام"])("classifies %s as packages", text => {
+    expect(classifyInquiry([], text, { destination: "فيتنام" })).toBe("بكج");
+  });
+  it("keeps specific services ahead of destination-based package inference", () => {
+    expect(classifyInquiry([], "تأشيرة فيتنام", { destination: "فيتنام" })).toBe("تأشيرات");
+    expect(classifyInquiry([], "تذاكر فيتنام", { destination: "فيتنام" })).toBe("طيران");
+    expect(classifyInquiry([], "فندق فقط في فيتنام", { destination: "فيتنام" })).toBe("فنادق");
+    expect(classifyInquiry([], "جورجيا بدون طيران", { destination: "جورجيا" })).toBe("بكج");
+  });
+  it("does not turn an origin or greeting into a package", () => {
+    expect(classifyInquiry([], "السلام عليكم")).toBe("طلب غير واضح");
+    expect(classifyInquiry([], "انا من الكويت", { destination: null })).toBe("طلب غير واضح");
+    expect(classifyInquiry([], "برنامج سياحي لمدة اسبوع")).toBe("بكج");
   });
 });

@@ -1,14 +1,15 @@
 import { fold } from "./sheet";
+import { mentionsPlace } from "./place-match";
 
 /**
  * «العملاء» phase two: what a Teletel conversation says about itself, with no
  * one typing it — the kind of request and the place, read from its labels and
- * the client's words. Rules, not guesses: nothing found → empty, and «يستفسر»
- * only for a conversation that says something without naming a service.
+ * the client's words. Rules, not guesses: nothing found → empty, and text with no recognized service remains «طلب غير واضح».
  */
 
 /** the service a client names, first match wins — patterns are written folded (fold(): no spaces, no hamza, ه for ة) (a visa before a flight: «تأشيرة وتذكرة» is a visa file) */
 const KINDS: [string, RegExp][] = [
+  ["رخص دولية", /(رخصهدوليه|رخصهقيادهدوليه|internationaldriving)/i],
   ["بكج", /(بكج|باكج|باكدج|بكدج|باقه|باقات|برنامجسياحي|بكجات|package)/i],
   ["تأشيرات", /(تاشير|فيزا|فيزه|visa|شنغن|شينغن|schengen)/i],
   ["فنادق", /(فندق|فنادق|حجزغرف|hotel)/i],
@@ -19,13 +20,18 @@ const KINDS: [string, RegExp][] = [
 /** a service the client says they do NOT want — «رحلة جورجيا بدون طيران» is no flight request */
 const NOT_WANTED = /(?:بدون|بلا|من غير|غير شامل|ما يحتاج|ماابي|ما ابي|مو محتاج)\s*(?:ال)?(?:طيران|تذاكر|تذكرة|تذكره|فندق|فنادق|سكن|تأشيرة|تاشيرة|تأشيره|فيزا|مواصلات|سيارة)/gu;
 
-/** «بكج» … from the labels first (staff put them), else the client's words; «يستفسر» when they wrote but named nothing */
-export function classifyInquiry(labels: string[], text: string): string {
+/** «بكج» … from the labels first (staff put them), else the client's words; no recognized service is unclassified */
+export function classifyInquiry(labels: string[], text: string, context: { destination?: string | null } = {}): string {
   for (const source of [labels.join(" "), text.replace(NOT_WANTED, " ")]) {
     const f = fold(source);
     for (const [label, re] of KINDS) if (re.test(f)) return label;
   }
-  return text.trim() ? "يستفسر" : "";
+  // A verified destination is already a travel request, even when the client
+  // answers with just «فيتنام». Missing dates/party are booking details, not ambiguity.
+  if (context.destination?.trim()) return "بكج";
+  const travel = text.replace(NOT_WANTED, " ");
+  if (/(?:برنامج|رحلة|رحله|سفرة|سفره)\s*(?:سياحي|سياحية|سياحيه)|شهر\s*عسل|(?:ال)?وجه[ةه]\s*[:：]?\s+[^\s؟?]+|honeymoon|tour\s*package/iu.test(travel)) return "بكج";
+  return text.trim() ? "طلب غير واضح" : "";
 }
 
 export type Place = { name: string; country: string };
@@ -38,9 +44,8 @@ export type Place = { name: string; country: string };
 export function findPlace(labels: string[], text: string, places: Place[]): string {
   const sorted = [...places].filter((p) => fold(p.name).length >= 3).sort((a, b) => fold(b.name).length - fold(a.name).length);
   for (const source of [labels.join(" "), text]) {
-    const f = fold(source);
-    if (!f) continue;
-    const hit = sorted.find((p) => f.includes(fold(p.name)));
+    if (!source.trim()) continue;
+    const hit = sorted.find((p) => mentionsPlace(source, p.name));
     if (hit) return hit.name;
   }
   return "";

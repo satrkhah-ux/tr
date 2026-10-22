@@ -266,6 +266,7 @@ function AdminHome({ opsSummary, mine, latest }: { opsSummary: OpsSummary; mine:
       {tab === "mine" ? <MyFollowups /> : null}
       {tab === "mine" ? <MyDashboard data={mine} /> : canExec && tab === "exec" ? <ExecutiveOverview /> : <TeamOperations />}
 
+      {(can("dashboard.admin") || can("developer.access")) && <Link href="/management-decisions" className="flex items-center justify-between rounded-xl border border-[#dbe6e1] bg-[#f0f7f4] p-5 font-bold text-[#185045]">قرارات الإدارة <span className="text-sm">المؤشرات ← الإجراء ← المسؤول ← التنفيذ</span></Link>}
       {/* live work before navigation: a case whose free-cancellation window
           closes tomorrow matters more than a link to the generator. */}
       <OperationsSnapshot summary={opsSummary} />

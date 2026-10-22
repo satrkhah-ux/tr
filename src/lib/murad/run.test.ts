@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { defaultControl } from "./control";
 
 /**
  * The minute job end to end, with Teletel, the model and the database all
@@ -201,5 +202,20 @@ describe("the minute job", { timeout: 30_000 }, () => {
     await freshRun();
     expect(s.sent).toEqual([]);
     expect(s.log.find((r) => r.conversation_id === 1)).toMatchObject({ mode: "skipped", error: "turn_changed" });
+  });
+});
+
+
+describe("saved Murad task and location controls", () => {
+  it("disabled reply tasks do not call a model or send notes/messages", async () => {
+    const c = defaultControl(); c.tasks.auto = false; c.tasks.suggest = false;
+    s.settings.set("murad_control", JSON.stringify(c));
+    await freshRun();
+    expect(s.asked).toBe(0); expect(s.sent).toEqual([]); expect(s.notes).toEqual([]);
+  });
+  it("excluded inboxes are never processed", async () => {
+    s.settings.set("murad_control", JSON.stringify({ ...defaultControl(), inboxIds: [999] }));
+    await freshRun();
+    expect(s.asked).toBe(0); expect(s.sent).toEqual([]);
   });
 });

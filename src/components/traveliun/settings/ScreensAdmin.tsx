@@ -97,14 +97,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
               ثوانٍ لكل إعلان
               <input type="number" min={4} max={120} value={cfg.slotSec} onChange={(e) => setCfg({ ...cfg, slotSec: Number(e.target.value) })} className={FIELD} />
             </label>
-            <label className="grid gap-1 text-[11.5px] font-bold text-[#185045]">
-              سرعة الشريط (بكسل في الثانية)
-              <input type="number" min={30} max={400} value={cfg.tickerSpeed} onChange={(e) => setCfg({ ...cfg, tickerSpeed: Number(e.target.value) })} className={FIELD} />
-            </label>
-            <label className="grid gap-1 text-[11.5px] font-bold text-[#185045]">
-              يظهر الشريط كل (دقيقة)
-              <input type="number" min={2} max={120} value={cfg.tickerEveryMin} onChange={(e) => setCfg({ ...cfg, tickerEveryMin: Number(e.target.value) })} className={FIELD} />
-            </label>
+            <p className="rounded-lg bg-[#f0f7f4] p-3 text-sm sm:col-span-2">الدول الأكثر طلبًا اليوم: جولة متتابعة كل 10 دقائق، تبدأ بالشاشة 1 ثم 2 ثم 3 ثم 4. مدة كل شاشة 36 ثانية، بعرض يجمع الوجهات كلها مع صور معالمها وترتيبها في مشهد واحد دون إظهار أعداد الطلبات، ثم ينتقل العرض كاملًا إلى الشاشة التالية. تستمر الإعلانات على الشاشات الأخرى.</p>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-4 text-[12.5px] font-bold text-[#185045]">
             <span>ينبّه «عميل جديد» عند طلب:</span>
@@ -129,7 +122,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
               {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : null}
               حفظ
             </button>
-            <span className="text-[11.5px] text-[#78948f]">بلا صوت — عرض فقط. الشريط السفلي يظهر مرة كل فترة لعبور واحد على كل الشاشات، ومرة فوراً حين تتغير الدول الأكثر طلباً</span>
+            <span className="text-[11.5px] text-[#78948f]">بلا صوت — عرض فقط. عرض الدول الأكثر طلبًا يظهر مرة كل فترة لعبور واحد على كل الشاشات، ومرة فوراً حين تتغير الدول الأكثر طلباً</span>
           </div>
         </section>
 
@@ -249,7 +242,7 @@ export function ScreensAdmin({ initial }: { initial: ScreensConfig }) {
               أرسل تجربة
             </button>
           </div>
-          <p className="mt-2 text-[11.5px] text-[#78948f]">الإشعار الحقيقي يظهر وحده حين تُصنَّف محادثة جديدة بطلب ووجهة — بالوجهة والنوع فقط، بلا اسم ولا رقم.</p>
+          <p className="mt-2 text-[11.5px] text-[#78948f]">يظهر اسم العميل المسجّل ونوع طلبه والوجهة لمدة 20 ثانية، فوق صورة معلم من الوجهة مع حركة الطائرة. تُعرض الخدمات المحددة فقط؛ الطلبات غير الواضحة تدخل المتابعة. يُعرض الطلب مرة لكل محادثة ووجهة في اليوم؛ وتستعيد الشاشة الإشعارات التي فاتتها خلال آخر 5 دقائق عند عودة الاتصال.</p>
         </section>
 
         <section className={CARD}>

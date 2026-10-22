@@ -1,3 +1,4 @@
+import { LANDMARK_IDS } from "./landmarks";
 import { ALERT_LEAD_MS, ALERT_SHOW_MS, core, REF_WIDTH, SCREEN_CORE } from "./core";
 import { TICKER_FONT_REF } from "./config";
 import type { ScreenState } from "./server";
@@ -27,11 +28,20 @@ const RUNTIME = String.raw`
   function $(id) { return document.getElementById(id); }
   var layers = [$("a0"), $("a1")], front = 0, shown = layers[0].getAttribute("src") || "", pending = "", failed = "", failedAt = 0, preloaded = "";
   var box = $("alert"), boxImg = $("alertImg"), shownAlert = "";
-  var band = $("band"), text = $("tick"), tag = $("alertTag"), scale = 1, bandUp = false;
+  var activeAlert = null, alertElapsed = 0, alertTick = Date.now(), seen = {};
+  var storageKey = "traveliun-screen-completed-v1-" + N + (MONITOR ? "-preview" : "");
+  try { seen = JSON.parse(localStorage.getItem(storageKey) || "{}") || {}; } catch (err) {}
+  function completed(e, t) {
+    seen[e.id] = t;
+    for (var id in seen) if (seen[id] < t - 86400000) delete seen[id];
+    try { localStorage.setItem(storageKey, JSON.stringify(seen)); } catch (err) {}
+  }
+  var text = $("tick"), tag = $("alertTag"), scale = 1;
   // the demo (while the TVs are set up): this load, on this screen only, one pass and then a «تجربة» alert
   var demo = S.demo, demoAt = Date.now();
-  function passMs() { return S.ticker ? tickerPassMs(S.ticker.speed, S.ticker.width, S.screens, REF) : 0; }
+  function passMs() { return 36000; }
   var pre = new Image();
+  var alertPre = new Image(), alertPreSrc = "";
 
   function measure() {
     var w = document.documentElement.clientWidth || window.innerWidth || REF;
@@ -68,6 +78,12 @@ const RUNTIME = String.raw`
   }
 
   function preloadNext(t) {
+    for (var e = 0; e < S.events.length; e++) {
+      if (!seen[S.events[e].id] && S.events[e].at < t + 60000 && S.events[e].src) {
+        if (alertPreSrc !== S.events[e].src) { alertPreSrc = S.events[e].src; alertPre.src = alertPreSrc; }
+        break;
+      }
+    }
     var end = (Math.floor(t / S.slotMs) + 1) * S.slotMs;
     if (end - t > 5000) return;
     var next = srcAt(end + 1);
@@ -75,10 +91,22 @@ const RUNTIME = String.raw`
   }
 
   function drawAlert(t) {
-    var i = alertAt(S.events, t, LEAD, SHOW), e = i < 0 ? null : S.events[i];
+    var tick = Date.now(), delta = Math.max(0, Math.min(1000, tick - alertTick));
+    alertTick = tick;
+    if (document.hidden) return;
+    if (activeAlert) {
+      alertElapsed += delta;
+      if (alertElapsed >= SHOW) { completed(activeAlert, t); activeAlert = null; }
+    }
+    if (!activeAlert) {
+      var i = nextScreenAlert(S.events, t, seen, LEAD);
+      if (i >= 0) { activeAlert = S.events[i]; alertElapsed = 0; }
+    }
+    var e = activeAlert;
     var d = demo ? Date.now() - demoAt - passMs() - LEAD : -1;
     if (!e && d >= 0 && d < SHOW) e = { at: -1, country: demo.country, line: demo.line, name: demo.name, test: true, src: demo.src };
-    var key = e ? e.at + "|" + e.line + "|" + (e.name || "") : "";
+    $("alertProgress").style.width = (100 * (1 - (activeAlert ? alertElapsed : Math.max(0, d)) / SHOW)) + "%";
+    var key = e ? (e.id || "demo") + "|" + e.line : "";
     if (key === shownAlert) return;
     shownAlert = key;
     if (!e) { box.className = ""; return; }
@@ -86,27 +114,50 @@ const RUNTIME = String.raw`
     $("aName").textContent = e.name || "";
     $("aName").style.display = e.name ? "block" : "none";
     $("aDest").textContent = e.line;
-    if (e.src) { boxImg.setAttribute("src", e.src); boxImg.style.display = "block"; } else boxImg.style.display = "none";
+    boxImg.style.display = "none";
+    boxImg.onload = function () { boxImg.style.display = "block"; };
+    boxImg.onerror = function () { boxImg.style.display = "none"; };
+    boxImg.setAttribute("src", e.src || "/screen-landmarks/journey.svg");
+    if (boxImg.complete && boxImg.naturalWidth) boxImg.style.display = "block";
     // from the start every time: off, a reflow, on — the animations run again
     box.className = "";
     void box.offsetWidth;
     box.className = "on";
   }
 
-  // the band is down until its pass: every period, and once more when its words changed (bumpAt)
+  // A single transparent motion layer travels through the numbered screens.
+  var spotlightKey = "";
+  function scenery(country) {
+    var key = country.replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/[ً-ْ]/g, "").trim();
+    return window.__LANDMARKS__[key] ? "/screen-landmarks/" + window.__LANDMARKS__[key] + ".webp" : "/screen-landmarks/journey.svg";
+  }
   function drawTicker(t) {
-    var k = S.ticker, e = -1;
-    if (k) {
-      var d = demo ? Date.now() - demoAt : -1;
-      e = d >= 0 && d < passMs() ? d : tickerElapsed(t, k.periodMs, passMs(), k.bumpAt);
+    var countries = S.countries || [];
+    var elapsed = countryBulletinElapsed(t, N, S.screens);
+    var active = countries.length > 0 && elapsed >= 0;
+    var panel = $("countries");
+    panel.className = active ? (elapsed >= 34800 ? "on departing" : "on") : "";
+    if (!active) { spotlightKey = ""; return; }
+    var slot = 36000 / countries.length, index = Math.min(countries.length - 1, Math.floor(elapsed / slot));
+    $("countryProgress").style.width = (100 * elapsed / 36000) + "%";
+    var date = new Date(t + 3 * 3600000);
+    var days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+    var months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    $("bulletinDate").textContent = days[date.getUTCDay()] + "، " + date.getUTCDate() + " " + months[date.getUTCMonth()] + " " + date.getUTCFullYear();
+    var key = Math.floor(t / 600000) + "|" + countries.join("|");
+    if (key !== spotlightKey) {
+      spotlightKey = key;
+      var html = "";
+      for (var i = 0; i < countries.length; i++) {
+        var card = document.createElement("div"); card.className = "country";
+        var rank = document.createElement("b"); rank.textContent = (i + 1 < 10 ? "0" : "") + (i + 1);
+        var name = document.createElement("span"); name.textContent = countries[i];
+        var photo = document.createElement("img"); photo.src = scenery(countries[i]); photo.alt = ""; photo.onerror = function () { this.style.visibility = "hidden"; };
+        card.appendChild(photo); card.appendChild(rank); card.appendChild(name); html += card.outerHTML;
+      }
+      $("countryList").innerHTML = html;
+
     }
-    // the band never covers the ad (its price sits at the bottom): while it is up the ad moves above it, whole
-    if ((e >= 0) !== bandUp) { bandUp = e >= 0; band.className = bandUp ? "up" : ""; document.body.className = bandUp ? "band" : ""; }
-    if (e < 0) return;
-    var px = tickerLeft(e, k.speed, k.width, S.position, REF) * scale;
-    var v = "translate3d(" + px.toFixed(1) + "px,0,0)";
-    text.style.webkitTransform = v;
-    text.style.transform = v;
   }
 
   function frame() {
@@ -136,7 +187,7 @@ const RUNTIME = String.raw`
       if (s.build && S.build && s.build !== S.build) { location.reload(); return; }
       var words = S.ticker ? S.ticker.text : "", next = s.ticker ? s.ticker.text : "";
       S = s;
-      if (words !== next) { text.textContent = next; measure(); }
+      if (words !== next) { text.textContent = next; }
     };
     x.send();
   }
@@ -149,7 +200,7 @@ const RUNTIME = String.raw`
   function wake() {
     try { if (navigator.wakeLock && !MONITOR) navigator.wakeLock.request("screen").catch(function () {}); } catch (e) {}
   }
-  document.addEventListener("visibilitychange", function () { if (!document.hidden) wake(); });
+  document.addEventListener("visibilitychange", function () { alertTick = Date.now(); if (!document.hidden) { wake(); poll(); } });
 
   // full screen always, no button (the owner): a page may only ask after a press, so the first
   // press of any remote key or a click asks, silently
@@ -184,17 +235,17 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 .ad{object-fit:cover;opacity:0;-webkit-transition:opacity .9s,height .4s ease;transition:opacity .9s,height .4s ease}
 .band .ad{height:91%;object-fit:contain}
 .ad.on{opacity:1}
-#alert{background:#000;opacity:0;visibility:hidden;overflow:hidden;-webkit-transition:opacity .5s,visibility 0s .5s;transition:opacity .5s,visibility 0s .5s}
+#alert{background:#185766 url(/screen-landmarks/journey.svg) center/cover;opacity:0;visibility:hidden;overflow:hidden;-webkit-transition:opacity .5s,visibility 0s .5s;transition:opacity .5s,visibility 0s .5s}
 #alert.on{opacity:1;visibility:visible;-webkit-transition:opacity .5s;transition:opacity .5s}
 #alertImg{width:100%;height:100%;object-fit:cover}
-#alert.on #alertImg{-webkit-animation:kb 9s ease-out both;animation:kb 9s ease-out both}
-#shade{position:absolute;left:0;top:0;width:100%;height:100%;background:-webkit-linear-gradient(bottom,rgba(4,30,26,.94) 0%,rgba(4,30,26,.6) 50%,rgba(4,30,26,.2) 100%);background:linear-gradient(to top,rgba(4,30,26,.94) 0%,rgba(4,30,26,.6) 50%,rgba(4,30,26,.2) 100%)}
+#alert.on #alertImg{-webkit-animation:kb 22s linear both;animation:kb 22s linear both}
+#shade{position:absolute;left:0;top:0;width:100%;height:100%;background:-webkit-linear-gradient(bottom,rgba(3,23,34,.82) 0%,rgba(3,23,34,.32) 48%,rgba(3,23,34,.04) 100%);background:linear-gradient(to top,rgba(3,23,34,.82) 0%,rgba(3,23,34,.32) 48%,rgba(3,23,34,.04) 100%)}
 #flight{position:absolute;left:0;width:100%;top:26%;height:6vw}
 #trail{position:absolute;left:0;top:50%;width:100%;height:.35vw;margin-top:-.17vw;background:-webkit-linear-gradient(left,rgba(201,162,39,0),#e3bd3c);background:linear-gradient(to right,rgba(201,162,39,0),#e3bd3c);-webkit-transform-origin:left;transform-origin:left;-webkit-transform:scaleX(0);transform:scaleX(0)}
 #alert.on #trail{-webkit-animation:trail 1.7s .2s cubic-bezier(.3,.7,.2,1) both,fade .8s 2.4s both;animation:trail 1.7s .2s cubic-bezier(.3,.7,.2,1) both,fade .8s 2.4s both}
 #plane{position:absolute;top:0;left:0;width:6vw;height:6vw;fill:#fff;-webkit-transform:translateX(-8vw) rotate(90deg);transform:translateX(-8vw) rotate(90deg);-webkit-filter:drop-shadow(0 0 1vw rgba(227,189,60,.9));filter:drop-shadow(0 0 1vw rgba(227,189,60,.9))}
 #alert.on #plane{-webkit-animation:fly 1.7s .2s cubic-bezier(.3,.7,.2,1) both;animation:fly 1.7s .2s cubic-bezier(.3,.7,.2,1) both}
-#msg{position:absolute;left:4%;right:4%;top:38%;text-align:center;direction:rtl}
+#msg{position:absolute;left:4%;right:4%;top:49%;text-align:center;direction:rtl}
 #kicker{display:inline-block;font-size:2.8vw;font-weight:800;color:#e3bd3c;letter-spacing:.05em;opacity:0}
 #kicker i{position:relative;display:inline-block;width:1.3vw;height:1.3vw;margin-left:1vw;border-radius:50%;background:#e53950;vertical-align:middle}
 #kicker i:after{content:"";position:absolute;left:0;top:0;width:100%;height:100%;border-radius:50%;background:#e53950}
@@ -202,7 +253,7 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #alert.on #kicker i:after{-webkit-animation:ping 1.2s 1.1s infinite;animation:ping 1.2s 1.1s infinite}
 #aName{font-size:4.6vw;font-weight:800;color:#fff;line-height:1.2;margin-top:.8vw;opacity:0}
 #alert.on #aName{-webkit-animation:rise .6s 1s both;animation:rise .6s 1s both}
-#aDest{font-size:8.4vw;font-weight:800;color:#fff;line-height:1.15;text-shadow:0 .4vw 2.4vw rgba(0,0,0,.6),0 0 3.5vw rgba(227,189,60,.5);opacity:0}
+#aDest{font-size:5.8vw;font-weight:800;color:#fff;line-height:1.15;text-shadow:0 .4vw 2.4vw rgba(0,0,0,.6),0 0 3.5vw rgba(227,189,60,.5);opacity:0}
 #alert.on #aDest{-webkit-animation:pop .9s 1.3s cubic-bezier(.2,1.5,.4,1) both;animation:pop .9s 1.3s cubic-bezier(.2,1.5,.4,1) both}
 @-webkit-keyframes kb{from{-webkit-transform:scale(1.18)}to{-webkit-transform:scale(1)}}
 @keyframes kb{from{transform:scale(1.18)}to{transform:scale(1)}}
@@ -222,6 +273,38 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #band{position:absolute;left:0;right:0;bottom:0;height:9%;z-index:3;background:rgba(10,58,51,.92);border-top:.35vh solid #2aa87a;overflow:hidden;-webkit-transform:translateY(105%);transform:translateY(105%);-webkit-transition:-webkit-transform .7s;transition:transform .7s}
 #band.up{-webkit-transform:translateY(0);transform:translateY(0)}
 #tick{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;direction:rtl;color:#fff;font-weight:800;line-height:1.24;will-change:transform}
+#band{display:none}
+#countries{position:absolute;inset:0;z-index:2;display:none;color:#fff;overflow:hidden;text-align:right;background:linear-gradient(135deg,#123a3c,#071f25)}
+#countries.on{display:block;animation:bulletinEnter 1.2s cubic-bezier(.16,1,.3,1) both}
+#countries.on.departing{animation:bulletinExit 1.2s cubic-bezier(.6,0,.8,.4) both}
+@keyframes bulletinEnter{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes bulletinExit{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
+.motionTitle{position:absolute;left:5vw;right:5vw;top:6vh;display:flex;justify-content:center;align-items:center;gap:1.2vw;font-size:2.5vw;font-weight:800;text-align:center}
+.titleText{position:relative;display:inline-block;color:#fff;background:linear-gradient(110deg,#fff 35%,#e6cf9c 48%,#fff 61%);background-size:260% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+#countries.on .motionTitle{animation:titleReveal 1s .3s cubic-bezier(.16,1,.3,1) both}
+#countries.on .titleText{animation:titleShimmer 7s 1.3s ease-in-out infinite}
+.motionTitle:after{content:"";position:absolute;width:5vw;height:2px;background:#d7bd86;bottom:-1.2vh;left:50%;transform:translateX(-50%);transform-origin:center}
+#countries.on .motionTitle:after{animation:titleUnderline 1.1s .7s ease-out both}
+@keyframes titleReveal{from{opacity:0;transform:translateY(1.6vh)}to{opacity:1;transform:translateY(0)}}
+@keyframes titleShimmer{0%,20%{background-position:130% 0}65%,100%{background-position:-30% 0}}
+@keyframes titleUnderline{from{opacity:0;width:0}to{opacity:1;width:5vw}}
+.motionTitle small{font-size:1.1vw;color:#c6af7b;border-right:1px solid #c6af7b66;padding-right:1.2vw}
+#countryList{position:absolute;right:5vw;left:5vw;top:19vh;bottom:12vh;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:1.1vw}
+.country{position:relative;min-width:0;min-height:0;overflow:hidden;background:#185766 url(/screen-landmarks/journey.svg) center/cover;isolation:isolate}
+.country:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(3,23,28,.96),rgba(3,23,28,.18) 55%,rgba(3,23,28,.1));z-index:1}
+.country img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:sceneryDrift 36s linear both}
+@keyframes sceneryDrift{from{transform:scale(1.07)}to{transform:scale(1)}}
+.country b{position:absolute;right:1.4vw;top:1.5vh;z-index:2;font-size:1vw;font-weight:700;color:#fff;text-shadow:0 1px 6px #00171b}
+.country span{position:absolute;right:1.4vw;left:1.4vw;bottom:2vh;z-index:2;font-size:2.1vw;font-weight:800;line-height:1.15;text-shadow:0 2px 12px #00171b;overflow-wrap:break-word}
+.country:first-child:before{content:"";position:absolute;right:1.4vw;bottom:1.1vh;height:2px;width:3vw;background:#d7bd86;z-index:3}
+#countries footer{position:absolute;bottom:4.5vh;left:5vw;right:5vw;display:flex;align-items:center;justify-content:flex-start;font-size:1.1vw;color:#b5c6c1}
+.countryNote{font-size:1.2vw;color:#d7bd86}
+.countryTrack{position:absolute;bottom:0;left:0;right:0;height:2px;background:#ffffff12}
+#countryProgress{height:100%;background:#c7ad79;width:0}
+#alertProgress{position:absolute;bottom:0;right:0;height:.4vh;background:#e3bd3c}
+#alert{z-index:4}
+@media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,.country img,#alert.on #alertImg,#countries.on .motionTitle,#countries.on .titleText,#countries.on .motionTitle:after{animation:none}}
+
 `;
 
 export function screenPage(n: number, s: ScreenState, monitor: boolean): string {
@@ -241,9 +324,14 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="alert"><img id="alertImg" alt=""><div id="shade"></div>
 <div id="flight"><div id="trail"></div><svg id="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
 <div id="alertTag">تجربة</div>
-<div id="msg"><div id="kicker"><i></i>✨ مسافر جديد مع ترافليون</div><div id="aName"></div><div id="aDest"></div></div></div>
+<div id="msg"><div id="kicker"><i></i>طلب سفر جديد</div><div id="aName"></div><div id="aDest"></div></div><div id="alertProgress"></div></div>
+<section id="countries">
+<div class="motionTitle"><span class="titleText">الوجهات الأكثر طلبًا اليوم</span></div>
+<div id="countryList"></div>
+<footer><span id="bulletinDate" class="countryNote"></span></footer>
+<div class="countryTrack"><div id="countryProgress"></div></div></section>
 <div id="band"><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
-<script>window.__S__=${json(s)};window.__N__=${n};window.__M__=${monitor ? "true" : "false"};</script>
+<script>window.__LANDMARKS__=${json(LANDMARK_IDS)};window.__S__=${json(s)};window.__N__=${n};window.__M__=${monitor ? "true" : "false"};</script>
 <script>${SCREEN_CORE}${RUNTIME}</script>
 </body></html>`;
 }

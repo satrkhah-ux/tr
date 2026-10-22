@@ -37,7 +37,7 @@ const ROWS = [
   R("Open-Meteo (الطقس)", "api", { used_by: "الطقس في البرنامج اليومي", secret_ref: "بلا مفتاح", check_key: "weather" }),
   R("أسعار العملات (exchange-api / open.er-api)", "api", { used_by: "التسعير — والدولار بسعر الشركة من «سياسة الربح»", secret_ref: "بلا مفتاح", check_key: "rates" }),
   R("Teletel (Chatwoot)", "api", {
-    used_by: "العملاء، مُراد، المستقبل الآلي، رسائل واتساب، SLA",
+    used_by: "العملاء، مُراد، المستقبل الآلي، رسائل واتساب، SLA؛ إعدادات مُراد: صناديق الرد والأقسام وتحويل الطلب إلى موظف؛ مراجعة وتصحيح الوجهات: scripts/repair-lead-destinations.mjs",
     secret_ref: "TELETEL_BASE_URL، TELETEL_API_TOKEN، TELETEL_ACCOUNT_ID",
     account: "توكن «احمد الرفاعي»",
     check_key: "teletel",
@@ -67,8 +67,9 @@ const ROWS = [
   // ---------- sheets ----------
   R("شيت العروض الجاهزة", "sheet", { used_by: "«العروض الجاهزة»", secret_ref: "app_settings ready_offers_sheet (أو READY_OFFERS_SHEET_ID)", check_key: "sheet_ready_offers" }),
   R("شيت المحادثات (العملاء)", "sheet", { used_by: "«العملاء» قبل Teletel", secret_ref: "LEADS_SHEET_ID (وإلا الافتراضي في الكود)، LEADS_SHEET_WEBHOOK", check_key: "sheet_leads" }),
+  R("مزامنة قسم المتابعة", "cron", { used_by: "فريق متابعة المبيعات والمواعيد؛ ضمن /api/murad/run كل دقيقة", secret_ref: "ADMIN_API_SECRET", account: "vps-new / traveliun-app", check_key: "followups_sync" }),
   // ---------- scheduled jobs (crontab of deploy on vps-new) ----------
-  R("/api/murad/run — كل دقيقة", "cron", { used_by: "مُراد والمستقبل الآلي وفحوص «الربط الخارجي»", secret_ref: "crontab ‏deploy@vps-new + ADMIN_API_SECRET", check_key: "job_murad" }),
+  R("/api/murad/run — كل دقيقة", "cron", { used_by: "مُراد والمستقبل الآلي ومزامنة المتابعة وفحوص «الربط الخارجي»", secret_ref: "crontab ‏deploy@vps-new + ADMIN_API_SECRET", check_key: "job_murad" }),
   R("/api/leads/pull — كل 5 دقائق", "cron", { used_by: "«العملاء» من Teletel", secret_ref: "crontab ‏deploy@vps-new + ADMIN_API_SECRET", check_key: "job_leads_pull" }),
   R("/api/ops/flights — كل 30 دقيقة", "cron", { used_by: "متابعة الرحلات في العمليات", secret_ref: "crontab ‏deploy@vps-new + ADMIN_API_SECRET", check_key: "job_ops_flights" }),
   R("/api/ops/daily — 04:00 UTC", "cron", { used_by: "مهام العمليات اليومية ورسائل العملاء المؤرخة", secret_ref: "crontab ‏deploy@vps-new + ADMIN_API_SECRET", check_key: "job_ops_daily" }),

@@ -1,5 +1,6 @@
 "use client";
 
+import { FollowupTeamSettings } from "./followups/FollowupTeamSettings";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
@@ -148,6 +149,9 @@ export function TeamRoles({ roles, members }: { roles: TeamRole[]; members: Team
         </div>
 
         <MembersTable roles={roles} members={members} />
+        <div id="followup-team" className="scroll-mt-8">
+          <FollowupTeamSettings key={JSON.stringify([roles.map(r => [r.id,r.permission_keys]),members.map(m => [m.id,m.role_id,m.status,m.extra_permission_keys,m.removed_permission_keys])])} />
+        </div>
       </div>
     </TraveliunShell>
   );
