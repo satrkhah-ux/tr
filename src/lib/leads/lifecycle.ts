@@ -1,7 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { addTeletelLabels, addTeletelNote, assignMuradHandoff, conversationEvents, listAssignableAgents, listOpenConversations, setTeletelStatus, teletelGet, unassignTeletel, type OpenConversation } from "@/lib/providers/teletel";
+import { parseAutoPhones } from "@/lib/murad/core";
+import { addTeletelLabels, addTeletelNote, assignMuradHandoff, conversationEvents, intlPhone, listAssignableAgents, listOpenConversations, setTeletelStatus, teletelGet, unassignTeletel, type OpenConversation } from "@/lib/providers/teletel";
 import { closerOf, CONFIRMED_TRIP, decideReturn, durationText, externalTripEnd, phoneKey, staleToClose, TRAVEL_LABEL, travellerReturn, travellersToClose, travelUntil, type ClosedBy, type TravelFile } from "./lifecycle-rules";
 
 // always the service role: the in-app «تحديث» runs the pull with a staff session, and closures are written by the system only
@@ -16,6 +17,15 @@ const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
  * client_leads.conversation_state says where each one stands, for «الشاشات» and /m (order 3).
  * The rules are lifecycle-rules.ts; this file does them.
  */
+
+/** «أرقام التجربة» of «إعدادات مُراد» and the client-WhatsApp trial number (murad/run.ts readSettings reads the same two) */
+async function isMuradTestPhone(service: SupabaseClient, raw: string | null): Promise<boolean> {
+  const phone = raw ? intlPhone(raw) : null;
+  if (!phone) return false;
+  const { data } = await service.from("app_settings").select("key, value").in("key", ["murad_auto_phones", "client_whatsapp_test_phone"]);
+  const v = new Map(((data ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
+  return parseAutoPhones(v.get("murad_auto_phones")).includes(phone) || intlPhone(v.get("client_whatsapp_test_phone") ?? "") === phone;
+}
 
 type Closure = { id: string; conversation_id: number; closed_at: string; closed_by_kind: ClosedBy; closed_by_agent_id: number | null; closed_by_name: string | null; travel_operation_id: string | null; travel_external_id: string | null; travel_until: string | null };
 
@@ -77,12 +87,15 @@ export async function onClientReturn(conversationId: number, atSec: number, byCl
     await service.from("client_leads").update({ conversation_state: "open", closed_at: null, closed_by_kind: null, closed_by_name: null }).eq("teletel_conversation_id", conversationId);
     return "kept";
   }
-  const conv = await teletelGet<{ meta?: { assignee?: { id?: number } | null; team?: { id?: number } | null } }>(`/conversations/${conversationId}`);
+  const conv = await teletelGet<{ meta?: { assignee?: { id?: number } | null; team?: { id?: number } | null; sender?: { phone_number?: string | null } | null } }>(`/conversations/${conversationId}`);
   const assigneeId = conv?.meta?.assignee?.id ?? null;
+  // Murad's test numbers come back unassigned, a new request: the owner tests on them, never an employee's (2026-10-23:
+  // 5050 went to its test trip's owner on «مرحبا» — «لا تسندها لموظف»)
+  const test = await isMuradTestPhone(service, conv?.meta?.sender?.phone_number ?? null);
   // a traveller before the return + 3 days: the trip's owner (who holds the file NOW); after, the normal rules
-  const file = closure.travel_until ? await travelFileOf(service, closure) : null;
-  const travel = closure.travel_until ? travellerReturn(closure.travel_until, riyadhDay(atSec), file?.ownerAgentId ?? null, assigneeId) : null;
-  const decision = travel ?? decideReturn(closure, assigneeId);
+  const file = closure.travel_until && !test ? await travelFileOf(service, closure) : null;
+  const travel = closure.travel_until && !test ? travellerReturn(closure.travel_until, riyadhDay(atSec), file?.ownerAgentId ?? null, assigneeId) : null;
+  const decision = test ? ({ act: "unassign" } as const) : (travel ?? decideReturn(closure, assigneeId));
   let done = true;
   if (decision.act === "assign") done = await assignMuradHandoff(conversationId, null, decision.agentId);
   if (decision.act === "unassign") done = await unassignTeletel(conversationId);
@@ -97,7 +110,9 @@ export async function onClientReturn(conversationId: number, atSec: number, byCl
   const trip = file?.destination ? ` (${file.destination})` : file?.serial ? ` (${file.serial})` : "";
   await addTeletelNote(
     conversationId,
-    action === "returned_to_file_owner"
+    test
+      ? "🧪 رقم تجربة مُراد — عاد بعد الإغلاق طلباً جديداً غير مسند."
+      : action === "returned_to_file_owner"
       ? `✈️ عاد العميل المسافر${trip} — المحادثة لصاحب الرحلة ${file?.ownerName ?? ""}، وليست طلباً جديداً${failed}.`
       : action === "unassigned"
         ? "🔁 عاد العميل بعد إغلاق آلي — المحادثة طلب جديد غير مسند."
