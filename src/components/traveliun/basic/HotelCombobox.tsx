@@ -1,7 +1,8 @@
 "use client";
 
 import { Combobox } from "@base-ui/react/combobox";
-import { Check, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { Check, ChevronDown, X } from "lucide-react";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { cn } from "@/lib/utils";
 import { unzoomedRoot, ZOOMED_POPUP } from "@/components/ui/overlay-root";
@@ -17,6 +18,11 @@ const CURRENT = "__current";
  * (Kuala Lumpur has hundreds) is unusable as a plain dropdown. Matching folds
  * hamza, ta-marbuta and alef-maqsura the way the catalogue does, so «اسطنبول»
  * finds «إسطنبول».
+ *
+ * Typing or erasing the name never removes the hotel (the evaluator, 2026-10-22: an
+ * emptied box saved the stay with no hotel 700 ms later). The hotel changes only
+ * when another one is picked, or by «إزالة الفندق»; leaving the box without a
+ * pick puts the hotel's name back.
  */
 export function HotelCombobox({
   hotels,
@@ -37,25 +43,52 @@ export function HotelCombobox({
   const listed = hotels.find((h) => h.id === valueId) ?? null;
   const current = !listed && currentName ? { id: valueId ?? CURRENT, name: currentName } : null;
   const items = current ? [current, ...hotels] : hotels;
+  const chosen = listed ?? current;
+  // what the box shows while typing; null = the chosen hotel's own name
+  const [typed, setTyped] = useState<string | null>(null);
 
   return (
     <Combobox.Root<HotelOption>
       items={items}
-      value={listed ?? current}
+      value={chosen}
+      inputValue={typed ?? chosen?.name ?? ""}
+      onInputValueChange={(value) => setTyped(value)}
+      onOpenChange={(open) => {
+        // closed without a pick: the hotel's name comes back
+        if (!open) setTyped(null);
+      }}
       onValueChange={(next) => {
-        if (next && next.id === current?.id) return;
+        setTyped(null);
+        // an emptied box is not a choice — only «إزالة الفندق» removes the hotel
+        if (!next || next.id === current?.id) return;
         onPick(next);
       }}
       itemToStringLabel={(h) => h.name}
       isItemEqualToValue={(a, b) => a.id === b.id}
-      filter={(h, query) => !query.trim() || normalizeName(h.name).includes(normalizeName(query))}
+      // the chosen hotel's own name in the box is not a search — opening the list shows them all
+      filter={(h, query) => !query.trim() || query === chosen?.name || normalizeName(h.name).includes(normalizeName(query))}
     >
       <div className={cn("relative", className)}>
         <Combobox.Input
           aria-label={placeholder}
           placeholder={placeholder}
-          className="h-9 w-full rounded-[8px] border border-[#dbe6e1] bg-white pe-8 ps-2.5 text-[12.5px] font-semibold text-[#185045] outline-none focus:border-[#2aa87a] dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]"
+          onBlur={() => setTyped(null)}
+          className={`h-9 w-full rounded-[8px] border border-[#dbe6e1] bg-white ${chosen ? "pe-14" : "pe-8"} ps-2.5 text-[12.5px] font-semibold text-[#185045] outline-none focus:border-[#2aa87a] dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]`}
         />
+        {chosen ? (
+          <button
+            type="button"
+            aria-label="إزالة الفندق"
+            title="إزالة الفندق"
+            onClick={() => {
+              setTyped(null);
+              onPick(null);
+            }}
+            className="absolute inset-y-0 end-7 flex w-6 items-center justify-center text-[#93aaa3] hover:text-[#c22850]"
+          >
+            <X className="size-3.5" />
+          </button>
+        ) : null}
         <Combobox.Trigger
           aria-label={placeholder}
           className="absolute inset-y-0 end-0 flex w-8 items-center justify-center text-[#557d78]"

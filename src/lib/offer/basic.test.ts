@@ -23,6 +23,7 @@ import {
   baseRoomName,
   basicDays,
   changeRoom,
+  roomChangeLine,
   cityLines,
   clearRoomChange,
   EXTRA_BED,
@@ -175,6 +176,29 @@ describe("النظام بيسك", () => {
     ]);
     // one hotel line, its 3-night total grown to 5 nights at the same rate
     expect(cityLines(next.hotels, "كوالالمبور").map((h) => h.rooms[0].price)).toEqual([1500]);
+  });
+
+  it("the same city again with a hotel picked is a second stay after the first — the pick is never dropped (the owner, 2026-10-22)", () => {
+    const data = malaysia();
+    data.hotels = data.hotels.map((h) => (h.city_name === "كوالالمبور" ? { ...h, hotel_id: "h-a", hotel_name: "فندق أ", rooms: h.rooms.map((r) => ({ ...r, price: 900 })) } : h));
+    const { joined, ...added } = addCity(data, { name: "كوالالمبور", nights: 2, tours: 0, hotel: { id: "h-b", name: "فندق ب" }, room: "ديلوكس", price: 700 }, "SAR");
+    const next = { ...data, ...added };
+    expect(joined).toBe("stay");
+    expect(next.cities.at(-1)).toMatchObject({ city_name: "كوالالمبور", nights: 5 });
+    const stays = deriveHotelStays(next.cities, next.hotels).filter((s) => s.city_name === "كوالالمبور");
+    expect(stays.map((s) => [s.line.hotel_name, s.from, s.nights])).toEqual([["فندق أ", 0, 3], ["فندق ب", 3, 2]]);
+    // the first hotel keeps its rate for its own three nights; the second carries what was picked
+    expect(stays.map((s) => s.line.rooms[0].price)).toEqual([900, 700]);
+    expect(stays[1].line.rooms[0].room_type_name).toBe("ديلوكس");
+  });
+
+  it("two stays with no hotel yet are two stays — the first row's pick never follows onto the second; a room change still does", () => {
+    const data = malaysia();
+    const lang = data.cities.findIndex((c) => c.city_name === "لنكاوي");
+    const second = addStay(data.cities, data.hotels, lang, "after");
+    expect(roomChangeLine(cityHotelLines(data.cities, second.hotels, lang))).toBeUndefined();
+    const split = { ...data, ...changeRoom(data, lang, 1, "جناح") };
+    expect(roomChangeLine(cityHotelLines(split.cities, split.hotels, lang))?.room_change).toBe(true);
   });
 
   it("adds a city with the hotel, room and room count picked on the bar", () => {

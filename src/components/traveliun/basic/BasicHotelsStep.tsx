@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AlertTriangle, BedDouble, CheckCircle2, Pencil } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { cityHotelLines, deriveHotelStays, hotelCoverage, type DraftData, type DraftHotel, type GeneratorLookups } from "@/lib/offer/draft-types";
@@ -14,7 +14,10 @@ import { useBasicLabels } from "./labels";
  * in one place, on their chained dates, with what each city's nights still lack
  * or have twice — before the city cards, which then open on the tours. The same
  * editor as the card's hotel tab (HotelPanel), so nothing is entered twice.
- * Folds to a one-line-a-city table once every stay is complete.
+ * Folds to a one-line-a-city table once every stay is complete — but never while
+ * the agent is inside it (the evaluator, 2026-10-22: typing «2» of 2000 completed
+ * the last price, the section folded and the stay saved at 2): only when the focus
+ * leaves it for good, or on «تم».
  */
 export function BasicHotelsStep({
   cities,
@@ -38,7 +41,14 @@ export function BasicHotelsStep({
   const linesOf = (i: number) => cityHotelLines(data.cities, data.hotels, i);
   const complete = cities.every((_, i) => stayDone(linesOf(i))) && coverage.every((c) => c.covered - c.extra === c.needed && c.extra === 0);
   const [editing, setEditing] = useState(false);
-  const open = editing || !complete;
+  // the agent is typing or picking inside the section (its dropdowns open in portals outside it)
+  const [inside, setInside] = useState(false);
+  const box = useRef<HTMLElement>(null);
+  const open = editing || !complete || inside;
+  const stillInside = () => {
+    const at = document.activeElement;
+    return Boolean(at && (box.current?.contains(at) || at.closest('[role="listbox"],[role="option"],[role="menu"],[role="dialog"]')));
+  };
 
   /** what a city's nights say: complete, short, or extra / overlapping */
   const nightsBadge = (i: number) => {
@@ -53,7 +63,13 @@ export function BasicHotelsStep({
   // each city's first day, counted as the cards count them
   const starts = cities.map((_, i) => firstDay + cities.slice(0, i).reduce((n, c) => n + c.nights, 0));
   return (
-    <section className="rounded-[14px] border border-[#d8e6e0] bg-white">
+    <section
+      ref={box}
+      onFocus={() => setInside(true)}
+      // after the blur settles: a click into the section's own dropdown is still inside
+      onBlur={() => setTimeout(() => setInside(stillInside()), 0)}
+      className="rounded-[14px] border border-[#d8e6e0] bg-white"
+    >
       <header className="flex flex-wrap items-center gap-2 border-b border-[#e6eeea] bg-[#eef5f2] px-3 py-2">
         <BedDouble className="size-4 text-[#185045]" />
         <h3 className="text-[13.5px] font-extrabold text-[#0f3d38]">{tx("hotelsStep")}</h3>
@@ -65,7 +81,20 @@ export function BasicHotelsStep({
         ) : (
           <span className="text-[11px] font-semibold text-[#78948f]">{tx("hotelsStepHint")}</span>
         )}
-        {complete ? (
+        {complete && open ? (
+          <button
+            type="button"
+            onClick={() => {
+              setEditing(false);
+              setInside(false);
+              (document.activeElement as HTMLElement | null)?.blur();
+            }}
+            className="ms-auto inline-flex h-7 items-center gap-1 rounded-[7px] bg-[#185045] px-2.5 text-[11px] font-bold text-white hover:bg-[#0f4439]"
+          >
+            <CheckCircle2 className="size-3.5" />
+            {tx("hotelsDone")}
+          </button>
+        ) : complete ? (
           <button
             type="button"
             onClick={() => setEditing((v) => !v)}

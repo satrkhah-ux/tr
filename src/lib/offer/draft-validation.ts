@@ -232,6 +232,12 @@ export function validateDraft(data: DraftData, opts: ValidateOptions = {}): Draf
     }
   }
 
+  // A stay's price is the WHOLE stay's: under 50 is almost surely a price cut short while typing (the evaluator,
+  // 2026-10-22: «2» of 2000 saved as the stay's price). Said before issuing, not blocked.
+  if (data.hotels.some((h) => h.rooms.some((r) => r.price != null && r.price > 0 && r.price < 50))) {
+    warnings.push({ severity: "warning", stage: "hotels", field: "hotels", key: "pg.warn.stayPriceLow" });
+  }
+
   // ---- structural invariants (nights sum, date spans, room+board) ----
   // A city's nights are covered by one or more stays in sequence; each stay
   // carries its own span, and every stay must state a room + board (invariant #3).

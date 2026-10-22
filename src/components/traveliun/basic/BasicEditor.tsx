@@ -662,6 +662,7 @@ export function BasicEditor({
   const [newRoom, setNewRoom] = useState("");
   const [newRooms, setNewRooms] = useState(0);
   const [newPrice, setNewPrice] = useState<number | null>(null);
+  const [joinedNote, setJoinedNote] = useState<string | null>(null);
   const nightsChoice = newNights || Math.max(left, 1);
   // the arrival day is spent arriving: four nights hold up to three tours (the city card allows more)
   const maxTours = Math.max(nightsChoice - 1, 0);
@@ -681,8 +682,7 @@ export function BasicEditor({
   function onAdd() {
     if (!newCity) return;
     const hotel = barHotels.find((h) => h.id === newHotel);
-    commit(
-      addCity(
+    const { joined, ...added } = addCity(
         data,
         {
           name: newCity,
@@ -695,8 +695,10 @@ export function BasicEditor({
           price: newPrice,
         },
         BASE_CURRENCY,
-      ),
-    );
+      );
+    commit(added);
+    // the same city twice in a row: say what became of it — never a silent merge
+    setJoinedNote(joined === "stay" ? tx("joinedStay", { city: newCity }) : joined === "nights" ? tx("joinedNights", { city: newCity, n: nightsChoice }) : null);
     pickCity("");
     setNewNights(0);
     setNewTours(null);
@@ -1392,8 +1394,9 @@ export function BasicEditor({
                 programs={programs.filter((p) => p.city_name === city.city_name)}
                 tourPrices={pricesForCity(tourPrices, city.city_name, cities.map((c) => c.city_name), normAr)}
                 listPrices={listPrices}
-                // the hotels are entered in «١. الفنادق» above — the card keeps the tours, transfers and programme
-                hotelsOn={scope.hotels && Boolean(focus)}
+                // the hotels are entered in «١. الفنادق» above; the card keeps a hotel tab to edit its stays, opening on the tours
+                hotelsOn={scope.hotels}
+                hotelsFirst={Boolean(focus)}
                 toursOn={toursOn}
                 transportOn={scope.transport}
                 isFirst={i === 0}
@@ -1555,6 +1558,12 @@ export function BasicEditor({
             </span>
           </div>
           <p className={`tv-tnum mt-1 rounded-[7px] px-2 py-0.5 text-[10.5px] font-bold md:hidden ${nightsTone}`}>{nightsNote}</p>
+          {joinedNote ? (
+            <p role="status" className="mt-1.5 flex items-center justify-between gap-2 rounded-[8px] bg-[#E8F6EF] px-2.5 py-1.5 text-[12px] font-bold text-[#0f7a52]">
+              {joinedNote}
+              <button type="button" onClick={() => setJoinedNote(null)} aria-label={tx("dismiss")} className="text-[#557d78]">×</button>
+            </p>
+          ) : null}
         </div>
         )}
       </div>

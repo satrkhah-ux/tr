@@ -685,6 +685,11 @@ export function stayTotal(line: Pick<DraftHotel, "rooms" | "manual_price">): num
 /** One hotel line per city (aligned by city_name). Prices live in the pricing stage. */
 export type DraftHotel = {
   /**
+   * The second half of a room change (basic.ts changeRoom): the same hotel, another room. Told apart
+   * from a second hotel stay by this mark when neither has a hotel yet — two empty rows are two stays.
+   */
+  room_change?: boolean;
+  /**
    * Stable identity for THIS stay.
    *
    * Two hotels in one city stopped being distinguishable by name the moment a
@@ -868,6 +873,7 @@ export function normalizeDraftHotel(raw: unknown): DraftHotel {
       : {}),
     ...(typeof h.supplier === "string" && h.supplier ? { supplier: h.supplier } : {}),
     ...(typeof h.priced_nights === "number" && h.priced_nights > 0 ? { priced_nights: h.priced_nights } : {}),
+    ...(h.room_change === true ? { room_change: true } : {}),
     // deliberately NOT `sourcing: h.sourcing ?? null` — a seeded line must carry
     // no supplier key at all, and a null one still reads as "priced from a
     // supplier, expired" to anything checking for the property.

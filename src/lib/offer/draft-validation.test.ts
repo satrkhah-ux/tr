@@ -381,3 +381,18 @@ describe("a city with nights and no hotel is never issued (AD-4-8573)", () => {
     expect(gate(validateDraft(completeDraft()))).toBe(false);
   });
 });
+
+describe("a stay priced under 50 (the evaluator, 2026-10-22)", () => {
+  const priced = (price: number) => {
+    const data = completeDraft();
+    data.hotels = data.hotels.map((h, i) => (i === 0 ? withRooms(h, h.rooms.map((r) => ({ ...r, price }))) : h));
+    return validateDraft(data);
+  };
+  const warned = (r: ReturnType<typeof validateDraft>) => r.warnings.some((w) => w.key === "pg.warn.stayPriceLow");
+
+  it("warns before issuing — «2» left from typing 2000 — without blocking", () => {
+    expect(warned(priced(2))).toBe(true);
+    expect(priced(2).blocking.some((b) => b.key === "pg.warn.stayPriceLow")).toBe(false);
+    expect(warned(priced(2000))).toBe(false);
+  });
+});

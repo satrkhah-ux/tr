@@ -132,6 +132,7 @@ export function BasicCityCard({
   tourPrices,
   listPrices = {},
   hotelsOn,
+  hotelsFirst = true,
   toursOn,
   transportOn,
   isFirst,
@@ -164,6 +165,12 @@ export function BasicCityCard({
   /** each transfer's price in the company's list (by pricing ref) — shown before the pricing sheet is worked out. */
   listPrices?: Record<string, { price: number; currency: string }>;
   hotelsOn: boolean;
+  /**
+   * the stay is entered here first (a focused city). false: «١. الفنادق» above has it — the card keeps its hotel
+   * tab to edit it (the evaluator, 2026-10-22: «تعديل» showed no hotel) but opens on the tours and does not repeat
+   * what the stay still lacks
+   */
+  hotelsFirst?: boolean;
   toursOn: boolean;
   transportOn: boolean;
   /** the city the group lands in, and the one it flies home from. */
@@ -219,7 +226,7 @@ export function BasicCityCard({
   ];
   // a stay already complete (picked from the add bar, or a file reopened) is not asked again: the card opens on what is left
   const hasTours = tabs.some((x) => x.key === "tours");
-  const [tab, setTab] = useState<Tab>(() => (hotelsOn && hasTours && stayDone(lines) ? "tours" : "hotel"));
+  const [tab, setTab] = useState<Tab>(() => (hotelsOn && hasTours && (stayDone(lines) || !hotelsFirst) ? "tours" : "hotel"));
   // focus left the hotel fields: once the stay is complete the card moves on by itself
   const [leftHotel, setLeftHotel] = useState(false);
   const wanted = leftHotel && tab === "hotel" && hasTours && stayDone(lines) ? "tours" : tab;
@@ -236,10 +243,10 @@ export function BasicCityCard({
   const showPrice = useRole().can("pricing.view");
   const rooms = lines.flatMap((l) => l.rooms);
   const missing = [
-    hotelsOn && lines.some((l) => !l.hotel_name.trim()) && tx("hotel"),
-    hotelsOn && rooms.some((r) => !(r.room_type_id || r.room_type_name.trim())) && tx("roomType"),
-    hotelsOn && rooms.some((r) => !r.board_type) && tx("board"),
-    hotelsOn && rooms.some((r) => r.price == null) && tx("price"),
+    hotelsOn && hotelsFirst && lines.some((l) => !l.hotel_name.trim()) && tx("hotel"),
+    hotelsOn && hotelsFirst && rooms.some((r) => !(r.room_type_id || r.room_type_name.trim())) && tx("roomType"),
+    hotelsOn && hotelsFirst && rooms.some((r) => !r.board_type) && tx("board"),
+    hotelsOn && hotelsFirst && rooms.some((r) => r.price == null) && tx("price"),
     picks.some((p) => !p.free && !p.title.trim()) && tx("tourService"),
     picks.some((p) => !p.free && !(p.car_type?.trim() || tripCar)) && tx("carType"),
     // a tour the list prices is priced (the sheet takes the list's figure) — asked only of who sees the price

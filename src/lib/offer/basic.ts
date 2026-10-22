@@ -27,6 +27,7 @@ import {
   newStayId,
   resizeRooms,
   roomFromName,
+  addStay,
   pickRoom,
   roomTypeNames,
   totalCityNights,
@@ -144,20 +145,28 @@ export function addCity(
   data: DraftData,
   city: { name: string; nights: number; tours: number; country?: string } & StayPick,
   currency: string,
-): Pick<DraftData, "cities" | "hotels"> {
+): Pick<DraftData, "cities" | "hotels"> & { joined?: "nights" | "stay" } {
   // The same city again, right after itself, is more nights there — not a second
   // row the group «moves» into from itself (with a transfer priced for the move).
   const at = data.cities.length - 1;
   const last = data.cities[at] as BasicCity | undefined;
   if (last && last.city_name === city.name) {
     const longer = setCityNights(data, at, last.nights + city.nights);
-    // a hotel picked now fills the city's line only if it has none yet
-    const [main] = cityHotelLines(longer.cities, longer.hotels, at);
+    const cities = longer.cities.map((c, i) =>
+      i === at ? { ...c, tours: Math.min(((c as BasicCity).tours ?? 0) + city.tours, c.nights) } : c,
+    );
+    // nothing picked on the bar: simply more nights where the group already is
+    if (!city.hotel && !city.room?.trim() && city.price == null) return { cities, hotels: longer.hotels, joined: "nights" };
+    // a hotel, a room or a price picked for these nights is never dropped (the owner, 2026-10-22: Istanbul 4 then
+    // Istanbul 3 merged into one stay of 7 and the second hotel was lost): the new nights are a second stay
+    // «بعده» with what was picked — the first stay keeps its own nights (the blank «rest» shares what is left)
+    // the hotels as they were: the first stay still covers only its own nights, so its price is not stretched to the
+    // city's new length (setCityNights scales a lone stay to it)
+    const added = addStay(cities, data.hotels, at, "after");
     return {
-      cities: longer.cities.map((c, i) =>
-        i === at ? { ...c, tours: Math.min(((c as BasicCity).tours ?? 0) + city.tours, c.nights) } : c,
-      ),
-      hotels: main && !main.hotel_name.trim() ? longer.hotels.map((h) => (h.id === main.id ? withStayPick(h, city) : h)) : longer.hotels,
+      cities,
+      hotels: added.hotels.map((h) => (h.id === added.id ? withStayPick({ ...h, nights: city.nights }, city) : h)),
+      joined: "stay",
     };
   }
   // a stop of its own, with a hotel line of its own: كوالالمبور again at the end is not the first visit's hotel
@@ -410,6 +419,9 @@ export const cityLines = (hotels: DraftHotel[], cityName: string) => hotels.filt
 export function roomChangeLine(lines: DraftHotel[]): DraftHotel | undefined {
   const [main, next] = lines;
   if (!main || !next || (next.dates ?? "after") !== "after") return undefined;
+  // two rows with no hotel yet are two stays still to fill — only a marked room change follows the first (the
+  // evaluator, 2026-10-22: picking the first row's hotel was copied onto the second)
+  if (!main.hotel_name.trim() && !next.hotel_name.trim()) return next.room_change ? next : undefined;
   return next.hotel_id === main.hotel_id && next.hotel_name === main.hotel_name ? next : undefined;
 }
 
@@ -435,8 +447,8 @@ export function changeRoom(data: DraftData, index: number, after: number, roomNa
   const prev = deriveHotelStays(data.cities, data.hotels);
   const next = renameRooms(
     second
-      ? { ...second, nights: 0 }
-      : withRooms({ ...main, id: newStayId(), nights: 0, sourcing: null, dates: undefined, check_in: undefined }, main.rooms.map((r) => ({ ...r, price: null }))),
+      ? { ...second, nights: 0, room_change: true }
+      : withRooms({ ...main, id: newStayId(), nights: 0, sourcing: null, dates: undefined, check_in: undefined, room_change: true }, main.rooms.map((r) => ({ ...r, price: null }))),
     roomName,
   );
   let hotels = data.hotels.map((h) => (h.id === main.id ? { ...main, nights } : h.id === next.id ? next : h));
