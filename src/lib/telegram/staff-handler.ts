@@ -7,7 +7,7 @@ import { buildReport } from "./staff-report";
 import { openFor, waitText } from "./staff-numbers";
 import { linkTeletelToken, promptReply, rememberThread, sendReply, threadOf, TOKEN_HELP } from "./staff-replies";
 import { openList, openScreen, screenView, unansweredList, weekView } from "./staff-screen";
-import { BROADCAST_PROMPT, canBroadcast, confirmBroadcast, draftBroadcast, promptBroadcast } from "./staff-broadcast";
+import { confirmDraft, draft, isBotManager, memberView, promptFor, remindDraft, takePending, teamView } from "./staff-manager";
 import type { InlineButton } from "./ops-bot";
 
 /**
@@ -50,6 +50,7 @@ const KEYS = {
   token: "🔑 الرد باسمي",
   tone: "🎵 النغمة",
   teletel: "🌐 تيلي تيل",
+  team: "👥 الفريق",
   broadcast: "📢 إعلان عام",
 } as const;
 type Key = keyof typeof KEYS;
@@ -61,7 +62,7 @@ function keyboard(manager: boolean): Record<string, unknown> {
     [KEYS.today, KEYS.week],
     [KEYS.token, KEYS.tone, KEYS.teletel],
   ];
-  if (manager) rows.push([KEYS.broadcast]);
+  if (manager) rows.push([KEYS.team, KEYS.broadcast]);
   return {
     keyboard: rows.map((row) => row.map((text) => ({ text }))),
     resize_keyboard: true,
@@ -182,9 +183,10 @@ async function show(chatId: number, screen: Screen, editId?: number): Promise<vo
 async function onKey(me: StaffMember, chatId: number, key: Key): Promise<void> {
   if (key === "screen") return openScreen(me, chatId, NO_AGENT);
   if (key === "tone") return sendTone(chatId);
-  if (key === "broadcast") return promptBroadcast(me, chatId);
+  if (key === "broadcast") return promptFor(me, chatId, "broadcast", null);
+  if (key === "team") return show(chatId, await teamView(me));
   if (key === "teletel") return show(chatId, teletelLink());
-  const data: Record<Exclude<Key, "screen" | "tone" | "broadcast" | "teletel">, string> = { waiting: "w", open: "o:0", unanswered: "u", today: "d", week: "wk", token: "k" };
+  const data: Record<Exclude<Key, "screen" | "tone" | "broadcast" | "team" | "teletel">, string> = { waiting: "w", open: "o:0", unanswered: "u", today: "d", week: "wk", token: "k" };
   return show(chatId, await screenFor(me, data[key]));
 }
 
@@ -200,6 +202,7 @@ const COMMANDS: Record<string, Key> = {
   "/token": "token",
   "/tone": "tone",
   "/broadcast": "broadcast",
+  "/team": "team",
 };
 
 async function welcome(me: StaffMember, chatId: number): Promise<void> {
@@ -216,7 +219,7 @@ async function welcome(me: StaffMember, chatId: number): Promise<void> {
       "القائمة أسفل المحادثة دائماً — ابدأ بـ «🖥️ شاشتي» وثبّتها أعلى المحادثة، تتحدّث وحدها كل ٥ دقائق.",
     ].join("\n"),
     undefined,
-    { reply_markup: keyboard(await canBroadcast(me.id)) },
+    { reply_markup: keyboard(await isBotManager(me.id)) },
   );
 }
 
@@ -229,7 +232,12 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
     if (!me || !chatId) return;
     const data = callback.data ?? "s";
     if (data.startsWith("r:")) return promptReply(me, chatId, Number(data.slice(2)));
-    if (data.startsWith("b:")) return confirmBroadcast(me, chatId, callback.message?.message_id, data);
+    // the manager's buttons: each one checks staffbot.manage / employees.manage again (staff-manager.ts)
+    if (data.startsWith("b:")) return confirmDraft(me, chatId, callback.message?.message_id, data);
+    if (data.startsWith("a:")) return promptFor(me, chatId, "alert", data.slice(2));
+    if (data.startsWith("q:")) return remindDraft(me, chatId, data.slice(2));
+    if (data === "team") return show(chatId, await teamView(me), callback.message?.message_id);
+    if (data.startsWith("e:")) return show(chatId, await memberView(me, data.slice(2)), callback.message?.message_id);
     await show(chatId, await screenFor(me, data), callback.message?.message_id);
     // a conversation's card can be answered with a Telegram «reply», like the client's own messages
     if (data.startsWith("c:") && callback.message) await rememberThread(chatId, callback.message.message_id, Number(data.slice(2)));
@@ -259,9 +267,13 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
 
   const text = (message.text ?? "").trim();
 
-  // a Telegram «reply»: to the announcement prompt it is the announcement, to anything about a conversation it is the answer to that client
+  // after «📢 إعلان عام» / «🔔 تنبيه له», the next text (reply or not) is the draft; the preview still asks before anything goes
+  if (text && !text.startsWith("/") && !(Object.values(KEYS) as string[]).includes(text)) {
+    const pending = await takePending(chatId);
+    if (pending) return draft(me, chatId, text, pending.kind === "alert" ? pending.targetId : null);
+  }
+  // a Telegram «reply» to anything about a conversation is the answer to that client
   if (message.reply_to_message && text && !text.startsWith("/")) {
-    if (message.reply_to_message.text?.startsWith(BROADCAST_PROMPT)) return draftBroadcast(me, chatId, text);
     const conversationId = await threadOf(chatId, message.reply_to_message.message_id);
     if (conversationId) return sendReply(me, chatId, conversationId, text);
     await staffSend(chatId, "لا أعرف لأي عميل هذا الرد — اضغط «✍️ رد» تحت رسالة العميل ثم اكتب ردك.");
@@ -275,6 +287,6 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
   if (key) return onKey(me, chatId, key);
   // anything else typed: the keyboard again, with a word on how to answer a client
   await staffSend(chatId, "اختر من القائمة أسفل المحادثة.\nللرد على عميل: اسحب رسالته (Reply) واكتب ردك، أو اضغط «✍️ رد».", undefined, {
-    reply_markup: keyboard(await canBroadcast(me.id)),
+    reply_markup: keyboard(await isBotManager(me.id)),
   });
 }

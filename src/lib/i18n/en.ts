@@ -821,6 +821,7 @@ export const en = {
   "perm.settings.manage": "System settings",
   "perm.settings.manage.hint": "Currencies, statuses, suppliers, climate, ready packages.",
   "perm.employees.manage": "Manage the team and its permissions",
+  "perm.staffbot.manage": "Staff bot management: follow every colleague's numbers, announce to all, alert one",
   "perm.employees.manage.hint": "Add colleagues, move them between sections, change what a section grants.",
   "perm.guide.view": "The Traveliun guide",
   "perm.guide.view.hint": "Internal reference pages.",

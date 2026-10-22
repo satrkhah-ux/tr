@@ -819,6 +819,7 @@ export const ar: Dictionary = {
   "perm.settings.manage": "إعدادات النظام",
   "perm.settings.manage.hint": "العملات والحالات والموردون والمناخ والعروض الجاهزة.",
   "perm.employees.manage": "إدارة الفريق وصلاحياته",
+  "perm.staffbot.manage": "إدارة بوت الموظفين: متابعة أداء كل الموظفين، والإعلان العام، وتنبيه موظف",
   "perm.employees.manage.hint": "إضافة الزملاء ونقلهم بين الأقسام وتغيير ما يمنحه القسم.",
   "perm.guide.view": "دليل ترافليون",
   "perm.guide.view.hint": "صفحات مرجعية داخلية.",

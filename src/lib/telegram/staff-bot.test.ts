@@ -3,7 +3,7 @@ import { riyadhDayStart, secondsText, waitText } from "./staff-numbers";
 import { assignmentText } from "./staff-events";
 import { ruleTips, teamAverages, type Facts } from "./staff-report";
 import { dashboardText, light } from "./staff-screen";
-import { broadcastText } from "./staff-broadcast";
+import { broadcastText } from "./staff-manager";
 
 describe("«تنبيهاتي» numbers", () => {
   it("starts the day at 00:00 Riyadh (21:00 UTC the day before)", () => {
@@ -99,6 +99,10 @@ describe("«🖥️ شاشتي»", () => {
 });
 
 describe("«📢 إعلان عام»", () => {
+  it("an alert to one colleague is titled as an alert", () => {
+    expect(broadcastText("ردّ على العميل", "احمد", true)).toContain("🔔 <b>تنبيه من الإدارة</b>");
+  });
+
   it("escapes the manager's text and signs it", () => {
     expect(broadcastText("اجتماع <الساعة 5>", "أدمن")).toBe("📢 <b>إعلان من الإدارة</b>\n\nاجتماع &lt;الساعة 5&gt;\n\n— أدمن");
   });

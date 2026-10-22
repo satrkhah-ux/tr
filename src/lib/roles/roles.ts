@@ -94,6 +94,13 @@ export const ALL_PERMISSIONS = [
   "clients.view",
   "followups.work",
   "followups.manage",
+  /**
+   * «تنبيهاتي» (@traveliunbot) as a manager (the user, 2026-10-22): every
+   * colleague's live numbers in the bot, «📢 إعلان عام», and an alert to one of
+   * them. The bot's management only, without employees.manage's power over
+   * roles and passwords. employees.manage holds it as well.
+   */
+  "staffbot.manage",
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
@@ -219,7 +226,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
   },
   {
     key: "perm.group.team",
-    items: [{ key: "employees.manage", kind: "do", sensitive: true }],
+    items: [
+      { key: "employees.manage", kind: "do", sensitive: true },
+      { key: "staffbot.manage", kind: "do", sensitive: true },
+    ],
   },
   {
     key: "perm.group.developer",
