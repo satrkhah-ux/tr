@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closerOf, decideReturn, durationText, readAutocloseHours, staleToClose } from "./lifecycle-rules";
+import { closerOf, decideReturn, durationText, phoneKey, readAutocloseHours, staleToClose, travellerReturn, travellersToClose, travelUntil } from "./lifecycle-rules";
 
 const agents = [
   { id: 30, name: "محمد الحبيب ", email: "m.habib@traveliun.com" },
@@ -34,6 +34,33 @@ describe("the conversation's life in Teletel (order 2, part C)", () => {
     ];
     expect(staleToClose(rows, now, 7 * 24).map((r) => r.id)).toEqual([2, 1]);
     expect(staleToClose(rows, now, 0)).toEqual([]);
+  });
+
+  it("«مؤكد — مسافر قريباً»: matched by the mobile however written, until the return + 3 days, idle an hour, never a waiting client", () => {
+    const hour = 3600, now = 1_000_000;
+    const file = (id: string, end: string, phones: string[]) => ({ source: "operation" as const, id, serial: null, destination: null, travelStart: null, travelEnd: end, phones, ownerName: "سارة", ownerAgentId: 9 });
+    const files = [file("old", "2026-10-01", ["0551234567"]), file("new", "2026-11-10", ["+966 55 123 4567"]), file("back", "2026-10-18", ["0500000001"])];
+    const rows = [
+      { id: 1, phone: "+966551234567", lastActivityAt: now - 2 * hour, waitingSince: 0 },
+      { id: 2, phone: "+966500000001", lastActivityAt: now - 2 * hour, waitingSince: 0 },
+      { id: 3, phone: "+966551234567", lastActivityAt: now - 10, waitingSince: 0 },
+      { id: 4, phone: "+966551234567", lastActivityAt: now - 2 * hour, waitingSince: now - hour },
+      { id: 5, phone: "+966599999999", lastActivityAt: now - 2 * hour, waitingSince: 0 },
+    ];
+    // 2026-10-22: «back» returned on the 18th — its 3 days are over; «new» is the latest trip of that mobile
+    expect(travellersToClose(rows, files, now, "2026-10-22").map((x) => [x.c.id, x.file.id])).toEqual([[1, "new"]]);
+    expect(travelUntil("2026-10-30")).toBe("2026-11-02");
+    expect(phoneKey("05 5123 4567")).toBe("551234567");
+    expect(phoneKey("٠٥٥١٢٣٤٥٦٧")).toBe("551234567");
+    expect(phoneKey("12345")).toBeNull();
+  });
+
+  it("a traveller writes: to the file's owner until the return + 3 days, then the normal rules", () => {
+    expect(travellerReturn("2026-11-02", "2026-10-25", 9, 40)).toEqual({ act: "assign", agentId: 9 });
+    expect(travellerReturn("2026-11-02", "2026-11-02", 9, 9)).toEqual({ act: "keep" });
+    expect(travellerReturn("2026-11-02", "2026-10-25", null, 40)).toEqual({ act: "keep" });
+    expect(travellerReturn("2026-11-02", "2026-11-03", 9, 40)).toBeNull();
+    expect(travellerReturn(null, "2026-10-25", 9, 40)).toBeNull();
   });
 
   it("the setting: whole hours from 1 to 90 days, anything else is off; said in words", () => {

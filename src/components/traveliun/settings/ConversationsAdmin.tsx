@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { previewAutoclose, saveAutoclose, type ConversationsAdmin as Data } from "@/lib/data/conversation-settings";
+import { previewAutoclose, saveAutoclose, saveTravellersClose, type ConversationsAdmin as Data } from "@/lib/data/conversation-settings";
 import { durationText } from "@/lib/leads/lifecycle-rules";
 import { TraveliunShell } from "../TraveliunShell";
 
@@ -18,7 +18,7 @@ const H = "text-[14px] font-extrabold text-[#0f3d38]";
 const BTN = "inline-flex h-9 items-center gap-1.5 rounded-[8px] px-3 text-[12.5px] font-bold disabled:opacity-50";
 
 const WHO = { employee: "موظف", system: "النظام", murad: "مُراد" } as const;
-const BACK = { returned_to_employee: "عادت للموظف الذي أغلقها", unassigned: "عادت طلباً جديداً", kept: "فتحها موظف" } as const;
+const BACK = { returned_to_employee: "عادت للموظف الذي أغلقها", returned_to_file_owner: "عادت لصاحب الرحلة", unassigned: "عادت طلباً جديداً", kept: "فتحها موظف" } as const;
 const when = (iso: string) => new Date(iso).toLocaleString("ar-SA-u-nu-latn", { timeZone: "Asia/Riyadh", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
 
 export function ConversationsAdmin({ initial }: { initial: Data }) {
@@ -44,6 +44,14 @@ export function ConversationsAdmin({ initial }: { initial: Data }) {
     const r = await saveAutoclose(next);
     setBusy(null);
     setMsg(r.ok ? { ok: true, text: next ? `حُفظ — يبدأ الإغلاق خلال 5 دقائق: بعد ${durationText(next)} بلا رد` : "أُوقف الإغلاق التلقائي" } : { ok: false, text: r.error });
+    if (r.ok) router.refresh();
+  };
+  const toggleTravellers = async (on: boolean) => {
+    setBusy("travellers");
+    setMsg(null);
+    const r = await saveTravellersClose(on);
+    setBusy(null);
+    setMsg(r.ok ? { ok: true, text: on ? "شُغّل تصنيف المسافرين" : "أُوقف تصنيف المسافرين" } : { ok: false, text: r.error });
     if (r.ok) router.refresh();
   };
 
@@ -88,6 +96,19 @@ export function ConversationsAdmin({ initial }: { initial: Data }) {
               من {preview.open} محادثة مفتوحة الآن سيُغلق <b>{preview.close}</b> (حتى 20 كل 5 دقائق)، ولن يُمس <b>{preview.waiting}</b> عميلاً ينتظر رداً.
             </p>
           ) : null}
+        </section>
+
+        <section className={CARD}>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className={H}>مؤكد — مسافر قريباً</h2>
+            <button type="button" onClick={() => toggleTravellers(!initial.travellers)} disabled={busy !== null} className={`${BTN} ${initial.travellers ? "border border-[#f1c5ce] bg-white text-[#a3263f]" : "bg-[#2aa87a] text-white"}`}>
+              {busy === "travellers" ? <Loader2 className="size-4 animate-spin" /> : null} {initial.travellers ? "إيقاف" : "تشغيل"}
+            </button>
+          </div>
+          <p className="text-[12.5px] leading-6 text-[#335f59]">
+            {initial.travellers ? "يعمل: " : "متوقف: "}
+            محادثة العميل الذي له رحلة مؤكدة — ملف عمليات أو مُدخل في «المؤكدون خارج النظام» — تُغلق بتصنيف «مسافر-قريبا» بعد ساعة من آخر رسالة منّا (ولا تُغلق إذا كان ينتظر رداً). إذا كتب العميل حتى ثلاثة أيام بعد عودته تذهب مباشرة لصاحب الرحلة وليس كطلب جديد، وبعدها القواعد العادية. الربط برقم الجوال؛ من ليس له رحلة مسجلة يتبع القواعد العادية.
+          </p>
         </section>
 
         <section className={CARD}>

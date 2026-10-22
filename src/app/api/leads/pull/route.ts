@@ -3,8 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { pullSheet } from "@/lib/leads/sync";
 import { pullTeletel } from "@/lib/leads/teletel-pull";
-import { closeStale } from "@/lib/leads/lifecycle";
-import { AUTOCLOSE_SETTING, readAutocloseHours } from "@/lib/leads/lifecycle-rules";
+import { closeIdle } from "@/lib/leads/lifecycle";
+import { AUTOCLOSE_SETTING, readAutocloseHours, TRAVELLERS_SETTING } from "@/lib/leads/lifecycle-rules";
 import { getTeletelConfig } from "@/lib/providers/teletel";
 import { recordCronRun } from "@/lib/data/cron-runs";
 
@@ -34,10 +34,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // phase two: Teletel's conversations; the sheet only where Teletel is not configured
     const result = getTeletelConfig() ? await pullTeletel(service) : await pullSheet(service);
     if (result.error) throw new Error(result.error);
-    // the system's closing (leads/lifecycle.ts): off until «إدارة المحادثات» sets how long without a reply closes one
-    const { data: setting } = await service.from("app_settings").select("value").eq("key", AUTOCLOSE_SETTING).maybeSingle();
-    const hours = readAutocloseHours((setting as { value: string } | null)?.value);
-    return hours && getTeletelConfig() ? { ...result, autoClosed: await closeStale(hours) } : result;
+    // the system's closings (leads/lifecycle.ts), both set on «إدارة المحادثات»: the confirmed travellers (on unless
+    // stopped there) and, once a time is set, the conversations nobody answered that long
+    const { data: settings } = await service.from("app_settings").select("key, value").in("key", [AUTOCLOSE_SETTING, TRAVELLERS_SETTING]);
+    const v = new Map(((settings ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
+    const opts = { hours: readAutocloseHours(v.get(AUTOCLOSE_SETTING)), travellers: v.get(TRAVELLERS_SETTING) !== "off" };
+    return getTeletelConfig() ? { ...result, closed: await closeIdle(opts) } : result;
   });
   return NextResponse.json({ ok: true, ...summary });
 }

@@ -1,4 +1,4 @@
-import { fold } from "./sheet";
+import { fold, normalizePhone } from "./sheet";
 
 /** Pure rules of the conversation's life in Teletel — the doing is lifecycle.ts. */
 
@@ -49,6 +49,88 @@ export const readAutocloseHours = (raw: string | null | undefined): number | nul
 export function staleToClose<T extends { lastActivityAt: number; waitingSince: number }>(rows: readonly T[], nowSec: number, hours: number): T[] {
   if (!(hours > 0)) return [];
   return rows.filter((c) => c.waitingSince === 0 && c.lastActivityAt > 0 && c.lastActivityAt <= nowSec - hours * 3600).sort((a, b) => a.lastActivityAt - b.lastActivityAt);
+}
+
+// ---------- «مؤكد — مسافر قريباً» (the user, 2026-10-22: linked by the mobile; no file, the normal rules) ----------
+
+export const TRAVELLERS_SETTING = "conversation_travellers_close";
+export const TRAVEL_LABEL = "مسافر-قريبا";
+/** operations.client_status of a confirmed trip — not awaiting the client, not done, not cancelled */
+export const CONFIRMED_TRIP = ["confirmed", "paid_partial", "paid_full"];
+
+/** the last 9 digits: one Saudi mobile however written (+9665…, 05…, 9665…) */
+export function phoneKey(raw: string | null | undefined): string | null {
+  const d = normalizePhone(raw ?? "");
+  return d.length >= 9 ? d.slice(-9) : null;
+}
+
+/**
+ * A trip the client is confirmed on, and whose it is: an operations file (its
+ * operations employee, else the seller), or a trip entered by hand in
+ * «المؤكدون خارج النظام» (whoever entered it).
+ */
+export type TravelFile = { source: "operation" | "external"; id: string; serial: string | null; destination: string | null; travelStart: string | null; travelEnd: string; phones: string[]; ownerName: string | null; ownerAgentId: number | null };
+
+/** until when a return goes to the file's owner: the return date + 3 days */
+export function travelUntil(travelEnd: string): string {
+  const d = new Date(`${travelEnd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 3);
+  return d.toISOString().slice(0, 10);
+}
+
+/** a traveller's conversation closes only once nobody is mid-exchange: we spoke last an hour ago */
+const TRAVEL_IDLE_SEC = 3600;
+
+/** Open conversations of confirmed travellers, matched by the mobile — the latest trip when a client has two. */
+export function travellersToClose<T extends { phone: string; lastActivityAt: number; waitingSince: number }>(rows: readonly T[], files: readonly TravelFile[], nowSec: number, today: string): { c: T; file: TravelFile }[] {
+  const byPhone = new Map<string, TravelFile>();
+  for (const f of [...files].sort((a, b) => b.travelEnd.localeCompare(a.travelEnd))) {
+    if (today > travelUntil(f.travelEnd)) continue;
+    for (const p of f.phones) {
+      const k = phoneKey(p);
+      if (k && !byPhone.has(k)) byPhone.set(k, f);
+    }
+  }
+  return rows.flatMap((c) => {
+    const file = byPhone.get(phoneKey(c.phone) ?? "");
+    return file && c.waitingSince === 0 && c.lastActivityAt > 0 && nowSec - c.lastActivityAt >= TRAVEL_IDLE_SEC ? [{ c, file }] : [];
+  });
+}
+
+/** A traveller wrote: until the return + 3 days, the file's owner (already theirs: nothing to do); after, null — the normal rules. */
+export function travellerReturn(until: string | null, today: string, ownerAgentId: number | null, assigneeId: number | null): ReturnDecision | null {
+  if (!until || today > until) return null;
+  return ownerAgentId && ownerAgentId !== assigneeId ? { act: "assign", agentId: ownerAgentId } : { act: "keep" };
+}
+
+// ---------- «المؤكدون خارج النظام» (the user, 2026-10-22): a confirmed client from before the system, by hand ----------
+
+export const EXTERNAL_STATUS = { confirmed: "مؤكد", paid_partial: "مدفوع جزئياً", paid_full: "مدفوع بالكامل", cancelled: "ملغي" } as const;
+export type ExternalStatus = keyof typeof EXTERNAL_STATUS;
+export const CONFIRMED_ITEMS = ["طيران", "فندق", "مواصلات", "جولات", "تأشيرة", "تأمين"] as const;
+
+export type ExternalTripInput = { phone: string; travelStart: string; days: number; destination: string; status: string; paidAmount: number | null; confirmed: string[] };
+export type ExternalTrip = { phone: string; travel_start: string; days: number; destination: string; status: ExternalStatus; paid_amount: number | null; confirmed_items: string[] };
+
+/** The form as typed → a row, or what to fix (in the words the form shows). */
+export function readExternalTrip(i: ExternalTripInput): { ok: true; row: ExternalTrip } | { ok: false; error: string } {
+  const phone = normalizePhone(i.phone);
+  if (phone.length < 9) return { ok: false, error: "رقم الجوال غير صحيح" };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(i.travelStart) || Number.isNaN(Date.parse(i.travelStart))) return { ok: false, error: "تاريخ السفر مطلوب" };
+  if (!Number.isInteger(i.days) || i.days < 1 || i.days > 365) return { ok: false, error: "عدد الأيام بين 1 و365" };
+  const destination = i.destination.trim().slice(0, 80);
+  if (!destination) return { ok: false, error: "الوجهة مطلوبة" };
+  if (!(i.status in EXTERNAL_STATUS)) return { ok: false, error: "اختر الحالة" };
+  if (i.paidAmount !== null && !(Number.isFinite(i.paidAmount) && i.paidAmount >= 0 && i.paidAmount < 10_000_000)) return { ok: false, error: "المبلغ المدفوع غير صحيح" };
+  const confirmed = CONFIRMED_ITEMS.filter((x) => i.confirmed.includes(x));
+  return { ok: true, row: { phone, travel_start: i.travelStart, days: i.days, destination, status: i.status as ExternalStatus, paid_amount: i.paidAmount, confirmed_items: confirmed } };
+}
+
+/** the return date of a hand-entered trip: the start + its days */
+export function externalTripEnd(travelStart: string, days: number): string {
+  const d = new Date(`${travelStart}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 /** «3 أيام»، «36 ساعة» */

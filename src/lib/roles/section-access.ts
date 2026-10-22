@@ -67,6 +67,8 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   ["/partner-companies", "settings.manage"],
   // «حجوزات المطار» (0100): operations confirm, the administration sets the margin and the login
   ["/almatar-bookings", ["operations.write", "settings.manage"]],
+  // «المؤكدون خارج النظام»: sales' own record of clients confirmed before the system (the user, 2026-10-22)
+  ["/confirmed-trips", "offers.write"],
   // «العملاء» (0107): a section like the others, so it can be taken from a role or a colleague
   ["/clients", "clients.view"],
   ["/followups", ["followups.work", "followups.manage", "dashboard.admin", "developer.access"]],

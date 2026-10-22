@@ -175,6 +175,8 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.readyOffers", href: "/ready-offers", perm: "offers.write" },
       // Issued only. Drafts stay where they are made.
       { labelKey: "nav.issuedOffers", href: "/offers", perm: "offers.write" },
+      // confirmed clients from before the system, by hand — no offer (the user, 2026-10-22)
+      { labelKey: "nav.externalTrips", href: "/confirmed-trips", perm: "offers.write" },
       // the offers by stage — sales work, not a reference table
       { labelKey: "nav.kanban", href: "/kanban-board" },
       { labelKey: "nav.repackage", href: "/repackage", perm: "repackage.write" },

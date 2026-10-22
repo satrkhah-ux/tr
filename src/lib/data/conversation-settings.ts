@@ -5,7 +5,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
 import { logAudit } from "@/lib/data/audit";
 import { getTeletelConfig, listOpenConversations } from "@/lib/providers/teletel";
-import { AUTOCLOSE_SETTING, readAutocloseHours, staleToClose } from "@/lib/leads/lifecycle-rules";
+import { AUTOCLOSE_SETTING, readAutocloseHours, staleToClose, TRAVELLERS_SETTING } from "@/lib/leads/lifecycle-rules";
 
 /**
  * «الإدارة ← إدارة المحادثات» (the user, 2026-10-22: «اضف هذه الخيارات في
@@ -25,20 +25,23 @@ export type ClosureRow = {
   closed_by_name: string | null;
   reason: string | null;
   reopened_at: string | null;
-  reopen_action: "returned_to_employee" | "unassigned" | "kept" | null;
+  reopen_action: "returned_to_employee" | "returned_to_file_owner" | "unassigned" | "kept" | null;
+  travel_until: string | null;
 };
 
-export type ConversationsAdmin = { hours: number | null; closures: ClosureRow[]; teletelBase: string | null };
+export type ConversationsAdmin = { hours: number | null; travellers: boolean; closures: ClosureRow[]; teletelBase: string | null };
 
 export async function getConversationsAdmin(): Promise<ConversationsAdmin | null> {
   if (!(await allowed())) return null;
-  const [{ data: setting }, { data: closures }] = await Promise.all([
-    db().from("app_settings").select("value").eq("key", AUTOCLOSE_SETTING).maybeSingle(),
-    db().from("conversation_closures").select("conversation_id, closed_at, closed_by_kind, closed_by_name, reason, reopened_at, reopen_action").order("closed_at", { ascending: false }).limit(40),
+  const [{ data: settings }, { data: closures }] = await Promise.all([
+    db().from("app_settings").select("key, value").in("key", [AUTOCLOSE_SETTING, TRAVELLERS_SETTING]),
+    db().from("conversation_closures").select("conversation_id, closed_at, closed_by_kind, closed_by_name, reason, reopened_at, reopen_action, travel_until").order("closed_at", { ascending: false }).limit(40),
   ]);
+  const v = new Map(((settings ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
   const config = getTeletelConfig();
   return {
-    hours: readAutocloseHours((setting as { value: string } | null)?.value),
+    hours: readAutocloseHours(v.get(AUTOCLOSE_SETTING)),
+    travellers: v.get(TRAVELLERS_SETTING) !== "off",
     closures: (closures ?? []) as ClosureRow[],
     teletelBase: config ? `${config.baseUrl}/app/accounts/${config.accountId}/conversations` : null,
   };
@@ -65,5 +68,16 @@ export async function saveAutoclose(hours: number | null): Promise<Result> {
     : await db().from("app_settings").delete().eq("key", AUTOCLOSE_SETTING);
   if (error) return { ok: false, error: "تعذّر الحفظ" };
   await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: AUTOCLOSE_SETTING, meta: { before: (before as { value: string } | null)?.value ?? null, after: h } });
+  return { ok: true };
+}
+
+/** «مؤكد — مسافر قريباً»: on unless stopped here (the user approved it, 2026-10-22). */
+export async function saveTravellersClose(on: boolean): Promise<Result> {
+  if (!(await allowed())) return { ok: false, error: "لا صلاحية" };
+  const { error } = on
+    ? await db().from("app_settings").delete().eq("key", TRAVELLERS_SETTING)
+    : await db().from("app_settings").upsert({ key: TRAVELLERS_SETTING, value: "off", updated_at: new Date().toISOString() });
+  if (error) return { ok: false, error: "تعذّر الحفظ" };
+  await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: TRAVELLERS_SETTING, meta: { after: on ? "on" : "off" } });
   return { ok: true };
 }
