@@ -104,6 +104,7 @@ export function visaFreeText(country: string): string {
 }
 export const isSaudi = (nationality: string | null) => Boolean(nationality && /سعود|saudi/i.test(nationality));
 
+export const VISA_WHICH_COUNTRY = "عشان أعطيك السعر والمتطلبات: تكرماً اكتب الدولة اللي تبي تأشيرتها؟";
 export const VISA_CLOSING = "سيتواصل معك زميلنا في قسم التأشيرات لإكمال الطلب.";
 
 const KIND_WORDS: Record<VisaKind, string> = { tourist: "سياحية", medical: "علاجية", study: "دراسة", work: "عمل", family: "زيارة عائلية", other: "أخرى (عبور أو غيره)" };
@@ -186,7 +187,7 @@ type ListRow = VisaRow & { country_id?: string | null };
 
 export type VisaStep =
   /** the one question — or, for «أسهل تأشيرة», the advice that ends in it */
-  | { do: "ask"; text: string }
+  | { do: "ask"; text: string; advice?: boolean }
   /** a Saudi party to a country the catalogue marks visa-free — no hand-over */
   | { do: "free"; country: string }
   /** the list's answer (row), or the hand-over line alone (null) — then «قسم فيزا» */
@@ -204,15 +205,20 @@ const isHome = (country: string | null) => Boolean(country && /سعودي|الم
  * are a resident's); a non-tourist visa — the team's, never the tourist price;
  * else the list's answer.
  */
-export function visaStep(i: { a: VisaAsk | null; facts: VisaFacts; asked: boolean; countries: VisaCountry[]; rows: ListRow[]; includePrice: boolean; schengen?: string[]; clientText?: string }): VisaStep {
+export function visaStep(i: { a: VisaAsk | null; facts: VisaFacts; asked: boolean; asks?: number; countries: VisaCountry[]; rows: ListRow[]; includePrice: boolean; schengen?: string[]; clientText?: string }): VisaStep {
   const { a, facts } = i;
   if (a?.status_query || a?.inbound || isHome(facts.country)) return { do: "answer", row: null };
   const need = visaNeed(facts);
-  if (!facts.country && (a?.advice || (a && ADVICE.test(i.clientText ?? ""))) && !facts.schengen && !i.asked) return { do: "ask", text: visaAdviceText({ facts, a, countries: i.countries, rows: i.rows, includePrice: i.includePrice }) };
+  // how many times this visit asked already: «اسهل دولة» answering the first question still gets the advice (2026-10-23)
+  const asks = i.asks ?? (i.asked ? 1 : 0);
+  if (!facts.country && (a?.advice || (a && ADVICE.test(i.clientText ?? ""))) && !facts.schengen && asks < 2) return { do: "ask", advice: true, text: visaAdviceText({ facts, a, countries: i.countries, rows: i.rows, includePrice: i.includePrice }) };
   const country = i.countries.find((c) => facts.country && fold(c.arabic_name) === fold(facts.country));
   // a Saudi party to a visa-free country needs no count first
   if (country?.visa_required === false && saudiParty(facts, a)) return { do: "free", country: country.arabic_name };
-  if (need.length && !i.asked) return { do: "ask", text: visaAskText(facts, need, i.schengen) };
+  if (need.length && asks === 0) return { do: "ask", text: visaAskText(facts, need, i.schengen) };
+  // still no country after the question and the client still writing («كم السعر؟»): the country alone, once more —
+  // never handed over blind (2026-10-23). The unanswered follow-through (a null) hands over.
+  if (!facts.country && asks >= 1 && asks < 3 && a) return { do: "ask", text: facts.schengen ? visaAskText(facts, ["country"], i.schengen) : VISA_WHICH_COUNTRY };
   if (facts.kind && facts.kind !== "tourist") return { do: "answer", row: null };
   return { do: "answer", row: visaRowFor(i.rows, country?.id ?? null, facts.country) };
 }

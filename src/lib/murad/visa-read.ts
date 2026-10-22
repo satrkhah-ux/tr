@@ -1,7 +1,7 @@
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
 import { datesSaid } from "./auto-offer";
 import { withoutAd } from "./reception";
-import type { VisaAsk } from "./visa";
+import { ADVICE, type VisaAsk } from "./visa";
 
 /**
  * A visa request from the whole visit (the owner, 2026-10-19: «كأن مراد موظف
@@ -99,7 +99,7 @@ export async function visaFaqAnswer(i: { faq: string; transcript: string; countr
       name: "visa_faq",
       system: [
         "You answer for a travel company in Saudi Arabia on WhatsApp. Below is the company's own visa Q&A, then one visit of a client's conversation (oldest first, «العميل» = the client, «مُراد» = us).",
-        "answer: reply to what the client's LATEST lines ask that the Q&A answers — only facts written in the Q&A, in its numbers and names, never anything else you know. A question about a country takes that country's section only («شنجن» covers the Schengen states). When the answer depends on whether the client is Saudi or a resident and that is not known, give both as the Q&A does.",
+        "answer: reply to what the client's LATEST lines ask that the Q&A answers — only facts written in the Q&A, in its numbers and names, never anything else you know. A question about a country takes that country's section only («شنجن» covers the Schengen states); a section never answers a question that names neither it nor one of its states — «اسهل دولة» / «أسهل تأشيرة» alone is null, not the Schengen embassy. When the answer depends on whether the client is Saudi or a resident and that is not known, give both as the Q&A does.",
         "Give the Q&A's WHOLE answer — every figure, fee, period, condition and exception it states (the fingerprint fee, the six months the officer reads) — never a part of it. Short Saudi Arabic, one to four lines, no greeting, no question back. A «ملاحظة» line is an answer too, and so is an answer that says there is no fixed figure («غير مذكور رصيد معين…») — say it with the rest of what it says. null when the Q&A does not answer it, and ALWAYS null for the visa's price or cost («كم سعر», «بكم», «كم التكلفة») — the price list answers it; what a fee INCLUDES («وش تشمل الرسوم») and any one paper's details (the balance, a sponsor, where to give fingerprints) are the Q&A's.",
         "",
         "## أسئلة وأجوبة الشركة",
@@ -116,7 +116,11 @@ export async function visaFaqAnswer(i: { faq: string; transcript: string; countr
     // the price is the list's, never the Q&A's fees («كم سعر تأشيرة فرنسا» got the office's 350 and Medina's 1100)
     const last = i.transcript.split("\n").filter((l) => l.startsWith("العميل")).at(-1) ?? "";
     if (PRICE_ASK.test(last) && !/تشمل|يشمل/u.test(last)) return null;
-    return a && a !== "null" ? a : null;
+    // «أسهل تأشيرة» with no Europe or embassy in it is the list's advice (visa.ts), not «أسهل سفارة شنغن» (2026-10-23)
+    if (ADVICE.test(last) && !/شنغن|شنجن|شينغن|[اأ]ور?وب|سفار/u.test(last)) return null;
+    // the Q&A's own «ج:» is no part of the answer
+    const clean = a?.replace(/^ج\s*:\s*/u, "").trim();
+    return clean && clean !== "null" ? clean : null;
   } catch {
     return null;
   }

@@ -15,7 +15,7 @@ import { readVisa, visaFaqAnswer } from "./visa-read";
 import { VISA_FREE_ASK, visaFacts, visaStep, type VisaCountry, type VisaFacts, type VisaRow } from "./visa";
 
 type Want = "ask" | "advice" | "answer" | "handoff" | "free" | "trip";
-type Case = { t: string[]; want: Want | Want[]; country?: string; asked?: boolean; before?: Partial<VisaFacts> };
+type Case = { t: string[]; want: Want | Want[]; country?: string; asked?: boolean; asks?: number; before?: Partial<VisaFacts> };
 
 const FORM = (c: string, n = "_", nat = "_") => `أهلًا، ممكن تفيدوني بتفاصيل أكثر عن تأشيرة (${c})؟ 🌍 - عدد المتقدمين: ${n} - الجنسية: ${nat} - أي طلبات أو تفاصيل إضافية:`;
 const CASES: Case[] = [
@@ -84,6 +84,9 @@ const CASES: Case[] = [
   { t: ["ابي اسهل تأشيرة", "م: الأقل متطلبات عندنا: الهند، اندونيسيا، تايلاند، روسيا. أي دولة تفضّل؟ وتكرماً الجنسية، وعدد المتقدمين؟", "روسيا، يمني، شخصين"], want: "answer", country: "روسيا", asked: true },
   { t: ["تاشيره عمل لبريطانيا", "م: حياك الله، عشان أجهز لك تفاصيل تأشيرة المملكة المتحدة: تكرماً الجنسية، وعدد المتقدمين؟", "يمني واحد"], want: "handoff", asked: true, before: { country: "المملكة المتحدة", kind: "work" } },
   { t: ["تأشيرة الإمارات", "م: حياك الله، عشان أجهز لك تفاصيل تأشيرة الإمارات العربية المتحدة: تكرماً الجنسية، وعدد المتقدمين؟", "يمني مقيم، واحد"], want: "answer", country: "الإمارات العربية المتحدة", asked: true, before: { country: "الإمارات العربية المتحدة" } },
+  // the owner's test of 2026-10-23 00:45 (004471): «اسهل دولة» after the first question, then «كم السعر؟»
+  { t: ["عندكم تأشيرات ، جنسيتي سعودي", "م: أكيد نخدمك في التأشيرات، عشان أجهز لك التفاصيل: تكرماً الدولة المطلوبة، وعدد المتقدمين؟", "اسهل دولة"], want: "advice", asked: true, asks: 1, before: { nationality: "سعودي" } },
+  { t: ["عندكم تأشيرات ، جنسيتي سعودي", "م: أكيد نخدمك في التأشيرات، عشان أجهز لك التفاصيل: تكرماً الدولة المطلوبة، وعدد المتقدمين؟", "اسهل دولة", "م: الجواز السعودي ما يحتاج تأشيرة مسبقة لدول كثيرة… أي دولة تفضّل؟ وتكرماً عدد المتقدمين؟", "كم السعر ؟"], want: "ask", asked: true, asks: 2, before: { nationality: "سعودي" } },
   // held out — written after the tuning above and run once as they are (2026-10-23)
   { t: ["السلام عليكم", "ابي فيزا لبريطانيا انا وزوجتي", "سعوديين"], want: "answer", country: "المملكة المتحدة" },
   { t: ["كم سعر تأشيرة امريكا للمقيم المصري"], want: ["ask", "answer"], country: "الولايات المتحدة" },
@@ -133,7 +136,7 @@ describe.skipIf(!process.env["VISA_EVAL"])("Murad visa — real openings", () =>
         const a = await readVisa(k.t.map((l) => (l.startsWith("م:") ? `مُراد: ${l.slice(2).trim()}` : `العميل: ${l}`)).join("\n"), text, countries.map((x) => x.arabic_name));
         const before = k.before ? ({ country: null, nationality: null, applicants: null, travelDate: null, ...k.before } as VisaFacts) : null;
         const facts = visaFacts({ a, clientText: text, said: readRequest(text, places).country, before, countries });
-        const step = a?.wants_trip ? ({ do: "trip" } as const) : visaStep({ a, facts, asked: Boolean(k.asked), countries, rows, includePrice: true, clientText: text });
+        const step = a?.wants_trip ? ({ do: "trip" } as const) : visaStep({ a, facts, asked: Boolean(k.asked), asks: k.asks, countries, rows, includePrice: true, clientText: text });
         const got: Want = step.do === "trip" ? "trip" : step.do === "free" ? "free" : step.do === "answer" ? (step.row ? "answer" : "handoff") : /أي دولة تفضّل/.test(step.text) ? "advice" : "ask";
         const wants = ([] as Want[]).concat(k.want);
         const countryOk = !k.country || (got === "advice" || got === "trip" ? true : facts.country === k.country);
@@ -166,6 +169,8 @@ const FAQ: { t: string; country: string | null; has: RegExp | null }[] = [
   { t: "كم نسبة القبول في تأشيرة فرنسا؟", country: "فرنسا", has: null },
   { t: "تأشيرة الهند كم تاخذ وقت؟", country: "الهند", has: null },
   { t: "كم سعر تأشيرة فرنسا؟", country: "فرنسا", has: null },
+  { t: "اسهل دولة", country: null, has: null },
+  { t: "وش اسهل تأشيرة؟ انا سعودي", country: null, has: null },
 ];
 
 describe.skipIf(!process.env["VISA_EVAL"])("Murad visa — the company's Q&A", () => {

@@ -655,10 +655,10 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
         const salam = request.salam && received.length === 0;
         const start = visitLines.find((t) => t.fromClient)?.at ?? since;
         const schengen = facts.schengen ? list.rows.filter((v) => SCHENGEN.has(list.countries.find((c) => c.id === v.country_id)?.iso2 ?? "")).map((v) => v.country) : [];
-        const step = visaStep({ a, facts, asked: asked.length > 0, countries: list.countries, rows: list.rows, includePrice: settings.control.includePrice, schengen, clientText: flowText });
+        const step = visaStep({ a, facts, asked: asked.length > 0, asks: asked.filter((r) => r.reason === "visa:asked1").length, countries: list.countries, rows: list.rows, includePrice: settings.control.includePrice, schengen, clientText: flowText });
         if (step.do === "ask") {
           // the client's own question first, from the company's Q&A, then the one question
-          const text = `${salam ? "وعليكم السلام ورحمة الله، " : ""}${faq ? `${faq}\n\n` : ""}${step.text}`;
+          const text = `${salam ? "وعليكم السلام ورحمة الله، " : ""}${faq && !step.advice ? `${faq}\n\n` : ""}${step.text}`;
           const replyId = await sendTeletelMessage(m.conversationId, text);
           if (!replyId) { await finish({ reason: "send_failed", reply: text, error: "send_failed" }); return "send_failed"; }
           await finish({ reason: "visa:asked1", reply: text, reply_message_id: replyId, intake: { ...intake, country: facts.country, visa_flow: facts } });

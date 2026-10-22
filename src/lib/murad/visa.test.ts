@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSaudi, repeatsMurad, VISA_FREE_ASK, visaFacts, visaFreeText, VISA_CLOSING, visaAskText, visaFlowNote, visaFlowText, visaNeed, visaRowFor, visaStep, type VisaAsk, type VisaCountry, type VisaFacts, type VisaRow } from "./visa";
+import { isSaudi, repeatsMurad, VISA_FREE_ASK, VISA_WHICH_COUNTRY, visaFacts, visaFreeText, VISA_CLOSING, visaAskText, visaFlowNote, visaFlowText, visaNeed, visaRowFor, visaStep, type VisaAsk, type VisaCountry, type VisaFacts, type VisaRow } from "./visa";
 import { withoutAd } from "./reception";
 
 const france: VisaRow = {
@@ -139,5 +139,21 @@ describe("visaStep — the questions of 120 real visa conversations (2026-10-23)
   it("the ad's slogan and audience are not the client's words", () => {
     expect(withoutAd("مرحبا بكم في ترافليون ✈️| احجز بكجات سفر مع ترافليون انا مهتم بـ تأشيرة أمريكا السياحية للسعوديين والمقيمين | ترافليون")).not.toMatch(/بكجات|سعوديين|مقيمين/);
     expect(VISA_FREE_ASK.test("أي دولة اقدر اسافر لها بدون فيزا؟")).toBe(true);
+  });
+});
+
+describe("the owner's test of 2026-10-23 00:45 — «اسهل دولة» then «كم السعر؟»", () => {
+  const countries: VisaCountry[] = [{ id: "ge", arabic_name: "جورجيا", iso2: "GE", visa_required: false }];
+  const a: VisaAsk = { country: null, kind: "tourist", nationality: "SAU", nationality_ar: "سعودي", applicants: null, travel_date: null, refused_before: null, special: null, others: [] };
+  const facts: VisaFacts = { country: null, nationality: "سعودي", applicants: null, travelDate: null };
+  const step = (asks: number, clientText: string, ask: VisaAsk | null = a) => visaStep({ a: ask, facts, asked: asks > 0, asks, countries, rows: [], includePrice: true, clientText });
+  it("the advice still comes after the first question, and is marked as advice", () => {
+    expect(step(1, "اسهل دولة")).toMatchObject({ do: "ask", advice: true });
+  });
+  it("no country yet and the client still writing: the country alone, not a blind hand-over — at most three asks", () => {
+    expect(step(2, "كم السعر ؟")).toEqual({ do: "ask", text: VISA_WHICH_COUNTRY });
+    expect(step(3, "كم السعر ؟")).toEqual({ do: "answer", row: null });
+    // the unanswered follow-through hands over
+    expect(step(1, "", null)).toEqual({ do: "answer", row: null });
   });
 });
