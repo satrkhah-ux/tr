@@ -813,5 +813,8 @@ export function inferDestinations(labels: string[], attributes: Record<string, u
 export async function assignMuradHandoff(conversationId: number, teamId: number | null, agentId: number | null): Promise<boolean> {
   const config = getTeletelConfig();
   if (!config || (!teamId && !agentId)) return false;
-  return (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { team_id: teamId, assignee_id: agentId })) !== null;
+  // one field per call: Teletel (Chatwoot) reads assignee_id whenever the key is sent — null unassigns the
+  // agent and team_id is ignored (2026-10-22: «بكج جورجيا» stayed with «قسم فيزا», nobody on it)
+  if (teamId && (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { team_id: teamId })) === null) return false;
+  return !agentId || (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { assignee_id: agentId })) !== null;
 }

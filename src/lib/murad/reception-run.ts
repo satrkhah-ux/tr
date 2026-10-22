@@ -414,12 +414,16 @@ async function markLead(
 async function visaConversation(service: SupabaseClient, m: IncomingMessage): Promise<boolean> {
   const explicit = readRequest(m.content, []);
   if (explicit.kind) return explicit.kind === "تأشيرات";
-  const [{ data: lead }, thread] = await Promise.all([
+  const [{ data: lead }, thread, events] = await Promise.all([
     service.from("client_leads").select("inquiry").eq("teletel_conversation_id", m.conversationId).maybeSingle(),
     readThread(m.conversationId),
+    conversationEvents(m.conversationId),
   ]);
-  const latest = [...(thread?.messages ?? [])].reverse().filter((t) => t.fromClient && !t.isPrivate).map((t) => readRequest(t.text, []).kind).find(Boolean);
-  return latest ? latest === "تأشيرات" : lead?.inquiry === "تأشيرات";
+  if (!thread) return lead?.inquiry === "تأشيرات";
+  // this visit only: after a close, a bare «السلام عليكم» is a new visit, not the last visit's visa (2026-10-22)
+  const visitStart = Math.max(m.at - VISIT_SEC, lastClosedAt(events ?? [], m.at));
+  const latest = [...thread.messages].reverse().filter((t) => t.fromClient && !t.isPrivate && t.at >= visitStart).map((t) => readRequest(t.text, []).kind).find(Boolean);
+  return latest === "تأشيرات";
 }
 
 // ---------- the visa flow (visa.ts): the list, the answer and the hand-over ----------
