@@ -119,6 +119,7 @@ import { ServicesStage } from "../generator/stages/ServicesStage";
 import { TermsStage } from "../generator/stages/TermsStage";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useDraftState } from "../generator/useDraftState";
+import { useNewDeploy } from "../useNewDeploy";
 import { BasicHotelsStep } from "./BasicHotelsStep";
 import { BasicCityCard } from "./BasicCityCard";
 import { BasicFlightPlan } from "./BasicFlightPlan";
@@ -329,7 +330,14 @@ export function BasicEditor({
   // the full generator's pages, while the developer has the legacy generator on
   // (a partner always: it is their «ملفاتي») — off, its addresses only lead back here
   const legacyOpen = useCanOpen()({ href: "/package-generator" });
-  const { data, patch, replace, flush, saveState } = useDraftState(draftId, initialData, savedAt);
+  const { data, patch, replace, flush, saveState, restored } = useDraftState(draftId, initialData, savedAt);
+  const [restoredSeen, setRestoredSeen] = useState(false);
+  // a new deploy: what is typed goes up first, then the bar — the agent reloads when ready
+  const newDeploy = useNewDeploy();
+  const [deployBar, setDeployBar] = useState(false);
+  useEffect(() => {
+    if (newDeploy) void flush().finally(() => setDeployBar(true));
+  }, [newDeploy, flush]);
   const trip = data.trip;
   const country = findLookupCountry(lookups.countries, trip.country);
   const cities = data.cities as BasicCity[];
@@ -1889,6 +1897,18 @@ export function BasicEditor({
     <TraveliunShell title="nav.basic">
       <FieldIssueProvider issues={[...validation.blocking, ...validation.warnings]} render={issueText}>
         <div className="tv-fade-up space-y-3">
+          {deployBar ? (
+            <div role="status" className="flex flex-wrap items-center gap-2 rounded-[12px] border border-[#f2d39a] bg-[#fff8e8] px-3 py-2 text-[12.5px] font-bold text-[#8a5a0c]">
+              <span className="min-w-0 flex-1">{tx("newDeploy")}</span>
+              <button
+                type="button"
+                onClick={() => void flush().finally(() => window.location.reload())}
+                className="inline-flex h-8 items-center rounded-[8px] bg-[#8a5a0c] px-3 text-[12px] font-bold text-white"
+              >
+                {tx("reload")}
+              </button>
+            </div>
+          ) : null}
           {/* top bar — no «كل الملفات» and no «فتح في المولّد الكامل»: both led staff astray (the owner, 2026-10-18);
               the files list is the side menu's «النظام بيسك», the generator only answers a «أصلح» */}
           <div className="flex flex-wrap items-center gap-2">
@@ -1908,6 +1928,15 @@ export function BasicEditor({
                 className="inline-flex h-8 items-center rounded-[8px] bg-[#c22850] px-2.5 text-[11.5px] font-bold text-white"
               >
                 {tx("reload")}
+              </button>
+            ) : null}
+            {restored && !restoredSeen ? (
+              <button
+                type="button"
+                onClick={() => setRestoredSeen(true)}
+                className="inline-flex h-8 items-center gap-1 rounded-full bg-[#e8f1fb] px-2.5 text-[11.5px] font-bold text-[#1d5fa8]"
+              >
+                {tx("restored")} ×
               </button>
             ) : null}
             {produced && !partnerSession ? <BasicFileStatus draftId={draftId} serial={produced} variant="chip" refresh={statusTick} /> : null}

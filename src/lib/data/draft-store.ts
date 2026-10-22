@@ -46,7 +46,8 @@ export type DraftRow = {
   created_by: string | null;
   maker: { arabic_name: string | null } | null;
 };
-export type SaveDraftResult = { ok: boolean; error?: TranslationKey };
+/** `savedAt`: the time a stage save wrote — the browser keeps its unsaved edits against it (useDraftState). */
+export type SaveDraftResult = { ok: boolean; error?: TranslationKey; savedAt?: string };
 export type InsertDraftResult = { ok: true; id: string } | { ok: false; error: TranslationKey };
 
 /** The latest 100 drafts this caller may see. */
@@ -125,14 +126,15 @@ export async function writeDraftStages(
     if (!record) return { ok: false, error: "err.loadFailed" };
     const merged: DraftData = { ...record.data, ...(restore ? restore(slices, record.data, record.partner_company_id) : slices) };
     const title = merged.customer.customer_name || merged.trip.destination || merged.trip.country || null;
+    const savedAt = new Date().toISOString();
     let query = a.db
       .from("offer_drafts")
-      .update({ data: merged as unknown as Record<string, unknown>, title, updated_at: new Date().toISOString() })
+      .update({ data: merged as unknown as Record<string, unknown>, title, updated_at: savedAt })
       .eq("id", draftId);
     if (a.partnerId) query = query.eq("partner_company_id", a.partnerId);
     const { error } = await query;
     if (error) return { ok: false, error: "err.updateFailed" };
-    return { ok: true };
+    return { ok: true, savedAt };
   } catch {
     return { ok: false, error: "err.db" };
   }

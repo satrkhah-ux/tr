@@ -4,35 +4,33 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { saveDraftStages } from "@/lib/data/drafts";
 import type { DraftData } from "@/lib/offer/draft-types";
 import { withFlightTotals } from "@/lib/offer/flight-fare";
+import { pendingToReplay } from "./pending-edits";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
 /**
  * What has not reached the server yet, kept in the browser too: a deploy
  * mid-shift turned the save into a 404 and the reload that followed lost the
- * prices just typed. It comes back only onto a draft saved BEFORE it was
- * typed — never over a newer save from another screen — and only within
- * twelve hours. Signing out clears it (clearPendingDrafts).
+ * prices just typed. It comes back only onto the save it was typed on, or onto
+ * one older than it — never over a newer save from another screen — and only
+ * within twelve hours (pending-edits.ts). Signing out clears it
+ * (clearPendingDrafts). Nothing secret goes in: the draft as this agent sees it.
  */
 export const PENDING_PREFIX = "tv-draft-pending:";
 const PENDING_KEY = (draftId: string) => `${PENDING_PREFIX}${draftId}`;
-const PENDING_MAX_AGE = 12 * 3_600_000;
-function keepPending(draftId: string, slice: Partial<DraftData>) {
+function keepPending(draftId: string, slice: Partial<DraftData>, base: string | undefined) {
   try {
     if (Object.keys(slice).length === 0) window.localStorage.removeItem(PENDING_KEY(draftId));
-    else window.localStorage.setItem(PENDING_KEY(draftId), JSON.stringify({ at: Date.now(), slice }));
+    else window.localStorage.setItem(PENDING_KEY(draftId), JSON.stringify({ at: Date.now(), base, slice }));
   } catch {
     // private window, storage full — the server save still runs
   }
 }
 function readPending(draftId: string, savedAt: string): Partial<DraftData> | null {
   try {
-    const raw = window.localStorage.getItem(PENDING_KEY(draftId));
-    if (!raw) return null;
-    const { at, slice } = JSON.parse(raw) as { at: number; slice: Partial<DraftData> };
-    const fresh = Date.now() - at < PENDING_MAX_AGE && at > Date.parse(savedAt);
-    if (!fresh) window.localStorage.removeItem(PENDING_KEY(draftId));
-    return fresh && slice && typeof slice === "object" ? slice : null;
+    const slice = pendingToReplay(window.localStorage.getItem(PENDING_KEY(draftId)), savedAt, Date.now());
+    if (!slice) window.localStorage.removeItem(PENDING_KEY(draftId));
+    return slice;
   } catch {
     return null;
   }
@@ -72,6 +70,8 @@ export function useDraftState(
   replace: (next: DraftData) => void;
   flush: () => Promise<void>;
   saveState: SaveState;
+  /** edits a reload brought back from the browser (and sent up again) — say so once */
+  restored: boolean;
 } {
   const [raw, setData] = useState<DraftData>(initialData);
   // a «للفرد» flight total follows the travellers the moment they change, on every screen
@@ -82,6 +82,9 @@ export function useDraftState(
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const pendingRef = useRef<Partial<DraftData>>({});
   const timerRef = useRef<number | null>(null);
+  // the server's time of the last save this tab knows — what its kept edits build on
+  const baseRef = useRef(savedAt);
+  const [restored, setRestored] = useState(false);
 
   const flush = useCallback(async () => {
     const slice = pendingRef.current;
@@ -91,7 +94,8 @@ export function useDraftState(
     try {
       const result = await saveDraftStages(draftId, slice);
       if (!result.ok) pendingRef.current = { ...slice, ...pendingRef.current };
-      if (savedAt) keepPending(draftId, pendingRef.current);
+      else if (result.savedAt) baseRef.current = result.savedAt;
+      if (savedAt) keepPending(draftId, pendingRef.current, baseRef.current);
       setSaveState(result.ok ? "saved" : "error");
     } catch {
       // The call itself failed — offline, or this tab is from before a deploy
@@ -99,7 +103,7 @@ export function useDraftState(
       // so «جارٍ الحفظ» spun forever; now it says so, and the work is kept to
       // go up with the next save.
       pendingRef.current = { ...slice, ...pendingRef.current };
-      if (savedAt) keepPending(draftId, pendingRef.current);
+      if (savedAt) keepPending(draftId, pendingRef.current, baseRef.current);
       setSaveState("error");
     }
   }, [draftId, savedAt]);
@@ -108,7 +112,7 @@ export function useDraftState(
     (slice: Partial<DraftData>) => {
       setData((current) => ({ ...current, ...slice }));
       pendingRef.current = { ...pendingRef.current, ...slice };
-      if (savedAt) keepPending(draftId, pendingRef.current);
+      if (savedAt) keepPending(draftId, pendingRef.current, baseRef.current);
       if (timerRef.current) window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(() => void flush(), 700);
     },
@@ -123,6 +127,7 @@ export function useDraftState(
       if (!slice) return;
       setData((current) => ({ ...current, ...slice }));
       pendingRef.current = { ...slice, ...pendingRef.current };
+      setRestored(true);
       void flush();
     }, 0);
     return () => window.clearTimeout(restore);
@@ -132,7 +137,7 @@ export function useDraftState(
   const replace = useCallback(
     (next: DraftData) => {
       pendingRef.current = {};
-      if (savedAt) keepPending(draftId, {});
+      if (savedAt) keepPending(draftId, {}, baseRef.current);
       setData(next);
     },
     [draftId, savedAt],
@@ -146,5 +151,5 @@ export function useDraftState(
     };
   }, [flush]);
 
-  return { data, patch, replace, flush, saveState };
+  return { data, patch, replace, flush, saveState, restored };
 }

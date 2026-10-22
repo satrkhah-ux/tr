@@ -24,6 +24,8 @@ set -euo pipefail
 HOST=${HOST:-deploy@vps-new}  # HOST=vps-deploy ships to the standby server (187.124.112.104)
 DIR=apps/traveliun-app
 DOMAIN=pkg.traveliun.com
+# Every build's /_next/static, kept beside the app (which each deploy wipes): see «static» below.
+STATIC=apps/traveliun-static
 
 # Not during the working day (08:00–23:00 Riyadh): a deploy mid-shift turned the
 # agents' saves into 404s and lost what they had typed (2026-10-13, twice).
@@ -48,6 +50,7 @@ trap 'ssh "$HOST" "rm -rf $LOCK" >/dev/null 2>&1 || true' EXIT
 # The commit is pinned ONCE, here. Reading HEAD again at the end reported the
 # wrong commit when another one landed while this deploy was still building.
 SHIPPED=$(git rev-parse HEAD)
+DPL=${SHIPPED:0:12}
 echo "==> shipping ${SHIPPED:0:7}"
 ssh "$HOST" "mkdir -p ~/$DIR && find ~/$DIR -mindepth 1 -maxdepth 1 ! -name .env ! -name .dockercfg -exec rm -rf {} +"
 git archive --format=tar "$SHIPPED" | ssh "$HOST" "tar -x -C ~/$DIR"
@@ -63,11 +66,48 @@ echo "==> building"
 # downloading the chunk and reading it said the deploy had succeeded. A deploy
 # that can lie about what it shipped is worth more than the three minutes the
 # cache saves.
-ssh "$HOST" "cd ~/$DIR && mkdir -p .dockercfg && DOCKER_CONFIG=\$PWD/.dockercfg docker build --no-cache -q --build-arg NEXT_DEPLOYMENT_ID=${SHIPPED:0:12} -t traveliun-app:latest ."
+#
+# The Server Actions key goes in as a build SECRET (see the Dockerfile): fixed,
+# it keeps the actions' ids, so a tab open across the deploy still saves. It
+# lives only in the server's .env — a secret stays out of every layer and history.
+ssh "$HOST" "cd ~/$DIR && mkdir -p .dockercfg && NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=\$(grep -m1 '^NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=' .env | cut -d= -f2-) DOCKER_CONFIG=\$PWD/.dockercfg docker build --no-cache -q --secret id=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY --build-arg NEXT_DEPLOYMENT_ID=$DPL -t traveliun-app:latest ."
+
+# A tab opened before this deploy still asks for ITS chunks — content-hashed
+# names the new build does not have — and without them its buttons stopped
+# working (404s after the swap, 2026-10-22, twice). So the container serves
+# .next/static from ~/$STATIC/serve-<dpl>: this build's files copied over the
+# previous two builds' (~9 MB each; the newest wins on a shared name). Made
+# BEFORE the swap, so a failure here stops the deploy with the old container
+# still serving. A running container that does not mount it (the first run, or
+# one started some other way) has its own files kept first.
+echo "==> static files: this build + the previous two"
+ssh "$HOST" bash -s -- "$STATIC" "$DPL" <<'REMOTE'
+set -euo pipefail
+S=$HOME/$1 DPL=$2
+mkdir -p "$S/builds"
+if docker inspect traveliun-app >/dev/null 2>&1 \
+  && ! docker inspect -f '{{range .Mounts}}{{.Destination}} {{end}}' traveliun-app | grep -q /app/.next/static; then
+  run=$S/builds/running-$(date +%s)
+  docker cp traveliun-app:/app/.next/static "$run"
+  touch "$run"
+fi
+rm -rf "${S:?}/builds/$DPL"
+docker rm -f traveliun-static >/dev/null 2>&1 || true
+docker create --name traveliun-static traveliun-app:latest >/dev/null
+docker cp traveliun-static:/app/.next/static "$S/builds/$DPL"
+docker rm traveliun-static >/dev/null
+touch "$S/builds/$DPL"
+ls -1dt "$S"/builds/*/ | tail -n +4 | xargs -r rm -rf   # this build + the previous two
+rm -rf "${S:?}/serve-$DPL"; mkdir "$S/serve-$DPL"
+for b in $(ls -1dtr "$S"/builds/*/); do cp -a "${b}." "$S/serve-$DPL/"; done   # oldest first
+test -d "$S/serve-$DPL/chunks"
+echo "    kept: $(ls -t "$S/builds" | tr '\n' ' ')"
+REMOTE
 
 echo "==> restarting"
 ssh "$HOST" "cd ~/$DIR && docker rm -f traveliun-app 2>/dev/null || true; docker run -d --name traveliun-app --restart unless-stopped \
   --network coolify --env-file .env \
+  -v \$HOME/$STATIC/serve-$DPL:/app/.next/static:ro \
   --label traefik.enable=true \
   --label 'traefik.http.routers.tv-http.rule=Host(\`$DOMAIN\`)' \
   --label traefik.http.routers.tv-http.entryPoints=http \
@@ -85,6 +125,8 @@ ssh "$HOST" "cd ~/$DIR && docker rm -f traveliun-app 2>/dev/null || true; docker
 # layer (~2.5 GB per deploy, 37 GB after one day). Drop it once the new
 # container is running — images, containers and volumes are untouched.
 ssh "$HOST" "docker builder prune -af >/dev/null 2>&1 || true; docker image prune -f >/dev/null 2>&1 || true"
+# the merged dirs of earlier containers — only this one's is mounted now
+ssh "$HOST" "find \$HOME/$STATIC -mindepth 1 -maxdepth 1 -name 'serve-*' ! -name 'serve-$DPL' -exec rm -rf {} +"
 
 echo "==> waiting for https://$DOMAIN"
 up=""
@@ -110,4 +152,4 @@ echo "    shipped:  ${want:0:7}${got:+  (server tree: ${got:0:7})}"
 # itself names the deploy it came from (data-dpl-id) — that is the proof.
 live=$(curl -s "https://$DOMAIN/sign-in" | grep -o 'data-dpl-id="[^"]*"' | head -1 | cut -d'"' -f2)
 echo "    live dpl: ${live:-none}"
-[ "$live" = "${want:0:12}" ] || { echo "the live page is not this deploy (dpl ${live:-none}, want ${want:0:12})" >&2; exit 1; }
+[ "$live" = "$DPL" ] || { echo "the live page is not this deploy (dpl ${live:-none}, want $DPL)" >&2; exit 1; }

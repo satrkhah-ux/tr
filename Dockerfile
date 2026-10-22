@@ -76,7 +76,15 @@ RUN rm -rf .next
 # This caches the .next/cache directory across builds, but it also prevents
 # .next/cache/fetch-cache from being included in the final image, meaning
 # cached fetch responses from the build won't be available at runtime.
-RUN if [ -f package-lock.json ]; then \
+#
+# NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: Server Function ids are hashed with it at
+# BUILD time, so a random key per build gave every action a new id and a tab
+# open across a deploy had its saves rejected («Failed to find Server Action»).
+# One fixed key (the server's .env, handed in by scripts/vps-deploy.sh as a
+# build secret — never a build arg, never in a layer) keeps an action's id while
+# its file and name stay. Without the secret the build picks a random one, as before.
+RUN --mount=type=secret,id=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY \
+  if [ -f package-lock.json ]; then \
   npm run build; \
   elif [ -f yarn.lock ]; then \
   corepack enable yarn && yarn build; \
