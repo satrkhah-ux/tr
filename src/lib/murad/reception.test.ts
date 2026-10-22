@@ -92,12 +92,13 @@ describe("the working day, Riyadh time", () => {
 
 describe("the department → team table", () => {
   const teams = [
+    { id: 28, name: "متابعة المبيعات " },
     { id: 38, name: "قسم المبيعات " },
     { id: 1, name: "قسم فيزا" },
     { id: 25, name: "قسم الطلبات" },
   ];
-  it("suggests from the account's own team names", () => {
-    expect(suggestRoutes(teams)).toMatchObject({ تأشيرات: 1, بكج: 38, طيران: 25, fallback: 25 });
+  it("visas to «قسم فيزا», every travel request to «قسم المبيعات» (not the follow-up team), the rest to «قسم الطلبات»", () => {
+    expect(suggestRoutes(teams)).toEqual({ تأشيرات: 1, بكج: 38, طيران: 38, فنادق: 38, مواصلات: 38, موظف: 25, "غير واضح": 25, fallback: 25 });
   });
   it("a saved table wins; an unrouted kind goes to the fallback", () => {
     const routes = readRoutes(JSON.stringify({ تأشيرات: 1, fallback: 25 }), teams);

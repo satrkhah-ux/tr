@@ -4,6 +4,20 @@ import { addTeletelNote, assignMuradHandoff, conversationEvents, listOpenConvers
 import { chooseVisaAgent, type VisaAgent, type MuradReceipt } from "./visa-assignment";
 import { currentAssignment } from "@/lib/leads/assignment";
 
+/**
+ * The team member to take a conversation now: the one already holding it when
+ * online, else the online member with the fewest open conversations. Null:
+ * nobody online (the team's queue holds it); undefined: the team could not be read.
+ */
+export async function onlineTeamAgent(teamId: number, inboxId: number | null, holderId: number | null): Promise<VisaAgent | null | undefined> {
+  const members = await teletelGet<VisaAgent[]>(`/teams/${teamId}/team_members`);
+  if (!Array.isArray(members)) return undefined;
+  const open = await listOpenConversations();
+  const workloads = new Map<number, number>();
+  for (const c of open?.rows ?? []) if (c.assigneeId) workloads.set(c.assigneeId, (workloads.get(c.assigneeId) ?? 0) + 1);
+  return chooseVisaAgent(members.filter((a) => a.id === holderId), inboxId, workloads) ?? chooseVisaAgent(members, inboxId, workloads);
+}
+
 /** Claimed in the database so overlapping minute jobs cannot route the same request twice. */
 export async function routeCompletedVisa(service: SupabaseClient, logId: string): Promise<boolean> {
   const { data } = await service.from("murad_log").update({ reason: "visa:handoff_working", acted_at: new Date().toISOString() }).eq("id", logId).eq("reason", "visa:handoff_pending").select("conversation_id,intake,created_at").maybeSingle();
@@ -21,13 +35,8 @@ export async function routeCompletedVisa(service: SupabaseClient, logId: string)
       await service.from("murad_log").update({ reason: "visa:handoff_cancelled", error: "conversation_closed_since_intake" }).eq("id", logId);
       return false;
     }
-    const members = await teletelGet<VisaAgent[]>(`/teams/${team.id}/team_members`);
-    if (!Array.isArray(members)) throw Error("visa_members_unavailable");
-    const open = await listOpenConversations();
-    const workloads = new Map<number, number>();
-    for (const c of open?.rows ?? []) if (c.assigneeId) workloads.set(c.assigneeId, (workloads.get(c.assigneeId) ?? 0) + 1);
-    const existing = members.filter((a) => a.id === conversation.meta?.assignee?.id);
-    const agent = chooseVisaAgent(existing, conversation.inbox_id ?? null, workloads) ?? chooseVisaAgent(members, conversation.inbox_id ?? null, workloads);
+    const agent = await onlineTeamAgent(team.id, conversation.inbox_id ?? null, conversation.meta?.assignee?.id ?? null);
+    if (agent === undefined) throw Error("visa_members_unavailable");
     if (!(await assignMuradHandoff(id, team.id, agent?.id ?? null))) throw Error("visa_assignment_failed");
     // Team auto-assignment must not silently give an offline employee this request.
     const current = await teletelGet<{ meta?: { team?: { id?: number }; assignee?: { id?: number; name?: string } } }>(`/conversations/${id}`);

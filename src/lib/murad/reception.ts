@@ -184,19 +184,23 @@ export function teamFor(routes: Routes, to: RouteKey): number | null {
 }
 
 /**
- * A first table from the account's own teams, by their names («قسم فيزا» for
- * visas, «قسم المبيعات» for packages, «قسم الطلبات» for the rest) — shown on
- * the settings page for the owner to correct; nothing is saved until they do.
+ * A first table from the account's own teams, by their names — shown on the
+ * settings page for the owner to correct; nothing is saved until they do. Two
+ * kinds of request (the owner, 2026-10-22): a visa to «قسم فيزا», and EVERY
+ * travel request — package, flight, hotel, transport — to «قسم المبيعات»
+ * (never «متابعة المبيعات», the follow-up team); a person asked for or a
+ * request not understood to «قسم الطلبات».
  */
 export function suggestRoutes(teams: { id: number; name: string }[]): Routes {
   const find = (re: RegExp) => teams.find((t) => re.test(fold(t.name)))?.id ?? null;
   const general = find(/طلبات|عام|استقبال/);
+  const sales = find(/قسمالمبيعات|^المبيعات$|^مبيعات$/) ?? general;
   return {
     تأشيرات: find(/فيزا|تاشير/),
-    بكج: find(/مبيعات/) ?? general,
-    طيران: find(/طيران|تذاكر/) ?? general,
-    فنادق: find(/فنادق|فندق/) ?? general,
-    مواصلات: find(/مواصلات|نقل/) ?? general,
+    بكج: sales,
+    طيران: find(/طيران|تذاكر/) ?? sales,
+    فنادق: find(/فنادق|فندق/) ?? sales,
+    مواصلات: find(/مواصلات|نقل/) ?? sales,
     موظف: general,
     "غير واضح": general,
     fallback: general,

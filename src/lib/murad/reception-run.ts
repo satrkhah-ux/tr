@@ -1,4 +1,4 @@
-import { routeCompletedVisa, retryVisaHandoffs } from "./visa-routing";
+import { onlineTeamAgent, routeCompletedVisa, retryVisaHandoffs } from "./visa-routing";
 import type { MuradReceipt } from "./visa-assignment";
 import { inMuradScope, visaForAll, type MuradControl } from "./control";
 import "server-only";
@@ -239,6 +239,44 @@ async function readVisa(transcript: string, clientText: string, countryNames: st
     const nat = iso3(r.nationality);
     const others = (r.others ?? []).map((o) => ({ ...o, nationality: iso3(o.nationality) ?? "" })).filter((o) => o.nationality && o.nationality !== nat);
     return { ...r, nationality: nat, nationality_ar: nat ? r.nationality_ar : null, others, travel_date: date, applicants: r.applicants && r.applicants > 0 ? r.applicants : null };
+  } catch {
+    return null;
+  }
+}
+
+/** the travel requests that go to sales (reception.ts suggestRoutes) */
+const TRAVEL = new Set<RouteKey>(["بكج", "طيران", "فنادق", "مواصلات"]);
+
+/**
+ * A travel request as the salesperson needs it (the owner, 2026-10-22: the
+ * destination, the dates, the travellers) — short Arabic from the client's own
+ * lines, null for what was not said; null on any failure (the note then says
+ * only where it went).
+ */
+async function readTravel(transcript: string): Promise<{ destination: string | null; dates: string | null; travellers: string | null } | null> {
+  if (!isOpenAIConfigured() || !transcript.trim()) return null;
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+  try {
+    const raw = await openaiJson({
+      name: "travel_request",
+      system: [
+        `Today is ${today} (Riyadh). Below is a client's WhatsApp conversation with a travel company, oldest first: «العميل» lines are the client's, «مُراد» lines are our assistant's.`,
+        "From the CLIENT's lines only, in short Arabic: destination — the country and cities they want to visit (never where they live); dates — as the client said them, with the year when clear («من 10 إلى 20 نوفمبر 2026», «بعد أسبوعين»); travellers — who travels («شخصين بالغين وطفل عمره 5»).",
+        "null for anything not said. Never invent.",
+      ].join("\n"),
+      user: transcript.slice(-3000),
+      schema: {
+        type: "object",
+        properties: { destination: { type: ["string", "null"] }, dates: { type: ["string", "null"] }, travellers: { type: ["string", "null"] } },
+        required: ["destination", "dates", "travellers"],
+        additionalProperties: false,
+      },
+      temperature: 0,
+      timeoutMs: 12000,
+    });
+    const r = JSON.parse(raw ?? "{}") as Record<string, unknown>;
+    const s = (k: string) => (typeof r[k] === "string" && (r[k] as string).trim() ? (r[k] as string).trim().slice(0, 120) : null);
+    return { destination: s("destination"), dates: s("dates"), travellers: s("travellers") };
   } catch {
     return null;
   }
@@ -812,17 +850,24 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     const handoff = settings.control.handoffs[decision.to];
     const teamId = handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), decision.to);
     const team = teams.find((t) => t.id === teamId) ?? null;
-    const assigned = await assignMuradHandoff(m.conversationId, teamId, handoff?.agentId ?? null);
+    // a visa: the visa agent who is online (the owner, 2026-10-22) — other teams' own auto-assignment picks the member
+    const agent = !handoff?.agentId && decision.to === "تأشيرات" && teamId ? await onlineTeamAgent(teamId, thread.inboxId ?? null, null) : null;
+    const assigned = await assignMuradHandoff(m.conversationId, teamId, handoff?.agentId ?? agent?.id ?? null);
+    // a travel request: what the salesperson needs, understood from the client's words (the owner: where, when, who, what)
+    const travel = TRAVEL.has(decision.to) ? await readTravel(transcript) : null;
     await addTeletelNote(
       m.conversationId,
-      `🤖 المستقبل الآلي: ${decision.to}${request.country ? ` · ${request.country}` : ""} — ${assigned && team ? `حُوّلت إلى «${team.name}»` : "لا فريق لهذا القسم في الإعدادات — بانتظار من يستلمها"}`,
+      [
+        `🤖 المستقبل الآلي: ${decision.to}${request.country ? ` · ${request.country}` : ""} — ${assigned && team ? `حُوّلت إلى «${team.name}»${agent ? ` — ${agent.name}` : ""}` : "لا فريق لهذا القسم في الإعدادات — بانتظار من يستلمها"}`,
+        ...(travel ? [`الوجهة: ${travel.destination ?? request.country ?? "لم تُذكر"}`, `التواريخ: ${travel.dates ?? "لم تُذكر"}`, `المسافرون: ${travel.travellers ?? "لم يُذكر"}`] : []),
+      ].join("\n"),
     );
     const at = now.toISOString();
     await finish({
       reason: `routed:${decision.to}`,
       reply: text,
       reply_message_id: replyId,
-      intake: { ...intake, team_id: teamId, team: team?.name ?? null, assigned },
+      intake: { ...intake, team_id: teamId, team: team?.name ?? null, assigned, agent_id: agent?.id ?? null, ...(travel ? { travel } : {}) },
       ...(teamId && !assigned ? { error: "assign_failed" } : {}),
     });
     await markLead(service, m, {
