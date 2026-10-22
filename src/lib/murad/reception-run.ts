@@ -502,7 +502,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       return "none:routed";
     }
     // Persistent visa intake: no two-question cutoff and no handoff on a damaged photo.
-    if (settings.control.visaAll && settings.control.tasks.visas && await visaConversation(service, m) && !request.wantsHuman) {
+    if ((settings.control.visaAll || (phone && settings.autoList.includes(phone))) && settings.control.tasks.visas && await visaConversation(service, m) && !request.wantsHuman) {
       const latest = thread.messages.filter((t) => t.fromClient && !t.isPrivate).at(-1);
       if (!thread.canReply || !latest || Date.now() / 1000 - latest.at > 24 * 3600) { await finish({ reason: "none:window" }); return "none:window"; }
       // a colleague answered or took it in this visit, or the client asked for a person: Murad stays out (21 Oct, 40347: he
@@ -895,7 +895,7 @@ export async function receptionSweep(): Promise<number> {
   const service = db();
   const [flags, settings, reception, list] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service), listOpenConversations()]);
   if (!flags.murad_reception || !settings.control.tasks.reception || !list) return 0;
-  if (settings.control.visaAll && settings.control.tasks.visas) await retryVisaHandoffs(service);
+  if (settings.control.tasks.visas) await retryVisaHandoffs(service);
   const nowSec = Math.floor(Date.now() / 1000);
   // a client waiting on us for under half an hour — a new conversation, or an old one the client reopened
   const { data: visaLeads } = settings.control.visaAll ? await service.from("client_leads").select("teletel_conversation_id").eq("inquiry", "تأشيرات").eq("status", "open") : { data: [] };
