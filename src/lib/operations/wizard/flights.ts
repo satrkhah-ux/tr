@@ -111,6 +111,40 @@ export function uniqueLegs<T extends Pick<FlightLeg, "flight_no" | "from" | "to"
   return out;
 }
 
+/**
+ * Our own ticket's legs (VoucherSheets prints each as a Latin leg line —
+ * «XY309 · RUH → TBS · 2026-10-30 07:05 · ARR 2026-10-30 12:00»): read back
+ * exactly, where its boarding-pass cards come out of the PDF right to left and
+ * reversed. Nothing for any other ticket.
+ */
+export function ownLegs(text: string): TicketLeg[] {
+  const wall = (part: string | undefined) => part?.match(/(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
+  return text
+    .split("\n")
+    .map((line) => {
+      const leg = parseLeg(line.trim());
+      const arr = wall(line.split("·")[3]);
+      return leg && !leg.arrival && arr ? { ...leg, arrival: `${arr[1]}T${arr[2]}` } : leg;
+    })
+    .filter((l): l is NonNullable<typeof l> => Boolean(l && /^[A-Z0-9]{2,8}$/.test(l.flight_no) && /^[A-Z]{3}$/.test(l.from) && /^[A-Z]{3}$/.test(l.to)))
+    .map((l) => ({
+      airline: "",
+      airline_iata: "",
+      flight_no: l.flight_no,
+      from_iata: l.from,
+      from_name: "",
+      to_iata: l.to,
+      to_name: "",
+      dep_date: l.departure?.slice(0, 10) ?? "",
+      dep_time: l.departure?.slice(11, 16) ?? "",
+      arr_date: l.arrival?.slice(0, 10) ?? "",
+      arr_time: l.arrival?.slice(11, 16) ?? "",
+      cabin: "",
+      baggage: "",
+      leg_order: null,
+    }));
+}
+
 /** A landing more than this after its take-off is a mistyped date, not a flight. */
 const LONGEST_LEG_MINUTES = 3 * 24 * 60;
 

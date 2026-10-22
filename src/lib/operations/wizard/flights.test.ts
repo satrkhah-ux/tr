@@ -20,6 +20,7 @@ import {
   skeleton,
   toFlightLegs,
   uniqueLegs,
+  ownLegs,
   withTicketLines,
 } from "./flights";
 import type { WizardCase } from "./types";
@@ -281,5 +282,13 @@ describe("each flight once (AD-5-3269, 2026-10-22)", () => {
   });
   it("keeps two real flights on the same route and day", () => {
     expect(uniqueLegs([leg("SV1020", "RUH", "JED", "2026-10-30T07:00"), leg("SV1030", "RUH", "JED", "2026-10-30T19:00")])).toHaveLength(2);
+  });
+});
+
+describe("our own ticket, uploaded again (2026-10-23)", () => {
+  it("reads each leg from its Latin line, the arrival too — and nothing from another ticket", () => {
+    const text = "TBS\n13:10\nXY309 · RUH → TBS · 2026-10-30 07:05 · ARR 2026-10-30 12:00\nC98TNC";
+    expect(ownLegs(text).map((l) => [l.flight_no, l.from_iata, l.to_iata, l.dep_date, l.dep_time, l.arr_date, l.arr_time])).toEqual([["XY309", "RUH", "TBS", "2026-10-30", "07:05", "2026-10-30", "12:00"]]);
+    expect(ownLegs("Flight XY309 RUH Riyadh - TBS Tbilisi 30OCT26 07:05")).toEqual([]);
   });
 });

@@ -1,30 +1,42 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, FileUp, Loader2, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import type { TranslationKey } from "@/lib/i18n";
 import { readPassportPhoto } from "@/lib/data/operation-travelers";
-import { sortPaper } from "@/lib/data/upload-sort";
+import { readMoney, sortPaper } from "@/lib/data/upload-sort";
+import { attachBookingInvoice, createSupplierFromInvoice, recordSupplierPayment, setBookingCost } from "@/lib/data/supplier-work";
+import { assignBooking } from "@/lib/data/operation-assign";
+import { recordPayment } from "@/lib/data/operations";
+import { uploadPaymentProof } from "@/lib/data/operation-payments";
+import { getRates } from "@/lib/data/rates-actions";
+import { paidTotal } from "@/lib/operations/payments";
 import { readBookingTicket, readHotelConfirmation, saveBookingTicket, saveHotelConfirmation, type HotelRead, type TicketRead } from "@/lib/data/wizard-tickets";
 import { parseTicketText } from "@/lib/flights/ticket-parse";
 import { trustedFields, type MrzPassport } from "@/lib/operations/mrz";
 import { hotelBookings } from "@/lib/operations/wizard/hotels";
 import { matchPassport, type MatchRow } from "@/lib/operations/wizard/passports";
-import { matchHotel, matchTicket, type PaperKind } from "@/lib/operations/wizard/upload-all";
+import { matchHotel, matchTicket, ticketInvoice, type PaperKind } from "@/lib/operations/wizard/upload-all";
 import type { WizardCase } from "@/lib/operations/wizard/types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { savePassport } from "./passport-save";
+import { MoneyFieldsRow, MoneySummary, type MoneyFields } from "./UploadMoney";
 import { wzPrimary, wzSecondary } from "./FlightsStep";
 
 /** What the MRZ reader is handed — a picture. */
 const READABLE = /^image\/(jpeg|png|webp)$/;
-const KINDS: PaperKind[] = ["passport", "ticket", "hotel", "unknown"];
+const KINDS: PaperKind[] = ["passport", "ticket", "hotel", "hotel_invoice", "ticket_invoice", "payment", "unknown"];
+type MoneyKind = "hotel_invoice" | "ticket_invoice" | "payment";
+const isMoney = (k: PaperKind): k is MoneyKind => k === "hotel_invoice" || k === "ticket_invoice" || k === "payment";
+const NO_MONEY: MoneyFields = { money: null, amount: "", currency: "", checked: false, supplier: "", payTo: false, duplicate: false };
+/** a client's slip says transfer/cash/pos/link; a supplier's payment is booked as bank_transfer/cash/card/other */
+const SUPPLIER_METHOD: Record<string, string> = { transfer: "bank_transfer", cash: "cash", pos: "card", link: "other", "": "bank_transfer" };
 /** Files read at once — a vision read is slow, and one slow file must not hold the rest. */
 const AT_ONCE = 2;
 
-type Item = {
+type Item = MoneyFields & {
   key: number;
   file: File;
   /** sorting: not yet known what it is; reading: read again for the place it was moved to */
@@ -61,10 +73,29 @@ const fileOf = (dataUrl: string, name: string) => {
  * actions, so their rules hold (only checked passport fields, never a blank
  * over a value, the server checks again), and the tiles above follow.
  */
-export function UploadAll({ data, canReadMrz, onClose }: { data: WizardCase; canReadMrz: boolean; onClose: () => void }) {
+export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: WizardCase; canReadMrz: boolean; canSeeCost: boolean; onClose: () => void }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
   const op = data.operation;
+  const caseCurrency = (op.currency || "SAR").toUpperCase();
+  // the system's rates (the dollar at the company's 3.80) — a slip in another currency is shown in the package's too
+  const [rates, setRates] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let live = true;
+    getRates()
+      .then((r) => live && setRates(r.sarPer))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+  /** a payment in the package's currency, at the system's rate; null when it already is (or no rate) */
+  const inCase = (amount: number, currency: string): { amount: number; rate: number } | null => {
+    const cur = currency.toUpperCase();
+    if (!cur || cur === caseCurrency || !rates[cur] || !rates[caseCurrency]) return null;
+    const rate = Math.round((rates[cur] / rates[caseCurrency]) * 10000) / 10000;
+    return { amount: Math.round(amount * rate * 100) / 100, rate };
+  };
   const [items, setItems] = useState<Item[]>([]);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
@@ -91,6 +122,29 @@ export function UploadAll({ data, canReadMrz, onClose }: { data: WizardCase; can
     return res.ok ? { hotel: res.result, ref: res.result.read.confirmation, error: undefined } : { hotel: null, error: t(res.error) };
   }
 
+  /** A flight booking whose PNR the paper prints, else the one its legs fly. */
+  const flightFor = (text: string) =>
+    flights.find((f) => [f.pnr, f.confirmation_number].some((ref) => ref && ref.length >= 5 && text.toUpperCase().includes(ref.toUpperCase())))?.id ??
+    matchTicket(parseTicketText(text).legs, flights);
+
+  /** A money paper's figures for the place it is put — an invoice beside the booking's cost and supplier. */
+  async function moneyFor(text: string, kind: MoneyKind, target: string): Promise<Partial<Item>> {
+    const res = await readMoney(op.id, { kind, text, ...(kind !== "payment" && target ? { booking_id: target } : {}) });
+    if (!res.ok) return { money: null, error: t(res.error) };
+    const m = res.read;
+    const currency = m.currency || (kind === "payment" ? caseCurrency : (m.cost?.currency ?? caseCurrency));
+    const amount = m.amount ?? 0;
+    const same = inCase(amount, currency)?.amount ?? amount;
+    const ref = m.reference.replace(/\s+/g, "").toUpperCase();
+    // the same reference, or the same amount on the same day — already recorded, so not ticked
+    const duplicate =
+      kind === "payment" &&
+      data.payments.some((p) => (ref && (p.reference ?? "").replace(/\s+/g, "").toUpperCase() === ref) || (Math.abs(p.amount - same) < 0.01 && (!m.date || p.paid_at === m.date)));
+    // the issuer becomes the booking's supplier only where it has none; a different one waits for the employee
+    const supplier = m.supplier && !m.onFile ? m.supplier.id : "";
+    return { money: m, amount: m.amount == null ? "" : String(m.amount), currency, supplier, payTo: false, checked: false, duplicate, error: undefined };
+  }
+
   async function sortOne(item: Item, placed: Set<string>) {
     const fd = new FormData();
     fd.append("file", item.file);
@@ -114,14 +168,26 @@ export function UploadAll({ data, canReadMrz, onClose }: { data: WizardCase; can
       return patch(item.key, { status: "ready", kind, picture, passport, target, error });
     }
     if (kind === "unknown") return patch(item.key, { status: "ready", kind, text });
-    const target = (kind === "ticket" ? matchTicket(parseTicketText(text).legs, flights) : matchHotel(text, hotels)) ?? "";
+    if (isMoney(kind)) {
+      // cost is pricing.internal's: an invoice is sorted, never read, without it
+      if (kind !== "payment" && !canSeeCost) return patch(item.key, { status: "ready", kind, text, error: t("wz.up.err.costOnly") });
+      const target = kind === "payment" ? "case" : ((kind === "hotel_invoice" ? matchHotel(text, hotels) : flightFor(text)) ?? "");
+      return patch(item.key, { status: "ready", kind, text, target, ...(target ? await moneyFor(text, kind, target) : {}) });
+    }
+    const target = (kind === "ticket" ? flightFor(text) : matchHotel(text, hotels)) ?? "";
     const read = target ? await readFor({ ...item, text }, kind, target) : {};
     patch(item.key, { status: "ready", kind, text, target, ...read });
+    // an e-ticket's PDF with its invoice in it: the invoice is a line of its own (cost — pricing.internal)
+    if (kind === "ticket" && canSeeCost && ticketInvoice(text)) {
+      const extra: Item = { ...item, key: seq.current++, kind: "ticket_invoice", status: "ready", text, target, ...NO_MONEY };
+      setItems((list) => [...list, extra]);
+      if (target) patch(extra.key, await moneyFor(text, "ticket_invoice", target));
+    }
   }
 
   function add(files: File[]) {
     if (!files.length) return;
-    const fresh: Item[] = files.map((file) => ({ key: seq.current++, file, status: "sorting", kind: "unknown", target: "", text: "", picture: null, passport: null, ticket: null, hotel: null, ref: "" }));
+    const fresh: Item[] = files.map((file) => ({ key: seq.current++, file, status: "sorting", kind: "unknown", target: "", text: "", picture: null, passport: null, ticket: null, hotel: null, ref: "", ...NO_MONEY }));
     setItems((list) => [...list, ...fresh]);
     setBusy(true);
     const queue = [...fresh];
@@ -139,8 +205,11 @@ export function UploadAll({ data, canReadMrz, onClose }: { data: WizardCase; can
   async function place(item: Item, value: string) {
     const [kind, target] = value.split(":") as [PaperKind, string];
     // a file that failed to sort is placed by hand too
-    patch(item.key, { kind, target, ticket: null, hotel: null, error: undefined, status: "ready" });
-    if (kind === "ticket" || kind === "hotel") {
+    patch(item.key, { kind, target, ticket: null, hotel: null, ...NO_MONEY, error: undefined, status: "ready" });
+    if (isMoney(kind)) {
+      patch(item.key, { status: "reading" });
+      patch(item.key, { status: "ready", ...(await moneyFor(item.text, kind, target)) });
+    } else if (kind === "ticket" || kind === "hotel") {
       patch(item.key, { status: "reading" });
       patch(item.key, { status: "ready", ...(await readFor(item, kind, target)) });
     } else if (kind === "passport" && !item.passport && canReadMrz && READABLE.test((item.picture ?? item.file).type)) {
@@ -177,14 +246,85 @@ export function UploadAll({ data, canReadMrz, onClose }: { data: WizardCase; can
       fd.append("booking_id", item.target);
       fd.append("confirmation_number", item.ref.trim());
       fd.append("file", item.file);
-      // only what the hotel's record lacks — the server checks again and never overwrites
-      if (item.hotel.fill.address && item.hotel.read.address) fd.append("address", item.hotel.read.address);
-      if (item.hotel.fill.phone && item.hotel.read.phone) fd.append("phone", item.hotel.read.phone);
+      // the hotel's address and phone are not filled from here: unseen in this list, and a paper's header
+      // phone may be the issuer's (ours, on a voucher of ours) — «الفنادق» shows them before it fills
       const res = await saveHotelConfirmation(fd);
       if (!res.ok) error = res.error;
+    } else if (isMoney(item.kind) && item.money) {
+      error = await saveMoney(item);
     } else error = "wz.up.err.unplaced";
     patch(item.key, error ? { status: "ready", error: t(error) } : { status: "saved" });
     return !error;
+  }
+
+  /**
+   * A money line, through the money screens' own actions: an invoice sets the
+   * booking's supplier (made from the paper only when ticked «new»), its cost
+   * and its filed invoice, and — when ticked — the payment to that supplier; a
+   * client's slip becomes a payment in the package's currency, its photo kept.
+   */
+  async function saveMoney(item: Item): Promise<TranslationKey | undefined> {
+    const m = item.money!;
+    const amount = Number(item.amount);
+    const currency = item.currency.trim().toUpperCase() || caseCurrency;
+    const fd = new FormData();
+    fd.append("file", item.file);
+    if (item.kind === "payment") {
+      const converted = inCase(amount, currency);
+      const paidBefore = paidTotal(data.payments);
+      const value = converted?.amount ?? amount;
+      const left = op.total == null ? null : op.total - paidBefore - value;
+      const res = await recordPayment({
+        operation_id: op.id,
+        amount: value,
+        currency: caseCurrency,
+        kind: left != null && left <= 0.01 ? "final" : paidBefore > 0 ? "installment" : "deposit",
+        method: m.method || null,
+        reference: m.reference || null,
+        paid_at: m.date || data.today,
+        note: converted ? `${amount} ${currency} × ${converted.rate}` : null,
+      });
+      if (!res.ok) return res.error;
+      const up = await uploadPaymentProof(res.id, fd).catch(() => null);
+      return up?.ok ? undefined : "ops.pay.proofUploadFailed";
+    }
+    let supplierId = item.supplier === "new" ? "" : item.supplier;
+    if (item.supplier === "new") {
+      const made = await createSupplierFromInvoice({ name: m.issuer, category: item.kind === "hotel_invoice" ? "فنادق" : "طيران" });
+      if (!made.ok) return made.error;
+      supplierId = made.id;
+    }
+    if (supplierId && supplierId !== m.onFile?.id) {
+      const res = await assignBooking({ booking_id: item.target, kind: "supplier", assignee_id: supplierId });
+      if (!res.ok) return res.error;
+    }
+    const cost = await setBookingCost({ booking_id: item.target, amount, currency });
+    if (!cost.ok) return cost.error;
+    const bd = new FormData();
+    bd.append("booking_id", item.target);
+    bd.append("file", item.file);
+    const filed = await attachBookingInvoice(bd);
+    if (!filed.ok) return filed.error;
+    if (item.payTo) {
+      const payee = supplierId || m.onFile?.id;
+      if (!payee) return "wz.up.err.supplier";
+      const pd = new FormData();
+      for (const [k, v] of Object.entries({
+        supplier_id: payee,
+        operation_id: op.id,
+        booking_ids: item.target,
+        amount: String(amount),
+        currency,
+        paid_on: m.date || data.today,
+        method: SUPPLIER_METHOD[m.method] ?? "bank_transfer",
+        reference: m.reference,
+      }))
+        pd.append(k, v);
+      pd.append("file", item.file);
+      const paid = await recordSupplierPayment(pd);
+      if (!paid.ok) return paid.error;
+    }
+    return undefined;
   }
 
   async function approveAll(list: Item[]) {
@@ -208,7 +348,17 @@ export function UploadAll({ data, canReadMrz, onClose }: { data: WizardCase; can
     },
     { kind: "ticket", options: flights.map((f) => ({ value: `ticket:${f.id}`, label: `${f.title} · ${f.start_date ?? "—"}` })) },
     { kind: "hotel", options: hotels.map((h) => ({ value: `hotel:${h.id}`, label: `${h.city_name || "—"} · ${h.title} · ${h.start_date ?? "—"}` })) },
+    // an invoice is cost: offered only to pricing.internal
+    ...(canSeeCost
+      ? [
+          { kind: "hotel_invoice" as const, options: hotels.map((h) => ({ value: `hotel_invoice:${h.id}`, label: `${h.city_name || "—"} · ${h.title}` })) },
+          { kind: "ticket_invoice" as const, options: flights.map((f) => ({ value: `ticket_invoice:${f.id}`, label: f.title })) },
+        ]
+      : []),
+    { kind: "payment", options: [{ value: "payment:case", label: t("wz.up.money.toCase") }] },
   ];
+  const payments = items.filter((i) => i.kind === "payment" && i.status !== "dropped" && i.status !== "saved" && i.checked && Number(i.amount) > 0);
+  const ticked = payments.reduce((sum, i) => sum + (inCase(Number(i.amount), i.currency)?.amount ?? Number(i.amount)), 0);
 
   return (
     <section className="rounded-2xl border border-[#cfe0d9] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
@@ -255,6 +405,8 @@ export function UploadAll({ data, canReadMrz, onClose }: { data: WizardCase; can
 
       {items.length > 0 ? (
         <div className="mt-3 grid gap-3">
+          {/* «إجمالي البكج · سدّد العميل · المتبقي» — before and after the payments ticked here */}
+          <MoneySummary total={op.total} paid={paidTotal(data.payments)} ticked={Math.round(ticked * 100) / 100} currency={caseCurrency} />
           {KINDS.map((kind) => {
             const group = items.filter((i) => i.kind === kind && i.status !== "dropped" && i.status !== "sorting");
             return group.length ? (
@@ -264,7 +416,14 @@ export function UploadAll({ data, canReadMrz, onClose }: { data: WizardCase; can
                 </h3>
                 <ul className="grid gap-1.5">
                   {group.map((item) => (
-                    <Line key={item.key} item={item} today={data.today} places={places} onPlace={(v) => void place(item, v)} onRef={(ref) => patch(item.key, { ref })} onApprove={() => void approve(item).then((ok) => ok && router.refresh())} onDrop={() => patch(item.key, { status: "dropped" })} />
+                    <Line
+                      key={item.key}
+                      item={item}
+                      today={data.today}
+                      caseCurrency={caseCurrency}
+                      inCase={item.kind === "payment" ? inCase(Number(item.amount), item.currency) : null}
+                      onMoney={(next) => patch(item.key, next)}
+                      places={places} onPlace={(v) => void place(item, v)} onRef={(ref) => patch(item.key, { ref })} onApprove={() => void approve(item).then((ok) => ok && router.refresh())} onDrop={() => patch(item.key, { status: "dropped" })} />
                   ))}
                 </ul>
               </div>
@@ -300,6 +459,8 @@ function canApprove(i: Item): boolean {
   if (i.kind === "passport") return true;
   if (i.kind === "ticket") return Boolean(i.ticket && i.ref.trim());
   if (i.kind === "hotel") return Boolean(i.hotel && i.ref.trim());
+  // a money line: read, a positive amount, and the employee's own «تحقّقت»
+  if (isMoney(i.kind)) return Boolean(i.money && i.checked && Number(i.amount) > 0);
   return false;
 }
 
@@ -315,12 +476,16 @@ function verdict(i: Item, today: string, field: (f: string) => string): { ok: bo
     return { ok: off.length === 0 && i.ticket.missing.length === 0 && i.ticket.legs.length > 0 && Boolean(i.ref.trim()), note: [...off, ...i.ticket.missing] };
   }
   if (i.kind === "hotel" && i.hotel) return { ok: i.hotel.diffs.length === 0 && Boolean(i.ref.trim()), note: i.hotel.diffs.map((d) => d.theirs) };
+  if (isMoney(i.kind) && i.money) return { ok: i.checked && !i.duplicate, note: [] };
   return { ok: false, note: [] };
 }
 
 function Line({
   item,
   today,
+  caseCurrency,
+  inCase,
+  onMoney,
   places,
   onPlace,
   onRef,
@@ -329,6 +494,9 @@ function Line({
 }: {
   item: Item;
   today: string;
+  caseCurrency: string;
+  inCase: { amount: number; rate: number } | null;
+  onMoney: (next: Partial<MoneyFields>) => void;
   places: { kind: PaperKind; options: { value: string; label: string }[] }[];
   onPlace: (value: string) => void;
   onRef: (ref: string) => void;
@@ -348,7 +516,9 @@ function Line({
         ? item.ticket.legs.map((l) => `${l.flight_no} ${l.from_iata}→${l.to_iata} ${l.dep_date}`).join(" · ")
         : item.kind === "hotel" && item.hotel
           ? `${item.hotel.read.check_in || "—"} → ${item.hotel.read.check_out || "—"}`
-          : "";
+          : isMoney(item.kind) && item.money
+            ? [item.money.issuer || item.money.sender, item.money.hotel].filter(Boolean).join(" · ")
+            : "";
   return (
     <li className={`rounded-[12px] border p-2.5 ${saved ? "border-[#cfe9dc] bg-[#f3faf6]" : "border-[#e2ebe7] bg-white"}`}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-bold">
@@ -406,6 +576,11 @@ function Line({
               />
             ) : null}
           </div>
+          {isMoney(item.kind) ? (
+            <div className="sm:col-span-2">
+              <MoneyFieldsRow kind={item.kind} fields={item} caseCurrency={caseCurrency} inCase={inCase} onChange={onMoney} disabled={working} />
+            </div>
+          ) : null}
           <div className="flex gap-2">
             <button type="button" disabled={working || !canApprove(item)} onClick={onApprove} className={`${wzPrimary} h-9`}>
               {t("wz.up.approve")}

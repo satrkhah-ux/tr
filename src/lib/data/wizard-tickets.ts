@@ -16,7 +16,7 @@ import { mergeTicket, parseTicketText, sanitizeTicket, ticketGaps, ticketNumbers
 import { readTicketText } from "@/lib/flights/ticket-ai";
 import type { PassportView, TravelerRow } from "@/lib/operations/traveler-dto";
 import { catalogHotelsFor } from "@/lib/data/hotel-match";
-import { badLeg, checkNames, toFlightLegs, uniqueLegs, withTicketLines, type LegInput, type NameCheck, type TravelerNames } from "@/lib/operations/wizard/flights";
+import { badLeg, checkNames, ownLegs, toFlightLegs, uniqueLegs, withTicketLines, type LegInput, type NameCheck, type TravelerNames } from "@/lib/operations/wizard/flights";
 import { hotelDiffs, parseHotelConfirmation, type HotelConfirmation, type HotelDiff } from "@/lib/operations/wizard/hotels";
 import { ticketTitle } from "@/lib/operations/seed-plan";
 
@@ -126,6 +126,9 @@ export async function readBookingTicket(formData: FormData): Promise<{ ok: true;
     if (!text.ok) return { ok: false, error: `fc.err.${text.error}` };
 
     let ticket = parseTicketText(text.text);
+    // our own ticket, uploaded again: its leg lines are exact where its cards read back reversed
+    const own = ownLegs(text.text);
+    if (own.length) ticket = { ...ticket, legs: own };
     let ai = false;
     // the model only fills what the parser left empty — and only sees the ticket
     if (isOpenAIConfigured() && ticketGaps(ticket).length > 0) {

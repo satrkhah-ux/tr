@@ -543,6 +543,76 @@ export async function setBookingCost(input: { booking_id: string; amount: number
 }
 
 /**
+ * The supplier's invoice for one booking («ارفع كل الملفات», 2026-10-23),
+ * filed beside its confirmation in the private bucket under the booking — the
+ * newest is the one shown. Cost, so pricing.internal, as setBookingCost.
+ */
+export async function attachBookingInvoice(formData: FormData): Promise<{ ok: true } | Fail> {
+  const bookingId = String(formData.get("booking_id") ?? "");
+  const denied = (await gateManagerRow("operation_bookings", bookingId)) ?? (await gate("pricing.internal"));
+  if (denied) return { ok: false, error: denied };
+  try {
+    const supabase = service();
+    const { data } = await supabase.from("operation_bookings").select("id, operation_id").eq("id", bookingId).maybeSingle();
+    const row = data as { id: string; operation_id: string } | null;
+    if (!row) return { ok: false, error: "ops.err.notFound" };
+    const up = await upload(supabase, `invoices/${row.operation_id}/${row.id}`, formData.get("file"));
+    if ("ok" in up) return up;
+    await logAudit({ action: "booking.created", entity: "operation_bookings", entity_id: row.id, meta: { edited: ["invoice"] } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+export async function getBookingInvoiceUrl(bookingId: string): Promise<{ ok: true; url: string } | Fail> {
+  const denied = (await gateRow("operation_bookings", bookingId)) ?? (await gate("pricing.internal"));
+  if (denied) return { ok: false, error: denied };
+  try {
+    const supabase = service();
+    const { data } = await supabase.from("operation_bookings").select("operation_id").eq("id", bookingId).maybeSingle();
+    const operationId = (data as { operation_id: string } | null)?.operation_id;
+    if (!operationId) return { ok: false, error: "ops.err.notFound" };
+    const folder = `invoices/${operationId}/${bookingId}`;
+    const { data: files } = await supabase.storage.from(BUCKET).list(folder, { sortBy: { column: "created_at", order: "desc" }, limit: 1 });
+    return await signed(supabase, files?.[0] ? `${folder}/${files[0].name}` : null);
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/**
+ * A supplier named on an invoice and not yet ours (the owner, 2026-10-23:
+ * «الموردين يتم تسجيلهم وفق الفواتير») — made only when the employee ticks it.
+ * The same name folded is the same supplier: the unique index answers, and
+ * the one already there is handed back.
+ */
+export async function createSupplierFromInvoice(input: { name: string; category: string }): Promise<{ ok: true; id: string } | Fail> {
+  const denied = await gate("pricing.internal");
+  if (denied) return { ok: false, error: denied };
+  const name = input.name.replace(/\s+/g, " ").trim().slice(0, 120);
+  if (name.length < 2) return { ok: false, error: "ops.err.pickAssignee" };
+  try {
+    const supabase = service();
+    const latin = /[A-Za-z]/.test(name) && !/[؀-ۿ]/.test(name);
+    const { data, error } = await supabase
+      .from("company_suppliers")
+      .insert({ arabic_name: name, english_name: latin ? name : null, categories: input.category.slice(0, 60) })
+      .select("id")
+      .single();
+    if (data) {
+      await logAudit({ action: "booking.created", entity: "company_suppliers", entity_id: (data as { id: string }).id, meta: { from: "invoice" } });
+      return { ok: true, id: (data as { id: string }).id };
+    }
+    if (error?.code !== "23505") return { ok: false, error: "err.createFailed" };
+    const { data: same } = await supabase.from("company_suppliers").select("id").ilike("arabic_name", name).limit(1).maybeSingle();
+    return same ? { ok: true, id: (same as { id: string }).id } : { ok: false, error: "err.createFailed" };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/**
  * «صدرت/سُددت» as money: a payment to the supplier (or a refund from it) with
  * its amount, day, method and receipt. Paying for bookings also marks them paid
  * — the switch the voucher's warning band reads.

@@ -50,6 +50,20 @@ export function packSheets(heights: number[], first: number, rest = SHEET_MM - R
 
 type Block = { mm: number; node: ReactNode };
 
+/**
+ * A line for our own reader only (upload-all, 2026-10-23): Latin, transparent,
+ * in the block's empty top. A paper of ours uploaded again reads back exactly —
+ * its cards and boxes come out of the PDF out of order, Arabic reversed.
+ */
+function Machine({ children }: { children: string }) {
+  return (
+    <span dir="ltr" style={{ position: "absolute", top: "-3.5mm", insetInlineStart: 0, fontSize: "2pt", lineHeight: 1, color: "rgba(0,0,0,0)", whiteSpace: "nowrap" }}>
+      {children}
+    </span>
+  );
+}
+const wall = (iso: string | null) => (iso ? `${iso.slice(0, 10)} ${iso.slice(11, 16)}` : "");
+
 const SHEET_CSS = `
 .od-company{font-size:9.6pt;line-height:1.6;}
 .od-company h2{font-size:13pt;}
@@ -404,7 +418,15 @@ export function HotelVoucher({ voucher, assets, brand }: { voucher: VoucherDTO; 
       headerMm={english ? HOTEL_HEADER_MM.en : HOTEL_HEADER_MM.ar}
       blocks={[
         ...guestBlocks(voucher),
-        ...voucher.bookings.map((b, i) => ({ mm: stayMm(b, english, shared), node: <StayCard key={i} booking={b} english={english} shared={shared} /> })),
+        ...voucher.bookings.map((b, i) => ({
+          mm: stayMm(b, english, shared),
+          node: (
+            <div className="vh-block">
+              <Machine>{`HOTEL CONFIRMATION NO: ${b.confirmation_number ?? ""} CHECK-IN ${b.start_date ?? ""} CHECK-OUT ${b.end_date ?? ""}`}</Machine>
+              <StayCard key={i} booking={b} english={english} shared={shared} />
+            </div>
+          ),
+        })),
         notesBlock(voucher, shared ? [shared] : []),
       ]}
     />
@@ -422,7 +444,9 @@ const TICKET_CSS = `
 .vt-meta span{display:block;color:var(--od-muted);font-size:8.5pt;}
 .vt-meta strong{display:block;color:var(--od-green);font-size:14pt;font-weight:800;line-height:1.45;}
 .vt-meta .vt-ok{color:#0f7a52;}
+.vt-flights{position:relative;}
 .vt-flights .od-subhead{margin-top:1mm;}
+.vt-flights,.vh-block{position:relative;}
 .vt-flights .od-fl{margin-bottom:0;}
 `;
 
@@ -502,6 +526,7 @@ export function FlightTicket({ voucher, assets, brand, logos }: { voucher: Vouch
           mm: CARD_MM + (i === 0 ? 11 : 0),
           node: (
             <div className="vt-flights">
+              <Machine>{`${legs[i].flight_no || "—"} · ${legs[i].from} → ${legs[i].to} · ${wall(legs[i].departs_at)} · ARR ${wall(legs[i].arrives_at)}`}</Machine>
               {i === 0 ? <h3 className="od-subhead">{both(true, AR.flights, "Flights")}</h3> : null}
               <FlightCards flights={[c]} />
             </div>

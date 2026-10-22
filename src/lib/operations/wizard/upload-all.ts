@@ -12,12 +12,21 @@ import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { plannedLegs } from "./flights";
 import { parseHotelConfirmation } from "./hotels";
 
-export type PaperKind = "passport" | "ticket" | "hotel" | "unknown";
+/**
+ * The money papers too (the owner, 2026-10-23: «فاتورة الفنادق و التذكرة و كم
+ * سدد العميل»): a supplier's invoice for a hotel or a ticket, and the client's
+ * payment slip (a transfer screenshot, a POS slip, a cash receipt).
+ */
+export type PaperKind = "passport" | "ticket" | "hotel" | "hotel_invoice" | "ticket_invoice" | "payment" | "unknown";
 
 /** A passport's machine-readable first line: «P<SAUALTHAIBAN<<MOHAMMED<HADI<<<…». */
 const MRZ = /^P[A-Z<][A-Z<]{3}[A-Z]+<<?[A-Z<]{5,}$/m;
 const TICKET_WORDS = /E-?TICKET|ETKT|BOARDING|FLIGHT|AIRLINE|AIRWAYS|BAGGAGE|PNR|BOOKING\s*REF|ITINERARY|تذكرة|طيران|رحلة|الأمتعة|الخطوط/g;
 const HOTEL_WORDS = /HOTEL|RESORT|CHECK[\s-]?IN|CHECK[\s-]?OUT|NIGHTS?|ROOM|GUEST|فندق|منتجع|الدخول|الخروج|ليال|ليلة|غرفة|نزيل/g;
+const INVOICE_WORDS = /INVOICE|فاتورة/g;
+const PAYMENT_WORDS = /TRANSFER|TRANSACTION|BENEFICIARY|IBAN|SENDER|APPROVED|MADA|STC\s*PAY|APPLE\s*PAY|حوالة|تحويل|المستفيد|المرسل|مدى|مقبولة|رقم\s*العملية|سند\s*قبض|إيصال/g;
+/** A total on the paper — what an invoice inside an e-ticket's PDF prints. */
+const TOTAL = /TOTAL|AMOUNT\s*(?:DUE|PAID)|الإجمالي|الاجمالي|المجموع|المبلغ/;
 
 /**
  * A paper's words → what it is. A passport by its MRZ line; a ticket and a
@@ -30,10 +39,62 @@ export function paperKind(text: string): PaperKind {
   if (MRZ.test(upper.replace(/ /g, "").replace(/«/g, "<"))) return "passport";
   const words = (re: RegExp) => Math.min(6, (upper.match(re) ?? []).length);
   const stay = parseHotelConfirmation(text);
-  const ticket = parseTicketText(text).legs.length * 3 + words(TICKET_WORDS);
+  const legs = parseTicketText(text).legs.length;
+  const ticket = legs * 3 + words(TICKET_WORDS);
   const hotel = (stay.check_in ? 2 : 0) + (stay.check_out ? 2 : 0) + words(HOTEL_WORDS);
+  const invoice = words(INVOICE_WORDS);
+  // a bank transfer or a POS slip: a payment's words, no invoice, no trip in it
+  if (words(PAYMENT_WORDS) >= 2 && invoice === 0 && ticket < 6 && hotel < 4) return "payment";
+  // an invoice names itself; one inside an e-ticket's PDF stays the ticket (ticketInvoice adds its line)
+  if (invoice > 0 && legs === 0 && ticket !== hotel) return ticket > hotel ? "ticket_invoice" : "hotel_invoice";
   if (Math.max(ticket, hotel) < 3 || ticket === hotel) return "unknown";
   return ticket > hotel ? "ticket" : "hotel";
+}
+
+/** An e-ticket's PDF that carries its invoice or receipt too — read as both papers. */
+export const ticketInvoice = (text: string): boolean => /INVOICE|RECEIPT|فاتورة|إيصال/i.test(text) && TOTAL.test(normalizeTicketText(text).toUpperCase());
+
+const CURRENCY: [RegExp, string][] = [
+  [/\bSAR\b|ر\.?\s?س|ريال/i, "SAR"],
+  [/\bUSD\b|US\$|\$|دولار/i, "USD"],
+  [/\bEUR\b|€|يورو/i, "EUR"],
+  [/\bTRY\b|\bTL\b|ليرة/i, "TRY"],
+  [/\bAED\b|درهم/i, "AED"],
+  [/\bGEL\b|لاري/i, "GEL"],
+  [/\bMYR\b|\bRM\b|رينغيت/i, "MYR"],
+  [/\bIDR\b|روبية/i, "IDR"],
+  [/\bTHB\b/i, "THB"],
+  [/\bGBP\b|£|جنيه/i, "GBP"],
+];
+const NUMBER = /(\d{1,3}(?:[,٬]\d{3})+(?:[.٫]\d{1,2})?|\d+(?:[.٫]\d{1,2})?)/g;
+
+/**
+ * A paper's amount and currency without the model: the biggest number on the
+ * lines that say «total» (else on any line naming a currency), and the first
+ * currency the paper names. The model's reading wins where it has one.
+ */
+export function amountIn(text: string): { amount: number | null; currency: string | null } {
+  const lines = normalizeTicketText(text).split("\n");
+  const pick = (only: (l: string) => boolean) =>
+    Math.max(0, ...lines.filter(only).flatMap((l) => [...l.matchAll(NUMBER)].map((m) => Number(m[1].replace(/[,٬]/g, "").replace("٫", ".")))).filter((n) => n < 10_000_000));
+  const currencyOf = (l: string) => CURRENCY.find(([re]) => re.test(l))?.[1] ?? null;
+  const total = pick((l) => TOTAL.test(l.toUpperCase()));
+  const amount = total || pick((l) => currencyOf(l) !== null);
+  return { amount: amount > 0 ? amount : null, currency: currencyOf(text) };
+}
+
+/**
+ * The invoice's issuer among our suppliers: the same name folded — Arabic or
+ * Latin, case, spaces and marks aside («Within Earth» is «within earth») — or
+ * one name holding the other («Within Earth Travel LLC»). null: a new one,
+ * offered to the employee, never made by itself.
+ */
+export function matchSupplier<T extends { id: string; arabic_name: string; english_name: string | null }>(issuer: string, suppliers: T[]): T | null {
+  const fold = (v: string | null) => normalizeName(v).replace(/[^\p{L}\p{N}]+/gu, "");
+  const name = fold(issuer);
+  if (name.length < 3) return null;
+  const names = (s: T) => [fold(s.arabic_name), fold(s.english_name)].filter((n) => n.length >= 3);
+  return suppliers.find((s) => names(s).includes(name)) ?? suppliers.find((s) => names(s).some((n) => n.length >= 5 && (name.includes(n) || n.includes(name)))) ?? null;
 }
 
 type Leg = { from_iata: string; to_iata: string; dep_date: string };

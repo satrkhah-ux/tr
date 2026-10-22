@@ -56,12 +56,15 @@ export function CaseWizardShell({
   canManage,
   canReadMrz,
   openUpload = false,
+  canSeeCost = false,
 }: {
   data: WizardCase;
   canManage: boolean;
   canReadMrz: boolean;
   /** ?upload=1 — opened from the operations list's «ارفع ملفات عميل» */
   openUpload?: boolean;
+  /** pricing.internal — the uploader reads suppliers' invoices (cost) only then */
+  canSeeCost?: boolean;
 }) {
   const { t } = useTraveliunUI();
   const [uploading, setUploading] = useState(openUpload);
@@ -141,7 +144,7 @@ export function CaseWizardShell({
           </div>
         </section>
 
-        {uploading ? <UploadAll data={data} canReadMrz={canReadMrz} onClose={() => setUploading(false)} /> : null}
+        {uploading ? <UploadAll data={data} canReadMrz={canReadMrz} canSeeCost={canSeeCost} onClose={() => setUploading(false)} /> : null}
 
         <CasePresence operationId={op.id} />
         <AutoIssue data={data} />
