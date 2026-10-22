@@ -4,6 +4,7 @@ import {
   assigneesFor,
   bookingCost,
   countryInName,
+  propertyAmong,
   isOpsTeam,
   buildSupplierRequest,
   requestState,
@@ -255,5 +256,17 @@ describe("the account", () => {
       { currency: "SAR", owed: 1500.5, paid: 800, balance: 700.5 },
       { currency: "USD", owed: 100, paid: 150, balance: -50 },
     ]);
+  });
+});
+
+describe("a supplier that is itself a hotel, in its own city only (2026-10-23)", () => {
+  it("offers «فلل الرمان» where the catalogue has it, never in Istanbul", () => {
+    const villa = { name: "فلل الرمان", categories: "فنادق" };
+    expect(propertyAmong(villa, ["فلل الرمان", "فندق اريادوتا بالي"])).toBe(true);
+    expect(propertyAmong(villa, ["فندق ديفان اسطنبول", "فندق رمادا"])).toBe(false);
+    expect(propertyAmong({ name: "فيلا إس 18", categories: "فنادق" }, ["فلل اس 18 بالي كوتا"])).toBe(true);
+    // not a property: the caller's rule
+    expect(propertyAmong({ name: "TBO Holidays", categories: "فنادق" }, [])).toBeNull();
+    expect(propertyAmong({ name: "فرع ماليزيا", categories: "فنادق، طيران" }, [])).toBeNull();
   });
 });

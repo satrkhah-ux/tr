@@ -66,7 +66,7 @@ import { tourPriced, toursTotal, type TourPrice } from "@/lib/offer/pricing-sugg
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { suppliersFor } from "../generator/SupplierPrice";
-import { countryInName } from "@/lib/operations/supplier-request";
+import { countryInName, propertyAmong } from "@/lib/operations/supplier-request";
 import { AddStayMenu, StayDatesLine } from "../generator/hotels/StayDates";
 import { basicField, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
@@ -578,7 +578,10 @@ export function HotelPanel({
       lookups.countries.map((c) => c.name),
       lookups.countries.flatMap((c) => c.cities.map((ci) => ({ name: ci.name, country: c.name }))),
     );
-  const hotelSuppliers = suppliersFor(lookups, "فنادق").filter((s) => s.name === main.supplier || !country || [null, country.name].includes(placeOf(s.name)));
+  // a supplier that is itself a hotel, only in that hotel's city
+  const hotelSuppliers = suppliersFor(lookups, "فنادق").filter(
+    (s) => s.name === main.supplier || (propertyAmong(s, hotels.map((h) => h.name)) ?? (!country || [null, country.name].includes(placeOf(s.name)))),
+  );
 
   /** The same answer for every stay of this city — the currency, the supplier. */
   const allLines = (fn: (line: DraftHotel) => DraftHotel) => onLines(lines.map(fn));

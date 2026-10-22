@@ -53,6 +53,18 @@ function namesProperty(property: string, title: string): boolean {
   return p.length >= 3 && t.length >= 3 && (t.includes(p) || p.includes(t));
 }
 
+/**
+ * Is a supplier that IS one hotel (isProperty) one of these hotels'? Such a
+ * supplier is offered in its hotel's own city only — «فلل الرمان» is Bali's,
+ * never Istanbul's: its name says no country (countryInName), the city's
+ * catalogue knows it (the evaluator, 2026-10-23). null: not a property — the
+ * caller's own rule decides.
+ */
+export function propertyAmong(supplier: { name: string; categories?: string | null }, hotels: string[]): boolean | null {
+  if (!isProperty({ label: supplier.name, categories: supplier.categories })) return null;
+  return hotels.some((h) => namesProperty(supplier.name, h));
+}
+
 export type AssigneeLike = { kind: "ops" | "employee" | "partner" | "supplier"; id: string | null; label: string; categories?: string | null };
 
 /**
