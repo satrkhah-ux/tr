@@ -2850,6 +2850,8 @@ export const ar: Dictionary = {
   "wz.up.paperSupplier": "في الورقة",
   "wz.up.otherHotel": "فندق آخر غير موجود في الملف: {name}",
   "wz.up.addHotel": "أضف كفندق جديد في الملف",
+  "wz.up.otherFlights": "رحلات غير موجودة في الملف",
+  "wz.up.addFlight": "أضفها كرحلة في الملف",
   "wz.hotels.title": "الفنادق",
   "wz.hotels.add": "إضافة فندق",
   "wz.hotels.none": "لا فنادق في هذا الملف.",

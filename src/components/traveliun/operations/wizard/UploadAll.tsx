@@ -17,6 +17,7 @@ import { paidTotal } from "@/lib/operations/payments";
 import { readBookingTicket, readHotelConfirmation, saveBookingTicket, saveHotelConfirmation, type HotelRead, type TicketRead } from "@/lib/data/wizard-tickets";
 import { parseTicketText } from "@/lib/flights/ticket-parse";
 import { trustedFields, type MrzPassport } from "@/lib/operations/mrz";
+import { ticketTitle } from "@/lib/operations/seed-plan";
 import { hotelBookings } from "@/lib/operations/wizard/hotels";
 import { matchPassport, type MatchRow } from "@/lib/operations/wizard/passports";
 import { matchHotel, matchTicket, placeStay, ticketInvoice, type PaperKind } from "@/lib/operations/wizard/upload-all";
@@ -136,6 +137,23 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
     patch(item.key, { status: "ready", target: res.id, stay: { ...item.stay, target: res.id, other: false }, ...(await readFor({ ...item, stay: { ...item.stay, target: res.id, other: false } }, "hotel", res.id)) });
   }
 
+  /** «أضفها كرحلة في الملف»: a ticket's flights the file does not have, as a flight booking of it, then the line placed on it. */
+  async function addTicketFlight(item: Item) {
+    const legs = item.read?.ticket?.legs ?? [];
+    if (!legs.length) return;
+    patch(item.key, { status: "reading", error: undefined });
+    const res = await addBooking({
+      operation_id: op.id,
+      kind: "flight",
+      title: ticketTitle(null, legs.map((l) => ({ from: l.from_iata, to: l.to_iata }))),
+      start_date: legs[0].dep_date || null,
+      end_date: legs.at(-1)?.arr_date || legs.at(-1)?.dep_date || null,
+    });
+    if (!res.ok) return patch(item.key, { status: "ready", error: t(res.error) });
+    router.refresh();
+    patch(item.key, { status: "ready", target: res.id, ...(await readFor(item, "ticket", res.id)) });
+  }
+
   const patch = (key: number, next: Partial<Item>) => setItems((list) => list.map((i) => (i.key === key ? { ...i, ...next } : i)));
 
   /** A ticket or a confirmation read again for the booking it is placed on — from its words, not the file again. */
@@ -147,7 +165,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
     if (item.text) fd.append("text", item.text);
     else if (!given) fd.append("file", item.file);
     // the supplier the paper names becomes the booking's only when the booking has none — else the employee picks
-    const sup = await paperSupplier(op.id, target, item.text).catch(() => null);
+    const sup = await paperSupplier(op.id, target, item.read?.issuer ?? "").catch(() => null);
     const supplier = sup?.supplier && !sup.onFile ? sup.supplier.id : "";
     if (kind === "ticket") {
       const res = await readBookingTicket(fd);
@@ -520,6 +538,7 @@ export function UploadAll({ data, canReadMrz, canSeeCost, onClose }: { data: Wiz
                       inCase={item.kind === "payment" ? inCase(Number(item.amount), item.currency) : null}
                       onMoney={(next) => patch(item.key, next)}
                       onAddHotel={() => void addStayHotel(item)}
+                      onAddFlight={() => void addTicketFlight(item)}
                       places={places} onPlace={(v) => void place(item, v)} onRef={(ref) => patch(item.key, { ref })} onApprove={() => void approve(item).then((ok) => ok && router.refresh())} onDrop={() => patch(item.key, { status: "dropped" })} />
                   ))}
                 </ul>
@@ -580,6 +599,7 @@ function verdict(i: Item, today: string, field: (f: string) => string): { ok: bo
 function Line({
   item,
   onAddHotel,
+  onAddFlight,
   groupMissing,
   today,
   caseCurrency,
@@ -594,6 +614,7 @@ function Line({
   item: Item;
   /** «أضف كفندق جديد في الملف» for a stay of a hotel the file does not have */
   onAddHotel: () => void;
+  onAddFlight: () => void;
   /** a ticket's travellers no paper of its PNR names — one PDF per passenger names one each */
   groupMissing: string[];
   today: string;
@@ -616,8 +637,8 @@ function Line({
       ? item.passport
         ? item.passport.full_name
         : t("wz.up.passport.unread")
-      : item.kind === "ticket" && item.ticket
-        ? item.ticket.legs.map((l) => `${l.flight_no} ${l.from_iata}→${l.to_iata} ${l.dep_date}`).join(" · ")
+      : item.kind === "ticket" && (item.ticket ?? item.read?.ticket)
+        ? (item.ticket ?? item.read?.ticket)!.legs.map((l) => `${l.flight_no} ${l.from_iata}→${l.to_iata} ${l.dep_date}`).join(" · ")
         : item.kind === "hotel" && item.hotel
           ? `${item.hotel.read.check_in || "—"} → ${item.hotel.read.check_out || "—"}`
           : isMoney(item.kind) && item.money
@@ -687,6 +708,15 @@ function Line({
               {[item.stay.check_in, item.stay.check_out].filter(Boolean).length ? <DirText className="tv-tnum">{`${item.stay.check_in || "—"} → ${item.stay.check_out || "—"}`}</DirText> : null}
               <button type="button" disabled={working} onClick={onAddHotel} className="inline-flex h-8 items-center rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]">
                 {t("wz.up.addHotel")}
+              </button>
+            </p>
+          ) : null}
+          {item.kind === "ticket" && !item.target && item.read?.ticket?.legs.length ? (
+            // a ticket of flights the file does not have (a domestic hop booked apart): said, with its flights above
+            <p className="flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#a86a10] sm:col-span-2">
+              {t("wz.up.otherFlights")}
+              <button type="button" disabled={working} onClick={onAddFlight} className="inline-flex h-8 items-center rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]">
+                {t("wz.up.addFlight")}
               </button>
             </p>
           ) : null}

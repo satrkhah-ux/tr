@@ -126,36 +126,35 @@ export function splitStays(text: string): string[] {
   return starts.map((s, k) => [head, ...lines.slice(s, starts[k + 1] ?? lines.length)].join("\n").trim());
 }
 
-/**
- * A supplier our list knows, named on the paper (the owner, 2026-10-23:
- * «الموردين يتم تسجيلهم وفق الفواتير») — the longest name found wins («Within
- * Earth Travel» over «Earth»). Folded, Arabic or Latin; a name under four
- * letters is too short to tell.
- */
-export function supplierInText<T extends { id: string; arabic_name: string; english_name: string | null }>(text: string, suppliers: T[]): T | null {
-  const fold = (v: string | null) => normalizeName(v).replace(/[^\p{L}\p{N}]+/gu, "");
-  const paper = fold(text);
-  let best: { s: T; n: number } | null = null;
-  for (const s of suppliers) {
-    for (const name of [fold(s.arabic_name), fold(s.english_name)]) {
-      if (name.length >= 4 && paper.includes(name) && (!best || name.length > best.n)) best = { s, n: name.length };
-    }
-  }
-  return best?.s ?? null;
-}
+/** Words a company's name carries beside its own: «Booking.com» is Booking, «… Tourism LLC» the same company. */
+const COMPANY = new Set("com net llc co ltd inc est company group".split(" "));
+const runIn = (hay: string[], run: string[]) => hay.some((_, i) => run.every((w, j) => hay[i + j] === w));
 
 /**
- * The invoice's issuer among our suppliers: the same name folded — Arabic or
- * Latin, case, spaces and marks aside («Within Earth» is «within earth») — or
- * one name holding the other («Within Earth Travel LLC»). null: a new one,
- * offered to the employee, never made by itself.
+ * The paper's issuer among our suppliers: the same name folded — Arabic or
+ * Latin, case, spaces and marks aside («Within Earth» is «within earth») — else
+ * a supplier's whole name among the issuer's words, in order: a name of two
+ * words or more anywhere in it («Within Earth Tourism LLC»), a one-word name
+ * only as the issuer's whole name («Booking» for «Booking.com»). Never a word
+ * inside a phrase — «Booking Reference» is no بوكينج, «TRIP TO DENPASAR» no
+ * Trip (the evaluator, 2026-10-23). null: a new one, offered to the employee,
+ * never made by itself.
  */
 export function matchSupplier<T extends { id: string; arabic_name: string; english_name: string | null }>(issuer: string, suppliers: T[]): T | null {
   const fold = (v: string | null) => normalizeName(v).replace(/[^\p{L}\p{N}]+/gu, "");
+  const words = (v: string | null) => normalizeName(v).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
   const name = fold(issuer);
   if (name.length < 3) return null;
-  const names = (s: T) => [fold(s.arabic_name), fold(s.english_name)].filter((n) => n.length >= 3);
-  return suppliers.find((s) => names(s).includes(name)) ?? suppliers.find((s) => names(s).some((n) => n.length >= 5 && (name.includes(n) || n.includes(name)))) ?? null;
+  const exact = suppliers.find((s) => [fold(s.arabic_name), fold(s.english_name)].includes(name));
+  if (exact) return exact;
+  const own = words(issuer);
+  const bare = own.filter((w) => !COMPANY.has(w));
+  const fits = (n: string[]) => (n.length >= 2 ? runIn(own, n) : n.length === 1 && bare.length === 1 && bare[0] === n[0]);
+  let best: { s: T; n: number } | null = null;
+  for (const s of suppliers) {
+    for (const n of [words(s.arabic_name), words(s.english_name)]) if (fits(n) && (!best || n.length > best.n)) best = { s, n: n.length };
+  }
+  return best?.s ?? null;
 }
 
 type Leg = { from_iata: string; to_iata: string; dep_date: string };

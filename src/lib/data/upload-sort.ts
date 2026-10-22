@@ -8,7 +8,7 @@ import { gateOperation, gateRow } from "@/lib/operations/access";
 import { isOpenAIConfigured } from "@/lib/providers/openai";
 import { readMoneyPaper, type MoneyPaper } from "@/lib/flights/ticket-ai";
 import { MAX_TICKET_BYTES } from "@/lib/flights/ticket-parse";
-import { amountIn, matchSupplier, supplierInText } from "@/lib/operations/wizard/upload-all";
+import { amountIn, matchSupplier } from "@/lib/operations/wizard/upload-all";
 import { caseBookings, sortBytes, staysOn, type PlacedStay, type SortedPaper } from "./paper-core";
 
 /**
@@ -116,13 +116,14 @@ function givenMoney(raw: MoneyPaper, blank: MoneyPaper): MoneyPaper {
 export type PaperSupplier = { onFile: { id: string; name: string } | null; supplier: { id: string; name: string } | null };
 
 /**
- * The supplier an airline's or a hotel supplier's paper names, beside the one
- * the booking has (the owner, 2026-10-23: «الموردين يتم تسجيلهم وفق
- * الفواتير») — offered on the line, set only when the employee approves it.
+ * The supplier an airline's or a hotel supplier's paper names — its issuer, as
+ * read off the file — beside the one the booking has (the owner, 2026-10-23:
+ * «الموردين يتم تسجيلهم وفق الفواتير»): offered on the line, set only when the
+ * employee approves it. Our own papers name no supplier.
  */
-export async function paperSupplier(operationId: string, bookingId: string, text: string): Promise<PaperSupplier> {
+export async function paperSupplier(operationId: string, bookingId: string, issuer: string): Promise<PaperSupplier> {
   const none: PaperSupplier = { onFile: null, supplier: null };
-  if (!text.trim() || (await gateOperation(operationId)) || (await gateRow("operation_bookings", bookingId))) return none;
+  if (!issuer.trim() || (await gateOperation(operationId)) || (await gateRow("operation_bookings", bookingId))) return none;
   try {
     const db = createSupabaseServiceClient() as unknown as SupabaseClient;
     const [{ data: suppliers }, { data: booking }] = await Promise.all([
@@ -133,7 +134,7 @@ export async function paperSupplier(operationId: string, bookingId: string, text
     const row = booking as { operation_id: string; assignee_supplier_id: string | null } | null;
     if (!row || row.operation_id !== operationId) return none;
     const own = row.assignee_supplier_id ? list.find((s) => s.id === row.assignee_supplier_id) : null;
-    const hit = supplierInText(text, list);
+    const hit = matchSupplier(issuer, list);
     return { onFile: own ? { id: own.id, name: own.arabic_name } : null, supplier: hit ? { id: hit.id, name: hit.arabic_name } : null };
   } catch {
     return none;

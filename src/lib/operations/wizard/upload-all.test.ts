@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountIn, matchHotel, matchSupplier, matchTicket, paperKind, placeStay, splitStays, supplierInText, ticketInvoice } from "./upload-all";
+import { amountIn, matchHotel, matchSupplier, matchTicket, paperKind, placeStay, splitStays, ticketInvoice } from "./upload-all";
 
 const PASSPORT = `KINGDOM OF SAUDI ARABIA
 PASSPORT
@@ -129,15 +129,22 @@ describe("«ارفع كل الملفات» — the suppliers' own papers (2026-1
     expect(splitStays(HOTEL)).toEqual([HOTEL]);
   });
 
-  it("names the supplier the paper names — the longest of ours found", () => {
+  it("names the supplier only by the issuer's whole name — never a word inside a phrase", () => {
     const suppliers = [
-      { id: "tbo", arabic_name: "تي بي او", english_name: "TBO Holidays" },
-      { id: "ag", arabic_name: "اجودا", english_name: "Agoda" },
-      { id: "x", arabic_name: "تي", english_name: "TB" },
+      { id: "bk", arabic_name: "بوكينج", english_name: "Booking" },
+      { id: "trip", arabic_name: "Trip", english_name: "Trip" },
+      { id: "smart", arabic_name: "Smart Booking", english_name: "Smart Booking" },
+      { id: "tbo", arabic_name: "TBO Holidays", english_name: "TBO Holidays" },
     ];
-    expect(supplierInText("TBO Holidays — Itinerary voucher", suppliers)?.id).toBe("tbo");
-    expect(supplierInText("Booked via agoda.com", suppliers)?.id).toBe("ag");
-    expect(supplierInText("Hotel direct booking", suppliers)).toBeNull();
+    expect(matchSupplier("Booking.com", suppliers)?.id).toBe("bk");
+    expect(matchSupplier("Trip.com", suppliers)?.id).toBe("trip");
+    expect(matchSupplier("Smart Booking LLC", suppliers)?.id).toBe("smart");
+    expect(matchSupplier("TBO Holidays Pvt", suppliers)?.id).toBe("tbo");
+    // the evaluator's live run: an agency's ticket said «بوكينج» and «Trip»
+    expect(matchSupplier("ITL Tourism and Travel LLC", suppliers)).toBeNull();
+    expect(matchSupplier("ITL WORLD - TMC", suppliers)).toBeNull();
+    expect(matchSupplier("Booking Reference", suppliers)).toBeNull();
+    expect(matchSupplier("Trip Planners", suppliers)).toBeNull();
   });
 });
 

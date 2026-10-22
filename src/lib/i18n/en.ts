@@ -2852,6 +2852,8 @@ export const en = {
   "wz.up.paperSupplier": "On the paper",
   "wz.up.otherHotel": "A hotel this file does not have: {name}",
   "wz.up.addHotel": "Add it as a new hotel of the file",
+  "wz.up.otherFlights": "Flights the file does not have",
+  "wz.up.addFlight": "Add them as a flight of the file",
   "wz.hotels.title": "Hotels",
   "wz.hotels.add": "Add a hotel",
   "wz.hotels.none": "This file has no hotels.",
