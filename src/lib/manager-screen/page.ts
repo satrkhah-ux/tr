@@ -240,7 +240,7 @@ const RUNTIME = String.raw`
     var h = "";
     for (var i = 0; i < F.urgent.length && i < 4; i++) {
       var u = F.urgent[i];
-      h += '<div class="uc"><small>' + esc(u.panelTitle) + "</small><b>" + esc(u.label) + ": " + esc(u.value) + "</b><p>" + esc(u.reason) + "</p><em>← " + esc(u.action) + "</em></div>";
+      h += '<div class="uc"><small>' + esc(u.panelTitle) + "</small><b>" + esc(u.label) + ": " + esc(u.value) + "</b><p>" + esc(u.detail || u.reason) + "</p><em>← " + esc(u.action) + "</em></div>";
     }
     if (!F.urgent.length) h = '<div class="calm rail"><b>✓</b>لا شيء يحتاج تدخلك الآن</div>';
     var wch = "";
@@ -256,7 +256,8 @@ const RUNTIME = String.raw`
     var i = Math.floor(t / 7000) % F.urgent.length, u = F.urgent[i], key = F.at + "|" + i;
     if (shown.breaking === key) return;
     shown.breaking = key;
-    $("breakText").textContent = u.label + ": " + u.value + " — " + u.reason;
+    // the whole of it where there is more (who, his number, what he wrote — rules.ts waitDetail)
+    $("breakText").textContent = u.label + ": " + u.value + " — " + (u.detail || u.reason);
     strip.className = "on";
   }
 
@@ -510,7 +511,7 @@ aside.rail h2{margin:0;display:flex;justify-content:space-between;align-items:ce
 footer{display:flex;align-items:stretch;background:var(--gold);color:#10221f;overflow:hidden}
 footer .now{position:relative;z-index:1;display:grid;place-items:center;padding:0 ${v(30)};background:#04101a;color:var(--gold);font-size:${v(28)};font-weight:800}
 #rail{position:relative;flex:1;overflow:hidden}
-#tick{position:absolute;left:0;top:50%;transform:translateY(-50%);white-space:nowrap;direction:rtl;font-size:${v(28)};font-weight:800;line-height:1.3;will-change:transform}
+#tick{position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;white-space:nowrap;direction:rtl;font-size:${v(28)};font-weight:800;line-height:1.3;will-change:transform}
 .ti.red{color:#8a0f22}.ti.red:before{content:"● ";color:#c4122f}
 .sep{margin:0 ${v(26)};opacity:.5}
 
@@ -532,7 +533,7 @@ export function managerPage(feed: ManagerScreenFeed): string {
 <style>${CSS}</style></head>
 <body>
 <header id="top">
-  <div class="bug"><img src="/traveliun/logo-body.svg" alt="ترافليون"><div class="ch"><b>نشرة ترافليون</b><small>TRAVELIUN LIVE</small></div></div>
+  <div class="bug"><img src="/traveliun/logo-body.svg" alt="ترافليون"><div class="ch"><b>النشرة</b></div></div>
   <div class="live"><i></i>مباشر</div>
   <nav id="lineup"></nav>
   <div id="overall" class="overall s-${feed.overall}"></div>

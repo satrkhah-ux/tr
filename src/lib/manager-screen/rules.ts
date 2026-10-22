@@ -39,6 +39,8 @@ export type Tile = {
   value: string;
   status: Status;
   reason: string;
+  /** the «عاجل» strip's and the rail card's fuller line, when there is more to say than `reason` */
+  detail?: string;
   /** a Teletel agent's status — the screen's dot: green online, amber busy, grey offline */
   presence?: Presence;
 };
@@ -205,7 +207,15 @@ export type LeadFact = {
 };
 
 /** One open Teletel conversation on the SLA board's clock (sla/classify.ts slaClock), «cold» left out. */
-export type WaitFact = { minutes: number; since: string; agent: string | null; client: string | null };
+export type WaitFact = {
+  minutes: number;
+  since: string;
+  agent: string | null;
+  client: string | null;
+  /** the client's number and the start of his last message — said on the red «عاجل» (the manager, 2026-10-22: «لم يوضح الرقم أو آخر رد») */
+  phone?: string | null;
+  preview?: string | null;
+};
 /** A Teletel agent and their status now (GET /agents availability_status). */
 export type AgentFact = { name: string; status: Presence };
 /** An open Teletel conversation: who holds it and when it last moved. */
@@ -279,6 +289,32 @@ const TICKER_MAX = 40;
 export const INQUIRY_KINDS = ["بكج", "فنادق", "طيران", "تأشيرات", "مواصلات", "رخص دولية", "طلب غير واضح"] as const;
 
 const minutesText = (m: number) => (m < 60 ? arCount(Math.round(m), "دقيقة", "دقيقتين", "دقائق") : agePhrase(m / 60));
+
+/**
+ * The longest red wait, said whole: who («أحمد علي» and his number), since
+ * when and what he last wrote, and who holds him. /m is the administration's
+ * (signed in, dashboard.admin) — the open office screens never show a number.
+ */
+function waitDetail(w: WaitFact, today: string): string {
+  const at = new Date(w.since);
+  const time = at.toLocaleTimeString("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit" });
+  const day = at.toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+  const yesterday = new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  // «18:40» alone reads as today's — a wait from yesterday or before says its day
+  const wrote = day === today ? time : day === yesterday ? `أمس ${time}` : `${day.slice(8, 10)}/${day.slice(5, 7)} ${time}`;
+  // the number in its own left-to-right island, so the Arabic line around it keeps its order
+  // a «name» that is only digits is Teletel listing him by his number — said once, as the number
+  const name = /[ء-يA-Za-z]/.test(w.client ?? "") ? w.client!.trim() : "عميل";
+  const who = [name, w.phone ? `⁦${w.phone}⁩` : null].filter(Boolean).join(" ");
+  const said = w.preview?.replace(/\s+/g, " ").trim();
+  return [
+    `${who} منذ ${minutesText(w.minutes)} (كتب ${wrote})`,
+    w.agent || "بلا موظف",
+    said ? `«${said.length > 40 ? `${said.slice(0, 40)}…` : said}»` : null,
+  ]
+    .filter(Boolean)
+    .join(" — ");
+}
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const money = (n: number, currency: string) => (currency === "USD" ? `$${n.toFixed(2)}` : `${n.toFixed(2)} ${currency}`);
 const names = (list: string[], n = 5) => list.slice(0, n).join("، ") + (list.length > n ? ` و${list.length - n} غيرهم` : "");
@@ -413,6 +449,7 @@ function conversations(f: ManagerFacts, today: LeadFact[], team: TeamToday): Sec
         ? `أطولها منذ ${minutesText(top.minutes)}${top.agent ? ` — ${top.agent}` : ""}${client ? ` · العميل ${client}` : ""}`
         : `لا أحد ينتظر أكثر من ${t.waitAmberMin} دقائق`,
     );
+    if (status === "red" && top) waiting.detail = waitDetail(top, f.day);
   }
 
   const todayTile = tile("today", "المحادثات اليوم", today.length, "green", `${open.length} مفتوحة · ${closed} مغلقة`);

@@ -110,6 +110,22 @@ describe("«المحادثات اليوم»", () => {
     expect(red.urgent.map((u) => u.key)).toContain("waiting");
   });
 
+  it("says the red wait whole on «عاجل»: the client, his number, when and what he wrote, who holds him", () => {
+    const wait = { minutes: 25, since: ago(25), agent: "رشا", client: "سارة القحطاني", phone: "+966581234567", preview: "السلام عليكم   أبغى أسعار بكج تركيا لشخصين في ديسمبر لو سمحت مع الطيران" };
+    const red = buildScreen(facts({ waits: [wait] }));
+    expect(red.urgent.find((u) => u.key === "waiting")?.detail).toBe(
+      "سارة القحطاني ⁦+966581234567⁩ منذ 25 دقيقة (كتب 14:35) — رشا — «السلام عليكم أبغى أسعار بكج تركيا لشخصين…»",
+    );
+    // a wait from yesterday says so — «18:05» alone would read as today's
+    const old = buildScreen(facts({ waits: [{ ...wait, minutes: 1320, since: "2026-10-18T15:05:00Z" }] }));
+    expect(old.urgent.find((u) => u.key === "waiting")?.detail).toContain("(كتب أمس 18:05)");
+    // the number is said there and nowhere else — not in a reason, a lane or the crawl
+    const { urgent, panels, channel, ticker } = red;
+    expect(JSON.stringify({ reasons: urgent.map((u) => u.reason), panels: panels.map((p) => p.tiles.map((x) => x.reason)), channel, ticker })).not.toMatch(/9665\d+/);
+    // amber says no name and no number
+    expect(tileOf(buildScreen(facts({ waits: [{ ...wait, minutes: 8 }] })), "conversations", "waiting").detail).toBeUndefined();
+  });
+
   it("never puts a phone on the screen, even when Teletel lists the client by it", () => {
     const s = buildScreen(facts({ waits: [{ minutes: 40, since: ago(40), agent: null, client: "966501234567" }] }));
     expect(JSON.stringify(s)).not.toMatch(/9665\d+/);
