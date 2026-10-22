@@ -3,6 +3,7 @@ import { riyadhDayStart, secondsText, speedText, waitText } from "./staff-number
 import { assignmentText } from "./staff-events";
 import { ruleTips, teamAverages, type Facts } from "./staff-report";
 import { dashboardText, light } from "./staff-screen";
+import { threadText, whenText } from "./staff-replies";
 import { broadcastText } from "./staff-manager";
 
 describe("«تنبيهاتي» numbers", () => {
@@ -106,6 +107,28 @@ describe("«🖥️ شاشتي»", () => {
     expect(speedText(600, [15, 120])).toContain("🟢 ضمن الهدف");
     expect(speedText(9000, [15, 120])).toContain("🔴 متأخر كثيراً");
     expect(speedText(null, [15, 120])).toBe("— لا يوجد بعد");
+  });
+});
+
+describe("a conversation in the bot says who wrote each message", () => {
+  it("names the client, the colleague and Murad, each message with its time, one block each", () => {
+    const now = Date.parse("2026-10-22T15:00:00Z");
+    const text = threadText(
+      "أبو جود",
+      [
+        { id: 1, at: Date.parse("2026-10-22T14:05:00Z") / 1000, text: "السلام عليكم", fromClient: true, sender: "أبو جود" },
+        { id: 2, at: Date.parse("2026-10-22T14:05:30Z") / 1000, text: "وعليكم السلام", fromClient: false, sender: "احمد الرفاعي" },
+        { id: 3, at: Date.parse("2026-10-22T14:07:00Z") / 1000, text: "أبشر <بالسعادة>", fromClient: false, sender: "رهف السيد" },
+      ],
+      new Set([2]),
+      now,
+    );
+    const blocks = text.split("\n┈┈┈┈┈┈┈┈\n");
+    expect(blocks).toHaveLength(3);
+    expect(blocks[0]).toBe("👤 <b>العميل — أبو جود</b> · 05:05 م\nالسلام عليكم");
+    expect(blocks[1]).toContain("🤖 <b>مُراد (رد آلي)</b>");
+    expect(blocks[2]).toContain("🟢 <b>رهف السيد</b> · 05:07 م\nأبشر &lt;بالسعادة&gt;");
+    expect(whenText(Date.parse("2026-10-21T14:05:00Z") / 1000, now)).toContain("/");
   });
 });
 

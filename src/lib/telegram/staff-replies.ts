@@ -42,6 +42,38 @@ export async function threadOf(chatId: number, messageId: number): Promise<numbe
   return (data as { conversation_id: number } | null)?.conversation_id ?? null;
 }
 
+/** «14:05», or «21/10 14:05» when it was not today (Riyadh). */
+export function whenText(atSec: number, nowMs = Date.now()): string {
+  const opts = { timeZone: "Asia/Riyadh" } as const;
+  const time = new Date(atSec * 1000).toLocaleTimeString("ar-SA-u-nu-latn", { ...opts, hour: "2-digit", minute: "2-digit" });
+  const day = (ms: number) => new Date(ms).toLocaleDateString("en-CA", opts);
+  if (day(atSec * 1000) === day(nowMs)) return time;
+  return `${new Date(atSec * 1000).toLocaleDateString("ar-SA-u-nu-latn-ca-gregory", { ...opts, day: "2-digit", month: "2-digit" })} ${time}`;
+}
+
+export type ThreadLine = { id: number; at: number; text: string; fromClient: boolean; sender: string | null };
+
+/**
+ * A conversation as the employee reads it in the bot (the user, 2026-10-22:
+ * «المحادثات متداخلة … اجعل شيء واضح من ارسل و من اجاب»). Each message is its
+ * own block, headed by who wrote it and when: the client by name, a colleague
+ * by name, or «مُراد» for an automatic reply (his murad_log reply ids). A line
+ * separates the messages.
+ */
+export function threadText(clientName: string, lines: ThreadLine[], muradIds: Set<number>, nowMs = Date.now()): string {
+  if (!lines.length) return "— لا رسائل —";
+  return lines
+    .map((m) => {
+      const who = m.fromClient
+        ? `👤 <b>العميل — ${escapeHtml(clientName)}</b>`
+        : muradIds.has(m.id)
+          ? "🤖 <b>مُراد (رد آلي)</b>"
+          : `🟢 <b>${escapeHtml(m.sender?.trim() || "ترافليون")}</b>`;
+      return `${who} · ${whenText(m.at, nowMs)}\n${escapeHtml(m.text.slice(0, 400))}`;
+    })
+    .join("\n┈┈┈┈┈┈┈┈\n");
+}
+
 export function replyButtons(conversationId: number): InlineButton[][] {
   const url = teletelConversationUrl(conversationId);
   return [[{ text: "✍️ رد", callback_data: `r:${conversationId}` }, ...(url ? [{ text: "💬 تيلي تيل", url }] : [])]];
@@ -74,7 +106,7 @@ export async function forwardClientMessage(body: TeletelMessageEvent): Promise<v
   const name = body.conversation?.meta?.sender?.name?.trim() || `#${conversationId}`;
   const sent = await staffSend(
     member.chatId,
-    [`💬 <b>${escapeHtml(name)}</b>`, text ? escapeHtml(text.slice(0, 1500)) : null, files || null].filter(Boolean).join("\n"),
+    [`👤 <b>رسالة من العميل — ${escapeHtml(name)}</b>`, text ?escapeHtml(text.slice(0, 1500)) : null, files || null].filter(Boolean).join("\n"),
     replyButtons(conversationId),
   );
   if (sent.ok) await rememberThread(member.chatId, sent.messageId, conversationId);

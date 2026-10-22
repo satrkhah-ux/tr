@@ -1,11 +1,13 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { conversationThread, getTeletelConfig, teletelConversationUrl, teletelGet } from "@/lib/providers/teletel";
 import { escapeHtml, staffCall, staffForChat, staffSend, staffSendAudio, type StaffMember } from "./staff-bot";
 import { buildReport } from "./staff-report";
 import { openFor, waitText } from "./staff-numbers";
-import { linkTeletelToken, promptReply, rememberThread, sendReply, threadOf, TOKEN_HELP } from "./staff-replies";
+import { linkTeletelToken, promptReply, rememberThread, sendReply, threadOf, threadText, TOKEN_HELP } from "./staff-replies";
 import { openList, openScreen, screenView, unansweredList, weekView } from "./staff-screen";
 import { confirmDraft, draft, isBotManager, memberView, promptFor, remindDraft, takePending, teamView } from "./staff-manager";
 import { decisionStep, decisionsView, decisionText, decisionView, interventionView, promptDecision, setDecisionStatus, signalView } from "./staff-decisions";
@@ -37,6 +39,8 @@ export type StaffUpdate = {
 };
 
 type Screen = { text: string; buttons: InlineButton[][] };
+
+const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 
 const BACK: InlineButton = { text: "↩️ شاشتي", callback_data: "s" };
 
@@ -102,21 +106,23 @@ async function conversation(me: StaffMember, id: number): Promise<Screen> {
   const conv = await teletelGet<{ meta?: { assignee?: { id?: number } | null; sender?: { name?: string | null } | null } }>(`/conversations/${id}`);
   if (!conv) return UNREACHABLE;
   if (conv.meta?.assignee?.id !== me.agentId) return { text: "هذه المحادثة لم تعد مسندة إليك.", buttons: [[BACK]] };
-  const thread = await conversationThread(id);
-  const lines = (thread?.messages ?? [])
-    .filter((m) => !m.isPrivate && m.text)
-    .slice(-6)
-    .map((m) => `${m.fromClient ? "👤" : "🟢"} ${escapeHtml(m.text.slice(0, 300))}`);
+  const [thread, murad] = await Promise.all([
+    conversationThread(id),
+    db().from("murad_log").select("reply_message_id").eq("conversation_id", id).not("reply_message_id", "is", null),
+  ]);
+  const client = conv.meta?.sender?.name?.trim() || `#${id}`;
+  const lines = (thread?.messages ?? []).filter((m) => !m.isPrivate && m.text).slice(-8);
+  const muradIds = new Set(((murad.data ?? []) as { reply_message_id: number }[]).map((r) => Number(r.reply_message_id)));
   const url = teletelConversationUrl(id);
   return {
     text: [
-      `💬 <b>${escapeHtml(conv.meta?.sender?.name?.trim() || `#${id}`)}</b>`,
+      `💬 <b>محادثتك مع ${escapeHtml(client)}</b> — آخر ${lines.length} رسائل`,
       "",
-      ...(lines.length ? lines : ["— لا رسائل —"]),
-      thread?.canReply ? "" : "\n⚠️ مرّ أكثر من ٢٤ ساعة على آخر رسالة من العميل — لا يصله إلا قالب معتمد من تيلي تيل.",
+      threadText(client, lines, muradIds),
+      thread?.canReply ? null : "\n⚠️ مرّ أكثر من ٢٤ ساعة على آخر رسالة من العميل — لا يصله إلا قالب معتمد من تيلي تيل.",
     ]
-      .join("\n")
-      .trim(),
+      .filter((line): line is string => line !== null)
+      .join("\n"),
     buttons: [
       [{ text: "✍️ رد", callback_data: `r:${id}` }, ...(url ? [{ text: "💬 افتح في تيلي تيل", url }] : [])],
       [{ text: "⏳ بانتظار ردي", callback_data: "w" }, BACK],
