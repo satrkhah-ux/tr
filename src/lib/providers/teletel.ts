@@ -558,6 +558,38 @@ export async function assignTeletelTeam(conversationId: number, teamId: number):
   return (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { team_id: teamId })) !== null;
 }
 
+/** Resolve or reopen a conversation (the system's closing, leads/lifecycle.ts). */
+export async function setTeletelStatus(conversationId: number, status: "resolved" | "open"): Promise<boolean> {
+  const config = getTeletelConfig();
+  return config ? (await api<unknown>(config, `/conversations/${conversationId}/toggle_status`, { status })) !== null : false;
+}
+
+/**
+ * No team, no agent: Teletel's own intake takes it as a new request. The team
+ * first — cleared second, its auto-assignment would already have given it to a member.
+ */
+export async function unassignTeletel(conversationId: number): Promise<boolean> {
+  const config = getTeletelConfig();
+  if (!config) return false;
+  // Chatwoot answers an un-assignment with a JSON null — read back instead: the team gone is the proof (the
+  // inbox's auto-assignment may already have given it to an online agent: that IS the new intake)
+  await api<unknown>(config, `/conversations/${conversationId}/assignments`, { team_id: 0 });
+  await api<unknown>(config, `/conversations/${conversationId}/assignments`, { assignee_id: 0 });
+  const now = await api<{ meta?: { team?: { id?: number } | null } }>(config, `/conversations/${conversationId}`);
+  return Boolean(now?.meta) && !now?.meta?.team?.id;
+}
+
+/** The agents who can take an inbox's conversations — names as Teletel's activity lines write them. */
+export async function listAssignableAgents(inboxId: number | null): Promise<{ id: number; name: string; email: string | null }[]> {
+  const config = getTeletelConfig();
+  if (!config || !inboxId) return [];
+  const res = await api<{ payload?: { id?: number; name?: string; available_name?: string; email?: string }[] }>(config, `/assignable_agents?inbox_ids[]=${inboxId}`);
+  return (res?.payload ?? []).filter((a) => typeof a.id === "number").flatMap((a) =>
+    // the activity line says the login name («msabry@…») or the display name («محمد صبري»)
+    [...new Set([a.name, a.available_name].filter((n): n is string => Boolean(n?.trim())))].map((name) => ({ id: a.id as number, name, email: a.email ?? null })),
+  );
+}
+
 /** The conversation read by us (the agent's «last seen») — WhatsApp's blue ticks where Teletel passes them on. */
 export async function markTeletelSeen(conversationId: number): Promise<boolean> {
   const config = getTeletelConfig();

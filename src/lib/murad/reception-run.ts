@@ -31,6 +31,7 @@ import { getRates } from "@/lib/data/rates-actions";
 import { USD_SAR_DEFAULT } from "@/lib/offer/pricing";
 import { askText, datesSaid, holdToText, missing, offerDraftData, offerText, priceOffer, readOffers, routeCity, tripChanged, tripDays, tripSummary, type OfferAsk, type OfferCountry } from "./auto-offer";
 import { loadPlaces } from "@/lib/leads/teletel-pull";
+import { returnedToEmployee } from "@/lib/leads/lifecycle";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
 import { isHumanReply, maskPhone, muradMessageIds, noteFor, SETTING, type TurnMessage } from "./core";
@@ -603,6 +604,11 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       (trip.only_city && !routeCity(c, trip.only_city) ? `المبيت في ${trip.only_city}` : null) ??
       ((trip.children ?? 0) > 0 ? "أطفال" : (trip.adults ?? 0) > c.maxPeople ? `أكثر من ${c.maxPeople} أشخاص` : null);
 
+    // an employee closed it and the client came back: it went back to them (leads/lifecycle.ts) — theirs, not a new request
+    if (await returnedToEmployee(m.conversationId, visitStart)) {
+      await finish({ reason: "none:assigned" });
+      return "none:assigned";
+    }
     // step 4 of the visa flow: handed to «قسم فيزا» in this visit — silence, whatever the client asks
     if (received.some((r) => r.intake?.visa_handoff || (r.intake?.visa_flow as { done?: boolean } | undefined)?.done)) {
       await finish({ reason: "none:routed" });

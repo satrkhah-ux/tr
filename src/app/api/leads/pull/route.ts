@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { pullSheet } from "@/lib/leads/sync";
 import { pullTeletel } from "@/lib/leads/teletel-pull";
+import { closeStale } from "@/lib/leads/lifecycle";
 import { getTeletelConfig } from "@/lib/providers/teletel";
 import { recordCronRun } from "@/lib/data/cron-runs";
 
@@ -32,7 +33,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // phase two: Teletel's conversations; the sheet only where Teletel is not configured
     const result = getTeletelConfig() ? await pullTeletel(service) : await pullSheet(service);
     if (result.error) throw new Error(result.error);
-    return result;
+    // the system's closing (leads/lifecycle.ts): off until the owner sets how many idle days close a conversation
+    const { data: setting } = await service.from("app_settings").select("value").eq("key", "conversation_autoclose_days").maybeSingle();
+    const days = Number((setting as { value: string } | null)?.value);
+    return days > 0 && getTeletelConfig() ? { ...result, autoClosed: await closeStale(days) } : result;
   });
   return NextResponse.json({ ok: true, ...summary });
 }

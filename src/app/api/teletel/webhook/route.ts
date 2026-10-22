@@ -1,5 +1,6 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 import { wakeFollowup } from "@/lib/followups/service";
+import { clientWrote } from "@/lib/leads/lifecycle";
 import { schedule, webhookToken } from "@/lib/murad/reception-run";
 
 export const runtime = "nodejs";
@@ -42,9 +43,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     contactName: sender?.name ?? body.sender?.name ?? "",
     content: String(body.content ?? ""),
   };
-  // «تأخير بشري»: marked read now, answered after a person's pause (reception-run.ts schedule)
+  // «تأخير بشري»: marked read now, answered after a person's pause (reception-run.ts schedule); a conversation we
+  // saw closed goes back to whoever closed it, or to intake (leads/lifecycle.ts) — done before the pause ends
   after(async () => {
-    await Promise.allSettled([wakeFollowup(message.conversationId, message.at), schedule(message)]);
+    await Promise.allSettled([wakeFollowup(message.conversationId, message.at), clientWrote(message.conversationId, message.at), schedule(message)]);
   });
   return NextResponse.json({ ok: true });
 }

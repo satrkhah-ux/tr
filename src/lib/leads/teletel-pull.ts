@@ -9,6 +9,7 @@ import { muradMessageIds } from "@/lib/murad/core";
 import { allRows } from "@/lib/data/all-rows";
 import { classifyConversationInquiry } from "./request-classification";
 import { inferConversationDestination } from "./destination";
+import { onClientReturn, recordClosed } from "./lifecycle";
 
 /**
  * «العملاء» phase two (the owner, 2026-10-17: «كل شيء تلقائي، خاصة اسم العميل»):
@@ -58,6 +59,7 @@ type Known = {
   assigned_to_name: string | null;
   delay: string | null;
   status: "open" | "closed";
+  conversation_state: string | null;
   teletel_conversation_id: number | null;
   first_message_at: string | null;
   first_reply_at: string | null;
@@ -106,7 +108,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
     allRows((a, b) =>
       supabase
         .from("client_leads")
-        .select("id, phone, name, inquiry, inquiry_source, destination, destination_source, received_by, assigned_to, assigned_to_name, delay, status, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at, auto_routed_at, created_at, last_visit_at, draft_id")
+        .select("id, phone, name, inquiry, inquiry_source, destination, destination_source, received_by, assigned_to, assigned_to_name, delay, status, conversation_state, teletel_conversation_id, first_message_at, first_reply_at, assigned_at, assignee_reply_at, contact_id, timeline_seen_at, auto_routed_at, created_at, last_visit_at, draft_id")
         .or("teletel_conversation_id.not.is.null,and(source.eq.sheet,teletel_conversation_id.is.null)")
         .order("id")
         .range(a, b),
@@ -123,10 +125,13 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
   const vague: { c: OpenConversation; inquiry: string | null; destination: string | null; mutableDestination: boolean; visitAt: number }[] = [];
   // something happened since their turns were last read: read them again
   const timelines: OpenConversation[] = [];
+  // seen closed, open again: the client came back (or a colleague reopened it) — the webhook usually saw it first
+  const reopened: OpenConversation[] = [];
   for (const c of open) {
     const phone = normalizePhone(c.phone);
     const holder = employeeFor(c.assignee, team);
-    const live = { ...currentAssignment(c, team), delay: delayText(c, nowSec) || null, status: "open" as const };
+    // where it stands for «الشاشات» and /m (lifecycle.ts): the client waiting on us, or we spoke last
+    const live = { ...currentAssignment(c, team), delay: delayText(c, nowSec) || null, status: "open" as const, conversation_state: c.waitingSince > 0 ? "waiting" : "open" };
     const had = byConversation.get(c.id) ?? sheetByPhone.get(phone);
     if (had) {
       if (!had.teletel_conversation_id) {
@@ -148,6 +153,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       if (Number(had.timeline_seen_at) !== c.lastActivityAt) timelines.push(c);
       // the client came back (0104): the conversation had been closed, or they wrote over a day after the visit before
       const visitStart = Date.parse(had.last_visit_at ?? had.created_at) / 1000;
+      if (had.status === "closed") reopened.push(c);
       if (c.waitingSince > 0 && c.waitingSince > visitStart && (had.status === "closed" || c.waitingSince - visitStart > 86_400)) {
         patch.last_visit_at = iso(c.waitingSince);
       }
@@ -193,6 +199,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
     }));
   }
   result.updated = updates.length;
+  for (const c of reopened) await onClientReturn(c.id, c.waitingSince || nowSec, c.waitingSince > 0);
   if (fresh.length) {
     // two pulls at once add each conversation once
     const { error } = await supabase.from("client_leads").upsert(fresh, { onConflict: "teletel_conversation_id", ignoreDuplicates: true });
@@ -277,9 +284,12 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
   for (let i = 0; i < gone.length; i += 5) {
     await Promise.all(gone.slice(i, i + 5).map(async (lead) => {
       // A handover may have happened just before closure, between two pulls.
-      const current = await teletelGet<{ meta?: { assignee?: { name?: string }; team?: { name?: string } } }>(`/conversations/${lead.teletel_conversation_id}`);
+      const current = await teletelGet<{ inbox_id?: number; status?: string; meta?: { assignee?: { id?: number; name?: string }; team?: { name?: string } } }>(`/conversations/${lead.teletel_conversation_id}`);
       const assignment = current?.meta ? currentAssignment({ assignee: current.meta.assignee?.name ?? null, team: current.meta.team?.name ?? null }, team) : {};
       await supabase.from("client_leads").update({ ...assignment, status: "closed", delay: null, updated_at: new Date().toISOString() }).eq("id", lead.id);
+      // who closed it, kept (lifecycle.ts): when the client writes again it goes back to them, or to intake — resolved
+      // only (a snoozed one leaves the open list too)
+      if (current?.status === "resolved") await recordClosed(Number(lead.teletel_conversation_id), current?.meta?.assignee?.id ?? null, current?.inbox_id ?? null);
     }));
   }
   result.closed = gone.length;
