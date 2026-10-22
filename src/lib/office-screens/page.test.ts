@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { screenPage } from "./page";
+import { serviceLine } from "./config";
 import type { ScreenState } from "./server";
 
 const state: ScreenState = {
@@ -11,7 +12,8 @@ describe("office country bulletin", () => {
     const html = screenPage(1, { ...state, countries: ["</script><script>bad()</script>"] }, true);
     expect(html).not.toContain("</script><script>bad()");
     expect(html).toContain("\\u003c/script>");
-    expect(html).toContain('id="countryList"');
+    expect(html).toContain('id="ranks"');
+    expect(html).toContain('id="hero"');
     expect(html).toContain("prefers-reduced-motion");
   });
   it("emits syntactically valid scripts for legacy screens", () => {
@@ -20,5 +22,12 @@ describe("office country bulletin", () => {
       expect(() => new Function(match[1])).not.toThrow();
       expect(match[1]).not.toMatch(/\b(?:const|let)\b|=>/);
     }
+  });
+  it("the alert encourages — never «طلب» (the owner, 2026-10-22: «مسافر جديد مع ترافليون — بكج إلى ماليزيا أفضل من طلب جديد»)", () => {
+    const html = screenPage(1, state, true);
+    const alert = html.slice(html.indexOf('<div id="alert">'), html.indexOf('<section id="countries">'));
+    expect(alert).toContain("مسافر جديد مع ترافليون");
+    expect(alert).not.toContain("طلب");
+    for (const kind of ["بكج", "طيران", "تأشيرات", "فنادق"]) expect(serviceLine(kind, "ماليزيا")).not.toContain("طلب");
   });
 });

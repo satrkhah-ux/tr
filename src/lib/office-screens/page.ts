@@ -147,16 +147,33 @@ const RUNTIME = String.raw`
     var key = Math.floor(t / 600000) + "|" + countries.join("|");
     if (key !== spotlightKey) {
       spotlightKey = key;
-      var html = "";
-      for (var i = 0; i < countries.length; i++) {
-        var card = document.createElement("div"); card.className = "country";
+      // the share of demand as a bar, never a number (the owner: no counts on the screens)
+      var stats = S.countryStats && S.countryStats.length ? S.countryStats : [];
+      if (!stats.length) for (var c = 0; c < countries.length; c++) stats.push({ country: countries[c], count: countries.length - c });
+      var top = stats[0].count || 1;
+      var hero = $("heroImg");
+      hero.style.visibility = "visible";
+      hero.onerror = function () { this.style.visibility = "hidden"; };
+      hero.src = scenery(stats[0].country);
+      $("heroName").textContent = stats[0].country;
+      var list = $("ranks");
+      while (list.firstChild) list.removeChild(list.firstChild);
+      for (var i = 1; i < stats.length && i < 8; i++) {
+        var row = document.createElement("div"); row.className = "rk";
+        row.style.webkitAnimationDelay = row.style.animationDelay = (0.7 + i * 0.22).toFixed(2) + "s";
         var rank = document.createElement("b"); rank.textContent = (i + 1 < 10 ? "0" : "") + (i + 1);
-        var name = document.createElement("span"); name.textContent = countries[i];
-        var photo = document.createElement("img"); photo.src = scenery(countries[i]); photo.alt = ""; photo.onerror = function () { this.style.visibility = "hidden"; };
-        card.appendChild(photo); card.appendChild(rank); card.appendChild(name); html += card.outerHTML;
+        var pic = document.createElement("img"); pic.alt = ""; pic.src = scenery(stats[i].country); pic.onerror = function () { this.style.visibility = "hidden"; };
+        var name = document.createElement("span"); name.textContent = stats[i].country;
+        var track = document.createElement("i"); var bar = document.createElement("u");
+        bar.style.width = Math.max(10, Math.round(100 * stats[i].count / top)) + "%";
+        bar.style.webkitAnimationDelay = bar.style.animationDelay = (1 + i * 0.22).toFixed(2) + "s";
+        track.appendChild(bar);
+        row.appendChild(rank); row.appendChild(pic); row.appendChild(name); row.appendChild(track);
+        list.appendChild(row);
       }
-      $("countryList").innerHTML = html;
-
+      list.className = stats.length > 1 ? "" : "none";
+      // restart the entrance for every new edition
+      var panelNow = $("countries"); panelNow.className = ""; void panelNow.offsetWidth; panelNow.className = active ? (elapsed >= 34800 ? "on departing" : "on") : "";
     }
   }
 
@@ -274,36 +291,51 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #band.up{-webkit-transform:translateY(0);transform:translateY(0)}
 #tick{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;direction:rtl;color:#fff;font-weight:800;line-height:1.24;will-change:transform}
 #band{display:none}
-#countries{position:absolute;inset:0;z-index:2;display:none;color:#fff;overflow:hidden;text-align:right;background:linear-gradient(135deg,#123a3c,#071f25)}
-#countries.on{display:block;animation:bulletinEnter 1.2s cubic-bezier(.16,1,.3,1) both}
-#countries.on.departing{animation:bulletinExit 1.2s cubic-bezier(.6,0,.8,.4) both}
+#countries{position:absolute;inset:0;z-index:2;display:none;color:#fff;overflow:hidden;text-align:right;background:radial-gradient(120% 95% at 88% 8%,#17504f 0%,#0a2b2f 48%,#04171b 100%)}
+#countries.on{display:block;-webkit-animation:bulletinEnter 1.1s cubic-bezier(.16,1,.3,1) both;animation:bulletinEnter 1.1s cubic-bezier(.16,1,.3,1) both}
+#countries.on.departing{-webkit-animation:bulletinExit 1.1s cubic-bezier(.6,0,.8,.4) both;animation:bulletinExit 1.1s cubic-bezier(.6,0,.8,.4) both}
 @keyframes bulletinEnter{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes bulletinExit{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
-.motionTitle{position:absolute;left:5vw;right:5vw;top:6vh;display:flex;justify-content:center;align-items:center;gap:1.2vw;font-size:2.5vw;font-weight:800;text-align:center}
-.titleText{position:relative;display:inline-block;color:#fff;background:linear-gradient(110deg,#fff 35%,#e6cf9c 48%,#fff 61%);background-size:260% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-#countries.on .motionTitle{animation:titleReveal 1s .3s cubic-bezier(.16,1,.3,1) both}
-#countries.on .titleText{animation:titleShimmer 7s 1.3s ease-in-out infinite}
-.motionTitle:after{content:"";position:absolute;width:5vw;height:2px;background:#d7bd86;bottom:-1.2vh;left:50%;transform:translateX(-50%);transform-origin:center}
-#countries.on .motionTitle:after{animation:titleUnderline 1.1s .7s ease-out both}
+.bHead{position:absolute;top:5.5vh;right:4.5vw;left:4.5vw;display:flex;align-items:flex-end;justify-content:space-between}
+.bHead .eyebrow{display:flex;align-items:center;gap:.8vw;font-size:1.25vw;font-weight:800;color:#e3bd3c}
+.bHead .eyebrow i{width:.8vw;height:.8vw;border-radius:50%;background:#e5354f;box-shadow:0 0 0 0 rgba(229,53,79,.7)}
+#countries.on .bHead .eyebrow i{animation:livePing 1.6s infinite}
+.bHead h1{margin:.8vh 0 0;font-size:3.7vw;font-weight:800;line-height:1.08}
+.bHead p{margin:.6vh 0 0;font-size:1.3vw;font-weight:700;color:#a9c3bd}
+#countries.on .bHead{animation:titleReveal .9s .25s cubic-bezier(.16,1,.3,1) both}
+.bWhen{text-align:left;font-size:1.35vw;font-weight:700;color:#d7bd86}
 @keyframes titleReveal{from{opacity:0;transform:translateY(1.6vh)}to{opacity:1;transform:translateY(0)}}
-@keyframes titleShimmer{0%,20%{background-position:130% 0}65%,100%{background-position:-30% 0}}
-@keyframes titleUnderline{from{opacity:0;width:0}to{opacity:1;width:5vw}}
-.motionTitle small{font-size:1.1vw;color:#c6af7b;border-right:1px solid #c6af7b66;padding-right:1.2vw}
-#countryList{position:absolute;right:5vw;left:5vw;top:19vh;bottom:12vh;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:1.1vw}
-.country{position:relative;min-width:0;min-height:0;overflow:hidden;background:#185766 url(/screen-landmarks/journey.svg) center/cover;isolation:isolate}
-.country:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(3,23,28,.96),rgba(3,23,28,.18) 55%,rgba(3,23,28,.1));z-index:1}
-.country img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:sceneryDrift 36s linear both}
-@keyframes sceneryDrift{from{transform:scale(1.07)}to{transform:scale(1)}}
-.country b{position:absolute;right:1.4vw;top:1.5vh;z-index:2;font-size:1vw;font-weight:700;color:#fff;text-shadow:0 1px 6px #00171b}
-.country span{position:absolute;right:1.4vw;left:1.4vw;bottom:2vh;z-index:2;font-size:2.1vw;font-weight:800;line-height:1.15;text-shadow:0 2px 12px #00171b;overflow-wrap:break-word}
-.country:first-child:before{content:"";position:absolute;right:1.4vw;bottom:1.1vh;height:2px;width:3vw;background:#d7bd86;z-index:3}
-#countries footer{position:absolute;bottom:4.5vh;left:5vw;right:5vw;display:flex;align-items:center;justify-content:flex-start;font-size:1.1vw;color:#b5c6c1}
+@keyframes livePing{0%{box-shadow:0 0 0 0 rgba(229,53,79,.7)}100%{box-shadow:0 0 0 1.2vw rgba(229,53,79,0)}}
+#hero{position:absolute;top:22vh;bottom:9vh;right:4.5vw;width:40vw;border-radius:1.6vw;overflow:hidden;background:#123d40;box-shadow:0 2vw 4vw rgba(0,0,0,.45)}
+#heroImg{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
+#countries.on #heroImg{animation:sceneryDrift 36s linear both}
+@keyframes sceneryDrift{from{transform:scale(1.1)}to{transform:scale(1)}}
+#hero:after{content:"";position:absolute;left:0;top:0;width:100%;height:100%;background:linear-gradient(0deg,rgba(3,20,24,.96) 0%,rgba(3,20,24,.4) 48%,rgba(3,20,24,.06) 100%)}
+#hero .crown{position:absolute;top:2vw;right:2vw;z-index:2;background:#e3bd3c;color:#0a2a2e;font-weight:800;font-size:1.35vw;border-radius:2vw;padding:.5vw 1.4vw}
+#hero .first{position:absolute;right:2.2vw;bottom:10vw;z-index:2;font-size:5.4vw;font-weight:800;color:#e3bd3c;line-height:1;font-variant-numeric:tabular-nums}
+#heroName{position:absolute;right:2.2vw;left:2.2vw;bottom:2.4vw;z-index:2;font-size:5.8vw;font-weight:800;line-height:1.05;text-shadow:0 .4vw 2vw rgba(0,0,0,.6)}
+#countries.on #hero .crown,#countries.on #hero .first{animation:titleReveal .7s .6s cubic-bezier(.16,1,.3,1) both}
+#countries.on #heroName{animation:heroPop .9s .8s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes heroPop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+#ranks{position:absolute;top:22vh;bottom:9vh;left:4.5vw;right:47vw;display:flex;flex-direction:column;justify-content:flex-start;gap:1.5vh}
+#ranks.none{display:none}
+.rk{display:grid;grid-template-columns:3.6vw 5.6vw minmax(0,1fr) 15vw;align-items:center;gap:1.3vw;height:8.2vh;padding:0 1.3vw;border-radius:1vw;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.07);opacity:0}
+#countries.on .rk{animation:rowIn .6s cubic-bezier(.16,1,.3,1) both}
+@keyframes rowIn{from{opacity:0;transform:translateX(-3vw)}to{opacity:1;transform:translateX(0)}}
+.rk b{font-size:2.1vw;font-weight:800;color:#e3bd3c;font-variant-numeric:tabular-nums}
+.rk img{width:5.6vw;height:6.2vh;border-radius:.7vw;object-fit:cover;background:#123d40}
+.rk span{font-size:2.3vw;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rk i{display:block;height:1.2vh;border-radius:1vh;background:rgba(255,255,255,.1);overflow:hidden}
+.rk u{display:block;height:100%;border-radius:1vh;background:linear-gradient(270deg,#c9a227,#f3d16b);transform-origin:right}
+#countries.on .rk u{animation:barGrow 1s cubic-bezier(.16,1,.3,1) both}
+@keyframes barGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.bFoot{position:absolute;bottom:3.6vh;left:4.5vw;right:4.5vw;font-size:1.1vw;font-weight:700;color:#8fb0a9}
 .countryNote{font-size:1.2vw;color:#d7bd86}
-.countryTrack{position:absolute;bottom:0;left:0;right:0;height:2px;background:#ffffff12}
-#countryProgress{height:100%;background:#c7ad79;width:0}
+.countryTrack{position:absolute;bottom:0;left:0;right:0;height:3px;background:#ffffff12}
+#countryProgress{height:100%;background:#e3bd3c;width:0}
 #alertProgress{position:absolute;bottom:0;right:0;height:.4vh;background:#e3bd3c}
 #alert{z-index:4}
-@media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,.country img,#alert.on #alertImg,#countries.on .motionTitle,#countries.on .titleText,#countries.on .motionTitle:after{animation:none}}
+@media(prefers-reduced-motion:reduce){#countries.on,#countries.on.departing,#countries.on #heroImg,#alert.on #alertImg,#countries.on .bHead,#countries.on .rk,#countries.on .rk u,#countries.on #heroName{animation:none;opacity:1}}
 
 `;
 
@@ -324,11 +356,12 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="alert"><img id="alertImg" alt=""><div id="shade"></div>
 <div id="flight"><div id="trail"></div><svg id="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
 <div id="alertTag">تجربة</div>
-<div id="msg"><div id="kicker"><i></i>طلب سفر جديد</div><div id="aName"></div><div id="aDest"></div></div><div id="alertProgress"></div></div>
+<div id="msg"><div id="kicker"><i></i>✨ مسافر جديد مع ترافليون</div><div id="aName"></div><div id="aDest"></div></div><div id="alertProgress"></div></div>
 <section id="countries">
-<div class="motionTitle"><span class="titleText">الوجهات الأكثر طلبًا اليوم</span></div>
-<div id="countryList"></div>
-<footer><span id="bulletinDate" class="countryNote"></span></footer>
+<header class="bHead"><div><div class="eyebrow"><i></i>ترافليون · نبض السفر</div><h1>الوجهات الأكثر طلباً اليوم</h1><p>بحسب طلبات العملاء اليوم · بتوقيت الرياض</p></div><div class="bWhen" id="bulletinDate"></div></header>
+<div id="hero"><img id="heroImg" alt=""><div class="crown">الأكثر طلباً</div><div class="first">01</div><div id="heroName"></div></div>
+<div id="ranks"></div>
+<div class="bFoot">الوجهة القادمة تبدأ بسؤال — يتجدد كل 10 دقائق</div>
 <div class="countryTrack"><div id="countryProgress"></div></div></section>
 <div id="band"><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
 <script>window.__LANDMARKS__=${json(LANDMARK_IDS)};window.__S__=${json(s)};window.__N__=${n};window.__M__=${monitor ? "true" : "false"};</script>

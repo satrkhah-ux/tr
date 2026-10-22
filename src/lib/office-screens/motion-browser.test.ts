@@ -50,9 +50,13 @@ it.skipIf(!existsSync("C:/Program Files/Google/Chrome/Application/chrome.exe"))(
     await writeFile("output/screen-review/motion-screen-2.html", screenPage(2, { ...state, position: 1 }, true));
     await page.screenshot({ path: "output/screen-review/motion-countries-1920.png" });
     await setTime(now + 6100);
-    expect(await page.$$eval("#countryList .country span", (items) => items.map((item) => item.textContent))).toEqual(countries);
-    expect(await page.$$("#countryList .country img")).toHaveLength(8);
-    await page.waitForFunction(() => Array.from(document.querySelectorAll<HTMLImageElement>("#countryList img")).every((img) => img.complete && img.naturalWidth > 0));
+    // the leader in the hero, the rest ranked under it — every destination, each with its scenery, no counts
+    expect(await page.$eval("#heroName", (e) => e.textContent)).toBe(countries[0]);
+    expect(await page.$$eval("#ranks .rk span", (items) => items.map((item) => item.textContent))).toEqual(countries.slice(1));
+    expect(await page.$$("#ranks .rk img")).toHaveLength(7);
+    await page.waitForFunction(() => Array.from(document.querySelectorAll<HTMLImageElement>("#heroImg, #ranks img")).every((img) => img.complete && img.naturalWidth > 0));
+    // a rank number, never a count of requests (the owner: no counts on the screens)
+    expect(await page.$$eval("#ranks .rk", (rows) => rows.some((r) => /[0-9٠-٩]/.test((r.textContent ?? "").replace(r.querySelector("b")?.textContent ?? "", ""))))).toBe(false);
     expect(await page.$("#countLabel")).toBeNull();
     await page.setViewport({ width: 1280, height: 720 });
     await new Promise((r) => setTimeout(r, 1500));
