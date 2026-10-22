@@ -21,7 +21,7 @@ export type UploadError = "empty" | "tooLarge" | "type" | "unreadable" | "needsR
 type Kind = { kind: "pdf" } | { kind: "image"; mime: string };
 
 /** By the bytes, not the name or the browser's word for it. */
-function sniff(bytes: Buffer): Kind | null {
+export function sniff(bytes: Buffer): Kind | null {
   const head = bytes.subarray(0, 12);
   if (head.subarray(0, 4).toString("latin1") === "%PDF") return { kind: "pdf" };
   if (head[0] === 0x89 && head.subarray(1, 4).toString("latin1") === "PNG") return { kind: "image", mime: "image/png" };

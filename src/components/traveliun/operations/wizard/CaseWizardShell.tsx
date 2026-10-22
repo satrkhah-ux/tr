@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ComponentType } from "react";
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, CircleAlert, Clock, LayoutList, Loader2, Minus, PlaneTakeoff } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, CircleAlert, Clock, FileUp, LayoutList, Loader2, Minus, PlaneTakeoff } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import type { TranslationKey } from "@/lib/i18n";
 import { setExecutionStatus } from "@/lib/data/operations";
@@ -22,6 +22,7 @@ import { TransportStep } from "./TransportStep";
 import { PaymentStep, UnbackedStatus } from "./PaymentStep";
 import { AutoIssue, DocumentsStep } from "./DocumentsStep";
 import { WaitButton } from "./WaitButton";
+import { UploadAll } from "./UploadAll";
 
 /**
  * «معالج الحجوزات» — the case page by default (the owner, 2026-10-17): six
@@ -50,8 +51,20 @@ const TONE: Record<StepTone, string> = {
 /** An item's own colour under its tile (index.ts itemTone) — a done one is green even under a red tile. */
 const ITEM_TONE: Record<ReturnType<typeof itemTone>, string> = { red: "text-[#c22850]", yellow: "text-[#a86a10]", green: "text-[#0f7a52]" };
 
-export function CaseWizardShell({ data, canManage, canReadMrz }: { data: WizardCase; canManage: boolean; canReadMrz: boolean }) {
+export function CaseWizardShell({
+  data,
+  canManage,
+  canReadMrz,
+  openUpload = false,
+}: {
+  data: WizardCase;
+  canManage: boolean;
+  canReadMrz: boolean;
+  /** ?upload=1 — opened from the operations list's «ارفع ملفات عميل» */
+  openUpload?: boolean;
+}) {
   const { t } = useTraveliunUI();
+  const [uploading, setUploading] = useState(openUpload);
   const op = data.operation;
   const states = stepStates(data);
   const [step, setStep] = useState<WizardStep>(() => firstOpenStep(data));
@@ -103,6 +116,17 @@ export function CaseWizardShell({ data, canManage, canReadMrz }: { data: WizardC
             </div>
           ) : null}
 
+          {/* «ارفع كل الملفات» (the owner, 2026-10-22): every passport, ticket and hotel paper in one drop, above the steps */}
+          <button
+            type="button"
+            onClick={() => setUploading((v) => !v)}
+            aria-expanded={uploading}
+            className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-extrabold text-white hover:bg-[#0f4439] sm:w-auto"
+          >
+            <FileUp className="size-4" />
+            {t("wz.up.button")}
+          </button>
+
           {/* the six steps: each tile coloured by its readiness, its items under it, and the switch to it */}
           <div className="mt-3 flex items-center gap-2">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#eef2f0]">
@@ -116,6 +140,8 @@ export function CaseWizardShell({ data, canManage, canReadMrz }: { data: WizardC
             <ReadyGate data={data} step={step} onOpenStep={setStep} />
           </div>
         </section>
+
+        {uploading ? <UploadAll data={data} canReadMrz={canReadMrz} onClose={() => setUploading(false)} /> : null}
 
         <CasePresence operationId={op.id} />
         <AutoIssue data={data} />

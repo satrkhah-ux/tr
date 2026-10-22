@@ -78,6 +78,38 @@ export async function transcribeTicket(images: AiImage[], what = "flight ticket"
   return typeof out.text === "string" ? out.text : "";
 }
 
+const KIND_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["kind"],
+  properties: { kind: { type: "string", enum: ["passport", "ticket", "hotel", "unknown"] } },
+} as const;
+
+/**
+ * Pictures of one paper → which paper it is, nothing more («ارفع كل الملفات»,
+ * 2026-10-22). Only the kind comes back: a passport is not read here — its
+ * own reader (the MRZ, audited) does that.
+ */
+export async function classifyPaper(images: AiImage[]): Promise<"passport" | "ticket" | "hotel" | "unknown"> {
+  const content = [
+    { type: "text", text: "Which travel document is this?" },
+    ...images.slice(0, 2).map((img) => ({ type: "image_url", image_url: { url: `data:${img.mime};base64,${img.base64}`, detail: "low" } })),
+  ];
+  const out = (await chatJson(
+    "paper_kind",
+    KIND_SCHEMA,
+    [
+      "You sort travel documents. Answer with one kind:",
+      "passport — a passport's data page (or an ID page with a machine-readable zone);",
+      "ticket — a flight e-ticket, itinerary receipt or boarding pass;",
+      "hotel — a hotel booking confirmation or voucher;",
+      "unknown — anything else, or not legible.",
+    ].join("\n"),
+    content,
+  )) as { kind?: unknown };
+  return out.kind === "passport" || out.kind === "ticket" || out.kind === "hotel" ? out.kind : "unknown";
+}
+
 const S = { type: "string" } as const;
 const TICKET_SCHEMA = {
   type: "object",

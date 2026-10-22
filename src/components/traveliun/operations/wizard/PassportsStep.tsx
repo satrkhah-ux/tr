@@ -4,29 +4,20 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, Upload } from "lucide-react";
 import type { TranslationKey } from "@/lib/i18n";
-import { readPassportPhoto, upsertTraveler, uploadPassportScan } from "@/lib/data/operation-travelers";
+import { readPassportPhoto, upsertTraveler } from "@/lib/data/operation-travelers";
 import { trustedFields } from "@/lib/operations/mrz";
-import { ageOn, kindForAge, sameName, takesPassportName } from "@/lib/operations/travelers";
 import { matchPassport, passportSummary, type KindCount, type MatchRow } from "@/lib/operations/wizard/passports";
 import type { StepProps } from "@/lib/operations/wizard/types";
 import { TravelersPanel } from "../TravelersPanel";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { useSafeTransition } from "../../useSafeTransition";
+import { savePassport, type PassportOutcome } from "./passport-save";
 
 /** What the reader is handed — a picture; a PDF is kept as the scan for a person to read. */
 const READABLE = /^image\/(jpeg|png|webp)$/;
 
-/**
- * `keep`: a typed name stayed — the passport's is offered, never forced (savedName).
- * `page`: the name as printed on the page and the Arabic one, when they differ from the MRZ's.
- */
-type Outcome = {
-  file: string;
-  state: "saved" | "review" | "unread";
-  error?: string;
-  keep?: { id: string; name: string; passport: string };
-  page?: { id: string; printed?: string; arabic?: string };
-};
+/** A file's outcome as the list shows it — passport-save.ts's, with the error said. */
+type Outcome = Omit<PassportOutcome, "error"> & { file: string; error?: string };
 
 /**
  * Step 1 — «الجوازات»: every passport at once. Each photo is read (when the
@@ -57,75 +48,11 @@ export function PassportsStep({ data, canReadMrz }: StepProps) {
         const fd = new FormData();
         fd.append("file", file);
         const read = canReadMrz && READABLE.test(file.type) ? await readPassportPhoto(data.operation.id, fd) : null;
-
-        let rowId: string | null = null;
-        let state: Outcome["state"] = "unread";
-        let error = read && !read.ok ? t(read.error) : undefined;
-        let keep: Outcome["keep"];
-        let page: Outcome["page"];
-        if (read?.ok) {
-          const { values, missing } = trustedFields(read.passport, data.today);
-          const row = matchPassport(rows, values, trip, data.today, taken);
-          const age = ageOn(values.birth_date || null, trip.travel_start ?? data.today);
-          // the passport's name replaces a planned or unnamed one; a typed one stays and is asked about
-          const takes = takesPassportName(row) && Boolean(values.full_name);
-          const name = takes ? values.full_name : (row?.display_name.trim() ?? "");
-          const saved = await upsertTraveler({
-            id: row?.id,
-            operation_id: data.operation.id,
-            sort: row ? undefined : rows.length,
-            // the row's name as it is — the server decides by the same rule (savedName)
-            display_name: row?.display_name ?? "",
-            passport_name: values.full_name,
-            traveler_kind: age != null ? kindForAge(age) : (row?.traveler_kind ?? "adult"),
-            // only what the read vouched for — an empty field never overwrites what is on file
-            ...(values.birth_date ? { birth_date: values.birth_date } : {}),
-            ...(values.nationality ? { nationality: values.nationality } : {}),
-            ...(values.expiry ? { passport_expiry: values.expiry } : {}),
-            ...(values.number && values.full_name ? { passport: { full_name: values.full_name, number: values.number, nationality: values.nationality } } : {}),
-          });
-          if (saved.ok) {
-            rowId = saved.id;
-            state = missing.length || read.passport.failed.length ? "review" : "saved";
-            if (!takes && values.full_name && !sameName(name, values.full_name)) keep = { id: saved.id, name, passport: values.full_name };
-            // the MRZ's name stops at 39 characters — the page's whole one, and the Arabic, one press away
-            const { printed_name, arabic_name } = read.passport;
-            const printed = printed_name && !sameName(printed_name, values.full_name) ? printed_name : undefined;
-            const arabic = arabic_name && !sameName(arabic_name, name) ? arabic_name : undefined;
-            if (printed || arabic) page = { id: saved.id, printed, arabic };
-            const next: MatchRow = {
-              id: saved.id,
-              display_name: name,
-              name_source: takes ? "passport" : (row?.name_source ?? null),
-              traveler_kind: age != null ? kindForAge(age) : (row?.traveler_kind ?? "adult"),
-              age: row?.age ?? null,
-              birth_date: values.birth_date || row?.birth_date || null,
-              nationality: values.nationality || row?.nationality || null,
-              has_passport: Boolean(row?.has_passport || values.number),
-            };
-            if (row) rows[rows.indexOf(row)] = next;
-            else rows.push(next);
-          } else error = t(saved.error);
-        }
-
-        if (!rowId) {
-          // unread: kept on a traveller still without a passport (a new one if none), to type from
-          const free = rows.find((r) => !taken.has(r.id) && !r.has_passport);
-          if (free) rowId = free.id;
-          else {
-            const added = await upsertTraveler({ operation_id: data.operation.id, display_name: "", traveler_kind: "adult", sort: rows.length });
-            if (added.ok) {
-              rowId = added.id;
-              rows.push({ id: added.id, display_name: "", name_source: "seed", traveler_kind: "adult", age: null, birth_date: null, nationality: null, has_passport: false });
-            } else error = t(added.error);
-          }
-        }
-        if (rowId) {
-          taken.add(rowId);
-          const scan = await uploadPassportScan(rowId, fd);
-          if (!scan.ok && state !== "unread") state = "review";
-          if (!scan.ok) error = t(scan.error);
-        }
+        const passport = read?.ok ? read.passport : null;
+        const row = passport ? matchPassport(rows, trustedFields(passport, data.today).values, trip, data.today, taken) : null;
+        const out = await savePassport({ operationId: data.operation.id, rows, taken, row, read: passport, fd, today: data.today, travelStart: trip.travel_start });
+        const error = out.error ? t(out.error) : read && !read.ok ? t(read.error) : undefined;
+        const { state, keep, page } = out;
         results.push({ file: file.name, state, error, keep, page });
         setProgress({ done: i + 1, of: files.length });
       }

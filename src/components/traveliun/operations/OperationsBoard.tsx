@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardCheck, PlaneTakeoff, Search, Users, Wallet, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, FileUp, PlaneTakeoff, Search, Users, Wallet, type LucideIcon } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -15,6 +16,7 @@ import { ArrivalsCalendar, OperationsFilters } from "./OperationsListControls";
 import { MoneyLinks } from "./MoneyReports";
 import type { TranslationKey } from "@/lib/i18n";
 import { TraveliunShell } from "../TraveliunShell";
+import { SuggestInput } from "../SuggestInput";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
 /**
@@ -138,7 +140,8 @@ export function OperationsBoard({
               );
             })}
           </div>
-          <div className="mt-3 flex">
+          <div className="mt-3 flex flex-wrap items-start gap-2">
+            <UploadPicker operations={listed} />
             <div className="relative ms-auto">
               <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
               <input
@@ -263,5 +266,46 @@ function Track({ label, value, tone }: { label: string; value: string; tone: "br
       <span className="opacity-60">{label}</span>
       {value}
     </span>
+  );
+}
+
+/**
+ * «ارفع ملفات عميل» (the owner, 2026-10-22): pick the client — by name or
+ * file number, any case — and its page opens on «ارفع كل الملفات».
+ */
+function UploadPicker({ operations }: { operations: OperationCard[] }) {
+  const { t } = useTraveliunUI();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const label = (op: OperationCard) => `${op.customer_name || "—"} · ${op.serial}`;
+  const byLabel = useMemo(() => new Map(operations.map((op) => [label(op), op.id])), [operations]);
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[12.5px] font-extrabold text-white hover:bg-[#0f4439]"
+      >
+        <FileUp className="size-4" />
+        {t("wz.up.pick")}
+      </button>
+    );
+  }
+  return (
+    <div className="w-72 max-w-full">
+      <SuggestInput
+        value={value}
+        items={operations.map((op) => ({ value: label(op), hint: op.destination ?? undefined, keywords: `${op.serial} ${op.customer_name ?? ""}` }))}
+        onChange={(next, picked) => {
+          setValue(next);
+          const id = byLabel.get(next);
+          if (picked && id) router.push(`/operations/${id}?upload=1`);
+        }}
+        placeholder={t("wz.up.pickHint")}
+        ariaLabel={t("wz.up.pick")}
+        className="h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]"
+      />
+    </div>
   );
 }
