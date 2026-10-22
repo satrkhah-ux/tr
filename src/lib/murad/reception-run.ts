@@ -1,6 +1,6 @@
 import { routeCompletedVisa, retryVisaHandoffs } from "./visa-routing";
 import type { MuradReceipt } from "./visa-assignment";
-import { visaIntakeReply } from "./visa-intake";
+import { repeatsMurad, visaIntakeReply } from "./visa-intake";
 import { inMuradScope } from "./control";
 import "server-only";
 import { createHash } from "node:crypto";
@@ -505,7 +505,9 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     if (settings.control.visaAll && settings.control.tasks.visas && await visaConversation(service, m) && !request.wantsHuman) {
       const latest = thread.messages.filter((t) => t.fromClient && !t.isPrivate).at(-1);
       if (!thread.canReply || !latest || Date.now() / 1000 - latest.at > 24 * 3600) { await finish({ reason: "none:window" }); return "none:window"; }
-      if (thread.messages.some((t) => t.at >= latest.at && isHumanReply(t, ours))) { await finish({ reason: "none:staff" }); return "none:staff"; }
+      // a colleague answered or took it in this visit, or the client asked for a person: Murad stays out (21 Oct, 40347: he
+      // answered between a colleague's replies and after «حوّلني لموظف»)
+      if (staffReplied || handedByHand || routedTo.includes("موظف") || thread.messages.some((t) => t.at >= latest.at && isHumanReply(t, ours))) { await finish({ reason: "none:staff" }); return "none:staff"; }
       const previous = rows.filter((r) => Date.parse(r.created_at) / 1000 >= closedAt).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).find((r) => r.intake?.visa_intake)?.intake?.visa_intake ?? null;
       const { data: catalog, error: catalogError } = await service.from("visas").select("country, visa_type, sell_price, sell_currency, arabic_requirements").eq("status", "Active");
       const result = await visaIntakeReply({ messages: visitLines, previous, catalog: catalogError ? [] : catalog, includePrice: settings.control.includePrice });
@@ -513,6 +515,12 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       const lastNow = again?.messages.filter((t) => t.fromClient && !t.isPrivate).at(-1);
       if (!again?.canReply || lastNow?.id !== latest.id || again.messages.some((t) => t.at >= latest.at && isHumanReply(t, ours))) {
         await finish({ reason: "none:staff", error: "turn_changed" }); return "none:staff";
+      }
+      // the hand-over line already said in this visit: not again, only the routing is retried
+      if (repeatsMurad(result.reply, visitLines)) {
+        await finish({ reason: "visa:handoff_pending", intake: { ...intake, country: result.country, visa_intake: result } });
+        await routeCompletedVisa(service, logId);
+        return "answered";
       }
       const replyId = await sendTeletelMessage(m.conversationId, result.reply);
       if (!replyId) { await finish({ reason: "send_failed", error: "send_failed" }); return "send_failed"; }

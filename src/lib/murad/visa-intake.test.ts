@@ -3,7 +3,7 @@ vi.mock("server-only", () => ({}));
 const call = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/providers/openai", () => ({ openaiJson: call }));
 vi.mock("@/lib/providers/teletel", () => ({ getTeletelConfig: () => ({ baseUrl: "https://chat.teletel.io" }) }));
-import { parseVisaIntake, trustedVisaImage, visaIntakeReply } from "./visa-intake";
+import { parseVisaIntake, repeatsMurad, trustedVisaImage, VISA_SPECIALIST_TEXT, visaIntakeReply } from "./visa-intake";
 const previous = { reply: "وصلت", summary: "تأشيرة فرنسا لشخصين", country: "فرنسا", missing: ["صورة الشخص الثاني"], review: [], completed: false };
 describe("visa intake", () => {
   it("restricts image URLs to Teletel storage, including protocol and path", () => {
@@ -30,6 +30,18 @@ describe("visa intake", () => {
     expect(r.reply).toContain("لا يوجد سعر معتمد");
     expect(r.reply).toContain("صورة جواز السفر واضحة");
     expect(r.reply).not.toContain("سأقوم");
+  });
+  it("hands an unanswerable question or a repeated line to the specialist, never guessed (21 Oct)", async () => {
+    const client = { id: 1, at: 100, text: "كم الراتب الكافي؟", fromClient: true, isPrivate: false, template: false, bot: false };
+    call.mockResolvedValueOnce(JSON.stringify({ ...previous, reply: "5000 ريال تكفي", needsSpecialist: true }));
+    const a = await visaIntakeReply({ messages: [client], previous, catalog: [], includePrice: true });
+    expect(a.reply).toBe(VISA_SPECIALIST_TEXT);
+    expect(a.completed).toBe(true);
+    const murad = { ...client, id: 2, at: 101, text: "هل يمكنك توفير صورة الإقامة؟\nشكراً", fromClient: false };
+    call.mockResolvedValueOnce(JSON.stringify({ ...previous, reply: "هل يمكنك توفير صورة الإقامة؟" }));
+    const b = await visaIntakeReply({ messages: [client, murad, { ...client, id: 3, at: 102, text: "طيب" }], previous, catalog: [], includePrice: true });
+    expect(b.reply).toBe(VISA_SPECIALIST_TEXT);
+    expect(repeatsMurad("رد جديد", [murad])).toBe(false);
   });
   it("only sends client public images and applies no-price setting", async () => {
     call.mockResolvedValueOnce(JSON.stringify(previous));
