@@ -912,8 +912,10 @@ export async function schedule(m: IncomingMessage): Promise<"waiting" | "extende
   }
   void markTeletelSeen(m.conversationId);
   const now = Date.now();
-  // the first answer of a visit about thirty seconds, every later one about ten (the owner, 2026-10-22)
-  const { count: answered } = await service.from("murad_log").select("id", { count: "exact", head: true }).eq("conversation_id", m.conversationId).eq("mode", "reception").not("reply_message_id", "is", null).gte("created_at", new Date(now - VISIT_SEC * 1000).toISOString());
+  // the first answer of a visit about thirty seconds, every later one about ten (the owner, 2026-10-22) —
+  // the visit as receive() reads it: since Teletel last closed the conversation, never over 12 hours back
+  const visitStart = Math.max(now / 1000 - VISIT_SEC, lastClosedAt((await conversationEvents(m.conversationId)) ?? [], m.at || now / 1000));
+  const { count: answered } = await service.from("murad_log").select("id", { count: "exact", head: true }).eq("conversation_id", m.conversationId).eq("mode", "reception").not("reply_message_id", "is", null).gte("created_at", new Date(visitStart * 1000).toISOString());
   const delay = answered ? FOLLOW_UP_DELAY : parseDelay(reception.delay);
   const had = waiting.get(m.conversationId);
   if (had) {
