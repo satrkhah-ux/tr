@@ -110,6 +110,14 @@ describe("the operational documents", () => {
     expect(out).not.toContain(">—</td></tr>");
   });
 
+  it("names the guests' country instead of the passport's «SAU» (the owner, 2026-10-22)", () => {
+    const v = { ...voucher("hotel_voucher", [booking({})]), travelers: [{ name: "NOURA ALQAHTANI", nationality: "SAU" }, { name: "ALI SAMER", nationality: "SYR" }] };
+    const out = html(v);
+    expect(out).toContain("السعودية");
+    expect(out).toContain("سوريا");
+    expect(out).not.toContain(">SAU<");
+  });
+
   it("prints a partner's client's voucher under the partner's name and number, not ours", () => {
     const brand = partnerBrand(
       { name: "سفريات الواحة", name_latin: "Oasis Travel", address: "جدة", phone: "0120000000", whatsapp: null, website: null, email: null, brand_color: "#123456", accent_color: "#abcdef", doc_font: null } as Parameters<typeof partnerBrand>[0],

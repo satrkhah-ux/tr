@@ -69,12 +69,60 @@ describe("parseTd3", () => {
     expect(parseTd3("", TODAY).ok).toBe(false);
     expect(parseTd3("hello world", TODAY).ok).toBe(false);
     expect(parseTd3(`${L1}`, TODAY).ok).toBe(false);
-    expect(parseTd3(`${L1}\n${L2}XYZ`, TODAY).ok).toBe(false);
+  });
+
+  it("keeps the fields that pass when junk trails line 2, instead of throwing the read away", () => {
+    const res = parseTd3(`${L1}\n${L2}XYZ`, TODAY);
+    expect(res.ok && res.passport.number).toBe("L898902C3");
+    expect(res.ok && res.passport.failed).not.toContain("number");
+    expect(res.ok && res.passport.failed).not.toContain("birth_date");
+    expect(res.ok && res.passport.failed).not.toContain("expiry");
   });
 
   it("returns a null date rather than an impossible one", () => {
     const res = parseTd3(`${L1}\n${line2("A1234567", "SAU", "851399", "M", "300101")}`, TODAY);
     expect(res.ok && res.passport.birth_date).toBeNull();
+  });
+});
+
+// the owner, 2026-10-22: «الجوازات لا يقرأها بالشكل الصحيح» — 15 live reads, none passed every check
+describe("parseTd3 — what a reader gets wrong", () => {
+  const SAUDI = line2("A1234567", "SAU", "850301", "M", "300101");
+  const L1S = "P<SAUALQAHTANI<<MOHAMMED<ABDULLAH<<<<<<<<<<<";
+  const clean = (l2: string) => parseTd3(`${L1S}\n${l2}`, TODAY);
+
+  it("reads a Saudi 8-character number padded with «<»", () => {
+    const res = clean(SAUDI);
+    expect(res.ok && res.passport).toMatchObject({ number: "A1234567", nationality: "SAU", birth_date: "1985-03-01", expiry: "2030-01-01", failed: [] });
+  });
+
+  it("re-aligns line 2 when the number's «<» was dropped or doubled", () => {
+    const dropped = SAUDI.slice(0, 8) + SAUDI.slice(9); // 43 characters
+    const doubled = SAUDI.slice(0, 8) + "<" + SAUDI.slice(8); // 45
+    for (const l2 of [dropped, doubled]) {
+      const res = clean(l2);
+      expect(res.ok && res.passport).toMatchObject({ number: "A1234567", birth_date: "1985-03-01", expiry: "2030-01-01", failed: [] });
+    }
+  });
+
+  it("trims a 45-character line and pads a short one", () => {
+    expect(clean(`${SAUDI}<`).ok && clean(`${SAUDI}<`)).toMatchObject({ passport: { failed: [] } });
+    expect(clean(SAUDI.replace(/<+(\d)$/, "$1")).ok && clean(SAUDI.replace(/<+(\d)$/, "$1"))).toMatchObject({ passport: { failed: [] } });
+    expect(parseTd3(`${L1S}<<<\n${SAUDI}`, TODAY)).toMatchObject({ ok: true, passport: { surname: "ALQAHTANI", given_names: "MOHAMMED ABDULLAH" } });
+  });
+
+  it("repairs look-alikes the check digits vouch for: letters in a date, a digit in the number, a digit in a name", () => {
+    // 850301 read «85O3O1», the number's 5 read «S», the name's O read «0»
+    const misread = SAUDI.slice(0, 5) + "S" + SAUDI.slice(6, 13) + "85O3O1" + SAUDI.slice(19);
+    const res = parseTd3(`${L1S.replace("MOHAMMED", "M0HAMMED")}\n${misread}`, TODAY);
+    expect(res.ok && res.passport).toMatchObject({ number: "A1234567", birth_date: "1985-03-01", given_names: "MOHAMMED ABDULLAH", failed: [] });
+  });
+
+  it("does not guess a number when the composite does not confirm the swap", () => {
+    const misread = SAUDI.slice(0, 5) + "S" + SAUDI.slice(6, 43) + String((Number(SAUDI[43]) + 1) % 10);
+    const res = clean(misread);
+    expect(res.ok && res.passport.failed).toEqual(["number", "composite"]);
+    expect(res.ok && trustedFields(res.passport, TODAY).values.number).toBe("");
   });
 });
 

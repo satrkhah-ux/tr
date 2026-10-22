@@ -16,8 +16,17 @@ import { useSafeTransition } from "../../useSafeTransition";
 /** What the reader is handed — a picture; a PDF is kept as the scan for a person to read. */
 const READABLE = /^image\/(jpeg|png|webp)$/;
 
-/** `keep`: a typed name stayed — the passport's is offered, never forced (savedName). */
-type Outcome = { file: string; state: "saved" | "review" | "unread"; error?: string; keep?: { id: string; name: string; passport: string } };
+/**
+ * `keep`: a typed name stayed — the passport's is offered, never forced (savedName).
+ * `page`: the name as printed on the page and the Arabic one, when they differ from the MRZ's.
+ */
+type Outcome = {
+  file: string;
+  state: "saved" | "review" | "unread";
+  error?: string;
+  keep?: { id: string; name: string; passport: string };
+  page?: { id: string; printed?: string; arabic?: string };
+};
 
 /**
  * Step 1 — «الجوازات»: every passport at once. Each photo is read (when the
@@ -53,6 +62,7 @@ export function PassportsStep({ data, canReadMrz }: StepProps) {
         let state: Outcome["state"] = "unread";
         let error = read && !read.ok ? t(read.error) : undefined;
         let keep: Outcome["keep"];
+        let page: Outcome["page"];
         if (read?.ok) {
           const { values, missing } = trustedFields(read.passport, data.today);
           const row = matchPassport(rows, values, trip, data.today, taken);
@@ -78,6 +88,11 @@ export function PassportsStep({ data, canReadMrz }: StepProps) {
             rowId = saved.id;
             state = missing.length || read.passport.failed.length ? "review" : "saved";
             if (!takes && values.full_name && !sameName(name, values.full_name)) keep = { id: saved.id, name, passport: values.full_name };
+            // the MRZ's name stops at 39 characters — the page's whole one, and the Arabic, one press away
+            const { printed_name, arabic_name } = read.passport;
+            const printed = printed_name && !sameName(printed_name, values.full_name) ? printed_name : undefined;
+            const arabic = arabic_name && !sameName(arabic_name, name) ? arabic_name : undefined;
+            if (printed || arabic) page = { id: saved.id, printed, arabic };
             const next: MatchRow = {
               id: saved.id,
               display_name: name,
@@ -111,7 +126,7 @@ export function PassportsStep({ data, canReadMrz }: StepProps) {
           if (!scan.ok && state !== "unread") state = "review";
           if (!scan.ok) error = t(scan.error);
         }
-        results.push({ file: file.name, state, error, keep });
+        results.push({ file: file.name, state, error, keep, page });
         setProgress({ done: i + 1, of: files.length });
       }
       setOutcomes(results);
@@ -175,6 +190,7 @@ export function PassportsStep({ data, canReadMrz }: StepProps) {
               {o.file} — {t(`wz.pass.result.${o.state}` as TranslationKey)}
               {o.error ? <span className="font-semibold"> ({o.error})</span> : null}
               {o.keep ? <KeptName keep={o.keep} operationId={data.operation.id} /> : null}
+              {o.page ? <PageNames page={o.page} operationId={data.operation.id} /> : null}
             </li>
           ))}
         </ul>
@@ -218,6 +234,40 @@ function KeptName({ keep, operationId }: { keep: NonNullable<Outcome["keep"]>; o
       >
         {t("ops.trav.usePassportName")}
       </button>
+      {error ? <span className="text-[#c22850]">{error}</span> : null}
+    </span>
+  );
+}
+
+/** The names the page prints — the Latin one whole, the Arabic one — each a press away from being the traveller's. */
+function PageNames({ page, operationId }: { page: NonNullable<Outcome["page"]>; operationId: string }) {
+  const { t } = useTraveliunUI();
+  const router = useRouter();
+  const [pending, run] = useSafeTransition();
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (done) return null;
+  const use = (name: string, passportName: string) =>
+    run(async () => {
+      const res = await upsertTraveler({ id: page.id, operation_id: operationId, display_name: name, passport_name: passportName });
+      if (!res.ok) return setError(t(res.error));
+      setDone(true);
+      router.refresh();
+    });
+  const chip =
+    "inline-flex h-7 items-center rounded-[7px] border border-[#e0c58a] bg-white px-2 text-[11px] font-bold text-[#185045] hover:bg-[#fffaf0] disabled:opacity-60";
+  return (
+    <span className="ms-1 inline-flex flex-wrap items-center gap-1.5">
+      {page.printed ? (
+        <button type="button" disabled={pending} title={t("ops.trav.useName")} onClick={() => use(page.printed ?? "", page.printed ?? "")} className={chip}>
+          {t("ops.trav.printedName", { name: page.printed })}
+        </button>
+      ) : null}
+      {page.arabic ? (
+        <button type="button" disabled={pending} title={t("ops.trav.useName")} onClick={() => use(page.arabic ?? "", "")} className={chip}>
+          {t("ops.trav.arabicName", { name: page.arabic })}
+        </button>
+      ) : null}
       {error ? <span className="text-[#c22850]">{error}</span> : null}
     </span>
   );

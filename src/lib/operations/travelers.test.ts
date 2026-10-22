@@ -200,6 +200,14 @@ describe("visaFor — nationality x destination", () => {
     expect(visaFor("SAU", null, false)).toBe("not_required");
   });
 
+  it("reads a Saudi nationality however it was typed (the owner, 2026-10-22)", () => {
+    for (const typed of ["سعودي", "سعودية", "السعودية", "Saudi", "SA", " sa "]) {
+      expect(visaFor(typed, INDONESIA, false)).toBe("not_required");
+      expect(visaFor(typed, AZERBAIJAN, false)).toBe("required");
+    }
+    expect(visaFor("KW", { iso2: "AE", visa_required: false }, false)).toBe("not_required");
+  });
+
   it("never says «غير مطلوبة» for any other nationality — Iraqi and Syrian to Indonesia need checking", () => {
     expect(visaFor("IRQ", INDONESIA, false)).toBe("check");
     expect(visaFor("SYR", INDONESIA, false)).toBe("check");

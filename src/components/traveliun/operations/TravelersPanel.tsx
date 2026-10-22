@@ -19,6 +19,7 @@ import {
 import { VISA_STATUSES, type PassportRead, type TravelerKind, type TravelerListItem, type VisaStatus } from "@/lib/operations/traveler-dto";
 import { ageOn, isLatinName, OLDEST_BIRTH, sameName, takesPassportName, travelerInputError, travelerReadiness } from "@/lib/operations/travelers";
 import { trustedFields, type MrzCheckedField, type MrzFormField, type MrzPassport } from "@/lib/operations/mrz";
+import { nationalityName } from "@/lib/operations/nationality";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition, useSessionField } from "../useSafeTransition";
@@ -192,7 +193,7 @@ function TravelerRow({
   canReadMrz: boolean;
   clientPassport?: PendingClientPassport;
 }) {
-  const { t } = useTraveliunUI();
+  const { t, language } = useTraveliunUI();
   const router = useRouter();
   const [passport, setPassport] = useState<PassportRead | null>(null);
   // never in browser storage: a passport number stays in this component only
@@ -318,7 +319,7 @@ function TravelerRow({
                 {t("ops.trav.birthDate")} <DirText dir="ltr">{traveler.birth_date}</DirText>
               </span>
             ) : null}
-            {traveler.nationality ? <span>{traveler.nationality}</span> : null}
+            {traveler.nationality ? <span>{nationalityName(traveler.nationality, language)}</span> : null}
             {traveler.passport_expiry ? (
               <span className="tv-tnum">
                 {t("ops.passport.expiry")} <DirText dir="ltr">{traveler.passport_expiry}</DirText>
@@ -420,7 +421,7 @@ function TravelerRow({
         ) : (
           gaps.map((g) => (
             <span key={g} className="rounded-full bg-[#fdecef] px-2 py-0.5 text-[10.5px] font-bold text-[#c22850]">
-              {t(`ops.trav.gap.${g}` as TranslationKey, { n: travelAge ?? "", nat: traveler.nationality || "—" })}
+              {t(`ops.trav.gap.${g}` as TranslationKey, { n: travelAge ?? "", nat: traveler.nationality ? nationalityName(traveler.nationality, language) : "—" })}
             </span>
           ))
         )}
@@ -512,6 +513,11 @@ function TravelerRow({
                 {t("ops.trav.usePassportName")}
               </button>
             ) : null}
+            {mrz?.arabic_name && !sameName(mrz.arabic_name, form.display_name) ? (
+              <button type="button" title={t("ops.trav.useName")} onClick={() => set({ display_name: mrz.arabic_name })} className="justify-self-start rounded-[7px] border border-[#e0c58a] bg-[#fffaf0] px-2 py-0.5 text-[11px] font-bold text-[#a86a10] hover:bg-[#fff3dc]">
+                {t("ops.trav.arabicName", { name: mrz.arabic_name })}
+              </button>
+            ) : null}
           </div>
           <label className={label}>
             {t("ops.traveler.kind")}
@@ -523,19 +529,27 @@ function TravelerRow({
               ))}
             </select>
           </label>
-          <label className={label}>
-            <span className="flex flex-wrap items-center gap-1.5">
-              {t("ops.passport.fullName")}
-              {fillTag("full_name")}
-            </span>
-            <input
-              dir="ltr"
-              value={form.full_name}
-              onChange={(e) => set({ full_name: e.target.value })}
-              className={`${field} text-start ${manual("full_name")}`}
-              placeholder="AHMED ALI"
-            />
-          </label>
+          <div className="grid gap-1">
+            <label className={label}>
+              <span className="flex flex-wrap items-center gap-1.5">
+                {t("ops.passport.fullName")}
+                {fillTag("full_name")}
+              </span>
+              <input
+                dir="ltr"
+                value={form.full_name}
+                onChange={(e) => set({ full_name: e.target.value })}
+                className={`${field} text-start ${manual("full_name")}`}
+                placeholder="AHMED ALI"
+              />
+            </label>
+            {/* the MRZ's name stops at 39 characters — the page prints it whole */}
+            {mrz?.printed_name && !sameName(mrz.printed_name, form.full_name) ? (
+              <button type="button" title={t("ops.trav.useName")} onClick={() => set({ full_name: mrz.printed_name })} className="justify-self-start rounded-[7px] border border-[#e0c58a] bg-[#fffaf0] px-2 py-0.5 text-[11px] font-bold text-[#a86a10] hover:bg-[#fff3dc]">
+                {t("ops.trav.printedName", { name: mrz.printed_name })}
+              </button>
+            ) : null}
+          </div>
           <label className={label}>
             <span className="flex flex-wrap items-center gap-1.5">
               {t("ops.passport.number")}
@@ -552,6 +566,9 @@ function TravelerRow({
             <span className="flex flex-wrap items-center gap-1.5">
               {t("ops.passport.nationality")}
               {fillTag("nationality")}
+              {form.nationality.trim() && nationalityName(form.nationality, language) !== form.nationality.trim() ? (
+                <span className="text-[10.5px] font-semibold text-[#93aaa3]">{nationalityName(form.nationality, language)}</span>
+              ) : null}
             </span>
             <input value={form.nationality} onChange={(e) => set({ nationality: e.target.value })} className={`${field} ${manual("nationality")}`} />
           </label>
@@ -615,7 +632,7 @@ function TravelerRow({
             <span className="tv-tnum">
               <DirText dir="ltr">{passport.passport.number}</DirText>
             </span>
-            <span>{passport.passport.nationality}</span>
+            <span>{nationalityName(passport.passport.nationality, language)}</span>
           </div>
         ) : passport.state === "unavailable" ? (
           // NOT "no passport on file" — a config error and a missing record are

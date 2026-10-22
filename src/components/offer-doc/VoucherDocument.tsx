@@ -4,6 +4,8 @@ import { TRAVELIUN_BRAND, type DocBrand } from "./brand";
 import { OFFER_DOC_CSS } from "./styles";
 import { DEFAULT_OFFER_DOC_ASSETS, type OfferDocAssets } from "./assets";
 import type { VoucherBooking, VoucherDTO, VoucherKind } from "@/lib/operations/voucher-dto";
+// the country's name, not «SAU» (the owner, 2026-10-22) — said at print time, so issued snapshots get it too
+import { nationalityName } from "@/lib/operations/nationality";
 
 /**
  * The operational documents — hotel voucher, flight ticket, itinerary, booking
@@ -545,7 +547,7 @@ function Travelers({ travelers, english = false }: { travelers: VoucherDTO["trav
                 <Ltr>{String(i + 1)}</Ltr>
               </th>
               <td>{t.name}</td>
-              {nationality ? <td style={{ width: "30%" }}>{t.nationality ?? "—"}</td> : null}
+              {nationality ? <td style={{ width: "30%" }}>{t.nationality ? nationalityName(t.nationality, english ? "en" : "ar") : "—"}</td> : null}
             </tr>
           ))}
         </tbody>

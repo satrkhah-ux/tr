@@ -2391,6 +2391,10 @@ export const ar: Dictionary = {
   "ops.trav.unnamed": "مسافر {n}",
   "ops.trav.usePassportName": "استبدال بالاسم من الجواز",
   "ops.trav.nameKept": "بقي الاسم المكتوب «{name}» — في الجواز: {passport}",
+  // the MRZ's name stops at 39 characters — the page's own, for the employee to click (the owner, 2026-10-22)
+  "ops.trav.printedName": "الاسم المطبوع في الجواز: {name}",
+  "ops.trav.arabicName": "الاسم بالعربية في الجواز: {name}",
+  "ops.trav.useName": "اضغط لاستعماله",
   "ops.trav.edit": "البيانات",
   "ops.trav.birthDate": "تاريخ الميلاد",
   "ops.trav.soldAge": "{n} سنة في العرض",

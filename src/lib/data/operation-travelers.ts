@@ -18,11 +18,11 @@ import {
 } from "@/lib/operations/traveler-dto";
 import { passportNumber, planTravelers, savedName, travelerInputError, visaFor, type DestinationVisa } from "@/lib/operations/travelers";
 import { riyadhDate } from "@/lib/operations/payments";
-import { parseTd3, type MrzPassport } from "@/lib/operations/mrz";
+import type { MrzPassport } from "@/lib/operations/mrz";
 import { findLookupCountry, normalizeDraftData, type DraftData } from "@/lib/offer/draft-types";
 import { issuedDraftData } from "@/lib/data/issued-draft";
 import { isOpenAIConfigured } from "@/lib/providers/openai";
-import { readMrzFromImage } from "@/lib/providers/mrz-vision";
+import { readPassportImage } from "@/lib/providers/mrz-vision";
 import { currentCan } from "@/lib/roles/current";
 import { gateOperation, gateRow, gateRows } from "@/lib/operations/access";
 
@@ -525,22 +525,19 @@ export async function readPassportMrz(
     const row = data as { id: string; operation_id: string; passport_image_path: string | null } | null;
     if (!row) return { ok: false, error: "err.loadFailed" };
 
-    const read = await readMrzFromImage({
-      mime: file.type,
-      base64: Buffer.from(await file.arrayBuffer()).toString("base64"),
-    });
-    const parsed = read.ok ? parseTd3(read.text, riyadhToday()) : null;
+    const read = await readPassportImage({ mime: file.type, bytes: Buffer.from(await file.arrayBuffer()) }, riyadhToday());
+    const passport = read.ok ? read.passport : null;
 
     const logged = await logAudit({
       action: "passport.mrz_read",
       entity: "operation_travelers",
       entity_id: travelerId,
-      // field NAMES that failed their check digit — never a value
-      meta: { operation_id: row.operation_id, read: parsed?.ok ?? false, failed: parsed?.ok ? parsed.passport.failed : null },
+      // field NAMES that failed their check digit — never a value; the model, to see whether the passport one answered
+      meta: { operation_id: row.operation_id, read: Boolean(passport), failed: passport?.failed ?? null, model: read.ok ? read.model : null },
     });
     if (!logged) return { ok: false, error: "ops.err.auditFailed" };
     if (!read.ok && read.error === "request_failed") return { ok: false, error: "ops.trav.err.mrzFailed" };
-    if (!parsed?.ok) return { ok: false, error: "ops.trav.err.mrzUnreadable" };
+    if (!passport) return { ok: false, error: "ops.trav.err.mrzUnreadable" };
 
     // the page just read becomes the scan when there is none — no second upload of it
     if (!row.passport_image_path) {
@@ -558,7 +555,7 @@ export async function readPassportMrz(
         });
       }
     }
-    return { ok: true, passport: parsed.passport };
+    return { ok: true, passport };
   } catch {
     return { ok: false, error: "err.db" };
   }
@@ -580,19 +577,19 @@ export async function readPassportPhoto(operationId: string, formData: FormData)
   if (typeof file === "string") return { ok: false, error: file };
   if (!MRZ_IMAGE.test(file.type)) return { ok: false, error: "ops.trav.err.imageOnly" };
   try {
-    const read = await readMrzFromImage({ mime: file.type, base64: Buffer.from(await file.arrayBuffer()).toString("base64") });
-    const parsed = read.ok ? parseTd3(read.text, riyadhToday()) : null;
+    const read = await readPassportImage({ mime: file.type, bytes: Buffer.from(await file.arrayBuffer()) }, riyadhToday());
+    const passport = read.ok ? read.passport : null;
     const logged = await logAudit({
       action: "passport.mrz_read",
       entity: "operations",
       entity_id: operationId,
       // field NAMES that failed their check digit — never a value
-      meta: { operation_id: operationId, read: parsed?.ok ?? false, failed: parsed?.ok ? parsed.passport.failed : null, bulk: true },
+      meta: { operation_id: operationId, read: Boolean(passport), failed: passport?.failed ?? null, model: read.ok ? read.model : null, bulk: true },
     });
     if (!logged) return { ok: false, error: "ops.err.auditFailed" };
     if (!read.ok && read.error === "request_failed") return { ok: false, error: "ops.trav.err.mrzFailed" };
-    if (!parsed?.ok) return { ok: false, error: "ops.trav.err.mrzUnreadable" };
-    return { ok: true, passport: parsed.passport };
+    if (!passport) return { ok: false, error: "ops.trav.err.mrzUnreadable" };
+    return { ok: true, passport };
   } catch {
     return { ok: false, error: "err.db" };
   }

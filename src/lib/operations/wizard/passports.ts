@@ -1,4 +1,5 @@
 import type { TravelerKind, TravelerListItem } from "@/lib/operations/traveler-dto";
+import { nationalityCode } from "@/lib/operations/nationality";
 import { ageOn, kindForAge, passportIssues, travelerReadiness } from "@/lib/operations/travelers";
 import { compareName } from "./flights";
 import type { ReadinessCase, ReadinessItem, SoldTravelers, StepState, WizardCase } from "./types";
@@ -99,7 +100,7 @@ export type MatchRow = Pick<TravelerListItem, "id" | "display_name" | "name_sour
 export function matchPassport(rows: MatchRow[], read: ReadPassport, trip: Trip, today: string, taken: ReadonlySet<string>): MatchRow | null {
   const open = rows.filter((r) => !taken.has(r.id));
   if (read.birth_date) {
-    const same = open.find((r) => r.birth_date === read.birth_date && (!r.nationality || !read.nationality || r.nationality === read.nationality));
+    const same = open.find((r) => r.birth_date === read.birth_date && (!r.nationality || !read.nationality || nationalityCode(r.nationality) === nationalityCode(read.nationality)));
     if (same) return same;
   }
   if (read.full_name.trim()) {

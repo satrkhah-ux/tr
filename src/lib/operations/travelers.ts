@@ -8,6 +8,7 @@
  * Pure: no React, no Supabase. Dates are YYYY-MM-DD strings; `today` is injected.
  */
 
+import { nationalityCode } from "./nationality";
 import { passportExpiringWithin, type NameSource, type TravelerKind, type TravelerListItem, type VisaStatus } from "./traveler-dto";
 
 export type PlannedTraveler = {
@@ -160,10 +161,11 @@ export const VISA_EXEMPT: Record<string, string[]> = Object.fromEntries(GCC_NATI
  * decides only for a Saudi — or for a case whose passports are not read yet,
  * as it always did. Any other nationality is «يحتاج تحقق» until an employee
  * looks, unless the exemption list says otherwise. A visa the offer SOLD is
- * required whoever travels.
+ * required whoever travels. A nationality typed «سعودي» or «SA» is SAU
+ * (nationalityCode) — it was «يحتاج تحقق» for a Saudi (the owner, 2026-10-22).
  */
 export function visaFor(nationality: string | null, destination: DestinationVisa, sold: boolean): VisaStatus {
-  const nat = (nationality ?? "").trim().toUpperCase();
+  const nat = nationalityCode(nationality);
   const iso2 = (destination?.iso2 ?? "").trim().toUpperCase();
   if (nat && iso2 && VISA_EXEMPT[nat]?.includes(iso2)) return "not_required";
   if (sold) return "required";

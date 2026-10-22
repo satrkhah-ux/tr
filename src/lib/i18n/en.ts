@@ -2393,6 +2393,10 @@ export const en = {
   "ops.trav.unnamed": "Traveller {n}",
   "ops.trav.usePassportName": "Use the passport's name",
   "ops.trav.nameKept": "The typed name “{name}” stayed — the passport says: {passport}",
+  // the MRZ's name stops at 39 characters — the page's own, for the employee to click (the owner, 2026-10-22)
+  "ops.trav.printedName": "Name printed on the passport: {name}",
+  "ops.trav.arabicName": "Arabic name on the passport: {name}",
+  "ops.trav.useName": "Click to use it",
   "ops.trav.edit": "Details",
   "ops.trav.birthDate": "Date of birth",
   "ops.trav.soldAge": "Age {n} in the offer",

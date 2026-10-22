@@ -11,8 +11,8 @@ import { decryptJson, encryptJson, isVaultConfigured } from "@/lib/crypto/secret
 import { currentCan } from "@/lib/roles/current";
 import { gateOperation, gateRow } from "@/lib/operations/access";
 import { isOpenAIConfigured } from "@/lib/providers/openai";
-import { readMrzFromImage } from "@/lib/providers/mrz-vision";
-import { parseTd3, type MrzPassport } from "@/lib/operations/mrz";
+import { readPassportImage } from "@/lib/providers/mrz-vision";
+import type { MrzPassport } from "@/lib/operations/mrz";
 import type { TravelerKind, TravelerRow } from "@/lib/operations/traveler-dto";
 import { passportIssues, passportNeedsUpdate } from "@/lib/operations/travelers";
 import {
@@ -145,10 +145,9 @@ export async function submitClientPassport(token: string, travelerId: string, fo
     // read it when we can; a photo we cannot read is still a photo staff can
     let parsed: MrzPassport | null = null;
     if (isOpenAIConfigured() && MRZ_READABLE.test(file.type)) {
-      const read = await readMrzFromImage({ mime: file.type, base64: Buffer.from(bytes).toString("base64") });
       const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
-      const res = read.ok ? parseTd3(read.text, today) : null;
-      if (res?.ok) parsed = res.passport;
+      const read = await readPassportImage({ mime: file.type, bytes: Buffer.from(bytes) }, today);
+      if (read.ok) parsed = read.passport;
     }
     let cipher: string | null = null;
     if (parsed && isVaultConfigured()) {

@@ -28,6 +28,13 @@ export type MrzPassport = {
   expiry: string | null;
   /** fields whose check digit did not match — empty means every check passed. */
   failed: MrzCheckedField[];
+  /**
+   * The name as PRINTED on the page, and the Arabic one when the page has it —
+   * the vision reader's, beside the MRZ (mrz-vision.ts). Reference only, for
+   * the employee to click: the MRZ's name field stops at 39 characters.
+   */
+  printed_name?: string;
+  arabic_name?: string;
 };
 
 export type MrzParse = { ok: true; passport: MrzPassport } | { ok: false; error: "format" };
@@ -69,10 +76,78 @@ const words = (s: string) => s.replace(/</g, " ").replace(/\s+/g, " ").trim();
 function mrzLines(text: string): string[] {
   return text
     .toUpperCase()
-    .replace(/[«‹]/g, "<")
+    .replace(/[«‹＜]/g, "<")
     .split(/\r?\n/)
     .map((l) => l.replace(/\s+/g, ""))
     .filter((l) => l.length >= 9 && /^[A-Z0-9<]+$/.test(l));
+}
+
+// The swaps a reader makes between look-alikes (the owner, 2026-10-22: «الجوازات لا
+// يقرأها بالشكل الصحيح» — 15 reads, none passed every check). ICAO fixes each
+// position's alphabet, so a letter where only a digit can stand is that digit.
+// G↔6 (16 vs 6) is invisible to every 7-3-1 digit — no check can catch that one.
+const SWAPS = [["O", "0"], ["I", "1"], ["S", "5"], ["B", "8"], ["Z", "2"], ["G", "6"]];
+const TO_DIGIT: Record<string, string> = Object.fromEntries(SWAPS);
+const TO_LETTER: Record<string, string> = Object.fromEntries(SWAPS.map(([l, d]) => [d, l]));
+const asDigits = (s: string) => s.replace(/[A-Z]/g, (c) => TO_DIGIT[c] ?? c);
+const asLetters = (s: string) => s.replace(/[0-9]/g, (c) => TO_LETTER[c] ?? c);
+const mapRange = (s: string, from: number, to: number, f: (part: string) => string) => s.slice(0, from) + f(s.slice(from, to)) + s.slice(to);
+
+/** To `n` characters: a longer field loses its trailing «<» first (one was added), a shorter one is padded (one was dropped). */
+function fit(s: string, n: number): string {
+  let v = s;
+  while (v.length > n && v.endsWith("<")) v = v.slice(0, -1);
+  return v.length > n ? v.slice(0, n) : v.padEnd(n, "<");
+}
+
+// «NAT(3) YYMMDD d SEX YYMMDD d» — the middle of line 2, whatever the number's length did
+const ANCHOR = /[A-Z0-9<]{3}[0-9OISBZG]{7}[MFX<][0-9OISBZG]{7}/y;
+
+/**
+ * Line 2 at 44 characters with every field where it belongs. A Saudi number is
+ * 8 characters and a «<»; a reader that drops or adds that «<» shifted every
+ * field after it and failed them all. The fixed middle is found (nearest to
+ * where it should start), the number before it fitted to 9 + its digit, the
+ * personal number after it to 14 + its digit + the composite.
+ */
+function alignLine2(raw: string): string {
+  let at = -1;
+  for (let i = 0; i + 18 <= raw.length; i++) {
+    ANCHOR.lastIndex = i;
+    if (ANCHOR.test(raw) && (at < 0 || Math.abs(i - 10) < Math.abs(at - 10))) at = i;
+  }
+  if (at < 0) return fit(raw, LINE);
+  const head = raw.slice(0, at);
+  let tail = raw.slice(at + 18);
+  while (tail.length > 16 && tail.endsWith("<")) tail = tail.slice(0, -1);
+  const n = tail.length;
+  return (
+    fit(head.slice(0, -1), 9) +
+    (head.slice(-1) || "<") +
+    raw.slice(at, at + 18) +
+    fit(tail.slice(0, Math.max(n - 2, 0)), 14) +
+    (n >= 2 ? tail[n - 2] : "<") +
+    (n >= 1 ? tail[n - 1] : "<")
+  );
+}
+
+const composite = (l2: string) => l2.slice(0, 10) + l2.slice(13, 20) + l2.slice(21, 43);
+
+/**
+ * One look-alike swap in a field of letters AND digits (the number, the personal
+ * number), kept only when its own digit and the composite both agree and no
+ * other swap does — a swap only its own digit vouched for would be a 1-in-10 guess.
+ */
+function repair(l2: string, from: number, to: number): string {
+  if (checks(l2.slice(from, to), l2[to])) return l2;
+  const fixes: string[] = [];
+  for (let i = from; i < to; i++) {
+    const alt = TO_DIGIT[l2[i]] ?? TO_LETTER[l2[i]];
+    if (!alt) continue;
+    const v = l2.slice(0, i) + alt + l2.slice(i + 1);
+    if (checks(v.slice(from, to), v[to]) && checks(composite(v), v[43])) fixes.push(v);
+  }
+  return fixes.length === 1 ? fixes[0] : l2;
 }
 
 export function parseTd3(text: string, today: string): MrzParse {
@@ -80,8 +155,13 @@ export function parseTd3(text: string, today: string): MrzParse {
   // line 1 is «P», a type letter or «<», the state, then names joined by «<»
   const start = lines.findIndex((l) => l.startsWith("P") && l.includes("<"));
   if (start < 0 || start + 1 >= lines.length) return { ok: false, error: "format" };
-  const [l1, l2] = [lines[start], lines[start + 1]].map((l) => l.padEnd(LINE, "<"));
-  if (l1.length !== LINE || l2.length !== LINE) return { ok: false, error: "format" };
+  // the state and the names are letters only
+  const l1 = mapRange(fit(lines[start], LINE), 2, LINE, asLetters);
+  let l2 = alignLine2(lines[start + 1]);
+  // the check digits and dates are digits, the nationality letters
+  for (const [from, to] of [[9, 10], [13, 20], [21, 28], [42, 44]]) l2 = mapRange(l2, from, to, asDigits);
+  l2 = mapRange(l2, 10, 13, asLetters);
+  l2 = repair(repair(l2, 0, 9), 28, 42);
 
   const nameField = l1.slice(5);
   const split = nameField.indexOf("<<");
@@ -98,7 +178,7 @@ export function parseTd3(text: string, today: string): MrzParse {
   if (!checks(l2.slice(13, 19), l2[19])) failed.push("birth_date");
   if (!checks(l2.slice(21, 27), l2[27])) failed.push("expiry");
   if (!checks(l2.slice(28, 42), l2[42])) failed.push("personal");
-  if (!checks(l2.slice(0, 10) + l2.slice(13, 20) + l2.slice(21, 43), l2[43])) failed.push("composite");
+  if (!checks(composite(l2), l2[43])) failed.push("composite");
 
   const sex = l2[20] === "M" || l2[20] === "F" ? l2[20] : null;
   return {
