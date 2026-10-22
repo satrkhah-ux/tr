@@ -110,7 +110,7 @@ describe("the department → team table", () => {
 
 describe("«تأخير بشري» (the owner, 2026-10-18)", () => {
   it("20–60 seconds unless set, within 0–90, min never above max", () => {
-    expect(parseDelay("")).toEqual({ min: 20, max: 60 });
+    expect(parseDelay("")).toEqual({ min: 25, max: 28 });
     expect(parseDelay("30-45")).toEqual({ min: 30, max: 45 });
     expect(parseDelay("50-20")).toEqual({ min: 50, max: 50 });
     expect(parseDelay("10-300")).toEqual({ min: 10, max: 90 });

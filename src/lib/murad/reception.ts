@@ -82,7 +82,9 @@ export function firstName(contactName: string): string | null {
  * restarts the count once, never past 90 seconds from the first.
  */
 export type Delay = { min: number; max: number };
-export const DEFAULT_DELAY: Delay = { min: 20, max: 60 };
+export const DEFAULT_DELAY: Delay = { min: 25, max: 28 };
+/** After Murad's first answer in a visit the client is mid-conversation: about ten seconds, the «يكتب…» pause included (the owner, 2026-10-22). */
+export const FOLLOW_UP_DELAY: Delay = { min: 5, max: 7 };
 export const MAX_WAIT_SEC = 90;
 
 /** «20-60» → seconds, kept within 0–90 and min ≤ max; the default when it does not read. */

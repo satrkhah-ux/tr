@@ -47,6 +47,7 @@ import {
   lastClosedAt,
   MAX_WAIT_SEC,
   parseDelay,
+  FOLLOW_UP_DELAY,
   parseHours,
   pickDelay,
   readRequest,
@@ -553,7 +554,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
   try {
     const [thread, past, places, events] = await Promise.all([
       readThread(m.conversationId),
-      service.from("murad_log").select("mode, reason, reply_message_id, created_at, intake").eq("conversation_id", m.conversationId),
+      service.from("murad_log").select("mode, reason, reply_message_id, created_at, intake").eq("conversation_id", m.conversationId).neq("id", logId), // not this turn's own claim: it made every first reply look like a second («السلام عليكم» went unanswered)
       loadPlaces(service),
       conversationEvents(m.conversationId),
     ]);
@@ -910,8 +911,10 @@ export async function schedule(m: IncomingMessage): Promise<"waiting" | "extende
     if (!inMuradScope(settings.control, thread.inboxId ?? null, thread.teamId ?? null)) return "out_of_scope";
   }
   void markTeletelSeen(m.conversationId);
-  const delay = parseDelay(reception.delay);
   const now = Date.now();
+  // the first answer of a visit about thirty seconds, every later one about ten (the owner, 2026-10-22)
+  const { count: answered } = await service.from("murad_log").select("id", { count: "exact", head: true }).eq("conversation_id", m.conversationId).eq("mode", "reception").not("reply_message_id", "is", null).gte("created_at", new Date(now - VISIT_SEC * 1000).toISOString());
+  const delay = answered ? FOLLOW_UP_DELAY : parseDelay(reception.delay);
   const had = waiting.get(m.conversationId);
   if (had) {
     had.message = { ...m, since: had.first };
