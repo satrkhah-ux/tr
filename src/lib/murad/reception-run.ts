@@ -29,13 +29,14 @@ import { logAudit } from "@/lib/data/audit";
 import { parseAssignment } from "@/lib/leads/auto";
 import { getRates } from "@/lib/data/rates-actions";
 import { USD_SAR_DEFAULT } from "@/lib/offer/pricing";
-import { askText, datesSaid, holdToText, missing, offerDraftData, offerText, priceOffer, readOffers, routeCity, tripChanged, tripDays, tripSummary, type OfferAsk, type OfferCountry } from "./auto-offer";
+import { askText, holdToText, missing, offerDraftData, offerText, priceOffer, readOffers, routeCity, tripChanged, tripDays, tripSummary, type OfferAsk, type OfferCountry } from "./auto-offer";
 import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { returnedToEmployee } from "@/lib/leads/lifecycle";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
 import { isHumanReply, maskPhone, muradMessageIds, noteFor, SETTING, type TurnMessage } from "./core";
-import { isSaudi, repeatsMurad, SCHENGEN, visaFreeText, visaAskText, visaFlowNote, visaFlowText, visaNeed, visaRowFor, type VisaAsk, type VisaFacts, type VisaRow } from "./visa";
+import { readVisa } from "./visa-read";
+import { repeatsMurad, SCHENGEN, VISA_FREE_ASK, visaFacts, visaFreeText, visaFlowNote, visaFlowText, visaStep, type VisaCountry, type VisaFacts, type VisaRow } from "./visa";
 import { readSettings, readThread } from "./run";
 import {
   clarifyText,
@@ -75,7 +76,6 @@ const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 /** how far back «this visit» reaches: a colleague's answer, or a reception, older than this belongs to an earlier one */
 const VISIT_SEC = 12 * 3600;
 /** spelling-blind: «فتنام» and «فيتنام», «ماليزيا» and «مالیزیا» — the long vowels and hamzas dropped */
-const loose = (t: string) => fold(t).replace(/[اأإآىيوءئؤةه\s]/gu, "");
 
 export type IncomingMessage = {
   conversationId: number;
@@ -170,78 +170,6 @@ async function readTrip(transcript: string, clientText: string, offer: OfferCoun
       { name: s("name"), arrival: s("arrival_date"), departure: s("departure_date"), days: n("days"), adults: n("adults"), children: n("children"), rooms: n("rooms"), only_city: s("only_city"), special: s("special") },
       today,
     );
-  } catch {
-    return null;
-  }
-}
-
-/**
- * A visa request from the whole visit (the owner, 2026-10-19: «كأن مراد موظف
- * تأشيرات»): the destination as our list spells it — never the client's own
- * country («مقيم في السعودية» is where they live) — the kind, each passport
- * among the applicants (the writer's, and others' when they differ: «عراقي
- * مقيم… وصديق لي سعودي»), the party, an approximate date, what they asked
- * about, a refusal before, a request already with the team. Only the client's
- * words are facts; a date counts only when the client named one. Null on any
- * failure: the request then goes to the visa team like any other.
- */
-async function readVisa(transcript: string, clientText: string, countryNames: string[]): Promise<VisaAsk | null> {
-  if (!isOpenAIConfigured()) return null;
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
-  try {
-    const raw = await openaiJson({
-      name: "visa_facts",
-      system: [
-        `Today is ${today} (Riyadh). Below is one visit of a client's WhatsApp conversation with a travel company in Saudi Arabia, oldest first: «العميل» lines are the client's, «مُراد» lines are our assistant's. The client is asking about a visa. Extract what the client wants NOW: a later client line replaces an earlier one. When the latest client line names another country («وإسبانيا؟», «طيب وايطاليا؟») that country IS the destination now, and the nationality, the applicants and the date said before carry over to it. Only the client's lines are facts.`,
-        `country: the DESTINATION country, spelled as one of: ${countryNames.join("، ")} — or as written when it is none of them (a city means its country: لندن → المملكة المتحدة, باريس → فرنسا; امريكا → الولايات المتحدة; بريطانيا → المملكة المتحدة). Never the country the client lives in or holds a passport of. null when only «شنغن» is said.`,
-        "schengen: true when the client says شنغن without naming one country.",
-        "kind: tourist (the default for تأشيرة/فيزا/فيزه/زيارة/سياحة), medical, study, work, family (to join a relative), other.",
-        "nationality: ISO 3166-1 alpha-3 of the writer's passport, only when said («سعودي» = SAU, «عراقي» = IRQ; «مقيم» alone is no nationality); nationality_ar: as an Arabic adjective («عراقي»); resident: true when the writer lives in Saudi Arabia on an إقامة, else null.",
-        "others: the other applicants whose passport differs from the writer's, one item per nationality — {nationality (alpha-3), nationality_ar, resident} («وصديق لي سعودي» → SAU). Empty when all share the writer's.",
-        "applicants: how many people apply in all («انا وزوجتي» = 2, «انا وصديقي» = 2), children included. travel_date: approximate travel date YYYY-MM-DD in the future (a month alone = the 1st of the next such month; relative dates from today).",
-        "topics: what the client asks about — requirements, price, time (how long it takes), appointment (موعد/مقابلة), fingerprints (بصمة), validity (how long the visa lasts), refund (if refused), guarantee (is approval guaranteed).",
-        "status_query: true when the client asks where an existing request stands («وين وصلت تأشيرتي»). wants_trip: true when the client also asks for a trip or package. refused_before: true only when the client says a visa WAS refused in the past («انرفضت قبل»); a question about what happens if refused («لو انرفضت») is the refund topic, not a refusal. special: a short Arabic phrase for anything unusual (urgent, a minor alone, an expired passport), else null.",
-        "null or empty for anything not said. Never invent.",
-      ].join("\n"),
-      user: transcript.slice(-3000),
-      schema: {
-        type: "object",
-        properties: {
-          country: { type: ["string", "null"] },
-          schengen: { type: ["boolean", "null"] },
-          kind: { type: ["string", "null"], enum: ["tourist", "medical", "study", "work", "family", "other", null] },
-          nationality: { type: ["string", "null"] },
-          nationality_ar: { type: ["string", "null"] },
-          resident: { type: ["boolean", "null"] },
-          others: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: { nationality: { type: "string" }, nationality_ar: { type: ["string", "null"] }, resident: { type: ["boolean", "null"] } },
-              required: ["nationality", "nationality_ar", "resident"],
-              additionalProperties: false,
-            },
-          },
-          applicants: { type: ["integer", "null"] },
-          travel_date: { type: ["string", "null"] },
-          topics: { type: "array", items: { type: "string", enum: ["requirements", "price", "time", "appointment", "fingerprints", "validity", "refund", "guarantee"] } },
-          status_query: { type: ["boolean", "null"] },
-          wants_trip: { type: ["boolean", "null"] },
-          refused_before: { type: ["boolean", "null"] },
-          special: { type: ["string", "null"] },
-        },
-        required: ["country", "schengen", "kind", "nationality", "nationality_ar", "resident", "others", "applicants", "travel_date", "topics", "status_query", "wants_trip", "refused_before", "special"],
-        additionalProperties: false,
-      },
-      temperature: 0,
-      timeoutMs: 15000,
-    });
-    const r = JSON.parse(raw ?? "{}") as VisaAsk;
-    const iso3 = (s: string | null | undefined) => (s && /^[A-Za-z]{3}$/.test(s) ? s.toUpperCase() : null);
-    const date = r.travel_date && /^\d{4}-\d{2}-\d{2}$/.test(r.travel_date) && r.travel_date >= today && datesSaid(clientText) > 0 ? r.travel_date : null;
-    const nat = iso3(r.nationality);
-    const others = (r.others ?? []).map((o) => ({ ...o, nationality: iso3(o.nationality) ?? "" })).filter((o) => o.nationality && o.nationality !== nat);
-    return { ...r, nationality: nat, nationality_ar: nat ? r.nationality_ar : null, others, travel_date: date, applicants: r.applicants && r.applicants > 0 ? r.applicants : null };
   } catch {
     return null;
   }
@@ -416,6 +344,7 @@ async function markLead(
 
 /** Widen only visa intake; other services retain their current trial scope. */
 async function visaConversation(service: SupabaseClient, m: IncomingMessage): Promise<boolean> {
+  if (VISA_FREE_ASK.test(m.content)) return true;
   const explicit = readRequest(m.content, []);
   if (explicit.kind) return explicit.kind === "تأشيرات";
   const [{ data: lead }, thread, events] = await Promise.all([
@@ -439,7 +368,7 @@ async function visaList(service: SupabaseClient) {
     service.from("visas").select("country, country_id, visa_type, sell_price, sell_currency, arabic_requirements, status").eq("status", "Active"),
   ]);
   return {
-    countries: (countries ?? []) as { id: string; arabic_name: string; iso2: string | null }[],
+    countries: (countries ?? []) as VisaCountry[],
     rows: ((rows ?? []) as (VisaRow & { country_id: string | null })[]).map((r) => ({ ...r, sell_price: r.sell_price == null ? null : Number(r.sell_price) })),
   };
 }
@@ -518,13 +447,13 @@ async function visaFollowThrough(service: SupabaseClient, control: MuradControl,
     if (claim.error || !claim.data) continue;
     const facts = r.intake.visa_flow;
     const list = await visaList(service);
-    const country = list.countries.find((c) => facts.country && fold(c.arabic_name) === fold(facts.country));
+    const step = visaStep({ a: null, facts, asked: true, countries: list.countries, rows: list.rows, includePrice: control.includePrice });
     const m: IncomingMessage = { conversationId: r.conversation_id, messageId: -Number(r.reply_message_id), at: askedAt, phone: r.phone ?? "", contactName: thread.name, content: "" };
     const out = await visaAnswer(service, {
       m,
       logId: (claim.data as { id: string }).id,
       facts,
-      row: visaRowFor(list.rows, country?.id ?? null, facts.country),
+      row: step.do === "answer" ? step.row : null,
       salam: false,
       includePrice: control.includePrice,
       visit: thread.messages,
@@ -696,17 +625,9 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
         const asked = flowRows.filter((r) => r.intake?.visa_flow);
         const earlier = (received.filter((r) => r.intake?.visa_flow).at(-1)?.intake?.visa_flow ?? null) as VisaFacts | null;
         const before = (asked.at(-1)?.intake?.visa_flow as VisaFacts | undefined) ?? (earlier ? { ...earlier, country: null } : null);
-        // a country the client did not write is the model's guess («أسهل تأشيرة لأي دولة» became ماليزيا, 2026-10-22)
         const flowText = flowLines.filter((t) => t.fromClient).map((t) => t.text).join("\n");
-        const written = (c: string) => Boolean(readRequest(flowText, places).country) || loose(flowText).includes(loose(c));
-        const named = (a?.country && written(a.country) ? a.country : null) ?? (handoffRow ? readRequest(flowLines.filter((t) => t.fromClient).map((t) => t.text).join("\n"), places).country : request.country) ?? before?.country ?? null;
-        const facts: VisaFacts = {
-          country: (named && list.countries.find((c) => fold(c.arabic_name) === fold(named))?.arabic_name) ?? named,
-          nationality: a?.nationality_ar ?? before?.nationality ?? null,
-          applicants: a?.applicants ?? before?.applicants ?? null,
-          travelDate: a?.travel_date ?? before?.travelDate ?? null,
-          ...(a?.schengen && !a.country ? { schengen: true } : {}),
-        };
+        const said = handoffRow ? readRequest(flowText, places).country : (readRequest(flowText, places).country ?? request.country);
+        const facts = visaFacts({ a, clientText: flowText, said, before, countries: list.countries });
         // the model took seconds: never over a colleague who just came in, nor past a client who just wrote more
         const again = await readThread(m.conversationId);
         const lastNow = again?.messages.filter((t) => t.fromClient && !t.isPrivate).at(-1);
@@ -716,10 +637,10 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
         }
         const salam = request.salam && received.length === 0;
         const start = visitLines.find((t) => t.fromClient)?.at ?? since;
-        const need = visaNeed(facts);
-        if (need.length && !asked.length) {
-          const schengen = facts.schengen ? list.rows.filter((v) => SCHENGEN.has(list.countries.find((c) => c.id === v.country_id)?.iso2 ?? "")).map((v) => v.country) : [];
-          const text = `${salam ? "وعليكم السلام ورحمة الله، " : ""}${visaAskText(facts, need, schengen)}`;
+        const schengen = facts.schengen ? list.rows.filter((v) => SCHENGEN.has(list.countries.find((c) => c.id === v.country_id)?.iso2 ?? "")).map((v) => v.country) : [];
+        const step = visaStep({ a, facts, asked: asked.length > 0, countries: list.countries, rows: list.rows, includePrice: settings.control.includePrice, schengen, clientText: flowText });
+        if (step.do === "ask") {
+          const text = `${salam ? "وعليكم السلام ورحمة الله، " : ""}${step.text}`;
           const replyId = await sendTeletelMessage(m.conversationId, text);
           if (!replyId) { await finish({ reason: "send_failed", reply: text, error: "send_failed" }); return "send_failed"; }
           await finish({ reason: "visa:asked1", reply: text, reply_message_id: replyId, intake: { ...intake, country: facts.country, visa_flow: facts } });
@@ -727,16 +648,15 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
           await visaReceipt(service, m.conversationId, closedAt, start);
           return "asked";
         }
-        const country = list.countries.find((c) => facts.country && fold(c.arabic_name) === fold(facts.country));
-        const row = visaRowFor(list.rows, country?.id ?? null, facts.country);
-        // off the list, and the catalogue says a Saudi passport enters without one: said so, no hand-over to visas
-        if (!row && country && (country as { visa_required?: boolean | null }).visa_required === false && isSaudi(facts.nationality)) {
-          const text = `${salam ? "وعليكم السلام ورحمة الله، " : ""}${visaFreeText(country.arabic_name)}`;
+        // the catalogue says a Saudi passport enters without one: said so, no hand-over to visas
+        if (step.do === "free") {
+          const text = `${salam ? "وعليكم السلام ورحمة الله، " : ""}${visaFreeText(step.country)}`;
           const replyId = await sendTeletelMessage(m.conversationId, text);
           if (!replyId) { await finish({ reason: "send_failed", reply: text, error: "send_failed" }); return "send_failed"; }
           await finish({ reason: "visa:not_needed", reply: text, reply_message_id: replyId, intake: { ...intake, country: facts.country, visa_flow: { ...facts, done: true, listed: false } } });
           return "answered";
         }
+        const row = step.row;
         return await visaAnswer(service, { m, logId, facts, row, salam, includePrice: settings.control.includePrice, visit: visitLines, intake, waitSec, closedAt, start });
       }
     }

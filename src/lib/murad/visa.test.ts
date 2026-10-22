@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isSaudi, repeatsMurad, visaFreeText, VISA_CLOSING, visaAskText, visaFlowNote, visaFlowText, visaNeed, visaRowFor, type VisaFacts, type VisaRow } from "./visa";
+import { isSaudi, repeatsMurad, VISA_FREE_ASK, visaFacts, visaFreeText, VISA_CLOSING, visaAskText, visaFlowNote, visaFlowText, visaNeed, visaRowFor, visaStep, type VisaAsk, type VisaCountry, type VisaFacts, type VisaRow } from "./visa";
+import { withoutAd } from "./reception";
 
 const france: VisaRow = {
   country: "فرنسا",
@@ -75,5 +76,68 @@ describe("Murad's visa flow — the owner's decision, 2026-10-22", () => {
     const murad = { id: 2, at: 101, text: "تأشيرة فرنسا — تأشيرة سياحية\n…", fromClient: false, isPrivate: false, template: false, bot: false };
     expect(repeatsMurad(visaFlowText({ row: france, facts: full, includePrice: true, salam: false }), [murad])).toBe(true);
     expect(repeatsMurad("رد جديد", [murad])).toBe(false);
+  });
+});
+
+describe("visaStep — the questions of 120 real visa conversations (2026-10-23)", () => {
+  const countries: VisaCountry[] = [
+    { id: "ae", arabic_name: "الإمارات العربية المتحدة", iso2: "AE", visa_required: false },
+    { id: "ge", arabic_name: "جورجيا", iso2: "GE", visa_required: false },
+    { id: "fr", arabic_name: "فرنسا", iso2: "FR", visa_required: true },
+    { id: "in", arabic_name: "الهند", iso2: "IN", visa_required: true },
+    { id: "sa", arabic_name: "السعودية", iso2: "SA", visa_required: false },
+  ];
+  const rows = [
+    { ...france, country_id: "fr" },
+    { ...france, country: "الإمارات العربية المتحدة", country_id: "ae", arabic_requirements: "صورة الجواز\nصورة شخصيه" },
+    { ...france, country: "الهند", country_id: "in", sell_price: 200, arabic_requirements: "صورة الجواز\nصورة شخصيه" },
+  ];
+  const ask = (over: Partial<VisaAsk> = {}): VisaAsk => ({ country: null, kind: "tourist", nationality: null, nationality_ar: null, applicants: null, travel_date: null, refused_before: null, special: null, others: [], ...over });
+  const step = (a: VisaAsk | null, facts: Partial<VisaFacts>, asked = false, clientText = "") =>
+    visaStep({ a, facts: { country: null, nationality: null, applicants: null, travelDate: null, ...facts }, asked, countries, rows, includePrice: true, clientText });
+
+  it("a Saudi to a visa-free country is told so — even where the list prices it for residents, and before any count", () => {
+    expect(step(ask(), { country: "الإمارات العربية المتحدة", nationality: "سعودي" })).toEqual({ do: "free", country: "الإمارات العربية المتحدة" });
+    expect(step(ask({ others: [{ nationality: "YEM", nationality_ar: "يمني", resident: true }] }), { country: "الإمارات العربية المتحدة", nationality: "سعودي", applicants: 2 })).toMatchObject({ do: "answer" });
+    expect(step(ask(), { country: "الإمارات العربية المتحدة", nationality: "يمني", applicants: 1 })).toMatchObject({ do: "answer", row: { country: "الإمارات العربية المتحدة" } });
+  });
+  it("a request already with the team, a visa into Saudi Arabia, a work visa: the team's, never the tourist price", () => {
+    expect(step(ask({ status_query: true }), {})).toEqual({ do: "answer", row: null });
+    expect(step(ask({ inbound: true }), { country: "السعودية" })).toEqual({ do: "answer", row: null });
+    expect(step(ask({ kind: "work" }), { country: "فرنسا", nationality: "يمني", applicants: 1, kind: "work" })).toEqual({ do: "answer", row: null });
+  });
+  it("«أسهل تأشيرة»: the advice from the list — light papers only, never an acceptance rate — then the one question", () => {
+    const s = step(ask({ advice: "easiest" }), {});
+    expect(s.do).toBe("ask");
+    const text = (s as { text: string }).text;
+    expect(text).toContain("الأقل متطلبات عندنا: الإمارات العربية المتحدة، الهند");
+    expect(text).not.toContain("فرنسا");
+    expect(text).not.toMatch(/نسب[ةه]/);
+    expect(text).toContain("أي دولة تفضّل؟ وتكرماً الجنسية، وعدد المتقدمين؟");
+    const saudi = (step(ask({ advice: "easiest" }), { nationality: "سعودي" }) as { text: string }).text;
+    expect(saudi).toContain("الجواز السعودي ما يحتاج تأشيرة مسبقة لدول كثيرة، منها: الإمارات العربية المتحدة، جورجيا 👍");
+    expect(saudi).toContain("ومن الدول اللي تحتاج تأشيرة، الأقل متطلبات عندنا: الهند");
+    expect((step(ask({ advice: "cheapest" }), {}) as { text: string }).text).toContain("الأقل سعراً عندنا: الهند 200 ريال، فرنسا 400 ريال، الإمارات العربية المتحدة 400 ريال.");
+    // the model missed it, the words did not
+    expect(step(ask(), {}, false, "أي تأشيرة ما تحتاج كشف حساب؟").do).toBe("ask");
+    expect((step(ask(), {}, false, "أي تأشيرة ما تحتاج كشف حساب؟") as { text: string }).text).toContain("الأقل متطلبات");
+  });
+  it("the facts: a country the client never wrote is dropped; a short name counts; «شنغن (أوروبا)» asks which state; transit is no tourist visa", () => {
+    const f = (a: VisaAsk, clientText: string, said: string | null = null) => visaFacts({ a, clientText, said, before: null, countries });
+    expect(f(ask({ country: "ماليزيا" }), "اسهل تأشيرة لأي دولة").country).toBeNull();
+    expect(f(ask({ country: "الإمارات العربية المتحدة" }), "تاشيرة الامارات سياحة").country).toBe("الإمارات العربية المتحدة");
+    expect(f(ask({ country: "قيرغيزستان" }), "بدي اقدم فيزا لقركزستان").country).toBe("قيرغيزستان");
+    expect(f(ask(), "ابغى تأشيرة شنغن", "شنغن (أوروبا)")).toMatchObject({ country: null, schengen: true });
+    expect(f(ask({ country: "الهند" }), "هندي عبور فقط من البحرين الى الهند").kind).toBe("other");
+    expect(f(ask({ advice: "easiest", schengen: true }), "اليونان - إيطاليا - إسبانيا أيها أسهل", "إيطاليا").country).toBeNull();
+  });
+  it("a question the list cannot answer is said back and noted", () => {
+    const facts: VisaFacts = { ...full, topics: ["time", "guarantee", "requirements"] };
+    expect(visaFlowText({ row: france, facts, includePrice: true, salam: false })).toContain("وسؤالك عن مدة الإصدار وضمان القبول يجاوبك عليه زميلنا.");
+    expect(visaFlowNote({ facts: { ...facts, refused: true, kind: "work" }, row: null, includePrice: true })).toContain("يسأل عن: مدة الإصدار وضمان القبول");
+  });
+  it("the ad's slogan and audience are not the client's words", () => {
+    expect(withoutAd("مرحبا بكم في ترافليون ✈️| احجز بكجات سفر مع ترافليون انا مهتم بـ تأشيرة أمريكا السياحية للسعوديين والمقيمين | ترافليون")).not.toMatch(/بكجات|سعوديين|مقيمين/);
+    expect(VISA_FREE_ASK.test("أي دولة اقدر اسافر لها بدون فيزا؟")).toBe(true);
   });
 });

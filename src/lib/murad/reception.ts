@@ -47,8 +47,20 @@ export type Request = {
   salam: boolean;
 };
 
+/**
+ * The ads' own words in a click-to-WhatsApp opening («مرحبا بكم في ترافليون ✈️| احجز بكجات سفر مع ترافليون انا مهتم
+ * بـ تأشيرة أمريكا…»): the company's slogan is not the client's request — «بكجات» in it made every visa ad a package
+ * (2026-10-23). What follows «انا مهتم بـ» stays.
+ */
+export const withoutAd = (text: string) =>
+  text
+    // whom the ad is for is no nationality: «تأشيرة أمريكا السياحية للسعوديين والمقيمين» (2026-10-23)
+    .replace(/(مهتم بـ.*?)\s*لل(?:سعوديين|مقيمين)(?:\s*و\s*(?:ال|لل)(?:سعوديين|مقيمين))?/gu, "$1")
+    .replace(/مرحبا بكم في ترافليون\s*✈️?\s*\|?|احجز بكجات سفر مع ترافليون|-?\s*ترافليون للسفر و\s*السياحة|\|\s*ترافليون\s*$/gmu, " ");
+
 /** What one message asks for — the same rules «العملاء» classifies by (auto.ts), nothing guessed. */
-export function readRequest(text: string, places: Place[]): Request {
+export function readRequest(raw: string, places: Place[]): Request {
+  const text = withoutAd(raw);
   const folded = fold(text);
 
   // the destination by the one rule (lib/leads/places.ts): a Saudi place is where the client is, never where they go
