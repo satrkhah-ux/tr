@@ -4,7 +4,23 @@ import { describe, expect, it } from "vitest";
 import type { OperationBooking } from "@/lib/data/operation-bookings";
 import { parseTicketText, ticketNumbersIn } from "@/lib/flights/ticket-parse";
 import { DRV, flightLegs, retimeTransfers } from "@/lib/operations/drivers";
-import { badLeg, checkNames, compareName, flightsReadiness, flightsState, isoAt, skeleton, toFlightLegs, withTicketLines } from "./flights";
+import { sanitizeTicket } from "@/lib/flights/ticket-parse";
+import type { LookupAirport } from "@/lib/offer/draft-types";
+import {
+  airportCode,
+  badLeg,
+  checkNames,
+  compareName,
+  flightsReadiness,
+  flightsState,
+  isoAt,
+  landingDay,
+  plannedLegs,
+  plannedLine,
+  skeleton,
+  toFlightLegs,
+  withTicketLines,
+} from "./flights";
 import type { WizardCase } from "./types";
 
 const booking = (p: Partial<OperationBooking>): OperationBooking =>
@@ -61,16 +77,82 @@ describe("the legs as stored", () => {
     expect(isoAt("2026-11-20", "", "Asia/Riyadh")).toBeNull();
   });
 
-  it("refuses a leg the drivers can't be timed from: no number, no arrival, or a landing before take-off", () => {
-    const zone = (c: string) => ({ RUH: "Asia/Riyadh", IST: "Europe/Istanbul", MED: "Asia/Riyadh" })[c] ?? null;
+  it("lands an overnight flight the next day from the clocks — no «same day» assumption (the owner, 2026-10-22)", () => {
+    const zone = (c: string) => ({ RUH: "Asia/Riyadh", IST: "Europe/Istanbul", MED: "Asia/Riyadh", KUL: "Asia/Kuala_Lumpur" })[c] ?? null;
     const [overnight] = toFlightLegs([{ flight_no: "SV 260", from_iata: "IST", to_iata: "RUH", dep_date: "2026-11-28", dep_time: "22:35", arr_date: "", arr_time: "04:20" }], zone);
-    expect(overnight.flight_no).toBe("SV260");
-    expect(badLeg(overnight)).toBe(true); // lands «before» it left: the arrival's date is missing
+    expect(overnight).toEqual({ flight_no: "SV260", from: "IST", to: "RUH", departs_at: "2026-11-28T22:35:00+03:00", arrives_at: "2026-11-29T04:20:00+03:00" });
+    expect(badLeg(overnight)).toBe(false);
+    // MED 23:00 → KUL 13:00 is the next day by the two zones; a short hop lands the day it left
+    const leg = { flight_no: "SV836", from_iata: "MED", to_iata: "KUL", dep_date: "2026-11-05", dep_time: "23:00", arr_date: "", arr_time: "13:00" };
+    expect(landingDay(leg, zone)).toBe("2026-11-06");
+    expect(landingDay({ ...leg, dep_time: "01:00", arr_time: "14:30" }, zone)).toBe("2026-11-05");
+    // no zone known: a landing clock earlier than the take-off is the next day
+    expect(landingDay({ ...leg, from_iata: "XXX", to_iata: "YYY" }, zone)).toBe("2026-11-06");
+    // a typed arrival day is the agent's
+    expect(landingDay({ ...leg, arr_date: "2026-11-07" }, zone)).toBe("2026-11-07");
+  });
+
+  it("refuses a leg the drivers can't be timed from — and no 22-hour rule", () => {
+    const zone = (c: string) => ({ RUH: "Asia/Riyadh", IST: "Europe/Istanbul" })[c] ?? null;
     const [fixed] = toFlightLegs([{ flight_no: "SV260", from_iata: "IST", to_iata: "RUH", dep_date: "2026-11-28", dep_time: "22:35", arr_date: "2026-11-29", arr_time: "04:20" }], zone);
-    expect(fixed).toEqual({ flight_no: "SV260", from: "IST", to: "RUH", departs_at: "2026-11-28T22:35:00+03:00", arrives_at: "2026-11-29T04:20:00+03:00" });
     expect(badLeg(fixed)).toBe(false);
     expect(badLeg({ ...fixed, flight_no: "" })).toBe(true);
     expect(badLeg({ ...fixed, arrives_at: null })).toBe(true);
+    expect(badLeg({ ...fixed, to: "" })).toBe(true); // an airport we could not name
+    expect(badLeg({ ...fixed, arrives_at: "2026-11-28T20:00:00+03:00" })).toBe(true); // lands before it left
+    expect(badLeg({ ...fixed, arrives_at: "2026-11-30T06:00:00+03:00" })).toBe(false); // 31 h — a long journey, not refused
+    expect(badLeg({ ...fixed, arrives_at: "2026-12-02T04:20:00+03:00" })).toBe(true); // four days on: a mistyped date
+  });
+
+  it("keeps one PNR per leg through the save's sanitising — a domestic hop bought on its own", () => {
+    const clean = sanitizeTicket({
+      pnr: "m3tq8z",
+      legs: [
+        { flight_no: "TK2810", from_iata: "IST", to_iata: "TZX", dep_date: "2026-10-20", dep_time: "08:15", arr_time: "10:05", pnr: "" },
+        { flight_no: "PC2811", from_iata: "TZX", to_iata: "SAW", dep_date: "2026-10-23", dep_time: "11:00", arr_time: "12:50", pnr: "x9k2pq" },
+      ],
+    });
+    expect(clean.legs.map((l) => l.pnr)).toEqual([undefined, "X9K2PQ"]);
+    const legs = toFlightLegs(clean.legs, () => "Europe/Istanbul");
+    expect(legs[0]).not.toHaveProperty("pnr");
+    expect(legs[1].pnr).toBe("X9K2PQ");
+  });
+});
+
+describe("the offer's planned legs (the owner, 2026-10-22: «التفاصيل المدخلة لا تمت بصلة»)", () => {
+  const AIRPORTS: LookupAirport[] = [
+    { id: "1", name: "مطار إسطنبول", code: "IST", timezone: "Europe/Istanbul", city: "إسطنبول", country: "تركيا", name_en: "Istanbul Airport" },
+    { id: "2", name: "مطار طرابزون", code: "TZX", timezone: "Europe/Istanbul", city: "طرابزون", country: "تركيا", name_en: "Trabzon Airport" },
+  ];
+  const detail = {
+    الذهاب: "SV834 · RUH → KUL · 2026-11-20 00:00",
+    "رحلة 2": "— · IST → TZX · 2026-11-24 يُحدَّد لاحقاً",
+    العودة: "SV835 · KUL → RUH · 2026-11-28 01:00 · الوصول 2026-11-28 04:30",
+    الدرجة: "اقتصادية",
+  };
+
+  it("starts the form from the plan: its day kept, a placeholder midnight or «يُحدَّد لاحقاً» left empty", () => {
+    expect(plannedLegs(detail)).toEqual([
+      { flight_no: "SV834", from_iata: "RUH", to_iata: "KUL", dep_date: "2026-11-20", dep_time: "", arr_date: "", arr_time: "" },
+      { flight_no: "", from_iata: "IST", to_iata: "TZX", dep_date: "2026-11-24", dep_time: "", arr_date: "", arr_time: "" },
+      { flight_no: "SV835", from_iata: "KUL", to_iata: "RUH", dep_date: "2026-11-28", dep_time: "01:00", arr_date: "2026-11-28", arr_time: "04:30" },
+    ]);
+  });
+
+  it("prints a planned leg readably — the number when there is one, never a 00:00", () => {
+    const [first, second, back] = plannedLegs(detail);
+    expect(plannedLine(first)).toBe("SV834 · RUH → KUL · 2026-11-20 يُحدَّد لاحقاً");
+    expect(plannedLine(second, (c) => `${AIRPORTS.find((a) => a.code === c)?.city} (${c})`)).toBe("إسطنبول (IST) → طرابزون (TZX) · 2026-11-24 يُحدَّد لاحقاً");
+    expect(plannedLine(back)).toBe("SV835 · KUL → RUH · 2026-11-28 01:00 · الوصول 2026-11-28 04:30");
+  });
+
+  it("names an airport by its code, its name or its city — hamza folded", () => {
+    expect(airportCode("ist", AIRPORTS)).toBe("IST");
+    expect(airportCode("اسطنبول", AIRPORTS)).toBe("IST");
+    expect(airportCode("مطار طرابزون (TZX)", AIRPORTS)).toBe("TZX");
+    expect(airportCode("Trabzon Airport", AIRPORTS)).toBe("TZX");
+    expect(airportCode("JED", AIRPORTS)).toBe("JED"); // a code we hold no row for still goes as typed
+    expect(airportCode("مدينة لا نعرفها", AIRPORTS)).toBe("");
   });
 });
 

@@ -1,18 +1,22 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AlertTriangle, Check, CheckCircle2, Download, Loader2, Pencil, Plane, Plus, Sparkles, Trash2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import type { TranslationKey } from "@/lib/i18n";
 import type { OperationBooking } from "@/lib/data/operation-bookings";
 import { seedBookingsFromOffer } from "@/lib/data/operation-seed";
+import { listWizardAirports } from "@/lib/data/operation-wizard";
 import { readBookingTicket, saveBookingTicket, type TicketRead } from "@/lib/data/wizard-tickets";
 import { MAX_TICKET_BYTES } from "@/lib/flights/ticket-parse";
+import { airportDisplay, findAirport } from "@/lib/offer/basic";
+import type { LookupAirport } from "@/lib/offer/draft-types";
 import { flightTicketed } from "@/lib/operations/client-booking-state";
-import { flightBookings, type LegInput, type NameCheck } from "@/lib/operations/wizard/flights";
+import { airportCode, flightBookings, landingDay, plannedLegs, plannedLine, type LegInput, type NameCheck } from "@/lib/operations/wizard/flights";
 import { notPulled } from "@/lib/operations/wizard/pull";
 import type { StepProps } from "@/lib/operations/wizard/types";
+import { SuggestInput } from "../../SuggestInput";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { useSafeTransition } from "../../useSafeTransition";
 
@@ -158,7 +162,7 @@ export function NameRow({ check }: { check: NameCheck }) {
 
 type Form = { pnr: string; tickets: string; legs: LegInput[]; baggage: string };
 
-const blankLeg = (): LegInput => ({ flight_no: "", from_iata: "", to_iata: "", dep_date: "", dep_time: "", arr_date: "", arr_time: "" });
+const blankLeg = (): LegInput => ({ flight_no: "", from_iata: "", to_iata: "", dep_date: "", dep_time: "", arr_date: "", arr_time: "", pnr: "" });
 
 /** A ticketed booking back into the form, for an edit. */
 function formOf(b: OperationBooking): Form {
@@ -174,6 +178,7 @@ function formOf(b: OperationBooking): Form {
       dep_time: l.departs_at?.slice(11, 16) ?? "",
       arr_date: l.arrives_at?.slice(0, 10) ?? "",
       arr_time: l.arrives_at?.slice(11, 16) ?? "",
+      pnr: l.pnr ?? "",
     })),
   };
 }
@@ -182,6 +187,19 @@ function formOf(b: OperationBooking): Form {
 export function FlightsStep({ data }: StepProps) {
   const { t } = useTraveliunUI();
   const flights = flightBookings(data);
+  // «من» / «إلى» by city, name or code — the airports loaded once for the step
+  const [airports, setAirports] = useState<LookupAirport[]>([]);
+  const any = flights.length > 0;
+  useEffect(() => {
+    if (!any) return;
+    let live = true;
+    listWizardAirports()
+      .then((list) => live && setAirports(list))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [any]);
   return (
     <section className={wzCard}>
       <h2 className="flex items-center gap-1.5 text-sm font-extrabold text-[#185045]">
@@ -192,7 +210,7 @@ export function FlightsStep({ data }: StepProps) {
       {flights.length > 0 ? (
         <ul className="grid gap-3">
           {flights.map((b) => (
-            <FlightCard key={b.id} booking={b} travelers={data.travelers.length} readsImages={data.readsImages ?? true} />
+            <FlightCard key={b.id} booking={b} travelers={data.travelers.length} readsImages={data.readsImages ?? true} airports={airports} />
           ))}
         </ul>
       ) : notPulled(data, "flight") ? (
@@ -204,11 +222,30 @@ export function FlightsStep({ data }: StepProps) {
   );
 }
 
-function FlightCard({ booking, travelers, readsImages }: { booking: OperationBooking; travelers: number; readsImages: boolean }) {
+function FlightCard({
+  booking,
+  travelers,
+  readsImages,
+  airports,
+}: {
+  booking: OperationBooking;
+  travelers: number;
+  readsImages: boolean;
+  airports: LookupAirport[];
+}) {
   const { t } = useTraveliunUI();
   const router = useRouter();
   // the one flight-done rule — a flight confirmed by hand in «عرض الكل» is done here too
   const done = flightTicketed(booking);
+  // the offer's own legs — shown before the ticket, and what a form starts from (the owner, 2026-10-22)
+  const planned = plannedLegs(booking.detail ?? {});
+  const startLegs = () => (planned.length > 0 ? planned : [blankLeg()]);
+  const place = (code: string) => {
+    const a = findAirport(code, airports);
+    return a?.code ? `${a.city || a.name} (${a.code})` : code;
+  };
+  const zoneOf = (code: string) => airports.find((a) => a.code?.toUpperCase() === code)?.timezone ?? null;
+  const airportItems = airports.map((a) => ({ value: airportDisplay(a), hint: a.city ?? undefined, keywords: [a.city, a.country, a.code, a.name_en].filter(Boolean).join(" ") }));
   const [form, setForm] = useState<Form | null>(null);
   const [read, setRead] = useState<TicketRead | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -226,20 +263,32 @@ function FlightCard({ booking, travelers, readsImages }: { booking: OperationBoo
         pnr: res.read.pnr,
         tickets: res.read.ticket_numbers.join("\n"),
         baggage: res.read.baggage,
-        legs: res.read.legs.length > 0 ? res.read.legs : [blankLeg()],
+        legs: res.read.legs.length > 0 ? res.read.legs : startLegs(),
       });
     });
   }
 
   function save() {
     if (!form) return;
+    // a city or an airport's name is sent as its code; one we do not know is said by name, not as «أكمل كل رحلة»
+    const coded = form.legs.map((l) => ({ ...l, from_iata: airportCode(l.from_iata, airports), to_iata: airportCode(l.to_iata, airports) }));
+    const unknown = form.legs
+      .flatMap((l, i) => [
+        [l.from_iata, coded[i].from_iata],
+        [l.to_iata, coded[i].to_iata],
+      ])
+      .find(([typed, code]) => typed.trim() && !code);
+    if (unknown) return setError(t("wz.flights.err.airport", { name: unknown[0] }));
+    // one PNR per leg is allowed (a domestic hop bought alone): the booking's is the one typed, else the first leg's
+    const pnr = (form.pnr || coded.find((l) => l.pnr?.trim())?.pnr || "").trim().toUpperCase();
+    const legs = coded.map((l) => ({ ...l, pnr: l.pnr?.trim().toUpperCase() === pnr ? "" : l.pnr }));
     startTransition(async () => {
       setError(null);
       const res = await saveBookingTicket({
         booking_id: booking.id,
-        pnr: form.pnr,
+        pnr,
         ticket_numbers: form.tickets.split(/\n/),
-        legs: form.legs,
+        legs,
         baggage: form.baggage,
       });
       if (!res.ok) return setError(t(res.error));
@@ -250,6 +299,18 @@ function FlightCard({ booking, travelers, readsImages }: { booking: OperationBoo
     });
   }
 
+  const multi = (form?.legs.length ?? 0) > 1;
+  /** the airport a «من» / «إلى» resolves to (a code or a city typed), under the field — nothing when it names none or is that airport already */
+  const known = (value: string) => {
+    const hit = value.trim() ? findAirport(value, airports) : null;
+    return hit && airportDisplay(hit) !== value.trim() ? airportDisplay(hit) : null;
+  };
+  /** «يصل 2026-11-29» under a landing that falls on another day than the take-off (landingDay) */
+  const landsOn = (l: LegInput) => {
+    if (l.arr_date || !l.dep_date || !l.dep_time || !l.arr_time) return null;
+    const day = landingDay({ ...l, from_iata: airportCode(l.from_iata, airports), to_iata: airportCode(l.to_iata, airports) }, zoneOf);
+    return day !== l.dep_date ? t("wz.flights.landsOn", { date: day }) : null;
+  };
   const setLeg = (i: number, patch: Partial<LegInput>) => setForm((f) => (f ? { ...f, legs: f.legs.map((l, k) => (k === i ? { ...l, ...patch } : l)) } : f));
   const ticketCount = form ? form.tickets.split(/\n/).filter((s) => s.trim()).length : 0;
 
@@ -283,7 +344,7 @@ function FlightCard({ booking, travelers, readsImages }: { booking: OperationBoo
           <ul className="grid gap-1">
             {booking.flight_legs.map((l, i) => (
               <li key={i} className="tv-tnum rounded-[8px] bg-[#f4f8f6] px-2.5 py-1">
-                <DirText>{`${l.flight_no} · ${l.from} → ${l.to} · ${l.departs_at?.slice(0, 16).replace("T", " ") ?? "—"} → ${l.arrives_at?.slice(0, 16).replace("T", " ") ?? "—"}`}</DirText>
+                <DirText>{`${l.flight_no} · ${l.from} → ${l.to} · ${l.departs_at?.slice(0, 16).replace("T", " ") ?? "—"} → ${l.arrives_at?.slice(0, 16).replace("T", " ") ?? "—"}${l.pnr ? ` · PNR ${l.pnr}` : ""}`}</DirText>
               </li>
             ))}
           </ul>
@@ -298,6 +359,19 @@ function FlightCard({ booking, travelers, readsImages }: { booking: OperationBoo
         </div>
       ) : null}
 
+      {!done && planned.length > 0 ? (
+        <div className="mt-2 grid gap-1">
+          <p className="text-[11px] font-bold text-[#557d78]">{t("wz.flights.planned")}</p>
+          <ul className="grid gap-1">
+            {planned.map((l, i) => (
+              <li key={i} className="tv-tnum rounded-[8px] bg-[#f4f8f6] px-2.5 py-1 text-[12px] font-semibold text-[#185045]">
+                <DirText>{plannedLine(l, place)}</DirText>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {!done && !form ? (
         <div className="mt-2">
           <PaperReader
@@ -305,7 +379,7 @@ function FlightCard({ booking, travelers, readsImages }: { booking: OperationBoo
             busy={pending}
             readsImages={readsImages}
             onRead={onRead}
-            onManual={() => setForm({ pnr: "", tickets: "", baggage: "", legs: [blankLeg()] })}
+            onManual={() => setForm({ pnr: "", tickets: "", baggage: "", legs: startLegs() })}
           />
         </div>
       ) : null}
@@ -368,15 +442,32 @@ function FlightCard({ booking, travelers, readsImages }: { booking: OperationBoo
           <div className="grid gap-2">
             <p className="text-[11.5px] font-bold text-[#185045]">{t("wz.flights.legs")}</p>
             {form.legs.map((l, i) => (
-              <div key={i} className="grid grid-cols-2 gap-2 rounded-[10px] border border-[#e2ebe7] bg-[#f8fbf9] p-2.5 sm:grid-cols-4 lg:grid-cols-8">
+              <div
+                key={i}
+                className={`grid grid-cols-2 gap-2 rounded-[10px] border border-[#e2ebe7] bg-[#f8fbf9] p-2.5 sm:grid-cols-4 ${multi ? "lg:grid-cols-9" : "lg:grid-cols-8"}`}
+              >
                 <Cell label={t("wz.flights.flightNo")}>
                   <input value={l.flight_no} onChange={(e) => setLeg(i, { flight_no: e.target.value.toUpperCase().replace(/\s+/g, "") })} dir="ltr" className={wzField} />
                 </Cell>
-                <Cell label={t("wz.flights.from")}>
-                  <input value={l.from_iata} maxLength={3} onChange={(e) => setLeg(i, { from_iata: e.target.value.toUpperCase().replace(/[^A-Z]/g, "") })} dir="ltr" className={wzField} />
+                <Cell label={t("wz.flights.from")} note={known(l.from_iata)}>
+                  <SuggestInput
+                    value={l.from_iata}
+                    items={airportItems}
+                    onChange={(v) => setLeg(i, { from_iata: v })}
+                    placeholder={t("wz.flights.airportHint")}
+                    ariaLabel={t("wz.flights.from")}
+                    className={wzField}
+                  />
                 </Cell>
-                <Cell label={t("wz.flights.to")}>
-                  <input value={l.to_iata} maxLength={3} onChange={(e) => setLeg(i, { to_iata: e.target.value.toUpperCase().replace(/[^A-Z]/g, "") })} dir="ltr" className={wzField} />
+                <Cell label={t("wz.flights.to")} note={known(l.to_iata)}>
+                  <SuggestInput
+                    value={l.to_iata}
+                    items={airportItems}
+                    onChange={(v) => setLeg(i, { to_iata: v })}
+                    placeholder={t("wz.flights.airportHint")}
+                    ariaLabel={t("wz.flights.to")}
+                    className={wzField}
+                  />
                 </Cell>
                 <Cell label={t("wz.flights.depDate")}>
                   <input type="date" value={l.dep_date} onChange={(e) => setLeg(i, { dep_date: e.target.value })} className={wzField} />
@@ -387,9 +478,20 @@ function FlightCard({ booking, travelers, readsImages }: { booking: OperationBoo
                 <Cell label={t("wz.flights.arrDate")}>
                   <input type="date" value={l.arr_date} onChange={(e) => setLeg(i, { arr_date: e.target.value })} className={wzField} />
                 </Cell>
-                <Cell label={t("wz.flights.arrTime")}>
+                <Cell label={t("wz.flights.arrTime")} note={landsOn(l)}>
                   <input type="time" value={l.arr_time} onChange={(e) => setLeg(i, { arr_time: e.target.value })} className={wzField} />
                 </Cell>
+                {multi ? (
+                  <Cell label={t("wz.flights.legPnr")}>
+                    <input
+                      value={l.pnr ?? ""}
+                      onChange={(e) => setLeg(i, { pnr: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") })}
+                      placeholder={t("wz.flights.legPnrHint")}
+                      dir="ltr"
+                      className={`${wzField} tv-tnum`}
+                    />
+                  </Cell>
+                ) : null}
                 <div className="flex items-end">
                   <button
                     type="button"
@@ -435,11 +537,12 @@ function FlightCard({ booking, travelers, readsImages }: { booking: OperationBoo
   );
 }
 
-function Cell({ label, children }: { label: string; children: ReactNode }) {
+function Cell({ label, note, children }: { label: string; note?: string | null; children: ReactNode }) {
   return (
-    <label className="grid gap-1 text-[10.5px] font-bold text-[#557d78]">
+    <label className="grid content-start gap-1 text-[10.5px] font-bold text-[#557d78]">
       {label}
       {children}
+      {note ? <span className="truncate text-[10px] font-semibold text-[#2aa87a]">{note}</span> : null}
     </label>
   );
 }

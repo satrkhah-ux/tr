@@ -8,6 +8,8 @@ import { logAudit } from "@/lib/data/audit";
 import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
 import { gateOperation, gateOps, gateRow, gateRows } from "@/lib/operations/access";
 import { composeRequest } from "@/lib/data/supplier-work";
+import { countryInName, isOpsTeam } from "@/lib/operations/supplier-request";
+import { grantedPermissions } from "@/lib/roles/roles";
 
 /**
  * Who is doing this booking.
@@ -48,6 +50,10 @@ export type AssigneeOption = {
   phone: string | null;
   /** a supplier's «فنادق، طيران، تنقلات، خدمات» — the picker offers it for those kinds only. */
   categories?: string | null;
+  /** a colleague in «فريق العمليات» (supplier-request isOpsTeam) — listed first; the others only on «الكل». */
+  team?: boolean;
+  /** the country a supplier's name says (countryInName); null — «عام». */
+  country?: string | null;
 };
 
 /** Everyone a booking can be handed to: the team, colleagues, partner companies, our suppliers. */
@@ -55,21 +61,46 @@ export async function listAssignees(): Promise<AssigneeOption[]> {
   if (await gateOps()) return [];
   try {
     const supabase = await db();
-    const [emps, partners, suppliers] = await Promise.all([
-      supabase.from("employees").select("id, arabic_name, mobile").order("arabic_name").limit(200),
+    const [emps, partners, suppliers, countries, cities] = await Promise.all([
+      // the role's keys too: «ينفّذه» lists the operations team first (the owner, 2026-10-22)
+      supabase
+        .from("employees")
+        .select("id, arabic_name, mobile, status, extra_permission_keys, removed_permission_keys, roles(permission_keys)")
+        .order("arabic_name")
+        .limit(200),
       // «المطار» (0100) buys transport from us — a client, not someone we hand a booking to
       supabase.from("booking_partners").select("id, name, phone").eq("active", true).neq("portal", "transport").order("name"),
       supabase.from("company_suppliers").select("id, arabic_name, mobile, whatsapp, categories").neq("status", "Disabled").order("arabic_name"),
+      // a supplier has no country of its own — its name says it (countryInName)
+      supabase.from("countries").select("arabic_name"),
+      supabase.from("cities").select("arabic_name, countries(arabic_name)"),
     ]);
+    const countryNames = ((countries.data ?? []) as { arabic_name: string }[]).map((c) => c.arabic_name);
+    const cityRows = ((cities.data ?? []) as unknown as { arabic_name: string; countries: { arabic_name: string } | null }[]).flatMap((c) =>
+      c.countries ? [{ name: c.arabic_name, country: c.countries.arabic_name }] : [],
+    );
+    type EmployeeRow = {
+      id: string;
+      arabic_name: string | null;
+      mobile: string | null;
+      status: string | null;
+      extra_permission_keys: string[] | null;
+      removed_permission_keys: string[] | null;
+      roles: { permission_keys: string[] } | { permission_keys: string[] }[] | null;
+    };
 
     return [
       { kind: "ops" as const, id: null, label: "قسم العمليات", phone: null },
-      ...((emps.data ?? []) as { id: string; arabic_name: string | null; mobile: string | null }[]).map((e) => ({
-        kind: "employee" as const,
-        id: e.id,
-        label: e.arabic_name ?? "—",
-        phone: e.mobile,
-      })),
+      ...((emps.data ?? []) as unknown as EmployeeRow[]).map((e) => {
+        const role = Array.isArray(e.roles) ? e.roles[0] : e.roles;
+        return {
+          kind: "employee" as const,
+          id: e.id,
+          label: e.arabic_name ?? "—",
+          phone: e.mobile,
+          team: isOpsTeam(grantedPermissions({ ...e, permission_keys: role?.permission_keys ?? null })),
+        };
+      }),
       ...((partners.data ?? []) as { id: string; name: string; phone: string | null }[]).map((p) => ({
         kind: "partner" as const,
         id: p.id,
@@ -82,6 +113,7 @@ export async function listAssignees(): Promise<AssigneeOption[]> {
         label: s.arabic_name,
         phone: s.whatsapp || s.mobile,
         categories: s.categories,
+        country: countryInName(s.arabic_name, countryNames, cityRows),
       })),
     ];
   } catch {

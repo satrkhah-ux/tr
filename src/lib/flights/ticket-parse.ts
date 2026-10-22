@@ -38,6 +38,12 @@ export type TicketLeg = {
   cabin: string;
   baggage: string;
   leg_order: LegOrder | null;
+  /**
+   * This leg's own booking reference, when it differs from the ticket's — a
+   * domestic hop bought on its own (the owner, 2026-10-22: one PNR per domestic
+   * leg). Absent when the ticket's PNR covers it.
+   */
+  pnr?: string;
 };
 
 /** Whether the fare can be refunded — printed on the card so the client knows before asking. */
@@ -681,6 +687,7 @@ export function sanitizeTicket(raw: unknown): ParsedTicket {
   const legs = (Array.isArray(r.legs) ? r.legs : []).slice(0, LIMITS.legs).map((item): TicketLeg => {
     const l = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
     const order = l.leg_order;
+    const pnr = pattern(l.pnr, /^[A-Z0-9]{5,8}$/, true);
     return {
       airline: text(l.airline, 60),
       airline_iata: pattern(l.airline_iata, /^[A-Z0-9]{2}$/, true),
@@ -696,6 +703,7 @@ export function sanitizeTicket(raw: unknown): ParsedTicket {
       cabin: text(l.cabin, 30),
       baggage: text(l.baggage, 40),
       leg_order: order === "outbound" || order === "inbound" || order === "internal" ? order : null,
+      ...(pnr ? { pnr } : {}),
     };
   });
   return {

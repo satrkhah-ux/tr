@@ -5,7 +5,8 @@ import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
-import { gateCaseManager, gateOperation } from "@/lib/operations/access";
+import { gateCaseManager, gateOperation, gateOps } from "@/lib/operations/access";
+import type { LookupAirport } from "@/lib/offer/draft-types";
 import { isIsoDate } from "@/lib/operations/payments";
 import { withoutWaits } from "@/lib/operations/wizard/followup";
 import { writeWaits } from "@/lib/data/wizard-sync";
@@ -90,5 +91,44 @@ export async function setPaymentException(operationId: string, note: string | nu
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
+  }
+}
+
+/**
+ * The airports «تذاكر الطيران» names a leg by — its code, its name, its city
+ * (the owner, 2026-10-22: by city name or code, not codes only). Loaded once
+ * by the step; a disabled airport is not offered.
+ */
+export async function listWizardAirports(): Promise<LookupAirport[]> {
+  if (await gateOps()) return [];
+  try {
+    const supabase = await db();
+    const { data } = await supabase
+      .from("airports")
+      .select("id, arabic_name, english_name, code, iana_timezone, status, cities(arabic_name), countries(arabic_name)")
+      .not("code", "is", null)
+      .order("code");
+    return ((data ?? []) as unknown as {
+      id: string;
+      arabic_name: string;
+      english_name: string | null;
+      code: string | null;
+      iana_timezone: string | null;
+      status: string | null;
+      cities: { arabic_name: string } | null;
+      countries: { arabic_name: string } | null;
+    }[])
+      .filter((a) => a.status !== "Disabled")
+      .map((a) => ({
+        id: a.id,
+        name: a.arabic_name,
+        code: a.code,
+        timezone: a.iana_timezone,
+        city: a.cities?.arabic_name ?? null,
+        country: a.countries?.arabic_name ?? null,
+        name_en: a.english_name?.trim() || null,
+      }));
+  } catch {
+    return [];
   }
 }

@@ -12,13 +12,17 @@ import {
   type RequestDraft,
 } from "@/lib/data/operation-assign";
 import type { OperationBooking } from "@/lib/data/operation-bookings";
-import { assigneesFor } from "@/lib/operations/supplier-request";
+import type { TranslationKey } from "@/lib/i18n";
+import { assigneeGroups, assigneesFor, type AssigneeGroup } from "@/lib/operations/supplier-request";
 import { isUnassigned } from "@/lib/operations/wizard";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
 const field =
   "h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-[13px] text-[#185045] outline-none focus:border-[#2aa87a]";
+
+/** The option «الكل» stands for — it opens the list, it assigns nobody. */
+const ALL = "__all";
 
 /**
  * Hand a booking to whoever is actually going to do it, then prepare the request
@@ -56,6 +60,8 @@ export function AssignBooking({
   const [draft, setDraft] = useState<RequestDraft | null>(null);
   const [body, setBody] = useState("");
   const [copied, setCopied] = useState(false);
+  // «ينفّذه» opens on the operations team and the suppliers; «الكل» adds every colleague (the owner, 2026-10-22)
+  const [all, setAll] = useState(false);
 
   const currentId = booking.assignee_employee_id ?? booking.assignee_partner_id ?? booking.assignee_supplier_id ?? null;
   // nobody chose yet (the column default, no assigned_at) reads as that — not as «قسم العمليات»
@@ -71,8 +77,14 @@ export function AssignBooking({
   // the list still loading says nothing about them yet
   const shown = assignees.length > 0 ? `${holder} (${t("ops.assignee.inactive")})` : holder;
   const options: AssigneeOption[] = missing ? [...listed, { kind: booking.assignee_kind ?? "ops", id: currentId, label: shown, phone: null }] : listed;
+  const { groups, hidden } = assigneeGroups(options, unset ? null : value, all);
+  const groupLabel = (g: AssigneeGroup<AssigneeOption>) =>
+    g.key === "suppliers"
+      ? t("ops.assignee.suppliers", { service: t(`ops.booking.${booking.kind}` as TranslationKey), country: g.country ?? t("ops.assignee.anyCountry") })
+      : t(`ops.assignee.group.${g.key}`);
 
   function assign(raw: string) {
+    if (raw === ALL) return setAll(true);
     const [kind, id] = raw.split(":") as [AssigneeKind, string];
     startTransition(async () => {
       setError(null);
@@ -135,11 +147,16 @@ export function AssignBooking({
                 {t("wz.transport.unassigned")}
               </option>
             ) : null}
-            {options.map((a) => (
-              <option key={`${a.kind}:${a.id ?? ""}`} value={`${a.kind}:${a.id ?? ""}`}>
-                {a.kind === "partner" ? `🏢 ${a.label}` : a.kind === "employee" ? `👤 ${a.label}` : a.kind === "supplier" ? `🧾 ${a.label}` : a.label}
-              </option>
+            {groups.map((g) => (
+              <optgroup key={`${g.key}:${g.country ?? ""}`} label={groupLabel(g)}>
+                {g.items.map((a) => (
+                  <option key={`${a.kind}:${a.id ?? ""}`} value={`${a.kind}:${a.id ?? ""}`}>
+                    {a.kind === "partner" ? `🏢 ${a.label}` : a.kind === "employee" ? `👤 ${a.label}` : a.kind === "supplier" ? `🧾 ${a.label}` : a.label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
+            {hidden > 0 ? <option value={ALL}>{t("ops.assignee.showAll", { n: hidden })}</option> : null}
           </select>
         </label>
         <label className="grid gap-1.5 text-[11.5px] font-bold text-[#185045]">

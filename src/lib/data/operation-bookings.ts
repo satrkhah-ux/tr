@@ -150,7 +150,15 @@ export type OperationBooking = {
 };
 
 /** One leg of a ticketed flight booking — times ISO with their offset; the drivers' pickups come from these. */
-export type FlightLeg = { flight_no: string; from: string; to: string; departs_at: string | null; arrives_at: string | null };
+export type FlightLeg = {
+  flight_no: string;
+  from: string;
+  to: string;
+  departs_at: string | null;
+  arrives_at: string | null;
+  /** this leg's own booking reference when it is not the booking's — a domestic hop bought on its own (jsonb, no migration). */
+  pnr?: string;
+};
 
 export async function listBookings(operationId: string): Promise<OperationBooking[]> {
   if (await gateOperation(operationId)) return [];

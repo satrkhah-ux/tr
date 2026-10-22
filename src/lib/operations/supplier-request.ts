@@ -82,6 +82,61 @@ export function assigneesFor<T extends AssigneeLike>(
   );
 }
 
+/**
+ * «فريق العمليات» — a colleague whose role runs every file (operations.write):
+ * «الاوبريشن», «التأشيرات». Not the administration (dashboard.admin) and not
+ * the developer: the owner, 2026-10-22, found «المطوّر» and «سين تكنولوجي» (the
+ * ads agency) offered beside the people who book. `permissions`: roles.ts
+ * grantedPermissions — an inactive colleague holds none.
+ */
+export function isOpsTeam(permissions: readonly string[]): boolean {
+  return permissions.includes("operations.write") && !permissions.includes("dashboard.admin") && !permissions.includes("developer.access");
+}
+
+/**
+ * The country a supplier's NAME says — «فرع ماليزيا», «اون تايم جورجيا», «حول
+ * العالم البوسنه» (a country's first word), «فندق نوفوتيل جاكرتا» (a city) —
+ * read from its last word back; null for one that works everywhere (TBO, «بوكينج»).
+ * ponytail: company_suppliers holds no country; a `countries` column on it is the
+ * exact answer (needs a migration) — until then the name is all there is.
+ */
+export function countryInName(name: string, countries: string[], cities: { name: string; country: string }[]): string | null {
+  const words = normalizeName(name).split(" ").filter((w) => w.length >= 3);
+  for (const w of words.reverse()) {
+    const country = countries.find((c) => normalizeName(c) === w || normalizeName(c).split(" ")[0] === w);
+    if (country) return country;
+    const city = cities.find((c) => normalizeName(c.name) === w);
+    if (city) return city.country;
+  }
+  return null;
+}
+
+export type GroupedAssignee = AssigneeLike & { team?: boolean; country?: string | null };
+
+export type AssigneeGroup<T> = { key: "team" | "partner" | "suppliers" | "others"; country: string | null; items: T[] };
+
+/**
+ * «ينفّذه» in the order the owner asked (2026-10-22): the operations team first,
+ * the file's partner, then the suppliers by country (the booking's kind is the
+ * service — assigneesFor already kept only its sellers), countries A–Z and
+ * «عام» last. The other colleagues only on «الكل» (`all`) — the one holding the
+ * booking (`holder`, «kind:id») stays in view either way. `hidden`: how many «الكل» adds.
+ */
+export function assigneeGroups<T extends GroupedAssignee>(listed: T[], holder: string | null, all: boolean): { groups: AssigneeGroup<T>[]; hidden: number } {
+  const others = listed.filter((a) => a.kind === "employee" && !a.team);
+  const shown = all ? others : others.filter((a) => `${a.kind}:${a.id ?? ""}` === holder);
+  const byCountry = new Map<string, T[]>();
+  for (const s of listed.filter((a) => a.kind === "supplier")) byCountry.set(s.country ?? "", [...(byCountry.get(s.country ?? "") ?? []), s]);
+  const countries = [...byCountry.keys()].sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b, "ar")));
+  const groups: AssigneeGroup<T>[] = [
+    { key: "team", country: null, items: listed.filter((a) => a.kind === "ops" || (a.kind === "employee" && a.team)) },
+    { key: "partner", country: null, items: listed.filter((a) => a.kind === "partner") },
+    ...countries.map((c) => ({ key: "suppliers" as const, country: c || null, items: byCountry.get(c) ?? [] })),
+    { key: "others", country: null, items: shown },
+  ];
+  return { groups: groups.filter((g) => g.items.length > 0), hidden: others.length - shown.length };
+}
+
 // ---------- the request ----------
 
 export type RequestTraveler = { name: string; kind: "adult" | "child" | "infant" };

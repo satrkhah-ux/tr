@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  assigneeGroups,
   assigneesFor,
   bookingCost,
+  countryInName,
+  isOpsTeam,
   buildSupplierRequest,
   requestState,
   supplierBalances,
@@ -152,6 +155,61 @@ describe("assigneesFor — «ينفّذه» (AD-2-3599: ~49 names for one hotel)
     expect(ids("hotel", "فندق اريادوتا بالي", null, "p2")).toEqual(["ops", "e1", "p2", "tbo", "beds"]);
     expect(ids("hotel", "فندق اريادوتا بالي", "partner:p1")).toEqual(["ops", "e1", "p1", "tbo", "beds"]);
     expect(ids("hotel", "فندق اريادوتا بالي", "supplier:qudra")).toEqual(["ops", "e1", "tbo", "beds", "qudra"]);
+  });
+});
+
+describe("«ينفّذه» in groups (the owner, 2026-10-22: the developer and the ads agency were offered beside ops)", () => {
+  it("counts as the operations team a role that runs every file — not the administration, not the developer, not sales", () => {
+    expect(isOpsTeam(["operations.write", "operations.passport"])).toBe(true); // «الاوبريشن», «التأشيرات»
+    expect(isOpsTeam(["dashboard.admin", "operations.write"])).toBe(false); // «كل الصلاحيات»
+    expect(isOpsTeam(["dashboard.admin", "developer.access", "operations.write"])).toBe(false); // «مطوّر»
+    expect(isOpsTeam(["operations.own", "operations.manage_own"])).toBe(false); // «مبيعات» — «سين تكنولوجي» is on it
+    expect(isOpsTeam([])).toBe(false); // inactive
+  });
+
+  it("reads a supplier's country from its name — a country, its first word, or a city", () => {
+    const countries = ["ماليزيا", "إندونيسيا", "جورجيا", "البوسنة والهرسك", "تايلاند"];
+    const cities = [{ name: "جاكرتا", country: "إندونيسيا" }];
+    expect(countryInName("فرع ماليزيا", countries, cities)).toBe("ماليزيا");
+    expect(countryInName("فرع اندونيسيا", countries, cities)).toBe("إندونيسيا");
+    expect(countryInName("اون تايم جورجيا", countries, cities)).toBe("جورجيا");
+    expect(countryInName("حول العالم البوسنه", countries, cities)).toBe("البوسنة والهرسك");
+    expect(countryInName("فندق نوفوتيل جاكرتا", countries, cities)).toBe("إندونيسيا");
+    expect(countryInName("TBO Holidays", countries, cities)).toBeNull();
+  });
+
+  type A = { kind: "ops" | "employee" | "partner" | "supplier"; id: string | null; label: string; team?: boolean; country?: string | null };
+  const list: A[] = [
+    { kind: "ops", id: null, label: "قسم العمليات" },
+    { kind: "employee", id: "dev", label: "المطوّر" },
+    { kind: "employee", id: "ads", label: "سين تكنولوجي" },
+    { kind: "employee", id: "visa", label: "ريموندا", team: true },
+    { kind: "partner", id: "p", label: "شركة" },
+    { kind: "supplier", id: "tbo", label: "TBO Holidays", country: null },
+    { kind: "supplier", id: "my", label: "فرع ماليزيا", country: "ماليزيا" },
+    { kind: "supplier", id: "id", label: "فرع اندونيسيا", country: "إندونيسيا" },
+  ];
+  const shape = (r: { groups: { key: string; country: string | null; items: A[] }[] }) => r.groups.map((g) => [g.key, g.country, g.items.map((a) => a.label)]);
+
+  it("lists the team, the partner, the suppliers by country («عام» last) — the other colleagues only on «الكل»", () => {
+    const closed = assigneeGroups(list, null, false);
+    expect(shape(closed)).toEqual([
+      ["team", null, ["قسم العمليات", "ريموندا"]],
+      ["partner", null, ["شركة"]],
+      ["suppliers", "إندونيسيا", ["فرع اندونيسيا"]],
+      ["suppliers", "ماليزيا", ["فرع ماليزيا"]],
+      ["suppliers", null, ["TBO Holidays"]],
+    ]);
+    expect(closed.hidden).toBe(2);
+    const open = assigneeGroups(list, null, true);
+    expect(open.groups.at(-1)?.items.map((a) => a.label)).toEqual(["المطوّر", "سين تكنولوجي"]);
+    expect(open.hidden).toBe(0);
+  });
+
+  it("keeps the colleague holding the booking in view, hidden or not", () => {
+    const r = assigneeGroups(list, "employee:ads", false);
+    expect(r.groups.at(-1)).toEqual({ key: "others", country: null, items: [list[2]] });
+    expect(r.hidden).toBe(1);
   });
 });
 

@@ -17,9 +17,12 @@
  */
 import type { FlightLeg, OperationBooking } from "@/lib/data/operation-bookings";
 import type { TicketLeg } from "@/lib/flights/ticket-parse";
+import { findAirport } from "@/lib/offer/basic";
+import { landingAt } from "@/lib/offer/basic-flights";
+import type { LookupAirport } from "@/lib/offer/draft-types";
 import { toInstant } from "@/lib/offer/schedule";
 import { flightTicketed } from "@/lib/operations/client-booking-state";
-import { parseLeg } from "@/lib/operations/drivers";
+import { flightLegs, parseLeg } from "@/lib/operations/drivers";
 import { LANDS, LATER } from "@/lib/operations/seed-plan";
 import { notPulled } from "./pull";
 import type { ReadinessItem, StepState, WizardCase } from "./types";
@@ -63,27 +66,102 @@ export function isoAt(date: string, time: string, tz: string | null): string | n
   return `${local}:00${offset < 0 ? "-" : "+"}${pad(Math.floor(a / 60))}:${pad(a % 60)}`;
 }
 
-export type LegInput = Pick<TicketLeg, "flight_no" | "from_iata" | "to_iata" | "dep_date" | "dep_time" | "arr_date" | "arr_time">;
+export type LegInput = Pick<TicketLeg, "flight_no" | "from_iata" | "to_iata" | "dep_date" | "dep_time" | "arr_date" | "arr_time" | "pnr">;
 
-/** The form's legs → the booking's flight_legs. An arrival with no date of its own lands the day it left. */
+/**
+ * The day a leg lands: the one typed, else worked out from the two clocks and
+ * the two airports' zones (basic-flights landingAt — RUH 23:00 → KUL 13:00 is
+ * the next day). The owner, 2026-10-22: an arrival may be the next day — the
+ * form no longer assumes the day it left. "" without a take-off day.
+ */
+export function landingDay(l: LegInput, zoneOf: (code: string) => string | null): string {
+  if (l.arr_date) return l.arr_date;
+  if (!l.dep_date || !l.dep_time || !l.arr_time) return l.dep_date;
+  return landingAt(`${l.dep_date}T${l.dep_time}`, zoneOf(l.from_iata.toUpperCase()), l.arr_time, zoneOf(l.to_iata.toUpperCase())).slice(0, 10);
+}
+
+/** The form's legs → the booking's flight_legs. A leg's own PNR is kept only when one was typed. */
 export function toFlightLegs(legs: LegInput[], zoneOf: (code: string) => string | null): FlightLeg[] {
   return legs.map((l) => ({
     flight_no: l.flight_no.toUpperCase().replace(/[\s-]+/g, ""),
     from: l.from_iata.toUpperCase(),
     to: l.to_iata.toUpperCase(),
     departs_at: isoAt(l.dep_date, l.dep_time, zoneOf(l.from_iata.toUpperCase())),
-    arrives_at: isoAt(l.arr_date || l.dep_date, l.arr_time, zoneOf(l.to_iata.toUpperCase())),
+    arrives_at: isoAt(landingDay(l, zoneOf), l.arr_time, zoneOf(l.to_iata.toUpperCase())),
+    ...(l.pnr?.trim() ? { pnr: l.pnr.trim().toUpperCase() } : {}),
   }));
 }
 
-/** Not a leg the drivers can be timed from: no number, no times, or a landing before (or a day after) the take-off. */
+/** A landing more than this after its take-off is a mistyped date, not a flight. */
+const LONGEST_LEG_MINUTES = 3 * 24 * 60;
+
+/**
+ * Not a leg the drivers can be timed from: no number, no airports, no times,
+ * or a landing before the take-off. No «same day» and no 22-hour rule (the
+ * owner, 2026-10-22: an overnight flight was refused) — only a landing three
+ * days on, which is a typo in the date.
+ */
 export function badLeg(l: FlightLeg): boolean {
-  if (!/^[A-Z0-9]{2}\d{1,4}[A-Z]?$/.test(l.flight_no) || !l.departs_at || !l.arrives_at) return true;
+  if (!/^[A-Z0-9]{2}\d{1,4}[A-Z]?$/.test(l.flight_no) || !/^[A-Z]{3}$/.test(l.from) || !/^[A-Z]{3}$/.test(l.to)) return true;
+  if (!l.departs_at || !l.arrives_at) return true;
   // both offsets known: the real duration; else the two wall clocks can't be compared
   const zoned = /[+-]\d{2}:\d{2}$/;
   if (!zoned.test(l.departs_at) || !zoned.test(l.arrives_at)) return false;
   const minutes = (Date.parse(l.arrives_at) - Date.parse(l.departs_at)) / 60_000;
-  return !(minutes > 0 && minutes <= 22 * 60);
+  return !(minutes > 0 && minutes <= LONGEST_LEG_MINUTES);
+}
+
+/**
+ * What the agent typed in «من» / «إلى» — a code, the airport's name or its
+ * city, hamza-folded (basic.ts findAirport, the same matching as «بيسك») — as
+ * the airport's code; "" when it is none we know.
+ */
+export function airportCode(value: string, airports: LookupAirport[]): string {
+  const v = value.trim();
+  const hit = findAirport(v, airports);
+  if (hit?.code) return hit.code.toUpperCase();
+  return /^[A-Za-z]{3}$/.test(v) ? v.toUpperCase() : "";
+}
+
+/** The plan writes midnight for «no time yet» (seed-plan legText) — never a time to show or to keep. */
+const clock = (iso: string | null) => {
+  const t = iso?.slice(11, 16) ?? "";
+  return t === "00:00" ? "" : t;
+};
+const firstDay = (text: string | undefined) => text?.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? "";
+
+/**
+ * The offer's legs on a flight booking (its leg lines, drivers.ts flightLegs)
+ * as the form's legs — what the card shows before the ticket and what «أدخل
+ * يدوياً» starts from (the owner, 2026-10-22: «التفاصيل المدخلة لا تمت
+ * بصلة»). A planned midnight is left empty; a landing day only stays beside a
+ * real landing clock, else landingDay works it out from the clocks typed.
+ */
+export function plannedLegs(detail: Record<string, string>): LegInput[] {
+  return flightLegs(detail).map(({ key, leg }) => {
+    const arr_time = clock(leg.arrival);
+    return {
+      flight_no: leg.flight_no,
+      from_iata: leg.from,
+      to_iata: leg.to,
+      // «2026-10-20 يُحدَّد لاحقاً» has a day and no time — parseLeg drops both
+      dep_date: leg.departure?.slice(0, 10) ?? (firstDay(detail[key]) || firstDay(detail["الإقلاع"])),
+      dep_time: clock(leg.departure),
+      arr_date: arr_time && leg.arrival ? leg.arrival.slice(0, 10) : "",
+      arr_time,
+    };
+  });
+}
+
+/**
+ * «SV834 · إسطنبول (IST) → طرابزون (TZX) · 2026-10-20 يُحدَّد لاحقاً» — a
+ * planned leg as the card prints it: the number when there is one, never a
+ * 00:00. `place` names an airport code (its city) where we know it.
+ */
+export function plannedLine(l: LegInput, place: (code: string) => string = (c) => c): string {
+  const when = l.dep_date ? `${l.dep_date} ${l.dep_time || LATER}` : LATER;
+  const landing = l.arr_time ? ` · ${LANDS} ${l.arr_date ? `${l.arr_date} ` : ""}${l.arr_time}` : "";
+  return [l.flight_no, `${place(l.from_iata)} → ${place(l.to_iata)}`, `${when}${landing}`].filter(Boolean).join(" · ");
 }
 
 const wall = (iso: string | null) => (iso ? `${iso.slice(0, 10)} ${iso.slice(11, 16)}` : LATER);
