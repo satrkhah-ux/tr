@@ -191,7 +191,7 @@ async function staffUpload(chatId: number, method: "sendAudio" | "sendPhoto", fi
 }
 
 /** A picture with a caption and buttons — the official letter. */
-export async function staffSendPhoto(chatId: number, png: Uint8Array, caption: string, buttons: InlineButton[][], slot: string | null): Promise<Sent> {
+export async function staffSendPhoto(chatId: number, png: Uint8Array, caption: string, buttons: InlineButton[][], slot: string | null, quiet = false): Promise<Sent> {
   return staffUpload(
     chatId,
     "sendPhoto",
@@ -200,6 +200,7 @@ export async function staffSendPhoto(chatId: number, png: Uint8Array, caption: s
       caption: caption.slice(0, 1000),
       parse_mode: "HTML",
       reply_markup: JSON.stringify({ inline_keyboard: buttons }),
+      ...(quiet ? { disable_notification: "true" } : {}),
     },
     slot,
   );

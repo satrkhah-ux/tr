@@ -7,7 +7,8 @@ import { countAgentConversations, listOpenConversations, listTeletelTeams, retur
 import { renderDocHtml } from "@/lib/offer-doc/html";
 import { documentToPng } from "@/lib/offer-doc/pdf";
 import { StaffLetterDocument, type PreviousLetter } from "@/components/offer-doc/StaffLetterDocument";
-import { escapeHtml, staffCall, staffSend, staffSendPhoto, type StaffMember } from "./staff-bot";
+import { StaffLettersSummaryDocument, type SummaryRow } from "@/components/offer-doc/StaffLettersSummaryDocument";
+import { clearSlot, escapeHtml, staffCall, staffSend, staffSendPhoto, type StaffMember } from "./staff-bot";
 import { loadTargets } from "./staff-numbers";
 import { closedEnough, SECOND_LETTER_DAYS, toWithdraw, WITHDRAW_AFTER_DAYS, type LetterNumbers } from "./staff-letter";
 import { managers } from "./staff-decisions";
@@ -27,7 +28,8 @@ import type { InlineButton } from "./ops-bot";
  *     the client has been silent for three days (nobody waiting for us) go back
  *     to «قسم المبيعات» with no agent (toWithdraw, once: withdrawn_at).
  *   - «✍️ اعتمدت الخطاب» is the employee's electronic signature: signed_at, an
- *     audit row, and the managers' summary updated.
+ *     audit row, and the managers' sheet («بيان الخطاب») updated. Until they
+ *     sign, the bot answers them with nothing but the lock notice (staff-handler).
  *
  * Numbers are frozen in the row when the letter is issued, so a re-send prints
  * the same letter.
@@ -109,7 +111,7 @@ function caption(row: LetterRow): string {
     `📄 <b>خطاب رسمي رقم ${row.number} من إدارة ترافليون</b>`,
     row.warned ? "⚠️ يتضمن إبلاغاً رسمياً بسحب المحادثات." : null,
     "",
-    "اقرأه، ثم اضغط «✍️ اعتمدت الخطاب». يُحفظ اعتمادك في النظام توقيعاً إلكترونياً منك.",
+    "اقرأه، ثم اضغط «✍️ اعتمدت الخطاب». يُحفظ اعتمادك في النظام توقيعاً إلكترونياً منك، ولا يعمل البوت قبل اعتماده.",
   ]
     .filter((line) => line !== null)
     .join("\n");
@@ -240,6 +242,27 @@ export async function lettersTick(nowMs = Date.now()): Promise<{ issued: number;
   return { issued, ...(waiting && !rows.length ? { waiting } : {}) };
 }
 
+/** A letter that reached them and is not signed yet: the bot stays locked until they sign it (the owner, 2026-10-23). */
+export async function unsignedLetter(employeeId: string): Promise<{ id: number; number: number } | null> {
+  const { data } = await db()
+    .from("staff_letters")
+    .select("id, number")
+    .eq("employee_id", employeeId)
+    .eq("delivered", true)
+    .is("signed_at", null)
+    .order("number")
+    .limit(1)
+    .maybeSingle();
+  return data as { id: number; number: number } | null;
+}
+
+/** «📄 اعرض الخطاب» on the lock notice: the same letter again (its slot drops the old copy), in case it scrolled away or was deleted. */
+export async function resendLetter(me: StaffMember, chatId: number, id: number): Promise<void> {
+  const { data } = await db().from("staff_letters").select(COLS).eq("id", id).eq("employee_id", me.id).is("signed_at", null).maybeSingle();
+  const row = data as LetterRow | null;
+  if (row && me.agentId) await deliver(row, { id: me.id, name: me.name.trim(), chatId, agentId: me.agentId });
+}
+
 /** «✍️ اعتمدت الخطاب» — theirs only, once. The button turns into the signature line. */
 export async function signLetter(me: StaffMember, chatId: number, id: number, messageId?: number): Promise<void> {
   const nowMs = Date.now();
@@ -258,12 +281,14 @@ export async function signLetter(me: StaffMember, chatId: number, id: number, me
     await staffCall("editMessageCaption", {
       chat_id: chatId,
       message_id: messageId,
-      caption: `📄 <b>خطاب رسمي رقم ${row.number} من إدارة ترافليون</b>\n\n✅ اعتمدته في ${dateTimeText(nowMs)}. اعتمادك محفوظ في النظام توقيعاً إلكترونياً منك.`,
+      caption: `📄 <b>خطاب رسمي رقم ${row.number} من إدارة ترافليون</b>\n\n✅ اعتمدته في ${dateTimeText(nowMs)}. اعتمادك محفوظ في النظام توقيعاً إلكترونياً منك، والبوت يعمل الآن كالمعتاد.`,
       parse_mode: "HTML",
       reply_markup: { inline_keyboard: [] },
     });
   }
-  await tellManagers();
+  // the lock notices go with the lock
+  await clearSlot(chatId, "view");
+  await tellManagers(true);
 }
 
 /** Who got which letter and who signed it — «📄 الخطابات» in the team view, and pushed to managers when it changes. */
@@ -308,8 +333,33 @@ export async function lettersView(me: StaffMember): Promise<{ text: string; butt
   return { text: await lettersText(), buttons: LETTERS_BUTTONS };
 }
 
-/** One message per manager (slot «letters»), replaced each time something changes. */
-async function tellManagers(): Promise<void> {
-  const text = await lettersText();
-  for (const m of await managers()) await staffSend(m.chatId, text, LETTERS_BUTTONS, {}, "letters");
+/**
+ * «بيان الخطاب الرسمي» to every manager (the owner, 2026-10-23): one sheet for
+ * the latest letter — each sales employee's numbers, received, signed — in the
+ * «letters» slot, so each change replaces the last. A signature updates it
+ * silently; the one that completes the list rings.
+ */
+async function tellManagers(signature = false): Promise<void> {
+  const [team, { data }] = await Promise.all([salesTeam(), db().from("staff_letters").select(COLS)]);
+  const all = (data ?? []) as LetterRow[];
+  if (!all.length) return;
+  const number = all.some((r) => r.number === 2) ? 2 : 1;
+  const of = all.filter((r) => r.number === number);
+  const rows: SummaryRow[] = of
+    .map((r) => ({
+      name: team.find((m) => m.id === r.employee_id)?.name ?? "—",
+      numbers: r.numbers,
+      received: r.delivered,
+      signed: r.signed_at ? dateTimeText(Date.parse(r.signed_at)) : null,
+      warned: r.warned,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "ar"));
+  const unlinked = team.filter((m) => !m.chatId && !of.some((r) => r.employee_id === m.id)).map((m) => m.name);
+  const received = rows.filter((r) => r.received).length;
+  const signed = rows.filter((r) => r.signed).length;
+  const html = await renderDocHtml((assets) => createElement(StaffLettersSummaryDocument, { number, date: dateText(Date.now()), rows, unlinked, assets }));
+  const png = await documentToPng(html);
+  const text = `📄 <b>بيان الخطاب الرسمي رقم ${number} — قسم المبيعات</b>\n\nاستلمه ${received} من ${rows.length}، واعتمده ${signed}.`;
+  const quiet = signature && signed < rows.length;
+  for (const m of await managers()) await staffSendPhoto(m.chatId, png, text, [[{ text: "📋 التفاصيل", callback_data: "lt" }]], "letters", quiet);
 }

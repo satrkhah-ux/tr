@@ -6,7 +6,7 @@ import { clearSlot, escapeHtml, keepInSlot, staffCall, staffForChat, staffSend, 
 import { buildReport } from "./staff-report";
 import { openFor, waitText } from "./staff-numbers";
 import { linkTeletelToken, promptReply, recentThread, rememberThread, sendReply, threadOf, TOKEN_HELP } from "./staff-replies";
-import { lettersView, signLetter } from "./staff-letters";
+import { lettersView, resendLetter, signLetter, unsignedLetter } from "./staff-letters";
 import { openList, openScreen, screenView, unansweredList, weekView } from "./staff-screen";
 import { confirmDraft, draft, isBotManager, memberView, promptFor, remindDraft, takePending, teamView } from "./staff-manager";
 import { decisionStep, decisionsView, decisionText, decisionView, interventionView, promptDecision, setDecisionStatus, signalView } from "./staff-decisions";
@@ -79,7 +79,9 @@ const NO_AGENT: Screen = {
   text: "حسابك في تيلي تيل غير مربوط بعد — اطلب من الإدارة ربطه من صفحة «الموظفين» لتصلك محادثاتك وأرقامك.",
   buttons: [],
 };
-const UNREACHABLE: Screen = { text: "تعذّر الوصول إلى تيلي تيل الآن — جرّب بعد دقيقة.", buttons: [[BACK]] };
+/** a button pressed before the letter is signed (Telegram's alert: 200 characters at most) */
+const LOCKED_ALERT = "🔒 اعتمد الخطاب الرسمي أولاً: اقرأه ثم اضغط تحته «✍️ اعتمدت الخطاب»، وبعدها يعمل البوت كالمعتاد.";
+const UNREACHABLE: Screen ={ text: "تعذّر الوصول إلى تيلي تيل الآن — جرّب بعد دقيقة.", buttons: [[BACK]] };
 
 async function waiting(me: StaffMember): Promise<Screen> {
   if (!me.agentId) return NO_AGENT;
@@ -239,9 +241,12 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
   if (callback) {
     const chatId = callback.message?.chat?.id;
     const me = chatId && callback.message?.chat?.type === "private" ? await staffForChat(chatId) : null;
-    await staffCall("answerCallbackQuery", { callback_query_id: callback.id });
-    if (!me || !chatId) return;
     const data = callback.data ?? "s";
+    // an unsigned letter locks every button but the letter's own
+    const lock = me && !/^l[sr]:/.test(data) ? await unsignedLetter(me.id) : null;
+    await staffCall("answerCallbackQuery", { callback_query_id: callback.id, ...(lock ? { text: LOCKED_ALERT, show_alert: true } : {}) });
+    if (!me || !chatId || lock) return;
+    if (data.startsWith("lr:")) return resendLetter(me, chatId, Number(data.slice(3)));
     if (data.startsWith("r:")) return promptReply(me, chatId, Number(data.slice(2)));
     // the manager's buttons: each one checks staffbot.manage / employees.manage again (staff-manager.ts)
     if (data.startsWith("b:")) return confirmDraft(me, chatId, callback.message?.message_id, data);
@@ -285,6 +290,24 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
       ].join("\n"),
       undefined,
       { reply_markup: { remove_keyboard: true } },
+    );
+    return;
+  }
+
+  // until they sign their letter (the owner, 2026-10-23), nothing they send is used: it goes, and the notice points at the letter
+  const lock = await unsignedLetter(me.id);
+  if (lock) {
+    await staffCall("deleteMessage", { chat_id: chatId, message_id: message.message_id });
+    await staffSend(
+      chatId,
+      [
+        `🔒 <b>البوت مقفل حتى تعتمد الخطاب الرسمي رقم ${lock.number}</b>`,
+        "",
+        "اقرأ الخطاب، ثم اضغط تحته «✍️ اعتمدت الخطاب». يُحفظ اعتمادك في النظام توقيعاً إلكترونياً منك، وبعده يعمل البوت كالمعتاد.",
+        "",
+        "تنبيهات عملائك تصلك كالمعتاد، وتستطيع الرد عليهم من تيلي تيل مباشرة.",
+      ].join("\n"),
+      [[{ text: "📄 اعرض الخطاب", callback_data: `lr:${lock.id}` }]],
     );
     return;
   }
