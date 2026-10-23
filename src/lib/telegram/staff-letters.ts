@@ -17,9 +17,9 @@ import type { InlineButton } from "./ops-bot";
 /**
  * «الخطاب الرسمي» (the owner, 2026-10-23) — sales only.
  *
- *   - Letter 1 goes out once EVERY sales employee with a Teletel account has
- *     pressed «ابدأ» in the bot, to all of them together. After that a newcomer
- *     gets theirs as soon as they join.
+ *   - Letter 1 goes out once EVERY sales employee with a Teletel account and a
+ *     linked Telegram has pressed «ابدأ» in the bot, to all of them together.
+ *     After that a newcomer (or one linked later) gets theirs as soon as they join.
  *   - Letter 2 follows ten days after each one's letter 1: the two side by side,
  *     and the notice that their conversations will be withdrawn when they did
  *     not close the finished ones (closedEnough).
@@ -221,10 +221,11 @@ export async function lettersTick(nowMs = Date.now()): Promise<{ issued: number;
     if (m) await withdraw(r, m);
   }
 
-  // letter 1: only once the whole sales team has joined; then each newcomer when they join
+  // letter 1: only once everyone with a linked Telegram has joined (the owner, 2026-10-23: the
+  // two without one don't hold it back); then each newcomer when they join
   const without = team.filter((m) => !has(m.id, 1));
   const ready = await Promise.all(without.map(joined));
-  const waiting = without.filter((_, i) => !ready[i]).length;
+  const waiting = without.filter((m, i) => m.chatId && !ready[i]).length;
   if (rows.some((r) => r.number === 1) || !waiting) {
     for (const [i, m] of without.entries()) if (ready[i] && (await issue(m, 1))) issued += 1;
   }
@@ -271,10 +272,13 @@ async function lettersText(): Promise<string> {
   const rows = (data ?? []) as LetterRow[];
   const lines = ["📄 <b>الخطابات الرسمية — قسم المبيعات</b>", ""];
   if (!rows.length) {
-    const ready = await Promise.all(team.map(joined));
-    const missing = team.filter((_, i) => !ready[i]).map((m) => escapeHtml(m.name));
-    lines.push("الخطاب رقم 1 لم يُرسل بعد: يُرسل تلقائياً عندما يدخل كل موظفي المبيعات إلى البوت.");
+    const linked = team.filter((m) => m.chatId);
+    const ready = await Promise.all(linked.map(joined));
+    const missing = linked.filter((_, i) => !ready[i]).map((m) => escapeHtml(m.name));
+    const unlinked = team.filter((m) => !m.chatId).map((m) => escapeHtml(m.name));
+    lines.push("الخطاب رقم 1 لم يُرسل بعد: يُرسل تلقائياً عندما يدخل البوت كل موظفي المبيعات المربوطين بتيليجرام.");
     lines.push(missing.length ? `⏳ بانتظار دخول ${missing.length}: ${missing.join("، ")}` : "✅ دخل الجميع — يُرسل في الدقائق القادمة (من 9 صباحاً إلى 9 مساءً).");
+    if (unlinked.length) lines.push(`➖ بلا تيليجرام، فلا ينتظرهم الخطاب: ${unlinked.join("، ")}`);
     return lines.join("\n");
   }
   for (const n of [1, 2] as const) {
