@@ -121,7 +121,7 @@ export function messagesDueToday(start: string | null, end: string | null, today
  * What a template is about: a stage message, the programme sent when a file is
  * issued, or a booking's update prepared for staff (client-booking-state.ts).
  */
-export type WaTemplateKey = ClientMessageKey | "programme" | "programme_updated" | "booking_update";
+export type WaTemplateKey = ClientMessageKey | "programme" | "programme_updated" | "booking_update" | "offer_followup_1" | "offer_followup_2" | "offer_followup_3";
 
 type WaField = "name" | "destination" | "serial" | "link" | "date";
 
@@ -133,6 +133,8 @@ export type WaTemplateDef = {
   body: string;
   /** the programme carries its PDF as the template's document header. */
   document?: boolean;
+  /** Meta's category; UTILITY unless said (a follow-up on an offer is MARKETING). */
+  category?: "UTILITY" | "MARKETING";
 };
 
 const SIGN = "فريق ترافليون للسفر والسياحة";
@@ -224,6 +226,31 @@ export const WA_TEMPLATES: Record<WaTemplateKey, WaTemplateDef> = {
     name: "traveliun_trip_checkin",
     params: ["name", "destination", "link"],
     body: [HELLO, "نطمئن عليك في {{2}}، ونتمنى أن رحلتك تسير كما تحب", "إن احتجت أي شيء نحن هنا، وبرنامجك من هنا:", "{{3}}", SIGN].join("\n\n"),
+  },
+  // «المتابعة» outside WhatsApp's 24 hours: days 1, 3 and 7 after an offer (the owner's wording, «موافق», 2026-10-23)
+  offer_followup_1: {
+    name: "traveliun_offer_followup_1",
+    category: "MARKETING",
+    params: ["name", "destination"],
+    body: [HELLO, "نتابع معك عرض رحلتك إلى {{2}} الذي أرسلناه لك", "هل اطلعت عليه؟ يسعدنا الرد على أي استفسار أو تعديل أي تفصيل يناسبك", SIGN].join("\n\n"),
+  },
+  offer_followup_2: {
+    name: "traveliun_offer_followup_2",
+    category: "MARKETING",
+    params: ["name", "destination"],
+    body: [
+      HELLO,
+      "بخصوص عرض رحلتك إلى {{2}}",
+      "الأسعار مرتبطة بتوفر الطيران والفنادق وقد تتغير قريباً، وإن كان العرض لا يناسبك نجهز لك بديلاً بميزانية أو تواريخ أو فنادق مختلفة",
+      "اكتب لنا ما يناسبك ونرتبه لك",
+      SIGN,
+    ].join("\n\n"),
+  },
+  offer_followup_3: {
+    name: "traveliun_offer_followup_3",
+    category: "MARKETING",
+    params: ["name", "destination"],
+    body: [HELLO, "هذه آخر متابعة منا لعرض رحلتك إلى {{2}}", "إن رغبت في إكماله أو تعديله فنحن بانتظارك، ويكفي أن ترد على هذه الرسالة", SIGN].join("\n\n"),
   },
   rate_trip: {
     name: "traveliun_rate_trip",

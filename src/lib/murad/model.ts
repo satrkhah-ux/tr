@@ -22,7 +22,14 @@ export function muradProvider(): MuradProvider | null {
   return null;
 }
 
-async function claudeJson(system: string, user: string): Promise<string | null> {
+/** Any of Murad's structured answers (the follow-up summary, followups/summary.ts) — same provider, same limits. */
+export async function muradJson(name: string, system: string, user: string, schema: Record<string, unknown>, timeoutMs = MODEL_TIMEOUT_MS): Promise<string | null> {
+  const p = muradProvider();
+  if (!p) throw new Error("no_provider");
+  return p.provider === "claude" ? claudeJson(system, user, schema) : openaiJson({ name, system, user, schema, timeoutMs });
+}
+
+async function claudeJson(system: string, user: string, schema: Record<string, unknown> = MURAD_OUTPUT_SCHEMA as unknown as Record<string, unknown>): Promise<string | null> {
   const client = new Anthropic({ apiKey: process.env["ANTHROPIC_API_KEY"], timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
   const res = await client.beta.messages.create({
     model: CLAUDE_MODEL,
@@ -33,7 +40,7 @@ async function claudeJson(system: string, user: string): Promise<string | null> 
     system,
     messages: [{ role: "user", content: user }],
     // a short WhatsApp answer: low effort is the chat setting
-    output_config: { effort: "low", format: { type: "json_schema", schema: MURAD_OUTPUT_SCHEMA } },
+    output_config: { effort: "low", format: { type: "json_schema", schema } },
   });
   if (res.stop_reason === "refusal") throw new Error("refusal");
   const text = res.content.find((b) => b.type === "text");

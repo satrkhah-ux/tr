@@ -4,6 +4,7 @@ import { receptionSweep } from "@/lib/murad/reception-run";
 import { recordCronRun } from "@/lib/data/cron-runs";
 import { runIntegrationChecks } from "@/lib/developer/integrations-run";
 import { syncFollowups } from "@/lib/followups/service";
+import { summarizeDue } from "@/lib/followups/summary";
 import { staffTick } from "@/lib/telegram/staff-events";
 
 export const runtime = "nodejs";
@@ -30,6 +31,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   await recordCronRun("followups_sync", syncFollowups).catch(() => null);
   // «تنبيهاتي»: assignments the webhook missed, on the list the sync just refreshed — after the answer, so Murad never waits on it
   after(() => recordCronRun("staff_tick", staffTick).catch(() => null));
+  // «ملخص مُراد» for the follow-ups whose thread moved — after the answer: the model takes seconds each
+  after(() => summarizeDue().catch(() => null));
   // every run leaves its trace for /developer, answered anyone or not (cron-runs.ts)
   // «المستقبل الآلي»: what the webhook missed, before Murad's own turns (no model, its turns claimed one by one)
   const received = await receptionSweep().catch(() => 0);

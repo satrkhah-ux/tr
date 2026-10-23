@@ -80,7 +80,7 @@ const only = process.argv.find((a) => a.startsWith("--only="))?.slice(7).split("
 for (const [key, def] of Object.entries(WA_TEMPLATES)) {
   if (only && !only.includes(def.name)) continue;
   // the programme and the prepared booking updates are always sent by a person — no switch to wait for
-  if (!["programme", "programme_updated", "booking_update"].includes(key) && !enabled.has(key)) continue;
+  if (!["programme", "programme_updated", "booking_update"].includes(key) && !key.startsWith("offer_followup_") && !enabled.has(key)) continue;
   if (existing.has(def.name)) {
     console.log(`= ${def.name}: already on the account (${existing.get(def.name)})`);
     continue;
@@ -94,7 +94,7 @@ for (const [key, def] of Object.entries(WA_TEMPLATES)) {
     }
     components.unshift({ type: "HEADER", format: "DOCUMENT", example: { header_handle: [handle] } });
   }
-  const payload = { name: def.name, language: "ar", category: "UTILITY", components };
+  const payload = { name: def.name, language: "ar", category: def.category ?? "UTILITY", components };
   if (!SUBMIT) {
     console.log(`- would submit ${def.name}:\n${JSON.stringify(payload, null, 2)}\n`);
     continue;

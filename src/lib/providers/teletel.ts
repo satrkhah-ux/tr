@@ -174,7 +174,7 @@ export async function whatsappTemplateStatus(): Promise<Map<string, string> | nu
  */
 export async function sendTeletelTemplate(
   conversationId: number,
-  template: { name: string; params: string[]; preview: string; document?: { url: string; name: string } },
+  template: { name: string; params: string[]; preview: string; document?: { url: string; name: string }; category?: "UTILITY" | "MARKETING" },
 ): Promise<number | null> {
   const config = getTeletelConfig();
   if (!config) return null;
@@ -185,7 +185,7 @@ export async function sendTeletelTemplate(
     private: false,
     template_params: {
       name: template.name,
-      category: "UTILITY",
+      category: template.category ?? "UTILITY",
       language: "ar",
       processed_params: {
         body,

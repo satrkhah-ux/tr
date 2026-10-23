@@ -1,6 +1,7 @@
 import "server-only";
 import type { AiImage } from "@/lib/repackage/extract/ai-extract";
 import { sanitizeTicket, type ParsedTicket } from "./ticket-parse";
+import { responsesJson } from "@/lib/providers/openai";
 
 /**
  * The model, for a ticket — two narrow jobs and nothing else:
@@ -47,31 +48,6 @@ async function chatJson(name: string, schema: Schema, system: string, content: C
   if (!res.ok) throw new Error(`openai_${res.status}`);
   const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
   return JSON.parse(data.choices?.[0]?.message?.content ?? "{}");
-}
-
-/**
- * One structured call on the Responses API — the original file in, the schema
- * out. A reasoning model reads a whole paper best (the evaluator's bench on the
- * owner's 12 samples, 2026-10-23: gpt-5.5 12/12, gpt-4o 9–10).
- */
-async function responsesJson(name: string, schema: Schema, content: Record<string, unknown>[], model: string): Promise<unknown> {
-  const key = process.env["OPENAI_API_KEY"];
-  if (!key) throw new Error("not_configured");
-  const res = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(120_000),
-    body: JSON.stringify({
-      model,
-      input: [{ role: "user", content }],
-      text: { format: { type: "json_schema", name, schema, strict: true } },
-      ...(/^(gpt-5|o\d)/.test(model) ? { reasoning: { effort: "low" } } : {}),
-    }),
-  });
-  if (!res.ok) throw new Error(`openai_${res.status}`);
-  const data = (await res.json()) as { output?: { content?: { type: string; text?: string }[] }[] };
-  const text = data.output?.flatMap((o) => o.content ?? []).find((c) => c.type === "output_text")?.text;
-  return JSON.parse(text ?? "{}");
 }
 
 const TRANSCRIBE_SCHEMA = {

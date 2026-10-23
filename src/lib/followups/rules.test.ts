@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isOfferMessage, lastOffer, mayAct, mayRead, stepDue, stepFor, todayGroup, toOfferMsg, validateResult, type OfferMsg, type WorkRow } from "./rules";
+import { isOfferMessage, isVisaOffer, lastOffer, offerLine, offerText, mayAct, mayRead, stepDue, stepFor, todayGroup, toOfferMsg, validateResult, type OfferMsg, type WorkRow } from "./rules";
 import { canOpenPath } from "@/lib/roles/section-access";
 
 describe("follow-up access and work rules", () => {
@@ -79,6 +79,26 @@ describe("offer detection (the evaluator's sample, narrowed)", () => {
   });
 });
 
+describe("what the card says of the offer (the evaluator's live rows, 2026-10-23)", () => {
+  it("keeps the title and the price, without the marks or the company's header", () => {
+    expect(offerLine("🌍 **TRAVELIUN | ترافليون للسفر والسياحة** 🇹🇷\n**عرض سياحي مميز إلى تركيا** 🇹🇷\n━━━━━━━━\n**إسطنبول • سبنجا • بورصة**\n💵 **السعر الإجمالي:** 12600 ريال")).toBe("عرض سياحي مميز إلى تركيا 🇹🇷 · 💵 السعر الإجمالي: 12600 ريال");
+    expect(offerLine("وهذا عرض ثاني السعر 8045 ريال")).toBe("وهذا عرض ثاني السعر 8045 ريال");
+    // a first file's line, already flattened
+    expect(offerLine("🌍 **TRAVELIUN | ترافليون للسفر والسياحة** 🇹🇷 **عرض سياحي مميز إلى تركيا** 🇹🇷")).toBe("🌍 🇹🇷 عرض سياحي مميز إلى تركيا 🇹🇷");
+  });
+  it("names a PDF sent alone by our words beside it", () => {
+    const pdf = { at: 100, text: "", fromClient: false, isPrivate: false, senderId: 1, pdf: true };
+    expect(offerText([pdf, { ...pdf, at: 160, pdf: false, text: "تفضل شيك البرنامج اندونيسيا\n9 ليالي 10 ايام" }], pdf)).toBe("تفضل شيك البرنامج اندونيسيا");
+    expect(offerText([pdf], pdf)).toBe("ملف مرفق (PDF)");
+  });
+  it("tells a visa's papers from a trip", () => {
+    expect(isVisaOffer("**الاوراق المطلوبه** صورة الجواز وصورة شخصية · الرسوم غير مسترده · السعر 750 ريال")).toBe(true);
+    expect(isVisaOffer("1-الجواز الاصل صالح لمده 6 شهور على الاقل بعد انتهاء الإقامة · السعر 450 ريال")).toBe(true);
+    expect(isVisaOffer("تأشيرة سنغافورة لغرض الأعمال تتطلب نفس المستندات · 600 ريال")).toBe(true);
+    expect(isVisaOffer("تفضل استاذي برنامجك السياحي يشمل تاشيرات فيتنام والفنادق · السعر 9800 ريال")).toBe(false);
+  });
+});
+
 describe("the cadence: two hours, days 1, 3, 7", () => {
   const H = 3600_000;
   const at = Date.parse("2026-10-20T09:00:00Z");
@@ -100,6 +120,8 @@ describe("the cadence: two hours, days 1, 3, 7", () => {
     const row = { status: "open", source: "price", step: 1, client_waiting: false, stage: "waiting", next_followup_at: "2026-10-23T05:00:00Z" } as WorkRow;
     expect(todayGroup(row, now)).toBe("due");
     expect(todayGroup({ ...row, next_followup_at: "2026-10-22T05:00:00Z" }, now)).toBe("late");
+    // came in today with yesterday's step: due, not late, on its first day
+    expect(todayGroup({ ...row, created_at: "2026-10-23T02:00:00Z", next_followup_at: "2026-10-22T05:00:00Z" }, now)).toBe("due");
     expect(todayGroup({ ...row, next_followup_at: "2026-10-24T05:00:00Z" }, now)).toBeNull();
     expect(todayGroup({ ...row, client_waiting: true, next_followup_at: null }, now)).toBe("replied");
     expect(todayGroup({ ...row, source: "sla", step: null, stage: "new", next_followup_at: null }, now)).toBeNull();

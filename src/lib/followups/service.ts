@@ -12,7 +12,7 @@ export async function followupRows<T>(page: (from: number, to: number) => Promis
   }
 }
 import { grantedPermissions } from "@/lib/roles/roles";
-import { CADENCE_MS, clientLine, isOfferRow, lastOffer, QUIET_MS, stepDue, stepFor, toOfferMsg, WORK_COLS, type RawThreadMsg, type WorkRow } from "./rules";
+import { CADENCE_MS, clientLine, isOfferRow, isVisaOffer, lastOffer, offerLine, offerText, QUIET_MS, stepDue, stepFor, toOfferMsg, WORK_COLS, type RawThreadMsg, type WorkRow } from "./rules";
 
 export const followupDb = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 /** Who may hold a follow-up: the follow-up team, its managers, and the sellers (their own offers). */
@@ -23,10 +23,10 @@ export async function followupPeople() {
   return ((data ?? []) as unknown as Person[]).filter((p) => {
     const keys = grantedPermissions({ ...p, permission_keys: p.roles?.permission_keys ?? [] });
     return keys.some((k) => ["followups.work", "followups.manage", "dashboard.admin", "developer.access", "offers.write"].includes(k));
-  }).map((p) => ({ id: p.id, name: p.arabic_name, agentId: p.teletel_agent_id }));
+  }).map((p) => ({ id: p.id, name: p.arabic_name, agentId: p.teletel_agent_id, seller: grantedPermissions({ ...p, permission_keys: p.roles?.permission_keys ?? [] }).includes("offers.write") }));
 }
 /** The employee behind a Teletel agent: their own link (employees.teletel_agent_id), else the follow-up map. */
-async function agentEmployees(people: Awaited<ReturnType<typeof followupPeople>>): Promise<(agentId: number | null) => string | null> {
+export async function agentEmployees(people: Awaited<ReturnType<typeof followupPeople>>): Promise<(agentId: number | null) => string | null> {
   const { data } = await followupDb().from("followup_agent_map").select("agent_id,employee_id");
   const map = new Map<number, string>(((data ?? []) as { agent_id: number; employee_id: string }[]).map((m) => [m.agent_id, m.employee_id]));
   for (const p of people) if (p.agentId) map.set(p.agentId, p.id);
@@ -106,6 +106,9 @@ async function enrolOffers(candidates: OpenConversation[], openIds: Set<number>,
     if (!offer || now - offer.lastAt * 1000 < QUIET_MS || now - offer.at * 1000 > CADENCE_MS) continue;
     const done = latestDone.get(c.id);
     if (done && offer.at * 1000 <= Date.parse(done.done_at ?? done.created_at)) continue;
+    const old = active.get(c.id);
+    // an open offer's file restarts its steps for a NEW programme only («عرض بديل»): a price line may be our own reminder
+    if (old && isOfferRow(old) && !(offer.strong && offer.at * 1000 > Date.parse(old.offer_at ?? "") + 60_000)) continue;
     const serial = offer.serial;
     const { data: basic } = serial
       ? await db.from("offers").select("id,serial,status,employee_id,destination,total,currency").eq("serial", serial).maybeSingle()
@@ -114,25 +117,29 @@ async function enrolOffers(candidates: OpenConversation[], openIds: Set<number>,
     const seller = basic?.employee_id ?? byAgent(offer.senderId) ?? byAgent(c.assigneeId);
     const offerAt = offer.at * 1000;
     const step = stepFor(offerAt, now);
+    const visa = !basic && isVisaOffer(offer.text);
     const fields = {
-      source: basic ? "offer" : "price",
+      source: basic ? "offer" : visa ? "visa" : "price",
       offer_id: basic?.id ?? null,
       offer_at: iso(offerAt),
-      offer_line: basic ? [basic.serial, basic.total ? `${Number(basic.total).toLocaleString("en-US")} ${basic.currency ?? ""}`.trim() : ""].filter(Boolean).join(" · ") : offer.text.replace(/\s+/g, " ").slice(0, 160),
+      offer_line: basic ? [basic.serial, basic.total ? `${Number(basic.total).toLocaleString("en-US")} ${basic.currency ?? ""}`.trim() : ""].filter(Boolean).join(" · ") : offerText(messages, offer),
       destination: basic?.destination ?? leadOf.get(c.id)?.destination ?? null,
       step,
-      next_followup_at: iso(stepDue(step, offerAt, offer.lastAt * 1000)),
+      // a backlog file starts at the step its age reached, due now — never born overdue
+      next_followup_at: iso(Math.max(now, stepDue(step, offerAt, offer.lastAt * 1000))),
       client_line: clientLine(messages),
       client_waiting: false,
-      transfer_reason: "عرض سعر بلا رد من العميل",
+      last_line: offer.text.replace(/[*_~`]+/g, "").replace(/\s+/g, " ").slice(0, 200) || "📎 ملف",
+      last_by: "us",
+      summary: null,
+      transfer_reason: visa ? "أوراق ورسوم تأشيرة بلا رد من العميل" : "عرض سعر بلا رد من العميل",
       request_started_at: iso(offerAt),
       last_synced_at: iso(now),
       external_status: openIds.has(c.id) ? "open" : "resolved",
     };
-    const old = active.get(c.id);
     if (old) {
-      // the old intake list or a team transfer: it becomes this offer's file, its history kept
-      await db.from("sla_followups").update({ ...fields, assigned_to: old.assigned_to ?? seller, stage: (old.assigned_to ?? seller) ? "waiting" : "new" }).eq("id", old.id).eq("status", "open").is("step", null);
+      // the old intake list or a team transfer becomes this offer's file, its history kept; an offer's file starts again
+      await db.from("sla_followups").update({ ...fields, assigned_to: old.assigned_to ?? seller, stage: (old.assigned_to ?? seller) ? "waiting" : "new" }).eq("id", old.id).eq("status", "open").is("send_lock", null);
     } else {
       const { error } = await db.from("sla_followups").insert({
         ...fields, conversation_id: c.id, contact_id: c.contactId, contact_name: c.name, contact_phone: c.phone,
@@ -185,7 +192,7 @@ export async function syncFollowups() {
   const quietAfterUs = (c: OpenConversation) => {
     const row = active.get(c.id);
     const idle = nowMs - c.lastActivityAt * 1000;
-    return !(row && isOfferRow(row)) && !c.waitingSince && idle >= QUIET_MS && idle <= CADENCE_MS && offerChecked.get(c.id) !== c.lastActivityAt;
+    return !(row?.send_lock) && !c.waitingSince && idle >= QUIET_MS && idle <= CADENCE_MS && offerChecked.get(c.id) !== c.lastActivityAt;
   };
   const candidates = [...fetched.rows, ...(resolved ?? [])].filter(quietAfterUs);
   for (const c of fetched.rows) {
@@ -199,12 +206,16 @@ export async function syncFollowups() {
     } else if (row) {
       const patch: Record<string, unknown> = { last_synced_at: now, external_status: "open" };
       const incomingAt = c.waitingSince ? new Date(c.waitingSince * 1000).toISOString() : null;
+      // the client wrote last and nobody answered since — in Teletel, or by a call recorded here
+      const waiting = Boolean(c.waitingSince) && !(row.last_attempt_at && Date.parse(row.last_attempt_at) > c.waitingSince * 1000);
       if (incomingAt && Date.parse(incomingAt) > Date.parse(row.last_client_at ?? row.created_at)) {
         patch.last_client_at = incomingAt;
         patch.client_waiting = true;
-        if (c.preview) patch.client_line = c.preview;
+        if (c.preview) { patch.client_line = c.preview; patch.last_line = c.preview; patch.last_by = "client"; }
         if (["waiting", "scheduled"].includes(row.stage)) { patch.stage = row.assigned_to ? "working" : "new"; patch.next_followup_at = null; awakened++; }
-      } else if (!c.waitingSince && row.client_waiting) {
+      } else if (waiting && !row.client_waiting) {
+        patch.client_waiting = true;
+      } else if (!waiting && row.client_waiting) {
         // answered in Teletel: the cadence goes on from that answer
         patch.client_waiting = false;
         if (isOfferRow(row) && !row.next_followup_at && row.offer_at) {
@@ -228,6 +239,12 @@ export async function syncFollowups() {
   }
   const openIds = new Set(fetched.rows.map((c) => c.id));
   added += await enrolOffers(candidates, openIds, active, latestDone, nowMs);
+  // the first files (498e50c) kept the raw text and took a visa's papers for a trip: put right once
+  for (const r of rows.filter((x) => x.status === "open" && x.source === "price" && x.offer_line)) {
+    const visa = isVisaOffer(r.offer_line!);
+    const line = offerLine(r.offer_line!) || r.offer_line!;
+    if (visa || line !== r.offer_line) await db.from("sla_followups").update({ offer_line: line, ...(visa ? { source: "visa", transfer_reason: "أوراق ورسوم تأشيرة بلا رد من العميل" } : {}) }).eq("id", r.id).eq("source", "price");
+  }
   await closeSettled(rows, now);
   for (const row of rows.filter((r) => r.status === "open" && !openIds.has(r.conversation_id)).sort((a, b) => Date.parse(a.last_synced_at ?? a.created_at) - Date.parse(b.last_synced_at ?? b.created_at)).slice(0, 25)) {
     const conversation = await teletelGet<{ status?: string }>(`/conversations/${row.conversation_id}`);
