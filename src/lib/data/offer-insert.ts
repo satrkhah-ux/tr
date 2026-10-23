@@ -90,7 +90,8 @@ export async function insertOffer(input: CreateOfferInput, asPartner?: string): 
     const offerId = offer.id;
 
     const cost = createSupabaseServiceClient() as unknown as SupabaseClient;
-    await insertChildren(supabase, cost, offerId, await withCatalogHotels(cost, input, serial));
+    // a partner never writes our catalogue — its typed hotels stay as typed
+    await insertChildren(supabase, cost, offerId, asPartner ? input : await withCatalogHotels(cost, input, serial));
 
     await cost.from("pricings").insert({ offer_id: offerId, ...pricingRow(input) });
     await supabase.from("offer_revisions").insert({ offer_id: offerId, revision: 1, note: "created via builder" });

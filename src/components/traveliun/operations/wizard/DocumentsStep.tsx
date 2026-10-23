@@ -42,7 +42,8 @@ export function DocumentsStep({ data }: StepProps) {
             {l.state === "issued" ? (
               <CheckCircle2 className="size-4 shrink-0 text-[#0f7a52]" />
             ) : l.state === "due" ? (
-              <Loader2 className="size-4 shrink-0 animate-spin text-[#185045]" />
+              // still here after the page's own issue: it waits on something (AutoIssue below says what)
+              <Clock className="size-4 shrink-0 text-[#185045]" />
             ) : (
               <Clock className="size-4 shrink-0 text-[#a86a10]" />
             )}

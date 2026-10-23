@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { HOTEL_ID_KEY } from "@/lib/operations/voucher-dto";
+import { HOTEL_ID_KEY, hotelIdOf } from "@/lib/operations/voucher-dto";
 import { issueVouchersForHotel } from "./wizard-sync";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
@@ -45,15 +45,17 @@ export type HotelUsage = {
 export type HotelBrief = { id: string; arabic_name: string; english_name: string | null; city_id: string | null; stars: number | null };
 
 async function usageOf(db: SupabaseClient, hotel: HotelBrief): Promise<HotelUsage> {
-  const [offers, drafts, rates, bookings] = await Promise.all([
+  const [offers, drafts, rates, bookings, linked] = await Promise.all([
     db.from("offers").select("id, offer_hotels!inner(hotel_id)", { count: "exact", head: true }).eq("offer_hotels.hotel_id", hotel.id),
     db.from("offer_drafts").select("id", { count: "exact", head: true }).contains("data", { hotels: [{ hotel_id: hotel.id }] }),
     db.from("hotel_rate_memory").select("id", { count: "exact", head: true }).eq("hotel_id", hotel.id),
     db.from("operation_bookings").select("id", { count: "exact", head: true }).eq("kind", "hotel").eq("title", hotel.arabic_name.trim()),
+    // and the ones that know it by id under another title (a hotel typed by hand, then renamed)
+    db.from("operation_bookings").select("id", { count: "exact", head: true }).eq("kind", "hotel").eq(`detail->>${HOTEL_ID_KEY}`, hotel.id).neq("title", hotel.arabic_name.trim()),
   ]);
-  const failed = [offers, drafts, rates, bookings].find((r) => r.error);
+  const failed = [offers, drafts, rates, bookings, linked].find((r) => r.error);
   if (failed) throw new Error(failed.error?.message);
-  return { offers: offers.count ?? 0, drafts: drafts.count ?? 0, rates: rates.count ?? 0, bookings: bookings.count ?? 0 };
+  return { offers: offers.count ?? 0, drafts: drafts.count ?? 0, rates: rates.count ?? 0, bookings: (bookings.count ?? 0) + (linked.count ?? 0) };
 }
 
 async function briefs(db: SupabaseClient, ids: string[]): Promise<HotelBrief[]> {
@@ -141,6 +143,8 @@ export async function mergeHotels(keepId: string, dropIds: string[]): Promise<Me
   if (denied) return { ok: false, error: denied };
   try {
     const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
+    // the dropped rows' names and cities, for the cases' bookings that know them by name only
+    const dropped = await briefs(service(), dropIds).catch(() => [] as HotelBrief[]);
     const { data, error } = await supabase.rpc("merge_hotels", { p_keep: keepId, p_drop: dropIds });
     if (error) {
       // PGRST202: the function is not in the schema — 0070 has not been applied
@@ -150,12 +154,31 @@ export async function mergeHotels(keepId: string, dropIds: string[]): Promise<Me
       if (error.message === "nothing_to_merge") return { ok: false, error: "data.tools.err.nothingToMerge" };
       return { ok: false, error: "err.db" };
     }
-    // a booking that knows its hotel by id (HOTEL_ID_KEY) follows it too — merge_hotels moves the
-    // offers' lines, not the cases' — and a voucher that waited on the dropped row goes out
-    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
-    const { data: moved } = await service.from("operation_bookings").select("id, detail").eq("kind", "hotel").in(`detail->>${HOTEL_ID_KEY}`, dropIds);
-    for (const b of (moved ?? []) as { id: string; detail: Record<string, string> }[]) {
-      await service.from("operation_bookings").update({ detail: { ...b.detail, [HOTEL_ID_KEY]: keepId } }).eq("id", b.id);
+    // the cases' bookings follow too — merge_hotels moves the offers' lines, not them: the ones
+    // that know a dropped row by id (HOTEL_ID_KEY), and the ones that know it by its name in its
+    // city — and a voucher that waited on a dropped row goes out
+    const admin = service();
+    const { data: byId } = await admin.from("operation_bookings").select("id, detail").eq("kind", "hotel").in(`detail->>${HOTEL_ID_KEY}`, dropIds);
+    const names = [...new Set(dropped.map((h) => h.arabic_name.trim()).filter(Boolean))];
+    const { data: byName } = names.length
+      ? await admin.from("operation_bookings").select("id, detail, title, city_name").eq("kind", "hotel").in("title", names)
+      : { data: [] };
+    const cityIds = [...new Set(dropped.map((h) => h.city_id).filter((c): c is string => Boolean(c)))];
+    const { data: cityRows } = cityIds.length ? await admin.from("cities").select("id, arabic_name").in("id", cityIds) : { data: [] };
+    const cityName = new Map(((cityRows ?? []) as { id: string; arabic_name: string }[]).map((c) => [c.id, c.arabic_name]));
+    const place = (v: string | null | undefined) => normAr(v).replace(/\s+/g, "");
+    const namedHere = ((byName ?? []) as { id: string; detail: Record<string, string> | null; title: string; city_name: string }[]).filter(
+      (b) =>
+        !hotelIdOf(b.detail) &&
+        dropped.some((h) => {
+          if (normAr(h.arabic_name) !== normAr(b.title)) return false;
+          const there = h.city_id ? cityName.get(h.city_id) : null;
+          const own = b.city_name || b.detail?.["المدينة"];
+          return !there || !own || place(there) === place(own);
+        }),
+    );
+    for (const b of [...((byId ?? []) as { id: string; detail: Record<string, string> | null }[]), ...namedHere]) {
+      await admin.from("operation_bookings").update({ detail: { ...(b.detail ?? {}), [HOTEL_ID_KEY]: keepId } }).eq("id", b.id);
     }
     after(() => issueVouchersForHotel(keepId));
     return { ok: true, removed: Number((data as { hotels_removed?: number } | null)?.hotels_removed ?? dropIds.length) };

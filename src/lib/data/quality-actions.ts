@@ -83,7 +83,8 @@ export async function getDataQualityReport(): Promise<QualityReport> {
 
 // ---------- the issue guard (order 11.1) ----------
 
-export type GuardResult = { issues: GuardIssue[]; canFix: boolean };
+/** `dataTeam`: the administration (settings.manage) — the hotel's data is theirs, not the booking agent's (2026-10-23) */
+export type GuardResult = { issues: GuardIssue[]; canFix: boolean; dataTeam?: boolean };
 
 /**
  * The catalogue problems of a draft's hotels, for the issue screens — and the
@@ -107,7 +108,8 @@ export async function checkHotelIssueGuard(
     // the data team hears about the record through the weekly quality summary
     const issues = (await getPartnerSession()) ? found.map((i) => ({ ...i, blocking: false })) : found;
     // «أصلح» opens /hotels, which is «قسم البيانات» — not every data.write holder can
-    return { issues, canFix: issues.length > 0 && (await currentCan("data.write")) && (await currentCanOpen("/hotels")) };
+    const canFix = issues.length > 0 && (await currentCan("data.write")) && (await currentCanOpen("/hotels"));
+    return { issues, canFix, dataTeam: canFix && (await currentCan("settings.manage")) };
   } catch {
     return none;
   }

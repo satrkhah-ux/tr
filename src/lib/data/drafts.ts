@@ -55,6 +55,8 @@ import { draftDaySkeleton, draftTransportNote } from "@/lib/offer/itinerary";
 import { validateDraft } from "@/lib/offer/draft-validation";
 import { getPublishedClientOffer, publishOffer, type CreateOfferInput, type OfferHotelInput, type OfferPricingItemInput } from "./offers";
 import { insertOffer, replaceOffer } from "./offer-insert";
+import { ensureCatalogHotel } from "./hotel-data-request";
+import { getCurrentEmployeeId } from "./metrics";
 import { reissueLocked } from "./issued-draft";
 import { pullBookingsFromOffer } from "./offer-pull";
 import { logAudit } from "./audit";
@@ -812,6 +814,28 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     const today = new Date().toISOString().slice(0, 10);
     if (data.hotels.some((h) => h.sourcing?.valid_until && h.sourcing.valid_until < today)) {
       return { ok: false, error: "pg.supplier.rateExpired" };
+    }
+
+    // A hotel typed by hand joins /hotels, its data asked of the administration (the owner,
+    // 2026-10-23: «عندما يدخله يدوياً يتم إضافته في النظام تلقائياً») — on the draft itself, so the
+    // pull, a re-issue and a merge (merge_hotels remaps drafts) all know it by id. Not a partner's.
+    if (!issuer && data.hotels.some((h) => !h.hotel_id && h.hotel_name.trim())) {
+      const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+      const by = await getCurrentEmployeeId();
+      const made = new Map<string, string | null>();
+      let linked = false;
+      for (const h of data.hotels) {
+        const name = h.hotel_name.trim();
+        if (h.hotel_id || !name) continue;
+        const key = `${normalizeName(name)}|${normalizeName(h.city_name)}`;
+        if (!made.has(key)) made.set(key, await ensureCatalogHotel(service, { name, city: h.city_name || null, serial: reissue ?? null, by }));
+        const id = made.get(key);
+        if (id) {
+          h.hotel_id = id;
+          linked = true;
+        }
+      }
+      if (linked) await writeDraftStages(draftId, { hotels: data.hotels });
     }
 
     const cities = deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities);

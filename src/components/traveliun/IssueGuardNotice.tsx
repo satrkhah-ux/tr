@@ -61,9 +61,9 @@ export function IssueGuardNotice({
   }, [check]);
 
   const shown = result.issues.filter((i) => (only === "blocking" ? i.blocking : only === "voucher" ? !i.blocking : true));
-  // the case's hotels: a hotel's data is the data team's, asked of them with the voucher
+  // the case's hotels: a hotel's data is the administration's, asked of them with the voucher
   // (hotel-data-request.ts) — the booking agent is not shown it (the owner, 2026-10-23)
-  if (shown.length === 0 || (only === "voucher" && !result.canFix)) return null;
+  if (shown.length === 0 || (only === "voucher" && !result.dataTeam)) return null;
   if (compact && !open) {
     return (
       <button

@@ -194,7 +194,8 @@ export type OfferMessage = {
   /** the team note and labels that travel with the send. */
   note: string;
   labels: string[];
-  template: WaTemplateSend;
+  /** none for a first send to a client who already confirmed: «traveliun_program_ready» promises the link he has */
+  template?: WaTemplateSend;
   pdfName: string;
 };
 
@@ -255,8 +256,9 @@ export async function offerMessage(serial: string, updated: boolean): Promise<Of
       note,
       labels: [updated ? "عرض-محدث" : "عرض-مرسل"],
       pdfName,
-      // after the 24 hours: the approved template — the same words, no link — the PDF riding as its document
-      template: {
+      // after the 24 hours: the approved template — the same words, no link — the PDF riding as its document;
+      // none for a confirmed client's first send (the text waits as a note for the agent)
+      template: row.status === "confirmed" && !updated ? undefined : {
         key,
         params: waParams(key, { name: customer?.arabic_name ?? "", destination: where, serial: row.serial, link, rate_link: "" }),
         document: { url: `${link}/pdf`, name: pdfName, serial: row.serial },

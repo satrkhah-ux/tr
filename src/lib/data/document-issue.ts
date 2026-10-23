@@ -5,7 +5,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { notifyPartnerCase } from "@/lib/data/ops-notify";
-import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, HOTEL_ID_KEY, shownDetail, type VoucherBooking, type VoucherDTO, type VoucherKind } from "@/lib/operations/voucher-dto";
+import { CLIENT_DOCUMENT_KINDS, DOCUMENT_LABEL, HOTEL_ID_KEY, hotelIdOf, shownDetail, type VoucherBooking, type VoucherDTO, type VoucherKind } from "@/lib/operations/voucher-dto";
 import { ensureCatalogHotel, requestHotelData } from "@/lib/data/hotel-data-request";
 import { voucherStay, type StayError, type StayHotel } from "@/lib/operations/room-details";
 import { hotelFinal } from "@/lib/operations/client-booking-state";
@@ -107,7 +107,7 @@ function tokenFor(seed: string): string {
  * stop chasing it and find out at the desk.
  */
 /** `issuedBy`: the employee whose action this is, if any; `auto`: issued by the server, not by a press of «إصدار». */
-export async function issueDocumentNow(input: IssueInput, issuedBy: string | null, auto = false): Promise<IssueResult> {
+export async function issueDocumentNow(input: IssueInput, issuedBy: string | null, auto = false, retried = false): Promise<IssueResult> {
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
 
@@ -228,6 +228,9 @@ export async function issueDocumentNow(input: IssueInput, issuedBy: string | nul
     // A hotel voucher prints each stay in its destination's language (room catalogue,
     // 2026-10-15) — or is not issued, saying which name is missing.
     const stays: VoucherBooking[] = [];
+    const waiting: string[] = [];
+    let relinked = false;
+    const asked = { serial: offer?.serial ?? null, by: issuedBy };
     if (input.kind === "hotel_voucher") {
       for (const raw of scoped) {
         const b = toVoucherBooking(raw);
@@ -240,19 +243,21 @@ export async function issueDocumentNow(input: IssueInput, issuedBy: string | nul
         const glossary = cityEn && /[A-Za-z]/.test(cityEn) ? { [city!.arabic_name.trim()]: cityEn, [b.city_name.trim()]: cityEn } : {};
         // the raw detail: toVoucherBooking has already set the room details aside
         const stay = voucherStay({ title: raw.title, city_name: raw.city_name, detail: raw.detail ?? {} }, hotel, glossary);
-        const asked = { serial: offer?.serial ?? null, by: issuedBy };
         if (!stay.ok && (stay.error === "hotelUnknown" || stay.error === "hotelName")) {
-          // the hotel's name is the data team's, never the agent's (the owner, 2026-10-23): a hotel
-          // typed by hand joins the catalogue, they are asked, and this voucher waits for them —
-          // issued by the server the moment the name is in (issueVouchersForHotel)
-          if (found) {
-            await requestHotelData(supabase, { id: found.row.id, name: found.row.arabic_name, city: city?.arabic_name ?? null }, "no_english", asked);
-          } else {
-            const id = await ensureCatalogHotel(supabase, { name: raw.title, city: raw.city_name || raw.detail?.["المدينة"] || null, ...asked });
-            // by its id from now on: the data team's edits, a merge included, reach this booking
-            if (id) await supabase.from("operation_bookings").update({ detail: { ...(raw.detail ?? {}), [HOTEL_ID_KEY]: id } }).eq("id", raw.id);
+          // the hotel's name is the administration's, never the agent's (the owner, 2026-10-23): a
+          // hotel typed by hand joins the catalogue, they are asked, and this voucher waits for them —
+          // issued by the server the moment the name is in (issueVouchersForHotel). Every hotel of
+          // the paper is seen to in this one pass.
+          const id = found ? found.row.id : await ensureCatalogHotel(supabase, { name: raw.title, city: raw.city_name || raw.detail?.["المدينة"] || null, ...asked });
+          if (found) await requestHotelData(supabase, { id: found.row.id, name: found.row.arabic_name, city: city?.arabic_name ?? null }, "no_english", asked);
+          // by its id from now on: the administration's rename or merge reaches this booking
+          if (id && hotelIdOf(raw.detail) !== id) {
+            const { error: pinError } = await supabase.from("operation_bookings").update({ detail: { ...(raw.detail ?? {}), [HOTEL_ID_KEY]: id } }).eq("id", raw.id);
+            // a hotel found only now may already print — read the paper again, once
+            if (!found && !pinError) relinked = true;
           }
-          return { ok: false, error: "ops.voucher.wait.hotelData", params: { hotel: b.title }, waiting: true };
+          waiting.push(b.title);
+          continue;
         }
         if (!stay.ok) return { ok: false, error: STAY_ERROR[stay.error][stay.locale], params: { hotel: b.title } };
         // a desk wants the address and the phone — asked of the data team, the voucher goes out without them
@@ -271,6 +276,10 @@ export async function issueDocumentNow(input: IssueInput, issuedBy: string | nul
           phone: found?.row.contact_number ?? null,
           map: found?.row.google_maps?.trim() || null,
         });
+      }
+      if (waiting.length > 0) {
+        if (relinked && !retried) return issueDocumentNow(input, issuedBy, auto, true);
+        return { ok: false, error: "ops.voucher.wait.hotelData", params: { hotel: waiting.join("، ") }, waiting: true };
       }
     }
 

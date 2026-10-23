@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
 import { miniAppUrl, sendMessage } from "@/lib/telegram/ops-bot";
-import { grantedPermissions } from "@/lib/roles/roles";
+import { grantedPermissions, type Permission } from "@/lib/roles/roles";
 import { noticeRecipients, operationOfPath, type StaffMember } from "./notify-recipients";
 
 /**
@@ -43,7 +43,7 @@ async function send(chatId: number, text: string, path?: string): Promise<boolea
  * file (notify-recipients.ts). Linking Telegram is the opt-in; the role is the
  * filter, so nobody taps a button that lands them on the dashboard.
  */
-async function recipientsFor(supabase: SupabaseClient, href: string): Promise<number[]> {
+async function recipientsFor(supabase: SupabaseClient, href: string, need?: Permission): Promise<number[]> {
   const { data } = await supabase
     .from("employees")
     .select("id, status, telegram_chat_id, roles(permission_keys)")
@@ -76,7 +76,9 @@ async function recipientsFor(supabase: SupabaseClient, href: string): Promise<nu
     const offers = (op as { offers: { employee_id: string | null } | { employee_id: string | null }[] | null } | null)?.offers;
     issuerId = (Array.isArray(offers) ? offers[0] : offers)?.employee_id ?? null;
   }
-  return noticeRecipients(staff, href, issuerId).map((s) => s.chatId);
+  return noticeRecipients(staff, href, issuerId)
+    .filter((s) => !need || s.permissions.includes(need))
+    .map((s) => s.chatId);
 }
 
 export type OpsNotice = {
@@ -126,7 +128,8 @@ export async function notifyHotelData(notice: { hotelId: string; name: string; c
   try {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const path = `/hotels?id=${notice.hotelId}`;
-    const chatIds = await recipientsFor(supabase, path);
+    // the administration, not every data.write holder — sales and bookings hold that too
+    const chatIds = await recipientsFor(supabase, path, "settings.manage");
     if (chatIds.length === 0) return 0;
     const base = readEnv("NEXT_PUBLIC_SITE_URL") ?? "https://pkg.traveliun.com";
     let by = notice.by;
