@@ -26,7 +26,9 @@ async function access(): Promise<FollowupAccess | null> {
   ]);
   const manager = manage || admin || developer;
   const closer = settings.closer === "employee" && settings.closerId === employeeId;
-  return employeeId && (manager || work || seller || closer) ? { employeeId, manager, claim: manager || work, closer } : null;
+  // «مسؤول التأشيرات» holds the visa files only — the open pool is the follow-up team's (the user, 2026-10-23: «التأشيرات ريموندا»)
+  const visaOnly = !manager && settings.visaOwner === employeeId;
+  return employeeId && (manager || work || seller || closer) ? { employeeId, manager, claim: manager || (work && !visaOnly), closer } : null;
 }
 async function visible(id: string, act = false) {
   const who = await access();
