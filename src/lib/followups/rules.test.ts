@@ -112,6 +112,8 @@ describe("the cadence: two hours, days 1, 3, 7", () => {
   });
   it("starts a late file at its latest due step, one catch-up only", () => {
     expect(stepFor(at, at + 3 * H)).toBe(0);
+    // past six hours the two-hour check is stale: day 1
+    expect(stepFor(at, at + 7 * H)).toBe(1);
     expect(stepFor(at, at + 30 * H)).toBe(1);
     expect(stepFor(at, at + 100 * H)).toBe(2);
     expect(stepFor(at, at + 169 * H)).toBe(3);

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, BellRing, CalendarClock, ExternalLink, FileText, Loader2, MessageCircle, Phone, RefreshCw, Search, Send, Sparkles, Zap } from "lucide-react";
 import { claimFollowup, assignWork, getFollowupWorkspace, getWorkDetail, recordFollowupResult, refreshFollowupSync, remakeSummary, reviewFollowupSend, sendFollowupReply, type FollowupWorkspaceData, type WorkDetail } from "@/lib/data/followups";
 import { duplicateDraft } from "@/lib/data/drafts";
-import { CLOSE_REASONS, handlerOf, isOldIntake, OUTCOMES, readable, todayGroup, type TodayGroup, type WorkResult, type WorkRow } from "@/lib/followups/rules";
+import { CLOSE_REASONS, handlerOf, isOldIntake, offerLine, OUTCOMES, readable, todayGroup, type TodayGroup, type WorkResult, type WorkRow } from "@/lib/followups/rules";
 import { NEXT_LABEL } from "@/lib/followups/summary-core";
 import { btn, btnPrimary, card, errors, field, GROUP, HeatChip, isToday, Row, since, StepChips, StepLabel, when } from "./followup-ui";
 import { ArchiveReview, ManagerBoard, QuickFollowup } from "./FollowupViews";
@@ -81,9 +81,9 @@ export function FollowupWorkspace({ initial, initialId }: { initial: FollowupWor
   const fileCard = (r: WorkRow) => {
     const s = r.summary;
     const faded = isToday(r.last_attempt_at, now) && !r.client_waiting;
-    const line = readable(r.last_line ?? r.client_line);
-    // the first files kept only the client's line
+    // the first files kept only the client's line; ours read like the offer line
     const byClient = r.last_line ? r.last_by === "client" : true;
+    const line = byClient ? readable(r.last_line ?? r.client_line) : offerLine(r.last_line ?? "") || r.last_line;
     return <button key={r.id} onClick={() => setSelected(r.id)} className={`w-full rounded-2xl border p-3.5 text-right transition-opacity ${r.id === selected ? "border-[#185045] bg-[#EEF5F1]" : "border-[#E3E8E4] bg-white hover:bg-[#F8FAF8]"} ${faded ? "opacity-55" : ""}`}>
       <span className="flex items-start justify-between gap-2"><span className="font-extrabold text-[#12332c]">{r.contact_name || `عميل #${r.conversation_id}`}</span><HeatChip heat={s?.heat} /></span>
       <span className="mt-1 block truncate text-sm text-slate-700">{[r.destination ?? s?.destination, s?.people].filter(Boolean).join(" · ") || "وجهة غير معروفة"}</span>

@@ -5,7 +5,7 @@ import { Loader2, Phone, Send, SkipForward } from "lucide-react";
 import { archiveFollowups, assignWork, distributeFollowups, getWorkDetail, restartFollowups, saveFollowupPageSettings, sendFollowupReply, type FollowupWorkspaceData, type WorkDetail } from "@/lib/data/followups";
 import { CLOSE_REASONS, STEP_LABELS, todayGroup, type FollowupSettings, type WorkResult, type WorkRow } from "@/lib/followups/rules";
 import { NEXT_LABEL } from "@/lib/followups/summary-core";
-import { btn, btnPrimary, card, CLAY, errors, field, GREEN, HeatChip, isToday, since, StepLabel, when } from "./followup-ui";
+import { btn, btnPrimary, card, CLAY, count, errors, field, FILES, GREEN, HeatChip, isToday, since, StepLabel, when } from "./followup-ui";
 
 const DAY = 864e5;
 
@@ -170,7 +170,7 @@ export function ManagerBoard({ data, refresh, now, show }: { data: FollowupWorks
   }
   return <div className="space-y-4">
     {unowned.length > 0 && <section className={`${card} flex flex-wrap items-center justify-between gap-3 border-[#9A3412]/30 p-4`}>
-      <button className="text-right" onClick={() => show(unowned.map((r) => r.id), "بلا مسؤول")}><b className="text-[#9A3412]">{unowned.length} ملفات بلا مسؤول</b><span className="block text-sm text-slate-500">موظف Teletel غير مربوط بموظف في النظام، أو حساب فريق. اختر «مسؤول التأشيرات» و«من يتولى اليوم السابع» في الإعدادات، أو وزّعها الآن.</span></button>
+      <button className="text-right" onClick={() => show(unowned.map((r) => r.id), "بلا مسؤول")}><b className="text-[#9A3412]">{count(unowned.length, FILES)} بلا مسؤول</b><span className="block text-sm text-slate-500">موظف Teletel غير مربوط بموظف في النظام، أو حساب فريق. اختر «مسؤول التأشيرات» و«من يتولى اليوم السابع» في الإعدادات، أو وزّعها الآن.</span></button>
       <button disabled={busy} className={btnPrimary} onClick={() => void distribute()}>{busy ? <Loader2 className="animate-spin" size={15} /> : null}وزّع</button>
       {notice && <p role="status" className="w-full text-sm">{notice}</p>}
     </section>}

@@ -23,6 +23,7 @@ export function count(n: number, [one, two, few, many]: readonly [string, string
 const MINUTES = ["دقيقة", "دقيقتان", "دقائق", "دقيقة"] as const;
 const HOURS = ["ساعة", "ساعتان", "ساعات", "ساعة"] as const;
 const DAYS = ["يوم", "يومان", "أيام", "يوماً"] as const;
+export const FILES = ["ملف", "ملفان", "ملفات", "ملفاً"] as const;
 /** «3 ساعات» / «يومان» / «12 يوماً» */
 export function since(at: string | null, now: number): string {
   if (!at) return "—";
@@ -57,7 +58,7 @@ export function StepChips({ r, now }: { r: WorkRow; now: number }) {
   })}</div>;
 }
 export function Row({ label, children, strong }: { label: string; children: ReactNode; strong?: boolean }) {
-  return <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] gap-2 py-1.5 text-sm"><span className="text-slate-500">{label}</span><span className={strong ? "font-extrabold text-[#185045]" : "text-slate-800"}>{children}</span></div>;
+  return <div className="grid grid-cols-[minmax(0,1fr)] gap-0.5 py-1.5 text-sm @min-[720px]:grid-cols-[7.5rem_minmax(0,1fr)] @min-[720px]:gap-2"><span className="text-xs text-slate-500 @min-[720px]:text-sm">{label}</span><span className={strong ? "font-extrabold text-[#185045]" : "text-slate-800"}>{children}</span></div>;
 }
 export const errors: Record<string, string> = {
   forbidden: "ليس لديك صلاحية لهذا الملف. قد يكون أُسند لموظف آخر.", claimed: "استلم موظف آخر هذا الملف.",

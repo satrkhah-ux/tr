@@ -23,9 +23,14 @@ export function stepDue(step: number, offerAt: number, lastAt: number): number {
   const s = Math.max(0, Math.min(4, step));
   return Math.max(offerAt + STEP_AT_H[s] * HOUR, lastAt + (s === 0 ? 2 : 20) * HOUR);
 }
-/** Enrolled late (a backlog, a slow sync): the latest step whose time has come — one catch-up, never all of them. */
+/**
+ * Enrolled late (a backlog, a slow sync): the latest step whose time has come —
+ * one catch-up, never all of them. Past six hours the two-hour check is stale
+ * (the evaluator, 2026-10-23: a note at dawn about last night's flight): day 1.
+ */
+export const TWO_HOUR_WINDOW_MS = 6 * HOUR;
 export function stepFor(offerAt: number, now: number): number {
-  let step = 0;
+  let step = now - offerAt > TWO_HOUR_WINDOW_MS ? 1 : 0;
   for (let s = 1; s < 4; s++) if (now >= offerAt + STEP_AT_H[s] * HOUR) step = s;
   return step;
 }
@@ -125,10 +130,11 @@ export const isVisaOffer = (text: string) => VISA.test(text);
  */
 // a line's decorative ends: flags, pictographs, bullets («🌍 🇹🇷 …», «✈️ …», «… 🇹🇷»)
 const EDGE = /^[\s|•·:–\-\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\uFE0F\u200D]+|[\s|•·:–\-\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\uFE0F\u200D]+$/gu;
+const EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\uFE0F\u200D]/gu;
 const BRAND = /\|?\s*(?:TRAVELIUN(?:\s+TRAVEL\s*&\s*TOURISM)?|ترافليون(?:\s+للسفر\s+والسياحة)?)\s*\|?/gi;
 export function offerLine(text: string): string {
   const lines = text.split(/\n|\\(?=\s)/)
-    .map((l) => l.replace(/[*_~`]+/g, "").replace(BRAND, " ").replace(/[━─➖=]{3,}/g, "").replace(EDGE, "").replace(/\s+/g, " ").trim())
+    .map((l) => l.replace(/[*_~`]+/g, "").replace(BRAND, " ").replace(/[━─➖=]{3,}/g, "").replace(EMOJI, " ").replace(EDGE, "").replace(/\s+/g, " ").trim())
     .filter((l) => l.replace(/[^\p{L}\d]/gu, "").length >= 3);
   if (!lines.length) return "";
   const title = lines[0];
