@@ -2303,6 +2303,8 @@ export const ar: Dictionary = {
   "ops.noOperations": "لا توجد عمليات بعد",
   "ops.noOperationsHint": "تظهر العملية هنا لحظة تسجيلك تأكيد العميل.",
   "ops.openCase": "افتح الملف",
+  "ops.lastProgress": "آخر إنجاز",
+  "ops.filtersToggle": "تصفية",
   "ops.backToBoard": "كل العمليات",
   "ops.clientTrack": "العميل",
   "ops.executionTrack": "التنفيذ",

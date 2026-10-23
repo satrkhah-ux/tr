@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardCheck, FileUp, PlaneTakeoff, Search, Users, Wallet, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardCheck, FileUp, PlaneTakeoff, Search, SlidersHorizontal, Users, Wallet, type LucideIcon } from "lucide-react";
+import { GlassFolder, hashString, type ArtPreset, type FolderFile, type GlassFolderStrings } from "@/components/ui/glass-folder-cards";
 import { DirText } from "@/components/DirText";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { OperationCard } from "@/lib/data/operations";
-import { severityRank, type OperationSignal } from "@/lib/operations/signals";
+import type { OperationSignal } from "@/lib/operations/signals";
+import { byLastProgress } from "@/lib/operations/last-progress";
+import type { ServiceKind, ServiceSummary } from "@/lib/operations/booking-summary";
 import { matchesFilters, matchesQuery, NO_FILTERS, type ListFilters } from "@/lib/operations/case-list";
-import { shownClientStatus } from "@/lib/operations/wizard/payment";
 import type { StaffOption } from "@/lib/data/operation-case";
 import { ArrivalsCalendar, OperationsFilters } from "./OperationsListControls";
 import { MoneyLinks } from "./MoneyReports";
@@ -31,11 +33,13 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
  * memory is the honest trade.
  */
 
-const CLIENT_KEY = (s: string) => `ops.client.${s}` as TranslationKey;
 const EXEC_KEY = (s: string) => `ops.exec.${s}` as TranslationKey;
 const SIGNAL_KEY = (c: string) => `ops.signal.${c}` as TranslationKey;
 
 type Filter = "needs_action" | "all" | "unpaid" | "travelling_soon";
+
+/** A case as the board gets it: its signals, «آخر إنجاز» and its services (operations-work.ts). */
+type BoardCase = OperationCard & { signals: OperationSignal[]; last_progress_at?: string | null; services?: ServiceSummary[] };
 
 const NO_PLACES: Place[] = [];
 
@@ -52,7 +56,7 @@ export function OperationsBoard({
    * offers: ops staff work what sales has handed over, and showing the whole
    * customer pipeline here made the one screen they live in unreadable.
    */
-  operations: (OperationCard & { signals: OperationSignal[] })[];
+  operations: BoardCase[];
   /** injected by the server page so the board and the signals agree on "now". */
   today: string;
   /** operation id → its owner's employee id (0064). */
@@ -65,8 +69,12 @@ export function OperationsBoard({
 }) {
   const { t } = useTraveliunUI();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<Filter>("needs_action");
+  // every client's card, newest progress first (the owner, 2026-10-23: «كل عميل بطاقته تظهر اول شيء، اول البطاقات هي اخر الانجاز»)
+  const [filter, setFilter] = useState<Filter>("all");
   const [filters, setFilters] = useState<ListFilters>(NO_FILTERS);
+  // the dates, destination, owner and state fold away, so the clients' cards are the first thing on the page
+  const [showFilters, setShowFilters] = useState(false);
+  const activeFilters = (Object.keys(NO_FILTERS) as (keyof ListFilters)[]).filter((k) => filters[k] !== NO_FILTERS[k]).length;
 
   const listed = useMemo(
     () =>
@@ -92,11 +100,7 @@ export function OperationsBoard({
           if (filter === "travelling_soon" && !op.signals.some((s) => s.code === "travel_approaching_incomplete")) return false;
           return true;
         });
-    return pool.sort((a, b) => {
-      const rank = severityRank(a.signals) - severityRank(b.signals);
-      if (rank !== 0) return rank;
-      return (a.travel_start ?? "9999").localeCompare(b.travel_start ?? "9999");
-    });
+    return pool.sort((a, b) => byLastProgress({ last_progress_at: a.last_progress_at ?? null }, { last_progress_at: b.last_progress_at ?? null }));
   }, [listed, base, filters, query, filter]);
 
   const counts = useMemo(
@@ -121,12 +125,16 @@ export function OperationsBoard({
   return (
     <TraveliunShell title="nav.operations">
       <div className="tv-fade-up space-y-4">
-        <section className="rounded-2xl border border-[#e2ebe7] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
-          <h1 className="text-lg font-extrabold text-[#003c3a]">{t("ops.title")}</h1>
-          <p className="mt-1 text-[12.5px] font-semibold text-[#93aaa3]">{t("ops.subtitle")}</p>
+        {/* a slim head — the title, the four lists as chips, search, upload — so the cards come first (the owner, 2026-10-23) */}
+        <section className="rounded-2xl border border-[#e2ebe7] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h1 className="text-lg font-extrabold text-[#003c3a]">{t("ops.title")}</h1>
+            <p className="text-[12px] font-semibold text-[#93aaa3]">{t("ops.subtitle")}</p>
+          </div>
           {canSeeMoney ? <MoneyLinks /> : null}
 
-          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {/* a chip per list, in the colour of what it holds (the owner, 2026-10-18: «يحتاج اجراء لون احمر») */}
+          <div className="-mx-1 mt-2.5 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {FILTERS.map((f) => {
               const Icon = f.icon;
               const on = filter === f.key;
@@ -136,41 +144,44 @@ export function OperationsBoard({
                   type="button"
                   aria-pressed={on}
                   onClick={() => setFilter(f.key)}
-                  className={cn(
-                    "flex min-w-0 items-center gap-3 rounded-2xl border p-3 text-start transition-shadow hover:shadow-[0_2px_10px_rgba(0,60,58,0.08)]",
-                    f.tone,
-                    on && `ring-2 ring-offset-1 ${f.ring}`,
-                  )}
+                  className={cn("inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold", f.tone, on && `ring-2 ring-offset-1 ${f.ring}`)}
                 >
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/70">
-                    <Icon className="size-5" />
+                  <Icon className="size-4" />
+                  <span className="tv-tnum text-[14px] font-extrabold">
+                    <DirText dir="ltr">{String(counts[f.key])}</DirText>
                   </span>
-                  <span className="min-w-0">
-                    <span className="tv-tnum block text-2xl font-extrabold leading-none">
-                      <DirText dir="ltr">{String(counts[f.key])}</DirText>
-                    </span>
-                    <span className="mt-1 block text-[12px] font-bold leading-snug">{t(f.labelKey)}</span>
-                  </span>
+                  {t(f.labelKey)}
                 </button>
               );
             })}
           </div>
-          <div className="mt-3 flex flex-wrap items-start gap-2">
+          <div className="mt-2 flex flex-wrap items-start gap-2">
             <UploadPicker operations={listed} />
-            <div className="relative ms-auto">
+            <button
+              type="button"
+              aria-expanded={showFilters}
+              onClick={() => setShowFilters((v) => !v)}
+              className={cn(
+                "inline-flex h-10 items-center gap-1.5 rounded-[10px] border px-3 text-[12.5px] font-bold",
+                showFilters || activeFilters > 0 ? "border-[#185045] bg-[#f0f7f4] text-[#185045]" : "border-[#dbe6e1] bg-white text-[#557d78]",
+              )}
+            >
+              <SlidersHorizontal className="size-4" />
+              {t("ops.filtersToggle")}
+              {activeFilters > 0 ? <span className="tv-tnum rounded-full bg-[#185045] px-1.5 text-[10.5px] text-white">{activeFilters}</span> : null}
+            </button>
+            <div className="relative basis-full sm:ms-auto sm:basis-auto">
               <Search className="absolute end-3 top-1/2 size-4 -translate-y-1/2 text-[#8aa29b]" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("ops.list.searchHint")}
-                className="h-10 w-64 max-w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 pe-9 text-sm text-[#185045] outline-none focus:border-[#2aa87a]"
+                className="h-10 w-full rounded-[10px] border border-[#dbe6e1] bg-white px-3 pe-9 text-sm text-[#185045] outline-none focus:border-[#2aa87a] sm:w-64"
               />
             </div>
           </div>
-          <OperationsFilters filters={filters} onChange={setFilters} destinations={destinations} staff={staff ?? []} />
+          {showFilters ? <OperationsFilters filters={filters} onChange={setFilters} destinations={destinations} staff={staff ?? []} /> : null}
         </section>
-
-        <ArrivalsCalendar operations={listed} today={today} />
 
         {rows.length === 0 ? (
           <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
@@ -181,12 +192,14 @@ export function OperationsBoard({
             />
           </section>
         ) : (
-          <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-            {rows.map((op) => (
-              <CaseCard key={op.id} op={op} owner={op.assignee_id ? (staffName.get(op.assignee_id) ?? null) : null} />
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] justify-items-center gap-x-4 gap-y-7">
+            {rows.map((op, i) => (
+              <CaseFolder key={op.id} op={op} index={i} owner={op.assignee_id ? (staffName.get(op.assignee_id) ?? null) : null} />
             ))}
           </div>
         )}
+
+        <ArrivalsCalendar operations={listed} today={today} />
 
         {/* today is injected so the server and the client agree on the clock */}
         <span className="hidden" data-today={today} />
@@ -195,51 +208,107 @@ export function OperationsBoard({
   );
 }
 
-function CaseCard({ op, owner }: { op: OperationCard & { signals: OperationSignal[] }; owner: string | null }) {
-  const { t } = useTraveliunUI();
-  const critical = op.signals.some((s) => s.severity === "critical");
+const KIND_LABEL: Record<ServiceKind, TranslationKey> = {
+  flight: "pg.stage.flights",
+  hotel: "pg.stage.hotels",
+  transport: "pg.stage.transport",
+  service: "pg.stage.services",
+  visa: "pg.stage.visas",
+};
+
+const FOLDER_AR: Partial<GlassFolderStrings> = {
+  open: "افتح",
+  close: "أغلق",
+  openFolder: "اعرض الخدمات",
+  closeFolder: "أغلق المجلد",
+  items: (n) => (n === 1 ? "خدمة واحدة" : n === 2 ? "خدمتان" : n >= 3 && n <= 10 ? `${n} خدمات` : `${n} خدمة`),
+  contents: "— الخدمات",
+  more: "خيارات",
+  options: "— خيارات",
+};
+
+/**
+ * One client, one glass folder (the owner, 2026-10-23, with the component he
+ * chose): the client on the glass, what the case waits on above it, its
+ * services inside — each opens the case — and under the folder the owner,
+ * the travellers, the money and «آخر إنجاز», which orders the board.
+ */
+function CaseFolder({ op, owner, index }: { op: BoardCase; owner: string | null; index: number }) {
+  const { t, language } = useTraveliunUI();
+  const router = useRouter();
+  const href = `/operations/${op.id}`;
+  const top = op.signals.find((s) => s.severity === "critical") ?? op.signals.find((s) => s.severity === "warn") ?? op.signals[0];
+  const services = op.services ?? [];
+  // the back panel says where the case stands at a glance: red ink when it is stuck, plum when it waits, green when all is booked
+  const art: ArtPreset = top?.severity === "critical"
+    ? "ember"
+    : top
+      ? "dusk"
+      : op.execution_status === "travelled"
+        ? "glacier"
+        : services.length > 0 && services.every((s) => s.state === "done")
+          ? "verdant"
+          : "aurora";
+  const files: FolderFile[] = services.length
+    ? services.map((s) => ({
+        name: t(KIND_LABEL[s.kind]),
+        meta: s.state === "done" ? "✓" : `${s.confirmed}/${s.total}`,
+        art: s.state === "done" ? "verdant" : s.state === "problem" ? "ember" : undefined,
+        href,
+      }))
+    : [{ name: t("ops.openCase"), href }];
+  const when = op.last_progress_at
+    ? new Date(op.last_progress_at).toLocaleString(language === "ar" ? "ar-SA-u-ca-gregory-nu-latn" : "en-GB", {
+        timeZone: "Asia/Riyadh",
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
 
   return (
-    <Link
-      href={`/operations/${op.id}`}
-      className={`block rounded-2xl border bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] transition-colors hover:bg-[#f8fbfa] ${
-        critical ? "border-[#f0c7c7]" : op.signals.length > 0 ? "border-[#f2e2b4]" : "border-[#e2ebe7]"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-[14px] font-extrabold text-[#003c3a]">{op.customer_name || "—"}</p>
-          <p className="tv-tnum mt-0.5 text-[11.5px] font-bold text-[#93aaa3]">
-            <DirText dir="ltr">{op.serial}</DirText>
-            {op.destination ? <span className="ms-2 font-semibold">{op.destination}</span> : null}
-            {op.partner_name ? (
-              <span className="ms-2 rounded-full bg-[#f0e9f9] px-2 py-0.5 text-[10.5px] font-bold text-[#6a3fa0]">
-                {t("ops.partnerTag", { name: op.partner_name })}
-              </span>
-            ) : null}
-            {owner ? <span className="ms-2 rounded-full bg-[#eaf1ff] px-2 py-0.5 text-[10.5px] font-bold text-[#2b57c4]">{owner}</span> : null}
-          </p>
-        </div>
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#eef4f1] px-2 py-1 text-[11px] font-bold text-[#557d78]">
+    <div className="flex w-[300px] max-w-full flex-col items-stretch">
+      <GlassFolder
+        width={300}
+        dir={language === "ar" ? "rtl" : "ltr"}
+        strings={language === "ar" ? FOLDER_AR : undefined}
+        label={op.customer_name || "—"}
+        meta={[op.serial, op.destination].filter(Boolean).join(" · ")}
+        badge={
+          top
+            ? { text: t(SIGNAL_KEY(top.code)), tone: top.severity === "critical" ? "danger" : "warn" }
+            : { text: t(EXEC_KEY(op.execution_status)), tone: "ok" }
+        }
+        art={art}
+        seed={(hashString(op.serial) % 4) + 1}
+        files={files}
+        action="more"
+        menu={[
+          { label: t("ops.openCase"), onSelect: () => router.push(href) },
+          { label: t("wz.up.button"), onSelect: () => router.push(`${href}?upload=1`) },
+        ]}
+        appearDelay={Math.min(index, 8) * 70}
+      />
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-[11.5px] font-bold text-[#557d78]">
+        {when ? (
+          <span className="tv-tnum text-[#185045]">
+            {t("ops.lastProgress")} <DirText dir="ltr">{when}</DirText>
+          </span>
+        ) : null}
+        {owner ? <span className="rounded-full bg-[#eaf1ff] px-2 py-0.5 text-[10.5px] text-[#2b57c4]">{owner}</span> : null}
+        {op.partner_name ? (
+          <span className="rounded-full bg-[#f0e9f9] px-2 py-0.5 text-[10.5px] text-[#6a3fa0]">{t("ops.partnerTag", { name: op.partner_name })}</span>
+        ) : null}
+        <span className="inline-flex items-center gap-1">
           <Users className="size-3" />
           <DirText dir="ltr">{String(op.travelers_count)}</DirText>
         </span>
-      </div>
-
-      {/* both tracks, side by side — the whole point of not merging them */}
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {/* the paid rungs as the recorded payments say, never a hand-picked «مسدّد» */}
-        <Track label={t("ops.clientTrack")} value={t(CLIENT_KEY(shownClientStatus(op.client_status, op.total, op.paid)))} tone="brand" />
-        <Track label={t("ops.executionTrack")} value={t(EXEC_KEY(op.execution_status))} tone="muted" />
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11.5px] font-bold">
-        <span className="text-[#557d78]">
-          {t("ops.travelWindow")}{" "}
-          <DirText dir="ltr">
-            <span className="tv-tnum">{op.travel_start ?? "—"}</span>
-          </DirText>
-        </span>
+        {op.travel_start ? (
+          <span className="tv-tnum">
+            {t("ops.travelWindow")} <DirText dir="ltr">{op.travel_start}</DirText>
+          </span>
+        ) : null}
         {op.total != null ? (
           <span className={op.paid >= op.total ? "text-[#0f7a52]" : "text-[#a86a10]"}>
             <DirText dir="ltr">
@@ -247,40 +316,12 @@ function CaseCard({ op, owner }: { op: OperationCard & { signals: OperationSigna
             </DirText>
           </span>
         ) : null}
+        <Link href={href} className="ms-auto inline-flex items-center gap-1 text-[#185045] hover:underline">
+          {t("ops.openCase")}
+          <ArrowLeft className="size-3.5 ltr:rotate-180" />
+        </Link>
       </div>
-
-      {op.signals.length > 0 ? (
-        <ul className="mt-3 space-y-1 border-t border-[#f0f4f2] pt-2.5">
-          {op.signals.slice(0, 3).map((s) => (
-            <li
-              key={s.code}
-              className={`flex items-start gap-1.5 text-[11.5px] font-bold ${
-                s.severity === "critical" ? "text-[#c22850]" : s.severity === "warn" ? "text-[#a86a10]" : "text-[#557d78]"
-              }`}
-            >
-              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-              <span>
-                {t(SIGNAL_KEY(s.code))}
-                {s.subjects.length > 0 ? <span className="font-semibold text-[#93aaa3]"> — {s.subjects.slice(0, 2).join("، ")}</span> : null}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </Link>
-  );
-}
-
-function Track({ label, value, tone }: { label: string; value: string; tone: "brand" | "muted" }) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-[8px] px-2 py-1 text-[11.5px] font-bold ${
-        tone === "brand" ? "bg-[#e9f7f0] text-[#0f7a52]" : "bg-[#eef4f1] text-[#557d78]"
-      }`}
-    >
-      <span className="opacity-60">{label}</span>
-      {value}
-    </span>
+    </div>
   );
 }
 

@@ -9,6 +9,8 @@ import { isLiveCase, summarizeOperations, type OpsCase, type OpsCounts } from "@
 import type { ExecutionStatus } from "@/lib/operations/state";
 import { opsAccess } from "@/lib/operations/access";
 import { defaultSchedule, riyadhDate } from "@/lib/operations/payments";
+import { lastProgress } from "@/lib/operations/last-progress";
+import { summarizeBookings, type ServiceSummary } from "@/lib/operations/booking-summary";
 
 /**
  * One loader behind both operations views: the board and the dashboard panel.
@@ -32,6 +34,10 @@ type BookingRow = {
   confirmed_at: string | null;
   confirmation_number: string | null;
   company_ref: string | null;
+  created_at: string | null;
+  paid_at: string | null;
+  request_sent_at: string | null;
+  request_answered_at: string | null;
 };
 
 type DocRow = { operation_id: string; kind: string; booking_id: string | null; created_at: string };
@@ -47,7 +53,13 @@ function byOperation<T extends { operation_id: string }>(rows: T[]): Map<string,
   return out;
 }
 
-export type OperationWork = OperationCard & { signals: OperationSignal[] };
+export type OperationWork = OperationCard & {
+  signals: OperationSignal[];
+  /** «آخر إنجاز» — the newest moment anything was done on the case (last-progress.ts); the board's order */
+  last_progress_at: string | null;
+  /** one line per kind of service: confirmed of total (booking-summary.ts) */
+  services: ServiceSummary[];
+};
 
 type Loaded = { ok: boolean; items: OperationWork[]; cases: OpsCase[]; today: string };
 
@@ -71,10 +83,12 @@ async function load(): Promise<Loaded> {
     const ids = operations.map((o) => o.id);
     const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
 
-    const [bookingsRes, docsRes, travelers, installmentsRes] = await Promise.all([
+    const [bookingsRes, docsRes, travelers, installmentsRes, touchedRes, paymentsRes, passportsRes] = await Promise.all([
       supabase
         .from("operation_bookings")
-        .select("id, operation_id, kind, title, status, cancellation_deadline, confirmed_at, confirmation_number, company_ref")
+        .select(
+          "id, operation_id, kind, title, status, cancellation_deadline, confirmed_at, confirmation_number, company_ref, created_at, paid_at, request_sent_at, request_answered_at",
+        )
         .in("operation_id", ids),
       // Revoked documents do not count as issued — that is the whole point of
       // revoking one. `created_at` is what tells a voucher printed BEFORE this
@@ -86,11 +100,18 @@ async function load(): Promise<Loaded> {
         .in("operation_id", ids),
       listTravelersByOperation(ids),
       supabase.from("operation_installments").select("operation_id, due_date, amount").in("operation_id", ids),
+      // «آخر إنجاز»: when the case itself, its payments and its travellers last changed
+      supabase.from("operations").select("id, updated_at").in("id", ids),
+      supabase.from("operation_payments").select("operation_id, created_at, updated_at").in("operation_id", ids),
+      supabase.from("operation_travelers").select("operation_id, updated_at").in("operation_id", ids),
     ]);
 
     const bookings = byOperation((bookingsRes.data ?? []) as BookingRow[]);
     const documents = byOperation((docsRes.data ?? []) as DocRow[]);
     const installments = byOperation((installmentsRes.data ?? []) as { operation_id: string; due_date: string; amount: number }[]);
+    const touched = new Map(((touchedRes.data ?? []) as { id: string; updated_at: string | null }[]).map((r) => [r.id, r.updated_at]));
+    const payments = byOperation((paymentsRes.data ?? []) as { operation_id: string; created_at: string | null; updated_at: string | null }[]);
+    const passports = byOperation((passportsRes.data ?? []) as { operation_id: string; updated_at: string | null }[]);
 
     const items: OperationWork[] = [];
     const cases: OpsCase[] = [];
@@ -125,7 +146,15 @@ async function load(): Promise<Loaded> {
       };
 
       const signals = operationSignals(snapshot, today);
-      items.push({ ...op, signals });
+      const last_progress_at = lastProgress(
+        touched.get(op.id),
+        op.confirmed_at,
+        ...bs.flatMap((b) => [b.created_at, b.confirmed_at, b.paid_at, b.request_sent_at, b.request_answered_at]),
+        ...ds.map((d) => d.created_at),
+        ...(payments.get(op.id) ?? []).flatMap((p) => [p.created_at, p.updated_at]),
+        ...(passports.get(op.id) ?? []).map((p) => p.updated_at),
+      );
+      items.push({ ...op, signals, last_progress_at, services: summarizeBookings(bs) });
       cases.push({
         client_status: op.client_status,
         execution_status: op.execution_status,

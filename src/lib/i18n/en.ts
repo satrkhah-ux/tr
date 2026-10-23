@@ -2305,6 +2305,8 @@ export const en = {
   "ops.noOperations": "No operations yet",
   "ops.noOperationsHint": "An operation appears here the moment you record a client confirmation.",
   "ops.openCase": "Open the file",
+  "ops.lastProgress": "Last progress",
+  "ops.filtersToggle": "Filters",
   "ops.backToBoard": "All operations",
   "ops.clientTrack": "Client",
   "ops.executionTrack": "Execution",
