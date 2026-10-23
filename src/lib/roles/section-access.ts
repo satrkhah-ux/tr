@@ -73,7 +73,8 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   ["/confirmed-trips", "offers.write"],
   // «العملاء» (0107): a section like the others, so it can be taken from a role or a colleague
   ["/clients", "clients.view"],
-  ["/followups", ["followups.work", "followups.manage", "dashboard.admin", "developer.access"]],
+  // «المتابعة»: the team, and each seller for his own offers (the owner, 2026-10-23)
+  ["/followups", ["followups.work", "followups.manage", "dashboard.admin", "developer.access", "offers.write"]],
   // the team and its roles
   ["/employees", "employees.manage"],
   // «مركز التشغيل الذكي»: company-wide revenue, conversion and average offer —

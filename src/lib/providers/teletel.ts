@@ -482,29 +482,50 @@ async function readOpen(): Promise<OpenList | null> {
   for (const c of raw) {
     if (typeof c.id !== "number" || seen.has(c.id)) continue;
     seen.add(c.id);
-    const sender = c.meta?.sender;
-    rows.push({
-      id: c.id,
-      inboxId: c.inbox_id ?? 0,
-      contactId: typeof sender?.id === "number" ? sender.id : null,
-      serviceType: [sender?.custom_attributes?.["service_type_list"], sender?.custom_attributes?.["service_type"]].find((v): v is string => typeof v === "string" && v.trim() !== "") ?? null,
-      name: sender?.name?.trim() || sender?.phone_number || `#${c.id}`,
-      phone: sender?.phone_number ?? "",
-      assignee: c.meta?.assignee?.name ?? null,
-      assigneeId: typeof c.meta?.assignee?.id === "number" ? c.meta.assignee.id : null,
-      team: c.meta?.team?.name ?? null,
-      teamId: typeof c.meta?.team?.id === "number" ? c.meta.team.id : null,
-      waitingSince: c.waiting_since ?? 0,
-      firstReplyAt: c.first_reply_created_at || null,
-      lastActivityAt: c.last_activity_at ?? 0,
-      createdAt: c.created_at ?? 0,
-      canReply: c.can_reply === true,
-      preview: (c.last_non_activity_message?.content ?? "").slice(0, 160),
-      labels: Array.isArray(c.labels) ? c.labels : [],
-    });
+    rows.push(toConversation(c as RawConversation & { id: number }));
   }
   openCache = { at: Date.now(), rows };
   return openCache;
+}
+
+/**
+ * The latest RESOLVED conversations (25 a page, the most recently active
+ * first) — «المتابعة» looks there too: a seller often closes the thread right
+ * after sending the price. Null when Teletel cannot be read.
+ */
+export async function recentResolvedConversations(pages = 2): Promise<OpenConversation[] | null> {
+  const config = getTeletelConfig();
+  if (!config) return null;
+  const rows: OpenConversation[] = [];
+  for (let n = 1; n <= pages; n++) {
+    const page = await api<{ data?: { payload?: RawConversation[] } }>(config, `/conversations?status=resolved&assignee_type=all&page=${n}`, undefined, 20_000);
+    if (!page?.data) return null;
+    for (const c of page.data.payload ?? []) if (typeof c.id === "number") rows.push(toConversation(c as RawConversation & { id: number }));
+  }
+  return rows;
+}
+
+function toConversation(c: RawConversation & { id: number }): OpenConversation {
+  const sender = c.meta?.sender;
+  return {
+    id: c.id,
+    inboxId: c.inbox_id ?? 0,
+    contactId: typeof sender?.id === "number" ? sender.id : null,
+    serviceType: [sender?.custom_attributes?.["service_type_list"], sender?.custom_attributes?.["service_type"]].find((v): v is string => typeof v === "string" && v.trim() !== "") ?? null,
+    name: sender?.name?.trim() || sender?.phone_number || `#${c.id}`,
+    phone: sender?.phone_number ?? "",
+    assignee: c.meta?.assignee?.name ?? null,
+    assigneeId: typeof c.meta?.assignee?.id === "number" ? c.meta.assignee.id : null,
+    team: c.meta?.team?.name ?? null,
+    teamId: typeof c.meta?.team?.id === "number" ? c.meta.team.id : null,
+    waitingSince: c.waiting_since ?? 0,
+    firstReplyAt: c.first_reply_created_at || null,
+    lastActivityAt: c.last_activity_at ?? 0,
+    createdAt: c.created_at ?? 0,
+    canReply: c.can_reply === true,
+    preview: (c.last_non_activity_message?.content ?? "").slice(0, 160),
+    labels: Array.isArray(c.labels) ? c.labels : [],
+  };
 }
 
 export type TeletelAgent = { id: number; name: string; email: string | null };

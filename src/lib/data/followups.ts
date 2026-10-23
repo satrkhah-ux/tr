@@ -10,12 +10,13 @@ import { recordCronRun } from "./cron-runs";
 
 const uuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const listTeletelAgents = async () => (await teletelGet<{ id: number; name: string }[]>("/agents")) ?? [];
+/** The follow-up team and its managers; a seller (offers.write) for his own offers' files only. */
 async function access(): Promise<FollowupAccess | null> {
-  const [employeeId, work, manage, admin, developer] = await Promise.all([
-    getCurrentEmployeeId(), currentCan("followups.work"), currentCan("followups.manage"), currentCan("dashboard.admin"), currentCan("developer.access"),
+  const [employeeId, work, manage, admin, developer, seller] = await Promise.all([
+    getCurrentEmployeeId(), currentCan("followups.work"), currentCan("followups.manage"), currentCan("dashboard.admin"), currentCan("developer.access"), currentCan("offers.write"),
   ]);
   const manager = manage || admin || developer;
-  return employeeId && (manager || work) ? { employeeId, manager } : null;
+  return employeeId && (manager || work || seller) ? { employeeId, manager, claim: manager || work } : null;
 }
 async function visible(id: string, act = false) {
   const who = await access();
@@ -43,7 +44,7 @@ export async function getFollowupWorkspace() {
   const [{ data }, people, teams, { data: heartbeat }] = await Promise.all([
     followupRows((a, b) => {
       let query = db.from("sla_followups").select(WORK_COLS);
-      if (!who.manager) query = query.or(`assigned_to.eq.${who.employeeId},and(assigned_to.is.null,status.eq.open)`);
+      if (!who.manager) query = query.or(who.claim ? `assigned_to.eq.${who.employeeId},and(assigned_to.is.null,status.eq.open)` : `assigned_to.eq.${who.employeeId}`);
       return query.order("request_started_at", { ascending: false }).order("id").range(a, b);
     }),
     followupPeople(), listTeletelTeams(),
@@ -60,21 +61,26 @@ export async function getFollowupWorkspace() {
   if (bookings?.error) throw new Error("تعذر تحميل الحجوزات المؤكدة");
   let lastSync: { at: string; ok: boolean } | null = null;
   try { lastSync = heartbeat ? JSON.parse(heartbeat.value) : null; } catch { /* unknown */ }
-  return { ...who, canManageTeam: await currentCan("employees.manage"), rows, people, teams, attempts, lastSync, confirmed: (bookings?.data ?? []) as { followup_id: string; serial: string }[] };
+  return { ...who, canManageTeam: await currentCan("employees.manage"), rows, people: people.map(({ id, name }) => ({ id, name })), teams, attempts, lastSync, confirmed: (bookings?.data ?? []) as { followup_id: string; serial: string }[] };
 }
 export type FollowupWorkspaceData = NonNullable<Awaited<ReturnType<typeof getFollowupWorkspace>>>;
 
+/** The badge: files needing a hand now — the client wrote back, a step is due, or (the team) nobody has it yet. */
 export async function getFollowupCount(): Promise<number> {
   const who = await access();
   if (!who) return 0;
   const db = followupDb();
-  // Unassigned and due are disjoint, so the badge counts each file once.
-  const unassigned = await db.from("sla_followups").select("id", { count: "exact", head: true }).eq("status", "open").is("assigned_to", null);
-  let due = db.from("sla_followups").select("id", { count: "exact", head: true }).eq("status", "open").not("assigned_to", "is", null).lte("next_followup_at", new Date().toISOString());
-  if (!who.manager) due = due.eq("assigned_to", who.employeeId);
-  const result = await due;
-  if (unassigned.error || result.error) throw new Error("followup count unavailable");
-  return (unassigned.count ?? 0) + (result.count ?? 0);
+  const base = () => {
+    const q = db.from("sla_followups").select("id", { count: "exact", head: true }).eq("status", "open").neq("source", "sla");
+    return who.manager ? q : q.eq("assigned_to", who.employeeId);
+  };
+  // disjoint: an unassigned file, or an assigned one whose client wrote back, or one due now
+  const [unassigned, mine] = await Promise.all([
+    who.claim ? db.from("sla_followups").select("id", { count: "exact", head: true }).eq("status", "open").is("assigned_to", null).neq("source", "sla") : Promise.resolve({ count: 0, error: null }),
+    base().not("assigned_to", "is", null).or(`client_waiting.eq.true,next_followup_at.lte.${new Date().toISOString()}`),
+  ]);
+  if (unassigned.error || mine.error) throw new Error("followup count unavailable");
+  return (unassigned.count ?? 0) + (mine.count ?? 0);
 }
 
 export async function getWorkDetail(id: string, pages = 2) {
@@ -87,11 +93,18 @@ export async function getWorkDetail(id: string, pages = 2) {
     db.from("client_leads").select("destination,inquiry,draft_id").eq("teletel_conversation_id", f.row.conversation_id).maybeSingle(),
     currentCan("offers.write"),
   ]);
+  // the Basic file of the offer followed, else the lead's
+  let draftId: string | null = lead?.draft_id ?? null;
+  if (f.row.offer_id) {
+    const { data: offer } = await db.from("offers").select("serial").eq("id", f.row.offer_id).maybeSingle();
+    const { data: draft } = offer ? await db.from("offer_drafts").select("id").eq("data->>produced_serial", offer.serial).limit(1).maybeSingle() : { data: null };
+    draftId = draft?.id ?? draftId;
+  }
   // Recheck ownership after network I/O; a reassignment revokes the old viewer.
   if (!(await visible(id))) return null;
   return { row: f.row, messages: thread?.messages.filter((m) => !m.isPrivate) ?? null, canReply: thread?.canReply ?? false,
     historyComplete: thread?.historyComplete ?? false, attempts: (attempts ?? []) as Attempt[],
-    destination: lead?.destination ?? null, inquiry: lead?.inquiry ?? null, draftId: canOffer ? lead?.draft_id ?? null : null };
+    destination: f.row.destination ?? lead?.destination ?? null, inquiry: lead?.inquiry ?? null, draftId: canOffer ? draftId : null };
 }
 export type WorkDetail = NonNullable<Awaited<ReturnType<typeof getWorkDetail>>>;
 export async function claimFollowup(id: string) { return action(id, "claim"); }
@@ -99,10 +112,11 @@ export async function assignWork(id: string, employeeId: string | null, onlyUnas
   if (employeeId && !uuid(employeeId)) return { ok: false, error: "invalid" } as WorkResult;
   return action(id, onlyUnassigned ? "assign_available" : "assign", { employeeId });
 }
-export async function recordFollowupResult(id: string, input: { outcome: string; dueAt: string | null; note: string; channel: string }): Promise<WorkResult> {
-  const error = validateResult(input.outcome, input.dueAt, input.note);
-  if (error || input.outcome === "transferred" || !["call", "note", "message"].includes(input.channel)) return { ok: false, error: error ?? "invalid" };
-  return action(id, "result", { ...input, note: input.note.slice(0, 2000) });
+/** An outcome button (لم يرد · مهتم · يريد تعديل · غير مهتم · أغلق); the next step is scheduled by itself unless «موعد آخر» named a time. */
+export async function recordFollowupResult(id: string, input: { outcome: string; dueAt: string | null; note: string; channel: string; reason?: string | null }): Promise<WorkResult> {
+  const error = validateResult(input.outcome, input.dueAt, input.note, input.reason ?? null);
+  if (error || !["call", "note", "message"].includes(input.channel)) return { ok: false, error: error ?? "invalid" };
+  return action(id, "result", { ...input, reason: input.reason ?? null, note: input.note.slice(0, 2000) });
 }
 export async function sendFollowupReply(id: string, text: string, requestId: string): Promise<WorkResult> {
   const f = await visible(id, true);

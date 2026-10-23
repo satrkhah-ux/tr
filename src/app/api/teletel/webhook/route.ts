@@ -51,7 +51,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // «تأخير بشري»: marked read now, answered after a person's pause (reception-run.ts schedule); a conversation we
   // saw closed goes back to whoever closed it, or to intake (leads/lifecycle.ts) — done before the pause ends
   after(async () => {
-    await Promise.allSettled([wakeFollowup(message.conversationId, message.at), clientWrote(message.conversationId, message.at), schedule(message)]);
+    await Promise.allSettled([wakeFollowup(message.conversationId, message.at, message.content), clientWrote(message.conversationId, message.at), schedule(message)]);
   });
   return NextResponse.json({ ok: true });
 }

@@ -11,7 +11,7 @@ const input = "w-full rounded-lg border border-slate-200 bg-white p-2 text-sm te
 const when = (at: string | null) => at ? new Date(at).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" }) : "—";
 const errors: Record<string, string> = {
   forbidden: "ليس لديك صلاحية لهذا الملف. قد يكون أُسند لموظف آخر.", claimed: "استلم موظف آخر هذا الملف. تم تحديث القائمة.",
-  due: "حدد موعدًا قادمًا للمتابعة.", note: "اكتب سبب الإغلاق أو النتيجة.", busy: "يوجد إرسال قيد المعالجة. تحقّق من نتيجته أولًا.",
+  due: "حدد موعدًا قادمًا للمتابعة.", note: "اكتب سبب الإغلاق أو النتيجة.", reason: "اكتب سبب الإغلاق.", busy: "يوجد إرسال قيد المعالجة. تحقّق من نتيجته أولًا.",
   uncertain: "لم تتأكد نتيجة العملية. لا نكرر الإرسال. استخدم «تحقق من الإرسال» أو اطلب مراجعة المشرف.",
   window: "نافذة الرد غير متاحة في Teletel. يمكن الاتصال وتسجيل النتيجة، أو استخدام قالب معتمد من Teletel.",
   invalid: "راجع البيانات المطلوبة.", unreachable: "تعذر الاتصال بـTeletel. لم نؤكد نجاح العملية.", done: "هذه المتابعة مغلقة.", failed: "تعذر حفظ العملية.", conflict: "تغير الملف أثناء العمل. حدّث الصفحة.",
