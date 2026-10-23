@@ -81,10 +81,11 @@ describe("offer detection (the evaluator's sample, narrowed)", () => {
 
 describe("what the card says of the offer (the evaluator's live rows, 2026-10-23)", () => {
   it("keeps the title and the price, without the marks or the company's header", () => {
-    expect(offerLine("🌍 **TRAVELIUN | ترافليون للسفر والسياحة** 🇹🇷\n**عرض سياحي مميز إلى تركيا** 🇹🇷\n━━━━━━━━\n**إسطنبول • سبنجا • بورصة**\n💵 **السعر الإجمالي:** 12600 ريال")).toBe("عرض سياحي مميز إلى تركيا 🇹🇷 · 💵 السعر الإجمالي: 12600 ريال");
+    expect(offerLine("🌍 **TRAVELIUN | ترافليون للسفر والسياحة** 🇹🇷\n**عرض سياحي مميز إلى تركيا** 🇹🇷\n━━━━━━━━\n**إسطنبول • سبنجا • بورصة**\n💵 **السعر الإجمالي:** 12600 ريال")).toBe("عرض سياحي مميز إلى تركيا · السعر الإجمالي: 12600 ريال");
     expect(offerLine("وهذا عرض ثاني السعر 8045 ريال")).toBe("وهذا عرض ثاني السعر 8045 ريال");
     // a first file's line, already flattened
-    expect(offerLine("🌍 **TRAVELIUN | ترافليون للسفر والسياحة** 🇹🇷 **عرض سياحي مميز إلى تركيا** 🇹🇷")).toBe("🌍 🇹🇷 عرض سياحي مميز إلى تركيا 🇹🇷");
+    expect(offerLine("🌍 **TRAVELIUN | ترافليون للسفر والسياحة** 🇹🇷 **عرض سياحي مميز إلى تركيا** 🇹🇷")).toBe("عرض سياحي مميز إلى تركيا");
+    expect(offerLine("✈️ **رحلات الطيران – فلاي ناس** 📅\nالسعر 1,900 ريال")).toBe("رحلات الطيران – فلاي ناس · السعر 1,900 ريال");
   });
   it("names a PDF sent alone by our words beside it", () => {
     const pdf = { at: 100, text: "", fromClient: false, isPrivate: false, senderId: 1, pdf: true };

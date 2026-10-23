@@ -2,10 +2,11 @@ import "server-only";
 import { muradJson, muradProvider } from "@/lib/murad/model";
 import { responsesJson } from "@/lib/providers/openai";
 import { noteFor } from "@/lib/murad/core";
-import { addTeletelNote, listOpenConversations, teletelGet } from "@/lib/providers/teletel";
+import { addTeletelNote, listOpenConversations, teletelGet, whatsappTemplateStatus } from "@/lib/providers/teletel";
+import { WA_TEMPLATES } from "@/lib/operations/client-messages";
 import { followupDb, followupPeople, followupRows } from "./service";
-import { FOLLOWUP_SETTINGS_KEY, isOfferRow, parseFollowupSettings, WORK_COLS, type RawThreadMsg, type WorkRow } from "./rules";
-import { parseSummary, renderThread, SUMMARY_SCHEMA, SUMMARY_SYSTEM, summaryPrompt, toSummaryMsg, unheardAfterUs, type FollowupSummary, type SummaryMsg } from "./summary-core";
+import { FOLLOWUP_SETTINGS_KEY, isOfferRow, parseFollowupSettings, readable, STEP_TEMPLATE, WORK_COLS, type RawThreadMsg, type WorkRow } from "./rules";
+import { parseSummary, renderThread, SUMMARY_SCHEMA, SUMMARY_VERSION, SUMMARY_SYSTEM, summaryPrompt, toSummaryMsg, unheardAfterUs, type FollowupSummary, type SummaryMsg } from "./summary-core";
 
 /** The thread's last two pages (forty messages), oldest first, without notes. */
 async function readMessages(conversationId: number): Promise<SummaryMsg[] | null> {
@@ -29,23 +30,30 @@ export async function summarize(row: WorkRow, seen = Math.floor(Date.now() / 100
   if (!muradProvider()) return null;
   const messages = await readMessages(row.conversation_id);
   if (!messages) return null;
-  const people = await followupPeople();
+  const [people, status] = await Promise.all([followupPeople(), whatsappTemplateStatus()]);
+  const now = Date.now();
+  const lastClient = messages.filter((m) => m.fromClient).at(-1)?.at ?? 0;
+  const windowOpen = now - lastClient * 1000 < 24 * 3600_000;
+  const tpl = row.source !== "visa" && row.step !== null && !row.client_waiting ? STEP_TEMPLATE[row.step] : undefined;
+  const templateReady = Boolean(tpl && status?.get(WA_TEMPLATES[tpl.key].name) === "APPROVED");
+  const last = messages.at(-1);
   const prompt = summaryPrompt({
     client: row.contact_name ?? "", seller: people.find((p) => p.id === row.assigned_to)?.name ?? null,
     offerLine: row.offer_line, step: row.step, clientWaiting: row.client_waiting, visa: row.source === "visa", thread: renderThread(messages),
+    today: new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "full" }).format(now),
+    windowOpen, templateReady, waitedHours: last?.fromClient ? (now - last.at * 1000) / 3600_000 : null,
   });
   const schema = SUMMARY_SCHEMA as unknown as Record<string, unknown>;
   // a reasoning model on OpenAI (the chat model left drafts empty and missed offers on live threads, 2026-10-23); Claude as Murad has it
   const raw = muradProvider()?.provider === "claude"
     ? await muradJson("followup_summary", SUMMARY_SYSTEM, prompt, schema)
     : JSON.stringify(await responsesJson("followup_summary", schema, [{ type: "input_text", text: `${SUMMARY_SYSTEM}\n\n${prompt}` }], process.env["OPENAI_FOLLOWUP_MODEL"] || "gpt-5.5"));
-  const summary = parseSummary(raw, { upto: messages.at(-1)?.at ?? 0, step: row.step, at: new Date().toISOString(), unheard: unheardAfterUs(messages), seen });
+  const summary = parseSummary(raw, { upto: last?.at ?? 0, step: row.step, at: new Date().toISOString(), unheard: unheardAfterUs(messages), seen }, !windowOpen && !templateReady);
   if (!summary) return null;
-  const last = messages.at(-1);
   await followupDb().from("sla_followups").update({
     summary,
     destination: row.destination ?? (summary.destination || null),
-    ...(last ? { last_line: (last.text || (last.audio ? "🎤 رسالة صوتية" : "")).slice(0, 200), last_by: last.fromClient ? "client" : "us" } : {}),
+    ...(last ? { last_line: readable((last.text || (last.audio ? "🎤 رسالة صوتية" : "")).slice(0, 200)), last_by: last.fromClient ? "client" : "us" } : {}),
   }).eq("id", row.id);
   return summary;
 }
@@ -75,7 +83,7 @@ export async function summarizeDue(): Promise<{ made: number; noted: number }> {
     const now = Date.now();
     const rows = (data as WorkRow[]).filter((r) => {
       const s = r.summary;
-      if (!s) return true;
+      if (!s || (s.v ?? 1) < SUMMARY_VERSION) return true;
       if (isOfferRow(r) && s.step !== r.step) return true;
       const moved = activity.get(r.conversation_id);
       return moved !== undefined && moved > (s.seen ?? s.upto) + 5;

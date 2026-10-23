@@ -16,15 +16,21 @@ export const field = "w-full rounded-xl border border-[#D5DED9] bg-white p-3 tex
 export const when = (at: string | null) => at ? new Date(at).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" }) : "—";
 const riyadhDay = (t: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(t);
 export const isToday = (at: string | null, now: number) => Boolean(at) && riyadhDay(Date.parse(at!)) === riyadhDay(now);
-/** «منذ 3 ساعات» / «منذ يومين» */
+/** An Arabic count: 1 ساعة, 2 ساعتان, 3–10 ساعات, 11+ ساعة (يوماً for days). */
+export function count(n: number, [one, two, few, many]: readonly [string, string, string, string]): string {
+  return n === 1 ? one : n === 2 ? two : n >= 3 && n <= 10 ? `${n} ${few}` : `${n} ${many}`;
+}
+const MINUTES = ["دقيقة", "دقيقتان", "دقائق", "دقيقة"] as const;
+const HOURS = ["ساعة", "ساعتان", "ساعات", "ساعة"] as const;
+const DAYS = ["يوم", "يومان", "أيام", "يوماً"] as const;
+/** «3 ساعات» / «يومان» / «12 يوماً» */
 export function since(at: string | null, now: number): string {
   if (!at) return "—";
   const min = Math.max(0, Math.round((now - Date.parse(at)) / 60000));
-  if (min < 60) return `${min} دقيقة`;
+  if (min < 60) return min < 1 ? "الآن" : count(min, MINUTES);
   const h = Math.round(min / 60);
-  if (h < 24) return `${h} ساعة`;
-  const d = Math.round(h / 24);
-  return d === 1 ? "يوم" : d === 2 ? "يومين" : `${d} أيام`;
+  if (h < 24) return count(h, HOURS);
+  return count(Math.round(h / 24), DAYS);
 }
 export const GROUP: Record<TodayGroup, { label: string; color: string }> = {
   replied: { label: "رد العميل — ينتظر ردنا", color: BLUE },

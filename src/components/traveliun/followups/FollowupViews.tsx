@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Phone, Send, SkipForward } from "lucide-react";
-import { archiveFollowups, assignWork, distributeFollowups, restartFollowups, saveFollowupPageSettings, sendFollowupReply, type FollowupWorkspaceData } from "@/lib/data/followups";
+import { archiveFollowups, assignWork, distributeFollowups, getWorkDetail, restartFollowups, saveFollowupPageSettings, sendFollowupReply, type FollowupWorkspaceData, type WorkDetail } from "@/lib/data/followups";
 import { CLOSE_REASONS, STEP_LABELS, todayGroup, type FollowupSettings, type WorkResult, type WorkRow } from "@/lib/followups/rules";
 import { NEXT_LABEL } from "@/lib/followups/summary-core";
 import { btn, btnPrimary, card, CLAY, errors, field, GREEN, HeatChip, isToday, since, StepLabel, when } from "./followup-ui";
@@ -22,8 +22,16 @@ export function QuickFollowup({ rows, refresh, done }: { rows: WorkRow[]; refres
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const request = useRef<{ text: string; id: string } | null>(null);
+  const [detail, setDetail] = useState<WorkDetail | null>(null);
   const now = Date.now();
   const r = queue[index];
+  // can anything reach him in writing: inside the 24 hours, or the step's approved template
+  useEffect(() => {
+    let live = true;
+    setDetail(null);
+    if (r) void getWorkDetail(r.id, 1).then((d) => { if (live) setDetail(d); }).catch(() => undefined);
+    return () => { live = false; };
+  }, [r]);
   const advance = (wasSent: boolean) => { if (wasSent) setSent(sent + 1); else setSkipped(skipped + 1); setIndex(index + 1); setText(null); setNotice(""); request.current = null; };
   if (!r) return <section className={`${card} p-8 text-center`}>
     <p className="text-xl font-extrabold">أنهيت متابعات اليوم</p>
@@ -31,6 +39,8 @@ export function QuickFollowup({ rows, refresh, done }: { rows: WorkRow[]; refres
     <button className={`${btnPrimary} mt-5`} onClick={() => { void refresh(); done(); }}>العودة للقائمة</button>
   </section>;
   const draft = text ?? r.summary?.draft ?? "";
+  const writable = detail ? detail.canReply || Boolean(detail.template?.approved && !r.client_waiting) : null;
+  const phone = r.contact_phone?.replace(/[^\d+]/g, "");
   async function send() {
     if (!request.current || request.current.text !== draft) request.current = { text: draft, id: crypto.randomUUID() };
     const id = request.current.id;
@@ -52,12 +62,14 @@ export function QuickFollowup({ rows, refresh, done }: { rows: WorkRow[]; refres
       {r.client_waiting && <p className="rounded-xl bg-[#E8EEFD] p-2 text-sm font-bold text-[#1D4ED8]">العميل كتب آخر رسالة: {r.client_line ?? r.last_line}</p>}
       {s ? <p className="rounded-xl bg-[#EEF5F1] p-3 text-sm"><b className="text-[#185045]">المقترح: {NEXT_LABEL[s.next]}</b> — {s.advice}</p> : <p className="text-sm text-slate-500">مُراد لم يقرأ المحادثة بعد.</p>}
       {s?.unheard && <p className="text-sm text-amber-900">🎤 رسالة صوتية لم تُسمع — استمع لها في Teletel أولًا.</p>}
-      <textarea className={field} rows={6} value={draft} onChange={(e) => setText(e.target.value)} placeholder="الرسالة للعميل…" />
+      {writable === false ? <p className="rounded-xl bg-[#F4F6F3] p-3 text-sm">مرّت 24 ساعة على آخر رسالة من العميل ولا قالب معتمد لهذه الخطوة — اتصل به.</p>
+        : detail && !detail.canReply ? <p className="rounded-xl bg-[#F4F6F3] p-3 text-sm">تُرسل كقالب «{detail.template?.label}» المعتمد.</p>
+        : <textarea className={field} rows={6} value={draft} onChange={(e) => setText(e.target.value)} placeholder="الرسالة للعميل…" />}
       {notice && <p role="status" className="rounded-xl bg-amber-50 p-2 text-sm text-amber-950">{notice}</p>}
       <div className="grid grid-cols-3 gap-2">
         <button disabled={busy} className={`${btn} min-h-14`} onClick={() => advance(false)}><SkipForward size={18} /> تخطَّ</button>
-        {r.contact_phone ? <a className={`${btn} min-h-14`} href={`tel:${r.contact_phone.replace(/[^\d+]/g, "")}`}><Phone size={18} /> اتصال</a> : <span />}
-        <button disabled={busy || !draft.trim()} className={`${btnPrimary} min-h-14`} onClick={() => void send()}>{busy ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />} أرسل</button>
+        {phone ? <a className={`${writable === false ? btnPrimary : btn} min-h-14`} href={`tel:${phone}`}><Phone size={18} /> اتصال</a> : <span />}
+        {writable === false ? <span /> : <button disabled={busy || writable === null || (detail?.canReply !== false && !draft.trim())} className={`${btnPrimary} min-h-14`} onClick={() => void send()}>{busy ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />} أرسل</button>}
       </div>
     </div>
   </section>;
@@ -131,7 +143,8 @@ export function ManagerBoard({ data, refresh, now, show }: { data: FollowupWorks
   const won = data.confirmed;
   const wonIds = new Set([...won.map((b) => b.followup_id), ...data.rows.filter((r) => r.outcome === "completed" && inWeek(r.done_at)).map((r) => r.id)]);
   const amount = won.reduce((sum, b) => sum + (b.total ?? 0), 0);
-  const lost = data.rows.filter((r) => r.status === "done" && inWeek(r.done_at) && r.outcome !== "completed" && r.outcome !== "transferred");
+  // the staff's own closes with a reason — not the old list the system closed
+  const lost = data.rows.filter((r) => r.status === "done" && inWeek(r.done_at) && ["not_interested", "not_completed"].includes(r.outcome ?? "") && r.close_reason);
   const tiles: [string, string, string[]][] = [
     ["تُوبعت خلال 24 ساعة", enrolled.length ? `${Math.round((onTime.length / enrolled.length) * 100)}% · الهدف 90%` : "—", onTime.map((r) => r.id)],
     ["عملاء ينتظرون ردنا", String(waiting.length), waiting.map((r) => r.id)],
@@ -146,8 +159,21 @@ export function ManagerBoard({ data, refresh, now, show }: { data: FollowupWorks
     ["عاد العميل", (r) => back.has(r.id)],
     ["حجز مؤكد", (r) => wonIds.has(r.id)],
   ];
-  const reasons = CLOSE_REASONS.map((reason) => [reason, lost.filter((r) => (r.close_reason ?? "أخرى") === reason)] as const);
+  const reasons = CLOSE_REASONS.map((reason) => [reason, lost.filter((r) => r.close_reason === reason)] as const);
+  const unowned = data.rows.filter((r) => r.status === "open" && !r.assigned_to && r.source !== "sla");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  async function distribute() {
+    setBusy(true); setNotice("");
+    try { const r = await distributeFollowups(unowned.map((x) => x.id)); setNotice(r.ok ? `وُزّعت: ${(r as { done?: number }).done ?? 0}` : errors[r.error] ?? r.error); await refresh(); }
+    catch { setNotice(errors.failed); } finally { setBusy(false); }
+  }
   return <div className="space-y-4">
+    {unowned.length > 0 && <section className={`${card} flex flex-wrap items-center justify-between gap-3 border-[#9A3412]/30 p-4`}>
+      <button className="text-right" onClick={() => show(unowned.map((r) => r.id), "بلا مسؤول")}><b className="text-[#9A3412]">{unowned.length} ملفات بلا مسؤول</b><span className="block text-sm text-slate-500">موظف Teletel غير مربوط بموظف في النظام، أو حساب فريق. اختر «مسؤول التأشيرات» و«من يتولى اليوم السابع» في الإعدادات، أو وزّعها الآن.</span></button>
+      <button disabled={busy} className={btnPrimary} onClick={() => void distribute()}>{busy ? <Loader2 className="animate-spin" size={15} /> : null}وزّع</button>
+      {notice && <p role="status" className="w-full text-sm">{notice}</p>}
+    </section>}
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{tiles.map(([label, value, ids]) => <button key={label} className={`${card} p-5 text-right`} onClick={() => ids.length && show(ids, label)}><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-2xl font-extrabold">{value}</p></button>)}</div>
     <section className={`${card} overflow-x-auto p-4`}><h2 className="mb-3 font-extrabold">البائعون هذا الأسبوع</h2>
       <table className="w-full min-w-[34rem] text-right text-sm"><thead><tr><th className="border-b p-2">البائع</th>{cols.map(([label]) => <th key={label} className="border-b p-2">{label}</th>)}</tr></thead>
@@ -177,6 +203,10 @@ function Settings({ data, refresh }: { data: FollowupWorkspaceData; refresh: () 
     <fieldset disabled={busy} className="space-y-2"><legend className="text-sm font-bold">من يتولى اليوم السابع والإغلاق</legend>
       <div className="flex flex-wrap items-center gap-2">{([["seller", "البائع نفسه"], ["employee", "موظف متابعة محدد"], ["manager", "المدير"]] as [FollowupSettings["closer"], string][]).map(([k, label]) => <button key={k} className={s.closer === k ? btnPrimary : btn} onClick={() => k === "employee" ? setS({ ...s, closer: k }) : void save({ ...s, closer: k, closerId: null })}>{label}</button>)}
         {s.closer === "employee" && <select className={`${field} !w-auto min-h-11`} value={s.closerId ?? ""} onChange={(e) => e.target.value && void save({ ...s, closer: "employee", closerId: e.target.value })}><option value="">اختر الموظف…</option>{data.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}</div>
+    </fieldset>
+    <fieldset disabled={busy} className="space-y-2"><legend className="text-sm font-bold">مسؤول التأشيرات</legend>
+      <select className={`${field} !w-auto min-h-11`} value={s.visaOwner ?? ""} onChange={(e) => void save({ ...s, visaOwner: e.target.value || null })}><option value="">لا أحد — تبقى للفريق</option>{data.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+      <p className="text-xs text-slate-500">متابعات التأشيرات التي لا يقابل موظفُ Teletel فيها موظفاً في النظام. يحتاج صلاحية «المتابعة» في الأدوار.</p>
     </fieldset>
     <fieldset disabled={busy} className="space-y-2"><legend className="text-sm font-bold">اقتراح مُراد بعد ساعتين</legend>
       <div className="flex flex-wrap gap-2">{([["note", "ملاحظة داخلية للبائع في Teletel"], ["off", "إيقاف"]] as [FollowupSettings["murad"], string][]).map(([k, label]) => <button key={k} className={s.murad === k ? btnPrimary : btn} onClick={() => void save({ ...s, murad: k })}>{label}</button>)}</div>

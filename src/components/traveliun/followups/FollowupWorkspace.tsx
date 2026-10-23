@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, BellRing, CalendarClock, ExternalLink, FileText, Loader2, MessageCircle, Phone, RefreshCw, Search, Send, Sparkles, Zap } from "lucide-react";
 import { claimFollowup, assignWork, getFollowupWorkspace, getWorkDetail, recordFollowupResult, refreshFollowupSync, remakeSummary, reviewFollowupSend, sendFollowupReply, type FollowupWorkspaceData, type WorkDetail } from "@/lib/data/followups";
 import { duplicateDraft } from "@/lib/data/drafts";
-import { CLOSE_REASONS, handlerOf, isOldIntake, OUTCOMES, todayGroup, type TodayGroup, type WorkResult, type WorkRow } from "@/lib/followups/rules";
+import { CLOSE_REASONS, handlerOf, isOldIntake, OUTCOMES, readable, todayGroup, type TodayGroup, type WorkResult, type WorkRow } from "@/lib/followups/rules";
 import { NEXT_LABEL } from "@/lib/followups/summary-core";
 import { btn, btnPrimary, card, errors, field, GROUP, HeatChip, isToday, Row, since, StepChips, StepLabel, when } from "./followup-ui";
 import { ArchiveReview, ManagerBoard, QuickFollowup } from "./FollowupViews";
@@ -81,8 +81,9 @@ export function FollowupWorkspace({ initial, initialId }: { initial: FollowupWor
   const fileCard = (r: WorkRow) => {
     const s = r.summary;
     const faded = isToday(r.last_attempt_at, now) && !r.client_waiting;
-    const line = r.last_line ?? r.client_line;
-    const byClient = (r.last_by ?? (r.client_waiting ? "client" : "us")) === "client";
+    const line = readable(r.last_line ?? r.client_line);
+    // the first files kept only the client's line
+    const byClient = r.last_line ? r.last_by === "client" : true;
     return <button key={r.id} onClick={() => setSelected(r.id)} className={`w-full rounded-2xl border p-3.5 text-right transition-opacity ${r.id === selected ? "border-[#185045] bg-[#EEF5F1]" : "border-[#E3E8E4] bg-white hover:bg-[#F8FAF8]"} ${faded ? "opacity-55" : ""}`}>
       <span className="flex items-start justify-between gap-2"><span className="font-extrabold text-[#12332c]">{r.contact_name || `عميل #${r.conversation_id}`}</span><HeatChip heat={s?.heat} /></span>
       <span className="mt-1 block truncate text-sm text-slate-700">{[r.destination ?? s?.destination, s?.people].filter(Boolean).join(" · ") || "وجهة غير معروفة"}</span>
@@ -115,8 +116,8 @@ export function FollowupWorkspace({ initial, initialId }: { initial: FollowupWor
         <div className="flex flex-wrap gap-1.5">{([["all", "الكل"], ["hot", "الساخن أولاً"], ["replied", "رد العميل"]] as [Filter, string][]).map(([key, label]) => <button key={key} onClick={() => setFilter(key)} className={`min-h-11 rounded-full px-4 text-sm font-bold ${filter === key ? "bg-[#12332c] text-white" : "bg-white text-[#185045]"}`}>{label}</button>)}</div>
       </div>}
       <div className="@container">
-        <div className="grid gap-4 @3xl:grid-cols-[minmax(270px,330px)_minmax(0,1fr)]">
-          <section className={`${card} p-3`}>
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 @min-[720px]:grid-cols-[minmax(250px,320px)_minmax(0,1fr)]">
+          <section className={`${card} min-w-0 p-3`}>
             <label className="flex items-center gap-2"><Search size={18} className="text-slate-400" /><input className={field} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="العميل أو الهاتف أو الوجهة" /></label>
             <div className="mt-3 max-h-[75vh] space-y-2 overflow-y-auto">
               {tab === "today" && !focus ? (["replied", "due", "late"] as TodayGroup[]).map((g) => {
@@ -130,7 +131,7 @@ export function FollowupWorkspace({ initial, initialId }: { initial: FollowupWor
           {selectedRow ? <WorkPanel key={selectedRow.id} row={selectedRow} data={data} refresh={refresh} close={() => setSelected(null)} name={name} now={now} next={() => {
             const index = rows.findIndex((r) => r.id === selectedRow.id);
             setSelected(rows[index + 1]?.id ?? null);
-          }} /> : <section className={`${card} hidden min-h-80 items-center justify-center p-8 text-slate-500 @3xl:flex`}>اختر عميلًا لترى ملخص مُراد ورسالته المقترحة.</section>}
+          }} /> : <section className={`${card} hidden min-h-80 min-w-0 items-center justify-center p-8 text-slate-500 @min-[720px]:flex`}>اختر عميلًا لترى ملخص مُراد ورسالته المقترحة.</section>}
         </div>
       </div>
       {data.manager && <p className="text-xs text-slate-500">آخر مزامنة: {when(data.lastSync?.at ?? null)} · {data.lastSync?.ok ? "الاتصال يعمل" : "لم تتأكد المزامنة الأخيرة"} · <button className="underline" disabled={busy} onClick={() => void sync()}><RefreshCw className="inline" size={12} /> مزامنة الآن</button></p>}
@@ -198,8 +199,8 @@ function WorkPanel({ row, data, refresh, next, close, name, now }: { row: WorkRo
     if (copy?.ok) router.push(`/basic/${copy.id}`);
     else setNotice("تعذّر نسخ ملف العرض. افتحه وعدّله من «ملف العرض».");
   }
-  return <section className="fixed inset-0 z-[100] space-y-3 overflow-y-auto bg-[#F4F6F3] p-3 @3xl:static @3xl:z-auto @3xl:overflow-visible @3xl:bg-transparent @3xl:p-0">
-    <button className={`${btn} @3xl:hidden`} onClick={close}><ArrowRight size={16} /> رجوع</button>
+  return <section className="fixed inset-0 z-[100] min-w-0 space-y-3 overflow-y-auto bg-[#F4F6F3] p-3 @min-[720px]:static @min-[720px]:z-auto @min-[720px]:overflow-visible @min-[720px]:bg-transparent @min-[720px]:p-0">
+    <button className={`${btn} @min-[720px]:hidden`} onClick={close}><ArrowRight size={16} /> رجوع</button>
     <div className={`${card} p-4`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0"><h2 className="text-xl font-extrabold">{f.contact_name || `عميل #${f.conversation_id}`}</h2>
@@ -214,7 +215,7 @@ function WorkPanel({ row, data, refresh, next, close, name, now }: { row: WorkRo
         {editable && <button className={btn} disabled={busy} onClick={() => void alternative()}>عرض بديل</button>}
       </div>
       {f.status === "open" && !f.assigned_to && data.claim && <button disabled={busy} className={`${btnPrimary} mt-3`} onClick={() => void perform(() => claimFollowup(f.id))}>استلام هذا العميل</button>}
-      {data.manager && f.status === "open" && <label className="mt-3 flex items-center gap-2 text-xs">البائع<select disabled={busy || Boolean(f.send_lock)} className={field} value={f.assigned_to ?? ""} onChange={(e) => void perform(() => assignWork(f.id, e.target.value || null))}><option value="">غير مسند</option>{data.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
+      {data.manager && f.status === "open" && <label className="mt-3 flex items-center gap-2 text-xs">البائع<select disabled={busy || Boolean(f.send_lock)} className={field} value={f.assigned_to ?? ""} onChange={(e) => void perform(() => assignWork(f.id, e.target.value || null))}><option value="">غير مسند</option>{data.people.filter((p) => p.seller || p.id === f.assigned_to).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
       {f.status === "done" && <p className="mt-3 rounded-xl bg-[#F4F6F3] p-3 text-sm">أُغلقت {when(f.done_at)} · {f.outcome && f.outcome in OUTCOMES ? OUTCOMES[f.outcome as keyof typeof OUTCOMES] : "مغلقة"}{f.close_reason ? ` · ${f.close_reason}` : ""}</p>}
       {isOldIntake(f) && <p className="mt-3 text-xs text-slate-500">من القائمة القديمة — تُراجع في «مراجعة قبل الأرشفة».</p>}
     </div>
@@ -239,7 +240,8 @@ function WorkPanel({ row, data, refresh, next, close, name, now }: { row: WorkRo
         {outside ? <p className="rounded-xl bg-[#F4F6F3] p-3 text-sm">{tpl && !f.client_waiting ? <>مرّت 24 ساعة على آخر رسالة من العميل، فتُرسل كقالب «{tpl.label}»{tpl.approved ? " المعتمد." : <span className="font-bold text-[#9A3412]"> — لم تعتمده واتساب بعد، فاتصل بالعميل وسجّل النتيجة.</span>}</> : "مرّت 24 ساعة على آخر رسالة من العميل ولا قالب لهذه الخطوة: اتصل بالعميل ثم سجّل النتيجة."}</p>
           : <><textarea disabled={busy || !detail} className={field} rows={5} maxLength={4000} value={draft} onChange={(e) => setText(e.target.value)} placeholder={s ? "اكتب ردك للعميل…" : "بانتظار مُراد… أو اكتب رسالتك"} /><p className="text-xs text-slate-500">داخل نافذة 24 ساعة: تُرسل نصًا حرًا كما هو.</p></>}
         <div className="flex flex-wrap gap-2">
-          <button disabled={busy || !detail || (outside ? !(tpl?.approved && !f.client_waiting) : !draft.trim())} className={btnPrimary} onClick={() => void send()}><Send size={15} /> أرسل للعميل</button>
+          {outside && !(tpl?.approved && !f.client_waiting) ? (f.contact_phone && <a className={btnPrimary} href={`tel:${f.contact_phone.replace(/[^\d+]/g, "")}`}><Phone size={15} /> اتصل بالعميل</a>)
+            : <button disabled={busy || !detail || (!outside && !draft.trim())} className={btnPrimary} onClick={() => void send()}><Send size={15} /> أرسل للعميل</button>}
           <button disabled={busy} className={btn} onClick={() => void perform(() => remakeSummary(f.id), "كتب مُراد اقتراحًا جديدًا.")}>{busy ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} اقتراح آخر من مُراد</button>
         </div>
         <div className="border-t border-[#EEF2EF] pt-3">

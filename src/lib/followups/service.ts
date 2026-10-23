@@ -12,7 +12,7 @@ export async function followupRows<T>(page: (from: number, to: number) => Promis
   }
 }
 import { grantedPermissions } from "@/lib/roles/roles";
-import { CADENCE_MS, clientLine, isOfferRow, isVisaOffer, lastOffer, offerLine, offerText, QUIET_MS, stepDue, stepFor, toOfferMsg, WORK_COLS, type RawThreadMsg, type WorkRow } from "./rules";
+import { CADENCE_MS, clientLine, FOLLOWUP_SETTINGS_KEY, isOfferRow, isVisaOffer, lastOffer, offerLine, offerText, parseFollowupSettings, type FollowupSettings, QUIET_MS, stepDue, stepFor, toOfferMsg, WORK_COLS, type RawThreadMsg, type WorkRow } from "./rules";
 
 export const followupDb = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 /** Who may hold a follow-up: the follow-up team, its managers, and the sellers (their own offers). */
@@ -23,7 +23,12 @@ export async function followupPeople() {
   return ((data ?? []) as unknown as Person[]).filter((p) => {
     const keys = grantedPermissions({ ...p, permission_keys: p.roles?.permission_keys ?? [] });
     return keys.some((k) => ["followups.work", "followups.manage", "dashboard.admin", "developer.access", "offers.write"].includes(k));
-  }).map((p) => ({ id: p.id, name: p.arabic_name, agentId: p.teletel_agent_id, seller: grantedPermissions({ ...p, permission_keys: p.roles?.permission_keys ?? [] }).includes("offers.write") }));
+  }).map((p) => {
+    const keys = grantedPermissions({ ...p, permission_keys: p.roles?.permission_keys ?? [] });
+    // the pickers' sellers: who sells in Teletel — not the administration's or the developer's accounts
+    const seller = Boolean(p.teletel_agent_id) && keys.includes("offers.write") && !keys.includes("dashboard.admin") && !keys.includes("developer.access");
+    return { id: p.id, name: p.arabic_name, agentId: p.teletel_agent_id, seller };
+  });
 }
 /** The employee behind a Teletel agent: their own link (employees.teletel_agent_id), else the follow-up map. */
 export async function agentEmployees(people: Awaited<ReturnType<typeof followupPeople>>): Promise<(agentId: number | null) => string | null> {
@@ -73,6 +78,9 @@ export async function enrollFollowup(c: OpenConversation, source: "manual" | "te
   return String(data.id);
 }
 
+/** The settings' owner for a file whose agent has no employee: a visa's «مسؤول التأشيرات», else the one named for day seven. */
+export const ownerFor = (visa: boolean, s: FollowupSettings) => (visa && s.visaOwner) || (s.closer === "employee" ? s.closerId : null);
+
 /** conversations already read for an offer, at their last activity (a restart reads them once more) */
 const offerChecked = new Map<number, number>();
 // ponytail: a dozen threads a minute; a deploy's backlog of a few hundred clears within the hour
@@ -88,7 +96,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
  * only (it has a client_leads row); never one the cadence is over for, nor an
  * offer a closed file already followed.
  */
-async function enrolOffers(candidates: OpenConversation[], openIds: Set<number>, active: Map<number, WorkRow>, latestDone: Map<number, WorkRow>, now: number): Promise<number> {
+async function enrolOffers(candidates: OpenConversation[], openIds: Set<number>, active: Map<number, WorkRow>, latestDone: Map<number, WorkRow>, now: number, settings: FollowupSettings): Promise<number> {
   if (!candidates.length) return 0;
   const db = followupDb();
   const { data: leads } = await db.from("client_leads").select("teletel_conversation_id,destination").in("teletel_conversation_id", candidates.map((c) => c.id));
@@ -97,27 +105,28 @@ async function enrolOffers(candidates: OpenConversation[], openIds: Set<number>,
   if (!queue.length) return 0;
   const byAgent = await followupPeople().then(agentEmployees);
   let added = 0;
-  for (const c of queue) {
+  const one = async (c: OpenConversation) => {
     const list = await teletelGet<{ payload?: RawThreadMsg[] }>(`/conversations/${c.id}/messages`);
-    if (!list) continue;
+    if (!list) return;
     offerChecked.set(c.id, c.lastActivityAt);
     const messages = (list.payload ?? []).map(toOfferMsg).filter((m) => m !== null);
     const offer = lastOffer(messages);
-    if (!offer || now - offer.lastAt * 1000 < QUIET_MS || now - offer.at * 1000 > CADENCE_MS) continue;
+    if (!offer || now - offer.lastAt * 1000 < QUIET_MS || now - offer.at * 1000 > CADENCE_MS) return;
     const done = latestDone.get(c.id);
-    if (done && offer.at * 1000 <= Date.parse(done.done_at ?? done.created_at)) continue;
+    if (done && offer.at * 1000 <= Date.parse(done.done_at ?? done.created_at)) return;
     const old = active.get(c.id);
     // an open offer's file restarts its steps for a NEW programme only («عرض بديل»): a price line may be our own reminder
-    if (old && isOfferRow(old) && !(offer.strong && offer.at * 1000 > Date.parse(old.offer_at ?? "") + 60_000)) continue;
+    if (old && isOfferRow(old) && !(offer.strong && offer.at * 1000 > Date.parse(old.offer_at ?? "") + 60_000)) return;
     const serial = offer.serial;
     const { data: basic } = serial
       ? await db.from("offers").select("id,serial,status,employee_id,destination,total,currency").eq("serial", serial).maybeSingle()
       : { data: null };
-    if (basic && ["confirmed", "cancelled"].includes(basic.status)) continue;
-    const seller = basic?.employee_id ?? byAgent(offer.senderId) ?? byAgent(c.assigneeId);
+    if (basic && ["confirmed", "cancelled"].includes(basic.status)) return;
+    const visa = !basic && isVisaOffer(offer.text);
+    // an agent with no employee behind him (a team account, a visa agent not in the system): the settings' owner
+    const seller = basic?.employee_id ?? byAgent(offer.senderId) ?? byAgent(c.assigneeId) ?? ownerFor(visa, settings);
     const offerAt = offer.at * 1000;
     const step = stepFor(offerAt, now);
-    const visa = !basic && isVisaOffer(offer.text);
     const fields = {
       source: basic ? "offer" : visa ? "visa" : "price",
       offer_id: basic?.id ?? null,
@@ -149,7 +158,10 @@ async function enrolOffers(candidates: OpenConversation[], openIds: Set<number>,
       if (error && error.code !== "23505") throw new Error("followup offer enrollment failed");
     }
     added++;
-  }
+  };
+  await Promise.all(Array.from({ length: 6 }, async () => {
+    for (let c = queue.shift(); c; c = queue.shift()) await one(c);
+  }));
   return added;
 }
 
@@ -238,12 +250,19 @@ export async function syncFollowups() {
     }
   }
   const openIds = new Set(fetched.rows.map((c) => c.id));
-  added += await enrolOffers(candidates, openIds, active, latestDone, nowMs);
+  const { data: setting } = await db.from("app_settings").select("value").eq("key", FOLLOWUP_SETTINGS_KEY).maybeSingle();
+  const settings = parseFollowupSettings(setting?.value);
+  added += await enrolOffers(candidates, openIds, active, latestDone, nowMs, settings);
+  // a file nobody holds goes to the owner the settings name («مسؤول التأشيرات», «من يتولى اليوم السابع»)
+  for (const r of rows.filter((x) => x.status === "open" && !x.assigned_to && x.source !== "sla")) {
+    const owner = ownerFor(r.source === "visa", settings);
+    if (owner) await db.from("sla_followups").update({ assigned_to: owner, assigned_at: now, stage: r.stage === "new" ? "working" : r.stage }).eq("id", r.id).is("assigned_to", null);
+  }
   // the first files (498e50c) kept the raw text and took a visa's papers for a trip: put right once
-  for (const r of rows.filter((x) => x.status === "open" && x.source === "price" && x.offer_line)) {
+  for (const r of rows.filter((x) => x.status === "open" && ["price", "visa"].includes(x.source) && x.offer_line)) {
     const visa = isVisaOffer(r.offer_line!);
     const line = offerLine(r.offer_line!) || r.offer_line!;
-    if (visa || line !== r.offer_line) await db.from("sla_followups").update({ offer_line: line, ...(visa ? { source: "visa", transfer_reason: "أوراق ورسوم تأشيرة بلا رد من العميل" } : {}) }).eq("id", r.id).eq("source", "price");
+    if ((visa && r.source === "price") || line !== r.offer_line) await db.from("sla_followups").update({ offer_line: line, ...(visa ? { source: "visa", transfer_reason: "أوراق ورسوم تأشيرة بلا رد من العميل" } : {}) }).eq("id", r.id);
   }
   await closeSettled(rows, now);
   for (const row of rows.filter((r) => r.status === "open" && !openIds.has(r.conversation_id)).sort((a, b) => Date.parse(a.last_synced_at ?? a.created_at) - Date.parse(b.last_synced_at ?? b.created_at)).slice(0, 25)) {

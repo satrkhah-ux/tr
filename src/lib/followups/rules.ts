@@ -106,6 +106,11 @@ export function toOfferMsg(m: RawThreadMsg): OfferMsg | null {
     serial: [text, ...names].join(" ").match(SERIAL)?.[0] ?? null,
   };
 }
+/** Teletel's own English line for a view-once photo, as the staff should read it. */
+export function readable(text: string | null): string | null {
+  if (!text) return text;
+  return /customer sent media|does not reach the system|view[- ]?once/i.test(text) ? "أرسل العميل صورة أو ملفاً لم يصل للنظام — اطلب إعادة إرساله كملف" : text;
+}
 /** The client's latest line, for the card. */
 /**
  * A visa's papers and fee, not a trip: followed as a visa (its own wording, no
@@ -118,10 +123,12 @@ export const isVisaOffer = (text: string) => VISA.test(text);
  * WhatsApp marks or the company's own header («🌍 **TRAVELIUN | ترافليون…**»).
  * A programme sent as a file alone borrows our text next to it.
  */
+// a line's decorative ends: flags, pictographs, bullets («🌍 🇹🇷 …», «✈️ …», «… 🇹🇷»)
+const EDGE = /^[\s|•·:–\-\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\uFE0F\u200D]+|[\s|•·:–\-\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\uFE0F\u200D]+$/gu;
 const BRAND = /\|?\s*(?:TRAVELIUN(?:\s+TRAVEL\s*&\s*TOURISM)?|ترافليون(?:\s+للسفر\s+والسياحة)?)\s*\|?/gi;
 export function offerLine(text: string): string {
   const lines = text.split(/\n|\\(?=\s)/)
-    .map((l) => l.replace(/[*_~`]+/g, "").replace(BRAND, " ").replace(/[━─➖=]{3,}/g, "").replace(/^[\s|•·:–-]+|[\s|•·:–-]+$/g, "").replace(/\s+/g, " ").trim())
+    .map((l) => l.replace(/[*_~`]+/g, "").replace(BRAND, " ").replace(/[━─➖=]{3,}/g, "").replace(EDGE, "").replace(/\s+/g, " ").trim())
     .filter((l) => l.replace(/[^\p{L}\d]/gu, "").length >= 3);
   if (!lines.length) return "";
   const title = lines[0];
@@ -136,7 +143,7 @@ export function offerText(messages: readonly OfferMsg[], offer: { at: number; te
 }
 export function clientLine(messages: readonly OfferMsg[]): string | null {
   const m = messages.filter((x) => x.fromClient && x.text.trim()).sort((a, b) => a.at - b.at).at(-1);
-  return m ? m.text.trim().slice(0, 200) : null;
+  return m ? readable(m.text.trim().slice(0, 200)) : null;
 }
 
 export type WorkRow = {
@@ -208,16 +215,17 @@ export const WORK_COLS = "id,conversation_id,contact_name,contact_phone,status,s
  * managers — and Murad's note two hours after an offer (a private Teletel note
  * to the seller; never a message to the client).
  */
-export type FollowupSettings = { closer: "seller" | "employee" | "manager"; closerId: string | null; murad: "note" | "off" };
+export type FollowupSettings = { closer: "seller" | "employee" | "manager"; closerId: string | null; murad: "note" | "off"; visaOwner?: string | null };
 export const FOLLOWUP_SETTINGS_KEY = "followup_settings";
 export function parseFollowupSettings(raw: string | null | undefined): FollowupSettings {
-  const fallback: FollowupSettings = { closer: "seller", closerId: null, murad: "note" };
+  const fallback: FollowupSettings = { closer: "seller", closerId: null, murad: "note", visaOwner: null };
   try {
     const v = JSON.parse(raw ?? "") as Partial<FollowupSettings>;
     return {
       closer: v.closer === "employee" || v.closer === "manager" ? v.closer : "seller",
       closerId: typeof v.closerId === "string" && /^[0-9a-f-]{36}$/i.test(v.closerId) ? v.closerId : null,
       murad: v.murad === "off" ? "off" : "note",
+      visaOwner: typeof v.visaOwner === "string" && /^[0-9a-f-]{36}$/i.test(v.visaOwner) ? v.visaOwner : null,
     };
   } catch { return fallback; }
 }

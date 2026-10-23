@@ -67,13 +67,14 @@ export async function getFollowupWorkspace() {
   const rows = (data ?? []) as WorkRow[];
   let attempts: (Pick<Attempt, "employee_id" | "kind" | "outcome" | "delivery_state" | "created_at"> & { followup_id: string })[] = [];
   let bookings: { followup_id: string; serial: string; total: number | null }[] = [];
-  let templates: Record<string, string> | null = null;
+  // everyone: the quick round and the panel offer «أرسل» outside the 24 hours only for an approved template
+  const status = await whatsappTemplateStatus();
+  const templates: Record<string, string> | null = status ? Object.fromEntries(TEMPLATE_NAMES.map((n) => [n, status.get(n) ?? "NONE"])) : null;
   if (who.manager) {
     const weekAgo = new Date(Date.now() - 8 * 864e5).toISOString();
-    const [result, confirmed, status] = await Promise.all([
+    const [result, confirmed] = await Promise.all([
       followupRows((a, b) => db.from("followup_attempts").select("followup_id,employee_id,kind,outcome,delivery_state,created_at").gte("created_at", weekAgo).order("id").range(a, b)),
       db.rpc("followup_confirmed_bookings"),
-      whatsappTemplateStatus(),
     ]);
     attempts = result.data ?? [];
     if (confirmed.error) throw new Error("تعذر تحميل الحجوزات المؤكدة");
@@ -81,7 +82,6 @@ export async function getFollowupWorkspace() {
     const { data: totals } = serials.length ? await db.from("offers").select("serial,total_sar").in("serial", serials.map((s) => s.serial)) : { data: [] };
     const sar = new Map(((totals ?? []) as { serial: string; total_sar: number | null }[]).map((t) => [t.serial, t.total_sar]));
     bookings = serials.map((s) => ({ ...s, total: sar.get(s.serial) ?? null }));
-    templates = status ? Object.fromEntries(TEMPLATE_NAMES.map((n) => [n, status.get(n) ?? "NONE"])) : null;
   }
   let lastSync: { at: string; ok: boolean } | null = null;
   try { lastSync = heartbeat ? JSON.parse(heartbeat.value) : null; } catch { /* unknown */ }
@@ -240,26 +240,30 @@ export async function restartFollowups(ids: string[]) {
     return action(id, "restart", { step: stepFor(from, Date.now()), offerAt: new Date(from).toISOString(), dueAt: new Date(Date.now() + 60_000).toISOString() });
   });
 }
-/** «وزّع على المبيعات»: each to the seller holding the conversation in Teletel, else in turn among the sellers. */
+/** «وزّع على المبيعات»: each to the seller holding the conversation in Teletel, a visa to «مسؤول التأشيرات», else in turn among the sellers. */
 export async function distributeFollowups(ids: string[]) {
-  const [people, open, { data }] = await Promise.all([
+  const [people, open, { data }, settings] = await Promise.all([
     followupPeople(), listOpenConversations(),
-    manyIds(ids) ? followupDb().from("sla_followups").select("id,conversation_id").in("id", ids) : Promise.resolve({ data: [] }),
+    manyIds(ids) ? followupDb().from("sla_followups").select("id,conversation_id,source").in("id", ids) : Promise.resolve({ data: [] }),
+    readSettings(),
   ]);
   const byAgent = await agentEmployees(people);
   const sellers = people.filter((p) => p.seller && p.agentId);
   const holder = new Map((open?.rows ?? []).map((c) => [c.id, byAgent(c.assigneeId)]));
-  const convOf = new Map(((data ?? []) as { id: string; conversation_id: number }[]).map((r) => [r.id, r.conversation_id]));
+  const rowOf = new Map(((data ?? []) as { id: string; conversation_id: number; source: string }[]).map((r) => [r.id, r]));
   let turn = 0;
   return each(ids, (id) => {
-    const target = holder.get(convOf.get(id) ?? -1) ?? sellers[turn++ % Math.max(1, sellers.length)]?.id ?? null;
+    const row = rowOf.get(id);
+    const target = holder.get(row?.conversation_id ?? -1) ?? (row?.source === "visa" ? settings.visaOwner : null) ?? sellers[turn++ % Math.max(1, sellers.length)]?.id ?? null;
     return target ? action(id, "assign", { employeeId: target }) : Promise.resolve({ ok: false, error: "invalid" } as WorkResult);
   });
 }
 export async function saveFollowupPageSettings(next: FollowupSettings): Promise<WorkResult> {
   if (!(await access())?.manager) return { ok: false, error: "forbidden" };
   const clean = parseFollowupSettings(JSON.stringify(next));
-  if (clean.closer === "employee" && !(clean.closerId && (await followupPeople()).some((p) => p.id === clean.closerId))) return { ok: false, error: "invalid" };
+  const people = await followupPeople();
+  if (clean.closer === "employee" && !(clean.closerId && people.some((p) => p.id === clean.closerId))) return { ok: false, error: "invalid" };
+  if (clean.visaOwner && !people.some((p) => p.id === clean.visaOwner)) return { ok: false, error: "invalid" };
   const { error } = await followupDb().from("app_settings").upsert({ key: FOLLOWUP_SETTINGS_KEY, value: JSON.stringify(clean), updated_at: new Date().toISOString() });
   if (!error) await logAudit({ action: "data.updated", entity: "followup_settings", entity_id: FOLLOWUP_SETTINGS_KEY, meta: clean });
   return error ? { ok: false, error: "failed" } : { ok: true };
