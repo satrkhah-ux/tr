@@ -121,7 +121,7 @@ export function messagesDueToday(start: string | null, end: string | null, today
  * What a template is about: a stage message, the programme sent when a file is
  * issued, or a booking's update prepared for staff (client-booking-state.ts).
  */
-export type WaTemplateKey = ClientMessageKey | "programme" | "booking_update";
+export type WaTemplateKey = ClientMessageKey | "programme" | "programme_updated" | "booking_update";
 
 type WaField = "name" | "destination" | "serial" | "link" | "date";
 
@@ -147,11 +147,19 @@ const HELLO = "عميلنا {{1}}،";
  * ends with a variable: Meta refuses those.
  */
 export const WA_TEMPLATES: Record<WaTemplateKey, WaTemplateDef> = {
+  // the programme's own words (programmeMessage, the owner 2026-10-22): no link — the PDF is the
+  // programme, the bookings' link goes once the client confirms. Replaces «traveliun_trip_program».
   programme: {
-    name: "traveliun_trip_program",
+    name: "traveliun_program_ready",
     document: true,
-    params: ["name", "destination", "serial", "link"],
-    body: [HELLO, "تم إعداد برنامج رحلتك إلى {{2}}", "(رقم الملف {{3}})", "البرنامج كاملاً في الملف المرفق، وتفاصيله من هنا:", "{{4}}", SIGN].join("\n\n"),
+    params: ["name", "destination", "serial"],
+    body: [HELLO, "برنامج رحلتك إلى {{2}} جاهز، وتجده في الملف المرفق.", "رقم الملف: {{3}}", "راجعه وأخبرنا بأي تعديل، وبعد تأكيدك نرسل لك رابط متابعة حجوزاتك.", SIGN].join("\n\n"),
+  },
+  programme_updated: {
+    name: "traveliun_program_updated",
+    document: true,
+    params: ["name", "destination", "serial"],
+    body: [HELLO, "حدّثنا برنامج رحلتك إلى {{2}}، والنسخة المحدَّثة في الملف المرفق.", "رقم الملف: {{3}}", "راجعه وأخبرنا بأي تعديل.", SIGN].join("\n\n"),
   },
   bookings_confirmed: {
     name: "traveliun_bookings_confirmed",

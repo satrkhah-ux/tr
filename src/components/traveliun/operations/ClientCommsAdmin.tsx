@@ -74,6 +74,7 @@ export function ClientCommsAdmin({
           <div className="mt-3 rounded-[10px] bg-[#f6faf8] px-3 py-2 dark:bg-[#0f1f1b]">
             <p className="text-[12.5px] font-bold text-[#185045] dark:text-[#d6e5df]">عند إصدار العرض: البرنامج مع نسخة PDF</p>
             <WaStatus k="programme" status={waStatus} />
+            <WaStatus k="programme_updated" status={waStatus} />
           </div>
         </section>
         {templates.map((t) => (

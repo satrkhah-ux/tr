@@ -4,6 +4,7 @@
 // Only the messages switched on in /settings/client-comms, the programme and the booking update.
 // Usage: node scripts/submit-wa-templates.mjs            (dry run: prints what would be sent)
 //        node scripts/submit-wa-templates.mjs --submit   (submits the ones not already on the account)
+//        … --only=traveliun_program_ready,traveliun_program_updated   (just these)
 //
 // The Meta token and the business account id are read from Teletel's WhatsApp inbox
 // (TELETEL_* in .env.local) at run time and never printed. Templates already on the
@@ -73,9 +74,13 @@ async function documentHandle() {
   return up?.h ?? null;
 }
 
+// --only=name1,name2: submit just these templates
+const only = process.argv.find((a) => a.startsWith("--only="))?.slice(7).split(",").filter(Boolean);
+
 for (const [key, def] of Object.entries(WA_TEMPLATES)) {
+  if (only && !only.includes(def.name)) continue;
   // the programme and the prepared booking updates are always sent by a person — no switch to wait for
-  if (key !== "programme" && key !== "booking_update" && !enabled.has(key)) continue;
+  if (!["programme", "programme_updated", "booking_update"].includes(key) && !enabled.has(key)) continue;
   if (existing.has(def.name)) {
     console.log(`= ${def.name}: already on the account (${existing.get(def.name)})`);
     continue;

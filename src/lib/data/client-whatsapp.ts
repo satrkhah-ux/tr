@@ -229,7 +229,7 @@ export async function offerMessage(serial: string, updated: boolean): Promise<Of
     const base = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
     const where = [row.destination, row.duration ? `(${row.duration})` : ""].filter(Boolean).join(" ");
     const link = `${base}/client-offer/${row.serial}`;
-    const destination = row.destination?.trim() || "";
+    const key = updated ? "programme_updated" : "programme";
     // short, and no link: the PDF follows, the bookings' link comes once the client confirms (client-messages.ts)
     const text = programmeMessage({
       hello: greeting(customer?.arabic_name),
@@ -255,10 +255,10 @@ export async function offerMessage(serial: string, updated: boolean): Promise<Of
       note,
       labels: [updated ? "عرض-محدث" : "عرض-مرسل"],
       pdfName,
-      // after the 24 hours: the approved template, the PDF riding as its document
+      // after the 24 hours: the approved template — the same words, no link — the PDF riding as its document
       template: {
-        key: "programme",
-        params: waParams("programme", { name: customer?.arabic_name ?? "", destination, serial: row.serial, link, rate_link: "" }),
+        key,
+        params: waParams(key, { name: customer?.arabic_name ?? "", destination: where, serial: row.serial, link, rate_link: "" }),
         document: { url: `${link}/pdf`, name: pdfName, serial: row.serial },
       },
     };
