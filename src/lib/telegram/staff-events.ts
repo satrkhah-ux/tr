@@ -2,11 +2,12 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { listOpenConversations, teletelConversationUrl } from "@/lib/providers/teletel";
-import { escapeHtml, staffForAgent, staffSend } from "./staff-bot";
+import { clearSlot, escapeHtml, staffForAgent, staffSend } from "./staff-bot";
 import type { InlineButton } from "./ops-bot";
 import { sendDailyReports } from "./staff-report";
 import { refreshScreens, remindWaiting } from "./staff-screen";
 import { pushDecisions } from "./staff-decisions";
+import { lettersTick } from "./staff-letters";
 import { forwardClientMessage, onMessageUpdated, refreshDeliveries, rememberThread, type TeletelMessageEvent } from "./staff-replies";
 
 /**
@@ -72,7 +73,7 @@ async function claimAndAnnounce(conversationId: number, agent: number | null, so
   if (error || data !== true || agent === null) return false;
   const member = await staffForAgent(agent);
   if (!member) return false;
-  const sent = await staffSend(member.chatId, assignmentText(card), assignmentButtons(conversationId));
+  const sent = await staffSend(member.chatId, assignmentText(card), assignmentButtons(conversationId), {}, `conv:${conversationId}`);
   if (sent.ok) await rememberThread(member.chatId, sent.messageId, conversationId);
   return sent.ok;
 }
@@ -146,15 +147,57 @@ export async function staffSweep(): Promise<{ seen: number; announced: number; b
   return { seen: rows.length, announced };
 }
 
+/**
+ * A client's message leaves the chat once their conversation is closed or is no
+ * longer this employee's. Judged against the open list as it was read: a
+ * message posted after that read (a fresh assignment) waits for the next one.
+ */
+export async function dropGone(): Promise<number> {
+  const { data } = await db().from("staff_bot_slots").select("chat_id, slot, created_at").like("slot", "conv:%");
+  const slots = (data ?? []) as { chat_id: number | string; slot: string; created_at: string }[];
+  if (!slots.length) return 0;
+  const list = await listOpenConversations();
+  if (!list) return 0;
+  const assignee = new Map(list.rows.map((r) => [r.id, r.assigneeId]));
+  const { data: people } = await db().from("employees").select("telegram_chat_id, teletel_agent_id").not("telegram_chat_id", "is", null);
+  const agentOf = new Map(((people ?? []) as { telegram_chat_id: number | string; teletel_agent_id: number | null }[]).map((p) => [Number(p.telegram_chat_id), p.teletel_agent_id]));
+  const newest = new Map<string, number>();
+  for (const s of slots) {
+    const key = `${s.chat_id}|${s.slot}`;
+    newest.set(key, Math.max(newest.get(key) ?? 0, Date.parse(s.created_at)));
+  }
+  let dropped = 0;
+  for (const [key, at] of newest) {
+    if (at >= list.at) continue;
+    const [chat, slot] = key.split("|");
+    const chatId = Number(chat);
+    if (assignee.get(Number(slot.slice(5))) === agentOf.get(chatId)) continue;
+    await clearSlot(chatId, slot);
+    dropped += 1;
+  }
+  return dropped;
+}
+
 /** The minute job's share of «تنبيهاتي» (inside /api/murad/run, after the follow-ups sync refreshed the open list): the sweep, the delivery statuses, the waiting reminders, the live screens (every fifth minute), and from 23:00 Riyadh the evening reports. */
 export async function staffTick(): Promise<Record<string, unknown>> {
-  const [sweep, deliveries, reminders, screens, reports, decisions] = await Promise.all([
+  const [sweep, deliveries, reminders, screens, reports, decisions, letters] = await Promise.all([
     staffSweep(),
     refreshDeliveries(),
     remindWaiting(),
     refreshScreens(),
     sendDailyReports(),
     pushDecisions(),
+    lettersTick(),
   ]);
-  return { sweep, deliveries, ...(reminders ? { reminders } : {}), ...(screens ? { screens } : {}), ...(reports ? { reports } : {}), ...(decisions ? { decisions } : {}) };
+  const dropped = await dropGone();
+  return {
+    sweep,
+    deliveries,
+    ...(reminders ? { reminders } : {}),
+    ...(screens ? { screens } : {}),
+    ...(reports ? { reports } : {}),
+    ...(decisions ? { decisions } : {}),
+    ...(letters ? { letters } : {}),
+    ...(dropped ? { dropped } : {}),
+  };
 }

@@ -83,7 +83,7 @@ export async function teamView(me: StaffMember): Promise<ScreenView> {
           callback_data: `e:${r.p.id}`,
         },
       ]),
-      [{ text: "🔄 تحديث", callback_data: "team" }],
+      [{ text: "🔄 تحديث", callback_data: "team" }, { text: "📄 الخطابات", callback_data: "lt" }],
     ],
   };
 }
@@ -237,7 +237,7 @@ export async function confirmDraft(me: StaffMember, chatId: number, previewId: n
   const people = (await colleagues()).filter((p) => p.chatId && (row.target_id ? p.id === row.target_id : p.id !== me.id));
   const missed: string[] = [];
   for (const p of people) {
-    if (!(await staffSend(p.chatId as number, broadcastText(row.content, me.name, Boolean(row.target_id)))).ok) missed.push(p.name);
+    if (!(await staffSend(p.chatId as number, broadcastText(row.content, me.name, Boolean(row.target_id)), undefined, {}, "admin")).ok) missed.push(p.name);
   }
   const delivered = people.length - missed.length;
   await db()

@@ -29,6 +29,34 @@ export const letterTerms = (t: LetterTargets): string[] => [
 
 export const share = (part: number, total: number): string => (total > 0 ? `${Math.round((part / total) * 100)}%` : "—");
 
+/** Letter 2 comes this long after letter 1. */
+export const SECOND_LETTER_DAYS = 10;
+
+/**
+ * Letter 2's verdict on closing: kept to it, unless 20 or more are still open
+ * and not down by a quarter since letter 1.
+ * ponytail: fixed thresholds (20 open, −25%); a setting when the owner wants to tune them.
+ */
+export const closedEnough = (before: LetterNumbers, now: LetterNumbers): boolean => !(now.open >= 20 && now.open > before.open * 0.75);
+
+export const delta = (before: number, now: number): string => (now === before ? "0" : now > before ? `+${now - before}` : `−${before - now}`);
+
+export function comparisonLines(before: LetterNumbers, now: LetterNumbers): string[] {
+  const closed = now.closed - before.closed;
+  return [
+    closed > 0 ? `أغلقت ${closed} محادثة خلال هذه المدة.` : "لم تُغلق أي محادثة خلال هذه المدة.",
+    now.open < before.open
+      ? `انخفضت محادثاتك المفتوحة من ${before.open} إلى ${now.open}.`
+      : now.open > before.open
+        ? `ارتفعت محادثاتك المفتوحة من ${before.open} إلى ${now.open}.`
+        : `بقيت محادثاتك المفتوحة ${now.open} كما هي.`,
+    `العملاء الذين أكّدوا معك: ${now.confirmed} (كانوا ${before.confirmed} في الخطاب رقم 1).`,
+  ];
+}
+
+export const WITHDRAW_NOTICE = "لم تلتزم بإغلاق المحادثات المنتهية خلال المهلة، وسيتم سحب المحادثات منك آلياً بعد استلامك هذا الخطاب.";
+export const COMMITTED_NOTE = "شكراً لالتزامك بإغلاق المحادثات المنتهية، استمر على ذلك.";
+
 /** At most three, the most pressing first; a clean sheet gets praise, not an invented problem. */
 export function letterTips(n: LetterNumbers): string[] {
   const tips: string[] = [];

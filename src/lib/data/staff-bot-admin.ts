@@ -139,6 +139,9 @@ export async function sendMemberTestMessage(employeeId: string): Promise<TestRes
   const sent = await staffSend(
     Number(row.telegram_chat_id),
     `🔔 رسالة تجربة من نظام ترافليون\n\nأهلاً ${row.arabic_name} — حسابك مربوط ✅\nستصلك هنا تنبيهات محادثاتك في تيلي تيل.`,
+    undefined,
+    {},
+    "test",
   );
   await logAudit({ action: "employee.telegram_test", entity: "employees", entity_id: employeeId, meta: { ok: sent.ok, reason: sent.ok ? null : sent.reason } });
   if (sent.ok) return { ok: true };

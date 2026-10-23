@@ -163,7 +163,7 @@ export async function sendDailyReports(nowMs = Date.now()): Promise<{ sent: numb
     if (!claimed?.length) continue;
     const report = await buildReport(me, nowMs, summaries);
     if (!report) continue;
-    const ok = (await staffSend(me.chatId, report.text)).ok;
+    const ok = (await staffSend(me.chatId, report.text, undefined, {}, "report")).ok;
     await db()
       .from("staff_bot_reports")
       .update({ numbers: report.facts, tips: report.tips, sent: ok })

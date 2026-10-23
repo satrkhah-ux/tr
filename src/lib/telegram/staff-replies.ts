@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { decryptSecret, encryptSecret, isVaultConfigured } from "@/lib/crypto/secrets";
 import { logAudit } from "@/lib/data/audit";
 import {
+  conversationThread,
   sendTeletelMessageAs,
   teletelAgentOfToken,
   teletelConversationUrl,
@@ -11,7 +12,7 @@ import {
   teletelMessageStatus,
   type DeliveryStatus,
 } from "@/lib/providers/teletel";
-import { escapeHtml, staffCall, staffForAgent, staffSend, type StaffMember } from "./staff-bot";
+import { clearSlot, escapeHtml, staffCall, staffForAgent, staffSend, type StaffMember } from "./staff-bot";
 import type { InlineButton } from "./ops-bot";
 
 /**
@@ -74,6 +75,26 @@ export function threadText(clientName: string, lines: ThreadLine[], muradIds: Se
     .join("\n┈┈┈┈┈┈┈┈\n");
 }
 
+/** The conversation's last `count` messages, who wrote each (the card and the client's new message share it). Null when Teletel cannot be read. */
+export async function recentThread(
+  conversationId: number,
+  clientName: string,
+  count: number,
+  extra?: ThreadLine,
+): Promise<{ text: string; shown: number; canReply: boolean } | null> {
+  const [thread, murad] = await Promise.all([
+    conversationThread(conversationId),
+    db().from("murad_log").select("reply_message_id").eq("conversation_id", conversationId).not("reply_message_id", "is", null),
+  ]);
+  if (!thread) return null;
+  const lines: ThreadLine[] = thread.messages.filter((m) => !m.isPrivate && m.text);
+  // the webhook can arrive before the message is listed
+  if (extra && !lines.some((m) => m.id === extra.id)) lines.push(extra);
+  const shown = lines.slice(-count);
+  const muradIds = new Set(((murad.data ?? []) as { reply_message_id: number }[]).map((r) => Number(r.reply_message_id)));
+  return { text: threadText(clientName, shown, muradIds), shown: shown.length, canReply: thread.canReply };
+}
+
 export function replyButtons(conversationId: number): InlineButton[][] {
   const url = teletelConversationUrl(conversationId);
   return [[{ text: "✍️ رد", callback_data: `r:${conversationId}` }, ...(url ? [{ text: "💬 تيلي تيل", url }] : [])]];
@@ -104,10 +125,16 @@ export async function forwardClientMessage(body: TeletelMessageEvent): Promise<v
   const files = body.attachments?.length ? `📎 ${body.attachments.length > 1 ? `${body.attachments.length} مرفقات` : "مرفق"} — افتحه في تيلي تيل` : "";
   if (!text && !files) return;
   const name = body.conversation?.meta?.sender?.name?.trim() || `#${conversationId}`;
+  // one message per client: this one replaces the older ones about them, so it carries the last few messages
+  const recent = text ? await recentThread(conversationId, name, 4, { id: Number(body.id), at: Math.floor(Date.now() / 1000), text, fromClient: true, sender: name }) : null;
   const sent = await staffSend(
     member.chatId,
-    [`👤 <b>رسالة من العميل — ${escapeHtml(name)}</b>`, text ?escapeHtml(text.slice(0, 1500)) : null, files || null].filter(Boolean).join("\n"),
+    [`👤 <b>رسالة جديدة من العميل — ${escapeHtml(name)}</b>`, "", recent ? recent.text : text ? escapeHtml(text.slice(0, 1500)) : null, files || null]
+      .filter((line) => line !== null)
+      .join("\n"),
     replyButtons(conversationId),
+    {},
+    `conv:${conversationId}`,
   );
   if (sent.ok) await rememberThread(member.chatId, sent.messageId, conversationId);
 }
@@ -119,9 +146,13 @@ export async function promptReply(me: StaffMember, chatId: number, conversationI
     await staffSend(chatId, conv.text);
     return;
   }
-  const sent = await staffSend(chatId, `✍️ اكتب ردك على <b>${escapeHtml(conv.name)}</b> — يصله من حسابك في تيلي تيل:`, undefined, {
-    reply_markup: { force_reply: true, input_field_placeholder: "ردك للعميل" },
-  });
+  const sent = await staffSend(
+    chatId,
+    `✍️ اكتب ردك على <b>${escapeHtml(conv.name)}</b> — يصله من حسابك في تيلي تيل:`,
+    undefined,
+    { reply_markup: { force_reply: true, input_field_placeholder: "ردك للعميل" } },
+    "prompt",
+  );
   if (sent.ok) await rememberThread(chatId, sent.messageId, conversationId);
 }
 
@@ -198,8 +229,13 @@ function confirmation(name: string, content: string, status: DeliveryStatus, err
   ].join("\n");
 }
 
-/** The employee's own words → the client, as them. Refused with the reason when it cannot go. */
-export async function sendReply(me: StaffMember, chatId: number, conversationId: number, content: string): Promise<void> {
+/**
+ * The employee's own words → the client, as them. Refused with the reason when
+ * it cannot go, and the typed message stays there to copy. Once sent, the
+ * confirmation (which quotes it) becomes the client's one message, and the
+ * typed message and the «✍️ اكتب ردك» prompt are deleted.
+ */
+export async function sendReply(me: StaffMember, chatId: number, conversationId: number, content: string, typedId?: number): Promise<void> {
   const text = content.trim();
   if (!text) return;
   const conv = await mine(me, conversationId);
@@ -221,8 +257,10 @@ export async function sendReply(me: StaffMember, chatId: number, conversationId:
     await staffSend(chatId, "⚠️ لم يُرسل: رفض تيلي تيل الرسالة. إن تكرر، انسخ رمز الوصول من جديد والصقه هنا.");
     return;
   }
-  const sent = await staffSend(chatId, confirmation(conv.name, text, "sent", null), replyButtons(conversationId));
+  const sent = await staffSend(chatId, confirmation(conv.name, text, "sent", null), replyButtons(conversationId), {}, `conv:${conversationId}`);
   if (sent.ok) await rememberThread(chatId, sent.messageId, conversationId);
+  await clearSlot(chatId, "prompt");
+  if (typedId) await staffCall("deleteMessage", { chat_id: chatId, message_id: typedId });
   await db().from("staff_bot_replies").insert({
     employee_id: me.id,
     conversation_id: conversationId,

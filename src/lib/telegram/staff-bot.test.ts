@@ -5,7 +5,7 @@ import { ruleTips, teamAverages, type Facts } from "./staff-report";
 import { dashboardText, light } from "./staff-screen";
 import { threadText, whenText } from "./staff-replies";
 import { broadcastText } from "./staff-manager";
-import { letterTips, share } from "./staff-letter";
+import { closedEnough, comparisonLines, delta, letterTips, share } from "./staff-letter";
 
 describe("«تنبيهاتي» numbers", () => {
   it("starts the day at 00:00 Riyadh (21:00 UTC the day before)", () => {
@@ -146,6 +146,26 @@ describe("«الخطاب الرسمي» tips", () => {
     expect(letterTips({ total: 40, confirmed: 3, open: 5, closed: 35 })[0]).toContain("منظّمة");
     expect(letterTips({ total: 0, confirmed: 0, open: 0, closed: 0 })).toEqual(["لا توجد محادثات مسندة لك بعد في تيلي تيل."]);
     expect(share(1, 0)).toBe("—");
+  });
+});
+
+describe("«الخطاب الرسمي» رقم 2", () => {
+  const first = { total: 252, confirmed: 4, open: 148, closed: 104 };
+
+  it("warns only who still holds 20 or more open, down by less than a quarter", () => {
+    expect(closedEnough(first, { ...first, open: 140, closed: 112 })).toBe(false);
+    expect(closedEnough(first, { ...first, open: 100, closed: 160 })).toBe(true);
+    expect(closedEnough({ ...first, open: 10 }, { ...first, open: 19 })).toBe(true);
+    expect(closedEnough({ ...first, open: 0 }, { ...first, open: 30 })).toBe(false);
+  });
+
+  it("says what changed between the two letters", () => {
+    const lines = comparisonLines(first, { total: 270, confirmed: 6, open: 90, closed: 180 });
+    expect(lines[0]).toBe("أغلقت 76 محادثة خلال هذه المدة.");
+    expect(lines[1]).toBe("انخفضت محادثاتك المفتوحة من 148 إلى 90.");
+    expect(lines[2]).toContain("6 (كانوا 4");
+    expect(comparisonLines(first, first)[0]).toBe("لم تُغلق أي محادثة خلال هذه المدة.");
+    expect([delta(148, 90), delta(4, 6), delta(5, 5)]).toEqual(["−58", "+2", "0"]);
   });
 });
 

@@ -117,15 +117,52 @@ export async function registerStaffWebhook(token?: string): Promise<TgReply<bool
 export type Sent = { ok: true; messageId: number } | { ok: false; reason: "not_configured" | "not_started" | "failed"; description?: string };
 
 /**
- * A message to one chat. «not_started» is Telegram refusing a chat that never
- * pressed «ابدأ»: a bot cannot speak first, and the screen tells the
- * administrator so.
+ * One thing at a time (the owner, 2026-10-23: «عندما يبدأ شيء جديد تنحذف الرسائل
+ * السابقة كي لا يكون متداخلاً»). Every message the bot posts sits in a slot:
+ * «view» (whatever the employee opened last), «conv:<id>» (one message per
+ * client), «prompt», «report», «admin», «urgent», «screen», «letter:<n>»…
+ * Posting into a slot deletes what was there. Telegram lets a bot delete a
+ * message for 48 hours only; an older one stays, and its row goes anyway.
+ */
+export async function clearSlot(chatId: number, slot: string): Promise<void> {
+  const { data } = await db().from("staff_bot_slots").select("message_id").eq("chat_id", chatId).eq("slot", slot);
+  const ids = ((data ?? []) as { message_id: number | string }[]).map((r) => Number(r.message_id));
+  if (!ids.length) return;
+  for (let i = 0; i < ids.length; i += 100) await staffCall("deleteMessages", { chat_id: chatId, message_ids: ids.slice(i, i + 100) });
+  await db().from("staff_bot_slots").delete().eq("chat_id", chatId).in("message_id", ids);
+}
+
+export async function keepInSlot(chatId: number, slot: string, messageId: number): Promise<void> {
+  await db().from("staff_bot_slots").upsert({ chat_id: chatId, message_id: messageId, slot }, { onConflict: "chat_id,message_id" });
+}
+
+/** Posted, then the slot's older messages deleted — so the chat never blinks empty, and a failed send leaves the old one. */
+async function settle(chatId: number, slot: string | null, sent: Sent): Promise<Sent> {
+  if (sent.ok && slot) {
+    await clearSlot(chatId, slot);
+    await keepInSlot(chatId, slot, sent.messageId);
+  }
+  return sent;
+}
+
+function outcome(reply: TgReply<{ message_id: number }>): Sent {
+  if (reply.ok && reply.result) return { ok: true, messageId: reply.result.message_id };
+  if (reply.description === "not_configured") return { ok: false, reason: "not_configured" };
+  const refused = reply.error_code === 403 || /chat not found|bot can't initiate|blocked/i.test(reply.description ?? "");
+  return { ok: false, reason: refused ? "not_started" : "failed", description: reply.description };
+}
+
+/**
+ * A message to one chat, into a slot (null: kept, never replaced). «not_started»
+ * is Telegram refusing a chat that never pressed «ابدأ»: a bot cannot speak
+ * first, and the screen tells the administrator so.
  */
 export async function staffSend(
   chatId: number,
   text: string,
   buttons?: InlineButton[][],
   extra: Record<string, unknown> = {},
+  slot: string | null = "view",
 ): Promise<Sent> {
   const reply = await staffCall<{ message_id: number }>("sendMessage", {
     chat_id: chatId,
@@ -135,29 +172,43 @@ export async function staffSend(
     ...(buttons ? { reply_markup: { inline_keyboard: buttons } } : {}),
     ...extra,
   });
-  if (reply.ok && reply.result) return { ok: true, messageId: reply.result.message_id };
-  if (reply.description === "not_configured") return { ok: false, reason: "not_configured" };
-  const refused = reply.error_code === 403 || /chat not found|bot can't initiate|blocked/i.test(reply.description ?? "");
-  return { ok: false, reason: refused ? "not_started" : "failed", description: reply.description };
+  return settle(chatId, slot, outcome(reply));
+}
+
+/** A file upload (multipart): the tone, a letter. Same slots as staffSend. */
+async function staffUpload(chatId: number, method: "sendAudio" | "sendPhoto", fields: Record<string, string | Blob>, slot: string | null): Promise<Sent> {
+  const { token } = await staffBotToken();
+  if (!token) return { ok: false, reason: "not_configured" };
+  try {
+    const form = new FormData();
+    form.set("chat_id", String(chatId));
+    for (const [key, value] of Object.entries(fields)) form.set(key, value);
+    const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, { method: "POST", body: form, signal: AbortSignal.timeout(30_000) });
+    return settle(chatId, slot, outcome((await res.json()) as TgReply<{ message_id: number }>));
+  } catch {
+    return { ok: false, reason: "failed" };
+  }
+}
+
+/** A picture with a caption and buttons — the official letter. */
+export async function staffSendPhoto(chatId: number, png: Uint8Array, caption: string, buttons: InlineButton[][], slot: string | null): Promise<Sent> {
+  return staffUpload(
+    chatId,
+    "sendPhoto",
+    {
+      photo: new File([new Uint8Array(png)], "letter.png", { type: "image/png" }),
+      caption: caption.slice(0, 1000),
+      parse_mode: "HTML",
+      reply_markup: JSON.stringify({ inline_keyboard: buttons }),
+    },
+    slot,
+  );
 }
 
 /** An audio file (the notification tone), uploaded as a file: Telegram offers «Save for notifications» on a short one. */
 export async function staffSendAudio(chatId: number, file: { bytes: Uint8Array; name: string; title: string }, caption: string): Promise<boolean> {
-  const { token } = await staffBotToken();
-  if (!token) return false;
-  try {
-    const form = new FormData();
-    form.set("chat_id", String(chatId));
-    form.set("audio", new Blob([new Uint8Array(file.bytes)], { type: "audio/mpeg" }), file.name);
-    form.set("title", file.title);
-    form.set("performer", "Traveliun");
-    form.set("caption", caption.slice(0, 1000));
-    form.set("parse_mode", "HTML");
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendAudio`, { method: "POST", body: form, signal: AbortSignal.timeout(30_000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
+  const audio = new File([new Uint8Array(file.bytes)], file.name, { type: "audio/mpeg" });
+  return (await staffUpload(chatId, "sendAudio", { audio, title: file.title, performer: "Traveliun", caption: caption.slice(0, 1000), parse_mode: "HTML" }, "view")).ok;
 }
 
 /** The bot's @username, for the «ابدأ» link: what was stored with the token, else getMe (and «traveliunbot» only if both fail). */

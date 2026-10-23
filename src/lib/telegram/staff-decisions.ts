@@ -232,6 +232,9 @@ async function announceDecision(d: DecisionRow, people: Awaited<ReturnType<typeo
     ]
       .filter(Boolean)
       .join("\n"),
+    undefined,
+    {},
+    `dec:${d.id}`,
   );
   return sent.ok;
 }
@@ -309,7 +312,7 @@ export async function setDecisionStatus(me: StaffMember, data: string): Promise<
 // ---------- pushed by the minute job ----------
 
 /** The bot's managers with a linked Telegram. */
-async function managers(): Promise<{ id: string; chatId: number }[]> {
+export async function managers(): Promise<{ id: string; chatId: number }[]> {
   const people = (await colleagues()).filter((p) => p.chatId);
   const checks = await Promise.all(people.map(async (p) => ((await isBotManager(p.id)) ? { id: p.id, chatId: p.chatId as number } : null)));
   return checks.filter((x): x is { id: string; chatId: number } => x !== null);
@@ -342,7 +345,7 @@ export async function pushDecisions(nowMs = Date.now()): Promise<{ newRed: numbe
         ...newRed.map((s) => `🔴 <b>${escapeHtml(s.label)}: ${escapeHtml(s.value)}</b>\n${escapeHtml(s.reason)}${s.action ? `\n← ${escapeHtml(s.action)}` : ""}`),
       ].join("\n");
       const buttons = [...newRed.map((s) => itemButton(s, true)), [{ text: "🚨 كل ما يحتاج تدخلك", callback_data: "si" }]];
-      for (const m of await managers()) await staffSend(m.chatId, text, buttons);
+      for (const m of await managers()) await staffSend(m.chatId, text, buttons, {}, "urgent");
     }
   }
 

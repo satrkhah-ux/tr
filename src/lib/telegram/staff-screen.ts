@@ -93,7 +93,7 @@ export async function screenView(me: StaffMember, nowMs = Date.now(), summaries?
 /** «🖥️ شاشتي» from the keyboard: a fresh screen, pinned silently. The previous one is removed, and the minute job keeps the new one current. */
 export async function openScreen(me: StaffMember, chatId: number, fallback: ScreenView): Promise<void> {
   const view = (await screenView(me)) ?? fallback;
-  const sent = await staffSend(chatId, view.text, view.buttons);
+  const sent = await staffSend(chatId, view.text, view.buttons, {}, "screen");
   if (!sent.ok || !me.agentId) return;
   const { data } = await db().from("staff_bot_screens").select("message_id").eq("employee_id", me.id).maybeSingle();
   const previous = (data as { message_id: number } | null)?.message_id;
@@ -258,6 +258,8 @@ export async function remindWaiting(nowMs = Date.now()): Promise<{ reminded: num
       chatId,
       [`⏰ <b>${escapeHtml(c.name)}</b> ينتظر ردك منذ ${waitText(minutes)}`, c.preview.trim() ? `💬 «${escapeHtml(c.preview.trim().slice(0, 200))}»` : null].filter(Boolean).join("\n"),
       replyButtons(c.id),
+      {},
+      `conv:${c.id}`,
     );
     if (sent.ok) {
       await rememberThread(chatId, sent.messageId, c.id);

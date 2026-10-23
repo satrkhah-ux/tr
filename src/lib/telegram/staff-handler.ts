@@ -1,13 +1,12 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { conversationThread, getTeletelConfig, teletelConversationUrl, teletelGet } from "@/lib/providers/teletel";
-import { escapeHtml, staffCall, staffForChat, staffSend, staffSendAudio, type StaffMember } from "./staff-bot";
+import { getTeletelConfig, teletelConversationUrl, teletelGet } from "@/lib/providers/teletel";
+import { clearSlot, escapeHtml, keepInSlot, staffCall, staffForChat, staffSend, staffSendAudio, type StaffMember } from "./staff-bot";
 import { buildReport } from "./staff-report";
 import { openFor, waitText } from "./staff-numbers";
-import { linkTeletelToken, promptReply, rememberThread, sendReply, threadOf, threadText, TOKEN_HELP } from "./staff-replies";
+import { linkTeletelToken, promptReply, recentThread, rememberThread, sendReply, threadOf, TOKEN_HELP } from "./staff-replies";
+import { lettersView, signLetter } from "./staff-letters";
 import { openList, openScreen, screenView, unansweredList, weekView } from "./staff-screen";
 import { confirmDraft, draft, isBotManager, memberView, promptFor, remindDraft, takePending, teamView } from "./staff-manager";
 import { decisionStep, decisionsView, decisionText, decisionView, interventionView, promptDecision, setDecisionStatus, signalView } from "./staff-decisions";
@@ -39,8 +38,6 @@ export type StaffUpdate = {
 };
 
 type Screen = { text: string; buttons: InlineButton[][] };
-
-const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 
 const BACK: InlineButton = { text: "↩️ شاشتي", callback_data: "s" };
 
@@ -106,20 +103,15 @@ async function conversation(me: StaffMember, id: number): Promise<Screen> {
   const conv = await teletelGet<{ meta?: { assignee?: { id?: number } | null; sender?: { name?: string | null } | null } }>(`/conversations/${id}`);
   if (!conv) return UNREACHABLE;
   if (conv.meta?.assignee?.id !== me.agentId) return { text: "هذه المحادثة لم تعد مسندة إليك.", buttons: [[BACK]] };
-  const [thread, murad] = await Promise.all([
-    conversationThread(id),
-    db().from("murad_log").select("reply_message_id").eq("conversation_id", id).not("reply_message_id", "is", null),
-  ]);
   const client = conv.meta?.sender?.name?.trim() || `#${id}`;
-  const lines = (thread?.messages ?? []).filter((m) => !m.isPrivate && m.text).slice(-8);
-  const muradIds = new Set(((murad.data ?? []) as { reply_message_id: number }[]).map((r) => Number(r.reply_message_id)));
+  const recent = await recentThread(id, client, 8);
   const url = teletelConversationUrl(id);
   return {
     text: [
-      `💬 <b>محادثتك مع ${escapeHtml(client)}</b> — آخر ${lines.length} رسائل`,
+      `💬 <b>محادثتك مع ${escapeHtml(client)}</b> — آخر ${recent?.shown ?? 0} رسائل`,
       "",
-      threadText(client, lines, muradIds),
-      thread?.canReply ? null : "\n⚠️ مرّ أكثر من ٢٤ ساعة على آخر رسالة من العميل — لا يصله إلا قالب معتمد من تيلي تيل.",
+      recent?.text ?? "— لا رسائل —",
+      recent?.canReply ? null : "\n⚠️ مرّ أكثر من ٢٤ ساعة على آخر رسالة من العميل — لا يصله إلا قالب معتمد من تيلي تيل.",
     ]
       .filter((line): line is string => line !== null)
       .join("\n"),
@@ -190,7 +182,11 @@ async function show(chatId: number, screen: Screen, editId?: number): Promise<vo
 }
 
 async function onKey(me: StaffMember, chatId: number, key: Key): Promise<void> {
-  if (key === "screen") return openScreen(me, chatId, NO_AGENT);
+  if (key === "screen") {
+    // the screen is pinned on its own; whatever was open before goes
+    await clearSlot(chatId, "view");
+    return openScreen(me, chatId, NO_AGENT);
+  }
   if (key === "tone") return sendTone(chatId);
   if (key === "broadcast") return promptFor(me, chatId, "broadcast", null);
   if (key === "team") return show(chatId, await teamView(me));
@@ -233,6 +229,8 @@ async function welcome(me: StaffMember, chatId: number): Promise<void> {
     ].join("\n"),
     undefined,
     { reply_markup: keyboard(await isBotManager(me.id)) },
+    // its own slot: the message that carries the keyboard is not swept away with the views
+    "menu",
   );
 }
 
@@ -261,6 +259,9 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
     if (data === "dl") return show(chatId, await decisionsView(me), at);
     if (data.startsWith("dc:")) return show(chatId, await decisionView(me, data.slice(3)), at);
     if (data.startsWith("ds:")) return show(chatId, await setDecisionStatus(me, data), at);
+    // «الخطاب الرسمي»: the employee's signature, and the managers' summary
+    if (data.startsWith("ls:")) return signLetter(me, chatId, Number(data.slice(3)), at);
+    if (data === "lt") return show(chatId, await lettersView(me), at);
     await show(chatId, await screenFor(me, data), callback.message?.message_id);
     // a conversation's card can be answered with a Telegram «reply», like the client's own messages
     if (data.startsWith("c:") && callback.message) await rememberThread(chatId, callback.message.message_id, Number(data.slice(2)));
@@ -289,28 +290,44 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
   }
 
   const text = (message.text ?? "").trim();
+  // what the employee pressed or typed goes once it is answered: the chat keeps the answer only
+  const drop = () => staffCall("deleteMessage", { chat_id: chatId, message_id: message.message_id });
+  // what may still be wanted (a refused reply, a stray text) stays until the next thing they open
+  const later = () => keepInSlot(chatId, "view", message.message_id);
 
-  // after «📢 إعلان عام» / «🔔 تنبيه له», the next text (reply or not) is the draft; the preview still asks before anything goes
+  // after «📢 إعلان عام» / «🔔 تنبيه له», the next text (reply or not) is the draft; the preview quotes it and still asks before anything goes
   if (text && !text.startsWith("/") && !(Object.values(KEYS) as string[]).includes(text)) {
     const pending = await takePending(chatId);
-    if (pending?.kind === "decision") return decisionText(me, chatId, text, pending.sourceKey);
-    if (pending) return draft(me, chatId, text, pending.kind === "alert" ? pending.targetId : null);
+    if (pending) {
+      if (pending.kind === "decision") await decisionText(me, chatId, text, pending.sourceKey);
+      else await draft(me, chatId, text, pending.kind === "alert" ? pending.targetId : null);
+      await drop();
+      return;
+    }
   }
   // a Telegram «reply» to anything about a conversation is the answer to that client
   if (message.reply_to_message && text && !text.startsWith("/")) {
     const conversationId = await threadOf(chatId, message.reply_to_message.message_id);
-    if (conversationId) return sendReply(me, chatId, conversationId, text);
-    await staffSend(chatId, "لا أعرف لأي عميل هذا الرد — اضغط «✍️ رد» تحت رسالة العميل ثم اكتب ردك.");
+    if (conversationId) await sendReply(me, chatId, conversationId, text, message.message_id);
+    else await staffSend(chatId, "لا أعرف لأي عميل هذا الرد — اضغط «✍️ رد» تحت رسالة العميل ثم اكتب ردك.");
+    await later();
     return;
   }
   // a pasted Teletel access token: one word of letters AND digits, nothing else (an English word alone is not one)
   if (/^(?=.*\d)(?=.*[A-Za-z])[A-Za-z0-9_-]{20,64}$/.test(text)) return linkTeletelToken(me, chatId, message.message_id, text);
 
-  if (text.startsWith("/start")) return welcome(me, chatId);
-  const key = (Object.keys(KEYS) as Key[]).find((k) => KEYS[k] === text) ?? COMMANDS[text.split(/[\s@]/)[0]];
-  if (key) return onKey(me, chatId, key);
+  const key = text.startsWith("/start") ? "start" : ((Object.keys(KEYS) as Key[]).find((k) => KEYS[k] === text) ?? COMMANDS[text.split(/[\s@]/)[0]]);
+  if (key) {
+    await drop();
+    return key === "start" ? welcome(me, chatId) : onKey(me, chatId, key);
+  }
   // anything else typed: the keyboard again, with a word on how to answer a client
-  await staffSend(chatId, "اختر من القائمة أسفل المحادثة.\nللرد على عميل: اسحب رسالته (Reply) واكتب ردك، أو اضغط «✍️ رد».", undefined, {
-    reply_markup: keyboard(await isBotManager(me.id)),
-  });
+  await staffSend(
+    chatId,
+    "اختر من القائمة أسفل المحادثة.\nللرد على عميل: اسحب رسالته (Reply) واكتب ردك، أو اضغط «✍️ رد».",
+    undefined,
+    { reply_markup: keyboard(await isBotManager(me.id)) },
+    "menu",
+  );
+  await later();
 }
