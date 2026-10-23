@@ -364,7 +364,7 @@ async function visaConversation(service: SupabaseClient, m: IncomingMessage): Pr
 /** the company's visa list and the countries it hangs on */
 async function visaList(service: SupabaseClient) {
   const [{ data: countries }, { data: rows }] = await Promise.all([
-    service.from("countries").select("id, arabic_name, iso2, visa_required"),
+    service.from("countries").select("id, arabic_name, iso2, visa_required, saudi_entry"),
     service.from("visas").select("country, country_id, visa_type, sell_price, sell_currency, arabic_requirements, status").eq("status", "Active"),
   ]);
   return {
@@ -668,7 +668,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
         }
         // the catalogue says a Saudi passport enters without one: said so, no hand-over to visas
         if (step.do === "free") {
-          const text = `${salam ? "وعليكم السلام ورحمة الله، " : ""}${visaFreeText(step.country)}`;
+          const text = `${salam ? "وعليكم السلام ورحمة الله، " : ""}${visaFreeText(step.country, step.entry)}`;
           const replyId = await sendTeletelMessage(m.conversationId, text);
           if (!replyId) { await finish({ reason: "send_failed", reply: text, error: "send_failed" }); return "send_failed"; }
           await finish({ reason: "visa:not_needed", reply: text, reply_message_id: replyId, intake: { ...intake, country: facts.country, visa_flow: { ...facts, done: true, listed: false } } });

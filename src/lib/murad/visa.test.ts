@@ -101,6 +101,14 @@ describe("visaStep — the questions of 120 real visa conversations (2026-10-23)
     expect(step(ask({ others: [{ nationality: "YEM", nationality_ar: "يمني", resident: true }] }), { country: "الإمارات العربية المتحدة", nationality: "سعودي", applicants: 2 })).toMatchObject({ do: "answer" });
     expect(step(ask(), { country: "الإمارات العربية المتحدة", nationality: "يمني", applicants: 1 })).toMatchObject({ do: "answer", row: { country: "الإمارات العربية المتحدة" } });
   });
+  it("on arrival and an e-visa not on our list: answered, no hand-over; an e-visa on our list is ours (the owner, 2026-10-23)", () => {
+    const more: VisaCountry[] = [...countries, { id: "mv", arabic_name: "المالديف", iso2: "MV", visa_required: false, saudi_entry: "arrival" }, { id: "lk", arabic_name: "سريلانكا", iso2: "LK", visa_required: true, saudi_entry: "evisa" }];
+    const at = (country: string, list = more) => visaStep({ a: ask(), facts: { country, nationality: "سعودي", applicants: 1, travelDate: null }, asked: true, countries: list, rows, includePrice: true });
+    expect(at("المالديف")).toEqual({ do: "free", country: "المالديف", entry: "arrival" });
+    expect(at("سريلانكا")).toEqual({ do: "free", country: "سريلانكا", entry: "evisa" });
+    expect(at("الهند", more.map((c) => (c.id === "in" ? { ...c, saudi_entry: "evisa" as const } : c)))).toMatchObject({ do: "answer", row: { country: "الهند" } });
+    expect(visaFreeText("المالديف", "arrival")).toContain("عند الوصول");
+  });
   it("a request already with the team, a visa into Saudi Arabia, a work visa: the team's, never the tourist price", () => {
     expect(step(ask({ status_query: true }), {})).toEqual({ do: "answer", row: null });
     expect(step(ask({ inbound: true }), { country: "السعودية" })).toEqual({ do: "answer", row: null });
@@ -110,17 +118,23 @@ describe("visaStep — the questions of 120 real visa conversations (2026-10-23)
     const s = step(ask({ advice: "easiest" }), {});
     expect(s.do).toBe("ask");
     const text = (s as { text: string }).text;
-    expect(text).toContain("الأقل متطلبات عندنا: الإمارات العربية المتحدة، الهند");
-    expect(text).not.toContain("فرنسا");
+    // no nationality yet: the Saudi passport's parts, then the resident's — the list's e-visas are ours, never «easy»
+    expect(text).toContain("إذا جوازك سعودي:");
+    expect(text).toContain("✅ بدون تأشيرة: الإمارات العربية المتحدة، جورجيا");
+    expect(text).toContain("وإذا كنت مقيم: الدخول بدون تأشيرة أو عند الوصول يعتمد على جنسية جوازك");
+    expect(text).toContain("ومن التأشيرات اللي نطلعها لك بدون حضور سفارة: الإمارات العربية المتحدة، الهند.");
+    expect(text).not.toContain("💻");
     expect(text).not.toMatch(/نسب[ةه]/);
     expect(text).toContain("أي دولة تفضّل؟ وتكرماً الجنسية، وعدد المتقدمين؟");
     const saudi = (step(ask({ advice: "easiest" }), { nationality: "سعودي" }) as { text: string }).text;
-    expect(saudi).toContain("الجواز السعودي ما يحتاج تأشيرة مسبقة لدول كثيرة، منها: الإمارات العربية المتحدة، جورجيا 👍");
-    expect(saudi).toContain("ومن الدول اللي تحتاج تأشيرة، الأقل متطلبات عندنا: الهند");
-    expect((step(ask({ advice: "cheapest" }), {}) as { text: string }).text).toContain("الأقل سعراً عندنا: الهند 200 ريال، فرنسا 400 ريال، الإمارات العربية المتحدة 400 ريال.");
+    expect(saudi).toContain("للجواز السعودي:");
+    expect(saudi).not.toContain("مقيم");
+    expect((step(ask({ advice: "cheapest" }), { nationality: "يمني" }) as { text: string }).text).toContain("الأقل سعراً عندنا: الهند 200 ريال، فرنسا 400 ريال، الإمارات العربية المتحدة 400 ريال.");
+    // a Saudi never sees the residents' price of a country he enters free
+    expect((step(ask({ advice: "cheapest" }), { nationality: "سعودي" }) as { text: string }).text).toContain("الأقل سعراً عندنا: الهند 200 ريال، فرنسا 400 ريال.");
     // the model missed it, the words did not
     expect(step(ask(), {}, false, "أي تأشيرة ما تحتاج كشف حساب؟").do).toBe("ask");
-    expect((step(ask(), {}, false, "أي تأشيرة ما تحتاج كشف حساب؟") as { text: string }).text).toContain("الأقل متطلبات");
+    expect((step(ask(), {}, false, "أي تأشيرة ما تحتاج كشف حساب؟") as { text: string }).text).toContain("بدون حضور سفارة");
   });
   it("the facts: a country the client never wrote is dropped; a short name counts; «شنغن (أوروبا)» asks which state; transit is no tourist visa", () => {
     const f = (a: VisaAsk, clientText: string, said: string | null = null) => visaFacts({ a, clientText, said, before: null, countries });

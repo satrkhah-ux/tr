@@ -23,6 +23,8 @@ const CONFIGS: TableConfig[] = [
       { key: "default_currency", labelKey: "col.defaultCurrency" },
       { key: "timezone", labelKey: "col.timezone", type: "serial", minWidth: "170px" },
       { key: "visa_required", labelKey: "col.visaRequired" },
+      // how a Saudi passport enters — Murad's «اسهل دولة» reads it (visa.ts)
+      { key: "saudi_entry", labelKey: "col.saudiEntry", options: (["free", "arrival", "evisa", "embassy"] as const).map((k) => ({ value: k, label: k, labelKey: `entry.${k}` as const })) },
       { key: "weekend", labelKey: "col.weekend" },
       { key: "status", labelKey: "col.status", type: "status" },
     ],

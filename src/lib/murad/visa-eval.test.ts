@@ -122,7 +122,7 @@ describe.skipIf(!process.env["VISA_EVAL"])("Murad visa — real openings", () =>
     env();
     const db = createClient(process.env["NEXT_PUBLIC_SUPABASE_URL"]!, process.env["SUPABASE_SERVICE_ROLE_KEY"]!);
     const [{ data: c }, { data: v }, places] = await Promise.all([
-      db.from("countries").select("id, arabic_name, iso2, visa_required"),
+      db.from("countries").select("id, arabic_name, iso2, visa_required, saudi_entry"),
       db.from("visas").select("country, country_id, visa_type, sell_price, sell_currency, arabic_requirements, status").eq("status", "Active"),
       loadPlaces(db),
     ]);

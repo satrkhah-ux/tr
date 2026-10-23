@@ -98,8 +98,13 @@ export function visaAskText(f: VisaFacts, need: VisaNeed[], schengen: string[] =
 }
 
 /** A country off the list whose entry the catalogue marks visa-free for a Saudi passport («ماليزيا بدون تأشيرة للسعودي»). */
-export function visaFreeText(country: string): string {
-  return `الجواز السعودي ما يحتاج تأشيرة مسبقة لـ${country} 👍
+export function visaFreeText(country: string, entry: Entry = "free"): string {
+  const said = entry === "arrival"
+    ? `الجواز السعودي يأخذ تأشيرة ${country} عند الوصول في المطار، بدون تقديم مسبق 👍`
+    : entry === "evisa"
+      ? `تأشيرة ${country} للجواز السعودي إلكترونية سهلة: تطلعها أونلاين بنفسك، بدون سفارة ولا بصمة 👍`
+      : `الجواز السعودي ما يحتاج تأشيرة مسبقة لـ${country} 👍`;
+  return `${said}
 وإذا تحب نجهز لك برنامج رحلة لها، قل لي وأحولك لزميلنا في البكجات.`;
 }
 export const isSaudi = (nationality: string | null) => Boolean(nationality && /سعود|saudi/i.test(nationality));
@@ -182,14 +187,19 @@ export function repeatsMurad(reply: string, messages: TurnMessage[]): boolean {
 
 // ---------- what to do with a visa turn (reception-run.ts sends it) ----------
 
-export type VisaCountry = { id: string; arabic_name: string; iso2: string | null; visa_required: boolean | null };
+/** how a Saudi passport enters (countries.saudi_entry): only «embassy» — and our own list's countries — are the visa team's */
+export type Entry = "free" | "arrival" | "evisa" | "embassy";
+export type VisaCountry = { id: string; arabic_name: string; iso2: string | null; visa_required: boolean | null; saudi_entry?: Entry | null };
 type ListRow = VisaRow & { country_id?: string | null };
+/** unset → the older visa_required flag */
+const entryOf = (c: VisaCountry | undefined): Entry | null => c?.saudi_entry ?? (c?.visa_required === false ? "free" : null);
+const onList = (rows: ListRow[], id: string) => rows.some((r) => r.country_id === id && (r.status ?? "Active") === "Active");
 
 export type VisaStep =
   /** the one question — or, for «أسهل تأشيرة», the advice that ends in it */
   | { do: "ask"; text: string; advice?: boolean }
-  /** a Saudi party to a country the catalogue marks visa-free — no hand-over */
-  | { do: "free"; country: string }
+  /** a Saudi party to a country entered without an application (free, on arrival, an e-visa not on our list) — no hand-over */
+  | { do: "free"; country: string; entry?: Entry }
   /** the list's answer (row), or the hand-over line alone (null) — then «قسم فيزا» */
   | { do: "answer"; row: VisaRow | null };
 
@@ -213,8 +223,10 @@ export function visaStep(i: { a: VisaAsk | null; facts: VisaFacts; asked: boolea
   const asks = i.asks ?? (i.asked ? 1 : 0);
   if (!facts.country && (a?.advice || (a && ADVICE.test(i.clientText ?? ""))) && !facts.schengen && asks < 2) return { do: "ask", advice: true, text: visaAdviceText({ facts, a, countries: i.countries, rows: i.rows, includePrice: i.includePrice }) };
   const country = i.countries.find((c) => facts.country && fold(c.arabic_name) === fold(facts.country));
-  // a Saudi party to a visa-free country needs no count first
-  if (country?.visa_required === false && saudiParty(facts, a)) return { do: "free", country: country.arabic_name };
+  // a Saudi party needing no application needs no count first; an e-visa on our own list is ours to issue (the owner, 2026-10-23)
+  const entry = entryOf(country);
+  if (country && saudiParty(facts, a) && (entry === "free" || entry === "arrival" || (entry === "evisa" && !onList(i.rows, country.id))))
+    return entry === "free" ? { do: "free", country: country.arabic_name } : { do: "free", country: country.arabic_name, entry };
   if (need.length && asks === 0) return { do: "ask", text: visaAskText(facts, need, i.schengen) };
   // still no country after the question and the client still writing («كم السعر؟»): the country alone, once more —
   // never handed over blind (2026-10-23). The unanswered follow-through (a null) hands over.
@@ -235,23 +247,35 @@ const HEAVY = /كشف\s*حساب|تعريف|خطاب|الجواز\s*الا?صل|
  */
 export function visaAdviceText(i: { facts: VisaFacts; a: VisaAsk | null; countries: VisaCountry[]; rows: ListRow[]; includePrice: boolean }): string {
   const saudi = saudiParty(i.facts, i.a);
-  const byId = new Map(i.countries.map((c) => [c.id, c]));
-  // a Saudi needs only the list's rows for countries that ask him for a visa
-  const rows = i.rows.filter((r) => (r.status ?? "Active") === "Active" && !(saudi && byId.get(r.country_id ?? "")?.visa_required === false));
+  // a resident: the nationality is known and it is not Saudi
+  const resident = !saudi && Boolean(i.facts.nationality);
+  const rows = i.rows.filter((r) => (r.status ?? "Active") === "Active");
   const lines: string[] = [];
-  if (saudi) {
-    const free = i.countries.filter((c) => c.visa_required === false && !isHome(c.arabic_name)).map((c) => c.arabic_name);
-    if (free.length) lines.push(`الجواز السعودي ما يحتاج تأشيرة مسبقة لدول كثيرة، منها: ${free.slice(0, 12).join("، ")}${free.length > 12 ? " وغيرها" : ""} 👍`);
+  // the Saudi passport in three parts (the owner, 2026-10-23); an e-visa on our own list is ours to issue, so never «easy»
+  if (!resident) {
+    const named = (e: Entry) => i.countries.filter((c) => entryOf(c) === e && !isHome(c.arabic_name) && !(e === "evisa" && onList(rows, c.id))).map((c) => c.arabic_name);
+    const parts = ([["free", "✅ بدون تأشيرة"], ["arrival", "🛬 تأشيرة عند الوصول في المطار"], ["evisa", "💻 تأشيرة إلكترونية سهلة تطلعها أونلاين بنفسك"]] as const)
+      .map(([e, head]) => [head, named(e)] as const)
+      .filter(([, names]) => names.length)
+      .map(([head, names]) => `${head}: ${names.join("، ")}`);
+    if (parts.length) lines.push(saudi ? "للجواز السعودي:" : "إذا جوازك سعودي:", ...parts);
   }
-  const cheap = i.a?.advice === "cheapest" && i.includePrice;
-  const pick = cheap
-    ? rows.filter((r) => listPrice(r)).sort((x, y) => listPrice(x)! - listPrice(y)!).slice(0, 4).map((r) => `${r.country} ${sar(listPrice(r)!)}`)
-    : [...new Set(rows.filter((r) => !HEAVY.test(r.arabic_requirements ?? "")).map((r) => r.country))].slice(0, 5);
-  const lead = saudi ? (cheap ? "ومن التأشيرات، " : "ومن الدول اللي تحتاج تأشيرة، ") : "";
-  if (pick.length) lines.push(cheap ? `${lead}الأقل سعراً عندنا: ${pick.join("، ")}.` : `${lead}الأقل متطلبات عندنا: ${pick.join("، ")} — بدون كشف حساب ولا تعريف راتب ولا حضور للسفارة.`);
-  if (!saudi) lines.push("والمتطلبات تختلف حسب الجنسية.");
+  if (!saudi) {
+    // the list's own visas a resident gets without attending an embassy
+    const light = [...new Set(rows.filter((r) => !HEAVY.test(r.arabic_requirements ?? "")).map((r) => r.country))].slice(0, 5);
+    lines.push(`${resident ? "" : "\nوإذا كنت مقيم: "}الدخول بدون تأشيرة أو عند الوصول يعتمد على جنسية جوازك، والإقامة الخليجية السارية تدخلك جورجيا بدون تأشيرة.`);
+    if (light.length) lines.push(`ومن التأشيرات اللي نطلعها لك بدون حضور سفارة: ${light.join("، ")}.`);
+  }
+  if (i.a?.advice === "cheapest" && i.includePrice) {
+    // a Saudi pays nothing where he enters free or on arrival — those prices are residents'
+    const noApplication = (r: ListRow) => ["free", "arrival"].includes(entryOf(i.countries.find((c) => c.id === r.country_id)) ?? "");
+    const pick = rows.filter((r) => listPrice(r) && !(saudi && noApplication(r)))
+      .sort((x, y) => listPrice(x)! - listPrice(y)!).slice(0, 4).map((r) => `${r.country} ${sar(listPrice(r)!)}`);
+    if (pick.length) lines.push(`الأقل سعراً عندنا: ${pick.join("، ")}.`);
+  }
+  lines.push("والدول اللي تحتاج تقديم وسفارة يخدمك فيها قسم التأشيرات عندنا.");
   const need = visaNeed(i.facts).filter((n) => n !== "country");
-  lines.push(`أي دولة تفضّل؟${need.length ? ` وتكرماً ${need.map((n) => WORDS[n]).join("، و")}؟` : ""}`);
+  lines.push(`\nأي دولة تفضّل؟${need.length ? ` وتكرماً ${need.map((n) => WORDS[n]).join("، و")}؟` : ""}`);
   return lines.join("\n");
 }
 
