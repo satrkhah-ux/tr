@@ -52,6 +52,17 @@ const COLS = "id, employee_id, number, numbers, warned, issued_at, delivered, si
 /** where a withdrawn conversation goes back to */
 const SALES_TEAM = "قسم المبيعات";
 
+/**
+ * The withdrawal is OFF until the owner says otherwise (2026-10-23: «لا تسحب الآن
+ * إلا بعد أن أبلغك»): app_settings «staff_letters_withdraw» = "on" turns it on.
+ * A missing row reads as off.
+ */
+const WITHDRAW_SETTING = "staff_letters_withdraw";
+async function withdrawOn(): Promise<boolean> {
+  const { data } = await db().from("app_settings").select("value").eq("key", WITHDRAW_SETTING).maybeSingle();
+  return (data as { value?: string } | null)?.value === "on";
+}
+
 /** what counts as «أكّد»: an operations file confirmed (or paid, or done) on an offer they sold */
 const CONFIRMED = ["confirmed", "paid_partial", "paid_full", "completed"];
 
@@ -141,6 +152,8 @@ async function deliver(row: LetterRow, m: Member): Promise<boolean> {
  * «قسم المبيعات» and read back. The employee is told how many, and why.
  */
 async function withdraw(row: LetterRow, m: Member): Promise<void> {
+  // held until the owner says so; the letter's row waits (withdrawn null) and the tick takes it once it is on
+  if (!(await withdrawOn())) return;
   const { data: claimed } = await db().from("staff_letters").update({ withdrawn_at: new Date().toISOString() }).eq("id", row.id).is("withdrawn_at", null).select("id");
   if (!claimed?.length) return;
   const [list, teams] = await Promise.all([listOpenConversations(true), listTeletelTeams()]);
@@ -280,6 +293,7 @@ async function lettersText(): Promise<string> {
     }
     lines.push("");
   }
+  if (rows.some((r) => r.warned && !r.withdrawn) && !(await withdrawOn())) lines.push("⏸️ السحب الآلي للمحادثات موقوف حتى تأذن الإدارة.");
   return lines.join("\n").trim();
 }
 
