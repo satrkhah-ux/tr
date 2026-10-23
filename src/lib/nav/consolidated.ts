@@ -89,6 +89,11 @@ export const TAB_GROUPS: SectionTab[][] = [
     { href: "/customers", labelKey: "nav.people" },
     { href: "/followups", labelKey: "nav.followups" },
   ],
+  // «قرارات الإدارة» and «إعدادات مُراد» — one page, each tab its own gate (2026-10-23)
+  [
+    { href: "/management-decisions", labelKey: "nav.managementDecisions" },
+    { href: "/murad-settings", labelKey: "nav.muradSettings" },
+  ],
   // the flight-card tool sits beside the supplier-PDF redesign it serves
   [
     { href: "/repackage", labelKey: "nav.repackage" },

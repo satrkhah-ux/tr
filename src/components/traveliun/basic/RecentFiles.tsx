@@ -9,6 +9,7 @@ import { normalizeName } from "@/lib/offer/pricing-suggest";
 import type { DraftSummary } from "@/lib/data/drafts";
 import { deleteFiles } from "@/lib/data/file-status";
 import { useTraveliunUI } from "../TraveliunUIProvider";
+import { useCanOpen } from "@/lib/roles/useCanOpen";
 import { nightsText, useBasicLabels } from "./labels";
 import { OfferVersions } from "../OfferVersions";
 import { FileStateChip } from "./FileStateChip";
@@ -109,7 +110,8 @@ export function RecentFiles({
   onCopy: (id: string) => void;
 }) {
   const tx = useBasicLabels();
-  const { language } = useTraveliunUI();
+  const { language, t } = useTraveliunUI();
+  const canOpen = useCanOpen();
   const [who, setWho] = useState<string>(meId && !allByDefault ? "mine" : "all");
   const [country, setCountry] = useState("");
   const [service, setService] = useState<ServiceKey | "">("");
@@ -236,6 +238,12 @@ export function RecentFiles({
             <span className={`tv-tnum rounded-full px-1.5 text-[10.5px] ${status === key ? "bg-white/20" : "bg-[#eef4f1]"}`}>{counts[key]}</span>
           </button>
         ))}
+        {/* the same offers by stage — «العروض السياحية» and «لوح الباقات» are one place (the user, 2026-10-23) */}
+        {canOpen({ href: "/kanban-board" }) ? (
+          <Link href="/kanban-board" className="inline-flex h-8 items-center rounded-full border border-[#cfe0d9] bg-white px-3 text-[12px] font-bold text-[#557d78] hover:bg-[#f4f8f6]">
+            {t("nav.kanban")}
+          </Link>
+        ) : null}
       </div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {meId ? (

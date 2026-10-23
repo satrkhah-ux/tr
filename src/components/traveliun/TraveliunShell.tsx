@@ -173,12 +173,10 @@ export const navGroups: NavGroup[] = [
     children: [
       { labelKey: "nav.newPackage", href: "/basic", perm: "offers.write" },
       { labelKey: "nav.readyOffers", href: "/ready-offers", perm: "offers.write" },
-      // Issued only. Drafts stay where they are made.
-      { labelKey: "nav.issuedOffers", href: "/offers", perm: "offers.write" },
       // confirmed clients from before the system, by hand — no offer (the user, 2026-10-22)
       { labelKey: "nav.externalTrips", href: "/confirmed-trips", perm: "offers.write" },
-      // the offers by stage — sales work, not a reference table
-      { labelKey: "nav.kanban", href: "/kanban-board" },
+      // «العروض السياحية»: the offers by stage; the issued list is a filter on /basic beside a link here (2026-10-23)
+      { labelKey: "nav.issuedOffers", href: "/kanban-board" },
       { labelKey: "nav.repackage", href: "/repackage", perm: "repackage.write" },
       { labelKey: "nav.legacyGenerator", href: "/package-generator", perm: "offers.write" },
     ],
@@ -250,7 +248,6 @@ export const navGroups: NavGroup[] = [
   { labelKey: "nav.sla", href: "/sla", icon: Timer },
   // «المطوّر» — the service switches and the external links' health (developer.access, section-access.ts)
   { labelKey: "nav.managementDecisions", href: "/management-decisions", icon: Wrench },
-  { labelKey: "nav.muradSettings", href: "/murad-settings", icon: Wrench },
   { labelKey: "nav.developer", href: "/developer", icon: Wrench },
 ];
 
