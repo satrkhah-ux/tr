@@ -87,7 +87,6 @@ export const TAB_GROUPS: SectionTab[][] = [
   [
     { href: "/clients", labelKey: "nav.customers" },
     { href: "/customers", labelKey: "nav.people" },
-    { href: "/followups", labelKey: "nav.followups" },
   ],
   // «قرارات الإدارة» and «إعدادات مُراد» — one page, each tab its own gate (2026-10-23)
   [

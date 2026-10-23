@@ -175,14 +175,14 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.readyOffers", href: "/ready-offers", perm: "offers.write" },
       // confirmed clients from before the system, by hand — no offer (the user, 2026-10-22)
       { labelKey: "nav.externalTrips", href: "/confirmed-trips", perm: "offers.write" },
-      // «العروض السياحية»: the offers by stage; the issued list is a filter on /basic beside a link here (2026-10-23)
-      { labelKey: "nav.issuedOffers", href: "/kanban-board" },
-      { labelKey: "nav.repackage", href: "/repackage", perm: "repackage.write" },
+      // the offers by stage; the issued list and the supplier-PDF redesign live on /basic itself (the user, 2026-10-23)
+      { labelKey: "nav.kanban", href: "/kanban-board" },
       { labelKey: "nav.legacyGenerator", href: "/package-generator", perm: "offers.write" },
     ],
   },
   // «العملاء» — every client conversation (the sheet pulled in), for every employee
   { labelKey: "nav.customers", href: "/clients", icon: Users },
+  { labelKey: "nav.followups", href: "/followups", icon: Users },
   { labelKey: "nav.partnerCompanies", href: "/partner-companies", icon: Building2 },
   // «المطار»: a transport-only partner's bookings (section-access.ts)
   { labelKey: "nav.almatar", href: "/almatar-bookings", icon: Car },
