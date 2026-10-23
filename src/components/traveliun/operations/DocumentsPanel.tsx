@@ -103,6 +103,8 @@ export function DocumentsPanel({
   const router = useRouter();
   const [pending, startTransition] = useSafeTransition();
   const [error, setError] = useState<string | null>(null);
+  // a voucher waiting on its hotel's data — the data team's, said as news (document-issue.ts «waiting»)
+  const [held, setHeld] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [confirmingAll, setConfirmingAll] = useState(false);
   // what the last pull added — 0 says the case already holds everything the offer has
@@ -140,19 +142,23 @@ export function DocumentsPanel({
   function issue(kind: VoucherKind) {
     startTransition(async () => {
       setError(null);
+      setHeld(null);
       if (kind === "hotel_voucher" && perHotel) {
+        const waiting: string[] = [];
         for (const h of finalHotels) {
           const res = await issueDocument({ operation_id: operationId, kind, booking_id: h.id });
-          if (!res.ok) {
+          if (!res.ok && res.waiting) waiting.push(t(res.error, res.params));
+          else if (!res.ok) {
             setError(t(res.error, res.params));
             return;
           }
         }
+        if (waiting.length) setHeld(waiting.join(" "));
         router.refresh();
         return;
       }
       const res = await issueDocument({ operation_id: operationId, kind, welcome_name: kind === "welcome_board" ? welcomeName : null });
-      if (!res.ok) setError(t(res.error, res.params));
+      if (!res.ok) (res.waiting ? setHeld : setError)(t(res.error, res.params));
       else router.refresh();
     });
   }
@@ -281,6 +287,7 @@ export function DocumentsPanel({
       <section className={card}>
         <h2 className="mb-3 text-sm font-extrabold text-[#185045]">{t("ops.documents")}</h2>
         {error ? <p className="mb-2 text-[12px] font-bold text-[#c22850]">{error}</p> : null}
+        {held ? <p className="mb-2 rounded-[10px] bg-[#eef4f1] px-3 py-2 text-[12px] font-semibold text-[#557d78]">{held}</p> : null}
 
         <div className="mb-3 flex flex-wrap gap-2">
           {DOC_KINDS.map((kind) => {

@@ -645,7 +645,7 @@ export async function listDocuments(operationId: string): Promise<OperationDocum
  * A paper identical to the latest of its kind comes back as it is, not as a
  * second version.
  */
-export async function issueDocument(input: IssueInput): Promise<{ ok: true; id: string; token: string } | (Fail & { params?: Record<string, string> })> {
+export async function issueDocument(input: IssueInput): Promise<{ ok: true; id: string; token: string } | (Fail & { params?: Record<string, string>; waiting?: true })> {
   const denied = (await gateOperation(input.operation_id)) ?? (input.booking_id ? await gateRow("operation_bookings", input.booking_id) : null);
   if (denied) return { ok: false, error: denied };
   const res = await issueDocumentNow(input, await getCurrentEmployeeId());

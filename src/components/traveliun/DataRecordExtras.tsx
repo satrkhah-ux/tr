@@ -86,6 +86,7 @@ const ACTION_LABEL: Record<string, TranslationKey> = {
   "data.deleted": "data.quality.history.deleted",
   "data.verified": "data.quality.history.verified",
   "data.unverified": "data.quality.history.unverified",
+  "data.requested": "data.quality.history.requested",
 };
 
 function RecordHistory({ config, id }: { config: TableConfig; id: string }) {

@@ -1,6 +1,9 @@
 "use server";
 
+import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { HOTEL_ID_KEY } from "@/lib/operations/voucher-dto";
+import { issueVouchersForHotel } from "./wizard-sync";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
@@ -147,6 +150,14 @@ export async function mergeHotels(keepId: string, dropIds: string[]): Promise<Me
       if (error.message === "nothing_to_merge") return { ok: false, error: "data.tools.err.nothingToMerge" };
       return { ok: false, error: "err.db" };
     }
+    // a booking that knows its hotel by id (HOTEL_ID_KEY) follows it too — merge_hotels moves the
+    // offers' lines, not the cases' — and a voucher that waited on the dropped row goes out
+    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { data: moved } = await service.from("operation_bookings").select("id, detail").eq("kind", "hotel").in(`detail->>${HOTEL_ID_KEY}`, dropIds);
+    for (const b of (moved ?? []) as { id: string; detail: Record<string, string> }[]) {
+      await service.from("operation_bookings").update({ detail: { ...b.detail, [HOTEL_ID_KEY]: keepId } }).eq("id", b.id);
+    }
+    after(() => issueVouchersForHotel(keepId));
     return { ok: true, removed: Number((data as { hotels_removed?: number } | null)?.hotels_removed ?? dropIds.length) };
   } catch {
     return { ok: false, error: "err.db" };

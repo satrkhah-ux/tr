@@ -2,6 +2,9 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { offerTotals, ratesFor } from "@/lib/offer/pricing";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { normAr } from "@/lib/catalog/norm";
+import { offerHotelCity } from "@/lib/operations/seed-plan";
+import { ensureCatalogHotel } from "./hotel-data-request";
 import { getCurrentEmployeeId } from "./metrics";
 import { getRates } from "./rates-actions";
 import type { CreateOfferInput, CreateOfferResult } from "./offers";
@@ -87,7 +90,7 @@ export async function insertOffer(input: CreateOfferInput, asPartner?: string): 
     const offerId = offer.id;
 
     const cost = createSupabaseServiceClient() as unknown as SupabaseClient;
-    await insertChildren(supabase, cost, offerId, input);
+    await insertChildren(supabase, cost, offerId, await withCatalogHotels(cost, input, serial));
 
     await cost.from("pricings").insert({ offer_id: offerId, ...pricingRow(input) });
     await supabase.from("offer_revisions").insert({ offer_id: offerId, revision: 1, note: "created via builder" });
@@ -152,7 +155,7 @@ export async function replaceOffer(serial: string, input: CreateOfferInput): Pro
       return failed;
     };
 
-    if (!(await insertChildren(supabase, cost, offerId, { ...input, days: [] }))) return rollback();
+    if (!(await insertChildren(supabase, cost, offerId, { ...(await withCatalogHotels(cost, input, serial)), days: [] }))) return rollback();
     const days = input.days ?? [];
     if (days.length && (await supabase.from("offer_days").upsert(dayRows(offerId, days), { onConflict: "offer_id,day_number" })).error) {
       return rollback();
@@ -200,6 +203,33 @@ export async function replaceOffer(serial: string, input: CreateOfferInput): Pro
   } catch {
     return { ok: false, error: "err.db" };
   }
+}
+
+/**
+ * A hotel typed by hand (a line with no catalogue id) joins /hotels in its
+ * city, its data asked of the data team (hotel-data-request.ts) — the line
+ * keeps that id, so the pull, the voucher and a merge all reach it. One at a
+ * time, the same name once: two stays in one hotel make one row.
+ */
+async function withCatalogHotels(cost: SupabaseClient, input: CreateOfferInput, serial: string): Promise<CreateOfferInput> {
+  if (!input.hotels?.some((h) => !h.hotel_id && h.hotel_name?.trim())) return input;
+  const by = await getCurrentEmployeeId();
+  const made = new Map<string, string | null>();
+  const stops = input.cities.map((c, i) => ({ ...c, id: `#${i}` }));
+  const hotels = [];
+  for (const h of input.hotels) {
+    const name = h.hotel_name?.trim();
+    if (h.hotel_id || !name) {
+      hotels.push(h);
+      continue;
+    }
+    // the stop that prints it, else the one its check-in falls in (seed-plan.ts, as the pull reads it)
+    const city = offerHotelCity({ hotel_name: name, check_in: h.check_in }, stops) || null;
+    const key = `${normAr(name)}|${normAr(city)}`;
+    if (!made.has(key)) made.set(key, await ensureCatalogHotel(cost, { name, city, serial, by }));
+    hotels.push({ ...h, hotel_id: made.get(key) ?? null });
+  }
+  return { ...input, hotels };
 }
 
 /** `total` in riyals for the KPIs — converted at today's rates when the caller left it out. */

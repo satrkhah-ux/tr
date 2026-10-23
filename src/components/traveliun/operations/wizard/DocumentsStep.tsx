@@ -104,6 +104,7 @@ export function AutoIssue({ data }: { data: WizardCase }) {
   const router = useRouter();
   const tried = useRef(new Set<string>());
   const [errors, setErrors] = useState<string[]>([]);
+  const [waits, setWaits] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const keyOf = (l: { kind: string; booking_id: string | null }) => `${l.kind}:${l.booking_id ?? ""}`;
   // what is due now, by name — the effect runs when that changes (after each refresh)
@@ -117,11 +118,14 @@ export function AutoIssue({ data }: { data: WizardCase }) {
     void (async () => {
       setBusy(true);
       const failed: string[] = [];
+      const held: string[] = [];
       for (const l of due) {
         const res = await issueDocument({ operation_id: data.operation.id, kind: l.kind, booking_id: l.booking_id }).catch(() => null);
-        if (res && !res.ok) failed.push(`${t(`ops.doc.${l.kind}` as TranslationKey)}${l.title ? ` (${l.title})` : ""}: ${t(res.error, res.params)}`);
+        // a hotel's data is the data team's — said as news, not as the agent's error (the owner, 2026-10-23)
+        if (res && !res.ok) (res.waiting ? held : failed).push(`${t(`ops.doc.${l.kind}` as TranslationKey)}${l.title ? ` (${l.title})` : ""}: ${t(res.error, res.params)}`);
       }
       setErrors((e) => [...e, ...failed]);
+      setWaits((w) => [...w, ...held]);
       setBusy(false);
       router.refresh();
     })();
@@ -129,18 +133,29 @@ export function AutoIssue({ data }: { data: WizardCase }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [work]);
 
-  if (!busy && errors.length === 0) return null;
+  if (!busy && errors.length === 0 && waits.length === 0) return null;
   return (
-    <div className={`rounded-[11px] px-3 py-2 text-[12px] font-bold ${errors.length ? "bg-[#fdecef] text-[#c22850]" : "bg-[#eef4f1] text-[#185045]"}`}>
-      {busy ? (
-        <p className="flex items-center gap-1.5">
-          <Loader2 className="size-3.5 animate-spin" />
-          {t("wz.doc.issuing")}
-        </p>
+    <div className="space-y-1.5">
+      {busy || errors.length ? (
+        <div className={`rounded-[11px] px-3 py-2 text-[12px] font-bold ${errors.length ? "bg-[#fdecef] text-[#c22850]" : "bg-[#eef4f1] text-[#185045]"}`}>
+          {busy ? (
+            <p className="flex items-center gap-1.5">
+              <Loader2 className="size-3.5 animate-spin" />
+              {t("wz.doc.issuing")}
+            </p>
+          ) : null}
+          {errors.map((e, i) => (
+            <p key={i}>{e}</p>
+          ))}
+        </div>
       ) : null}
-      {errors.map((e, i) => (
-        <p key={i}>{e}</p>
-      ))}
+      {waits.length ? (
+        <div className="rounded-[11px] bg-[#eef4f1] px-3 py-2 text-[12px] font-semibold text-[#557d78]">
+          {waits.map((w, i) => (
+            <p key={i}>{w}</p>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

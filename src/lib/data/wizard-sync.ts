@@ -6,7 +6,7 @@ import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { issueDocumentNow } from "@/lib/data/document-issue";
 import type { OperationBooking, OperationDocument } from "@/lib/data/operation-bookings";
-import { CLIENT_DOCUMENT_KINDS } from "@/lib/operations/voucher-dto";
+import { CLIENT_DOCUMENT_KINDS, HOTEL_ID_KEY } from "@/lib/operations/voucher-dto";
 import { toTravelerListItem, type TravelerRow } from "@/lib/operations/traveler-dto";
 import { dueDocuments } from "@/lib/operations/wizard/documents";
 import { readWaits, withoutWaits } from "@/lib/operations/wizard/followup";
@@ -52,6 +52,30 @@ export async function writeWaits(
     if ((written ?? []).length > 0) return { ok: true, waits: next };
   }
   return { ok: false };
+}
+
+/**
+ * The vouchers that waited on a hotel's data (document-issue.ts «waiting»),
+ * now that the data team has given it — every open case with a booking in
+ * this hotel, by its catalogue id or its name. Best-effort, like the rest.
+ */
+export async function issueVouchersForHotel(hotelId: string): Promise<void> {
+  try {
+    const supabase = service();
+    const { data: hotel } = await supabase.from("hotels").select("arabic_name").eq("id", hotelId).maybeSingle();
+    const name = (hotel as { arabic_name: string } | null)?.arabic_name?.trim();
+    const [byId, byName] = await Promise.all([
+      supabase.from("operation_bookings").select("operation_id").eq("kind", "hotel").eq(`detail->>${HOTEL_ID_KEY}`, hotelId),
+      name ? supabase.from("operation_bookings").select("operation_id").eq("kind", "hotel").eq("title", name) : Promise.resolve({ data: [] }),
+    ]);
+    const ids = [...new Set([...(byId.data ?? []), ...(byName.data ?? [])].map((r) => (r as { operation_id: string }).operation_id))];
+    if (ids.length === 0) return;
+    // a popular hotel's old trips are long done — only the open cases are worth a look
+    const { data: open } = await supabase.from("operations").select("id").in("id", ids.slice(0, 500)).not("execution_status", "in", "(cancelled,travelled)");
+    for (const { id } of (open ?? []) as { id: string }[]) await autoIssueDocuments(id);
+  } catch {
+    /* the wizard issues them on its next visit all the same */
+  }
 }
 
 /**

@@ -118,6 +118,42 @@ export async function notifyOperationConfirmed(notice: OpsNotice): Promise<numbe
   }
 }
 
+/**
+ * A hotel's data for the data team (hotel-data-request.ts) — to whoever opens
+ * /hotels, the button on that very row. The agent who typed it is not stopped.
+ */
+export async function notifyHotelData(notice: { hotelId: string; name: string; city: string | null; why: string; serial: string | null; by: string | null }): Promise<number> {
+  try {
+    const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const path = `/hotels?id=${notice.hotelId}`;
+    const chatIds = await recipientsFor(supabase, path);
+    if (chatIds.length === 0) return 0;
+    const base = readEnv("NEXT_PUBLIC_SITE_URL") ?? "https://pkg.traveliun.com";
+    let by = notice.by;
+    if (by && /^[0-9a-f-]{36}$/i.test(by)) {
+      const { data } = await supabase.from("employees").select("arabic_name").eq("id", by).maybeSingle();
+      by = (data as { arabic_name: string | null } | null)?.arabic_name ?? null;
+    }
+    const text = [
+      "🏨 <b>بيانات فندق للإكمال</b>",
+      "",
+      `الفندق: <b>${escapeHtml(notice.name)}</b>${notice.city ? ` — ${escapeHtml(notice.city)}` : ""}`,
+      `المطلوب: ${escapeHtml(notice.why)}`,
+      notice.serial ? `الملف: <code>${escapeHtml(notice.serial)}</code>` : null,
+      by ? `أدخله: ${escapeHtml(by)}` : null,
+      "",
+      "الموظف يكمل حجوزاته، والفاوتشر يصدر تلقائياً بعد إكمال البيانات:",
+      `${base}${path}`,
+    ]
+      .filter((l): l is string => l !== null)
+      .join("\n");
+    const results = await Promise.all(chatIds.map((id) => sendMessage(id, text, [[{ text: "🏨 فتح الفندق", web_app: { url: miniAppUrl(path) } }]])));
+    return results.filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

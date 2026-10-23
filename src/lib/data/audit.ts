@@ -35,6 +35,8 @@ export type AuditAction =
   | "data.deleted"
   | "data.verified"
   | "data.unverified"
+  // a hotel's data asked of the data team (hotel-data-request.ts; meta: reason, serial)
+  | "data.requested"
   // «مراجعة الأسعار»: a price set or kept (meta: kind, label, before, after)
   | "price.reviewed"
   // operations

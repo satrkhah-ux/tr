@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
@@ -12,6 +13,7 @@ import { FILTER_NOT_NULL, FILTER_NULL } from "./types";
 import { catalogSkel, normAr } from "@/lib/catalog/norm";
 import { hotelRuleError } from "@/lib/catalog/hotel-rules";
 import { getHotelUsage } from "./hotel-tools";
+import { issueVouchersForHotel } from "./wizard-sync";
 import { logAudit } from "./audit";
 import { diffRecord, issueRowsFunction } from "./quality";
 import { OFFER_LOCKED_COLUMNS, OFFER_OWNER_COLUMNS, changedLockedColumns } from "@/lib/offer/locked-columns";
@@ -384,6 +386,8 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
     if (Object.keys(changes).length > 0) {
       await logAudit({ action: "data.updated", entity: table, entity_id: id, meta: { changes } });
     }
+    // a hotel's name given: the vouchers that waited on it go out (the owner, 2026-10-23)
+    if (table === "hotels" && ("english_name" in changes || "arabic_name" in changes)) after(() => issueVouchersForHotel(id));
     return { ok: true, row: data as unknown as DataRow };
   } catch {
     return { ok: false, error: "err.db" };
