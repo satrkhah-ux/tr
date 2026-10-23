@@ -494,6 +494,12 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
               الأشخاص
             </Link>
           ) : null}
+          {/* «المتابعة» — a tab of «العملاء» since the menu lost its own link (8b0ff52); its page's own gate */}
+          {opens({ href: "/followups" }) ? (
+            <Link href="/followups" className="-mb-px shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-[13px] font-bold text-[#6b7f7a] hover:text-[var(--tv-brand)]">
+              المتابعة
+            </Link>
+          ) : null}
         </nav>
         {pane !== "clients" ? (
           <div className="flex flex-wrap items-center gap-1.5">
