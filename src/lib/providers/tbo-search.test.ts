@@ -70,10 +70,15 @@ describe("helpers", () => {
     expect([tboStars("FiveStar"), tboStars(3), tboStars("2"), tboStars("All"), tboStars(null)]).toEqual([5, 3, 2, null, null]);
   });
 
-  it("one age per child, per room", () => {
-    expect(tboPaxRooms({ rooms: 2, adults: 2, children: 2, children_ages: [4] })).toEqual([
-      { Adults: 2, Children: 2, ChildrenAges: [4, 8] },
-      { Adults: 2, Children: 2, ChildrenAges: [4, 8] },
+  it("shares the whole party out room by room, each child with its own age", () => {
+    // the draft's totals: 4 adults and 2 children (2 and 6) in two rooms — not 8 adults and 4 children
+    expect(tboPaxRooms({ rooms: 2, adults: 4, children: 2, children_ages: [2, 6] })).toEqual([
+      { Adults: 2, Children: 1, ChildrenAges: [2] },
+      { Adults: 2, Children: 1, ChildrenAges: [6] },
+    ]);
+    expect(tboPaxRooms({ rooms: 2, adults: 5, children: 1, children_ages: [] })).toEqual([
+      { Adults: 3, Children: 1, ChildrenAges: [8] },
+      { Adults: 2, Children: 0, ChildrenAges: [] },
     ]);
     expect(tboPaxRooms({ rooms: 1, adults: 1, children: 0 })).toEqual([{ Adults: 1, Children: 0, ChildrenAges: [] }]);
   });

@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import { normAr } from "@/lib/catalog/norm";
 import { getRates } from "./rates-actions";
 import { getActiveMarkupRules } from "./markup-rules";
 import { getGeneratorLookups } from "./drafts";
@@ -378,11 +379,13 @@ export async function searchHotelsForCity(
   const countryCode = await resolveCountryCode(cityCountry(data, cityName));
 
   const query: HotelSearchQuery = {
-    city: cityName,
+    city: await supplierCityName(cityName, countryCode),
     check_in: stay.check_in,
     check_out: stay.check_out,
     adults: data.trip.adults,
     children: data.trip.children,
+    // the real ages: a child of 2 is often free where one of 8 is charged
+    children_ages: data.trip.children_ages,
     rooms: stay.rooms,
     country_code: countryCode,
     // Hotel net rates are nationality-dependent (resident vs GCC vs other), so
@@ -525,6 +528,27 @@ async function resolveCountryCode(countryName: string): Promise<string | null> {
   }
 }
 
+/**
+ * The catalogue's English name for the draft's city. A supplier's city list is
+ * English («Dubai») and the draft holds the Arabic name («دبي») — sent as is,
+ * TBO matched no city at all from the generator. The pricing context keeps the
+ * Arabic name: the markup rules are written in it.
+ */
+async function supplierCityName(cityName: string, iso2: string | null): Promise<string> {
+  if (!iso2) return cityName;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: country } = await supabase.from("countries").select("id").ilike("iso2", iso2).maybeSingle();
+    if (!country) return cityName;
+    const { data } = await supabase.from("cities").select("arabic_name, english_name").eq("country_id", (country as { id: string }).id);
+    const wanted = normAr(cityName);
+    const hit = ((data ?? []) as { arabic_name: string; english_name: string | null }[]).find((c) => normAr(c.arabic_name) === wanted);
+    return hit?.english_name?.trim() || cityName;
+  } catch {
+    return cityName;
+  }
+}
+
 export type SelectResult = { ok: true; blocked: boolean } | { ok: false; error: TranslationKey };
 
 /**
@@ -560,17 +584,19 @@ export async function selectHotelRate(
   // (2) re-fetch the LIVE rate fresh — never trust a possibly-expired list
   let freshRates;
   try {
+    const countryCode = await resolveCountryCode(cityCountry(data, cityName));
     freshRates = await adapter.searchRates({
-      city: cityName,
+      city: await supplierCityName(cityName, countryCode),
       check_in: stay.check_in,
       check_out: stay.check_out,
       adults: data.trip.adults,
       children: data.trip.children,
+      children_ages: data.trip.children_ages,
       rooms: stay.rooms,
       supplier_hotel_id: supplierHotelId,
       // Same omission as the search had: without these the re-fetch comes back
       // empty and the agent is told the rate expired, seconds after seeing it.
-      country_code: await resolveCountryCode(cityCountry(data, cityName)),
+      country_code: countryCode,
       nationality: "SA",
     });
   } catch {

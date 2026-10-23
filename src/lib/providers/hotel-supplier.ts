@@ -60,7 +60,9 @@ export type HotelSearchQuery = {
   city: string;
   check_in: string;
   check_out: string;
+  /** the whole party across all rooms (the draft's trip totals), not per room. */
   adults: number;
+  /** the whole party across all rooms. */
   children: number;
   /** each child's age, one per child; TBO refuses a child without one. */
   children_ages?: number[] | null;
@@ -534,7 +536,9 @@ class TboHotelSupplier implements HotelSupplier {
       return { kind: "ok", data: json };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      emit({ response: { error: message }, http_status: null, status_code: null, ok: false });
+      // our own clock ran out — the request reached TBO, which was too slow; not a dead host
+      const timeout = err instanceof Error && err.name === "TimeoutError";
+      emit({ response: { error: message, timeout }, http_status: null, status_code: null, ok: false });
       console.warn(`[tbo] ${path} threw — ${message}`);
       return { kind: "unreachable", message: "تعذّر الوصول إلى المورّد" };
     }
@@ -870,22 +874,29 @@ export function tboStars(v: unknown): number | null {
 }
 
 /**
- * One PaxRooms entry per room — adults and children are PER ROOM. TBO requires
- * ChildrenAges to be exactly as long as Children; an age we were not given is
- * sent as 8 rather than dropping the child (a room priced for fewer guests is
- * a room the hotel refuses at the desk).
+ * One PaxRooms entry per room. The query holds the whole party; TBO counts
+ * PER ROOM (Adults 1-8, Children 0-4), so the party is shared out room by room
+ * — copying the totals into every room asked for twice the guests in two rooms.
+ * ChildrenAges must be exactly as long as Children; an age we were not given is
+ * sent as 8 rather than dropping the child (a room priced for fewer guests is a
+ * room the hotel refuses at the desk).
  */
 export function tboPaxRooms(query: Pick<HotelSearchQuery, "rooms" | "adults" | "children" | "children_ages">) {
-  const children = Math.min(4, Math.max(0, query.children));
+  const rooms = Math.max(1, Math.floor(query.rooms) || 1);
+  const share = (total: number, i: number) => Math.floor(total / rooms) + (i < total % rooms ? 1 : 0);
+  const adults = Math.max(0, Math.floor(query.adults) || 0);
+  const children = Math.max(0, Math.floor(query.children) || 0);
   const ages = Array.from({ length: children }, (_, i) => {
     const age = query.children_ages?.[i];
     return typeof age === "number" && age >= 0 && age <= 17 ? Math.floor(age) : 8;
   });
-  return Array.from({ length: Math.max(1, query.rooms) }, () => ({
-    Adults: Math.min(8, Math.max(1, query.adults)),
-    Children: children,
-    ChildrenAges: ages,
-  }));
+  let next = 0;
+  return Array.from({ length: rooms }, (_, i) => {
+    const kids = Math.min(4, share(children, i));
+    const own = ages.slice(next, next + kids);
+    next += share(children, i);
+    return { Adults: Math.min(8, Math.max(1, share(adults, i))), Children: kids, ChildrenAges: own };
+  });
 }
 
 type TboBookingDetail = {

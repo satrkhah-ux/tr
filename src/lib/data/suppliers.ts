@@ -200,6 +200,8 @@ export type SearchTryCall = {
   ms: number;
   /** how many rows the call returned (cities, hotel codes, hotels). */
   count: number | null;
+  /** no answer within our time limit — the supplier was slow, the address is fine. */
+  timeout: boolean;
 };
 
 function callView(c: SupplierCallRecord): SearchTryCall {
@@ -208,12 +210,14 @@ function callView(c: SupplierCallRecord): SearchTryCall {
   const list = Object.values(body).find(Array.isArray) as unknown[] | undefined;
   return {
     method: c.method,
-    ok: c.ok,
+    // 201 on Search is TBO's «no rooms for these criteria» — an answer, not a refusal
+    ok: c.ok || (c.method.toLowerCase() === "search" && c.status_code === 201),
     http: c.http_status,
     code: c.status_code,
     description: typeof status?.Description === "string" ? status.Description : typeof body.error === "string" ? body.error : null,
     ms: c.duration_ms,
     count: list ? list.length : null,
+    timeout: body.timeout === true,
   };
 }
 
@@ -236,7 +240,11 @@ export async function trySupplierCities(code: string, countryCode: string): Prom
   const adapter = await testAdapter(code, sink);
   if (!adapter?.listCities) return { ok: false, message: NO_CREDS, calls: [] };
   const cities = await adapter.listCities(countryCode);
-  if (!cities) return { ok: false, message: "لم يُرجع المورّد قائمة المدن.", calls: sink.map(callView) };
+  if (!cities) {
+    // nothing was sent: the row itself is not usable (sandbox with no URL, half the credentials) — say which
+    if (sink.length === 0) return { ok: false, message: (await adapter.testConnection()).message, calls: [] };
+    return { ok: false, message: "لم يُرجع المورّد قائمة المدن.", calls: sink.map(callView) };
+  }
   return { ok: true, cities: cities.sort((a, b) => a.name.localeCompare(b.name)) };
 }
 
@@ -264,11 +272,13 @@ export type SearchTryRate = {
   board: string;
   refundable: boolean;
   policy: string;
-  /** what the supplier charges us, whole stay. */
-  net: number;
+  /** what the supplier charges us, whole stay — null without pricing.internal. */
+  net: number | null;
   currency: string;
   /** our price by the markup rules, whole stay in SAR; null = no rule or no exchange rate. */
   sell: number | null;
+  /** the rules refuse this sell (below the floor or the minimum margin), as /basic marks it. */
+  blocked: boolean;
 };
 
 export type SearchTryHotel = { id: string; name: string; stars: number | null; rates: SearchTryRate[] };
@@ -278,6 +288,29 @@ export type SearchTryResult =
   | { ok: false; message: string; calls: SearchTryCall[] };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A whole number from the browser, kept inside [min, max]; anything else is `fallback`. */
+function int(v: unknown, min: number, max: number, fallback: number): number {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+}
+
+/**
+ * The catalogue's Arabic name for a supplier's city — what the markup rules and
+ * the drafts are written in, so the sell shown here is the one /basic would get.
+ */
+async function catalogCity(iso2: string, english: string): Promise<string | null> {
+  try {
+    const supabase = db();
+    const { data: country } = await supabase.from("countries").select("id").ilike("iso2", iso2).maybeSingle();
+    if (!country) return null;
+    const { data } = await supabase.from("cities").select("arabic_name, english_name").eq("country_id", (country as { id: string }).id);
+    const wanted = english.trim().toLowerCase();
+    return ((data ?? []) as { arabic_name: string; english_name: string | null }[]).find((c) => (c.english_name ?? "").trim().toLowerCase() === wanted)?.arabic_name ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Admin: a real availability search at the supplier, run from inside the system.
@@ -297,37 +330,56 @@ export async function trySupplierSearch(input: SearchTryInput): Promise<SearchTr
   if (!adapter) return { ok: false, message: NO_CREDS, calls: [] };
 
   const nights = Math.round((Date.parse(input.check_out) - Date.parse(input.check_in)) / 86_400_000);
-  const children = Math.min(4, Math.max(0, Math.floor(input.children)));
-  const [results, { sarPer }, rules] = await Promise.all([
+  // the form asks per room; the adapter takes the whole party and shares it out
+  const rooms = int(input.rooms, 1, 4, 1);
+  const adults = int(input.adults, 1, 8, 2);
+  const children = int(input.children, 0, 4, 0);
+  const ages = (Array.isArray(input.children_ages) ? input.children_ages : []).slice(0, children).map((a) => int(a, 0, 17, 8));
+  while (ages.length < children) ages.push(8);
+  const iso2 = input.country_code.toUpperCase();
+  const [results, { sarPer }, rules, internal, city] = await Promise.all([
     adapter
       .searchHotels({
         city: input.city.trim(),
-        country_code: input.country_code.toUpperCase(),
+        country_code: iso2,
         check_in: input.check_in,
         check_out: input.check_out,
-        rooms: Math.min(4, Math.max(1, Math.floor(input.rooms))),
-        adults: Math.min(8, Math.max(1, Math.floor(input.adults))),
-        children,
-        children_ages: input.children_ages.slice(0, children),
+        rooms,
+        adults: adults * rooms,
+        children: children * rooms,
+        children_ages: Array.from({ length: rooms }, () => ages).flat(),
         nationality: /^[A-Za-z]{2}$/.test(input.nationality) ? input.nationality.toUpperCase() : "SA",
         hotel_name: input.hotel_name.trim() || null,
       })
       .catch(() => []),
-    getRates(),
-    getActiveMarkupRules(),
+    // a price we cannot work out is shown as «بلا قاعدة تسعير», never as a lost search
+    getRates().catch(() => ({ sarPer: {} as Record<string, number> })),
+    getActiveMarkupRules().catch(() => []),
+    currentCan("pricing.internal"),
+    catalogCity(iso2, input.city),
   ]);
+  const calls = sink.map(callView);
+
+  // the name narrowed the city's list to nothing, so TBO was never asked for rooms
+  const listed = sink.find((c) => c.method === "TBOHotelCodeList");
+  if (input.hotel_name.trim() && listed?.ok && !sink.some((c) => c.method.toLowerCase() === "search")) {
+    return { ok: false, message: "لا يوجد فندق بهذا الاسم في قائمة فنادق TBO لهذه المدينة — جرّب جزءاً من الاسم بالإنجليزية.", calls };
+  }
 
   const fxDate = new Date().toISOString().slice(0, 10);
-  const hotels = results.map((h): SearchTryHotel => ({
+  const cheapest = (h: (typeof results)[number]) => Math.min(...h.rates.map((r) => r.inclusive));
+  const hotels = [...results].sort((a, b) => cheapest(a) - cheapest(b)).map((h): SearchTryHotel => ({
     id: h.supplier_hotel_id,
     name: h.name_ar,
     stars: h.star_rating,
-    rates: h.rates
+    rates: [...h.rates]
+      .sort((a, b) => a.inclusive - b.inclusive)
       .map((r): SearchTryRate => {
+        // the context /basic prices with (contextFor): the catalogue's city, no stars
         const priced = priceSupplierRate(
           r,
           rules,
-          { country: input.country_name || null, city: input.city, supplier_id: r.supplier_id, stars: h.star_rating, date: input.check_in, customer_type: "individual" },
+          { country: input.country_name || null, city: city ?? input.city, supplier_id: r.supplier_id, stars: null, date: input.check_in, customer_type: "individual" },
           sarPer,
           "SAR",
           fxDate,
@@ -337,13 +389,12 @@ export async function trySupplierSearch(input: SearchTryInput): Promise<SearchTr
           board: r.board_type,
           refundable: r.refundable,
           policy: r.cancellation_policy,
-          net: r.inclusive,
+          net: internal ? r.inclusive : null,
           currency: r.currency,
           sell: priced.ok ? priced.line.sell : null,
+          blocked: priced.ok && priced.line.blocks.length > 0,
         };
-      })
-      .sort((a, b) => a.net - b.net),
+      }),
   }));
-  hotels.sort((a, b) => (a.rates[0]?.net ?? 0) - (b.rates[0]?.net ?? 0));
-  return { ok: true, hotels, calls: sink.map(callView), nights };
+  return { ok: true, hotels, calls, nights };
 }

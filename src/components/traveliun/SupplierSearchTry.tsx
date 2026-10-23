@@ -252,7 +252,15 @@ function Refusal({ message, calls }: { message: string; calls: SearchTryCall[] }
             })}
           </p>
           <p className="mt-1 text-[12px] font-semibold text-[#8a5a66]">
-            {t(failed.code === 401 ? "settings.supplierTry.hintCreds" : "settings.supplierTry.hintServer")}
+            {t(
+              failed.code === 401 || failed.http === 401
+                ? "settings.supplierTry.hintCreds"
+                : failed.timeout
+                  ? "settings.supplierTry.hintTimeout"
+                  : failed.http === null
+                  ? "settings.supplierTry.hintNetwork"
+                  : "settings.supplierTry.hintServer",
+            )}
           </p>
         </>
       ) : null}
@@ -305,14 +313,19 @@ function HotelRow({ hotel }: { hotel: SearchTryHotel }) {
               </span>
               {r.refundable ? <div className="tv-tnum text-[11px] text-[#93aaa3]">{r.policy}</div> : null}
             </div>
-            <div className="whitespace-nowrap">
-              <div className="text-[11px] font-bold text-[#93aaa3]">{t("settings.supplierTry.net")}</div>
-              <DirText dir="ltr" className="tv-tnum font-bold text-[#557d78]">{money(r.net)} {r.currency}</DirText>
-            </div>
+            {r.net !== null ? (
+              <div className="whitespace-nowrap">
+                <div className="text-[11px] font-bold text-[#93aaa3]">{t("settings.supplierTry.net")}</div>
+                <DirText dir="ltr" className="tv-tnum font-bold text-[#557d78]">{money(r.net)} {r.currency}</DirText>
+              </div>
+            ) : null}
             <div className="whitespace-nowrap">
               <div className="text-[11px] font-bold text-[#93aaa3]">{t("settings.supplierTry.sell")}</div>
               {r.sell !== null ? (
-                <DirText dir="ltr" className="tv-tnum font-extrabold text-[#185045]">{money(r.sell)} SAR</DirText>
+                <>
+                  <DirText dir="ltr" className={`tv-tnum font-extrabold ${r.blocked ? "text-[#c22850]" : "text-[#185045]"}`}>{money(r.sell)} SAR</DirText>
+                  {r.blocked ? <div className="text-[11px] font-bold text-[#c22850]" title={t("pg.supplier.blocked")}>{t("settings.supplierTry.blocked")}</div> : null}
+                </>
               ) : (
                 <span className="text-[11.5px] font-bold text-[#b7791f]">{t("settings.supplierTry.noSell")}</span>
               )}
