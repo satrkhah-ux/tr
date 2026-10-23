@@ -54,7 +54,19 @@ export function comparisonLines(before: LetterNumbers, now: LetterNumbers): stri
   ];
 }
 
-export const WITHDRAW_NOTICE = "لم تلتزم بإغلاق المحادثات المنتهية خلال المهلة، وسيتم سحب المحادثات منك آلياً بعد استلامك هذا الخطاب.";
+/** The withdrawal after a warned letter 2 (the owner, 2026-10-23): open, the client silent this long, nobody waiting for us. */
+export const WITHDRAW_AFTER_DAYS = 3;
+
+export const WITHDRAW_NOTICE = `لم تلتزم بإغلاق المحادثات المنتهية خلال المهلة. لذلك ستُسحب منك آلياً بعد استلامك هذا الخطاب المحادثات المفتوحة التي مرّ عليها ${WITHDRAW_AFTER_DAYS} أيام بلا رد من العميل، وتعود لقسم المبيعات.`;
+
+/**
+ * Which of an agent's open conversations go back to «قسم المبيعات»: we spoke
+ * last (no client waiting for our reply) and nothing has moved for three days.
+ * A conversation with a client waiting is never taken.
+ */
+export function toWithdraw(rows: { id: number; assigneeId: number | null; waitingSince: number; lastActivityAt: number }[], agentId: number, nowSec: number): number[] {
+  return rows.filter((r) => r.assigneeId === agentId && !r.waitingSince && nowSec - r.lastActivityAt >= WITHDRAW_AFTER_DAYS * 86_400).map((r) => r.id);
+}
 export const COMMITTED_NOTE = "شكراً لالتزامك بإغلاق المحادثات المنتهية، استمر على ذلك.";
 
 /** At most three, the most pressing first; a clean sheet gets praise, not an invented problem. */

@@ -701,6 +701,21 @@ export async function unassignTeletel(conversationId: number): Promise<boolean> 
   return Boolean(now?.meta) && !now?.meta?.team?.id;
 }
 
+/**
+ * Back to a team's queue with nobody on it (the warned letter 2's withdrawal):
+ * the team first, the agent cleared second. Read back: done when the team is
+ * set and the conversation is no longer `fromAgent`'s (an inbox auto-assignment
+ * may already have handed it to someone else, which is still a withdrawal).
+ */
+export async function returnToTeam(conversationId: number, teamId: number, fromAgent: number): Promise<boolean> {
+  const config = getTeletelConfig();
+  if (!config) return false;
+  await api<unknown>(config, `/conversations/${conversationId}/assignments`, { team_id: teamId });
+  await api<unknown>(config, `/conversations/${conversationId}/assignments`, { assignee_id: 0 });
+  const now = await api<{ meta?: { team?: { id?: number } | null; assignee?: { id?: number } | null } }>(config, `/conversations/${conversationId}`);
+  return now?.meta?.team?.id === teamId && now.meta.assignee?.id !== fromAgent;
+}
+
 /** The agents who can take an inbox's conversations — names as Teletel's activity lines write them. */
 export async function listAssignableAgents(inboxId: number | null): Promise<{ id: number; name: string; email: string | null }[]> {
   const config = getTeletelConfig();

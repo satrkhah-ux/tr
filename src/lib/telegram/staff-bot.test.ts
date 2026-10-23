@@ -5,7 +5,7 @@ import { ruleTips, teamAverages, type Facts } from "./staff-report";
 import { dashboardText, light } from "./staff-screen";
 import { threadText, whenText } from "./staff-replies";
 import { broadcastText } from "./staff-manager";
-import { closedEnough, comparisonLines, delta, letterTips, share } from "./staff-letter";
+import { closedEnough, comparisonLines, delta, letterTips, share, toWithdraw } from "./staff-letter";
 
 describe("«تنبيهاتي» numbers", () => {
   it("starts the day at 00:00 Riyadh (21:00 UTC the day before)", () => {
@@ -166,6 +166,21 @@ describe("«الخطاب الرسمي» رقم 2", () => {
     expect(lines[2]).toContain("6 (كانوا 4");
     expect(comparisonLines(first, first)[0]).toBe("لم تُغلق أي محادثة خلال هذه المدة.");
     expect([delta(148, 90), delta(4, 6), delta(5, 5)]).toEqual(["−58", "+2", "0"]);
+  });
+});
+
+describe("withdrawal after a warned letter 2", () => {
+  it("takes only the agent's open conversations silent for 3 days where no client waits", () => {
+    const now = Date.parse("2026-11-02T09:00:00Z") / 1000;
+    const day = 86_400;
+    const rows = [
+      { id: 1, assigneeId: 71, waitingSince: 0, lastActivityAt: now - 4 * day }, // we spoke last, 4 days → taken
+      { id: 2, assigneeId: 71, waitingSince: now - 5 * day, lastActivityAt: now - 5 * day }, // the client waits → never
+      { id: 3, assigneeId: 71, waitingSince: 0, lastActivityAt: now - 2 * day }, // 2 days → kept
+      { id: 4, assigneeId: 15, waitingSince: 0, lastActivityAt: now - 9 * day }, // someone else's
+      { id: 5, assigneeId: 71, waitingSince: 0, lastActivityAt: now - 3 * day }, // exactly 3 days → taken
+    ];
+    expect(toWithdraw(rows, 71, now)).toEqual([1, 5]);
   });
 });
 

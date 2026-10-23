@@ -112,6 +112,7 @@ export type AuditAction =
   // «الخطاب الرسمي»: issued by the system, signed by the employee in the bot
   | "staff_letter.issued"
   | "staff_letter.signed"
+  | "staff_letter.withdrawn"
   | "employee.extra_permissions"
   | "employee.deleted"
   // «عين الإدارة» — what it said, and what management did about it

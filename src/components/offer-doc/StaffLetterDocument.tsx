@@ -215,8 +215,8 @@ export function StaffLetterDocument({
               style={{
                 marginTop: "3mm",
                 padding: "3mm 5mm",
-                fontSize: "11pt",
-                lineHeight: 1.7,
+                fontSize: "10.5pt",
+                lineHeight: 1.6,
                 fontWeight: 800,
                 borderColor: warned ? "#c0392b" : "var(--od-green)",
                 borderWidth: "2px",
@@ -245,7 +245,7 @@ export function StaffLetterDocument({
           </div>
           <ul style={LIST}>
             {letterTips(numbers)
-              .slice(0, previous ? 2 : 3)
+              .slice(0, warned ? 1 : previous ? 2 : 3)
               .map((t) => (
                 <li key={t}>{t}</li>
               ))}

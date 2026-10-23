@@ -3,13 +3,13 @@ import { createElement } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
-import { countAgentConversations } from "@/lib/providers/teletel";
+import { countAgentConversations, listOpenConversations, listTeletelTeams, returnToTeam } from "@/lib/providers/teletel";
 import { renderDocHtml } from "@/lib/offer-doc/html";
 import { documentToPng } from "@/lib/offer-doc/pdf";
 import { StaffLetterDocument, type PreviousLetter } from "@/components/offer-doc/StaffLetterDocument";
 import { escapeHtml, staffCall, staffSend, staffSendPhoto, type StaffMember } from "./staff-bot";
 import { loadTargets } from "./staff-numbers";
-import { closedEnough, SECOND_LETTER_DAYS, type LetterNumbers } from "./staff-letter";
+import { closedEnough, SECOND_LETTER_DAYS, toWithdraw, WITHDRAW_AFTER_DAYS, type LetterNumbers } from "./staff-letter";
 import { managers } from "./staff-decisions";
 import { isBotManager } from "./staff-manager";
 import type { InlineButton } from "./ops-bot";
@@ -23,6 +23,9 @@ import type { InlineButton } from "./ops-bot";
  *   - Letter 2 follows ten days after each one's letter 1: the two side by side,
  *     and the notice that their conversations will be withdrawn when they did
  *     not close the finished ones (closedEnough).
+ *   - Once a warned letter 2 has reached them, their open conversations where
+ *     the client has been silent for three days (nobody waiting for us) go back
+ *     to «قسم المبيعات» with no agent (toWithdraw, once: withdrawn_at).
  *   - «✍️ اعتمدت الخطاب» is the employee's electronic signature: signed_at, an
  *     audit row, and the managers' summary updated.
  *
@@ -33,8 +36,21 @@ import type { InlineButton } from "./ops-bot";
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 
 type Member = { id: string; name: string; chatId: number | null; agentId: number };
-type LetterRow = { id: number; employee_id: string; number: 1 | 2; numbers: LetterNumbers; warned: boolean; issued_at: string; delivered: boolean; signed_at: string | null };
-const COLS = "id, employee_id, number, numbers, warned, issued_at, delivered, signed_at";
+type LetterRow = {
+  id: number;
+  employee_id: string;
+  number: 1 | 2;
+  numbers: LetterNumbers;
+  warned: boolean;
+  issued_at: string;
+  delivered: boolean;
+  signed_at: string | null;
+  withdrawn: number[] | null;
+};
+const COLS = "id, employee_id, number, numbers, warned, issued_at, delivered, signed_at, withdrawn";
+
+/** where a withdrawn conversation goes back to */
+const SALES_TEAM = "قسم المبيعات";
 
 /** what counts as «أكّد»: an operations file confirmed (or paid, or done) on an offer they sold */
 const CONFIRMED = ["confirmed", "paid_partial", "paid_full", "completed"];
@@ -113,8 +129,46 @@ async function deliver(row: LetterRow, m: Member): Promise<boolean> {
   );
   const png = await documentToPng(html);
   const sent = await staffSendPhoto(m.chatId, png, caption(row), [[{ text: "✍️ اعتمدت الخطاب", callback_data: `ls:${row.id}` }]], `letter:${row.number}`);
-  if (sent.ok) await db().from("staff_letters").update({ delivered: true, chat_id: m.chatId, message_id: sent.messageId }).eq("id", row.id);
-  return sent.ok;
+  if (!sent.ok) return false;
+  await db().from("staff_letters").update({ delivered: true, chat_id: m.chatId, message_id: sent.messageId }).eq("id", row.id);
+  if (row.number === 2 && row.warned) await withdraw(row, m);
+  return true;
+}
+
+/**
+ * What the warned letter announced, right after it arrived: claimed once
+ * (withdrawn_at), read from a fresh open list, each conversation handed back to
+ * «قسم المبيعات» and read back. The employee is told how many, and why.
+ */
+async function withdraw(row: LetterRow, m: Member): Promise<void> {
+  const { data: claimed } = await db().from("staff_letters").update({ withdrawn_at: new Date().toISOString() }).eq("id", row.id).is("withdrawn_at", null).select("id");
+  if (!claimed?.length) return;
+  const [list, teams] = await Promise.all([listOpenConversations(true), listTeletelTeams()]);
+  const team = teams.find((t) => t.name === SALES_TEAM);
+  if (!list || !team) {
+    // Teletel unreadable: released, the next tick tries again
+    await db().from("staff_letters").update({ withdrawn_at: null }).eq("id", row.id);
+    return;
+  }
+  const done: number[] = [];
+  for (const id of toWithdraw(list.rows, m.agentId, Date.now() / 1000)) if (await returnToTeam(id, team.id, m.agentId)) done.push(id);
+  await db().from("staff_letters").update({ withdrawn: done }).eq("id", row.id);
+  await logAudit({
+    action: "staff_letter.withdrawn",
+    entity: "employees",
+    entity_id: m.id,
+    meta: { letter: row.id, conversations: done, team: team.id },
+    actor: { id: null, label: "تنبيهاتي" },
+  });
+  if (done.length && m.chatId) {
+    await staffSend(
+      m.chatId,
+      `🔁 <b>سحب المحادثات</b>\n\nكما ورد في الخطاب رقم 2، سُحبت منك <b>${done.length}</b> محادثة مفتوحة مرّ عليها ${WITHDRAW_AFTER_DAYS} أيام بلا رد من العميل، وأُعيدت لقسم المبيعات.`,
+      undefined,
+      {},
+      "withdrawn",
+    );
+  }
 }
 
 /** Numbers frozen, the row claimed (one per employee and number), then delivered. */
@@ -146,6 +200,12 @@ export async function lettersTick(nowMs = Date.now()): Promise<{ issued: number;
   for (const r of rows.filter((x) => !x.delivered)) {
     const m = team.find((x) => x.id === r.employee_id);
     if (m && (await deliver(r, m))) issued += 1;
+  }
+
+  // a warned letter 2 that arrived while Teletel could not be read: its withdrawal again
+  for (const r of rows.filter((x) => x.number === 2 && x.warned && x.delivered && !x.withdrawn)) {
+    const m = team.find((x) => x.id === r.employee_id);
+    if (m) await withdraw(r, m);
   }
 
   // letter 1: only once the whole sales team has joined; then each newcomer when they join
@@ -215,7 +275,8 @@ async function lettersText(): Promise<string> {
     for (const r of of) {
       const name = escapeHtml(team.find((m) => m.id === r.employee_id)?.name ?? "—");
       const state = r.signed_at ? `✅ اعتمده ${dateTimeText(Date.parse(r.signed_at))}` : r.delivered ? "⏳ وصله ولم يعتمده" : "⚠️ لم يصله بعد";
-      lines.push(`${state} · ${name}${r.warned ? " · 🔴 إبلاغ بسحب المحادثات" : ""}`);
+      const withdrawn = r.withdrawn ? ` · 🔁 سُحب منه ${r.withdrawn.length}` : r.warned ? " · 🔴 إبلاغ بسحب المحادثات" : "";
+      lines.push(`${state} · ${name}${withdrawn}`);
     }
     lines.push("");
   }
