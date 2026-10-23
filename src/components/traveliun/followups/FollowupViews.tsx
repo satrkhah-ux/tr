@@ -202,10 +202,10 @@ function Settings({ data, refresh }: { data: FollowupWorkspaceData; refresh: () 
     <h2 className="font-extrabold">الإعدادات</h2>
     <fieldset disabled={busy} className="space-y-2"><legend className="text-sm font-bold">من يتولى اليوم السابع والإغلاق</legend>
       <div className="flex flex-wrap items-center gap-2">{([["seller", "البائع نفسه"], ["employee", "موظف متابعة محدد"], ["manager", "المدير"]] as [FollowupSettings["closer"], string][]).map(([k, label]) => <button key={k} className={s.closer === k ? btnPrimary : btn} onClick={() => k === "employee" ? setS({ ...s, closer: k }) : void save({ ...s, closer: k, closerId: null })}>{label}</button>)}
-        {s.closer === "employee" && <select className={`${field} !w-auto min-h-11`} value={s.closerId ?? ""} onChange={(e) => e.target.value && void save({ ...s, closer: "employee", closerId: e.target.value })}><option value="">اختر الموظف…</option>{data.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}</div>
+        {s.closer === "employee" && <select className={`${field} !w-auto min-h-11`} value={s.closerId ?? ""} onChange={(e) => e.target.value && void save({ ...s, closer: "employee", closerId: e.target.value })}><option value="">اختر الموظف…</option>{data.people.filter((p) => p.pick).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}</div>
     </fieldset>
     <fieldset disabled={busy} className="space-y-2"><legend className="text-sm font-bold">مسؤول التأشيرات</legend>
-      <select className={`${field} !w-auto min-h-11`} value={s.visaOwner ?? ""} onChange={(e) => void save({ ...s, visaOwner: e.target.value || null })}><option value="">لا أحد — تبقى للفريق</option>{data.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+      <select className={`${field} !w-auto min-h-11`} value={s.visaOwner ?? ""} onChange={(e) => void save({ ...s, visaOwner: e.target.value || null })}><option value="">لا أحد — تبقى للفريق</option>{data.people.filter((p) => p.pick).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
       <p className="text-xs text-slate-500">متابعات التأشيرات التي لا يقابل موظفُ Teletel فيها موظفاً في النظام. يحتاج صلاحية «المتابعة» في الأدوار.</p>
     </fieldset>
     <fieldset disabled={busy} className="space-y-2"><legend className="text-sm font-bold">اقتراح مُراد بعد ساعتين</legend>

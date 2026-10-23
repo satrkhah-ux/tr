@@ -89,7 +89,8 @@ export async function getFollowupWorkspace() {
   try { lastSync = heartbeat ? JSON.parse(heartbeat.value) : null; } catch { /* unknown */ }
   return {
     ...who, canManageTeam: await currentCan("employees.manage"), rows, settings, templates, attempts, lastSync, confirmed: bookings,
-    people: people.map(({ id, name, seller }) => ({ id, name, seller })),
+    // pick: a colleague the settings may name — in Teletel, not the developer's or a shared account
+    people: people.map(({ id, name, seller, person, agentId }) => ({ id, name, seller, pick: person && Boolean(agentId) })),
   };
 }
 export type FollowupWorkspaceData = NonNullable<Awaited<ReturnType<typeof getFollowupWorkspace>>>;
@@ -263,7 +264,7 @@ export async function distributeFollowups(ids: string[]) {
 export async function saveFollowupPageSettings(next: FollowupSettings): Promise<WorkResult> {
   if (!(await access())?.manager) return { ok: false, error: "forbidden" };
   const clean = parseFollowupSettings(JSON.stringify(next));
-  const people = await followupPeople();
+  const people = (await followupPeople()).filter((p) => p.person && p.agentId);
   if (clean.closer === "employee" && !(clean.closerId && people.some((p) => p.id === clean.closerId))) return { ok: false, error: "invalid" };
   if (clean.visaOwner && !people.some((p) => p.id === clean.visaOwner)) return { ok: false, error: "invalid" };
   const { error } = await followupDb().from("app_settings").upsert({ key: FOLLOWUP_SETTINGS_KEY, value: JSON.stringify(clean), updated_at: new Date().toISOString() });

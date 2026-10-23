@@ -12,7 +12,7 @@ export async function followupRows<T>(page: (from: number, to: number) => Promis
   }
 }
 import { grantedPermissions } from "@/lib/roles/roles";
-import { CADENCE_MS, clientLine, FOLLOWUP_SETTINGS_KEY, isOfferRow, isVisaOffer, lastOffer, offerLine, offerText, parseFollowupSettings, type FollowupSettings, QUIET_MS, stepDue, stepFor, toOfferMsg, WORK_COLS, type RawThreadMsg, type WorkRow } from "./rules";
+import { CADENCE_MS, clientLine, FOLLOWUP_SETTINGS_KEY, isOfferRow, isVisaOffer, lastOffer, offerLine, offerText, parseFollowupSettings, type FollowupSettings, QUIET_MS, stepDue, stepFor, toOfferMsg, TWO_HOUR_WINDOW_MS, WORK_COLS, type RawThreadMsg, type WorkRow } from "./rules";
 
 export const followupDb = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 /** Who may hold a follow-up: the follow-up team, its managers, and the sellers (their own offers). */
@@ -27,7 +27,9 @@ export async function followupPeople() {
     const keys = grantedPermissions({ ...p, permission_keys: p.roles?.permission_keys ?? [] });
     // the pickers' sellers: who sells in Teletel — not the administration's or the developer's accounts
     const seller = Boolean(p.teletel_agent_id) && keys.includes("offers.write") && !keys.includes("dashboard.admin") && !keys.includes("developer.access");
-    return { id: p.id, name: p.arabic_name, agentId: p.teletel_agent_id, seller };
+    // the developer's account is no one to follow a client: Murad's visa replies go out as its Teletel agent
+    const person = !keys.includes("developer.access");
+    return { id: p.id, name: p.arabic_name, agentId: p.teletel_agent_id, seller, person };
   });
 }
 /** The employee behind a Teletel agent: their own link (employees.teletel_agent_id), else the follow-up map. */
@@ -35,7 +37,7 @@ export async function agentEmployees(people: Awaited<ReturnType<typeof followupP
   const { data } = await followupDb().from("followup_agent_map").select("agent_id,employee_id");
   const map = new Map<number, string>(((data ?? []) as { agent_id: number; employee_id: string }[]).map((m) => [m.agent_id, m.employee_id]));
   for (const p of people) if (p.agentId) map.set(p.agentId, p.id);
-  const known = new Set(people.map((p) => p.id));
+  const known = new Set(people.filter((p) => p.person).map((p) => p.id));
   return (agentId) => {
     const id = agentId === null ? undefined : map.get(agentId);
     return id && known.has(id) ? id : null;
@@ -253,10 +255,19 @@ export async function syncFollowups() {
   const { data: setting } = await db.from("app_settings").select("value").eq("key", FOLLOWUP_SETTINGS_KEY).maybeSingle();
   const settings = parseFollowupSettings(setting?.value);
   added += await enrolOffers(candidates, openIds, active, latestDone, nowMs, settings);
-  // a file nobody holds goes to the owner the settings name («مسؤول التأشيرات», «من يتولى اليوم السابع»)
-  for (const r of rows.filter((x) => x.status === "open" && !x.assigned_to && x.source !== "sla")) {
+  // a file nobody holds — or the developer's account holds — goes to the owner the settings name («مسؤول التأشيرات», «من يتولى اليوم السابع»)
+  const nobody = new Set((await followupPeople()).filter((p) => !p.person).map((p) => p.id));
+  for (const r of rows.filter((x) => x.status === "open" && (!x.assigned_to || nobody.has(x.assigned_to)) && x.source !== "sla")) {
     const owner = ownerFor(r.source === "visa", settings);
-    if (owner) await db.from("sla_followups").update({ assigned_to: owner, assigned_at: now, stage: r.stage === "new" ? "working" : r.stage }).eq("id", r.id).is("assigned_to", null);
+    if (!owner && !r.assigned_to) continue;
+    const query = db.from("sla_followups").update({ assigned_to: owner, assigned_at: now, stage: r.stage === "new" && owner ? "working" : r.stage }).eq("id", r.id);
+    await (r.assigned_to ? query.eq("assigned_to", r.assigned_to) : query.is("assigned_to", null));
+  }
+  // enrolled before the six-hour rule (75f2b2b) and still at the two-hour check: the step its age reached, like a new file
+  for (const r of rows.filter((x) => x.status === "open" && x.step === 0 && x.offer_at && nowMs - Date.parse(x.offer_at) > TWO_HOUR_WINDOW_MS && !(x.last_attempt_at && Date.parse(x.last_attempt_at) > Date.parse(x.offer_at)))) {
+    const offerAt = Date.parse(r.offer_at!);
+    const step = stepFor(offerAt, nowMs);
+    await db.from("sla_followups").update({ step, ...(r.client_waiting ? {} : { next_followup_at: iso(Math.max(nowMs, stepDue(step, offerAt, offerAt))) }) }).eq("id", r.id).eq("step", 0);
   }
   // the first files (498e50c) kept the raw text and took a visa's papers for a trip: put right once
   for (const r of rows.filter((x) => x.status === "open" && ["price", "visa"].includes(x.source) && x.offer_line)) {
