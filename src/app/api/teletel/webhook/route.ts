@@ -1,5 +1,6 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 import { wakeFollowup } from "@/lib/followups/service";
+import { alertReply } from "@/lib/followups/remind";
 import { clientWrote, conversationResolved } from "@/lib/leads/lifecycle";
 import { schedule, webhookToken } from "@/lib/murad/reception-run";
 import { staffOnTeletel, type TeletelEvent } from "@/lib/telegram/staff-events";
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // «تأخير بشري»: marked read now, answered after a person's pause (reception-run.ts schedule); a conversation we
   // saw closed goes back to whoever closed it, or to intake (leads/lifecycle.ts) — done before the pause ends
   after(async () => {
-    await Promise.allSettled([wakeFollowup(message.conversationId, message.at, message.content), clientWrote(message.conversationId, message.at), schedule(message)]);
+    await Promise.allSettled([wakeFollowup(message.conversationId, message.at, message.content).then((row) => row && alertReply(row, message.content)), clientWrote(message.conversationId, message.at), schedule(message)]);
   });
   return NextResponse.json({ ok: true });
 }

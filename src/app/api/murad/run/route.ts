@@ -5,6 +5,7 @@ import { recordCronRun } from "@/lib/data/cron-runs";
 import { runIntegrationChecks } from "@/lib/developer/integrations-run";
 import { syncFollowups } from "@/lib/followups/service";
 import { summarizeDue } from "@/lib/followups/summary";
+import { followupDigest } from "@/lib/followups/remind";
 import { staffTick } from "@/lib/telegram/staff-events";
 
 export const runtime = "nodejs";
@@ -33,6 +34,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   after(() => recordCronRun("staff_tick", staffTick).catch(() => null));
   // «ملخص مُراد» for the follow-ups whose thread moved — after the answer: the model takes seconds each
   after(() => summarizeDue().catch(() => null));
+  // «تنبيهاتي» 10:00 and 16:00: each seller's follow-ups due today
+  after(() => followupDigest().catch(() => null));
   // every run leaves its trace for /developer, answered anyone or not (cron-runs.ts)
   // «المستقبل الآلي»: what the webhook missed, before Murad's own turns (no model, its turns claimed one by one)
   const received = await receptionSweep().catch(() => 0);

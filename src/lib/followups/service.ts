@@ -254,8 +254,12 @@ export async function syncFollowups() {
 }
 
 /** Authenticated incoming webhook; the database serializes it with staff work. */
+/** The file as it was before the client wrote — «تنبيهاتي» alerts its holder on the first reply (remind.ts). */
 export async function wakeFollowup(conversationId: number, at: number, text = "") {
-  if (!Number.isSafeInteger(conversationId) || conversationId <= 0 || !Number.isFinite(at)) return;
-  const { error } = await followupDb().rpc("followup_wake", { p_conversation: conversationId, p_at: new Date(at * 1000).toISOString(), p_text: text.slice(0, 200) || null });
+  if (!Number.isSafeInteger(conversationId) || conversationId <= 0 || !Number.isFinite(at)) return null;
+  const db = followupDb();
+  const { data: before } = await db.from("sla_followups").select("id,contact_name,conversation_id,assigned_to,step,client_waiting").eq("conversation_id", conversationId).eq("status", "open").maybeSingle();
+  const { error } = await db.rpc("followup_wake", { p_conversation: conversationId, p_at: new Date(at * 1000).toISOString(), p_text: text.slice(0, 200) || null });
   if (error) throw new Error("followup wake failed");
+  return before as Pick<WorkRow, "id" | "contact_name" | "conversation_id" | "assigned_to" | "step" | "client_waiting"> | null;
 }

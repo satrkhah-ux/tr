@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isOfferMessage, isVisaOffer, lastOffer, offerLine, offerText, mayAct, mayRead, stepDue, stepFor, todayGroup, toOfferMsg, validateResult, type OfferMsg, type WorkRow } from "./rules";
+import { handlerOf, isOfferMessage, isVisaOffer, lastOffer, offerLine, offerText, mayAct, mayRead, stepDue, stepFor, todayGroup, toOfferMsg, validateResult, type OfferMsg, type WorkRow } from "./rules";
 import { canOpenPath } from "@/lib/roles/section-access";
 
 describe("follow-up access and work rules", () => {
@@ -126,5 +126,15 @@ describe("the cadence: two hours, days 1, 3, 7", () => {
     expect(todayGroup({ ...row, client_waiting: true, next_followup_at: null }, now)).toBe("replied");
     expect(todayGroup({ ...row, source: "sla", step: null, stage: "new", next_followup_at: null }, now)).toBeNull();
     expect(todayGroup({ ...row, source: "teletel", step: null, stage: "new", next_followup_at: null }, now)).toBe("due");
+  });
+});
+
+describe("who takes day seven («من يتولى اليوم السابع والإغلاق»)", () => {
+  it("is the seller until day seven, then whoever the setting names", () => {
+    const row = { assigned_to: "seller", step: 2 };
+    expect(handlerOf(row, { closer: "manager", closerId: null, murad: "note" })).toBe("seller");
+    expect(handlerOf({ ...row, step: 3 }, { closer: "seller", closerId: null, murad: "note" })).toBe("seller");
+    expect(handlerOf({ ...row, step: 3 }, { closer: "employee", closerId: "closer", murad: "note" })).toBe("closer");
+    expect(handlerOf({ ...row, step: 4 }, { closer: "manager", closerId: null, murad: "off" })).toBe("managers");
   });
 });
