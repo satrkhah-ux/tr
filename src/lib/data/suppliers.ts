@@ -4,8 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { encryptJson } from "@/lib/crypto/secrets";
-import { getSupplierAdapter, getSupplierRows } from "@/lib/providers/hotel-registry";
-import type { TestConnectionResult } from "@/lib/providers/hotel-supplier";
+import { getSupplierAdapter, getSupplierAdapterLogged, getSupplierRows } from "@/lib/providers/hotel-registry";
+import type { SupplierCallRecord, TestConnectionResult } from "@/lib/providers/hotel-supplier";
+import { getRates } from "@/lib/data/rates-actions";
+import { getActiveMarkupRules } from "@/lib/data/markup-rules";
+import { priceSupplierRate } from "@/lib/pricing/price-line";
 import type { HotelSupplierRow, MarkupRuleRow } from "@/lib/types";
 import { currentCan } from "@/lib/roles/current";
 
@@ -182,4 +185,165 @@ export async function testSupplierConnection(code: string): Promise<TestConnecti
     /* status update is best-effort */
   }
   return result;
+}
+
+// ------------------------------------------------------------ «تجربة البحث» ----
+
+/** One supplier call as the test screen shows it — its verdict only, never a body or a header. */
+export type SearchTryCall = {
+  method: string;
+  ok: boolean;
+  http: number | null;
+  /** the supplier's Status.Code (TBO answers HTTP 200 and puts the verdict here). */
+  code: number | null;
+  description: string | null;
+  ms: number;
+  /** how many rows the call returned (cities, hotel codes, hotels). */
+  count: number | null;
+};
+
+function callView(c: SupplierCallRecord): SearchTryCall {
+  const body = (c.response && typeof c.response === "object" ? c.response : {}) as Record<string, unknown>;
+  const status = body.Status as { Description?: unknown } | undefined;
+  const list = Object.values(body).find(Array.isArray) as unknown[] | undefined;
+  return {
+    method: c.method,
+    ok: c.ok,
+    http: c.http_status,
+    code: c.status_code,
+    description: typeof status?.Description === "string" ? status.Description : typeof body.error === "string" ? body.error : null,
+    ms: c.duration_ms,
+    count: list ? list.length : null,
+  };
+}
+
+/** The adapter for a test — logged, and refused when it would silently be the mock. */
+async function testAdapter(code: string, sink: SupplierCallRecord[]) {
+  const adapter = await getSupplierAdapterLogged(code, sink);
+  return adapter && adapter.code === code ? adapter : null;
+}
+
+const NO_CREDS = "لا توجد بيانات اعتماد محفوظة لهذا المورّد — احفظها في «ربط مزوّدي الفنادق» أولاً.";
+
+export type CitiesTryResult =
+  | { ok: true; cities: { code: string; name: string }[] }
+  | { ok: false; message: string; calls: SearchTryCall[] };
+
+/** Admin: the supplier's own cities of a country, to search one of them exactly. */
+export async function trySupplierCities(code: string, countryCode: string): Promise<CitiesTryResult> {
+  if (!(await requireAdmin())) return { ok: false, message: "غير مصرّح لك بهذا الإجراء.", calls: [] };
+  const sink: SupplierCallRecord[] = [];
+  const adapter = await testAdapter(code, sink);
+  if (!adapter?.listCities) return { ok: false, message: NO_CREDS, calls: [] };
+  const cities = await adapter.listCities(countryCode);
+  if (!cities) return { ok: false, message: "لم يُرجع المورّد قائمة المدن.", calls: sink.map(callView) };
+  return { ok: true, cities: cities.sort((a, b) => a.name.localeCompare(b.name)) };
+}
+
+export type SearchTryInput = {
+  code: string;
+  country_code: string;
+  /** Arabic — what the markup rules are written against. */
+  country_name: string;
+  /** the supplier's own spelling, from trySupplierCities. */
+  city: string;
+  check_in: string;
+  check_out: string;
+  rooms: number;
+  /** per room */
+  adults: number;
+  /** per room */
+  children: number;
+  children_ages: number[];
+  nationality: string;
+  hotel_name: string;
+};
+
+export type SearchTryRate = {
+  room: string;
+  board: string;
+  refundable: boolean;
+  policy: string;
+  /** what the supplier charges us, whole stay. */
+  net: number;
+  currency: string;
+  /** our price by the markup rules, whole stay in SAR; null = no rule or no exchange rate. */
+  sell: number | null;
+};
+
+export type SearchTryHotel = { id: string; name: string; stars: number | null; rates: SearchTryRate[] };
+
+export type SearchTryResult =
+  | { ok: true; hotels: SearchTryHotel[]; calls: SearchTryCall[]; nights: number }
+  | { ok: false; message: string; calls: SearchTryCall[] };
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Admin: a real availability search at the supplier, run from inside the system.
+ * Read-only — no PreBook, no Book. Shows the net, our sell by the markup rules,
+ * and every call's verdict, so a refusal reads as the supplier's own words.
+ */
+export async function trySupplierSearch(input: SearchTryInput): Promise<SearchTryResult> {
+  if (!(await requireAdmin())) return { ok: false, message: "غير مصرّح لك بهذا الإجراء.", calls: [] };
+  if (!ISO_DATE.test(input.check_in) || !ISO_DATE.test(input.check_out) || input.check_out <= input.check_in) {
+    return { ok: false, message: "تاريخ المغادرة يجب أن يكون بعد تاريخ الوصول.", calls: [] };
+  }
+  if (!input.city.trim() || !/^[A-Za-z]{2}$/.test(input.country_code)) {
+    return { ok: false, message: "اختر الدولة والمدينة.", calls: [] };
+  }
+  const sink: SupplierCallRecord[] = [];
+  const adapter = await testAdapter(input.code, sink);
+  if (!adapter) return { ok: false, message: NO_CREDS, calls: [] };
+
+  const nights = Math.round((Date.parse(input.check_out) - Date.parse(input.check_in)) / 86_400_000);
+  const children = Math.min(4, Math.max(0, Math.floor(input.children)));
+  const [results, { sarPer }, rules] = await Promise.all([
+    adapter
+      .searchHotels({
+        city: input.city.trim(),
+        country_code: input.country_code.toUpperCase(),
+        check_in: input.check_in,
+        check_out: input.check_out,
+        rooms: Math.min(4, Math.max(1, Math.floor(input.rooms))),
+        adults: Math.min(8, Math.max(1, Math.floor(input.adults))),
+        children,
+        children_ages: input.children_ages.slice(0, children),
+        nationality: /^[A-Za-z]{2}$/.test(input.nationality) ? input.nationality.toUpperCase() : "SA",
+        hotel_name: input.hotel_name.trim() || null,
+      })
+      .catch(() => []),
+    getRates(),
+    getActiveMarkupRules(),
+  ]);
+
+  const fxDate = new Date().toISOString().slice(0, 10);
+  const hotels = results.map((h): SearchTryHotel => ({
+    id: h.supplier_hotel_id,
+    name: h.name_ar,
+    stars: h.star_rating,
+    rates: h.rates
+      .map((r): SearchTryRate => {
+        const priced = priceSupplierRate(
+          r,
+          rules,
+          { country: input.country_name || null, city: input.city, supplier_id: r.supplier_id, stars: h.star_rating, date: input.check_in, customer_type: "individual" },
+          sarPer,
+          "SAR",
+          fxDate,
+        );
+        return {
+          room: r.room_category_raw,
+          board: r.board_type,
+          refundable: r.refundable,
+          policy: r.cancellation_policy,
+          net: r.inclusive,
+          currency: r.currency,
+          sell: priced.ok ? priced.line.sell : null,
+        };
+      })
+      .sort((a, b) => a.net - b.net),
+  }));
+  hotels.sort((a, b) => (a.rates[0]?.net ?? 0) - (b.rates[0]?.net ?? 0));
+  return { ok: true, hotels, calls: sink.map(callView), nights };
 }

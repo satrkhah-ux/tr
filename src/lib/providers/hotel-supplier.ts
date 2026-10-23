@@ -62,6 +62,8 @@ export type HotelSearchQuery = {
   check_out: string;
   adults: number;
   children: number;
+  /** each child's age, one per child; TBO refuses a child without one. */
+  children_ages?: number[] | null;
   rooms: number;
   /**
    * ISO-2 of the destination country. Optional for the mock adapter, but REAL
@@ -177,6 +179,8 @@ export interface HotelSupplier {
   searchRates(query: HotelSearchQuery & { supplier_hotel_id: string }): Promise<SupplierRate[]>;
   /** STATIC content for one hotel — fetched ONCE, then cached. */
   fetchContent(supplierHotelId: string): Promise<SupplierHotelContent | null>;
+  /** the supplier's own cities of a country (ISO-2); null = no answer. */
+  listCities?(countryCode: string): Promise<{ code: string; name: string }[] | null>;
 
   // ---- optional: only suppliers we can actually book through implement these.
   // Optional rather than throwing stubs, so `typeof s.book === "function"` is the
@@ -568,18 +572,28 @@ class TboHotelSupplier implements HotelSupplier {
     return { ok: true, message: "تم الاتصال بـTBO والمصادقة بنجاح.", sampleCount: count };
   }
 
-  /** City name -> TBO city code, via the country the city belongs to. */
-  private async resolveCityCode(city: string, countryCode: string): Promise<string | null> {
+  /** TBO's own cities of a country — what «تجربة البحث» offers to pick from. null = no answer. */
+  async listCities(countryCode: string): Promise<{ code: string; name: string }[] | null> {
+    if (!this.ready()) return null;
     const data = await this.call<TboStatus & { CityList?: { Code?: string; Name?: string }[] }>(
       "CityList",
-      { CountryCode: countryCode },
+      { CountryCode: countryCode.trim().toUpperCase() },
     );
-    if (!data?.CityList) return null;
+    if (!data) return null;
+    return (data.CityList ?? [])
+      .filter((c): c is { Code: string; Name: string } => Boolean(c.Code && c.Name))
+      .map((c) => ({ code: String(c.Code), name: c.Name.trim() }));
+  }
+
+  /** City name -> TBO city code, via the country the city belongs to. */
+  private async resolveCityCode(city: string, countryCode: string): Promise<string | null> {
+    const cities = await this.listCities(countryCode);
+    if (!cities) return null;
     const wanted = city.trim().toLowerCase();
     const hit =
-      data.CityList.find((c) => (c.Name ?? "").trim().toLowerCase() === wanted) ??
-      data.CityList.find((c) => (c.Name ?? "").trim().toLowerCase().includes(wanted));
-    return hit?.Code ?? null;
+      cities.find((c) => c.name.toLowerCase() === wanted) ??
+      cities.find((c) => c.name.toLowerCase().includes(wanted));
+    return hit?.code ?? null;
   }
 
   async searchHotels(query: HotelSearchQuery): Promise<SupplierHotelSearchResult[]> {
@@ -593,14 +607,18 @@ class TboHotelSupplier implements HotelSupplier {
 
     // Hotel codes for the city. This list is large and static — the caller
     // caches it (hotel_content_cache) so this runs once per city, not per search.
-    const codes = await this.call<TboStatus & { Hotels?: { HotelCode?: string }[] }>(
+    const codes = await this.call<TboStatus & { Hotels?: TboCodeListHotel[] }>(
       "TBOHotelCodeList",
       { CityCode: cityCode, IsDetailedResponse: "false" },
     );
-    const hotelCodes = (codes?.Hotels ?? [])
-      .map((h) => h.HotelCode)
-      .filter((c): c is string => Boolean(c))
-      .slice(0, 200); // TBO caps the codes per availability call
+    // Search answers with codes only — the names and stars are on this list.
+    const known = new Map((codes?.Hotels ?? []).filter((h) => h.HotelCode).map((h) => [String(h.HotelCode), h]));
+    // The name narrows the city's list here, before the cap — Search has no name filter.
+    const name = query.hotel_name?.trim().toLowerCase();
+    const hotelCodes = [...known.values()]
+      .filter((h) => !name || (h.HotelName ?? "").toLowerCase().includes(name))
+      .map((h) => String(h.HotelCode))
+      .slice(0, 100); // the spec's recommended codes per availability call
     if (hotelCodes.length === 0) return [];
 
     const avail = await this.call<TboStatus & { HotelResult?: TboHotelResult[] }>("search", {
@@ -608,23 +626,14 @@ class TboHotelSupplier implements HotelSupplier {
       CheckOut: query.check_out,
       HotelCodes: hotelCodes.join(","),
       GuestNationality: query.nationality ?? "SA",
-      PaxRooms: Array.from({ length: Math.max(1, query.rooms) }, () => ({
-        Adults: Math.max(1, query.adults),
-        Children: Math.max(0, query.children),
-        ChildrenAges: [],
-      })),
+      PaxRooms: tboPaxRooms(query),
       ResponseTime: 23,
       IsDetailedResponse: true,
-      Filters: {
-        Refundable: false,
-        NoOfRooms: 0,
-        MealType: "All",
-        ...(query.hotel_name?.trim() ? { HotelName: query.hotel_name.trim() } : {}),
-      },
+      Filters: { Refundable: false, NoOfRooms: 0, MealType: "All" },
     });
 
     return (avail?.HotelResult ?? [])
-      .map((h) => toSearchResult(h, query))
+      .map((h) => toSearchResult(h, query, known.get(String(h.HotelCode))))
       .filter((r): r is SupplierHotelSearchResult => r !== null);
   }
 
@@ -635,11 +644,7 @@ class TboHotelSupplier implements HotelSupplier {
       CheckOut: query.check_out,
       HotelCodes: query.supplier_hotel_id,
       GuestNationality: query.nationality ?? "SA",
-      PaxRooms: Array.from({ length: Math.max(1, query.rooms) }, () => ({
-        Adults: Math.max(1, query.adults),
-        Children: Math.max(0, query.children),
-        ChildrenAges: [],
-      })),
+      PaxRooms: tboPaxRooms(query),
       ResponseTime: 23,
       IsDetailedResponse: true,
     });
@@ -846,6 +851,43 @@ type TboHotelResult = {
   Rooms?: TboRoom[];
 };
 
+/** A row of TBOHotelCodeList — static, and the only place a code has a name. */
+type TboCodeListHotel = {
+  HotelCode?: string | number;
+  HotelName?: string;
+  /** "ThreeStar", or a number on some accounts. */
+  HotelRating?: string | number;
+};
+
+const STAR_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+
+/** "FourStar" / 4 / "4" → 4; anything else → null. */
+export function tboStars(v: unknown): number | null {
+  const n = numOrNull(v);
+  if (n !== null) return n > 0 && n <= 5 ? n : null;
+  const word = typeof v === "string" ? /^(one|two|three|four|five)/i.exec(v.trim()) : null;
+  return word ? STAR_WORDS[word[1].toLowerCase()] : null;
+}
+
+/**
+ * One PaxRooms entry per room — adults and children are PER ROOM. TBO requires
+ * ChildrenAges to be exactly as long as Children; an age we were not given is
+ * sent as 8 rather than dropping the child (a room priced for fewer guests is
+ * a room the hotel refuses at the desk).
+ */
+export function tboPaxRooms(query: Pick<HotelSearchQuery, "rooms" | "adults" | "children" | "children_ages">) {
+  const children = Math.min(4, Math.max(0, query.children));
+  const ages = Array.from({ length: children }, (_, i) => {
+    const age = query.children_ages?.[i];
+    return typeof age === "number" && age >= 0 && age <= 17 ? Math.floor(age) : 8;
+  });
+  return Array.from({ length: Math.max(1, query.rooms) }, () => ({
+    Adults: Math.min(8, Math.max(1, query.adults)),
+    Children: children,
+    ChildrenAges: ages,
+  }));
+}
+
 type TboBookingDetail = {
   BookingStatus?: string;
   VoucherStatus?: string | boolean;
@@ -928,14 +970,15 @@ function toRates(hotel: TboHotelResult, query: HotelSearchQuery): SupplierRate[]
     });
 }
 
-function toSearchResult(hotel: TboHotelResult, query: HotelSearchQuery): SupplierHotelSearchResult | null {
+function toSearchResult(hotel: TboHotelResult, query: HotelSearchQuery, listed?: TboCodeListHotel): SupplierHotelSearchResult | null {
   if (!hotel.HotelCode) return null;
-  const rates = toRates(hotel, query);
+  const name = hotel.HotelName ?? listed?.HotelName;
+  const rates = toRates({ ...hotel, HotelName: name }, query);
   if (rates.length === 0) return null;
   return {
     supplier_hotel_id: hotel.HotelCode,
-    name_ar: hotel.HotelName ?? hotel.HotelCode,
-    star_rating: null,
+    name_ar: name ?? hotel.HotelCode,
+    star_rating: tboStars(listed?.HotelRating),
     thumbnail_url: null,
     rates,
   };

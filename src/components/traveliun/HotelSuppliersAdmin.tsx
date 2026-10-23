@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, KeyRound, Loader2, PlugZap, XCircle } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, KeyRound, Loader2, PlugZap, Search, XCircle } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { setHotelSearchSource } from "@/lib/data/app-settings";
 import {
@@ -283,6 +284,15 @@ function SupplierCard({ supplier, markupRules }: { supplier: SupplierView; marku
           {test.state === "testing" ? <Loader2 className="size-4 animate-spin" /> : <PlugZap className="size-4" />}
           {t("settings.suppliers.test")}
         </button>
+        {supplier.code === "tbo" ? (
+          <Link
+            href="/settings/suppliers/tbo"
+            className="inline-flex h-9 items-center gap-2 rounded-[9px] border border-[#dbe6e1] bg-white px-4 text-[12.5px] font-bold text-[#185045] transition-colors hover:bg-[#f0f7f4]"
+          >
+            <Search className="size-4" />
+            {t("settings.supplierTry.open")}
+          </Link>
+        ) : null}
         {saveState === "error" ? <span className="text-[12px] font-bold text-[#c22850]">{t("settings.suppliers.saveError")}</span> : null}
         {test.state === "done" ? (
           <span className={`inline-flex items-center gap-1.5 text-[12px] font-bold ${test.ok ? "text-[#0f7a52]" : "text-[#c22850]"}`}>
