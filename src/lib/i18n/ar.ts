@@ -2011,7 +2011,8 @@ export const ar: Dictionary = {
 
   // ---------- إعادة تصميم بكج مورّد ----------
   "nav.repackage": "إعادة تصميم بكج مورّد",
-  "nav.basic": "النظام بيسك",
+  "nav.basic": "إصدار بكج سياحي",
+  "nav.newPackage": "بكج جديد",
   // the menus' reorganisation (2026-10-17)
   "nav.legacyGenerator": "مولد البكجات (القديم)",
   "nav.managementDecisions": "قرارات الإدارة",

@@ -171,7 +171,7 @@ export const navGroups: NavGroup[] = [
     href: "/basic",
     icon: Zap,
     children: [
-      { labelKey: "nav.issuePackage", href: "/basic", perm: "offers.write" },
+      { labelKey: "nav.newPackage", href: "/basic", perm: "offers.write" },
       { labelKey: "nav.readyOffers", href: "/ready-offers", perm: "offers.write" },
       // Issued only. Drafts stay where they are made.
       { labelKey: "nav.issuedOffers", href: "/offers", perm: "offers.write" },
@@ -180,14 +180,11 @@ export const navGroups: NavGroup[] = [
       // the offers by stage — sales work, not a reference table
       { labelKey: "nav.kanban", href: "/kanban-board" },
       { labelKey: "nav.repackage", href: "/repackage", perm: "repackage.write" },
-      // same gate as its page (app/repackage/flight-card)
-      { labelKey: "fc.title", href: "/repackage/flight-card", perm: "repackage.write" },
       { labelKey: "nav.legacyGenerator", href: "/package-generator", perm: "offers.write" },
     ],
   },
   // «العملاء» — every client conversation (the sheet pulled in), for every employee
   { labelKey: "nav.customers", href: "/clients", icon: Users },
-  { labelKey: "nav.followups", href: "/followups", icon: Users },
   { labelKey: "nav.partnerCompanies", href: "/partner-companies", icon: Building2 },
   // «المطار»: a transport-only partner's bookings (section-access.ts)
   { labelKey: "nav.almatar", href: "/almatar-bookings", icon: Car },
@@ -277,7 +274,7 @@ export const partnerNavGroups: NavGroup[] = [
     icon: FileText,
     children: [
       { labelKey: "nav.myFiles", href: "/package-generator" },
-      { labelKey: "nav.basic", href: "/basic" },
+      { labelKey: "nav.newPackage", href: "/basic" },
       { labelKey: "nav.readyOffers", href: "/ready-offers" },
     ],
   },

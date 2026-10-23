@@ -87,6 +87,12 @@ export const TAB_GROUPS: SectionTab[][] = [
   [
     { href: "/clients", labelKey: "nav.customers" },
     { href: "/customers", labelKey: "nav.people" },
+    { href: "/followups", labelKey: "nav.followups" },
+  ],
+  // the flight-card tool sits beside the supplier-PDF redesign it serves
+  [
+    { href: "/repackage", labelKey: "nav.repackage" },
+    { href: "/repackage/flight-card", labelKey: "fc.title" },
   ],
   // the hotel suppliers' API vault and the data transfer belong with the developer's tools
   [

@@ -2013,7 +2013,8 @@ export const en = {
 
   // ---------- repackage a supplier PDF ----------
   "nav.repackage": "Repackage Supplier",
-  "nav.basic": "Basic system",
+  "nav.basic": "Issue a Package",
+  "nav.newPackage": "New package",
   // the menus' reorganisation (2026-10-17)
   "nav.legacyGenerator": "Package generator (legacy)",
   "nav.managementDecisions": "Management decisions",
