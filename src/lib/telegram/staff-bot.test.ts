@@ -5,6 +5,7 @@ import { ruleTips, teamAverages, type Facts } from "./staff-report";
 import { dashboardText, light } from "./staff-screen";
 import { threadText, whenText } from "./staff-replies";
 import { broadcastText } from "./staff-manager";
+import { letterTips, share } from "./staff-letter";
 
 describe("«تنبيهاتي» numbers", () => {
   it("starts the day at 00:00 Riyadh (21:00 UTC the day before)", () => {
@@ -129,6 +130,22 @@ describe("a conversation in the bot says who wrote each message", () => {
     expect(blocks[1]).toContain("🤖 <b>مُراد (رد آلي)</b>");
     expect(blocks[2]).toContain("🟢 <b>رهف السيد</b> · 05:07 م\nأبشر &lt;بالسعادة&gt;");
     expect(whenText(Date.parse("2026-10-21T14:05:00Z") / 1000, now)).toContain("/");
+  });
+});
+
+describe("«الخطاب الرسمي» tips", () => {
+  it("stand on the employee's own numbers, never more than three", () => {
+    const busy = letterTips({ total: 78, confirmed: 0, open: 78, closed: 0 });
+    expect(busy).toHaveLength(3);
+    expect(busy[0]).toContain("محادثاتك المفتوحة 78 (100% من محادثاتك)");
+    expect(busy[2]).toContain("لا يوجد لك حجز مؤكد");
+    expect(letterTips({ total: 252, confirmed: 4, open: 148, closed: 104 })[1]).toContain("العملاء الذين أكّدوا معك: 4 (2% من محادثاتك)");
+  });
+
+  it("praises a tidy list with confirmations, and says plainly when there is nothing yet", () => {
+    expect(letterTips({ total: 40, confirmed: 3, open: 5, closed: 35 })[0]).toContain("منظّمة");
+    expect(letterTips({ total: 0, confirmed: 0, open: 0, closed: 0 })).toEqual(["لا توجد محادثات مسندة لك بعد في تيلي تيل."]);
+    expect(share(1, 0)).toBe("—");
   });
 });
 
