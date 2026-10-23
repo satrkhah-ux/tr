@@ -100,6 +100,13 @@ async function ticker(now: number, speed: number, periodMs: number): Promise<{ b
   return { band: text ? { text, width: tickerWidth(text), speed, periodMs, bumpAt } : null, top, countries, stats };
 }
 
+/** «الأكثر طلباً اليوم»: today's countries by conversations, with each one's local photo — the screens' own count */
+export async function topCountriesToday(): Promise<{ country: string; count: number; src: string }[]> {
+  const { stats } = await ticker(Date.now(), SCREENS_DEFAULT_SPEED, 600_000);
+  return stats.map((r) => ({ ...r, src: landmarkFor(r.country) }));
+}
+const SCREENS_DEFAULT_SPEED = 110;
+
 async function shared(now: number): Promise<Shared> {
   return memo(cache, "shared", async () => {
     const cfg = await readScreensConfig();

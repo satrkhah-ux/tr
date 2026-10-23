@@ -147,6 +147,11 @@ const RUNTIME = String.raw`
     var key = Math.floor(t / 600000) + "|" + countries.join("|");
     if (key !== spotlightKey) {
       spotlightKey = key;
+      // the polaroid line (/screen/top) covers the bulletin: back to the first country each time it comes up
+      // (loaded on its first appearance, then kept: a fresh load starts at the first country anyway)
+      var pf = $("polaroid");
+      if (!pf.getAttribute("src")) pf.setAttribute("src", "/screen/top");
+      else try { pf.contentWindow.postMessage("tt-start", location.origin); } catch (e) { /* still loading */ }
       // the share of demand as a bar, never a number (the owner: no counts on the screens)
       var stats = S.countryStats && S.countryStats.length ? S.countryStats : [];
       if (!stats.length) for (var c = 0; c < countries.length; c++) stats.push({ country: countries[c], count: countries.length - c });
@@ -331,7 +336,8 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 @keyframes barGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 .bFoot{position:absolute;bottom:3.6vh;left:4.5vw;right:4.5vw;font-size:1.1vw;font-weight:700;color:#8fb0a9}
 .countryNote{font-size:1.2vw;color:#d7bd86}
-.countryTrack{position:absolute;bottom:0;left:0;right:0;height:3px;background:#ffffff12}
+.countryTrack{position:absolute;bottom:0;left:0;right:0;height:3px;background:#ffffff12;z-index:4}
+#polaroid{position:absolute;left:0;top:0;width:100%;height:100%;border:0;z-index:3;background:#0b3a32}
 #countryProgress{height:100%;background:#e3bd3c;width:0}
 #alertProgress{position:absolute;bottom:0;right:0;height:.4vh;background:#e3bd3c}
 #alert{z-index:4}
@@ -362,6 +368,7 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="hero"><img id="heroImg" alt=""><div class="crown">الأكثر طلباً</div><div class="first">01</div><div id="heroName"></div></div>
 <div id="ranks"></div>
 <div class="bFoot">الوجهة القادمة تبدأ بسؤال — يتجدد كل 10 دقائق</div>
+<iframe id="polaroid" title="الأكثر طلباً اليوم" scrolling="no"></iframe>
 <div class="countryTrack"><div id="countryProgress"></div></div></section>
 <div id="band"><div id="tick">${esc(s.ticker?.text ?? "")}</div></div>
 <script>window.__LANDMARKS__=${json(LANDMARK_IDS)};window.__S__=${json(s)};window.__N__=${n};window.__M__=${monitor ? "true" : "false"};</script>
