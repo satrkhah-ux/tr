@@ -383,11 +383,28 @@ function isGroupActive(pathname: string, group: NavGroup) {
   return group.children?.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`)) ?? false;
 }
 
+/** module scope, not state: the first click navigates to /developer and remounts the shell, the count must survive it.
+ * Counted by hand, not e.detail — a phone's taps never reach detail 3. */
+let developerClicks: number[] = [];
+function countDeveloperClick(): boolean {
+  const now = Date.now();
+  developerClicks = [...developerClicks.filter((t) => now - t < 1500), now];
+  if (developerClicks.length < 3) return false;
+  developerClicks = [];
+  return true;
+}
+
 export function TraveliunShell({ title, focus = false, children }: TraveliunShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  // «الحسابات المالية» has no menu link: three clicks on «المطوّر»'s title open it (the owner, 2026-10-25); the page checks developer.access itself
-  const openFinance = (e: React.MouseEvent) => { if (e.detail === 3 && pathname.startsWith("/developer")) router.push("/finance"); };
+  // «الحسابات المالية» has no menu link: three clicks on «المطوّر» — its menu item, or the title on its page — open it
+  // (the owner, 2026-10-25); the page checks developer.access itself
+  const openFinance = (e: React.MouseEvent) => {
+    if (!countDeveloperClick()) return;
+    e.preventDefault();
+    router.push("/finance");
+  };
+  const onTitleClick = (e: React.MouseEvent) => { if (pathname.startsWith("/developer")) openFinance(e); };
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = usePinnedSidebar();
   const [panel, setPanel] = useState<"guide" | "calculator" | "view" | "settings" | "profile" | null>(null);
@@ -536,11 +553,11 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
           <Menu className="size-6" />
         </button>
         <div className="hidden min-w-[140px] shrink-0 lg:block">
-          <div onClick={openFinance} className="truncate text-lg font-extrabold leading-tight text-[#003c3a] select-none">{displayTitle}</div>
+          <div onClick={onTitleClick} className="truncate text-lg font-extrabold leading-tight text-[#003c3a] select-none">{displayTitle}</div>
           <div className="mt-0.5 text-[11.5px] font-semibold text-[#8aa29b]">{t("brand")}</div>
         </div>
         {/* phones: compact app-style title; the trial pill shows from lg up. */}
-        <div onClick={openFinance} className="min-w-0 flex-1 truncate text-center text-[15px] font-extrabold text-[#003c3a] select-none lg:hidden">
+        <div onClick={onTitleClick} className="min-w-0 flex-1 truncate text-center text-[15px] font-extrabold text-[#003c3a] select-none lg:hidden">
           {displayTitle}
         </div>
         <div className="mx-auto hidden min-w-0 max-w-[520px] shrink items-center gap-2 rounded-full border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2 text-[#a86a10] lg:flex">
@@ -754,6 +771,12 @@ function SideMenu({
   const { t } = useTraveliunUI();
   const partner = usePartnerBrand();
   const groups = useNavGroups();
+  const router = useRouter();
+  const openFinance = (e: React.MouseEvent) => {
+    if (!countDeveloperClick()) return;
+    e.preventDefault();
+    router.push("/finance");
+  };
   return (
     <aside className="traveliun-side-menu absolute start-0 top-0 z-30 h-screen w-[260px] overflow-hidden border-e border-[#d9e0dc] bg-white shadow-[0_8px_28px_rgba(0,0,0,0.12)]">
       <div className="flex h-[96px] items-center justify-center bg-[var(--tv-brand)] px-6">
@@ -786,6 +809,7 @@ function SideMenu({
               ) : (
                 <Link
                   href={group.href}
+                  onClick={group.href === "/developer" ? openFinance : undefined}
                   className={`flex w-full items-center gap-3 px-4 py-[11px] text-start text-[13px] font-bold transition-colors duration-200 ${
                     active ? "bg-[var(--tv-brand)] text-white" : "text-[var(--tv-brand)] hover:bg-[#eef4f1]"
                   }`}
