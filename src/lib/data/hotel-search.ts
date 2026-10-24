@@ -1,6 +1,9 @@
 "use server";
 
-import { createSupabaseServerClient, getServerUser } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
+import { currentCan } from "@/lib/roles/current";
+import { ensureCatalogHotel } from "./hotel-data-request";
 import { normAr } from "@/lib/catalog/norm";
 import { getRates } from "./rates-actions";
 import { getActiveMarkupRules } from "./markup-rules";
@@ -8,7 +11,8 @@ import { getGeneratorLookups } from "./drafts";
 import { loadDraft, writeDraftStages } from "./draft-store";
 import { ensureHotelContentCached } from "./hotel-content";
 import { getEnabledHotelSuppliers, getSupplierAdapter } from "@/lib/providers/hotel-registry";
-import type { HotelSearchQuery, SupplierCallRecord } from "@/lib/providers/hotel-supplier";
+import { similarHotels, type HotelLite } from "@/lib/catalog/hotel-rules";
+import type { HotelSearchQuery, SupplierCallRecord, SupplierListedHotel } from "@/lib/providers/hotel-supplier";
 import { priceSupplierRate } from "@/lib/pricing/price-line";
 import type { MarkupContext } from "@/lib/pricing/markup";
 import {
@@ -24,7 +28,7 @@ import {
   type DraftPricingItem,
 } from "@/lib/offer/draft-types";
 import { itineraryStartDate } from "@/lib/offer/schedule";
-import { viewerTerms } from "@/lib/partners/price-view";
+import { partnerCaller, viewerTerms } from "@/lib/partners/price-view";
 import { partnerPrice, priceForViewer, type PartnerTerms } from "@/lib/partners/pricing";
 import type { BoardType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
@@ -520,7 +524,8 @@ function emptyReason(calls: SupplierCallRecord[]): Pick<SupplierNote, "reason" |
 async function resolveCountryCode(countryName: string): Promise<string | null> {
   if (!countryName?.trim()) return null;
   try {
-    const { countries } = await getGeneratorLookups();
+    // the countries only — the catalogue (every hotel, every room type) is not needed for a code
+    const { countries } = await getGeneratorLookups({ catalog: false });
     const hit = findLookupCountry(countries, countryName.trim());
     return hit?.iso2?.trim().toUpperCase() || null;
   } catch {
@@ -730,4 +735,216 @@ export async function selectHotelRate(
   // the quote currency is the agent's choice; the totals convert this SAR line into it
   await writeDraftStages(draftId, { hotels, pricing: { ...data.pricing, items } });
   return { ok: true, blocked: sourcing.blocked };
+}
+
+// ------------------------------------------- TBO's own hotels in /basic (the owner, 2026-10-24) ----
+// «عند اختيار الفندق اختيار الغرف من داخل النظام الداخلي ونكتب السعر يدوي، وعند الإصلاح يظهر السعر الحقيقي»:
+// the hotel is picked from TBO's list of the city and becomes ours (a /hotels row linked to its TBO code in
+// hotel_content_cache.internal_hotel_id); the rooms stay ours, the price typed; TBO's own price is asked for
+// when wanted — Search answers 500 until TBO enables it for our account.
+
+export type SupplierHotelHit = { code: string; name: string; stars: number | null };
+
+/** A city's TBO list is static and thousands long: one read a day per city. */
+// ponytail: kept in this one server process (the VPS); a table if the app ever runs on more than one
+const cityLists = new Map<string, { at: number; hotels: SupplierListedHotel[] }>();
+/** a city list being read now — the next keystroke waits on it rather than asking TBO again */
+const cityReads = new Map<string, Promise<SupplierListedHotel[] | null>>();
+const CITY_LIST_MS = 24 * 3600_000;
+
+/** staff with offers.write — a partner's file never writes our catalogue */
+async function supplierGate(): Promise<boolean> {
+  if (!(await getServerUser())) return false;
+  if (await partnerCaller()) return false;
+  return currentCan("offers.write");
+}
+
+/** TBO's hotels of the file's city whose (English) name holds every word typed — 20 at most. */
+export async function searchSupplierHotels(countryName: string, cityName: string, query: string): Promise<SupplierHotelHit[]> {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.join("").length < 2 || !(await supplierGate())) return [];
+  try {
+    const iso2 = await resolveCountryCode(countryName);
+    if (!iso2) return [];
+    const city = await supplierCityName(cityName, iso2);
+    const key = `${iso2}|${city.trim().toLowerCase()}`;
+    let list = cityLists.get(key);
+    if (!list || Date.now() - list.at > CITY_LIST_MS) {
+      let reading = cityReads.get(key);
+      if (!reading) {
+        reading = getSupplierAdapter("tbo")
+          .then((adapter) => (adapter?.listHotels ? adapter.listHotels(city, iso2) : null))
+          .finally(() => cityReads.delete(key));
+        cityReads.set(key, reading);
+      }
+      const hotels = await reading;
+      if (!hotels) return [];
+      list = { at: Date.now(), hotels };
+      cityLists.set(key, list);
+    }
+    const code = words.join("");
+    return list.hotels
+      .filter((h) => h.code === code || words.every((w) => h.name.toLowerCase().includes(w)))
+      .sort((a, b) => Number(b.name.toLowerCase().startsWith(words[0])) - Number(a.name.toLowerCase().startsWith(words[0])) || (b.stars ?? 0) - (a.stars ?? 0))
+      .slice(0, 20);
+  } catch {
+    return [];
+  }
+}
+
+export type PickedSupplierHotel = { ok: true; hotel: { id: string; name: string; name_en: string | null; stars: number | null; tbo: string } } | { ok: false };
+
+/**
+ * A TBO hotel picked for a stay: ours from now on — the /hotels row it was linked to before, else the one of that
+ * name in the city, else a new row with TBO's English name, stars, address and map (the data team is told, as for a
+ * hotel typed by hand) — and linked to its TBO code, so operations can book it there.
+ */
+export async function pickSupplierHotel(code: string, cityName: string): Promise<PickedSupplierHotel> {
+  if (!/^\d{1,12}$/.test(code) || !(await supplierGate())) return { ok: false };
+  try {
+    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const read = async (id: string) => {
+      const { data } = await service.from("hotels").select("id, arabic_name, english_name, stars").eq("id", id).maybeSingle();
+      const h = data as { id: string; arabic_name: string; english_name: string | null; stars: number | null } | null;
+      return h ? ({ ok: true, hotel: { id: h.id, name: h.arabic_name, name_en: h.english_name, stars: h.stars, tbo: code } } as const) : null;
+    };
+    const { data: linked } = await service.from("hotel_content_cache").select("internal_hotel_id").eq("supplier", "tbo").eq("supplier_hotel_id", code).maybeSingle();
+    const known = (linked as { internal_hotel_id: string | null } | null)?.internal_hotel_id;
+    if (known) {
+      const hotel = await read(known);
+      if (hotel) return hotel;
+    }
+    if (!(await ensureHotelContentCached("tbo", code))) return { ok: false };
+    const { data: row } = await service.from("hotel_content_cache").select("name_en, name_ar, star_rating, address, lat, lng").eq("supplier", "tbo").eq("supplier_hotel_id", code).maybeSingle();
+    const c = row as { name_en: string | null; name_ar: string | null; star_rating: number | null; address: string | null; lat: number | null; lng: number | null } | null;
+    const name = (c?.name_en || c?.name_ar || "").trim();
+    if (!c || !name) return { ok: false };
+    // the hotel we already hold under the same name (either language, either field): linked, never a twin — only
+    // that exact one, and only while no other TBO hotel is linked to it («Holiday Inn Istanbul City» is not
+    // «… Old City»: a near name is the duplicates card's to judge, not this pick's)
+    const { data: cityRows } = await service.from("cities").select("id, arabic_name");
+    const cityId = ((cityRows ?? []) as { id: string; arabic_name: string }[]).find((x) => normAr(x.arabic_name) === normAr(cityName))?.id ?? null;
+    if (cityId) {
+      const { data: rows } = await service.from("hotels").select("id, arabic_name, english_name, city_id").eq("city_id", cityId);
+      const exact = similarHotels({ arabic: "", english: name, cityId }, (rows ?? []) as HotelLite[]).filter((h) => h.sameCity && h.exact);
+      const one = exact.length === 1 ? exact[0] : null;
+      const { data: other } = one
+        ? await service.from("hotel_content_cache").select("supplier_hotel_id").eq("supplier", "tbo").eq("internal_hotel_id", one.id).neq("supplier_hotel_id", code).limit(1)
+        : { data: [] };
+      if (one && !(other ?? []).length) {
+        await service.from("hotel_content_cache").update({ internal_hotel_id: one.id }).eq("supplier", "tbo").eq("supplier_hotel_id", code);
+        return (await read(one.id)) ?? { ok: false };
+      }
+    }
+    const stars = c.star_rating && c.star_rating >= 1 && c.star_rating <= 5 ? Math.round(c.star_rating) : null;
+    const id = await ensureCatalogHotel(service, {
+      name,
+      city: cityName,
+      from: "tbo",
+      by: (await getServerUser())?.email ?? null,
+      extra: { stars, address: c.address, google_maps: c.lat != null && c.lng != null ? `https://www.google.com/maps?q=${c.lat},${c.lng}` : null },
+    });
+    if (!id) return { ok: false };
+    await service.from("hotel_content_cache").update({ internal_hotel_id: id }).eq("supplier", "tbo").eq("supplier_hotel_id", code);
+    return (await read(id)) ?? { ok: false };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export type SupplierStayRate = {
+  room: string;
+  /** one name per room, in order (TBO joins them with « + ») */
+  rooms: string[];
+  board: BoardType;
+  refundable: boolean;
+  policy: string;
+  /** the supplier's total for the whole stay, every room */
+  total: number;
+  currency: string;
+  /** the same in the stay's currency; null when no exchange rate */
+  total_line: number | null;
+};
+
+export type SupplierStayRates =
+  | { ok: true; rates: SupplierStayRate[] }
+  | { ok: false; why: "forbidden" | "not_linked" | "no_dates" | "not_enabled" | "none" | "unreachable" | "too_many" };
+
+/**
+ * TBO's own price for a stay of a hotel picked from TBO — the stay's dates, rooms and party, as the screen holds
+ * them. Read-only; a supplier's cost, so pricing.internal. Until TBO enables Search for our account the answer is
+ * «not_enabled» and the price stays the typed one.
+ */
+export async function supplierStayRates(input: {
+  hotelId: string;
+  countryName: string;
+  checkIn: string;
+  checkOut: string;
+  rooms: number;
+  adults: number;
+  children: number;
+  childrenAges: number[];
+  currency: string;
+}): Promise<SupplierStayRates> {
+  if (!(await getServerUser()) || (await partnerCaller()) || !(await currentCan("pricing.internal"))) return { ok: false, why: "forbidden" };
+  const day = /^\d{4}-\d{2}-\d{2}$/;
+  if (!day.test(input.checkIn) || !day.test(input.checkOut) || input.checkOut <= input.checkIn) return { ok: false, why: "no_dates" };
+  // a quote for fewer rooms than the stay holds would be shared out as if it were all of them
+  if (!(Number(input.rooms) >= 1 && Number(input.rooms) <= 9)) return { ok: false, why: "too_many" };
+  try {
+    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const { data: link } = await service.from("hotel_content_cache").select("supplier_hotel_id").eq("supplier", "tbo").eq("internal_hotel_id", input.hotelId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const code = (link as { supplier_hotel_id: string } | null)?.supplier_hotel_id;
+    if (!code) return { ok: false, why: "not_linked" };
+    const sink: SupplierCallRecord[] = [];
+    // only while TBO is switched on in «ربط مزوّدي الفنادق»
+    const adapter = (await getEnabledHotelSuppliers(sink)).find((s) => s.code === "tbo") ?? null;
+    if (!adapter) return { ok: false, why: "unreachable" };
+    const whole = (n: unknown, min: number, max: number) => Math.min(max, Math.max(min, Math.floor(Number(n)) || min));
+    const rates = await adapter
+      .searchRates({
+        city: "",
+        supplier_hotel_id: code,
+        check_in: input.checkIn,
+        check_out: input.checkOut,
+        rooms: whole(input.rooms, 1, 9),
+        adults: whole(input.adults, 1, 40),
+        children: whole(input.children, 0, 20),
+        children_ages: (Array.isArray(input.childrenAges) ? input.childrenAges : []).map((a) => whole(a, 0, 17)),
+        country_code: await resolveCountryCode(input.countryName),
+        nationality: "SA",
+      })
+      .catch(() => []);
+    if (!rates.length) {
+      const failed = sink.find((c) => !c.ok);
+      if (!failed) return { ok: false, why: "none" };
+      // 500 on Search: TBO has not enabled availability for our account (2026-10-23)
+      if ((failed.status_code ?? failed.http_status ?? 0) >= 500) return { ok: false, why: "not_enabled" };
+      return { ok: false, why: failed.status_code === 201 ? "none" : "unreachable" };
+    }
+    const { sarPer } = await getRates();
+    const to = input.currency.trim().toUpperCase();
+    return {
+      ok: true,
+      rates: rates
+        .map((r) => {
+          const from = sarPer[r.currency.toUpperCase()];
+          const target = to === "SAR" ? 1 : sarPer[to];
+          return {
+            room: r.room_category_raw,
+            rooms: r.room_category_raw.split(" + ").map((x) => x.trim()).filter(Boolean),
+            board: r.board_type,
+            refundable: r.refundable,
+            policy: r.cancellation_policy,
+            total: r.inclusive,
+            currency: r.currency,
+            total_line: from && target ? Math.round(((r.inclusive * from) / target) * 100) / 100 : r.currency.toUpperCase() === to ? r.inclusive : null,
+          };
+        })
+        .sort((a, b) => a.total - b.total)
+        .slice(0, 15),
+    };
+  } catch {
+    return { ok: false, why: "unreachable" };
+  }
 }

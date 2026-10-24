@@ -11,6 +11,7 @@ import {
   ChevronDown,
   GripVertical,
   ListChecks,
+  Loader2,
   Pencil,
   Plane,
   Plus,
@@ -41,6 +42,7 @@ import {
   type DraftHotel,
   type DraftRoomSpec,
   type GeneratorLookups,
+  type LookupHotel,
   type ServiceKind,
   type TourPick,
   type TransportLeg,
@@ -66,6 +68,8 @@ import { arrivalLines, autoTourPicks, departureDay, departureLines, type TourPro
 import { BasicCityProgram } from "./BasicCityProgram";
 import { DirText } from "@/components/DirText";
 import { useRole } from "@/lib/roles/RoleContext";
+import { usePartnerBrand } from "@/lib/partners/PartnerContext";
+import { supplierStayRates, type SupplierStayRate, type SupplierStayRates } from "@/lib/data/hotel-search";
 import { tourPriced, toursTotal, type TourPrice } from "@/lib/offer/pricing-suggest";
 import type { BoardType } from "@/lib/types";
 import { useTraveliunUI } from "../TraveliunUIProvider";
@@ -570,7 +574,23 @@ export function HotelPanel({
   const change = roomChangeLine(lines);
   const mainNights = Math.max(stays[0]?.nights ?? city.nights, 1);
   const country = findLookupCountry(lookups.countries, city.country || data.trip.country);
-  const hotels = country?.cities.find((c) => c.name === city.city_name)?.hotels ?? [];
+  const listedHotels = country?.cities.find((c) => c.name === city.city_name)?.hotels ?? [];
+  // staff only: where a room is bought is never a partner's to see
+  const partner = usePartnerBrand() !== null;
+  // hotels picked from TBO on this page: ours now, linked to their code — kept for the page (a remounted card keeps
+  // them), and over the list read before the link existed
+  const [, redraw] = useState(0);
+  const pickedHere = [...tboPicked.values()].filter((p) => p.city === city.city_name);
+  const hotels = [
+    ...listedHotels.map((h) => {
+      const p = pickedHere.find((x) => x.hotel.id === h.id)?.hotel;
+      return p ? { ...h, ...p, name_en: p.name_en ?? h.name_en } : h;
+    }),
+    ...pickedHere.filter((p) => !listedHotels.some((h) => h.id === p.hotel.id)).map((p) => p.hotel),
+  ];
+  const tboOf = (id: string | null) => (id && !partner ? (hotels.find((h) => h.id === id)?.tbo ?? null) : null);
+  const [tboFailed, setTboFailed] = useState(false);
+  const canInternal = useRole().can("pricing.internal");
   // the currency: the destination's, the riyal and the dollar — every other behind «أخرى…»
   const [allCurrencies, setAllCurrencies] = useState(false);
   const shortCurrencies = [...new Set([country?.default_currency, "SAR", "USD", main.manual_currency].map((c) => c?.trim().toUpperCase()).filter((c): c is string => Boolean(c)))];
@@ -661,15 +681,23 @@ export function HotelPanel({
                       valueId={line.hotel_id}
                       currentName={outside ? line.hotel_name : null}
                       placeholder={`${tx("hotel")} — ${tx("choose")}`}
-                      onPick={(h) =>
+                      supplier={country && !partner ? { country: country.name, city: city.city_name } : null}
+                      tboLabel={tx("tboChip")}
+                      onFailed={() => setTboFailed(true)}
+                      onPick={(h) => {
+                        setTboFailed(false);
+                        if (h?.tbo) {
+                          tboPicked.set(h.id, { city: city.city_name, hotel: { id: h.id, name: h.name, name_en: h.name_en ?? null, stars: h.stars ?? null, tbo: h.tbo } });
+                          redraw((n) => n + 1);
+                        }
                         follow(line, (l) =>
                           withRooms(
                             { ...l, hotel_id: h?.id ?? null, hotel_name: h?.name ?? "", hotel_name_en: "", sourcing: null },
                             // a room type belongs to its hotel: the old hotel's id — and its own name for the room — must not follow
                             l.rooms.map((room) => ({ ...room, room_type_id: null, hotel_room_name: h?.id === l.hotel_id ? room.hotel_room_name : undefined })),
                           ),
-                        )
-                      }
+                        );
+                      }}
                       className="col-span-2 xl:col-span-1"
                     />
                   ) : (
@@ -765,6 +793,20 @@ export function HotelPanel({
                 {line.refundable && line.refundable_until ? ` · ${line.refundable_until}` : ""}
               </span>
             ) : null}
+            {tboOf(line.hotel_id) ? (
+              <TboStayPrice
+                // a new hotel, other dates, rooms or party: the last answer is not this stay's
+                key={`${line.hotel_id}|${stay?.check_in}|${stay?.check_out}|${line.rooms.length}|${data.trip.adults}|${data.trip.children}|${(data.trip.children_ages ?? []).join(",")}|${line.manual_currency}`}
+                line={line}
+                country={country?.name ?? data.trip.country}
+                checkIn={stay?.check_in ?? null}
+                checkOut={stay?.check_out ?? null}
+                nights={nights}
+                trip={data.trip}
+                canPrice={canInternal}
+                onApply={(next) => onLines([next])}
+              />
+            ) : null}
             <div className="flex flex-wrap items-center gap-3 pt-0.5">
               {/* a new room is a room of its own: its type and price are asked, the board follows */}
               <button
@@ -781,6 +823,7 @@ export function HotelPanel({
         );
       })}
 
+      {tboFailed ? <p className="text-[11.5px] font-bold text-[#c22850]">{tx("tboPickFailed")}</p> : null}
       <div className="flex flex-wrap items-center gap-3 border-t border-dashed border-[#DCE9E5] pt-2">
         <AddStayMenu
           label={t("pg.stay.addInCity")}
@@ -856,6 +899,114 @@ export function HotelPanel({
             </Field>
           ) : null}
         </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** TBO hotels picked on this page, by our hotel id — the page's life, so a remounted card keeps them. */
+const tboPicked = new Map<string, { city: string; hotel: LookupHotel }>();
+
+/**
+ * A stay at a hotel picked from TBO: the price stays the one typed (TBO's rooms are not needed to sell it), and
+ * «السعر من TBO» asks TBO for this stay's real price — the stay's dates, rooms and party — to put in its place
+ * (the owner, 2026-10-24). A supplier's cost: pricing.internal only.
+ */
+function TboStayPrice({
+  line,
+  country,
+  checkIn,
+  checkOut,
+  nights,
+  trip,
+  canPrice,
+  onApply,
+}: {
+  line: DraftHotel;
+  country: string;
+  checkIn: string | null;
+  checkOut: string | null;
+  nights: number;
+  trip: DraftData["trip"];
+  canPrice: boolean;
+  onApply: (line: DraftHotel) => void;
+}) {
+  const tx = useBasicLabels();
+  const { t } = useTraveliunUI();
+  const [state, setState] = useState<SupplierStayRates | "loading" | null>(null);
+  const ask = () => {
+    if (!line.hotel_id) return;
+    setState("loading");
+    void supplierStayRates({
+      hotelId: line.hotel_id,
+      countryName: country,
+      checkIn: checkIn ?? "",
+      checkOut: checkOut ?? "",
+      rooms: Math.max(line.rooms.length, 1),
+      adults: trip.adults,
+      children: trip.children,
+      childrenAges: trip.children_ages ?? [],
+      currency: line.manual_currency,
+    })
+      .then(setState)
+      .catch(() => setState({ ok: false, why: "unreachable" }));
+  };
+  const apply = (rate: SupplierStayRate) => {
+    if (rate.total_line == null) return;
+    const each = Math.round((rate.total_line / Math.max(line.rooms.length, 1)) * 100) / 100;
+    onApply({
+      ...withRooms(
+        { ...line, sourcing: null, supplier: "TBO Holidays", refundable: rate.refundable, refundable_until: null },
+        // each room its own name, as TBO gives them in order
+        line.rooms.map((r, j) => ({ ...r, price: each, board_type: rate.board, hotel_room_name: (rate.rooms[j] ?? rate.rooms[0] ?? rate.room).slice(0, HOTEL_ROOM_NAME_MAX) })),
+      ),
+      priced_nights: nights,
+    });
+    setState(null);
+  };
+  return (
+    <div className="grid gap-1.5 rounded-[9px] bg-[#f4f8ff] px-2.5 py-2">
+      <div className="flex flex-wrap items-center gap-2 text-[11.5px] font-bold text-[#2b5bb5]">
+        <span className="rounded-full bg-white px-2 py-0.5 text-[10.5px] font-extrabold">{tx("tboChip")}</span>
+        <span className="text-[#557d78]">{tx("tboTyped")}</span>
+        {canPrice ? (
+          <button
+            type="button"
+            onClick={ask}
+            disabled={state === "loading" || !checkIn || !checkOut}
+            className="ms-auto inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#2b5bb5] bg-white px-2.5 text-[11.5px] font-bold text-[#2b5bb5] hover:bg-[#eef4ff] disabled:opacity-50"
+          >
+            {state === "loading" ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            {tx("tboPrice")}
+          </button>
+        ) : null}
+      </div>
+      {state && state !== "loading" ? (
+        state.ok ? (
+          <ul className="grid gap-1">
+            {state.rates.map((r, i) => (
+              <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-[7px] bg-white px-2 py-1.5 text-[11.5px]">
+                <span dir="ltr" className="font-bold text-[#0f3d38]">{r.room}</span>
+                <span className="text-[#557d78]">{t(BOARD_LABEL_KEYS[r.board])}</span>
+                <span className={r.refundable ? "text-[#0f7a52]" : "text-[#c22850]"}>{r.refundable ? tx("refundable") : tx("nonRefundable")}</span>
+                <span dir="ltr" className="tv-tnum ms-auto font-extrabold text-[#185045]">
+                  {r.total.toLocaleString("en-US")} {r.currency}
+                  {r.total_line != null && r.currency.toUpperCase() !== line.manual_currency.toUpperCase() ? ` ≈ ${r.total_line.toLocaleString("en-US")} ${line.manual_currency}` : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => apply(r)}
+                  disabled={r.total_line == null}
+                  className="rounded-[7px] bg-[#185045] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-50"
+                >
+                  {tx("tboUse")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[11.5px] font-semibold text-[#7a5a12]">{tx(`tboWhy_${state.why}`)}</p>
+        )
       ) : null}
     </div>
   );

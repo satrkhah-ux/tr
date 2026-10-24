@@ -26,12 +26,13 @@ import { notifyHotelData } from "@/lib/data/ops-notify";
 /** «كوالالمبور» and «كوالا لمبور» — one city (hotel-match.ts). */
 const place = (s: string | null | undefined) => normAr(s).replace(/\s+/g, "");
 
-export type HotelDataReason = "new" | "no_english" | "no_contact";
+export type HotelDataReason = "new" | "no_english" | "no_contact" | "tbo";
 
 const REASON: Record<HotelDataReason, string> = {
   new: "فندق جديد أُضيف من إدخال يدوي — أكمل اسمه الإنكليزي وعنوانه وهاتفه وتصنيفه",
   no_english: "الاسم الإنكليزي — فاوتشر الإقامة ينتظره",
   no_contact: "العنوان أو الهاتف — يُطبع في الفاوتشر لموظف الاستقبال",
+  tbo: "فندق جديد من قائمة TBO — اسمه الإنكليزي وعنوانه ونجومه من TBO؛ أكمل اسمه العربي وهاتفه",
 };
 
 /**
@@ -54,7 +55,7 @@ export async function requestHotelData(
         .eq("action", "data.requested")
         .eq("entity", "hotels")
         .eq("entity_id", hotel.id)
-        .in("meta->>reason", [reason, "new"])
+        .in("meta->>reason", [reason, "new", "tbo"])
         .gte("created_at", since)
         .limit(1);
       if ((asked ?? []).length > 0) return;
@@ -80,7 +81,16 @@ export async function requestHotelData(
  */
 export async function ensureCatalogHotel(
   supabase: SupabaseClient,
-  input: { name: string; city: string | null; serial?: string | null; by?: string | null },
+  input: {
+    name: string;
+    city: string | null;
+    serial?: string | null;
+    by?: string | null;
+    /** a supplier's own facts for a NEW row (TBO's Hoteldetails): what the voucher needs, so the data team asks less */
+    extra?: { stars?: number | null; address?: string | null; google_maps?: string | null };
+    /** where the name came from, for the record's history */
+    from?: "typed" | "tbo";
+  },
 ): Promise<string | null> {
   const name = input.name.trim();
   if (!name) return null;
@@ -108,13 +118,21 @@ export async function ensureCatalogHotel(
     const latin = !hasArabicLetter(name);
     const { data: created, error } = await supabase
       .from("hotels")
-      .insert({ arabic_name: name, english_name: latin ? name : null, city_id: city?.id ?? null, country_id: city?.country_id ?? null })
+      .insert({
+        arabic_name: name,
+        english_name: latin ? name : null,
+        city_id: city?.id ?? null,
+        country_id: city?.country_id ?? null,
+        ...(input.extra?.stars ? { stars: input.extra.stars } : {}),
+        ...(input.extra?.address ? { address: input.extra.address } : {}),
+        ...(input.extra?.google_maps ? { google_maps: input.extra.google_maps } : {}),
+      })
       .select("id")
       .single();
     if (error || !created) return null;
     const id = (created as { id: string }).id;
-    await logAudit({ action: "data.created", entity: "hotels", entity_id: id, meta: { from: "typed", serial: input.serial ?? null, city: input.city ?? null } });
-    await requestHotelData(supabase, { id, name, city: city?.arabic_name ?? input.city ?? null }, "new", input);
+    await logAudit({ action: "data.created", entity: "hotels", entity_id: id, meta: { from: input.from ?? "typed", serial: input.serial ?? null, city: input.city ?? null } });
+    await requestHotelData(supabase, { id, name, city: city?.arabic_name ?? input.city ?? null }, input.from === "tbo" ? "tbo" : "new", input);
     return id;
   } catch {
     return null;

@@ -1,14 +1,25 @@
 "use client";
 
 import { Combobox } from "@base-ui/react/combobox";
-import { useState } from "react";
-import { Check, ChevronDown, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, ChevronDown, Loader2, X } from "lucide-react";
+import { pickSupplierHotel, searchSupplierHotels } from "@/lib/data/hotel-search";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { cn } from "@/lib/utils";
 import { unzoomedRoot, ZOOMED_POPUP } from "@/components/ui/overlay-root";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
-export type HotelOption = { id: string; name: string; stars?: number | null };
+export type HotelOption = {
+  id: string;
+  name: string;
+  /** our hotel's English name — a name typed in Latin letters finds it by that */
+  name_en?: string | null;
+  stars?: number | null;
+  /** its TBO code — a hotel of ours linked to TBO, or (with a "tbo:" id) one of TBO's still to be added */
+  tbo?: string | null;
+};
+
+const TBO_ID = "tbo:";
 
 /** a stay whose hotel is not in this city's list keeps showing it (an old or typed name) */
 const CURRENT = "__current";
@@ -31,6 +42,9 @@ export function HotelCombobox({
   onPick,
   placeholder,
   className,
+  supplier,
+  tboLabel,
+  onFailed,
 }: {
   hotels: HotelOption[];
   valueId: string | null;
@@ -38,14 +52,56 @@ export function HotelCombobox({
   onPick: (hotel: HotelOption | null) => void;
   placeholder: string;
   className?: string;
+  /** search TBO's list of this city too, for a name in English (the owner, 2026-10-24) — staff files only */
+  supplier?: { country: string; city: string } | null;
+  tboLabel?: string;
+  /** a TBO hotel that could not be added */
+  onFailed?: () => void;
 }) {
   const { t } = useTraveliunUI();
   const listed = hotels.find((h) => h.id === valueId) ?? null;
   const current = !listed && currentName ? { id: valueId ?? CURRENT, name: currentName } : null;
-  const items = current ? [current, ...hotels] : hotels;
-  const chosen = listed ?? current;
   // what the box shows while typing; null = the chosen hotel's own name
   const [typed, setTyped] = useState<string | null>(null);
+  // TBO's hotels for what is typed in Latin letters — the ones we already hold are not offered twice
+  // the hits and the query they answer — another query's hits are never shown under this one
+  const [remote, setRemote] = useState<{ q: string; hits: HotelOption[] }>({ q: "", hits: [] });
+  const [adding, setAdding] = useState(false);
+  // a TBO pick lands seconds later: it goes through the card's newest onPick (never the one from the click, which
+  // would write the lines as they were then over every edit made meanwhile), and only if no other pick came since
+  const pickRef = useRef(onPick);
+  useEffect(() => {
+    pickRef.current = onPick;
+  });
+  const picks = useRef(0);
+  const query = typed?.trim() ?? "";
+  const latin = /[a-z]{2}/i.test(query) && !/[\u0600-\u06FF]/.test(query);
+  // by value, not by object: the card makes both afresh on every render
+  const where = supplier ? `${supplier.country}|${supplier.city}` : "";
+  const ours = hotels.map((h) => h.tbo).filter(Boolean).join(",");
+  useEffect(() => {
+    if (!where || !latin) return;
+    const [country, city] = where.split("|");
+    let live = true;
+    const timer = window.setTimeout(() => {
+      void searchSupplierHotels(country, city, query)
+        .then((found) => {
+          if (!live) return;
+          const held = new Set(ours.split(","));
+          setRemote({ q: query, hits: found.filter((f) => !held.has(f.code)).map((f) => ({ id: `${TBO_ID}${f.code}`, name: f.name, stars: f.stars, tbo: f.code })) });
+        })
+        .catch(() => {
+          if (live) setRemote({ q: query, hits: [] });
+        });
+    }, 350);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [where, latin, query, ours]);
+  const shownRemote = supplier && latin && remote.q === query ? remote.hits : [];
+  const items = [...(current ? [current] : []), ...hotels, ...shownRemote];
+  const chosen = listed ?? current;
 
   return (
     <Combobox.Root<HotelOption>
@@ -61,12 +117,38 @@ export function HotelCombobox({
         setTyped(null);
         // an emptied box is not a choice — only «إزالة الفندق» removes the hotel
         if (!next || next.id === current?.id) return;
+        const n = ++picks.current;
+        if (next.id.startsWith(TBO_ID) && next.tbo && supplier) {
+          // one of TBO's: made ours first (a /hotels row linked to its code), then picked
+          setAdding(true);
+          void pickSupplierHotel(next.tbo, supplier.city)
+            .then((res) => {
+              if (n !== picks.current) return;
+              if (res.ok) pickRef.current(res.hotel);
+              else onFailed?.();
+            })
+            .catch(() => n === picks.current && onFailed?.())
+            .finally(() => n === picks.current && setAdding(false));
+          return;
+        }
+        setAdding(false);
         onPick(next);
       }}
       itemToStringLabel={(h) => h.name}
       isItemEqualToValue={(a, b) => a.id === b.id}
       // the chosen hotel's own name in the box is not a search — opening the list shows them all
-      filter={(h, query) => !query.trim() || query === chosen?.name || normalizeName(h.name).includes(normalizeName(query))}
+      filter={(h, query) => {
+        const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        // TBO's hits: every typed word in the name, like the server asked
+        if (h.id.startsWith(TBO_ID)) return words.every((w) => h.name.toLowerCase().includes(w));
+        return (
+          !query.trim() ||
+          query === chosen?.name ||
+          normalizeName(h.name).includes(normalizeName(query)) ||
+          // ours by its English name too, so a hotel linked to TBO is found by the name TBO gives it
+          (words.length > 0 && Boolean(h.name_en) && words.every((w) => h.name_en!.toLowerCase().includes(w)))
+        );
+      }}
     >
       <div className={cn("relative", className)}>
         <Combobox.Input
@@ -75,6 +157,11 @@ export function HotelCombobox({
           onBlur={() => setTyped(null)}
           className={`h-9 w-full rounded-[8px] border border-[#dbe6e1] bg-white ${chosen ? "pe-14" : "pe-8"} ps-2.5 text-[12.5px] font-semibold text-[#185045] outline-none focus:border-[#2aa87a] dark:border-[#294039] dark:bg-[#14231f] dark:text-[#d6e5df]`}
         />
+        {adding ? (
+          <span className="absolute inset-y-0 start-2 flex items-center text-[#2aa87a]" aria-hidden>
+            <Loader2 className="size-3.5 animate-spin" />
+          </span>
+        ) : null}
         {chosen ? (
           <button
             type="button"
@@ -82,6 +169,8 @@ export function HotelCombobox({
             title="إزالة الفندق"
             onClick={() => {
               setTyped(null);
+              picks.current += 1;
+              setAdding(false);
               onPick(null);
             }}
             className="absolute inset-y-0 end-7 flex w-6 items-center justify-center text-[#93aaa3] hover:text-[#c22850]"
@@ -112,7 +201,8 @@ export function HotelCombobox({
                       <Check className="size-4 text-[#2aa87a]" />
                     </Combobox.ItemIndicator>
                   </span>
-                  <span className="min-w-0 flex-1">{h.name}</span>
+                  <span className="min-w-0 flex-1" dir="auto">{h.name}</span>
+                  {h.tbo ? <span className="shrink-0 rounded-full bg-[#eef4ff] px-1.5 text-[10px] font-extrabold text-[#2b5bb5]">{tboLabel ?? "TBO"}</span> : null}
                   {h.stars ? <span className="shrink-0 text-[11px] text-[#c79a2b]">{"★".repeat(h.stars)}</span> : null}
                 </Combobox.Item>
               )}

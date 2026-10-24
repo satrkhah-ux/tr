@@ -2262,7 +2262,15 @@ export function currencyOptions(
 }
 
 // ---------- lookups (loaded server-side, passed to stage pages) ----------
-export type LookupHotel = { id: string; name: string; stars: number | null };
+export type LookupHotel = {
+  id: string;
+  name: string;
+  stars: number | null;
+  /** hotels.english_name — a name typed in Latin letters finds the hotel by it */
+  name_en?: string | null;
+  /** its code at TBO when it was picked from TBO's list (hotel_content_cache.internal_hotel_id) */
+  tbo?: string | null;
+};
 export type LookupCity = {
   id: string;
   name: string;

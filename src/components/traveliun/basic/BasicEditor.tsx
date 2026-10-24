@@ -537,7 +537,8 @@ export function BasicEditor({
     patch({ services: { ...data.services, includes: count > 0 ? [...includes, `${SIM_LINE} × ${count}`] : includes } });
   }
 
-  const setLines = (lines: DraftHotel[]) => commit({ hotels: data.hotels.map((h) => lines.find((l) => l.id === h.id) ?? h) });
+  // over the newest hotels (latest), not this render's: a TBO pick lands seconds later and must not undo the edits made meanwhile
+  const setLines = (lines: DraftHotel[]) => commit({ hotels: latest.current.hotels.map((h) => lines.find((l) => l.id === h.id) ?? h) });
 
   // ---------- the catalogue, fetched per country ----------
   // The page opens without the 2,300 hotels of every country; the hotels of a

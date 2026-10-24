@@ -392,11 +392,18 @@ export async function getCountryHotels(countryName: string): Promise<Record<stri
     const ids = ((cityRows ?? []) as { id: string }[]).map((c) => c.id);
     if (ids.length === 0) return {};
     const { data } = await allRows((from, to) =>
-      supabase.from("hotels").select("id, arabic_name, stars, city_id").in("city_id", ids).order("id").range(from, to),
+      supabase.from("hotels").select("id, arabic_name, english_name, stars, city_id").in("city_id", ids).order("id").range(from, to),
     );
+    // the hotels picked from TBO's list carry their code (hotel-search.ts pickSupplierHotel) — staff only: where we
+    // buy a room is never a partner's to see
+    // ponytail: every link at once — a few hundred rows at most; by hotel id if it ever grows past that
+    const { data: links } = (await partnerCaller())
+      ? { data: [] }
+      : await supabase.from("hotel_content_cache").select("supplier_hotel_id, internal_hotel_id").eq("supplier", "tbo").not("internal_hotel_id", "is", null);
+    const tbo = new Map(((links ?? []) as { supplier_hotel_id: string; internal_hotel_id: string }[]).map((l) => [l.internal_hotel_id, l.supplier_hotel_id]));
     const byCity: Record<string, LookupHotel[]> = {};
-    for (const h of data as { id: string; arabic_name: string; stars: number | null; city_id: string }[]) {
-      (byCity[h.city_id] ??= []).push({ id: h.id, name: h.arabic_name, stars: h.stars });
+    for (const h of data as { id: string; arabic_name: string; english_name: string | null; stars: number | null; city_id: string }[]) {
+      (byCity[h.city_id] ??= []).push({ id: h.id, name: h.arabic_name, name_en: h.english_name, stars: h.stars, tbo: tbo.get(h.id) ?? null });
     }
     return byCity;
   } catch {

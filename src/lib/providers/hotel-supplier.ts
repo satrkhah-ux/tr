@@ -183,6 +183,8 @@ export interface HotelSupplier {
   fetchContent(supplierHotelId: string): Promise<SupplierHotelContent | null>;
   /** the supplier's own cities of a country (ISO-2); null = no answer. */
   listCities?(countryCode: string): Promise<{ code: string; name: string }[] | null>;
+  /** a city's whole static hotel list (names and stars, no rates); null = no answer. */
+  listHotels?(city: string, countryCode: string): Promise<SupplierListedHotel[] | null>;
 
   // ---- optional: only suppliers we can actually book through implement these.
   // Optional rather than throwing stubs, so `typeof s.book === "function"` is the
@@ -587,6 +589,13 @@ class TboHotelSupplier implements HotelSupplier {
     return (data.CityList ?? [])
       .filter((c): c is { Code: string; Name: string } => Boolean(c.Code && c.Name))
       .map((c) => ({ code: String(c.Code), name: c.Name.trim() }));
+  }
+
+  async listHotels(city: string, countryCode: string): Promise<SupplierListedHotel[] | null> {
+    const code = this.ready() ? await this.resolveCityCode(city, countryCode.trim().toUpperCase()) : null;
+    if (!code) return null;
+    const data = await this.call<TboStatus & { Hotels?: TboCodeListHotel[] }>("TBOHotelCodeList", { CityCode: code, IsDetailedResponse: "false" });
+    return data ? tboListedHotels(data) : null;
   }
 
   /** City name -> TBO city code, via the country the city belongs to. */
