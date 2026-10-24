@@ -1222,6 +1222,7 @@ export function BasicEditor({
           window.setTimeout(() => document.getElementById(`basic-${part}-${i + 1}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
         }}
         onExpand={() => setDoneCities((d) => d.filter((k) => k !== done))}
+        onFold={() => setDoneCities((d) => (d.includes(done) ? d : [...d, done]))}
       />
     );
   };

@@ -9,6 +9,7 @@ import {
   Camera,
   CheckCircle2,
   ChevronDown,
+  ChevronUp,
   GripVertical,
   ListChecks,
   Loader2,
@@ -103,7 +104,7 @@ type Tab = "tours" | "program";
 const head = "hidden px-0.5 text-[10.5px] font-bold text-[#7a948f] xl:grid";
 const rowGap = "grid grid-cols-2 items-start gap-2";
 // the hotel, its room type, the board, the price (the owner, 2026-10-22) — the rest under «المزيد»
-const HOTEL_COLS = "xl:grid-cols-[minmax(12rem,1.6fr)_minmax(10rem,1.4fr)_minmax(7.5rem,0.9fr)_minmax(7rem,0.8fr)_2rem]";
+const HOTEL_COLS = "xl:grid-cols-[minmax(12rem,1.6fr)_5rem_minmax(10rem,1.4fr)_minmax(7.5rem,0.9fr)_minmax(7rem,0.8fr)_2rem]";
 const chip = "inline-flex w-fit items-center rounded-full bg-[#eef6f3] px-2 py-0.5 text-[10.5px] font-bold text-[#185045]";
 /** the services table: day · type · service · car · cars · price per car · total · remove */
 const SVC_COLS = "xl:grid-cols-[minmax(9rem,1fr)_6.5rem_minmax(13rem,2fr)_minmax(8.5rem,1fr)_4.5rem_minmax(6.5rem,0.7fr)_minmax(6.5rem,0.7fr)_2.25rem]";
@@ -152,6 +153,7 @@ export function BasicCityCard({
   collapsed,
   onDone,
   onExpand,
+  onFold,
 }: {
   part: "hotels" | "programme";
   index: number;
@@ -193,6 +195,8 @@ export function BasicCityCard({
   collapsed: boolean;
   onDone: () => void;
   onExpand: () => void;
+  /** «تصغير»: folds the card to its line, done or not (the line says what is missing) */
+  onFold: () => void;
 }) {
   const tx = useBasicLabels();
   const hotelsPart = part === "hotels";
@@ -272,7 +276,7 @@ export function BasicCityCard({
   // the part's own body — a city without hotels in the file has no stays to enter: its header is all of it
   const body = hotelsPart ? (
     hotelsOn && main ? (
-      <HotelPanel index={index} city={city} dayFrom={dayFrom} data={data} lookups={lookups} lines={lines} onLines={onLines} onSlice={onSlice} />
+      <HotelPanel index={index} city={city} dayFrom={dayFrom} data={data} lookups={lookups} lines={lines} onLines={onLines} onSlice={onSlice} onNights={onNights} />
     ) : null
   ) : open ? (
     <>
@@ -380,6 +384,17 @@ export function BasicCityCard({
             <GripVertical className="size-4" />
           </span>
         ) : null}
+        {hotelsPart ? (
+          // the arrows do what the drag does — on a phone, and from the keyboard — beside the handle, with the order
+          <span className="inline-flex items-center">
+            <button type="button" disabled={isFirst} onClick={() => onMove(index, index - 1)} aria-label={tx("moveUp")} title={tx("moveUp")} className="rounded-[7px] p-1 text-[#557d78] hover:bg-white disabled:opacity-30">
+              <ArrowUp className="size-3.5" />
+            </button>
+            <button type="button" disabled={isLast} onClick={() => onMove(index, index + 1)} aria-label={tx("moveDown")} title={tx("moveDown")} className="rounded-[7px] p-1 text-[#557d78] hover:bg-white disabled:opacity-30">
+              <ArrowDown className="size-3.5" />
+            </button>
+          </span>
+        ) : null}
         <span className={`flex size-6 items-center justify-center rounded-full text-[11px] font-extrabold text-white ${moved ? "bg-[#c43d3d]" : "bg-[#185045]"}`}>{index + 1}</span>
         <h3 className="text-[13.5px] font-extrabold text-[#0f3d38]">{city.city_name}</h3>
         {city.country ? <span className="rounded-full bg-white px-2 py-0.5 text-[10.5px] font-bold text-[#557d78]">{city.country}</span> : null}
@@ -417,17 +432,11 @@ export function BasicCityCard({
             ))}
           </div>
         ) : null}
-        {hotelsPart ? (
-          <div className="ms-auto flex items-center gap-2">
-            {/* the arrows do what the drag does — on a phone, and from the keyboard */}
-            <span className="inline-flex items-center">
-              <button type="button" disabled={isFirst} onClick={() => onMove(index, index - 1)} aria-label={tx("moveUp")} title={tx("moveUp")} className="rounded-[7px] p-1 text-[#557d78] hover:bg-white disabled:opacity-30">
-                <ArrowUp className="size-3.5" />
-              </button>
-              <button type="button" disabled={isLast} onClick={() => onMove(index, index + 1)} aria-label={tx("moveDown")} title={tx("moveDown")} className="rounded-[7px] p-1 text-[#557d78] hover:bg-white disabled:opacity-30">
-                <ArrowDown className="size-3.5" />
-              </button>
-            </span>
+        {/* the card's own controls, at its end: edit, delete, fold (the owner, 2026-10-24) — the nights are a field
+            of the hotel row, never here beside the dates where they read as something else */}
+        <div className={`flex items-center gap-1.5 ${tabs.length > 1 && !collapsed ? "" : "ms-auto"}`}>
+          {hotelsPart ? (
+            <>
             <button
               type="button"
               onClick={() => {
@@ -436,24 +445,48 @@ export function BasicCityCard({
                 setEditing((v) => !v);
               }}
               aria-expanded={editing}
+              aria-label={tx("editCity")}
+              title={tx("editCity")}
               className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#d3e2dc] bg-white px-2 text-[11px] font-bold text-[#185045] hover:border-[#165749]"
             >
               <Pencil className="size-3.5" />
-              {tx("editCity")}
+              {tx("edit")}
             </button>
-            <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#185045]">
-              {tx("nights")}
-              <select value={city.nights} onChange={(e) => onNights(Number(e.target.value))} className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold">
-                {range(1, 30).map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-            </label>
-            <button type="button" onClick={onRemove} aria-label={tx("removeCity")} className="rounded-[7px] p-1 text-[#c43d3d] hover:bg-[#fff1f1]">
-              <Trash2 className="size-4" />
+            {/* a city whose file has no hotels has no hotel row: its nights stay here */}
+            {!hotelsOn || !main ? (
+              <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#185045]">
+                {tx("nights")}
+                <select value={city.nights} onChange={(e) => onNights(Number(e.target.value))} className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold">
+                  {range(1, 30).map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <button
+              type="button"
+              onClick={onRemove}
+              aria-label={tx("removeCity")}
+              title={tx("removeCity")}
+              className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#f2c7c7] bg-white px-2 text-[11px] font-bold text-[#c43d3d] hover:bg-[#fff1f1]"
+            >
+              <Trash2 className="size-3.5" />
+              {tx("delete")}
             </button>
-          </div>
-        ) : null}
+            </>
+          ) : null}
+          {body ? (
+            <button
+              type="button"
+              onClick={collapsed ? onExpand : onFold}
+              aria-expanded={!collapsed}
+              className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#d3e2dc] bg-white px-2 text-[11px] font-bold text-[#557d78] hover:border-[#165749] hover:text-[#185045]"
+            >
+              {collapsed ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
+              {collapsed ? tx("expand") : tx("fold")}
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {/* «تعديل المدينة»: another city, the same place in the trip */}
@@ -566,6 +599,7 @@ export function HotelPanel({
   lines,
   onLines,
   onSlice,
+  onNights,
 }: {
   index: number;
   city: BasicCity;
@@ -576,6 +610,8 @@ export function HotelPanel({
   lines: DraftHotel[];
   onLines: (lines: DraftHotel[]) => void;
   onSlice: (slice: Partial<DraftData>) => void;
+  /** the city's nights — a field of the first hotel row (the owner, 2026-10-24) */
+  onNights?: (nights: number) => void;
 }) {
   const tx = useBasicLabels();
   const { t, language } = useTraveliunUI();
@@ -652,6 +688,7 @@ export function HotelPanel({
     <div className="space-y-1.5">
       <div className={`${head} ${HOTEL_COLS} gap-2`}>
         <span>{tx("hotel")}</span>
+        <span>{tx("nights")}</span>
         <span>{tx("roomType")}</span>
         <span>{tx("board")}</span>
         <span>{tx("nightPrice")}</span>
@@ -716,6 +753,24 @@ export function HotelPanel({
                     <span className="col-span-2 inline-flex h-9 items-center text-[11.5px] font-extrabold text-[#185045] xl:col-span-1 xl:justify-end xl:pe-2">
                       {tx("roomN", { n: j + 1 })}
                     </span>
+                  )}
+                  {/* the city's nights: on its first row; the other stays say their own on their dates line */}
+                  {i === 0 && j === 0 && onNights ? (
+                    <label className="grid gap-0.5">
+                      <span className="text-[10.5px] font-bold text-[#7a948f] xl:hidden">{tx("nights")}</span>
+                      <select
+                        value={city.nights}
+                        onChange={(e) => onNights(Number(e.target.value))}
+                        aria-label={tx("nights")}
+                        className={`${basicField} tv-tnum text-center`}
+                      >
+                        {range(1, 30).map((n) => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <span className="max-xl:hidden" />
                   )}
                   {/* the owner's catalogue: type, category, suite type — the extra bed rides on the name as before */}
                   <span className="grid gap-1">

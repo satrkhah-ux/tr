@@ -49,6 +49,7 @@ const render = (data = file(), index = 0, transportOn = false, part: "hotels" | 
       collapsed={false}
       onDone={() => {}}
       onExpand={() => {}}
+      onFold={() => {}}
     />,
   );
 };
@@ -141,9 +142,14 @@ describe("the hotels part — the city with its stays, apart from its programme 
     expect(html).toContain("1 نوفمبر – 4 نوفمبر");
     expect(html).toContain("غرفة مزدوجة");
     expect(html).toContain("أضف فندقاً آخر في هذه المدينة");
-    // the city's own controls live here: its nights, another city, its removal
+    // the city's own controls at the card's end: edit, delete, fold (the owner, 2026-10-24)
     expect(html).toContain("تعديل المدينة");
     expect(html).toContain("حذف المدينة");
+    expect(html).toContain("تصغير");
+    // the nights are a field of the hotel row, after the hotel — not in the header beside the dates
+    const header = html.slice(0, html.indexOf("</header>"));
+    expect(header).not.toContain("الليالي");
+    expect(html.slice(html.indexOf("</header>"))).toContain('aria-label="الليالي"');
     expect(html).not.toContain("عدد الجولات");
     expect(html).not.toContain("البرنامج السياحي");
   });

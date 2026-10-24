@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Plus } from "lucide-react";
+import { CalendarPlus, CalendarRange, ChevronDown, Plus, Users } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DirText } from "@/components/DirText";
 import type { HotelStay, StayDates } from "@/lib/offer/draft-types";
 import type { TranslationKey } from "@/lib/i18n";
@@ -12,6 +12,15 @@ const ADD_LABEL: Record<StayDates, TranslationKey> = {
   same: "pg.stay.same",
   custom: "pg.stay.custom",
 };
+
+/** what each way means, under its name in the menu */
+const ADD_HINT: Record<StayDates, TranslationKey> = {
+  after: "pg.stay.after.hint",
+  same: "pg.stay.same.hint",
+  custom: "pg.stay.custom.hint",
+};
+
+const ADD_ICON = { after: CalendarRange, same: Users, custom: CalendarPlus } as const;
 
 const dayBefore = (iso: string) => new Date(Date.parse(`${iso}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 
@@ -79,28 +88,28 @@ export function StayDatesLine({
 /** «فندق آخر»: after it, on the same dates (the rooms split), or on dates of its own. */
 export function AddStayMenu({ label, className, onAdd }: { label: string; className: string; onAdd: (dates: StayDates) => void }) {
   const { t } = useTraveliunUI();
-  const [open, setOpen] = useState(false);
+  // a menu of its own, each way with what it means — never three more buttons in the row (the owner, 2026-10-24)
   return (
-    <span className="inline-flex flex-wrap items-center gap-1.5">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className={className}>
+    <DropdownMenu>
+      <DropdownMenuTrigger className={className}>
         <Plus className="size-3.5" />
         {label}
-      </button>
-      {open
-        ? (Object.keys(ADD_LABEL) as StayDates[]).map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                onAdd(d);
-              }}
-              className="inline-flex h-8 items-center rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
-            >
-              {t(ADD_LABEL[d])}
-            </button>
-          ))
-        : null}
-    </span>
+        <ChevronDown className="size-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-[19rem]">
+        {(Object.keys(ADD_LABEL) as StayDates[]).map((d) => {
+          const Icon = ADD_ICON[d];
+          return (
+            <DropdownMenuItem key={d} onClick={() => onAdd(d)} className="items-start">
+              <Icon className="mt-0.5 size-4 shrink-0 text-[#2aa87a]" />
+              <span className="grid gap-0.5">
+                <span className="text-[12.5px] font-extrabold">{t(ADD_LABEL[d])}</span>
+                <span className="text-[11px] font-semibold text-[#7a948f]">{t(ADD_HINT[d])}</span>
+              </span>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
