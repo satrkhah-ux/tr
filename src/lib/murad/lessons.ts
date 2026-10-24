@@ -41,25 +41,38 @@ export async function lessonsFrom(conversationId: number, opts: { model?: string
   if (lines.length < 2 || !lines.some((l) => l.startsWith("الموظف"))) return [];
   const prompt = [
     "هذه محادثة واتساب بين عميل وموظف في شركة ترافليون للسفر. استخرج ما يتعلمه مساعد الاستقبال «مُراد» من ردود الموظف الجيدة:",
-    "- سؤال أو موقف يتكرر عند العملاء (بصيغة عامة) والجواب الذي أعطته الشركة أو طريقة الرد.",
-    "- لا تكتب اسم العميل ولا رقمه ولا سعراً خاصاً بطلبه ولا تواريخه. معلومة عامة عن الخدمة أو السياسة أو الإجراء أو الأسلوب فقط.",
-    "- لا تستخرج شيئاً من رد خاطئ أو غير مهذب. إن لم يكن في المحادثة شيء عام يُتعلّم فأعد قائمة فارغة.",
+    "- سؤال يتكرر عند العملاء (بصيغة عامة) وجواب الشركة عليه، والجواب فيه معلومة محددة: متطلبات، مدة، إجراء، ما يشمله البكج، سياسة دفع أو إلغاء، نصيحة سفر.",
+    "- لا تستخرج العبارات العامة: الترحيب، «سيتم تحويلك»، «سيتواصل معك الموظف/المستشار»، «سنتابع طلبك»، الشكر. هذه ليست دروساً.",
+    "- لا تكتب اسم العميل ولا رقمه ولا سعراً خاصاً بطلبه ولا تواريخه.",
+    "- لا تستخرج شيئاً من رد خاطئ أو غير مهذب. إن لم يكن في المحادثة معلومة محددة تُتعلّم فأعد قائمة فارغة — وهذا هو الغالب.",
     `- kind نوع الطلب: ${ROUTE_KEYS.join("، ")} أو null.`,
-    "- ستة دروس على الأكثر، كل جواب في سطرين على الأكثر.",
+    "- ثلاثة دروس على الأكثر، كل جواب في سطرين على الأكثر.",
     "",
     lines.slice(-40).join("\n"),
   ].join("\n");
   const out = (await responsesJson("murad_lessons", LESSONS_SCHEMA, [{ type: "input_text", text: prompt }], opts.model ?? (process.env["OPENAI_FOLLOWUP_MODEL"] || "gpt-5.5"))) as { lessons?: Lesson[] };
-  return (out.lessons ?? []).filter((l) => l.answer?.trim()).slice(0, 6).map((l) => ({ question: l.question?.trim() || null, answer: l.answer.trim(), kind: l.kind }));
+  return (out.lessons ?? []).filter((l) => l.answer?.trim() && !GENERIC.test(l.answer)).slice(0, 3).map((l) => ({ question: l.question?.trim() || null, answer: l.answer.trim(), kind: l.kind }));
+}
+
+/** an answer that only says someone will answer — what the first 18 lessons were (2026-10-24), and no lesson */
+const GENERIC = /^[^.،]{0,40}(سيتم تحويل|سيتواصل معك|سنتواصل|يرحب بالعميل|سنتابع|زميلنا|المستشار)[^.]*\.?$/u;
+
+/** kept unless the same question is already known — the same few questions recur across thousands of conversations */
+async function keep(service: SupabaseClient, lessons: Lesson[], conversationId: number, instructionId: string | null): Promise<number | null> {
+  const asked = lessons.map((l) => l.question).filter((q): q is string => Boolean(q));
+  const { data } = asked.length ? await service.from("murad_lessons").select("question").in("question", asked) : { data: [] };
+  const known = new Set(((data ?? []) as { question: string }[]).map((r) => r.question));
+  const fresh = lessons.filter((l) => !l.question || !known.has(l.question));
+  if (!fresh.length) return 0;
+  const { error } = await service.from("murad_lessons").insert(fresh.map((l) => ({ source: "conversation", kind: l.kind, question: l.question, answer: l.answer, conversation_id: conversationId, instruction_id: instructionId })));
+  return error ? null : fresh.length;
 }
 
 /** «تدرب على هذه المحادثة»: its lessons, kept; how many. */
 export async function trainOn(service: SupabaseClient, conversationId: number, instructionId: string | null = null): Promise<number | null> {
   const lessons = await lessonsFrom(conversationId);
   if (!lessons) return null;
-  if (!lessons.length) return 0;
-  const { error } = await service.from("murad_lessons").insert(lessons.map((l) => ({ source: "conversation", kind: l.kind, question: l.question, answer: l.answer, conversation_id: conversationId, instruction_id: instructionId })));
-  return error ? null : lessons.length;
+  return lessons.length ? keep(service, lessons, conversationId, instructionId) : 0;
 }
 
 /** where the reading of every past conversation stands (app_settings murad_learn) */
@@ -91,8 +104,7 @@ export async function learnSweep(service: SupabaseClient, control: MuradControl,
   for (const id of ids.filter((x) => !seen.has(x))) {
     const lessons = await lessonsFrom(id, { model: process.env["OPENAI_LEARN_MODEL"] || "gpt-4o-mini", skip }).catch(() => null);
     if (!lessons?.length) continue;
-    const { error } = await service.from("murad_lessons").insert(lessons.map((l) => ({ source: "conversation", kind: l.kind, question: l.question, answer: l.answer, conversation_id: id })));
-    if (!error) added += lessons.length;
+    added += (await keep(service, lessons, id, null)) ?? 0;
   }
   const { data: now } = await service.from("app_settings").select("value").eq("key", LEARN_KEY).maybeSingle();
   const latest = (() => { try { return JSON.parse((now as { value?: string } | null)?.value ?? "") as LearnState; } catch { return claimed; } })();
