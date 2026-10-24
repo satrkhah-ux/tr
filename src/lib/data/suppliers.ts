@@ -5,7 +5,7 @@ import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/serve
 import { logAudit } from "@/lib/data/audit";
 import { encryptJson } from "@/lib/crypto/secrets";
 import { getSupplierAdapter, getSupplierAdapterLogged, getSupplierRows } from "@/lib/providers/hotel-registry";
-import type { SupplierCallRecord, TestConnectionResult } from "@/lib/providers/hotel-supplier";
+import { tboListedHotels, type SupplierCallRecord, type SupplierListedHotel, type TestConnectionResult } from "@/lib/providers/hotel-supplier";
 import { getRates } from "@/lib/data/rates-actions";
 import { getActiveMarkupRules } from "@/lib/data/markup-rules";
 import { priceSupplierRate } from "@/lib/pricing/price-line";
@@ -284,8 +284,9 @@ export type SearchTryRate = {
 export type SearchTryHotel = { id: string; name: string; stars: number | null; rates: SearchTryRate[] };
 
 export type SearchTryResult =
-  | { ok: true; hotels: SearchTryHotel[]; calls: SearchTryCall[]; nights: number }
-  | { ok: false; message: string; calls: SearchTryCall[] };
+  /** `listed`: the city's whole static list as the supplier sent it (TBOHotelCodeList), rates or not */
+  | { ok: true; hotels: SearchTryHotel[]; calls: SearchTryCall[]; nights: number; listed: SupplierListedHotel[] }
+  | { ok: false; message: string; calls: SearchTryCall[]; listed?: SupplierListedHotel[] };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -359,11 +360,13 @@ export async function trySupplierSearch(input: SearchTryInput): Promise<SearchTr
     catalogCity(iso2, input.city),
   ]);
   const calls = sink.map(callView);
+  // the hotels TBO sent for the city — shown whatever Search answered (the owner, 2026-10-24: «اظهر الفنادق التي جلبها»)
+  const codeList = sink.find((c) => c.method === "TBOHotelCodeList" && c.ok);
+  const listed = codeList ? tboListedHotels(codeList.response) : [];
 
   // the name narrowed the city's list to nothing, so TBO was never asked for rooms
-  const listed = sink.find((c) => c.method === "TBOHotelCodeList");
-  if (input.hotel_name.trim() && listed?.ok && !sink.some((c) => c.method.toLowerCase() === "search")) {
-    return { ok: false, message: "لا يوجد فندق بهذا الاسم في قائمة فنادق TBO لهذه المدينة — جرّب جزءاً من الاسم بالإنجليزية.", calls };
+  if (input.hotel_name.trim() && codeList && !sink.some((c) => c.method.toLowerCase() === "search")) {
+    return { ok: false, message: "لا يوجد فندق بهذا الاسم في قائمة فنادق TBO لهذه المدينة — جرّب جزءاً من الاسم بالإنجليزية.", calls, listed };
   }
 
   const fxDate = new Date().toISOString().slice(0, 10);
@@ -396,5 +399,58 @@ export async function trySupplierSearch(input: SearchTryInput): Promise<SearchTr
         };
       }),
   }));
-  return { ok: true, hotels, calls, nights };
+  return { ok: true, hotels, calls, nights, listed };
+}
+
+export type HotelTryDetails = {
+  name: string;
+  stars: number | null;
+  address: string | null;
+  description: string | null;
+  facilities: string[];
+  images: string[];
+  lat: number | null;
+  lng: number | null;
+};
+
+export type HotelTryResult = { ok: true; hotel: HotelTryDetails; calls: SearchTryCall[] } | { ok: false; message: string; calls: SearchTryCall[] };
+
+/** «Hoteldetails» → plain text: TBO's descriptions are HTML. */
+function plainText(html: string | null): string | null {
+  if (!html) return null;
+  const text = html
+    .replace(/<br\s*\/?>|<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s*\n\s*/g, "\n")
+    .trim();
+  return text ? text.slice(0, 1500) : null;
+}
+
+/** Admin: one hotel's static content at the supplier (Hoteldetails) — read-only, nothing cached. */
+export async function trySupplierHotel(code: string, hotelCode: string): Promise<HotelTryResult> {
+  if (!(await requireAdmin())) return { ok: false, message: "غير مصرّح لك بهذا الإجراء.", calls: [] };
+  if (!/^[A-Za-z0-9-]{1,20}$/.test(hotelCode)) return { ok: false, message: "رقم الفندق غير صحيح.", calls: [] };
+  const sink: SupplierCallRecord[] = [];
+  const adapter = await testAdapter(code, sink);
+  if (!adapter) return { ok: false, message: NO_CREDS, calls: [] };
+  const content = await adapter.fetchContent(hotelCode).catch(() => null);
+  const calls = sink.map(callView);
+  if (!content) return { ok: false, message: "لم يُرجع TBO بيانات لهذا الفندق.", calls };
+  return {
+    ok: true,
+    calls,
+    hotel: {
+      name: content.name_en ?? content.name_ar,
+      stars: content.star_rating,
+      address: content.address,
+      description: plainText(content.description),
+      facilities: content.facilities.slice(0, 30),
+      images: content.images.map((i) => i.url).filter((u) => /^https?:\/\//.test(u)).slice(0, 8),
+      lat: content.lat,
+      lng: content.lng,
+    },
+  };
 }

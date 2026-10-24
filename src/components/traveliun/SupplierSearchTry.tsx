@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, Loader2, Search, Star, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, Loader2, MapPin, Search, Star, XCircle } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import {
   trySupplierCities,
+  trySupplierHotel,
   trySupplierSearch,
+  type HotelTryResult,
   type SearchTryCall,
   type SearchTryHotel,
   type SearchTryResult,
 } from "@/lib/data/suppliers";
+import type { SupplierListedHotel } from "@/lib/providers/hotel-supplier";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { TraveliunShell } from "./TraveliunShell";
@@ -32,6 +35,7 @@ const METHOD_LABEL: Record<string, TranslationKey> = {
   CityList: "settings.supplierTry.m.CityList",
   TBOHotelCodeList: "settings.supplierTry.m.TBOHotelCodeList",
   search: "settings.supplierTry.m.search",
+  Hoteldetails: "settings.supplierTry.m.Hoteldetails",
 };
 
 const BOARD_LABEL: Record<string, TranslationKey> = {
@@ -194,16 +198,17 @@ export function SupplierSearchTry({ code, countries }: { code: string; countries
           </button>
         </section>
 
-        {result ? <Outcome result={result} /> : null}
+        {result ? <Outcome code={code} result={result} query={hotelName} /> : null}
       </div>
     </TraveliunShell>
   );
 }
 
 /** What came back: the supplier's refusal in its own words, or the hotels — then every call. */
-function Outcome({ result }: { result: SearchTryResult & { at: string } }) {
+function Outcome({ code, result, query }: { code: string; result: SearchTryResult & { at: string }; query: string }) {
   const { t } = useTraveliunUI();
   const failed = result.calls.find((c) => !c.ok);
+  const priced = new Set(result.ok ? result.hotels.map((h) => h.id) : []);
   return (
     <div className="mt-5 space-y-4">
       {!result.ok ? (
@@ -221,6 +226,8 @@ function Outcome({ result }: { result: SearchTryResult & { at: string } }) {
         </>
       )}
 
+      {result.listed?.length ? <ListedHotels code={code} hotels={result.listed} priced={priced} initial={query} /> : null}
+
       {result.calls.length ? (
         <section className="rounded-[12px] border border-[#e7f0ec] bg-[#f8fbf9] p-3">
           <p className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[12.5px] font-extrabold text-[#185045]">
@@ -232,6 +239,124 @@ function Outcome({ result }: { result: SearchTryResult & { at: string } }) {
           </ul>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * The city's hotels as TBO sent them (TBOHotelCodeList) — no prices, shown whatever Search answered; a press opens
+ * one hotel's own details (Hoteldetails).
+ */
+function ListedHotels({ code, hotels, priced, initial }: { code: string; hotels: SupplierListedHotel[]; priced: Set<string>; initial: string }) {
+  const { t } = useTraveliunUI();
+  const [query, setQuery] = useState(initial);
+  const [stars, setStars] = useState(0);
+  const [shown, setShown] = useState(50);
+  const [open, setOpen] = useState<string | null>(null);
+  const wanted = query.trim().toLowerCase();
+  const list = hotels.filter((h) => (!wanted || h.name.toLowerCase().includes(wanted) || h.code === wanted) && (!stars || h.stars === stars));
+  return (
+    <section className="rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-[14.5px] font-extrabold text-[#003c3a]">{t("settings.supplierTry.listed.title")}</h2>
+        <span className="tv-tnum text-[12px] font-bold text-[#557d78]">{t("settings.supplierTry.listed.count", { shown: list.length, total: hotels.length })}</span>
+      </div>
+      <p className="mb-3 text-[12px] font-semibold text-[#93aaa3]">{t("settings.supplierTry.listed.hint")}</p>
+      <div className="mb-3 flex flex-wrap gap-2">
+        <input
+          dir="ltr"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setShown(50); }}
+          placeholder={t("settings.supplierTry.listed.search")}
+          aria-label={t("settings.supplierTry.listed.search")}
+          className={`${fieldClass} min-w-[220px] flex-1 text-start`}
+        />
+        <select value={stars} onChange={(e) => { setStars(Number(e.target.value)); setShown(50); }} className={`${fieldClass} tv-tnum`} aria-label={t("settings.supplierTry.listed.allStars")}>
+          <option value={0}>{t("settings.supplierTry.listed.allStars")}</option>
+          {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{t("settings.supplierTry.stars", { n })}</option>)}
+        </select>
+      </div>
+      {list.length === 0 ? (
+        <p className="py-4 text-center text-[13px] font-bold text-[#93aaa3]">{t("settings.supplierTry.listed.none")}</p>
+      ) : (
+        <ul className="divide-y divide-[#eef4f1]">
+          {list.slice(0, shown).map((h) => (
+            <li key={h.code}>
+              <button
+                type="button"
+                onClick={() => setOpen(open === h.code ? null : h.code)}
+                aria-expanded={open === h.code}
+                className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 py-2 text-start hover:bg-[#f8fbf9]"
+              >
+                <ChevronDown className={`size-4 shrink-0 text-[#93aaa3] transition-transform ${open === h.code ? "rotate-180" : ""}`} aria-hidden />
+                <DirText dir="ltr" className="text-[13px] font-bold text-[#0f3d38]">{h.name}</DirText>
+                {h.stars ? (
+                  <span className="inline-flex items-center gap-0.5 text-[11.5px] font-bold text-[#b7791f]">
+                    <Star className="size-3 fill-current" aria-hidden />
+                    {h.stars}
+                  </span>
+                ) : null}
+                {priced.has(h.code) ? <span className="rounded-full bg-[#e6f4ee] px-2 text-[11px] font-bold text-[#0f7a52]">{t("settings.supplierTry.listed.priced")}</span> : null}
+                <DirText dir="ltr" className="tv-tnum ms-auto text-[11px] font-bold text-[#93aaa3]">#{h.code}</DirText>
+              </button>
+              {open === h.code ? <HotelDetails code={code} hotelCode={h.code} /> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {list.length > shown ? (
+        <button type="button" onClick={() => setShown(shown + 50)} className="mt-2 text-[12.5px] font-bold text-[#2aa87a] hover:text-[#185045]">
+          {t("settings.supplierTry.listed.more")}
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
+function HotelDetails({ code, hotelCode }: { code: string; hotelCode: string }) {
+  const { t } = useTraveliunUI();
+  const [state, setState] = useState<HotelTryResult | null>(null);
+  useEffect(() => {
+    let live = true;
+    trySupplierHotel(code, hotelCode)
+      .then((r) => { if (live) setState(r); })
+      .catch(() => { if (live) setState({ ok: false, message: t("err.db"), calls: [] }); });
+    return () => { live = false; };
+  }, [code, hotelCode, t]);
+  if (!state) {
+    return (
+      <p className="flex items-center gap-2 pb-3 ps-7 text-[12px] font-semibold text-[#93aaa3]">
+        <Loader2 className="size-3.5 animate-spin" aria-hidden /> {t("settings.supplierTry.details.loading")}
+      </p>
+    );
+  }
+  if (!state.ok) return <div className="pb-3 ps-7"><Refusal message={state.message} calls={state.calls} /></div>;
+  const h = state.hotel;
+  return (
+    <div className="grid gap-2 pb-4 ps-7 text-[12.5px] text-[#0f3d38]">
+      {h.images.length ? (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {h.images.map((src) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={src} src={src} alt="" loading="lazy" className="h-24 w-36 shrink-0 rounded-lg bg-[#eef4f1] object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+          ))}
+        </div>
+      ) : null}
+      {h.address ? <DirText dir="ltr" className="font-semibold text-[#557d78]">{h.address}</DirText> : null}
+      {h.lat !== null && h.lng !== null ? (
+        <a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noreferrer" className="inline-flex w-fit items-center gap-1 font-bold text-[#2aa87a] hover:text-[#185045]">
+          <MapPin className="size-3.5" aria-hidden /> {t("settings.supplierTry.details.map")}
+        </a>
+      ) : null}
+      {h.facilities.length ? (
+        <div>
+          <p className="mb-1 text-[11.5px] font-bold text-[#93aaa3]">{t("settings.supplierTry.details.facilities")}</p>
+          <div dir="ltr" className="flex flex-wrap gap-1">
+            {h.facilities.map((f) => <span key={f} className="rounded-full bg-[#f4f8f6] px-2 py-0.5 text-[11px] font-semibold text-[#557d78]">{f}</span>)}
+          </div>
+        </div>
+      ) : null}
+      {h.description ? <p dir="ltr" className="line-clamp-6 whitespace-pre-line text-start text-[12px] text-[#557d78]">{h.description}</p> : null}
     </div>
   );
 }

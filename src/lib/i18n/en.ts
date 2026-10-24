@@ -2066,6 +2066,18 @@ export const en = {
   "settings.supplierTry.m.CityList": "City list",
   "settings.supplierTry.m.TBOHotelCodeList": "The city's hotels",
   "settings.supplierTry.m.search": "Room search",
+  "settings.supplierTry.m.Hoteldetails": "Hotel details",
+  "settings.supplierTry.listed.title": "The city's hotels at TBO",
+  "settings.supplierTry.listed.hint": "TBO's fixed list for this city, without prices. Press any hotel to see its details from TBO.",
+  "settings.supplierTry.listed.count": "{shown} of {total}",
+  "settings.supplierTry.listed.search": "Search by hotel name or code",
+  "settings.supplierTry.listed.allStars": "All stars",
+  "settings.supplierTry.listed.more": "Show more",
+  "settings.supplierTry.listed.priced": "Has rates",
+  "settings.supplierTry.listed.none": "No hotel matches the search.",
+  "settings.supplierTry.details.loading": "Fetching the hotel from TBO…",
+  "settings.supplierTry.details.map": "On the map",
+  "settings.supplierTry.details.facilities": "Facilities",
   "settings.supplierTry.rows": "{n} rows",
 
   // ---------- repackage a supplier PDF ----------

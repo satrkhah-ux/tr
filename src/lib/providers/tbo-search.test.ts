@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildHotelSupplier, tboPaxRooms, tboStars } from "./hotel-supplier";
+import { buildHotelSupplier, tboListedHotels, tboPaxRooms, tboStars } from "./hotel-supplier";
 
 /**
  * Search, against the shapes in TBOH Hotel API Specifications v2.1: Search
@@ -81,5 +81,14 @@ describe("helpers", () => {
       { Adults: 2, Children: 0, ChildrenAges: [] },
     ]);
     expect(tboPaxRooms({ rooms: 1, adults: 1, children: 0 })).toEqual([{ Adults: 1, Children: 0, ChildrenAges: [] }]);
+  });
+});
+
+describe("the city's list as TBO sent it", () => {
+  it("reads the TBOHotelCodeList answer the call log keeps", () => {
+    const answer = { Status: OK, Hotels: [{ HotelCode: 11, HotelName: " Grand Plaza ", HotelRating: "FourStar" }, { HotelCode: "12", HotelRating: "All" }, { HotelName: "no code" }] };
+    expect(tboListedHotels(answer)).toEqual([{ code: "11", name: "Grand Plaza", stars: 4 }, { code: "12", name: "12", stars: null }]);
+    expect(tboListedHotels("not json")).toEqual([]);
+    expect(tboListedHotels(null)).toEqual([]);
   });
 });

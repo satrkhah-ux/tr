@@ -865,6 +865,17 @@ type TboCodeListHotel = {
 
 const STAR_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5 };
 
+/** One hotel of a city's static list — no rate, no availability. */
+export type SupplierListedHotel = { code: string; name: string; stars: number | null };
+
+/** A TBOHotelCodeList answer (as the call log keeps it) → the city's hotels, by name. */
+export function tboListedHotels(response: unknown): SupplierListedHotel[] {
+  const hotels = (response && typeof response === "object" ? (response as { Hotels?: unknown }).Hotels : null) ?? [];
+  return (Array.isArray(hotels) ? (hotels as TboCodeListHotel[]) : [])
+    .filter((h) => h && h.HotelCode)
+    .map((h) => ({ code: String(h.HotelCode), name: h.HotelName?.trim() || String(h.HotelCode), stars: tboStars(h.HotelRating) }));
+}
+
 /** "FourStar" / 4 / "4" → 4; anything else → null. */
 export function tboStars(v: unknown): number | null {
   const n = numOrNull(v);

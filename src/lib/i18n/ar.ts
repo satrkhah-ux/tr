@@ -2064,6 +2064,18 @@ export const ar: Dictionary = {
   "settings.supplierTry.m.CityList": "قائمة المدن",
   "settings.supplierTry.m.TBOHotelCodeList": "فنادق المدينة",
   "settings.supplierTry.m.search": "البحث عن الغرف",
+  "settings.supplierTry.m.Hoteldetails": "بيانات الفندق",
+  "settings.supplierTry.listed.title": "فنادق المدينة عند TBO",
+  "settings.supplierTry.listed.hint": "قائمة TBO الثابتة لهذه المدينة، بلا أسعار. اضغط أي فندق لترى بياناته من TBO.",
+  "settings.supplierTry.listed.count": "{shown} من {total}",
+  "settings.supplierTry.listed.search": "ابحث باسم الفندق (بالإنجليزية) أو رقمه",
+  "settings.supplierTry.listed.allStars": "كل النجوم",
+  "settings.supplierTry.listed.more": "عرض المزيد",
+  "settings.supplierTry.listed.priced": "له أسعار",
+  "settings.supplierTry.listed.none": "لا فندق يطابق البحث.",
+  "settings.supplierTry.details.loading": "يجلب بيانات الفندق من TBO…",
+  "settings.supplierTry.details.map": "الموقع على الخريطة",
+  "settings.supplierTry.details.facilities": "المرافق",
   "settings.supplierTry.rows": "{n} نتيجة",
 
   // ---------- إعادة تصميم بكج مورّد ----------
