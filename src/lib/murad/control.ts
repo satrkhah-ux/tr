@@ -9,8 +9,23 @@ export const TASK_LABELS = {
   visas: "الإجابة عن التأشيرات",
   holding: "طمأنة العميل أثناء انتظار الموظف",
 } as const;
+/** what Murad does with a kind of request (the owner, 2026-10-24: «لا تستلم اي طلب يخص التأشيرات» is a decision, not a prompt) */
+export const KIND_MODES = { handle: "يرد ويحوّل", route: "يحوّل فقط بلا إجابة", off: "لا يتدخل — يتركه للقسم" } as const;
+export type KindMode = keyof typeof KIND_MODES;
 export type MuradControl = {
   tasks: Record<keyof typeof TASK_LABELS, boolean>;
+  /** per kind of request; absent = «handle» */
+  kinds?: Partial<Record<RouteKey, KindMode>>;
+  /** Teletel agents Murad never hands a conversation to («لا ترسل لفلان») */
+  paused?: number[];
+  /** a client still unanswered this many minutes after Murad's hand-over → this agent */
+  late?: { minutes: number; agentId: number } | null;
+  /** the management's numbers: what they write is a decision or a lesson for Murad, never a client's request */
+  admins?: string[];
+  /** numbers Murad never hands to anyone (the owner's own test line) */
+  noHandoff?: string[];
+  /** written on an admin number: a new trial starts, as a client would write */
+  resetCode?: string;
   visaAll?: boolean;
   includePrice: boolean;
   inboxIds: number[];
@@ -21,6 +36,7 @@ export const defaultControl = (): MuradControl => ({
   tasks: { reception: true, suggest: true, auto: true, offers: true, visas: true, holding: true },
   visaAll: false, includePrice: true, inboxIds: [], teamIds: [], handoffs: {},
 });
+const phones = (v: unknown) => v === undefined || (Array.isArray(v) && v.length <= 20 && v.every((p) => typeof p === "string" && /^\+?\d{6,15}$/.test(p)));
 const ids = (v: unknown): v is number[] => Array.isArray(v) && v.length <= 100 && v.every((n) => Number.isSafeInteger(n) && n > 0);
 export function validControl(v: unknown): v is MuradControl {
   if (!v || typeof v !== "object") return false;
@@ -29,7 +45,12 @@ export function validControl(v: unknown): v is MuradControl {
     && !!c.tasks && Object.keys(TASK_LABELS).every((k) => typeof c.tasks[k as keyof typeof TASK_LABELS] === "boolean")
     && !!c.handoffs && typeof c.handoffs === "object" && !Array.isArray(c.handoffs)
     && Object.entries(c.handoffs).every(([k, h]) => ROUTE_KEYS.includes(k as RouteKey) && !!h
-      && (h.teamId === null || ids([h.teamId])) && (h.agentId === null || ids([h.agentId])));
+      && (h.teamId === null || ids([h.teamId])) && (h.agentId === null || ids([h.agentId])))
+    && (c.kinds === undefined || (!!c.kinds && typeof c.kinds === "object" && Object.entries(c.kinds).every(([k, m]) => ROUTE_KEYS.includes(k as RouteKey) && typeof m === "string" && m in KIND_MODES)))
+    && (c.paused === undefined || ids(c.paused))
+    && (c.late === undefined || c.late === null || (Number.isInteger(c.late.minutes) && c.late.minutes >= 1 && c.late.minutes <= 1440 && ids([c.late.agentId])))
+    && phones(c.admins) && phones(c.noHandoff)
+    && (c.resetCode === undefined || (typeof c.resetCode === "string" && /^\d{4,12}$/.test(c.resetCode)));
 }
 export function parseControl(raw: string | null | undefined): MuradControl {
   if (!raw) return defaultControl();
@@ -51,3 +72,10 @@ export function inMuradScope(c: MuradControl, inbox: number | null, team: number
   return (!c.inboxIds.length || (inbox !== null && c.inboxIds.includes(inbox)))
     && (!c.teamIds.length || (team !== null && c.teamIds.includes(team)));
 }
+
+export const kindMode = (c: MuradControl, kind: RouteKey | null): KindMode => (kind && c.kinds?.[kind]) || "handle";
+/** a number on a list, matched on its last nine digits — WhatsApp writes +966…, people write 05… */
+export const onList = (phone: string | null | undefined, list: string[] | undefined): boolean => {
+  const tail = (phone ?? "").replace(/\D/g, "").slice(-9);
+  return tail.length === 9 && (list ?? []).some((p) => p.replace(/\D/g, "").slice(-9) === tail);
+};

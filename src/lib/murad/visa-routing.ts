@@ -1,17 +1,21 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { addTeletelNote, assignMuradHandoff, conversationEvents, listOpenConversations, listTeletelTeams, teletelGet } from "@/lib/providers/teletel";
+import { addTeletelNote, conversationEvents, listOpenConversations, listTeletelTeams, teletelGet } from "@/lib/providers/teletel";
 import { chooseVisaAgent, type VisaAgent, type MuradReceipt } from "./visa-assignment";
 import { currentAssignment } from "@/lib/leads/assignment";
+import { onList } from "./control";
+import { handOver, readControl } from "./handover";
 
 /**
  * The team member to take a conversation now: the one already holding it when
  * online, else the online member with the fewest open conversations. Null:
  * nobody online (the team's queue holds it); undefined: the team could not be read.
  */
-export async function onlineTeamAgent(teamId: number, inboxId: number | null, holderId: number | null): Promise<VisaAgent | null | undefined> {
-  const members = await teletelGet<VisaAgent[]>(`/teams/${teamId}/team_members`);
-  if (!Array.isArray(members)) return undefined;
+export async function onlineTeamAgent(teamId: number, inboxId: number | null, holderId: number | null, paused: number[] = []): Promise<VisaAgent | null | undefined> {
+  const all = await teletelGet<VisaAgent[]>(`/teams/${teamId}/team_members`);
+  if (!Array.isArray(all)) return undefined;
+  // «لا ترسل لفلان» (murad_control.paused): never chosen, even when online
+  const members = all.filter((a) => !paused.includes(a.id));
   const open = await listOpenConversations();
   const workloads = new Map<number, number>();
   for (const c of open?.rows ?? []) if (c.assigneeId) workloads.set(c.assigneeId, (workloads.get(c.assigneeId) ?? 0) + 1);
@@ -27,7 +31,7 @@ export async function routeCompletedVisa(service: SupabaseClient, logId: string)
     const teams = await listTeletelTeams();
     const team = teams.find((t) => /تأش|تاش|فيزا/i.test(t.name));
     if (!team) throw Error("visa_team_missing");
-    const conversation = await teletelGet<{ inbox_id?: number; status?: string; meta?: { assignee?: { id?: number } } }>(`/conversations/${id}`);
+    const conversation = await teletelGet<{ inbox_id?: number; status?: string; meta?: { assignee?: { id?: number }; sender?: { phone_number?: string } } }>(`/conversations/${id}`);
     if (!conversation) throw Error("conversation_unavailable");
     const events = await conversationEvents(id);
     if (!events) throw Error("conversation_history_unavailable");
@@ -35,9 +39,15 @@ export async function routeCompletedVisa(service: SupabaseClient, logId: string)
       await service.from("murad_log").update({ reason: "visa:handoff_cancelled", error: "conversation_closed_since_intake" }).eq("id", logId);
       return false;
     }
-    const agent = await onlineTeamAgent(team.id, conversation.inbox_id ?? null, conversation.meta?.assignee?.id ?? null);
+    const control = await readControl(service);
+    // the owner's own line is handed to no one: the flow ends here, as handed over
+    if (onList(conversation.meta?.sender?.phone_number, control.noHandoff)) {
+      await service.from("murad_log").update({ reason: "visa:handoff", error: null, intake: { ...data.intake, visa_handoff: { teamId: null, agentId: null, assignedAt: new Date().toISOString(), noHandoff: true } } }).eq("id", logId);
+      return true;
+    }
+    const agent = await onlineTeamAgent(team.id, conversation.inbox_id ?? null, conversation.meta?.assignee?.id ?? null, control.paused);
     if (agent === undefined) throw Error("visa_members_unavailable");
-    if (!(await assignMuradHandoff(id, team.id, agent?.id ?? null))) throw Error("visa_assignment_failed");
+    if (!(await handOver(control, id, team.id, agent?.id ?? null, conversation.meta?.sender?.phone_number))) throw Error("visa_assignment_failed");
     // Team auto-assignment must not silently give an offline employee this request.
     const current = await teletelGet<{ meta?: { team?: { id?: number }; assignee?: { id?: number; name?: string } } }>(`/conversations/${id}`);
     if (current?.meta?.team?.id !== team.id || (current.meta.assignee?.id ?? null) !== (agent?.id ?? null)) throw Error("visa_assignment_not_confirmed");

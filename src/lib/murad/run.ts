@@ -6,7 +6,6 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getFeatureFlags } from "@/lib/features-server";
 import {
   addTeletelLabels,
-  assignMuradHandoff,
   addTeletelNote,
   getTeletelConfig,
   inferDestinations,
@@ -44,6 +43,7 @@ import {
   type TurnMessage,
 } from "./core";
 import { muradProvider, muradReply, type MuradProvider } from "./model";
+import { handOver } from "./handover";
 
 /**
  * The minute job behind POST /api/murad/run (core.ts says when Murad acts).
@@ -384,7 +384,7 @@ async function answer(
       const route = readRequest(lastClient, []).kind ?? "موظف";
       const handoff = control.handoffs[route];
       if (handoff && (handoff.teamId || handoff.agentId)) {
-        const assigned = await assignMuradHandoff(c.id, handoff.teamId, handoff.agentId);
+        const assigned = await handOver(control, c.id, handoff.teamId, handoff.agentId, c.phone);
         await addTeletelNote(c.id, assigned ? "تم تحويل الطلب حسب إعدادات مُراد." : "تعذّر التحويل حسب إعدادات مُراد — يرجى إسناد الطلب يدويًا.");
       }
     }

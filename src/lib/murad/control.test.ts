@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultControl, inMuradScope, parseControl, validControl } from "./control";
+import { defaultControl, inMuradScope, kindMode, onList, parseControl, validControl } from "./control";
 import { canOpenPath } from "@/lib/roles/section-access";
 import { visaFlowText } from "./visa";
 
@@ -9,6 +9,21 @@ describe("Murad controls", () => {
     expect(Object.values(parseControl("{bad").tasks)).not.toContain(true);
     expect(validControl({ ...defaultControl(), inboxIds: [-1] })).toBe(false);
     expect(validControl({ ...defaultControl(), handoffs: { wrong: { teamId: 1, agentId: null } } })).toBe(false);
+  });
+  it("reads the management's decisions: a kind kept for the team, paused colleagues, the late rule, its numbers", () => {
+    const c = { ...defaultControl(), kinds: { تأشيرات: "off" as const }, paused: [7], late: { minutes: 15, agentId: 9 }, admins: ["+966500005050"], noHandoff: ["+995555004471"], resetCode: "11223344" };
+    expect(validControl(c)).toBe(true);
+    expect(kindMode(c, "تأشيرات")).toBe("off");
+    expect(kindMode(c, "طيران")).toBe("handle");
+    expect(kindMode(defaultControl(), null)).toBe("handle");
+    expect(onList("995555004471", c.noHandoff)).toBe(true);
+    expect(onList("0500005050", c.admins)).toBe(true);
+    expect(onList("+966500005051", c.admins)).toBe(false);
+    expect(onList(null, c.admins)).toBe(false);
+    expect(validControl({ ...c, kinds: { تأشيرات: "maybe" } })).toBe(false);
+    expect(validControl({ ...c, late: { minutes: 0, agentId: 9 } })).toBe(false);
+    expect(validControl({ ...c, admins: ["abc"] })).toBe(false);
+    expect(validControl({ ...c, resetCode: "12" })).toBe(false);
   });
   it("requires BOTH the selected inbox and department, and rejects unknown scope", () => {
     const c = { ...defaultControl(), inboxIds: [1], teamIds: [2] };

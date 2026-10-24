@@ -29,7 +29,8 @@ export async function saveMuradControl(control: MuradControl): Promise<{ ok: boo
     || control.teamIds.some((id) => !options.teams.some((x) => x.id === id))
     || Object.values(control.handoffs).some((h) => !h
       || (h.teamId !== null && !options.teams.some((x) => x.id === h.teamId))
-      || (h.agentId !== null && !options.agents.some((x) => x.id === h.agentId)))) {
+      || (h.agentId !== null && !options.agents.some((x) => x.id === h.agentId)))
+    || [...(control.paused ?? []), ...(control.late ? [control.late.agentId] : [])].some((id) => !options.agents.some((x) => x.id === id))) {
     return { ok: false, error: "تعذّر التحقق من القسم أو الموظف. حدّث الصفحة وحاول مجددًا." };
   }
   const { error } = await db().from("app_settings").upsert({ key: MURAD_CONTROL_KEY, value: JSON.stringify(control), updated_at: new Date().toISOString() });
