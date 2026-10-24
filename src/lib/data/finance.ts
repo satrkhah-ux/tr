@@ -12,7 +12,7 @@ import { parseBook, type FinanceBook } from "@/lib/finance/model";
 /**
  * The book is one document; every save appends a version to finance_book_versions (closed table,
  * migration 20261025090000), so the newest row is the book and the rest its history.
- * developer.access only — salaries and the partners' shares are not the administration's screen.
+ * developer.access, or the owner's own account (FINANCE_ACCOUNTS) — salaries and the partners' shares are not the staff's screen.
  *
  * A password on top (finance_lock, migration 20261025100000): the owner sets it on his first visit,
  * then it is asked once a browser session — the unlock cookie has no expiry, so closing the browser
@@ -20,7 +20,10 @@ import { parseBook, type FinanceBook } from "@/lib/finance/model";
  * open session, and no one can make the cookie without the hash.
  */
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
-const allowed = () => currentCan("developer.access");
+/** the owner signs in as the administration's own account (2026-10-24); its role is shared with staff, so the ACCOUNT is named, not the role */
+const FINANCE_ACCOUNTS = ["admin@admin.com"];
+const allowed = async () => (await currentCan("developer.access"))
+  || FINANCE_ACCOUNTS.includes((await getServerUser())?.email?.toLowerCase() ?? "");
 const EMPTY: FinanceBook = { rents: [], staff: [], debts: [], bookings: [], partners: [], expenses: [], reservePct: 20, updatedAt: "" };
 const COOKIE = "fin_unlock";
 const MIN_LENGTH = 6;
