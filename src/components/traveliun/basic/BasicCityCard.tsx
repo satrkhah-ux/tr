@@ -31,6 +31,8 @@ import {
   emptyRoomSpec,
   findLookupCountry,
   fromUnit,
+  HOTEL_ROOM_NAME_MAX,
+  hotelRoomName,
   perUnit,
   tourCars,
   withRooms,
@@ -663,8 +665,8 @@ export function HotelPanel({
                         follow(line, (l) =>
                           withRooms(
                             { ...l, hotel_id: h?.id ?? null, hotel_name: h?.name ?? "", hotel_name_en: "", sourcing: null },
-                            // a room type belongs to its hotel: the old hotel's id must not follow
-                            l.rooms.map((room) => ({ ...room, room_type_id: null })),
+                            // a room type belongs to its hotel: the old hotel's id — and its own name for the room — must not follow
+                            l.rooms.map((room) => ({ ...room, room_type_id: null, hotel_room_name: h?.id === l.hotel_id ? room.hotel_room_name : undefined })),
                           ),
                         )
                       }
@@ -685,6 +687,22 @@ export function HotelPanel({
                       selectClass={basicField}
                       extras={more}
                     />
+                    {/* the hotel's own name for the room (hotels name theirs differently): under «المزيد», said here once given */}
+                    {more ? (
+                      <input
+                        type="text"
+                        value={r.hotel_room_name ?? ""}
+                        maxLength={HOTEL_ROOM_NAME_MAX}
+                        // not setRoom: a name is no reason to drop a supplier's rate
+                        onChange={(e) => onLines([withRooms(line, line.rooms.map((x, k) => (k === j ? { ...x, hotel_room_name: e.target.value } : x)))])}
+                        placeholder={tx("hotelRoomName")}
+                        aria-label={tx("hotelRoomName")}
+                        dir="auto"
+                        className={basicField}
+                      />
+                    ) : hotelRoomName(r) ? (
+                      <span dir="auto" className={`${chip} max-w-full break-words`}>{hotelRoomName(r)}</span>
+                    ) : null}
                     {/* the extra bed: under «المزيد», and said here once it is on */}
                     {more ? (
                       <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] border border-[#dbe6e1] bg-white px-2 text-[11.5px] font-bold text-[#185045]">

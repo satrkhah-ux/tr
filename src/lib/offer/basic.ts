@@ -411,7 +411,8 @@ export function withExtraBeds(line: DraftHotel, count: number): DraftHotel {
 export function renameRooms(line: DraftHotel, name: string): DraftHotel {
   return withRooms(
     line,
-    line.rooms.map((r) => ({ ...r, ...roomFromName(name), room_type_name: name + (r.room_type_name.endsWith(EXTRA_BED) ? EXTRA_BED : "") })),
+    // another room: the hotel's own name for the old one does not follow
+    line.rooms.map((r) => ({ ...r, ...roomFromName(name), room_type_name: name + (r.room_type_name.endsWith(EXTRA_BED) ? EXTRA_BED : ""), hotel_room_name: undefined })),
   );
 }
 

@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  addStay,
   deriveCityDates,
   emptyDraftData,
+  HOTEL_ROOM_NAME_MAX,
+  hotelRoomName,
   normalizeDraftHotel,
   resizeRooms,
+  roomTypesText,
   withRooms,
   type DraftData,
+  type DraftRoomSpec,
 } from "./draft-types";
+import { renameRooms } from "./basic";
 import { validateDraft } from "./draft-validation";
 import { withRequiredAnswers } from "./draft-test-helpers";
 
@@ -107,6 +113,32 @@ describe("resizeRooms", () => {
   it("refuses to go below one room", () => {
     const line = normalizeDraftHotel({ city_name: "باكو" });
     expect(resizeRooms(line, 0).rooms).toHaveLength(1);
+  });
+});
+
+describe("«اسم الغرفة عند الفندق» — the hotel's own name beside the catalogue's", () => {
+  const room = (over: Partial<DraftRoomSpec> = {}): DraftRoomSpec => ({ room_type_id: null, room_type_name: "غرفة مزدوجة", board_type: "BB", price: null, ...over });
+
+  it("prints beside the catalogue's name, trimmed and capped", () => {
+    expect(roomTypesText([room({ hotel_room_name: "  Deluxe Sea View " })])).toBe("غرفة مزدوجة — Deluxe Sea View");
+    expect(roomTypesText([room({ hotel_room_name: "Deluxe" }), room({ hotel_room_name: "Deluxe" }), room()])).toBe("غرفة مزدوجة — Deluxe × 2 + غرفة مزدوجة");
+    expect(hotelRoomName({ hotel_room_name: "x".repeat(200) })).toHaveLength(HOTEL_ROOM_NAME_MAX);
+    expect(hotelRoomName({ hotel_room_name: 42 })).toBe("");
+  });
+
+  it("an older file without it reads exactly as before", () => {
+    const old = normalizeDraftHotel({ city_name: "باكو", rooms: [{ room_type_id: null, room_type_name: "غرفة مزدوجة | الفئة: ديلوكس", board_type: "BB", price: 300 }] });
+    expect("hotel_room_name" in old.rooms[0]).toBe(false);
+    expect(roomTypesText(old.rooms)).toBe("غرفة مزدوجة | الفئة: ديلوكس");
+    expect(roomTypesText([room({ hotel_room_name: "   " })])).toBe("غرفة مزدوجة");
+  });
+
+  it("survives a save, and does not follow the room to another hotel or another type", () => {
+    const line = normalizeDraftHotel({ city_name: "باكو", hotel_name: "فندق باكو سنتر", rooms: [room({ hotel_room_name: "Deluxe Sea View" })] });
+    expect(line.rooms[0].hotel_room_name).toBe("Deluxe Sea View");
+    const cities = deriveCityDates("2026-08-01", [{ city_name: "باكو", nights: 3, check_in: null, check_out: null }]);
+    expect(hotelRoomName(addStay(cities, [line], 0, "same").hotels[1].rooms[0])).toBe("");
+    expect(hotelRoomName(renameRooms(line, "جناح").rooms[0])).toBe("");
   });
 });
 

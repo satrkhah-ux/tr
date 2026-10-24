@@ -60,3 +60,15 @@ describe("OfferDocument — a stay split over two hotels", () => {
     expect(runs.map((r) => r.map((h) => h.hotel_name))).toEqual([["أ", "ب"], ["ج"], ["د"], ["بلا تاريخ"]]);
   });
 });
+
+describe("OfferDocument — the hotel's own name for the room", () => {
+  it("prints beside the catalogue's name, as text", () => {
+    const data = draft("after");
+    data.hotels[0] = { ...data.hotels[0], rooms: data.hotels[0].rooms.map((r) => ({ ...r, hotel_room_name: "Deluxe <b>Sea</b> View" })) };
+    const html = render(data);
+    expect(html).toContain("ديلوكس — Deluxe &lt;b&gt;Sea&lt;/b&gt; View × 2");
+    expect(html).not.toContain("<b>Sea</b>");
+    // the other stays, which have none, print as before
+    expect(render(draft("after"))).not.toContain(" — Deluxe");
+  });
+});

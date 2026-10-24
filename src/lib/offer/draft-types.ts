@@ -565,6 +565,12 @@ export type DraftRoomSpec = {
   room_type_code?: string | null;
   room_category_code?: string | null;
   suite_subtype_code?: string | null;
+  /**
+   * «اسم الغرفة عند الفندق» — the hotel's own name for the room (hotels name
+   * theirs differently), optional free text. Printed beside the catalogue's
+   * name, never a pricing key: prices and the rate memory stay on room_type_name.
+   */
+  hotel_room_name?: string;
   board_type: BoardType | null;
   /**
    * What THIS room costs for the whole stay.
@@ -580,6 +586,17 @@ export type DraftRoomSpec = {
 export function emptyRoomSpec(): DraftRoomSpec {
   return { room_type_id: null, room_type_name: "", board_type: null, price: null };
 }
+
+/** The longest hotel's room name kept — a name, not a note. */
+export const HOTEL_ROOM_NAME_MAX = 60;
+
+/** The hotel's own name for a room, trimmed and capped; "" when there is none (every older file). */
+export const hotelRoomName = (room: { hotel_room_name?: unknown }): string =>
+  typeof room.hotel_room_name === "string" ? room.hotel_room_name.trim().slice(0, HOTEL_ROOM_NAME_MAX).trim() : "";
+
+/** The room as the client reads it — «غرفة مزدوجة — Deluxe Sea View»; the catalogue's name alone when the hotel's is not given. */
+export const roomLabel = (room: Pick<DraftRoomSpec, "room_type_name" | "hotel_room_name">): string =>
+  [room.room_type_name.trim(), hotelRoomName(room)].filter(Boolean).join(" — ");
 
 export type RoomCodes = Required<Pick<DraftRoomSpec, "room_type_code" | "room_category_code" | "suite_subtype_code">>;
 
@@ -650,14 +667,14 @@ function cataloguedRoom(room: DraftRoomSpec): DraftRoomSpec {
  * different rooms printed only the first one's type.
  */
 export function roomTypesText(
-  rooms: Pick<DraftRoomSpec, "room_type_name" | "board_type">[],
+  rooms: Pick<DraftRoomSpec, "room_type_name" | "hotel_room_name" | "board_type">[],
   /** the board's printed name — given, so rooms on different boards say which is which. */
   boardLabel?: (board: BoardType) => string,
 ): string {
   const boards = new Set(rooms.map((r) => r.board_type ?? ""));
   const counts = new Map<string, number>();
   for (const r of rooms) {
-    const name = r.room_type_name.trim();
+    const name = roomLabel(r);
     if (!name) continue;
     const board = boards.size > 1 && r.board_type && boardLabel ? ` (${boardLabel(r.board_type)})` : "";
     const key = `${name}${board}`;
@@ -2018,7 +2035,8 @@ export function addStay(
   const from = lines[lines.length - 1];
   if (!city) return { hotels, id: "" };
   const cov = hotelCoverage(cities, hotels)[index];
-  const rooms = (from?.rooms ?? [emptyRoomSpec()]).map((r) => ({ ...r, price: null }));
+  // another hotel: the types follow, the previous hotel's own names for its rooms do not
+  const rooms = (from?.rooms ?? [emptyRoomSpec()]).map((r) => ({ ...r, price: null, hotel_room_name: undefined }));
   const line = withRooms(
     {
       ...normalizeDraftHotel({ city_name: city.city_name }),

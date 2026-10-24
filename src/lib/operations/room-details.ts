@@ -27,11 +27,14 @@ import {
   type RoomLocale,
   type RoomSpec,
 } from "@/lib/catalog/room-catalog";
+import { hasArabicLetter } from "@/lib/catalog/hotel-rules";
+import { hotelRoomName, roomLabel } from "@/lib/offer/draft-types";
 import { toEnglish } from "./supplier-request";
 import { ROOM_SPEC_KEY, shownDetail } from "./voucher-dto";
 
 export type ConnectingStatus = "confirmed" | "on_request" | "not_applicable";
-export type BookingRoomSpec = RoomSpec & { connecting_status?: ConnectingStatus };
+/** `hotel_room_name`: the hotel's own name for the room, as the offer had it (DraftRoomSpec) — kept beside the catalogue's. */
+export type BookingRoomSpec = RoomSpec & { connecting_status?: ConnectingStatus; hotel_room_name?: string };
 export type BookingRooms = { locale: LocaleChoice; rooms: Record<string, BookingRoomSpec> };
 type Detail = Record<string, string> | null | undefined;
 
@@ -78,27 +81,35 @@ export function splitRoomText(text: string): { room: string; multiplier: string;
 
 const joinRoomText = (room: string, multiplier: string, board: string) => [[room, multiplier].filter(Boolean).join(" "), board].filter(Boolean).join(" — ");
 
-/** What the line reads once details are saved: the catalogue's Arabic name, keeping the count and the board. */
+/** What the line reads once details are saved: the catalogue's Arabic name (the hotel's own beside it), keeping the count and the board. */
 export function roomLineText(old: string, spec: BookingRoomSpec): string {
   const name = roomName(spec, "ar").name;
   if (!name) return old;
   const { multiplier, board } = splitRoomText(old);
-  return joinRoomText(name, multiplier, board);
+  return joinRoomText(roomLabel({ room_type_name: name, hotel_room_name: spec.hotel_room_name }), multiplier, board);
 }
 
 // ---------- seeding and the editor's starting point ----------
 
 /** A draft room as the offer side writes it (the codes are its; older drafts have only the name). */
-export type SeedRoom = { room_type_name: string; room_type_code?: string | null; room_category_code?: string | null; suite_subtype_code?: string | null };
+export type SeedRoom = {
+  room_type_name: string;
+  room_type_code?: string | null;
+  room_category_code?: string | null;
+  suite_subtype_code?: string | null;
+  hotel_room_name?: string;
+};
 
-/** The offer's own codes; else the old name read into a type and category; null when it names no type. */
+/** The offer's own codes; else the old name read into a type and category; null when it names no type. The hotel's own name rides along. */
 export function seededSpec(room: SeedRoom): BookingRoomSpec | null {
+  const own = hotelRoomName(room);
+  const named = own ? { hotel_room_name: own } : {};
   const type = room.room_type_code?.trim();
   if (type) {
-    return { room_type_id: type, room_category_id: room.room_category_code || null, suite_subtype_id: type === "suite" ? room.suite_subtype_code || null : null };
+    return { room_type_id: type, room_category_id: room.room_category_code || null, suite_subtype_id: type === "suite" ? room.suite_subtype_code || null : null, ...named };
   }
   const read = classifyRoomName(splitRoomText(room.room_type_name).room);
-  return read.room_type_id ? read : null;
+  return read.room_type_id ? { ...read, ...named } : null;
 }
 
 /** What the editor opens on: the saved spec, else what the line's text says. */
@@ -137,6 +148,7 @@ export function cleanSpec(raw: unknown): BookingRoomSpec {
   const statuses = (r.custom_name_status ?? {}) as Record<string, unknown>;
   const bed = ["guaranteed", "on_request", "unspecified"].includes(r.bed_configuration_status as string) ? (r.bed_configuration_status as BedStatus) : "unspecified";
   const connecting = r.connecting_status === "confirmed" || r.connecting_status === "on_request" ? r.connecting_status : "not_applicable";
+  const own = hotelRoomName(r);
   return {
     room_type_id: id(r.room_type_id),
     room_category_id: id(r.room_category_id),
@@ -154,6 +166,7 @@ export function cleanSpec(raw: unknown): BookingRoomSpec {
       ? { custom_room_name: { ar: names.ar || null, en: names.en || null }, custom_name_status: { ar: status(names.ar, statuses.ar), en: status(names.en, statuses.en) } }
       : {}),
     connecting_status: connecting,
+    ...(own ? { hotel_room_name: own } : {}),
   };
 }
 
@@ -184,11 +197,30 @@ const CONNECTING: Record<"confirmed" | "on_request", Record<RoomLocale, string>>
   on_request: RULES.bed_status_suffix.on_request,
 };
 
-/** The export contract's notes: the beds when a custom name hides them, and the connecting rooms' state. */
+const hasCustomName = (spec: BookingRoomSpec) => Boolean(spec.custom_room_name?.ar?.trim() || spec.custom_room_name?.en?.trim());
+// Latin letters and no Arabic ones: a name an English voucher can print as it is
+const latinOnly = (text: string) => /[A-Za-z]/.test(text) && !hasArabicLetter(text);
+
+/**
+ * The room's name on a voucher. The hotel's own name for it is what its desk
+ * knows the room by: an English voucher prints it alone when it is Latin, else
+ * the catalogue's English (never refused over it); an Arabic one prints it
+ * beside the catalogue's, as the offer does. A custom name operations entered
+ * still wins, and the catalogue's errors stand.
+ */
+export function voucherRoomName(spec: BookingRoomSpec, locale: RoomLocale): ReturnType<typeof roomName> {
+  const room = roomName(spec, locale);
+  const own = hotelRoomName(spec);
+  if (!room.name || !own || hasCustomName(spec)) return room;
+  if (locale === "ar") return { name: roomLabel({ room_type_name: room.name, hotel_room_name: own }) };
+  return { name: latinOnly(own) ? own : room.name };
+}
+
+/** The export contract's notes: the beds when a custom name — or the hotel's own — hides them, and the connecting rooms' state. */
 export function roomNotes(spec: BookingRoomSpec, locale: RoomLocale): string[] {
   const out: string[] = [];
-  const custom = spec.custom_room_name;
-  const beds = custom && (custom.ar?.trim() || custom.en?.trim()) ? bedsText(spec, locale) : null;
+  const hidden = hasCustomName(spec) || (locale === "en" && latinOnly(hotelRoomName(spec)));
+  const beds = hidden ? bedsText(spec, locale) : null;
   if (beds) out.push(`${RULES.field_labels[locale].beds}: ${beds}`);
   if (spec.feature_ids?.includes("connecting") && (spec.connecting_status === "confirmed" || spec.connecting_status === "on_request")) {
     out.push(`${catalogLabel("features", "connecting", locale)}: ${CONNECTING[spec.connecting_status][locale]}`);
@@ -236,7 +268,7 @@ export function voucherStay(
       continue;
     }
     if (roomDetailIssues(spec).length > 0) return { ok: false, error: "roomInvalid", locale };
-    const room = roomName(spec, locale);
+    const room = voucherRoomName(spec, locale);
     if (room.error || !room.name) return { ok: false, error: "roomName", locale };
     const { multiplier, board } = splitRoomText(v);
     detail[k] = joinRoomText(room.name, multiplier, say(board));

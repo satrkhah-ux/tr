@@ -83,6 +83,56 @@ describe("the hotel voucher is in English", () => {
   });
 });
 
+describe("the hotel's own name for the room on the voucher", () => {
+  const own = (name: string, spec: BookingRoomSpec = deluxeKing): BookingRoomSpec => ({ ...spec, hotel_room_name: name });
+
+  it("a Latin name is what an English voucher prints — the beds noted, as under a custom name", () => {
+    const s = voucherStay(stay({ الغرفة: own("Deluxe Sea View") }), pullman("MY"));
+    expect(s.ok && s.detail["الغرفة"]).toBe("Deluxe Sea View — Bed & breakfast");
+    expect(s.ok && s.notes).toEqual(["Beds: 1 × King Bed (Guaranteed)"]);
+  });
+
+  it("an Arabic or mixed name falls back to the catalogue's English — never refused", () => {
+    for (const name of ["ديلوكس مطلة على البحر", "Deluxe مطلة"]) {
+      const s = voucherStay(stay({ الغرفة: own(name, { room_type_id: "double", room_category_id: "deluxe" }) }), pullman("MY"));
+      expect(s.ok && s.detail["الغرفة"]).toBe("Double Room | Category: Deluxe — Bed & breakfast");
+    }
+  });
+
+  it("an Arabic voucher prints it beside the catalogue's, and a custom name operations entered still wins", () => {
+    const ar = { ...stay(), detail: { ...stay().detail, [ROOM_SPEC_KEY]: roomsJson({ الغرفة: own("Deluxe Sea View", { room_type_id: "twin" }) }, "ar") } };
+    const s = voucherStay(ar, pullman("MY"));
+    expect(s.ok && s.detail["الغرفة"]).toBe(`غرفة بسريرين منفصلين — Deluxe Sea View — ${BOARD_AR.BB}`);
+    const custom = own("Deluxe Sea View", { room_type_id: "double", custom_room_name: { ar: null, en: "King Suite" }, custom_name_status: { ar: "missing", en: "verified" } });
+    expect(voucherStay(stay({ الغرفة: custom }), pullman("MY"))).toMatchObject({ ok: true, detail: { الغرفة: "King Suite — Bed & breakfast" } });
+  });
+
+  it("is pulled from the draft and kept when operations save the details", () => {
+    const data = normalizeDraftData({
+      ...emptyDraftData(),
+      trip: { ...emptyDraftData().trip, adults: 2, nights: 3, arrival_date: "2026-11-20" },
+      scope: { ...emptyDraftData().scope, hotels: true },
+      cities: [{ key: "كوالالمبور#1", nights: 3, check_in: "2026-11-20", check_out: "2026-11-23", city_name: "كوالالمبور" }],
+      hotels: [
+        {
+          id: "s1",
+          city_name: "كوالالمبور",
+          hotel_name: "بولمان سيتي سنتر",
+          nights: 0,
+          rooms: [{ room_type_id: null, room_type_name: "غرفة مزدوجة", board_type: "BB", price: null, room_type_code: "double", hotel_room_name: " Deluxe Sea View " }],
+        },
+      ],
+    } as unknown as Record<string, unknown>);
+    const hotel = planBookingsFromDraft(data, "شروط").find((r) => r.kind === "hotel")!;
+    expect(hotel.detail["الغرفة"]).toBe(`غرفة مزدوجة — Deluxe Sea View — ${BOARD_AR.BB}`);
+    expect(readRooms(hotel.detail).rooms["الغرفة"]).toEqual({ room_type_id: "double", room_category_id: null, suite_subtype_id: null, hotel_room_name: "Deluxe Sea View" });
+
+    const saved = applyRoomDetails(hotel.detail, { الغرفة: { ...readRooms(hotel.detail).rooms["الغرفة"], room_category_id: "deluxe" } }, "auto")!;
+    expect(saved["الغرفة"]).toBe(`غرفة مزدوجة | الفئة: ديلوكس — Deluxe Sea View — ${BOARD_AR.BB}`);
+    expect(readRooms(saved).rooms["الغرفة"].hotel_room_name).toBe("Deluxe Sea View");
+  });
+});
+
 describe("«تفاصيل الغرفة» — after the hotel is confirmed", () => {
   it("is shown for a confirmed hotel only", () => {
     expect(roomDetailsOpen({ kind: "hotel", status: "pending" })).toBe(false);

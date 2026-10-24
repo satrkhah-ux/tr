@@ -16,6 +16,7 @@ import {
   deriveCityDates,
   deriveHotelStays,
   FREE_DAY_TITLE,
+  roomLabel,
   stayTotal,
   TRANSPORT_AIRPORT,
   TRANSPORT_HOTEL_PREFIX,
@@ -339,7 +340,7 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
       line.rooms.forEach((r, k) => {
         const board = r.board_type ? BOARD_AR[r.board_type] : "";
         const key = line.rooms.length > 1 ? `الغرفة ${k + 1}` : "الغرفة";
-        detail[key] = [r.room_type_name.trim() || "—", board].filter(Boolean).join(" — ");
+        detail[key] = [roomLabel(r) || "—", board].filter(Boolean).join(" — ");
         const spec = seededSpec(r);
         if (spec) specs[key] = spec;
       });

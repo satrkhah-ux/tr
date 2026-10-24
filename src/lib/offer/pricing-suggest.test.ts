@@ -314,6 +314,17 @@ describe("suggestPricing — the order of trust", () => {
     expect(hotel.source).toBe("remembered");
   });
 
+  it("remembers by the catalogue's room, never by the hotel's own name for it", () => {
+    const data = draftWithOneStay();
+    data.hotels[0] = withRooms(data.hotels[0], data.hotels[0].rooms.map((r) => ({ ...r, hotel_room_name: "Deluxe Sea View" })));
+    const rooms = [{ hotel_id: "h1", hotel_name: "", room_type_name: "استاندر", board_type: "BB", price: 500, currency: "SAR", per_night: true }];
+    const [hotel] = suggestPricing(data, { ...EMPTY, rooms }, LABELS);
+    expect(hotel.source).toBe("remembered");
+    expect(hotel.sell_price).toBe(500 * 2 * 3);
+    // a memory row written under a free name is no key
+    expect(findRoomPrice([{ ...rooms[0], room_type_name: "استاندر — Deluxe Sea View" }], "h1", "", "استاندر", "BB")).toBeNull();
+  });
+
   it("leaves the line unpriced, and says so, when nothing knows the answer", () => {
     const [hotel] = suggestPricing(draftWithOneStay(), EMPTY, LABELS);
     expect(hotel.sell_price).toBeNull();
