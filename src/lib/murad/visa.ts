@@ -280,7 +280,7 @@ export function visaAdviceText(i: { facts: VisaFacts; a: VisaAsk | null; countri
 }
 
 /** «أي دولة أسافر لها بدون فيزا؟» — a visa question though «بدون فيزا» reads as a service NOT wanted (auto.ts) */
-export const VISA_FREE_ASK = /(دول[ةه]|دول|بلد|وين|[اأ]ين).{0,30}(بدون|بلا|ما تحتاج|ماتحتاج|من غير|ما يحتاج) ?(ال)?(فيز|تاشير|تأشير)/u;
+export const VISA_FREE_ASK = /(دول[ةه]|دول|بلد|وين|[اأ]ين|وجهات)[^\n]{0,30}?(بدون|بلا|ما تحتاج|ماتحتاج|من غير|ما يحتاج) ?(ال)?(فيز|تاشير|تأشير)/u;
 const TRANSIT = /عبور|ترانزيت|ترانسيت|transit/iu;
 const GENERIC = new Set(["المملكة", "المتحدة", "العربية", "الولايات", "جمهورية", "الشعبية", "الجنوبية", "الشمالية"]);
 /** «أسهل تأشيرة», «اي دولة مش شرط», «بدون كشف حساب» — the model's advice missed it (2026-10-23) */

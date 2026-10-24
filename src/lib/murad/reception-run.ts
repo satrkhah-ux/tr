@@ -40,8 +40,10 @@ import { readVisa, visaFaqAnswer } from "./visa-read";
 import { repeatsMurad, SCHENGEN, VISA_FREE_ASK, visaFacts, visaFreeText, visaFlowNote, visaFlowText, visaStep, type VisaCountry, type VisaFacts, type VisaRow } from "./visa";
 import { readSettings, readThread } from "./run";
 import {
+  asksDestinations,
   clarifyText,
   decideReception,
+  destinationsText,
   DEPARTMENT,
   firstName,
   holdText,
@@ -376,6 +378,24 @@ async function visaList(service: SupabaseClient) {
   };
 }
 
+/**
+ * What we sell now, by name: the «عرض آلي» countries, then the ready offers the owner published and has not let
+ * expire (his sheet, «العروض الجاهزة»). A sheet row's problems are about its price or nights, not its country,
+ * so they do not take the country off a names-only list. Never prices here.
+ */
+async function sellingCountries(service: SupabaseClient, offers: OfferCountry[]): Promise<string[]> {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+  const { data } = await service.from("ready_offers").select("country, valid_to").eq("active", true).eq("published", true).eq("status", "ready").order("country");
+  const sheet = ((data ?? []) as { country: string | null; valid_to: string | null }[]).filter((o) => o.country?.trim() && (!o.valid_to || o.valid_to >= today)).map((o) => o.country!.trim());
+  const seen = new Set<string>();
+  return [...offers.filter((o) => o.enabled).map((o) => o.country.trim()), ...sheet].filter((name) => {
+    const key = fold(name);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 /** Murad answered first in this visit — «العملاء» and visa-routing.ts read it (a receipt from this visit is kept). */
 async function visaReceipt(service: SupabaseClient, conversationId: number, closedAt: number, startSec: number): Promise<void> {
   const { data } = await service.from("client_leads").select("id, murad_receipt").eq("teletel_conversation_id", conversationId).maybeSingle();
@@ -527,6 +547,8 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     }
     const thisVisit = (sec: number) => sec >= visitStart - 1;
     const received = rows.filter((r) => r.mode === "reception" && thisVisit(Date.parse(r.created_at) / 1000));
+    // the client's first turn of the visit — the trial code's own row is not one (the salam is returned on it)
+    const firstTurn = !received.some((r) => !r.reason?.startsWith("admin:"));
     const ours = muradMessageIds(rows);
     // everything the client wrote while Murad waited, read as one («ابغى» … «تأشيرة» … «الى لندن»)
     const said = thread.messages.filter((t) => t.fromClient && !t.isPrivate && t.at >= since).map((t) => t.text).join("\n").trim() || m.content;
@@ -581,7 +603,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     /** a detail the package as priced cannot honour: said plainly, what was understood with it, and to packages */
     const handOff = async (c: OfferCountry, trip: OfferAsk, special: string): Promise<ReceptionOutcome> => {
       const summary = tripSummary(c.country, trip);
-      const text = `${request.salam && received.length === 0 ? "وعليكم السلام ورحمة الله، " : ""}طلبك فيه تفصيل خاص (${special})، سأحوّله لزميل يجهزه لك. سجّلت: ${summary}.${opensAt ? ` ويتواصل معك عند بداية الدوام الساعة ${sayTime(opensAt)}.` : ""}`;
+      const text = `${request.salam && firstTurn ? "وعليكم السلام ورحمة الله، " : ""}طلبك فيه تفصيل خاص (${special})، سأحوّله لزميل يجهزه لك. سجّلت: ${summary}.${opensAt ? ` ويتواصل معك عند بداية الدوام الساعة ${sayTime(opensAt)}.` : ""}`;
       const replyId = await sendTeletelMessage(m.conversationId, text);
       if (!replyId) {
         await finish({ reason: "send_failed", reply: text, error: "send_failed" });
@@ -678,7 +700,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
           await finish({ reason: "none:staff", error: "turn_changed" });
           return "none:staff";
         }
-        const salam = request.salam && received.length === 0;
+        const salam = request.salam && firstTurn;
         const start = visitLines.find((t) => t.fromClient)?.at ?? since;
         const schengen = facts.schengen ? list.rows.filter((v) => SCHENGEN.has(list.countries.find((c) => c.id === v.country_id)?.iso2 ?? "")).map((v) => v.country) : [];
         const step = visaStep({ a, facts, asked: asked.length > 0, asks: asked.filter((r) => r.reason === "visa:asked1").length, countries: list.countries, rows: list.rows, includePrice: settings.control.includePrice, schengen, clientText: flowText });
@@ -809,6 +831,27 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       routeAs = { ...request, kind: "بكج" };
     }
 
+    // «ما هي الوجهات لديكم؟» (the owner's test, 2026-10-24: asked twice, handed over twice): the countries we sell,
+    // once a visit, the visit left open like «لا تحتاج تأشيرة» — the next message names one (its own flow) or goes
+    // to packages
+    const listed = received.some((r) => r.reason === "destinations");
+    if (!done && free && !listed && !routeAs.country && (routeAs.kind === null || routeAs.kind === "بكج") && kindMode(settings.control, "بكج") === "handle" && asksDestinations(said)) {
+      const countries = await sellingCountries(service, offers);
+      const text = countries.length ? destinationsText({ countries, salam: request.salam && firstTurn }) : null;
+      if (text && !repeatsMurad(text, visitLines)) {
+        const replyId = await sendTeletelMessage(m.conversationId, text);
+        if (!replyId) {
+          await finish({ reason: "send_failed", reply: text, intake, error: "send_failed" });
+          return "send_failed";
+        }
+        await finish({ reason: "destinations", reply: text, reply_message_id: replyId, intake: { ...intake, countries } });
+        await markLead(service, m, { inquiry: "بكج", destination: null, route: DEPARTMENT["بكج"], at: new Date().toISOString(), waitSec, intakeOnly: true });
+        return "answered";
+      }
+    }
+    // after the list, a message that still names nothing is a travel request: packages, not «غير واضح»
+    if (listed && !routeAs.kind && !routeAs.wantsHuman) routeAs = { ...routeAs, kind: "بكج" };
+
     const decision = decideReception({
       routed: done,
       asked: received.some((r) => r.reason === "asked"),
@@ -919,8 +962,11 @@ export async function schedule(m: IncomingMessage): Promise<"waiting" | "extende
   const now = Date.now();
   // the first answer of a visit about thirty seconds, every later one about ten (the owner, 2026-10-22) —
   // the visit as receive() reads it: since Teletel last closed the conversation, never over 12 hours back
-  const visitStart = Math.max(now / 1000 - VISIT_SEC, lastClosedAt((await conversationEvents(m.conversationId)) ?? [], m.at || now / 1000));
-  const { count: answered } = await service.from("murad_log").select("id", { count: "exact", head: true }).eq("conversation_id", m.conversationId).eq("mode", "reception").not("reply_message_id", "is", null).gte("created_at", new Date(visitStart * 1000).toISOString());
+  // after the trial code (a management order), a new visit — receive() reads it so, and the first answer waits so
+  const { data: order } = await service.from("murad_log").select("created_at").eq("conversation_id", m.conversationId).eq("mode", "reception").like("reason", "admin:%").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const adminAt = order ? Date.parse((order as { created_at: string }).created_at) / 1000 : 0;
+  const visitStart = Math.max(now / 1000 - VISIT_SEC, lastClosedAt((await conversationEvents(m.conversationId)) ?? [], m.at || now / 1000), adminAt);
+  const { count: answered } = await service.from("murad_log").select("id", { count: "exact", head: true }).eq("conversation_id", m.conversationId).eq("mode", "reception").not("reply_message_id", "is", null).not("reason", "like", "admin:%").gte("created_at", new Date(visitStart * 1000).toISOString());
   const delay = answered ? FOLLOW_UP_DELAY : parseDelay(reception.delay);
   const had = waiting.get(m.conversationId);
   if (had) {
@@ -988,8 +1034,9 @@ export async function receptionSweep(): Promise<number> {
   const moved = await lateSweep(service, settings.control, list.rows.filter(inScope), nowSec);
   const fresh = list.rows.filter((c) => inScope(c) && c.waitingSince > 0 && nowSec - c.waitingSince < 1800);
   if (!fresh.length) return moved;
-  // where Murad's own five-minute answer runs (run.ts: murad_auto on the auto list) it answers the client's words — better than «وصلت رسالتك», and it comes next in this same run
-  const held = settings.control.tasks.holding && reception.scope === "all" ? await holdSweep(service, fresh.filter((c) => !(flags.murad_auto && settings.autoList.includes(intlPhone(c.phone) ?? ""))), nowSec, reception.hours) : 0;
+  // every conversation in scope, the test numbers too: run.ts never answers a turn the reception already claimed
+  // (core.ts `logged`), so leaving them to it left «لماذا يتم التحويل؟» unanswered (the owner's test, 2026-10-24)
+  const held = settings.control.tasks.holding && settings.clientWhatsapp !== "off" ? await holdSweep(service, fresh, nowSec, reception.hours) : 0;
   const { data } = await service
     .from("murad_log")
     .select("conversation_id")
@@ -1063,8 +1110,8 @@ const HOLD_AFTER_SEC = 300;
  * Murad says it arrived and who answers it (holdText), and a note mentions
  * that colleague so Teletel notifies them. Claimed in murad_log as the
  * client message's NEGATIVE id (its own id is the reception's turn already).
- * Not where run.ts answers the wait itself (the two test numbers while
- * murad_auto is on): there the client hears an answer to what they wrote.
+ * Every conversation in scope, the test numbers too (run.ts never answers a
+ * turn the reception claimed, so they were left with nothing — 2026-10-24).
  * ponytail: the colleague only; their supervisor too when the teams name one.
  */
 async function holdSweep(service: SupabaseClient, fresh: OpenConversation[], nowSec: number, hoursRaw: string | null): Promise<number> {
@@ -1084,7 +1131,11 @@ async function holdSweep(service: SupabaseClient, fresh: OpenConversation[], now
     const handedAt = Math.max(0, ...mine.filter((r) => r.reason?.startsWith("routed") || r.reason === "offer:sent" || r.reason === "offer:updated" || r.reason === "offer:handoff").map((r) => Date.parse(r.created_at) / 1000));
     // not handed over by Murad, or the client has waited since before (the hand-over was the answer)
     if (!handedAt || c.waitingSince < handedAt) continue;
-    if (mine.some((r) => r.reason === "hold" && Date.parse(r.created_at) / 1000 >= handedAt)) continue;
+    // a hand-over from an earlier visit: the trial code or Teletel's close since then started a new one, as receive() reads it
+    const trialAt = Math.max(0, ...mine.filter((r) => r.reason?.startsWith("admin:")).map((r) => Date.parse(r.created_at) / 1000));
+    if (handedAt < trialAt || handedAt < lastClosedAt((await conversationEvents(c.id)) ?? [], c.waitingSince)) continue;
+    // already told it arrived: the hold itself, or the out-of-hours «ack»
+    if (mine.some((r) => (r.reason === "hold" || r.reason === "ack") && Date.parse(r.created_at) / 1000 >= handedAt)) continue;
     const thread = await readThread(c.id);
     const last = [...(thread?.messages ?? [])].reverse().find((t) => t.fromClient && !t.isPrivate);
     if (!last) continue;

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  asksDestinations,
+  destinationsText,
   clarifyText,
   parseDelay,
   pickDelay,
@@ -100,6 +102,12 @@ describe("the department → team table", () => {
   it("visas to «قسم فيزا», every travel request to «قسم المبيعات» (not the follow-up team), the rest to «قسم الطلبات»", () => {
     expect(suggestRoutes(teams)).toEqual({ تأشيرات: 1, بكج: 38, طيران: 38, فنادق: 38, مواصلات: 38, موظف: 25, "غير واضح": 25, fallback: 25 });
   });
+  it("«قسم الطلبات», not «العلاقات العامه» listed before it (2026-10-24)", () => {
+    const account = [{ id: 40, name: "قسم العلاقات العامه" }, ...teams];
+    expect(suggestRoutes(account)["غير واضح"]).toBe(25);
+    expect(suggestRoutes([{ id: 40, name: "قسم العلاقات العامه" }])["غير واضح"]).toBeNull();
+    expect(suggestRoutes([{ id: 7, name: "الاستقبال العام" }])["موظف"]).toBe(7);
+  });
   it("a saved table wins; an unrouted kind goes to the fallback", () => {
     const routes = readRoutes(JSON.stringify({ تأشيرات: 1, fallback: 25 }), teams);
     expect(teamFor(routes, "تأشيرات")).toBe(1);
@@ -154,5 +162,29 @@ describe("destination-only travel requests", () => {
   it("does not mistake the departure country for a package request", () => {
     expect(readRequest("انا من الكويت", catalog).kind).toBeNull();
     expect(readRequest("تذاكر إلى فيتنام", catalog).kind).toBe("طيران");
+  });
+});
+
+describe("«ما هي الوجهات لديكم؟» (the owner's test, 2026-10-24)", () => {
+  it("is read in every way the owner and clients ask it", () => {
+    for (const q of ["ما هي الوجهات لديكم ؟", "ابغى أعرف الوجهات الي عندكم", "إيش الوجهات المتاحة", "وين تسافرون؟", "وش العروض اللي عندكم", "ايش عندكم من عروض", "ما هي الوجهة المتاحة", "وش البكجات المتوفرة", "وش عندكم؟", "السلام عليكم، وش عندكم", "ايش البكجات اللي عندكم"]) {
+      expect(asksDestinations(q), q).toBe(true);
+    }
+  });
+  it("is not a visa list question, a request, or a question about the hand-over", () => {
+    for (const q of [
+      "وش الدول اللي ما تحتاج فيزا", "ابي بكج تركيا", "لماذا يتم التحويل ؟", "تأشيرة بريطانيا", "كم سعر الفندق",
+      // a flight, a visa-free filter, another service (the review, 2026-10-24)
+      "وش الرحلات المتوفرة للرياض بكرة", "رحلاتكم لجدة كم سعرها", "الرحلات إلى أبها",
+      "وش عندكم بكجات بدون فيزا", "الوجهات بدون فيزا", "وش عندكم سيارات للايجار", "وش عندكم عمرة",
+      "سيارات للايجار وش عندكم؟", "عمرة وش عندكم؟", "البرامج اللي ارسلتوها لي امس", "العروض اللي ارسلتوها غالية",
+    ]) {
+      expect(asksDestinations(q), q).toBe(false);
+    }
+  });
+  it("lists the countries and asks the one question", () => {
+    const text = destinationsText({ countries: ["تركيا", "جورجيا"], salam: true });
+    expect(text.split("\n")).toEqual(["وعليكم السلام ورحمة الله، حياك الله، وجهاتنا الحالية في البكجات 🌍", "تركيا، جورجيا", "وإذا في بالك وجهة ثانية قل لي.", "أي وجهة تناسبك؟ ومتى ناوي تسافر وكم شخص؟"]);
+    expect(destinationsText({ countries: ["تركيا"], salam: false }).startsWith("حياك الله")).toBe(true);
   });
 });

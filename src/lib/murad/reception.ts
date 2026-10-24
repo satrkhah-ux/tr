@@ -15,6 +15,7 @@ import { classifyInquiry, type Place } from "@/lib/leads/auto";
 import { inferConversationDestination } from "@/lib/leads/destination";
 import { resolvePlace } from "@/lib/leads/places";
 import { fold } from "@/lib/leads/sheet";
+import { VISA_FREE_ASK } from "./visa";
 
 /** where a request goes: the five services, a client asking for a person, and one we could not read */
 export const ROUTE_KEYS = ["بكج", "تأشيرات", "طيران", "فنادق", "مواصلات", "موظف", "غير واضح"] as const;
@@ -168,6 +169,32 @@ export function holdText(i: { assignee: string | null; team: string | null; open
   return `وصلت رسالتك، ${who}${from} سيرد عليك ${i.opensAt ? `عند بداية الدوام الساعة ${sayTime(i.opensAt)}` : "خلال دقائق"}.`;
 }
 
+/**
+ * «ما هي الوجهات لديكم؟», «إيش الوجهات المتاحة», «وين تسافرون», «وش العروض اللي عندكم» — a client asking what we
+ * sell, not naming a service (the owner's test, 2026-10-24: asked twice, handed over twice without an answer).
+ * Read folded (no spaces, ا for أ, ه for ة); «وين بدون فيزا» is the visa list's question, not this one.
+ */
+const DESTINATIONS_ASK =
+  /(الوجهات|وجهاتكم|وجهات(متاح|متوفر)|الوجهه(المتاح|المتوفر)|(لوين|وين)(تسافرون|توديون)|الدول(الي|اللي)(عندكم|تسافرون|توديون)|(العروض|البكجات|البرامج)(الموجوده|المتوفره|المتاحه|الحاليه|(اللي|الي)(?=عندكم|لديكم)|عندكم|لديكم)|(عروضكم|بكجاتكم)|(ايش|وش|شو)عندكم(من)?(عروض|بكجات|برامج|وجهات|دول)|^(السلامعليكم(ورحمهالله(وبركاته)?)?|مرحبا|هلا)?[،,.!]*(ايش|وش|شو)عندكم[؟?!.]*$)/u;
+/** «بكجات بدون فيزا», «الوجهات اللي ما تحتاج تأشيرة» — the visa list's question, however it opens */
+const VISA_FREE_WORDS = /(بدون|بلا|منغير|ماتحتاج|مايحتاج)(ال)?(فيز|تاشير)/u;
+
+export function asksDestinations(text: string): boolean {
+  const own = withoutAd(text);
+  const folded = fold(own);
+  return !VISA_FREE_ASK.test(own) && !VISA_FREE_WORDS.test(folded) && DESTINATIONS_ASK.test(folded);
+}
+
+/** Our countries, and the one question that moves the visit on — no prices, no promise of a country not listed. */
+export function destinationsText(i: { countries: string[]; salam: boolean }): string {
+  return [
+    `${i.salam ? "وعليكم السلام ورحمة الله، " : ""}حياك الله، وجهاتنا الحالية في البكجات 🌍`,
+    i.countries.join("، "),
+    "وإذا في بالك وجهة ثانية قل لي.",
+    "أي وجهة تناسبك؟ ومتى ناوي تسافر وكم شخص؟",
+  ].join("\n");
+}
+
 /** The question when the first message names nothing — with the salam returned when it came with one. */
 export function clarifyText(salam: boolean): string {
   return salam ? `وعليكم السلام ورحمة الله، ${CLARIFY_QUESTION}` : CLARIFY_QUESTION;
@@ -207,7 +234,8 @@ export function teamFor(routes: Routes, to: RouteKey): number | null {
  */
 export function suggestRoutes(teams: { id: number; name: string }[]): Routes {
   const find = (re: RegExp) => teams.find((t) => re.test(fold(t.name)))?.id ?? null;
-  const general = find(/طلبات|عام|استقبال/);
+  // «قسم الطلبات» first: «العلاقات العامه» also holds «عام», and Teletel listed it before (2026-10-24, team 40)
+  const general = find(/طلبات/) ?? find(/استقبال/) ?? find(/^(?!.*علاقات).*عام/);
   const sales = find(/قسمالمبيعات|^المبيعات$|^مبيعات$/) ?? general;
   return {
     تأشيرات: find(/فيزا|تاشير/),
