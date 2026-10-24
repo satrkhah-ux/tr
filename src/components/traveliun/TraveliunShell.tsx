@@ -181,6 +181,10 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.externalTrips", href: "/confirmed-trips", perm: "offers.write" },
       // the offers by stage; the issued list and the supplier-PDF redesign live on /basic itself (the user, 2026-10-23)
       { labelKey: "nav.kanban", href: "/kanban-board" },
+      // their buttons sat on /basic's home, which «بكج جديد» now skips (the owner, 2026-10-25: «اعادة تصميم تذكرة
+      // الطيران، اعادة تصميم بكج مورد — لم تظهر في القائمة؟»); each follows its own switch (features.ts)
+      { labelKey: "nav.repackage", href: "/repackage", perm: "repackage.write" },
+      { labelKey: "nav.flightCard", href: "/repackage/flight-card", perm: "repackage.write" },
       { labelKey: "nav.legacyGenerator", href: "/package-generator", perm: "offers.write" },
     ],
   },
