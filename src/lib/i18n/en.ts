@@ -2075,6 +2075,7 @@ export const en = {
   // the menus' reorganisation (2026-10-17)
   "nav.legacyGenerator": "Package generator (legacy)",
   "nav.managementDecisions": "Management decisions",
+  "nav.finance": "Company finances",
   "nav.muradSettings": "Murad settings",
   "nav.developer": "Developer",
   "nav.sla": "SLA — response time",

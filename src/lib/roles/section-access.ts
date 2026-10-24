@@ -95,6 +95,8 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   // «المطوّر»: service switches and external links' health
   ["/murad-settings", ["settings.manage", "developer.access"]],
   ["/management-decisions", ["dashboard.admin", "developer.access"]],
+  // «الحسابات المالية»: the developer only — salaries and the partners' shares (the owner, 2026-10-25)
+  ["/finance", "developer.access"],
   ["/developer", "developer.access"],
   // «SLA»: the administration and the developer only (the owner, 2026-10-17);
   // a follow-up's own page (/followups) opens to its assignee too (data/sla.ts)

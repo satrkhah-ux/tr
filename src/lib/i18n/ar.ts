@@ -2073,6 +2073,7 @@ export const ar: Dictionary = {
   // the menus' reorganisation (2026-10-17)
   "nav.legacyGenerator": "مولد البكجات (القديم)",
   "nav.managementDecisions": "قرارات الإدارة",
+  "nav.finance": "الحسابات المالية",
   "nav.muradSettings": "إعدادات مُراد",
   "nav.developer": "المطوّر",
   "nav.sla": "SLA — سرعة الرد",

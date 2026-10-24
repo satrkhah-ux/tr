@@ -157,6 +157,8 @@ export type AuditAction =
   | "settings.updated"
   | "management.decision.created"
   | "management.decision.updated"
+  // «الحسابات المالية» saved (developer only; the figures stay out of the log)
+  | "finance.saved"
   | "catalog.imported"
   // «استعادة نسخة سابقة»: an older version's draft put back and issued as the next version
   | "offer.version_restored"

@@ -32,6 +32,7 @@ import {
   ClipboardCheck,
   Database,
   FileText,
+  Gavel,
   Languages,
   Loader2,
   LogOut,
@@ -247,7 +248,7 @@ export const navGroups: NavGroup[] = [
   // «SLA» — how long Teletel conversations wait, and «المتابعة» (dashboard.admin / developer.access, section-access.ts)
   { labelKey: "nav.sla", href: "/sla", icon: Timer },
   // «المطوّر» — the service switches and the external links' health (developer.access, section-access.ts)
-  { labelKey: "nav.managementDecisions", href: "/management-decisions", icon: Wrench },
+  { labelKey: "nav.managementDecisions", href: "/management-decisions", icon: Gavel },
   { labelKey: "nav.developer", href: "/developer", icon: Wrench },
 ];
 
@@ -384,6 +385,9 @@ function isGroupActive(pathname: string, group: NavGroup) {
 
 export function TraveliunShell({ title, focus = false, children }: TraveliunShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  // «الحسابات المالية» has no menu link: three clicks on «المطوّر»'s title open it (the owner, 2026-10-25); the page checks developer.access itself
+  const openFinance = (e: React.MouseEvent) => { if (e.detail === 3 && pathname.startsWith("/developer")) router.push("/finance"); };
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = usePinnedSidebar();
   const [panel, setPanel] = useState<"guide" | "calculator" | "view" | "settings" | "profile" | null>(null);
@@ -532,11 +536,11 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
           <Menu className="size-6" />
         </button>
         <div className="hidden min-w-[140px] shrink-0 lg:block">
-          <div className="truncate text-lg font-extrabold leading-tight text-[#003c3a]">{displayTitle}</div>
+          <div onClick={openFinance} className="truncate text-lg font-extrabold leading-tight text-[#003c3a] select-none">{displayTitle}</div>
           <div className="mt-0.5 text-[11.5px] font-semibold text-[#8aa29b]">{t("brand")}</div>
         </div>
         {/* phones: compact app-style title; the trial pill shows from lg up. */}
-        <div className="min-w-0 flex-1 truncate text-center text-[15px] font-extrabold text-[#003c3a] lg:hidden">
+        <div onClick={openFinance} className="min-w-0 flex-1 truncate text-center text-[15px] font-extrabold text-[#003c3a] select-none lg:hidden">
           {displayTitle}
         </div>
         <div className="mx-auto hidden min-w-0 max-w-[520px] shrink items-center gap-2 rounded-full border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2 text-[#a86a10] lg:flex">
