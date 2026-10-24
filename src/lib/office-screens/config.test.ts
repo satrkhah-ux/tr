@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayName, normalizeConfig, positionOf, riyadhDay, serviceLine, tickerText } from "./config";
+import { displayName, normalizeConfig, positionOf, riyadhDay, serviceLine, tickerText, walkInKind } from "./config";
 
 describe("«الشاشات» settings and words", () => {
   it("every screen exactly once in the hanging order, whatever was saved", () => {
@@ -27,6 +27,10 @@ describe("«الشاشات» settings and words", () => {
     expect(serviceLine("طيران", "تركيا")).toBe("طيران إلى تركيا");
     expect(serviceLine("تأشيرات", "بريطانيا")).toBe("تأشيرة إلى بريطانيا");
     expect(serviceLine("فنادق", "تركيا")).toBe("فندق في تركيا");
+    expect(walkInKind(["visas"])).toBe("تأشيرات");
+    expect(walkInKind(["flights_intl", "flights_domestic"])).toBe("طيران");
+    expect(walkInKind(["hotels", "visas"])).toBe("بكج");
+    expect(walkInKind([])).toBe("بكج");
   });
 
   it("the ticker: today's top countries by conversations, no counts; under three → yesterday's with its date", () => {

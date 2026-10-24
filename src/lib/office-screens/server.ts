@@ -175,10 +175,10 @@ export async function insertTestEvent(destination: string): Promise<boolean> {
   return !error;
 }
 
-/** «عميلنا محمد طلب بكج إلى جورجيا»: a client in the office, once per file; false when it was already shown or failed */
-export async function insertWalkInEvent(draftId: string, name: string, destination: string): Promise<boolean> {
+/** «عميلنا محمد طلب بكج إلى جورجيا»: a client in the office, once per file, as the service asked for; false when it was already shown or failed */
+export async function insertWalkInEvent(draftId: string, name: string, destination: string, kind: string): Promise<boolean> {
   const { data: at } = await db().rpc("office_screen_next_at");
-  const { error } = await db().from("office_screen_events").insert({ draft_id: draftId, name: displayName(name), kind: "بكج", destination, at: at ?? new Date().toISOString() });
+  const { error } = await db().from("office_screen_events").insert({ draft_id: draftId, name: displayName(name), kind, destination, at: at ?? new Date().toISOString() });
   cache.clear();
   return !error;
 }

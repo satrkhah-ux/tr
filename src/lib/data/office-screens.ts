@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/data/audit";
 import { AD_HEIGHT, AD_MAX_BYTES, AD_WIDTH, normalizeConfig, SCREENS_BUCKET, SCREENS_SETTING, type ScreensConfig } from "@/lib/office-screens/config";
 import { forgetScreens, insertTestEvent, insertWalkInEvent, readScreensConfig } from "@/lib/office-screens/server";
 import { getDraft } from "@/lib/data/drafts";
+import { walkInKind } from "@/lib/office-screens/config";
 
 /**
  * «الإدارة ← الشاشات» (the owner, 2026-10-19), settings.manage: how many screens
@@ -92,12 +93,13 @@ export async function sendScreensTest(destination: string): Promise<Result> {
 /**
  * «عميلنا محمد طلب بكج إلى جورجيا» (the user, 2026-10-25): the agent ticked «اعرض على شاشات
  * المكتب» on a file's first step and pressed «التالي». Any agent who can open the file; the
- * name and the country are read from the saved file, once per file.
+ * name and the country are read from the saved file, once per file; the service from the
+ * ticked «البرنامج يشمل» chips — one → that service, more → «بكج».
  */
-export async function announceWalkIn(draftId: string): Promise<Result> {
+export async function announceWalkIn(draftId: string, services: string[]): Promise<Result> {
   const draft = await getDraft(draftId);
   if (!draft) return { ok: false, error: "لا صلاحية" };
   const destination = (draft.data.trip.country || draft.data.trip.destination || "").trim().slice(0, 60);
   if (!destination) return { ok: false, error: "اختر الدولة" };
-  return (await insertWalkInEvent(draftId, draft.data.customer.customer_name, destination)) ? { ok: true } : { ok: false, error: "ظهر على الشاشات من قبل" };
+  return (await insertWalkInEvent(draftId, draft.data.customer.customer_name, destination, walkInKind(services))) ? { ok: true } : { ok: false, error: "ظهر على الشاشات من قبل" };
 }

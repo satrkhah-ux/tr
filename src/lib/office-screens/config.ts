@@ -58,7 +58,18 @@ export function serviceLine(kind: string, country: string): string {
   if (kind === "فنادق") return `فندق في ${country}`;
   if (kind === "طيران") return `طيران إلى ${country}`;
   if (kind === "تأشيرات") return `تأشيرة إلى ${country}`;
+  if (kind === "مواصلات") return `تنقلات في ${country}`;
+  if (kind === "جولات") return `جولات في ${country}`;
+  if (kind === "خدمات") return `خدمات في ${country}`;
   return `بكج إلى ${country}`;
+}
+
+const WALK_IN_KIND: Record<string, string> = { hotels: "فنادق", flights_intl: "طيران", flights_domestic: "طيران", transport: "مواصلات", tours: "جولات", services: "خدمات", visas: "تأشيرات" };
+
+/** a walk-in's kind from «البرنامج يشمل» (the user, 2026-10-25): one service → that service, more (or none) → «بكج» */
+export function walkInKind(services: string[]): string {
+  const kinds = [...new Set(services.map((k) => WALK_IN_KIND[k]).filter(Boolean))];
+  return kinds.length === 1 ? kinds[0] : "بكج";
 }
 
 const LRI = String.fromCharCode(0x2066);

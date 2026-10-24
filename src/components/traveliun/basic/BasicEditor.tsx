@@ -36,7 +36,7 @@ import { getTourPrices, getTourPrograms, getTransferCars } from "@/lib/data/tour
 import { autoTourPicks, withTours, type TourProgram } from "@/lib/offer/itinerary";
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
 import { announceWalkIn } from "@/lib/data/office-screens";
-import { displayName } from "@/lib/office-screens/config";
+import { displayName, serviceLine, walkInKind } from "@/lib/office-screens/config";
 import type { ProfitSettings } from "@/lib/data/app-settings";
 import {
   AGE_BANDS,
@@ -1101,6 +1101,12 @@ export function BasicEditor({
   const [reached, setReached] = useState<Section>(firstTodo);
   /** the walk-in alert: off · on (ticked) · sending · sent · or why it was not shown */
   const [walkIn, setWalkIn] = useState<string>("off");
+  // the services ticked in «البرنامج يشمل», as the chips show them — one → that service on the screens, more → «بكج»
+  const walkInServices = [
+    ...(Object.keys(scope) as (keyof DraftScope)[]).filter((k) => k !== "flights_domestic" && scope[k]),
+    ...(modes.includes("flight") ? ["flights_domestic"] : []),
+    ...(toursOn ? ["tours"] : []),
+  ];
   const shown = (s: Section) => steps.includes(s) && SECTION_ORDER.indexOf(s) <= SECTION_ORDER.indexOf(reached);
 
   function show(step: Section) {
@@ -1123,7 +1129,7 @@ export function BasicEditor({
     if (from === "client" && walkIn === "on") {
       setWalkIn("sending");
       void flush()
-        .then(() => announceWalkIn(draftId))
+        .then(() => announceWalkIn(draftId, walkInServices))
         .then((r) => setWalkIn(r.ok ? "sent" : r.error))
         .catch(() => setWalkIn("on"));
     }
@@ -1287,7 +1293,7 @@ export function BasicEditor({
                 onChange={(e) => setWalkIn(e.target.checked ? "on" : "off")}
               />
               <span className="min-w-0 flex-1">
-                اعرض على شاشات المكتب: «عميلنا{displayName(data.customer.customer_name) ? ` ${displayName(data.customer.customer_name)}` : ""} طلب بكج إلى {trip.country || trip.destination || "…"}»
+                اعرض على شاشات المكتب: «عميلنا{displayName(data.customer.customer_name) ? ` ${displayName(data.customer.customer_name)}` : ""} طلب {serviceLine(walkInKind(walkInServices), trip.country || trip.destination || "…")}»
               </span>
               {walkIn === "sent" ? <span className="text-[#0f7a52]">✓ ظهر على الشاشات</span> : walkIn === "sending" ? <span className="text-[#557d78]">…</span> : walkIn !== "on" && walkIn !== "off" ? <span className="text-[#a86a10]">{walkIn}</span> : null}
             </label>
