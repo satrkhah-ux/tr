@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { saveFinance } from "@/lib/data/finance";
 import { arCount } from "@/lib/eye/anomalies";
 import {
-  DEBT_KINDS, EVERY, MONTHS, breakEven, bookingProfit, bookingReserve, debtLeft, debtPaid, monthPlan, payrollByTeam, quarter, rentDue, sar, summary, treasury,
+  DEBT_KINDS, EVERY, MONTHS, breakEven, bookingProfit, bookingReserve, debtLeft, debtPaid, monthPlan, payrollByTeam, quarter, rentDue, sar, summary, treasury, treasuryIn, treasuryOut,
   type Booking, type Debt, type DebtKind, type Expense, type FinanceBook, type Partner, type Rent, type Staff,
 } from "@/lib/finance/model";
 
@@ -224,11 +224,10 @@ function ProfitsTab({ book, set }: Edit) {
   const shareSum = book.partners.reduce((a, p) => a + p.share, 0);
   const patchPartner = (id: string, p: Partial<Partner>) => set((b) => ({ ...b, partners: upd(b.partners, id, p) }));
   const patchBooking = (id: string, p: Partial<Booking>) => set((b) => ({ ...b, bookings: upd(b.bookings, id, p) }));
-  const patchExpense = (id: string, p: Partial<Expense>) => set((b) => ({ ...b, expenses: upd(b.expenses, id, p) }));
   const sellers = [...new Set(book.staff.map((s) => s.name).filter(Boolean))];
   const bookings = [...book.bookings].sort((a, b) => (a.date < b.date ? 1 : -1));
   const tiles: [string, string, string][] = [
-    ["خزينة الشركة", sar(treasury(book)), `${book.reservePct}% من صافي ربح كل حجز، تُسحب فوراً`],
+    ["خزينة الشركة", sar(treasury(book)), `دخلها ${sar(treasuryIn(book))} (${book.reservePct}% من صافي ربح كل حجز)، وسُحب منها ${sar(treasuryOut(book))}`],
     ["ربح الحجوزات المطلوب هذا الشهر", sar(breakEven(book, y, m)), "ليغطي المصاريف الثابتة بعد نصيب الخزينة"],
     [`القابل للتوزيع — الربع ${q} من ${y}`, sar(Math.max(0, cur.distributable)), cur.distributable < 0 ? `ينقص ${sar(-cur.distributable)} عن تغطية المصاريف` : "يُقسَّم على الشركاء آخر الربع"],
   ];
@@ -279,20 +278,29 @@ function ProfitsTab({ book, set }: Edit) {
       {!book.bookings.length && <p className="mt-2 text-sm text-[#5b6b66]">لا حجوزات بعد. سجّل كل حجز مباع بسعره وتكلفته، فيُحسب نصيب الخزينة والشركاء وحده.</p>}
     </section>
 
-    <section className={card}>
-      <div className="mb-1 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">مصاريف أخرى ({book.expenses.length})</h2>
-        <button onClick={() => set((b) => ({ ...b, expenses: [{ id: uid(), date: today(), title: "", amount: 0, note: "" }, ...b.expenses] }))} className="min-h-10 rounded-lg border border-[#185045] px-4 text-sm font-bold text-[#185045]">+ أضف مصروفاً</button></div>
-      <p className="mb-3 text-xs text-[#5b6b66]">كل مصروف غير الرواتب والإيجارات والأقساط: إعلانات، فواتير، رسوم حكومية، مستحقات نهاية خدمة… يُخصم في ربعه قبل قسمة الشركاء.</p>
-      <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-sm">
-        <thead><tr><th className={th}>التاريخ</th><th className={th}>البند</th><th className={th}>المبلغ</th><th className={th}>ملاحظة</th><th className={th} /></tr></thead>
-        <tbody>{[...book.expenses].sort((a, b) => (a.date < b.date ? 1 : -1)).map((x) => <tr key={x.id}>
-          <td className={td}><input aria-label="التاريخ" type="date" value={x.date} onChange={(e) => e.target.value && patchExpense(x.id, { date: e.target.value })} className={`${field} w-36`} /></td>
-          <td className={td}><input aria-label="البند" value={x.title} onChange={(e) => patchExpense(x.id, { title: e.target.value })} className={`${field} min-w-40`} /></td>
-          <td className={td}><input aria-label="المبلغ" type="number" min={0} inputMode="decimal" value={x.amount || ""} placeholder="0" onChange={(e) => patchExpense(x.id, { amount: num(e.target.value) })} className={`${field} w-28`} /></td>
-          <td className={td}><input aria-label="ملاحظة" value={x.note} onChange={(e) => patchExpense(x.id, { note: e.target.value })} className={field} /></td>
-          <td className={td}><button onClick={() => confirm(`حذف «${x.title || x.date}»؟`) && set((b) => ({ ...b, expenses: b.expenses.filter((k) => k.id !== x.id) }))} className="min-h-9 rounded-lg px-2 text-sm text-[#9a3412] hover:bg-[#fbf4f0]">حذف</button></td>
-        </tr>)}</tbody>
-      </table></div>
-    </section>
+    <MoneyLog title="مصاريف أخرى" items={book.expenses} onChange={(expenses) => set((b) => ({ ...b, expenses }))}
+      hint="كل مصروف غير الرواتب والإيجارات والأقساط: إعلانات، فواتير، رسوم حكومية، مستحقات نهاية خدمة… يُخصم في ربعه قبل قسمة الشركاء." add="+ أضف مصروفاً" />
+    <MoneyLog title="مسحوبات الخزينة" items={book.treasuryOut} onChange={(treasuryOut) => set((b) => ({ ...b, treasuryOut }))}
+      hint="ما يُصرف من الخزينة نفسها (سداد دين، طارئ…). لا يُخصم من أرباح الربع، بل من رصيد الخزينة فقط." add="+ أضف سحباً" />
   </div>;
+}
+
+/** a dated list of amounts: «مصاريف أخرى» and «مسحوبات الخزينة» */
+function MoneyLog({ title, hint, add, items, onChange }: { title: string; hint: string; add: string; items: Expense[]; onChange: (items: Expense[]) => void }) {
+  const patch = (id: string, p: Partial<Expense>) => onChange(upd(items, id, p));
+  return <section className={card}>
+    <div className="mb-1 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">{title} ({items.length})</h2>
+      <button onClick={() => onChange([{ id: uid(), date: today(), title: "", amount: 0, note: "" }, ...items])} className="min-h-10 rounded-lg border border-[#185045] px-4 text-sm font-bold text-[#185045]">{add}</button></div>
+    <p className="mb-3 text-xs text-[#5b6b66]">{hint}</p>
+    <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-sm">
+      <thead><tr><th className={th}>التاريخ</th><th className={th}>البند</th><th className={th}>المبلغ</th><th className={th}>ملاحظة</th><th className={th} /></tr></thead>
+      <tbody>{[...items].sort((a, b) => (a.date < b.date ? 1 : -1)).map((x) => <tr key={x.id}>
+        <td className={td}><input aria-label="التاريخ" type="date" value={x.date} onChange={(e) => e.target.value && patch(x.id, { date: e.target.value })} className={`${field} w-36`} /></td>
+        <td className={td}><input aria-label="البند" value={x.title} onChange={(e) => patch(x.id, { title: e.target.value })} className={`${field} min-w-40`} /></td>
+        <td className={td}><input aria-label="المبلغ" type="number" min={0} inputMode="decimal" value={x.amount || ""} placeholder="0" onChange={(e) => patch(x.id, { amount: num(e.target.value) })} className={`${field} w-28`} /></td>
+        <td className={td}><input aria-label="ملاحظة" value={x.note} onChange={(e) => patch(x.id, { note: e.target.value })} className={field} /></td>
+        <td className={td}><button onClick={() => confirm(`حذف «${x.title || x.date}»؟`) && onChange(items.filter((k) => k.id !== x.id))} className="min-h-9 rounded-lg px-2 text-sm text-[#9a3412] hover:bg-[#fbf4f0]">حذف</button></td>
+      </tr>)}</tbody>
+    </table></div>
+  </section>;
 }

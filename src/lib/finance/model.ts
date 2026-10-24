@@ -39,6 +39,8 @@ export type Expense = { id: string; date: string; title: string; amount: number;
 export type FinanceBook = {
   rents: Rent[]; staff: Staff[]; debts: Debt[];
   bookings: Booking[]; partners: Partner[]; expenses: Expense[];
+  /** what was taken OUT of the treasury (a debt paid from it…) — the balance is what came in minus these */
+  treasuryOut: Expense[];
   /** % of each booking's net profit that goes straight to the company treasury */
   reservePct: number;
   updatedAt: string;
@@ -128,7 +130,10 @@ export function quarter(book: FinanceBook, year: number, q: number): Quarter {
   return { year, q, bookings: inQ.length, profit, reserve, fixed, other, distributable,
     shares: book.partners.map((p) => ({ name: p.name, amount: distributable > 0 ? (distributable * p.share) / 100 : 0 })) };
 }
-export const treasury = (book: FinanceBook) => sum(book.bookings.map((b) => bookingReserve(b, book.reservePct)));
+export const treasuryIn = (book: FinanceBook) => sum(book.bookings.map((b) => bookingReserve(b, book.reservePct)));
+export const treasuryOut = (book: FinanceBook) => sum(book.treasuryOut.map((x) => x.amount));
+/** the treasury's balance today: every booking's share in, every withdrawal out (the owner, 2026-10-24: «خزينة الشركة 0 حاليا لانها سددت ديون سابقة») */
+export const treasury = (book: FinanceBook) => treasuryIn(book) - treasuryOut(book);
 /** the bookings' monthly net profit that covers this month's fixed costs after the treasury share */
 export const breakEven = (book: FinanceBook, y: number, m: number) => fixedCostIn(book, y, m) / (1 - book.reservePct / 100);
 
@@ -154,9 +159,9 @@ const isDebt = (d: unknown): d is Debt => rec(d) && id(d.id) && str(d.creditor) 
 export function parseBook(v: unknown): FinanceBook | null {
   if (!rec(v) || !list(v.rents, isRent) || !list(v.staff, isStaff) || !list(v.debts, isDebt) || !str(v.updatedAt, 40)) return null;
   // books saved before the profits tab carry no bookings, partners or treasury share
-  const bookings = v.bookings ?? [], partners = v.partners ?? [], expenses = v.expenses ?? [], reservePct = v.reservePct ?? 20;
-  if (!list(bookings, isBooking, 20000) || !list(partners, isPartner, 20) || !list(expenses, isExpense, 20000)
+  const bookings = v.bookings ?? [], partners = v.partners ?? [], expenses = v.expenses ?? [], reservePct = v.reservePct ?? 20, out = v.treasuryOut ?? [];
+  if (!list(bookings, isBooking, 20000) || !list(partners, isPartner, 20) || !list(expenses, isExpense, 20000) || !list(out, isExpense, 20000)
     || typeof reservePct !== "number" || reservePct < 0 || reservePct > 100) return null;
   // books saved before «يتوقف من» existed carry no stopFrom
-  return { rents: v.rents, staff: v.staff.map((s) => ({ ...s, stopFrom: s.stopFrom ?? "" })), debts: v.debts, bookings, partners, expenses, reservePct, updatedAt: v.updatedAt };
+  return { rents: v.rents, staff: v.staff.map((s) => ({ ...s, stopFrom: s.stopFrom ?? "" })), debts: v.debts, bookings, partners, expenses, treasuryOut: out, reservePct, updatedAt: v.updatedAt };
 }

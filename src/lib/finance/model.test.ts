@@ -4,6 +4,7 @@ import { breakEven, monthPlan, parseBook, payrollByTeam, quarter, rentDue, summa
 const book: FinanceBook = {
   updatedAt: "",
   reservePct: 20,
+  treasuryOut: [],
   expenses: [{ id: "x1", date: "2027-03-15", title: "إعلانات", amount: 3000, note: "" }],
   partners: [{ id: "n", name: "شريك أ", share: 50 }, { id: "a", name: "شريك ب", share: 30 }, { id: "k", name: "شريك ج", share: 20 }],
   bookings: [
@@ -42,6 +43,8 @@ describe("finance book", () => {
   });
   it("sends 20% of each booking's profit to the treasury, never of a loss", () => {
     expect(treasury(book)).toBe(2000 + 0 + 1600);
+    // what is taken out of the treasury comes off its balance
+    expect(treasury({ ...book, treasuryOut: [{ id: "o", date: "2026-10-24", title: "دين سابق", amount: 3600, note: "" }] })).toBe(0);
   });
   it("splits a quarter's profit after the treasury and all expenses, by share", () => {
     const q = quarter({ ...book, debts: [] }, 2027, 1);
@@ -58,7 +61,7 @@ describe("finance book", () => {
   it("reads a book saved before the profits tab", () => {
     const { bookings, partners, reservePct, expenses, ...old } = book;
     void bookings; void partners; void reservePct; void expenses;
-    expect(parseBook({ ...old, staff: old.staff.map(({ stopFrom, ...s }) => (void stopFrom, s)) })).toMatchObject({ bookings: [], partners: [], expenses: [], reservePct: 20 });
+    expect(parseBook({ ...old, staff: old.staff.map(({ stopFrom, ...s }) => (void stopFrom, s)) })).toMatchObject({ bookings: [], partners: [], expenses: [], treasuryOut: [], reservePct: 20 });
   });
   it("refuses a malformed book", () => {
     expect(parseBook(book)).not.toBeNull();
