@@ -355,7 +355,8 @@ export function BasicCityCard({
         onDragFrom(null);
       }}
       className={`scroll-mt-20 overflow-hidden rounded-[14px] border bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)] ${
-        target ? "border-dashed border-[#2aa87a]" : moved ? "border-[#f1b5b5]" : "border-[#d8e6e0]"
+        // an open card — the one being worked on — framed in the brand's green; a folded one stays quiet
+        target ? "border-dashed border-[#2aa87a]" : moved ? "border-[#f1b5b5]" : !collapsed && body ? "border-[#2aa87a] ring-1 ring-[#2aa87a]/40" : "border-[#d8e6e0]"
       } ${over ? "border-t-4 border-t-[#2aa87a] shadow-[0_-6px_0_rgba(42,168,122,0.15)]" : ""} ${dragFrom === index ? "opacity-50" : ""}`}
     >
       {/* the city, its dates — and here its nights, order and removal, or there its tabs — one line */}

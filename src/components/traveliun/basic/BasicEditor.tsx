@@ -208,11 +208,21 @@ function Fold({
   children: ReactNode;
 }) {
   const tx = useBasicLabels();
+  // the section being edited stands out in the brand's dark green — the agent sees at once where they are
+  // working (the owner, 2026-10-24: «المكان الذي ادخل فيه وابدأ التعديلات يتميز بلون … أخضر غامق»)
   if (open)
     return (
-      <section id={id} className={`${basicCard} scroll-mt-20`}>
-        <h2 className="mb-2.5 text-[14px] font-extrabold text-[#003c3a]">{title}</h2>
-        {children}
+      <section
+        id={id}
+        aria-current="step"
+        className="scroll-mt-20 overflow-hidden rounded-[14px] border-2 border-[#185045] bg-white shadow-[0_8px_24px_rgba(24,80,69,0.16)] dark:bg-[#10201c]"
+      >
+        <header className="flex items-center gap-2 bg-[#185045] px-3.5 py-2.5 text-white">
+          <Pencil className="size-4 shrink-0" aria-hidden />
+          <h2 className="text-[14px] font-extrabold">{title}</h2>
+          <span className="ms-auto rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-bold">{tx("editingHere")}</span>
+        </header>
+        <div className="p-3">{children}</div>
       </section>
     );
   return (
