@@ -1580,7 +1580,7 @@ export const en = {
   "pg.warn.noFlights": "No flights added.",
   "pg.warn.noServices": "No included services.",
   "pg.warn.dayOneLateArrival": "The flight lands at night — day one is a transfer day; review the tours written on it.",
-  "pg.warn.stayPriceLow": "A hotel stay is priced under 50 — the room price is for the whole stay; check it was not cut short while typing.",
+  "pg.warn.stayPriceLow": "A whole hotel stay comes to under 50 — check the price was not cut short while typing.",
   "pg.warn.tourNoCar": "A tour has no car — choose one for it, or the trip's tours car.",
   "pg.warn.noPricing": "No pricing items.",
   // customer stage

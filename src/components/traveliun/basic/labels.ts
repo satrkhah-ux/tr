@@ -114,8 +114,9 @@ const AR = {
   hotel: "الفندق",
   roomType: "نوع الغرفة",
   board: "الوجبة",
-  stayPrice: "إجمالي {n} للغرفة",
-  perNightIs: "الليلة: {price}",
+  nightPrice: "سعر الليلة للغرفة",
+  night: "الليلة",
+  nightsTimes: "× {n} = {total}",
   currency: "العملة",
   moreInfo: "معلومات إضافية",
   otherCurrency: "أخرى…",
@@ -494,8 +495,9 @@ const EN: Record<keyof typeof AR, string> = {
   hotel: "Hotel",
   roomType: "Room type",
   board: "Board",
-  stayPrice: "Total for {n}, per room",
-  perNightIs: "Per night: {price}",
+  nightPrice: "Per night, per room",
+  night: "Per night",
+  nightsTimes: "× {n} = {total}",
   currency: "Currency",
   moreInfo: "More details",
   otherCurrency: "Other…",
@@ -773,6 +775,12 @@ export type BasicLabel = keyof typeof AR;
 export function nightsText(n: number, language: string): string {
   if (language !== "ar") return `${n} night${n === 1 ? "" : "s"}`;
   return n === 1 ? "ليلة واحدة" : n === 2 ? "ليلتين" : n <= 10 ? `${n} ليالٍ` : `${n} ليلة`;
+}
+
+/** «غرفتين»، «3 غرف»، «11 غرفة» — as nightsText. */
+export function roomsText(n: number, language: string): string {
+  if (language !== "ar") return `${n} room${n === 1 ? "" : "s"}`;
+  return n === 1 ? "غرفة واحدة" : n === 2 ? "غرفتين" : n <= 10 ? `${n} غرف` : `${n} غرفة`;
 }
 
 export function useBasicLabels() {

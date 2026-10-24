@@ -682,6 +682,32 @@ export function stayTotal(line: Pick<DraftHotel, "rooms" | "manual_price">): num
   return null;
 }
 
+/**
+ * What a stay's price is typed as: the NIGHT's rate, of one room while its
+ * rooms cost the same — one night of them all when they do not (Order 5,
+ * 2026-10-24: the sheet said «× 1» and 320 for two nights). The figure stored
+ * stays the whole stay's, so keepNightlyRates, the sheet's totals and every
+ * document read what they always read; only the fields divide and multiply.
+ */
+export function stayUnits(line: Pick<DraftHotel, "rooms">, nights: number): { rooms: number; nights: number } {
+  const first = line.rooms[0]?.price ?? null;
+  return { rooms: line.rooms.every((r) => r.price === first) ? Math.max(line.rooms.length, 1) : 1, nights: Math.max(nights, 1) };
+}
+
+/** A stored total as the rate typed (to the cent) — and back. */
+export const perUnit = (total: number | null, units: number) => (total == null ? null : Math.round((total / Math.max(units, 1)) * 100) / 100);
+export const fromUnit = (rate: number | null, units: number) => (rate == null ? null : Math.round(rate * Math.max(units, 1) * 100) / 100);
+
+/** A stay's line on the pricing sheet, as typed (stayUnits); null for any other line, or one already × a count. */
+export function sheetStayUnits(
+  data: Pick<DraftData, "cities" | "hotels">,
+  item: Pick<DraftPricingItem, "item_type" | "ref" | "quantity">,
+): { rooms: number; nights: number } | null {
+  if (item.item_type !== "hotel" || item.quantity !== 1) return null;
+  const stay = deriveHotelStays(data.cities, data.hotels).find((s) => pricingRefFor(s) === item.ref);
+  return stay ? stayUnits(stay.line, stay.nights) : null;
+}
+
 /** One hotel line per city (aligned by city_name). Prices live in the pricing stage. */
 export type DraftHotel = {
   /**

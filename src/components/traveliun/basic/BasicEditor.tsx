@@ -42,6 +42,7 @@ import {
   clampAge,
   currencyOptions,
   findLookupCountry,
+  fromUnit,
   hopKey,
   hopMode,
   inheritBoard,
@@ -50,9 +51,11 @@ import {
   MEAL_PLAN_LABEL_KEYS,
   MEAL_PLANS,
   moveTripCountry,
+  perUnit,
   resizeAges,
   resizeRooms,
   SCOPE_LABEL_KEYS,
+  sheetStayUnits,
   stageHref,
   STAGES,
   stayTotal,
@@ -126,7 +129,7 @@ import { BasicFlightPlan } from "./BasicFlightPlan";
 import { BasicFileStatus } from "./BasicFileStatus";
 import { BasicPhoneLookup } from "./BasicPhoneLookup";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
-import { nightsText, useBasicLabels, type BasicLabel } from "./labels";
+import { nightsText, roomsText, useBasicLabels, type BasicLabel } from "./labels";
 import { basicCard, basicField, basicLabel, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
 import { BasicEdges } from "./BasicEdges";
@@ -1671,20 +1674,24 @@ export function BasicEditor({
                     </button>
                     {isOpen ? (
                     <div className="divide-y divide-[#f0f5f3] px-3">
-                      {g.rows.map(({ item, i }) => (
+                      {g.rows.map(({ item, i }) => {
+                        // a stay is typed a night (and a room) and kept as its whole stay: «× غرفتين × 3 ليالٍ = …»
+                        const per = sheetStayUnits(data, item);
+                        const units = per ? per.rooms * per.nights : 1;
+                        return (
                         <div key={i} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 py-1.5 sm:grid-cols-[1fr_52px_8rem_5.5rem]">
                           <span className="min-w-0 truncate text-[12px] font-bold text-[#185045]" title={item.description}>
                             {item.description}
                           </span>
-                          <span className="tv-tnum hidden text-center text-[11px] font-bold text-[#7a948f] sm:block">× {item.quantity}</span>
+                          <span className="tv-tnum hidden text-center text-[11px] font-bold text-[#7a948f] sm:block">{per ? tx("night") : `× ${item.quantity}`}</span>
                           <input
                             type="number"
                             min={0}
                             dir="ltr"
-                            aria-label={tx("sell")}
-                            value={item.sell_price ?? ""}
+                            aria-label={per ? tx("night") : tx("sell")}
+                            value={(per ? perUnit(item.sell_price, units) : item.sell_price) ?? ""}
                             placeholder="—"
-                            onChange={(e) => setItem(i, { sell_price: typedNumber(e.target) })}
+                            onChange={(e) => setItem(i, { sell_price: per ? fromUnit(typedNumber(e.target), units) : typedNumber(e.target) })}
                             className={`${basicField} tv-tnum text-center ${item.sell_price == null ? "border-[#f0b4c2] bg-[#fff5f7]" : ""}`}
                           />
                           <select value={item.sell_currency || display} onChange={(e) => setItem(i, { sell_currency: e.target.value })} className={`${basicField} px-1.5`}>
@@ -1692,11 +1699,20 @@ export function BasicEditor({
                               <option key={c} value={c}>{c}</option>
                             ))}
                           </select>
+                          {per ? (
+                            <p className="tv-tnum col-span-full text-[11px] font-bold text-[#0f7a52]">
+                              {tx("nightsTimes", {
+                                n: [per.rooms > 1 ? roomsText(per.rooms, language) : "", nightsText(per.nights, language)].filter(Boolean).join(" × "),
+                                total: item.sell_price == null ? "—" : `${item.sell_price.toLocaleString("en-US")} ${item.sell_currency || display}`,
+                              })}
+                            </p>
+                          ) : null}
                           {fareNote && item.ref === fareNote ? (
                             <p className="col-span-full text-[11px] font-semibold text-[#557d78]">{t("pg.fare.toTotal")}</p>
                           ) : null}
                         </div>
-                      ))}
+                        );
+                      })}
                       <div className="flex items-center justify-end gap-2 py-2">
                         {bad ? <span className="text-[11px] font-bold text-[#c22850]">{tx("priceMissing", { n: g.missing })}</span> : null}
                         {savedGroup === g.key && saveState !== "saving" && saveState !== "error" ? (

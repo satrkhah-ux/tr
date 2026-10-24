@@ -33,6 +33,16 @@ describe("«١. الفنادق» (2026-10-18)", () => {
     expect(html).toContain("غرفة مزدوجة");
   });
 
+  it("shows a stay's price as the room's night — «× 3 ليالٍ = 900» — not its total (Order 5)", () => {
+    const data = file();
+    data.hotels = data.hotels.map((h, i) => (i === 0 ? { ...h, hotel_name: "فندق البسفور", rooms: h.rooms.map((r) => ({ ...r, board_type: "BB", price: 900 })) } : h));
+    const html = render(data);
+    expect(html).toContain("سعر الليلة للغرفة");
+    expect(html).toContain('value="300"');
+    expect(html).not.toContain('value="900"');
+    expect(html).toContain("× 3 ليالٍ = 900 SAR");
+  });
+
   it("folds to one line a stay once every hotel is complete", () => {
     const data = file();
     data.hotels = data.hotels.map((h, i) => ({ ...h, hotel_name: i === 0 ? "فندق البسفور" : "فندق طرابزون", rooms: h.rooms.map((r) => ({ ...r, board_type: "BB", price: 900 })) }));

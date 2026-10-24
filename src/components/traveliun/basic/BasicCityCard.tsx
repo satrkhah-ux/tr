@@ -30,6 +30,8 @@ import {
   deriveHotelStays,
   emptyRoomSpec,
   findLookupCountry,
+  fromUnit,
+  perUnit,
   tourCars,
   withRooms,
   type CityService,
@@ -76,7 +78,6 @@ import { nightsText, useBasicLabels } from "./labels";
 import { CarCountSelect, CarOptions, ServiceKindSelect, TourRow, type TourCatalog } from "../tours/TourRow";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
-const money = (n: number) => Math.round(n * 100) / 100;
 const DAY = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
 const SHORT = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "long", timeZone: "UTC" });
 /** «20 أكتوبر – 24 أكتوبر» */
@@ -591,22 +592,23 @@ export function HotelPanel({
   const setRoom = (line: DraftHotel, j: number, slice: Partial<DraftRoomSpec>) =>
     withRooms({ ...line, sourcing: null }, line.rooms.map((r, k) => (k === j ? { ...r, ...slice } : r)));
 
-  const priceField = (value: number | null, nights: number, currency: string, onValue: (v: number | null) => void, label: string) => (
+  // the room's NIGHT is typed; the stay's total is what is kept (stayUnits) — and the nights it is for
+  const priceField = (value: number | null, nights: number, currency: string, onValue: (v: number | null) => void) => (
     <span className="grid gap-0.5">
       <input
         type="number"
         min={0}
         dir="ltr"
-        aria-label={label}
-        title={label}
-        value={value ?? ""}
+        aria-label={tx("nightPrice")}
+        title={tx("nightPrice")}
+        value={perUnit(value, nights) ?? ""}
         placeholder={tx("price")}
-        onChange={(e) => onValue(typedNumber(e.target))}
+        onChange={(e) => onValue(fromUnit(typedNumber(e.target), nights))}
         className={`${basicField} tv-tnum text-center`}
       />
       {value != null ? (
         <span className="tv-tnum text-[10px] font-bold text-[#0f7a52]">
-          {tx("perNightIs", { price: `${money(value / nights).toLocaleString("en-US")} ${currency}` })}
+          {tx("nightsTimes", { n: nightsText(nights, language), total: `${value.toLocaleString("en-US")} ${currency}` })}
         </span>
       ) : null}
     </span>
@@ -618,7 +620,7 @@ export function HotelPanel({
         <span>{tx("hotel")}</span>
         <span>{tx("roomType")}</span>
         <span>{tx("board")}</span>
-        <span>{tx("stayPrice", { n: nightsText(mainNights, language) })}</span>
+        <span>{tx("nightPrice")}</span>
         <span />
       </div>
 
@@ -626,7 +628,6 @@ export function HotelPanel({
       {lines.map((line, i) => {
         const stay = stays[i];
         const nights = Math.max(stay?.nights ?? city.nights, 1);
-        const priceTitle = tx("stayPrice", { n: nightsText(nights, language) });
         // a hotel the list does not hold (an older file) still shows its name
         const outside = line.hotel_name && !hotels.some((h) => h.id === line.hotel_id) ? (line.hotel_id ?? "__current") : null;
         return (
@@ -710,7 +711,7 @@ export function HotelPanel({
                       <option key={b} value={b}>{t(BOARD_LABEL_KEYS[b])}</option>
                     ))}
                   </select>
-                  {priceField(r.price, nights, line.manual_currency, (price) => onLines([setRoom(line, j, { price })]), priceTitle)}
+                  {priceField(r.price, nights, line.manual_currency, (price) => onLines([{ ...setRoom(line, j, { price }), priced_nights: nights }]))}
                   {line.rooms.length > 1 ? (
                     <button
                       type="button"
