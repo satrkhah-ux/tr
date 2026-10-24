@@ -1150,7 +1150,7 @@ function ServicesPanel({
   onSlice: (slice: Partial<DraftData>) => void;
 }) {
   const tx = useBasicLabels();
-  const { t } = useTraveliunUI();
+  const { t, language } = useTraveliunUI();
   const plan = data.transport_plan;
   const tripCar = plan.tours.car_type;
   const cols = showPrice ? SVC_COLS : SVC_COLS_NO_PRICE;
@@ -1289,6 +1289,14 @@ function ServicesPanel({
 
   return (
     <div className="space-y-1.5">
+      {/* first, where the group sleeps on this visit and for how many nights — clear and dark (the owner, 2026-10-24) */}
+      {hotels.length > 0 ? (
+        <p className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[#cfe0d9] bg-[#f4f9f7] px-3 py-2 text-[13.5px] font-extrabold text-[#0f3d38]">
+          <BedDouble className="size-4 shrink-0 text-[#185045]" aria-hidden />
+          <span>{tx("hotelIs", { hotel: hotels.join(" + ") })}</span>
+          <span className="tv-tnum rounded-full bg-[#185045] px-2.5 py-0.5 text-[11.5px] font-bold text-white">{nightsText(city.nights, language)}</span>
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-end gap-2">
         {toursOn ? (
           <>
@@ -1334,13 +1342,6 @@ function ServicesPanel({
             .join(" · ")}
         </span>
       </div>
-      {/* under it, where the group sleeps on this visit */}
-      {hotels.length > 0 ? (
-        <p className="flex items-center gap-1.5 text-[11.5px] font-bold text-[#557d78]">
-          <BedDouble className="size-3.5 text-[#185045]" />
-          {tx("hotelIs", { hotel: hotels.join(" + ") })}
-        </p>
-      ) : null}
 
       <div className={`${head} ${cols} gap-2`}>
         <span>{t("pg.tour.date")}</span>
