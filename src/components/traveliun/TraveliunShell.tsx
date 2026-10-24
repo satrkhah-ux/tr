@@ -35,6 +35,7 @@ import {
   Gavel,
   Languages,
   Loader2,
+  Lock,
   LogOut,
   Menu,
   NotebookText,
@@ -386,6 +387,8 @@ function isGroupActive(pathname: string, group: NavGroup) {
 /** module scope, not state: the first click navigates to /developer and remounts the shell, the count must survive it.
  * Counted by hand, not e.detail — a phone's taps never reach detail 3. */
 let developerClicks: number[] = [];
+/** «المطوّر» and its tabs: where the lock shows */
+const DEVELOPER_PAGES = ["/developer", "/settings/integrations"];
 function countDeveloperClick(): boolean {
   const now = Date.now();
   developerClicks = [...developerClicks.filter((t) => now - t < 1500), now];
@@ -397,14 +400,14 @@ function countDeveloperClick(): boolean {
 export function TraveliunShell({ title, focus = false, children }: TraveliunShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  // «الحسابات المالية» has no menu link: three clicks on «المطوّر» — its menu item, or the title on its page — open it
-  // (the owner, 2026-10-25); the page checks developer.access itself
+  // «الحسابات المالية» has no menu link: three clicks on the lock at the top of «المطوّر»'s pages, or on its menu item,
+  // open it (the owner, 2026-10-24: «بالاعلى ضع زر قفل نضغط عليه 3 مرات»); the page checks developer.access itself
   const openFinance = (e: React.MouseEvent) => {
     if (!countDeveloperClick()) return;
     e.preventDefault();
     router.push("/finance");
   };
-  const onTitleClick = (e: React.MouseEvent) => { if (pathname.startsWith("/developer")) openFinance(e); };
+  const onDeveloperPage = DEVELOPER_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = usePinnedSidebar();
   const [panel, setPanel] = useState<"guide" | "calculator" | "view" | "settings" | "profile" | null>(null);
@@ -553,13 +556,18 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
           <Menu className="size-6" />
         </button>
         <div className="hidden min-w-[140px] shrink-0 lg:block">
-          <div onClick={onTitleClick} className="truncate text-lg font-extrabold leading-tight text-[#003c3a] select-none">{displayTitle}</div>
+          <div className="truncate text-lg font-extrabold leading-tight text-[#003c3a]">{displayTitle}</div>
           <div className="mt-0.5 text-[11.5px] font-semibold text-[#8aa29b]">{t("brand")}</div>
         </div>
         {/* phones: compact app-style title; the trial pill shows from lg up. */}
-        <div onClick={onTitleClick} className="min-w-0 flex-1 truncate text-center text-[15px] font-extrabold text-[#003c3a] select-none lg:hidden">
+        <div className="min-w-0 flex-1 truncate text-center text-[15px] font-extrabold text-[#003c3a] lg:hidden">
           {displayTitle}
         </div>
+        {onDeveloperPage ? (
+          <button type="button" onClick={openFinance} aria-label="قفل" className="flex size-9 shrink-0 touch-manipulation select-none items-center justify-center rounded-md text-[#557d78] hover:bg-[#eef4f1]">
+            <Lock className="size-5" />
+          </button>
+        ) : null}
         <div className="mx-auto hidden min-w-0 max-w-[520px] shrink items-center gap-2 rounded-full border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2 text-[#a86a10] lg:flex">
           <AlertTriangle className="size-4 shrink-0" />
           <span className="truncate text-[12.5px] font-bold leading-tight">{t("notice.trial")}</span>
