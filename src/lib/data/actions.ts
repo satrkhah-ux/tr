@@ -302,13 +302,30 @@ async function hotelWrite(
   return { ...values, country_id: (data as { country_id: string | null }).country_id };
 }
 
+/**
+ * A visa's country: picked, and its name written from the pick. Murad opens the
+ * client's answer with `country` («تأشيرة فرنسا») and matches on it, so a copy of
+ * France switched to Spain must not go on saying France.
+ */
+async function visaWrite(
+  supabase: SupabaseClient<Database>,
+  values: DataRow,
+  creating: boolean,
+): Promise<DataRow | TranslationKey> {
+  if (!("country_id" in values)) return creating ? "data.visas.err.country" : values;
+  if (!values.country_id) return "data.visas.err.country";
+  const { data } = await supabase.from("countries").select("arabic_name").eq("id", String(values.country_id)).maybeSingle();
+  if (!data) return "data.visas.err.country";
+  return { ...values, country: (data as { arabic_name: string }).arabic_name };
+}
+
 export async function createRow(table: AllowedTable, values: DataRow): Promise<MutateResult> {
   try {
     const granted = await writeAccess(table);
     if (typeof granted === "string") return { ok: false, error: granted };
     const { supabase, columns, internal } = granted;
-    if (table === "hotels") {
-      const checked = await hotelWrite(supabase, values, true);
+    if (table === "hotels" || table === "visas") {
+      const checked = await (table === "hotels" ? hotelWrite : visaWrite)(supabase, values, true);
       if (typeof checked === "string") return { ok: false, error: checked };
       values = checked;
     }
@@ -354,8 +371,8 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
       else if (await currentCan("offers.write")) writer = createSupabaseServiceClient();
       else return { ok: false, error: "err.forbidden" };
     }
-    if (table === "hotels") {
-      const checked = await hotelWrite(supabase, values, false);
+    if (table === "hotels" || table === "visas") {
+      const checked = await (table === "hotels" ? hotelWrite : visaWrite)(supabase, values, false);
       if (typeof checked === "string") return { ok: false, error: checked };
       values = checked;
     }

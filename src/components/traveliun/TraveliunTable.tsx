@@ -1,8 +1,8 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -33,6 +33,7 @@ import {
 } from "@/lib/data/actions";
 import { qualityIssue } from "@/lib/data/quality";
 import { BOOLEAN_KEYS, coerceCell, refId } from "@/lib/data/table-csv";
+import { runsOn, splitNumbered } from "@/lib/data/numbered-lines";
 import { DATA_TABLES } from "@/lib/data/table-config";
 import { hotelRuleError } from "@/lib/catalog/hotel-rules";
 import { normAr } from "@/lib/catalog/norm";
@@ -76,13 +77,17 @@ export function TraveliunTable({
   config,
   filterOptions,
   initialSearch = "",
+  extra,
 }: {
   config: TableConfig;
   filterOptions: FilterOptions;
   /** «/hotels?q=…» — a link from «يوجد فندق مشابه» opens the table on that hotel. */
   initialSearch?: string;
+  /** drawn by the page above the filters (/visas: «مراجعة القائمة»), and drawn again after every change */
+  extra?: ReactNode;
 }) {
   const { view, t } = useTraveliunUI();
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSizeState] = useState(25);
   // a link's search and filters (?q=…&country_id=…, from «ابحث عن دولة أو خدمة») open the page on them
@@ -216,7 +221,9 @@ export function TraveliunTable({
 
   function refresh() {
     setError(null);
-    setReload((n) => n + 1);
+    // with a page-drawn panel the server render is redone, and its new config reloads the rows once
+    if (extra) router.refresh();
+    else setReload((n) => n + 1);
   }
 
   // debounce the search box
@@ -308,6 +315,8 @@ export function TraveliunTable({
             </div>
           </div>
         ) : null}
+
+        {extra}
 
         {hasFilters ? (
           <FilterBar
@@ -481,7 +490,7 @@ export function TraveliunTable({
                           </td>
                           {config.columns.map((column) => (
                             <td key={column.key} className="px-[14px] py-[17px] align-middle leading-6">
-                              <Cell column={column} row={row} />
+                              <Cell column={column} row={row} clamp />
                             </td>
                           ))}
                         </tr>
@@ -553,7 +562,7 @@ export function TraveliunTable({
           onCopy={() => onDuplicate(viewing)}
           onDelete={manage ? () => onDelete(viewing) : undefined}
           onMerge={merges ? () => { setMerging([viewing]); setViewing(null); } : undefined}
-          onStatus={isHotels ? (status) => onStatus(viewing, status) : undefined}
+          onStatus={isHotels || config.table === "visas" ? (status) => onStatus(viewing, status) : undefined}
         />
       ) : null}
 
@@ -625,12 +634,19 @@ function CardsView({
             </button>
           </div>
           <dl className="grid gap-1.5">
-            {rest.map((column) => (
-              <div key={column.key} className="flex items-start justify-between gap-3 text-[13px]">
-                <dt className="shrink-0 font-semibold text-[#93aaa3]">{t(column.labelKey)}</dt>
-                <dd className="min-w-0 text-end font-medium text-[#0f3d38]"><Cell column={column} row={row} /></dd>
-              </div>
-            ))}
+            {rest.map((column) =>
+              column.multiline ? (
+                <div key={column.key} className="mt-1 grid gap-1 border-t border-[#eef4f1] pt-2 text-[13px]">
+                  <dt className="font-semibold text-[#93aaa3]">{t(column.labelKey)}</dt>
+                  <dd className="min-w-0 font-medium text-[#0f3d38]"><Cell column={column} row={row} clamp /></dd>
+                </div>
+              ) : (
+                <div key={column.key} className="flex items-start justify-between gap-3 text-[13px]">
+                  <dt className="shrink-0 font-semibold text-[#93aaa3]">{t(column.labelKey)}</dt>
+                  <dd className="min-w-0 text-end font-medium text-[#0f3d38]"><Cell column={column} row={row} /></dd>
+                </div>
+              ),
+            )}
           </dl>
         </article>
       ))}
@@ -638,7 +654,8 @@ function CardsView({
   );
 }
 
-function Cell({ column, row }: { column: ColumnDef; row: DataRow }) {
+/** `clamp`: a long text cut to three lines (table, cards); the details show it whole. */
+function Cell({ column, row, clamp = false }: { column: ColumnDef; row: DataRow; clamp?: boolean }) {
   const { t } = useTraveliunUI();
   const refs = useContext(RefOptionsContext);
   const value: DataValue = column.ref && refs
@@ -674,6 +691,14 @@ function Cell({ column, row }: { column: ColumnDef; row: DataRow }) {
   if (column.type && LTR_TYPES.has(column.type)) {
     const numeric = column.type === "number" || column.type === "currency" || column.type === "serial" || column.type === "date";
     return <DirText dir="ltr" className={numeric ? "tv-tnum" : undefined}>{String(value)}</DirText>;
+  }
+  if (column.multiline) {
+    return (
+      // line-clamp sets its own display; with `block` beside it the cut never happened
+      <span dir="auto" className={`whitespace-pre-line break-words text-start ${clamp ? "line-clamp-3" : "block"}`}>
+        {String(value)}
+      </span>
+    );
   }
   return <span>{String(value)}</span>;
 }
@@ -874,7 +899,8 @@ function RecordForm({
     else onClose();
   }
 
-  const required = (key: string) => isHotels && (key === "arabic_name" || key === "city_id");
+  const required = (key: string) =>
+    (isHotels && (key === "arabic_name" || key === "city_id")) || (config.table === "visas" && key === "country_id");
 
   return (
     <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/25 p-4" role="dialog" aria-modal="true" dir={dir}>
@@ -889,7 +915,7 @@ function RecordForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           {columns.map((column) => (
-            <label key={column.key} className="grid gap-2 text-sm font-semibold">
+            <label key={column.key} className={`grid gap-2 text-sm font-semibold ${column.multiline ? "md:col-span-2" : ""}`}>
               <span>
                 {t(column.labelKey)}
                 {required(column.key) ? <span className="text-[#c22850]" aria-hidden> *</span> : null}
@@ -1004,13 +1030,41 @@ function FieldInput({ column, value, required, onChange }: { column: ColumnDef; 
       </select>
     );
   }
-  const choices = column.source ? (lookups?.[column.source] ?? []) : column.options;
+  const listed = column.source ? (lookups?.[column.source] ?? []) : column.options;
+  // a stored value the list lacks stays a choice: a select missing it shows «اختر» and saves it empty
+  const choices = listed && value && !listed.some((o) => o.value === value) ? [...listed, { value, label: value }] : listed;
   if (choices) {
     return (
       <select value={value} onChange={(e) => onChange(e.target.value)} className={formField}>
         <option value="">{t("chooseOption")}</option>
         {choices.map((opt) => (<option key={opt.value} value={opt.value}>{opt.labelKey ? t(opt.labelKey) : opt.label}</option>))}
       </select>
+    );
+  }
+  if (column.multiline) {
+    return (
+      <span className="grid gap-1.5">
+        <textarea
+          dir="auto"
+          rows={8}
+          value={value}
+          required={required}
+          onChange={(e) => onChange(e.target.value)}
+          className={formArea}
+        />
+        <span className="flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-[#93aaa3]">
+          <span>{t("data.form.oneItemPerLine")}</span>
+          {runsOn(value) ? (
+            <button
+              type="button"
+              onClick={() => onChange(splitNumbered(value))}
+              className="rounded-lg border border-[#2aa87a] px-3 py-1 text-xs font-bold text-[#185045] hover:bg-[#eef7f3]"
+            >
+              {t("data.form.splitItems")}
+            </button>
+          ) : null}
+        </span>
+      </span>
     );
   }
   const inputType = column.type === "number" || column.type === "currency" ? "number" : column.type === "date" ? "date" : "text";
@@ -1066,7 +1120,7 @@ function RowActionModal({
 
         <div className="mb-5 grid gap-3 md:grid-cols-2">
           {config.columns.map((column) => (
-            <div key={column.key} className="rounded-[10px] bg-[#f4f8f6] p-3">
+            <div key={column.key} className={`rounded-[10px] bg-[#f4f8f6] p-3 ${column.multiline ? "md:col-span-2" : ""}`}>
               <p className="mb-1 text-xs font-bold text-[#93aaa3]">{t(column.labelKey)}</p>
               <div className="text-sm"><Cell column={column} row={row} /></div>
             </div>
@@ -1127,7 +1181,13 @@ function RowActionModal({
             ) : null}
             {onStatus && inactive ? (
               <button type="button" disabled={busy} onClick={() => start(() => onStatus("Active"))} className="flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#185045] text-sm font-bold sm:col-span-4 disabled:opacity-70">
-                <Power className="size-4" aria-hidden /> {t("data.tools.activate")}
+                <Power className="size-4" aria-hidden /> {t(config.table === "hotels" ? "data.tools.activate" : "data.tools.reactivate")}
+              </button>
+            ) : null}
+            {onStatus && !inactive && config.table === "visas" ? (
+              // /visas: a paused visa stays on the list, but Murad stops quoting it
+              <button type="button" disabled={busy} onClick={() => start(() => onStatus("Inactive"))} className="flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#d9c48f] text-sm font-bold text-[#7a5a12] hover:bg-[#fff8e6] sm:col-span-4 disabled:opacity-70">
+                {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Power className="size-4" aria-hidden />} {t("data.tools.deactivate")}
               </button>
             ) : null}
           </div>
@@ -1154,3 +1214,5 @@ const fieldClass =
   "flex h-[46px] items-center rounded-[11px] border border-[#dbe6e1] bg-white px-3 text-sm font-normal text-[#557d78] outline-none transition-colors focus:border-[#2aa87a]";
 const formField =
   "h-11 rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] px-3 text-sm font-normal text-[#185045] outline-none transition-colors focus:border-[#185045]";
+const formArea =
+  "min-h-[180px] w-full resize-y rounded-[10px] border border-[#d8e3de] bg-[#f8fbf9] px-3 py-2.5 text-sm font-normal leading-7 text-[#185045] outline-none transition-colors focus:border-[#185045]";

@@ -96,7 +96,8 @@ function RecordHistory({ config, id }: { config: TableConfig; id: string }) {
   const [pending, run] = useSafeTransition();
   const label = (column: string) => {
     const known = config.columns.find((c) => c.key === column);
-    return known ? t(known.labelKey) : column;
+    // /visas writes `country` from the picked country without showing it as a column
+    return known ? t(known.labelKey) : column === "country" ? t("data.model.col.countryText") : column;
   };
 
   function toggle() {

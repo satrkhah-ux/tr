@@ -27,6 +27,8 @@ export type ColumnDef = {
   source?: Exclude<FilterSource, "static">;
   /** the value is a city's / country's id: shown by name, picked from a searchable list. */
   ref?: "cities" | "countries";
+  /** long text kept line by line: a wide box in the form, shown with its line breaks. */
+  multiline?: boolean;
 };
 
 export type FilterOp = "eq" | "gte" | "lte" | "in" | "ilike";

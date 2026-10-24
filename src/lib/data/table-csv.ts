@@ -17,7 +17,7 @@ export const BOOLEAN_KEYS = new Set(["checked", "is_default", "visa_required", "
 
 /** A form box or a spreadsheet cell → the value the column stores. */
 export function coerceCell(column: ColumnDef, raw: string): DataValue {
-  const trimmed = raw.trim();
+  const trimmed = raw.replace(/\r\n?/g, "\n").trim();
   if (BOOLEAN_KEYS.has(column.key)) return /^(true|yes|نعم|1)$/i.test(trimmed);
   if (trimmed === "") return null;
   if (column.type === "number" || column.type === "currency") {

@@ -1,6 +1,8 @@
 import { PLACE_KINDS, ROOM_CATEGORIES } from "@/lib/catalog/model";
 import { FILTER_NOT_NULL, FILTER_NULL, type AllowedTable, type FilterDef, type FilterOption, type TableConfig } from "./types";
+import { CURRENCIES } from "@/lib/offer/draft-types";
 
+const CURRENCY_OPTIONS: FilterOption[] = CURRENCIES.map((c) => ({ value: c, label: c }));
 const COUNTRY_FILTER: FilterDef = { key: "country_id", labelKey: "filter.country", kind: "select", source: "countries" };
 const CITY_FILTER: FilterDef = { key: "city_id", labelKey: "filter.city", kind: "select", source: "cities" };
 const EMPLOYEE_FILTER: FilterDef = { key: "employee_id", labelKey: "filter.employee", kind: "select", source: "employees" };
@@ -402,22 +404,22 @@ const CONFIGS: TableConfig[] = [
     defaultSort: { column: "created_at", ascending: false },
   },
   {
-    // the old static page's rows, moved by data-texts (0072); src/app/visas/page.tsx switches once they are in
+    // the old static page's rows, moved by data-texts (0072). What Murad answers a visa client with, word for word.
+    // `country` (the name Murad writes) is not typed: actions.ts sets it from the picked country.
     route: "/visas", table: "visas", titleKey: "nav.visas",
     columns: [
-      { key: "country_id", labelKey: "filter.country", source: "countries" },
-      { key: "country", labelKey: "data.model.col.countryText" },
+      { key: "country_id", labelKey: "filter.country", ref: "countries" },
       { key: "visa_type", labelKey: "col.visaType" },
-      { key: "buy_price", labelKey: "col.buyPrice", type: "currency" },
-      { key: "buy_currency", labelKey: "col.buyCurrency" },
       { key: "sell_price", labelKey: "col.sellPrice", type: "currency" },
-      { key: "sell_currency", labelKey: "col.sellCurrency" },
-      { key: "arabic_requirements", labelKey: "col.arabicRequirements", minWidth: "300px" },
-      { key: "english_requirements", labelKey: "col.englishRequirements", minWidth: "300px" },
+      { key: "sell_currency", labelKey: "col.sellCurrency", options: CURRENCY_OPTIONS },
+      { key: "buy_price", labelKey: "col.buyPrice", type: "currency" },
+      { key: "buy_currency", labelKey: "col.buyCurrency", options: CURRENCY_OPTIONS },
       { key: "status", labelKey: "col.status", type: "status" },
+      { key: "arabic_requirements", labelKey: "col.arabicRequirements", minWidth: "300px", multiline: true },
+      { key: "english_requirements", labelKey: "col.englishRequirements", minWidth: "300px", multiline: true },
     ],
     searchable: ["country", "visa_type", "arabic_requirements"],
-    filters: [COUNTRY_FILTER],
+    filters: [{ ...COUNTRY_FILTER, present: true }],
     defaultSort: { column: "country", ascending: true },
   },
   {

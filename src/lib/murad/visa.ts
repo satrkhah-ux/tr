@@ -174,7 +174,7 @@ export function visaFlowNote(i: { facts: VisaFacts; row: VisaRow | null; include
 
 /** The list's row for a country: the tourist visa first. */
 export function visaRowFor(rows: (VisaRow & { country_id?: string | null })[], countryId: string | null, name: string | null): VisaRow | null {
-  const list = rows.filter((r) => (r.status ?? "Active") === "Active" && ((countryId && r.country_id === countryId) || (name && fold(r.country) === fold(name))));
+  const list = rows.filter((r) => (r.status ?? "Active") === "Active" && ((countryId && r.country_id === countryId) || (name && fold(r.country ?? "") === fold(name))));
   return list.find((v) => v.visa_type?.includes("سياح")) ?? list[0] ?? null;
 }
 
