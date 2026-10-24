@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { instructMurad, setLessonActive, type InstructionRow, type LessonRow } from "@/lib/data/murad-control";
-import { TOPICS, type Knowledge } from "@/lib/murad/knowledge";
+import { TOPICS, type Knowledge } from "@/lib/murad/knowledge-topics";
 
 const field = "w-full rounded-lg border border-[#dbe6e1] bg-white p-3 text-sm text-[#185045]";
 const STATUS: Record<string, string> = { applied: "نُفّذ", not_understood: "لم يُفهم", undone: "تُراجع عنه", failed: "تعذّر" };

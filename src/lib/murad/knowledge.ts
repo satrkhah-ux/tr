@@ -2,6 +2,9 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { responsesJson } from "@/lib/providers/openai";
 import type { RouteKey } from "./reception";
+import { TOPICS, type Knowledge, type Topic } from "./knowledge-topics";
+
+export { TOPICS, type Knowledge, type Topic };
 
 /**
  * «ذاكرة مُراد» (the owner, 2026-10-24: «ارفع مستوى ذكاء مراد الى اعلى جاهزية»): the thousands of lessons read from
@@ -11,9 +14,6 @@ import type { RouteKey } from "./reception";
  * lessons came in, or half a day passed (app_settings murad_knowledge).
  */
 export const KNOWLEDGE_KEY = "murad_knowledge";
-export const TOPICS = { visa: "التأشيرات", package: "البكجات والوجهات", flight: "الطيران", hotel: "الفنادق", transport: "المواصلات", general: "عام وسياسات" } as const;
-export type Topic = keyof typeof TOPICS;
-export type Knowledge = { at: string | null; topics: Partial<Record<Topic, { at: string; lessons: number; items: { q: string; a: string }[] }>> };
 
 const KIND_TOPIC: Partial<Record<RouteKey, Topic>> = { تأشيرات: "visa", بكج: "package", طيران: "flight", فنادق: "hotel", مواصلات: "transport" };
 export const topicOf = (kind: RouteKey | string | null | undefined): Topic => KIND_TOPIC[kind as RouteKey] ?? "general";
