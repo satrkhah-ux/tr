@@ -895,3 +895,15 @@ export async function assignAgentThenTeam(conversationId: number, agentId: numbe
   const now = await api<{ meta?: { assignee?: { id?: number } | null } }>(config, `/conversations/${conversationId}`);
   return now?.meta?.assignee?.id === agentId;
 }
+
+let selfId: number | null | undefined;
+/** The API token's own agent — Murad's login (renamed «مٌراد», 2026-10-24) — asked once per process. */
+export async function teletelSelfId(): Promise<number | null> {
+  if (selfId !== undefined) return selfId;
+  const config = getTeletelConfig();
+  if (!config) return null;
+  const res = await fetch(`${config.baseUrl}/api/v1/profile`, { headers: { api_access_token: config.token }, signal: AbortSignal.timeout(8000), cache: "no-store" }).catch(() => null);
+  const body = res?.ok ? ((await res.json().catch(() => null)) as { id?: number } | null) : null;
+  selfId = typeof body?.id === "number" ? body.id : null;
+  return selfId;
+}

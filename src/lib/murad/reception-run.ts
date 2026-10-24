@@ -18,6 +18,8 @@ import {
   type OpenConversation,
   sendTeletelMessage,
   setTeletelTyping,
+  teletelGet,
+  teletelSelfId,
 } from "@/lib/providers/teletel";
 import { asSystem } from "@/lib/supabase/system-actor";
 import { produceOfferFromDraft } from "@/lib/data/drafts";
@@ -488,6 +490,22 @@ async function visaFollowThrough(service: SupabaseClient, control: MuradControl,
   return n;
 }
 
+/**
+ * Out of hours only when the clock says so AND nobody is at work: a colleague online in Teletel besides Murad's own
+ * login means the client hears «زميلنا يرد عليك» rather than «عند بداية الدوام الساعة 9» (the owner, 2026-10-24:
+ * «يجاوبه سيتم التواصل معك على الساعة 9 صباحا و الموظفين موجودين» — the staff answer past midnight). Teletel is
+ * asked once a minute at most; when it cannot say, the clock decides.
+ */
+let online = { at: 0, yes: false };
+async function staffOnline(): Promise<boolean | null> {
+  if (Date.now() - online.at < 60_000) return online.yes;
+  const [agents, me] = await Promise.all([teletelGet<{ id: number; availability_status?: string }[]>("/agents"), teletelSelfId()]);
+  if (!Array.isArray(agents)) return null;
+  online = { at: Date.now(), yes: agents.some((a) => a.id !== me && a.availability_status === "online") };
+  return online.yes;
+}
+const outOfHours = async (hours: ReturnType<typeof parseHours>) => !isWorkingTime(new Date(), hours) && (await staffOnline()) !== true;
+
 export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
   if (!m.conversationId || !m.messageId) return "unreadable";
   const service = db();
@@ -571,7 +589,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     const handedByHand = (events ?? []).some((e) => e.kind === "activity" && e.at >= since && parseAssignment(e.text)?.by != null);
     const hours = parseHours(reception.hours);
     const now = new Date();
-    const opensAt = isWorkingTime(now, hours) ? null : hours.open;
+    const opensAt = (await outOfHours(hours)) ? hours.open : null;
 
     // «عرض آلي»: a trip to a country the company prices this way — asked for what is missing, then proposed. The
     // whole visit is read each time, the client's lines and Murad's between them, the newest word winning (the
@@ -1143,7 +1161,7 @@ async function holdSweep(service: SupabaseClient, fresh: OpenConversation[], now
       .select("id")
       .maybeSingle();
     if (claim.error || !claim.data) continue;
-    const text = holdText({ assignee: c.assignee, team: c.team, opensAt: isWorkingTime(new Date(), hours) ? null : hours.open });
+    const text = holdText({ assignee: c.assignee, team: c.team, opensAt: (await outOfHours(hours)) ? hours.open : null });
     const replyId = await sendTeletelMessage(c.id, text);
     if (replyId && (c.assignee || c.team)) {
       await addTeletelNote(c.id, `🤖 ${noteFor(c)} العميل كتب بعد التحويل وينتظر منذ ${Math.round((nowSec - c.waitingSince) / 60)} دقائق بلا رد — طمأنه مُراد. ردّ عليه الآن.`);
