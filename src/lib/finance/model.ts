@@ -53,7 +53,8 @@ export const EVERY: Record<number, string> = { 1: "شهرياً", 3: "كل 3 أ�
 export const MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
-export const sar = (n: number) => `${Math.round(n).toLocaleString("en-US")} ريال`;
+// `|| 0`: a sum that ends a hair below zero rounds to -0, which prints «-0»
+export const sar = (n: number) => `${(Math.round(n) || 0).toLocaleString("en-US")} ريال`;
 
 export function payrollByTeam(staff: Staff[]) {
   const teams = new Map<string, Staff[]>();
