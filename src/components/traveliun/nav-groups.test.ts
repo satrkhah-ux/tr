@@ -18,7 +18,7 @@ describe("the sidebar", () => {
 
   it("holds the old «البكجات السياحية» inside «بيسك», the legacy generator only while it is on", () => {
     const basic = (featureOn: (f: Feature) => boolean) => navGroupsFor(SALES, featureOn).find((g) => g.labelKey === "nav.basic")?.children?.map((c) => c.href);
-    expect(basic(on)).toEqual(["/basic?new=1", "/ready-offers", "/confirmed-trips", "/kanban-board", "/repackage", "/repackage/flight-card", "/package-generator"]);
+    expect(basic(on)).toEqual(["/basic?new=1", "/basic?files=issued", "/ready-offers", "/confirmed-trips", "/kanban-board", "/repackage", "/repackage/flight-card", "/package-generator"]);
     expect(basic(off("legacy_generator"))).not.toContain("/package-generator");
     // the two redesign tools, each with its own switch
     expect(basic(off("flight_card"))).toContain("/repackage");

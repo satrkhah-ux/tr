@@ -192,6 +192,7 @@ export const ar: Dictionary = {
   "nav.packageGenerator": "مولد البكجات السياحية",
   "nav.issuePackage": "إصدار بكج سياحي",
   "nav.issuedOffers": "العروض السياحية",
+  "nav.sentOffers": "العروض المرسلة",
   "nav.terms": "الشروط والأحكام",
   "nav.offerIncludes": "يشمل العرض",
   "nav.offerExcludes": "لا يشمل العرض",

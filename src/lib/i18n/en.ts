@@ -194,6 +194,7 @@ export const en = {
   "nav.packageGenerator": "Package Generator",
   "nav.issuePackage": "Issue a Package",
   "nav.issuedOffers": "Issued Offers",
+  "nav.sentOffers": "Sent offers",
   "nav.terms": "Terms & Conditions",
   "nav.offerIncludes": "Offer Includes",
   "nav.offerExcludes": "Offer Excludes",

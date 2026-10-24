@@ -176,6 +176,9 @@ export const navGroups: NavGroup[] = [
     children: [
       // straight into a new file (the owner, 2026-10-25: «عندما يضغط على بكج جديد مباشرة يدخله على نظام البكج»)
       { labelKey: "nav.newPackage", href: "/basic?new=1", perm: "offers.write" },
+      // the issued files, to review and edit (the owner, 2026-10-25: «اضف ايضا العروض المرسلة كي يمكن الموظف ان
+      // يراجع العروض ويعدلها»)
+      { labelKey: "nav.sentOffers", href: "/basic?files=issued", perm: "offers.write" },
       { labelKey: "nav.readyOffers", href: "/ready-offers", perm: "offers.write" },
       // confirmed clients from before the system, by hand — no offer (the user, 2026-10-22)
       { labelKey: "nav.externalTrips", href: "/confirmed-trips", perm: "offers.write" },
@@ -848,7 +851,8 @@ function SideMenu({
               {active && group.children ? (
                 <div className="py-1">
                   {group.children.map((child) => {
-                    const childActive = pathname === pageOf(child.href);
+                    // «بكج جديد» makes a file and moves on — /basic itself is the files list, never «new»
+                    const childActive = pathname === pageOf(child.href) && !child.href.includes("new=1");
                     return (
                       <div key={child.href}>
                       {child.captionKey ? (
