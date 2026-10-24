@@ -8,6 +8,7 @@ import { summarizeDue } from "@/lib/followups/summary";
 import { followupDigest } from "@/lib/followups/remind";
 import { staffTick } from "@/lib/telegram/staff-events";
 import { learnSweep } from "@/lib/murad/lessons";
+import { sweepSharedAccounts } from "@/lib/routing/shared-sweep";
 import { readSettings } from "@/lib/murad/run";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -46,6 +47,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const settings = await readSettings(service);
     await learnSweep(service, settings.control, [...(settings.control.admins ?? []), ...settings.autoList]);
   });
+  // «لا طلب بلا صاحب»: a client waiting on a shared Teletel login goes to a seller (routing/shared-sweep.ts)
+  after(() => recordCronRun("shared_sweep", sweepSharedAccounts).catch(() => null));
   // every run leaves its trace for /developer, answered anyone or not (cron-runs.ts)
   // «المستقبل الآلي»: what the webhook missed, before Murad's own turns (no model, its turns claimed one by one)
   const received = await receptionSweep().catch(() => 0);

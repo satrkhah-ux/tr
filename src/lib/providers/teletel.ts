@@ -859,3 +859,19 @@ export async function assignMuradHandoff(conversationId: number, teamId: number 
   }
   return (await api<unknown>(config, `/conversations/${conversationId}/assignments`, { assignee_id: agentId })) !== null;
 }
+
+export type TeamMember = { id: number; name: string; availability: string | null };
+const membersCache = new Map<number, { at: number; members: TeamMember[] }>();
+
+/** A team's agents with their «متصل» state — who can take a client now (routing/shared-sweep.ts). Kept a minute. */
+export async function teamMembers(teamId: number): Promise<TeamMember[]> {
+  const hit = membersCache.get(teamId);
+  if (hit && Date.now() - hit.at < 60_000) return hit.members;
+  const res = await teletelGet<{ id?: number; name?: string; availability_status?: string }[]>(`/teams/${teamId}/team_members`);
+  if (!Array.isArray(res)) return hit?.members ?? [];
+  const members = res
+    .filter((m) => typeof m.id === "number")
+    .map((m) => ({ id: m.id as number, name: (m.name ?? "").trim() || `#${m.id}`, availability: m.availability_status ?? null }));
+  membersCache.set(teamId, { at: Date.now(), members });
+  return members;
+}

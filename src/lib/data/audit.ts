@@ -176,6 +176,8 @@ export type AuditAction =
   | "offer.deleted"
   // «SLA»: the rules' moves turned on or off (data/sla.ts setSlaApply)
   | "sla.rules_toggled"
+  // «لا طلب بلا صاحب»: a client waiting on a shared Teletel login handed to a seller (routing/shared-sweep.ts)
+  | "teletel.shared_reassigned"
   | "draft.deleted";
 
 export type AuditInput = {
