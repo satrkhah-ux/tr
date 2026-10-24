@@ -875,3 +875,18 @@ export async function teamMembers(teamId: number): Promise<TeamMember[]> {
   membersCache.set(teamId, { at: Date.now(), members });
   return members;
 }
+
+/**
+ * Hand a conversation to an agent and the agent's team — the AGENT first. Team first, Teletel's
+ * auto-assignment hands it to a member at once and the bot tells them (2026-10-24: 40450 flashed to
+ * «محمد صالح», 39412 to «عبد الله علي», before reaching «احمد القدسي»); with an agent already on it the
+ * team change keeps a member and assigns no one. Read back: done when the agent holds it.
+ */
+export async function assignAgentThenTeam(conversationId: number, agentId: number, teamId: number): Promise<boolean> {
+  const config = getTeletelConfig();
+  if (!config) return false;
+  if ((await api<unknown>(config, `/conversations/${conversationId}/assignments`, { assignee_id: agentId })) === null) return false;
+  await api<unknown>(config, `/conversations/${conversationId}/assignments`, { team_id: teamId });
+  const now = await api<{ meta?: { assignee?: { id?: number } | null } }>(config, `/conversations/${conversationId}`);
+  return now?.meta?.assignee?.id === agentId;
+}

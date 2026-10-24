@@ -1,17 +1,15 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { addTeletelNote, listOpenConversations, teamMembers, teletelGet } from "@/lib/providers/teletel";
+import { addTeletelNote, assignAgentThenTeam, listOpenConversations, teamMembers, teletelGet } from "@/lib/providers/teletel";
 import { MURAD_CONTROL_KEY, onList, parseControl } from "@/lib/murad/control";
-import { handOver } from "@/lib/murad/handover";
 import { logAudit } from "@/lib/data/audit";
 import { isOrphan, parseShared, pickSeller, type Seller, type SellerLoad } from "./shared";
 import { presenceOnlineAgentIds } from "./presence";
 
 /**
  * «لا طلب بلا صاحب» — the minute sweep (api/murad/run). A client waiting on a shared Teletel login
- * (shared.ts) goes to a seller of «قسم المبيعات» through Murad's own hand-over (handover.ts: never a
- * «لا يُحوّل أبداً» number, never a paused colleague), with a team note saying why, audited. Teletel
+ * (shared.ts) goes to a seller of «قسم المبيعات» — never a «لا يُحوّل أبداً» number, never a paused colleague — with a team note saying why, audited. Teletel
  * then tells the seller on «تنبيهاتي» like any assignment.
  *
  * The open list is the shared cache (up to five minutes old), so each candidate is read again just
@@ -72,7 +70,8 @@ export async function sweepSharedAccounts(): Promise<Record<string, unknown>> {
     if (!seller) break;
     const waited = Math.round((now - owner.waitingSince) / 60);
     if (s.mode === "on") {
-      if (!(await handOver(control, c.id, s.salesTeam, seller.id, phone))) continue;
+      // the agent first: team first, Teletel auto-assigns a member and «تنبيهاتي» tells the wrong seller (teletel.ts)
+      if (!(await assignAgentThenTeam(c.id, seller.id, s.salesTeam))) continue;
       await addTeletelNote(c.id, `أُسندت تلقائياً إلى ${seller.name}: العميل ينتظر ردنا منذ ${waitedText(waited)} على حساب مشترك لا يملكه موظف («لا طلب بلا صاحب»).`);
       await logAudit({
         action: "teletel.shared_reassigned",
