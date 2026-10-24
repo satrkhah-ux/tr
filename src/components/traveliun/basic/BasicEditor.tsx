@@ -1071,6 +1071,8 @@ export function BasicEditor({
       // the reception car and the tours car, on the first city's tours
       scope.transport && cities.length > 0 && !plan.airport.car_type.trim() && tx("transferCar"),
       scope.transport && toursOn && cities.length > 0 && !plan.tours.car_type.trim() && tx("tourCar"),
+      // a day with no title, fixed in its city's «البرنامج السياحي»
+      ...new Set(blocking.filter((i) => i.stage === "itinerary").map(issueText)),
     ].filter((x): x is string => Boolean(x)),
     services: [...new Set(blocking.filter((i) => i.stage === "services").map(issueText))],
     pricing: [...new Set(blocking.filter((i) => i.stage === "pricing").map(issueText))],
