@@ -82,6 +82,7 @@ import {
   basicDays,
   carForGroup,
   cityAirport,
+  cityMoves,
   HOME_AIRPORT,
   planInternational,
   withAdvancedAirports,
@@ -124,7 +125,6 @@ import { TermsStage } from "../generator/stages/TermsStage";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useDraftState } from "../generator/useDraftState";
 import { useNewDeploy } from "../useNewDeploy";
-import { BasicHotelsStep } from "./BasicHotelsStep";
 import { BasicCityCard } from "./BasicCityCard";
 import { BasicFlightPlan } from "./BasicFlightPlan";
 import { BasicHopFlight, gapWords } from "./BasicHopFlight";
@@ -135,6 +135,7 @@ import { nightsText, roomsText, useBasicLabels, type BasicLabel } from "./labels
 import { basicCard, basicField, basicLabel, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
 import { BasicEdges } from "./BasicEdges";
+import { DOM_KEYS, fileSections, SECTION_ORDER, sectionOf, type Section } from "./flow";
 import { AdvancedQuestions } from "./AdvancedQuestions";
 import { advancedDefaults, advancedTripDates, emptyAdvanced, fillAdvanced, isStation, type DraftAdvanced } from "@/lib/offer/advanced";
 import { IssueGuardNotice } from "../IssueGuardNotice";
@@ -147,7 +148,7 @@ const range = (from: number, to: number) => Array.from({ length: to - from + 1 }
 const BASE_CURRENCY = "SAR";
 /** The «يشمل» line the SIM count writes. */
 const SIM_LINE = "شريحة اتصال";
-/** «الوكيل / الشركة» on the client step — hidden for now, every file a direct client (owner, 2026-10-17). */
+/** «الوكيل / الشركة» with the client's answers — hidden for now, every file a direct client (owner, 2026-10-17). */
 const SHOW_AGENT = false;
 const MODE_CHIPS: { mode: TransportMode; label: BasicLabel; icon: typeof Car }[] = [
   { mode: "car", label: "byCar", icon: Car },
@@ -165,29 +166,6 @@ const PRICE_GROUPS: { key: PriceGroup; label: BasicLabel; icon: typeof Car }[] =
   { key: "visas", label: "groupVisas", icon: Stamp },
   { key: "other", label: "groupOther", icon: Plus },
 ];
-
-/** The page's steps, in order; one is open at a time. */
-type Step = "client" | "flights" | "cities" | "services" | "pricing" | "finish";
-const STEP_ORDER: Step[] = ["client", "flights", "cities", "services", "pricing", "finish"];
-/** Which step of this page answers a stage's blocking issue. */
-const STEP_OF: Partial<Record<string, Step>> = {
-  customer: "client",
-  trip: "client",
-  visas: "client",
-  // «البرنامج يشمل» chips sit on the first step
-  scope: "client",
-  flights: "flights",
-  cities: "cities",
-  hotels: "cities",
-  transport: "cities",
-  services: "services",
-  pricing: "pricing",
-  // a day with no title is fixed in its city's «البرنامج السياحي» tab
-  itinerary: "cities",
-};
-
-/** The checks on the domestic flights — asked on the cities step, where each leg sits on its hop. */
-const DOM_KEYS = ["pg.err.domFlightIncomplete", "pg.err.domFlightUnpriced", "pg.err.domesticMismatch"];
 
 /** «Booking engine» chip from the program-includes spec: whole chip clickable, state not by colour alone. */
 function Chip({ on, icon: Icon, label, onClick }: { on: boolean; icon: typeof Car; label: string; onClick: () => void }) {
@@ -208,8 +186,9 @@ function Chip({ on, icon: Icon, label, onClick }: { on: boolean; icon: typeof Ca
 }
 
 /**
- * A section that folds to one line once it is done: «التالي» closes it, a press
- * on the line opens it again. Keeps the screen on what is still to be entered.
+ * A section that folds to one line once it is done: «متابعة» closes it, a press
+ * on the line opens it again. Keeps the screen on what is still to be entered —
+ * a folded section that still lacks something says what, in amber.
  */
 function Fold({
   id,
@@ -217,6 +196,7 @@ function Fold({
   open,
   onOpen,
   summary,
+  missing,
   children,
 }: {
   id: string;
@@ -224,6 +204,7 @@ function Fold({
   open: boolean;
   onOpen: () => void;
   summary: ReactNode;
+  missing: string[];
   children: ReactNode;
 }) {
   const tx = useBasicLabels();
@@ -241,9 +222,11 @@ function Fold({
       onClick={onOpen}
       className={`${basicCard} flex w-full scroll-mt-20 items-center gap-2 py-2.5 text-start hover:border-[#a9cbbf]`}
     >
-      <CheckCircle2 className="size-4 shrink-0 text-[#0f7a52]" />
+      {missing.length > 0 ? <AlertTriangle className="size-4 shrink-0 text-[#a86a10]" /> : <CheckCircle2 className="size-4 shrink-0 text-[#0f7a52]" />}
       <span className="shrink-0 text-[13px] font-extrabold text-[#003c3a]">{title}</span>
-      <span className="tv-tnum min-w-0 flex-1 truncate text-[12px] font-semibold text-[#557d78]">{summary}</span>
+      <span className={`tv-tnum min-w-0 flex-1 truncate text-[12px] font-semibold ${missing.length > 0 ? "text-[#a86a10]" : "text-[#557d78]"}`}>
+        {missing.length > 0 ? tx("needFirst", { list: missing.join("، ") }) : summary}
+      </span>
       <span className="inline-flex shrink-0 items-center gap-1 text-[11.5px] font-bold text-[#185045]">
         <Pencil className="size-3.5" />
         {tx("edit")}
@@ -252,20 +235,14 @@ function Fold({
   );
 }
 
-/** «التالي» with what still stops it, in words — and «السابق» back to the step before (nothing entered is lost). */
-function NextButton({ missing, onNext, onPrev }: { missing: string[]; onNext: () => void; onPrev?: () => void }) {
+/**
+ * «متابعة» with what still stops it, in words. No «السابق»: the sections above are
+ * one line each, and a press on one opens it again (nothing entered is lost).
+ */
+function NextButton({ missing, onNext }: { missing: string[]; onNext: () => void }) {
   const tx = useBasicLabels();
   return (
     <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-dashed border-[#DCE9E5] pt-2.5">
-      {onPrev ? (
-        <button
-          type="button"
-          onClick={onPrev}
-          className="me-auto inline-flex h-9 items-center rounded-[9px] border border-[#cfe0d9] px-4 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
-        >
-          {tx("prev")}
-        </button>
-      ) : null}
       {missing.length > 0 ? <span className="text-[11.5px] font-bold text-[#a86a10]">{tx("needFirst", { list: missing.join("، ") })}</span> : null}
       <button
         type="button"
@@ -289,8 +266,10 @@ function legText(f: DraftData["flights"][number]): string {
 /**
  * «النظام بيسك» — the whole file on one page, the way the company's own system
  * asks for it: the customer and the trip once, what the programme includes, the
- * flights, then a bar that adds a city with its nights and tours — and inside
- * each city its hotel. Nothing entered once is asked again; what follows from
+ * international flights, then the hotels city by city (a bar adds a city with its
+ * nights), the domestic flights between them, and each city's programme and
+ * tours (the owner, 2026-10-25) — sections that open one after another, never
+ * shown as numbered stages. Nothing entered once is asked again; what follows from
  * it (dates, rooms, meals, the programme's day titles) is filled in and kept
  * under «معلومات إضافية». The package is issued from here too.
  *
@@ -515,8 +494,17 @@ export function BasicEditor({
     commit({ transport_plan: { ...plan, intercity: { ...plan.intercity, modes: list, mode: list[0] } } });
   }
 
+  /**
+   * How one move is made, picked between the two cities' hotels. Every other move keeps the way it
+   * goes now — a flight picked for one never sends the rest by air — and the trip's ways are the ones
+   * its moves take: no move left by air, no domestic flight (its section goes with it).
+   */
   function setHop(from: string, to: string, mode: TransportMode) {
-    commit({ transport_plan: { ...plan, intercity: { ...plan.intercity, hop_modes: { ...plan.intercity.hop_modes, [hopKey(from, to)]: mode } } } });
+    const p = latest.current.transport_plan;
+    const now = { ...Object.fromEntries(cityMoves(latest.current).map((m) => [hopKey(m.from, m.to), hopMode(p, m.from, m.to)])), [hopKey(from, to)]: mode };
+    // the road first while a move takes it: a city added later goes as the trip mostly goes
+    const used = MODE_CHIPS.map((m) => m.mode).filter((m) => Object.values(now).includes(m));
+    commit({ transport_plan: { ...p, intercity: { ...p.intercity, modes: used, mode: used[0], hop_modes: { ...p.intercity.hop_modes, ...now } } } });
   }
 
   function toggleScope(key: keyof DraftScope) {
@@ -765,24 +753,30 @@ export function BasicEditor({
   const landingCity = intlLegs.filter((f) => f.leg_order === "outbound").at(-1)?.to_city?.trim() ?? "";
   const homeCity = intlLegs.find((f) => f.leg_order === "inbound")?.from_city?.trim() ?? "";
   const flies = (a: string, b: string) => Boolean(cityAirport(a, lookups.airports, data.flights) && cityAirport(b, lookups.airports, data.flights));
-  const hopSelect = (a: string, b: string, label: string) => (
-    <label key={`${a}>${b}`} className="inline-flex items-center gap-1 text-[11px] font-bold text-[#557d78]">
-      {label}
-      <select
-        value={hopMode(plan, a, b)}
-        onChange={(e) => setHop(a, b, e.target.value as TransportMode)}
-        className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold text-[#185045]"
-      >
-        {MODE_CHIPS.filter((m) => modes.includes(m.mode)).map((m) => (
-          <option key={m.mode} value={m.mode}>{tx(m.label)}</option>
-        ))}
-      </select>
-    </label>
-  );
+  // how the group gets from one city to the next — asked between the two cities' hotels, every way on offer
+  const hopLine = (a: string, b: string) => {
+    const mode = hopMode(plan, a, b);
+    const chip = MODE_CHIPS.find((m) => m.mode === mode) ?? MODE_CHIPS[0];
+    return (
+      <label key={`${a}>${b}`} className="flex flex-wrap items-center justify-center gap-2 px-2 text-[11.5px] font-bold text-[#557d78]">
+        <chip.icon className="size-4 shrink-0 text-[#185045]" />
+        {tx("hopBetween", { from: a, to: b })}
+        <select
+          value={mode}
+          onChange={(e) => setHop(a, b, e.target.value as TransportMode)}
+          className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold text-[#185045]"
+        >
+          {MODE_CHIPS.map((m) => (
+            <option key={m.mode} value={m.mode}>{tx(m.label)}</option>
+          ))}
+        </select>
+      </label>
+    );
+  };
 
-  // day numbers on each card: after any travel day, one city after another
+  // day numbers of each city: after any travel day, one city after another
   const travelDays = data.days.filter((d) => d.kind === "travel").length;
-  let dayCursor = travelDays + 1;
+  const dayFroms = cities.map((_, i) => travelDays + 1 + cities.slice(0, i).reduce((n, c) => n + c.nights, 0));
 
   // ---------- pricing (sell side only) ----------
   // a partner company prices its own file: the server hands it our prices at its terms
@@ -954,7 +948,7 @@ export function BasicEditor({
       const result = await produceOfferFromDraft(draftId);
       if (!result.ok) return setProduceError(t(result.error));
       patch({ produced_serial: result.serial });
-      // issued — nothing went to the client: the finish step offers «أرسل إلى العميل عبر واتساب»
+      // issued — nothing went to the client: the issuing section offers «أرسل إلى العميل عبر واتساب»
       bumpStatus();
     } catch {
       setProduceError(tx("serverLost"));
@@ -972,7 +966,7 @@ export function BasicEditor({
     back: trip.departure_date ?? "",
     round: data.flight_booking.mode !== "oneway",
   };
-  // the domestic legs, each on its hop between two city cards (the evaluator, 2026-10-24) — and what each still lacks
+  // the domestic legs, each on its move between two cities, in their own section — and what each still lacks
   const booking = data.flight_booking;
   const hopsOf = flightHops(data);
   const domIssue = (key: string) => scope.flights_domestic && !booking.later_dom && blocking.some((i) => i.key === key);
@@ -980,8 +974,8 @@ export function BasicEditor({
   const gapsOf = (leg: DraftData["flights"][number]) =>
     scope.flights_domestic && !booking.later_dom ? legGaps(leg, domIssue("pg.err.domFlightUnpriced"), movedLegs) : [];
   /**
-   * «ينقص» for the domestic flights, said by leg and field on the cities step where they are entered; a reason
-   * no leg carries (a hand-typed total gone, say) keeps the check's own words, so «التالي» never stops unexplained.
+   * «ينقص» for the domestic flights, said by leg and field on their own section where they are entered; a reason
+   * no leg carries (a hand-typed total gone, say) keeps the check's own words, so «متابعة» never stops unexplained.
    */
   const domMissing = (() => {
     const legs = data.flights.filter((f) => f.leg_order === "internal");
@@ -998,18 +992,11 @@ export function BasicEditor({
     const unsaid = blocking.filter((i) => i.key && DOM_KEYS.includes(i.key) && !said.some((s) => covers[i.key!](s.g)));
     return [...said.map((s) => s.text), ...unsaid.map(issueText)];
   })();
-  // the moves by air that come before card `at` (the cities' count: after the last), each with its legs
-  const hopStrips = (at: number) =>
-    hopsOf.hops
-      .filter((h) => h.before === at)
-      .map((h) => (
-        <BasicHopFlight key={`hop-${at}-${h.from}`} hop={h} legs={h.legs} data={data} lookups={lk} gaps={gapsOf} onChange={commit} current={() => latest.current} />
-      ));
-  // «التالي» to the cities built them from the flights — said once over the cities
+  // «متابعة» from the flights built the cities from them — said once over the hotels
   const [citiesNote, setCitiesNote] = useState<BasicLabel | null>(null);
   const countryOfCity = (name: string) => lk.countries.find((c) => c.cities.some((x) => x.name === name))?.name;
 
-  // ---------- the steps: one open at a time ----------
+  // ---------- the sections: one open at a time ----------
   // the cities whose stay still lacks a hotel, a room type, a board or a price — «إكمال» opens only these
   // (no hotel at all: the same function the server's issue gate asks)
   const noHotel = citiesWithoutHotel(data);
@@ -1024,8 +1011,9 @@ export function BasicEditor({
       )
     : [];
   const [focus, setFocus] = useState<string[] | null>(null);
-  // the cities the agent marked «تمت» — folded to their summary line
+  // the cities the agent marked «تمت» — folded to their summary line: "part|stop", the hotels apart from the programme
   const [doneCities, setDoneCities] = useState<string[]>([]);
+  const stopOf = (done: string) => done.slice(done.indexOf("|") + 1);
   // the city being dragged, and the cities whose dates the new order moved (what they were) — red until «تمت»
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [datesWere, setDatesWere] = useState<Record<string, { check_in: string | null; check_out: string | null; prev: string | undefined }>>({});
@@ -1053,13 +1041,14 @@ export function BasicEditor({
       return Object.fromEntries(Object.entries(all).filter(([k, was]) => now.has(k) && differs(was, now.get(k)!)));
     });
     // a stop that changed opens again
-    setDoneCities((d) => d.filter((k) => !(before.has(k) && now.has(k) && differs(before.get(k)!, now.get(k)!))));
+    setDoneCities((d) => d.filter((k) => !(before.has(stopOf(k)) && now.has(stopOf(k)) && differs(before.get(stopOf(k))!, now.get(stopOf(k))!))));
     commit(moved);
   }
   const partner = data.customer.partner_company_id;
-  // the flights step is the international flights' — the domestic ones are entered on the cities' hops
-  const flightsOn = scope.flights_intl;
-  const missingOf: Record<Step, string[]> = {
+  // the domestic flights' section: there while a move between the cities is flown (or a leg of the agent's own is left)
+  const domLegs = data.flights.filter((f) => f.leg_order === "internal");
+  const steps = fileSections({ intl: scope.flights_intl, domestic: scope.flights_domestic && domLegs.length > 0, pricing: canPricing });
+  const missingOf: Record<Section, string[]> = {
     client: [
       !country && tx("country"),
       !partner && !data.customer.customer_name.trim() && tx("customer"),
@@ -1068,49 +1057,47 @@ export function BasicEditor({
       trip.nights <= 0 && tx("nights"),
       !trip.meal_plan && tx("meals"),
     ].filter((x): x is string => Boolean(x)),
-    // what stops the international flights, in words — «سعر الطيران الدولي», not just «الطيران»; the domestic
-    // legs are asked on the cities step, where they are entered (the evaluator, 2026-10-24)
-    flights: [...new Set(blocking.filter((i) => i.stage === "flights" && !DOM_KEYS.includes(i.key ?? "")).map(issueText))],
-    cities: [
+    // what stops the international flights, in words — «سعر الطيران الدولي», not just «الطيران»
+    flights: [...new Set(blocking.filter((i) => sectionOf(i, steps) === "flights").map(issueText))],
+    hotels: [
       cities.length === 0 && tx("city"),
       cities.length > 0 && used !== trip.nights && nightsNote,
-      // the reception car and the tours car, on the first city's tours tab
-      scope.transport && cities.length > 0 && !plan.airport.car_type.trim() && tx("transferCar"),
-      scope.transport && toursOn && cities.length > 0 && !plan.tours.car_type.trim() && tx("tourCar"),
       // a stay with no room type, board or price stops here, not at the end
       ...blocking.filter((i) => i.stage === "hotels").map(issueText),
-      // each domestic leg's gaps, by leg — cleared on its hop
-      ...domMissing,
+    ].filter((x): x is string => Boolean(x)),
+    // each domestic leg's gaps, by leg — cleared on its move
+    domestic: domMissing,
+    programme: [
+      // the reception car and the tours car, on the first city's tours
+      scope.transport && cities.length > 0 && !plan.airport.car_type.trim() && tx("transferCar"),
+      scope.transport && toursOn && cities.length > 0 && !plan.tours.car_type.trim() && tx("tourCar"),
     ].filter((x): x is string => Boolean(x)),
     services: [...new Set(blocking.filter((i) => i.stage === "services").map(issueText))],
     pricing: [...new Set(blocking.filter((i) => i.stage === "pricing").map(issueText))],
     finish: [],
   };
-  const steps = STEP_ORDER.filter(
-    (s) => (s !== "flights" || flightsOn) && (s !== "pricing" || canPricing),
-  );
-  // a new file opens on its first step; a file coming back, on the first one not done
+  // a new file opens on its first section; a file coming back, on the first one not done
   const firstTodo = steps.find((s) => missingOf[s].length > 0) ?? "finish";
-  const [open, setOpen] = useState<Step>(firstTodo);
-  const [reached, setReached] = useState<Step>(firstTodo);
-  const shown = (s: Step) => steps.includes(s) && STEP_ORDER.indexOf(s) <= STEP_ORDER.indexOf(reached);
+  const [open, setOpen] = useState<Section>(firstTodo);
+  const [reached, setReached] = useState<Section>(firstTodo);
+  const shown = (s: Section) => steps.includes(s) && SECTION_ORDER.indexOf(s) <= SECTION_ORDER.indexOf(reached);
 
-  function show(step: Step) {
+  function show(step: Section) {
     setOpen(step);
-    // the flights step opens already planned: no empty box for what the file already says
+    // the flights open already planned: no empty box for what the file already says
     if (step === "flights" && scope.flights_intl && !latest.current.flights.some((f) => f.leg_order !== "internal")) {
       const planned = planInternational(latest.current, lookups.airports, planDefaults);
       // «بكج متقدم» already said where they land and leave from
       commit({ ...planned, ...(withAdvancedAirports({ ...latest.current, ...planned }, lookups.airports) ?? {}) });
     }
-    if (step !== "cities") setFocus(null);
-    // the prices are worked out as the step opens — no button to remember
+    if (step !== "hotels") setFocus(null);
+    // the prices are worked out as the section opens — no button to remember
     if (step === "pricing" && canPricing) void calculate();
     if (step === "services") commit({ services: withScopeLines(latest.current) });
     window.setTimeout(() => document.getElementById(`basic-${step}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   }
 
-  function next(from: Step) {
+  function next(from: Section) {
     // the cities from the flights' dates (the owner, 2026-10-22: «الإدخال التلقائي وفق التواريخ يقلل الأخطاء») —
     // a part left for later leaves the cities to the agent, as before
     if (from === "flights" && scope.flights_intl && !latest.current.flight_booking.later_intl) {
@@ -1119,7 +1106,7 @@ export function BasicEditor({
       setCitiesNote(built ? "flightCities" : "noFlightCities");
     }
     const to = steps[steps.indexOf(from) + 1] ?? "finish";
-    if (STEP_ORDER.indexOf(to) > STEP_ORDER.indexOf(reached)) setReached(to);
+    if (SECTION_ORDER.indexOf(to) > SECTION_ORDER.indexOf(reached)) setReached(to);
     show(to);
   }
 
@@ -1128,7 +1115,7 @@ export function BasicEditor({
     trip.children > 0 ? `${trip.children} ${tx("children")}` : "",
     trip.infants > 0 ? `${trip.infants} ${tx("infants")}` : "",
   ].filter(Boolean);
-  const summaryOf: Record<Step, string> = {
+  const summaryOf: Record<Section, string> = {
     client: [
       trip.country,
       partner ? data.customer.company : data.customer.customer_name,
@@ -1141,47 +1128,107 @@ export function BasicEditor({
       .filter(Boolean)
       .join(" · "),
     flights: [booking.later_intl ? tx("laterLine", { part: tx("laterIntl") }) : "", ...data.flights.filter((f) => f.leg_order !== "internal" && !booking.later_intl).map(legText)].filter(Boolean).join(" · "),
-    cities: cities
+    hotels: cities
       .map((c, i) => {
         // each visit of a city with its own hotels
         const hotel = [...new Set(cityHotelLines(cities, data.hotels, i).map((h) => h.hotel_name.trim()).filter(Boolean))].join(" + ");
         return `${c.city_name} (${nightsText(c.nights, language)})${hotel ? ` — ${hotel}` : ""}`;
       })
       .join(" · "),
+    domestic: booking.later_dom ? tx("laterLine", { part: tx("laterDom") }) : domLegs.map(legText).join(" · "),
+    // each city with how many tours it has
+    programme: cities
+      .map((c) => (toursOn ? `${c.city_name} (${tx("toursCount")}: ${(c.tour_picks ?? []).slice(0, c.tours ?? 0).filter((p) => !p.free).length})` : c.city_name))
+      .join(" · "),
     services: tx("servicesSummary", { a: data.services.includes.length, b: data.services.excludes.length }),
     pricing: data.pricing.items.length > 0 ? `${tx("total")}: ${summary.total_sell.toLocaleString("en-US")} ${display}` : tx("noLines"),
     finish: produced ?? (blocking.length > 0 ? tx("missing") : tx("allGood")),
   };
-  const titleOf: Record<Step, string> = {
+  // plain headings — one page to the agent, never numbered stages (the owner, 2026-10-25)
+  const titleOf: Record<Section, string> = {
     client: tx("booking"),
-    flights: t("pg.flightsTitle"),
-    cities: tx("citiesStep"),
+    flights: tx("intlFlights"),
+    hotels: scope.hotels ? tx("hotelsStep") : tx("citiesOnly"),
+    domestic: tx("domFlights"),
+    programme: toursOn ? tx("toursStep") : tx("programTab"),
     services: tx("servicesStep"),
     pricing: tx("pricing"),
     finish: tx("finish"),
   };
-  const fold = (step: Step, body: ReactNode) =>
+  /**
+   * One city's card: in the hotels its stays and the city itself (order, nights, another city, removal),
+   * in the programme its tours and days — the same answers, each «تمت» folding its own place.
+   */
+  const cityCard = (part: "hotels" | "programme", city: BasicCity, i: number) => {
+    const key = stopKey(city, i);
+    const done = `${part}|${key}`;
+    return (
+      <BasicCityCard
+        part={part}
+        index={i}
+        city={city}
+        dayFrom={dayFroms[i]}
+        data={data}
+        lookups={lk}
+        programs={programs.filter((p) => p.city_name === city.city_name)}
+        tourPrices={pricesForCity(tourPrices, city.city_name, cities.map((c) => c.city_name), normAr)}
+        listPrices={listPrices}
+        hotelsOn={scope.hotels}
+        toursOn={toursOn}
+        transportOn={scope.transport}
+        isFirst={i === 0}
+        isLast={i === cities.length - 1}
+        onNights={(n) => commit(setCityNights(data, i, n))}
+        onPicks={(tour_picks) => commit({ cities: cities.map((c, k) => (k === i ? { ...c, tour_picks, tours: tour_picks.length } : c)) })}
+        onLines={setLines}
+        onSlice={commit}
+        onCar={(leg, slice) =>
+          leg === "airport"
+            ? setLeg("airport", slice)
+            : leg === "tours"
+              ? setTourCar(slice)
+              : commit({ transport_plan: withCar({ ...plan, farewell: { ...(plan.farewell ?? plan.airport), ...slice, enabled: true } }, slice.car_type) })
+        }
+        onRemove={() => {
+          if (!window.confirm(tx("confirmRemove", { city: city.city_name }))) return;
+          // its key may come back with a new city: nothing of this one may carry over
+          setDatesWere((w) => Object.fromEntries(Object.entries(w).filter(([k]) => k !== key)));
+          setDoneCities((d) => d.filter((k) => stopOf(k) !== key));
+          commit(removeCity(data, i));
+        }}
+        onMove={reorder}
+        dragFrom={dragFrom}
+        onDragFrom={setDragFrom}
+        onReplace={(next) => {
+          const changed = replaceCity(data, i, next);
+          if (changed.cities === data.cities) {
+            if (next.name.trim() !== city.city_name) window.alert(tx("sameCityTwice"));
+            return;
+          }
+          // its hotel and tours are to be chosen again: the card opens, and a focus on the old name follows it
+          setDoneCities((d) => d.filter((k) => stopOf(k) !== key));
+          setFocus((f) => (f ? f.map((n) => (n === city.city_name ? next.name.trim() : n)) : f));
+          commit(changed);
+        }}
+        datesWere={datesWere[key] ?? null}
+        // a city «إكمال» brought here is open, whatever was folded
+        collapsed={!(part === "hotels" && focus) && doneCities.includes(done)}
+        onDone={() => {
+          setDoneCities((d) => [...d, done]);
+          setDatesWere((w) => Object.fromEntries(Object.entries(w).filter(([k]) => k !== key)));
+          // on to the next city
+          window.setTimeout(() => document.getElementById(`basic-${part}-${i + 1}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+        }}
+        onExpand={() => setDoneCities((d) => d.filter((k) => k !== done))}
+      />
+    );
+  };
+  const fold = (step: Section, body: ReactNode) =>
     shown(step) ? (
-      <Fold key={step} id={`basic-${step}`} title={titleOf[step]} open={open === step} onOpen={() => show(step)} summary={summaryOf[step]}>
+      <Fold key={step} id={`basic-${step}`} title={titleOf[step]} open={open === step} onOpen={() => show(step)} summary={summaryOf[step]} missing={missingOf[step]}>
         {body}
-        {step === "finish" ? (
-          // the last step has nothing after it — only the way back
-          <div className="mt-3 border-t border-dashed border-[#DCE9E5] pt-2.5">
-            <button
-              type="button"
-              onClick={() => show(steps[steps.indexOf(step) - 1])}
-              className="inline-flex h-9 items-center rounded-[9px] border border-[#cfe0d9] px-4 text-[12.5px] font-bold text-[#185045] hover:bg-[#f4f8f6]"
-            >
-              {tx("prev")}
-            </button>
-          </div>
-        ) : (
-          <NextButton
-            missing={missingOf[step]}
-            onNext={() => next(step)}
-            onPrev={steps.indexOf(step) > 0 ? () => show(steps[steps.indexOf(step) - 1]) : undefined}
-          />
-        )}
+        {/* the last section has nothing after it */}
+        {step === "finish" ? null : <NextButton missing={missingOf[step]} onNext={() => next(step)} />}
       </Fold>
     ) : null;
 
@@ -1210,8 +1257,8 @@ export function BasicEditor({
       </DialogContent>
     </Dialog>
   );
-  const body: Record<Step, ReactNode> = {
-    // ---- 1. the customer and the trip, and what the programme includes ----
+  const body: Record<Section, ReactNode> = {
+    // ---- the customer and the trip, and what the programme includes ----
     client: (
       <>
         {/* who: equal columns */}
@@ -1366,7 +1413,7 @@ export function BasicEditor({
           </div>
         ) : null}
 
-        {/* «البرنامج يشمل» — small chips, after the program-includes spec; the details come in their own steps */}
+        {/* «البرنامج يشمل» — small chips, after the program-includes spec; the details come in their own sections */}
         <div className="mt-3 border-t border-dashed border-[#DCE9E5] pt-2.5">
           <h3 className="mb-2 text-[13px] font-bold text-[#15483F]">{tx("includes")}</h3>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -1394,11 +1441,11 @@ export function BasicEditor({
       </>
     ),
 
-    // ---- 2. the international flights: the number first, fetched; or «أضف لاحقاً» (the domestic ones are on the hops) ----
+    // ---- the international flights: the number first, fetched; or «أضف لاحقاً» (the domestic ones have their own section) ----
     flights: <BasicFlightPlan data={data} lookups={lk} defaults={planDefaults} onChange={commit} current={() => latest.current} />,
 
-    // ---- 3. the cities, each with its hotel, and the bar that adds them ----
-    cities: (
+    // ---- the hotels: city by city, each hotel on its dates, the way between two cities asked between them; the bar adds a city ----
+    hotels: (
       <div className="space-y-3">
         {citiesNote && !focus ? (
           <p role="status" className={`flex items-center gap-2 rounded-[10px] px-3 py-1.5 text-[12px] font-bold ${citiesNote === "flightCities" ? "bg-[#eef6f2] text-[#185045]" : "bg-[#fff8e8] text-[#a86a10]"}`}>
@@ -1406,15 +1453,6 @@ export function BasicEditor({
             <span className="flex-1">{tx(citiesNote)}</span>
             <button type="button" onClick={() => setCitiesNote(null)} aria-label={tx("dismiss")} className="text-[#557d78]">×</button>
           </p>
-        ) : null}
-        {/* how the group moves between cities — the transport step's only question left */}
-        {cities.length > 1 && !focus ? (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className={basicLabel}>{tx("between")}</span>
-            {MODE_CHIPS.map(({ mode, label, icon }) => (
-              <Chip key={mode} on={modes.includes(mode)} icon={icon} label={tx(label)} onClick={() => toggleMode(mode)} />
-            ))}
-          </div>
         ) : null}
         {/* a road hop nobody would drive (Puncak → Bali): said, never blocked */}
         {cities.length > 1 && !focus ? <OverlandHopNotice data={data} countries={lk.countries} /> : null}
@@ -1427,105 +1465,23 @@ export function BasicEditor({
             </button>
           </div>
         ) : null}
-        {/* «١. الفنادق» for every city first, then the cards for the tours and transfers (2026-10-18); a focused view keeps the card's own hotel tab */}
-        {scope.hotels && cities.length > 0 && !focus ? (
-          <>
-            <BasicHotelsStep cities={cities} firstDay={travelDays + 1} data={data} lookups={lk} onLines={setLines} onSlice={commit} />
-            <h3 className="px-1 pt-1 text-[13.5px] font-extrabold text-[#0f3d38]">{tx("toursStep")}</h3>
-          </>
-        ) : null}
         {cities.length === 0 ? (
           <p className="rounded-[12px] border border-dashed border-[#cfe0d9] px-4 py-5 text-center text-[12.5px] font-semibold text-[#93aaa3]">{tx("noCities")}</p>
         ) : (
           cities.map((city, i) => {
-            const dayFrom = dayCursor;
-            dayCursor += city.nights;
             if (focus && !focus.includes(city.city_name)) return null;
-            // the group may land in another city and fly on — or fly from the last city to the flight home
+            // the group may land in another city and go on — or go from the last city to the flight home
             const from = cities[i - 1]?.city_name ?? (landingCity && landingCity !== city.city_name && flies(landingCity, city.city_name) ? landingCity : "");
             const out = i === cities.length - 1 && homeCity && homeCity !== city.city_name && flies(city.city_name, homeCity) ? homeCity : "";
-            // several ways between cities: each move says which one it takes
-            const hop =
-              modes.length > 1 && (from || out) ? (
-                <>
-                  {from ? hopSelect(from, city.city_name, tx("hop", { city: from })) : null}
-                  {out ? hopSelect(city.city_name, out, tx("hopOut", { city: out })) : null}
-                </>
-              ) : undefined;
             return (
               <Fragment key={`${i}-${city.city_name}`}>
-              {/* the move by air into this city, between the two cards — after the last, the one to the flight home */}
-              {focus ? null : hopStrips(i)}
-              <BasicCityCard
-                index={i}
-                city={city}
-                dayFrom={dayFrom}
-                data={data}
-                lookups={lk}
-                programs={programs.filter((p) => p.city_name === city.city_name)}
-                tourPrices={pricesForCity(tourPrices, city.city_name, cities.map((c) => c.city_name), normAr)}
-                listPrices={listPrices}
-                // the hotels are entered in «١. الفنادق» above; the card keeps a hotel tab to edit its stays, opening on the tours
-                hotelsOn={scope.hotels}
-                hotelsFirst={Boolean(focus)}
-                toursOn={toursOn}
-                transportOn={scope.transport}
-                isFirst={i === 0}
-                isLast={i === cities.length - 1}
-                hop={hop}
-                onNights={(n) => commit(setCityNights(data, i, n))}
-                onPicks={(tour_picks) => commit({ cities: cities.map((c, k) => (k === i ? { ...c, tour_picks, tours: tour_picks.length } : c)) })}
-                onLines={setLines}
-                onSlice={commit}
-                onCar={(leg, slice) =>
-                  leg === "airport"
-                    ? setLeg("airport", slice)
-                    : leg === "tours"
-                      ? setTourCar(slice)
-                      : commit({ transport_plan: withCar({ ...plan, farewell: { ...(plan.farewell ?? plan.airport), ...slice, enabled: true } }, slice.car_type) })
-                }
-                onRemove={() => {
-                  if (!window.confirm(tx("confirmRemove", { city: city.city_name }))) return;
-                  // its key may come back with a new city: nothing of this one may carry over
-                  const key = stopKey(city, i);
-                  setDatesWere((w) => Object.fromEntries(Object.entries(w).filter(([k]) => k !== key)));
-                  setDoneCities((d) => d.filter((k) => k !== key));
-                  commit(removeCity(data, i));
-                }}
-                onMove={reorder}
-                dragFrom={dragFrom}
-                onDragFrom={setDragFrom}
-                onReplace={(next) => {
-                  const changed = replaceCity(data, i, next);
-                  if (changed.cities === data.cities) {
-                    if (next.name.trim() !== city.city_name) window.alert(tx("sameCityTwice"));
-                    return;
-                  }
-                  // its hotel and tours are to be chosen again: the card opens, and a focus on the old name follows it
-                  setDoneCities((d) => d.filter((k) => k !== stopKey(city, i)));
-                  setFocus((f) => (f ? f.map((n) => (n === city.city_name ? next.name.trim() : n)) : f));
-                  commit(changed);
-                }}
-                datesWere={datesWere[stopKey(city, i)] ?? null}
-                collapsed={doneCities.includes(stopKey(city, i))}
-                onDone={() => {
-                  setDoneCities((d) => [...d, stopKey(city, i)]);
-                  setDatesWere((w) => Object.fromEntries(Object.entries(w).filter(([k]) => k !== stopKey(city, i))));
-                  // on to the next city
-                  window.setTimeout(() => document.getElementById(`basic-city-${i + 1}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
-                }}
-                onExpand={() => setDoneCities((d) => d.filter((k) => k !== stopKey(city, i)))}
-              />
-              {focus || i < cities.length - 1 ? null : hopStrips(cities.length)}
+                {from && !focus ? hopLine(from, city.city_name) : null}
+                {cityCard("hotels", city, i)}
+                {out && !focus ? hopLine(city.city_name, out) : null}
               </Fragment>
             );
           })
         )}
-        {/* a domestic leg no move claims — still here to complete or remove */}
-        {focus ? null : (
-          <BasicHopFlight hop={null} legs={hopsOf.rest} data={data} lookups={lk} gaps={gapsOf} onChange={commit} current={() => latest.current} />
-        )}
-
         {/* the add bar, like the company's system — gone once every night has its city */}
         {focus || (trip.nights > 0 && used === trip.nights) ? null : (
         <div className="sticky bottom-3 z-20 rounded-[14px] border border-[#cfe0d9] bg-[#e9f3ef]/95 px-2 py-1.5 shadow-[0_8px_24px_rgba(0,60,58,0.12)] backdrop-blur max-lg:bottom-[80px] sm:px-2.5">
@@ -1623,11 +1579,11 @@ export function BasicEditor({
               type="button"
               onClick={onAdd}
               disabled={!newCity}
-              aria-label={tx("add")}
+              aria-label={tx("addCity")}
               className="inline-flex h-9 shrink-0 items-center gap-1 rounded-[8px] bg-[#185045] px-2.5 text-[12.5px] font-extrabold text-white disabled:opacity-50 sm:px-3.5"
             >
               <Plus className="size-4" />
-              <span className="max-sm:hidden">{tx("add")}</span>
+              <span className="max-sm:hidden">{tx("addCity")}</span>
             </button>
             <span className={`tv-tnum hidden h-9 shrink-0 items-center gap-1 rounded-[8px] px-2.5 text-[11.5px] font-bold md:inline-flex ${nightsTone}`}>
               <MapPin className="size-3.5" />
@@ -1646,7 +1602,24 @@ export function BasicEditor({
       </div>
     ),
 
-    // ---- 4. what the programme includes and does not — the generator's own lists, ✓ / ✗ ----
+    // ---- the domestic flights: each move by air between two cities, its leg on the move's day ----
+    domestic: booking.later_dom ? (
+      // «أضف لاحقاً»: one line for all of them, and the way back
+      <BasicHopFlight hop={null} legs={domLegs} data={data} lookups={lk} gaps={gapsOf} onChange={commit} current={() => latest.current} />
+    ) : (
+      <div className="space-y-3">
+        {hopsOf.hops.map((h) => (
+          <BasicHopFlight key={`${h.before}-${h.from}`} hop={h} legs={h.legs} data={data} lookups={lk} gaps={gapsOf} onChange={commit} current={() => latest.current} />
+        ))}
+        {/* a domestic leg no move claims — still here to complete or remove */}
+        <BasicHopFlight hop={null} legs={hopsOf.rest} data={data} lookups={lk} gaps={gapsOf} onChange={commit} current={() => latest.current} />
+      </div>
+    ),
+
+    // ---- the programme: each city's tours, receptions and transfers, and its days as the client reads them ----
+    programme: <div className="space-y-3">{cities.map((city, i) => <Fragment key={`${i}-${city.city_name}`}>{cityCard("programme", city, i)}</Fragment>)}</div>,
+
+    // ---- what the programme includes and does not — the generator's own lists, ✓ / ✗ ----
     services: (
       <>
         {/* the SIM lines: a count, written as one «يشمل» line */}
@@ -1670,7 +1643,7 @@ export function BasicEditor({
       </>
     ),
 
-    // ---- 5. the price (sell side only, for whoever may see prices) ----
+    // ---- the price (sell side only, for whoever may see prices) ----
     pricing: (
           <div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -1876,7 +1849,7 @@ export function BasicEditor({
           </div>
     ),
 
-    // ---- 6. what is missing, and issuing — here ----
+    // ---- what is missing, and issuing — here ----
     finish: (
         <div>
           {/* an issued file: one panel, the steps in order (BasicFileStatus) — a partner keeps the plain line */}
@@ -1905,13 +1878,13 @@ export function BasicEditor({
               </h3>
               <ul className="space-y-1">
                 {blocking.map((issue, i) => {
-                  // the domestic legs are entered on the cities' hops
-                  const target = DOM_KEYS.includes(issue.key ?? "") ? "cities" : STEP_OF[issue.stage];
+                  // named by the section that answers it — a domestic leg's by the domestic flights
+                  const target = sectionOf(issue, steps);
                   return (
                   <li key={i} className="flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[#5b4a2a]">
-                    <span className="rounded-full bg-[#fff3d6] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">{stageLabel(issue.stage)}</span>
+                    <span className="rounded-full bg-[#fff3d6] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">{target ? titleOf[target] : stageLabel(issue.stage)}</span>
                     <span className="min-w-0 flex-1">{issueText(issue)}</span>
-                    {target && steps.includes(target) ? (
+                    {target ? (
                       <button
                         type="button"
                         onClick={() => {
@@ -1923,7 +1896,7 @@ export function BasicEditor({
                         {tx("fix")}
                       </button>
                     ) : legacyOpen ? (
-                      // a stage Basic has no step for (none today) — the full generator, while it is on
+                      // a stage Basic has no section for (none today) — the full generator, while it is on
                       <Link href={stageHref(draftId, issue.stage)} onClick={() => void flush()} className="text-[11.5px] font-bold text-[#185045] underline">
                         {tx("fix")}
                       </Link>
@@ -2061,7 +2034,7 @@ export function BasicEditor({
             />
           ) : null}
 
-          {/* one step open at a time; the done ones fold to a line, the next ones wait */}
+          {/* one section open at a time; the done ones fold to a line, the next ones appear as they are reached */}
           {steps.map((step) => fold(step, body[step]))}
         </div>
       </FieldIssueProvider>

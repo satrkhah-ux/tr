@@ -68,7 +68,7 @@ export type LegChange = Partial<Pick<DraftFlight, "flight_no" | "airline" | "air
  * following its move); its number — or, off a move, an airport — makes it the
  * agent's own (withDomesticFlights leaves it alone after).
  *
- * `hop`: the leg is edited on the move between two cities (the cities step) —
+ * `hop`: the leg is edited on the move between two cities (the domestic flights' section) —
  * it stays that move's whatever airport serves the cities (KUL for Selangor).
  */
 export function changeLeg(
@@ -142,9 +142,9 @@ export function withLegFares(booking: FlightBooking, trip: Pick<DraftTrip, "adul
 export type FlightHop = CityMove & { legs: DraftFlight[] };
 
 /**
- * The moves the group makes by air, each with its legs — what the cities step
- * shows between two city cards (the evaluator, 2026-10-24: the domestic leg
- * belongs on the hop, not in the flights step before the cities). A leg is a
+ * The moves the group makes by air, each with its legs — what Basic's domestic
+ * flights section shows, after the hotels (the evaluator, 2026-10-24: the domestic
+ * leg belongs on the hop, not with the international flights). A leg is a
  * move's when it flies between its two cities (on its day first), else when it
  * leaves on its day (a connection through another airport); a leg no move
  * claims is `rest` — shown too, so nothing «ينقص» asks for is out of reach.

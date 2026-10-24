@@ -16,13 +16,13 @@ export function gapWords(tx: ReturnType<typeof useBasicLabels>, gaps: LegGap[], 
 }
 
 /**
- * A move by air between two city cards (the evaluator, 2026-10-24: the domestic
- * flight lives on the hop, after the hotels, not in the flights step before the
- * cities): the leg the cities wrote for it — from the city's airport to the
+ * A move by air between two cities, in the domestic flights' own section after
+ * the hotels (the evaluator, 2026-10-24; the owner, 2026-10-25 — not with the
+ * international flights): the leg the cities wrote for it — from the city's airport to the
  * next one's, on the day the city changes — with its number, airports, day,
  * clocks and ticket «للفرد», each editable here, and what it still lacks said
  * under it, so «ينقص» is cleared where it is read. A leg the cities wrote goes
- * when the hop is switched off «طيران»; one of the agent's own is removed here.
+ * when the move is switched off «طيران» (between the two cities' hotels); one of the agent's own is removed here.
  * `hop` null: the legs no move claims («رحلات داخلية أخرى»).
  */
 export function BasicHopFlight({
@@ -106,7 +106,7 @@ export function BasicHopFlight({
             canFetch={canFetch}
             onEdit={(change) => edit(leg.id ?? "", change)}
             onHit={(h) => hit(leg.id ?? "", h)}
-            // a leg the cities wrote goes with its hop («برّي» on the city card); the agent's own goes here
+            // a leg the cities wrote goes with its hop («برّي» between the cities' hotels); the agent's own goes here
             onRemove={leg.auto ? undefined : () => remove(leg.id ?? "")}
             price={{
               label: tx("legFare"),

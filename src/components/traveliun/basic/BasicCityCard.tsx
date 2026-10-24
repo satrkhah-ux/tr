@@ -32,6 +32,7 @@ import {
   emptyRoomSpec,
   findLookupCountry,
   fromUnit,
+  hotelCoverage,
   HOTEL_ROOM_NAME_MAX,
   hotelRoomName,
   perUnit,
@@ -92,7 +93,7 @@ const span = (c: { check_in: string | null; check_out: string | null }) =>
 /** «الأربعاء، 11 نوفمبر» */
 const dayLabel = (iso: string) => DAY.format(new Date(`${iso}T00:00:00Z`));
 
-type Tab = "hotel" | "tours" | "program";
+type Tab = "tours" | "program";
 
 /**
  * The card's tables share one look: a row of small headings once, then rows of
@@ -114,17 +115,16 @@ const toursText = (tx: ReturnType<typeof useBasicLabels>, n: number, total: numb
   total == null ? `${tx("toursCount")}: ${n}` : tx("toursSummary", { n, total: total.toLocaleString("en-US") });
 
 /**
- * One city: its tabs in the header beside its name — the hotel, the tours (with
- * the airport reception / farewell beside them), the domestic flights — one open
- * at a time.
+ * One city, in one of the page's two places for it (the owner, 2026-10-25: the hotels apart,
+ * city by city, then the programme and the tours): `part` "hotels" is the city itself — its
+ * order, its nights, another city in its place, its removal — with its stays, each hotel on
+ * its dates; "programme" is its tours (with the airport reception / farewell beside them) and
+ * its days, one tab open at a time.
  * Everything the trip already said (dates, meals, currency) is filled in for
  * the agent and kept under «معلومات إضافية».
  */
-/** a stop's stays are complete: a hotel, and every room typed, with its board and price */
-export const stayDone = (ls: DraftHotel[]) =>
-  ls.length > 0 && ls.every((l) => l.hotel_name.trim() && l.rooms.length > 0 && l.rooms.every((r) => (r.room_type_id || r.room_type_name.trim()) && r.board_type && r.price != null));
-
 export function BasicCityCard({
+  part,
   index,
   city,
   dayFrom,
@@ -134,12 +134,10 @@ export function BasicCityCard({
   tourPrices,
   listPrices = {},
   hotelsOn,
-  hotelsFirst = true,
   toursOn,
   transportOn,
   isFirst,
   isLast,
-  hop,
   onNights,
   onPicks,
   onLines,
@@ -155,6 +153,7 @@ export function BasicCityCard({
   onDone,
   onExpand,
 }: {
+  part: "hotels" | "programme";
   index: number;
   city: BasicCity;
   dayFrom: number;
@@ -167,19 +166,11 @@ export function BasicCityCard({
   /** each transfer's price in the company's list (by pricing ref) — shown before the pricing sheet is worked out. */
   listPrices?: Record<string, { price: number; currency: string }>;
   hotelsOn: boolean;
-  /**
-   * the stay is entered here first (a focused city). false: «١. الفنادق» above has it — the card keeps its hotel
-   * tab to edit it (the evaluator, 2026-10-22: «تعديل» showed no hotel) but opens on the tours and does not repeat
-   * what the stay still lacks
-   */
-  hotelsFirst?: boolean;
   toursOn: boolean;
   transportOn: boolean;
   /** the city the group lands in, and the one it flies home from. */
   isFirst: boolean;
   isLast: boolean;
-  /** how the group gets here from the previous city, when the trip moves more than one way. */
-  hop?: ReactNode;
   onNights: (nights: number) => void;
   /** the city's tours, in date order — their count is the city's tour count. */
   onPicks: (picks: TourPick[]) => void;
@@ -204,60 +195,65 @@ export function BasicCityCard({
   onExpand: () => void;
 }) {
   const tx = useBasicLabels();
+  const hotelsPart = part === "hotels";
   // this stop's own stays — a city visited twice has two sets
   const lines = cityHotelLines(data.cities, data.hotels, index);
   const [main] = lines;
   // the visit's reception, farewell and transfers — on the tours tab, with the tours
-  const services = transportOn ? cityServices(data, index) : [];
+  const services = transportOn && !hotelsPart ? cityServices(data, index) : [];
   // «البرنامج السياحي» opens once every tour of the city says what it is
-  const picks = toursOn ? withTours(city, city.tours ?? 0, undefined, isLast) : [];
+  const picks = toursOn && !hotelsPart ? withTours(city, city.tours ?? 0, undefined, isLast) : [];
   const programLocked = picks.some((p) => !p.free && !p.title.trim());
-  const tabs: { key: Tab; label: string; icon: typeof Plane; locked?: boolean }[] = [
-    ...(hotelsOn && main ? [{ key: "hotel" as const, label: tx("hotel"), icon: BedDouble }] : []),
-    // the tours, and every car the group rides in on this visit
-    ...(toursOn || services.length > 0
-      ? [{ key: "tours" as const, label: toursOn ? tx("tours") : tx("transfersTab"), icon: toursOn ? Camera : UserRound }]
-      : []),
-    { key: "program" as const, label: tx("programTab"), icon: ListChecks, locked: programLocked },
-  ];
-  // a stay already complete (picked from the add bar, or a file reopened) is not asked again: the card opens on what is left
-  const hasTours = tabs.some((x) => x.key === "tours");
-  const [tab, setTab] = useState<Tab>(() => (hotelsOn && hasTours && (stayDone(lines) || !hotelsFirst) ? "tours" : "hotel"));
-  // focus left the hotel fields: once the stay is complete the card moves on by itself
-  const [leftHotel, setLeftHotel] = useState(false);
-  const wanted = leftHotel && tab === "hotel" && hasTours && stayDone(lines) ? "tours" : tab;
-  const open = tabs.some((x) => x.key === wanted && !x.locked) ? wanted : tabs[0]?.key;
-  const pickTab = (key: Tab) => {
-    setLeftHotel(false);
-    setTab(key);
-  };
+  const tabs: { key: Tab; label: string; icon: typeof Plane; locked?: boolean }[] = hotelsPart
+    ? []
+    : [
+        // the tours, and every car the group rides in on this visit
+        ...(toursOn || services.length > 0
+          ? [{ key: "tours" as const, label: toursOn ? tx("tours") : tx("transfersTab"), icon: toursOn ? Camera : UserRound }]
+          : []),
+        { key: "program" as const, label: tx("programTab"), icon: ListChecks, locked: programLocked },
+      ];
+  const [tab, setTab] = useState<Tab>("tours");
+  const open = tabs.some((x) => x.key === tab && !x.locked) ? tab : tabs[0]?.key;
 
-  // what the city still lacks before «تمت»: the stay, the tours, the airport cars
+  // the city's nights against its stays: a night with no hotel, or one booked twice
+  const cover = hotelsPart && hotelsOn ? hotelCoverage(data.cities, data.hotels)[index] : undefined;
+  const short = cover ? cover.needed - (cover.covered - cover.extra) : 0;
+
+  // what the city still lacks before «تمت»: its stays here; the tours and the airport cars in the programme
   const plan = data.transport_plan;
   const tripCar = plan.tours.car_type.trim();
   // the tours' prices, as the generator shows them: pricing.view only (a hidden price is kept, never cleared)
   const showPrice = useRole().can("pricing.view");
   const rooms = lines.flatMap((l) => l.rooms);
-  const missing = [
-    hotelsOn && hotelsFirst && lines.some((l) => !l.hotel_name.trim()) && tx("hotel"),
-    hotelsOn && hotelsFirst && rooms.some((r) => !(r.room_type_id || r.room_type_name.trim())) && tx("roomType"),
-    hotelsOn && hotelsFirst && rooms.some((r) => !r.board_type) && tx("board"),
-    hotelsOn && hotelsFirst && rooms.some((r) => r.price == null) && tx("price"),
-    picks.some((p) => !p.free && !p.title.trim()) && tx("tourService"),
-    picks.some((p) => !p.free && !(p.car_type?.trim() || tripCar)) && tx("carType"),
-    // a tour the list prices is priced (the sheet takes the list's figure) — asked only of who sees the price
-    showPrice && picks.some((p) => !tourPriced(p, tripCar, tourPrices)) && tx("tourPrice"),
-    transportOn && isFirst && !plan.airport.car_type.trim() && tx("reception"),
-    transportOn && isLast && !(plan.farewell ?? plan.airport).car_type.trim() && tx("farewell"),
-  ].filter((x): x is string => Boolean(x));
+  const missing = (
+    hotelsPart
+      ? [
+          hotelsOn && lines.some((l) => !l.hotel_name.trim()) && tx("hotel"),
+          hotelsOn && rooms.some((r) => !(r.room_type_id || r.room_type_name.trim())) && tx("roomType"),
+          hotelsOn && rooms.some((r) => !r.board_type) && tx("board"),
+          hotelsOn && rooms.some((r) => r.price == null) && tx("price"),
+        ]
+      : [
+          picks.some((p) => !p.free && !p.title.trim()) && tx("tourService"),
+          picks.some((p) => !p.free && !(p.car_type?.trim() || tripCar)) && tx("carType"),
+          // a tour the list prices is priced (the sheet takes the list's figure) — asked only of who sees the price
+          showPrice && picks.some((p) => !tourPriced(p, tripCar, tourPrices)) && tx("tourPrice"),
+          transportOn && isFirst && !plan.airport.car_type.trim() && tx("reception"),
+          transportOn && isLast && !(plan.farewell ?? plan.airport).car_type.trim() && tx("farewell"),
+        ]
+  ).filter((x): x is string => Boolean(x));
   const stayPrice = rooms.reduce((sum, r) => sum + (r.price ?? 0), 0);
   const tours = picks.filter((p) => !p.free);
-  const summary = [
-    [...new Set(lines.map((l) => l.hotel_name.trim()).filter(Boolean))].join(" + "),
-    main && main.rooms.length > 0 ? `${main.rooms.length} × ${baseRoomName(main.rooms[0].room_type_name) || "—"}` : "",
-    hotelsOn && stayPrice > 0 ? `${stayPrice.toLocaleString("en-US")} ${main?.manual_currency ?? ""}`.trim() : "",
-    toursOn ? toursText(tx, tours.length, showPrice ? toursTotal(tours, tripCar, tourPrices, lookups.sarPer ?? { SAR: 1 }) : null) : "",
-  ]
+  const summary = (
+    hotelsPart
+      ? [
+          [...new Set(lines.map((l) => l.hotel_name.trim()).filter(Boolean))].join(" + "),
+          main && main.rooms.length > 0 ? `${main.rooms.length} × ${baseRoomName(main.rooms[0].room_type_name) || "—"}` : "",
+          hotelsOn && stayPrice > 0 ? `${stayPrice.toLocaleString("en-US")} ${main?.manual_currency ?? ""}`.trim() : "",
+        ]
+      : [toursOn ? toursText(tx, tours.length, showPrice ? toursTotal(tours, tripCar, tourPrices, lookups.sarPer ?? { SAR: 1 }) : null) : ""]
+  )
     .filter(Boolean)
     .join(" · ");
 
@@ -273,10 +269,69 @@ export function BasicCityCard({
   const editCities = editing ? (findLookupCountry(lookups.countries, editCountry)?.cities ?? []) : [];
   const moved = Boolean(datesWere);
 
+  // the part's own body — a city without hotels in the file has no stays to enter: its header is all of it
+  const body = hotelsPart ? (
+    hotelsOn && main ? (
+      <HotelPanel index={index} city={city} dayFrom={dayFrom} data={data} lookups={lookups} lines={lines} onLines={onLines} onSlice={onSlice} />
+    ) : null
+  ) : open ? (
+    <>
+      {open === "tours" ? (
+        <ServicesPanel
+          index={index}
+          city={city}
+          programs={programs}
+          tourPrices={tourPrices}
+          listPrices={listPrices}
+          sarPer={lookups.sarPer ?? { SAR: 1 }}
+          data={data}
+          carTypes={lookups.carTypes}
+          isLast={isLast}
+          toursOn={toursOn}
+          transportOn={transportOn}
+          showPrice={showPrice}
+          hotels={hotelsOn ? [...new Set(lines.map((l) => l.hotel_name.trim()).filter(Boolean))] : []}
+          services={services}
+          onPicks={onPicks}
+          onCar={onCar}
+          onSlice={onSlice}
+        />
+      ) : null}
+      {open === "program" && isFirst ? (
+        <div className="mb-2">
+          <DayLines label={tx("welcomeText")} date={city.check_in} lines={data.arrival_lines} fallback={arrivalLines(data)} onChange={(arrival_lines) => onSlice({ arrival_lines })} />
+        </div>
+      ) : null}
+      {open === "program" ? (
+        <BasicCityProgram
+          city={city}
+          data={data}
+          dayLabel={dayLabel}
+          onSlice={onSlice}
+          onTours={() => setTab("tours")}
+          catalog={{
+            city: city.city_name,
+            programs,
+            prices: tourPrices,
+            sarPer: lookups.sarPer ?? { SAR: 1 },
+            carTypes: lookups.carTypes,
+            tripCar: plan.tours.car_type,
+            showPrice,
+          }}
+        />
+      ) : null}
+      {open === "program" && isLast ? (
+        <div className="mt-2">
+          <DayLines label={tx("farewellText")} date={departureDay(city)} lines={data.departure_lines} fallback={departureLines(data)} onChange={(departure_lines) => onSlice({ departure_lines })} />
+        </div>
+      ) : null}
+    </>
+  ) : null;
+
   return (
     <article
       ref={card}
-      id={`basic-city-${index}`}
+      id={`basic-${part}-${index}`}
       onDragOver={(e) => {
         if (dragFrom === null) return;
         // the drop is the card's, never a field's under the pointer
@@ -299,36 +354,50 @@ export function BasicCityCard({
         target ? "border-dashed border-[#2aa87a]" : moved ? "border-[#f1b5b5]" : "border-[#d8e6e0]"
       } ${over ? "border-t-4 border-t-[#2aa87a] shadow-[0_-6px_0_rgba(42,168,122,0.15)]" : ""} ${dragFrom === index ? "opacity-50" : ""}`}
     >
-      {/* the city, its tabs and its nights — one line */}
+      {/* the city, its dates — and here its nights, order and removal, or there its tabs — one line */}
       <header className={`flex flex-wrap items-center gap-2 px-3 py-2 ${moved ? "bg-[#fdecec]" : "bg-[#eef5f2]"}`}>
-        <span
-          draggable
-          role="button"
-          tabIndex={-1}
-          aria-label={tx("dragCity")}
-          title={tx("dragCity")}
-          onDragStart={(e) => {
-            e.dataTransfer.effectAllowed = "move";
-            // not text/plain: dropped on a field by mistake, the city's number would be typed into it
-            e.dataTransfer.setData("application/x-basic-city", String(index));
-            if (card.current) {
-              const r = card.current.getBoundingClientRect();
-              e.dataTransfer.setDragImage(card.current, e.clientX - r.left, e.clientY - r.top);
-            }
-            // after the browser has taken the picture — the card fades only then
-            window.setTimeout(() => onDragFrom(index), 0);
-          }}
-          onDragEnd={() => onDragFrom(null)}
-          className="cursor-grab text-[#7a948f] hover:text-[#185045] active:cursor-grabbing"
-        >
-          <GripVertical className="size-4" />
-        </span>
+        {hotelsPart ? (
+          <span
+            draggable
+            role="button"
+            tabIndex={-1}
+            aria-label={tx("dragCity")}
+            title={tx("dragCity")}
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = "move";
+              // not text/plain: dropped on a field by mistake, the city's number would be typed into it
+              e.dataTransfer.setData("application/x-basic-city", String(index));
+              if (card.current) {
+                const r = card.current.getBoundingClientRect();
+                e.dataTransfer.setDragImage(card.current, e.clientX - r.left, e.clientY - r.top);
+              }
+              // after the browser has taken the picture — the card fades only then
+              window.setTimeout(() => onDragFrom(index), 0);
+            }}
+            onDragEnd={() => onDragFrom(null)}
+            className="cursor-grab text-[#7a948f] hover:text-[#185045] active:cursor-grabbing"
+          >
+            <GripVertical className="size-4" />
+          </span>
+        ) : null}
         <span className={`flex size-6 items-center justify-center rounded-full text-[11px] font-extrabold text-white ${moved ? "bg-[#c43d3d]" : "bg-[#185045]"}`}>{index + 1}</span>
         <h3 className="text-[13.5px] font-extrabold text-[#0f3d38]">{city.city_name}</h3>
         {city.country ? <span className="rounded-full bg-white px-2 py-0.5 text-[10.5px] font-bold text-[#557d78]">{city.country}</span> : null}
-        {hop}
-        {tabs.length > 0 && !collapsed ? (
-          <div role="tablist" className="flex flex-wrap gap-1 sm:ms-3">
+        {/* from a date to a date — the stays below are held inside them */}
+        <span className="tv-tnum text-[11.5px] font-semibold text-[#557d78]">{span(city)}</span>
+        {cover && cover.extra > 0 ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#b42318]">
+            <AlertTriangle className="size-3.5" />
+            {tx("nightsExtra", { n: cover.extra })}
+          </span>
+        ) : short > 0 ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#a86a10]">
+            <AlertTriangle className="size-3.5" />
+            {tx("nightsShort", { n: short })}
+          </span>
+        ) : null}
+        {tabs.length > 1 && !collapsed ? (
+          <div role="tablist" className="flex flex-wrap gap-1 sm:ms-auto">
             {tabs.map(({ key, label, icon: Icon, locked }) => (
               <button
                 key={key}
@@ -337,7 +406,7 @@ export function BasicCityCard({
                 aria-selected={open === key}
                 disabled={locked}
                 title={locked ? tx("programLocked") : undefined}
-                onClick={() => pickTab(key)}
+                onClick={() => setTab(key)}
                 className={`inline-flex h-7 items-center gap-1 rounded-[7px] border px-2.5 text-[11.5px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                   open === key ? "border-[#185045] bg-[#185045] text-white" : "border-[#d3e2dc] bg-white text-[#557d78] hover:border-[#165749]"
                 }`}
@@ -348,41 +417,43 @@ export function BasicCityCard({
             ))}
           </div>
         ) : null}
-        <div className="ms-auto flex items-center gap-2">
-          {/* the arrows do what the drag does — on a phone, and from the keyboard */}
-          <span className="inline-flex items-center">
-            <button type="button" disabled={isFirst} onClick={() => onMove(index, index - 1)} aria-label={tx("moveUp")} title={tx("moveUp")} className="rounded-[7px] p-1 text-[#557d78] hover:bg-white disabled:opacity-30">
-              <ArrowUp className="size-3.5" />
+        {hotelsPart ? (
+          <div className="ms-auto flex items-center gap-2">
+            {/* the arrows do what the drag does — on a phone, and from the keyboard */}
+            <span className="inline-flex items-center">
+              <button type="button" disabled={isFirst} onClick={() => onMove(index, index - 1)} aria-label={tx("moveUp")} title={tx("moveUp")} className="rounded-[7px] p-1 text-[#557d78] hover:bg-white disabled:opacity-30">
+                <ArrowUp className="size-3.5" />
+              </button>
+              <button type="button" disabled={isLast} onClick={() => onMove(index, index + 1)} aria-label={tx("moveDown")} title={tx("moveDown")} className="rounded-[7px] p-1 text-[#557d78] hover:bg-white disabled:opacity-30">
+                <ArrowDown className="size-3.5" />
+              </button>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setEditCountry(city.country || data.trip.country);
+                setEditCity(city.city_name);
+                setEditing((v) => !v);
+              }}
+              aria-expanded={editing}
+              className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#d3e2dc] bg-white px-2 text-[11px] font-bold text-[#185045] hover:border-[#165749]"
+            >
+              <Pencil className="size-3.5" />
+              {tx("editCity")}
             </button>
-            <button type="button" disabled={isLast} onClick={() => onMove(index, index + 1)} aria-label={tx("moveDown")} title={tx("moveDown")} className="rounded-[7px] p-1 text-[#557d78] hover:bg-white disabled:opacity-30">
-              <ArrowDown className="size-3.5" />
+            <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#185045]">
+              {tx("nights")}
+              <select value={city.nights} onChange={(e) => onNights(Number(e.target.value))} className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold">
+                {range(1, 30).map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+            <button type="button" onClick={onRemove} aria-label={tx("removeCity")} className="rounded-[7px] p-1 text-[#c43d3d] hover:bg-[#fff1f1]">
+              <Trash2 className="size-4" />
             </button>
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              setEditCountry(city.country || data.trip.country);
-              setEditCity(city.city_name);
-              setEditing((v) => !v);
-            }}
-            aria-expanded={editing}
-            className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-[#d3e2dc] bg-white px-2 text-[11px] font-bold text-[#185045] hover:border-[#165749]"
-          >
-            <Pencil className="size-3.5" />
-            {tx("editCity")}
-          </button>
-          <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#185045]">
-            {tx("nights")}
-            <select value={city.nights} onChange={(e) => onNights(Number(e.target.value))} className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold">
-              {range(1, 30).map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </label>
-          <button type="button" onClick={onRemove} aria-label={tx("removeCity")} className="rounded-[7px] p-1 text-[#c43d3d] hover:bg-[#fff1f1]">
-            <Trash2 className="size-4" />
-          </button>
-        </div>
+          </div>
+        ) : null}
       </header>
 
       {/* «تعديل المدينة»: another city, the same place in the trip */}
@@ -441,7 +512,7 @@ export function BasicCityCard({
         </p>
       ) : null}
 
-      {collapsed ? (
+      {!body ? null : collapsed ? (
         // done: one line — what the city holds, and a press reopens it
         <button
           type="button"
@@ -461,68 +532,9 @@ export function BasicCityCard({
             {tx("edit")}
           </span>
         </button>
-      ) : open ? (
+      ) : (
         <div className="p-3">
-          {open === "hotel" && main ? (
-            // leaving a complete stay moves on to the tours — never mid-typing; «الفندق» brings it back
-            <div
-              onFocus={() => setLeftHotel(false)}
-              onBlur={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setLeftHotel(true);
-              }}
-            >
-              <HotelPanel index={index} city={city} dayFrom={dayFrom} data={data} lookups={lookups} lines={lines} onLines={onLines} onSlice={onSlice} />
-            </div>
-          ) : null}
-          {open === "tours" ? (
-            <ServicesPanel
-              index={index}
-              city={city}
-              programs={programs}
-              tourPrices={tourPrices}
-              listPrices={listPrices}
-              sarPer={lookups.sarPer ?? { SAR: 1 }}
-              data={data}
-              carTypes={lookups.carTypes}
-              isLast={isLast}
-              toursOn={toursOn}
-              transportOn={transportOn}
-              showPrice={showPrice}
-              hotels={hotelsOn ? [...new Set(lines.map((l) => l.hotel_name.trim()).filter(Boolean))] : []}
-              services={services}
-              onPicks={onPicks}
-              onCar={onCar}
-              onSlice={onSlice}
-            />
-          ) : null}
-          {open === "program" && isFirst ? (
-            <div className="mb-2">
-              <DayLines label={tx("welcomeText")} date={city.check_in} lines={data.arrival_lines} fallback={arrivalLines(data)} onChange={(arrival_lines) => onSlice({ arrival_lines })} />
-            </div>
-          ) : null}
-          {open === "program" ? (
-            <BasicCityProgram
-              city={city}
-              data={data}
-              dayLabel={dayLabel}
-              onSlice={onSlice}
-              onTours={() => pickTab("tours")}
-              catalog={{
-                city: city.city_name,
-                programs,
-                prices: tourPrices,
-                sarPer: lookups.sarPer ?? { SAR: 1 },
-                carTypes: lookups.carTypes,
-                tripCar: plan.tours.car_type,
-                showPrice,
-              }}
-            />
-          ) : null}
-          {open === "program" && isLast ? (
-            <div className="mt-2">
-              <DayLines label={tx("farewellText")} date={departureDay(city)} lines={data.departure_lines} fallback={departureLines(data)} onChange={(departure_lines) => onSlice({ departure_lines })} />
-            </div>
-          ) : null}
+          {body}
           {/* «تمت <city>»: open only when the city has all it needs, and says what is missing until then */}
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-dashed border-[#DCE9E5] pt-2.5">
             {missing.length > 0 ? <span className="text-[11.5px] font-bold text-[#a86a10]">{tx("needFirst", { list: missing.join("، ") })}</span> : null}
@@ -537,14 +549,14 @@ export function BasicCityCard({
             </button>
           </div>
         </div>
-      ) : null}
+      )}
     </article>
   );
 }
 
 // ---------- the panels ----------
 
-/** a city's stays — the hotel, rooms, board and price; on the card and in «١. الفنادق» (BasicHotelsStep). */
+/** a city's stays — the hotel, rooms, board and price, each hotel on its dates; the hotels part of the card. */
 export function HotelPanel({
   index,
   city,
@@ -826,7 +838,7 @@ export function HotelPanel({
       {tboFailed ? <p className="text-[11.5px] font-bold text-[#c22850]">{tx("tboPickFailed")}</p> : null}
       <div className="flex flex-wrap items-center gap-3 border-t border-dashed border-[#DCE9E5] pt-2">
         <AddStayMenu
-          label={t("pg.stay.addInCity")}
+          label={tx("addHotel")}
           onAdd={(dates) => onSlice({ hotels: addStay(data.cities, data.hotels, index, dates).hotels })}
           className="inline-flex h-7 items-center gap-1 rounded-[7px] border border-dashed border-[#b7d0c7] px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
         />

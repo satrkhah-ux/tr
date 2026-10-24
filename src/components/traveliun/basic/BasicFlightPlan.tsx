@@ -56,7 +56,7 @@ export function useCanFetch(): boolean {
 
 /**
  * One flight leg on one line — the international legs in the flights step, a
- * domestic leg on its hop between two city cards. The number first («جلب»
+ * domestic leg on its move between two cities. The number first («جلب»
  * fills the airline, the airports and the clocks; the day stays the agent's),
  * then the two airports, the day and the two clocks — every field editable —
  * and, for a domestic leg, its ticket «للفرد» (`price`).
@@ -241,7 +241,7 @@ export function LegRow({
  * set the trip's dates — each leg asked by its NUMBER, which «جلب» turns into
  * the airline, the two airports and the clocks (the day stays the agent's), the
  * agent typing the price. The domestic legs are no longer here: each sits on its
- * hop between two city cards (the evaluator, 2026-10-24 — BasicHopFlight).
+ * move in the domestic flights' section, after the hotels (BasicHopFlight).
  * «أضف لاحقاً» leaves the international flights for later. Nothing here blocks.
  */
 export function BasicFlightPlan({

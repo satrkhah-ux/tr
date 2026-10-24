@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { deriveCityDates, emptyDraftData, type DraftData, type GeneratorLookups } from "@/lib/offer/draft-types";
-import { basicDays, type BasicCity } from "@/lib/offer/basic";
+import { basicDays, withHotelLines, type BasicCity } from "@/lib/offer/basic";
 import { ownerExample } from "@/lib/offer/draft-test-helpers";
 
 let pricing = true;
@@ -20,14 +20,15 @@ function file(): DraftData {
   return data;
 }
 
-const render = (data = file(), index = 0, transportOn = false) => {
+const render = (data = file(), index = 0, transportOn = false, part: "hotels" | "programme" = "programme") => {
   return renderToStaticMarkup(
     <BasicCityCard
+      part={part}
       index={index}
       city={data.cities[index] as BasicCity}
       dayFrom={1}
       data={data}
-      lookups={{ carTypes: [{ name: "فان", pax: 7 }], sarPer: { SAR: 1 }, airports: [], airlines: [] } as unknown as GeneratorLookups}
+      lookups={{ countries: [], carTypes: [{ name: "فان", pax: 7 }], sarPer: { SAR: 1 }, airports: [], airlines: [] } as unknown as GeneratorLookups}
       programs={[]}
       tourPrices={[]}
       hotelsOn={transportOn}
@@ -114,5 +115,62 @@ describe("Basic's services table — the owner's example", () => {
     expect(count(html, "الاستقبال من مطار لنكاوي الدولي والتوصيل إلى الفندق")).toBe(1);
     expect(count(html, "التوصيل من فندق لنكاوي إلى مطار لنكاوي الدولي")).toBe(1);
     expect(html).toContain("الوصول 16:05");
+  });
+});
+
+describe("the hotels part — the city with its stays, apart from its programme (the owner, 2026-10-25)", () => {
+  /** Istanbul 3 nights then Trabzon 3, two people in one room. */
+  const turkey = () => {
+    const data = emptyDraftData();
+    data.trip = { ...data.trip, country: "تركيا", destination: "تركيا", arrival_date: "2026-11-01", nights: 6, days: 7, adults: 2, rooms: 1 };
+    data.cities = deriveCityDates("2026-11-01", [
+      { city_name: "اسطنبول", nights: 3, check_in: null, check_out: null },
+      { city_name: "طرابزون", nights: 3, check_in: null, check_out: null },
+    ]);
+    data.hotels = withHotelLines(data, "SAR");
+    return data;
+  };
+  const hotels = (data: DraftData, index = 0) => {
+    pricing = true;
+    return render(data, index, true, "hotels");
+  };
+
+  it("shows the city from a date to a date, its stay's room, and a way to add a second hotel — no tours", () => {
+    const html = hotels(turkey());
+    expect(html).toContain("اسطنبول");
+    expect(html).toContain("1 نوفمبر – 4 نوفمبر");
+    expect(html).toContain("غرفة مزدوجة");
+    expect(html).toContain("أضف فندقاً آخر في هذه المدينة");
+    // the city's own controls live here: its nights, another city, its removal
+    expect(html).toContain("تعديل المدينة");
+    expect(html).toContain("حذف المدينة");
+    expect(html).not.toContain("عدد الجولات");
+    expect(html).not.toContain("البرنامج السياحي");
+  });
+
+  it("shows a stay's price as the room's night — «× 3 ليالٍ = 900» — not its total (Order 5)", () => {
+    const data = turkey();
+    data.hotels = data.hotels.map((h, i) => (i === 0 ? { ...h, hotel_name: "فندق البسفور", rooms: h.rooms.map((r) => ({ ...r, board_type: "BB", price: 900 })) } : h));
+    const html = hotels(data);
+    expect(html).toContain("سعر الليلة للغرفة");
+    expect(html).toContain('value="300"');
+    expect(html).not.toContain('value="900"');
+    expect(html).toContain("× 3 ليالٍ = 900 SAR");
+  });
+
+  it("says what the stay still lacks, and the nights no hotel covers", () => {
+    const data = turkey();
+    data.hotels = data.hotels.map((h, i) => (i === 0 ? { ...h, nights: 2 } : h));
+    const html = hotels(data);
+    expect(html).toContain("ينقص: الفندق");
+    expect(html).toContain("ينقص 1 ليلة بلا فندق");
+  });
+
+  it("the programme part of the same city holds no hotel fields", () => {
+    pricing = true;
+    const html = render(turkey(), 0, true, "programme");
+    expect(html).not.toContain("سعر الليلة للغرفة");
+    expect(html).not.toContain("تعديل المدينة");
+    expect(html).toContain("البرنامج السياحي");
   });
 });
