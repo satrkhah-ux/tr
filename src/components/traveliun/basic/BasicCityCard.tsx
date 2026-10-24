@@ -154,6 +154,7 @@ export function BasicCityCard({
   onDone,
   onExpand,
   onFold,
+  onGoHotel,
 }: {
   part: "hotels" | "programme";
   index: number;
@@ -197,6 +198,8 @@ export function BasicCityCard({
   onExpand: () => void;
   /** «تصغير»: folds the card to its line, done or not (the line says what is missing) */
   onFold: () => void;
+  /** the programme's hotel line, pressed: this city's card in «الفنادق», open — its hotel, nights, rooms */
+  onGoHotel?: () => void;
 }) {
   const tx = useBasicLabels();
   const hotelsPart = part === "hotels";
@@ -299,6 +302,7 @@ export function BasicCityCard({
           onPicks={onPicks}
           onCar={onCar}
           onSlice={onSlice}
+          onGoHotel={onGoHotel}
         />
       ) : null}
       {open === "program" && isFirst ? (
@@ -1127,6 +1131,7 @@ function ServicesPanel({
   onPicks,
   onCar,
   onSlice,
+  onGoHotel,
 }: {
   index: number;
   city: BasicCity;
@@ -1148,6 +1153,8 @@ function ServicesPanel({
   onPicks: (picks: TourPick[]) => void;
   onCar: (leg: "airport" | "farewell" | "tours", slice: Partial<TransportLeg>) => void;
   onSlice: (slice: Partial<DraftData>) => void;
+  /** the hotel line pressed: the city's card in «الفنادق» */
+  onGoHotel?: () => void;
 }) {
   const tx = useBasicLabels();
   const { t, language } = useTraveliunUI();
@@ -1289,13 +1296,26 @@ function ServicesPanel({
 
   return (
     <div className="space-y-1.5">
-      {/* first, where the group sleeps on this visit and for how many nights — clear and dark (the owner, 2026-10-24) */}
+      {/* first, where the group sleeps on this visit and for how many nights — clear and dark; pressed, it takes the
+          agent to the city's own hotel card to change the hotel, its nights or rooms (the owner, 2026-10-24) */}
       {hotels.length > 0 ? (
-        <p className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[#cfe0d9] bg-[#f4f9f7] px-3 py-2 text-[13.5px] font-extrabold text-[#0f3d38]">
+        <button
+          type="button"
+          onClick={onGoHotel}
+          disabled={!onGoHotel}
+          title={tx("goHotel")}
+          className="group flex w-full flex-wrap items-center gap-2 rounded-[10px] border border-[#cfe0d9] bg-[#f4f9f7] px-3 py-2 text-start text-[13.5px] font-extrabold text-[#0f3d38] transition-colors hover:border-[#185045] hover:bg-[#eaf4f0] disabled:cursor-default"
+        >
           <BedDouble className="size-4 shrink-0 text-[#185045]" aria-hidden />
           <span>{tx("hotelIs", { hotel: hotels.join(" + ") })}</span>
           <span className="tv-tnum rounded-full bg-[#185045] px-2.5 py-0.5 text-[11.5px] font-bold text-white">{nightsText(city.nights, language)}</span>
-        </p>
+          {onGoHotel ? (
+            <span className="ms-auto inline-flex items-center gap-1 text-[11.5px] font-bold text-[#557d78] group-hover:text-[#185045]">
+              <Pencil className="size-3.5" aria-hidden />
+              {tx("goHotel")}
+            </span>
+          ) : null}
+        </button>
       ) : null}
       <div className="flex flex-wrap items-end gap-2">
         {toursOn ? (

@@ -1233,6 +1233,16 @@ export function BasicEditor({
         }}
         onExpand={() => setDoneCities((d) => d.filter((k) => k !== done))}
         onFold={() => setDoneCities((d) => (d.includes(done) ? d : [...d, done]))}
+        onGoHotel={
+          part === "programme" && scope.hotels
+            ? () => {
+                // «الفنادق» open, this city's card unfolded, and brought into view
+                setDoneCities((d) => d.filter((k) => k !== `hotels|${key}`));
+                show("hotels");
+                window.setTimeout(() => document.getElementById(`basic-hotels-${i}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 160);
+              }
+            : undefined
+        }
       />
     );
   };
