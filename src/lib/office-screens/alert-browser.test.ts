@@ -10,7 +10,7 @@ it.skipIf(!existsSync("C:/Program Files/Google/Chrome/Application/chrome.exe"))(
   const at = Date.parse("2026-10-20T12:05:00Z");
   const events: ScreenState["events"] = [
     { id: "qa-1", at: at - 60000, name: "عميل الاختبار", country: "إندونيسيا", line: "استفسار عن إندونيسيا", test: true, src: null },
-    { id: "qa-2", at: at - 38000, name: "عميل آخر", country: "جورجيا", line: "بكج إلى جورجيا", test: true, src: null },
+    { id: "qa-2", at: at - 38000, name: "محمد", country: "جورجيا", line: "بكج إلى جورجيا", test: true, src: null, walkIn: true },
   ];
   const state: ScreenState = { now: at, build: "qa", screens: 4, position: 0, slotMs: 12000, ads: [], ticker: null, countries: [], events, demo: null };
   try {
@@ -50,7 +50,9 @@ it.skipIf(!existsSync("C:/Program Files/Google/Chrome/Application/chrome.exe"))(
     await advance(14);
     expect(await page.$eval("#aDest", (e) => e.textContent)).toBe("استفسار عن إندونيسيا");
     await advance(1);
-    expect(await page.$eval("#aDest", (e) => e.textContent)).toBe("بكج إلى جورجيا");
+    // a client in the office: «عميلنا محمد طلب بكج إلى جورجيا»
+    expect(await page.$eval("#aDest", (e) => e.textContent)).toBe("طلب بكج إلى جورجيا");
+    expect(await page.$eval("#aName", (e) => e.textContent)).toBe("عميلنا محمد");
     await advance(19);
     expect(await page.$eval("#alert", (e) => e.className)).toBe("on");
     await advance(1);

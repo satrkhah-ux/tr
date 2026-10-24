@@ -111,9 +111,12 @@ const RUNTIME = String.raw`
     shownAlert = key;
     if (!e) { box.className = ""; return; }
     tag.style.display = e.test ? "block" : "none";
-    $("aName").textContent = e.name || "";
-    $("aName").style.display = e.name ? "block" : "none";
-    $("aDest").textContent = e.line;
+    // a client in the office (the user, 2026-10-25): «عميلنا محمد» over «طلب بكج إلى جورجيا»
+    var name = e.walkIn ? "عميلنا" + (e.name ? " " + e.name : "") : e.name;
+    $("kickerText").textContent = e.walkIn ? "في مكتب ترافليون الآن" : "✨ مسافر جديد مع ترافليون";
+    $("aName").textContent = name || "";
+    $("aName").style.display = name ? "block" : "none";
+    $("aDest").textContent = e.walkIn ? "طلب " + e.line : e.line;
     boxImg.style.display = "none";
     boxImg.onload = function () { boxImg.style.display = "block"; };
     boxImg.onerror = function () { boxImg.style.display = "none"; };
@@ -131,10 +134,27 @@ const RUNTIME = String.raw`
     var key = country.replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/[ً-ْ]/g, "").trim();
     return window.__LANDMARKS__[key] ? "/screen-landmarks/" + window.__LANDMARKS__[key] + ".webp" : "/screen-landmarks/journey.svg";
   }
+  // the polaroid strip (/screen/top) covers the bulletin: ONE strip over the whole wall at once, each
+  // screen drawing its own part from the server's clock — told where it hangs and when the pass begins.
+  // It is loaded and told half a minute AHEAD, and shown only once loaded, so when the bulletin comes up
+  // it is already sized with its photos in — no green, no white, no settling on screen (the user, 2026-10-25)
+  var polaroidStart = -1;
+  function polaroid(t, elapsed, count) {
+    if (!count || N < 1 || N > S.screens) return;
+    var into = mod(t, 600000), start = elapsed >= 0 ? t - elapsed : into >= 570000 ? t - into + 600000 : -1;
+    if (start < 0 || start === polaroidStart) return;
+    polaroidStart = start;
+    var pf = $("polaroid"), wall = { tt: "start", pos: S.position, of: S.screens, start: start, now: t };
+    if (!pf.getAttribute("src")) {
+      pf.onload = function () { setTimeout(function () { pf.className = "ready"; }, 1200); };
+      pf.setAttribute("src", "/screen/top?pos=" + wall.pos + "&of=" + wall.of + "&start=" + wall.start + "&now=" + wall.now);
+    } else try { pf.contentWindow.postMessage(wall, location.origin); } catch (e) { /* still loading: the link carried it */ }
+  }
   function drawTicker(t) {
     var countries = S.countries || [];
     var elapsed = countryBulletinElapsed(t, N, S.screens);
     var active = countries.length > 0 && elapsed >= 0;
+    polaroid(t, elapsed, countries.length);
     var panel = $("countries");
     panel.className = active ? (elapsed >= 58800 ? "on departing" : "on") : "";
     if (!active) { spotlightKey = ""; return; }
@@ -147,12 +167,6 @@ const RUNTIME = String.raw`
     var key = Math.floor(t / 600000) + "|" + countries.join("|");
     if (key !== spotlightKey) {
       spotlightKey = key;
-      // the polaroid strip (/screen/top) covers the bulletin: ONE strip over the whole wall at once, each
-      // screen drawing its own part from the server's clock — told where it hangs and when the pass began
-      // (loaded on its first appearance with those in the link, told by message every time after)
-      var pf = $("polaroid"), wall = { tt: "start", pos: S.position, of: S.screens, start: t - elapsed, now: t };
-      if (!pf.getAttribute("src")) pf.setAttribute("src", "/screen/top?pos=" + wall.pos + "&of=" + wall.of + "&start=" + wall.start + "&now=" + wall.now);
-      else try { pf.contentWindow.postMessage(wall, location.origin); } catch (e) { /* still loading */ }
       // the share of demand as a bar, never a number (the owner: no counts on the screens)
       var stats = S.countryStats && S.countryStats.length ? S.countryStats : [];
       if (!stats.length) for (var c = 0; c < countries.length; c++) stats.push({ country: countries[c], count: countries.length - c });
@@ -298,10 +312,10 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 #tick{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;direction:rtl;color:#fff;font-weight:800;line-height:1.24;will-change:transform}
 #band{display:none}
 #countries{position:absolute;inset:0;z-index:2;display:none;color:#fff;overflow:hidden;text-align:right;background:radial-gradient(120% 95% at 88% 8%,#17504f 0%,#0a2b2f 48%,#04171b 100%)}
-#countries.on{display:block;-webkit-animation:bulletinEnter 1.1s cubic-bezier(.16,1,.3,1) both;animation:bulletinEnter 1.1s cubic-bezier(.16,1,.3,1) both}
-#countries.on.departing{-webkit-animation:bulletinExit 1.1s cubic-bezier(.6,0,.8,.4) both;animation:bulletinExit 1.1s cubic-bezier(.6,0,.8,.4) both}
-@keyframes bulletinEnter{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
-@keyframes bulletinExit{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
+#countries.on{display:block;-webkit-animation:bulletinEnter .8s ease both;animation:bulletinEnter .8s ease both}
+#countries.on.departing{-webkit-animation:bulletinExit 1.1s ease both;animation:bulletinExit 1.1s ease both}
+@keyframes bulletinEnter{from{opacity:0}to{opacity:1}}
+@keyframes bulletinExit{from{opacity:1}to{opacity:0}}
 .bHead{position:absolute;top:5.5vh;right:4.5vw;left:4.5vw;display:flex;align-items:flex-end;justify-content:space-between}
 .bHead .eyebrow{display:flex;align-items:center;gap:.8vw;font-size:1.25vw;font-weight:800;color:#e3bd3c}
 .bHead .eyebrow i{width:.8vw;height:.8vw;border-radius:50%;background:#e5354f;box-shadow:0 0 0 0 rgba(229,53,79,.7)}
@@ -338,7 +352,8 @@ body{position:relative;height:100vh;height:100dvh;font-family:Tajawal,"Noto Sans
 .bFoot{position:absolute;bottom:3.6vh;left:4.5vw;right:4.5vw;font-size:1.1vw;font-weight:700;color:#8fb0a9}
 .countryNote{font-size:1.2vw;color:#d7bd86}
 .countryTrack{position:absolute;bottom:0;left:0;right:0;height:3px;background:#ffffff12;z-index:4}
-#polaroid{position:absolute;left:0;top:0;width:100%;height:100%;border:0;z-index:3;background:#0b3a32}
+#polaroid{position:absolute;left:0;top:0;width:100%;height:100%;border:0;z-index:3;background:#0b3a32;visibility:hidden}
+#polaroid.ready{visibility:visible}
 #countryProgress{height:100%;background:#e3bd3c;width:0}
 #alertProgress{position:absolute;bottom:0;right:0;height:.4vh;background:#e3bd3c}
 #alert{z-index:4}
@@ -363,7 +378,7 @@ export function screenPage(n: number, s: ScreenState, monitor: boolean): string 
 <div id="alert"><img id="alertImg" alt=""><div id="shade"></div>
 <div id="flight"><div id="trail"></div><svg id="plane" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
 <div id="alertTag">تجربة</div>
-<div id="msg"><div id="kicker"><i></i>✨ مسافر جديد مع ترافليون</div><div id="aName"></div><div id="aDest"></div></div><div id="alertProgress"></div></div>
+<div id="msg"><div id="kicker"><i></i><span id="kickerText">✨ مسافر جديد مع ترافليون</span></div><div id="aName"></div><div id="aDest"></div></div><div id="alertProgress"></div></div>
 <section id="countries">
 <header class="bHead"><div><div class="eyebrow"><i></i>ترافليون · نبض السفر</div><h1>الوجهات الأكثر طلباً اليوم</h1><p>بحسب طلبات العملاء اليوم · بتوقيت الرياض</p></div><div class="bWhen" id="bulletinDate"></div></header>
 <div id="hero"><img id="heroImg" alt=""><div class="crown">الأكثر طلباً</div><div class="first">01</div><div id="heroName"></div></div>

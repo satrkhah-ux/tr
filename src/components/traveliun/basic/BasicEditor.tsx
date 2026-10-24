@@ -35,6 +35,8 @@ import { getCountryHotels, produceOfferFromDraft } from "@/lib/data/drafts";
 import { getTourPrices, getTourPrograms, getTransferCars } from "@/lib/data/tour-programs";
 import { autoTourPicks, withTours, type TourProgram } from "@/lib/offer/itinerary";
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
+import { announceWalkIn } from "@/lib/data/office-screens";
+import { displayName } from "@/lib/office-screens/config";
 import type { ProfitSettings } from "@/lib/data/app-settings";
 import {
   AGE_BANDS,
@@ -1097,6 +1099,8 @@ export function BasicEditor({
   const firstTodo = steps.find((s) => missingOf[s].length > 0) ?? "finish";
   const [open, setOpen] = useState<Section>(firstTodo);
   const [reached, setReached] = useState<Section>(firstTodo);
+  /** the walk-in alert: off · on (ticked) · sending · sent · or why it was not shown */
+  const [walkIn, setWalkIn] = useState<string>("off");
   const shown = (s: Section) => steps.includes(s) && SECTION_ORDER.indexOf(s) <= SECTION_ORDER.indexOf(reached);
 
   function show(step: Section) {
@@ -1115,6 +1119,14 @@ export function BasicEditor({
   }
 
   function next(from: Section) {
+    // «عميلنا محمد طلب بكج إلى جورجيا» on the office screens, once, after the file is saved
+    if (from === "client" && walkIn === "on") {
+      setWalkIn("sending");
+      void flush()
+        .then(() => announceWalkIn(draftId))
+        .then((r) => setWalkIn(r.ok ? "sent" : r.error))
+        .catch(() => setWalkIn("on"));
+    }
     // the cities from the flights' dates (the owner, 2026-10-22: «الإدخال التلقائي وفق التواريخ يقلل الأخطاء») —
     // a part left for later leaves the cities to the agent, as before
     if (from === "flights" && scope.flights_intl && !latest.current.flight_booking.later_intl) {
@@ -1262,7 +1274,27 @@ export function BasicEditor({
       <Fold key={step} id={`basic-${step}`} title={titleOf[step]} open={open === step} onOpen={() => show(step)} summary={summaryOf[step]} missing={missingOf[step]}>
         {body}
         {/* the last section has nothing after it */}
-        {step === "finish" ? null : <NextButton missing={missingOf[step]} onNext={() => next(step)} />}
+        {step === "finish" ? null : (
+          <>
+          {step === "client" ? (
+            // a client in the office (the user, 2026-10-25): tick, «التالي», and every screen says it
+            <label className="mt-3 flex cursor-pointer items-center gap-2 rounded-[9px] border border-[#DCE9E5] bg-[#f6faf8] px-3 py-2 text-[12.5px] font-bold text-[#185045]">
+              <input
+                type="checkbox"
+                className="size-4 accent-[#185045]"
+                checked={walkIn !== "off"}
+                disabled={walkIn === "sending" || walkIn === "sent"}
+                onChange={(e) => setWalkIn(e.target.checked ? "on" : "off")}
+              />
+              <span className="min-w-0 flex-1">
+                اعرض على شاشات المكتب: «عميلنا{displayName(data.customer.customer_name) ? ` ${displayName(data.customer.customer_name)}` : ""} طلب بكج إلى {trip.country || trip.destination || "…"}»
+              </span>
+              {walkIn === "sent" ? <span className="text-[#0f7a52]">✓ ظهر على الشاشات</span> : walkIn === "sending" ? <span className="text-[#557d78]">…</span> : walkIn !== "on" && walkIn !== "off" ? <span className="text-[#a86a10]">{walkIn}</span> : null}
+            </label>
+          ) : null}
+            <NextButton missing={missingOf[step]} onNext={() => next(step)} />
+          </>
+        )}
       </Fold>
     ) : null;
 

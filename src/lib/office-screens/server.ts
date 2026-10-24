@@ -30,7 +30,7 @@ export type ScreenState = {
   /** the band: its words, their room, its speed, how often it comes up, and the extra pass when the words changed */
   ticker: { text: string; width: number; speed: number; periodMs: number; bumpAt: number } | null;
   /** «بكج إلى تركيا» and the client's recorded name, three words at most (never a phone), «تجربة» when it is one */
-  events: { id: string; at: number; country: string; line: string; name: string | null; test: boolean; src: string | null }[];
+  events: { id: string; at: number; country: string; line: string; name: string | null; test: boolean; src: string | null; walkIn?: boolean }[];
   /** while the TVs are set up: on every load, one pass and then this alert, on that screen only — never stored, never counted */
   demo: { country: string; line: string; name: string; src: string | null } | null;
 };
@@ -133,21 +133,22 @@ async function shared(now: number): Promise<Shared> {
       ticker(now, cfg.tickerSpeed, cfg.tickerEveryMin * 60_000),
       db()
         .from("office_screen_events")
-        .select("id, lead_id, kind, destination, test, at")
+        .select("id, lead_id, draft_id, name, kind, destination, test, at")
         .gte("at", new Date(now - 300_000).toISOString())
         .lte("at", new Date(now + 600_000).toISOString())
         .order("at"),
     ]);
-    const evs = (rows ?? []) as { id: number; lead_id: string | null; kind: string; destination: string; test: boolean; at: string }[];
+    const evs = (rows ?? []) as { id: number; lead_id: string | null; draft_id: string | null; name: string | null; kind: string; destination: string; test: boolean; at: string }[];
     // the client's name as recorded on «العملاء», three words at most (displayName) — never anything else about them
     const ids = [...new Set(evs.map((e) => e.lead_id).filter((id): id is string => Boolean(id)))];
     const { data: named } = ids.length ? await db().from("client_leads").select("id, name").in("id", ids) : { data: [] };
     const nameOf = new Map(((named ?? []) as { id: string; name: string | null }[]).map((l) => [l.id, displayName(l.name)]));
     const events = evs.flatMap((e) => {
-      if (!e.test && !cfg.kinds.includes(e.kind)) return [];
+      // a walk-in is the agent's own announcement, whatever kinds the settings let alert
+      if (!e.test && !e.draft_id && !cfg.kinds.includes(e.kind)) return [];
       const country = countryOf(e.destination, list);
       if (!country) return [];
-      return [{ id: String(e.id), at: Date.parse(e.at), country, line: serviceLine(e.kind, country), name: e.lead_id ? (nameOf.get(e.lead_id) ?? null) : null, test: e.test, src: landmarkFor(country) }];
+      return [{ id: String(e.id), at: Date.parse(e.at), country, line: serviceLine(e.kind, country), name: e.draft_id ? displayName(e.name) : e.lead_id ? (nameOf.get(e.lead_id) ?? null) : null, test: e.test, src: landmarkFor(country), ...(e.draft_id ? { walkIn: true } : {}) }];
     });
     const demoCountry = tick.top ?? "تركيا";
     const demo = now < Date.parse(cfg.demoUntil) ? { country: demoCountry, line: serviceLine("بكج", demoCountry), name: "أحمد العتيبي", src: landmarkFor(demoCountry) } : null;
@@ -170,6 +171,14 @@ export async function screenState(n: number): Promise<ScreenState | null> {
 export async function insertTestEvent(destination: string): Promise<boolean> {
   const { data: at } = await db().rpc("office_screen_next_at");
   const { error } = await db().from("office_screen_events").insert({ kind: "بكج", destination, test: true, at: at ?? new Date().toISOString() });
+  cache.clear();
+  return !error;
+}
+
+/** «عميلنا محمد طلب بكج إلى جورجيا»: a client in the office, once per file; false when it was already shown or failed */
+export async function insertWalkInEvent(draftId: string, name: string, destination: string): Promise<boolean> {
+  const { data: at } = await db().rpc("office_screen_next_at");
+  const { error } = await db().from("office_screen_events").insert({ draft_id: draftId, name: displayName(name), kind: "بكج", destination, at: at ?? new Date().toISOString() });
   cache.clear();
   return !error;
 }
