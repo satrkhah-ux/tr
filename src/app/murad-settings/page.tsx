@@ -3,7 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { TraveliunShell } from "@/components/traveliun/TraveliunShell";
 import { MuradSettings } from "@/components/traveliun/settings/MuradSettings";
 import { ReceptionRoutes } from "@/components/traveliun/operations/ReceptionRoutes";
-import { getMuradControl } from "@/lib/data/murad-control";
+import { getMuradControl, muradTeaching } from "@/lib/data/murad-control";
+import { MuradInstructions } from "@/components/traveliun/settings/MuradInstructions";
 import { AutoOffers } from "@/components/traveliun/operations/AutoOffers";
 import { MuradPolicies } from "@/components/traveliun/operations/MuradPolicies";
 import { MuradPanel } from "@/components/traveliun/developer/MuradPanel";
@@ -19,10 +20,11 @@ export default async function MuradSettingsPage() {
   const setup = await getMuradControl();
   if (!setup) redirect("/dashboard");
   const dev = await currentCan("developer.access");
-  const [reception, policies, visaFaq, live] = await Promise.all([
+  const [reception, policies, visaFaq, teaching, live] = await Promise.all([
     getReceptionSetup(),
     getMuradPolicies(),
     getMuradPolicies("murad_visa_faq"),
+    muradTeaching(),
     // every Murad setting on one page (the owner, 2026-10-24) — the switches that let a model write to clients stay the developer's
     dev ? Promise.all([getFeatureFlags(), muradPanel(), readReceptionSettings(createSupabaseServiceClient() as unknown as SupabaseClient), receptionToday()]) : null,
   ]);
@@ -33,6 +35,7 @@ export default async function MuradSettingsPage() {
       <ReceptionPanel data={{ on: live[0].murad_reception, scope: live[2].scope, webhookUrl: token ? `${site}/api/teletel/webhook?token=${token}` : null, today: live[3] }} />
       <MuradPanel data={live[1]} flags={{ suggest: live[0].murad_suggest, auto: live[0].murad_auto }} />
     </> : null}
+    {teaching ? <MuradInstructions data={teaching} /> : null}
     <MuradSettings setup={setup} /><ReceptionRoutes setup={reception} />{reception && <AutoOffers initial={reception.offers} usd={reception.usd} />}<MuradPolicies initial={visaFaq} setting="murad_visa_faq" /><MuradPolicies initial={policies} />
   </div></TraveliunShell>;
 }

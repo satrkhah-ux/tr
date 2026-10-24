@@ -44,6 +44,7 @@ import {
 } from "./core";
 import { muradProvider, muradReply, type MuradProvider } from "./model";
 import { handOver } from "./handover";
+import { lessonsText } from "./lessons-text";
 
 /**
  * The minute job behind POST /api/murad/run (core.ts says when Murad acts).
@@ -100,7 +101,11 @@ export async function readThread(conversationId: number): Promise<FreshThread | 
 type Settings = { control: MuradControl; clientWhatsapp: string | null; autoList: string[]; policies: string; visaFaq: string; cap: number };
 
 export async function readSettings(service: SupabaseClient): Promise<Settings & { autoPhones: string[]; testPhone: string | null }> {
-  const { data } = await service.from("app_settings").select("key, value").in("key", Object.values(SETTING));
+  const [{ data }, taught, taughtVisa] = await Promise.all([
+    service.from("app_settings").select("key, value").in("key", Object.values(SETTING)),
+    lessonsText(service).catch(() => ""),
+    lessonsText(service, "تأشيرات").catch(() => ""),
+  ]);
   const v = new Map(((data ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
   const autoPhones = parseAutoPhones(v.get(SETTING.autoPhones));
   const testPhone = intlPhone(v.get(SETTING.testPhone) ?? "");
@@ -111,8 +116,9 @@ export async function readSettings(service: SupabaseClient): Promise<Settings & 
     autoList: [...new Set([...(testPhone ? [testPhone] : []), ...autoPhones])],
     autoPhones,
     testPhone,
-    policies: v.get(SETTING.policies) ?? "",
-    visaFaq: v.get(SETTING.visaFaq) ?? "",
+    // what the management taught Murad sits beside the company's own words (lessons-text.ts)
+    policies: [v.get(SETTING.policies) ?? "", taught].filter(Boolean).join("\n\n"),
+    visaFaq: [v.get(SETTING.visaFaq) ?? "", taughtVisa].filter(Boolean).join("\n\n"),
     cap: capFor(v.get(SETTING.cap)),
   };
 }

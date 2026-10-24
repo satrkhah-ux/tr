@@ -4,7 +4,8 @@ import { addTeletelNote, conversationEvents, listOpenConversations, listTeletelT
 import { chooseVisaAgent, type VisaAgent, type MuradReceipt } from "./visa-assignment";
 import { currentAssignment } from "@/lib/leads/assignment";
 import { onList } from "./control";
-import { handOver, readControl } from "./handover";
+import { handOver } from "./handover";
+import { readControl } from "./control-store";
 
 /**
  * The team member to take a conversation now: the one already holding it when

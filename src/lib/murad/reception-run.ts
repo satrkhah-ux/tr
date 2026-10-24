@@ -2,6 +2,7 @@ import { onlineTeamAgent, routeCompletedVisa, retryVisaHandoffs } from "./visa-r
 import type { MuradReceipt } from "./visa-assignment";
 import { inMuradScope, kindMode, onList, visaForAll, type MuradControl } from "./control";
 import { handOver } from "./handover";
+import { instruct } from "./instruct";
 import "server-only";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -96,6 +97,8 @@ export type ReceptionOutcome =
   | `none:${"routed" | "staff" | "assigned" | "window" | "kind_off"}`
   | "asked"
   | `routed:${RouteKey}`
+  /** a management number's order, lesson, undo or trial code — done and answered (instruct.ts) */
+  | "admin"
   /** answered in full by Murad, nothing handed over («لا تحتاج تأشيرة») */
   | "answered"
   | "send_failed";
@@ -471,10 +474,12 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
   if (!m.conversationId || !m.messageId) return "unreadable";
   const service = db();
   const [flags, settings, reception] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service)]);
-  if (!flags.murad_reception || !settings.control.tasks.reception || settings.clientWhatsapp === "off") return "off";
+  // a management number is heard whatever the scope and the reception switch (its orders may switch them back on)
+  const admin = onList(m.phone, settings.control.admins);
+  if (!flags.murad_reception || (!settings.control.tasks.reception && !admin) || settings.clientWhatsapp === "off") return "off";
   const phone = intlPhone(m.phone);
   // the trial: the owner's two numbers only, until they widen it from /developer
-  if (reception.scope !== "all" && (!phone || !settings.autoList.includes(phone)) && !(visaForAll(settings.control) && await visaConversation(service, m))) return "out_of_scope";
+  if (!admin && reception.scope !== "all" && (!phone || !settings.autoList.includes(phone)) && !(visaForAll(settings.control) && await visaConversation(service, m))) return "out_of_scope";
 
   // claimed before anything is read or sent — one answer per client message, whoever comes second
   const claim = await service
@@ -508,7 +513,9 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     // last closed the conversation before this message (the owner, 2026-10-18: «لكي يكون طلباً جديداً كاملاً»),
     // never more than 12 hours back — Teletel's own closing line, not «العملاء»'s status (lastClosedAt).
     const closedAt = lastClosedAt(events ?? [], since);
-    const visitStart = Math.max(m.at - VISIT_SEC, closedAt);
+    // on a management number, every order or lesson — and the trial code — starts the trial afresh: what was ordered is not a client's words
+    const adminAt = Math.max(0, ...rows.filter((r) => r.reason?.startsWith("admin:")).map((r) => Date.parse(r.created_at) / 1000));
+    const visitStart = Math.max(m.at - VISIT_SEC, closedAt, adminAt);
     const { data: leadRow } = await service.from("client_leads").select("id, status, last_visit_at").eq("teletel_conversation_id", m.conversationId).maybeSingle();
     const lead = leadRow as { id: string; status: string; last_visit_at: string | null } | null;
     const newVisit = closedAt > 0 && (!lead?.last_visit_at || Date.parse(lead.last_visit_at) / 1000 < closedAt);
@@ -523,6 +530,20 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     const ours = muradMessageIds(rows);
     // everything the client wrote while Murad waited, read as one («ابغى» … «تأشيرة» … «الى لندن»)
     const said = thread.messages.filter((t) => t.fromClient && !t.isPrivate && t.at >= since).map((t) => t.text).join("\n").trim() || m.content;
+    // a management number (the owner, 2026-10-24: «اعتبر هذه الارقام هي اماكن استلام قرارات الادارة»): a decision, a
+    // lesson, «تراجع» or the trial code is done and answered here (instruct.ts); written as a client's, it is a trial
+    if (admin) {
+      const done = await instruct(service, { text: said, source: "whatsapp", phone: m.phone });
+      if (done) {
+        const replyId = await sendTeletelMessage(m.conversationId, done.reply);
+        await finish({ reason: `admin:${done.kind}`, reply: done.reply, reply_message_id: replyId, ...(replyId ? {} : { error: "send_failed" }) });
+        return replyId ? "admin" : "send_failed";
+      }
+      if (!settings.control.tasks.reception) {
+        await finish({ reason: "off" });
+        return "off";
+      }
+    }
     const request = readRequest(said, places);
     const waitSec = Math.max(0, Math.round(Date.now() / 1000 - since));
     const intake = { kind: request.kind, country: request.country, wants_human: request.wantsHuman, wait_sec: waitSec };
@@ -884,9 +905,11 @@ export async function schedule(m: IncomingMessage): Promise<"waiting" | "extende
   if (!m.conversationId || !m.messageId) return "unreadable";
   const service = db();
   const [flags, settings, reception] = await Promise.all([getFeatureFlags(), readSettings(service), readReceptionSettings(service)]);
-  if (!flags.murad_reception || !settings.control.tasks.reception || settings.clientWhatsapp === "off") return "off";
+  // a management number is heard whatever the scope and the reception switch (its orders may switch them back on)
+  const admin = onList(m.phone, settings.control.admins);
+  if (!flags.murad_reception || (!settings.control.tasks.reception && !admin) || settings.clientWhatsapp === "off") return "off";
   const phone = intlPhone(m.phone);
-  if (reception.scope !== "all" && (!phone || !settings.autoList.includes(phone)) && !(visaForAll(settings.control) && await visaConversation(service, m))) return "out_of_scope";
+  if (!admin && reception.scope !== "all" && (!phone || !settings.autoList.includes(phone)) && !(visaForAll(settings.control) && await visaConversation(service, m))) return "out_of_scope";
   if (settings.control.inboxIds.length || settings.control.teamIds.length) {
     const thread = await readThread(m.conversationId);
     if (!thread) return "unreadable";

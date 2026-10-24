@@ -1,12 +1,6 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { assignMuradHandoff } from "@/lib/providers/teletel";
-import { MURAD_CONTROL_KEY, onList, parseControl, type MuradControl } from "./control";
-
-export async function readControl(service: SupabaseClient): Promise<MuradControl> {
-  const { data } = await service.from("app_settings").select("value").eq("key", MURAD_CONTROL_KEY).maybeSingle();
-  return parseControl((data as { value?: string } | null)?.value);
-}
+import { onList, type MuradControl } from "./control";
 
 /**
  * Every hand-over Murad makes goes through here (the owner, 2026-10-24): a number on «لا يُحوّل أبداً» is handed to
