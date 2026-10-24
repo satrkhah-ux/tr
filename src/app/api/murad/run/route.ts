@@ -8,6 +8,7 @@ import { summarizeDue } from "@/lib/followups/summary";
 import { followupDigest } from "@/lib/followups/remind";
 import { staffTick } from "@/lib/telegram/staff-events";
 import { learnSweep } from "@/lib/murad/lessons";
+import { foldKnowledge } from "@/lib/murad/knowledge";
 import { sweepSharedAccounts } from "@/lib/routing/shared-sweep";
 import { readSettings } from "@/lib/murad/run";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
@@ -60,6 +61,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const service = createSupabaseServiceClient() as unknown as SupabaseClient;
     const settings = await readSettings(service);
     await learnSweep(service, settings.control, [...(settings.control.admins ?? []), ...settings.autoList]);
+    // «ذاكرة مُراد»: one subject folded at most, when enough new lessons came in (knowledge.ts)
+    if (settings.control.learn) await foldKnowledge(service).catch(() => null);
   });
   // «لا طلب بلا صاحب»: a client waiting on a shared Teletel login goes to a seller (routing/shared-sweep.ts)
   after(() => recordCronRun("shared_sweep", sweepSharedAccounts).catch(() => null));

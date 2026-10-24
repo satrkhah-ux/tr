@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { instructMurad, setLessonActive, type InstructionRow, type LessonRow } from "@/lib/data/murad-control";
+import { TOPICS, type Knowledge } from "@/lib/murad/knowledge";
 
 const field = "w-full rounded-lg border border-[#dbe6e1] bg-white p-3 text-sm text-[#185045]";
 const STATUS: Record<string, string> = { applied: "نُفّذ", not_understood: "لم يُفهم", undone: "تُراجع عنه", failed: "تعذّر" };
 const when = (iso: string) => new Date(iso).toLocaleString("ar-SA-u-nu-latn", { timeZone: "Asia/Riyadh", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 /** «تعليمات الإدارة لمُراد» (the owner, 2026-10-24): an order or a lesson in words, done at once, said back, undoable. */
-export function MuradInstructions({ data }: { data: { instructions: InstructionRow[]; lessons: LessonRow[]; learned: number; read: number; left: number } }) {
+export function MuradInstructions({ data }: { data: { instructions: InstructionRow[]; lessons: LessonRow[]; learned: number; read: number; left: number; knowledge: Knowledge } }) {
   const router = useRouter();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,6 +43,14 @@ export function MuradInstructions({ data }: { data: { instructions: InstructionR
         <p className="font-bold">{i.text}</p>
         {i.reply ? <p className="whitespace-pre-line text-[#3d6158]">{i.reply}</p> : null}
       </li>)}</ul> : <p className="text-sm">لا تعليمات بعد.</p>}
+    </div>
+
+    <div className="space-y-2"><h3 className="font-bold">ذاكرة مُراد</h3>
+      <p className="text-sm">ما تعلّمه من محادثات فريقكم، مدموجاً حسب الموضوع بلا تكرار ولا أسعار قديمة — يُحدَّث وحده كلما تجمّعت دروس جديدة. السياسات وقائمة التأشيرات وتعليم الإدارة أولى منه دائماً.</p>
+      {Object.keys(data.knowledge.topics).length ? <div className="space-y-2">{(Object.keys(TOPICS) as (keyof typeof TOPICS)[]).filter((t) => data.knowledge.topics[t]).map((t) => { const k = data.knowledge.topics[t]!; return <details key={t} className="rounded-xl border border-[#dbe6e1] p-3 text-sm">
+        <summary className="cursor-pointer font-bold">{TOPICS[t]} · {k.items.length} سؤالاً <span className="font-normal text-[#5c7d75]">— {when(k.at)}، من {k.lessons.toLocaleString("en-US")} درساً</span></summary>
+        <ul className="mt-2 space-y-2">{k.items.map((i, n) => <li key={n}><p className="font-bold">{i.q}</p><p className="text-[#3d6158]">{i.a}</p></li>)}</ul>
+      </details>; })}</div> : <p className="text-sm">تُبنى الذاكرة خلال الساعة الأولى من التعلّم.</p>}
     </div>
 
     <div className="space-y-2"><h3 className="font-bold">ما علّمته الإدارة لمُراد</h3>

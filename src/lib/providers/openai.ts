@@ -176,6 +176,20 @@ export async function generateItineraryText(req: ItineraryRequest): Promise<Itin
 }
 
 /**
+ * A request, and once more two seconds on when the failure passes by itself — a rate limit (not an empty balance:
+ * insufficient_quota stays a failure) or the provider's own 5xx (2026-10-24: «قلل الاخطاء»).
+ */
+async function postOpenAI(url: string, key: string, timeoutMs: number, body: string): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(timeoutMs), body });
+    if (res.ok || attempt === 2) return res;
+    const passing = res.status >= 500 || (res.status === 429 && !/insufficient_quota|spend_limit/.test(await res.clone().text()));
+    if (!passing) return res;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
+
+/**
  * One JSON answer held to a strict schema, for callers other than the
  * itinerary («مُراد», murad/model.ts). The raw JSON text, or null when the
  * model said nothing; throws on a refused or failed request — the caller
@@ -184,11 +198,7 @@ export async function generateItineraryText(req: ItineraryRequest): Promise<Itin
 export async function openaiJson(req: { name: string; system: string; user: string; schema: Record<string, unknown>; images?: string[]; temperature?: number; timeoutMs?: number }): Promise<string | null> {
   const key = readEnv("OPENAI_API_KEY");
   if (!key) throw new Error("not_configured");
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(req.timeoutMs ?? 45_000),
-    body: JSON.stringify({
+  const res = await postOpenAI("https://api.openai.com/v1/chat/completions", key, req.timeoutMs ?? 45_000, JSON.stringify({
       model: readEnv("OPENAI_MODEL") ?? DEFAULT_MODEL,
       temperature: req.temperature ?? 0.3,
       messages: [
@@ -196,8 +206,7 @@ export async function openaiJson(req: { name: string; system: string; user: stri
         { role: "user", content: req.images?.length ? [{ type: "text", text: req.user }, ...req.images.map((url) => ({ type: "image_url", image_url: { url, detail: "high" } }))] : req.user },
       ],
       response_format: { type: "json_schema", json_schema: { name: req.name, strict: true, schema: req.schema } },
-    }),
-  });
+    }));
   if (!res.ok) throw new Error(`openai ${res.status}`);
   return ((await res.json()) as ChatResponse).choices?.[0]?.message?.content ?? null;
 }
@@ -207,20 +216,15 @@ export async function openaiJson(req: { name: string; system: string; user: stri
  * out (a paper; «ملخص مُراد» in followups/summary.ts). A reasoning model reads a whole paper best (the evaluator's bench on the
  * owner's 12 samples, 2026-10-23: gpt-5.5 12/12, gpt-4o 9–10).
  */
-export async function responsesJson(name: string, schema: Record<string, unknown>, content: Record<string, unknown>[], model: string): Promise<unknown> {
+export async function responsesJson(name: string, schema: Record<string, unknown>, content: Record<string, unknown>[], model: string, timeoutMs = 120_000): Promise<unknown> {
   const key = readEnv("OPENAI_API_KEY");
   if (!key) throw new Error("not_configured");
-  const res = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(120_000),
-    body: JSON.stringify({
+  const res = await postOpenAI("https://api.openai.com/v1/responses", key, timeoutMs, JSON.stringify({
       model,
       input: [{ role: "user", content }],
       text: { format: { type: "json_schema", name, schema, strict: true } },
       ...(/^(gpt-5|o\d)/.test(model) ? { reasoning: { effort: "low" } } : {}),
-    }),
-  });
+    }));
   if (!res.ok) throw new Error(`openai_${res.status}`);
   const data = (await res.json()) as { output?: { content?: { type: string; text?: string }[] }[] };
   const text = data.output?.flatMap((o) => o.content ?? []).find((c) => c.type === "output_text")?.text;

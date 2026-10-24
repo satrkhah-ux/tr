@@ -78,7 +78,10 @@ export async function trainOn(service: SupabaseClient, conversationId: number, i
 /** where the reading of every past conversation stands (app_settings murad_learn) */
 export type LearnState = { next: number; read: number; lessons: number; at: string | null };
 export const LEARN_KEY = "murad_learn";
-const PER_RUN = 3;
+// twelve a minute, four at a time (the owner, 2026-10-24: «سرع التعلم») — the old conversations in about two days
+const PER_RUN = 12;
+const AT_ONCE = 4;
+let learning = false;
 
 /**
  * «تعلّم من كل المحادثات» (murad_control.learn): a few past conversations a minute, newest first, down to the first —
@@ -86,7 +89,17 @@ const PER_RUN = 3;
  * conversations). The management's teaching and «تدرب على المحادثة» keep the stronger one.
  */
 export async function learnSweep(service: SupabaseClient, control: MuradControl, skip: string[]): Promise<number> {
-  if (!control.learn) return 0;
+  // one sweep at a time in the process: a slow minute must not read the same conversations twice
+  if (!control.learn || learning) return 0;
+  learning = true;
+  try {
+    return await sweep(service, skip);
+  } finally {
+    learning = false;
+  }
+}
+
+async function sweep(service: SupabaseClient, skip: string[]): Promise<number> {
   const { data } = await service.from("app_settings").select("value").eq("key", LEARN_KEY).maybeSingle();
   let state = (() => { try { return JSON.parse((data as { value?: string } | null)?.value ?? "") as LearnState; } catch { return null; } })();
   if (!state) {
@@ -101,10 +114,12 @@ export async function learnSweep(service: SupabaseClient, control: MuradControl,
   const { data: known } = await service.from("murad_lessons").select("conversation_id").in("conversation_id", ids);
   const seen = new Set(((known ?? []) as { conversation_id: number }[]).map((r) => Number(r.conversation_id)));
   let added = 0;
-  for (const id of ids.filter((x) => !seen.has(x))) {
-    const lessons = await lessonsFrom(id, { model: process.env["OPENAI_LEARN_MODEL"] || "gpt-4o-mini", skip }).catch(() => null);
-    if (!lessons?.length) continue;
-    added += (await keep(service, lessons, id, null)) ?? 0;
+  const todo = ids.filter((x) => !seen.has(x));
+  for (let i = 0; i < todo.length; i += AT_ONCE) {
+    await Promise.all(todo.slice(i, i + AT_ONCE).map(async (id) => {
+      const lessons = await lessonsFrom(id, { model: process.env["OPENAI_LEARN_MODEL"] || "gpt-4o-mini", skip }).catch(() => null);
+      if (lessons?.length) added += (await keep(service, lessons, id, null)) ?? 0;
+    }));
   }
   const { data: now } = await service.from("app_settings").select("value").eq("key", LEARN_KEY).maybeSingle();
   const latest = (() => { try { return JSON.parse((now as { value?: string } | null)?.value ?? "") as LearnState; } catch { return claimed; } })();

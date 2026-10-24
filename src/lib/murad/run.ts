@@ -45,6 +45,7 @@ import {
 import { muradProvider, muradReply, type MuradProvider } from "./model";
 import { handOver } from "./handover";
 import { lessonsText, relevantLessons } from "./lessons-text";
+import { knowledgeText, readKnowledge } from "./knowledge";
 
 /**
  * The minute job behind POST /api/murad/run (core.ts says when Murad acts).
@@ -369,7 +370,8 @@ async function answer(
   try {
     // what past conversations show about what the client is asking now (lessons-text.ts)
     const asked = thread.messages.filter((t) => t.fromClient && !t.isPrivate).slice(-3).map((t) => t.text).join("\n");
-    const examples = await relevantLessons(service, asked).catch(() => "");
+    // «ذاكرة مُراد» on the request's subject — the folded reference; the raw lessons only while it is not made yet
+    const examples = knowledgeText(await readKnowledge(service), readRequest(asked, []).kind) || (await relevantLessons(service, asked).catch(() => ""));
     const context = await buildContext(service, c, thread, muradIds, [policies, examples].filter(Boolean).join("\n\n"));
     context.includePrice = control.includePrice;
     if (!control.includePrice) {

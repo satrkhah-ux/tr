@@ -1,7 +1,7 @@
 import "server-only";
 import { withoutPrices } from "./price-visibility";
 import Anthropic from "@anthropic-ai/sdk";
-import { DEFAULT_MODEL, isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
+import { DEFAULT_MODEL, isOpenAIConfigured, openaiJson, responsesJson } from "@/lib/providers/openai";
 import { holding, MURAD_OUTPUT_SCHEMA, MURAD_SYSTEM_PROMPT, parseMuradOutput, renderContext, type MuradContext, type MuradResult } from "./core";
 
 /**
@@ -48,6 +48,20 @@ async function claudeJson(system: string, user: string, schema: Record<string, u
 }
 
 /**
+ * Murad's answer on OpenAI: the reasoning model (MURAD_MODEL, gpt-5.5 — the owner, 2026-10-24: «ارفع مستوى ذكاء
+ * مراد»), and the chat model when it fails or is slow, so a client is never left without an answer for it.
+ */
+async function openaiReply(system: string, user: string): Promise<string | null> {
+  const schema = MURAD_OUTPUT_SCHEMA as unknown as Record<string, unknown>;
+  try {
+    const out = await responsesJson("murad_reply", schema, [{ type: "input_text", text: `${system}\n\n${user}` }], process.env["MURAD_MODEL"] || "gpt-5.5", MODEL_TIMEOUT_MS);
+    return JSON.stringify(out);
+  } catch {
+    return openaiJson({ name: "murad_reply", system, user, schema, timeoutMs: MODEL_TIMEOUT_MS });
+  }
+}
+
+/**
  * One answer for one client turn. Never throws: a provider error, a refusal or
  * an answer that fails validation all come back as the holding reply with
  * needsStaff — and `error` says which, for the log.
@@ -60,10 +74,7 @@ export async function muradReply(context: MuradContext): Promise<MuradResult & {
     const system = MURAD_SYSTEM_PROMPT + (context.includePrice === false
       ? "\nتعليمات الإدارة الملزمة: أجب عن تفاصيل الطلب بدون أي أسعار أو مبالغ أو رسوم أو تقديرات مالية، بالأرقام أو الكلمات، وبدون روابط أو مرفقات. أي سؤال عن السعر يحال إلى الموظف. لا تعِد بإرسال عرض مسعّر."
       : "");
-    const raw =
-      p.provider === "claude"
-        ? await claudeJson(system, user)
-        : await openaiJson({ name: "murad_reply", system, user, schema: MURAD_OUTPUT_SCHEMA as unknown as Record<string, unknown>, timeoutMs: MODEL_TIMEOUT_MS });
+    const raw = p.provider === "claude" ? await claudeJson(system, user) : await openaiReply(system, user);
     const { result, ok } = parseMuradOutput(raw);
     if (context.includePrice === false) result.reply = withoutPrices(result.reply) || holding("prices_disabled").reply;
     return ok ? result : { ...result, error: "invalid_output" };
