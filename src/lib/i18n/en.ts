@@ -948,6 +948,7 @@ export const en = {
   "dev.d.teletel": "{name} — {host}",
   "dev.d.openai": "Model {model} available",
   "dev.d.openaiModel": "Model {model} is not available to this key",
+  "dev.d.openaiQuota": "OpenAI spend limit reached — every AI feature is failing (Murad summaries, follow-up drafts, passport and ticket reading). Raise the limit on the OpenAI dashboard",
   "dev.d.flightIdle": "Configured — its monthly quota is tiny, so it is only called from «Test» (one request)",
   "dev.d.flightOk": "Working — answered the test request",
   "dev.d.ocr": "Configured on {host} — not checked automatically, it bills per page",

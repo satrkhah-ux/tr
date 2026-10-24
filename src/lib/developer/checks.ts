@@ -297,6 +297,19 @@ const CHECKS: Check[] = [
       const [res, ms] = await timed(() => get(`https://api.openai.com/v1/models/${encodeURIComponent(model)}`, { authorization: `Bearer ${key}` }));
       if (res.status === 404) return { status: "warn", latencyMs: ms, detail: { key: "dev.d.openaiModel", params: { model } } };
       if (!res.ok) return httpProblem(res.status, ms);
+      // …but the card answers when the account can no longer pay: one token tells (the spend limit, 2026-10-24)
+      const spend = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+        body: JSON.stringify({ model: DEFAULT_MODEL, messages: [{ role: "user", content: "ok" }], max_completion_tokens: 1 }),
+        signal: signal(),
+        cache: "no-store",
+      });
+      if (spend.status === 429) {
+        const { error } = (await spend.json().catch(() => ({}))) as { error?: { code?: string; type?: string } };
+        if (/quota|spend_limit|billing/.test(`${error?.code} ${error?.type}`)) return { status: "down", latencyMs: ms, detail: { key: "dev.d.openaiQuota" } };
+      }
+      if (!spend.ok) return httpProblem(spend.status, ms);
       return ok(ms, { key: "dev.d.openai", params: { model } });
     },
   },
