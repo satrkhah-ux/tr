@@ -14,6 +14,7 @@ import {
   hotelCoverage,
   pricingRefFor,
   SCOPE_KEYS,
+  soldHotels,
   stayTotal,
   totalCityNights,
   STAGE_SCOPE,
@@ -136,7 +137,8 @@ export function citiesWithoutHotel(data: DraftData): string[] {
   return data.cities
     .filter((c, i) => {
       const mine = stays.filter((s) => s.city_index === i);
-      return c.nights > 0 && (mine.length === 0 || mine.some((s) => !s.line.hotel_name.trim()));
+      // a city whose hotel the client booked himself has none of ours, on purpose
+      return c.nights > 0 && !c.client_hotel && (mine.length === 0 || mine.some((s) => !s.line.hotel_name.trim()));
     })
     .map((c) => c.city_name);
 }
@@ -237,14 +239,15 @@ export function validateDraft(data: DraftData, opts: ValidateOptions = {}): Draf
 
   // A stay's price is the WHOLE stay's: under 50 is almost surely a price cut short while typing (the evaluator,
   // 2026-10-22: «2» of 2000 saved as the stay's price). Said before issuing, not blocked.
-  if (data.hotels.some((h) => h.rooms.some((r) => r.price != null && r.price > 0 && r.price < 50))) {
+  if (soldHotels(data).some((h) => h.rooms.some((r) => r.price != null && r.price > 0 && r.price < 50))) {
     warnings.push({ severity: "warning", stage: "hotels", field: "hotels", key: "pg.warn.stayPriceLow" });
   }
 
   // ---- structural invariants (nights sum, date spans, room+board) ----
   // A city's nights are covered by one or more stays in sequence; each stay
   // carries its own span, and every stay must state a room + board (invariant #3).
-  const stays = deriveHotelStays(cities, data.hotels);
+  // the stays this file sells — a line of a sale without hotels, or of a city the client booked, is none of them
+  const stays = deriveHotelStays(cities, soldHotels(data));
   const invariantResult = validateInvariants({
     trip_nights: total,
     cities: cities.map((c) => ({
@@ -448,8 +451,8 @@ function stageStatuses(data: DraftData, blocking: DraftIssue[]): Record<StageKey
   const hotelsComplete =
     data.cities.length > 0 &&
     // «مكتمل» means every night has a bed, not "a row exists per city".
-    hotelCoverage(data.cities, data.hotels).every((c) => c.covered === c.needed && c.extra === 0) &&
-    data.hotels.every((h) => Boolean(statedRoom(h) && statedBoard(h)));
+    hotelCoverage(data.cities, data.hotels).every((c, i) => data.cities[i].client_hotel || (c.covered === c.needed && c.extra === 0)) &&
+    soldHotels(data).every((h) => Boolean(statedRoom(h) && statedBoard(h)));
   const pricingComplete =
     isFixedPrice(data) || (data.pricing.items.length > 0 && data.pricing.items.every((i) => i.sell_price != null));
   const writtenDays = data.days.filter((d) => d.title.trim().length > 0);

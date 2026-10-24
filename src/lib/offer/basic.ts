@@ -38,6 +38,7 @@ import {
   withCityKeys,
   withRooms,
   type CityService,
+  type ClientHotel,
   type DraftCity,
   type DraftData,
   type DraftDay,
@@ -325,14 +326,45 @@ export function replaceCity(data: DraftData, index: number, next: { name: string
   return { cities: dated, hotels, days };
 }
 
-/** Every city holds a hotel line while the sale includes hotels — a city the flights created has none yet. */
+/**
+ * Every city holds a hotel line while the sale includes hotels — a city the flights created has none yet. A city
+ * whose hotel the client booked himself holds none.
+ */
 export function withHotelLines(data: DraftData, currency: string): DraftHotel[] {
   if (!data.scope.hotels) return data.hotels;
   const keys = cityKeys(data.cities);
   const missing = data.cities.flatMap((c, i) =>
-    c.city_name.trim() && cityHotelLines(data.cities, data.hotels, i).length === 0 ? [hotelForCity(data, c.city_name, currency, keys[i])] : [],
+    c.city_name.trim() && !c.client_hotel && cityHotelLines(data.cities, data.hotels, i).length === 0 ? [hotelForCity(data, c.city_name, currency, keys[i])] : [],
   );
   return missing.length === 0 ? data.hotels : [...data.hotels, ...missing];
+}
+
+/** A stop's own hotel of the client's changed — the name, its dates, the address… (the owner, 2026-10-25, Order 7). */
+export function setClientHotel(cities: DraftCity[], index: number, slice: Partial<ClientHotel>): DraftCity[] {
+  return cities.map((c, i) => (i === index ? { ...c, client_hotel: { name: "", ...c.client_hotel, ...slice } } : c));
+}
+
+/**
+ * «الفندق محجوز من العميل» on a stop of a sale with hotels (a mixed trip): on, its hotel lines go — with their
+ * lines on the pricing sheet, so nothing of them is priced, booked or vouchered — and the client's hotel starts
+ * from the one that was typed there; off, the stop is ours again (withHotelLines gives it a fresh line).
+ */
+export function setClientBooked(data: DraftData, index: number, on: boolean): Pick<DraftData, "cities" | "hotels" | "pricing"> {
+  const city = data.cities[index];
+  const same = { cities: data.cities, hotels: data.hotels, pricing: data.pricing };
+  if (!city || on === Boolean(city.client_hotel)) return same;
+  if (!on) return { ...same, cities: data.cities.map((c, i) => (i === index ? { ...c, client_hotel: undefined } : c)) };
+  // removeCity's rule: its own lines, and a by-name line no other stop reads
+  const keyed = withCityKeys(data.cities);
+  const others = new Set(keyed.flatMap((_, i) => (i === index ? [] : cityHotelLines(keyed, data.hotels, i))));
+  const gone = cityHotelLines(keyed, data.hotels, index).filter((h) => h.city_key === keyed[index].key || !others.has(h));
+  const ids = new Set(gone.map((h) => h.id));
+  const typed = gone.find((h) => h.hotel_name.trim());
+  return {
+    cities: setClientHotel(data.cities, index, typed ? { name: typed.hotel_name.trim(), hotel_id: typed.hotel_id } : {}),
+    hotels: data.hotels.filter((h) => !ids.has(h.id)),
+    pricing: { ...data.pricing, items: data.pricing.items.filter((it) => it.item_type !== "hotel" || !ids.has(it.ref ?? "")) },
+  };
 }
 
 /**

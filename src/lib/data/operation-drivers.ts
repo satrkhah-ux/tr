@@ -20,7 +20,7 @@ import { normAr } from "@/lib/catalog/norm";
 import { catalogHotelsFor } from "@/lib/data/hotel-match";
 import { gateOps, gateRow, mayWork, opsAccess } from "@/lib/operations/access";
 import { carText, DRV, driverServiceKind, linkOf, meetTime, type ServiceKind } from "@/lib/operations/drivers";
-import { hotelsMessage, programmeMessage, programmeUpdate, recipientKey, type HotelGap, type ProgrammeInput } from "@/lib/operations/driver-programme";
+import { clientStays, hotelsMessage, programmeMessage, programmeUpdate, recipientKey, type HotelGap, type ProgrammeInput } from "@/lib/operations/driver-programme";
 import { cityOf, transportCities } from "@/lib/operations/wizard/transport";
 import { leadName } from "@/lib/operations/travelers";
 
@@ -175,7 +175,8 @@ export async function draftDriverProgramme(bookingId: string): Promise<{ ok: tru
           map: h?.google_maps ?? null,
           coords: c?.lat != null && c?.lng != null ? { lat: Number(c.lat), lng: Number(c.lng) } : null,
         };
-      }),
+      // the hotels the client booked himself: no booking of ours — read off the drives and tours that go there
+      }).concat(clientStays(trips.map((t) => ({ city: cityOf(t.booking), detail: t.booking.detail })))),
       legs: bookings.filter((b) => b.kind === "flight" && b.status !== "cancelled").flatMap((b) => b.flight_legs ?? []),
       airports: Object.fromEntries(((airportsRes.data ?? []) as { code: string; arabic_name: string }[]).map((a) => [a.code, a.arabic_name])),
       // the driver works for us whoever sold the trip — he calls our operations line

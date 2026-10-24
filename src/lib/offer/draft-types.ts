@@ -405,10 +405,69 @@ export type DraftCity = {
    * (CityService). Absent on every file from before: the trip's rows as they were.
    */
   services?: CityService[];
+  /**
+   * «فندق العميل (محجوز من خارجنا)» — the hotel the client booked himself (the
+   * owner, 2026-10-25). In a sale without hotels it is where each city sleeps;
+   * in a sale with them, its presence marks the city as the client's own: no
+   * hotel line of ours there (soldHotels). Absent on every file from before.
+   */
+  client_hotel?: ClientHotel;
   /** derived from trip.arrival_date + the nights chain (deriveCityDates). */
   check_in: string | null;
   check_out: string | null;
 };
+
+/** «الحجز من» — where the client booked his own hotel. */
+export type ClientHotelSource = "app" | "company" | "client";
+export const CLIENT_HOTEL_SOURCES: ClientHotelSource[] = ["app", "company", "client"];
+export const CLIENT_HOTEL_SOURCE_AR: Record<ClientHotelSource, string> = { app: "تطبيق", company: "شركة أخرى", client: "العميل نفسه" };
+
+/**
+ * A hotel the client booked outside us. Never priced, never a booking or a
+ * voucher, never a hotel line — only the place the cars pick the group up from
+ * and drop it at, and the programme's «الإقامة: … — حجز العميل».
+ */
+export type ClientHotel = {
+  name: string;
+  /** the catalogue's hotel when picked from it (its address and phone came with it). */
+  hotel_id?: string | null;
+  /** its own nights inside the city's; absent (or outside them) — the city's (clientHotelDates). */
+  check_in?: string | null;
+  check_out?: string | null;
+  /** an address or a map link. */
+  address?: string;
+  phone?: string;
+  source?: ClientHotelSource;
+};
+
+/** «فندق X (حجز العميل)» — a stop's own hotel of the client's as a car's pickup or drop point; null without one. */
+export function clientHotelPlace(city: Pick<DraftCity, "client_hotel"> | undefined): string | null {
+  const name = city?.client_hotel?.name.trim();
+  return name ? `فندق ${name.replace(/^فندق\s+/, "")} (حجز العميل)` : null;
+}
+
+/** The client hotel's nights: each of its own days while it sits inside the city's, else the city's. */
+export function clientHotelDates(city: Pick<DraftCity, "client_hotel" | "check_in" | "check_out">): { check_in: string | null; check_out: string | null } {
+  const inCity = (d: string | null | undefined): d is string => Boolean(d && city.check_in && city.check_out && d >= city.check_in && d <= city.check_out);
+  const own = city.client_hotel;
+  const check_in = inCity(own?.check_in) ? own.check_in : city.check_in;
+  const check_out = inCity(own?.check_out) ? own.check_out : city.check_out;
+  return check_in && check_out && check_in < check_out ? { check_in, check_out } : { check_in: city.check_in, check_out: city.check_out };
+}
+
+/**
+ * The hotel lines this file SELLS — priced, issued, pulled into operations: none
+ * when the sale has no hotels (a line Basic made for a city before the switch
+ * went off is not a hotel the client buys), and never one of a stop whose hotel
+ * the client booked himself. A file with hotels and no such stop: its lines as
+ * they are, the same array.
+ */
+export function soldHotels(data: Pick<DraftData, "scope" | "cities" | "hotels">): DraftHotel[] {
+  if (!data.scope.hotels) return [];
+  if (!data.cities.some((c) => c.client_hotel)) return data.hotels;
+  const theirs = new Set(data.cities.flatMap((c, i) => (c.client_hotel ? cityHotelLines(data.cities, data.hotels, i) : [])));
+  return data.hotels.filter((h) => !theirs.has(h));
+}
 
 /** What a row of a city visit's services table is. A tour is its TourPick; the others are transport rows. */
 export type ServiceKind = "reception" | "farewell" | "transfer" | "tour";
@@ -1284,7 +1343,7 @@ export function deriveTransportRows(plan: TransportPlan, cities: TransportCity[]
   return transportEntries(plan, cities, stays).map((e) => e.row);
 }
 
-type TransportCity = Pick<DraftCity, "city_name" | "check_in"> & Partial<Pick<DraftCity, "check_out" | "services" | "edge_out">>;
+type TransportCity = Pick<DraftCity, "city_name" | "check_in"> & Partial<Pick<DraftCity, "check_out" | "services" | "edge_out" | "client_hotel">>;
 
 /**
  * A transport row as a city visit's service: the stop it belongs to, its id
@@ -1344,6 +1403,11 @@ function transportEntries(plan: TransportPlan, cities: TransportCity[], stays: H
       svc: { city: c, id, kind: own?.kind ?? kind, leg, ...(own ? { own } : {}), ...(row.text ? { words: row.text } : {}) },
     });
   };
+  // the hotel the client booked himself: the car meets the group there and drops it there, and says so —
+  // the row's words only, its places stay the keys the price lists read
+  const theirs = (i: number) => clientHotelPlace(cities[i]);
+  const metAt = (i: number) => (theirs(i) ? { text: `الاستقبال من المطار إلى ${theirs(i)}` } : {});
+  const seenOff = (i: number) => (theirs(i) ? { text: `التوصيل من ${theirs(i)} إلى المطار` } : {});
 
   if (plan.airport.enabled) {
     put(0, "in", "reception", plan.airport, {
@@ -1352,6 +1416,7 @@ function transportEntries(plan: TransportPlan, cities: TransportCity[], stays: H
       car_type: "",
       date: cities[0]?.check_in ?? null,
       note: plan.airport.note,
+      ...metAt(0),
     });
     // a last day without a hotel: one car from check-out at noon, with the luggage, until the airport
     const dayCar = cities[lastAt]?.edge_out === "no_hotel_day";
@@ -1361,6 +1426,7 @@ function transportEntries(plan: TransportPlan, cities: TransportCity[], stays: H
       car_type: "",
       date: dayCar ? (cities[lastAt]?.check_out ?? null) : null,
       note: dayCar ? ["سيارة يوم المغادرة: من الفندق الساعة 12:00 حتى المطار — الأمتعة في السيارة", plan.airport.note].filter(Boolean).join(" · ") : plan.airport.note,
+      ...seenOff(lastAt),
     });
   }
 
@@ -1390,13 +1456,14 @@ function transportEntries(plan: TransportPlan, cities: TransportCity[], stays: H
         const date = cities[i]?.check_in ?? null;
         // to the airport the day the flight leaves — the evening before, when it lands after midnight
         const leaves = cities[i - 1]?.check_out ?? date;
-        put(i - 1, "out", "farewell", plan.airport, { from_place: `${TRANSPORT_HOTEL_PREFIX}${from}`, to_place: TRANSPORT_AIRPORT, car_type: "", date: leaves, note: plan.airport.note });
-        put(i, "in", "reception", plan.airport, { from_place: TRANSPORT_AIRPORT, to_place: `${TRANSPORT_HOTEL_PREFIX}${to}`, car_type: "", date, note: plan.airport.note });
+        put(i - 1, "out", "farewell", plan.airport, { from_place: `${TRANSPORT_HOTEL_PREFIX}${from}`, to_place: TRANSPORT_AIRPORT, car_type: "", date: leaves, note: plan.airport.note, ...seenOff(i - 1) });
+        put(i, "in", "reception", plan.airport, { from_place: TRANSPORT_AIRPORT, to_place: `${TRANSPORT_HOTEL_PREFIX}${to}`, car_type: "", date, note: plan.airport.note, ...metAt(i) });
         continue;
       }
       // what hopVehicle prints: the car for a road hop, the mode itself for a train or a ship
       const leg = mode === "car" ? { car_type: plan.intercity.car_type.trim() || TRANSPORT_MODE_AR.car, cars: plan.intercity.cars } : { car_type: TRANSPORT_MODE_AR[mode], cars: 1 };
-      put(i, "in", "transfer", leg, { from_place: from, to_place: to, car_type: "", date: cities[i]?.check_in ?? null, note: plan.intercity.note });
+      const road = theirs(i - 1) || theirs(i) ? { text: `الانتقال من ${theirs(i - 1) ?? from} إلى ${theirs(i) ?? to}` } : {};
+      put(i, "in", "transfer", leg, { from_place: from, to_place: to, car_type: "", date: cities[i]?.check_in ?? null, note: plan.intercity.note, ...road });
     }
   }
 
@@ -1422,7 +1489,7 @@ function transportEntries(plan: TransportPlan, cities: TransportCity[], stays: H
         date: serviceDate({ check_in: c.check_in, check_out: c.check_out ?? null }, s),
         note: "",
         ref: `transport:svc:${s.id}`,
-        ...(kind === "transfer" ? { text: inCityTransferText(name) } : {}),
+        ...(kind === "transfer" ? { text: inCityTransferText(name) } : kind === "reception" ? metAt(k) : seenOff(k)),
       });
     }
   });
@@ -1824,7 +1891,12 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
 function withCleanServices(raw: DraftCity): DraftCity {
   // `from_flight` is a mark, true or absent: «تحديث من الرحلات» rewrites only the stops carrying it
   const { from_flight, ...rest } = raw ?? ({} as DraftCity);
-  const city = !raw ? raw : from_flight === true ? raw : (rest as DraftCity);
+  let city = !raw ? raw : from_flight === true ? raw : (rest as DraftCity);
+  // a client hotel is an object with a name, whatever the jsonb holds
+  if (city && city.client_hotel !== undefined) {
+    const h = city.client_hotel as unknown;
+    city = h && typeof h === "object" ? { ...city, client_hotel: { ...(h as ClientHotel), name: String((h as ClientHotel).name ?? "") } } : { ...city, client_hotel: undefined };
+  }
   if (!city || !Array.isArray(city.services)) return city;
   const services = city.services.flatMap((s): CityService[] => {
     if (!s || typeof s !== "object" || typeof s.id !== "string" || !s.id) return [];

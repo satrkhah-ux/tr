@@ -13,10 +13,13 @@
  */
 
 import {
+  clientHotelPlace,
+  CLIENT_HOTEL_SOURCE_AR,
   deriveCityDates,
   deriveHotelStays,
   FREE_DAY_TITLE,
   roomLabel,
+  soldHotels,
   stayTotal,
   TRANSPORT_AIRPORT,
   TRANSPORT_HOTEL_PREFIX,
@@ -82,6 +85,24 @@ export const NOTICE = "تنبيه";
 export const ARRIVAL_DAY_TOUR = "يوم الوصول — تبدأ الجولة بعد وصول المجموعة إلى الفندق";
 export const DEPARTURE_DAY_TOUR = "يوم المغادرة — تنتهي الجولة قبل الإقلاع بأربع ساعات";
 export const FAREWELL_UNSOLD = "التوديع إلى المطار — لم يكن بنداً مستقلاً في العرض (أُزيل أو صار جولة قبل المغادرة)";
+/**
+ * The detail lines a drive or a tour carries when its city's hotel is the client's own (Order 7): no booking of
+ * ours — only where the car goes. driver-programme.ts reads them back for the driver's hotels message.
+ */
+export const CLIENT_HOTEL = { name: "فندق العميل", address: "عنوان فندق العميل", phone: "هاتف فندق العميل" } as const;
+export const OUTSIDE_US = "محجوز من خارجنا";
+
+/** The lobby of `city`'s own hotel of the client's — where the car picks the group up — or null without one. */
+const lobbyOf = (city: DraftCity | undefined) => (clientHotelPlace(city) ? `بهو ${clientHotelPlace(city)}` : null);
+
+/** The client's own hotel of `city`, written on a drive or a tour of it. */
+function putClientHotel(detail: Record<string, string>, city: DraftCity | undefined) {
+  const h = city?.client_hotel;
+  if (!h?.name.trim()) return;
+  detail[CLIENT_HOTEL.name] = `${h.name.trim()} — ${OUTSIDE_US}${h.source ? ` (${CLIENT_HOTEL_SOURCE_AR[h.source]})` : ""}`;
+  if (h.address?.trim()) detail[CLIENT_HOTEL.address] = h.address.trim();
+  if (h.phone?.trim()) detail[CLIENT_HOTEL.phone] = h.phone.trim();
+}
 
 /** «YYYY-MM-DDTHH:mm» shifted by minutes, as the wall clock of the same place. */
 export function shift(at: string, minutes: number): { date: string; time: string } {
@@ -228,6 +249,11 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
   // …and the one that takes it away on `date` — the earliest, if two leave that day
   const leavesFrom = (city: string, date: string) =>
     flights.find((f) => f.leg_order !== "outbound" && f.from_city?.trim() === city.trim() && (f.departure_at ?? "").slice(0, 10) === date);
+  // the visit of a city a drive is on: the one whose nights hold its day, else the first of that name
+  const visitOf = (name: string, date: string | null) => {
+    const named = cities.filter((c) => c.city_name.trim() === name.trim());
+    return named.find((c) => date && c.check_in && c.check_out && date >= c.check_in && date <= c.check_out) ?? named[0];
+  };
   const buyOf = (ref: string) => {
     const item = data.pricing.items.find((i) => i.ref === ref);
     return item?.buy_price != null ? { price: item.buy_price * (item.quantity > 0 ? item.quantity : 1), currency: item.buy_currency || "SAR" } : null;
@@ -316,12 +342,13 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
     });
   }
 
-  // ---- the stays: a booking per hotel, its rooms and its guests ----
+  // ---- the stays: a booking per hotel, its rooms and its guests — never a hotel the client booked himself ----
   if (data.scope.hotels) {
-    const stays = deriveHotelStays(cities, data.hotels);
+    const sold = soldHotels({ ...data, cities });
+    const stays = deriveHotelStays(cities, sold);
     // a named hotel no stop holds any more (its city renamed) is still a hotel the client was sold
     const placed = new Set(stays.map((s) => s.line.id));
-    const orphans = data.hotels
+    const orphans = sold
       .filter((h) => !placed.has(h.id) && h.hotel_name.trim())
       .map((line) => ({ line, city_name: line.city_name, nights: line.nights, check_in: null, check_out: null }));
     // A line written before stops had keys goes by its city's NAME, so a city visited twice
@@ -426,11 +453,16 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
         meet = "بهو الفندق";
       }
       date ??= dayOf(tr.from_place, tr.to_place);
+      // the client's own hotel at the drive's hotel end — leaving from it, its lobby is where the group is met
+      const end = tr.to_place.startsWith(TRANSPORT_HOTEL_PREFIX) ? tr.to_place : tr.from_place;
+      const visit = visitOf(end.replace(TRANSPORT_HOTEL_PREFIX, ""), date);
+      if (lobbyOf(visit) && tr.from_place !== TRANSPORT_AIRPORT) meet = lobbyOf(visit)!;
       detail["الوقت"] = time || LATER;
       if (flight) detail["الرحلة"] = `${flight.flight_no.trim() || "—"} ${code(flight.from_airport)} → ${code(flight.to_airport)}`;
       detail["نقطة الالتقاء"] = meet;
       putCar(detail, tr.car_type ?? "");
       detail["الركاب"] = String(people);
+      putClientHotel(detail, visit);
       if (unsold.includes(tr)) detail[NOTICE] = FAREWELL_UNSOLD;
       const buy = buyOf(transportRef(tr));
       rows.push({
@@ -477,10 +509,13 @@ export function planBookingsFromDraft(data: DraftData, companyCancellation: stri
           const fits = latest && latest.date === pick.date && latest.time >= EARLIEST_TOUR;
           detail["وقت الانطلاق"] = fits ? (latest.time < "09:00" ? latest.time : "09:00") : LATER;
         }
+        // from the client's own hotel: the lobby the car waits in
+        if (lobbyOf(city)) detail["نقطة الالتقاء"] = lobbyOf(city)!;
         // the car and how many — «فان» and 2, read together as «فان × 2»
         putCar(detail, tourVehicle(pick, data.transport_plan.tours.car_type));
         detail["الركاب"] = String(people);
         if (pick.text.trim()) detail["البرنامج"] = pick.text.trim();
+        putClientHotel(detail, city);
         if (arrival) detail[NOTICE] = ARRIVAL_DAY_TOUR;
         else if (departure) detail[NOTICE] = DEPARTURE_DAY_TOUR;
         rows.push({

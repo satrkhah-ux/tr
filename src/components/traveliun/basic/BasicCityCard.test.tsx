@@ -50,6 +50,8 @@ const render = (data = file(), index = 0, transportOn = false, part: "hotels" | 
       onDone={() => {}}
       onExpand={() => {}}
       onFold={() => {}}
+      onClientHotel={() => {}}
+      onClientBooked={() => {}}
     />,
   );
 };
@@ -178,5 +180,55 @@ describe("the hotels part — the city with its stays, apart from its programme 
     expect(html).not.toContain("سعر الليلة للغرفة");
     expect(html).not.toContain("تعديل المدينة");
     expect(html).toContain("البرنامج السياحي");
+  });
+});
+
+describe("«فندق العميل» — the client's own hotel (Order 7)", () => {
+  /** the same city in a sale without hotels: «الفنادق» is off */
+  const toursOnly = (hotel?: string) => {
+    const data = file();
+    data.scope = { ...data.scope, hotels: false };
+    if (hotel) data.cities[0] = { ...data.cities[0], client_hotel: { name: hotel, source: "company" } };
+    return data;
+  };
+
+  it("asks for it on the city, with no price anywhere, and says — softly — what it is for", () => {
+    pricing = true;
+    const html = render(toursOnly(), 0, false, "hotels");
+    expect(html).toContain("فندق العميل (محجوز من خارجنا)");
+    expect(html).toContain('aria-label="اسم الفندق — اكتبه أو اختره"');
+    expect(html).toContain("الحجز من");
+    expect(html).toContain("أدخل فندق العميل لعنوان الاستلام");
+    expect(html).not.toContain("سعر الليلة للغرفة");
+    // the soft hint never holds the city's «تمت»
+    expect(html).not.toContain("ينقص:");
+  });
+
+  it("shows its dates as the city's until changed, and who it was booked through", () => {
+    const html = render(toursOnly("هيلتون"), 0, false, "hotels");
+    expect(html).toContain('value="2026-10-20"');
+    expect(html).toContain('value="2026-10-22"');
+    expect(html).toMatch(/<option value="company" selected="">شركة أخرى<\/option>/);
+    expect(html).not.toContain("أدخل فندق العميل لعنوان الاستلام");
+  });
+
+  it("heads the city's programme as the client's — or asks for it there", () => {
+    expect(render(toursOnly("هيلتون"), 0, false, "programme")).toContain("الفندق: هيلتون — حجز العميل");
+    expect(render(toursOnly(), 0, false, "programme")).toContain("فندق العميل: لم يُدخل بعد — أدخل فندق العميل لعنوان الاستلام");
+  });
+
+  it("in a sale with hotels, each city may be the client's own (a mixed trip)", () => {
+    pricing = true;
+    const data = file();
+    data.hotels = withHotelLines(data, "SAR");
+    const ours = render(data, 0, true, "hotels");
+    expect(ours).toContain("الفندق محجوز من العميل (من خارجنا)");
+    expect(ours).toContain("سعر الليلة للغرفة");
+    expect(ours).not.toContain("فندق العميل (محجوز من خارجنا)");
+    data.cities[0] = { ...data.cities[0], client_hotel: { name: "هيلتون" } };
+    const theirs = render(data, 0, true, "hotels");
+    expect(theirs).toContain("فندق العميل (محجوز من خارجنا)");
+    expect(theirs).not.toContain("سعر الليلة للغرفة");
+    expect(theirs).not.toContain("بلا فندق");
   });
 });

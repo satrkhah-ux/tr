@@ -26,6 +26,8 @@ import {
   BOARD_LABEL_KEYS,
   BOARD_TYPES,
   cityHotelLines,
+  clientHotelDates,
+  CLIENT_HOTEL_SOURCES,
   currencyOptions,
   FREE_DAY_TITLE,
   vehicleText,
@@ -40,6 +42,8 @@ import {
   tourCars,
   withRooms,
   type CityService,
+  type ClientHotel,
+  type ClientHotelSource,
   type DraftData,
   type DraftHotel,
   type DraftRoomSpec,
@@ -80,6 +84,8 @@ import { countryInName, propertyAmong } from "@/lib/operations/supplier-request"
 import { AddStayMenu, StayDatesLine } from "../generator/hotels/StayDates";
 import { basicField, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
+import { SuggestInput } from "../SuggestInput";
+import { getHotelContact } from "@/lib/data/drafts";
 import { RefundControl } from "../generator/hotels/RefundControl";
 import { RoomTypePicker } from "../generator/hotels/RoomTypePicker";
 import { nightsText, useBasicLabels } from "./labels";
@@ -155,6 +161,8 @@ export function BasicCityCard({
   onExpand,
   onFold,
   onGoHotel,
+  onClientHotel,
+  onClientBooked,
 }: {
   part: "hotels" | "programme";
   index: number;
@@ -200,6 +208,10 @@ export function BasicCityCard({
   onFold: () => void;
   /** the programme's hotel line, pressed: this city's card in «الفنادق», open — its hotel, nights, rooms */
   onGoHotel?: () => void;
+  /** «فندق العميل»: a field of the stop's own hotel of the client's changed (Order 7) */
+  onClientHotel: (slice: Partial<ClientHotel>) => void;
+  /** «الفندق محجوز من العميل», in a sale with hotels: the stop's hotel is the client's own, or ours again */
+  onClientBooked: (on: boolean) => void;
 }) {
   const tx = useBasicLabels();
   const hotelsPart = part === "hotels";
@@ -223,8 +235,12 @@ export function BasicCityCard({
   const [tab, setTab] = useState<Tab>("tours");
   const open = tabs.some((x) => x.key === tab && !x.locked) ? tab : tabs[0]?.key;
 
+  // where the city sleeps is the client's own hotel: every city of a sale without hotels, one marked so in a sale with them
+  const theirs = !hotelsOn || Boolean(city.client_hotel);
+  const ours = !theirs;
+  const clientName = city.client_hotel?.name.trim() ?? "";
   // the city's nights against its stays: a night with no hotel, or one booked twice
-  const cover = hotelsPart && hotelsOn ? hotelCoverage(data.cities, data.hotels)[index] : undefined;
+  const cover = hotelsPart && ours ? hotelCoverage(data.cities, data.hotels)[index] : undefined;
   const short = cover ? cover.needed - (cover.covered - cover.extra) : 0;
 
   // what the city still lacks before «تمت»: its stays here; the tours and the airport cars in the programme
@@ -236,10 +252,10 @@ export function BasicCityCard({
   const missing = (
     hotelsPart
       ? [
-          hotelsOn && lines.some((l) => !l.hotel_name.trim()) && tx("hotel"),
-          hotelsOn && rooms.some((r) => !(r.room_type_id || r.room_type_name.trim())) && tx("roomType"),
-          hotelsOn && rooms.some((r) => !r.board_type) && tx("board"),
-          hotelsOn && rooms.some((r) => r.price == null) && tx("price"),
+          ours && lines.some((l) => !l.hotel_name.trim()) && tx("hotel"),
+          ours && rooms.some((r) => !(r.room_type_id || r.room_type_name.trim())) && tx("roomType"),
+          ours && rooms.some((r) => !r.board_type) && tx("board"),
+          ours && rooms.some((r) => r.price == null) && tx("price"),
         ]
       : [
           picks.some((p) => !p.free && !p.title.trim()) && tx("tourService"),
@@ -254,11 +270,13 @@ export function BasicCityCard({
   const tours = picks.filter((p) => !p.free);
   const summary = (
     hotelsPart
-      ? [
-          [...new Set(lines.map((l) => l.hotel_name.trim()).filter(Boolean))].join(" + "),
-          main && main.rooms.length > 0 ? `${main.rooms.length} × ${baseRoomName(main.rooms[0].room_type_name) || "—"}` : "",
-          hotelsOn && stayPrice > 0 ? `${stayPrice.toLocaleString("en-US")} ${main?.manual_currency ?? ""}`.trim() : "",
-        ]
+      ? theirs
+        ? [clientName ? tx("clientHotelIs", { hotel: clientName }) : ""]
+        : [
+            [...new Set(lines.map((l) => l.hotel_name.trim()).filter(Boolean))].join(" + "),
+            main && main.rooms.length > 0 ? `${main.rooms.length} × ${baseRoomName(main.rooms[0].room_type_name) || "—"}` : "",
+            stayPrice > 0 ? `${stayPrice.toLocaleString("en-US")} ${main?.manual_currency ?? ""}`.trim() : "",
+          ]
       : [toursOn ? toursText(tx, tours.length, showPrice ? toursTotal(tours, tripCar, tourPrices, lookups.sarPer ?? { SAR: 1 }) : null) : ""]
   )
     .filter(Boolean)
@@ -276,16 +294,33 @@ export function BasicCityCard({
   const editCities = editing ? (findLookupCountry(lookups.countries, editCountry)?.cities ?? []) : [];
   const moved = Boolean(datesWere);
 
-  // the part's own body — a city without hotels in the file has no stays to enter: its header is all of it
+  // the part's own body — the city's stays, or the hotel the client booked himself (Order 7)
   const body = hotelsPart ? (
-    hotelsOn && main ? (
-      <HotelPanel index={index} city={city} dayFrom={dayFrom} data={data} lookups={lookups} lines={lines} onLines={onLines} onSlice={onSlice} onNights={onNights} />
-    ) : null
+    <>
+      {/* a mixed trip (the owner, 2026-10-25): we book one city, the client books another */}
+      {hotelsOn ? (
+        <ClientBookedSwitch
+          on={theirs}
+          onChange={(on) => {
+            const named = lines.map((l) => l.hotel_name.trim()).filter(Boolean);
+            if (on && named.length > 0 && !window.confirm(tx("clientBookedConfirm", { hotel: named.join(" + ") }))) return;
+            onClientBooked(on);
+          }}
+        />
+      ) : null}
+      {theirs ? (
+        <ClientHotelPanel city={city} lookups={lookups} country={city.country || data.trip.country} onChange={onClientHotel} />
+      ) : main ? (
+        <HotelPanel index={index} city={city} dayFrom={dayFrom} data={data} lookups={lookups} lines={lines} onLines={onLines} onSlice={onSlice} onNights={onNights} />
+      ) : null}
+    </>
   ) : open ? (
     <>
       {/* where the group sleeps, on both tabs (the owner, 2026-10-24: «اسم الفندق لا يظهر في الجولات!» — read on
-          «البرنامج السياحي») */}
-      {hotelsOn && main ? (
+          «البرنامج السياحي») — the client's own hotel said as his */}
+      {theirs ? (
+        <HotelLine hotels={clientName ? [clientName] : []} nights={city.nights} onGo={onGoHotel} client />
+      ) : main ? (
         <HotelLine
           hotels={[...new Set(lines.map((l) => l.hotel_name.trim()).filter(Boolean))]}
           nights={city.nights}
@@ -465,7 +500,7 @@ export function BasicCityCard({
               {tx("edit")}
             </button>
             {/* a city whose file has no hotels has no hotel row: its nights stay here */}
-            {!hotelsOn || !main ? (
+            {theirs || !main ? (
               <label className="inline-flex items-center gap-1 text-[11px] font-bold text-[#185045]">
                 {tx("nights")}
                 <select value={city.nights} onChange={(e) => onNights(Number(e.target.value))} className="h-7 rounded-[7px] border border-[#cfe0d9] bg-white px-1 text-[12px] font-bold">
@@ -988,7 +1023,7 @@ export function HotelPanel({
  * alike; pressed, it takes the agent to the city's own hotel card to change the hotel, its nights or rooms
  * (the owner, 2026-10-24). A city whose hotel is not chosen yet says so.
  */
-function HotelLine({ hotels, nights, onGo }: { hotels: string[]; nights: number; onGo?: () => void }) {
+function HotelLine({ hotels, nights, onGo, client = false }: { hotels: string[]; nights: number; onGo?: () => void; client?: boolean }) {
   const tx = useBasicLabels();
   const { language } = useTraveliunUI();
   return (
@@ -1004,7 +1039,13 @@ function HotelLine({ hotels, nights, onGo }: { hotels: string[]; nights: number;
       }`}
     >
       <BedDouble className="size-4 shrink-0 text-[#185045]" aria-hidden />
-      <span>{hotels.length > 0 ? tx("hotelIs", { hotel: hotels.join(" + ") }) : tx("hotelNone")}</span>
+      <span>
+        {hotels.length > 0
+          ? tx(client ? "clientHotelIs" : "hotelIs", { hotel: hotels.join(" + ") })
+          : client
+            ? `${tx("clientHotelNone")} — ${tx("clientHint")}`
+            : tx("hotelNone")}
+      </span>
       <span className="tv-tnum rounded-full bg-[#185045] px-2.5 py-0.5 text-[11.5px] font-bold text-white">{nightsText(nights, language)}</span>
       {onGo ? (
         <span className="ms-auto inline-flex items-center gap-1 text-[11.5px] font-bold text-[#557d78] group-hover:text-[#185045]">
@@ -1013,6 +1054,130 @@ function HotelLine({ hotels, nights, onGo }: { hotels: string[]; nights: number;
         </span>
       ) : null}
     </button>
+  );
+}
+
+/** «الفندق محجوز من العميل» — on a city of a sale with hotels: on, the city's hotel is the client's own (Order 7). */
+function ClientBookedSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  const tx = useBasicLabels();
+  return (
+    <label className="mb-2 inline-flex cursor-pointer items-center gap-1.5 text-[11.5px] font-bold text-[#557d78]">
+      <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} className="size-3.5 accent-[#185045]" />
+      {tx("clientBooked")}
+    </label>
+  );
+}
+
+const SOURCE_LABEL = { app: "srcApp", company: "srcCompany", client: "srcClient" } as const;
+
+/**
+ * «فندق العميل (محجوز من خارجنا)» (the owner, 2026-10-25: «في حال فقط جولات يتم ادخال الفندق يدويا حسب حجز
+ * العميل»): the name — typed, or picked from the city's hotels (the catalogue's address and phone come with it) —
+ * its dates (the city's until changed), an address or map link and who it was booked through. Never priced:
+ * there is no price here. Missing, it is only said — the drivers need it, the issue does not.
+ */
+function ClientHotelPanel({
+  city,
+  lookups,
+  country,
+  onChange,
+}: {
+  city: BasicCity;
+  lookups: GeneratorLookups;
+  country: string;
+  onChange: (slice: Partial<ClientHotel>) => void;
+}) {
+  const tx = useBasicLabels();
+  const own = city.client_hotel;
+  const hotels = findLookupCountry(lookups.countries, country)?.cities.find((c) => c.name === city.city_name)?.hotels ?? [];
+  const dates = clientHotelDates(city);
+  // a day the same as the city's is not kept: the hotel follows the city when its dates move
+  const day = (key: "check_in" | "check_out", value: string) => {
+    const kept = value && value !== city[key] ? value : null;
+    onChange(key === "check_in" ? { check_in: kept } : { check_out: kept });
+  };
+  return (
+    <div className="grid gap-2 rounded-[10px] border border-[#d6e4f5] bg-[#f6f9fe] p-2.5">
+      <p className="text-[12px] font-extrabold text-[#2b5bb5]">{tx("clientHotel")}</p>
+      <div className="grid grid-cols-2 items-end gap-2 xl:grid-cols-[minmax(12rem,2fr)_minmax(8rem,1fr)_minmax(8rem,1fr)_minmax(8rem,1fr)]">
+        <span className="col-span-2 xl:col-span-1">
+          <SuggestInput
+            value={own?.name ?? ""}
+            items={hotels.map((h) => ({ value: h.name, keywords: h.name_en ?? "" }))}
+            ariaLabel={tx("clientHotelName")}
+            placeholder={tx("clientHotelName")}
+            className={basicField}
+            onChange={(name, picked) => {
+              const hit = picked ? hotels.find((h) => h.name === name) : undefined;
+              onChange({ name, hotel_id: hit?.id ?? null });
+              // the catalogue's address and phone, where it has them
+              if (hit)
+                void getHotelContact(hit.id).then((c) => {
+                  if (c) onChange({ ...(c.address ? { address: c.address } : {}), ...(c.phone ? { phone: c.phone } : {}) });
+                });
+            }}
+          />
+        </span>
+        <Field label={tx("clientCheckIn")}>
+          <input
+            type="date"
+            dir="ltr"
+            value={dates.check_in ?? ""}
+            min={city.check_in ?? undefined}
+            max={city.check_out ?? undefined}
+            onChange={(e) => day("check_in", e.target.value)}
+            className={`${basicField} tv-tnum`}
+          />
+        </Field>
+        <Field label={tx("clientCheckOut")}>
+          <input
+            type="date"
+            dir="ltr"
+            value={dates.check_out ?? ""}
+            min={city.check_in ?? undefined}
+            max={city.check_out ?? undefined}
+            onChange={(e) => day("check_out", e.target.value)}
+            className={`${basicField} tv-tnum`}
+          />
+        </Field>
+        <Field label={tx("clientSource")}>
+          <select value={own?.source ?? ""} onChange={(e) => onChange({ source: (e.target.value || undefined) as ClientHotelSource | undefined })} className={basicField}>
+            <option value="">{tx("choose")}</option>
+            {CLIENT_HOTEL_SOURCES.map((s) => (
+              <option key={s} value={s}>{tx(SOURCE_LABEL[s])}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-2 xl:grid-cols-[minmax(12rem,2fr)_minmax(8rem,1fr)]">
+        <input
+          type="text"
+          dir="auto"
+          value={own?.address ?? ""}
+          onChange={(e) => onChange({ address: e.target.value })}
+          placeholder={tx("clientAddress")}
+          aria-label={tx("clientAddress")}
+          className={`${basicField} col-span-2 xl:col-span-1`}
+        />
+        <input
+          type="tel"
+          dir="ltr"
+          value={own?.phone ?? ""}
+          onChange={(e) => onChange({ phone: e.target.value })}
+          placeholder={tx("clientPhone")}
+          aria-label={tx("clientPhone")}
+          className={`${basicField} col-span-2 xl:col-span-1`}
+        />
+      </div>
+      {/* soft: the drivers need it, the issue does not */}
+      {own?.name.trim() ? null : (
+        <p className="flex items-center gap-1.5 text-[11.5px] font-bold text-[#a86a10]">
+          <AlertTriangle className="size-3.5 shrink-0" />
+          {tx("clientHint")}
+        </p>
+      )}
+      <p className="text-[11px] font-semibold text-[#7a948f]">{tx("clientNote")}</p>
+    </div>
   );
 }
 

@@ -14,6 +14,7 @@
 import type { FlightLeg } from "@/lib/data/operation-bookings";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { linkOf, type ServiceKind } from "./drivers";
+import { CLIENT_HOTEL, OUTSIDE_US } from "./seed-plan";
 import type { TransportCity } from "./wizard/transport";
 
 export const LATER = "يُبلَّغ لاحقاً / TBA";
@@ -104,6 +105,23 @@ export function recipientKey(city: TransportCity): string {
   if (phone) return `tel:${phone.replace(/\D/g, "")}`;
   if (name) return `drv:${normalizeName(name)}`;
   return city.supplierId ? `sup:${city.supplierId}` : "";
+}
+
+/**
+ * The hotels the client booked himself (Order 7): no booking of ours, but written on the drives and tours that go
+ * to them (seed-plan CLIENT_HOTEL) — the driver is told where they are all the same. Once per city.
+ */
+export function clientStays(trips: { city: string; detail?: Record<string, string> | null }[]): ProgrammeStay[] {
+  const out = new Map<string, ProgrammeStay>();
+  for (const t of trips) {
+    const name = t.detail?.[CLIENT_HOTEL.name]?.split(` — ${OUTSIDE_US}`)[0].trim();
+    const key = `${normalizeName(t.city)}|${normalizeName(name)}`;
+    if (!name || out.has(key)) continue;
+    const address = t.detail?.[CLIENT_HOTEL.address]?.trim() || null;
+    const phone = t.detail?.[CLIENT_HOTEL.phone]?.trim() || null;
+    out.set(key, { name, name_en: null, city: t.city, check_in: null, check_out: null, address, phone, map: address && /^https?:\/\//.test(address) ? address : null, coords: null });
+  }
+  return [...out.values()];
 }
 
 /** The hotel of a city on a day — the stay covering it, else the city's first. */

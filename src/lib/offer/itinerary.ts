@@ -11,6 +11,8 @@
  */
 
 import {
+  clientHotelDates,
+  clientHotelPlace,
   deriveCityDates,
   deriveHotelStays,
   FREE_DAY_TITLE,
@@ -713,9 +715,11 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
       activities = picked.flatMap((t) => (t.text.trim() ? [t.text.trim()] : [])).slice(0, 1);
     } else if (tours.length > 0) {
       const line = (t: TourPick) => (t.text.trim() ? `${t.title}: ${t.text.trim()}` : t.title);
-      // the car each tour goes in, and how many — said once
+      // the car each tour goes in, and how many — said once; from the client's own hotel, said where it waits
       const cars = [...new Set(tours.map((t) => tourVehicle(t, tripCar)).filter(Boolean))];
-      const car = cars.length > 0 ? [`${TOUR_CAR_LINE}${cars.join(" و")}`] : [];
+      const pickup = clientHotelPlace(cities[cityOf[i]]);
+      const from = pickup ? `الاستلام من ${pickup}` : "";
+      const car = cars.length > 0 ? [`${TOUR_CAR_LINE}${cars.join(" و")}${from ? ` — ${from}` : ""}`] : from ? [from] : [];
       if (kind === "stay") {
         // the day is named after its first tour; any more the client asked for follow it
         title = tours[0].title;
@@ -744,6 +748,17 @@ export function daysFromTours(data: DraftData, legacyTitles = false): DraftDay[]
     if (day.ai_generated && day.title === title) return { ...day, auto_title: title };
     return { ...day, title, activities, auto_title: title, ai_generated: false };
   });
+}
+
+/**
+ * «الإقامة: فندق X — حجز العميل» on the day the group reaches a hotel the client
+ * booked himself (`cities` dated) — the issued paper and its preview add it to
+ * the day whoever wrote the day, so it is never lost to a hand edit; a hotel
+ * we sell is printed as a stay instead, never here.
+ */
+export function clientStayLine(cities: DraftCity[], date: string | null): string | null {
+  const city = date ? cities.find((c) => c.client_hotel?.name.trim() && clientHotelDates(c).check_in === date) : undefined;
+  return city ? `الإقامة: فندق ${city.client_hotel!.name.trim().replace(/^فندق\s+/, "")} — حجز العميل` : null;
 }
 
 /** the lead before a flight's take-off to leave for the airport (as «بكج متقدم» checks it) */

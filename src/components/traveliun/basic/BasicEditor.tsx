@@ -59,6 +59,7 @@ import {
   stageHref,
   STAGES,
   stayTotal,
+  soldHotels,
   totalCityNights,
   type DraftData,
   type DraftHotel,
@@ -103,6 +104,8 @@ import {
   moveCity,
   replaceCity,
   setCityNights,
+  setClientBooked,
+  setClientHotel,
   setEdge,
   withHotelLines,
   withTripDates,
@@ -1010,10 +1013,12 @@ export function BasicEditor({
   // the cities whose stay still lacks a hotel, a room type, a board or a price — «إكمال» opens only these
   // (no hotel at all: the same function the server's issue gate asks)
   const noHotel = citiesWithoutHotel(data);
+  // the hotels this file sells: not a city the client booked himself
+  const sold = soldHotels(data);
   const hotelGaps = scope.hotels
     ? [...new Set(cities.map((c) => c.city_name))].filter((name) =>
         noHotel.includes(name) ||
-        data.hotels.some(
+        sold.some(
           (h) =>
             h.city_name === name &&
             (h.rooms.some((r) => !(r.room_type_id || r.room_type_name.trim()) || !r.board_type) || (h.hotel_name.trim() && !h.sourcing && stayTotal(h) == null)),
@@ -1142,8 +1147,11 @@ export function BasicEditor({
     flights: [booking.later_intl ? tx("laterLine", { part: tx("laterIntl") }) : "", ...data.flights.filter((f) => f.leg_order !== "internal" && !booking.later_intl).map(legText)].filter(Boolean).join(" · "),
     hotels: cities
       .map((c, i) => {
-        // each visit of a city with its own hotels
-        const hotel = [...new Set(cityHotelLines(cities, data.hotels, i).map((h) => h.hotel_name.trim()).filter(Boolean))].join(" + ");
+        // each visit of a city with its own hotels — or the one the client booked himself
+        const theirs = c.client_hotel?.name.trim();
+        const hotel = theirs
+          ? tx("clientHotelIs", { hotel: theirs })
+          : [...new Set(cityHotelLines(cities, sold, i).map((h) => h.hotel_name.trim()).filter(Boolean))].join(" + ");
         return `${c.city_name} (${nightsText(c.nights, language)})${hotel ? ` — ${hotel}` : ""}`;
       })
       .join(" · "),
@@ -1233,8 +1241,11 @@ export function BasicEditor({
         }}
         onExpand={() => setDoneCities((d) => d.filter((k) => k !== done))}
         onFold={() => setDoneCities((d) => (d.includes(done) ? d : [...d, done]))}
+        // the newest cities, not this render's: the catalogue's address lands after the pick
+        onClientHotel={(slice) => commit({ cities: setClientHotel(latest.current.cities, i, slice) })}
+        onClientBooked={(on) => commit(setClientBooked(latest.current, i, on))}
         onGoHotel={
-          part === "programme" && scope.hotels
+          part === "programme"
             ? () => {
                 // «الفنادق» open, this city's card unfolded, and brought into view
                 setDoneCities((d) => d.filter((k) => k !== `hotels|${key}`));
@@ -1937,7 +1948,7 @@ export function BasicEditor({
           )}
           {produced ? null : (
             <>
-              <IssueGuardNotice hotels={data.hotels} onBlocked={setGuardBlocked} only="blocking" className="mt-2" />
+              <IssueGuardNotice hotels={sold} onBlocked={setGuardBlocked} only="blocking" className="mt-2" />
               {produceError ? <p role="alert" className="mt-2 text-[12px] font-bold text-[#c22850]">{produceError}</p> : null}
               <div className="mt-3 flex justify-end">
                 <button

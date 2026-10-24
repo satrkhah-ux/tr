@@ -23,6 +23,7 @@ import {
   matchPartner,
   mealPlanIncludeLine,
   roomTypesText,
+  soldHotels,
   stayCancellation,
   type DraftData,
   type GeneratorLookups,
@@ -30,7 +31,7 @@ import {
   FLIGHTS_LATER_LINE,
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
-import { draftTransportNote } from "./itinerary";
+import { clientStayLine, draftTransportNote } from "./itinerary";
 import { AIRPORT_TRANSFER_LINE, advancedDayNote, advancedLines, meetsElsewhere } from "./advanced";
 import { offerTotals, type CurrencyRates } from "./pricing";
 import { packageNights, packageStays, type ExtractedPackage, type RepackageData } from "@/lib/repackage/repackage-types";
@@ -104,7 +105,8 @@ export function draftToPreviewOffer(
     total: draftSellTotal(data, sarPer),
     currency: data.pricing.display_currency,
     pricing: emptyPricing(data.pricing.display_currency),
-    hotels: deriveHotelStays(cities, data.hotels).map(({ line: h, nights: stayNights, check_in, check_out }) => {
+    // what the issue prints: the hotels this file sells (soldHotels)
+    hotels: deriveHotelStays(cities, soldHotels(data)).map(({ line: h, nights: stayNights, check_in, check_out }) => {
       return {
         city_name: h.city_name || null,
         hotel_name: h.hotel_name || null,
@@ -165,7 +167,8 @@ export function draftToPreviewOffer(
         date: d.date,
         city_name: d.city_name,
         title: d.title,
-        activities: d.activities,
+        // as the issue adds it: the client's own hotel on the day the group reaches it
+        activities: d.activities.concat(clientStayLine(cities, d.date) ?? []),
         temp_max: d.weather?.temp_max ?? null,
         temp_min: d.weather?.temp_min ?? null,
         rain_chance: d.weather?.rain_chance ?? null,

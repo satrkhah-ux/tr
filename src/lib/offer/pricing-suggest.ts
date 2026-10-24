@@ -22,6 +22,7 @@ import {
   FREE_DAY_TITLE,
   deriveHotelStays,
   pricingRefFor,
+  soldHotels,
   stayTotal,
   TRANSPORT_AIRPORT,
   TRANSPORT_HOTEL_PREFIX,
@@ -505,9 +506,10 @@ export function suggestPricing(
   labels: { hotel: string; airline: string },
 ): SuggestedItem[] {
   const currency = data.pricing.display_currency || "SAR";
+  // only what the file sells: a client's own hotel is never priced (soldHotels)
   const stays = deriveHotelStays(
     deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities),
-    data.hotels,
+    soldHotels(data),
   );
 
   const items: SuggestedItem[] = [];

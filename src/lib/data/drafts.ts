@@ -17,6 +17,7 @@ import {
   deriveHotelStays,
   emptyDraftData,
   roomTypesText,
+  soldHotels,
   emptyTermLibrary,
   findLookupCountry,
   flightsLater,
@@ -51,7 +52,7 @@ import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { byUsage } from "@/lib/offer/country-priority";
 import { attachWeather, weatherMissing } from "@/lib/offer/weather-attach";
 import { itineraryStartDate } from "@/lib/offer/schedule";
-import { draftDaySkeleton, draftTransportNote } from "@/lib/offer/itinerary";
+import { clientStayLine, draftDaySkeleton, draftTransportNote } from "@/lib/offer/itinerary";
 import { validateDraft } from "@/lib/offer/draft-validation";
 import { getPublishedClientOffer, publishOffer, type CreateOfferInput, type OfferHotelInput, type OfferPricingItemInput } from "./offers";
 import { insertOffer, replaceOffer } from "./offer-insert";
@@ -406,6 +407,21 @@ export async function getCountryHotels(countryName: string): Promise<Record<stri
       (byCity[h.city_id] ??= []).push({ id: h.id, name: h.arabic_name, name_en: h.english_name, stars: h.stars, tbo: tbo.get(h.id) ?? null });
     }
     return byCity;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What the catalogue knows of where a hotel is — for a client's own hotel picked from it (Order 7): its address
+ * (else its map link) and phone. Null when the session is gone or the hotel is not ours.
+ */
+export async function getHotelContact(hotelId: string): Promise<{ address: string; phone: string } | null> {
+  try {
+    if (!(await getServerUser()) || !/^[0-9a-f-]{36}$/i.test(hotelId)) return null;
+    const { data } = await (await db()).from("hotels").select("address, contact_number, google_maps").eq("id", hotelId).maybeSingle();
+    const h = data as { address: string | null; contact_number: string | null; google_maps: string | null } | null;
+    return h ? { address: h.address?.trim() || h.google_maps?.trim() || "", phone: h.contact_number?.trim() ?? "" } : null;
   } catch {
     return null;
   }
@@ -819,19 +835,21 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // PreBook re-validation: a supplier rate must still be valid at CONFIRM time.
     // Never freeze/publish a rate whose validity has lapsed since selection.
     const today = new Date().toISOString().slice(0, 10);
-    if (data.hotels.some((h) => h.sourcing?.valid_until && h.sourcing.valid_until < today)) {
+    // the hotels this file sells — none in a sale without them, none of a city the client booked himself
+    const sold = soldHotels(data);
+    if (sold.some((h) => h.sourcing?.valid_until && h.sourcing.valid_until < today)) {
       return { ok: false, error: "pg.supplier.rateExpired" };
     }
 
     // A hotel typed by hand joins /hotels, its data asked of the administration (the owner,
     // 2026-10-23: «عندما يدخله يدوياً يتم إضافته في النظام تلقائياً») — on the draft itself, so the
     // pull, a re-issue and a merge (merge_hotels remaps drafts) all know it by id. Not a partner's.
-    if (!issuer && data.hotels.some((h) => !h.hotel_id && h.hotel_name.trim())) {
+    if (!issuer && sold.some((h) => !h.hotel_id && h.hotel_name.trim())) {
       const service = createSupabaseServiceClient() as unknown as SupabaseClient;
       const by = await getCurrentEmployeeId();
       const made = new Map<string, string | null>();
       let linked = false;
-      for (const h of data.hotels) {
+      for (const h of sold) {
         const name = h.hotel_name.trim();
         if (h.hotel_id || !name) continue;
         const key = `${normalizeName(name)}|${normalizeName(h.city_name)}`;
@@ -849,7 +867,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // One row per STAY, not per city. The old Map keyed by city_name silently
     // kept only the last hotel when a city held two — the offer would print one
     // hotel and operations would book one, for a trip that needed both.
-    const stays = deriveHotelStays(cities, data.hotels);
+    const stays = deriveHotelStays(cities, sold);
     // A partner's file is issued at their terms: the stay's sell is a column
     // their token reads (offer_hotels_partner_read), and the sheet already is.
     const terms = await viewerTerms(record.partner_company_id);
@@ -1137,7 +1155,8 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
           day_date: d.date,
           city_name: d.city_name,
           title: d.title.trim(),
-          activities: d.activities.map((a) => a.trim()).filter(Boolean),
+          // where the group sleeps when the client booked it himself — said, never sold
+          activities: d.activities.map((a) => a.trim()).filter(Boolean).concat(clientStayLine(cities, d.date) ?? []),
           temp_max: d.weather?.temp_max ?? null,
           temp_min: d.weather?.temp_min ?? null,
           rain_chance: d.weather?.rain_chance ?? null,
