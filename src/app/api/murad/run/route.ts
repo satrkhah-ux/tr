@@ -32,16 +32,30 @@ function authorised(req: NextRequest): boolean {
   return Boolean(expected) && req.headers.get("x-admin-secret") === expected;
 }
 
+// one chain at a time in this process: a sync that outlives the minute (61 s on 2026-10-25) is not started twice
+let chain = false;
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!authorised(req)) return NextResponse.json({ ok: false }, { status: 401 });
-  await recordCronRun("followups_sync", syncFollowups).catch(() => null);
-  // «تنبيهاتي»: assignments the webhook missed, on the list the sync just refreshed — after the answer, so Murad never waits on it
-  after(() => recordCronRun("staff_tick", staffTick).catch(() => null));
-  // «ملخص مُراد» for the follow-ups whose thread moved — after the answer: the model takes seconds each
-  after(() => summarizeDue().catch(() => null));
+  // every job that need not shape the answer is registered FIRST, before anything is awaited: the cron's curl gives up
+  // at 55 s, and an after() registered once the caller has gone never runs (2026-10-25: the follow-ups sync took 61 s
+  // and «تنبيهاتي», the summaries, the learning and the shared-login sweep all stopped)
+  after(async () => {
+    if (chain) return;
+    chain = true;
+    try {
+      await recordCronRun("followups_sync", syncFollowups).catch(() => null);
+      // «تنبيهاتي»: assignments the webhook missed, on the list the sync just refreshed
+      await recordCronRun("staff_tick", staffTick).catch(() => null);
+      // «ملخص مُراد» for the follow-ups whose thread moved — the model takes seconds each
+      await summarizeDue().catch(() => null);
+    } finally {
+      chain = false;
+    }
+  });
   // «تنبيهاتي» 10:00 and 16:00: each seller's follow-ups due today
   after(() => followupDigest().catch(() => null));
-  // «تعلّم من كل المحادثات»: a few past conversations a minute, after the answer (lessons.ts)
+  // «تعلّم من كل المحادثات»: a few past conversations a minute (lessons.ts)
   after(async () => {
     const service = createSupabaseServiceClient() as unknown as SupabaseClient;
     const settings = await readSettings(service);
