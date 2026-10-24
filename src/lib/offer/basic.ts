@@ -561,7 +561,7 @@ export function priceAtSource(
   // ponytail: a list line in another currency (MYR) typed over here is riyals on the next sync, as a tour's is;
   // give CityService a currency if the lists' ringgit prices get typed over often.
   if (item.item_type === "transport" && change.price !== undefined) {
-    const hit = transportServices(data.transport_plan, data.cities).find((s) => transportRef(s.row) === ref);
+    const hit = transportServices(data.transport_plan, data.cities, deriveHotelStays(data.cities, data.hotels)).find((s) => transportRef(s.row) === ref);
     if (!hit || !data.cities[hit.city]) return null;
     return { cities: setService(data.cities, hit.city, hit.id, { price: change.price }) };
   }
@@ -692,10 +692,11 @@ export function cityServices(data: DraftData, index: number): ServiceRow[] {
     const t = (iso ?? "").slice(11, 16);
     return t && t !== "00:00" ? t : "";
   };
-  return transportServices(data.transport_plan, data.cities)
+  return transportServices(data.transport_plan, data.cities, deriveHotelStays(data.cities, data.hotels))
     .filter((s) => s.city === index)
     .map((s) => {
-      const auto_text = serviceText(data, index, s.kind, s.id);
+      // a move to another hotel says which two (hotelMoves)
+      const auto_text = s.words ?? serviceText(data, index, s.kind, s.id);
       return {
         id: s.id,
         kind: s.kind,
@@ -896,28 +897,47 @@ export function planInternational(
  * rules wrote (`auto`) follows the cities, and goes when its move does. A leg
  * the agent added by hand is never touched.
  */
+/** One move of the group from a place to the next, on its day; `before` — the city card it comes before (the cities' count: after the last). */
+export type CityMove = { from: string; to: string; day: string | null; overnight?: boolean; before: number; fromAirport?: string; toAirport?: string };
+
+/**
+ * Every move the group makes: from where the international flight lands to the
+ * first city, city to city, and from the last city to where the flight home
+ * leaves — on the day of the move. `overnight`: it leaves the evening the city
+ * before checks out and lands the next day (arrives_next_day).
+ */
+export function cityMoves(data: Pick<DraftData, "cities" | "flights">): CityMove[] {
+  const cities = data.cities;
+  if (cities.length === 0) return [];
+  const intl = data.flights.filter((f) => f.leg_order !== "internal");
+  const landing = finalOutbound(intl);
+  const home = intl.filter((f) => f.leg_order === "inbound").sort((a, b) => (a.departure_at ?? "").localeCompare(b.departure_at ?? ""))[0];
+  const moves: CityMove[] = [];
+  if (landing?.to_city?.trim()) moves.push({ from: landing.to_city, to: cities[0].city_name, day: cities[0].check_in, before: 0, fromAirport: landing.to_airport });
+  cities
+    .slice(1)
+    .forEach((c, i) =>
+      moves.push({ from: cities[i].city_name, to: c.city_name, day: c.arrives_next_day ? cities[i].check_out : c.check_in, overnight: c.arrives_next_day, before: i + 1 }),
+    );
+  const last = cities[cities.length - 1];
+  if (home?.from_city?.trim()) moves.push({ from: last.city_name, to: home.from_city, day: last.check_out, before: cities.length, toAirport: home.from_airport });
+  return moves.map((m) => ({ ...m, from: m.from.trim(), to: m.to.trim() })).filter((m) => m.from && m.to && m.from !== m.to);
+}
+
+/** Domestic legs in travel order: by their day, a leg with none after the rest (stable). */
+export const byTravelOrder = (legs: DraftFlight[]) =>
+  [...legs].sort((a, b) => (a.departure_at ?? "9999").localeCompare(b.departure_at ?? "9999"));
+
 export function withDomesticFlights(data: DraftData, airports: LookupAirport[]): Pick<DraftData, "flights" | "transport_plan"> {
   const plan = data.transport_plan;
   const cities = data.cities;
   if (cities.length === 0) return { flights: data.flights, transport_plan: plan };
   const intl = data.flights.filter((f) => f.leg_order !== "internal");
   const old = data.flights.filter((f) => f.leg_order === "internal");
-  const landing = finalOutbound(intl);
-  const home = intl.filter((f) => f.leg_order === "inbound").sort((a, b) => (a.departure_at ?? "").localeCompare(b.departure_at ?? ""))[0];
 
   type Stop = { city: string; airport: string };
-  const stop = (city: string, airport?: string): Stop => ({ city: city.trim(), airport: airport?.trim() || cityAirport(city, airports, intl) });
-  // `overnight`: it leaves the evening the city before checks out and lands the next day (arrives_next_day)
-  const moves: { from: Stop; to: Stop; day: string | null; overnight?: boolean }[] = [];
-  if (landing?.to_city?.trim()) moves.push({ from: stop(landing.to_city, landing.to_airport), to: stop(cities[0].city_name), day: cities[0].check_in });
-  cities
-    .slice(1)
-    .forEach((c, i) =>
-      moves.push({ from: stop(cities[i].city_name), to: stop(c.city_name), day: c.arrives_next_day ? cities[i].check_out : c.check_in, overnight: c.arrives_next_day }),
-    );
-  const last = cities[cities.length - 1];
-  if (home?.from_city?.trim()) moves.push({ from: stop(last.city_name), to: stop(home.from_city, home.from_airport), day: last.check_out });
-  const real = moves.filter((m) => m.from.city && m.to.city && m.from.city !== m.to.city);
+  const stop = (city: string, airport?: string): Stop => ({ city, airport: airport?.trim() || cityAirport(city, airports, intl) });
+  const real = cityMoves(data).map((m) => ({ ...m, from: stop(m.from, m.fromAirport), to: stop(m.to, m.toAirport) }));
 
   // a move with no pick of its own, between two airports, flies once flights are on
   const modes = intercityModes(plan);
@@ -932,11 +952,17 @@ export function withDomesticFlights(data: DraftData, airports: LookupAirport[]):
 
   const ticketed = (f: DraftFlight) => Boolean(f.flight_no.trim());
   const taken = new Set<DraftFlight>();
-  // a city the agent's own domestic flights land in is reached by them — a connection through another
-  // airport included — and never planned a second time (the flights step enters them, 2026-10-22)
-  const flownByAgent = (city: string) => old.some((f) => !f.auto && f.to_city?.trim() === city);
+  // a city the agent's own domestic flights land in that day is reached by them — a connection through another
+  // airport included — and never planned a second time; a city visited twice is flown into twice (Bangkok, then
+  // Phuket, then Bangkok again — the evaluator, 2026-10-24)
+  const flownByAgent = (m: (typeof real)[number]) =>
+    old.some((f) => !f.auto && f.to_city?.trim() === m.to.city && (!m.day || !f.departure_at || f.departure_at.slice(0, 10) === m.day));
+  // a move between two cities by air whose city has no airport of its own (Selangor, flown from KUL) gets its leg
+  // all the same, the airport left for the agent to pick on the hop — a hop by air is never silently not booked
+  // (AD-6-7907: «طيران» from Selangor and no flight sold). To or from the international flight, only between airports.
+  const between = (m: (typeof real)[number]) => m.before > 0 && m.before < cities.length;
   const legs = real
-    .filter((m) => hopMode(transport_plan, m.from.city, m.to.city) === "flight" && m.from.airport && m.to.airport && !flownByAgent(m.to.city))
+    .filter((m) => hopMode(transport_plan, m.from.city, m.to.city) === "flight" && ((m.from.airport && m.to.airport) || between(m)) && !flownByAgent(m))
     .map((m): DraftFlight => {
       const mine = old.find((f) => !taken.has(f) && f.from_city?.trim() === m.from.city && f.to_city?.trim() === m.to.city);
       if (mine) taken.add(mine);
@@ -965,9 +991,10 @@ export function withDomesticFlights(data: DraftData, airports: LookupAirport[]):
         auto: true,
       };
     });
-  // the agent's own legs stay; the ones these rules wrote go with their move
+  // the agent's own legs stay; the ones these rules wrote go with their move — all of them in travel order, so an
+  // edited leg never jumps to the end of the list under the agent's hand (the evaluator, 2026-10-24: 03/12 above 26/11)
   const kept = old.filter((f) => !taken.has(f) && (!f.auto || ticketed(f)));
-  return { flights: [...intl, ...legs, ...kept], transport_plan };
+  return { flights: [...intl, ...byTravelOrder([...legs, ...kept])], transport_plan };
 }
 
 // ---------- «يشمل» that follows the file ----------

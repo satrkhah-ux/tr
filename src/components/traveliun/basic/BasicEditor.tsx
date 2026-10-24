@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Building2,
@@ -72,7 +72,8 @@ import {
   keepNightlyRates,
   flightsLater,
 } from "@/lib/offer/draft-types";
-import { withCitiesFromFlights } from "@/lib/offer/basic-flights";
+import { flightHops, legGaps, withCitiesFromFlights, withLegFares } from "@/lib/offer/basic-flights";
+import { domesticMismatches } from "@/lib/offer/flight-cities";
 import { ROOM_TYPES } from "@/lib/catalog/room-catalog";
 import {
   addCity,
@@ -126,6 +127,7 @@ import { useNewDeploy } from "../useNewDeploy";
 import { BasicHotelsStep } from "./BasicHotelsStep";
 import { BasicCityCard } from "./BasicCityCard";
 import { BasicFlightPlan } from "./BasicFlightPlan";
+import { BasicHopFlight, gapWords } from "./BasicHopFlight";
 import { BasicFileStatus } from "./BasicFileStatus";
 import { BasicPhoneLookup } from "./BasicPhoneLookup";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
@@ -183,6 +185,9 @@ const STEP_OF: Partial<Record<string, Step>> = {
   // a day with no title is fixed in its city's «البرنامج السياحي» tab
   itinerary: "cities",
 };
+
+/** The checks on the domestic flights — asked on the cities step, where each leg sits on its hop. */
+const DOM_KEYS = ["pg.err.domFlightIncomplete", "pg.err.domFlightUnpriced", "pg.err.domesticMismatch"];
 
 /** «Booking engine» chip from the program-includes spec: whole chip clickable, state not by colour alone. */
 function Chip({ on, icon: Icon, label, onClick }: { on: boolean; icon: typeof Car; label: string; onClick: () => void }) {
@@ -373,14 +378,27 @@ export function BasicEditor({
     // a domestic flight is one of the ways between cities — the two switches are one fact
     const nextScope = { ...merged.scope, flights_domestic: intercityModes(transport_plan).includes("flight") };
     // a move by air becomes its planned domestic leg — the agent never types a route the cities already say
-    const shaped = { ...merged, cities: chained, scope: nextScope, ...withDomesticFlights({ ...merged, flights, cities: chained, transport_plan }, lookups.airports) };
+    const domestic = withDomesticFlights({ ...merged, flights, cities: chained, transport_plan }, lookups.airports);
+    // a leg's ticket is «للفرد»: the domestic booking follows its legs × the travellers — typed, added, or gone with its hop
+    const flight_booking = withLegFares(merged.flight_booking, merged.trip, domestic.flights, latest.current.flights);
+    const shaped = { ...merged, cities: chained, scope: nextScope, ...domestic, flight_booking };
     // the night's rate stays what the agent typed whatever moves the nights — split, merge, removal, the city's nights
     const hotels = keepNightlyRates(chained, withHotelLines(shaped, BASE_CURRENCY));
     // «بكج متقدم»: its dates follow Basic's until the agent types their own
     const advanced = merged.advanced?.on ? fillAdvanced(merged.advanced, advancedDefaults({ ...shaped, cities: chained })) : merged.advanced;
     const next = { ...shaped, hotels, advanced, days: basicDays({ ...shaped, hotels, advanced }) };
     latest.current = next;
-    patch({ ...slice, flights: shaped.flights, cities: chained, transport_plan: shaped.transport_plan, scope: nextScope, hotels, days: next.days, ...(advanced && advanced !== merged.advanced ? { advanced } : {}) });
+    patch({
+      ...slice,
+      flights: shaped.flights,
+      cities: chained,
+      transport_plan: shaped.transport_plan,
+      scope: nextScope,
+      hotels,
+      days: next.days,
+      ...(flight_booking !== merged.flight_booking ? { flight_booking } : {}),
+      ...(advanced && advanced !== merged.advanced ? { advanced } : {}),
+    });
   }
 
   /**
@@ -804,7 +822,8 @@ export function BasicEditor({
   // the transfers' list prices, worked out as the sheet would (the way back from the way there) and shown on
   // the city cards before anyone opens the sheet — the owner's review, 2026-10-18: four typed by hand
   const [listPrices, setListPrices] = useState<Record<string, { price: number; currency: string }>>(() => preload?.listPrices ?? {});
-  const transferKey = JSON.stringify([plan, data.flights.map((f) => [f.from_airport, f.to_airport]), cities.map((c) => [c.city_name, c.nights, (c as BasicCity).services])]);
+  // the hotels too: a city of several hotels has a transfer on each change of hotel
+  const transferKey = JSON.stringify([plan, data.flights.map((f) => [f.from_airport, f.to_airport]), cities.map((c) => [c.city_name, c.nights, (c as BasicCity).services]), data.hotels.map((h) => [h.city_key, h.hotel_name, h.nights])]);
   // as it opened: priced by the page already, or an issued file that needs none — only a change prices again
   const openedWith = useRef(preload && (preload.listPrices || initialData.produced_serial) ? transferKey : null);
   useEffect(() => {
@@ -952,10 +971,39 @@ export function BasicEditor({
     back: trip.departure_date ?? "",
     round: data.flight_booking.mode !== "oneway",
   };
-  // the international legs first; «التالي» folds them and the domestic ones follow in the same step
-  const [flightPart, setFlightPart] = useState<"intl" | "dom">("intl");
+  // the domestic legs, each on its hop between two city cards (the evaluator, 2026-10-24) — and what each still lacks
   const booking = data.flight_booking;
-  const innerNext = flightPart === "intl" && scope.flights_intl && !booking.later_intl && scope.flights_domestic && !booking.later_dom;
+  const hopsOf = flightHops(data);
+  const domIssue = (key: string) => scope.flights_domestic && !booking.later_dom && blocking.some((i) => i.key === key);
+  const movedLegs = domIssue("pg.err.domesticMismatch") ? domesticMismatches(data.flights, data.cities) : [];
+  const gapsOf = (leg: DraftData["flights"][number]) =>
+    scope.flights_domestic && !booking.later_dom ? legGaps(leg, domIssue("pg.err.domFlightUnpriced"), movedLegs) : [];
+  /**
+   * «ينقص» for the domestic flights, said by leg and field on the cities step where they are entered; a reason
+   * no leg carries (a hand-typed total gone, say) keeps the check's own words, so «التالي» never stops unexplained.
+   */
+  const domMissing = (() => {
+    const legs = data.flights.filter((f) => f.leg_order === "internal");
+    const dayOf = (leg: DraftData["flights"][number]) => hopsOf.hops.find((h) => h.legs.includes(leg))?.day ?? null;
+    const said = legs.flatMap((leg) => {
+      const g = gapsOf(leg);
+      return g.length > 0 ? [{ g, text: tx("legNeeds", { from: leg.from_city || leg.from_airport || "—", to: leg.to_city || leg.to_airport || "—", list: gapWords(tx, g, dayOf(leg)) }) }] : [];
+    });
+    const covers: Record<string, (g: string[]) => boolean> = {
+      "pg.err.domFlightIncomplete": (g) => g.some((x) => x === "from" || x === "to" || x === "date"),
+      "pg.err.domFlightUnpriced": (g) => g.includes("price"),
+      "pg.err.domesticMismatch": (g) => g.includes("day"),
+    };
+    const unsaid = blocking.filter((i) => i.key && DOM_KEYS.includes(i.key) && !said.some((s) => covers[i.key!](s.g)));
+    return [...said.map((s) => s.text), ...unsaid.map(issueText)];
+  })();
+  // the moves by air that come before card `at` (the cities' count: after the last), each with its legs
+  const hopStrips = (at: number) =>
+    hopsOf.hops
+      .filter((h) => h.before === at)
+      .map((h) => (
+        <BasicHopFlight key={`hop-${at}-${h.from}`} hop={h} legs={h.legs} data={data} lookups={lk} gaps={gapsOf} onChange={commit} current={() => latest.current} />
+      ));
   // «التالي» to the cities built them from the flights — said once over the cities
   const [citiesNote, setCitiesNote] = useState<BasicLabel | null>(null);
   const countryOfCity = (name: string) => lk.countries.find((c) => c.cities.some((x) => x.name === name))?.name;
@@ -1008,7 +1056,8 @@ export function BasicEditor({
     commit(moved);
   }
   const partner = data.customer.partner_company_id;
-  const flightsOn = scope.flights_intl || scope.flights_domestic;
+  // the flights step is the international flights' — the domestic ones are entered on the cities' hops
+  const flightsOn = scope.flights_intl;
   const missingOf: Record<Step, string[]> = {
     client: [
       !country && tx("country"),
@@ -1018,9 +1067,9 @@ export function BasicEditor({
       trip.nights <= 0 && tx("nights"),
       !trip.meal_plan && tx("meals"),
     ].filter((x): x is string => Boolean(x)),
-    // what stops the flights, in words — «سعر الطيران الداخلي», not just «الطيران»; the flights and the
-    // cities disagreeing is what «التالي» itself mends (the cities are built from the flights), never a stop here
-    flights: [...new Set(blocking.filter((i) => i.stage === "flights" && i.key !== "pg.err.domesticMismatch").map(issueText))],
+    // what stops the international flights, in words — «سعر الطيران الدولي», not just «الطيران»; the domestic
+    // legs are asked on the cities step, where they are entered (the evaluator, 2026-10-24)
+    flights: [...new Set(blocking.filter((i) => i.stage === "flights" && !DOM_KEYS.includes(i.key ?? "")).map(issueText))],
     cities: [
       cities.length === 0 && tx("city"),
       cities.length > 0 && used !== trip.nights && nightsNote,
@@ -1029,6 +1078,8 @@ export function BasicEditor({
       scope.transport && toursOn && cities.length > 0 && !plan.tours.car_type.trim() && tx("tourCar"),
       // a stay with no room type, board or price stops here, not at the end
       ...blocking.filter((i) => i.stage === "hotels").map(issueText),
+      // each domestic leg's gaps, by leg — cleared on its hop
+      ...domMissing,
     ].filter((x): x is string => Boolean(x)),
     services: [...new Set(blocking.filter((i) => i.stage === "services").map(issueText))],
     pricing: [...new Set(blocking.filter((i) => i.stage === "pricing").map(issueText))],
@@ -1061,7 +1112,7 @@ export function BasicEditor({
   function next(from: Step) {
     // the cities from the flights' dates (the owner, 2026-10-22: «الإدخال التلقائي وفق التواريخ يقلل الأخطاء») —
     // a part left for later leaves the cities to the agent, as before
-    if (from === "flights" && scope.flights_intl && !flightsLater(latest.current)) {
+    if (from === "flights" && scope.flights_intl && !latest.current.flight_booking.later_intl) {
       const built = withCitiesFromFlights(latest.current, countryOfCity);
       if (built) commit(built);
       setCitiesNote(built ? "flightCities" : "noFlightCities");
@@ -1088,7 +1139,7 @@ export function BasicEditor({
     ]
       .filter(Boolean)
       .join(" · "),
-    flights: [flightsLater(data) ? tx("flightsLater") : "", ...data.flights.filter((f) => !(f.leg_order === "internal" ? booking.later_dom : booking.later_intl)).map(legText)].filter(Boolean).join(" · "),
+    flights: [booking.later_intl ? tx("laterLine", { part: tx("laterIntl") }) : "", ...data.flights.filter((f) => f.leg_order !== "internal" && !booking.later_intl).map(legText)].filter(Boolean).join(" · "),
     cities: cities
       .map((c, i) => {
         // each visit of a city with its own hotels
@@ -1124,10 +1175,9 @@ export function BasicEditor({
             </button>
           </div>
         ) : (
-          // the flights' «التالي» first folds the international legs and opens the domestic ones (one thing at a time)
           <NextButton
-            missing={step === "flights" && innerNext ? [] : missingOf[step]}
-            onNext={() => (step === "flights" && innerNext ? setFlightPart("dom") : next(step))}
+            missing={missingOf[step]}
+            onNext={() => next(step)}
             onPrev={steps.indexOf(step) > 0 ? () => show(steps[steps.indexOf(step) - 1]) : undefined}
           />
         )}
@@ -1343,18 +1393,8 @@ export function BasicEditor({
       </>
     ),
 
-    // ---- 2. the flights: the number first, fetched; the domestic ones after the international; or «أضف لاحقاً» ----
-    flights: (
-      <BasicFlightPlan
-        data={data}
-        lookups={lk}
-        defaults={planDefaults}
-        part={flightPart}
-        onPart={setFlightPart}
-        onChange={commit}
-        current={() => latest.current}
-      />
-    ),
+    // ---- 2. the international flights: the number first, fetched; or «أضف لاحقاً» (the domestic ones are on the hops) ----
+    flights: <BasicFlightPlan data={data} lookups={lk} defaults={planDefaults} onChange={commit} current={() => latest.current} />,
 
     // ---- 3. the cities, each with its hotel, and the bar that adds them ----
     cities: (
@@ -1412,8 +1452,10 @@ export function BasicEditor({
                 </>
               ) : undefined;
             return (
+              <Fragment key={`${i}-${city.city_name}`}>
+              {/* the move by air into this city, between the two cards — after the last, the one to the flight home */}
+              {focus ? null : hopStrips(i)}
               <BasicCityCard
-                key={`${i}-${city.city_name}`}
                 index={i}
                 city={city}
                 dayFrom={dayFrom}
@@ -1473,8 +1515,14 @@ export function BasicEditor({
                 }}
                 onExpand={() => setDoneCities((d) => d.filter((k) => k !== stopKey(city, i)))}
               />
+              {focus || i < cities.length - 1 ? null : hopStrips(cities.length)}
+              </Fragment>
             );
           })
+        )}
+        {/* a domestic leg no move claims — still here to complete or remove */}
+        {focus ? null : (
+          <BasicHopFlight hop={null} legs={hopsOf.rest} data={data} lookups={lk} gaps={gapsOf} onChange={commit} current={() => latest.current} />
         )}
 
         {/* the add bar, like the company's system — gone once every night has its city */}
@@ -1856,7 +1904,8 @@ export function BasicEditor({
               </h3>
               <ul className="space-y-1">
                 {blocking.map((issue, i) => {
-                  const target = STEP_OF[issue.stage];
+                  // the domestic legs are entered on the cities' hops
+                  const target = DOM_KEYS.includes(issue.key ?? "") ? "cities" : STEP_OF[issue.stage];
                   return (
                   <li key={i} className="flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[#5b4a2a]">
                     <span className="rounded-full bg-[#fff3d6] px-2 py-0.5 text-[10.5px] font-bold text-[#a86a10]">{stageLabel(issue.stage)}</span>

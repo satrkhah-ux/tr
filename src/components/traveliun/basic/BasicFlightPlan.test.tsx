@@ -18,14 +18,12 @@ function file(): DraftData {
   return data;
 }
 
-const render = (data: DraftData, part: "intl" | "dom") =>
+const render = (data: DraftData) =>
   renderToStaticMarkup(
     <BasicFlightPlan
       data={data}
       lookups={{ airports: [], airlines: [], countries: [] } as unknown as GeneratorLookups}
       defaults={{ from: "", to: "", go: "", back: "", round: true }}
-      part={part}
-      onPart={() => {}}
       onChange={() => {}}
       current={() => data}
     />,
@@ -33,30 +31,28 @@ const render = (data: DraftData, part: "intl" | "dom") =>
 
 describe("BasicFlightPlan", () => {
   it("asks the international legs by their number first, with no ticket or flight-card buttons", () => {
-    const html = render(file(), "intl");
+    const html = render(file());
     expect(html).toContain("TK101");
     expect(html).toContain("أضف لاحقاً");
     expect(html).not.toContain("الرحلة النهائية");
     expect(html).not.toContain("بطاقة");
     // the number comes before the cabin
     expect(html.indexOf("TK101")).toBeLessThan(html.indexOf("aria-label=\"الدرجة\""));
-    // one thing at a time: the domestic flights wait for «التالي»
+  });
+
+  it("is the international flights' only: a domestic leg lives on its hop between the city cards (the evaluator, 2026-10-24)", () => {
+    const html = render(file());
     expect(html).not.toContain('value="TK2830"');
+    expect(html).not.toContain("900");
+    // no sample number standing in an empty field, to be read as every leg's
+    expect(html).not.toContain('placeholder="TK2830"');
   });
 
-  it("folds the international legs to a line and opens the domestic ones in their place", () => {
-    const html = render(file(), "dom");
-    expect(html).toContain('value="TK2830"');
-    expect(html).toContain("الطيران الداخلي");
-    expect(html).toContain("900");
-    expect(html).not.toContain("value=\"TK101\"");
-  });
-
-  it("says a part left for later, with the way back", () => {
+  it("says the international flights left for later, with the way back", () => {
     const data = file();
     data.flight_booking = { ...data.flight_booking, later_intl: true };
-    const html = render(data, "intl");
+    const html = render(data);
     expect(html).toContain("الطيران الدولي: يُضاف لاحقاً");
-    expect(html).toContain('value="TK2830"');
+    expect(html).not.toContain('value="TK101"');
   });
 });

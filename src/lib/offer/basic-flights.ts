@@ -10,17 +10,20 @@ import type { FlightLookupHit } from "@/lib/providers/flight-lookup";
 import {
   cityKeys,
   hopKey,
+  hopMode,
   intercityModes,
   withCityKeys,
   type DraftCity,
   type DraftData,
   type DraftFlight,
   type DraftTrip,
+  type FlightBooking,
   type LookupAirport,
   type TransportMode,
 } from "./draft-types";
-import { airportDisplay, findAirport } from "./basic";
+import { airportDisplay, byTravelOrder, cityMoves, findAirport, type CityMove } from "./basic";
 import { citiesFromFlights, flownInto } from "./flight-cities";
+import { withFare } from "./flight-fare";
 import { parseFlightNumber } from "./flight-number";
 import { autoDepartureDate, localDatePart, localTimePart, toInstant } from "./schedule";
 
@@ -60,10 +63,21 @@ export type LegChange = Partial<Pick<DraftFlight, "flight_no" | "airline" | "air
 /**
  * One leg changed, found by its id — never by its cities, so a leg whose
  * airport the agent corrects stays the same leg. An airport resolves its zone
- * and city; a new day moves the landing with it; a domestic leg the cities
- * wrote becomes the agent's own (withDomesticFlights leaves it alone after).
+ * and city; a new day moves the landing with it. A domestic leg the cities
+ * wrote stays theirs while its day, clocks and price are typed on it (it keeps
+ * following its move); its number — or, off a move, an airport — makes it the
+ * agent's own (withDomesticFlights leaves it alone after).
+ *
+ * `hop`: the leg is edited on the move between two cities (the cities step) —
+ * it stays that move's whatever airport serves the cities (KUL for Selangor).
  */
-export function changeLeg(data: Pick<DraftData, "trip" | "flights">, airports: LookupAirport[], id: string, change: LegChange): DraftFlight[] {
+export function changeLeg(
+  data: Pick<DraftData, "trip" | "flights">,
+  airports: LookupAirport[],
+  id: string,
+  change: LegChange,
+  hop?: { from: string; to: string },
+): DraftFlight[] {
   return data.flights.map((f) => {
     if (f.id !== id) return f;
     const { date, dep, arr, ...fields } = change;
@@ -94,27 +108,86 @@ export function changeLeg(data: Pick<DraftData, "trip" | "flights">, airports: L
     if (landing !== null && next.departure_at) {
       next = { ...next, arrival_at: landing ? landingAt(next.departure_at, next.from_tz, landing, next.to_tz) : null };
     }
-    return next.leg_order === "internal" && next.auto ? { ...next, auto: undefined } : next;
+    if (hop) next = { ...next, from_city: hop.from, to_city: hop.to };
+    const owned = fields.flight_no !== undefined || (!hop && (fields.from_airport !== undefined || fields.to_airport !== undefined));
+    return next.leg_order === "internal" && next.auto && owned ? { ...next, auto: undefined } : next;
   });
 }
 
-/** A new domestic leg, from where the group last landed; its day is the agent's to give. */
-export function newDomesticLeg(data: Pick<DraftData, "flights" | "flight_booking">, blank: DraftFlight): DraftFlight {
-  const byDay = (a: DraftFlight, b: DraftFlight) => (a.departure_at ?? "").localeCompare(b.departure_at ?? "");
-  const before = data.flights.filter((f) => f.leg_order === "internal").sort(byDay).at(-1) ?? data.flights.filter((f) => f.leg_order === "outbound").sort(byDay).at(-1);
-  return {
-    ...blank,
-    from_airport: before?.to_airport ?? "",
-    from_tz: before?.to_tz ?? null,
-    from_city: before?.to_city ?? "",
-    cabin_class: data.flight_booking.cabin,
-  };
-}
-
-/** The domestic booking's total: its legs' prices added up — null while no leg has one. */
-export function domesticTotal(flights: DraftFlight[]): number | null {
+/** One traveller's domestic fare: the legs' tickets added up — null while no leg has one. */
+export function domesticFare(flights: DraftFlight[]): number | null {
   const priced = flights.filter((f) => f.leg_order === "internal" && f.price != null);
   return priced.length > 0 ? Math.round(priced.reduce((sum, f) => sum + (f.price ?? 0), 0) * 100) / 100 : null;
+}
+
+/**
+ * The domestic booking from its legs' tickets, each «للفرد» (the evaluator, 2026-10-24: 300 + 300 for two
+ * adults came to 600): «للفرد» at their sum, so the travellers multiply it the way the international fare's
+ * «للفرد» does (flightBookingTotal — a child at the adult's ticket, an infant at none unless typed), and
+ * `dom_price` stays the booking's total. `was`: the legs before this change —
+ *  · a leg's price typed, added, or gone with its move: the fare follows;
+ *  · the last priced leg gone: a fare the legs made is unpriced again («ينقص» asks for it);
+ *  · nothing typed on a leg: a total (the pricing sheet's, a file from before) stays as it is.
+ */
+export function withLegFares(booking: FlightBooking, trip: Pick<DraftTrip, "adults" | "children" | "infants">, flights: DraftFlight[], was = flights): FlightBooking {
+  const fare = domesticFare(flights);
+  const perPerson = booking.dom_fare.price_mode === "per_person";
+  if (fare === domesticFare(was) && !perPerson && booking.dom_price != null) return booking;
+  if (fare == null) return perPerson && domesticFare(was) != null ? withFare(booking, trip, "dom", { adult_price: null }) : booking;
+  if (perPerson && booking.dom_fare.adult_price === fare && booking.dom_price != null) return booking;
+  return { ...withFare(booking, trip, "dom", { price_mode: "per_person", adult_price: fare }), dom_currency: booking.dom_currency || "SAR" };
+}
+
+/** A move by air with the domestic legs that fly it. */
+export type FlightHop = CityMove & { legs: DraftFlight[] };
+
+/**
+ * The moves the group makes by air, each with its legs — what the cities step
+ * shows between two city cards (the evaluator, 2026-10-24: the domestic leg
+ * belongs on the hop, not in the flights step before the cities). A leg is a
+ * move's when it flies between its two cities (on its day first), else when it
+ * leaves on its day (a connection through another airport); a leg no move
+ * claims is `rest` — shown too, so nothing «ينقص» asks for is out of reach.
+ * All in travel order.
+ */
+export function flightHops(data: Pick<DraftData, "cities" | "flights" | "transport_plan">): { hops: FlightHop[]; rest: DraftFlight[] } {
+  const dom = byTravelOrder(data.flights.filter((f) => f.leg_order === "internal"));
+  const used = new Set<DraftFlight>();
+  const take = (legs: DraftFlight[]) => {
+    for (const f of legs) used.add(f);
+    return legs;
+  };
+  const hops = cityMoves(data)
+    .filter((m) => hopMode(data.transport_plan, m.from, m.to) === "flight")
+    .map((m) => {
+      const free = dom.filter((f) => !used.has(f));
+      const on = (f: DraftFlight) => Boolean(m.day) && localDatePart(f.departure_at) === m.day;
+      const pair = free.filter((f) => f.from_city?.trim() === m.from && f.to_city?.trim() === m.to);
+      const legs = pair.some(on) ? pair.filter(on) : pair.length > 0 ? pair.slice(0, 1) : free.filter(on);
+      return { ...m, legs: take(legs) };
+    });
+  return { hops, rest: dom.filter((f) => !used.has(f)) };
+}
+
+/** What a domestic leg still lacks before the file is issued. */
+export type LegGap = "from" | "to" | "date" | "price" | "day";
+
+/**
+ * What a domestic leg still lacks, named on its hop — so «ينقص» says which leg
+ * and what, and is cleared where it is said (the evaluator, 2026-10-24: «أكمل كل
+ * رحلة داخلية…» stayed whatever was done to the hotels). `unpriced`: the domestic
+ * booking has no price yet (a total typed on the pricing sheet prices every leg);
+ * `moved`: the legs whose day is not their move's (domesticMismatches).
+ */
+export function legGaps(leg: DraftFlight, unpriced: boolean, moved: DraftFlight[] = []): LegGap[] {
+  const gaps: (LegGap | false)[] = [
+    !leg.from_airport.trim() && "from",
+    !leg.to_airport.trim() && "to",
+    !leg.departure_at && "date",
+    unpriced && !(leg.price != null && leg.price > 0) && "price",
+    moved.includes(leg) && "day",
+  ];
+  return gaps.filter((g): g is LegGap => Boolean(g));
 }
 
 /**
@@ -217,7 +290,8 @@ export function withCitiesFromFlights(
     after = j;
     const c = current[j];
     if (!c.from_flight) return { at: j, stop: c };
-    return { at: j, stop: { ...c, nights: d.nights, arrives_next_day: d.arrives_next_day, tours: Math.min(c.tours ?? 0, d.nights) } };
+    // its tours fit its nights but the arrival day — a city cut to one night keeps none (as a new one gets)
+    return { at: j, stop: { ...c, nights: d.nights, arrives_next_day: d.arrives_next_day, tours: Math.min(c.tours ?? 0, Math.max(d.nights - 1, 0)) } };
   });
   const kept = current.flatMap((c, k) => (!used.has(k) && !c.from_flight ? [{ at: k, stop: c }] : []));
   const cities = withCityKeys([...placed, ...kept].sort((a, b) => a.at - b.at).map((x) => x.stop));

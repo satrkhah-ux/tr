@@ -13,7 +13,7 @@ import {
   type LookupAirport,
 } from "./draft-types";
 import { addCity, chainCities, findAirport, priceAtSource, setCityNights, withDomesticFlights, withHotelLines, withScopeLines } from "./basic";
-import { applyFlightHit, changeLeg, domesticTotal, landingAt, newDomesticLeg, withCitiesFromFlights } from "./basic-flights";
+import { applyFlightHit, changeLeg, domesticFare, landingAt, withCitiesFromFlights } from "./basic-flights";
 import { citiesFromFlights, domesticMismatches } from "./flight-cities";
 import { validateDraft } from "./draft-validation";
 import { suggestPricing } from "./pricing-suggest";
@@ -245,17 +245,12 @@ describe("a leg, edited by its id", () => {
     expect(landingAt("2026-11-05T23:30", null, "01:10", null)).toBe("2026-11-06T01:10");
   });
 
-  it("a new domestic leg leaves from where the group last landed", () => {
-    const data = trabzon();
-    expect(newDomesticLeg(data, emptyFlight("internal")).from_airport).toBe(data.flights[1].to_airport);
-  });
-
-  it("adds the legs' prices into the domestic booking; the sheet's total clears them", () => {
+  it("adds the legs' tickets into one traveller's domestic fare; the sheet's total clears them", () => {
     const data = trabzon();
     data.flights[1] = { ...data.flights[1], price: 900 };
     data.flights.push({ ...leg("internal", "TZX", "IST", "2026-11-12T07:00"), price: 650.5 });
-    expect(domesticTotal(data.flights)).toBe(1550.5);
-    expect(domesticTotal([data.flights[0]])).toBeNull();
+    expect(domesticFare(data.flights)).toBe(1550.5);
+    expect(domesticFare([data.flights[0]])).toBeNull();
     const at = priceAtSource(data, { item_type: "flight", ref: "flight:dom" }, { price: 2000 });
     expect(at?.flight_booking?.dom_price).toBe(2000);
     expect(at?.flights?.filter((f) => f.leg_order === "internal").every((f) => f.price === undefined)).toBe(true);

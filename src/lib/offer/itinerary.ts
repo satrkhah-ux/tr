@@ -12,6 +12,7 @@
 
 import {
   deriveCityDates,
+  deriveHotelStays,
   FREE_DAY_TITLE,
   hopMode,
   hopVehicle,
@@ -25,6 +26,7 @@ import {
   type DraftData,
   type DraftDay,
   type DraftFlight,
+  type DraftHotel,
   type DraftTrip,
   type TourPick,
   type TransportMode,
@@ -250,6 +252,8 @@ export function transportNoteForDay(
   flights: DraftFlight[] = [],
   /** the cities, dated: the services table's own rows and cars. */
   cities?: DraftCity[],
+  /** their hotels: a day the group changes hotel says so (hotelMoves). */
+  hotels: DraftHotel[] = [],
 ): string | null {
   const day = days[index];
   if (!day || day.kind === "travel") return null;
@@ -269,7 +273,7 @@ export function transportNoteForDay(
   const said = (label: string, car: string) => (car ? `${label} — ${car}` : label);
 
   // the services tables' rows of this day: seen off first, then the flight, then met — once the cities have dates
-  const rows = cities?.some((c) => c.check_in) && day.date ? servicesOn(plan, cities, day.date) : null;
+  const rows = cities?.some((c) => c.check_in) && day.date ? servicesOn(plan, cities, day.date, hotels) : null;
   const before: string[] = [];
   const after: string[] = [];
   if (rows) {
@@ -304,21 +308,27 @@ export function transportNoteForDay(
  * The trip's own receptions, farewells and transfers on `date`, each in its own
  * car: the first city's reception and the last city's farewell in the words the
  * «بكج متقدم» note rewrites, the rest as what they are — or the agent's words.
- * A row the agent added is the day's activity (daysFromTours), not said here.
+ * A move by air names both ends (the evaluator, 2026-10-24: the day is printed
+ * under the next city, and «من الفندق» read as that city's hotel): seen off from
+ * the city's hotel, met at the next city's airport. A move to another hotel of
+ * the city says which two. A row the agent added is the day's activity
+ * (daysFromTours), not said here.
  */
-function servicesOn(plan: TransportPlan, cities: DraftCity[], date: string): { kind: string; label: string; car: string }[] {
+function servicesOn(plan: TransportPlan, cities: DraftCity[], date: string, hotels: DraftHotel[] = []): { kind: string; label: string; car: string }[] {
   const lastAt = cities.length - 1;
-  return transportServices(plan, cities)
+  const city = (i: number) => cities[i]?.city_name.trim() ?? "";
+  return transportServices(plan, cities, hotels.length > 0 ? deriveHotelStays(cities, hotels) : [])
     .filter((s) => isTripService(s.id) && (s.row.date ?? (s.id === "out" ? cities[s.city]?.check_out : null)) === date)
     .map((s) => {
       const own = s.own?.text?.trim();
       const label =
         own ||
+        s.words ||
         (s.kind === "reception"
-          ? s.city === 0 && s.id === "in" ? "استقبال من المطار إلى الفندق" : "الاستقبال في المطار والتوصيل إلى الفندق"
+          ? s.city === 0 && s.id === "in" ? "استقبال من المطار إلى الفندق" : `الاستقبال في مطار ${city(s.city)} والتوصيل إلى الفندق`
           : s.kind === "farewell"
-            ? s.city === lastAt && s.id === "out" ? "توديع من الفندق إلى المطار" : "التوصيل من الفندق إلى المطار"
-            : `الانتقال إلى ${cities[s.city]?.city_name.trim() ?? ""}`);
+            ? s.city === lastAt && s.id === "out" ? "توديع من الفندق إلى المطار" : `التوصيل من فندق ${city(s.city)} إلى المطار`
+            : `الانتقال إلى ${city(s.city)}`);
       return { kind: s.kind, label, car: s.row.car_type };
     });
 }
@@ -330,8 +340,8 @@ function toursOn(plan: TransportPlan, cities: DraftCity[], date: string | null):
 }
 
 /** transportNoteForDay for a draft: its cities dated from where the itinerary starts. */
-export function draftTransportNote(data: Pick<DraftData, "trip" | "flights" | "cities" | "transport_plan">, days: DraftDay[], index: number): string | null {
-  return transportNoteForDay(data.transport_plan, days, index, data.flights, deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities));
+export function draftTransportNote(data: Pick<DraftData, "trip" | "flights" | "cities" | "transport_plan" | "hotels">, days: DraftDay[], index: number): string | null {
+  return transportNoteForDay(data.transport_plan, days, index, data.flights, deriveCityDates(itineraryStartDate(data.trip, data.flights), data.cities), data.hotels);
 }
 
 /** A clock on a leg, or "" — midnight is how a leg with no time yet is stored. */

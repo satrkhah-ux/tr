@@ -181,12 +181,12 @@ describe("the issued offer and the document say a row by its own words", () => {
 describe("the programme names each service's own car", () => {
   const notes = (data: DraftData) => data.days.map((_, i) => draftTransportNote(data, data.days, i));
 
-  it("each reception, farewell and flight move on its day, in the row's car", () => {
+  it("each reception, farewell and flight move on its day, in the row's car — the move naming the city it leaves and the one it reaches", () => {
     const data = withServices((c) => setService(setService(setService(c, 1, "in", { car_type: "باص 14 راكب", cars: 2 }), 0, "out", { car_type: "سيارة صغيرة" }), 2, "out", { car_type: "سيارة صغيرة" }));
     const n = notes(data);
     expect(n[0]).toBe("استقبال من المطار إلى الفندق — فان");
     expect(n[2]).toBe(
-      "التوصيل من الفندق إلى المطار — سيارة صغيرة · الانتقال إلى لنكاوي — طيران داخلي (الإقلاع 15:00، الوصول 16:05) · الاستقبال في المطار والتوصيل إلى الفندق — باص 14 راكب × 2",
+      "التوصيل من فندق سيلانجور إلى المطار — سيارة صغيرة · الانتقال إلى لنكاوي — طيران داخلي (الإقلاع 15:00، الوصول 16:05) · الاستقبال في مطار لنكاوي والتوصيل إلى الفندق — باص 14 راكب × 2",
     );
     expect(n[7]).toBe("توديع من الفندق إلى المطار — سيارة صغيرة");
   });

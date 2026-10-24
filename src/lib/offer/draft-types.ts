@@ -438,8 +438,9 @@ export type CityService = {
   removed?: boolean;
 };
 
-/** The ids of the rows the trip writes for a visit. */
-export const isTripService = (id: string) => id === "in" || id === "out";
+/** The ids of the rows the trip writes for a visit — its way in and out, and each move to another hotel (hotelMoves). */
+export const isTripService = (id: string) => id === "in" || id === "out" || id.startsWith(HOTEL_MOVE);
+const HOTEL_MOVE = "hotel:";
 
 /** An added row's words until the agent types their own. */
 export const inCityTransferText = (city: string) => `التوصيل داخل ${city.trim()}`;
@@ -974,7 +975,10 @@ export type DraftFlight = {
    * a leg saved before it existed.
    */
   id?: string;
-  /** A domestic leg's own price, the whole leg for every traveller; the legs add up to `dom_price`. */
+  /**
+   * A domestic leg's ticket, «للفرد» (the evaluator, 2026-10-24: 300 + 300 for two adults is 1,200, not 600):
+   * the legs add up to the domestic booking's per-person fare, which the travellers multiply (withLegFares).
+   */
   price?: number | null;
 };
 
@@ -1276,8 +1280,8 @@ export const TRANSPORT_HOTEL_PREFIX = "فندق ";
  * طرابزون» is a thing that happens on a date and gets priced; "moving between
  * cities" is not.
  */
-export function deriveTransportRows(plan: TransportPlan, cities: TransportCity[]): DraftTransport[] {
-  return transportEntries(plan, cities).map((e) => e.row);
+export function deriveTransportRows(plan: TransportPlan, cities: TransportCity[], stays: HotelStay[] = []): DraftTransport[] {
+  return transportEntries(plan, cities, stays).map((e) => e.row);
 }
 
 type TransportCity = Pick<DraftCity, "city_name" | "check_in"> & Partial<Pick<DraftCity, "check_out" | "services" | "edge_out">>;
@@ -1294,14 +1298,33 @@ export type TransportService = {
   kind: Exclude<ServiceKind, "tour">;
   leg: Pick<TransportLeg, "car_type" | "cars">;
   own?: CityService;
+  /** the trip's own words for a row that has them (a move to another hotel) — the agent's, when typed, are the row's `text`. */
+  words?: string;
 };
 
 /** The rows that are a visit's services — every row but the trip's tours line. */
-export function transportServices(plan: TransportPlan, cities: TransportCity[]): TransportService[] {
-  return transportEntries(plan, cities).flatMap((e) => (e.svc ? [{ row: e.row, ...e.svc }] : []));
+export function transportServices(plan: TransportPlan, cities: TransportCity[], stays: HotelStay[] = []): TransportService[] {
+  return transportEntries(plan, cities, stays).flatMap((e) => (e.svc ? [{ row: e.row, ...e.svc }] : []));
 }
 
-function transportEntries(plan: TransportPlan, cities: TransportCity[]): { row: DraftTransport; svc?: Omit<TransportService, "row"> }[] {
+/**
+ * The days a group changes hotel inside one city (the evaluator, 2026-10-24: Phuket's seven nights over three
+ * hotels had only the reception and the last day's farewell): a stay that starts after the city's first night,
+ * where the one before it ends, in another hotel. A room change in the same hotel, a stay on the same dates
+ * (rooms split over two hotels) or a hotel not chosen yet moves nobody.
+ */
+export function hotelMoves(stays: HotelStay[]): { city: number; id: string; date: string | null; text: string }[] {
+  const name = (s: HotelStay) => s.line.hotel_name.trim();
+  const bare = (n: string) => n.replace(/^فندق\s+/, "");
+  return stays.flatMap((b) => {
+    if (b.dates === "same" || !b.from) return [];
+    const a = stays.find((s) => s !== b && s.city_index === b.city_index && s.dates !== "same" && s.nights > 0 && s.from != null && s.from + s.nights === b.from);
+    if (!a || !name(a) || !name(b) || name(a) === name(b)) return [];
+    return [{ city: b.city_index, id: `${HOTEL_MOVE}${b.line.id}`, date: b.check_in, text: `الانتقال من فندق ${bare(name(a))} إلى فندق ${bare(name(b))}` }];
+  });
+}
+
+function transportEntries(plan: TransportPlan, cities: TransportCity[], stays: HotelStay[] = []): { row: DraftTransport; svc?: Omit<TransportService, "row"> }[] {
   const out: { row: DraftTransport; svc?: Omit<TransportService, "row"> }[] = [];
   const first = cities[0]?.city_name?.trim();
   const lastAt = cities.length - 1;
@@ -1318,7 +1341,7 @@ function transportEntries(plan: TransportPlan, cities: TransportCity[]): { row: 
         ...(text ? { text } : {}),
         ...(own?.price != null ? { price: own.price } : {}),
       },
-      svc: { city: c, id, kind: own?.kind ?? kind, leg, ...(own ? { own } : {}) },
+      svc: { city: c, id, kind: own?.kind ?? kind, leg, ...(own ? { own } : {}), ...(row.text ? { words: row.text } : {}) },
     });
   };
 
@@ -1375,6 +1398,12 @@ function transportEntries(plan: TransportPlan, cities: TransportCity[]): { row: 
       const leg = mode === "car" ? { car_type: plan.intercity.car_type.trim() || TRANSPORT_MODE_AR.car, cars: plan.intercity.cars } : { car_type: TRANSPORT_MODE_AR[mode], cars: 1 };
       put(i, "in", "transfer", leg, { from_place: from, to_place: to, car_type: "", date: cities[i]?.check_in ?? null, note: plan.intercity.note });
     }
+  }
+
+  // to the next hotel of the same city, in the transfer car — priced as a ride inside the city, on its own line
+  for (const m of hotelMoves(stays)) {
+    const name = cities[m.city]?.city_name?.trim() ?? "";
+    put(m.city, m.id, "transfer", plan.airport, { from_place: name, to_place: name, car_type: "", date: m.date, note: "", ref: `transport:${m.id}`, text: m.text });
   }
 
   // the rows the agent added, after the trip's: met at the airport, seen off to it, or driven inside the city
@@ -1646,6 +1675,21 @@ function normalizeDraftDay(raw: unknown, index: number): DraftDay {
   };
 }
 
+/**
+ * Two legs never share an id: an edit finds its leg by id, so a shared one would put a number typed (or looked
+ * up) on one leg onto the other too. An older id-less leg takes its place's id (`leg-1`) — a leg already saved
+ * under that id keeps it, the newcomer gets the next free one. Stable: a draft read twice ids the same.
+ */
+function withUniqueLegIds(flights: DraftFlight[]): DraftFlight[] {
+  const seen = new Set<string>();
+  return flights.map((f) => {
+    let id = f.id ?? "";
+    for (let n = 1; !id || seen.has(id); n++) id = `${f.id || "leg"}-${n}`;
+    seen.add(id);
+    return id === f.id ? f : { ...f, id };
+  });
+}
+
 /** Backfill tz/user-set fields on flights persisted before prompt-5 (old drafts have none). */
 function normalizeDraftFlight(raw: unknown, index: number): DraftFlight {
   const f = (raw && typeof raw === "object" ? raw : {}) as Partial<DraftFlight>;
@@ -1719,6 +1763,7 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
   };
   const scope = normalizeScope(source.scope);
   const advanced = normalizeAdvanced(source.advanced);
+  const hotels = Array.isArray(source.hotels) ? source.hotels.map(normalizeDraftHotel) : [];
 
   return {
     customer: { ...empty.customer, ...(source.customer ?? {}) },
@@ -1748,8 +1793,8 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     },
     scope,
     cities,
-    hotels: Array.isArray(source.hotels) ? source.hotels.map(normalizeDraftHotel) : [],
-    flights: Array.isArray(source.flights) ? source.flights.map(normalizeDraftFlight) : [],
+    hotels,
+    flights: Array.isArray(source.flights) ? withUniqueLegIds(source.flights.map(normalizeDraftFlight)) : [],
     // «للفرد»: the total follows the travellers, whoever changed them last
     flight_booking: withFlightTotals(normalizeFlightBooking(source.flight_booking), trip),
     transport_plan: transportPlan,
@@ -1759,7 +1804,7 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     // flip the switch back and the rows return — but leaving the rows derived
     // meant the document still promised an airport pickup on a file whose
     // transport switch was off.
-    transport: scope.transport ? withAdvancedTransport(deriveTransportRows(transportPlan, cities), advanced, TRANSPORT_AIRPORT) : [],
+    transport: scope.transport ? withAdvancedTransport(deriveTransportRows(transportPlan, cities, deriveHotelStays(cities, hotels)), advanced, TRANSPORT_AIRPORT) : [],
     services: { ...empty.services, ...(source.services ?? {}) },
     visas: Array.isArray(source.visas) ? source.visas : [],
     days: normalizeDraftDays(source.days),

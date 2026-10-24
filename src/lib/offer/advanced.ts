@@ -272,7 +272,10 @@ export function withAdvancedTransport(rows: DraftTransport[], adv: DraftAdvanced
   adv = activeAdvanced(adv);
   // the arrival pickup is the first row from the airport, the farewell the last row to it
   const first = rows.findIndex((r) => r.from_place === airport);
-  const last = rows.map((r) => r.to_place).lastIndexOf(airport);
+  // the trip's own farewell, never a flight hop's (the evaluator, 2026-10-24: the farewell from the city before the
+  // flight was gone): the latest row to the airport — undated is the day home, a hop's is dated the day it flies on
+  const end = (r: DraftTransport) => r.date ?? "9999";
+  const last = rows.reduce((at, r, i) => (r.to_place === airport && (at < 0 || end(r) > end(rows[at])) ? i : at), -1);
   const out: DraftTransport[] = [];
   rows.forEach((row, i) => {
     if (i === first && adv.reception.kind) {
