@@ -70,7 +70,23 @@ const countryOf = (text: string | null | undefined, list: Place[]) => {
 let lastWords: string | null = null;
 let bumpAt = 0;
 
-/** today's and yesterday's conversations by destination (the ticker) */
+/**
+ * The countries we actually sell: those with an active offer in «العروض الجاهزة»,
+ * in the leads' own spelling. Null when it cannot be read, or nothing is on sale —
+ * then nothing is filtered rather than the screens going blank.
+ */
+async function soldCountries(list: Place[]): Promise<Set<string> | null> {
+  const { data, error } = await db().from("ready_offers").select("country").eq("active", true);
+  if (error) return null;
+  const sold = new Set(((data ?? []) as { country: string | null }[]).map((r) => countryOf(r.country, list)).filter((c): c is string => Boolean(c)));
+  return sold.size ? sold : null;
+}
+
+/**
+ * today's and yesterday's conversations by destination (the ticker and «الأكثر طلباً اليوم») —
+ * only countries we have a package for (the user, 2026-10-24: a client in the office saw
+ * «المانيا» on the screen and we had nothing for Germany)
+ */
 async function ticker(now: number, speed: number, periodMs: number): Promise<{ band: ScreenState["ticker"]; top: string | null; countries: string[]; stats: NonNullable<ScreenState["countryStats"]> }> {
   const { text, top, countries, stats } = await memo(slow, `ticker:${riyadhDay(now)}`, async () => {
     const since = new Date(riyadhDay(now) - 86_400_000).toISOString();
@@ -82,9 +98,10 @@ async function ticker(now: number, speed: number, periodMs: number): Promise<{ b
       if ((page.data?.length ?? 0) < 1000) break;
     }
     const list = await places();
+    const sold = await soldCountries(list);
     const leads = ((data ?? []) as { destination: string | null; created_at: string; last_visit_at: string | null }[]).flatMap((l) => {
       const country = countryOf(l.destination, list);
-      if (!country) return [];
+      if (!country || (sold && !sold.has(country))) return [];
       const days = [l.created_at, l.last_visit_at].filter((d): d is string => Boolean(d)).map((d) => riyadhDay(Date.parse(d)));
       return [{ country, days }];
     });
