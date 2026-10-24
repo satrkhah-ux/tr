@@ -27,7 +27,7 @@ it.skipIf(!existsSync("C:/Program Files/Google/Chrome/Application/chrome.exe"))(
     await mkdir("output/screen-review", { recursive: true });
     await page.screenshot({ path: "output/screen-review/countries-1920.png" });
     await page.setViewport({ width: 1280, height: 720 }); await page.screenshot({ path: "output/screen-review/countries-1280.png" });
-    await page.evaluate((n) => { Object.assign(window, { qaNow: n + 31000 }); }, now);
+    await page.evaluate((n) => { Object.assign(window, { qaNow: n + 56000 }); /* 61 s in: the 60 s bulletin is down on every screen */ }, now);
     await new Promise((r) => setTimeout(r, 100)); expect(await page.$eval("#countries", (e) => e.className)).toBe("");
     await page.evaluate((n) => { Object.assign(window, { qaNow: n + 600000 }); }, now);
     await new Promise((r) => setTimeout(r, 100)); expect(await page.$eval("#countries", (e) => e.className)).toBe("on");

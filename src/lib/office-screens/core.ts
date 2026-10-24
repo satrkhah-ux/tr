@@ -22,8 +22,8 @@ export const SCREEN_CORE = String.raw`
 function mod(a, n) { return ((a % n) + n) % n; }
 function countryBulletinElapsed(now, screen, screens) {
   if (screen < 1 || screen > screens) return -1;
-  var elapsed = mod(now, 600000) - (screen - 1) * 36000;
-  return elapsed >= 0 && elapsed < 36000 ? elapsed : -1;
+  var elapsed = mod(now, 600000);
+  return elapsed < 60000 ? elapsed : -1;
 }
 function adIndexAt(now, slotMs, position, count) {
   if (!(count > 0) || !(slotMs > 0)) return -1;

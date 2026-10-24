@@ -136,10 +136,10 @@ const RUNTIME = String.raw`
     var elapsed = countryBulletinElapsed(t, N, S.screens);
     var active = countries.length > 0 && elapsed >= 0;
     var panel = $("countries");
-    panel.className = active ? (elapsed >= 34800 ? "on departing" : "on") : "";
+    panel.className = active ? (elapsed >= 58800 ? "on departing" : "on") : "";
     if (!active) { spotlightKey = ""; return; }
-    var slot = 36000 / countries.length, index = Math.min(countries.length - 1, Math.floor(elapsed / slot));
-    $("countryProgress").style.width = (100 * elapsed / 36000) + "%";
+    var slot = 60000 / countries.length, index = Math.min(countries.length - 1, Math.floor(elapsed / slot));
+    $("countryProgress").style.width = (100 * elapsed / 60000) + "%";
     var date = new Date(t + 3 * 3600000);
     var days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
     var months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
@@ -147,11 +147,12 @@ const RUNTIME = String.raw`
     var key = Math.floor(t / 600000) + "|" + countries.join("|");
     if (key !== spotlightKey) {
       spotlightKey = key;
-      // the polaroid line (/screen/top) covers the bulletin: back to the first country each time it comes up
-      // (loaded on its first appearance, then kept: a fresh load starts at the first country anyway)
-      var pf = $("polaroid");
-      if (!pf.getAttribute("src")) pf.setAttribute("src", "/screen/top");
-      else try { pf.contentWindow.postMessage("tt-start", location.origin); } catch (e) { /* still loading */ }
+      // the polaroid strip (/screen/top) covers the bulletin: ONE strip over the whole wall at once, each
+      // screen drawing its own part from the server's clock — told where it hangs and when the pass began
+      // (loaded on its first appearance with those in the link, told by message every time after)
+      var pf = $("polaroid"), wall = { tt: "start", pos: S.position, of: S.screens, start: t - elapsed, now: t };
+      if (!pf.getAttribute("src")) pf.setAttribute("src", "/screen/top?pos=" + wall.pos + "&of=" + wall.of + "&start=" + wall.start + "&now=" + wall.now);
+      else try { pf.contentWindow.postMessage(wall, location.origin); } catch (e) { /* still loading */ }
       // the share of demand as a bar, never a number (the owner: no counts on the screens)
       var stats = S.countryStats && S.countryStats.length ? S.countryStats : [];
       if (!stats.length) for (var c = 0; c < countries.length; c++) stats.push({ country: countries[c], count: countries.length - c });
@@ -178,7 +179,7 @@ const RUNTIME = String.raw`
       }
       list.className = stats.length > 1 ? "" : "none";
       // restart the entrance for every new edition
-      var panelNow = $("countries"); panelNow.className = ""; void panelNow.offsetWidth; panelNow.className = active ? (elapsed >= 34800 ? "on departing" : "on") : "";
+      var panelNow = $("countries"); panelNow.className = ""; void panelNow.offsetWidth; panelNow.className = active ? (elapsed >= 58800 ? "on departing" : "on") : "";
     }
   }
 
