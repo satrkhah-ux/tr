@@ -5,9 +5,8 @@ import { FREE_DAY_TITLE, type DraftData, type DraftDay } from "@/lib/offer/draft
 import { dayTours, draftTransportNote, programDayText, tourService, withDayPick } from "@/lib/offer/itinerary";
 import { advancedDayNote } from "@/lib/offer/advanced";
 import type { BasicCity } from "@/lib/offer/basic";
-import { listedTourPrice } from "@/lib/offer/pricing-suggest";
 import { SuggestInput } from "../SuggestInput";
-import { tourChoices, type TourCatalog } from "../tours/TourRow";
+import { chosenTour, tourChoices, type TourCatalog } from "../tours/TourRow";
 import { basicField } from "./styles";
 import { useBasicLabels } from "./labels";
 
@@ -52,8 +51,10 @@ export function BasicCityProgram({
   const choices = tourChoices(catalog);
   // the arrival, a move or the day home keeps its own title; a tour joins its lines — never «يوم حر»
   const joining = choices.filter((c) => c.value !== FREE_DAY_TITLE);
-  // with the tours switched off a day takes no tour, only a programme's words
-  const words = data.transport_plan.tours.enabled ? [] : choices.filter((c) => catalog.programs.some((p) => programDayText(p).title === c.value));
+  // with the tours switched off a day takes no tour, only a programme's words — every programme's, priced or not
+  const words = data.transport_plan.tours.enabled
+    ? []
+    : [...new Set(catalog.programs.map((p) => programDayText(p).title))].map((value) => ({ value }));
   /** a title typed is the day's title; a tour picked from the list becomes the day's tour, in place of the one it had */
   const setTitle = (i: number, title: string, picked: boolean) => {
     if (!picked) return setDay(i, { title });
@@ -66,9 +67,8 @@ export function BasicCityProgram({
     // the day's own tour picked again changes nothing — its price, its car, the day's words stay
     const had = on.picks[0];
     if (had && Boolean(had.free) === Boolean(s.free) && had.title === s.title) return;
-    const car = had?.car_type?.trim() || catalog.tripCar;
-    const price = s.free ? 0 : (listedTourPrice(catalog.prices, catalog.sarPer, title, car, s.program_id) ?? null);
-    const next = withDayPick(data, i, 0, { ...s, price });
+    // priced as on the tours tab: for the tours car, or the car the list prices it in
+    const next = withDayPick(data, i, 0, chosenTour(catalog, title, { free: false, price: null }));
     if (next) onSlice(next);
   };
 

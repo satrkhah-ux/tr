@@ -26,7 +26,9 @@ import {
   findTourPrice,
   findTransferPrice,
   listedTourPrice,
+  repricedTour,
   tourCarPrice,
+  tourOffer,
   tourPriced,
   toursTotal,
   mergeSuggestions,
@@ -629,6 +631,49 @@ describe("data model 0072 — airport → city rows and per-car tours", () => {
     expect(findTourPrice(tours, "جولة اوزنغول", "فيتو", "p9")).toMatchObject({ price: 100, provisional: true });
     // a real price for one car is still that car's only
     expect(findTourPrice([{ ...tours[0], provisional: false }], "جولة اوزنغول", "فيتو", "p9")).toBeNull();
+  });
+
+  it("a placeholder gives way to the real per-car rows of the same tour (the evaluator's Phuket list, 2026-10-24)", () => {
+    const tours = [
+      { name: "الجولة الثانية", price: 100, currency: "SAR", car_type: "سيارة صغيرة", program_id: "p2", provisional: true },
+      { name: "الجولة الثانية (سيارة صغيرة)", price: 2600, currency: "THB" },
+      { name: "الجولة الثانية (باص كبير)", price: 3500, currency: "THB" },
+    ];
+    expect(findTourPrice(tours, "الجولة الثانية", "سيارة صغيرة")).toMatchObject({ price: 2600, currency: "THB" });
+    // a real price is its car's only: no row for the van
+    expect(findTourPrice(tours, "الجولة الثانية", "فان")).toBeNull();
+    // the programme itself is still priced by its placeholder
+    expect(findTourPrice(tours, "الجولة الثانية في فوكيت", "فان", "p2")).toMatchObject({ price: 100, provisional: true });
+  });
+
+  it("offers a tour for the tours car, else the nearest car that seats as many — a car the fleet does not size counts as big", () => {
+    const fleet = [{ name: "سيارة صغيرة", pax: 2 }, { name: "سيارة متوسطة", pax: 4 }, { name: "ميني فان", pax: 5 }, { name: "باص 40 مقعد", pax: 40 }];
+    const tours = [
+      { name: "جولة كرابي (سيارة متوسطة)", price: 380, currency: "SAR" },
+      { name: "جولة كرابي (باص كبير)", price: 450, currency: "SAR" },
+      { name: "جولة كرابي (باص 40 مقعد)", price: 1000, currency: "SAR" },
+    ];
+    expect(tourOffer(tours, "جولة كرابي", "سيارة متوسطة", null, fleet)).toMatchObject({ car: "سيارة متوسطة", hit: { price: 380 } });
+    expect(tourOffer(tours, "جولة كرابي", "سيارة صغيرة", null, fleet)).toMatchObject({ car: "سيارة متوسطة", hit: { price: 380 } });
+    expect(tourOffer(tours, "جولة كرابي", "ميني فان", null, fleet)).toMatchObject({ car: "باص 40 مقعد", hit: { price: 1000 } });
+    expect(tourOffer(tours.slice(0, 2), "جولة كرابي", "ميني فان", null, fleet)).toMatchObject({ car: "باص كبير", hit: { price: 450 } });
+    expect(tourOffer(tours, "جولة أخرى", "ميني فان", null, fleet)).toBeNull();
+  });
+
+  it("a tour moved to another car takes that car's list price; the old car's list price never stays on it; a typed price does", () => {
+    const tours = [
+      { name: "جولة المدينة (سيارة صغيرة)", price: 200, currency: "SAR" },
+      { name: "جولة المدينة (فان)", price: 350, currency: "SAR" },
+    ];
+    const pick = { program_id: null, title: "جولة المدينة", text: "", price: 200 };
+    const sar = { SAR: 1 };
+    expect(repricedTour(pick, "سيارة صغيرة", "فان", tours, sar).price).toBe(350);
+    // no row for the bus: the small car's 200 is no bus price — the line asks for one
+    expect(repricedTour(pick, "سيارة صغيرة", "باص", tours, sar).price).toBeNull();
+    // a price the agent typed is theirs when the list has none for the new car
+    expect(repricedTour({ ...pick, price: 180 }, "سيارة صغيرة", "باص", tours, sar).price).toBe(180);
+    // a tour still priced by the list follows the car by itself
+    expect(repricedTour({ ...pick, price: null }, "سيارة صغيرة", "فان", tours, sar).price).toBeNull();
   });
 });
 

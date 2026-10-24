@@ -155,8 +155,10 @@ export function addCity(
   const last = data.cities[at] as BasicCity | undefined;
   if (last && last.city_name === city.name) {
     const longer = setCityNights(data, at, last.nights + city.nights);
+    // the nights added are free days: the city keeps its tours, or the bar's count when that is more — a stay
+    // entered hotel by hotel was a tour more each time (the evaluator, 2026-10-24: «يوم حر» unless the agent adds one)
     const cities = longer.cities.map((c, i) =>
-      i === at ? { ...c, tours: Math.min(((c as BasicCity).tours ?? 0) + city.tours, c.nights) } : c,
+      i === at ? { ...c, tours: Math.max((c as BasicCity).tours ?? 0, city.tours) } : c,
     );
     // nothing picked on the bar: simply more nights where the group already is
     if (!city.hotel && !city.room?.trim() && city.price == null) return { cities, hotels: longer.hotels, joined: "nights" };

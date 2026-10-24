@@ -5,7 +5,7 @@ import { ChevronDown, X } from "lucide-react";
 import { FREE_DAY_TITLE, tourCars, type GeneratorLookups, type ServiceKind, type TourPick } from "@/lib/offer/draft-types";
 import type { TranslationKey } from "@/lib/i18n";
 import { programDayText, tourService, type TourProgram } from "@/lib/offer/itinerary";
-import { findTourPrice, listedTourPrice, tourCarPrice, type TourPrice } from "@/lib/offer/pricing-suggest";
+import { findTourPrice, listedTourPrice, normalizeName, repricedTour, tourCarPrice, tourOffer, type TourPrice } from "@/lib/offer/pricing-suggest";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { SuggestInput, type Suggestion } from "../SuggestInput";
 import { basicField, typedNumber } from "../basic/styles";
@@ -39,64 +39,90 @@ export const tourField = basicField;
 const caption = "text-[10.5px] font-bold text-[#7a948f]";
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
-/** The services a city's tour field offers: «يوم حر», its programmes, then the price list — each tour once. */
+/** A car in a tour's name — the old list filed a tour once per car: «جولة البسفور (فيتو)»، «… (باص كبير)». */
+const VEHICLE = /^(?:سيار[ةه]|فان|ميني|باص|حافل[ةه]|فيتو|ليموزين|سبرانتر)/u;
+
+/**
+ * The services a city's tour field offers (the evaluator's Phuket list,
+ * 2026-10-24): «يوم حر», then each tour of the city ONCE by its name — a
+ * programme, or the price list's tour however many cars it is priced in —
+ * sorted by name, its price the one for the trip's tours car (tourOffer: else
+ * the nearest car's, named). Tours without a price follow; a placeholder (only
+ * the 0096 «مؤقت» price) is left out while the city has a real tour, and
+ * otherwise comes last.
+ */
 export function tourChoices(catalog: TourCatalog): Suggestion[] {
   const own = new Set(catalog.programs.map((p) => p.id));
-  // a listed tour of another city's programme is that city's, not this one's
+  // a listed tour of another city's programme is that city's; one of this city's is its programme's own price
   const prices = catalog.prices.filter((p) => !p.program_id || own.has(p.program_id));
-  const out = new Map<string, Suggestion>([[FREE_DAY_TITLE, { value: FREE_DAY_TITLE }]]);
   /** a listed price as the file reads it: riyals, and a foreign price said in riyals first (≈ 563 ر.س (150 USD · فان)) */
   const money = (price: number, currency: string, car?: string) => {
     const rate = currency === "SAR" ? 1 : catalog.sarPer[currency];
     if (currency === "SAR" || !rate) return car ? `${price} ${currency} (${car})` : `${price} ${currency}`;
     return `≈ ${Math.round(price * rate).toLocaleString("en-US")} ر.س (${price} ${currency}${car ? ` · ${car}` : ""})`;
   };
-  // a tour without a price says so, at the end of the list (the owner, 2026-10-22) — never «≈ 0 ر.س»
-  const NO_PRICE = "بدون سعر";
-  const priced = (value: string, programId?: string) => {
-    const hit = catalog.showPrice ? findTourPrice(prices, value, catalog.tripCar, programId) : null;
-    const hint = !catalog.showPrice ? undefined : hit && hit.price > 0 ? `${money(hit.price, hit.currency)}${hit.provisional ? " · مؤقت" : ""}` : hit ? NO_PRICE : undefined;
-    return { value, ...tourGist(value), ...(hint ? { hint } : {}) };
-  };
-  for (const p of catalog.programs) {
-    const title = programDayText(p).title;
-    if (!p.is_free_day && !out.has(title)) out.set(title, priced(title, p.id));
-  }
-  // one entry per tour: a tour priced per car is listed once, its price shown for the trip's car — and so is
-  // one the old list filed once per car in its NAME («جولة البسفور (فيتو)»، «… (فان مرسيدس)»: three rows
-  // of every tour, the owner's review 2026-10-18). Only a fleet car in the brackets is a car.
+  // the tours: the programmes, then the list's names with their car taken out
   const fleet = new Set(catalog.carTypes.map((c) => c.name.trim()));
   const baseOf = (name: string) => {
     const split = splitTourName(name);
-    return split && fleet.has(split.car) ? split.base : name;
+    return split && (fleet.has(split.car) || VEHICLE.test(split.car)) ? split.base : name;
   };
-  for (const name of new Set(prices.map((t) => baseOf(t.name)))) {
-    if (out.has(name)) continue;
-    const entry = priced(name);
-    // the trip's car has no price for it: the nearest car that has one says what it costs, and says which car
-    if (!entry.hint && catalog.showPrice) {
-      // the smallest car that seats what the trip's car seats, else the biggest there is
-      const paxOf = (car: string) => catalog.carTypes.find((c) => c.name.trim() === car)?.pax ?? 0;
-      const need = paxOf(catalog.tripCar.trim());
-      const others = prices
-        .filter((t) => baseOf(t.name) === name && t.name !== name)
-        .sort((x, y) => paxOf(splitTourName(x.name)!.car) - paxOf(splitTourName(y.name)!.car));
-      const other = others.find((t) => paxOf(splitTourName(t.name)!.car) >= need) ?? others[others.length - 1];
-      const car = other ? splitTourName(other.name)?.car : null;
-      if (other && car && other.price > 0) out.set(name, { ...entry, hint: money(other.price, other.currency, car) });
-      else out.set(name, { ...entry, ...(catalog.showPrice ? { hint: NO_PRICE } : {}) });
-    } else out.set(name, entry);
+  const tours = new Map<string, { value: string; programId?: string }>();
+  for (const p of catalog.programs) {
+    const value = programDayText(p).title;
+    if (!p.is_free_day && !tours.has(normalizeName(value))) tours.set(normalizeName(value), { value, programId: p.id });
   }
+  for (const t of prices) {
+    const value = baseOf(t.name);
+    if (!t.program_id && !tours.has(normalizeName(value))) tours.set(normalizeName(value), { value });
+  }
+  // a tour without a price says so (the owner, 2026-10-22) — never «≈ 0 ر.س»
+  const NO_PRICE = "بدون سعر";
+  const listed = [...tours.values()].map(({ value, programId }) => {
+    const offer = tourOffer(prices, value, catalog.tripCar, programId, catalog.carTypes);
+    const kind = !offer || offer.hit.price <= 0 ? "none" : offer.hit.provisional ? "placeholder" : "real";
+    // another car's price names the car — the trip's has none for this tour
+    const hint = !catalog.showPrice
+      ? undefined
+      : !offer || kind === "none"
+        ? NO_PRICE
+        : `${money(offer.hit.price, offer.hit.currency, offer.car !== catalog.tripCar.trim() ? offer.car : undefined)}${kind === "placeholder" ? " · مؤقت" : ""}`;
+    return { kind, s: { value, ...tourGist(value), ...(hint ? { hint } : {}) } };
+  });
   // each tour once: the same paragraph with «ثم التوصيل الى …» or without its dashes is the one already listed
   const seen = new Set<string>();
-  const once = [...out.values()].filter((s) => {
+  const once = listed.filter(({ s }) => {
     // the same words, or the same title and places as the list shows them
     const keys = [tourKey(s.value), s.label ? `${s.label}|${s.sub ?? ""}` : ""].filter(Boolean);
     if (keys.some((k) => seen.has(k))) return false;
     keys.forEach((k) => seen.add(k));
     return true;
   });
-  return [...once.filter((s) => s.hint !== NO_PRICE), ...once.filter((s) => s.hint === NO_PRICE)];
+  const real = once.some((x) => x.kind === "real");
+  const byName = (kind: string) =>
+    once
+      .filter((x) => x.kind === kind)
+      .map((x) => x.s)
+      .sort((a, b) => (a.label ?? a.value).localeCompare(b.label ?? b.value, "ar"));
+  return [{ value: FREE_DAY_TITLE }, ...byName("real"), ...byName("none"), ...(real ? [] : byName("placeholder"))];
+}
+
+/**
+ * What choosing `value` writes on a tour row (the tours tab and the
+ * programme's day alike): the service and its price as the list shows it — for
+ * the trip's tours car (tourOffer); else the nearest car's, and the tour then
+ * goes in that car, since the price is that car's. Its car is stored only when
+ * it is not the trip's; with no tours car chosen yet the tour waits for it. A
+ * tour the list does not price keeps the row's price and car (typed by hand).
+ */
+export function chosenTour(catalog: TourCatalog, value: string, was: Pick<TourPick, "free" | "price">): Partial<TourPick> {
+  const s = tourService(value, catalog.programs);
+  if (s.free) return { ...s, price: 0 };
+  const trip = catalog.tripCar.trim();
+  const car = (trip && tourOffer(catalog.prices, value, trip, s.program_id, catalog.carTypes)?.car) || trip;
+  const price = listedTourPrice(catalog.prices, catalog.sarPer, value, car, s.program_id);
+  if (price == null) return { ...s, price: was.free ? null : was.price };
+  return { ...s, price, car_type: car !== trip ? car : undefined };
 }
 
 /** The company's cars, and a car typed elsewhere that the list does not hold. */
@@ -259,9 +285,8 @@ export function TourRow({
           onChange={(value, picked) => {
             // the tour it already is, picked again, changes nothing (a typed price stays)
             if (picked && value === (pick.free ? FREE_DAY_TITLE : pick.title)) return;
-            const s = tourService(value, catalog.programs);
-            // a tour from the price list arrives priced for its car; a typed one keeps what was there
-            onChange({ ...s, price: s.free ? 0 : (listedTourPrice(prices, sarPer, value, car, s.program_id) ?? (pick.free ? null : pick.price)) });
+            // a tour from the price list arrives priced for the tours car (or the car its price is for); a typed one keeps what was there
+            onChange(chosenTour(catalog, value, pick));
           }}
           className={`${field} ${pick.free ? "text-[#7a948f]" : ""}`}
         />,
@@ -289,10 +314,9 @@ export function TourRow({
           disabled={pick.free}
           onChange={(e) => {
             const next = e.target.value;
-            // another car is another price, when the list has the tour for it
-            const listed = pick.title.trim() ? listedTourPrice(prices, sarPer, pick.title, next, pick.program_id) : null;
+            // another car is another price: the list's for it, or none where the old car's list price was
             if (!tripCar) onTripCar(next);
-            else onChange({ car_type: next && next !== tripCar ? next : undefined, ...(listed != null ? { price: listed } : {}) });
+            else onChange({ car_type: next && next !== tripCar ? next : undefined, price: repricedTour(pick, car, next || tripCar, prices, sarPer).price });
           }}
           className={field}
         >

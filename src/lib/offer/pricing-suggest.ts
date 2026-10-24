@@ -36,7 +36,7 @@ import {
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
 import type { DraftPricingItem } from "./draft-types";
-import { splitTourName } from "@/lib/catalog/model";
+import { seatsFromName, splitTourName } from "@/lib/catalog/model";
 import { fareBreakdown, flightBookingTotal } from "./flight-fare";
 
 /** A transfer price from the reference list. */
@@ -135,27 +135,76 @@ export function findTourPrice(
   carType?: string | null,
   programId?: string | null,
 ): TourPrice | null {
-  const rows = list ?? [];
-  const key = normalizeName(title);
-  let hits = programId ? rows.filter((t) => t.program_id === programId) : [];
-  if (hits.length === 0 && key) hits = rows.filter((t) => normalizeName(t.name) === key);
-  // the old list (before 0072) names the car inside the tour: «جولة المدينة (فان)» is «جولة المدينة» in a van
-  if (hits.length === 0 && key) {
-    hits = rows.flatMap((t) => {
-      const split = t.car_type?.trim() ? null : splitTourName(t.name);
-      return split && normalizeName(split.base) === key ? [{ ...t, car_type: split.car }] : [];
-    });
-  }
-  let car = baseVehicle(carType);
-  if (hits.length === 0) {
-    const split = splitTourName(title);
-    if (!split) return null;
-    hits = rows.filter((t) => normalizeName(t.name) === normalizeName(split.base));
-    car = car || baseVehicle(split.car);
-  }
+  const { hits, car: named } = tourRows(list ?? [], title, programId);
+  const car = baseVehicle(carType) || baseVehicle(named);
   const perCar = hits.filter((t) => t.car_type?.trim());
   if (car && perCar.length > 0) return perCar.find((t) => baseVehicle(t.car_type) === car) ?? (perCar.every((t) => t.provisional) ? perCar[0] : null);
   return hits.find((t) => !t.car_type?.trim()) ?? (perCar.length === 1 ? perCar[0] : null);
+}
+
+/**
+ * A tour's rows on the list, each with the car it prices (findTourPrice): the
+ * programme's, else the same name's. The old list (before 0072) names the car
+ * inside the tour — «جولة المدينة (فان)» is «جولة المدينة» in a van — and a
+ * placeholder of the same name (0096) gives way to those: it only stood in
+ * until a real price was entered (Phuket's «الجولة الثانية», 2026-10-24).
+ * A title with its car in it («… (فان)») names the car (`car`).
+ */
+function tourRows(rows: TourPrice[], title: string, programId?: string | null): { hits: TourPrice[]; car: string } {
+  const key = normalizeName(title);
+  let hits = programId ? rows.filter((t) => t.program_id === programId) : [];
+  if (hits.length === 0 && key) hits = rows.filter((t) => normalizeName(t.name) === key);
+  if (key && hits.every((t) => t.provisional)) {
+    const named = rows.flatMap((t) => {
+      const split = t.car_type?.trim() ? null : splitTourName(t.name);
+      return split && normalizeName(split.base) === key ? [{ ...t, car_type: split.car }] : [];
+    });
+    if (named.length > 0) hits = named;
+  }
+  if (hits.length > 0) return { hits, car: "" };
+  const split = splitTourName(title);
+  return split ? { hits: rows.filter((t) => normalizeName(t.name) === normalizeName(split.base)), car: split.car } : { hits: [], car: "" };
+}
+
+/**
+ * The price a tour is offered at for the car the trip tours in — and when the
+ * list has none for that car, the nearest car it has a real price for: the
+ * smallest that seats as many, else the biggest (`car` says which; a car the
+ * fleet does not size, «باص كبير», counts as big). Null when no car has one.
+ */
+export function tourOffer(
+  list: TourPrice[] | undefined,
+  title: string,
+  carType: string,
+  programId: string | null | undefined,
+  fleet: { name: string; pax: number | null }[],
+): { hit: TourPrice; car: string } | null {
+  const own = findTourPrice(list, title, carType, programId);
+  if (own) return { hit: own, car: carType.trim() };
+  const pax = (car: string) => (car.trim() ? (fleet.find((c) => baseVehicle(c.name) === baseVehicle(car))?.pax ?? seatsFromName(car) ?? Infinity) : 0);
+  const need = pax(carType);
+  const others = tourRows(list ?? [], title, programId)
+    .hits.filter((t) => t.car_type?.trim() && !t.provisional && t.price > 0)
+    .sort((a, b) => pax(a.car_type!) - pax(b.car_type!));
+  const other = others.find((t) => pax(t.car_type!) >= need) ?? others[others.length - 1];
+  return other ? { hit: other, car: other.car_type!.trim() } : null;
+}
+
+/**
+ * A tour moved to another car: the list's price for the new car when it has
+ * one; else a price that was the list's for the old car goes (the line asks
+ * for one — it was no price for this car), and a price typed by hand stays. A
+ * tour still priced by the list (no price of its own) follows by itself.
+ *
+ * ponytail: «was the list's» is the riyal figure compared again at today's
+ * rate; a foreign-currency tour picked before the rate moved reads as typed and
+ * keeps its price. Mark list prices on the pick if that ever matters.
+ */
+export function repricedTour<P extends PricedPick>(pick: P, from: string, to: string, list: TourPrice[] | undefined, sarPer: Record<string, number>): P {
+  if (pick.free || pick.price == null || !pick.title.trim() || baseVehicle(from) === baseVehicle(to)) return pick;
+  const listed = listedTourPrice(list, sarPer, pick.title, to, pick.program_id);
+  if (listed != null) return { ...pick, price: listed };
+  return pick.price === listedTourPrice(list, sarPer, pick.title, from, pick.program_id) ? { ...pick, price: null } : pick;
 }
 
 /** A listed tour for the car it goes in, in riyals (the tours are typed in riyals) — null when the list or the rate does not know it. */

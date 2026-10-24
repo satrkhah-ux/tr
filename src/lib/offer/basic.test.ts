@@ -169,13 +169,31 @@ describe("النظام بيسك", () => {
     const data = malaysia();
     data.hotels = data.hotels.map((h) => (h.city_name === "كوالالمبور" ? { ...h, rooms: h.rooms.map((r) => ({ ...r, price: 900 })) } : h));
     const next = { ...data, ...addCity(data, { name: "كوالالمبور", nights: 2, tours: 1 }, "SAR") };
+    // the nights added are free days: the city keeps its one tour (2026-10-24)
     expect(next.cities.map((c) => [c.city_name, c.nights, (c as BasicCity).tours])).toEqual([
       ["سيلانغور", 2, 1],
       ["لنكاوي", 3, 2],
-      ["كوالالمبور", 5, 2],
+      ["كوالالمبور", 5, 1],
     ]);
     // one hotel line, its 3-night total grown to 5 nights at the same rate
     expect(cityLines(next.hotels, "كوالالمبور").map((h) => h.rooms[0].price)).toEqual([1500]);
+  });
+
+  it("a stay entered hotel by hotel keeps the bar's one tour — every other day is «يوم حر» (the evaluator, 2026-10-24)", () => {
+    let data = emptyDraftData();
+    data.trip = { ...data.trip, country: "تايلاند", destination: "تايلاند", arrival_date: "2026-11-25", nights: 9, days: 10 };
+    data.flights = [];
+    // the bar's own default: one tour for a stay of two nights or more, none for one night
+    for (const [name, nights] of [["بانكوك", 1], ["فوكيت", 2], ["فوكيت", 2], ["فوكيت", 3], ["بانكوك", 1]] as const) {
+      data = { ...data, ...addCity(data, { name, nights, tours: Math.min(1, nights - 1), hotel: { id: `h-${nights}`, name: `فندق ${nights}` } }, "SAR") };
+    }
+    expect(data.cities.map((c) => [c.city_name, c.nights, (c as BasicCity).tours])).toEqual([
+      ["بانكوك", 1, 0],
+      ["فوكيت", 7, 1],
+      ["بانكوك", 1, 0],
+    ]);
+    const phuket = basicDays(data).filter((d) => d.city_name === "فوكيت").map((d) => d.title);
+    expect(phuket).toEqual(["الانتقال إلى فوكيت", "جولة سياحية في فوكيت", "يوم حر", "يوم حر", "يوم حر", "يوم حر", "يوم حر"]);
   });
 
   it("the same city again with a hotel picked is a second stay after the first — the pick is never dropped (the owner, 2026-10-22)", () => {

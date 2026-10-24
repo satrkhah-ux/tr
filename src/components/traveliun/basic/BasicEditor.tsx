@@ -110,7 +110,7 @@ import {
 } from "@/lib/offer/basic";
 import { citiesWithoutHotel, validateDraft, type DraftIssue } from "@/lib/offer/draft-validation";
 import { computeOfferPricing, rebase, roundUpTotal } from "@/lib/offer/pricing";
-import { pricesForCity, syncSuggestions, type TourPrice } from "@/lib/offer/pricing-suggest";
+import { pricesForCity, repricedTour, syncSuggestions, type TourPrice } from "@/lib/offer/pricing-suggest";
 import { normAr } from "@/lib/catalog/norm";
 import { syncDepartureDates } from "@/lib/offer/schedule";
 import { useRole } from "@/lib/roles/RoleContext";
@@ -466,10 +466,28 @@ export function BasicEditor({
   }
 
   function setTourCar(slice: { car_type?: string; cars?: number }) {
-    const old = plan.tours.car_type;
-    const follow = slice.car_type !== undefined && old
-      ? { cities: cities.map((c) => (c.tour_picks ? { ...c, tour_picks: c.tour_picks.map((p) => (p.car_type === old ? { ...p, car_type: undefined } : p)) } : c)) }
-      : {};
+    const old = plan.tours.car_type.trim();
+    const to = slice.car_type?.trim();
+    // the tours in the trip's car go in the new one, at its price on the list (a price typed by hand stays)
+    const names = cities.map((c) => c.city_name);
+    const sarPer = lookups.sarPer ?? { SAR: 1 };
+    const follow =
+      to !== undefined && to !== old
+        ? {
+            cities: cities.map((c) =>
+              c.tour_picks
+                ? {
+                    ...c,
+                    tour_picks: c.tour_picks.map((p) =>
+                      p.car_type?.trim() && p.car_type.trim() !== old
+                        ? p
+                        : repricedTour({ ...p, car_type: undefined }, old, to, pricesForCity(tourPrices, c.city_name, names, normAr), sarPer),
+                    ),
+                  }
+                : c,
+            ),
+          }
+        : {};
     commit({ transport_plan: withCar({ ...plan, tours: { ...plan.tours, ...slice } }, slice.car_type), ...follow });
   }
 
