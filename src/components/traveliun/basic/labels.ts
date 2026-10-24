@@ -401,6 +401,7 @@ const AR = {
   removeService: "حذف الخدمة",
   fromSheet: "من القائمة",
   hotelIs: "الفندق: {hotel}",
+  hotelNone: "الفندق: لم يُختر بعد",
   totalIs: "الإجمالي: {total}",
 } as const;
 
@@ -798,6 +799,7 @@ const EN: Record<keyof typeof AR, string> = {
   removeService: "Remove the service",
   fromSheet: "from the list",
   hotelIs: "Hotel: {hotel}",
+  hotelNone: "Hotel: not chosen yet",
   totalIs: "Total: {total}",
 };
 

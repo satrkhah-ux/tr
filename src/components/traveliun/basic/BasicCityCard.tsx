@@ -283,6 +283,15 @@ export function BasicCityCard({
     ) : null
   ) : open ? (
     <>
+      {/* where the group sleeps, on both tabs (the owner, 2026-10-24: «اسم الفندق لا يظهر في الجولات!» — read on
+          «البرنامج السياحي») */}
+      {hotelsOn && main ? (
+        <HotelLine
+          hotels={[...new Set(lines.map((l) => l.hotel_name.trim()).filter(Boolean))]}
+          nights={city.nights}
+          onGo={onGoHotel}
+        />
+      ) : null}
       {open === "tours" ? (
         <ServicesPanel
           index={index}
@@ -297,12 +306,10 @@ export function BasicCityCard({
           toursOn={toursOn}
           transportOn={transportOn}
           showPrice={showPrice}
-          hotels={hotelsOn ? [...new Set(lines.map((l) => l.hotel_name.trim()).filter(Boolean))] : []}
           services={services}
           onPicks={onPicks}
           onCar={onCar}
           onSlice={onSlice}
-          onGoHotel={onGoHotel}
         />
       ) : null}
       {open === "program" && isFirst ? (
@@ -976,6 +983,39 @@ export function HotelPanel({
   );
 }
 
+/**
+ * Where the group sleeps on this visit and for how many nights — clear and dark, above the tours and the programme
+ * alike; pressed, it takes the agent to the city's own hotel card to change the hotel, its nights or rooms
+ * (the owner, 2026-10-24). A city whose hotel is not chosen yet says so.
+ */
+function HotelLine({ hotels, nights, onGo }: { hotels: string[]; nights: number; onGo?: () => void }) {
+  const tx = useBasicLabels();
+  const { language } = useTraveliunUI();
+  return (
+    <button
+      type="button"
+      onClick={onGo}
+      disabled={!onGo}
+      title={tx("goHotel")}
+      className={`group mb-2 flex w-full flex-wrap items-center gap-2 rounded-[10px] border px-3 py-2 text-start text-[13.5px] font-extrabold transition-colors disabled:cursor-default ${
+        hotels.length > 0
+          ? "border-[#cfe0d9] bg-[#f4f9f7] text-[#0f3d38] hover:border-[#185045] hover:bg-[#eaf4f0]"
+          : "border-[#f0d9a8] bg-[#fffaf0] text-[#8a5a00] hover:border-[#c98a12]"
+      }`}
+    >
+      <BedDouble className="size-4 shrink-0 text-[#185045]" aria-hidden />
+      <span>{hotels.length > 0 ? tx("hotelIs", { hotel: hotels.join(" + ") }) : tx("hotelNone")}</span>
+      <span className="tv-tnum rounded-full bg-[#185045] px-2.5 py-0.5 text-[11.5px] font-bold text-white">{nightsText(nights, language)}</span>
+      {onGo ? (
+        <span className="ms-auto inline-flex items-center gap-1 text-[11.5px] font-bold text-[#557d78] group-hover:text-[#185045]">
+          <Pencil className="size-3.5" aria-hidden />
+          {tx("goHotel")}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
 /** TBO hotels picked on this page, by our hotel id — the page's life, so a remounted card keeps them. */
 const tboPicked = new Map<string, { city: string; hotel: LookupHotel }>();
 
@@ -1126,12 +1166,10 @@ function ServicesPanel({
   toursOn,
   transportOn,
   showPrice,
-  hotels,
   services,
   onPicks,
   onCar,
   onSlice,
-  onGoHotel,
 }: {
   index: number;
   city: BasicCity;
@@ -1146,18 +1184,14 @@ function ServicesPanel({
   transportOn: boolean;
   /** pricing.view: the price per car and the total. */
   showPrice: boolean;
-  /** the hotels of this visit, by name. */
-  hotels: string[];
   /** the visit's receptions, farewells and transfers (cityServices). */
   services: ServiceRow[];
   onPicks: (picks: TourPick[]) => void;
   onCar: (leg: "airport" | "farewell" | "tours", slice: Partial<TransportLeg>) => void;
   onSlice: (slice: Partial<DraftData>) => void;
-  /** the hotel line pressed: the city's card in «الفنادق» */
-  onGoHotel?: () => void;
 }) {
   const tx = useBasicLabels();
-  const { t, language } = useTraveliunUI();
+  const { t } = useTraveliunUI();
   const plan = data.transport_plan;
   const tripCar = plan.tours.car_type;
   const cols = showPrice ? SVC_COLS : SVC_COLS_NO_PRICE;
@@ -1296,27 +1330,6 @@ function ServicesPanel({
 
   return (
     <div className="space-y-1.5">
-      {/* first, where the group sleeps on this visit and for how many nights — clear and dark; pressed, it takes the
-          agent to the city's own hotel card to change the hotel, its nights or rooms (the owner, 2026-10-24) */}
-      {hotels.length > 0 ? (
-        <button
-          type="button"
-          onClick={onGoHotel}
-          disabled={!onGoHotel}
-          title={tx("goHotel")}
-          className="group flex w-full flex-wrap items-center gap-2 rounded-[10px] border border-[#cfe0d9] bg-[#f4f9f7] px-3 py-2 text-start text-[13.5px] font-extrabold text-[#0f3d38] transition-colors hover:border-[#185045] hover:bg-[#eaf4f0] disabled:cursor-default"
-        >
-          <BedDouble className="size-4 shrink-0 text-[#185045]" aria-hidden />
-          <span>{tx("hotelIs", { hotel: hotels.join(" + ") })}</span>
-          <span className="tv-tnum rounded-full bg-[#185045] px-2.5 py-0.5 text-[11.5px] font-bold text-white">{nightsText(city.nights, language)}</span>
-          {onGoHotel ? (
-            <span className="ms-auto inline-flex items-center gap-1 text-[11.5px] font-bold text-[#557d78] group-hover:text-[#185045]">
-              <Pencil className="size-3.5" aria-hidden />
-              {tx("goHotel")}
-            </span>
-          ) : null}
-        </button>
-      ) : null}
       <div className="flex flex-wrap items-end gap-2">
         {toursOn ? (
           <>
