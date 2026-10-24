@@ -44,7 +44,7 @@ import {
 } from "./core";
 import { muradProvider, muradReply, type MuradProvider } from "./model";
 import { handOver } from "./handover";
-import { lessonsText } from "./lessons-text";
+import { lessonsText, relevantLessons } from "./lessons-text";
 
 /**
  * The minute job behind POST /api/murad/run (core.ts says when Murad acts).
@@ -365,7 +365,10 @@ async function answer(
   control: MuradControl,
 ): Promise<Answer> {
   try {
-    const context = await buildContext(service, c, thread, muradIds, policies);
+    // what past conversations show about what the client is asking now (lessons-text.ts)
+    const asked = thread.messages.filter((t) => t.fromClient && !t.isPrivate).slice(-3).map((t) => t.text).join("\n");
+    const examples = await relevantLessons(service, asked).catch(() => "");
+    const context = await buildContext(service, c, thread, muradIds, [policies, examples].filter(Boolean).join("\n\n"));
     context.includePrice = control.includePrice;
     if (!control.includePrice) {
       context.files = context.files.map((f) => ({ ...f, total: null, trip: f.trip ? { ...f.trip, payment: "", link: null } : null }));

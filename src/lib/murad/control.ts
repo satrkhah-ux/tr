@@ -26,6 +26,8 @@ export type MuradControl = {
   noHandoff?: string[];
   /** written on an admin number: a new trial starts, as a client would write */
   resetCode?: string;
+  /** read every past conversation into lessons (lessons.ts learnSweep) */
+  learn?: boolean;
   visaAll?: boolean;
   includePrice: boolean;
   inboxIds: number[];
@@ -49,7 +51,7 @@ export function validControl(v: unknown): v is MuradControl {
     && (c.kinds === undefined || (!!c.kinds && typeof c.kinds === "object" && Object.entries(c.kinds).every(([k, m]) => ROUTE_KEYS.includes(k as RouteKey) && typeof m === "string" && m in KIND_MODES)))
     && (c.paused === undefined || ids(c.paused))
     && (c.late === undefined || c.late === null || (Number.isInteger(c.late.minutes) && c.late.minutes >= 1 && c.late.minutes <= 1440 && ids([c.late.agentId])))
-    && phones(c.admins) && phones(c.noHandoff)
+    && phones(c.admins) && phones(c.noHandoff) && (c.learn === undefined || typeof c.learn === "boolean")
     && (c.resetCode === undefined || (typeof c.resetCode === "string" && /^\d{4,12}$/.test(c.resetCode)));
 }
 export function parseControl(raw: string | null | undefined): MuradControl {

@@ -9,7 +9,7 @@ const STATUS: Record<string, string> = { applied: "نُفّذ", not_understood: 
 const when = (iso: string) => new Date(iso).toLocaleString("ar-SA-u-nu-latn", { timeZone: "Asia/Riyadh", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 /** «تعليمات الإدارة لمُراد» (the owner, 2026-10-24): an order or a lesson in words, done at once, said back, undoable. */
-export function MuradInstructions({ data }: { data: { instructions: InstructionRow[]; lessons: LessonRow[]; learned: number } }) {
+export function MuradInstructions({ data }: { data: { instructions: InstructionRow[]; lessons: LessonRow[]; learned: number; read: number; left: number } }) {
   const router = useRouter();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -45,7 +45,7 @@ export function MuradInstructions({ data }: { data: { instructions: InstructionR
     </div>
 
     <div className="space-y-2"><h3 className="font-bold">ما علّمته الإدارة لمُراد</h3>
-      <p className="text-sm">يقرؤها مُراد مع سياسات الشركة وأسئلة التأشيرات في كل رد. أوقف درساً لا تريده. تعلّم أيضاً {data.learned.toLocaleString("en-US")} درساً من المحادثات.</p>
+      <p className="text-sm">يقرؤها مُراد مع سياسات الشركة وأسئلة التأشيرات في كل رد. أوقف درساً لا تريده. تعلّم أيضاً {data.learned.toLocaleString("en-US")} درساً من {data.read.toLocaleString("en-US")} محادثة قرأها{data.left ? `، وبقي نحو ${data.left.toLocaleString("en-US")}` : ""}.</p>
       {data.lessons.length ? <ul className="space-y-2">{data.lessons.map((l) => <li key={l.id} className={`flex items-start justify-between gap-3 rounded-xl p-3 text-sm ${l.active ? "bg-[#f0f7f4]" : "bg-[#f6f6f4] text-[#8a958f]"}`}>
         <div>{l.question ? <p><strong>إذا:</strong> {l.question}</p> : null}<p><strong>يرد:</strong> {l.answer}</p></div>
         <button onClick={() => toggle(l)} className="shrink-0 rounded-lg border px-3 py-1 text-xs font-bold">{l.active ? "إيقاف" : "تشغيل"}</button>

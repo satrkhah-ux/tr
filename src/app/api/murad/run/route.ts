@@ -7,6 +7,10 @@ import { syncFollowups } from "@/lib/followups/service";
 import { summarizeDue } from "@/lib/followups/summary";
 import { followupDigest } from "@/lib/followups/remind";
 import { staffTick } from "@/lib/telegram/staff-events";
+import { learnSweep } from "@/lib/murad/lessons";
+import { readSettings } from "@/lib/murad/run";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -36,6 +40,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   after(() => summarizeDue().catch(() => null));
   // «تنبيهاتي» 10:00 and 16:00: each seller's follow-ups due today
   after(() => followupDigest().catch(() => null));
+  // «تعلّم من كل المحادثات»: a few past conversations a minute, after the answer (lessons.ts)
+  after(async () => {
+    const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+    const settings = await readSettings(service);
+    await learnSweep(service, settings.control, [...(settings.control.admins ?? []), ...settings.autoList]);
+  });
   // every run leaves its trace for /developer, answered anyone or not (cron-runs.ts)
   // «المستقبل الآلي»: what the webhook missed, before Murad's own turns (no model, its turns claimed one by one)
   const received = await receptionSweep().catch(() => 0);

@@ -46,14 +46,16 @@ export async function saveMuradControl(control: MuradControl): Promise<{ ok: boo
 export type InstructionRow = { id: string; source: "page" | "whatsapp"; text: string; kind: string; status: string; reply: string | null; created_at: string };
 export type LessonRow = { id: string; source: "teaching" | "conversation"; question: string | null; answer: string; active: boolean; created_at: string };
 
-export async function muradTeaching(): Promise<{ instructions: InstructionRow[]; lessons: LessonRow[]; learned: number } | null> {
+export async function muradTeaching(): Promise<{ instructions: InstructionRow[]; lessons: LessonRow[]; learned: number; read: number; left: number } | null> {
   if (!(await allowed())) return null;
   const [i, l, c] = await Promise.all([
     db().from("murad_instructions").select("id, source, text, kind, status, reply, created_at").order("created_at", { ascending: false }).limit(30),
     db().from("murad_lessons").select("id, source, question, answer, active, created_at").eq("source", "teaching").order("created_at", { ascending: false }).limit(100),
     db().from("murad_lessons").select("id", { count: "exact", head: true }).eq("source", "conversation"),
   ]);
-  return { instructions: (i.data ?? []) as InstructionRow[], lessons: (l.data ?? []) as LessonRow[], learned: c.count ?? 0 };
+  const { data: s } = await db().from("app_settings").select("value").eq("key", "murad_learn").maybeSingle();
+  const state = (() => { try { return JSON.parse((s as { value?: string } | null)?.value ?? "{}") as { read?: number; next?: number }; } catch { return {}; } })();
+  return { instructions: (i.data ?? []) as InstructionRow[], lessons: (l.data ?? []) as LessonRow[], learned: c.count ?? 0, read: state.read ?? 0, left: Math.max(0, state.next ?? 0) };
 }
 
 /** The manager's order from the page — read, applied and answered as from a management number. */
