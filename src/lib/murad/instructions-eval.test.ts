@@ -23,6 +23,10 @@ it.skipIf(!on)("reads the owner's orders", { timeout: 300_000 }, async () => {
     ["اذا سألك العميل عن التقسيط قل له متاح عبر تابي وتمارا", (r) => r.type === "lesson" && Boolean(r.lesson_answer?.includes("تابي"))],
     ["تدرب على المحادثة 40317", (r) => r.type === "train" && r.conversation_id === 40317],
     ["السلام عليكم ابي بكج تركيا لشخصين", (r) => r.type === "client"],
+    // the owner's test, 2026-10-24: asking to see the answer is no lesson
+    ["اعطيني الاجابة الان", (r) => r.type === "preview"],
+    ["اييش الاجابه اذا احد سالك عن ايش العروض اللي عندكم", (r) => r.type === "preview" && Boolean(r.lesson_question?.includes("العروض"))],
+    ["طيب هذه الالجابه ممتازه ابيك تضيف عليها اننا اقوياء في جنوب شرق اسيا وعندنا فروع في ماليزيا\nهذا تعليم لي مراد", (r) => r.type === "lesson"],
     ["حول طلبات الطيران لاكرم", (r) => toActions(r, ctx).some((a) => a.do === "route" && a.kind === "طيران" && a.agentId === 15)],
   ];
   const fails: string[] = [];

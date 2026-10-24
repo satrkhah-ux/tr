@@ -1,6 +1,6 @@
 import { describe as group, expect, it } from "vitest";
 import { defaultControl } from "./control";
-import { applyActions, describe, isUndo, toActions, type Reading } from "./instructions";
+import { applyActions, describe, isRefusal, isUndo, toActions, type Reading } from "./instructions";
 
 const ctx = { agents: [{ id: 7, name: "ريموندا" }, { id: 9, name: "رشا" }], teams: [{ id: 1, name: "فيزا" }, { id: 38, name: "المبيعات" }] };
 const act = (a: Partial<Reading["actions"][number]> & Pick<Reading["actions"][number], "do">): Reading["actions"][number] =>
@@ -32,5 +32,9 @@ group("management instructions", () => {
     expect(isUndo(" تراجع. ")).toBe(true);
     expect(isUndo("الغ آخر قرار")).toBe(true);
     expect(isUndo("تراجع عن التأشيرات وحولها لرشا")).toBe(false);
+    // «لا» after a lesson refuses it (the owner's test, 2026-10-24) — a sentence starting with «لا» is not one
+    expect(isRefusal("لا")).toBe(true);
+    expect(isRefusal("غلط")).toBe(true);
+    expect(isRefusal("لا تستلم التأشيرات")).toBe(false);
   });
 });

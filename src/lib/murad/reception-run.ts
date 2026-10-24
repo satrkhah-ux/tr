@@ -36,9 +36,10 @@ import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { returnedToEmployee } from "@/lib/leads/lifecycle";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
+import { withTeaching } from "./lessons-text";
 import { isHumanReply, maskPhone, muradMessageIds, noteFor, SETTING, type TurnMessage } from "./core";
 import { readVisa, visaFaqAnswer } from "./visa-read";
-import { repeatsMurad, SCHENGEN, VISA_FREE_ASK, visaFacts, visaFreeText, visaFlowNote, visaFlowText, visaStep, type VisaCountry, type VisaFacts, type VisaRow } from "./visa";
+import { entryOf, isSaudi, repeatsMurad, SCHENGEN, VISA_FREE_ASK, visaFacts, visaFreeText, visaFlowNote, visaFlowText, visaStep, type VisaCountry, type VisaFacts, type VisaRow } from "./visa";
 import { readSettings, readThread } from "./run";
 import {
   asksDestinations,
@@ -366,6 +367,16 @@ async function visaConversation(service: SupabaseClient, m: IncomingMessage): Pr
 
 // ---------- the visa flow (visa.ts): the list, the answer and the hand-over ----------
 
+/** «الجواز السعودي ما يحتاج تأشيرة مسبقة لـجورجيا 👍» — the first line of the free answer, or null when the country needs an application */
+async function saudiVisaLine(service: SupabaseClient, country: string): Promise<string | null> {
+  const { countries, rows } = await visaList(service);
+  const c = countries.find((x) => fold(x.arabic_name) === fold(country));
+  const entry = entryOf(c);
+  const ours = rows.some((r) => r.country_id === c?.id);
+  if (!c || !entry || entry === "embassy" || (entry === "evisa" && ours)) return null;
+  return visaFreeText(c.arabic_name, entry).split("\n")[0];
+}
+
 /** the company's visa list and the countries it hangs on */
 async function visaList(service: SupabaseClient) {
   const [{ data: countries }, { data: rows }] = await Promise.all([
@@ -551,7 +562,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     const closedAt = lastClosedAt(events ?? [], since);
     // on a management number, every order or lesson — and the trial code — starts the trial afresh: what was ordered is not a client's words
     const adminAt = Math.max(0, ...rows.filter((r) => r.reason?.startsWith("admin:")).map((r) => Date.parse(r.created_at) / 1000));
-    const visitStart = Math.max(m.at - VISIT_SEC, closedAt, adminAt);
+    let visitStart = Math.max(m.at - VISIT_SEC, closedAt, adminAt);
     const { data: leadRow } = await service.from("client_leads").select("id, status, last_visit_at").eq("teletel_conversation_id", m.conversationId).maybeSingle();
     const lead = leadRow as { id: string; status: string; last_visit_at: string | null } | null;
     const newVisit = closedAt > 0 && (!lead?.last_visit_at || Date.parse(lead.last_visit_at) / 1000 < closedAt);
@@ -562,17 +573,31 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
         .eq("id", lead.id);
     }
     const thisVisit = (sec: number) => sec >= visitStart - 1;
-    const received = rows.filter((r) => r.mode === "reception" && thisVisit(Date.parse(r.created_at) / 1000));
+    let received = rows.filter((r) => r.mode === "reception" && thisVisit(Date.parse(r.created_at) / 1000));
     // the client's first turn of the visit — the trial code's own row is not one (the salam is returned on it)
-    const firstTurn = !received.some((r) => !r.reason?.startsWith("admin:"));
+    let firstTurn = !received.some((r) => !r.reason?.startsWith("admin:"));
     const ours = muradMessageIds(rows);
     // everything the client wrote while Murad waited, read as one («ابغى» … «تأشيرة» … «الى لندن»)
-    const said = thread.messages.filter((t) => t.fromClient && !t.isPrivate && t.at >= since).map((t) => t.text).join("\n").trim() || m.content;
+    let said = thread.messages.filter((t) => t.fromClient && !t.isPrivate && t.at >= since).map((t) => t.text).join("\n").trim() || m.content;
     // a management number (the owner, 2026-10-24: «اعتبر هذه الارقام هي اماكن استلام قرارات الادارة»): a decision, a
     // lesson, «تراجع» or the trial code is done and answered here (instruct.ts); written as a client's, it is a trial
     if (admin) {
       const done = await instruct(service, { text: said, source: "whatsapp", phone: m.phone });
-      if (done) {
+      // «اعطني الإجابة الآن» / «ايش ترد لو سألك عميل كذا» (the owner's test, 2026-10-24: answered «ما الأمر؟» and saved a
+      // question as a lesson): the question — or the trial's last one — answered as a client's, in a visit of its own
+      const lastAsk = () => {
+        const reply = [...rows].reverse().find((r) => r.mode === "reception" && r.reply_message_id && !r.reason?.startsWith("admin:"))?.reply_message_id;
+        const at = thread.messages.find((t) => t.id === reply)?.at;
+        return at ? thread.messages.filter((t) => t.fromClient && !t.isPrivate && t.at <= at).at(-1)?.text ?? null : null;
+      };
+      const question = done?.kind === "preview" ? (done.question ?? lastAsk()) : null;
+      if (done?.kind === "preview" && question) {
+        said = question;
+        visitStart = m.at + 1;
+        received = [];
+        firstTurn = true;
+      } else if (done) {
+        if (done.kind === "preview") Object.assign(done, { kind: "unclear", reply: "أي سؤال تبي أجاوب عليه؟ اكتبه لي كما يكتبه العميل." });
         const replyId = await sendTeletelMessage(m.conversationId, done.reply);
         await finish({ reason: `admin:${done.kind}`, reply: done.reply, reply_message_id: replyId, ...(replyId ? {} : { error: "send_failed" }) });
         return replyId ? "admin" : "send_failed";
@@ -853,7 +878,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     const listed = received.some((r) => r.reason === "destinations");
     if (!done && free && !listed && !routeAs.country && (routeAs.kind === null || routeAs.kind === "بكج") && kindMode(settings.control, "بكج") === "handle" && asksDestinations(said)) {
       const countries = await sellingCountries(service, offers);
-      const text = countries.length ? destinationsText({ countries, salam: request.salam && firstTurn }) : null;
+      const text = countries.length ? await withTeaching(service, destinationsText({ countries, salam: request.salam && firstTurn }), said, "بكج") : null;
       if (text && !repeatsMurad(text, visitLines)) {
         const replyId = await sendTeletelMessage(m.conversationId, text);
         if (!replyId) {
@@ -902,7 +927,10 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     }
 
     // the hand-over: the greeting by name — the one the client gave in this visit first — the department, the team in Teletel
-    const text = receptionText({ name: firstName(knownName ?? m.contactName), salam: request.salam, to: decision.to, opensAt });
+    // a trip that also asks «هل فيها تأشيرة» for a Saudi (the owner's test, 2026-10-24: «برنامج شهر عسل جورجيا وهل فيها
+    // تاشيرة الجنسيه سعودي» was handed over unanswered): the visa part answered when no application is needed
+    const visaLine = decision.to === "بكج" && request.country && /تا?ش[يى]ر|تأشير|فيز/u.test(said) && isSaudi(said) ? await saudiVisaLine(service, request.country) : null;
+    const text = `${receptionText({ name: firstName(knownName ?? m.contactName), salam: request.salam, to: decision.to, opensAt })}${visaLine ? `\n\nوبخصوص التأشيرة: ${visaLine}` : ""}`;
     const replyId = await sendTeletelMessage(m.conversationId, text);
     if (!replyId) {
       await finish({ reason: "send_failed", reply: text, intake, error: "send_failed" });

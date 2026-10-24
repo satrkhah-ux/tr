@@ -22,7 +22,7 @@ export type Action =
 
 /** what the model returns (strict schema: every key present, null when it does not apply) */
 export type Reading = {
-  type: "decision" | "lesson" | "train" | "client" | "unclear";
+  type: "decision" | "lesson" | "train" | "client" | "preview" | "unclear";
   actions: {
     do: Action["do"];
     kind: RouteKey | null;
@@ -48,7 +48,7 @@ export const READING_SCHEMA = {
   additionalProperties: false,
   required: ["type", "actions", "lesson_question", "lesson_answer", "lesson_kind", "conversation_id", "ask_back"],
   properties: {
-    type: { type: "string", enum: ["decision", "lesson", "train", "client", "unclear"] },
+    type: { type: "string", enum: ["decision", "lesson", "train", "client", "preview", "unclear"] },
     actions: {
       type: "array",
       items: {
@@ -83,6 +83,7 @@ export function readingPrompt(text: string, ctx: { agents: Named[]; teams: Named
     "- lesson: تعليم لطريقة الرد (إذا سأل العميل عن كذا فرد بكذا، الرد الأفضل هو…، لا تقل كذا). ضع السؤال أو الموقف في lesson_question والرد أو القاعدة في lesson_answer.",
     "- train: طلب أن تتدرب على محادثة، ومعه رقم المحادثة في conversation_id.",
     "- client: رسالة مكتوبة كأنها من عميل (طلب سفر، تأشيرة، سؤال عميل) — تجربة لك كعميل.",
+    "- preview: الإدارة تطلب أن ترى ردك الآن، لا أن تعلّمك («اعطني الإجابة الآن»، «ايش الإجابة إذا أحد سألك عن كذا»، «كيف بترد لو سألك عميل…»، «جرّب الرد»). ضع سؤال العميل نفسه في lesson_question («ايش العروض اللي عندكم»)، أو null إذا لم يُذكر سؤال. سؤال عن ردّك ليس درساً أبداً.",
     "- unclear: أمر لا تفهمه بثقة؛ اكتب في ask_back سؤالاً قصيراً واحداً.",
     "",
     "أفعال القرار (actions) — استخدم الأرقام من القوائم فقط ولا تخترع رقماً:",
@@ -159,3 +160,5 @@ export function describe(a: Action, ctx: { agents: Named[]; teams: Named[] }): s
 
 /** «تراجع» / «الغ آخر قرار» — the undo word, folded loosely */
 export const isUndo = (text: string) => /^(تراجع|تراجّع|الغ(اء)? (اخر|آخر) (قرار|امر|أمر)|undo)[.!؟\s]*$/u.test(text.trim());
+/** «لا» / «غلط» / «مو كذا» — a lesson just saved, refused */
+export const isRefusal = (text: string) => /^(لا|لاء|لا ?مو ?كذا|مو ?كذا|غلط|خطأ|خطا|مو ?صحيح|غير ?صحيح|لا ?تحفظه|احذفه|امسحه)[.!؟\s]*$/u.test(text.trim());

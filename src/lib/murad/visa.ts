@@ -192,7 +192,7 @@ export type Entry = "free" | "arrival" | "evisa" | "embassy";
 export type VisaCountry = { id: string; arabic_name: string; iso2: string | null; visa_required: boolean | null; saudi_entry?: Entry | null };
 type ListRow = VisaRow & { country_id?: string | null };
 /** unset → the older visa_required flag */
-const entryOf = (c: VisaCountry | undefined): Entry | null => c?.saudi_entry ?? (c?.visa_required === false ? "free" : null);
+export const entryOf = (c: VisaCountry | undefined): Entry | null => c?.saudi_entry ?? (c?.visa_required === false ? "free" : null);
 const onList = (rows: ListRow[], id: string) => rows.some((r) => r.country_id === id && (r.status ?? "Active") === "Active");
 
 export type VisaStep =

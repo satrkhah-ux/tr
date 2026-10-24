@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
 import type { RouteKey } from "./reception";
 
 /**
@@ -36,4 +37,33 @@ export async function relevantLessons(service: SupabaseClient, text: string, kin
     .slice(0, 6);
   if (!rows.length) return "";
   return ["## من محادثات فريقنا السابقة (أمثلة — السياسات وقائمة التأشيرات وتعليم الإدارة أولى منها)", ...rows.map((r) => `س: ${r.question ?? "—"}\nج: ${r.answer}`)].join("\n");
+}
+
+/**
+ * A fixed reply (the destinations list) with the management's teaching applied (the owner's test, 2026-10-24: «أضف
+ * أننا أقوياء في جنوب شرق آسيا…» was learnt and the next «ايش العروض» was the same list): the model may add or
+ * reword what a lesson for this question says, never drop what the reply lists. The reply as it was on any failure.
+ */
+export async function withTeaching(service: SupabaseClient, reply: string, clientText: string, kind?: RouteKey): Promise<string> {
+  const taught = await lessonsText(service, kind);
+  if (!taught || !isOpenAIConfigured()) return reply;
+  try {
+    const raw = await openaiJson({
+      name: "taught_reply",
+      system: [
+        "You are Murad, the WhatsApp assistant of Traveliun, a Saudi travel company. Below: what the management taught you, the client's message, and the reply about to be sent.",
+        "If a lesson applies to this message, return the reply with that lesson applied — add what it says to add, use its wording where it gives one — keeping every country, number and the closing question of the reply. Short Saudi Arabic. If no lesson applies, return the reply unchanged. Never add a fact that is in neither.",
+        "",
+        taught,
+      ].join("\n"),
+      user: `رسالة العميل: ${clientText.slice(-1000)}\n\nالرد:\n${reply}`,
+      schema: { type: "object", properties: { reply: { type: "string" } }, required: ["reply"], additionalProperties: false },
+      temperature: 0,
+      timeoutMs: 15000,
+    });
+    const out = (JSON.parse(raw ?? "{}") as { reply?: string }).reply?.trim();
+    return out || reply;
+  } catch {
+    return reply;
+  }
 }

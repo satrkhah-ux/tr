@@ -4,10 +4,11 @@ import { listTeletelTeams, teletelGet } from "@/lib/providers/teletel";
 import { responsesJson } from "@/lib/providers/openai";
 import type { MuradControl } from "./control";
 import { readControl, readScope, storeControl } from "./control-store";
-import { applyActions, describe, isUndo, READING_SCHEMA, readingPrompt, toActions, type Named, type Reading, type Scope } from "./instructions";
+import { applyActions, describe, isRefusal, isUndo, READING_SCHEMA, readingPrompt, toActions, type Named, type Reading, type Scope } from "./instructions";
 import { trainOn } from "./lessons";
 
-export type Instructed = { kind: "decision" | "lesson" | "train" | "undo" | "reset" | "unclear"; reply: string; ok: boolean };
+/** «preview»: the management asks to see the answer now — the reception answers `question` (null: the trial's last one) as a client's */
+export type Instructed = { kind: "decision" | "lesson" | "train" | "undo" | "reset" | "unclear" | "preview"; reply: string; ok: boolean; question?: string | null };
 type Source = { text: string; source: "page" | "whatsapp"; phone?: string | null; authorId?: string | null };
 type State = { control: MuradControl; scope: Scope };
 
@@ -23,16 +24,33 @@ export async function instruct(service: SupabaseClient, input: Source): Promise<
   const record = (row: Record<string, unknown>) =>
     service.from("murad_instructions").insert({ source: input.source, phone: input.phone ?? null, author_id: input.authorId ?? null, text: text.slice(0, 4000), ...row }).select("id").maybeSingle();
 
-  // «11223344»: a new trial — the reception reads the visit from here (its own murad_log reason)
-  if (input.source === "whatsapp" && control.resetCode && text.replace(/\D/g, "") === control.resetCode && /^[\d\s]+$/.test(text)) {
-    const reply = "بدأنا تجربة جديدة ✅ اكتب لي الآن كأنك عميل.";
+  // «11223344»: a new trial — the reception reads the visit from here (its own murad_log reason). On its own line among
+  // others («لا» then the code, read as one, 2026-10-24): the rest is done first, then the trial starts
+  const isCode = (t: string) => Boolean(control.resetCode) && t.replace(/\D/g, "") === control.resetCode && /^[\d\s]+$/.test(t);
+  const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  if (input.source === "whatsapp" && lines.some(isCode)) {
+    const rest = lines.filter((l) => !isCode(l)).join("\n");
+    const first = rest ? await instruct(service, { ...input, text: rest }) : null;
+    const reply = [first?.kind === "preview" ? null : first?.reply, "بدأنا تجربة جديدة ✅ اكتب لي الآن كأنك عميل."].filter(Boolean).join("\n\n");
     await record({ kind: "reset", reply });
     return { kind: "reset", reply, ok: true };
   }
 
-  if (isUndo(text)) {
-    const { data } = await service.from("murad_instructions").select("id, before, reply").eq("kind", "decision").eq("status", "applied").order("created_at", { ascending: false }).limit(1).maybeSingle();
-    const last = data as { id: string; before: State | null; reply: string | null } | null;
+  // «لا» right after a lesson is that lesson refused (the owner's test, 2026-10-24: a question was saved as a lesson)
+  const { data: lastRow } = await service.from("murad_instructions").select("kind, status, created_at").eq("phone", input.phone ?? "").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const prev = lastRow as { kind: string; status: string | null; created_at: string } | null;
+  const refusesLesson = prev?.kind === "lesson" && prev.status === "applied" && Date.now() - Date.parse(prev.created_at) < 30 * 60_000 && isRefusal(text);
+  if (isUndo(text) || refusesLesson) {
+    // the last applied decision or lesson, whichever is newer
+    const { data } = await service.from("murad_instructions").select("id, kind, before, reply").in("kind", ["decision", "lesson"]).eq("status", "applied").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const last = data as { id: string; kind: string; before: State | null; reply: string | null } | null;
+    if (last?.kind === "lesson") {
+      const { error } = await service.from("murad_lessons").update({ active: false }).eq("instruction_id", last.id);
+      const reply = error ? "تعذّر حذف الدرس الآن — أعد المحاولة بعد قليل." : `حذفت آخر درس ✅ ولن أستعمله.${last.reply ? `\n${last.reply.split("\n").filter((l) => /^(إذا|أرد):/u.test(l)).join("\n")}` : ""}`;
+      if (!error) await service.from("murad_instructions").update({ status: "undone", undone_at: new Date().toISOString() }).eq("id", last.id);
+      await record({ kind: "undo", status: error ? "failed" : undefined, reply });
+      return { kind: "undo", reply, ok: !error };
+    }
     if (!last?.before) {
       const reply = "لا يوجد قرار إداري أتراجع عنه.";
       await record({ kind: "undo", status: "not_understood", reply });
@@ -65,6 +83,11 @@ export async function instruct(service: SupabaseClient, input: Source): Promise<
     const reply = "هذه تبدو رسالة عميل، لا قراراً إدارياً. جرّبها من رقم الإدارة على واتساب.";
     await record({ kind: "unclear", status: "not_understood", reply });
     return { kind: "unclear", reply, ok: false };
+  }
+
+  if (reading.type === "preview" && input.source === "whatsapp") {
+    await record({ kind: "preview", reply: null });
+    return { kind: "preview", reply: "", ok: true, question: reading.lesson_question?.trim() || null };
   }
 
   if (reading.type === "lesson" && reading.lesson_answer?.trim()) {
