@@ -47,30 +47,33 @@ export function TopToday({ countries, wall: first = null }: { countries: Country
     };
   }, [router]);
 
-  const today = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Riyadh" }).format(new Date());
-  // on the wall the title stands once, on the right-most screen (where Arabic starts), the logo on the left-most
-  const showTitle = !wall || wall.pos === wall.of - 1;
+  const today = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Riyadh" }).format(new Date());
+  // the title and the date head every screen of the wall, at its top centre (the owner, 2026-10-25: «اكتب بالاعلى
+  // الوجهات الاكثر طلبا اليوم مع التاريخ واجعلها باعلى منتصف الشاشة») — the same header on each, so the line of
+  // prints stays at one level across them; the logo once, on the left-most; «nothing yet» once, on the right-most
+  const showEmpty = !wall || wall.pos === wall.of - 1;
   const showLogo = !wall || wall.pos === 0;
 
   return (
     <main dir="rtl" className="relative flex h-screen flex-col overflow-hidden bg-[radial-gradient(ellipse_at_top,#1f7667_0%,#135549_45%,#0b3a32_100%)] text-white">
       {/* the world map, faint, behind everything */}
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[url('/traveliun/world-map.png')] bg-cover bg-center opacity-[0.12] mix-blend-screen" />
-      <header className="relative z-10 flex min-h-[clamp(90px,16vh,200px)] items-center justify-between gap-4 px-[clamp(16px,4vw,56px)] pt-[clamp(16px,3vh,36px)]">
-        <div className={showTitle ? "" : "invisible"}>
-          <p className="text-[clamp(13px,1.2vw,22px)] font-bold text-[#f0ad22]">{today}</p>
-          <h1 className="mt-1 text-[clamp(26px,3.4vw,64px)] font-extrabold leading-tight">الأكثر طلباً اليوم</h1>
-          <p className="mt-1 text-[clamp(13px,1.2vw,22px)] font-medium text-white/70">الوجهات التي سأل عنها عملاؤنا اليوم، الأكثر أولاً</p>
-        </div>
+      <header className="relative z-10 flex min-h-[clamp(90px,16vh,200px)] flex-col items-center justify-center px-[clamp(16px,4vw,56px)] pt-[clamp(16px,3vh,36px)] text-center">
         {showLogo ? (
           // eslint-disable-next-line @next/next/no-img-element -- static brand asset
-          <img src="/traveliun/logo-en.svg" alt="Traveliun" className="h-[clamp(36px,5vw,90px)] w-auto brightness-0 invert" />
+          <img
+            src="/traveliun/logo-en.svg"
+            alt="Traveliun"
+            className="mb-2 h-[clamp(28px,4vw,72px)] w-auto brightness-0 invert md:absolute md:left-[clamp(16px,4vw,56px)] md:top-1/2 md:mb-0 md:-translate-y-1/2"
+          />
         ) : null}
+        <h1 className="text-[clamp(26px,3.4vw,64px)] font-extrabold leading-tight">الوجهات الأكثر طلباً اليوم</h1>
+        <p className="mt-1 text-[clamp(15px,1.6vw,30px)] font-bold text-[#f0ad22]">{today}</p>
       </header>
 
       {countries.length === 0 ? (
         <div className="relative z-10 flex flex-1 items-center justify-center px-6 text-center text-[clamp(18px,2vw,32px)] font-bold text-white/80">
-          {showTitle ? "لم تصل محادثات بوجهة محددة اليوم بعد" : ""}
+          {showEmpty ? "لم تصل محادثات بوجهة محددة اليوم بعد" : ""}
         </div>
       ) : (
         <DriftLine key={wall ? `${wall.start}` : "loop"} countries={countries} wall={wall} />
