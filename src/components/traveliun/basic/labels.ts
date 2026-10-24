@@ -8,7 +8,7 @@ import { useTraveliunUI } from "../TraveliunUIProvider";
  * goes as one folder.
  */
 const AR = {
-  newFile: "ملف بيسك جديد",
+  newFile: "عرض جديد",
   homeHint: "إدخال سريع على صفحة واحدة: بيانات العميل، ثم الطيران، ثم الفنادق مدينة مدينة، ثم الطيران الداخلي، ثم البرنامج والجولات. يحفظ في نفس ملفات المولّد، فتعمل المعاينة والـPDF والتسعير كما هي.",
   recent: "آخر الملفات",
   emptyList: "لا ملفات بعد.",
@@ -405,7 +405,7 @@ const AR = {
 } as const;
 
 const EN: Record<keyof typeof AR, string> = {
-  newFile: "New basic file",
+  newFile: "New offer",
   homeHint: "Quick one-page entry: the client, the flights, the hotels city by city, the domestic flights, then the programme and tours. It saves into the same files as the generator, so preview, PDF and pricing work unchanged.",
   recent: "Recent files",
   emptyList: "No files yet.",

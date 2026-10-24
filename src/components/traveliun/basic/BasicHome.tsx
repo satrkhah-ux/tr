@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { FileUp, Loader2, Package, Plane, Plus, Zap } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { createDraft, duplicateDraft, type DraftSummary } from "@/lib/data/drafts";
@@ -78,8 +78,20 @@ export function BasicHome({
       setCreating(false);
       return;
     }
-    router.push(`/basic/${result.id}`);
+    // replace, not push: «رجوع» from the new file must not land on ?new=1 and make another
+    router.replace(`/basic/${result.id}`);
   }
+
+  // «بكج جديد» in the menu (/basic?new=1) opens a new file at once (the owner, 2026-10-25) — on a real visit only:
+  // a link's prefetch runs no effect, and the ref keeps a second render from making a second file
+  const wantsNew = useSearchParams().get("new") === "1";
+  const started = useRef(false);
+  useEffect(() => {
+    if (!wantsNew || started.current) return;
+    started.current = true;
+    void onCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per visit
+  }, [wantsNew]);
 
   return (
     <TraveliunShell title="nav.basic">

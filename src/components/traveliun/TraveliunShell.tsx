@@ -174,7 +174,8 @@ export const navGroups: NavGroup[] = [
     href: "/basic",
     icon: Zap,
     children: [
-      { labelKey: "nav.newPackage", href: "/basic", perm: "offers.write" },
+      // straight into a new file (the owner, 2026-10-25: «عندما يضغط على بكج جديد مباشرة يدخله على نظام البكج»)
+      { labelKey: "nav.newPackage", href: "/basic?new=1", perm: "offers.write" },
       { labelKey: "nav.readyOffers", href: "/ready-offers", perm: "offers.write" },
       // confirmed clients from before the system, by hand — no offer (the user, 2026-10-22)
       { labelKey: "nav.externalTrips", href: "/confirmed-trips", perm: "offers.write" },
@@ -274,7 +275,7 @@ export const partnerNavGroups: NavGroup[] = [
     icon: FileText,
     children: [
       { labelKey: "nav.myFiles", href: "/package-generator" },
-      { labelKey: "nav.newPackage", href: "/basic" },
+      { labelKey: "nav.newPackage", href: "/basic?new=1" },
       { labelKey: "nav.readyOffers", href: "/ready-offers" },
     ],
   },
@@ -380,9 +381,12 @@ function BrandMark({
   );
 }
 
+/** a link's page without its query («/basic?new=1» is /basic) */
+const pageOf = (href: string) => href.split("?")[0];
+
 function isGroupActive(pathname: string, group: NavGroup) {
   if (pathname === group.href) return true;
-  return group.children?.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`)) ?? false;
+  return group.children?.some((child) => pathname === pageOf(child.href) || pathname.startsWith(`${pageOf(child.href)}/`)) ?? false;
 }
 
 /** module scope, not state: the first click navigates to /developer and remounts the shell, the count must survive it.
@@ -840,7 +844,7 @@ function SideMenu({
               {active && group.children ? (
                 <div className="py-1">
                   {group.children.map((child) => {
-                    const childActive = pathname === child.href;
+                    const childActive = pathname === pageOf(child.href);
                     return (
                       <div key={child.href}>
                       {child.captionKey ? (
