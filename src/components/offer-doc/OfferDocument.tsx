@@ -250,19 +250,24 @@ function tripNights(offer: ClientOfferDTO): number {
  */
 function withLists<T extends ClientOfferDTO>(offer: T): T {
   const list = <V,>(value: V[] | undefined): V[] => (Array.isArray(value) ? value : []);
+  // The NESTED arrays too, not only the top-level ones. A snapshot frozen before
+  // `excluded_surcharges` existed reached stayHeightMm as undefined and threw —
+  // so an old published offer produced a 500 on its own PDF while its preview,
+  // which reads live data, was fine. Every list the document iterates is
+  // defaulted here, once.
+  const hotels = list(offer.hotels).map((h) => ({
+    ...h,
+    excluded_surcharges: list(h.excluded_surcharges),
+    facilities: list(h.facilities),
+  }));
   return {
     ...offer,
-    // The NESTED arrays too, not only the top-level ones. A snapshot frozen before
-    // `excluded_surcharges` existed reached stayHeightMm as undefined and threw —
-    // so an old published offer produced a 500 on its own PDF while its preview,
-    // which reads live data, was fine. Every list the document iterates is
-    // defaulted here, once.
-    hotels: list(offer.hotels).map((h) => ({
-      ...h,
-      excluded_surcharges: list(h.excluded_surcharges),
-      facilities: list(h.facilities),
-    })),
-    days: list(offer.days).map((d) => ({ ...d, activities: list(d.activities), transport_note: d.transport_note ?? null })),
+    hotels,
+    // the days name the hotel they mean — here, on what the client reads, never in the text the agent edits
+    days: withHotelNames(
+      list(offer.days).map((d) => ({ ...d, activities: list(d.activities), transport_note: d.transport_note ?? null })),
+      hotels,
+    ),
     flights: list(offer.flights),
     transport: list(offer.transport),
     visas: list(offer.visas),
@@ -969,6 +974,99 @@ function visitHotels(visit: { city: string; days: Day[] }, hotels: ClientOfferDT
     .map((h) => h.hotel_name?.trim() ?? "")
     .filter(Boolean);
   return [...new Set(names)];
+}
+
+/**
+ * «الفندق» as a word of its own — not «الفندقية», not «بالفندق»; a clause may end on it («الفندق،»). No lookbehind:
+ * an older Safari would not parse it.
+ */
+const HOTEL_WORD = /(^|[^\u0600-\u06FF])الفندق(?![\u0600-\u060B\u060D-\u061A\u061C-\u061E\u0620-\u06FF])/g;
+/** What comes before the word says which hotel it is: the one left («تسجيل الخروج من», «مغادرة», «إخلاء») … */
+const HOTEL_OUT = /(?:الخروج|خروج|المغادرة|مغادرة|إخلاء)(?:\s+(?:المتأخر|متأخر))?(?:\s+(?:من|عن))?\s*$/;
+/** … a pickup point («الاستقبال من الفندق» — «بكج متقدم»'s hotel not named), never ours … */
+const HOTEL_PICKUP = /[اإ]ستقبال\S*\s+من\s*$/;
+/** … the one the day starts from («الانطلاق من») … */
+const HOTEL_FROM = /(?:^|\s)(?:من|عن)\s*$/;
+/** … or the one the group goes to and sleeps in («التوجه إلى», «العودة الي», «الدخول في»). */
+const HOTEL_TO = /(?:(?:^|\s)(?:إلى|الى|الي|إلي)|الدخول\s+في|(?:المبيت|الإقامة)\s+في)\s*$/;
+/** Where the day leaves its hotel, said anywhere — «… ثم العودة إلى الفندق وتسجيل الخروج». */
+const CHECK_OUT = /(^|[^\u0600-\u06FF])[وف]?(?:ال)?(?:خروج|مغادرة|إخلاء)(?![\u0600-\u06FF])/;
+type HotelWhere = "out" | "pickup" | "from" | "to" | "other";
+const hotelWhere = (head: string): HotelWhere =>
+  HOTEL_PICKUP.test(head) ? "pickup" : HOTEL_OUT.test(head) ? "out" : HOTEL_FROM.test(head) ? "from" : HOTEL_TO.test(head) ? "to" : "other";
+
+/** «فندق …» — said once: a name that already says what it is (فندق، منتجع، شقق، Hotel …) is printed as it is. */
+const LODGING = /^(?:فندق|الفندق|فنادق|أوتيل|اوتيل|منتجع|شقق|فلل|فيلا|فيلات|نزل|أجنحة|كامب|مخيم|hotel|resort|suites?|apartments?|villas?|hostel)(?:\s|$)/i;
+const hotelPhrase = (name: string) => (LODGING.test(name) ? name : `فندق ${name}`);
+
+/**
+ * The programme says which hotel (the owner, 2026-10-24: its name on the client link and in the PDF only — the
+ * day text the agent writes stays «الفندق»). On each day the first «الفندق» meant for a stay takes its name; a
+ * stay already named that day (typed by the agent, or named earlier) is not named again, and an undated stay is
+ * never guessed. Which stay:
+ * - a day with one hotel (a stay day, the arrival, the day home): that hotel — but a check-out on a day no stay
+ *   ends, or a pickup point, stays «الفندق»;
+ * - a day the group changes hotel, read in order: everything before the check-out (wherever it is said) is the
+ *   hotel left, and so are the check-out itself and «من الفندق» until the group reaches the next one; «إلى
+ *   الفندق» is the new one, and after it everything is. Before the check-out or the way in, a mention that says
+ *   neither is left as «الفندق» rather than guessed.
+ * Two hotels on the same dates are both named.
+ */
+export function withHotelNames<D extends { date: string | null; activities: string[] }>(
+  days: D[],
+  hotels: { hotel_name: string | null; check_in: string | null; check_out: string | null }[],
+): D[] {
+  const dated = hotels.filter((h) => h.check_in && h.check_out && h.hotel_name?.trim());
+  const names = (pick: (h: (typeof dated)[number]) => boolean) => [...new Set(dated.filter(pick).map((h) => h.hotel_name!.trim()))];
+  const own = (line: string) => !line.startsWith(TOUR_CAR_LINE);
+  return days.map((day) => {
+    const date = day.date;
+    if (!date || dated.length === 0) return day;
+    const leaving = names((h) => h.check_out === date);
+    const sleeping = names((h) => h.check_in! <= date && date < h.check_out!);
+    const change = leaving.length > 0 && sleeping.length > 0 && leaving.join("|") !== sleeping.join("|");
+    // every mention of the day in reading order — what comes before it, and where it stands (line, then place)
+    const lines = day.activities.filter(own);
+    const mentions = lines.flatMap((line, i) =>
+      [...line.matchAll(HOTEL_WORD)].map((m) => ({ where: hotelWhere(line.slice(0, m.index + m[1].length)), at: i * 1e6 + m.index + m[1].length })),
+    );
+    // where the group checks out, said anywhere in the day
+    const outAt = lines.reduce<number | null>((found, line, i) => {
+      const m = found === null ? CHECK_OUT.exec(line) : null;
+      return m ? i * 1e6 + m.index + m[1].length : found;
+    }, null);
+    let arrived = false;
+    const stays = mentions.map(({ where, at }): string[] => {
+      if (where === "pickup") return [];
+      if (!change) return where === "out" ? leaving : sleeping.length > 0 ? sleeping : leaving;
+      if (where === "to") {
+        // the way in — unless the group has not left yet («العودة إلى الفندق وتسجيل الخروج»)
+        if (outAt !== null && at < outAt) return leaving;
+        arrived = true;
+        return sleeping;
+      }
+      if (outAt !== null && at < outAt) return leaving;
+      if (where === "out" || where === "from") return arrived ? sleeping : leaving;
+      return arrived ? sleeping : [];
+    });
+    const done = new Set<string>();
+    let k = 0;
+    const activities = day.activities.map((line) =>
+      own(line)
+        ? line.replace(HOTEL_WORD, (match: string, before: string) => {
+            const stay = stays[k] ?? [];
+            k += 1;
+            const key = stay.join("|");
+            if (stay.length === 0 || done.has(key)) return match;
+            done.add(key);
+            // the agent already wrote it somewhere on the day
+            if (day.activities.some((l) => stay.every((n) => l.includes(n)))) return match;
+            return `${before}${stay.map(hotelPhrase).join(" و")}`;
+          })
+        : line,
+    );
+    return { ...day, activities };
+  });
 }
 
 /** The city heading band: name, dates, hotels. */

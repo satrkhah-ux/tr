@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { OfferDocument } from "./OfferDocument";
+import { OfferDocument, withHotelNames } from "./OfferDocument";
 import { computeOfferPricing } from "@/lib/offer/pricing";
 import { toClientOfferDTO, type InternalOfferDTO, type ItineraryDayLine } from "@/lib/offer/dto";
 import { AR } from "./labels";
@@ -299,3 +299,134 @@ describe("OfferDocument — a v4 draft's programme", () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 });
+
+/**
+ * The owner, 2026-10-24: the programme the client reads names the hotel — on the client link and the PDF; the
+ * text the agent edits keeps «الفندق».
+ */
+describe("OfferDocument — the hotel named in the day's text", () => {
+  const KL = "ذا ساوجانا كوالالمبور";
+  const SEL = "فندق صنواي بيراميد";
+  const stay = (hotel_name: string, check_in: string | null, check_out: string | null) => ({ hotel_name, check_in, check_out });
+  const hotels = [stay(KL, "2026-10-25", "2026-10-27"), stay(SEL, "2026-10-27", "2026-10-28")];
+  const on = (date: string, activities: string[]) => withHotelNames([{ date, activities }], hotels)[0].activities;
+
+  it("the check-out names the hotel left, the way in the hotel slept in — «فندق» said once", () => {
+    expect(on("2026-10-25", ["الاستقبال من المطار من قبل موظف ترافليون والتوجه إلى الفندق"])).toEqual([
+      `الاستقبال من المطار من قبل موظف ترافليون والتوجه إلى فندق ${KL}`,
+    ]);
+    expect(on("2026-10-27", ["تسجيل الخروج من الفندق", "الانتقال براً إلى سيلانجور والتوجه إلى الفندق"])).toEqual([
+      `تسجيل الخروج من فندق ${KL}`,
+      `الانتقال براً إلى سيلانجور والتوجه إلى ${SEL}`,
+    ]);
+    // both on one line
+    expect(on("2026-10-27", ["تسجيل الخروج من الفندق والتوجه إلى الفندق"])).toEqual([`تسجيل الخروج من فندق ${KL} والتوجه إلى ${SEL}`]);
+  });
+
+  it("the day home names the hotel it leaves, whatever the line says", () => {
+    expect(on("2026-10-28", ["جولة قبل المغادرة ثم العودة إلى الفندق", "تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة"])).toEqual([
+      `جولة قبل المغادرة ثم العودة إلى ${SEL}`,
+      "تسجيل الخروج من الفندق والتوجه إلى المطار للمغادرة",
+    ]);
+  });
+
+  it("names a stay once a day, and never one the agent already wrote", () => {
+    expect(on("2026-10-26", ["التجمع في بهو الفندق ثم العودة إلى الفندق"])).toEqual([`التجمع في بهو فندق ${KL} ثم العودة إلى الفندق`]);
+    expect(on("2026-10-26", [`الإفطار في فندق ${KL}`, "العودة إلى الفندق"])).toEqual([`الإفطار في فندق ${KL}`, "العودة إلى الفندق"]);
+  });
+
+  it("on the day it changes hotel: the one left until it is left, then the new one — however the leaving is said", () => {
+    expect(on("2026-10-27", ["مغادرة الفندق والتوجه إلى المطار", "الاستقبال في مطار لنكاوي والتوجه إلى الفندق"])).toEqual([
+      `مغادرة فندق ${KL} والتوجه إلى المطار`,
+      `الاستقبال في مطار لنكاوي والتوجه إلى ${SEL}`,
+    ]);
+    expect(on("2026-10-27", ["تناول الإفطار في الفندق ثم تسجيل الخروج من الفندق", "الانتقال براً إلى سيلانجور والتوجه إلى الفندق"])).toEqual([
+      `تناول الإفطار في فندق ${KL} ثم تسجيل الخروج من الفندق`,
+      `الانتقال براً إلى سيلانجور والتوجه إلى ${SEL}`,
+    ]);
+    expect(on("2026-10-27", ["تسجيل خروج من الفندق", "المغادرة من الفندق"])).toEqual([`تسجيل خروج من فندق ${KL}`, "المغادرة من الفندق"]);
+    // one city, two hotels: the day starts from the first and ends in the second
+    expect(on("2026-10-27", ["الانطلاق من الفندق صباحاً ثم العودة إلى الفندق"])).toEqual([`الانطلاق من فندق ${KL} صباحاً ثم العودة إلى ${SEL}`]);
+    // nothing said of leaving: only the way in is the new hotel; the rest is not guessed
+    expect(on("2026-10-27", ["الاستراحة في بهو الفندق", "ثم العودة الي الفندق"])).toEqual(["الاستراحة في بهو الفندق", `ثم العودة الي ${SEL}`]);
+  });
+
+  it("reads the day in order: the check-out said anywhere, the way in, then what follows it", () => {
+    // a check-out with no «الفندق» after it still marks the leaving
+    expect(on("2026-10-27", ["جولة صباحية ثم العودة إلى الفندق وتسجيل الخروج", "الانتقال براً إلى سيلانجور والتوجه إلى الفندق"])).toEqual([
+      `جولة صباحية ثم العودة إلى فندق ${KL} وتسجيل الخروج`,
+      `الانتقال براً إلى سيلانجور والتوجه إلى ${SEL}`,
+    ]);
+    // a morning outing before the check-out is the hotel left; the way in after it the new one
+    expect(on("2026-10-27", ["جولة صباحية: الانطلاق من الفندق إلى السوق ثم العودة إلى الفندق", "تسجيل الخروج من الفندق", "الانتقال براً إلى سيلانجور والتوجه إلى الفندق"])).toEqual([
+      `جولة صباحية: الانطلاق من فندق ${KL} إلى السوق ثم العودة إلى الفندق`,
+      "تسجيل الخروج من الفندق",
+      `الانتقال براً إلى سيلانجور والتوجه إلى ${SEL}`,
+    ]);
+    // «من الفندق» after the way in is the new hotel, never a reason to name the old one
+    expect(on("2026-10-27", ["الاستقبال في مطار لنكاوي والتوجه إلى الفندق", "عشاء في مطعم قريب من الفندق"])).toEqual([
+      `الاستقبال في مطار لنكاوي والتوجه إلى ${SEL}`,
+      "عشاء في مطعم قريب من الفندق",
+    ]);
+  });
+
+  it("a pickup point is never our hotel, and a check-out on a day nothing ends is not named", () => {
+    expect(on("2026-10-25", ["الاستقبال من الفندق الساعة 10:00 من قبل موظف ترافليون والتوجه إلى الفندق"])).toEqual([
+      `الاستقبال من الفندق الساعة 10:00 من قبل موظف ترافليون والتوجه إلى فندق ${KL}`,
+    ]);
+    expect(on("2026-10-26", ["تسجيل الخروج من الفندق"])).toEqual(["تسجيل الخروج من الفندق"]);
+    expect(on("2026-10-25", ["الإستقبال من الفندق والتوجه إلى الفندق"])).toEqual([`الإستقبال من الفندق والتوجه إلى فندق ${KL}`]);
+    expect(on("2026-10-25", ["استقبالكم من الفندق والتوجه إلى الفندق"])).toEqual([`استقبالكم من الفندق والتوجه إلى فندق ${KL}`]);
+  });
+
+  it("names it before an Arabic comma, and says «فندق» only where the name does not say what it is", () => {
+    expect(on("2026-10-26", ["العودة إلى الفندق، ثم وقت حر"])).toEqual([`العودة إلى فندق ${KL}، ثم وقت حر`]);
+    const resort = withHotelNames([{ date: "2026-10-20", activities: ["العودة إلى الفندق"] }], [stay("منتجع ناتيا أوبود", "2026-10-20", "2026-10-22")]);
+    expect(resort[0].activities).toEqual(["العودة إلى منتجع ناتيا أوبود"]);
+    const named = (name: string) => withHotelNames([{ date: "2026-10-20", activities: ["العودة إلى الفندق"] }], [stay(name, "2026-10-20", "2026-10-22")])[0].activities[0];
+    expect(named("الفندق الكبير")).toBe("العودة إلى الفندق الكبير");
+    expect(named("Hotel Majestic")).toBe("العودة إلى Hotel Majestic");
+    expect(named("ابيسود تبليسي")).toBe("العودة إلى فندق ابيسود تبليسي");
+  });
+
+  it("two hotels on the same dates are both named", () => {
+    const two = withHotelNames([{ date: "2026-10-20", activities: ["التوجه إلى الفندق"] }], [stay("فندق الشروق", "2026-10-20", "2026-10-22"), stay("الغروب", "2026-10-20", "2026-10-22")]);
+    expect(two[0].activities).toEqual(["التوجه إلى فندق الشروق وفندق الغروب"]);
+  });
+
+  it("leaves alone what is not the word, the car line, an undated stay and a day without a date", () => {
+    expect(on("2026-10-26", ["الخدمات الفندقية", "الإقامة بالفندق", "التنقل بـفان إلى الفندق"])).toEqual(["الخدمات الفندقية", "الإقامة بالفندق", "التنقل بـفان إلى الفندق"]);
+    expect(withHotelNames([{ date: "2026-10-26", activities: ["العودة إلى الفندق"] }], [stay(KL, null, null)])[0].activities).toEqual(["العودة إلى الفندق"]);
+    expect(withHotelNames([{ date: null, activities: ["العودة إلى الفندق"] }], hotels)[0].activities).toEqual(["العودة إلى الفندق"]);
+  });
+
+  it("reaches the document the client link and the PDF print", () => {
+    const offer = offerWith([
+      day({ day_number: 1, date: "2026-10-27", city_name: "سيلانجور", activities: ["تسجيل الخروج من الفندق", "الانتقال براً إلى سيلانجور والتوجه إلى الفندق"] }),
+    ]);
+    const html = renderToStaticMarkup(
+      createElement(OfferDocument, {
+        variant: "client",
+        offer: toClientOfferDTO({
+          ...offer,
+          hotels: [
+            { ...hotelRow(), city_name: "كوالالمبور", hotel_name: KL, check_in: "2026-10-25", check_out: "2026-10-27" },
+            { ...hotelRow(), city_name: "سيلانجور", hotel_name: SEL, check_in: "2026-10-27", check_out: "2026-10-28" },
+          ],
+        }),
+      }),
+    );
+    expect(html).toContain(`تسجيل الخروج من فندق ${KL}`);
+    expect(html).toContain(`والتوجه إلى ${SEL}`);
+  });
+});
+
+function hotelRow() {
+  return {
+    city_name: null, hotel_name: null, stars: 5, room_type: null, board_type: null, rooms_count: 1, nights: 1,
+    check_in: null, check_out: null, sell_price: 100, sell_currency: "SAR", buy_price: 80, buy_currency: "SAR",
+    cancellation_policy: null, excluded_surcharges: [], valid_until: null, image_url: null, facilities: [],
+    supplier_id: null, supplier_name: null, rate_key: null, net_base: null, net_source_currency: null,
+    fx_rate: null, fx_date: null, ref_sell_base: null, markup_amount: null, markup_pct: null,
+  };
+}
