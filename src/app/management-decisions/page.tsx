@@ -10,8 +10,9 @@ export default async function ManagementDecisionsPage() {
   if (!data || !rules) redirect("/dashboard");
   return <TraveliunShell title="nav.managementDecisions">
     <div dir="rtl" className="space-y-8 text-[#185045]">
-      <ManagementDecisions initial={data} />
+      {/* folded behind its top button so the page stays short (the owner, 2026-10-24) */}
       <MuradStaffRules initial={rules} />
+      <ManagementDecisions initial={data} />
     </div>
   </TraveliunShell>;
 }
