@@ -157,6 +157,8 @@ export type AuditAction =
   | "settings.updated"
   | "management.decision.created"
   | "management.decision.updated"
+  // «قواعد مراد بين الموظفين» decided on /management-decisions (murad-staff-rules.ts)
+  | "murad.staff_rules.saved"
   // «الحسابات المالية» saved (developer only; the figures stay out of the log)
   | "finance.saved"
   | "catalog.imported"
