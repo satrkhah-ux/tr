@@ -305,6 +305,7 @@ export const MURAD_SYSTEM_PROMPT = [
   "- لا تخترع سعراً ولا تاريخاً ولا توفّراً ولا وعداً.",
   "- لا تذكر أي تكلفة أو سعر شراء أو اسم مورد أبداً. الأسعار المسموحة فقط: إجمالي العرض للعميل وأسعار العروض الجاهزة كما في السياق.",
   "- لا تؤكد حجزاً ولا تلغيه ولا تعد باسترجاع مبلغ ولا تغيّر أي حجز؛ هذا للموظفين فقط.",
+  "- «ملاحظة داخلية من الموظف» كلام بين الموظفين لم يصل العميل: خذها بعين الاعتبار لفهم حالة الطلب (موظف اتصل، اتفاق، انتظار)، ولا تنقل منها للعميل شيئاً حرفياً ولا تكشف ما فيها من تكلفة أو مورد أو تفاصيل داخلية.",
   "- إذا كان العميل يشتكي أو غاضباً، أو يطلب سعراً خاصاً أو خصماً، أو سأل عن شيء غير موجود في السياق: اكتب رداً لطيفاً قصيراً مثل «استلمنا طلبك وأحد زملائي يتواصل معك قريباً» واجعل needs_staff = true.",
   "- أسئلة السياسات (الإلغاء، الاسترجاع، الدفع، التعديل): أجب من «سياسات الشركة» إن وُجدت فيه، وإلا فهي للموظفين: needs_staff = true.",
   "- طلب رحلة جديد ليس سبباً لتحويله للموظف: رحّب واسأل في الرسالة نفسها عمّا ينقص فقط من: الوجهة، تواريخ السفر، عدد البالغين والأطفال، ولا تعد بسعر؛ needs_staff = false. وإن كان في السياق عرض جاهز مطابق فاذكره باختصار. وإذا ذكر العميل الثلاثة كلها فقل إن زميلك يجهّز له العرض ويتواصل معه، واجعل needs_staff = true.",
@@ -319,7 +320,7 @@ export const MURAD_SYSTEM_PROMPT = [
   "- intake: ما ذكره العميل حتى الآن: الوجهة، التواريخ، عدد البالغين، عدد الأطفال (نص فارغ لما لم يذكره).",
 ].join("\n");
 
-export type MuradMessage = { who: "client" | "staff" | "murad" | "template"; at: number; text: string };
+export type MuradMessage = { who: "client" | "staff" | "murad" | "template" | "note"; at: number; text: string };
 
 export type MuradFile = {
   serial: string;
@@ -356,7 +357,7 @@ export type MuradContext = {
   policies: string;
 };
 
-const WHO: Record<MuradMessage["who"], string> = { client: "العميل", staff: "الموظف", murad: "مُراد", template: "رسالة قالب من الشركة" };
+const WHO: Record<MuradMessage["who"], string> = { client: "العميل", staff: "الموظف", murad: "مُراد", template: "رسالة قالب من الشركة", note: "ملاحظة داخلية من الموظف (لا يراها العميل)" };
 
 const riyadhClock = (sec: number) =>
   new Date(sec * 1000).toLocaleString("en-GB", { timeZone: "Asia/Riyadh", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });

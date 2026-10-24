@@ -301,11 +301,13 @@ async function buildContext(service: SupabaseClient, c: OpenConversation, thread
     now: new Date().toLocaleString("en-GB", { timeZone: "Asia/Riyadh", weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }),
     // Teletel names an unnamed contact by its number (or «#id»): that is not a name to greet
     contact: { name: [thread.name, c.name].find((n) => n && !/\d{6}|^#/.test(n)) ?? "", labels: thread.labels },
-    // private notes stay out: they are staff talk, and may name a cost
+    // staff private notes come along, marked «ملاحظة داخلية» («يأخذها مراد بعين الاعتبار», the owner,
+    // 2026-10-24) — the system rules forbid repeating anything from them to the client; Murad's own
+    // notes (💡) stay out so he does not echo himself
     messages: thread.messages
-      .filter((m) => !m.isPrivate)
+      .filter((m) => !m.isPrivate || !m.text.startsWith("💡"))
       .slice(-15)
-      .map((m) => ({ who: m.fromClient ? "client" : muradIds.has(m.id) ? "murad" : m.template ? "template" : "staff", at: m.at, text: m.text })),
+      .map((m) => ({ who: m.isPrivate ? "note" : m.fromClient ? "client" : muradIds.has(m.id) ? "murad" : m.template ? "template" : "staff", at: m.at, text: m.text })),
     files,
     readyOffers: await readyOffersFor(service, destinations),
     policies,

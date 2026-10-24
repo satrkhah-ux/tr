@@ -8,7 +8,7 @@ import { followupDb, followupPeople, followupRows } from "./service";
 import { FOLLOWUP_SETTINGS_KEY, isOfferRow, offerLine, parseFollowupSettings, readable, STEP_TEMPLATE, TWO_HOUR_WINDOW_MS, WORK_COLS, type RawThreadMsg, type WorkRow } from "./rules";
 import { parseSummary, renderThread, SUMMARY_SCHEMA, SUMMARY_VERSION, SUMMARY_SYSTEM, summaryPrompt, toSummaryMsg, unheardAfterUs, type FollowupSummary, type SummaryMsg } from "./summary-core";
 
-/** The thread's last two pages (forty messages), oldest first, without notes. */
+/** The thread's last two pages (forty messages), oldest first — staff private notes included, marked. */
 async function readMessages(conversationId: number): Promise<SummaryMsg[] | null> {
   const latest = await teletelGet<{ payload?: RawThreadMsg[] }>(`/conversations/${conversationId}/messages`);
   if (!latest) return null;
@@ -36,7 +36,8 @@ export async function summarize(row: WorkRow, seen = Math.floor(Date.now() / 100
   const windowOpen = now - lastClient * 1000 < 24 * 3600_000;
   const tpl = row.source !== "visa" && row.step !== null && !row.client_waiting ? STEP_TEMPLATE[row.step] : undefined;
   const templateReady = Boolean(tpl && status?.get(WA_TEMPLATES[tpl.key].name) === "APPROVED");
-  const last = messages.at(-1);
+  // the card's «آخرها» and the waiting clock are about what the CLIENT sees — notes never count there
+  const last = messages.filter((m) => !m.note).at(-1);
   const prompt = summaryPrompt({
     client: row.contact_name ?? "", seller: people.find((p) => p.id === row.assigned_to)?.name ?? null,
     offerLine: row.offer_line, step: row.step, clientWaiting: row.client_waiting, visa: row.source === "visa", thread: renderThread(messages),

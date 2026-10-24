@@ -20,3 +20,12 @@ it("names a client's voice note after our last message as unheard", () => {
   expect(renderThread(msgs)).toContain("[رسالة صوتية لم تُسمع]");
   expect(unheardAfterUs([...msgs, { at: 30, text: "وصلت؟", fromClient: false, audio: false }])).toBe(false);
 });
+
+it("keeps staff private notes in the thread, marked, and drops Murad's own notes", () => {
+  const staff = toSummaryMsg({ id: 3, created_at: 30, message_type: 1, private: true, content: "اتصلت بالعميل ووضحت له البرنامج" });
+  expect(staff).toMatchObject({ note: true, fromClient: false });
+  expect(renderThread([staff!])).toContain("ملاحظة داخلية من الموظف");
+  expect(toSummaryMsg({ id: 4, created_at: 40, message_type: 1, private: true, content: "💡 مُراد — متابعة العرض بعد ساعتين" })).toBeNull();
+  // a note is not a message the client saw: it never answers his waiting voice note
+  expect(unheardAfterUs([{ at: 10, text: "", fromClient: true, audio: true }, staff!])).toBe(true);
+});
