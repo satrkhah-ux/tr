@@ -60,7 +60,7 @@ export function QuickFollowup({ rows, refresh, done }: { rows: WorkRow[]; refres
       <div className="flex items-start justify-between gap-2"><h2 className="text-xl font-extrabold">{r.contact_name || `عميل #${r.conversation_id}`}</h2><HeatChip heat={s?.heat} /></div>
       <p className="text-sm text-slate-600">{[r.destination ?? s?.destination, s?.people].filter(Boolean).join(" · ") || "وجهة غير معروفة"} · <StepLabel r={r} now={now} /></p>
       {r.client_waiting && <p className="rounded-xl bg-[#E8EEFD] p-2 text-sm font-bold text-[#1D4ED8]">العميل كتب آخر رسالة: {r.client_line ?? r.last_line}</p>}
-      {s ? <p className="rounded-xl bg-[#EEF5F1] p-3 text-sm"><b className="text-[#185045]">المقترح: {NEXT_LABEL[s.next]}</b> — {s.advice}</p> : <p className="text-sm text-slate-500">مُراد لم يقرأ المحادثة بعد.</p>}
+      {s ? <p className="rounded-xl bg-[#EEF5F1] p-3 text-sm"><span className="block text-slate-700">أراد: {s.wants}</span><b className="text-[#185045]">المقترح: {NEXT_LABEL[s.next]}</b> — {s.advice}</p> : <p className="text-sm text-slate-500">مُراد لم يقرأ المحادثة بعد.</p>}
       {s?.unheard && <p className="text-sm text-amber-900">🎤 رسالة صوتية لم تُسمع — استمع لها في Teletel أولًا.</p>}
       {writable === false ? <p className="rounded-xl bg-[#F4F6F3] p-3 text-sm">مرّت 24 ساعة على آخر رسالة من العميل ولا قالب معتمد لهذه الخطوة — اتصل به.</p>
         : detail && !detail.canReply ? <p className="rounded-xl bg-[#F4F6F3] p-3 text-sm">تُرسل كقالب «{detail.template?.label}» المعتمد.</p>

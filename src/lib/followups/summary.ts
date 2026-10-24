@@ -90,6 +90,13 @@ export async function summarizeDue(): Promise<{ made: number; noted: number }> {
     });
     const rank = (r: WorkRow) => (r.client_waiting ? 0 : r.next_followup_at && Date.parse(r.next_followup_at) <= now ? 1 : isOfferRow(r) ? 2 : r.source === "sla" ? 4 : 3);
     rows.sort((a, b) => rank(a) - rank(b));
+    // «المغلقة» carries Murad's reading too (the owner, 2026-10-25): a closed file never read, two a minute at most, after the open ones
+    if (rows.length < PER_RUN) {
+      // taken from a window that moves each minute: one that cannot be read never holds up the rest
+      const k = Math.floor(now / 60_000) % 10;
+      const { data: closed } = await db.from("sla_followups").select(WORK_COLS).eq("status", "done").is("summary", null).order("done_at", { ascending: false }).range(k * 2, k * 2 + Math.min(2, PER_RUN - rows.length) - 1);
+      rows.push(...((closed ?? []) as WorkRow[]));
+    }
     const settings = parseFollowupSettings(setting?.value);
     const people = settings.murad === "note" ? await followupPeople() : [];
     let made = 0, noted = 0;
@@ -102,7 +109,7 @@ export async function summarizeDue(): Promise<{ made: number; noted: number }> {
       // the two-hour note only while it is news (the offer at most six hours old) and in working hours (09:00–23:00 Riyadh)
       const hour = new Date(now + 3 * 3600_000).getUTCHours();
       const fresh = row.offer_at && now - Date.parse(row.offer_at) <= TWO_HOUR_WINDOW_MS && hour >= 9 && hour < 23;
-      if (settings.murad === "note" && row.step === 0 && due && fresh && !row.client_waiting && !row.murad_note_at && summary.draft && seller) {
+      if (settings.murad === "note" && row.status === "open" && row.step === 0 && due && fresh && !row.client_waiting && !row.murad_note_at && summary.draft && seller) {
         const to = noteFor({ assignee: seller.name, assigneeId: seller.agentId, team: null });
         const posted = await addTeletelNote(row.conversation_id, [`💡 مُراد — متابعة العرض بعد ساعتين ${to}`.trim(), summary.advice, `رسالة مقترحة:\n${summary.draft}`, "أرسلها من «المتابعة» كما هي أو بعد تعديلها."].filter(Boolean).join("\n\n"));
         if (posted) {

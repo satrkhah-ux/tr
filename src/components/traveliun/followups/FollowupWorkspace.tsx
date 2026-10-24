@@ -87,6 +87,8 @@ export function FollowupWorkspace({ initial, initialId }: { initial: FollowupWor
     return <button key={r.id} onClick={() => setSelected(r.id)} className={`w-full rounded-2xl border p-3.5 text-right transition-opacity ${r.id === selected ? "border-[#185045] bg-[#EEF5F1]" : "border-[#E3E8E4] bg-white hover:bg-[#F8FAF8]"} ${faded ? "opacity-55" : ""}`}>
       <span className="flex items-start justify-between gap-2"><span className="font-extrabold text-[#12332c]">{r.contact_name || `عميل #${r.conversation_id}`}</span><HeatChip heat={s?.heat} /></span>
       <span className="mt-1 block truncate text-sm text-slate-700">{[r.destination ?? s?.destination, s?.people].filter(Boolean).join(" · ") || "وجهة غير معروفة"}</span>
+      {/* Murad's reading on every card, not only in the panel (the owner, 2026-10-25: «اريد ان يظهر المقترح على اي محادثة») */}
+      {s && <><span className="mt-0.5 block truncate text-sm text-slate-700">أراد: {s.wants}</span><span className="block truncate text-sm font-bold text-[#185045]">المقترح: {NEXT_LABEL[s.next]} — {s.advice}</span></>}
       <span className="mt-0.5 block truncate text-sm text-slate-600">{r.offer_line ?? "لم يُرسل عرض بعد"}</span>
       {line && <span className={`mt-1 block truncate text-xs ${r.client_waiting ? "font-bold text-[#1D4ED8]" : "text-slate-500"}`}>{byClient ? "آخر رسالة من العميل" : "آخر رسالة منا"}: {line}</span>}
       <span className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500"><StepLabel r={r} now={now} /><span>{name(r.assigned_to) ?? "بلا بائع"} · {since(r.offer_at ?? r.request_started_at, now)}</span></span>
