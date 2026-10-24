@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildHotelSupplier, type SupplierCallRecord } from "./hotel-supplier";
+import { buildHotelSupplier, tboCancellation, tboDate, type SupplierCallRecord } from "./hotel-supplier";
 
 /**
  * The booking path, against TBO's own documented answers.
@@ -49,9 +49,16 @@ const PREBOOK_OK = {
           BookingCode: "1345320!TB!3!TB!fresh-session",
           TotalFare: 164.65,
           IsRefundable: true,
-          CancelPolicies: [{ FromDate: "2026-09-01 00:00:00", CancellationCharge: 0 }],
+          // TBO's own shape (spec sample): free from the first tier, 100% from the second
+          CancelPolicies: [
+            { FromDate: "25-08-2026 00:00:00", ChargeType: "Fixed", CancellationCharge: 0 },
+            { FromDate: "01-09-2026 00:00:00", ChargeType: "Percentage", CancellationCharge: 100 },
+          ],
+          Supplements: [[{ Index: 1, Type: "AtProperty", Description: "mandatory_tax", Price: 20, Currency: "AED" }]],
         },
       ],
+      // on the hotel, as in TBO's PreBook samples
+      RateConditions: ["Early check out will attract full cancellation charge unless otherwise specified."],
     },
   ],
 };
@@ -68,7 +75,11 @@ describe("prebook", () => {
     // is the documented way to be rejected at the last step.
     expect(out.data.booking_code).toBe("1345320!TB!3!TB!fresh-session");
     expect(out.data.cancellation_deadline).toBe("2026-09-01");
+    expect(out.data.cancellation_policy).toBe("إلغاء مجاني قبل 2026-09-01 — من 2026-09-01 رسوم إلغاء 100%");
     expect(out.data.refundable).toBe(true);
+    expect(out.data.hotel_code).toBe("1345320");
+    expect(out.data.supplements).toEqual(["mandatory tax: 20 AED — يُدفع في الفندق"]);
+    expect(out.data.conditions).toHaveLength(1);
   });
 
   it("treats a 200 with no room as a REJECTION — the rate is gone, retrying will not bring it back", async () => {
@@ -219,7 +230,10 @@ describe("bookingDetail — the recovery path", () => {
       InvoiceNumber: "INV-1",
       CheckIn: "2026-09-10",
       CheckOut: "2026-09-14",
-      Rooms: [{ Currency: "USD", TotalFare: 164.65, CancelPolicies: [{ FromDate: "2026-09-01 00:00:00" }] }],
+      Rooms: [
+        { Currency: "USD", TotalFare: 164.65, CancelPolicies: [{ FromDate: "01-09-2026 00:00:00", ChargeType: "Percentage", CancellationCharge: 100 }] },
+        { Currency: "USD", TotalFare: 100, CancelPolicies: [] },
+      ],
     },
   };
 
@@ -286,5 +300,20 @@ describe("the call log", () => {
 
     expect(log[0].ok).toBe(false);
     expect(log[0].status_code).toBe(401);
+  });
+});
+
+describe("the cancellation terms, as TBO writes them", () => {
+  it("reads TBO's day-first dates", () => {
+    expect([tboDate("05-05-2022 00:00:00"), tboDate("2026-09-01T00:00:00"), tboDate("soon")]).toEqual(["2022-05-05", "2026-09-01", null]);
+  });
+  it("is free until the first charged tier, never «free until» a non-refundable rate's date", () => {
+    expect(tboCancellation([{ FromDate: "05-05-2022 00:00:00", ChargeType: "Fixed", CancellationCharge: 0 }, { FromDate: "12-05-2022 00:00:00", ChargeType: "Percentage", CancellationCharge: 100 }], true)).toEqual({ text: "إلغاء مجاني قبل 2022-05-12 — من 2022-05-12 رسوم إلغاء 100%", deadline: "2022-05-12" });
+    // a fixed fee is our cost: never in the words
+    expect(tboCancellation([{ FromDate: "05-05-2022 00:00:00", CancellationCharge: 0 }, { FromDate: "12-05-2022 00:00:00", ChargeType: "Fixed", CancellationCharge: 164.65 }], true).text).not.toContain("164");
+    // TBO's own non-refundable sample: one 100% tier
+    expect(tboCancellation([{ FromDate: "05-05-2022 00:00:00", ChargeType: "Percentage", CancellationCharge: 100 }], true).text.startsWith("غير قابل للإلغاء")).toBe(true);
+    expect(tboCancellation([], false)).toEqual({ text: "غير قابل للإلغاء", deadline: null });
+    expect(tboCancellation([{ FromDate: "05-05-2022 00:00:00", CancellationCharge: 0 }], true)).toEqual({ text: "إلغاء مجاني", deadline: null });
   });
 });

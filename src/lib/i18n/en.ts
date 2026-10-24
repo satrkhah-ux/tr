@@ -837,6 +837,8 @@ export const en = {
   "perm.operations.write.hint": "Bookings, requests to suppliers and issuing vouchers.",
   "perm.operations.passport": "Read passport data",
   "perm.operations.passport.hint": "Decrypt passport numbers and open scans. Every read is logged.",
+  "perm.operations.book": "Book at the supplier (TBO)",
+  "perm.operations.book.hint": "Book and cancel hotels at the supplier directly — spends the company's balance there. Price checks for whoever sees costs.",
   "perm.data.write": "Data section — view and edit",
   "perm.data.write.hint": "Hotels, countries, airports, transport, services, visas.",
   "perm.settings.manage": "System settings",

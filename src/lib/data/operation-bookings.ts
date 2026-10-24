@@ -487,6 +487,18 @@ export async function updateBooking(input: {
     if (Object.keys(patch).length === 0) return { ok: true };
 
     const supabase = await db();
+    // new dates, rooms or hotel: a supplier price checked for the old ones is void — «احجز» asks for a new check
+    if (input.start_date !== undefined || input.end_date !== undefined || input.detail !== undefined) {
+      const { data: was } = await supabase.from("operation_bookings").select("status, start_date, end_date, detail").eq("id", input.id).maybeSingle();
+      const w = was as { status: string; start_date: string | null; end_date: string | null; detail: Record<string, string> | null } | null;
+      const moved =
+        w &&
+        (w.status === "prebooked" || w.status === "failed") &&
+        ((input.start_date !== undefined && input.start_date !== w.start_date) ||
+          (input.end_date !== undefined && input.end_date !== w.end_date) ||
+          (input.detail !== undefined && (input.detail["عدد الغرف"] !== w.detail?.["عدد الغرف"] || input.detail.hotel_id !== w.detail?.hotel_id)));
+      if (moved && patch.status === undefined) Object.assign(patch, { status: "pending", supplier_booking_code: null, prebook_net: null, prebook_at: null });
+    }
     // a flight's legs time the receptions and drop-offs — keep the lines as they were before the edit
     const before = input.detail
       ? ((await supabase.from("operation_bookings").select("kind, title, operation_id, detail").eq("id", input.id).maybeSingle()).data as {
@@ -496,6 +508,9 @@ export async function updateBooking(input: {
           detail: Record<string, string> | null;
         } | null)
       : null;
+    // the supplier price check's currency (supplier-booking.ts) is ours, never the form's: carried over
+    const checkCurrency = before?.detail?.prebook_currency;
+    if (input.detail && checkCurrency && !input.detail.prebook_currency) patch.detail = { ...input.detail, prebook_currency: checkCurrency };
     const { error } = await supabase.from("operation_bookings").update(patch).eq("id", input.id);
     if (error) return { ok: false, error: "err.updateFailed" };
     if (before?.kind === "flight" && input.detail) {

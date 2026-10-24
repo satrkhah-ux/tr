@@ -207,6 +207,8 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "operations.own", kind: "do" },
       { key: "operations.manage_own", kind: "do", sensitive: true },
       { key: "operations.passport", kind: "view", sensitive: true },
+      // a booking at the supplier spends money: given by name, never with «تحديد الكل»
+      { key: "operations.book", kind: "do", sensitive: true },
     ],
   },
   {

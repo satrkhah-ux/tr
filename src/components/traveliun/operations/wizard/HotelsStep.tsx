@@ -20,6 +20,7 @@ import { AssignBooking } from "../AssignBooking";
 import { AddBooking } from "../DocumentsPanel";
 import { PullNotice, wzCard, wzField, wzPrimary, wzSecondary } from "./FlightsStep";
 import { IssueGuardNotice } from "../../IssueGuardNotice";
+import { SupplierBooking } from "../SupplierBooking";
 
 /** «الوصول → المغادرة» — on a narrow phone it breaks at the arrow, never inside a date */
 function Stay({ b }: { b: Pick<OperationBooking, "start_date" | "end_date"> }) {
@@ -100,6 +101,8 @@ export function HotelsStep({ data }: StepProps) {
               partnerId={data.operation.partner_id}
               overlaps={overlaps.get(b.id) ?? []}
               readsImages={data.readsImages ?? true}
+              tbo={(data.tboBookings ?? []).includes(b.id)}
+              canBook={data.canBook ?? false}
             />
           ))}
         </ul>
@@ -144,6 +147,8 @@ function HotelRow({
   partnerId,
   overlaps,
   readsImages,
+  tbo,
+  canBook,
 }: {
   booking: OperationBooking;
   done: boolean;
@@ -160,6 +165,9 @@ function HotelRow({
   /** the other hotels holding one of its nights (hotels.ts hotelOverlaps). */
   overlaps: Pick<OperationBooking, "title" | "start_date" | "end_date">[];
   readsImages: boolean;
+  /** its hotel was picked from TBO: it can be booked there (the owner, 2026-10-24) */
+  tbo: boolean;
+  canBook: boolean;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -268,6 +276,17 @@ function HotelRow({
       ) : null}
 
       {open ? <HotelEntry booking={booking} initial={done ? number : ""} readsImages={readsImages} onSaved={onSaved} onCancel={done ? onClose : undefined} /> : null}
+
+      {/* a hotel picked from TBO: booked there — or, while TBO's search is off, by hand and its number typed above */}
+      {tbo && (open || booking.status === "in_flight" || (booking.source === "api" && Boolean(booking.confirmation_number))) ? (
+        // what the rooms were searched for: new dates, rooms or hotel start the panel afresh
+        <SupplierBooking
+          key={`${booking.start_date}|${booking.end_date}|${booking.detail?.hotel_id ?? ""}|${booking.detail?.["عدد الغرف"] ?? ""}`}
+          booking={booking}
+          canBook={canBook}
+          onDone={() => router.refresh()}
+        />
+      ) : null}
 
       {options ? (
         <div className="mt-2 grid gap-2 rounded-[10px] bg-[#f6faf8] p-3 text-[11.5px] font-semibold text-[#557d78] animate-in fade-in slide-in-from-top-1">

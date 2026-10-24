@@ -77,6 +77,10 @@ export type WizardCase = {
   readsImages?: boolean;
   /** the offer's hotels as the catalogue knows them — what «أكمل بيانات الفندق» checks */
   offerHotels?: { hotel_id: string | null; hotel_name: string }[];
+  /** the hotel bookings whose hotel was picked from TBO (hotel_content_cache.internal_hotel_id) — booked there */
+  tboBookings?: string[];
+  /** operations.book: may commit a booking at the supplier */
+  canBook?: boolean;
 };
 
 /** What every step screen receives. `canManage`: the manager steps on THIS case (gateCaseManager). */

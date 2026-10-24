@@ -354,7 +354,8 @@ function RoleForm({
         </span>
         <button
           type="button"
-          onClick={() => setDraft({ ...draft, keys: new Set(PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i.key)).filter((k) => !lockedKey(k))) })}
+          // «الحجز من المورّد» spends money: given by name, never with «تحديد الكل»
+          onClick={() => setDraft({ ...draft, keys: new Set(PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i.key)).filter((k) => !lockedKey(k) && k !== "operations.book")) })}
           className="rounded-full border border-[#dbe6e1] px-3 py-1 text-[11.5px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
         >
           {t("team.pickAll")}

@@ -68,6 +68,7 @@ export const KIND_TITLE_EN: Record<VoucherKind, string> = {
   welcome_board: "Welcome Board",
 };
 const KEY_EN: Record<string, string> = {
+  "رقم تأكيد الفندق": "Hotel confirmation no.",
   "نوع الغرفة": "Room type",
   الغرفة: "Room",
   الإقامة: "Board",

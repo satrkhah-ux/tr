@@ -18,6 +18,8 @@ import { seedBookingsFromOffer } from "@/lib/data/operation-seed";
 import { offerBookingKinds } from "@/lib/data/offer-pull";
 import { isOpenAIConfigured } from "@/lib/providers/openai";
 import { getOcrProvider } from "@/lib/repackage/extract/ocr";
+import { currentCan } from "@/lib/roles/current";
+import { hotelIdOf } from "@/lib/operations/voucher-dto";
 import type { ReadinessItem, ReadyExceptions, WizardCase } from "@/lib/operations/wizard/types";
 
 /**
@@ -43,6 +45,20 @@ async function listOrPullBookings(operationId: string) {
   if (listed.length > 0) return listed;
   const pulled = await seedBookingsFromOffer(operationId);
   return pulled.ok && pulled.added > 0 ? listBookings(operationId) : listed;
+}
+
+/**
+ * Which hotel bookings TBO can book — their hotel was picked from TBO's list in /basic — and whether the caller may
+ * commit one (operations.book). The links are no secret, but where we buy is staff's: the case is already gated.
+ */
+async function tboOf(bookings: OperationBooking[]): Promise<Pick<WizardCase, "tboBookings" | "canBook">> {
+  const hotels = bookings.filter((b) => b.kind === "hotel").map((b) => ({ id: b.id, hotel: hotelIdOf(b.detail) })).filter((b) => b.hotel);
+  const canBook = await currentCan("operations.book");
+  if (!hotels.length) return { tboBookings: [], canBook };
+  const service = createSupabaseServiceClient() as unknown as SupabaseClient;
+  const { data } = await service.from("hotel_content_cache").select("internal_hotel_id").eq("supplier", "tbo").in("internal_hotel_id", [...new Set(hotels.map((h) => h.hotel!))]);
+  const linked = new Set(((data ?? []) as { internal_hotel_id: string }[]).map((r) => r.internal_hotel_id));
+  return { tboBookings: hotels.filter((h) => linked.has(h.hotel!)).map((h) => h.id), canBook };
 }
 
 /** null when the case is not the caller's to see, or does not exist. */
@@ -89,6 +105,7 @@ export async function loadWizardCase(operationId: string): Promise<WizardCase | 
     offerHotels: ((offerHotels.data ?? []) as { hotel_id: string | null; hotel_name: string | null }[]).map((h) => ({ hotel_id: h.hotel_id, hotel_name: h.hotel_name ?? "" })),
     // the readers upload-text.ts tries for a picture; without either, only text reads
     readsImages: isOpenAIConfigured() || getOcrProvider().isConfigured(),
+    ...(await tboOf(bookings)),
   };
   // a step that is done no longer waits on anyone
   const stale = staleWaits(data.waits, ownStates(data));

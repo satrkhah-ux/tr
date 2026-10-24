@@ -125,9 +125,17 @@ export type PrebookResult = {
   currency: string;
   refundable: boolean;
   cancellation_policy: string;
-  /** last moment a free cancellation is possible, ISO date, if any. */
+  /** the day the first cancellation charge starts (free before it), ISO date, if any. */
   cancellation_deadline: string | null;
   room_name: string;
+  /** the hotel this rate is for — checked against the booking's own before anything is committed */
+  hotel_code: string | null;
+  /** one name per room, in order */
+  rooms: string[];
+  /** what is paid at the hotel or included, as TBO words it — to be shown before booking (TBO's own rule) */
+  supplements: string[];
+  /** the rate's norms, FINAL at PreBook — to be shown before booking */
+  conditions: string[];
 };
 
 export type BookGuest = {
@@ -733,19 +741,25 @@ class TboHotelSupplier implements HotelSupplier {
       return { kind: "rejected", code: out.data.Status?.Code ?? null, message: "لم يعد هذا السعر متاحاً لدى المورّد." };
     }
 
-    const policy = (room.CancelPolicies ?? [])[0];
+    const refundable = room.IsRefundable === true;
+    const terms = tboCancellation(room.CancelPolicies, refundable);
     return {
       kind: "ok",
       data: {
         // TBO re-issues the code on PreBook; Book must use THIS one, not the
         // search's, or it books against a stale session.
         booking_code: room.BookingCode ?? bookingCode,
-        total_fare: Number(room.TotalFare.toFixed(2)),
+        // as TBO sent it — Book must send back exactly this figure
+        total_fare: room.TotalFare,
         currency: hotel.Currency ?? "USD",
-        refundable: room.IsRefundable === true,
-        cancellation_policy: policy?.FromDate ? `إلغاء مجاني حتى ${policy.FromDate}` : "غير قابل للإلغاء",
-        cancellation_deadline: policy?.FromDate ? policy.FromDate.slice(0, 10) : null,
+        refundable,
+        cancellation_policy: terms.text,
+        cancellation_deadline: terms.deadline,
         room_name: (room.Name ?? []).join(" + ") || "Room",
+        hotel_code: hotel.HotelCode ? String(hotel.HotelCode) : null,
+        rooms: room.Name ?? [],
+        supplements: tboSupplements(room),
+        conditions: tboConditions(hotel.RateConditions ?? room.RateConditions),
       },
     };
   }
@@ -804,7 +818,8 @@ class TboHotelSupplier implements HotelSupplier {
     if (!d) return { kind: "rejected", code: out.data.Status?.Code ?? null, message: "لا يوجد حجز بهذا المرجع لدى المورّد." };
 
     const room = (d.Rooms ?? [])[0];
-    const policy = (room?.CancelPolicies ?? [])[0];
+    const terms = tboCancellation(room?.CancelPolicies, room?.IsRefundable !== false);
+    const fares = (d.Rooms ?? []).map((r) => r.TotalFare).filter((f): f is number => typeof f === "number");
     return {
       kind: "ok",
       data: {
@@ -816,10 +831,11 @@ class TboHotelSupplier implements HotelSupplier {
         invoice_number: d.InvoiceNumber ?? null,
         check_in: d.CheckIn ?? null,
         check_out: d.CheckOut ?? null,
-        total_fare: typeof room?.TotalFare === "number" ? room.TotalFare : null,
+        // a booking of several rooms is the sum of its rooms
+        total_fare: fares.length ? Math.round(fares.reduce((a, b) => a + b, 0) * 100) / 100 : null,
         currency: d.Rooms?.[0]?.Currency ?? null,
-        cancellation_policy: policy?.FromDate ? `إلغاء مجاني حتى ${policy.FromDate}` : null,
-        cancellation_deadline: policy?.FromDate ? policy.FromDate.slice(0, 10) : null,
+        cancellation_policy: room?.CancelPolicies?.length ? terms.text : null,
+        cancellation_deadline: terms.deadline,
         voucher: String(d.VoucherStatus ?? "").toLowerCase() === "voucher" || d.VoucherStatus === true,
       },
     };
@@ -845,6 +861,10 @@ class TboHotelSupplier implements HotelSupplier {
 
 // ---------- TBO response shapes (only the fields we consume) ----------
 
+type TboCancelPolicy = { Index?: string; FromDate?: string; ChargeType?: string; CancellationCharge?: number };
+
+type TboSupplement = { Index?: number; Type?: string; Description?: string; Price?: number; Currency?: string };
+
 type TboRoom = {
   Name?: string[];
   BookingCode?: string;
@@ -852,16 +872,74 @@ type TboRoom = {
   TotalFare?: number;
   TotalTax?: number;
   RoomPromotion?: string[];
-  CancelPolicies?: { FromDate?: string; CancellationCharge?: number }[];
+  CancelPolicies?: TboCancelPolicy[];
   MealType?: string;
   IsRefundable?: boolean;
+  Supplements?: TboSupplement[][];
+  RateConditions?: string[];
 };
+
+/** TBO's «DD-MM-YYYY HH:mm:ss» (or an ISO date) → «YYYY-MM-DD»; null when unreadable. */
+export function tboDate(raw: string | null | undefined): string | null {
+  const s = (raw ?? "").trim();
+  const dmy = /^(\d{2})-(\d{2})-(\d{4})/.exec(s);
+  if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  return iso ? `${iso[1]}-${iso[2]}-${iso[3]}` : null;
+}
+
+/**
+ * The cancellation terms in words, read from the tiers: each tier says what is charged FROM its date. Free until
+ * the first tier that charges anything; non-refundable when nothing is free (TBO's own non-refundable sample is a
+ * single 100% tier — never «إلغاء مجاني حتى» its date).
+ */
+export function tboCancellation(policies: TboCancelPolicy[] | undefined, refundable: boolean): { text: string; deadline: string | null } {
+  const tiers = (policies ?? [])
+    .map((p) => ({ date: tboDate(p.FromDate), charge: Number(p.CancellationCharge ?? 0), kind: (p.ChargeType ?? "").toLowerCase() }))
+    .filter((p) => p.date)
+    .sort((a, b) => a.date!.localeCompare(b.date!));
+  const charged = tiers.find((p) => p.charge > 0);
+  // a percentage only: a fixed fee is what TBO charges US — the terms reach clients and staff who see no costs
+  const fee = charged && charged.kind.startsWith("percent") ? ` ${charged.charge}%` : "";
+  if (!refundable || (charged && tiers[0] === charged)) {
+    return { text: "غير قابل للإلغاء", deadline: charged?.date ?? null };
+  }
+  if (!charged) return { text: "إلغاء مجاني", deadline: null };
+  // charged FROM that day at 00:00: the last free day is the one before it
+  return { text: `إلغاء مجاني قبل ${charged.date} — من ${charged.date} رسوم إلغاء${fee}`, deadline: charged.date };
+}
+
+/** «mandatory_tax: 20 AED — يُدفع في الفندق» for every supplement of every room. */
+export function tboSupplements(room: TboRoom | undefined): string[] {
+  return (room?.Supplements ?? [])
+    .flat()
+    .filter((s) => s && (s.Description || s.Price))
+    .map((s) => `${(s.Description ?? "").replace(/_/g, " ").trim() || "supplement"}: ${s.Price ?? ""} ${s.Currency ?? ""} — ${String(s.Type).toLowerCase() === "atproperty" ? "يُدفع في الفندق" : "مشمول في السعر"}`.replace(/\s+/g, " "));
+}
+
+/** The rate's norms as plain lines (TBO sends them HTML-escaped). */
+function tboConditions(lines: string[] | undefined): string[] {
+  return (lines ?? [])
+    .map((c) =>
+      String(c)
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&amp;/g, "&")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
+    .filter(Boolean)
+    .map((c) => (c.length > 600 ? `${c.slice(0, 600)}…` : c));
+}
 
 type TboHotelResult = {
   HotelCode?: string;
   HotelName?: string;
   Currency?: string;
   Rooms?: TboRoom[];
+  /** the rate's norms — on the hotel in TBO's PreBook samples */
+  RateConditions?: string[];
 };
 
 /** A row of TBOHotelCodeList — static, and the only place a code has a name. */
@@ -955,7 +1033,8 @@ function numOrNull(v: unknown): number | null {
  * unknown label can never silently promise a customer meals we did not buy.
  */
 function toBoardType(raw: string | undefined): BoardType {
-  const s = (raw ?? "").toLowerCase();
+  // «Half_Board», «All_Inclusive_All_Meal» — TBO's own spellings
+  const s = (raw ?? "").toLowerCase().replace(/[_-]+/g, " ");
   if (s.includes("all inclusive") || s.includes("all-inclusive")) return "AI";
   if (s.includes("full board")) return "FB";
   if (s.includes("half board")) return "HB";
@@ -974,7 +1053,7 @@ function toRates(hotel: TboHotelResult, query: HotelSearchQuery): SupplierRate[]
   return (hotel.Rooms ?? [])
     .filter((r) => typeof r.TotalFare === "number")
     .map((r): SupplierRate => {
-      const policy = (r.CancelPolicies ?? [])[0];
+      const terms = tboCancellation(r.CancelPolicies, r.IsRefundable === true);
       return {
         supplier_id: "tbo",
         supplier_name: "TBO Holidays",
@@ -988,9 +1067,7 @@ function toRates(hotel: TboHotelResult, query: HotelSearchQuery): SupplierRate[]
         board_type: toBoardType(r.MealType ?? r.Inclusion),
         // absent means non-refundable: the safer assumption to quote against.
         refundable: r.IsRefundable === true,
-        cancellation_policy: policy?.FromDate
-          ? `إلغاء مجاني حتى ${policy.FromDate}`
-          : "غير قابل للإلغاء",
+        cancellation_policy: terms.text,
         inclusive: Number((r.TotalFare as number).toFixed(2)),
         currency,
         // TBO folds taxes into TotalFare and returns no separate line items.

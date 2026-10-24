@@ -835,6 +835,8 @@ export const ar: Dictionary = {
   "perm.operations.write.hint": "الحجوزات وطلبات الموردين وإصدار الفوتشرات.",
   "perm.operations.passport": "قراءة بيانات الجوازات",
   "perm.operations.passport.hint": "فكّ أرقام الجوازات وفتح الصور. كل اطلاع يُسجَّل.",
+  "perm.operations.book": "الحجز من المورّد (TBO)",
+  "perm.operations.book.hint": "حجز الفندق وإلغاؤه لدى المورّد مباشرة — يُصرف من رصيد الشركة عنده. التحقق من السعر لمن يرى التكاليف.",
   "perm.data.write": "قسم البيانات — عرض وتعديل",
   "perm.data.write.hint": "الفنادق والدول والمطارات والمواصلات والخدمات والتأشيرات.",
   "perm.settings.manage": "إعدادات النظام",

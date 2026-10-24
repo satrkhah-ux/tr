@@ -90,6 +90,8 @@ export function shownDetail(detail: Record<string, string> | null | undefined): 
   const rest = { ...(detail ?? {}) };
   delete rest[ROOM_SPEC_KEY];
   delete rest[HOTEL_ID_KEY];
+  // the supplier price check's currency (supplier-booking.ts) — ours, never a paper's
+  delete rest.prebook_currency;
   return rest;
 }
 
