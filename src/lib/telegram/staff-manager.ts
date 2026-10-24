@@ -83,7 +83,7 @@ export async function teamView(me: StaffMember): Promise<ScreenView> {
           callback_data: `e:${r.p.id}`,
         },
       ]),
-      [{ text: "🔄 تحديث", callback_data: "team" }, { text: "📄 الخطابات", callback_data: "lt" }],
+      [{ text: "🔄 تحديث", callback_data: "team" }, { text: "📄 الخطابات", callback_data: "lt" }, { text: "🎯 الأهداف", callback_data: "tg" }],
     ],
   };
 }

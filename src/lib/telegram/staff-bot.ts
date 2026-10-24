@@ -106,6 +106,7 @@ export async function registerStaffWebhook(token?: string): Promise<TgReply<bool
         { command: "unanswered", description: "بلا رد" },
         { command: "report", description: "أدائي اليوم" },
         { command: "week", description: "أدائي الأسبوع" },
+        { command: "goal", description: "هدفي هذا الشهر" },
         { command: "token", description: "الرد باسمي من هنا" },
         { command: "tone", description: "نغمة التنبيه" },
       ],

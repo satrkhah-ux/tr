@@ -7,6 +7,7 @@ import { buildReport } from "./staff-report";
 import { openFor, waitText } from "./staff-numbers";
 import { linkTeletelToken, promptReply, recentThread, rememberThread, sendReply, threadOf, TOKEN_HELP } from "./staff-replies";
 import { lettersView, resendLetter, signLetter, unsignedLetter } from "./staff-letters";
+import { targetView, teamTargetsView } from "./staff-target";
 import { openList, openScreen, screenView, unansweredList, weekView } from "./staff-screen";
 import { confirmDraft, draft, isBotManager, memberView, promptFor, remindDraft, takePending, teamView } from "./staff-manager";
 import { decisionStep, decisionsView, decisionText, decisionView, interventionView, promptDecision, setDecisionStatus, signalView } from "./staff-decisions";
@@ -49,6 +50,7 @@ const KEYS = {
   unanswered: "🆕 بلا رد",
   today: "📈 أدائي اليوم",
   week: "📅 أدائي الأسبوع",
+  goal: "🎯 هدفي",
   token: "🔑 الرد باسمي",
   tone: "🎵 النغمة",
   teletel: "🌐 تيلي تيل",
@@ -63,7 +65,7 @@ function keyboard(manager: boolean): Record<string, unknown> {
   const rows: string[][] = [
     [KEYS.screen, KEYS.waiting],
     [KEYS.open, KEYS.unanswered],
-    [KEYS.today, KEYS.week],
+    [KEYS.today, KEYS.week, KEYS.goal],
     [KEYS.token, KEYS.tone, KEYS.teletel],
   ];
   if (manager) rows.push([KEYS.urgent, KEYS.decisions], [KEYS.team, KEYS.broadcast]);
@@ -195,7 +197,8 @@ async function onKey(me: StaffMember, chatId: number, key: Key): Promise<void> {
   if (key === "urgent") return show(chatId, await interventionView(me));
   if (key === "decisions") return show(chatId, await decisionsView(me));
   if (key === "teletel") return show(chatId, teletelLink());
-  const data: Record<Exclude<Key, "screen" | "tone" | "broadcast" | "team" | "urgent" | "decisions" | "teletel">, string> = { waiting: "w", open: "o:0", unanswered: "u", today: "d", week: "wk", token: "k" };
+  if (key === "goal") return show(chatId, await targetView(me));
+  const data: Record<Exclude<Key, "screen" | "tone" | "broadcast" | "team" | "urgent" | "decisions" | "teletel" | "goal">, string> = { waiting: "w", open: "o:0", unanswered: "u", today: "d", week: "wk", token: "k" };
   return show(chatId, await screenFor(me, data[key]));
 }
 
@@ -208,6 +211,7 @@ const COMMANDS: Record<string, Key> = {
   "/unanswered": "unanswered",
   "/report": "today",
   "/week": "week",
+  "/goal": "goal",
   "/token": "token",
   "/tone": "tone",
   "/broadcast": "broadcast",
@@ -267,6 +271,8 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
     // «الخطاب الرسمي»: the employee's signature, and the managers' summary
     if (data.startsWith("ls:")) return signLetter(me, chatId, Number(data.slice(3)), at);
     if (data === "lt") return show(chatId, await lettersView(me), at);
+    // «🎯 هدفي»: the managers' targets of the whole team
+    if (data === "tg") return show(chatId, await teamTargetsView(me), at);
     await show(chatId, await screenFor(me, data), callback.message?.message_id);
     // a conversation's card can be answered with a Telegram «reply», like the client's own messages
     if (data.startsWith("c:") && callback.message) await rememberThread(chatId, callback.message.message_id, Number(data.slice(2)));
