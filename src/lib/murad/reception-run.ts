@@ -16,7 +16,6 @@ import {
   listTeletelTeams,
   markTeletelSeen,
   type OpenConversation,
-  sendTeletelAttachment,
   sendTeletelMessage,
   setTeletelTyping,
 } from "@/lib/providers/teletel";
@@ -24,7 +23,7 @@ import { asSystem } from "@/lib/supabase/system-actor";
 import { produceOfferFromDraft } from "@/lib/data/drafts";
 import { getTourPrograms } from "@/lib/data/tour-programs";
 import { offerMessage, pdfMissedNote } from "@/lib/data/client-whatsapp";
-import { clientOfferPdf } from "@/lib/offer-doc/client-pdf";
+import { sendProgrammePdf } from "@/lib/offer-doc/client-pdf";
 import { tidyWhatsapp } from "@/lib/operations/client-messages";
 import { logAudit } from "@/lib/data/audit";
 import { parseAssignment } from "@/lib/leads/auto";
@@ -245,14 +244,13 @@ async function issueAndSend(draftId: string, conversationId: number, updated = f
     if (linkId) ids.push(linkId);
     if (sent) {
       // Chromium takes seconds; the client has the link meanwhile
-      const bytes = await clientOfferPdf(serial).catch(() => null);
-      const pdfId = bytes ? await sendTeletelAttachment(conversationId, "📎 برنامج رحلتك", { name: message.pdfName, type: "application/pdf", bytes }) : null;
+      const pdfId = await sendProgrammePdf(conversationId, serial, message.pdfName);
       if (pdfId) ids.push(pdfId);
       // the text says the programme is attached and carries no link: a PDF that did not go is the colleague's to send
       else await addTeletelNote(conversationId, pdfMissedNote(serial)).catch(() => false);
       const { data: offer } = await db().from("offers").select("id").eq("serial", serial).maybeSingle();
       const offerId = (offer as { id: string } | null)?.id;
-      if (offerId) await logAudit({ action: "offer.client_sent", entity: "offers", entity_id: offerId, meta: { result: "sent", version, serial, by: "murad", pdf: Boolean(bytes) } });
+      if (offerId) await logAudit({ action: "offer.client_sent", entity: "offers", entity_id: offerId, meta: { result: "sent", version, serial, by: "murad", pdf: Boolean(pdfId) } });
     }
     return { serial, sent, pdf: ids.length > 1, version, ids };
   });

@@ -4,6 +4,7 @@ import { resolveDocBrand } from "@/lib/data/doc-brand";
 import { getPublishedClientOffer } from "@/lib/data/offers";
 import { renderOfferDocumentHtml } from "./html";
 import { offerDocumentToPdf } from "./pdf";
+import { sendTeletelAttachment } from "@/lib/providers/teletel";
 
 /**
  * The client's programme PDF — the latest PUBLISHED snapshot, as the public
@@ -39,4 +40,29 @@ export async function clientOfferPdf(serial: string): Promise<Uint8Array | null>
   // ponytail: oldest-first eviction at 20 entries (~15 MB); a real store if many issue at once
   while (cache.size > MAX) cache.delete(cache.keys().next().value as string);
   return bytes;
+}
+
+/**
+ * The programme PDF into the client's conversation — once more after 20 s when the render or the upload fails (the
+ * first send after a deploy missed it, 2026-10-24: AD-7-5934, 75 s after the container started). Each miss is said in
+ * the log; null after both, and the caller leaves the agent its note (pdfMissedNote).
+ */
+export async function sendProgrammePdf(conversationId: number, serial: string, name: string): Promise<number | null> {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    let reason: string;
+    try {
+      const bytes = await clientOfferPdf(serial);
+      if (!bytes) reason = "no published version";
+      else {
+        const id = await sendTeletelAttachment(conversationId, "📎 برنامج رحلتك", { name, type: "application/pdf", bytes });
+        if (id !== null) return id;
+        reason = "upload refused";
+      }
+    } catch (error) {
+      reason = `render: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    console.error(`[programme-pdf] ${serial} → ${conversationId}, try ${attempt}: ${reason}`);
+    if (attempt === 1) await new Promise((r) => setTimeout(r, 20_000));
+  }
+  return null;
 }

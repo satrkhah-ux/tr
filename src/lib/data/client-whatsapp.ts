@@ -8,13 +8,12 @@ import {
   addTeletelNote,
   clientThread,
   getTeletelConfig,
-  sendTeletelAttachment,
   sendTeletelMessage,
   sendTeletelTemplate,
   whatsappTemplateStatus,
 } from "@/lib/providers/teletel";
 import { programmeMessage, tidyWhatsapp, WA_TEMPLATES, waParams, waPreview, type WaTemplateKey } from "@/lib/operations/client-messages";
-import { clientOfferPdf } from "@/lib/offer-doc/client-pdf";
+import { clientOfferPdf, sendProgrammePdf } from "@/lib/offer-doc/client-pdf";
 
 /**
  * The client hears about their file on WhatsApp, through Teletel (the owner,
@@ -163,8 +162,7 @@ export async function messageClient(
       const conversationId = thread.conversationId;
       try {
         after(async () => {
-          const bytes = await clientOfferPdf(serial).catch(() => null);
-          const pdfId = bytes ? await sendTeletelAttachment(conversationId, "📎 برنامج رحلتك", { name, type: "application/pdf", bytes }).catch(() => null) : null;
+          const pdfId = await sendProgrammePdf(conversationId, serial, name);
           // the text says «في الملف المرفق» and carries no link (2026-10-22): a PDF that did not go is the agent's to send
           if (pdfId === null) await addTeletelNote(conversationId, pdfMissedNote(serial)).catch(() => false);
         });

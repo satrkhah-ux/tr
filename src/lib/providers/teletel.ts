@@ -138,10 +138,15 @@ export async function sendTeletelAttachment(
       signal: AbortSignal.timeout(30000),
       cache: "no-store",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // said in the log: a missed programme PDF is otherwise only a note with no reason (2026-10-24, AD-7-5934)
+      console.error(`[teletel] attachment to ${conversationId}: HTTP ${res.status}`);
+      return null;
+    }
     const body = (await res.json()) as { id?: number };
     return typeof body.id === "number" ? body.id : null;
-  } catch {
+  } catch (error) {
+    console.error(`[teletel] attachment to ${conversationId}: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }

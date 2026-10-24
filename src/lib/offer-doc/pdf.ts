@@ -116,6 +116,14 @@ export async function offerDocumentToPdf(html: string, footer?: FooterInfo): Pro
 }
 
 /**
+ * One throwaway print at server start (src/instrumentation.ts), so the first programme PDF after a deploy does not pay
+ * Chromium's cold start — on 2026-10-24 AD-7-5934 missed its PDF 75 s after the container started.
+ */
+export async function warmPdfEngine(): Promise<void> {
+  await offerDocumentToPdf("<!doctype html><html><body><p>ok</p></body></html>");
+}
+
+/**
  * The same printed sheet as a picture — what an employee drops into WhatsApp.
  * Same browser, same HTML as the PDF, so the image cannot drift from the paper;
  * only the first `.od-page` is captured, at twice the A4 pixel width.
