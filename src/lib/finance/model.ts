@@ -20,6 +20,8 @@ export type Staff = {
   id: string; name: string; job: string; team: string; place: string; salary: number; note: string;
   /** "YYYY-MM": the first month with no salary (service stopped); "" = staying */
   stopFrom: string;
+  /** "YYYY-MM": the first month paid (a salary that changed is two rows: the old one stops, the new one starts); "" = always */
+  startFrom: string;
 };
 export type DebtKind = "supplier" | "rent" | "salary" | "installment" | "other";
 export type DebtPayment = { id: string; date: string; amount: number; note: string };
@@ -56,10 +58,16 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 // `|| 0`: a sum that ends a hair below zero rounds to -0, which prints «-0»
 export const sar = (n: number) => `${(Math.round(n) || 0).toLocaleString("en-US")} ريال`;
 
-export function payrollByTeam(staff: Staff[]) {
+const ym = (y: number, m: number) => `${y}-${String(m).padStart(2, "0")}`;
+const thisMonth = () => { const d = new Date(); return ym(d.getFullYear(), d.getMonth() + 1); };
+/** is this salary paid in month `at` ("YYYY-MM")? */
+export const paidIn = (s: Staff, at: string) => (!s.startFrom || s.startFrom <= at) && (!s.stopFrom || at < s.stopFrom);
+
+/** every row (past and future ones too), each team's total counting only the salaries paid this month */
+export function payrollByTeam(staff: Staff[], at = thisMonth()) {
   const teams = new Map<string, Staff[]>();
   for (const s of staff) teams.set(s.team || "بلا فريق", [...(teams.get(s.team || "بلا فريق") ?? []), s]);
-  return [...teams].map(([team, people]) => ({ team, people, total: sum(people.map((p) => p.salary)) }));
+  return [...teams].map(([team, people]) => ({ team, people, total: sum(people.filter((p) => paidIn(p, at)).map((p) => p.salary)) }));
 }
 
 /** what this rent asks for in this month (1–12): a share of the year on its payment months, else 0 */
@@ -73,9 +81,8 @@ export const debtLeft = (d: Debt) => Math.max(0, d.amount - debtPaid(d));
 export type PlanMonth = { year: number; month: number; salaries: number; rents: { name: string; amount: number }[]; installments: number; total: number };
 
 /** the next `count` months from (year, month): salaries, the rents due, and the instalments while a debt lasts */
-const ym = (y: number, m: number) => `${y}-${String(m).padStart(2, "0")}`;
-/** salaries owed for that month: whoever has not stopped by then */
-export const salariesIn = (staff: Staff[], y: number, m: number) => sum(staff.filter((s) => !s.stopFrom || ym(y, m) < s.stopFrom).map((s) => s.salary));
+/** salaries owed for that month: whoever has started and not stopped by then */
+export const salariesIn = (staff: Staff[], y: number, m: number) => sum(staff.filter((s) => paidIn(s, ym(y, m))).map((s) => s.salary));
 
 export function monthPlan(book: FinanceBook, year: number, month: number, count = 12): PlanMonth[] {
   const left = book.debts.map((d) => (d.monthly > 0 ? debtLeft(d) : 0));
@@ -92,9 +99,10 @@ export function monthPlan(book: FinanceBook, year: number, month: number, count 
   return out;
 }
 
-export function summary(book: FinanceBook) {
-  const salaries = sum(book.staff.map((s) => s.salary));
-  const stopping = book.staff.filter((s) => s.stopFrom);
+export function summary(book: FinanceBook, at = thisMonth()) {
+  const paid = book.staff.filter((s) => paidIn(s, at));
+  const salaries = sum(paid.map((s) => s.salary));
+  const stopping = paid.filter((s) => s.stopFrom);
   const salariesAfter = salaries - sum(stopping.map((s) => s.salary));
   const rentsMonthly = sum(book.rents.map((r) => r.yearly / 12));
   const installments = sum(book.debts.map((d) => Math.min(d.monthly, debtLeft(d))));
@@ -148,7 +156,7 @@ const list = <T>(v: unknown, ok: (x: unknown) => x is T, max = 2000): v is T[] =
 const isRent = (r: unknown): r is Rent => rec(r) && id(r.id) && str(r.name) && money(r.yearly) && [1, 3, 6, 12].includes(r.every as number)
   && Number.isInteger(r.startMonth) && (r.startMonth as number) >= 1 && (r.startMonth as number) <= 12 && str(r.note, 1000);
 const isStaff = (s: unknown): s is Staff => rec(s) && id(s.id) && str(s.name) && str(s.job) && str(s.team) && str(s.place) && money(s.salary) && str(s.note, 1000)
-  && (s.stopFrom === undefined || s.stopFrom === "" || (str(s.stopFrom, 7) && /^\d{4}-(0[1-9]|1[0-2])$/.test(s.stopFrom)));
+  && [s.stopFrom, s.startFrom].every((v) => v === undefined || v === "" || (str(v, 7) && /^\d{4}-(0[1-9]|1[0-2])$/.test(v)));
 const isPayment = (p: unknown): p is DebtPayment => rec(p) && id(p.id) && str(p.date, 10) && /^\d{4}-\d{2}-\d{2}$/.test(p.date as string) && money(p.amount) && str(p.note, 1000);
 const isBooking = (b: unknown): b is Booking => rec(b) && id(b.id) && str(b.date, 10) && /^\d{4}-\d{2}-\d{2}$/.test(b.date as string)
   && str(b.title) && str(b.seller) && money(b.sale) && money(b.cost) && str(b.note, 1000);
@@ -163,6 +171,6 @@ export function parseBook(v: unknown): FinanceBook | null {
   const bookings = v.bookings ?? [], partners = v.partners ?? [], expenses = v.expenses ?? [], reservePct = v.reservePct ?? 20, out = v.treasuryOut ?? [];
   if (!list(bookings, isBooking, 20000) || !list(partners, isPartner, 20) || !list(expenses, isExpense, 20000) || !list(out, isExpense, 20000)
     || typeof reservePct !== "number" || reservePct < 0 || reservePct > 100) return null;
-  // books saved before «يتوقف من» existed carry no stopFrom
-  return { rents: v.rents, staff: v.staff.map((s) => ({ ...s, stopFrom: s.stopFrom ?? "" })), debts: v.debts, bookings, partners, expenses, treasuryOut: out, reservePct, updatedAt: v.updatedAt };
+  // books saved before «يتوقف من» / «يبدأ من» existed carry no stopFrom / startFrom
+  return { rents: v.rents, staff: v.staff.map((s) => ({ ...s, stopFrom: s.stopFrom ?? "", startFrom: s.startFrom ?? "" })), debts: v.debts, bookings, partners, expenses, treasuryOut: out, reservePct, updatedAt: v.updatedAt };
 }

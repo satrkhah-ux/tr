@@ -104,7 +104,7 @@ function StaffTab({ book, set }: Edit) {
   const teams = payrollByTeam(book.staff);
   const teamNames = teams.map((t) => t.team);
   const patch = (id: string, p: Partial<Staff>) => set((b) => ({ ...b, staff: upd(b.staff, id, p) }));
-  const add = (team: string) => set((b) => ({ ...b, staff: [...b.staff, { id: uid(), name: "", job: "", team, place: "", salary: 0, note: "", stopFrom: "" }] }));
+  const add = (team: string) => set((b) => ({ ...b, staff: [...b.staff, { id: uid(), name: "", job: "", team, place: "", salary: 0, note: "", stopFrom: "", startFrom: "" }] }));
   const pickTeam = (s: Staff, v: string) => {
     if (v !== "__new") return patch(s.id, { team: v });
     const name = window.prompt("اسم الفريق الجديد")?.trim();
@@ -114,8 +114,8 @@ function StaffTab({ book, set }: Edit) {
     <button onClick={() => add(teamNames[0] ?? "")} className="min-h-10 rounded-lg border border-[#185045] px-4 text-sm font-bold text-[#185045]">+ أضف موظفاً</button>
     {teams.map((t) => <section key={t.team} className={card}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">{t.team} <span className="text-sm font-normal text-[#5b6b66]">· {t.people.length}</span></h2><strong className="text-[#185045]">{sar(t.total)} شهرياً</strong></div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[860px] text-sm">
-        <thead><tr><th className={th}>الاسم</th><th className={th}>الوظيفة</th><th className={th}>الفريق</th><th className={th}>المكان</th><th className={th}>الراتب الشهري</th><th className={th}>يتوقف من</th><th className={th}>ملاحظة</th><th className={th} /></tr></thead>
+      <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-sm">
+        <thead><tr><th className={th}>الاسم</th><th className={th}>الوظيفة</th><th className={th}>الفريق</th><th className={th}>المكان</th><th className={th}>الراتب الشهري</th><th className={th}>يبدأ من</th><th className={th}>يتوقف من</th><th className={th}>ملاحظة</th><th className={th} /></tr></thead>
         <tbody>{t.people.map((s) => <tr key={s.id} className={s.stopFrom ? "bg-[#fbf4f0]" : ""}>
           <td className={td}><input aria-label="الاسم" value={s.name} onChange={(e) => patch(s.id, { name: e.target.value })} className={`${field} min-w-36`} /></td>
           <td className={td}><input aria-label="الوظيفة" value={s.job} onChange={(e) => patch(s.id, { job: e.target.value })} className={field} /></td>
@@ -123,6 +123,7 @@ function StaffTab({ book, set }: Edit) {
             {[...new Set([...teamNames, s.team])].map((n) => <option key={n} value={n}>{n || "بلا فريق"}</option>)}<option value="__new">+ فريق جديد…</option></select></td>
           <td className={td}><input aria-label="المكان" value={s.place} onChange={(e) => patch(s.id, { place: e.target.value })} className={field} /></td>
           <td className={td}><input aria-label="الراتب" type="number" min={0} inputMode="decimal" value={s.salary || ""} placeholder="0" onChange={(e) => patch(s.id, { salary: num(e.target.value) })} className={`${field} w-28`} /></td>
+          <td className={td}><input aria-label="يبدأ من" type="month" value={s.startFrom} onChange={(e) => patch(s.id, { startFrom: e.target.value })} className={`${field} w-36`} /></td>
           <td className={td}><input aria-label="يتوقف من" type="month" value={s.stopFrom} onChange={(e) => patch(s.id, { stopFrom: e.target.value })} className={`${field} w-36`} /></td>
           <td className={td}><input aria-label="ملاحظة" value={s.note} onChange={(e) => patch(s.id, { note: e.target.value })} className={field} /></td>
           <td className={td}><button onClick={() => confirm(`حذف «${s.name || "موظف"}» من الرواتب؟`) && set((b) => ({ ...b, staff: b.staff.filter((x) => x.id !== s.id) }))} className="min-h-9 rounded-lg px-2 text-sm text-[#9a3412] hover:bg-[#fbf4f0]">حذف</button></td>

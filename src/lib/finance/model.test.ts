@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breakEven, monthPlan, parseBook, payrollByTeam, quarter, rentDue, summary, treasury, type FinanceBook } from "./model";
+import { breakEven, monthPlan, parseBook, payrollByTeam, quarter, rentDue, salariesIn, summary, treasury, type FinanceBook } from "./model";
 
 const book: FinanceBook = {
   updatedAt: "",
@@ -14,9 +14,9 @@ const book: FinanceBook = {
   ],
   rents: [{ id: "r", name: "مكتب", yearly: 40000, every: 3, startMonth: 10, note: "" }],
   staff: [
-    { id: "a", name: "أ", job: "", team: "المبيعات", place: "", salary: 3000, note: "", stopFrom: "" },
-    { id: "b", name: "ب", job: "", team: "المبيعات", place: "", salary: 2000, note: "", stopFrom: "2027-02" },
-    { id: "c", name: "ج", job: "", team: "المالية", place: "", salary: 1000, note: "", stopFrom: "" },
+    { id: "a", name: "أ", job: "", team: "المبيعات", place: "", salary: 3000, note: "", stopFrom: "", startFrom: "" },
+    { id: "b", name: "ب", job: "", team: "المبيعات", place: "", salary: 2000, note: "", stopFrom: "2027-02", startFrom: "" },
+    { id: "c", name: "ج", job: "", team: "المالية", place: "", salary: 1000, note: "", stopFrom: "", startFrom: "" },
   ],
   debts: [
     { id: "d", creditor: "سيارات", kind: "installment", amount: 5000, monthly: 2000, payments: [{ id: "p", date: "2026-10-01", amount: 1000, note: "" }], note: "" },
@@ -40,6 +40,16 @@ describe("finance book", () => {
   it("sums what is left", () => {
     const s = summary(book);
     expect([s.salaries, s.debtLeft, s.debtPaid, s.installments]).toEqual([6000, 11000, 1000, 2000]);
+  });
+  it("pays a changed salary as two rows: the old one until it stops, the new one from its start", () => {
+    const changed = { ...book, staff: [
+      { id: "o", name: "د", job: "", team: "الشركاء", place: "", salary: 3000, note: "", startFrom: "2026-02", stopFrom: "2026-10" },
+      { id: "n", name: "د", job: "", team: "الشركاء", place: "", salary: 7500, note: "", startFrom: "2026-10", stopFrom: "" },
+    ] };
+    expect([1, 2, 9, 10, 11].map((m) => salariesIn(changed.staff, 2026, m))).toEqual([0, 3000, 3000, 7500, 7500]);
+    // today counts only what is paid now, so the old row is neither in the total nor «stopping»
+    expect(summary(changed, "2026-10")).toMatchObject({ salaries: 7500, stopping: 0, salariesAfter: 7500 });
+    expect(payrollByTeam(changed.staff, "2026-10")[0].total).toBe(7500);
   });
   it("sends 20% of each booking's profit to the treasury, never of a loss", () => {
     expect(treasury(book)).toBe(2000 + 0 + 1600);
