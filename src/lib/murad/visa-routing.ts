@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addTeletelNote, conversationEvents, listOpenConversations, listTeletelTeams, teletelGet } from "@/lib/providers/teletel";
+import { presenceOnlineAgentIds } from "@/lib/routing/presence";
 import { chooseVisaAgent, type VisaAgent, type MuradReceipt } from "./visa-assignment";
 import { currentAssignment } from "@/lib/leads/assignment";
 import { onList } from "./control";
@@ -15,8 +16,13 @@ import { readControl } from "./control-store";
 export async function onlineTeamAgent(teamId: number, inboxId: number | null, holderId: number | null, paused: number[] = []): Promise<VisaAgent | null | undefined> {
   const all = await teletelGet<VisaAgent[]>(`/teams/${teamId}/team_members`);
   if (!Array.isArray(all)) return undefined;
+  // «فاتح النظام = متصل» (the owner, 2026-10-24): a live session in our system makes
+  // the agent online here, even when they set «غير متصل» in Teletel
+  const inSystem = await presenceOnlineAgentIds();
   // «لا ترسل لفلان» (murad_control.paused): never chosen, even when online
-  const members = all.filter((a) => !paused.includes(a.id));
+  const members = all
+    .filter((a) => !paused.includes(a.id))
+    .map((a) => (inSystem.has(a.id) ? { ...a, availability_status: "online" } : a));
   const open = await listOpenConversations();
   const workloads = new Map<number, number>();
   for (const c of open?.rows ?? []) if (c.assigneeId) workloads.set(c.assigneeId, (workloads.get(c.assigneeId) ?? 0) + 1);

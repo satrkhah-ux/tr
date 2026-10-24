@@ -16,6 +16,7 @@ import {
 import { DirectionProvider } from "@base-ui/react/direction-provider";
 import { Dialog as PaletteDialog } from "@base-ui/react/dialog";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { touchPresence } from "@/lib/data/metrics";
 import { cn } from "@/lib/utils";
 import { DirText } from "@/components/DirText";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -440,6 +441,15 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleNavGroups is a fresh array each render; the URL is the only thing that should re-run this
   }, [pathname]);
+
+  // «فاتح النظام = متصل» (the owner, 2026-10-24): ANY open page beats presence,
+  // not just the dashboard — the beat is what counts someone online for the
+  // screens and for routing, whatever they set in Teletel.
+  useEffect(() => {
+    void touchPresence();
+    const id = window.setInterval(() => void touchPresence(), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

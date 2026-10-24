@@ -6,6 +6,7 @@ import { MURAD_CONTROL_KEY, onList, parseControl } from "@/lib/murad/control";
 import { handOver } from "@/lib/murad/handover";
 import { logAudit } from "@/lib/data/audit";
 import { isOrphan, parseShared, pickSeller, type Seller, type SellerLoad } from "./shared";
+import { presenceOnlineAgentIds } from "./presence";
 
 /**
  * «لا طلب بلا صاحب» — the minute sweep (api/murad/run). A client waiting on a shared Teletel login
@@ -37,15 +38,17 @@ export async function sweepSharedAccounts(): Promise<Record<string, unknown>> {
   if (due.length === 0) return { mode: s.mode, due: 0 };
 
   // the sellers: «قسم المبيعات» members who are someone in our system, not paused, not a shared login themselves
-  const [members, { data: emps }] = await Promise.all([
+  const [members, { data: emps }, inSystem] = await Promise.all([
     teamMembers(s.salesTeam),
     service.from("employees").select("teletel_agent_id").eq("status", "Active").not("teletel_agent_id", "is", null),
+    // «فاتح النظام = متصل»: a live session in our system counts as online, whatever Teletel says
+    presenceOnlineAgentIds(service),
   ]);
   const people = new Set(((emps ?? []) as { teletel_agent_id: number }[]).map((e) => Number(e.teletel_agent_id)));
   const paused = new Set(control.paused ?? []);
   const sellers: Seller[] = members
     .filter((m) => people.has(m.id) && !paused.has(m.id) && !s.agents.includes(m.id))
-    .map((m) => ({ id: m.id, name: m.name, online: m.availability === "online" }));
+    .map((m) => ({ id: m.id, name: m.name, online: m.availability === "online" || inSystem.has(m.id) }));
   if (sellers.length === 0) return { mode: s.mode, due: due.length, sellers: 0 };
 
   const load = new Map<number, SellerLoad>();

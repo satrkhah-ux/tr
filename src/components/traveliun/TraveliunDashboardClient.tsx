@@ -37,7 +37,6 @@ import { useCanOpen } from "@/lib/roles/useCanOpen";
 import {
   getAdminMetrics,
   searchEmployees,
-  touchPresence,
   type AdminMetrics,
   type EmployeeOption,
 } from "@/lib/data/metrics";
@@ -58,13 +57,7 @@ export function TraveliunDashboardClient({ opsSummary, mine, latest = null }: { 
   const { dashboardView } = useRole();
   const { t, dir } = useTraveliunUI();
 
-  // Heartbeat so online-now / active-today reflect this real session.
-  useEffect(() => {
-    void touchPresence();
-    const id = window.setInterval(() => void touchPresence(), 30_000);
-    return () => window.clearInterval(id);
-  }, []);
-
+  // The presence heartbeat lives in TraveliunShell now: any open page counts.
   return (
     <TraveliunShell title="nav.dashboard">
       <div className="tv-fade-up" dir={dir}>

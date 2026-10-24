@@ -17,6 +17,7 @@ import { parseHours } from "@/lib/murad/reception";
 import { SETTING } from "@/lib/murad/core";
 import type { Place, Stage } from "@/lib/leads/auto";
 import { buildScreen, dayStartMs, normalizeManagerThresholds, type AgentFact, type ClosureFact, type ExternalTripFact, type ManagerFacts, type ManagerSnapshot } from "./rules";
+import { presenceOnlineAgentIds } from "@/lib/routing/presence";
 
 export type { ManagerScreenFeed, ManagerSnapshot } from "./rules";
 
@@ -83,14 +84,14 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
   const evening = riyadhParts(now).time >= DAY_END;
   const service = db();
 
-  const [settings, leads, open, agentsRaw, employees, audit, offers, confirms, files, adRows, adLatest, murad, integrations, places, ops, eye, closures, trips] =
+  const [settings, leads, open, agentsRaw, employees, audit, offers, confirms, files, adRows, adLatest, murad, integrations, places, ops, eye, closures, trips, inSystem] =
     await Promise.all([
       service.from("app_settings").select("key, value").in("key", ["manager_screen", "pkg_backup", SETTING.receptionHours]),
       allRows<LeadRow>((a, b) => service.from("client_leads").select(LEAD_COLS).or(`created_at.gte.${since},last_visit_at.gte.${since}`).order("id").range(a, b)),
       // the SLA board's clocks, from the list the leads pull keeps warm (cached; a cold process waits ~10 s once)
       listOpenConversations(),
       // each agent's status now — Teletel keeps no history of it (8 s, the client's own limit)
-      teletelGet<{ name?: string | null; availability_status?: string | null }[]>("/agents"),
+      teletelGet<{ id?: number; name?: string | null; availability_status?: string | null }[]>("/agents"),
       service.from("employees").select("id, arabic_name"),
       allRows((a, b) => service.from("audit_logs").select("action, actor_id, entity_id, created_at, meta").gte("created_at", since).order("created_at").order("id").range(a, b)),
       // the staff's offers — the partners' portal is a test bed today
@@ -110,6 +111,8 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
       service.from("conversation_closures").select("closed_at, closed_by_kind, reopened_at, reopen_action, travel_until").or(`closed_at.gte.${since},reopened_at.gte.${since}`).limit(2000),
       // confirmed trips from outside the system leaving today or tomorrow — no phone read
       service.from("external_trips").select("travel_start, destination, status").gte("travel_start", day).lte("travel_start", new Date(Date.parse(`${day}T12:00:00Z`) + DAY_MS).toISOString().slice(0, 10)),
+      // «فاتح النظام = متصل»: live sessions in our system, shown online whatever Teletel says
+      presenceOnlineAgentIds(service),
     ]);
 
   const setting = new Map(rows<{ key: string; value: string | null }>(settings).map((s) => [s.key, s.value]));
@@ -117,7 +120,10 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
   const agents: AgentFact[] | null = Array.isArray(agentsRaw)
     ? agentsRaw
         .filter((a) => a.name?.trim())
-        .map((a) => ({ name: a.name!.trim(), status: (PRESENCE.has(a.availability_status ?? "") ? a.availability_status : "offline") as AgentFact["status"] }))
+        .map((a) => {
+          const status = typeof a.id === "number" && inSystem.has(a.id) ? "online" : PRESENCE.has(a.availability_status ?? "") ? a.availability_status : "offline";
+          return { name: a.name!.trim(), status: status as AgentFact["status"] };
+        })
     : null;
   const nowSec = Math.floor(now / 1000);
 
