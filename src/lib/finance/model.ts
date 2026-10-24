@@ -38,11 +38,24 @@ export type Booking = { id: string; date: string; title: string; seller: string;
 export type Partner = { id: string; name: string; share: number };
 /** any other cost (ads, bills, fees, an end-of-service settlement): deducted in its quarter before the partners' split */
 export type Expense = { id: string; date: string; title: string; amount: number; note: string };
+/** «الخطة القادمة»: one month's targets and what to do (the owner, 2026-10-24: «ارسم لي خطة نوفمبر وديسمبر … واجعلها في النظام») */
+export type Target = {
+  id: string;
+  /** "YYYY-MM" */
+  month: string;
+  /** the month's targets: sales and the bookings' net profit, SAR */
+  sales: number; profit: number;
+  /** what the month sets aside for debts once its costs are paid */
+  debtBudget: number;
+  /** what to focus on and which debts to pay, one item a line */
+  focus: string; payments: string;
+};
 export type FinanceBook = {
   rents: Rent[]; staff: Staff[]; debts: Debt[];
   bookings: Booking[]; partners: Partner[]; expenses: Expense[];
   /** what was taken OUT of the treasury (a debt paid from it…) — the balance is what came in minus these */
   treasuryOut: Expense[];
+  targets: Target[];
   /** % of each booking's net profit that goes straight to the company treasury */
   reservePct: number;
   updatedAt: string;
@@ -146,6 +159,35 @@ export const treasury = (book: FinanceBook) => treasuryIn(book) - treasuryOut(bo
 /** the bookings' monthly net profit that covers this month's fixed costs after the treasury share */
 export const breakEven = (book: FinanceBook, y: number, m: number) => fixedCostIn(book, y, m) / (1 - book.reservePct / 100);
 
+// ── «الخطة القادمة»: a month's costs against its target, the pace so far, and what was done ──
+const monthOf = (date: string) => date.slice(0, 7);
+/** the bookings' net profit a month at the pace of the last 90 days before `month` (by days, so a half month counts as half) */
+export function recentPace(book: FinanceBook, month: string): { profit: number; sales: number } {
+  const start = new Date(`${month}-01T00:00:00Z`).getTime();
+  const from = start - 90 * 86400000;
+  const recent = book.bookings.filter((b) => { const t = new Date(`${b.date}T00:00:00Z`).getTime(); return t >= from && t < start; });
+  if (!recent.length) return { profit: 0, sales: 0 };
+  const days = (Math.max(...recent.map((b) => new Date(`${b.date}T00:00:00Z`).getTime())) - Math.min(...recent.map((b) => new Date(`${b.date}T00:00:00Z`).getTime()))) / 86400000 + 1;
+  const perMonth = 30.4 / days;
+  return { profit: sum(recent.map(bookingProfit)) * perMonth, sales: sum(recent.map((b) => b.sale)) * perMonth };
+}
+export function targetMonth(book: FinanceBook, t: Target) {
+  const [y, m] = t.month.split("-").map(Number);
+  const fixed = fixedCostIn(book, y, m);
+  const other = sum(book.expenses.filter((e) => monthOf(e.date) === t.month).map((e) => e.amount));
+  const done = book.bookings.filter((b) => monthOf(b.date) === t.month);
+  const pace = recentPace(book, t.month);
+  return {
+    fixed, other, pace,
+    /** the profit that only covers the month: fixed costs and the other expenses logged in it */
+    cover: fixed + other,
+    /** left at the target for the debt budget and the treasury */
+    surplus: t.profit - fixed - other,
+    paceSurplus: pace.profit - fixed - other,
+    done: { count: done.length, sales: sum(done.map((b) => b.sale)), profit: sum(done.map(bookingProfit)) },
+  };
+}
+
 // ── the server's check of a saved book: everything it writes passes through here ──
 const str = (v: unknown, max = 200): v is string => typeof v === "string" && v.length <= max;
 const money = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1e9;
@@ -161,6 +203,8 @@ const isPayment = (p: unknown): p is DebtPayment => rec(p) && id(p.id) && str(p.
 const isBooking = (b: unknown): b is Booking => rec(b) && id(b.id) && str(b.date, 10) && /^\d{4}-\d{2}-\d{2}$/.test(b.date as string)
   && str(b.title) && str(b.seller) && money(b.sale) && money(b.cost) && str(b.note, 1000);
 const isExpense = (e: unknown): e is Expense => rec(e) && id(e.id) && str(e.date, 10) && /^\d{4}-\d{2}-\d{2}$/.test(e.date as string) && str(e.title) && money(e.amount) && str(e.note, 1000);
+const isTarget = (t: unknown): t is Target => rec(t) && id(t.id) && str(t.month, 7) && /^\d{4}-(0[1-9]|1[0-2])$/.test(t.month as string)
+  && money(t.sales) && money(t.profit) && money(t.debtBudget) && str(t.focus, 5000) && str(t.payments, 5000);
 const isPartner = (p: unknown): p is Partner => rec(p) && id(p.id) && str(p.name) && typeof p.share === "number" && p.share >= 0 && p.share <= 100;
 const isDebt = (d: unknown): d is Debt => rec(d) && id(d.id) && str(d.creditor) && typeof d.kind === "string" && d.kind in DEBT_KINDS
   && money(d.amount) && money(d.monthly) && list(d.payments, isPayment) && str(d.note, 1000);
@@ -168,9 +212,9 @@ const isDebt = (d: unknown): d is Debt => rec(d) && id(d.id) && str(d.creditor) 
 export function parseBook(v: unknown): FinanceBook | null {
   if (!rec(v) || !list(v.rents, isRent) || !list(v.staff, isStaff) || !list(v.debts, isDebt) || !str(v.updatedAt, 40)) return null;
   // books saved before the profits tab carry no bookings, partners or treasury share
-  const bookings = v.bookings ?? [], partners = v.partners ?? [], expenses = v.expenses ?? [], reservePct = v.reservePct ?? 20, out = v.treasuryOut ?? [];
-  if (!list(bookings, isBooking, 20000) || !list(partners, isPartner, 20) || !list(expenses, isExpense, 20000) || !list(out, isExpense, 20000)
+  const bookings = v.bookings ?? [], partners = v.partners ?? [], expenses = v.expenses ?? [], reservePct = v.reservePct ?? 20, out = v.treasuryOut ?? [], targets = v.targets ?? [];
+  if (!list(bookings, isBooking, 20000) || !list(partners, isPartner, 20) || !list(expenses, isExpense, 20000) || !list(out, isExpense, 20000) || !list(targets, isTarget, 120)
     || typeof reservePct !== "number" || reservePct < 0 || reservePct > 100) return null;
   // books saved before «يتوقف من» / «يبدأ من» existed carry no stopFrom / startFrom
-  return { rents: v.rents, staff: v.staff.map((s) => ({ ...s, stopFrom: s.stopFrom ?? "", startFrom: s.startFrom ?? "" })), debts: v.debts, bookings, partners, expenses, treasuryOut: out, reservePct, updatedAt: v.updatedAt };
+  return { rents: v.rents, staff: v.staff.map((s) => ({ ...s, stopFrom: s.stopFrom ?? "", startFrom: s.startFrom ?? "" })), debts: v.debts, bookings, partners, expenses, treasuryOut: out, targets, reservePct, updatedAt: v.updatedAt };
 }

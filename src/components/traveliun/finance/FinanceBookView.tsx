@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { saveFinance } from "@/lib/data/finance";
 import { arCount } from "@/lib/eye/anomalies";
 import {
-  DEBT_KINDS, EVERY, MONTHS, breakEven, bookingProfit, bookingReserve, debtLeft, debtPaid, monthPlan, payrollByTeam, quarter, rentDue, sar, summary, treasury, treasuryIn, treasuryOut,
-  type Booking, type Debt, type DebtKind, type Expense, type FinanceBook, type Partner, type Rent, type Staff,
+  DEBT_KINDS, EVERY, MONTHS, breakEven, bookingProfit, bookingReserve, debtLeft, debtPaid, monthPlan, payrollByTeam, quarter, rentDue, sar, summary, targetMonth, treasury, treasuryIn, treasuryOut,
+  type Booking, type Debt, type Target, type DebtKind, type Expense, type FinanceBook, type Partner, type Rent, type Staff,
 } from "@/lib/finance/model";
 
-type Tab = "summary" | "staff" | "rents" | "debts" | "profits";
+type Tab = "summary" | "plan" | "staff" | "rents" | "debts" | "profits";
 const field = "w-full min-w-0 rounded-lg border border-[#dbe6e1] bg-white px-2 py-1.5 text-sm";
 const card = "rounded-2xl border border-[#dbe6e1] bg-white p-4 sm:p-5";
 const th = "whitespace-nowrap px-2 py-2 text-right text-xs font-semibold text-[#5b6b66]";
@@ -43,7 +43,7 @@ export function FinanceBookView({ initial }: { initial: FinanceBook }) {
     } catch { setMessage("تعذّر الاتصال — لم يُحفظ شيء."); } finally { setBusy(false); }
   }
 
-  const tabs: [Tab, string][] = [["summary", "الملخص"], ["staff", `الرواتب (${book.staff.length})`], ["rents", `الإيجارات (${book.rents.length})`], ["debts", `الديون (${book.debts.length})`], ["profits", "الأرباح والشركاء"]];
+  const tabs: [Tab, string][] = [["summary", "الملخص"], ["plan", "الخطة القادمة"], ["staff", `الرواتب (${book.staff.length})`], ["rents", `الإيجارات (${book.rents.length})`], ["debts", `الديون (${book.debts.length})`], ["profits", "الأرباح والشركاء"]];
   return <div dir="rtl" className="min-w-0 space-y-4 text-[#10231f]">
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div><h1 className="text-2xl font-extrabold text-[#185045]">الحسابات المالية</h1>
@@ -56,6 +56,7 @@ export function FinanceBookView({ initial }: { initial: FinanceBook }) {
       <button onClick={() => void save()} disabled={busy || !dirty} className="min-h-10 rounded-lg bg-[#185045] px-5 text-sm font-bold text-white disabled:opacity-40">{busy ? "جارٍ الحفظ…" : "حفظ"}</button>
     </div>
     {tab === "summary" && <Summary book={book} />}
+    {tab === "plan" && <PlanTab book={book} set={set} />}
     {tab === "staff" && <StaffTab book={book} set={set} />}
     {tab === "rents" && <RentsTab book={book} set={set} />}
     {tab === "debts" && <DebtsTab book={book} set={set} />}
@@ -283,6 +284,47 @@ function ProfitsTab({ book, set }: Edit) {
       hint="كل مصروف غير الرواتب والإيجارات والأقساط: إعلانات، فواتير، رسوم حكومية، مستحقات نهاية خدمة… يُخصم في ربعه قبل قسمة الشركاء." add="+ أضف مصروفاً" />
     <MoneyLog title="مسحوبات الخزينة" items={book.treasuryOut} onChange={(treasuryOut) => set((b) => ({ ...b, treasuryOut }))}
       hint="ما يُصرف من الخزينة نفسها (سداد دين، طارئ…). لا يُخصم من أرباح الربع، بل من رصيد الخزينة فقط." add="+ أضف سحباً" />
+  </div>;
+}
+
+/** «الخطة القادمة»: each month's targets beside what it costs, the current pace and what is done so far */
+function PlanTab({ book, set }: Edit) {
+  const patch = (id: string, p: Partial<Target>) => set((b) => ({ ...b, targets: upd(b.targets, id, p) }));
+  const targets = [...book.targets].sort((a, b) => (a.month < b.month ? -1 : 1));
+  const addMonth = () => {
+    const last = targets.at(-1)?.month;
+    const d = new Date();
+    const [y, m] = last ? last.split("-").map(Number) : [d.getFullYear(), d.getMonth() + 1];
+    const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+    set((b) => ({ ...b, targets: [...b.targets, { id: uid(), month: next, sales: 0, profit: 0, debtBudget: 0, focus: "", payments: "" }] }));
+  };
+  return <div className="space-y-4">
+    <p className="text-sm text-[#5b6b66]">لكل شهر: الهدف، وما يكلّفه الشهر (الرواتب والإيجارات والأقساط والمصاريف المسجّلة فيه)، والمتوقع بمعدّل آخر 90 يوماً، وما تحقق من الحجوزات المسجّلة.</p>
+    {targets.map((t) => { const x = targetMonth(book, t); const [y, m] = t.month.split("-").map(Number);
+      const pct = t.profit > 0 ? Math.min(100, Math.round((100 * x.done.profit) / t.profit)) : 0;
+      const stat = (label: string, value: number, hint = "", bad = false) => <div className="rounded-xl bg-[#f6faf8] p-3"><p className="text-xs text-[#5b6b66]">{label}</p><p className={`mt-0.5 text-lg font-extrabold ${bad ? "text-[#9a3412]" : "text-[#185045]"}`}>{sar(value)}</p>{hint && <p className="text-[11px] text-[#5b6b66]">{hint}</p>}</div>;
+      return <section key={t.id} className={card}>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-extrabold text-[#185045]">{MONTHS[m - 1]} {y}</h2>
+          <button onClick={() => confirm(`حذف خطة ${MONTHS[m - 1]} ${y}؟`) && set((b) => ({ ...b, targets: b.targets.filter((k) => k.id !== t.id) }))} className="min-h-9 rounded-lg px-2 text-sm text-[#9a3412] hover:bg-[#fbf4f0]">حذف</button></div>
+        <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(160px,1fr))]">
+          {stat("ما يكلّفه الشهر", x.cover, `ثابت ${sar(x.fixed)}${x.other ? ` + مصاريف ${sar(x.other)}` : ""}`)}
+          {stat("المتوقع بالمعدّل الحالي", x.pace.profit, x.paceSurplus < 0 ? `ينقص ${sar(-x.paceSurplus)} عن التغطية` : `يفيض ${sar(x.paceSurplus)}`, x.paceSurplus < 0)}
+          {stat("الفائض عند تحقيق الهدف", x.surplus, "للسداد والخزينة", x.surplus < 0)}
+          {stat("تحقق حتى الآن", x.done.profit, `${x.done.count} حجز · ${pct}% من الهدف`)}
+        </div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#eef2f0]" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="ما تحقق من هدف الربح"><div className="h-full bg-[#185045]" style={{ width: `${pct}%` }} /></div>
+        <div className="mt-3 flex flex-wrap gap-3">
+          <label className="text-sm">هدف المبيعات<input type="number" min={0} inputMode="decimal" value={t.sales || ""} placeholder="0" onChange={(e) => patch(t.id, { sales: num(e.target.value) })} className={`${field} w-36`} /></label>
+          <label className="text-sm">هدف صافي الربح<input type="number" min={0} inputMode="decimal" value={t.profit || ""} placeholder="0" onChange={(e) => patch(t.id, { profit: num(e.target.value) })} className={`${field} w-36`} /></label>
+          <label className="text-sm">ميزانية السداد<input type="number" min={0} inputMode="decimal" value={t.debtBudget || ""} placeholder="0" onChange={(e) => patch(t.id, { debtBudget: num(e.target.value) })} className={`${field} w-36`} /></label>
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <label className="text-sm font-semibold">ماذا نركز (بند في كل سطر)<textarea value={t.focus} onChange={(e) => patch(t.id, { focus: e.target.value })} rows={9} className={`${field} mt-1 font-normal leading-7`} /></label>
+          <label className="text-sm font-semibold">خطة السداد (بند في كل سطر)<textarea value={t.payments} onChange={(e) => patch(t.id, { payments: e.target.value })} rows={9} className={`${field} mt-1 font-normal leading-7`} /></label>
+        </div>
+      </section>; })}
+    <button onClick={addMonth} className="min-h-10 rounded-lg border border-[#185045] px-4 text-sm font-bold text-[#185045]">+ أضف شهراً</button>
   </div>;
 }
 

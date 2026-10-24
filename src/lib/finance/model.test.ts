@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { breakEven, monthPlan, parseBook, payrollByTeam, quarter, rentDue, salariesIn, summary, treasury, type FinanceBook } from "./model";
+import { breakEven, monthPlan, parseBook, payrollByTeam, quarter, rentDue, salariesIn, summary, targetMonth, treasury, type FinanceBook } from "./model";
 
 const book: FinanceBook = {
   updatedAt: "",
   reservePct: 20,
   treasuryOut: [],
+  targets: [],
   expenses: [{ id: "x1", date: "2027-03-15", title: "إعلانات", amount: 3000, note: "" }],
   partners: [{ id: "n", name: "شريك أ", share: 50 }, { id: "a", name: "شريك ب", share: 30 }, { id: "k", name: "شريك ج", share: 20 }],
   bookings: [
@@ -51,6 +52,13 @@ describe("finance book", () => {
     expect(summary(changed, "2026-10")).toMatchObject({ salaries: 7500, stopping: 0, salariesAfter: 7500 });
     expect(payrollByTeam(changed.staff, "2026-10")[0].total).toBe(7500);
   });
+  it("sets a month's target against its costs, the recent pace and what is done", () => {
+    const t = { id: "t", month: "2027-01", sales: 0, profit: 20000, debtBudget: 0, focus: "", payments: "" };
+    const x = targetMonth({ ...book, targets: [t] }, t);
+    // January: salaries 6000 + the rent 10000 + the instalment 2000 (fixedCostIn counts it while the debt is open)
+    expect([x.fixed, x.other, x.cover, x.surplus]).toEqual([18000, 0, 18000, 2000]);
+    expect(x.done.count).toBe(book.bookings.filter((b) => b.date.startsWith("2027-01")).length);
+  });
   it("sends 20% of each booking's profit to the treasury, never of a loss", () => {
     expect(treasury(book)).toBe(2000 + 0 + 1600);
     // what is taken out of the treasury comes off its balance
@@ -71,7 +79,7 @@ describe("finance book", () => {
   it("reads a book saved before the profits tab", () => {
     const { bookings, partners, reservePct, expenses, ...old } = book;
     void bookings; void partners; void reservePct; void expenses;
-    expect(parseBook({ ...old, staff: old.staff.map(({ stopFrom, ...s }) => (void stopFrom, s)) })).toMatchObject({ bookings: [], partners: [], expenses: [], treasuryOut: [], reservePct: 20 });
+    expect(parseBook({ ...old, staff: old.staff.map(({ stopFrom, ...s }) => (void stopFrom, s)) })).toMatchObject({ bookings: [], partners: [], expenses: [], treasuryOut: [], targets: [], reservePct: 20 });
   });
   it("refuses a malformed book", () => {
     expect(parseBook(book)).not.toBeNull();

@@ -24,7 +24,7 @@ const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 const FINANCE_ACCOUNTS = ["admin@admin.com"];
 const allowed = async () => (await currentCan("developer.access"))
   || FINANCE_ACCOUNTS.includes((await getServerUser())?.email?.toLowerCase() ?? "");
-const EMPTY: FinanceBook = { rents: [], staff: [], debts: [], bookings: [], partners: [], expenses: [], treasuryOut: [], reservePct: 20, updatedAt: "" };
+const EMPTY: FinanceBook = { rents: [], staff: [], debts: [], bookings: [], partners: [], expenses: [], treasuryOut: [], targets: [], reservePct: 20, updatedAt: "" };
 const COOKIE = "fin_unlock";
 const MIN_LENGTH = 6;
 const scryptAsync = promisify(scrypt) as (pw: string, salt: Buffer, len: number) => Promise<Buffer>;
