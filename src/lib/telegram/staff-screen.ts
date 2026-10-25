@@ -7,6 +7,9 @@ import { DEFAULT_TARGETS, loadTargets, myNumbers, openFor, riyadhDayStart, secon
 import { teamAverages, type Team } from "./staff-report";
 import { rememberThread, replyButtons } from "./staff-replies";
 import type { InlineButton } from "./ops-bot";
+import { loadSettings } from "@/lib/mine/day";
+import { onlineAgents } from "@/lib/mine/remind";
+import { quiet, STOP_REMINDING_AT, waitLevelNow, waitLevels, type DaySettings } from "@/lib/mine/rank";
 
 /**
  * «🖥️ شاشتي» (the user, 2026-10-22: «يكون البوت كشاشة موظف يراقب اداءه
@@ -215,54 +218,56 @@ export async function weekView(me: StaffMember, nowMs = Date.now()): Promise<Scr
   };
 }
 
-/** 09:00–23:00 Riyadh, the reception's hours: a reminder at three in the morning helps nobody. */
-const WORK_HOURS = [9, 23] as const;
-const LEVELS = [
-  { level: 15, until: 60 },
-  { level: 60, until: 180 },
-] as const;
-
 /**
- * «⏰ ينتظر ردك»: a client waiting 15 minutes, and again at 60, during working
- * hours. A wait already past three hours is not news to anyone (it is on
- * «بانتظار ردي» and in the evening report), so it is not reminded. That is also
- * why the first run after a deploy cannot flood anyone with old waits.
+ * «⏰ ينتظر ردك»: a client waiting past the employee's own first minutes (15 unless
+ * they set otherwise in «متابعتي»), and once more after their repeat (45 more),
+ * outside their quiet hours (23:00–09:00 unless set), a hot client (Murad) at five
+ * minutes too — and nothing to anyone offline (the owner, 2026-10-25). A wait
+ * already past three hours is not news to anyone (it is on «بانتظار ردي» and in
+ * the evening report), so it is not reminded. That is also why the first run
+ * after a deploy cannot flood anyone with old waits.
  */
 export async function remindWaiting(nowMs = Date.now()): Promise<{ reminded: number } | null> {
-  const hour = new Date(nowMs + 3 * 3600_000).getUTCHours();
-  if (hour < WORK_HOURS[0] || hour >= WORK_HOURS[1]) return null;
   const list = await listOpenConversations();
   if (!list) return null;
   const nowSec = nowMs / 1000;
-  const due = list.rows
-    .filter((c) => c.assigneeId && c.waitingSince > 0)
-    .map((c) => ({ c, minutes: nowMinutes(c.waitingSince, nowSec) }))
-    .map(({ c, minutes }) => ({ c, minutes, step: LEVELS.find((l) => minutes >= l.level && minutes < l.until) }))
-    .filter((x): x is { c: OpenConversation; minutes: number; step: (typeof LEVELS)[number] } => Boolean(x.step));
-  if (!due.length) return { reminded: 0 };
+  const waiting = list.rows.filter((c) => c.assigneeId && c.waitingSince > 0 && nowMinutes(c.waitingSince, nowSec) < STOP_REMINDING_AT);
+  if (!waiting.length) return { reminded: 0 };
 
-  const agents = [...new Set(due.map((d) => d.c.assigneeId as number))];
-  const { data } = await db().from("employees").select("telegram_chat_id, teletel_agent_id").eq("status", "Active").in("teletel_agent_id", agents).not("telegram_chat_id", "is", null);
-  const chatOf = new Map(((data ?? []) as { telegram_chat_id: number | string; teletel_agent_id: number }[]).map((e) => [e.teletel_agent_id, Number(e.telegram_chat_id)]));
+  const agents = [...new Set(waiting.map((c) => c.assigneeId as number))];
+  const [{ data }, online, { data: hotRows }] = await Promise.all([
+    db().from("employees").select("id, telegram_chat_id, teletel_agent_id").eq("status", "Active").in("teletel_agent_id", agents).not("telegram_chat_id", "is", null),
+    onlineAgents(),
+    db().from("sla_followups").select("conversation_id").eq("status", "open").eq("summary->>heat", "hot").in("conversation_id", waiting.map((c) => c.id)),
+  ]);
+  const byAgent = new Map(((data ?? []) as { id: string; telegram_chat_id: number | string; teletel_agent_id: number }[]).map((e) => [e.teletel_agent_id, { id: e.id, chat: Number(e.telegram_chat_id) }]));
+  const hot = new Set(((hotRows ?? []) as { conversation_id: number }[]).map((r) => Number(r.conversation_id)));
+  const settings = new Map<string, Promise<DaySettings>>();
 
   let reminded = 0;
-  for (const { c, minutes, step } of due) {
-    const chatId = chatOf.get(c.assigneeId as number);
-    if (!chatId) continue;
+  for (const c of waiting) {
+    const who = byAgent.get(c.assigneeId as number);
+    if (!who?.chat || (online && !online.has(c.assigneeId as number))) continue;
+    if (!settings.has(who.id)) settings.set(who.id, loadSettings(who.id));
+    const mine = await settings.get(who.id)!;
+    if (quiet(mine, nowMs)) continue;
+    const minutes = nowMinutes(c.waitingSince, nowSec);
+    const level = waitLevelNow(waitLevels(mine, hot.has(c.id)), minutes);
+    if (level === null) continue;
     const { data: claimed } = await db()
       .from("staff_bot_reminders")
-      .upsert({ conversation_id: c.id, waiting_since: c.waitingSince, level: step.level }, { onConflict: "conversation_id,waiting_since,level", ignoreDuplicates: true })
+      .upsert({ conversation_id: c.id, waiting_since: c.waitingSince, level }, { onConflict: "conversation_id,waiting_since,level", ignoreDuplicates: true })
       .select("level");
     if (!claimed?.length) continue;
     const sent = await staffSend(
-      chatId,
-      [`⏰ <b>${escapeHtml(c.name)}</b> ينتظر ردك منذ ${waitText(minutes)}`, c.preview.trim() ? `💬 «${escapeHtml(c.preview.trim().slice(0, 200))}»` : null].filter(Boolean).join("\n"),
+      who.chat,
+      [`${hot.has(c.id) ? "🔥 عميل ساخن — " : "⏰ "}<b>${escapeHtml(c.name)}</b> ينتظر ردك منذ ${waitText(minutes)}`, c.preview.trim() ? `💬 «${escapeHtml(c.preview.trim().slice(0, 200))}»` : null].filter(Boolean).join("\n"),
       replyButtons(c.id),
       {},
       `conv:${c.id}`,
     );
     if (sent.ok) {
-      await rememberThread(chatId, sent.messageId, c.id);
+      await rememberThread(who.chat, sent.messageId, c.id);
       reminded += 1;
     }
   }

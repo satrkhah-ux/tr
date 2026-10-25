@@ -2099,6 +2099,7 @@ export const en = {
   "nav.developer": "Developer",
   "nav.sla": "SLA — response time",
   "nav.followups": "Follow-up",
+  "nav.myFollowups": "My follow-up",
   "perm.followups.work": "Follow-up agent",
   "perm.followups.work.hint": "Claim transferred clients and work on your assigned cases.",
   "perm.followups.manage": "Follow-up supervisor",

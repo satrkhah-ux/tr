@@ -2097,6 +2097,7 @@ export const ar: Dictionary = {
   "nav.developer": "المطوّر",
   "nav.sla": "SLA — سرعة الرد",
   "nav.followups": "المتابعة",
+  "nav.myFollowups": "متابعتي",
   "perm.followups.work": "موظف المتابعة",
   "perm.followups.work.hint": "استلام العملاء المحولين للمتابعة والعمل على الملفات المسندة إليك.",
   "perm.followups.manage": "الإشراف على المتابعة",
