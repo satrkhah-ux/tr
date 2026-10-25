@@ -67,3 +67,5 @@ scripts/legacy-import-app-reference.sql
 # Same, for the suppliers: contact names and mobile numbers.
 scripts/legacy-import-suppliers.sql
 scripts/legacy-import-tour-programs.sql
+# Same, for the transport order (2026-10-26): node scripts/legacy-build-transport-sql.mjs
+scripts/legacy-import-transport.sql

@@ -34,8 +34,7 @@ const MOVED: Record<string, string> = {
   "/setting/statuses": "/dashboard",
   "/setting/supervisors": "/sla",
   "/guide/informations": "/web-guide",
-  "/ports": "/dashboard",
-  "/drivers": "/company-suppliers",
+  // /ports and /drivers rejoined the transport tabs (the owner's transport order, 2026-10-26)
   "/rooms-types": "/hotels",
 };
 
@@ -70,9 +69,15 @@ export const TAB_GROUPS: SectionTab[][] = [
     { href: "/offers/offer-not-includes", labelKey: "nav.offerExcludes" },
     { href: "/offers/terms-and-conditions", labelKey: "nav.terms" },
   ],
+  // «قسم المواصلات» as one family of tabs (the owner's transport order, 2026-10-26)
   [
+    { href: "/cars-types", labelKey: "nav.carTypes" },
+    { href: "/cars-capacities", labelKey: "nav.carCapacities" },
     { href: "/cars/transfers", labelKey: "nav.transfers" },
     { href: "/cars/tours", labelKey: "nav.tours" },
+    { href: "/tour-programs", labelKey: "nav.tourPrograms" },
+    { href: "/drivers", labelKey: "nav.drivers" },
+    { href: "/ports", labelKey: "nav.ports" },
     { href: "/price-grid", labelKey: "data.model.grid.title" },
   ],
   [

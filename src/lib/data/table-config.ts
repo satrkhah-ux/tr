@@ -280,6 +280,20 @@ const CONFIGS: TableConfig[] = [
     defaultSort: { column: "arabic_name", ascending: true },
   },
   {
+    // a vehicle's capacity IN a country (20261026): the old system's per-country
+    // seat/bag counts; /cars-types keeps the general figure as the fallback
+    route: "/cars-capacities", table: "country_vehicles", titleKey: "nav.carCapacities",
+    columns: [
+      { key: "country_id", labelKey: "filter.country", source: "countries" },
+      { key: "car_type", labelKey: "col.carType" },
+      { key: "pax_capacity", labelKey: "col.paxCapacity", type: "number" },
+      { key: "luggage_capacity", labelKey: "col.luggageCapacity", type: "number" },
+    ],
+    searchable: ["car_type"],
+    filters: [{ ...COUNTRY_FILTER, present: true }, { key: "car_type", labelKey: "col.carType", kind: "select", present: true }],
+    defaultSort: { column: "car_type", ascending: true },
+  },
+  {
     route: "/markup-rules", table: "markup_rules", titleKey: "nav.markupRules",
     columns: [
       { key: "arabic_name", labelKey: "col.arabicName", minWidth: "200px" },

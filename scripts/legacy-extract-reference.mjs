@@ -52,6 +52,9 @@ const WANTED = new Set([
   // the visa price list and its kinds (the owner, 2026-10-19: Murad answers visa requests from it)
   "visas",
   "visas_types",
+  // the guide's reference notes (the owner's transport order, 2026-10-26: 72 there, 4 here)
+  "guide_informations",
+  "guide_categories",
 ]);
 
 /**
