@@ -30,6 +30,13 @@ A reusable template for reverse-engineering any website into a clean, modern Nex
 - 2-space indentation
 - Responsive: mobile-first
 
+## How to Change Code
+Adapted from [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills) (MIT), fitted to how the owner works: many sessions in parallel, followed from a phone.
+1. **Think before coding.** State your assumptions. If a request has two readings, say which one you took. Stop and ask only where the choice is the owner's — money and prices, deleting or changing production data, anything a client will see. For everything else take the safest default, say so in one line and go on: a stalled session costs more than a stated default.
+2. **Simplicity first.** The minimum code that solves the request: no speculative feature, no abstraction for a single use, no setting nobody asked for, no handling of a case that cannot happen. If 200 lines could be 50, rewrite them.
+3. **Surgical changes.** Every changed line traces to the request. Do not "improve" neighbouring code, comments or formatting; match the existing style; mention unrelated dead code instead of deleting it; remove only what your own change orphaned. What the request itself leaves unfinished (the test, the screen it implies, the deploy already asked for) is part of the request, not scope creep.
+4. **Goal-driven.** Turn the task into a check before starting — a test that fails and then passes, or tests green before and after a refactor — and loop until it holds. For multi-step work write the plan as `step → verify`.
+
 ## Design Principles
 - **Pixel-perfect emulation** — match the target's spacing, colors, typography exactly
 - **No personal aesthetic changes during emulation phase** — match 1:1 first, customize later
