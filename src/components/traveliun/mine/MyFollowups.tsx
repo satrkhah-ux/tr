@@ -84,7 +84,7 @@ export function MyFollowups({ view }: { view: MyFollowupsView }) {
               ))}
             </select>
           )}
-          {view.team && (
+          {view.board && (
             <Link href="/my-followups/team" className={btn}>
               لوحة الفريق
             </Link>

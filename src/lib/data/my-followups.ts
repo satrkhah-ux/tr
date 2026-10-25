@@ -2,7 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { currentCan } from "@/lib/roles/current";
+import { currentCan, currentPermissions, currentRealPermissions } from "@/lib/roles/current";
 import { getCurrentEmployeeId } from "./metrics";
 import { teletelConversationUrl } from "@/lib/providers/teletel";
 import { followupPeople } from "@/lib/followups/service";
@@ -15,14 +15,21 @@ import { dayCounts, parseSettings, type DayItem, type DaySettings } from "@/lib/
  * list only; the follow-up team and the administration (followups.work /
  * followups.manage / dashboard.admin / developer.access) may READ anyone's — never
  * act on it. Every read and write goes through the service client after that check.
+ *
+ * The administration sees every employee's real list (the owner, 2026-10-26: «اجعل
+ * حساب الإدارة يشاهد كل الاختصاصات … وبشكل حقيقي»): opened with no one picked, the
+ * list is the first colleague's when the account holds no Teletel conversations of
+ * its own; and the picker stays while it looks through another role («عرض كموظف»),
+ * because reading is the account's own right — acting stays with the list's owner.
  */
 
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 const TEAM = ["followups.work", "followups.manage", "dashboard.admin", "developer.access"] as const;
 
 async function who() {
-  const [me, seller, ...team] = await Promise.all([getCurrentEmployeeId(), currentCan("offers.write"), ...TEAM.map((p) => currentCan(p))]);
-  return me ? { me, seller, team: team.some(Boolean) } : null;
+  const [me, seller, now, real] = await Promise.all([getCurrentEmployeeId(), currentCan("offers.write"), currentPermissions(), currentRealPermissions()]);
+  // board: the team page itself follows the role being looked through (section-access)
+  return me ? { me, seller, team: TEAM.some((p) => now.includes(p) || real.includes(p)), board: TEAM.some((p) => now.includes(p)) } : null;
 }
 
 export type MyFollowupItem = DayItem & { url: string | null };
@@ -33,6 +40,8 @@ export type MyFollowupsView = {
   readOnly: boolean;
   /** the team may open anyone's list */
   team: boolean;
+  /** the team board opens in the role being used now */
+  board: boolean;
   items: MyFollowupItem[];
   settings: DaySettings;
   teletel: boolean;
@@ -44,19 +53,23 @@ export type MyFollowupsView = {
 export async function getMyFollowups(employeeId?: string): Promise<MyFollowupsView | null> {
   const w = await who();
   if (!w || !(w.seller || w.team)) return null;
-  const target = employeeId && /^[0-9a-f-]{36}$/i.test(employeeId) ? employeeId : w.me;
+  // the picker: every colleague with Teletel conversations (sellers and the follow-up team), not the developer's account
+  const people = w.team ? (await followupPeople()).filter((p) => p.person && p.agentId).sort((a, b) => Number(b.seller) - Number(a.seller) || a.name.localeCompare(b.name, "ar")) : [];
+  const picked = employeeId && /^[0-9a-f-]{36}$/i.test(employeeId) ? employeeId : null;
+  const target = picked ?? (w.team && !people.some((p) => p.id === w.me) && people[0] ? people[0].id : w.me);
   if (target !== w.me && !w.team) return null;
-  const [day, { data: emp }, people] = await Promise.all([myDay(target), db().from("employees").select("arabic_name").eq("id", target).maybeSingle(), w.team ? followupPeople() : Promise.resolve([])]);
+  const [day, { data: emp }] = await Promise.all([myDay(target), db().from("employees").select("arabic_name").eq("id", target).maybeSingle()]);
   if (!day) return null;
   return {
     employeeId: target,
     name: ((emp as { arabic_name?: string } | null)?.arabic_name ?? "").trim(),
     readOnly: target !== w.me,
     team: w.team,
+    board: w.board,
     items: day.items.map((i) => ({ ...i, url: i.conversationId ? teletelConversationUrl(i.conversationId) : null })),
     settings: day.settings,
     teletel: day.teletel,
-    people: people.filter((p) => p.seller).map((p) => ({ id: p.id, name: p.name.trim() })),
+    people: people.map((p) => ({ id: p.id, name: p.name.trim() })),
     at: Date.now(),
   };
 }
