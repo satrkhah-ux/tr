@@ -8,7 +8,7 @@ import { forgetFeatureFlags, getFeatureFlags } from "@/lib/features-server";
 import { FEATURES_SETTING_KEY, isFeature, type Feature } from "@/lib/features";
 import { intlPhone, listTeletelTeams } from "@/lib/providers/teletel";
 import { SETTING as MURAD_SETTING } from "@/lib/murad/core";
-import { parseDelay, parseHours, readRoutes, ROUTE_KEYS, type Routes } from "@/lib/murad/reception";
+import { hoursText, parseDelay, parseHours, readRoutes, ROUTE_KEYS, type Routes } from "@/lib/murad/reception";
 import { readOffers, type OfferCountry } from "@/lib/murad/auto-offer";
 import { usdSarRate } from "@/lib/offer/pricing";
 
@@ -237,7 +237,7 @@ export async function getReceptionSetup(): Promise<ReceptionSetup | null> {
       teams,
       routes: readRoutes(v.get(MURAD_SETTING.receptionRoutes), teams),
       saved: v.has(MURAD_SETTING.receptionRoutes),
-      hours: `${hours.open}-${hours.close}`,
+      hours: hoursText(hours),
       scope: v.get(MURAD_SETTING.receptionScope) === "all" ? "all" : "test",
     };
   } catch {
@@ -260,11 +260,11 @@ export async function setReceptionRoutes(routes: Routes, hours: string, delay = 
     const now = new Date().toISOString();
     const { error } = await service.from("app_settings").upsert([
       { key: MURAD_SETTING.receptionRoutes, value: JSON.stringify(clean), updated_at: now },
-      { key: MURAD_SETTING.receptionHours, value: `${h.open}-${h.close}`, updated_at: now },
+      { key: MURAD_SETTING.receptionHours, value: hoursText(h), updated_at: now },
       { key: MURAD_SETTING.receptionDelay, value: `${d.min}-${d.max}`, updated_at: now },
     ]);
     if (error) return { ok: false, error: "err.db" };
-    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: MURAD_SETTING.receptionRoutes, meta: { routes: clean, hours: `${h.open}-${h.close}`, delay: `${d.min}-${d.max}` } });
+    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: MURAD_SETTING.receptionRoutes, meta: { routes: clean, hours: hoursText(h), delay: `${d.min}-${d.max}` } });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };

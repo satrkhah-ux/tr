@@ -26,8 +26,7 @@ const field = "h-9 w-full rounded-[8px] border border-[#dbe6e1] bg-white px-2 te
 
 export function ReceptionRoutes({ setup }: { setup: ReceptionSetup | null }) {
   const [routes, setRoutes] = useState<Routes>(setup?.routes ?? {});
-  const [open, setOpen] = useState(setup?.hours.split("-")[0] ?? "09:00");
-  const [close, setClose] = useState(setup?.hours.split("-")[1] ?? "23:00");
+  const [hours, setHours] = useState(setup?.hours ?? "");
   const [minWait, setMinWait] = useState(Number(setup?.delay.split("-")[0] ?? 20));
   const [maxWait, setMaxWait] = useState(Number(setup?.delay.split("-")[1] ?? 60));
   const [saving, setSaving] = useState(false);
@@ -40,7 +39,7 @@ export function ReceptionRoutes({ setup }: { setup: ReceptionSetup | null }) {
   async function save() {
     setSaving(true);
     setNote(null);
-    const res = await setReceptionRoutes(routes, `${open}-${close}`, `${minWait}-${maxWait}`).catch(() => ({ ok: false }));
+    const res = await setReceptionRoutes(routes, hours, `${minWait}-${maxWait}`).catch(() => ({ ok: false }));
     setSaving(false);
     setNote(res.ok ? "saved" : "failed");
   }
@@ -84,15 +83,11 @@ export function ReceptionRoutes({ setup }: { setup: ReceptionSetup | null }) {
       ) : null}
 
       <div className="mt-3 flex flex-wrap items-end gap-2">
-        <label className="grid gap-1">
-          <span className="text-[11.5px] font-bold text-[#557d78]">بداية الدوام</span>
-          <input type="time" value={open} onChange={(e) => setOpen(e.target.value)} className={`${field} w-32`} />
+        <label className="grid min-w-0 flex-1 gap-1">
+          <span className="text-[11.5px] font-bold text-[#557d78]">أوقات دوام المكتب</span>
+          <input dir="rtl" value={hours} onChange={(e) => setHours(e.target.value)} placeholder="السبت-الخميس 10:30-12:30 16:00-00:00 | الجمعة 16:00-00:00" className={`${field} w-full`} />
         </label>
-        <label className="grid gap-1">
-          <span className="text-[11.5px] font-bold text-[#557d78]">نهاية الدوام</span>
-          <input type="time" value={close} onChange={(e) => setClose(e.target.value)} className={`${field} w-32`} />
-        </label>
-        <span className="pb-2 text-[11.5px] font-semibold text-[#93aaa3]">بتوقيت الرياض — خارجه يُضاف «وسيتواصل معك الموظف عند بداية الدوام».</span>
+        <span className="basis-full pb-1 text-[11.5px] font-semibold text-[#93aaa3]">بتوقيت الرياض: الأيام ثم فترات «من-إلى» (00:00 = منتصف الليل)، ويفصل بين المجموعات الخط العمودي |. خارجها ولا أحد متصل يُضاف «وسيتواصل معك الموظف عند بداية الدوام الساعة …» بأقرب فتح. الفارغ = أوقات المكتب الأصلية.</span>
       </div>
 
       <div className="mt-3 flex flex-wrap items-end gap-2">

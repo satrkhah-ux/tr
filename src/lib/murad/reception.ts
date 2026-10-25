@@ -112,21 +112,128 @@ export function parseDelay(raw: string | null | undefined): Delay {
 /** One wait, in seconds, somewhere in the range. */
 export const pickDelay = (d: Delay, random = Math.random()) => d.min + Math.round(random * (d.max - d.min));
 
-export type Hours = { open: string; close: string };
-export const DEFAULT_HOURS: Hours = { open: "09:00", close: "23:00" };
+/** one opening window, Riyadh time; a close at or before the open runs past midnight (16:00-00:00, 18:00-02:00) */
+export type Window = { open: string; close: string };
+/** the week as windows per weekday, 0 = Sunday … 6 = Saturday (JS getDay) */
+export type Week = Window[][];
+/**
+ * The office's working time. `open`/`close` are the legacy single window (kept for what only knows one); `week` is
+ * set when the text names days and windows — «السبت-الخميس 10:30-12:30 16:00-00:00 | الجمعة 16:00-00:00».
+ */
+export type Hours = { open: string; close: string; week?: Week };
 
-/** «09:00-23:00» → the working day in Riyadh time; the default when it does not read. */
+const SAT_FIRST = [6, 0, 1, 2, 3, 4, 5] as const;
+const DAY_NAME = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"] as const;
+const dayKey = (name: string) => name.replace(/[ً-ْ]/g, "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/^ال/, "").trim();
+const DAY_BY_KEY = new Map<string, number>(DAY_NAME.map((n, i) => [dayKey(n), i]));
+const day = (name: string): number | null => DAY_BY_KEY.get(dayKey(name)) ?? null;
+const hm = (h: string, m: string) => `${(Number(h) % 24).toString().padStart(2, "0")}:${m}`;
+const WINDOW = /^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/;
+
+/** the office's own sign (the owner, 2026-10-26): Saturday–Thursday 10:30–12:30 and 16:00–00:00, Friday 16:00–00:00 */
+export const DEFAULT_WEEK: Week = [
+  [{ open: "10:30", close: "12:30" }, { open: "16:00", close: "00:00" }], // Sun
+  [{ open: "10:30", close: "12:30" }, { open: "16:00", close: "00:00" }], // Mon
+  [{ open: "10:30", close: "12:30" }, { open: "16:00", close: "00:00" }], // Tue
+  [{ open: "10:30", close: "12:30" }, { open: "16:00", close: "00:00" }], // Wed
+  [{ open: "10:30", close: "12:30" }, { open: "16:00", close: "00:00" }], // Thu
+  [{ open: "16:00", close: "00:00" }], // Fri
+  [{ open: "10:30", close: "12:30" }, { open: "16:00", close: "00:00" }], // Sat
+];
+export const DEFAULT_HOURS: Hours = { open: "10:30", close: "12:30", week: DEFAULT_WEEK };
+
+/**
+ * «09:00-23:00» (every day) or «السبت-الخميس 10:30-12:30 16:00-00:00 | الجمعة 16:00-00:00» → the working time in
+ * Riyadh; the office's own sign when it does not read.
+ */
 export function parseHours(raw: string | null | undefined): Hours {
-  const m = (raw ?? "").match(/^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$/);
-  if (!m) return DEFAULT_HOURS;
-  const t = (h: string, mm: string) => `${h.padStart(2, "0")}:${mm}`;
-  return { open: t(m[1], m[2]), close: t(m[3], m[4]) };
+  const text = (raw ?? "").trim();
+  const legacy = text.match(/^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$/);
+  if (legacy) return { open: hm(legacy[1], legacy[2]), close: hm(legacy[3], legacy[4]) };
+  const week: Week = Array.from({ length: 7 }, () => []);
+  let any = false;
+  for (const group of text.split(/[|\n;]+/).map((g) => g.trim()).filter(Boolean)) {
+    const tokens = group.split(/[\s،,]+/).filter(Boolean);
+    const windows: Window[] = [];
+    const words: string[] = [];
+    for (const t of tokens) {
+      const w = t.match(WINDOW);
+      if (w) windows.push({ open: hm(w[1], w[2]), close: hm(w[3], w[4]) });
+      else words.push(t);
+    }
+    if (!windows.length) continue;
+    const days: number[] = [];
+    for (const w of words) {
+      const range = w.match(/^(.+?)-(.+)$/);
+      if (range) {
+        const a = day(range[1]);
+        const b = day(range[2]);
+        if (a === null || b === null) return DEFAULT_HOURS;
+        for (let d = a; ; d = (d + 1) % 7) {
+          days.push(d);
+          if (d === b) break;
+        }
+      } else {
+        const d = day(w);
+        if (d === null) return DEFAULT_HOURS;
+        days.push(d);
+      }
+    }
+    for (const d of days.length ? days : [0, 1, 2, 3, 4, 5, 6]) {
+      week[d] = windows.map((w) => ({ ...w }));
+      any = true;
+    }
+  }
+  if (!any) return DEFAULT_HOURS;
+  for (const w of week) w.sort((a, b) => a.open.localeCompare(b.open));
+  const first = week.find((w) => w.length)?.[0] ?? DEFAULT_HOURS;
+  return { open: first.open, close: first.close, week };
 }
 
-/** Inside the working day, Riyadh time (a day past midnight, «18:00-02:00», wraps). */
+/** the text the settings page shows and saves — days with equal windows grouped, the week from Saturday */
+export function hoursText(h: Hours): string {
+  const week = h.week;
+  if (!week) return `${h.open}-${h.close}`;
+  const key = (d: number) => week[d].map((w) => `${w.open}-${w.close}`).join(" ");
+  if (SAT_FIRST.every((d) => key(d) === key(SAT_FIRST[0])) && week[SAT_FIRST[0]].length === 1) return key(SAT_FIRST[0]);
+  const groups: { from: number; to: number; text: string }[] = [];
+  for (const d of SAT_FIRST) {
+    const text = key(d);
+    if (!text) continue;
+    const last = groups.at(-1);
+    if (last && last.text === text && SAT_FIRST[SAT_FIRST.indexOf(last.to as (typeof SAT_FIRST)[number]) + 1] === d) last.to = d;
+    else groups.push({ from: d, to: d, text });
+  }
+  return groups.map((g) => `${g.from === g.to ? DAY_NAME[g.from] : `${DAY_NAME[g.from]}-${DAY_NAME[g.to]}`} ${g.text}`).join(" | ");
+}
+
+const WEEKDAY = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 } as const;
+function riyadh(now: Date): { dow: number; hm: string } {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Riyadh", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return { dow: WEEKDAY[get("weekday") as keyof typeof WEEKDAY] ?? 0, hm: `${get("hour")}:${get("minute")}` };
+}
+/** the week the hours mean: its own, or the legacy single window every day */
+const weekOf = (h: Hours): Week => h.week ?? Array.from({ length: 7 }, () => [{ open: h.open, close: h.close }]);
+
+/** Inside the working time, Riyadh time (a window that closes at or before it opens runs on into the next day). */
 export function isWorkingTime(now: Date, hours: Hours): boolean {
-  const hm = now.toLocaleTimeString("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-  return hours.open <= hours.close ? hm >= hours.open && hm < hours.close : hm >= hours.open || hm < hours.close;
+  const { dow, hm: at } = riyadh(now);
+  const week = weekOf(hours);
+  return week.some((windows, d) =>
+    windows.some((w) => (w.open < w.close ? d === dow && at >= w.open && at < w.close : (d === dow && at >= w.open) || ((d + 1) % 7 === dow && at < w.close))),
+  );
+}
+
+/** When the next window opens after now — «HH:MM» (a week ahead at most), null when the office never opens. */
+export function nextOpening(now: Date, hours: Hours): string | null {
+  const { dow, hm: at } = riyadh(now);
+  const week = weekOf(hours);
+  for (let k = 0; k <= 7; k++) {
+    const starts = week[(dow + k) % 7].map((w) => w.open).filter((open) => k > 0 || open > at).sort();
+    if (starts.length) return starts[0];
+  }
+  return null;
 }
 
 /** «9:00 صباحاً» */

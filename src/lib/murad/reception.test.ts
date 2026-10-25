@@ -7,7 +7,11 @@ import {
   pickDelay,
   decideReception,
   firstName,
+  DEFAULT_HOURS,
+  hoursText,
   isWorkingTime,
+  nextOpening,
+  sayTime,
   parseHours,
   readRequest,
   readRoutes,
@@ -83,12 +87,46 @@ describe("the rule for one message", () => {
 describe("the working day, Riyadh time", () => {
   it("reads «09:00-23:00», the default when it does not read", () => {
     expect(parseHours("9:00-23:30")).toEqual({ open: "09:00", close: "23:30" });
-    expect(parseHours("")).toEqual({ open: "09:00", close: "23:00" });
+    // not set: the office's own sign (the owner, 2026-10-26)
+    expect(parseHours("")).toEqual(DEFAULT_HOURS);
+    expect(parseHours("كلام لا يُقرأ")).toEqual(DEFAULT_HOURS);
   });
   it("is open at 10:00 and closed at 03:00 Riyadh (07:00 and 00:00 UTC)", () => {
     const h = parseHours("09:00-23:00");
     expect(isWorkingTime(new Date("2026-10-18T07:00:00Z"), h)).toBe(true);
     expect(isWorkingTime(new Date("2026-10-18T00:00:00Z"), h)).toBe(false);
+  });
+});
+
+describe("the office's own hours (the sign, 2026-10-26)", () => {
+  // Riyadh = UTC+3: Sat 2026-10-24 is a Saturday, Fri 2026-10-23 a Friday
+  const at = (iso: string) => new Date(`${iso}+03:00`);
+  const h = DEFAULT_HOURS;
+  it("Saturday–Thursday: 10:30–12:30 and 16:00–00:00; Friday only 16:00–00:00", () => {
+    expect(isWorkingTime(at("2026-10-24T10:29:00"), h)).toBe(false);
+    expect(isWorkingTime(at("2026-10-24T10:30:00"), h)).toBe(true);
+    expect(isWorkingTime(at("2026-10-24T12:30:00"), h)).toBe(false); // the midday break
+    expect(isWorkingTime(at("2026-10-24T14:00:00"), h)).toBe(false);
+    expect(isWorkingTime(at("2026-10-24T16:00:00"), h)).toBe(true);
+    expect(isWorkingTime(at("2026-10-24T23:59:00"), h)).toBe(true);
+    expect(isWorkingTime(at("2026-10-25T00:30:00"), h)).toBe(false); // midnight closes it
+    expect(isWorkingTime(at("2026-10-23T11:00:00"), h)).toBe(false); // Friday morning is closed
+    expect(isWorkingTime(at("2026-10-23T17:00:00"), h)).toBe(true);
+  });
+  it("says the next opening: after the break 4 pm, after midnight 10:30, and Friday has no morning", () => {
+    expect(nextOpening(at("2026-10-24T13:00:00"), h)).toBe("16:00");
+    expect(nextOpening(at("2026-10-24T02:00:00"), h)).toBe("10:30");
+    expect(nextOpening(at("2026-10-23T02:00:00"), h)).toBe("16:00"); // Thursday night → Friday 16:00
+    expect(nextOpening(at("2026-10-22T23:50:00"), h)).toBe("16:00"); // Thursday 23:50 is open: the next opening is Friday 16:00
+    expect(sayTime("16:00")).toBe("4:00 مساءً");
+  });
+  it("reads and writes the sign's text, and a legacy window means every day", () => {
+    expect(hoursText(h)).toBe("السبت-الخميس 10:30-12:30 16:00-00:00 | الجمعة 16:00-00:00");
+    expect(hoursText(parseHours(hoursText(h)))).toBe(hoursText(h));
+    expect(hoursText(parseHours("09:00-23:00"))).toBe("09:00-23:00");
+    const legacy = parseHours("09:00-23:00");
+    expect(isWorkingTime(at("2026-10-23T11:00:00"), legacy)).toBe(true);
+    expect(parseHours("الجمعة 10:00-12:00").week?.[5]).toEqual([{ open: "10:00", close: "12:00" }]);
   });
 });
 

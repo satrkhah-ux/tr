@@ -50,6 +50,7 @@ import {
   firstName,
   holdText,
   isWorkingTime,
+  nextOpening,
   lastClosedAt,
   MAX_WAIT_SEC,
   parseDelay,
@@ -614,7 +615,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     const handedByHand = (events ?? []).some((e) => e.kind === "activity" && e.at >= since && parseAssignment(e.text)?.by != null);
     const hours = parseHours(reception.hours);
     const now = new Date();
-    const opensAt = (await outOfHours(hours)) ? hours.open : null;
+    const opensAt = (await outOfHours(hours)) ? nextOpening(new Date(), hours) : null;
 
     // «عرض آلي»: a trip to a country the company prices this way — asked for what is missing, then proposed. The
     // whole visit is read each time, the client's lines and Murad's between them, the newest word winning (the
@@ -1189,7 +1190,7 @@ async function holdSweep(service: SupabaseClient, fresh: OpenConversation[], now
       .select("id")
       .maybeSingle();
     if (claim.error || !claim.data) continue;
-    const text = holdText({ assignee: c.assignee, team: c.team, opensAt: (await outOfHours(hours)) ? hours.open : null });
+    const text = holdText({ assignee: c.assignee, team: c.team, opensAt: (await outOfHours(hours)) ? nextOpening(new Date(), hours) : null });
     const replyId = await sendTeletelMessage(c.id, text);
     if (replyId && (c.assignee || c.team)) {
       await addTeletelNote(c.id, `🤖 ${noteFor(c)} العميل كتب بعد التحويل وينتظر منذ ${Math.round((nowSec - c.waitingSince) / 60)} دقائق بلا رد — طمأنه مُراد. ردّ عليه الآن.`);

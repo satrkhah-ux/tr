@@ -2,6 +2,7 @@ import "server-only";
 import { muradJson, muradProvider } from "@/lib/murad/model";
 import { responsesJson } from "@/lib/providers/openai";
 import { noteFor } from "@/lib/murad/core";
+import { isWorkingTime, parseHours } from "@/lib/murad/reception";
 import { addTeletelNote, listOpenConversations, teletelGet, whatsappTemplateStatus } from "@/lib/providers/teletel";
 import { WA_TEMPLATES } from "@/lib/operations/client-messages";
 import { followupDb, followupPeople, followupRows } from "./service";
@@ -75,11 +76,13 @@ export async function summarizeDue(): Promise<{ made: number; noted: number }> {
   running = true;
   try {
     const db = followupDb();
-    const [{ data }, open, { data: setting }] = await Promise.all([
+    const [{ data }, open, { data: setting }, { data: hoursSetting }] = await Promise.all([
       followupRows((a, b) => db.from("sla_followups").select(WORK_COLS).eq("status", "open").order("id").range(a, b)),
       listOpenConversations(),
       db.from("app_settings").select("value").eq("key", FOLLOWUP_SETTINGS_KEY).maybeSingle(),
+      db.from("app_settings").select("value").eq("key", "murad_reception_hours").maybeSingle(),
     ]);
+    const hours = parseHours((hoursSetting as { value?: string } | null)?.value);
     const activity = new Map((open?.rows ?? []).map((c) => [c.id, c.lastActivityAt]));
     const now = Date.now();
     const rows = (data as WorkRow[]).filter((r) => {
@@ -107,9 +110,8 @@ export async function summarizeDue(): Promise<{ made: number; noted: number }> {
       made++;
       const seller = people.find((p) => p.id === row.assigned_to);
       const due = row.next_followup_at && Date.parse(row.next_followup_at) <= now;
-      // the two-hour note only while it is news (the offer at most six hours old) and in working hours (09:00–23:00 Riyadh)
-      const hour = new Date(now + 3 * 3600_000).getUTCHours();
-      const fresh = row.offer_at && now - Date.parse(row.offer_at) <= TWO_HOUR_WINDOW_MS && hour >= 9 && hour < 23;
+      // the two-hour note only while it is news (the offer at most six hours old) and in the office's hours (murad_reception_hours)
+      const fresh = row.offer_at && now - Date.parse(row.offer_at) <= TWO_HOUR_WINDOW_MS && isWorkingTime(new Date(now), hours);
       if (settings.murad === "note" && row.status === "open" && row.step === 0 && due && fresh && !row.client_waiting && !row.murad_note_at && summary.draft && seller) {
         const to = noteFor({ assignee: seller.name, assigneeId: seller.agentId, team: null });
         const posted = await addTeletelNote(row.conversation_id, [`💡 مُراد — متابعة العرض بعد ساعتين ${to}`.trim(), summary.advice, `رسالة مقترحة:\n${summary.draft}`, "أرسلها من «المتابعة» كما هي أو بعد تعديلها."].filter(Boolean).join("\n\n"));
