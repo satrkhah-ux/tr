@@ -339,3 +339,6 @@ export function mergeRead(list: VisaTraveler[], targetId: string | "new", read: 
   if (targetId === "new") return [...list, { ...blankTraveler(newId), ...found }];
   return list.map((t) => (t.id === targetId ? { ...t, ...found } : t));
 }
+
+/** Teletel's last_activity_at arrives in seconds (Chatwoot) — milliseconds too, should that ever change */
+export const epochMs = (n: number) => (n < 1e12 ? n * 1000 : n);
