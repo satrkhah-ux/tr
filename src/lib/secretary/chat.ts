@@ -2,7 +2,8 @@
 
 import { logAudit } from "@/lib/data/audit";
 import { muradJson } from "@/lib/murad/model";
-import { currentSecretaryEmployee, renderBriefing, secretaryBriefing, secretaryDb, secretarySettings } from "./core";
+import { currentCan } from "@/lib/roles/current";
+import { currentSecretaryEmployee, planText, renderBriefing, secretaryBriefing, secretaryDb, secretarySettings, type SecretaryEmployee } from "./core";
 
 /**
  * «سكرتيري الخاص» — the chat (phase أ: read-only answers about the employee's
@@ -95,4 +96,44 @@ export async function askSecretary(text: string): Promise<SecretaryThread> {
   await logAudit({ action: "secretary.chat", entity: "secretary_messages", entity_id: employee.id, meta: { chars: question.length } });
   const messages = await thread(employee.id);
   return { ok: true, messages: messages ?? [] };
+}
+
+/* ---- «مشاهدة الإدارة» (the owner, 2026-10-26): an admin opens any employee's
+   secretary READ-ONLY — their day now, their thread, nothing written in their
+   name (there is deliberately no admin ask/write verb here). Every open is
+   audited with who was viewed. ---- */
+
+const adminAllowed = async () => (await currentCan("dashboard.admin")) || (await currentCan("developer.access"));
+const UUID = /^[0-9a-f-]{36}$/i;
+
+/** The picker's list — null hides the whole admin view (not an admin, or view-as an employee). */
+export async function adminSecretaryEmployees(): Promise<{ id: string; name: string }[] | null> {
+  if (!(await adminAllowed())) return null;
+  const { data } = await secretaryDb().from("employees").select("id, arabic_name").eq("status", "Active").order("arabic_name");
+  return ((data ?? []) as { id: string; arabic_name: string | null }[]).map((e) => ({ id: e.id, name: e.arabic_name ?? "بلا اسم" }));
+}
+
+export type AdminSecretaryView = { ok: true; name: string; today: string; messages: SecretaryMsg[] } | { ok: false; error: string };
+
+export async function adminSecretaryView(employeeId: string): Promise<AdminSecretaryView> {
+  if (!(await adminAllowed())) return { ok: false, error: "لا صلاحية" };
+  if (typeof employeeId !== "string" || !UUID.test(employeeId)) return { ok: false, error: "قيمة غير صالحة" };
+  const db = secretaryDb();
+  const { data } = await db.from("employees").select("id, arabic_name, teletel_agent_id, telegram_chat_id").eq("id", employeeId).maybeSingle();
+  const e = data as { id: string; arabic_name: string | null; teletel_agent_id: number | string | null; telegram_chat_id: number | string | null } | null;
+  if (!e) return { ok: false, error: "موظف غير موجود" };
+  const employee: SecretaryEmployee = {
+    id: e.id,
+    name: e.arabic_name ?? "",
+    agentId: e.teletel_agent_id == null ? null : Number(e.teletel_agent_id),
+    chatId: e.telegram_chat_id == null ? null : Number(e.telegram_chat_id),
+  };
+  const [briefing, messages] = await Promise.all([secretaryBriefing(db, employee).catch(() => null), thread(employee.id)]);
+  await logAudit({ action: "secretary.admin_view", entity: "secretary_messages", entity_id: employee.id, meta: { name: employee.name } });
+  return {
+    ok: true,
+    name: employee.name || "بلا اسم",
+    today: briefing ? planText(employee, briefing) : "تعذّر قراءة بيانات يومه الآن.",
+    messages: messages ?? [],
+  };
 }

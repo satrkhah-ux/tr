@@ -162,6 +162,8 @@ export type AuditAction =
   // «سكرتيري الخاص»: an employee asked their secretary / got the day plan (secretary/*)
   | "secretary.chat"
   | "secretary.plan_sent"
+  // the administration opened an employee's secretary read-only (who, in meta)
+  | "secretary.admin_view"
   // «الحسابات المالية» saved (developer only; the figures stay out of the log)
   | "finance.saved"
   | "catalog.imported"
