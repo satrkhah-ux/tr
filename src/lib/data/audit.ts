@@ -164,6 +164,8 @@ export type AuditAction =
   | "secretary.plan_sent"
   // the administration opened an employee's secretary read-only (who, in meta)
   | "secretary.admin_view"
+  // the secretary prepared a review-ready COPY of a file from the client's request (phase ب)
+  | "secretary.file_prepared"
   // «الحسابات المالية» saved (developer only; the figures stay out of the log)
   | "finance.saved"
   | "catalog.imported"
