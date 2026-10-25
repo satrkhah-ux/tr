@@ -14,6 +14,7 @@ import {
   Hotel,
   LayoutGrid,
   RotateCcw,
+  Stamp,
   Users,
   Zap,
   type LucideIcon,
@@ -39,6 +40,8 @@ const DESTINATIONS: TabDest[] = [
   { id: "basic", labelKey: "nav.basic", href: "/basic", icon: Zap, perm: "offers.write" },
   { id: "operations", labelKey: "nav.operations", href: "/operations", icon: ClipboardCheck },
   { id: "kanban", labelKey: "nav.kanban", href: "/kanban-board", icon: Columns3 },
+  // «التأشيرات» (section-access.ts shows it to the visa department and the management only)
+  { id: "visas", labelKey: "nav.visaFiles", href: "/visa-files", icon: Stamp },
   { id: "generator", labelKey: "nav.legacyGenerator", href: "/package-generator", icon: FilePlus2, perm: "offers.write" },
   { id: "repackage", labelKey: "nav.repackage", href: "/repackage", icon: FileUp, perm: "repackage.write" },
   { id: "offers", labelKey: "nav.packages", href: "/offers", icon: FileText, perm: "offers.write" },

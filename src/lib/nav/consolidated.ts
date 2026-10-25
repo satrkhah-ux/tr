@@ -93,6 +93,11 @@ export const TAB_GROUPS: SectionTab[][] = [
     { href: "/management-decisions", labelKey: "nav.managementDecisions" },
     { href: "/murad-settings", labelKey: "nav.muradSettings" },
   ],
+  // «التأشيرات»: the board and a new file, one tap apart on a phone (the price list keeps its own page under «البيانات»)
+  [
+    { href: "/visa-files", labelKey: "nav.visaBoard" },
+    { href: "/visa-files/new", labelKey: "nav.visaNew" },
+  ],
   // the flight-card tool sits beside the supplier-PDF redesign it serves
   [
     { href: "/repackage", labelKey: "nav.repackage" },

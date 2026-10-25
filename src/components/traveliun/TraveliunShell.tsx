@@ -44,6 +44,7 @@ import {
   Settings,
   Users,
   Settings2,
+  Stamp,
   Table2,
   UserCircle,
   Timer,
@@ -96,6 +97,8 @@ type NavLink = {
   captionKey?: TranslationKey;
   /** hides the link unless the role holds this permission. */
   perm?: Permission;
+  /** hides the link unless this other route opens too (section-access.ts) — a page that lives under another section's gate. */
+  alsoNeeds?: string;
 };
 
 export type NavGroup = {
@@ -194,6 +197,19 @@ export const navGroups: NavGroup[] = [
   // «العملاء» — every client conversation (the sheet pulled in), for every employee
   { labelKey: "nav.customers", href: "/clients", icon: Users },
   { labelKey: "nav.followups", href: "/followups", icon: Users },
+  // «التأشيرات» — the visa department's files and board (the owner, 2026-10-26). The price list stays under «البيانات»
+  // and is linked here too, but only to whoever opens the board: its own gate (data.write) alone would show sales a
+  // «التأشيرات» section holding that one link.
+  {
+    labelKey: "nav.visaFiles",
+    href: "/visa-files",
+    icon: Stamp,
+    children: [
+      { labelKey: "nav.visaBoard", href: "/visa-files" },
+      { labelKey: "nav.visaNew", href: "/visa-files/new" },
+      { labelKey: "nav.visaCatalogue", href: "/visas", alsoNeeds: "/visa-files" },
+    ],
+  },
   { labelKey: "nav.partnerCompanies", href: "/partner-companies", icon: Building2 },
   // «المطار»: a transport-only partner's bookings (section-access.ts)
   { labelKey: "nav.almatar", href: "/almatar-bookings", icon: Car },
@@ -316,12 +332,13 @@ export function navGroupsFor(can: (permission: Permission) => boolean, featureOn
 function filterGroups(groups: NavGroup[], openRaw: (link: { href: string; perm?: Permission }) => boolean): NavGroup[] {
   // a link to a merged page opens for whoever can open any of its tabs, and lands on their first one
   // («المطوّر» for an admin without developer.access: the hotel suppliers' vault — the walk of 94c84a7)
-  const land = <T extends { href: string; perm?: Permission }>(link: T): T | null => {
+  const land = <T extends { href: string; perm?: Permission; alsoNeeds?: string }>(link: T): T | null => {
+    if (link.alsoNeeds && !openRaw({ href: link.alsoNeeds })) return null;
     if (openRaw(link)) return link;
     const tab = TAB_GROUPS.find((g) => g.some((t) => t.href === link.href))?.find((t) => openRaw({ href: t.href }));
     return tab && !link.perm ? { ...link, href: tab.href } : null;
   };
-  const opens = (link: { href: string; perm?: Permission }) => land(link) !== null;
+  const opens = (link: { href: string; perm?: Permission; alsoNeeds?: string }) => land(link) !== null;
   return groups.flatMap((group) => {
     if (!group.children) {
       const landed = land(group);
