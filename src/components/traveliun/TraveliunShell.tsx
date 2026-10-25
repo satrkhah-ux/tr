@@ -21,9 +21,11 @@ import { cn } from "@/lib/utils";
 import { DirText } from "@/components/DirText";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { SecretaryFab } from "@/components/traveliun/secretary/SecretaryFab";
 import {
   AlertTriangle,
   BarChart3,
+  BotMessageSquare,
   Building2,
   BadgePercent,
   Car,
@@ -194,6 +196,8 @@ export const navGroups: NavGroup[] = [
   // «العملاء» — every client conversation (the sheet pulled in), for every employee
   { labelKey: "nav.customers", href: "/clients", icon: Users },
   { labelKey: "nav.followups", href: "/followups", icon: Users },
+  // «سكرتيري الخاص» — each employee's own assistant (secretary/*); open to every signed-in employee
+  { labelKey: "nav.secretary", href: "/secretary", icon: BotMessageSquare },
   { labelKey: "nav.partnerCompanies", href: "/partner-companies", icon: Building2 },
   // «المطار»: a transport-only partner's bookings (section-access.ts)
   { labelKey: "nav.almatar", href: "/almatar-bookings", icon: Car },
@@ -497,6 +501,8 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
   return (
     <DirectionProvider direction={dir}>
     <div className="tv-app min-h-screen bg-[#eef3f1] font-sans text-[#0f3d38]" dir={dir}>
+      {/* «سكرتيري الخاص»: the floating button on every page (not in focus mode, not for partners) */}
+      {focus || partner ? null : <SecretaryFab />}
       {focus ? null : (
       <div
         className={`fixed start-0 top-0 z-[90] hidden h-screen transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:block ${
