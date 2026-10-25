@@ -16,3 +16,8 @@ create index if not exists secretary_messages_employee_created
   on public.secretary_messages (employee_id, created_at desc);
 
 alter table public.secretary_messages enable row level security;
+
+-- belt over the braces: RLS with no policies already denies everyone but the
+-- service role; revoking the default grants keeps it denied even if a policy
+-- is ever added carelessly (same hardening as my_followup_* tables).
+revoke all on public.secretary_messages from anon, authenticated;

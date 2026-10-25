@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { TraveliunShell } from "@/components/traveliun/TraveliunShell";
 import { AdminSecretaryViewer } from "@/components/traveliun/secretary/AdminSecretaryViewer";
 import { SecretaryChat } from "@/components/traveliun/secretary/SecretaryChat";
+import { SecretaryEditRequest } from "@/components/traveliun/secretary/SecretaryEditRequest";
 import { adminSecretaryEmployees } from "@/lib/secretary/chat";
 import { currentSecretaryEmployee } from "@/lib/secretary/core";
 
@@ -16,6 +17,7 @@ export default async function SecretaryPage() {
       </header>
       {/* «مشاهدة الإدارة»: hidden under view-as-an-employee, because the admin then holds that role's permissions */}
       {adminList && <AdminSecretaryViewer employees={adminList} />}
+      {employee && <SecretaryEditRequest />}
       {employee && <div className="overflow-hidden rounded-2xl border border-[#dfe8e4] bg-[#fbfdfc]">
         <SecretaryChat tall />
       </div>}
