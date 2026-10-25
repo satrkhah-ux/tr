@@ -1,6 +1,7 @@
 "use client";
 
 import { FollowupBadge } from "./followups/FollowupEntry";
+import { MyFollowupBadge } from "./mine/MyFollowupBadge";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -44,6 +45,7 @@ import {
   NotebookText,
   Search,
   Settings,
+  UserRound,
   Users,
   Settings2,
   Table2,
@@ -195,6 +197,8 @@ export const navGroups: NavGroup[] = [
   },
   // «العملاء» — every client conversation (the sheet pulled in), for every employee
   { labelKey: "nav.customers", href: "/clients", icon: Users },
+  // «متابعتي»: each seller's own conversations to follow today (the owner, 2026-10-25)
+  { labelKey: "nav.myFollowups", href: "/my-followups", icon: UserRound },
   { labelKey: "nav.followups", href: "/followups", icon: Users },
   // «سكرتيري الخاص» — each employee's own assistant (secretary/*); open to every signed-in employee
   { labelKey: "nav.secretary", href: "/secretary", icon: BotMessageSquare },
@@ -838,7 +842,7 @@ function SideMenu({
                   }`}
                 >
                   <Icon className="size-5" />
-                  <span className="flex-1">{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}
+                  <span className="flex-1">{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}
                   <ChevronDown className={`size-4 transition-transform duration-200 ${active ? "" : "rotate-90"}`} />
                 </button>
               ) : (
@@ -850,7 +854,7 @@ function SideMenu({
                   }`}
                 >
                   <Icon className="size-5" />
-                  <span className="flex-1">{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}
+                  <span className="flex-1">{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}
                   <ChevronDown className="size-4 rotate-90" />
                 </Link>
               )}
@@ -934,7 +938,7 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
                 onClick={close}
               >
                 <Icon className="size-5" />
-                <span>{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}
+                <span>{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}
               </Link>
             </div>
           );

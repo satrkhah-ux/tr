@@ -12,9 +12,9 @@ const off = (feature: Feature) => (f: Feature) => f !== feature && FEATURE_DEFAU
 
 describe("the sidebar", () => {
   it("shows sales the home, «بيسك», the clients, operations and the data — nothing else", () => {
-    // «المتابعة»: each seller follows his own offers (owner order 4, 2026-10-23)
+    // «المتابعة»: each seller follows his own offers (owner order 4, 2026-10-23); «متابعتي»: his own conversations (2026-10-25)
     // «سكرتيري الخاص»: every employee's own assistant (owner order 2, 2026-10-24)
-    expect(navGroupsFor(SALES, on).map((g) => g.labelKey)).toEqual(["nav.dashboard", "nav.basic", "nav.customers", "nav.followups", "nav.secretary", "nav.operations", "nav.dataSection"]);
+    expect(navGroupsFor(SALES, on).map((g) => g.labelKey)).toEqual(["nav.dashboard", "nav.basic", "nav.customers", "nav.myFollowups", "nav.followups", "nav.secretary", "nav.operations", "nav.dataSection"]);
   });
 
   it("holds the old «البكجات السياحية» inside «بيسك», the legacy generator only while it is on", () => {
