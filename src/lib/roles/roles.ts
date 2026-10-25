@@ -284,7 +284,9 @@ export function viewAsPermissions(realPermissions: readonly Permission[], roleKe
   if (!canSwitchRoles(realPermissions)) return null;
   const keys = roleKeys.filter(isPermission);
   if (keys.includes("developer.access") && !realPermissions.includes("developer.access")) return null;
-  return keys.filter((k) => realPermissions.includes(k));
+  // the visa department's two keys are implied by the management keys (visa-files/access.ts), so they are held too
+  const managed = realPermissions.includes("dashboard.admin") || realPermissions.includes("developer.access");
+  return keys.filter((k) => realPermissions.includes(k) || (managed && (k === "visas.work" || k === "visas.manage")));
 }
 
 /** The roles the switcher offers this account: the ones viewAsPermissions accepts, nothing else. */
