@@ -323,7 +323,7 @@ export async function listSweepBookings(today: string, operationId?: string): Pr
   type R = BookingRow & { operations: unknown };
   return (((data ?? []) as R[]) ?? [])
     .filter((r) => r.supplier_ref || r.client_reference)
-    .map(({ operations: _ops, ...row }) => ({ row: row as BookingRow, operation_id: row.operation_id }));
+    .map((r) => { const { operations: _unused, ...row } = r; void _unused; return { row: row as BookingRow, operation_id: row.operation_id }; });
 }
 
 /**
