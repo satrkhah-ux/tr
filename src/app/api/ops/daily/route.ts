@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { runOpsDaily } from "@/lib/operations/daily";
 import { trackFlights } from "@/lib/data/flight-tracking";
 import { recordCronRun } from "@/lib/data/cron-runs";
+import { sweepTboBookings } from "@/lib/operations/tbo-sweep";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -30,7 +31,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const result = await runOpsDaily(today);
     // the morning's first look at today's arrivals (operations order 11)
     const flights = await trackFlights();
-    return { day: today, ...result, flights };
+    // TBO has no webhooks (the V2.1 spec, 2026-10-26): the morning asks it about
+    // every live case's bookings — a cancellation becomes an issue and a notice
+    const tbo = await sweepTboBookings(today).catch(() => null);
+    return { day: today, ...result, flights, tbo };
   });
   return NextResponse.json({ ok: true, ...summary });
 }

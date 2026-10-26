@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { after } from "next/server";
+import { sweepCaseTbo } from "@/lib/operations/tbo-sweep";
 import { OperationCase, OperationRefused } from "@/components/traveliun/operations/OperationCase";
 import { isOpenAIConfigured } from "@/lib/providers/openai";
 import { listAssignees, listSentRequests } from "@/lib/data/operation-assign";
@@ -38,6 +40,10 @@ export default async function OperationCasePage({
   const canManageP = gateCaseManager(id).then((no) => !no);
   const [data, canManage] = await Promise.all([dataP, canManageP]);
   if (!data) notFound();
+
+  // TBO is asked about this case's bookings as the page opens — after the answer,
+  // never holding it up; a change shows as an issue on the next load (tbo-sweep.ts)
+  after(() => sweepCaseTbo(id, new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" })).catch(() => undefined));
 
   if (query.view !== "all") {
     const canSeeCost = await currentCan("pricing.internal");
