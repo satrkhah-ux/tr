@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Copy, ExternalLink, Loader2, Scale } from "lucide-react";
-import { compareLinks, parsePastedPrice } from "@/lib/secretary/compare";
+import { Loader2, Scale } from "lucide-react";
+import type { PastedPrice } from "@/lib/secretary/compare";
+import { ComparePanel } from "./ComparePanel";
 import { applyComparedHotel, listMyProposals, type Proposal, type ProposalStay } from "@/lib/secretary/proposals";
 
 /**
@@ -14,31 +15,14 @@ import { applyComparedHotel, listMyProposals, type Proposal, type ProposalStay }
  * it into THEIR proposal draft by their hand. Nothing reaches any client.
  */
 
-function openCompare(url: string) {
-  const mobile = typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches;
-  if (mobile) { window.open(url, "_blank", "noopener"); return; }
-  const w = Math.min(960, Math.round(window.screen.availWidth / 2));
-  const h = Math.round(window.screen.availHeight * 0.92);
-  window.open(url, "tv-compare", `width=${w},height=${h},left=0,top=0,noopener`);
-}
-
 function StayCompare({ proposal, stay }: { proposal: Proposal; stay: ProposalStay }) {
   const [hotelName, setHotelName] = useState("");
-  const [pasted, setPasted] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
-  const parsed = parsePastedPrice(pasted);
-  const links = compareLinks({ hotelName: stay.hotelName, cityEn: stay.cityEn, cityAr: stay.cityAr, checkIn: stay.checkIn, checkOut: stay.checkOut, adults: proposal.adults, rooms: stay.roomsCount });
 
-  async function copyCurrent() {
-    if (!stay.currentTotal) return;
-    try { await navigator.clipboard.writeText(`${stay.currentTotal.amount} ${stay.currentTotal.currency}`); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* select by hand */ }
-  }
-
-  async function apply() {
-    if (!parsed || busy) return;
+  async function apply(parsed: PastedPrice) {
+    if (busy) return;
     setBusy(true); setError("");
     try {
       const r = await applyComparedHotel({ draftId: proposal.id, cityKey: stay.cityKey, hotelName, amount: parsed.amount, currency: parsed.currency, site: "لصق يدوي" });
@@ -48,36 +32,22 @@ function StayCompare({ proposal, stay }: { proposal: Proposal; stay: ProposalSta
   }
 
   return <div className="rounded-xl border border-[#e3e9e6] bg-white p-3">
-    <div className="flex flex-wrap items-baseline gap-2 text-sm">
-      <strong>{stay.cityAr}</strong>
-      <span className="text-[#557d78]">{stay.hotelName}</span>
-      <span className="text-xs text-[#8ba09b] tabular-nums">{stay.checkIn ?? "؟"} ← {stay.checkOut ?? "؟"} · {stay.nights} ليالٍ · {stay.roomsCount} غرفة</span>
-      {stay.currentTotal && <button type="button" onClick={() => void copyCurrent()} className="inline-flex items-center gap-1 rounded border border-[#dbe6e1] px-2 py-0.5 text-xs font-bold text-[#185045]">
-        <Copy size={11} /> {copied ? "نُسخ ✓" : `سعرنا: ${stay.currentTotal.amount} ${stay.currentTotal.currency}`}
-      </button>}
-    </div>
-    <div className="mt-2 flex flex-wrap gap-2">
-      {links.map((l) => <button key={l.key} type="button" onClick={() => openCompare(l.url)}
-        className="inline-flex items-center gap-1 rounded-lg border border-[#dbe6e1] px-3 py-1.5 text-xs font-bold text-[#185045] hover:bg-[#f4f8f6]">
-        <ExternalLink size={12} /> {l.label}
-      </button>)}
-    </div>
-    {done == null ? <div className="mt-2 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
-      <input value={hotelName} onChange={(e) => setHotelName(e.target.value)} maxLength={150} placeholder="اسم الفندق الذي وجدته…"
-        className="rounded-lg border border-[#dbe6e1] p-2 text-sm" />
-      <input value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder="الصق السعر هنا (مثل: SAR 1,250)"
-        className="rounded-lg border border-[#dbe6e1] p-2 text-sm" dir="auto" />
-      <button type="button" disabled={busy || !parsed || !hotelName.trim()} onClick={() => void apply()}
-        className="rounded-lg bg-[var(--tv-brand)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
-        {busy ? <Loader2 size={13} className="animate-spin" /> : "+ أضف هذا الفندق بديلاً"}
-      </button>
-      {parsed && <p className="text-xs text-[#557d78] md:col-span-3">
-        قرأت: <b className="tabular-nums">{parsed.amount.toLocaleString("en-US")} {parsed.currency}</b>{parsed.assumed ? " (افترضتها ريالاً — صحّح إن كانت غيرها)" : ""}
-        {stay.currentTotal && parsed.currency === stay.currentTotal.currency && <> — {parsed.amount < stay.currentTotal.amount ? `أرخص بـ ${(stay.currentTotal.amount - parsed.amount).toLocaleString("en-US")}` : `أغلى بـ ${(parsed.amount - stay.currentTotal.amount).toLocaleString("en-US")}`} {parsed.currency}</>}
-      </p>}
-    </div> : <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-800">
-      ✓ أُضيف «{hotelName}» بسعر ≈{done.toLocaleString("en-US")} ريال — <Link href={`/basic/${proposal.id}`} className="underline">افتح المسودة وراجع ثم أصدر</Link>. السعر بيدك أنت وتأكيده عليك.
-    </p>}
+    <ComparePanel
+      query={{ hotelName: stay.hotelName, cityEn: stay.cityEn, cityAr: stay.cityAr, checkIn: stay.checkIn, checkOut: stay.checkOut, adults: proposal.adults, rooms: stay.roomsCount }}
+      current={stay.currentTotal}
+      action={(parsed) => done == null
+        ? <div className="flex flex-wrap gap-2">
+            <input value={hotelName} onChange={(e) => setHotelName(e.target.value)} maxLength={150} placeholder="اسم الفندق الذي وجدته…"
+              className="min-w-0 flex-1 rounded-lg border border-[#dbe6e1] p-2 text-sm" />
+            <button type="button" disabled={busy || !parsed || !hotelName.trim()} onClick={() => parsed && void apply(parsed)}
+              className="rounded-lg bg-[var(--tv-brand)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+              {busy ? <Loader2 size={13} className="animate-spin" /> : "+ أضف هذا الفندق بديلاً"}
+            </button>
+          </div>
+        : <p className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-800">
+            ✓ أُضيف «{hotelName}» بسعر ≈{done.toLocaleString("en-US")} ريال — <Link href={`/basic/${proposal.id}`} className="underline">افتح المسودة وراجع ثم أصدر</Link>. السعر بيدك أنت وتأكيده عليك.
+          </p>}
+    />
     {error && <p role="alert" className="mt-1 text-xs text-red-700">{error}</p>}
   </div>;
 }

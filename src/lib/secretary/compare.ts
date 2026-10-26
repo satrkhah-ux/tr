@@ -41,6 +41,30 @@ export function compareLinks(q: CompareQuery): CompareLink[] {
   ];
 }
 
+/** an amount in another currency, through SAR (sarPer: SAR per 1 unit; SAR itself is 1) — null when a rate is missing */
+export function convertAmount(amount: number, from: string, to: string, sarPer: Record<string, number>): number | null {
+  const f = from.toUpperCase();
+  const t = to.toUpperCase();
+  if (f === t) return amount;
+  const inSar = f === "SAR" ? amount : sarPer[f] ? amount * sarPer[f] : null;
+  if (inSar == null) return null;
+  return t === "SAR" ? inSar : sarPer[t] ? inSar / sarPer[t] : null;
+}
+
+/**
+ * «استخدم هذا السعر» in Basic: a pasted WHOLE-STAY price for all the stay's
+ * rooms, in the stay's own currency, split per room (what a room's price holds
+ * — the whole stay, DraftRoomSpec.price) and per night (what the field shows).
+ */
+export function pastedToRoomPrice(pasted: { amount: number; currency: string }, stay: { currency: string; nights: number; rooms: number }, sarPer: Record<string, number>): { perRoomStay: number; perRoomNight: number } | null {
+  const total = convertAmount(pasted.amount, pasted.currency, stay.currency || "SAR", sarPer);
+  if (total == null || total <= 0) return null;
+  const rooms = Math.max(stay.rooms, 1);
+  const nights = Math.max(stay.nights, 1);
+  const perRoomStay = Math.round((total / rooms) * 100) / 100;
+  return { perRoomStay, perRoomNight: Math.round((perRoomStay / nights) * 100) / 100 };
+}
+
 /** ١٬٢٣٤٫٥٦ and 1,234.56 alike; the currency from its word or sign, SAR assumed when none is said. */
 export type PastedPrice = { amount: number; currency: string; assumed: boolean };
 
