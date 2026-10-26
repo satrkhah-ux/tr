@@ -37,7 +37,7 @@ describe("the sidebar", () => {
   });
 
   // fourteen, and «ابحث عن دولة أو خدمة» first — the owner's own order of 2026-10-22
-  it("holds «البيانات» to fifteen links and «الإدارة» to four (the owner, 2026-10-19, 2026-10-22)", () => {
+  it("holds «البيانات» to sixteen links and «الإدارة» to four (the owner, 2026-10-19, 2026-10-22, 2026-10-26)", () => {
     const all = () => true;
     const section = (key: string) => navGroupsFor(all, on).find((g) => g.labelKey === key)?.children?.map((c) => c.href) ?? [];
     expect(section("nav.dataSection")).toEqual([
@@ -50,6 +50,8 @@ describe("the sidebar", () => {
       "/airlines",
       "/airports",
       "/cars-types",
+      // «إدارة أسعار المواصلات» (the owner's transport details order, 2026-10-26)
+      "/transport-prices",
       "/cars/transfers",
       "/tour-programs",
       "/services-types",

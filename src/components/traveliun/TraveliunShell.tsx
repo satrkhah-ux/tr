@@ -249,6 +249,8 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.airlines", href: "/airlines", captionKey: "nav.dataCap.air" },
       { labelKey: "nav.airports", href: "/airports" },
       { labelKey: "nav.carTypes", href: "/cars-types", captionKey: "nav.dataCap.transport" },
+      // the step-by-step price screen (the owner's transport details order, 2026-10-26)
+      { labelKey: "nav.transportPrices", href: "/transport-prices" },
       // the transfers, the tours and the grid they are typed in
       { labelKey: "nav.transfersTours", href: "/cars/transfers" },
       { labelKey: "nav.tourPrograms", href: "/tour-programs" },
