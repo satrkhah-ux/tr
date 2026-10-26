@@ -3296,4 +3296,16 @@ export const en = {
   "wz.follow.title": "Your follow-up list today",
   "wz.follow.travel": "Travel",
   "wz.follow.notice": "Follow-up today",
+
+  // ---------- unfiled mail — the reservations mailbox (2026-10-26) ----------
+  "ops.mail.title": "Unfiled mail ({n})",
+  "ops.mail.pickHint": "Link to a client file…",
+  "ops.mail.dismiss": "Dismiss",
+  "ops.mail.kind.confirmation": "Confirmation",
+  "ops.mail.kind.hotel_change": "Hotel change",
+  "ops.mail.kind.no_availability": "No availability",
+  "ops.mail.kind.cancellation": "Cancellation",
+  "ops.mail.kind.other": "Other",
+  "dev.c.mailReservations": "Reservations mailbox (IMAP)",
+  "dev.d.imapOk": "Mailbox connection ok ({host})",
 } as const;

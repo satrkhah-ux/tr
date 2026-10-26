@@ -22,6 +22,8 @@ import { SuggestInput } from "../SuggestInput";
 import { resolvePlace } from "@/lib/leads/places";
 import type { Place } from "@/lib/leads/auto";
 import { useTraveliunUI } from "../TraveliunUIProvider";
+import type { UnlinkedEmail } from "@/lib/data/reservation-mail-actions";
+import { UnlinkedMail } from "./UnlinkedMail";
 
 /**
  * The operations board.
@@ -42,6 +44,7 @@ type Filter = "needs_action" | "all" | "unpaid" | "travelling_soon";
 type BoardCase = OperationCard & { signals: OperationSignal[]; last_progress_at?: string | null; services?: ServiceSummary[] };
 
 const NO_PLACES: Place[] = [];
+const NO_MAIL: UnlinkedEmail[] = [];
 
 export function OperationsBoard({
   operations,
@@ -50,6 +53,7 @@ export function OperationsBoard({
   staff,
   canSeeMoney,
   places = NO_PLACES,
+  mail = NO_MAIL,
 }: {
   /**
    * ONLY confirmed cases. The board deliberately does not list unconfirmed
@@ -66,6 +70,8 @@ export function OperationsBoard({
   canSeeMoney?: boolean;
   /** the catalogue's countries and cities — «الوجهة» lists each country once, however the case spelled it */
   places?: Place[];
+  /** «بريد بلا ملف»: supplier emails the reader could not match (reservation-mail-actions.ts) */
+  mail?: UnlinkedEmail[];
 }) {
   const { t } = useTraveliunUI();
   const [query, setQuery] = useState("");
@@ -207,6 +213,8 @@ export function OperationsBoard({
         )}
 
         <ArrivalsCalendar operations={listed} today={today} />
+
+        <UnlinkedMail emails={mail} operations={listed} />
 
         {/* today is injected so the server and the client agree on the clock */}
         <span className="hidden" data-today={today} />

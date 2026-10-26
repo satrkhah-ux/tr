@@ -3294,4 +3294,16 @@ export const ar: Dictionary = {
   "wz.follow.title": "قائمة متابعتك اليوم",
   "wz.follow.travel": "السفر",
   "wz.follow.notice": "متابعة اليوم",
+
+  // ---------- «بريد بلا ملف» — the reservations mailbox (2026-10-26) ----------
+  "ops.mail.title": "بريد بلا ملف ({n})",
+  "ops.mail.pickHint": "اربطه بملف عميل…",
+  "ops.mail.dismiss": "تجاهل",
+  "ops.mail.kind.confirmation": "تأكيد حجز",
+  "ops.mail.kind.hotel_change": "تغيير فندق",
+  "ops.mail.kind.no_availability": "عدم توفر",
+  "ops.mail.kind.cancellation": "إلغاء",
+  "ops.mail.kind.other": "أخرى",
+  "dev.c.mailReservations": "بريد الحجوزات (IMAP)",
+  "dev.d.imapOk": "الاتصال بالصندوق ناجح ({host})",
 };
