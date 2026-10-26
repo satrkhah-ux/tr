@@ -34,7 +34,7 @@ await build({ ...common, entryPoints: [join(here, "src/sw.ts")], outfile: join(o
 for (const name of ["popup", "panel", "link", "teletel", "capture"]) {
   await build({ ...common, entryPoints: [join(here, `src/${name}.ts`)], outfile: join(out, `${name}.js`), format: "iife" });
 }
-for (const file of ["popup.html", "panel.html", "styles.css"]) cpSync(join(here, "static", file), join(out, file));
+for (const file of ["popup.html", "panel.html", "styles.css", "INSTALL-AR.txt"]) cpSync(join(here, "static", file), join(out, file));
 cpSync(join(here, "..", "public", "icons", "icon-192.png"), join(out, "icons", "icon.png"));
 
 const manifest = {
