@@ -10,6 +10,12 @@
 -- where a human links or dismisses it. unique (message_uid) is the dedupe: the
 -- reader inserts on-conflict-do-nothing and only a NEW row triggers the issue
 -- and the notice.
+--
+-- Closed table like the rest of ours (as employee_notifications): RLS on with
+-- NO policies + default grants revoked from anon AND authenticated. A supplier's
+-- email carries guest names and confirmation numbers across every case, so no
+-- browser session reaches it — only the service role, behind the reader (cron,
+-- secret-gated) and reservation-mail-actions.ts (operations.write).
 -- ============================================================================
 
 create table if not exists public.reservation_emails (
@@ -34,11 +40,9 @@ create table if not exists public.reservation_emails (
 create index if not exists reservation_emails_status_idx on public.reservation_emails (status, created_at desc);
 
 alter table public.reservation_emails enable row level security;
-revoke all on public.reservation_emails from anon;
-
+revoke all on public.reservation_emails from anon, authenticated;
+-- an earlier draft opened it to every staff session — never applied, dropped here so a re-run is clean
 drop policy if exists reservation_emails_staff_all on public.reservation_emails;
-create policy reservation_emails_staff_all on public.reservation_emails
-  for all to authenticated using (public.is_staff()) with check (public.is_staff());
 
 comment on table public.reservation_emails is
   'Supplier replies read from reservations@traveliun.com (IMAP): classified, ref-extracted, linked to a booking or left for «بريد بلا ملف».';
@@ -59,6 +63,11 @@ on conflict (name) do nothing;
 
 notify pgrst, 'reload schema';
 
--- ROLLBACK (manual):
+-- ROLLBACK (manual) — the table is closed, so nothing outside it depends on a policy:
 --   delete from public.integrations where name = 'بريد الحجوزات reservations@';
 --   drop table if exists public.reservation_emails;
+--
+-- DRY RUN: begin; \i supabase/migrations/20261026200000_reservation_emails.sql
+--   then: select has_table_privilege('authenticated', 'public.reservation_emails', 'select');  -- must be false
+--         select count(*) from pg_policies where tablename = 'reservation_emails';               -- must be 0
+--   rollback;

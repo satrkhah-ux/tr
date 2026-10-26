@@ -2,8 +2,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
-import { currentCan } from "@/lib/roles/current";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { gateManager, gateOperation } from "@/lib/operations/access";
 import { notifyOps } from "@/lib/data/ops-notify";
 import { logAudit } from "@/lib/data/audit";
 import type { MailKind } from "@/lib/reservations-mail/classify";
@@ -11,18 +11,20 @@ import type { MailKind } from "@/lib/reservations-mail/classify";
 /**
  * «بريد بلا ملف» — supplier emails the reader could not match, listed at the
  * bottom of the operations board: a human links each to its case or dismisses
- * it. data.write, like the data screens (price-grid.ts) — linking an email IS
- * a data correction, not a booking act.
+ * it.
  *
- * Service client after the gate: reservation_emails and operation_issues are
- * written together with the notice, exactly as the reader writes a matched one.
+ * operations.write (gateManager): an unmatched email belongs to no case yet and
+ * carries guest names and confirmation numbers from ANY of them, so it spans
+ * every case like the cash flow does — an own-files holder never sees it. The
+ * table itself is closed (no policy, grants revoked — 20261026200000); this
+ * gate is the only door, and the service client goes through it.
  */
 
 type Fail = { ok: false; error: TranslationKey };
 
 async function gate(): Promise<SupabaseClient | Fail> {
-  if (!(await getServerUser())) return { ok: false, error: "err.session" };
-  if (!(await currentCan("data.write"))) return { ok: false, error: "err.forbidden" };
+  const denied = await gateManager();
+  if (denied) return { ok: false, error: denied };
   return createSupabaseServiceClient() as unknown as SupabaseClient;
 }
 
@@ -52,6 +54,9 @@ export async function listUnlinkedEmails(): Promise<UnlinkedEmail[]> {
 export async function linkEmailToOperation(emailId: string, operationId: string): Promise<{ ok: true } | Fail> {
   const db = await gate();
   if (isFail(db)) return db;
+  // the case id comes from the browser: it must be a real case the caller may work
+  const deniedCase = await gateOperation(operationId);
+  if (deniedCase) return { ok: false, error: deniedCase };
   const { data: mail } = await db.from("reservation_emails").select("id, subject, from_address, kind, status").eq("id", emailId).maybeSingle();
   const row = mail as { id: string; subject: string | null; from_address: string | null; kind: string | null; status: string } | null;
   if (!row || row.status !== "new") return { ok: false, error: "ops.err.notFound" };
