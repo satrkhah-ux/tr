@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 import { riyadhDate } from "@/lib/operations/payments";
 import { useRole } from "@/lib/roles/RoleContext";
-import { VISA_STATUS_LABEL, type VisaActionResult, type VisaEvent, type VisaFile, type VisaPayment, type VisaStatus } from "@/lib/visa-files/types";
+import { VISA_STATUS_LABEL, dueAmount, type VisaActionResult, type VisaEvent, type VisaFile, type VisaPayment, type VisaStatus } from "@/lib/visa-files/types";
 import {
   CONFIRM_STATUS,
+  money as moneyText,
   badPrice,
   datesOf,
   datesPatch,
@@ -121,7 +122,8 @@ function VisaFileBody({ data, people, teletelUrl, reload, refreshing, staleError
     checked.ok ? run(key, () => updateVisaFile(id, checked.value), ok, saved) : Promise.resolve(say(key, { tone: "error", text: checked.error }));
 
   const step = (to: VisaStatus) => {
-    if (CONFIRM_STATUS.includes(to)) setConfirming(to);
+    // handing over a visa whose fees are not all paid is never blocked, but asks first, in red (the owner, 2026-10-26)
+    if (CONFIRM_STATUS.includes(to) || (to === "delivered" && dueAmount(file) > 0)) setConfirming(to);
     else void doStep(to);
   };
   async function doStep(to: VisaStatus) {
@@ -150,6 +152,7 @@ function VisaFileBody({ data, people, teletelUrl, reload, refreshing, staleError
       <StatusBar
         status={file.status}
         confirming={confirming}
+        owing={confirming === "delivered" && dueAmount(file) > 0 ? moneyText(dueAmount(file), file.currency) : null}
         note={stepNote}
         busy={Boolean(busy.status)}
         message={said.status ?? null}

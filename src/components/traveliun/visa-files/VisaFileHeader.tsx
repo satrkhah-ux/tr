@@ -88,10 +88,12 @@ const CONFIRM_TEXT: Partial<Record<VisaStatus, string>> = {
 
 /** The steps the file may take from where it stands. The embassy's answers and a cancel ask «هل أنت متأكد؟» first. */
 export function StatusBar({
-  status, confirming, note, busy, message, onPick, onConfirm, onCancel, onNote,
+  status, confirming, owing, note, busy, message, onPick, onConfirm, onCancel, onNote,
 }: {
   status: VisaStatus;
   confirming: VisaStatus | null;
+  /** the fees still owed, said when the file is about to be handed over unpaid — never a block, only a red question */
+  owing?: string | null;
   note: string;
   busy: boolean;
   message: Message;
@@ -125,12 +127,13 @@ export function StatusBar({
         <div role="alertdialog" aria-label="تأكيد الخطوة" className="space-y-2 rounded-[12px] border border-[#f2e2b4] bg-[#fff8e8] p-3">
           <p className="text-sm font-extrabold text-[#a86a10]">هل أنت متأكد من «{VISA_STATUS_LABEL[confirming]}»؟</p>
           {CONFIRM_TEXT[confirming] ? <p className="text-[13px] font-semibold text-[#a86a10]">{CONFIRM_TEXT[confirming]}</p> : null}
+          {owing ? <p role="alert" className="rounded-[8px] bg-[#fdeef2] p-2 text-[13px] font-extrabold text-[#a3263f]">لم يسدد العميل كامل الرسوم — المتبقي {owing}. التسليم غير ممنوع، لكن تأكّد أنه مقصود.</p> : null}
           <label className={label}>
             ملاحظة (اختيارية)
             <input className={field} value={note} onChange={(e) => onNote(e.target.value)} placeholder={confirming === "rejected" ? "سبب الرفض كما ذكرته السفارة" : "تُحفظ في سجل الملف"} />
           </label>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={confirming === "cancelled" || confirming === "rejected" ? btnDanger : btnPrimary} disabled={busy} onClick={onConfirm}>
+            <button type="button" className={confirming === "cancelled" || confirming === "rejected" || owing ? btnDanger : btnPrimary} disabled={busy} onClick={onConfirm}>
               {busy ? <Loader2 className="size-4 animate-spin" /> : null} نعم، أكّد
             </button>
             <button type="button" className={btn} disabled={busy} onClick={onCancel}>تراجع</button>

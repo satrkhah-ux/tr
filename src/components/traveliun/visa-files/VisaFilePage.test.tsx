@@ -40,6 +40,14 @@ describe("the status bar", () => {
   const bar = (status: VisaStatus, over: Partial<Parameters<typeof StatusBar>[0]> = {}) =>
     renderToStaticMarkup(<StatusBar status={status} confirming={null} note="" busy={false} message={NO_MESSAGE} onPick={() => {}} onConfirm={() => {}} onCancel={() => {}} onNote={() => {}} {...over} />);
 
+  it("hands an unpaid file over only after a red question that names what is owed — never a block", () => {
+    const html = bar("approved", { confirming: "delivered", owing: "500 SAR" });
+    expect(html).toContain("لم يسدد العميل كامل الرسوم");
+    expect(html).toContain("500 SAR");
+    expect(html).toContain("نعم، أكّد"); // the question can still be answered yes
+    expect(bar("approved", { confirming: "delivered", owing: null })).not.toContain("لم يسدد العميل");
+  });
+
   it("offers exactly the steps the status allows, the first one as the main button", () => {
     const html = bar("ready");
     expect(html).toContain("تم التقديم للسفارة");
