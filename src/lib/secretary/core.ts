@@ -1,16 +1,16 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
-import { listOpenConversations, type OpenConversation } from "@/lib/providers/teletel";
-import { followupRows } from "@/lib/followups/service";
-import { FOLLOWUP_SETTINGS_KEY, handlerOf, parseFollowupSettings, STEP_LABELS, todayGroup, WORK_COLS, type WorkRow } from "@/lib/followups/rules";
+import { myDay } from "@/lib/mine/day";
+import { dayCounts, KIND_LABEL, KIND_ORDER, type DayItem, type DayKind } from "@/lib/mine/rank";
 import { HEAT_LABEL } from "@/lib/followups/summary-core";
 
 /**
  * «سكرتيري الخاص» (the owner, 2026-10-24, order 2) — the data side: who the
- * signed-in employee is, and their OWN briefing (their follow-ups, their open
- * Teletel conversations, who is hot, what is due today). Nothing of anyone
- * else's ever enters the briefing or the model's context.
+ * signed-in employee is, and their OWN briefing. The day itself comes from
+ * «متابعتي»'s read interface (mine/day.ts myDay — one ranking for the page,
+ * the bot and the secretary), so nothing is computed twice and nothing of
+ * anyone else's ever enters the briefing or the model's context.
  */
 
 export type SecretaryEmployee = { id: string; name: string; agentId: number | null; chatId: number | null };
@@ -65,55 +65,31 @@ export async function currentSecretaryEmployee(): Promise<SecretaryEmployee | nu
   };
 }
 
-export type SecretaryBriefing = {
-  followups: WorkRow[];
-  dueToday: WorkRow[];
-  hot: WorkRow[];
-  clientWaiting: WorkRow[];
-  /** the employee's own open Teletel conversations, the waiting ones first */
-  conversations: Pick<OpenConversation, "id" | "name" | "waitingSince" | "preview" | "serviceType">[];
-};
+export type SecretaryBriefing = { items: DayItem[]; teletel: boolean };
 
-/** Everything the secretary may know: this one employee's files and conversations. */
-export async function secretaryBriefing(db: SupabaseClient, employee: SecretaryEmployee, nowMs = Date.now()): Promise<SecretaryBriefing> {
-  const [{ data: rows }, { data: setting }, open] = await Promise.all([
-    followupRows<WorkRow>((a, b) => db.from("sla_followups").select(WORK_COLS).eq("status", "open").order("id").range(a, b)),
-    db.from("app_settings").select("value").eq("key", FOLLOWUP_SETTINGS_KEY).maybeSingle(),
-    listOpenConversations().catch(() => null),
-  ]);
-  const settings = parseFollowupSettings((setting as { value?: string } | null)?.value);
-  const mine = rows.filter((r) => handlerOf(r, settings) === employee.id);
-  const conversations = (open?.rows ?? [])
-    .filter((c) => c.assigneeId != null && c.assigneeId === employee.agentId)
-    .sort((a, b) => b.waitingSince - a.waitingSince)
-    .slice(0, 30)
-    .map((c) => ({ id: c.id, name: c.name, waitingSince: c.waitingSince, preview: c.preview, serviceType: c.serviceType }));
-  return {
-    followups: mine,
-    dueToday: mine.filter((r) => todayGroup(r, nowMs) !== null),
-    hot: mine.filter((r) => r.summary?.heat === "hot"),
-    clientWaiting: mine.filter((r) => r.client_waiting),
-    conversations,
-  };
+/** Everything the secretary may know: this one employee's «عليّ اليوم» (mine/day.ts). */
+export async function secretaryBriefing(employee: SecretaryEmployee, nowMs = Date.now()): Promise<SecretaryBriefing> {
+  const day = await myDay(employee.id, nowMs);
+  return { items: day?.items ?? [], teletel: day?.teletel ?? false };
 }
 
-const waitedText = (sinceUnix: number, nowMs: number) => {
-  if (!sinceUnix) return "";
-  const m = Math.max(1, Math.round((nowMs / 1000 - sinceUnix) / 60));
-  return m < 120 ? `ينتظر ${m} دقيقة` : `ينتظر ${Math.round(m / 60)} ساعة`;
+const sinceText = (sinceMs: number | null, nowMs: number) => {
+  if (!sinceMs) return "";
+  const m = Math.max(1, Math.round((nowMs - sinceMs) / 60_000));
+  return m < 120 ? `منذ ${m} دقيقة` : m < 48 * 60 ? `منذ ${Math.round(m / 60)} ساعة` : `منذ ${Math.round(m / (24 * 60))} يوماً`;
 };
 
-const fuLine = (r: WorkRow, nowMs: number) => {
-  const s = r.summary;
+const itemLine = (i: DayItem, nowMs: number) => {
   const bits = [
-    r.contact_name || `محادثة #${r.conversation_id}`,
-    r.destination ? `وجهته: ${r.destination}` : "",
-    r.step !== null ? `خطوة المتابعة: ${STEP_LABELS[r.step] ?? r.step}` : "",
-    s ? `حرارته: ${HEAT_LABEL[s.heat]}` : "",
-    r.client_waiting ? "العميل رد وينتظرك" : "",
-    todayGroup(r, nowMs) ? "مستحقة اليوم" : "",
-    s?.stopped ? `أين توقفت: ${s.stopped}` : "",
-    s?.advice ? `نصيحة مُراد: ${s.advice}` : "",
+    i.name || (i.conversationId ? `محادثة #${i.conversationId}` : "عميل"),
+    `${KIND_LABEL[i.kind]}${i.tags.length ? ` (وأيضاً: ${i.tags.map((t) => KIND_LABEL[t]).join("، ")})` : ""}`,
+    i.destination ? `وجهته: ${i.destination}` : "",
+    i.heat ? `حرارته: ${HEAT_LABEL[i.heat]}` : "",
+    i.wants ? `يريد: ${i.wants}` : "",
+    i.since ? sinceText(i.since, nowMs) : "",
+    i.advice ? `نصيحة مُراد: ${i.advice}` : "",
+    i.reminder ? `تذكيرك: ${i.reminder.text}` : "",
+    i.preview ? `آخر رسالة: ${i.preview.slice(0, 120)}` : "",
   ].filter(Boolean);
   return `- ${bits.join(" | ")}`;
 };
@@ -124,28 +100,33 @@ export function renderBriefing(employee: SecretaryEmployee, b: SecretaryBriefing
   return [
     `الموظف: ${employee.name || "غير مسمّى"} — الآن: ${day} (توقيت الرياض)`,
     "",
-    `ملفات المتابعة المفتوحة (${b.followups.length})، منها مستحقة اليوم ${b.dueToday.length} وساخنة ${b.hot.length} وعملاء ردوا وينتظرون ${b.clientWaiting.length}:`,
-    ...(b.followups.length ? b.followups.slice(0, 25).map((r) => fuLine(r, nowMs)) : ["(لا ملفات متابعة مفتوحة)"]),
-    "",
-    `محادثاته المفتوحة في تيلي تيل (${b.conversations.length}):`,
-    ...(b.conversations.length
-      ? b.conversations.slice(0, 20).map((c) => `- ${c.name || `#${c.id}`}${c.serviceType ? ` (${c.serviceType})` : ""}${c.waitingSince ? ` — ${waitedText(c.waitingSince, nowMs)}` : " — الرد الأخير منا"}${c.preview ? ` — آخر رسالة: ${c.preview.slice(0, 120)}` : ""}`)
-      : ["(لا محادثات مفتوحة)"]),
+    `قائمة «عليّ اليوم» (${b.items.length})، مرتبة بالأولوية:`,
+    ...(b.items.length ? b.items.slice(0, 30).map((i) => itemLine(i, nowMs)) : ["(لا شيء مستحق الآن)"]),
+    ...(b.teletel ? [] : ["", "تنبيه: تعذّرت قراءة محادثات تيلي تيل الآن — القائمة تشمل متابعات العروض والتذكيرات فقط."]),
   ].join("\n");
 }
 
-/** The day plan, deterministic (no model): what is due, who is hot, who waits. */
+const PLAN_HEAD: Record<DayKind, string> = {
+  waiting: "💬 ردوا وينتظرونك",
+  silent: "🤐 سكتوا بعد رسالتك",
+  hot: "🔥 عملاء ساخنون — كلّمهم أولاً",
+  offer: "📋 متابعات عروض مستحقة",
+  reminder: "⏰ تذكيراتك",
+};
+
+/** The day plan, deterministic (no model): the ranked list, grouped, each client once under its top reason. */
 export function planText(employee: SecretaryEmployee, b: SecretaryBriefing, nowMs = Date.now()): string {
-  const name = (r: WorkRow) => r.contact_name || `محادثة #${r.conversation_id}`;
   const lines: string[] = [`صباح الخير${employee.name ? ` يا ${employee.name}` : ""} 🌤️ — خطة يومك:`];
-  if (b.clientWaiting.length) lines.push("", `💬 عملاء ردوا وينتظرونك (${b.clientWaiting.length}):`, ...b.clientWaiting.slice(0, 8).map((r) => `• ${name(r)}`));
-  const hotIds = new Set(b.hot.map((r) => r.id));
-  if (b.hot.length) lines.push("", `🔥 عملاء ساخنون — كلّمهم أولاً (${b.hot.length}):`, ...b.hot.slice(0, 8).map((r) => `• ${name(r)}${r.summary?.heat_why ? ` — ${r.summary.heat_why}` : ""}`));
-  const due = b.dueToday.filter((r) => !hotIds.has(r.id) && !r.client_waiting);
-  if (due.length) lines.push("", `📋 متابعات مستحقة اليوم (${due.length}):`, ...due.slice(0, 10).map((r) => `• ${name(r)}${r.step !== null ? ` — ${STEP_LABELS[r.step] ?? ""}` : ""}`));
-  const waiting = b.conversations.filter((c) => c.waitingSince > 0);
-  if (waiting.length) lines.push("", `⏳ محادثات تنتظر ردك الآن (${waiting.length}):`, ...waiting.slice(0, 8).map((c) => `• ${c.name || `#${c.id}`} — ${waitedText(c.waitingSince, nowMs)}`));
+  const counts = dayCounts(b.items);
+  for (const kind of KIND_ORDER) {
+    const of = b.items.filter((i) => i.kind === kind);
+    if (!of.length) continue;
+    lines.push("", `${PLAN_HEAD[kind]} (${counts[kind]}):`);
+    lines.push(...of.slice(0, 8).map((i) => `• ${i.name || `#${i.conversationId ?? ""}`}${i.kind === "reminder" && i.reminder ? ` — ${i.reminder.text}` : i.heat === "hot" && i.wants ? ` — ${i.wants}` : i.since ? ` — ${sinceText(i.since, nowMs)}` : ""}`));
+    if (of.length > 8) lines.push(`و${of.length - 8} أخرى…`);
+  }
   if (lines.length === 1) lines.push("", "لا شيء مستحق عليك الآن — يوم هادئ. ✅");
+  if (!b.teletel) lines.push("", "(تعذّرت قراءة تيلي تيل الآن — القائمة قد تنقص المحادثات المنتظرة)");
   lines.push("", "اسألني أي وقت: «ما حال محادثاتي؟» أو «من الساخن؟»");
   return lines.join("\n");
 }

@@ -1,16 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { WorkRow } from "@/lib/followups/rules";
-import { parseSecretarySettings, planText, type SecretaryBriefing, type SecretaryEmployee } from "./core";
+import type { DayItem, DayKind } from "@/lib/mine/rank";
+import { parseSecretarySettings, planText, type SecretaryEmployee } from "./core";
 
 const employee: SecretaryEmployee = { id: "e1", name: "رشا", agentId: 5, chatId: null };
-const row = (over: Partial<WorkRow>): WorkRow => ({
-  id: "f1", conversation_id: 100, contact_name: "أبو فهد", contact_phone: null, status: "open", stage: "working",
-  assigned_to: "e1", assigned_at: null, request_started_at: "", created_at: "", next_followup_at: null, first_followed_at: null,
-  last_attempt_at: null, last_client_at: null, last_synced_at: null, source: "teletel", source_team_id: null, transfer_reason: null,
-  outcome: null, external_status: null, attempt_count: 0, send_lock: null, done_at: null, offer_id: null, offer_at: null,
-  offer_line: null, destination: null, step: 1, client_line: null, client_waiting: false, close_reason: null,
-  summary: null, last_line: null, last_by: null, murad_note_at: null, ...over,
-} as WorkRow);
+const item = (kind: DayKind, name: string): DayItem => ({
+  key: `${kind}:${name}`, kind, tags: [], conversationId: 1, name, phone: null, since: Date.now() - 3600_000,
+  wants: null, next: null, advice: null, heat: kind === "hot" ? "hot" : null, offerLine: null, destination: null,
+  followupId: null, step: null, canReply: null, preview: null, reminder: null, note: null,
+});
 
 describe("«سكرتيري الخاص» settings", () => {
   it("defaults and survives bad JSON", () => {
@@ -24,20 +21,17 @@ describe("«سكرتيري الخاص» settings", () => {
 });
 
 describe("the day plan", () => {
-  it("orders: who replied, then hot, then due — and a quiet day says so", () => {
-    const b: SecretaryBriefing = {
-      followups: [], conversations: [],
-      clientWaiting: [row({ id: "w", contact_name: "منتظِر" })],
-      hot: [row({ id: "h", contact_name: "ساخن" })],
-      dueToday: [row({ id: "d", contact_name: "مستحق" })],
-    };
-    const text = planText(employee, b);
+  it("groups in «متابعتي»'s order (waiting → silent → hot → offer → reminder) and a quiet day says so", () => {
+    const items = [item("waiting", "منتظِر"), item("silent", "ساكت"), item("hot", "ساخن"), item("offer", "مستحق")];
+    const text = planText(employee, { items, teletel: true });
     expect(text.indexOf("منتظِر")).toBeGreaterThan(-1);
-    expect(text.indexOf("منتظِر")).toBeLessThan(text.indexOf("ساخن"));
+    expect(text.indexOf("منتظِر")).toBeLessThan(text.indexOf("ساكت"));
+    expect(text.indexOf("ساكت")).toBeLessThan(text.indexOf("ساخن"));
     expect(text.indexOf("ساخن")).toBeLessThan(text.indexOf("مستحق"));
     expect(text).toContain("رشا");
 
-    const quiet = planText(employee, { followups: [], conversations: [], clientWaiting: [], hot: [], dueToday: [] });
+    const quiet = planText(employee, { items: [], teletel: true });
     expect(quiet).toContain("يوم هادئ");
+    expect(planText(employee, { items: [], teletel: false })).toContain("تعذّرت قراءة تيلي تيل");
   });
 });

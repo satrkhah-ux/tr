@@ -2,6 +2,7 @@ import "server-only";
 import { logAudit } from "@/lib/data/audit";
 import { escapeHtml, staffSend } from "@/lib/telegram/staff-bot";
 import { siteUrl } from "@/lib/telegram/ops-bot";
+import { dayCounts } from "@/lib/mine/rank";
 import { planText, secretaryBriefing, secretaryDb, secretarySettings, type SecretaryEmployee } from "./core";
 
 /**
@@ -43,7 +44,7 @@ export async function sweepSecretaryPlans(nowMs = Date.now()): Promise<Record<st
       agentId: e.teletel_agent_id == null ? null : Number(e.teletel_agent_id),
       chatId: e.telegram_chat_id == null ? null : Number(e.telegram_chat_id),
     };
-    const briefing = await secretaryBriefing(db, employee, nowMs).catch(() => null);
+    const briefing = await secretaryBriefing(employee, nowMs).catch(() => null);
     if (!briefing) continue;
     const text = planText(employee, briefing, nowMs);
     // the row FIRST: it is the once-a-day claim, so a failed Telegram send never repeats the plan
@@ -52,7 +53,7 @@ export async function sweepSecretaryPlans(nowMs = Date.now()): Promise<Record<st
     if (employee.chatId) {
       await staffSend(employee.chatId, `🗂 <b>خطة يومك من سكرتيرك الخاص</b>\n\n${escapeHtml(text)}`, [[{ text: "افتح سكرتيري الخاص", url: `${siteUrl()}/secretary` }]], {}, "secretary").catch(() => null);
     }
-    await logAudit({ action: "secretary.plan_sent", entity: "secretary_messages", entity_id: e.id, meta: { due: briefing.dueToday.length, hot: briefing.hot.length, waiting: briefing.clientWaiting.length } });
+    await logAudit({ action: "secretary.plan_sent", entity: "secretary_messages", entity_id: e.id, meta: dayCounts(briefing.items) });
     sent++;
   }
   return { online: online.length, sent };
