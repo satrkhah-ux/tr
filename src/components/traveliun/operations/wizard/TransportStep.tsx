@@ -146,7 +146,10 @@ function CityCard({
   // remounts the file input once its paper is filed
   const [paperKey, setPaperKey] = useState(0);
   const [driver, setDriver] = useState<Driver | null>(null);
-  const drv = driver ?? city.driver;
+  // «بأقل الإدخالات» (the owner, 2026-10-26): a city with no driver yet offers the one
+  // the office last used there — shown in the fields, saved only when the clerk presses save
+  const remembered = !city.driver.name && !city.driver.phone ? (setup?.usualDriver[city.key] ?? null) : null;
+  const drv = driver ?? (remembered ?? city.driver);
   const targets = driverTargets(city);
   // worth saving: a new name or number, or the city's driver not yet on one of its trips
   const driverChanged = drv.name !== city.driver.name || drv.phone !== city.driver.phone;
@@ -378,6 +381,9 @@ function CityCard({
         <p className="flex items-center gap-1.5 text-[12px] font-extrabold text-[#185045] sm:col-span-3">
           <UserRound className="size-3.5" />
           {t("wz.transport.driver")}
+          {remembered && !driver ? (
+            <span className="rounded-full bg-[#eef5f2] px-2 py-0.5 text-[10.5px] font-bold text-[#2a7d66]">{t("wz.transport.driverUsual")}</span>
+          ) : null}
         </p>
         <DriverFields value={drv} onChange={setDriver} />
         <button

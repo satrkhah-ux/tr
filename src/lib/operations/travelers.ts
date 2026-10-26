@@ -141,8 +141,8 @@ export function travelerReadiness(
   return gaps;
 }
 
-/** The destination's own visa setting (countries.visa_required, 0011), or null when the trip's country is not in /countries. */
-export type DestinationVisa = { iso2: string | null; visa_required: boolean | null } | null;
+/** The destination's own visa setting (countries.visa_required, 0011; saudi_entry since 20261023), or null when the trip's country is not in /countries. */
+export type DestinationVisa = { iso2: string | null; visa_required: boolean | null; saudi_entry?: string | null } | null;
 
 /**
  * ponytail: a STARTING list, not a visa database — the pairs we are sure of:
@@ -170,6 +170,11 @@ export function visaFor(nationality: string | null, destination: DestinationVisa
   if (nat && iso2 && VISA_EXEMPT[nat]?.includes(iso2)) return "not_required";
   if (sold) return "required";
   if (nat && nat !== "SAU") return "check";
+  // the catalogue's own answer for a Saudi passport (countries.saudi_entry, the visa
+  // list's data): free or on-arrival needs nothing from us; e-visa or embassy does
+  const entry = destination?.saudi_entry ?? null;
+  if (entry === "free" || entry === "arrival") return "not_required";
+  if (entry === "evisa" || entry === "embassy") return "required";
   return destination?.visa_required ? "required" : "not_required";
 }
 

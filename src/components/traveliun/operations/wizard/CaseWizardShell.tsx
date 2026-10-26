@@ -9,6 +9,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { setExecutionStatus } from "@/lib/data/operations";
 import { paidTotal } from "@/lib/operations/payments";
 import { firstOpenStep, itemTone, readiness, readyLabel, readyToTravel, stepStates, stepTone, type StepTone } from "@/lib/operations/wizard/index";
+import { calmDone, calmRows, calmUrgency, nextNow } from "@/lib/operations/wizard/calm";
 import { clientStatusUnbacked, paidState } from "@/lib/operations/wizard/payment";
 import { WIZARD_STEPS, type StepProps, type WizardCase, type WizardStep } from "@/lib/operations/wizard/types";
 import { TraveliunShell } from "../../TraveliunShell";
@@ -140,7 +141,7 @@ export function CaseWizardShell({
             </span>
           </div>
           <div className="mt-3">
-            <ReadyGate data={data} step={step} onOpenStep={setStep} />
+            <CalmGate data={data} step={step} onOpenStep={setStep} />
           </div>
         </section>
 
@@ -184,6 +185,141 @@ export function CaseWizardShell({
 
       </div>
     </TraveliunShell>
+  );
+}
+
+/**
+ * The calm gate (the owner, 2026-10-26: «يدخل على ملف يساعده وليس يصعب عليه»):
+ * ONE big card with the next thing to do and its button, a quiet ordered list
+ * of what follows, the finished steps folded to a ✓ line, and the «جاهز
+ * للسفر» button. One palette — the brand green and grey; red only when the
+ * travel date is on top of us with something mandatory missing, amber only
+ * for a real warning. The old six-tile grid (ReadyGate below) stays on
+ * «عرض الكل», so nothing is lost.
+ */
+function CalmGate({ data, step, onOpenStep }: { data: WizardCase; step: WizardStep; onOpenStep: (step: WizardStep) => void }) {
+  const { t } = useTraveliunUI();
+  const router = useRouter();
+  const [pending, run] = useSafeTransition();
+  const [error, setError] = useState<string | null>(null);
+  const op = data.operation;
+  const next = nextNow(data);
+  const rows = calmRows(data, next?.step);
+  const done = calmDone(data);
+  const items = readiness(data);
+  const ready = readyToTravel(items);
+  const urgency = calmUrgency(op.travel_start, data.today);
+  const urgent = urgency !== "normal" && next?.item && !next.item.optional;
+  const exec = op.execution_status;
+
+  return (
+    <div className="space-y-2.5">
+      {next ? (
+        <div
+          className={`rounded-[14px] border p-4 ${
+            urgent ? "border-[#f4c9d4] bg-[#fdf4f6]" : "border-[#cfe0d9] bg-[#f4faf7]"
+          }`}
+        >
+          <p className={`text-[11px] font-bold ${urgent ? "text-[#c22850]" : "text-[#6d8a84]"}`}>
+            {t("wz.calm.next")}
+            {urgent ? <span className="ms-1.5">{t(urgency === "late" ? "wz.calm.late" : "wz.calm.soon")}</span> : null}
+          </p>
+          <p className="mt-1 text-[16px] font-extrabold leading-snug text-[#0f3d38]">
+            {next.item ? t(readyLabel(next.item)) : t(`wz.step.${next.step}` as TranslationKey)}
+          </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            {next.step === step ? (
+              <span className="text-[12px] font-bold text-[#6d8a84]">{t("wz.calm.below")}</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onOpenStep(next.step)}
+                className={`inline-flex h-10 items-center gap-1.5 rounded-[10px] px-4 text-[13px] font-extrabold text-white ${
+                  urgent ? "bg-[#c22850] hover:bg-[#a81f42]" : "bg-[#185045] hover:bg-[#0f4439]"
+                }`}
+              >
+                {t("wz.calm.open", { step: t(`wz.step.${next.step}` as TranslationKey) })}
+                <ArrowLeft className="size-4 ltr:rotate-180" />
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-[14px] border border-[#bfe5d4] bg-[#e9f7f0] p-4">
+          <p className="text-[14px] font-extrabold text-[#0f7a52]">{t("wz.calm.allDone")}</p>
+        </div>
+      )}
+
+      {rows.length > 0 ? (
+        <ol className="overflow-hidden rounded-[12px] border border-[#eef2f0]">
+          {rows.map((r) => (
+            <li key={r.step} className="border-b border-[#f4f7f5] last:border-b-0">
+              <button
+                type="button"
+                onClick={() => onOpenStep(r.step)}
+                aria-current={r.step === step ? "step" : undefined}
+                className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-start hover:bg-[#f8fbf9] ${r.step === step ? "bg-[#f4faf7]" : "bg-white"}`}
+              >
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#eef2f0] text-[11px] font-extrabold text-[#557d78]">
+                  {r.state === "waiting" ? <Clock className="size-3.5" /> : WIZARD_STEPS.indexOf(r.step) + 1}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-extrabold text-[#0f3d38]">{t(`wz.step.${r.step}` as TranslationKey)}</span>
+                  {r.first ? (
+                    <span className={`block truncate text-[11.5px] font-semibold ${r.warning ? "text-[#a86a10]" : "text-[#93aaa3]"}`}>
+                      {t(readyLabel(r.first))}
+                      {r.more > 0 ? <span className="tv-tnum ms-1">+{r.more}</span> : null}
+                    </span>
+                  ) : null}
+                </span>
+                {r.state === "waiting" ? <span className="shrink-0 text-[11px] font-bold text-[#93aaa3]">{t("wz.state.waiting")}</span> : null}
+              </button>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+
+      {done.length > 0 ? (
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[12px] font-bold text-[#557d78]">
+          {done.map((d) => (
+            <button key={d.step} type="button" onClick={() => onOpenStep(d.step)} className="inline-flex items-center gap-1 hover:underline">
+              <Check className={`size-3.5 ${d.na ? "text-[#b9c8c3]" : "text-[#0f7a52]"}`} />
+              {t(`wz.step.${d.step}` as TranslationKey)}
+            </button>
+          ))}
+        </p>
+      ) : null}
+
+      {exec === "cancelled" || exec === "travelled" ? null : (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#f0f4f2] pt-2.5">
+          <p className="text-[12.5px] font-extrabold text-[#003c3a]">{t("ops.ready.title")}</p>
+          {exec === "ready_to_travel" ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e9f7f0] px-3 py-1 text-[12px] font-bold text-[#0f7a52]">
+              <PlaneTakeoff className="size-4" />
+              {t("ops.exec.ready_to_travel")}
+            </span>
+          ) : (
+            <button
+              type="button"
+              disabled={!ready || pending}
+              onClick={() =>
+                run(async () => {
+                  setError(null);
+                  const res = await setExecutionStatus(op.id, "ready_to_travel");
+                  if (res.ok) router.refresh();
+                  else setError(t(res.error));
+                })
+              }
+              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#0f7a52] px-4 text-[12.5px] font-bold text-white disabled:bg-[#b7d0c7]"
+            >
+              {pending ? <Loader2 className="size-4 animate-spin" /> : <PlaneTakeoff className="size-4" />}
+              {t("ops.ready.mark")}
+            </button>
+          )}
+        </div>
+      )}
+      {error ? <p className="text-[12px] font-bold text-[#c22850]">{error}</p> : null}
+    </div>
   );
 }
 

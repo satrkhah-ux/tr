@@ -11,6 +11,7 @@ import {
   getVisaFileUrl,
   readPassportMrz,
   seedTravelersFromOffer,
+  applyVisaDefaults,
   setTravelerVisa,
   uploadPassportScan,
   uploadVisaFile,
@@ -90,14 +91,35 @@ export function TravelersPanel({
     <section id="travelers" className={`${card} scroll-mt-24`}>
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-extrabold text-[#185045]">{t("ops.travelers")}</h2>
-        <button
-          type="button"
-          onClick={() => setAdding((v) => !v)}
-          className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
-        >
-          <Plus className="size-3.5" />
-          {t("ops.traveler.add")}
-        </button>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* «الافتراضي لكل المسافرين بضغطة واحدة» (the owner, 2026-10-26) — drawn only while someone is still «يحتاج تحقق» */}
+          {travelers.some((x) => x.visa_status === "check") ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  setError(null);
+                  const res = await applyVisaDefaults(operationId);
+                  if (!res.ok) setError(t(res.error));
+                  else router.refresh();
+                })
+              }
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60"
+            >
+              {pending ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldAlert className="size-3.5" />}
+              {t("ops.trav.visaDefaults")}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setAdding((v) => !v)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-dashed border-[#b7d0c7] px-3 text-[12px] font-bold text-[#185045] hover:bg-[#f0f7f4]"
+          >
+            <Plus className="size-3.5" />
+            {t("ops.traveler.add")}
+          </button>
+        </div>
       </div>
       <p className="mb-3 flex items-center gap-1.5 text-[11.5px] font-semibold text-[#93aaa3]">
         <Lock className="size-3.5" />

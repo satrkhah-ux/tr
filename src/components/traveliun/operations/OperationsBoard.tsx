@@ -239,16 +239,18 @@ function CaseFolder({ op, owner, index }: { op: BoardCase; owner: string | null;
   const href = `/operations/${op.id}`;
   const top = op.signals.find((s) => s.severity === "critical") ?? op.signals.find((s) => s.severity === "warn") ?? op.signals[0];
   const services = op.services ?? [];
-  // the back panel says where the case stands at a glance: red ink when it is stuck, plum when it waits, green when all is booked
+  const allDone = services.length > 0 && services.every((s) => s.state === "done");
+  // one calm palette (the owner, 2026-10-26: «بلون واحد … بالالوان المزعجة»): red ink only
+  // for a critical signal; everything in progress shares the quiet default
   const art: ArtPreset = top?.severity === "critical"
     ? "ember"
-    : top
-      ? "dusk"
-      : op.execution_status === "travelled"
-        ? "glacier"
-        : services.length > 0 && services.every((s) => s.state === "done")
-          ? "verdant"
-          : "aurora";
+    : op.execution_status === "travelled"
+      ? "glacier"
+      : allDone
+        ? "verdant"
+        : "aurora";
+  // the badge says THE WORD the case lacks: the signal when one fires, else the first unfinished service
+  const firstOpen = services.find((s) => s.state !== "done");
   const files: FolderFile[] = services.length
     ? services.map((s) => ({
         name: t(KIND_LABEL[s.kind]),
@@ -278,7 +280,9 @@ function CaseFolder({ op, owner, index }: { op: BoardCase; owner: string | null;
         badge={
           top
             ? { text: t(SIGNAL_KEY(top.code)), tone: top.severity === "critical" ? "danger" : "warn" }
-            : { text: t(EXEC_KEY(op.execution_status)), tone: "ok" }
+            : firstOpen
+              ? { text: t("ops.card.lacks", { what: t(KIND_LABEL[firstOpen.kind]) }), tone: "warn" }
+              : { text: t(EXEC_KEY(op.execution_status)), tone: "ok" }
         }
         art={art}
         seed={(hashString(op.serial) % 4) + 1}
