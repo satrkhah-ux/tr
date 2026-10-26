@@ -125,6 +125,8 @@ export function planStatus(file: Pick<VisaFile, "status" | "country"> & StatusDa
 
 /** Ordered: the first pattern that matches names the kind («صورة الجواز» is a passport, not a photo). */
 const KIND_GUESS: [VisaDocKind, RegExp][] = [
+  // «خطاب تعريف موجه إلى السفارة… رقم الجواز الوظيفة الراتب» is a letter that MENTIONS the passport, not the passport
+  ["employment_letter", /خطاب\s*تعريف/],
   ["passport", /جواز|باسبور|passport/i],
   ["photo", /صور[ةه]?\s*(?:شخصي|ملون|حديث|بخلف|بيضاء)|صورتان|صورتين|صور شخصي|photo|\d\s*[x×*]\s*\d/i],
   ["hotel", /فندق|فنادق|حجز\s*(?:ال)?سكن|hotel/i],
@@ -153,6 +155,9 @@ export function requirementLines(text: string | null | undefined): string[] {
     .slice(0, 40);
 }
 
+/** a note about price, fee or time inside a requirements list — read by the client, nothing to collect */
+const NOT_A_DOCUMENT = /^(?:ال)?(?:سعر|اسعار|أسعار|رسوم|مدة|مده)(?=\s|$)/;
+
 /**
  * The expected documents of a new file: one per requirement line (fee and price lines are not documents),
  * the personal ones once per traveller; the passport is always there, and a catalogue with no list gives the
@@ -163,9 +168,12 @@ export function expectedDocs(lines: string[], travelerIds: string[], newId: () =
   const wanted: { kind: VisaDocKind; label: string }[] = [];
   for (const raw of lines) {
     const line = withoutPrices(raw).trim();
-    if (!line || seen.has(fold(line))) continue;
+    if (!line || seen.has(fold(line)) || NOT_A_DOCUMENT.test(line)) continue;
+    const kind = guessDocKind(line);
+    // a one-word line that is no document is the list's heading («الصين»), not something to collect
+    if (kind === "other" && line.split(/\s+/).length <= 1) continue;
     seen.add(fold(line));
-    wanted.push({ kind: guessDocKind(line), label: cut(line, 120) });
+    wanted.push({ kind, label: cut(line, 120) });
   }
   if (!wanted.some((w) => w.kind === "passport")) wanted.unshift({ kind: "passport", label: VISA_DOC_LABEL.passport });
   if (wanted.length === 1) wanted.push({ kind: "photo", label: VISA_DOC_LABEL.photo });

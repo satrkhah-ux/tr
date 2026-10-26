@@ -295,3 +295,15 @@ describe("submitting attaches what is in hand", () => {
     expect(stampSubmitted([], "now")).toBeNull();
   });
 });
+
+describe("the expected documents of China's real list (2026-10-26)", () => {
+  it("drops the heading and the price note, and reads the introduction letter as a letter", () => {
+    const docs = expectedDocs(
+      ["الصين", "الجواز الأصلي ويوجد به اكثر من 6 اشهر صلاحيه و3 صفحات فارغيين", "صورتين شخصيه بخلفيه بيضاء مكشوفه الراس", "خطاب تعريف موجه الي سفاره الصين الشعبيه ويذكر فيه الاسم الجنسيه رقم الجواز الوظيفه الراتب", "صورة من هويه المقيم", "السعر يختلف حسب الجنسيه"],
+      ["t1"],
+      () => "id",
+    );
+    expect(docs.map((d) => d.kind)).toEqual(["passport", "photo", "employment_letter", "residence"]);
+    expect(docs.some((d) => /^الصين$|السعر/.test(d.label))).toBe(false);
+  });
+});
