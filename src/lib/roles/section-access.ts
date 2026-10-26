@@ -78,6 +78,8 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   // «متابعتي»: each seller's own list; the follow-up team reads anyone's, and the team board is theirs (the owner, 2026-10-25)
   ["/my-followups/team", ["followups.work", "followups.manage", "dashboard.admin", "developer.access"]],
   ["/my-followups", ["offers.write", "followups.work", "followups.manage", "dashboard.admin", "developer.access"]],
+  // «التأشيرات» — the visa department's files and board; the management sees all of it (the owner, 2026-10-26)
+  ["/visa-files", ["visas.work", "visas.manage", "dashboard.admin", "developer.access"]],
   // the team and its roles
   ["/employees", "employees.manage"],
   // «مركز التشغيل الذكي»: company-wide revenue, conversion and average offer —

@@ -74,6 +74,16 @@ export type AuditAction =
   | "traveler.deleted"
   | "visa.updated"
   | "visa.file_viewed"
+  // «ملفات التأشيرات» (visa-files): the file, who holds it, money received, the papers, and every read of identity data
+  | "visa.file.created"
+  | "visa.file.updated"
+  | "visa.file.status"
+  | "visa.file.assigned"
+  | "visa.file.payment"
+  | "visa.file.document"
+  | "visa.file.doc_viewed"
+  | "visa.file.passport.read"
+  | "visa.file.passport.revealed"
   // execution
   | "booking.created"
   | "booking.confirmed"

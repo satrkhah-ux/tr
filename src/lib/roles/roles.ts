@@ -94,6 +94,10 @@ export const ALL_PERMISSIONS = [
   "clients.view",
   "followups.work",
   "followups.manage",
+  /** «التأشيرات»: work the visa files (create, collect documents, submit, follow up) — the visa department. */
+  "visas.work",
+  /** «التأشيرات»: the department's whole board, reassigning files, payments and the numbers. */
+  "visas.manage",
   /**
    * «تنبيهاتي» (@traveliunbot) as a manager (the user, 2026-10-22): every
    * colleague's live numbers in the bot, «📢 إعلان عام», and an alert to one of
@@ -201,6 +205,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     items: [{ key: "clients.view", kind: "view" }, { key: "followups.work", kind: "do" }, { key: "followups.manage", kind: "do", sensitive: true }],
   },
   {
+    key: "perm.group.visas",
+    items: [{ key: "visas.work", kind: "do" }, { key: "visas.manage", kind: "do", sensitive: true }],
+  },
+  {
     key: "perm.group.operations",
     items: [
       { key: "operations.write", kind: "do" },
@@ -276,7 +284,9 @@ export function viewAsPermissions(realPermissions: readonly Permission[], roleKe
   if (!canSwitchRoles(realPermissions)) return null;
   const keys = roleKeys.filter(isPermission);
   if (keys.includes("developer.access") && !realPermissions.includes("developer.access")) return null;
-  return keys.filter((k) => realPermissions.includes(k));
+  // the visa department's two keys are implied by the management keys (visa-files/access.ts), so they are held too
+  const managed = realPermissions.includes("dashboard.admin") || realPermissions.includes("developer.access");
+  return keys.filter((k) => realPermissions.includes(k) || (managed && (k === "visas.work" || k === "visas.manage")));
 }
 
 /** The roles the switcher offers this account: the ones viewAsPermissions accepts, nothing else. */
