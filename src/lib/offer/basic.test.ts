@@ -30,6 +30,7 @@ import {
   extraBeds,
   priceAtSource,
   carForGroup,
+  withCountryCapacities,
   packageProfitFor,
   resizeGroupCars,
   withGroupCars,
@@ -491,6 +492,23 @@ describe("النظام بيسك", () => {
     expect(carForGroup(FLEET, 3)).toEqual({ car_type: "سيارة متوسطة", cars: 1 });
     expect(carForGroup(FLEET, 4)).toEqual({ car_type: "ميني فان", cars: 1 });
     expect(carForGroup(FLEET, 12)).toEqual({ car_type: "فان مرسيدس", cars: 2 });
+  });
+
+  it("lays the trip's countries' own capacities over the fleet — the smallest pax when countries disagree", () => {
+    const fleet = FLEET.map((c) => ({ ...c, luggage: null as number | null }));
+    const caps = [
+      { car_type: "سيارة صغيرة", pax: 3, luggage: 2 },
+      { car_type: "سيارة صغيرة", pax: 2, luggage: 1 }, // a second country, tighter: it wins
+      { car_type: "سيارة غير معروفة", pax: 9, luggage: 9 }, // no such fleet car: ignored
+    ];
+    const adjusted = withCountryCapacities(fleet, caps);
+    expect(adjusted.find((c) => c.name === "سيارة صغيرة")).toMatchObject({ pax: 2, luggage: 1 });
+    expect(adjusted.find((c) => c.name === "ميني فان")).toMatchObject({ pax: 5 }); // untouched
+    expect(withCountryCapacities(fleet, [])).toBe(fleet); // no rows: the same list back
+    // the default car follows the country's numbers: three people fit the متوسطة in general (pax 4),
+    // but in a country where it seats 3 the group moves up to the ميني فان
+    expect(carForGroup(fleet, 3)).toEqual({ car_type: "سيارة متوسطة", cars: 1 });
+    expect(carForGroup(withCountryCapacities(fleet, [{ car_type: "سيارة متوسطة", pax: 3, luggage: null }]), 3)).toEqual({ car_type: "ميني فان", cars: 1 });
   });
 
   it("fills only the cars still empty, and moves only the ones that were the group's size", () => {

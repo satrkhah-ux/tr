@@ -75,7 +75,7 @@ export async function askSecretary(text: string): Promise<SecretaryThread> {
   const { error: insertError } = await db.from("secretary_messages").insert({ employee_id: employee.id, role: "user", content: question });
   if (insertError) return { ok: false, error: "تعذّر الحفظ." };
 
-  const [briefing, history] = await Promise.all([secretaryBriefing(db, employee), thread(employee.id, 12)]);
+  const [briefing, history] = await Promise.all([secretaryBriefing(employee), thread(employee.id, 12)]);
   const context = [
     renderBriefing(employee, briefing),
     "",
@@ -128,7 +128,7 @@ export async function adminSecretaryView(employeeId: string): Promise<AdminSecre
     agentId: e.teletel_agent_id == null ? null : Number(e.teletel_agent_id),
     chatId: e.telegram_chat_id == null ? null : Number(e.telegram_chat_id),
   };
-  const [briefing, messages] = await Promise.all([secretaryBriefing(db, employee).catch(() => null), thread(employee.id)]);
+  const [briefing, messages] = await Promise.all([secretaryBriefing(employee).catch(() => null), thread(employee.id)]);
   await logAudit({ action: "secretary.admin_view", entity: "secretary_messages", entity_id: employee.id, meta: { name: employee.name } });
   return {
     ok: true,

@@ -206,6 +206,7 @@ export const ar: Dictionary = {
   "nav.ports": "أسماء الموانئ",
   "nav.transportation": "المواصلات",
   "nav.carTypes": "أنواع السيارات",
+  "nav.carCapacities": "سعات السيارات بالدولة",
   "nav.markupRules": "قواعد الهامش",
   "nav.cars": "ربط السيارات بالدول",
   "nav.transfers": "التوصيلات",
