@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { DirText } from "@/components/DirText";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { SecretaryPanel, SecretaryTrigger } from "@/components/traveliun/secretary/SecretaryPanel";
+import { SecretaryFab } from "@/components/traveliun/secretary/SecretaryFab";
 import { NotificationBell } from "@/components/traveliun/notifications/NotificationBell";
 import {
   AlertTriangle,
@@ -451,7 +451,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
   const onDeveloperPage = DEVELOPER_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = usePinnedSidebar();
-  const [panel, setPanel] = useState<"guide" | "calculator" | "view" | "settings" | "profile" | "secretary" | null>(null);
+  const [panel, setPanel] = useState<"guide" | "calculator" | "view" | "settings" | "profile" | null>(null);
   const { language, setLanguage, view, setView, theme, setTheme, dir, t } = useTraveliunUI();
   const partner = usePartnerBrand();
   const visibleNavGroups = useNavGroups();
@@ -526,6 +526,9 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
   return (
     <DirectionProvider direction={dir}>
     <div className="tv-app min-h-screen bg-[#eef3f1] font-sans text-[#0f3d38]" dir={dir}>
+      {/* «مُراد — سكرتيري الخاص»: floating on the WHOLE system (the owner, 2026-10-26), focus mode included, and never over a
+          button or a field — it measures the page and moves off them (secretary/SecretaryFab.tsx); partners are outside companies and never see it */}
+      {partner ? null : <SecretaryFab />}
       {focus ? null : (
       <div
         className={`fixed start-0 top-0 z-[90] hidden h-screen transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:block ${
@@ -640,15 +643,6 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
 
           {/* «مركز الإشعارات»: the bell and its unread count (notifications/NotificationBell.tsx) */}
           {partner ? null : <NotificationBell />}
-          {/* «مُراد»: in the bar, not floating over buttons and fields (the owner, 2026-10-26) */}
-          {partner || pathname?.startsWith("/secretary") ? null : (
-            <Popover open={panel === "secretary"} onOpenChange={(o) => setPanel(o ? "secretary" : null)}>
-              <PopoverTrigger render={<SecretaryTrigger active={panel === "secretary"} />} />
-              <PopoverContent className="w-[min(430px,calc(100vw/var(--tv-zoom)_-_24px))] overflow-hidden p-0">
-                <SecretaryPanel close={() => setPanel(null)} />
-              </PopoverContent>
-            </Popover>
-          )}
           </div>
           {/* the guide, the calculator and the table view are our tools, together — a partner keeps settings and account */}
           {partner ? null : (

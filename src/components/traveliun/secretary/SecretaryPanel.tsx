@@ -1,44 +1,15 @@
 "use client";
 
-import { forwardRef, useEffect, useState, useSyncExternalStore, type ComponentProps } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BotMessageSquare, Loader2, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { getSecretaryBoard, type SecretaryBoard } from "@/lib/data/my-followups";
 import { SecretaryChat } from "./SecretaryChat";
 import { SecretaryDayBoard } from "./SecretaryDayBoard";
 
 /**
- * «مُراد — سكرتيري الخاص» lives in the top bar, not floating over the page (the owner, 2026-10-26: «الزر العائم لمراد يعيق
- * الاستخدام في بعض الاماكن، لا تجعله امام زر اطلاقا او ادخال بيانات»): a pill beside the bell opens this panel under the bar.
- * The panel opens on the day board («خطتي») with a chat tab beside it.
+ * The panel مُراد's floating button opens (SecretaryFab.tsx): the day board («خطتي») with a chat tab beside it.
  */
-
-// the bell (NotificationBell) announces the unread count; مُراد's pill wears the same number
-let notifCount = 0;
-const subscribeNotif = (cb: () => void) => {
-  const on = (e: Event) => { notifCount = Number((e as CustomEvent<{ count?: number }>).detail?.count ?? 0) || 0; cb(); };
-  window.addEventListener("tv-notifications", on);
-  return () => window.removeEventListener("tv-notifications", on);
-};
-const readNotif = () => notifCount;
-
-export const SecretaryTrigger = forwardRef<HTMLButtonElement, { active?: boolean } & ComponentProps<"button">>(function SecretaryTrigger({ active = false, className, ...props }, ref) {
-  const unread = useSyncExternalStore(subscribeNotif, readNotif, () => 0);
-  return (
-    <button
-      ref={ref}
-      type="button"
-      aria-label="مُراد — سكرتيري الخاص"
-      title="مُراد — سكرتيري الخاص"
-      className={`relative flex h-10 shrink-0 items-center gap-1.5 rounded-[10px] px-3 text-[13px] font-extrabold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#b7d0c7] ${active ? "bg-[#0f4439] text-white" : "bg-[var(--tv-brand)] text-white hover:bg-[#0f4439]"} ${className ?? ""}`}
-      {...props}
-    >
-      <BotMessageSquare className="size-[18px]" />
-      <span className="max-sm:hidden">مُراد</span>
-      {unread > 0 && <span className="absolute -top-1.5 -end-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#b3261e] px-1 text-[11px] font-extrabold tabular-nums text-white ring-2 ring-white">{unread > 99 ? "99+" : unread}</span>}
-    </button>
-  );
-});
 
 export function SecretaryPanel({ close }: { close: () => void }) {
   const [tab, setTab] = useState<"plan" | "chat">("plan");
