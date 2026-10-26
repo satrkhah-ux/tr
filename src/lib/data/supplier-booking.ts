@@ -303,6 +303,30 @@ async function loadBooking(bookingId: string): Promise<BookingRow | null> {
 }
 
 /**
+ * The daily TBO sweep's candidates (tbo-sweep.ts): hotel bookings that hold a
+ * reference to ask TBO about, on cases whose travel is not behind us. Service
+ * client — the sweep runs with no session; its route's secret is the gate.
+ */
+export async function listSweepBookings(today: string, operationId?: string): Promise<{ row: BookingRow; operation_id: string }[]> {
+  const supabase = await db();
+  let query = supabase
+    .from("operation_bookings")
+    .select(`${BOOKING_COLUMNS}, operations!inner(travel_end, execution_status)`)
+    .eq("kind", "hotel")
+    .in("status", ["confirmed", "in_flight", "prebooked"])
+    .or("supplier_ref.not.is.null,confirmation_number.not.is.null")
+    .gte("operations.travel_end", today)
+    .neq("operations.execution_status", "cancelled")
+    .limit(100);
+  if (operationId) query = query.eq("operation_id", operationId);
+  const { data } = await query;
+  type R = BookingRow & { operations: unknown };
+  return (((data ?? []) as R[]) ?? [])
+    .filter((r) => r.supplier_ref || r.client_reference)
+    .map(({ operations: _ops, ...row }) => ({ row: row as BookingRow, operation_id: row.operation_id }));
+}
+
+/**
  * The rate identifier to commit against.
  *
  * Prefers the code returned by the most recent PreBook (TBO re-issues it and the
@@ -676,6 +700,19 @@ export async function refreshSupplierBooking(bookingId: string): Promise<
 
   const row = await loadBooking(bookingId);
   if (!row) return { ok: false, error: "ops.err.notFound" };
+  return refreshLoadedBooking(row);
+}
+
+/**
+ * The read-and-apply core, shared with the daily TBO sweep (tbo-sweep.ts),
+ * which runs with no session — its caller answers for access; here the
+ * gate above does.
+ */
+export async function refreshLoadedBooking(row: NonNullable<Awaited<ReturnType<typeof loadBooking>>>): Promise<
+  | { ok: true; status: string; confirmation_number: string | null; hotel_confirmation_number: string | null }
+  | Fail
+  | Blocked
+> {
   if (!row.confirmation_number && !row.supplier_ref) {
     return { ok: false, message: "لا رقم تأكيد ولا مرجع حجز — لا شيء نسأل عنه المورّد." };
   }
