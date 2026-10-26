@@ -33,6 +33,14 @@ describe("compareLinks", () => {
     expect(agoda.searchParams.get("los")).toBe("2");
     expect(links.find((l) => l.key === "almosafer")!.url).toContain("almosafer.com");
   });
+  it("never mixes scripts in the search: a Latin hotel keeps to Latin, an Arabic one to Arabic", () => {
+    const ss = (q: Partial<Parameters<typeof compareLinks>[0]>) => new URL(compareLinks({ cityAr: "كوالالمبور", cityEn: null, checkIn: null, checkOut: null, adults: 2, rooms: 1, ...q })[0].url).searchParams.get("ss");
+    // the owner's screenshot: Booking found nothing for the English hotel with the Arabic city glued on
+    expect(ss({ hotelName: "The Saujana Kuala Lumpur" })).toBe("The Saujana Kuala Lumpur");
+    expect(ss({ hotelName: "The Saujana", cityEn: "Kuala Lumpur" })).toBe("The Saujana Kuala Lumpur");
+    expect(ss({ hotelName: "The Saujana Kuala Lumpur", cityEn: "Kuala Lumpur" })).toBe("The Saujana Kuala Lumpur");
+    expect(ss({ hotelName: "فندق ذا ساوجانا" })).toBe("فندق ذا ساوجانا كوالالمبور");
+  });
   it("falls back to the Arabic city and survives missing dates", () => {
     const links = compareLinks({ cityAr: "تبليسي", cityEn: null, checkIn: null, checkOut: null, adults: 2, rooms: 2 });
     const booking = new URL(links[0].url);

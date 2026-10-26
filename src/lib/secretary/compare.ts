@@ -23,8 +23,23 @@ export type CompareQuery = {
   rooms: number;
 };
 
+/**
+ * What the sites are asked for. One script only (the owner's screenshot, 2026-10-26: Booking answered «0 أماكن» to
+ * «The Saujana Kuala Lumpur كوالالمبور» — an English hotel with the Arabic city glued on): a Latin hotel name goes
+ * with the English city, or alone when the city is only known in Arabic or the name already holds it; an Arabic
+ * name goes with the Arabic city.
+ */
+function searchPlace(q: CompareQuery): string {
+  const hotel = q.hotelName?.trim() ?? "";
+  const cityEn = q.cityEn?.trim() ?? "";
+  const cityAr = q.cityAr.trim();
+  if (!hotel) return cityEn || cityAr;
+  if (/[A-Za-z]/.test(hotel)) return cityEn && !hotel.toLowerCase().includes(cityEn.toLowerCase()) ? `${hotel} ${cityEn}` : hotel;
+  return [hotel, cityAr].filter(Boolean).join(" ");
+}
+
 export function compareLinks(q: CompareQuery): CompareLink[] {
-  const place = [q.hotelName?.trim(), q.cityEn?.trim() || q.cityAr.trim()].filter(Boolean).join(" ");
+  const place = searchPlace(q);
   const booking = new URLSearchParams({ ss: place, group_adults: String(Math.max(q.adults, 1)), no_rooms: String(Math.max(q.rooms, 1)), group_children: "0" });
   if (q.checkIn) booking.set("checkin", q.checkIn);
   if (q.checkOut) booking.set("checkout", q.checkOut);
