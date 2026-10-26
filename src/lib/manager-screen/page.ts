@@ -382,7 +382,9 @@ const CSS = `
 :root{--bg:#04101a;--panel:#0a1c28;--panel2:#0e2533;--line:#18384a;--text:#f3f7fa;--muted:#8fa7b8;--dim:#4f6b7d;--green:#22c55e;--amber:#ff9f1c;--red:#ff3b4e;--gold:#f5b400;--blue:#3ea6ff}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;cursor:none;background:var(--bg);color:var(--text)}
-body{font-family:Tajawal,"Noto Sans Arabic",Tahoma,Arial,sans-serif;font-size:${v(22)};height:100vh;height:100dvh;display:grid;grid-template-rows:${v(86)} ${v(96)} minmax(0,1fr) ${v(56)} ${v(62)}}
+body{font-family:Tajawal,"Noto Sans Arabic",Tahoma,Arial,sans-serif;font-size:${v(22)};height:100vh;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:${v(86)} ${v(96)} minmax(0,1fr) ${v(56)} ${v(62)}}
+/* nothing inside may widen the page: a long line made the track wider than the screen and pushed the left rail off it (the owner's TV photo, 2026-10-26) */
+body>*{min-width:0}
 .tnum{font-variant-numeric:tabular-nums}
 .s-green{--c:var(--green)}.s-amber{--c:var(--amber)}.s-red{--c:var(--red)}
 

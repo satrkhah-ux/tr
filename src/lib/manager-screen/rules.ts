@@ -804,12 +804,18 @@ function murad(f: ManagerFacts): Section {
   };
 }
 
+/** A wall screen says what is wrong in words, not the variable names a check printed (the owner's TV, 2026-10-26) */
+export function plainReason(error: string | null): string {
+  const text = (error ?? "").replace(/[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?:\s*\/\s*)?/g, "").replace(/\s+[—-]\s+لا يوجد\s*(?:في متغيرات البيئة)?\s*$/u, "").replace(/\s{2,}/g, " ").trim();
+  return text || "لا يعمل";
+}
+
 /** What is down NOW — an end date next week is «الربط الخارجي»'s own alert, not today's screen. */
 function system(f: ManagerFacts): Section {
   // «الربط الخارجي»'s own judgement (integration-alerts.ts): «fail» = two failed checks in a row, «expiry:1» = ends within a day
   const judged = f.integrations.map((r) => {
     const status: Status = r.alerted === "fail" ? "red" : r.alerted === "expiry:1" ? soft(f, "red") : r.fail_streak === 1 ? "amber" : "green";
-    const why = r.alerted === "expiry:1" ? "ينتهي خلال يوم" : (r.last_error ?? "لا يعمل");
+    const why = r.alerted === "expiry:1" ? "ينتهي خلال يوم" : plainReason(r.last_error);
     return { name: r.name, status, why };
   });
   const bad = judged.filter((j) => j.status !== "green").sort((a, b) => RANK[b.status] - RANK[a.status]);
