@@ -32,6 +32,24 @@ let shownCapture: string | null = null;
 const when = (iso: string | null) =>
   iso ? new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Riyadh" }).format(new Date(iso)) : "";
 
+/** The capture to show: this tab's, else the newest of the last ten minutes made in a popup window. */
+async function captureFor(tabId: number | undefined): Promise<{ key: string; cap: Capture & { at: number } } | null> {
+  const all = (await chrome.storage.session.get(null)) as Record<string, unknown>;
+  const own = tabId !== undefined ? (all[`cap:${tabId}`] as (Capture & { at: number }) | undefined) : undefined;
+  if (own) return { key: `cap:${tabId}`, cap: own };
+  const recent = Object.entries(all)
+    .filter(([k, v]) => k.startsWith("cap:") && typeof (v as { at?: unknown })?.at === "number" && Date.now() - (v as { at: number }).at < 10 * 60_000)
+    .sort((a, b) => (b[1] as { at: number }).at - (a[1] as { at: number }).at);
+  for (const [k, v] of recent) {
+    const win = await chrome.tabs
+      .get(Number(k.slice(4)))
+      .then((t) => chrome.windows.get(t.windowId))
+      .catch(() => null);
+    if (win?.type === "popup") return { key: k, cap: v as Capture & { at: number } };
+  }
+  return null;
+}
+
 /** this window's active tab */
 async function activeTab(): Promise<chrome.tabs.Tab | null> {
   const win = await chrome.windows.getCurrent();
@@ -64,13 +82,13 @@ async function refresh(force = false) {
   const c = conv && tab?.id !== undefined ? { tabId: tab.id, ...conv } : null;
   if (!c) {
     shown = null;
-    // a hotel price captured in this tab: its form
-    const key = tab?.id !== undefined ? `cap:${tab.id}` : null;
-    const cap = key ? ((await chrome.storage.session.get(key))[key] as (Capture & { at: number }) | undefined) : undefined;
-    if (cap && key) {
-      if (!force && shownCapture === `${key}:${cap.at}`) return;
-      shownCapture = `${key}:${cap.at}`;
-      return renderCapture(root, cap);
+    // a hotel price captured in this tab — or in a popup window «قارن» opened beside the system (it has no panel)
+    const found = await captureFor(tab?.id);
+    if (found) {
+      const mark = `${found.key}:${found.cap.at}`;
+      if (!force && shownCapture === mark) return;
+      shownCapture = mark;
+      return renderCapture(root, found.cap, () => shownCapture === mark, () => void refresh(true));
     }
     shownCapture = null;
     root.innerHTML = `

@@ -73,6 +73,12 @@ chrome.runtime.onMessage.addListener((msg: Incoming, sender, reply) => {
   if (msg?.type === "capture") {
     const tabId = fromHotelSite(sender);
     if (tabId === null) return false;
+    // first, while the press still counts as the user's: the panel beside the page (a popup window has none —
+    // the panel open in the system's window shows the capture instead)
+    const opening = chrome.sidePanel.open({ tabId }).then(
+      () => true,
+      () => false,
+    );
     const d = msg.data ?? {};
     const nights = Number(d.nights);
     void (async () => {
@@ -91,9 +97,7 @@ chrome.runtime.onMessage.addListener((msg: Incoming, sender, reply) => {
           at: Date.now(),
         },
       });
-      // the press on the page counts as the user's: the panel opens beside it (else the employee opens it)
-      const opened = await chrome.sidePanel.open({ tabId }).then(() => true, () => false);
-      reply({ opened });
+      reply({ opened: await opening });
     })();
     return true;
   }

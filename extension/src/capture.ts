@@ -51,8 +51,14 @@ function capture() {
 async function send(ev: MouseEvent, button: HTMLButtonElement) {
   // a click a person made — a page script cannot press it for them
   if (!ev.isTrusted) return;
-  const r = (await chrome.runtime.sendMessage({ type: "capture", data: capture() }).catch(() => null)) as { opened?: boolean } | null;
-  button.textContent = r?.opened ? "✓ في لوحة المساعد — راجع وأرسل" : r ? "✓ افتح لوحة المساعد من أيقونة الإضافة" : "حدّث الصفحة ثم حاول";
+  let r: { opened?: boolean } | null = null;
+  try {
+    // cut off when the extension was reloaded since this page opened
+    if (chrome.runtime?.id) r = (await chrome.runtime.sendMessage({ type: "capture", data: capture() })) as { opened?: boolean } | null;
+  } catch {
+    r = null;
+  }
+  button.textContent = r?.opened ? "✓ في لوحة المساعد — راجع وأرسل" : r ? "✓ في لوحة المساعد — افتحها من أيقونة الإضافة في نافذة النظام" : "حدّث الصفحة ثم حاول";
   window.setTimeout(() => (button.textContent = "⇪ أرسل السعر إلى الملف"), 4000);
 }
 
