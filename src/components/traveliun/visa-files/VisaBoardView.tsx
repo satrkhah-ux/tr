@@ -319,7 +319,7 @@ function FileTableRow({ r, now, person }: { r: VisaRow; now: number; person: str
   const link = "inline-flex min-h-11 items-center hover:underline";
   return (
     <tr className="border-b border-[#eef2f0] align-top last:border-0 hover:bg-[#f7faf8]">
-      <td className="px-3 py-1"><Link href={`/visa-files/${r.id}`} className={`${link} font-bold text-[#185045]`}><DirText>{r.serial}</DirText></Link></td>
+      <td className="px-3 py-1"><Link href={`/visa-files/${r.id}`} className={`${link} whitespace-nowrap font-bold text-[#185045]`}><DirText>{r.serial}</DirText></Link></td>
       <td className="px-3 py-1">
         <Link href={`/visa-files/${r.id}`} className={`${link} font-extrabold text-[#003c3a]`}>{r.clientName}</Link>
         {r.clientPhone ? <DirText className="block text-xs text-[#6f8f88]">{r.clientPhone}</DirText> : null}

@@ -29,9 +29,11 @@ export function VisaBoard({ initial }: { initial: VisaActionResult<{ board: Boar
   const searched = useRef(filter.search);
   const first = useRef(true);
 
-  const load = useCallback(async (f: BoardFilterState) => {
+  const load = useCallback(async (f: BoardFilterState, quiet = false) => {
     const mine = ++ticket.current;
     setRefreshing(true);
+    // a retry after a failure shows the skeleton again (not the minute's own refresh, which would flicker it); a refresh over a board keeps the board
+    if (!quiet) setPhase((p) => (p.kind === "error" ? { kind: "loading" } : p));
     const r = await settle(() => getVisaBoard(toVisaFilter(f)));
     if (mine !== ticket.current) return;
     setRefreshing(false);
@@ -58,7 +60,7 @@ export function VisaBoard({ initial }: { initial: VisaActionResult<{ board: Boar
   }, [filter, load]);
 
   useEffect(() => {
-    const every = setInterval(() => void load(filterRef.current), 60_000);
+    const every = setInterval(() => void load(filterRef.current, true), 60_000);
     return () => clearInterval(every);
   }, [load]);
 

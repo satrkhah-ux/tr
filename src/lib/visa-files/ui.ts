@@ -90,13 +90,13 @@ export function toVisaFilter(s: BoardFilterState): VisaFilter {
 /** A status counter: that status, no attention filter. */
 export const pickStatus = (s: BoardFilterState, status: BoardFilterState["status"]): BoardFilterState => ({ ...s, status, focus: null, limit: BOARD_PAGE });
 /** An attention counter: the files it counts. «صدرت ولم تُسلَّم» is by definition not an open file. */
-export const pickFocus = (s: BoardFilterState, focus: BoardFilterState["focus"]): BoardFilterState => ({
-  ...s,
-  focus: s.focus === focus ? null : focus,
-  status: focus === "toDeliver" ? "all" : "open",
-  limit: BOARD_PAGE,
-});
-export const isDefaultFilter = (s: BoardFilterState) => JSON.stringify(s) === JSON.stringify(defaultBoardFilter());
+export const pickFocus = (s: BoardFilterState, focus: BoardFilterState["focus"]): BoardFilterState => {
+  // pressed again, a counter lets go and the board is back on the open files
+  const off = s.focus === focus;
+  return { ...s, focus: off ? null : focus, status: !off && focus === "toDeliver" ? "all" : "open", limit: BOARD_PAGE };
+};
+/** nothing narrowed — a longer page is still the default view */
+export const isDefaultFilter = (s: BoardFilterState) => JSON.stringify({ ...s, limit: BOARD_PAGE }) === JSON.stringify(defaultBoardFilter());
 
 export const FOCUS_LABEL: Record<NonNullable<VisaFilter["focus"]>, string> = {
   missingDocs: "ناقصة مستندات",

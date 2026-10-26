@@ -71,8 +71,11 @@ describe("the board's filter", () => {
     expect(pickStatus(focused, "rejected")).toMatchObject({ status: "rejected", focus: null });
     // an approved file is not open: its counter must look at all of them
     expect(toVisaFilter(pickFocus(defaultBoardFilter(), "toDeliver"))).toMatchObject({ status: "all", focus: "toDeliver" });
-    // pressing the same counter again lets go of it
-    expect(pickFocus(focused, "missingDocs").focus).toBeNull();
+    // pressing the same counter again lets go of it, and the board is back on the open files
+    expect(pickFocus(focused, "missingDocs")).toMatchObject({ focus: null, status: "open" });
+    expect(pickFocus(pickFocus(defaultBoardFilter(), "toDeliver"), "toDeliver")).toMatchObject({ focus: null, status: "open" });
+    // a longer page is still the default view
+    expect(isDefaultFilter({ ...defaultBoardFilter(), limit: 300 })).toBe(true);
   });
 
   it("keeps the person and the country across counters", () => {

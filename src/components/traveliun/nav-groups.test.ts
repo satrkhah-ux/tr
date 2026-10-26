@@ -100,5 +100,4 @@ describe("«التأشيرات» (the owner, 2026-10-26)", () => {
     // the board's keys alone do not open /visas (data.write), so no dead link
     expect(hrefs(role(["visas.manage"]))).not.toContain("/visas");
   });
-
 });
