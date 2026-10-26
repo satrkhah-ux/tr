@@ -75,7 +75,7 @@ import {
   keepNightlyRates,
   flightsLater,
 } from "@/lib/offer/draft-types";
-import { flightHops, legGaps, withCitiesFromFlights, withLegFares } from "@/lib/offer/basic-flights";
+import { alignTripToFlights, flightHops, legGaps, withCitiesFromFlights, withLegFares } from "@/lib/offer/basic-flights";
 import { domesticMismatches } from "@/lib/offer/flight-cities";
 import { ROOM_TYPES } from "@/lib/catalog/room-catalog";
 import {
@@ -1021,6 +1021,47 @@ export function BasicEditor({
   const [citiesNote, setCitiesNote] = useState<BasicLabel | null>(null);
   const countryOfCity = (name: string) => lk.countries.find((c) => c.cities.some((x) => x.name === name))?.name;
 
+  // ---------- the flights' dates against the client's (the owner, 2026-10-26) ----------
+  // Said once, applied only on «اعتمد» — never silently; «أبقِ» hides it until a date moves.
+  const dayMonth = (iso: string | null) => (iso ? `${Number(iso.slice(8, 10))}/${Number(iso.slice(5, 7))}` : "—");
+  const dateFit = scope.flights_intl && !booking.later_intl ? alignTripToFlights(data, countryOfCity) : null;
+  const dateFitKey = dateFit ? [dateFit.arrival_date, dateFit.departure_date, trip.arrival_date, trip.departure_date].join("|") : "";
+  const [keptDates, setKeptDates] = useState("");
+  const [datesNote, setDatesNote] = useState<string | null>(null);
+  function adoptFlightDates() {
+    const fit = alignTripToFlights(latest.current, countryOfCity);
+    if (!fit) return;
+    commit(fit.patch);
+    const done = tx("datesFitDone", { a: dayMonth(fit.arrival_date), b: dayMonth(fit.departure_date) });
+    const moved = fit.lastCity ? ` ${tx(fit.lastCity.delta > 0 ? "datesFitAdded" : "datesFitRemoved", { n: nightsText(Math.abs(fit.lastCity.delta), language), city: fit.lastCity.city })}` : "";
+    setDatesNote(done + moved);
+  }
+  const datesFit = (
+    <>
+      {dateFit && keptDates !== dateFitKey ? (
+        <div role="status" className="flex flex-wrap items-center gap-2 rounded-[10px] bg-[#fff8e8] px-3 py-2 text-[12px] font-bold text-[#a86a10]">
+          <AlertTriangle className="size-4 shrink-0" />
+          <span className="min-w-0 flex-1">
+            {tx("datesFitAsk", { a: dayMonth(dateFit.arrival_date), b: dayMonth(dateFit.departure_date), c: dayMonth(trip.arrival_date), d: dayMonth(trip.departure_date) })}
+          </span>
+          <button type="button" onClick={adoptFlightDates} className="h-8 rounded-[8px] bg-[#185045] px-3 text-[12px] font-bold text-white">
+            {tx("datesFitYes")}
+          </button>
+          <button type="button" onClick={() => setKeptDates(dateFitKey)} className="text-[11.5px] font-bold text-[#185045] underline">
+            {tx("datesFitKeep")}
+          </button>
+        </div>
+      ) : null}
+      {datesNote ? (
+        <p role="status" className="flex items-center gap-2 rounded-[10px] bg-[#eef6f2] px-3 py-1.5 text-[12px] font-bold text-[#185045]">
+          <Plane className="size-4 shrink-0" />
+          <span className="flex-1">{datesNote}</span>
+          <button type="button" onClick={() => setDatesNote(null)} aria-label={tx("dismiss")} className="text-[#557d78]">×</button>
+        </p>
+      ) : null}
+    </>
+  );
+
   // ---------- the sections: one open at a time ----------
   // the cities whose stay still lacks a hotel, a room type, a board or a price — «إكمال» opens only these
   // (no hotel at all: the same function the server's issue gate asks)
@@ -1524,11 +1565,17 @@ export function BasicEditor({
     ),
 
     // ---- the international flights: the number first, fetched; or «أضف لاحقاً» (the domestic ones have their own section) ----
-    flights: <BasicFlightPlan data={data} lookups={lk} defaults={planDefaults} onChange={commit} current={() => latest.current} />,
+    flights: (
+      <div className="space-y-3">
+        {datesFit}
+        <BasicFlightPlan data={data} lookups={lk} defaults={planDefaults} onChange={commit} current={() => latest.current} />
+      </div>
+    ),
 
     // ---- the hotels: city by city, each hotel on its dates, the way between two cities asked between them; the bar adds a city ----
     hotels: (
       <div className="space-y-3">
+        {datesFit}
         {citiesNote && !focus ? (
           <p role="status" className={`flex items-center gap-2 rounded-[10px] px-3 py-1.5 text-[12px] font-bold ${citiesNote === "flightCities" ? "bg-[#eef6f2] text-[#185045]" : "bg-[#fff8e8] text-[#a86a10]"}`}>
             <Plane className="size-4 shrink-0" />

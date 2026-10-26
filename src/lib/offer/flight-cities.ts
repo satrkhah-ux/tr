@@ -11,11 +11,13 @@
  */
 
 import type { DraftCity, DraftFlight } from "./draft-types";
-import { localDatePart } from "./schedule";
+import { finalOutbound, localDatePart, localTimePart } from "./schedule";
 
 function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
+
+const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 const byDeparture = (a: DraftFlight, b: DraftFlight) => (a.departure_at ?? "").localeCompare(b.departure_at ?? "");
 
@@ -154,6 +156,44 @@ export function domesticMismatches(flights: DraftFlight[], cities: DraftCity[]):
       return Boolean(change && change !== m.day);
     })
     .flatMap((m) => m.legs);
+}
+
+/**
+ * The two ends of the trip as the flights state them (local dates, at the airports): the day the
+ * group lands where it is going and the day it leaves for home, each with its clock. null until
+ * both are stated — no flight, a leg with no landing time, a one-way trip.
+ */
+export function flightEnds(flights: DraftFlight[]): { landing: string; landingTime: string; leaving: string; leavingTime: string } | null {
+  const land = finalOutbound(flights);
+  const leave = flights.filter((f) => f.leg_order === "inbound").sort(byDeparture)[0];
+  const landing = localDatePart(land?.arrival_at);
+  const leaving = localDatePart(leave?.departure_at);
+  if (!landing || !leaving) return null;
+  return { landing, landingTime: localTimePart(land?.arrival_at) ?? "00:00", leaving, leavingTime: localTimePart(leave?.departure_at) ?? "00:00" };
+}
+
+export type SpanIssue = "hotel_before_arrival" | "night_no_hotel";
+
+/**
+ * The hotels against the flights (the owner, 2026-10-26): the group sleeps from the night it lands
+ * to the night before it flies home. A first stay that starts before the landing, or a first or last
+ * night the cities leave with no hotel, is a file the client reads as wrong. `cities` carry their dates
+ * (deriveCityDates). Allowed, never said: a night before a landing under 06:00 and a last night short
+ * before a home flight under 06:00 (a small-hours flight), an edge the agent chose (`edge_in` / `edge_out`
+ * «no_hotel» — a night elsewhere), and a first or last city the client booked himself.
+ */
+export function hotelsOffFlights(flights: DraftFlight[], cities: DraftCity[]): SpanIssue[] {
+  const ends = flightEnds(flights);
+  const first = cities[0];
+  const last = cities[cities.length - 1];
+  if (!ends || !first || !last) return [];
+  const smallHours = (time: string) => (time < "06:00" ? -1 : 0);
+  const issues: SpanIssue[] = [];
+  if (!first.client_hotel && first.check_in && first.check_in < addDays(ends.landing, smallHours(ends.landingTime))) issues.push("hotel_before_arrival");
+  const late = !first.client_hotel && first.edge_in !== "no_hotel" && first.check_in != null && first.check_in > ends.landing;
+  const short = !last.client_hotel && last.edge_out !== "no_hotel_day" && last.check_out != null && last.check_out < addDays(ends.leaving, smallHours(ends.leavingTime));
+  if (late || short) issues.push("night_no_hotel");
+  return issues;
 }
 
 /**

@@ -66,6 +66,60 @@ describe("flightTiming", () => {
   });
 });
 
+// The impossible-flight check reads both clocks on ONE clock, each in its own airport's zone (the owner,
+// 2026-10-26). Real pairs, never a naive clock difference.
+describe("flightTiming on each airport's own zone", () => {
+  const MED = "Asia/Riyadh"; // UTC+3
+  const CGK = "Asia/Jakarta"; // UTC+7
+  const LHR = "Europe/London"; // BST (UTC+1) until 2026-10-25 01:00Z, then GMT
+  const AKL = "Pacific/Auckland"; // NZST UTC+12 in June
+  const HNL = "Pacific/Honolulu"; // UTC−10, no DST
+  const timing = (from_tz: string | null, departure_at: string, to_tz: string | null, arrival_at: string) =>
+    flightTiming(leg({ from_tz, to_tz, departure_at, arrival_at }));
+
+  it("flags MED → CGK 04:50 → 08:20: it lands (01:20Z) before it leaves (01:50Z)", () => {
+    const t = timing(MED, "2026-10-31T04:50", CGK, "2026-10-31T08:20");
+    expect(t.durationMinutes).toBe(-30);
+    expect(t.arrivalBeforeDeparture).toBe(true);
+  });
+
+  it("passes a real MED → CGK: 23:00 → 12:30 the next day is 9h30", () => {
+    const t = timing(MED, "2026-10-30T23:00", CGK, "2026-10-31T12:30");
+    expect(t.durationMinutes).toBe(570);
+    expect(t.arrivalBeforeDeparture).toBe(false);
+  });
+
+  it("passes an east → west flight: CGK → MED 12:00 → 18:15 is 10h15, not 6h15", () => {
+    const t = timing(CGK, "2026-11-10T12:00", MED, "2026-11-10T18:15");
+    expect(t.durationMinutes).toBe(615);
+    expect(t.arrivalBeforeDeparture).toBe(false);
+  });
+
+  it("passes a flight that lands EARLIER on the clock the same day: Auckland 18:00 → Honolulu 07:00 is 11h", () => {
+    const t = timing(AKL, "2026-06-10T18:00", HNL, "2026-06-10T07:00");
+    expect(t.durationMinutes).toBe(660);
+    expect(t.arrivalBeforeDeparture).toBe(false);
+  });
+
+  it("follows daylight saving: London is BST before 25 Oct 2026 and GMT after", () => {
+    // 22:00 Riyadh on the 23rd = 19:00Z; 02:30 BST on the 24th = 01:30Z → 6h30
+    expect(timing(MED, "2026-10-23T22:00", LHR, "2026-10-24T02:30").durationMinutes).toBe(390);
+    // the clocks went back at 02:00 BST on the 25th: 22:00 Riyadh on the 24th = 19:00Z; 02:30 GMT on the 25th = 02:30Z → 7h30
+    expect(timing(MED, "2026-10-24T22:00", LHR, "2026-10-25T02:30").durationMinutes).toBe(450);
+    // 05:00 Riyadh = 02:00Z; 02:30 London that morning is GMT (02:30Z) — after the take-off (read as BST it would be 01:30Z, before it)
+    expect(timing(MED, "2026-10-25T05:00", LHR, "2026-10-25T02:30").arrivalBeforeDeparture).toBe(false);
+    expect(timing(MED, "2026-10-25T05:00", LHR, "2026-10-25T03:30").durationMinutes).toBe(90);
+    expect(timing(LHR, "2026-10-25T03:00", MED, "2026-10-25T05:30").durationMinutes).toBe(-30);
+  });
+
+  it("never judges a leg whose zone is missing or unknown", () => {
+    expect(timing(null, "2026-10-31T04:50", CGK, "2026-10-31T01:00").arrivalBeforeDeparture).toBe(false);
+    expect(timing(MED, "2026-10-31T04:50", null, "2026-10-31T01:00").arrivalBeforeDeparture).toBe(false);
+    expect(timing(MED, "2026-10-31T04:50", "Not/AZone", "2026-10-31T01:00")).toMatchObject({ durationMinutes: null, arrivalBeforeDeparture: false });
+    expect(timing(MED, "2026-10-31T04:50", "", "2026-10-31T01:00").arrivalBeforeDeparture).toBe(false);
+  });
+});
+
 describe("formatDurationAr", () => {
   it("formats hours + minutes in Arabic", () => {
     expect(formatDurationAr(510)).toBe("8 س 30 د");

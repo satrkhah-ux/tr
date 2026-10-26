@@ -81,8 +81,8 @@ export function LegRow({
   airlines: GeneratorLookups["airlines"];
   canFetch: boolean;
   onEdit: (change: LegChange) => void;
-  /** a looked-up flight laid onto the leg; true when its date should be checked */
-  onHit: (hit: FlightLookupHit) => boolean;
+  /** a looked-up flight laid onto the leg: its date to be checked, or its clocks left unfilled (they land before they take off) */
+  onHit: (hit: FlightLookupHit) => { checkDate: boolean; badTimes: boolean } | null;
   onRemove?: () => void;
   /** the ticket's price field — a domestic leg's, «للفرد» */
   price?: { label: string; caption?: string | null };
@@ -119,8 +119,8 @@ export function LegRow({
   }
 
   function apply(hit: FlightLookupHit) {
-    const check = onHit(hit);
-    setLook({ note: check && hit.schedule_date ? tx("checkDate", { date: hit.schedule_date }) : undefined });
+    const out = onHit(hit);
+    setLook({ note: out?.badTimes ? tx("flightTimesOff") : out?.checkDate && hit.schedule_date ? tx("checkDate", { date: hit.schedule_date }) : undefined });
   }
 
   async function fetchLeg() {
@@ -270,13 +270,13 @@ export function BasicFlightPlan({
   /** one leg changed, on the file as it is now */
   const edit = (id: string, change: LegChange) => onChange({ flights: changeLeg(current(), lookups.airports, id, change) });
 
-  function hit(id: string, h: FlightLookupHit): boolean {
+  function hit(id: string, h: FlightLookupHit) {
     const d = current();
     const leg = d.flights.find((f) => f.id === id);
-    if (!leg) return false;
+    if (!leg) return null;
     const out = applyFlightHit(leg, h, { airports: lookups.airports, airlines: lookups.airlines, trip: d.trip });
     onChange({ flights: d.flights.map((f) => (f.id === id ? out.leg : f)) });
-    return out.checkDate;
+    return out;
   }
 
   /** there and back, or one way: the legs are planned again, each keeping what was typed on it */

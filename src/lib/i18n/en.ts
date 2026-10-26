@@ -1668,6 +1668,8 @@ export const en = {
   "pg.err.dayUntitled": "Give every day a title, or mark it a free day.",
   "pg.err.stayUnpriced": "Enter a price for every chosen hotel.",
   "pg.err.cityNoHotel": "A city has nights but no hotel — choose a hotel for every city before issuing the package.",
+  "pg.err.hotelBeforeArrival": "A hotel starts before the arrival — the first hotel night is before the day the outbound flight lands. Fix the flight's or the check-in date.",
+  "pg.err.nightNoHotel": "A night with no hotel — the hotels do not cover the nights between the outbound landing and the flight home. Add the missing night to a city.",
   "pg.warn.overlandFar": "Going from {from} to {to} by road is about {km} km — a full day in the car. A domestic flight is suggested.",
   "pg.warn.overlandSea": "Going from {from} to {to} by road crosses the sea by ferry — a domestic flight is suggested.",
   "pg.warn.overlandSeaFar": "Going from {from} to {to} by road crosses the sea by ferry and runs about {km} km — a domestic flight is suggested.",
