@@ -13,13 +13,14 @@ import {
   type VisaActionResult,
   type VisaDoc,
   type VisaDocKind,
+  type VisaFile,
   type VisaFilter,
   type VisaRow,
   type VisaService,
   type VisaStatus,
   type VisaTraveler,
 } from "./types";
-import type { NewVisaFile } from "@/lib/data/visa-files";
+import type { NewVisaFile, VisaFilePatch } from "@/lib/data/visa-files";
 
 /**
  * What the visa screens decide without the server: which button a file offers, how the board's filter maps to
@@ -342,3 +343,65 @@ export function mergeRead(list: VisaTraveler[], targetId: string | "new", read: 
 
 /** Teletel's last_activity_at arrives in seconds (Chatwoot) — milliseconds too, should that ever change */
 export const epochMs = (n: number) => (n < 1e12 ? n * 1000 : n);
+
+// ---------- the file page's sections: each is a draft of strings, a check, and the patch it sends ----------
+
+export type Checked<T> = { ok: true; value: T } | { ok: false; error: string };
+
+export type DetailsDraft = { clientName: string; clientPhone: string; country: string; visaType: string; applicants: string; note: string };
+export const detailsOf = (f: VisaFile): DetailsDraft => ({
+  clientName: f.clientName, clientPhone: f.clientPhone ?? "", country: f.country, visaType: f.visaType ?? "", applicants: String(f.applicants), note: f.note ?? "",
+});
+export function detailsPatch(d: DetailsDraft): Checked<VisaFilePatch> {
+  const applicants = Number(d.applicants);
+  if (!d.clientName.trim()) return { ok: false, error: "اكتب اسم العميل." };
+  if (!d.country.trim()) return { ok: false, error: "اكتب الدولة." };
+  if (!Number.isInteger(applicants) || applicants < 1) return { ok: false, error: "عدد المتقدمين رقم صحيح من 1 فأكثر." };
+  return { ok: true, value: { clientName: d.clientName.trim(), clientPhone: d.clientPhone.trim() || null, country: d.country.trim(), visaType: d.visaType.trim() || null, applicants, note: d.note.trim() || null } };
+}
+
+export type DatesDraft = { appliedAt: string; appointmentAt: string; expectedReplyAt: string; repliedAt: string };
+export const datesOf = (f: VisaFile): DatesDraft => ({
+  appliedAt: toDateInput(f.appliedAt), appointmentAt: toLocalInput(f.appointmentAt), expectedReplyAt: toDateInput(f.expectedReplyAt), repliedAt: toDateInput(f.repliedAt),
+});
+export function datesPatch(d: DatesDraft): Checked<VisaFilePatch> {
+  // a reply cannot be expected, or have come, before the application went in
+  if (d.appliedAt && d.expectedReplyAt && d.expectedReplyAt < d.appliedAt) return { ok: false, error: "موعد الرد المتوقع لا يسبق تاريخ التقديم." };
+  if (d.appliedAt && d.repliedAt && d.repliedAt < d.appliedAt) return { ok: false, error: "تاريخ الرد لا يسبق تاريخ التقديم." };
+  return { ok: true, value: { appliedAt: d.appliedAt || null, appointmentAt: fromLocalInput(d.appointmentAt), expectedReplyAt: d.expectedReplyAt || null, repliedAt: d.repliedAt || null } };
+}
+
+export type FollowDraft = { nextAction: string; nextActionAt: string };
+export const followOf = (f: VisaFile): FollowDraft => ({ nextAction: f.nextAction ?? "", nextActionAt: toDateInput(f.nextActionAt) });
+export const followPatch = (d: FollowDraft): Checked<VisaFilePatch> => ({ ok: true, value: { nextAction: d.nextAction.trim() || null, nextActionAt: d.nextActionAt || null } });
+
+export type MoneyDraft = { feeService: string; feeEmbassy: string; currency: string };
+export const moneyOf = (f: VisaFile): MoneyDraft => ({ feeService: numText(f.feeService), feeEmbassy: numText(f.feeEmbassy), currency: f.currency });
+export function moneyPatch(d: MoneyDraft): Checked<VisaFilePatch> {
+  const feeService = numOrNull(d.feeService) ?? 0;
+  const feeEmbassy = numOrNull(d.feeEmbassy) ?? 0;
+  if (!(feeService >= 0) || !(feeEmbassy >= 0)) return { ok: false, error: "الرسوم أرقام لا تقل عن صفر." };
+  return { ok: true, value: { feeService, feeEmbassy, currency: d.currency } };
+}
+
+export type PaymentDraft = { amount: string; method: string; note: string; paidAt: string };
+export function paymentInput(d: PaymentDraft): Checked<{ amount: number; method: string | null; note: string | null; paidAt: string }> {
+  const amount = numOrNull(d.amount);
+  if (amount === null || !(amount > 0)) return { ok: false, error: "اكتب مبلغ الدفعة (أكبر من صفر)." };
+  if (!d.paidAt) return { ok: false, error: "اختر تاريخ الدفعة." };
+  return { ok: true, value: { amount, method: d.method || null, note: d.note.trim() || null, paidAt: d.paidAt } };
+}
+
+export function travelersPatch(list: VisaTraveler[]): Checked<VisaFilePatch> {
+  const bad = list.findIndex((t) => !t.fullName.trim());
+  if (bad >= 0) return { ok: false, error: `اكتب اسم المسافر رقم ${bad + 1}.` };
+  const text = (s: string | null) => (s && s.trim() ? s.trim() : null);
+  return { ok: true, value: { travelers: list.map((t) => ({ ...t, fullName: t.fullName.trim(), passportNo: text(t.passportNo), nationality: text(t.nationality), visaNo: text(t.visaNo), note: text(t.note), birthDate: t.birthDate || null, passportExpiry: t.passportExpiry || null })) } };
+}
+
+/** who did it: a name when the id is a colleague we know, nothing for a bare uuid */
+export function whoText(by: string | null, people: { id: string; name: string }[]): string {
+  if (!by) return "";
+  const known = people.find((p) => p.id === by)?.name;
+  return known ?? (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(by) ? "" : by);
+}

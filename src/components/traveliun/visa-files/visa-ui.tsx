@@ -8,6 +8,11 @@ import { PAYMENT_LABEL, VISA_STATUS_LABEL, type PaymentState, type VisaStatus } 
  * The visa screens' look: the operations screens' palette (white cards, #185045 green, 44 px targets), which the dark
  * layer in globals.css already remaps. Status and payment chips keep their own tints, as the other badges do.
  */
+/** a colleague for a picker */
+export type Person = { id: string; name: string };
+/** what the last action of a section said, shown under it */
+export type Message = { tone: "ok" | "error" | "busy"; text: string } | null;
+
 export const card = "rounded-2xl border border-[#e2ebe7] bg-white p-4 shadow-[0_1px_2px_rgba(0,60,58,0.04)] sm:p-5";
 export const field = "h-11 w-full min-w-0 rounded-[10px] border border-[#dbe6e1] bg-white px-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a] disabled:opacity-60";
 export const area = "min-h-24 w-full min-w-0 rounded-[10px] border border-[#dbe6e1] bg-white p-3 text-sm text-[#185045] outline-none focus:border-[#2aa87a]";

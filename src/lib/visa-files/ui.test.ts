@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { VISA_DOC_LABEL, VISA_STATUSES, type TeletelPull, type VisaDoc, type VisaRow, type VisaTraveler } from "./types";
+import { visaFile } from "./test-helpers";
 import {
   CONFIRM_STATUS,
   NEXT_STATUS,
+  datesOf,
+  datesPatch,
+  detailsOf,
+  detailsPatch,
+  followOf,
+  followPatch,
+  moneyOf,
+  moneyPatch,
+  paymentInput,
+  travelersPatch,
+  whoText,
   addCustomService,
   applyCatalogRow,
   applyPull,
@@ -282,5 +294,58 @@ describe("a passport read", () => {
     const list = mergeRead([ali], "new", { fullName: "SARA", passportExpiry: "2030-01-01" }, "n1");
     expect(list.map((t) => t.id)).toEqual(["t1", "n1"]);
     expect(list[1]).toMatchObject({ fullName: "SARA", passportExpiry: "2030-01-01", result: null });
+  });
+});
+
+describe("the file page's sections", () => {
+  const f = visaFile();
+
+  it("details: shows the file as strings and sends only a valid whole", () => {
+    expect(detailsOf(f)).toMatchObject({ clientName: "أحمد العتيبي", country: "جورجيا", applicants: "2", note: "" });
+    const ok = detailsPatch({ ...detailsOf(f), clientPhone: " ", visaType: " تجارية ", applicants: "3" });
+    expect(ok).toEqual({ ok: true, value: { clientName: "أحمد العتيبي", clientPhone: null, country: "جورجيا", visaType: "تجارية", applicants: 3, note: null } });
+    expect(detailsPatch({ ...detailsOf(f), clientName: " " }).ok).toBe(false);
+    expect(detailsPatch({ ...detailsOf(f), applicants: "0" }).ok).toBe(false);
+    expect(detailsPatch({ ...detailsOf(f), applicants: "2.5" }).ok).toBe(false);
+  });
+
+  it("dates: Riyadh's clock in the appointment, and no reply before the application", () => {
+    const d = datesOf(f);
+    expect(d).toEqual({ appliedAt: "2026-10-20", appointmentAt: "2026-10-30T10:30", expectedReplyAt: "2026-11-05", repliedAt: "" });
+    expect(datesPatch(d)).toEqual({ ok: true, value: { appliedAt: "2026-10-20", appointmentAt: "2026-10-30T10:30:00+03:00", expectedReplyAt: "2026-11-05", repliedAt: null } });
+    expect(datesPatch({ ...d, expectedReplyAt: "2026-10-19" }).ok).toBe(false);
+    expect(datesPatch({ ...d, repliedAt: "2026-10-01" }).ok).toBe(false);
+    // clearing a date sends null, not an empty string
+    expect(datesPatch({ appliedAt: "", appointmentAt: "", expectedReplyAt: "", repliedAt: "" })).toEqual({ ok: true, value: { appliedAt: null, appointmentAt: null, expectedReplyAt: null, repliedAt: null } });
+  });
+
+  it("follow-up and money: the next action and its day; fees that are not negative", () => {
+    expect(followOf(f)).toEqual({ nextAction: "طلب كشف الحساب", nextActionAt: "2026-10-27" });
+    expect(followPatch({ nextAction: "  ", nextActionAt: "" })).toEqual({ ok: true, value: { nextAction: null, nextActionAt: null } });
+    expect(moneyOf(f)).toEqual({ feeService: "300", feeEmbassy: "200", currency: "SAR" });
+    expect(moneyPatch({ feeService: "1,250.5", feeEmbassy: "", currency: "USD" })).toEqual({ ok: true, value: { feeService: 1250.5, feeEmbassy: 0, currency: "USD" } });
+    expect(moneyPatch({ feeService: "-1", feeEmbassy: "", currency: "SAR" }).ok).toBe(false);
+    expect(moneyPatch({ feeService: "abc", feeEmbassy: "", currency: "SAR" }).ok).toBe(false);
+  });
+
+  it("a payment needs an amount above zero and a date", () => {
+    expect(paymentInput({ amount: "150", method: "cash", note: " ", paidAt: "2026-10-26" })).toEqual({ ok: true, value: { amount: 150, method: "cash", note: null, paidAt: "2026-10-26" } });
+    expect(paymentInput({ amount: "0", method: "", note: "", paidAt: "2026-10-26" }).ok).toBe(false);
+    expect(paymentInput({ amount: "", method: "", note: "", paidAt: "2026-10-26" }).ok).toBe(false);
+    expect(paymentInput({ amount: "10", method: "", note: "", paidAt: "" }).ok).toBe(false);
+  });
+
+  it("travellers: each needs a name; the masked passport number goes back as it came", () => {
+    const list = [...f.travelers, { ...blankTraveler("t2"), fullName: "  سارة  ", passportNo: " ", nationality: "" }];
+    const r = travelersPatch(list);
+    expect(r.ok && r.value.travelers).toEqual([f.travelers[0], { ...blankTraveler("t2"), fullName: "سارة" }]);
+    expect(travelersPatch([...f.travelers, blankTraveler("t3")])).toEqual({ ok: false, error: "اكتب اسم المسافر رقم 2." });
+  });
+
+  it("names the colleague who did something, and never shows a bare id", () => {
+    expect(whoText("emp-1", [{ id: "emp-1", name: "ريم" }])).toBe("ريم");
+    expect(whoText("6f1c2b3a-1111-4222-8333-444455556666", [])).toBe("");
+    expect(whoText("النظام", [])).toBe("النظام");
+    expect(whoText(null, [])).toBe("");
   });
 });

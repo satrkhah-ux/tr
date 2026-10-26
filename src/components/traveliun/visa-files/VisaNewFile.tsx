@@ -25,12 +25,11 @@ import {
 } from "@/lib/visa-files/ui";
 import { SuggestInput } from "../SuggestInput";
 import { VisaServicesEditor } from "./VisaServicesEditor";
-import { Notice, area, btn, btnPrimary, card, field, heading, label, useUnsavedGuard } from "./visa-ui";
+import { Notice, area, btn, btnPrimary, card, field, heading, label, useUnsavedGuard, type Person } from "./visa-ui";
 
 export type CatalogRow = { id: string; visaType: string | null; sellPrice: number | null; sellCurrency: string | null; requirements: string[] };
 export type CatalogState = { kind: "idle" } | { kind: "loading" } | { kind: "none" } | { kind: "error"; message: string } | { kind: "ready"; rows: CatalogRow[] };
 export type TeleState = { q: string; phase: "idle" | "loading" | "done" | "error"; candidates: TeletelCandidate[]; message: string; pulling: number | null; pull: TeletelPull | null };
-export type Person = { id: string; name: string };
 
 type ViewProps = {
   form: NewFileForm;

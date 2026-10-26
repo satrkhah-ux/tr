@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { VisaBoard as Board } from "@/lib/visa-files/types";
 import { defaultBoardFilter, pickFocus, pickStatus } from "@/lib/visa-files/ui";
-import { NOW, visaBoard, visaRow } from "./visa-test-helpers";
+import { NOW, visaBoard, visaRow } from "@/lib/visa-files/test-helpers";
 
 let held: string[] = ["visas.work"];
 vi.mock("@/lib/roles/RoleContext", () => ({ useRole: () => ({ can: (p: string) => held.includes(p) }) }));
