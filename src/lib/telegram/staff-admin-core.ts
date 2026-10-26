@@ -15,6 +15,7 @@ export const ADMIN_TITLE = "🏢 <b>لوحة الإدارة — ترافليون
 /** the administration's keyboard, by what each key opens; the labels are what Telegram sends back */
 export const ADMIN_KEYS = {
   day: "🏢 لوحة اليوم",
+  waiting: "⏳ المحادثات المنتظرة",
   urgent: "🚨 يحتاج تدخلك",
   decisions: "📋 قرارات الإدارة",
   team: "👥 الفريق",
@@ -35,7 +36,14 @@ export const BACK_ADMIN: InlineButton = { text: "↩️ لوحة الإدارة"
 /** `money`: «المال والتحصيل» only for who holds it */
 export function adminRows(money: boolean): string[][] {
   const k = ADMIN_KEYS;
-  return [[k.day, k.urgent], [k.decisions, k.team], money ? [k.performance, k.money] : [k.performance], [k.broadcast, k.alert], [k.ops, k.system], [k.toStaff]];
+  return [
+    [k.day, k.waiting],
+    [k.urgent, k.decisions],
+    [k.team, k.performance],
+    money ? [k.money, k.alert] : [k.alert],
+    [k.broadcast, k.ops],
+    [k.system, k.toStaff],
+  ];
 }
 
 export type Face = "admin" | "staff";
@@ -128,14 +136,17 @@ export function dayText(input: {
 
 export const DAY_BUTTONS: InlineButton[][] = [
   [
+    { text: "⏳ المحادثات المنتظرة", callback_data: "aw:all:0" },
     { text: "🚨 يحتاج تدخلك", callback_data: "si" },
-    { text: "👥 الفريق", callback_data: "at" },
   ],
   [
+    { text: "👥 الفريق", callback_data: "at" },
     { text: "🧭 العمليات والتأشيرات", callback_data: "ao" },
-    { text: "🔌 النظام", callback_data: "as" },
   ],
-  [{ text: "🔄 تحديث", callback_data: "ad" }],
+  [
+    { text: "🔌 النظام", callback_data: "as" },
+    { text: "🔄 تحديث", callback_data: "ad" },
+  ],
 ];
 
 export type MemberRow = {
