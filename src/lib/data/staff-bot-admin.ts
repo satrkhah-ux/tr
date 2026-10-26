@@ -138,7 +138,7 @@ export async function sendMemberTestMessage(employeeId: string): Promise<TestRes
   if (!row?.telegram_chat_id) return { ok: false, error: "team.tg.notLinked" };
   const sent = await staffSend(
     Number(row.telegram_chat_id),
-    `🔔 رسالة تجربة من نظام ترافليون\n\nأهلاً ${row.arabic_name} — حسابك مربوط ✅\nستصلك هنا تنبيهات محادثاتك في تيلي تيل.`,
+    `🔔 رسالة تجربة من ترافليون ون\n\nأهلاً ${row.arabic_name} — حسابك مربوط ✅\nستصلك هنا تنبيهات محادثاتك في تيلي تيل.`,
     undefined,
     {},
     "test",
