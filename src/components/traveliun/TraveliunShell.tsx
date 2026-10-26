@@ -924,6 +924,8 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
   const { t } = useTraveliunUI();
   const partner = usePartnerBrand();
   const groups = useNavGroups();
+  // the section the page belongs to starts open
+  const [openKey, setOpenKey] = useState<string | null>(() => groups.find((g) => (g.children?.length ?? 0) > 1 && isGroupActive(pathname, g))?.labelKey ?? null);
   return (
     <>
       <div className="flex h-[76px] items-center justify-between border-b border-[#d9e0dc] px-5">
@@ -944,22 +946,51 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
           <X className="size-5" />
         </button>
       </div>
-      <nav className="p-3">
+      {/* a section with pages opens as a list under its row (the owner, 2026-10-26: «الأقسام في الموبايل لا تظهر كاملة») —
+          the bottom padding keeps the last row above the phone browser's toolbar */}
+      <nav className="p-3 pb-28">
         {groups.map((group) => {
           const Icon = group.icon;
           const active = isGroupActive(pathname, group);
+          const rowClass = `flex w-full items-center gap-3 rounded-md px-3 py-3 text-sm ${active ? "bg-[#e8f1ed] font-semibold text-[var(--tv-brand)]" : "text-[#557d78]"}`;
+          const badges = <>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}</>;
+          if (!group.children || group.children.length < 2) {
+            return (
+              <div key={group.labelKey} className="mb-1">
+                <Link href={group.href} className={rowClass} onClick={close}>
+                  <Icon className="size-5" />
+                  <span>{t(group.labelKey)}</span>{badges}
+                </Link>
+              </div>
+            );
+          }
+          const open = openKey === group.labelKey;
           return (
             <div key={group.labelKey} className="mb-1">
-              <Link
-                href={group.href}
-                className={`flex items-center gap-3 rounded-md px-3 py-3 text-sm ${
-                  active ? "bg-[#e8f1ed] font-semibold text-[var(--tv-brand)]" : "text-[#557d78]"
-                }`}
-                onClick={close}
-              >
+              <button type="button" className={rowClass} aria-expanded={open} onClick={() => setOpenKey(open ? null : group.labelKey)}>
                 <Icon className="size-5" />
-                <span>{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}
-              </Link>
+                <span className="flex-1 text-start">{t(group.labelKey)}</span>
+                <ChevronDown className={`size-4 transition-transform duration-200 ${open ? "" : "rotate-90 rtl:-rotate-90"}`} />
+              </button>
+              {open ? (
+                <div className="py-1">
+                  {group.children.map((child) => {
+                    const here = pathname === pageOf(child.href);
+                    return (
+                      <div key={child.href}>
+                        {child.captionKey ? <p className="mt-2 px-6 pb-1 text-[10.5px] font-extrabold text-[#9cafaa]">{t(child.captionKey)}</p> : null}
+                        <Link
+                          href={child.href}
+                          onClick={close}
+                          className={`block rounded-md px-6 py-2.5 text-[13.5px] ${here ? "bg-[#eef4f1] font-extrabold text-[var(--tv-brand)]" : "font-medium text-[#557d78]"}`}
+                        >
+                          {t(child.labelKey)}
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
           );
         })}
