@@ -179,6 +179,11 @@ export function expectedDocs(lines: string[], travelerIds: string[], newId: () =
   );
 }
 
+/** Submitting attaches what is in hand: each received document not yet marked as attached is stamped with the moment. Null when there is nothing to stamp. */
+export function stampSubmitted(docs: VisaDoc[], at: string): VisaDoc[] | null {
+  return docs.some((d) => d.receivedAt && !d.submittedAt) ? docs.map((d) => (d.receivedAt && !d.submittedAt ? { ...d, submittedAt: at } : d)) : null;
+}
+
 export const DEFAULT_SERVICE_KEYS: readonly (typeof VISA_SERVICE_KEYS)[number][] = ["documents_review", "form_filling", "submission", "tracking", "delivery"];
 export const defaultServices = (): VisaService[] => DEFAULT_SERVICE_KEYS.map((key) => ({ key, label: VISA_SERVICE_LABEL[key], price: null, done: false }));
 

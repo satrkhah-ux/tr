@@ -12,7 +12,7 @@ import { employeeWorksVisas, visaPeople, type VisaEmployeeRow } from "@/lib/visa
 import { buildBoard } from "@/lib/visa-files/board";
 import {
   checkUpload, cleanFields, cleanFileName, cleanServices, cleanText, defaultServices, describeChange, diffFields, docPath, expectedDocs, fold, isUuid, money2, nextSerial,
-  parseInstant, parseProcessingDays, planStatus, requirementLines, serialYear, sniffMime, UPLOAD_MESSAGE,
+  parseInstant, parseProcessingDays, planStatus, requirementLines, serialYear, sniffMime, stampSubmitted, UPLOAD_MESSAGE,
 } from "@/lib/visa-files/rules";
 import { blankTraveler, BOARD_COLS, boardRowToFile, mergeTravelers, rowToEvent, rowToPayment, storedTravelers, toColumns, type BoardDb, type StoredTraveler } from "@/lib/visa-files/rows";
 import { audit, addEvents, BUCKET, db, employeeNames, ERR, gate, mutateFile, readFile } from "@/lib/visa-files/store";
@@ -276,7 +276,7 @@ export async function updateVisaFile(id: string, patch: VisaFilePatch): Promise<
         if (!m.ok) return { error: m.error };
         if (JSON.stringify(m.travelers) !== JSON.stringify(before)) {
           columns.travelers = m.travelers;
-          // a documented removal: the papers of a traveller who left the list stay on the file, unattached
+          // the papers of a traveller who left the list stay on the file, no longer tied to him
           const kept = new Set(m.travelers.map((t) => t.id));
           if (file.documents.some((d) => d.travelerId && !kept.has(d.travelerId))) columns.documents = file.documents.map((d) => (d.travelerId && !kept.has(d.travelerId) ? { ...d, travelerId: null } : d));
           const passportChanged = m.travelers.some((t) => t.passportEnc !== (before.find((b) => b.id === t.id)?.passportEnc ?? null));
@@ -288,6 +288,7 @@ export async function updateVisaFile(id: string, patch: VisaFilePatch): Promise<
     });
     if (!res.ok) return res;
     if (touched.length) await audit("visa.file.updated", id, { fields: touched });
+    if (touched.includes("assignedTo")) await audit("visa.file.assigned", id, { to: cleaned.set.assignedTo ?? null, via: "update" });
     return { ok: true };
   } catch {
     return fail(ERR.db);
@@ -305,8 +306,9 @@ export async function setVisaStatus(id: string, status: VisaStatus, note?: strin
     const res = await mutateFile(g.caller, id, (file) => {
       const plan = planStatus(file, status, { processingDays: days });
       if (!plan.ok) return { error: plan.error };
+      const attached = status === "submitted" ? stampSubmitted(file.documents, new Date().toISOString()) : null;
       return {
-        patch: { status, ...toColumns(plan.patch) },
+        patch: { status, ...toColumns(plan.patch), ...(attached ? { documents: attached } : {}) },
         events: [{ kind: "status", text: `الحالة: من «${VISA_STATUS_LABEL[file.status]}» إلى «${VISA_STATUS_LABEL[status]}»${why ? ` — ${why}` : ""}` }],
       };
     });

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  checkUpload, cleanFields, cleanFileName, cleanServices, defaultServices, describeChange, diffFields, docPath, expectedDocs, expectedReplyFor, formatSerial, guessDocKind, isSerial,
+  checkUpload, stampSubmitted, cleanFields, cleanFileName, cleanServices, defaultServices, describeChange, diffFields, docPath, expectedDocs, expectedReplyFor, formatSerial, guessDocKind, isSerial,
   MAX_DOC_BYTES, nextSerial, nextStatuses, parseInstant, parseProcessingDays, planStatus, processingDays, requirementLines, sniffMime, TRANSITIONS,
 } from "./rules";
-import { replyOverdue, actionDue, VISA_STATUSES, type VisaStatus } from "./types";
+import { replyOverdue, actionDue, VISA_STATUSES, type VisaDoc, type VisaStatus } from "./types";
 
 describe("the serial", () => {
   it("is VF-YY-NNNN and counts on within the year", () => {
@@ -277,5 +277,21 @@ describe("cleaning what a person typed", () => {
     expect(Object.keys(changed).sort()).toEqual(["applicants", "expectedReplyAt", "note"]);
     expect(describeChange(changed)).toBe("عدد المتقدمين: 3 · موعد الرد المتوقع: 2026-11-16 · الملاحظة");
     expect(describeChange({})).toBeNull();
+  });
+});
+
+describe("submitting attaches what is in hand", () => {
+  const doc = (id: string, receivedAt: string | null, submittedAt: string | null): VisaDoc => ({ id, kind: "other", label: id, travelerId: null, path: null, fileName: null, required: true, receivedAt, submittedAt, fromMessageId: null });
+
+  it("stamps the received papers not yet attached, leaves the rest as they are", () => {
+    const docs = [doc("a", "2026-10-01T00:00:00Z", null), doc("b", null, null), doc("c", "2026-10-02T00:00:00Z", "2026-10-03T00:00:00Z")];
+    const out = stampSubmitted(docs, "2026-10-26T09:00:00Z");
+    expect(out?.map((d) => d.submittedAt)).toEqual(["2026-10-26T09:00:00Z", null, "2026-10-03T00:00:00Z"]);
+    expect(docs[0].submittedAt).toBeNull();
+  });
+
+  it("nothing to stamp, nothing written", () => {
+    expect(stampSubmitted([doc("b", null, null), doc("c", "x", "y")], "now")).toBeNull();
+    expect(stampSubmitted([], "now")).toBeNull();
   });
 });

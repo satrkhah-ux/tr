@@ -27,7 +27,8 @@ const isVisaTeam = (team: string | null) => /فيزا|تأشير|visa/i.test(tea
 /** open conversations by name or phone, then the other conversations of the contacts Teletel finds; the visa team's first */
 export async function searchConversations(query: string): Promise<TeletelCandidate[] | null> {
   const q = query.trim();
-  const d = q.replace(/\D/g, "");
+  // a number typed the local way (05...) still finds +9665...
+  const d = q.replace(/\D/g, "").replace(/^0+/, "");
   const [open, contacts] = await Promise.all([listOpenConversations(), searchTeletelContacts(q, 8)]);
   if (!open && contacts === null) return null;
   const found = new Map<number, TeletelCandidate>();

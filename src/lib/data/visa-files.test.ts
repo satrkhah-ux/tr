@@ -22,6 +22,9 @@ const world = {
   fetched: [] as { url: string; token: string | undefined }[],
   /** what the passport reader answers; null = the reader is not configured */
   reader: null as Row | null,
+  /** the open conversations and the contacts Teletel answers a search with */
+  open: [] as Row[],
+  contacts: [] as Row[],
 };
 
 /** the part of the PostgREST builder the actions use, over plain arrays */
@@ -96,14 +99,19 @@ vi.mock("@/lib/providers/teletel", () => ({
   getTeletelConfig: () => (world.teletel ? { baseUrl: "https://t.example", token: "t", accountId: "1" } : null),
   addTeletelNote: async (conversationId: number, text: string) => (world.notes.push({ conversationId, text }), true),
   intlPhone: (s: string) => (s.startsWith("05") ? `+966${s.slice(1)}` : s),
-  listOpenConversations: async () => ({ rows: [], at: 0 }),
-  searchTeletelContacts: async () => [],
+  listOpenConversations: async () => ({ rows: world.open, at: 0 }),
+  searchTeletelContacts: async (q: string) => {
+    const d = q.replace(/\D/g, "").replace(/^0+/, "");
+    return world.contacts.filter((c) => c.name.includes(q) || (d.length > 3 && c.phone.replace(/\D/g, "").includes(d)));
+  },
   teletelGet: async (path: string) =>
     path.startsWith("/conversations/40123/messages")
       ? { payload: path.includes("before=") ? [] : world.messages }
       : path === "/conversations/40123"
         ? { id: 40123, meta: { sender: { id: 77, name: "عميل تيلي", phone_number: "+966500000008" } } }
-        : null,
+        : path === "/contacts/99/conversations"
+          ? { payload: [{ id: 7, last_activity_at: 50 }] }
+          : null,
 }));
 vi.mock("@/lib/providers/openai", () => ({ isOpenAIConfigured: () => world.reader !== null }));
 vi.mock("@/lib/providers/mrz-vision", () => ({ readPassportImage: async () => (world.reader ? { ok: true, passport: world.reader, model: "m" } : { ok: false, error: "not_configured" }) }));
@@ -135,6 +143,8 @@ beforeEach(() => {
   world.messages = [];
   world.fetched = [];
   world.reader = null;
+  world.open = [];
+  world.contacts = [];
   seedCatalog();
 });
 
@@ -236,6 +246,16 @@ describe("the management account runs the whole department with nothing granted"
     expect(lines).toHaveLength(4);
     expect(lines[1]).toContain("قُدِّم في السفارة");
     expect(world.audits.filter((a) => a.action === "visa.file.status")).toHaveLength(4);
+  });
+
+  it("submitting marks the received papers as attached to the application", async () => {
+    const { id } = await make({ applicants: 1 });
+    const doc = firstDoc();
+    await actions.uploadVisaDocument(id, doc.id, upload(JPEG, "a.jpg", "image/jpeg"));
+    expect(firstDoc().submittedAt).toBeNull();
+    await actions.setVisaStatus(id, "submitted");
+    expect(firstDoc().submittedAt).toBeTruthy();
+    expect(world.tables.visa_files[0].documents.filter((d: Row) => d.submittedAt)).toHaveLength(1);
   });
 
   it("uses the country's processing days from the settings when there are any", async () => {
@@ -529,5 +549,59 @@ describe("Teletel", () => {
     expect(await actions.importTeletelAttachment(id, { messageId: 9, attachmentId: 5, docId })).toEqual({ ok: false, error: "تعذّر تنزيل المرفق من تيلي تيل." });
     expect(world.objects.size).toBe(0);
     vi.unstubAllGlobals();
+  });
+});
+
+describe("the rest of the desk", () => {
+  it("the catalogue gives the sell side only, with the requirements as lines; inactive rows and other countries are left out", async () => {
+    world.tables.visas = [
+      { ...world.tables.visas[0], buy_price: 123, english_requirements: "secret" },
+      { id: SOME, country: "جورجيا", visa_type: "قديمة", sell_price: null, sell_currency: null, arabic_requirements: "", status: "Paused" },
+      { id: COLLEAGUE, country: "تركيا", visa_type: "سياحية", sell_price: 0, sell_currency: "SAR", arabic_requirements: "جواز", status: "Active" },
+    ];
+    const r = await actions.visaCatalogFor("جورجيا");
+    expect(r).toEqual({ ok: true, rows: [{ id: CATALOG, visaType: "سياحية", sellPrice: 300, sellCurrency: "SAR", requirements: ["صورة الجواز", "صورة شخصية بخلفية بيضاء", "حجز فندق", "رسوم السفارة 100 ريال"] }] });
+    expect(JSON.stringify(r)).not.toMatch(/buy|123|secret/);
+    expect((await actions.visaCatalogFor("")).ok && (await actions.visaCatalogFor("")).ok).toBe(true);
+    const all = await actions.visaCatalogFor("");
+    expect(all.ok && all.rows.map((x) => x.id)).toEqual([CATALOG, COLLEAGUE]);
+    const none = await actions.visaCatalogFor("اليابان");
+    expect(none.ok && none.rows).toEqual([]);
+  });
+
+  it("a note or a contact line goes to the timeline; services are replaced as a whole", async () => {
+    const { id } = await make();
+    expect(await actions.addVisaNote(id, "   ")).toMatchObject({ ok: false });
+    expect(await actions.addVisaNote(id, "x".repeat(2001))).toMatchObject({ ok: false });
+    expect(await actions.addVisaNote(id, "اتصلت بالعميل", "contact")).toEqual({ ok: true });
+    expect(world.tables.visa_file_events.at(-1)).toMatchObject({ kind: "contact", text: "اتصلت بالعميل", by: ME });
+
+    const services = [{ key: "tracking", label: "متابعة الطلب", price: 50, done: true }, { key: "mine", label: "خدمة خاصة", price: null, done: false }];
+    expect(await actions.setVisaServices(id, services)).toEqual({ ok: true });
+    expect(world.tables.visa_files[0].services).toEqual(services);
+    expect(world.tables.visa_file_events.at(-1)?.text).toContain("1/2");
+    expect(await actions.setVisaServices(id, [{ key: "", label: "x", price: null, done: false }])).toMatchObject({ ok: false });
+    expect(world.tables.visa_files[0].services).toEqual(services);
+  });
+
+  it("finds Teletel conversations by name or phone, the visa team's first, then the contact's other conversations", async () => {
+    expect(await actions.searchTeletelForVisa("س")).toMatchObject({ ok: false });
+    expect(await actions.searchTeletelForVisa("سارة")).toEqual({ ok: false, error: "تيلي تيل غير مضبوط في هذا النظام." });
+    world.teletel = true;
+    world.open = [
+      { id: 1, name: "سارة", phone: "+966500000001", team: "قسم المبيعات", assignee: "موظف", contactId: 5, lastActivityAt: 300 },
+      { id: 2, name: "سارة محمد", phone: "+966500000002", team: "قسم فيزا", assignee: "ريموندا", contactId: 6, lastActivityAt: 100 },
+      { id: 3, name: "آخر", phone: "+966500000003", team: null, assignee: null, contactId: 7, lastActivityAt: 900 },
+    ];
+    world.contacts = [{ id: 99, name: "سارة القديمة", phone: "+966500000099" }, { id: 5, name: "سارة", phone: "+966500000001" }];
+    const r = await actions.searchTeletelForVisa("سارة");
+    if (!r.ok) throw new Error(r.error);
+    expect(r.candidates.map((c) => [c.conversationId, c.team])).toEqual([[2, "قسم فيزا"], [1, "قسم المبيعات"], [7, null]]);
+    expect(r.candidates[0]).toEqual({ conversationId: 2, contactName: "سارة محمد", phone: "+966500000002", lastActivityAt: 100, team: "قسم فيزا", assignee: "ريموندا" });
+    // by phone digits, however typed
+    const byPhone = await actions.searchTeletelForVisa("0500000003");
+    expect(byPhone.ok && byPhone.candidates.map((c) => c.conversationId)).toEqual([3]);
+    const intl = await actions.searchTeletelForVisa("966500000003");
+    expect(intl.ok && intl.candidates.map((c) => c.conversationId)).toEqual([3]);
   });
 });
