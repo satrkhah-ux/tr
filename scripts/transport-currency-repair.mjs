@@ -44,8 +44,17 @@ const mix = async () =>
     left join public.countries co on co.id = t.country_id
     where not tp.provisional group by 1, 2 order by 1, 3 desc`)).rows;
 
+// five contaminated rows, named, so the owner sees exactly what moves
+const sample = async () =>
+  (await c.query(`select co.arabic_name as country, t.arabic_name as tour, tp.car_type, tp.price, tp.currency, tp.provisional
+    from public.tour_prices tp join public.tours t on t.id = tp.tour_id
+    left join public.countries co on co.id = t.country_id
+    where co.arabic_name in ('جورجيا','أذربيجان','تايلاند') and tp.currency in ('IDR','THB')
+    order by co.arabic_name, t.arabic_name, tp.car_type limit 5`)).rows;
+
 try {
   await c.query("begin");
+  const sampled = await sample();
   console.log("before:"); console.table(await mix());
 
   // 1. tour_prices back to the pre-import state (the backup is the whole table)
@@ -64,6 +73,15 @@ try {
   await c.query(sql);
 
   console.log("after:"); console.table(await mix());
+  console.log("sample rows — BEFORE:"); console.table(sampled);
+  console.log("the same tours AFTER (their current prices, placeholder = مؤقت 100):");
+  console.table((await c.query(`select co.arabic_name as country, t.arabic_name as tour, tp.car_type, tp.price, tp.currency, tp.provisional
+    from public.tour_prices tp join public.tours t on t.id = tp.tour_id
+    left join public.countries co on co.id = t.country_id
+    where (co.arabic_name, t.arabic_name) in (select co2.arabic_name, t2.arabic_name from public.tours t2
+      left join public.countries co2 on co2.id = t2.country_id where co2.arabic_name in ('جورجيا','أذربيجان','تايلاند'))
+      and co.arabic_name in ('جورجيا','أذربيجان','تايلاند')
+    order by co.arabic_name, t.arabic_name, tp.car_type limit 8`)).rows);
   const { rows: [sum] } = await c.query(`select
     (select count(*)::int from public.tour_prices where not provisional) real,
     (select count(*)::int from public.tour_prices where provisional) placeholder,
