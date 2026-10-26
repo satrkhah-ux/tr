@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { getCountryHotels, produceOfferFromDraft } from "@/lib/data/drafts";
-import { getTourPrices, getTourPrograms, getTransferCars } from "@/lib/data/tour-programs";
+import { getCountryCarCapacities, getTourPrices, getTourPrograms, getTransferCars } from "@/lib/data/tour-programs";
 import { autoTourPicks, withTours, type TourProgram } from "@/lib/offer/itinerary";
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
 import { announceWalkIn } from "@/lib/data/office-screens";
@@ -84,6 +84,8 @@ import {
   arrivalAirport,
   basicDays,
   carForGroup,
+  withCountryCapacities,
+  type CountryCarCapacity,
   cityAirport,
   cityMoves,
   HOME_AIRPORT,
@@ -564,15 +566,19 @@ export function BasicEditor({
       });
     }
   }, [wantedCountries]);
+  // the trip's countries' capacity rows (loaded with the transfer cars below)
+  const [countryCaps, setCountryCaps] = useState<CountryCarCapacity[]>([]);
   const lk = useMemo<GeneratorLookups>(
     () => ({
       ...lookups,
+      // the trip's countries' own seat/bag counts over the fleet's general ones (2026-10-26)
+      carTypes: withCountryCapacities(lookups.carTypes, countryCaps),
       countries: lookups.countries.map((c) => {
         const byCity = hotelsByCountry[c.name];
         return byCity ? { ...c, cities: c.cities.map((city) => ({ ...city, hotels: byCity[city.id] ?? [] })) } : c;
       }),
     }),
-    [lookups, hotelsByCountry],
+    [lookups, hotelsByCountry, countryCaps],
   );
   // «بكج متقدم» opened on a file whose dates it has not taken yet: take them now
   useEffect(() => {
@@ -629,11 +635,14 @@ export function BasicEditor({
     if (!transferCountries) return;
     let live = true;
     const loaded = preload && preload.carsKey === transferCountries ? Promise.resolve(preload.cars) : getTransferCars(transferCountries.split("|"));
-    void loaded.then((names) => {
+    void Promise.all([loaded, getCountryCarCapacities(transferCountries.split("|")).catch(() => [])]).then(([names, caps]) => {
       if (!live) return;
-      const priced = lookups.carTypes.filter((c) => names.includes(c.name));
+      setCountryCaps(caps);
+      // the countries' own capacities decide the default car too, not just the picker's labels
+      const fleet = withCountryCapacities(lookups.carTypes, caps);
+      const priced = fleet.filter((c) => names.includes(c.name));
       const was = groupCars.current;
-      groupCars.current = priced.length > 0 ? priced : lookups.carTypes;
+      groupCars.current = priced.length > 0 ? priced : fleet;
       // the cars were filled before the country was chosen (the add bar, a new file): every car the
       // system chose — the group's size from the old set — becomes the country's; one the agent chose
       // stays. A file already issued keeps what it was issued with (the owner's review, 2026-10-18).
