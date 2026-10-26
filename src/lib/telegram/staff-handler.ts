@@ -24,6 +24,7 @@ import {
   setFace,
   systemView,
 } from "./staff-admin";
+import { confirmNudge, prepareNudge, waitingConvView, waitingListView, waitingPickView } from "./staff-waiting";
 import { decisionStep, decisionsView, decisionText, decisionView, interventionView, promptDecision, setDecisionStatus, signalView } from "./staff-decisions";
 import type { InlineButton } from "./ops-bot";
 
@@ -235,6 +236,7 @@ async function onKey(me: StaffMember, chatId: number, key: Key): Promise<void> {
 type AdminAction = AdminKey | "toAdmin";
 const ADMIN_VIEWS: Record<Exclude<AdminKey, "broadcast" | "toStaff">, (me: StaffMember) => Promise<Screen>> = {
   day: dayView,
+  waiting: (me) => waitingListView(me, "aw:all:0"),
   urgent: (me) => interventionView(me),
   decisions: decisionsView,
   team: adminTeamView,
@@ -335,6 +337,12 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
       an: alertPickView,
     };
     if (admin[data]) return show(chatId, withBack(await admin[data](me)), at);
+    // «⏳ المحادثات المنتظرة» (staff-waiting.ts): the list, one conversation read-only, and a nudge — each checks the manager first
+    if (data === "awp") return show(chatId, withBack(await waitingPickView(me)), at);
+    if (data.startsWith("aw:")) return show(chatId, withBack(await waitingListView(me, data)), at);
+    if (data.startsWith("av:")) return show(chatId, withBack(await waitingConvView(me, Number(data.slice(3)))), at);
+    if (data.startsWith("ax:") || data.startsWith("ay:")) return prepareNudge(me, chatId, Number(data.slice(3)), data.startsWith("ay:"));
+    if (data.startsWith("bw:")) return confirmNudge(me, chatId, at, data);
     if (data.startsWith("e:")) return show(chatId, withBack(await memberView(me, data.slice(2))), at);
     // «قرارات الإدارة»: the screen's items and the decisions (staff-decisions.ts, each step checks the manager again)
     if (data === "si" || data === "sw") return show(chatId, withBack(await interventionView(me, data === "sw")), at);
