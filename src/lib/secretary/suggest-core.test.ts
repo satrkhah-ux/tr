@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { cityKeys, emptyDraftData, normalizeDraftData, normalizeDraftHotel, type DraftData } from "@/lib/offer/draft-types";
-import { buildSuggestions, cheaperForStay, rateKey, type CandidateHotel } from "./suggest-core";
+import { buildSuggestions, memoryAlternatives, rateKey, type CandidateHotel, type StayAlternative } from "./suggest-core";
 
 /** the owner's test: تبليسي من 1 إلى 3 + باتومي من 3 إلى 8، بفندقين اختارهما الموظف */
 const ROOM = rateKey("مزدوجة", "BB");
+const SAR = { USD: 3.75 } as Record<string, number>;
 const hotel = (id: string, name: string, stars: number | null, perNight: number | null, currency = "USD"): CandidateHotel => ({
   id, name, stars, rates: perNight == null ? {} : { [ROOM]: { perNight, currency } },
 });
@@ -37,46 +38,64 @@ const batumi = [
   hotel("h-sea-4", "Sea View", 4, 90),
 ];
 
-function market(d: DraftData): Map<string, CandidateHotel[]> {
-  return new Map([[d.cities[0].key!, tbilisi], [d.cities[1].key!, batumi]]);
-}
+const tboAlt = (name: string, staySar: number): StayAlternative => ({
+  source: "tbo", hotelId: null, supplierHotelId: `t-${name}`, hotelName: name, stars: 4,
+  staySar, saveSar: 100, board: "BB", cancellation: "مجاني حتى قبل 3 أيام", refundable: true,
+});
 
-describe("cheaperForStay", () => {
-  it("same stars only, known prices only, cheaper only — cheapest first", () => {
+describe("memoryAlternatives", () => {
+  it("same stars only, known cheaper prices only, cheapest first, trusted prices filled, SAR figures set", () => {
     const d = georgia();
-    const out = cheaperForStay(d.hotels[0], 2, tbilisi);
-    expect(out.map((o) => o.hotel.name)).toEqual(["Garden Inn", "Tbilisi Inn"]);
+    const out = memoryAlternatives(d.hotels[0], 2, tbilisi, SAR);
+    expect(out.map((o) => o.hotelName)).toEqual(["Garden Inn", "Tbilisi Inn"]);
+    expect(out[0].roomPrices).toEqual({ prices: [120], currency: "USD" }); // 60 × ليلتان
+    expect(out[0].staySar).toBe(Math.round(60 * 2 * 3.75));
+    expect(out[0].saveSar).toBe(Math.round((100 - 60) * 2 * 3.75));
+    expect(out[0].source).toBe("memory");
   });
   it("unknown original stars or no baseline → nothing", () => {
     const d = georgia();
-    expect(cheaperForStay(d.hotels[0], 2, [hotel("h-old-wall", "Old Wall", null, 100), hotel("x", "X", 4, 50)])).toEqual([]);
-    expect(cheaperForStay(d.hotels[0], 2, [hotel("h-old-wall", "Old Wall", 4, null), hotel("x", "X", 4, 50)])).toEqual([]);
+    expect(memoryAlternatives(d.hotels[0], 2, [hotel("h-old-wall", "Old Wall", null, 100), hotel("x", "X", 4, 50)], SAR)).toEqual([]);
+    expect(memoryAlternatives(d.hotels[0], 2, [hotel("h-old-wall", "Old Wall", 4, null), hotel("x", "X", 4, 50)], SAR)).toEqual([]);
   });
 });
 
 describe("buildSuggestions", () => {
-  it("two variants: cheapest combo then the next, rooms priced per-night × nights, route and dates untouched", () => {
+  it("variant k takes the k-th alternative; memory prices written, route and dates untouched", () => {
     const d = georgia();
-    const out = buildSuggestions(d, market(d), 2);
+    const alts = new Map([
+      [d.cities[0].key!, memoryAlternatives(d.hotels[0], 2, tbilisi, SAR)],
+      [d.cities[1].key!, memoryAlternatives(d.hotels[1], 5, batumi, SAR)],
+    ]);
+    const out = buildSuggestions(d, alts, 2);
     expect(out).toHaveLength(2);
-    // proposal 1: Garden Inn (60×2) + Sea View (90×5)
     expect(out[0].data.hotels.map((h) => h.hotel_name)).toEqual(["Garden Inn", "Sea View"]);
     expect(out[0].data.hotels[0].rooms[0].price).toBe(120);
     expect(out[0].data.hotels[1].rooms[0].price).toBe(450);
-    // proposal 2: second-cheapest in Tbilisi, Batumi falls back to its only cheaper one
+    expect(out[0].unverified).toBe(false);
     expect(out[1].data.hotels.map((h) => h.hotel_name)).toEqual(["Tbilisi Inn", "Sea View"]);
-    // nothing else moved
     expect(out[0].data.cities.map((c) => [c.city_name, c.nights])).toEqual([["تبليسي", 2], ["باتومي", 5]]);
     expect(out[0].data.trip.arrival_date).toBe("2026-12-01");
     expect(out[0].data.produced_serial ?? null).toBeNull();
-    expect(out[0].swapped).toHaveLength(2);
   });
-  it("a city with nothing cheaper keeps its hotel; no swaps at all → no variants", () => {
+
+  it("a TBO alternative swaps the hotel but writes NO price — the variant is marked unverified", () => {
     const d = georgia();
-    const onlyBatumi = new Map([[d.cities[1].key!, batumi]]);
-    const out = buildSuggestions(d, onlyBatumi, 2);
-    expect(out).toHaveLength(1); // the second variant repeats the first and is dropped
-    expect(out[0].data.hotels.map((h) => h.hotel_name)).toEqual(["Old Wall", "Sea View"]);
+    const alts = new Map([[d.cities[0].key!, [tboAlt("Cheap TBO", 300)]]]);
+    const out = buildSuggestions(d, alts, 2);
+    expect(out).toHaveLength(1);
+    const stay = out[0].data.hotels[0];
+    expect(stay.hotel_name).toBe("Cheap TBO");
+    expect(stay.hotel_id).toBeNull();
+    expect(stay.rooms[0].price).toBeNull();
+    expect(out[0].unverified).toBe(true);
+    expect(out[0].swapped[0]).toMatchObject({ source: "tbo", cancellation: "مجاني حتى قبل 3 أيام" });
+  });
+
+  it("no cheaper anywhere → no variants; a repeated combination is dropped", () => {
+    const d = georgia();
     expect(buildSuggestions(d, new Map(), 2)).toEqual([]);
+    const only = new Map([[d.cities[1].key!, memoryAlternatives(d.hotels[1], 5, batumi, SAR)]]);
+    expect(buildSuggestions(d, only, 2)).toHaveLength(1);
   });
 });
