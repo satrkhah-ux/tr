@@ -15,17 +15,28 @@ import { HEAT_LABEL } from "@/lib/followups/summary-core";
 
 export type SecretaryEmployee = { id: string; name: string; agentId: number | null; chatId: number | null };
 
-export type SecretarySettings = { off: boolean; dailyLimit: number };
+/** `suggest`: phase ج — the cheaper proposals' switch, the silence that triggers them, and the day's cap. */
+export type SecretarySettings = { off: boolean; dailyLimit: number; suggest: { on: boolean; silentHours: number; maxPerDay: number; proposals: number } };
 export const SECRETARY_SETTINGS_KEY = "secretary";
 
 export const secretaryDb = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 
 export function parseSecretarySettings(raw: string | null | undefined): SecretarySettings {
-  const fallback: SecretarySettings = { off: false, dailyLimit: 60 };
+  const fallback: SecretarySettings = { off: false, dailyLimit: 60, suggest: { on: true, silentHours: 24, maxPerDay: 10, proposals: 2 } };
   if (!raw) return fallback;
   try {
-    const v = JSON.parse(raw) as Partial<SecretarySettings>;
-    return { off: v.off === true, dailyLimit: Number.isFinite(v.dailyLimit) && Number(v.dailyLimit) > 0 ? Number(v.dailyLimit) : fallback.dailyLimit };
+    const v = JSON.parse(raw) as Partial<SecretarySettings> & { suggest?: Partial<SecretarySettings["suggest"]> };
+    const num = (x: unknown, d: number) => (Number.isFinite(x) && Number(x) > 0 ? Number(x) : d);
+    return {
+      off: v.off === true,
+      dailyLimit: num(v.dailyLimit, fallback.dailyLimit),
+      suggest: {
+        on: v.suggest?.on !== false,
+        silentHours: num(v.suggest?.silentHours, fallback.suggest.silentHours),
+        maxPerDay: num(v.suggest?.maxPerDay, fallback.suggest.maxPerDay),
+        proposals: Math.min(num(v.suggest?.proposals, fallback.suggest.proposals), 3),
+      },
+    };
   } catch { return fallback; }
 }
 
