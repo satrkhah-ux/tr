@@ -726,8 +726,9 @@ export function BasicEditor({
   const nightsChoice = newNights || Math.max(left, 1);
   // the arrival day is spent arriving: four nights hold up to three tours (the city card allows more)
   const maxTours = Math.max(nightsChoice - 1, 0);
-  // one tour unless the agent asks for more — every night but the last was too many to undo (the owner's review, 2026-10-18)
-  const toursChoice = newTours == null ? Math.min(1, maxTours) : Math.min(newTours, maxTours);
+  // nights − 1 tours unless the agent picks another number (the owner, 2026-10-26, asking for the 2026-10-15 default back
+  // over the 2026-10-18 «one tour»)
+  const toursChoice = newTours == null ? maxTours : Math.min(newTours, maxTours);
   const roomsChoice = newRooms || Math.max(trip.rooms, 1);
   // the trip's country unless the group crosses into a neighbour
   const barCountry = findLookupCountry(lk.countries, newCountry || trip.country);
