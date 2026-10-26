@@ -115,6 +115,22 @@ export async function getPriceGrid(mode: GridMode, cityId: string): Promise<{ ok
   return { ok: true, grid: { rows, cars, cells } };
 }
 
+/** «أضف جولة» on the grid's tours tab (the owner, 2026-10-26): a tour born here, priced in its cells. */
+export async function addGridTour(cityId: string, name: string): Promise<{ ok: true; id: string } | Fail> {
+  const db = await staffClient();
+  if (isFail(db)) return db;
+  const trimmed = name.trim();
+  if (!trimmed || !cityId) return { ok: false, error: "err.updateFailed" };
+  const { data: city } = await db.from("cities").select("country_id").eq("id", cityId).maybeSingle();
+  if (!city) return { ok: false, error: "err.updateFailed" };
+  const { data, error } = await db
+    .from("tours")
+    .insert({ arabic_name: trimmed, city_id: cityId, country_id: (city as { country_id: string | null }).country_id })
+    .select("id")
+    .single();
+  return error ? { ok: false, error: "err.updateFailed" } : { ok: true, id: (data as { id: string }).id };
+}
+
 /** The point kind a row of /airports is, as a transfer names it. */
 const pointKind = (kind: string | null) => (kind === "airport" ? "airport" : kind === "port" ? "port" : "station");
 

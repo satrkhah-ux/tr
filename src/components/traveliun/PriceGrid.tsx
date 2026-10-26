@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
-import { getPriceGrid, savePriceCell, type GridCity, type GridMode, type PriceGrid as Grid } from "@/lib/data/price-grid";
+import { addGridTour, getPriceGrid, savePriceCell, type GridCity, type GridMode, type PriceGrid as Grid } from "@/lib/data/price-grid";
 import { TraveliunShell } from "./TraveliunShell";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
@@ -123,6 +123,22 @@ export function PriceGrid({ cities }: { cities: GridCity[] }) {
               className={`${field} w-24 text-center`}
             />
           </label>
+          {mode === "tours" && cityId ? (
+            <button
+              type="button"
+              onClick={() => {
+                const name = window.prompt(t("data.model.grid.newTourName"));
+                if (!name?.trim()) return;
+                void addGridTour(cityId, name).then((r) => {
+                  if (r.ok) void load(mode, cityId);
+                  else setError(t(r.error));
+                });
+              }}
+              className="mb-0.5 h-10 rounded-[10px] border border-[#2aa87a] px-4 text-[13px] font-bold text-[#185045] hover:bg-[#eef7f3]"
+            >
+              {t("data.model.grid.addTour")}
+            </button>
+          ) : null}
           {loading ? <Loader2 className="mb-2.5 size-4 animate-spin text-[#2aa87a]" aria-hidden /> : null}
         </div>
 
