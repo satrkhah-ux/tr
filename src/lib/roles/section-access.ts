@@ -36,8 +36,10 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   ["/airports", "data.write"],
   ["/ports", "data.write"],
   ["/cars-types", "data.write"],
+  ["/cars-capacities", "data.write"],
   ["/cars", "data.write"],
   ["/price-grid", "data.write"],
+  ["/transport-prices", "data.write"],
   // «مراجعة الأسعار»: the provisional and missing prices, with who changed what
   ["/price-review", "data.write"],
   ["/tour-programs", "data.write"],

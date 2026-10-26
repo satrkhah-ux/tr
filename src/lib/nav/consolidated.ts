@@ -71,6 +71,7 @@ export const TAB_GROUPS: SectionTab[][] = [
   ],
   // «قسم المواصلات» as one family of tabs (the owner's transport order, 2026-10-26)
   [
+    { href: "/transport-prices", labelKey: "nav.transportPrices" },
     { href: "/cars-types", labelKey: "nav.carTypes" },
     { href: "/cars-capacities", labelKey: "nav.carCapacities" },
     { href: "/cars/transfers", labelKey: "nav.transfers" },
