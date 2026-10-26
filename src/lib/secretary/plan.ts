@@ -51,7 +51,7 @@ export async function sweepSecretaryPlans(nowMs = Date.now()): Promise<Record<st
     const { error } = await db.from("secretary_messages").insert({ employee_id: e.id, role: "plan", content: text });
     if (error) continue;
     if (employee.chatId) {
-      await staffSend(employee.chatId, `🗂 <b>خطة يومك من سكرتيرك الخاص</b>\n\n${escapeHtml(text)}`, [[{ text: "افتح سكرتيري الخاص", url: `${siteUrl()}/secretary` }]], {}, "secretary").catch(() => null);
+      await staffSend(employee.chatId, `🗂 <b>خطة يومك من مُراد</b>\n\n${escapeHtml(text)}`, [[{ text: "افتح خطتي", url: `${siteUrl()}/secretary` }]], {}, "secretary").catch(() => null);
     }
     await logAudit({ action: "secretary.plan_sent", entity: "secretary_messages", entity_id: e.id, meta: dayCounts(briefing.items) });
     sent++;

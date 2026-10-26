@@ -5,7 +5,7 @@ import { parseSecretarySettings, planText, type SecretaryEmployee } from "./core
 const employee: SecretaryEmployee = { id: "e1", name: "رشا", agentId: 5, chatId: null };
 const item = (kind: DayKind, name: string): DayItem => ({
   key: `${kind}:${name}`, kind, tags: [], conversationId: 1, name, phone: null, since: Date.now() - 3600_000,
-  wants: null, next: null, advice: null, heat: kind === "hot" ? "hot" : null, offerLine: null, destination: null,
+  wants: null, next: null, advice: null, draft: null, heat: kind === "hot" ? "hot" : null, offerLine: null, destination: null,
   followupId: null, step: null, canReply: null, preview: null, reminder: null, note: null,
 });
 
@@ -20,15 +20,17 @@ describe("«سكرتيري الخاص» settings", () => {
   });
 });
 
-describe("the day plan", () => {
-  it("groups in «متابعتي»'s order (waiting → silent → hot → offer → reminder) and a quiet day says so", () => {
+describe("the day plan (short pointer, the board is the tool)", () => {
+  it("one line of counts, the hot names first, and a quiet day says so", () => {
     const items = [item("waiting", "منتظِر"), item("silent", "ساكت"), item("hot", "ساخن"), item("offer", "مستحق")];
     const text = planText(employee, { items, teletel: true });
-    expect(text.indexOf("منتظِر")).toBeGreaterThan(-1);
-    expect(text.indexOf("منتظِر")).toBeLessThan(text.indexOf("ساكت"));
-    expect(text.indexOf("ساكت")).toBeLessThan(text.indexOf("ساخن"));
-    expect(text.indexOf("ساخن")).toBeLessThan(text.indexOf("مستحق"));
     expect(text).toContain("رشا");
+    expect(text).toContain("🔥 1 ساخن");
+    expect(text).toContain("💬 1 ينتظر ردك");
+    expect(text).toContain("🤐 1 ساكت");
+    expect(text).toContain("ابدأ بالساخنين: ساخن");
+    expect(text).toContain("خطتي");
+    expect(text.split("\n").length).toBeLessThanOrEqual(5);
 
     const quiet = planText(employee, { items: [], teletel: true });
     expect(quiet).toContain("يوم هادئ");

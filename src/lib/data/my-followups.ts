@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { currentCan, currentPermissions, currentRealPermissions } from "@/lib/roles/current";
 import { getCurrentEmployeeId } from "./metrics";
-import { teletelConversationUrl } from "@/lib/providers/teletel";
+import { listOpenConversations, teletelConversationUrl } from "@/lib/providers/teletel";
 import { followupPeople } from "@/lib/followups/service";
 import { loadSettings, myDay, SETTINGS_KEY } from "@/lib/mine/day";
 import { dayCounts, parseSettings, type DayItem, type DaySettings } from "@/lib/mine/rank";
@@ -72,6 +72,65 @@ export async function getMyFollowups(employeeId?: string): Promise<MyFollowupsVi
     people: people.map((p) => ({ id: p.id, name: p.name.trim() })),
     at: Date.now(),
   };
+}
+
+/** «أنجزت اليوم» — one done client: when, and how Murad knew (a «تمّت» press, a reply, an offer step acted on). */
+export type DoneItem = { conversationId: number; name: string; at: string; how: "mark" | "replied" | "acted" };
+export type SecretaryBoard = { view: MyFollowupsView; doneToday: DoneItem[]; yesterdayDone: number };
+
+const riyadhDayStart = (nowMs: number, daysBack = 0) =>
+  new Date(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(nowMs - daysBack * 86_400_000) + "T00:00:00+03:00").toISOString();
+
+/**
+ * «سكرتيري الخاص» work screen: the day list PLUS what Murad sees as already
+ * done — automatically, no button needed: the employee replied in Teletel (we
+ * spoke last, today), acted on a follow-up (last_attempt_at / done_at today),
+ * or pressed «تمّت». Derived on read from what the tables already say, so
+ * nothing new is stored and nothing can drift.
+ */
+export async function getSecretaryBoard(employeeId?: string): Promise<SecretaryBoard | null> {
+  const view = await getMyFollowups(employeeId);
+  if (!view) return null;
+  const nowMs = view.at;
+  const today = riyadhDayStart(nowMs);
+  const yesterday = riyadhDayStart(nowMs, 1);
+  const service = db();
+  const [{ data: emp }, { data: markRows }, { data: acted }] = await Promise.all([
+    service.from("employees").select("teletel_agent_id").eq("id", view.employeeId).maybeSingle(),
+    service.from("my_followup_marks").select("key, done_at").eq("employee_id", view.employeeId).gte("done_at", yesterday).like("key", "c:%"),
+    service
+      .from("sla_followups")
+      .select("conversation_id, contact_name, last_attempt_at, done_at")
+      .eq("assigned_to", view.employeeId)
+      .or(`last_attempt_at.gte.${yesterday},done_at.gte.${yesterday}`),
+  ]);
+  const agentId = (emp as { teletel_agent_id: number | string | null } | null)?.teletel_agent_id;
+  const open = agentId != null ? await listOpenConversations().catch(() => null) : null;
+
+  const todayMap = new Map<number, DoneItem>();
+  let yCount = 0;
+  const add = (conversationId: number, name: string, at: string, how: DoneItem["how"]) => {
+    if (at >= today) {
+      const had = todayMap.get(conversationId);
+      if (!had || at > had.at) todayMap.set(conversationId, { conversationId, name: name || `عميل #${conversationId}`, at, how });
+    } else if (at >= yesterday) yCount += 1;
+  };
+  const nameOf = new Map(((acted ?? []) as { conversation_id: number; contact_name: string | null }[]).map((r) => [r.conversation_id, r.contact_name ?? ""]));
+  for (const m of (markRows ?? []) as { key: string; done_at: string | null }[]) {
+    const id = Number(m.key.slice(2));
+    if (m.done_at && Number.isFinite(id)) add(id, nameOf.get(id) ?? "", m.done_at, "mark");
+  }
+  for (const r of (acted ?? []) as { conversation_id: number; contact_name: string | null; last_attempt_at: string | null; done_at: string | null }[]) {
+    const at = [r.last_attempt_at, r.done_at].filter((x): x is string => Boolean(x)).sort().at(-1);
+    if (at) add(r.conversation_id, r.contact_name ?? "", at, "acted");
+  }
+  for (const c of open?.rows ?? []) {
+    if (c.assigneeId !== Number(agentId) || c.waitingSince) continue;
+    const at = new Date(c.lastActivityAt * 1000).toISOString();
+    if (at >= today) add(c.id, c.name, at, "replied");
+  }
+  // yesterday's Teletel replies are gone from the open list's clock — the count is marks + follow-up acts only
+  return { view, doneToday: [...todayMap.values()].sort((a, b) => (a.at < b.at ? 1 : -1)), yesterdayDone: yCount };
 }
 
 /** the badge beside «متابعتي»: how many cards are on me now */

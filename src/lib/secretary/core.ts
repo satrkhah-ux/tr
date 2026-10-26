@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { myDay } from "@/lib/mine/day";
-import { dayCounts, KIND_LABEL, KIND_ORDER, type DayItem, type DayKind } from "@/lib/mine/rank";
+import { dayCounts, KIND_LABEL, type DayItem } from "@/lib/mine/rank";
 import { HEAT_LABEL } from "@/lib/followups/summary-core";
 
 /**
@@ -106,27 +106,27 @@ export function renderBriefing(employee: SecretaryEmployee, b: SecretaryBriefing
   ].join("\n");
 }
 
-const PLAN_HEAD: Record<DayKind, string> = {
-  waiting: "💬 ردوا وينتظرونك",
-  silent: "🤐 سكتوا بعد رسالتك",
-  hot: "🔥 عملاء ساخنون — كلّمهم أولاً",
-  offer: "📋 متابعات عروض مستحقة",
-  reminder: "⏰ تذكيراتك",
-};
-
-/** The day plan, deterministic (no model): the ranked list, grouped, each client once under its top reason. */
+/**
+ * The day plan as ONE SHORT line of numbers (the owner, 2026-10-26: «هذه
+ * الرسالة أنا لا أحتاج هكذا … أريدها أداة») — the tool itself is the board on
+ * /secretary and in مُراد's floating panel; this text only points at it.
+ */
 export function planText(employee: SecretaryEmployee, b: SecretaryBriefing, nowMs = Date.now()): string {
-  const lines: string[] = [`صباح الخير${employee.name ? ` يا ${employee.name}` : ""} 🌤️ — خطة يومك:`];
-  const counts = dayCounts(b.items);
-  for (const kind of KIND_ORDER) {
-    const of = b.items.filter((i) => i.kind === kind);
-    if (!of.length) continue;
-    lines.push("", `${PLAN_HEAD[kind]} (${counts[kind]}):`);
-    lines.push(...of.slice(0, 8).map((i) => `• ${i.name || `#${i.conversationId ?? ""}`}${i.kind === "reminder" && i.reminder ? ` — ${i.reminder.text}` : i.heat === "hot" && i.wants ? ` — ${i.wants}` : i.since ? ` — ${sinceText(i.since, nowMs)}` : ""}`));
-    if (of.length > 8) lines.push(`و${of.length - 8} أخرى…`);
-  }
-  if (lines.length === 1) lines.push("", "لا شيء مستحق عليك الآن — يوم هادئ. ✅");
-  if (!b.teletel) lines.push("", "(تعذّرت قراءة تيلي تيل الآن — القائمة قد تنقص المحادثات المنتظرة)");
-  lines.push("", "اسألني أي وقت: «ما حال محادثاتي؟» أو «من الساخن؟»");
-  return lines.join("\n");
+  void nowMs;
+  const c = dayCounts(b.items);
+  const parts = [
+    c.hot ? `🔥 ${c.hot} ساخن` : "",
+    c.waiting ? `💬 ${c.waiting} ينتظر ردك` : "",
+    c.offer ? `📋 ${c.offer} متابعة عرض` : "",
+    c.reminder ? `⏰ ${c.reminder} تذكير` : "",
+    c.silent ? `🤐 ${c.silent} ساكت` : "",
+  ].filter(Boolean);
+  const hot = b.items.filter((i) => i.heat === "hot").slice(0, 3).map((i) => i.name).filter(Boolean);
+  return [
+    `صباح الخير${employee.name ? ` يا ${employee.name}` : ""} 🌤️`,
+    parts.length ? parts.join(" · ") : "لا شيء مستحق عليك الآن — يوم هادئ ✅",
+    ...(hot.length ? [`ابدأ بالساخنين: ${hot.join("، ")}`] : []),
+    ...(b.teletel ? [] : ["(تعذّرت قراءة تيلي تيل — القائمة قد تنقص المحادثات المنتظرة)"]),
+    "افتح «خطتي» من زر مُراد العائم أو قسم «سكرتيري الخاص».",
+  ].join("\n");
 }

@@ -73,6 +73,8 @@ export type DayItem = {
   wants: string | null;
   next: FollowupSummary["next"] | null;
   advice: string | null;
+  /** Murad's ready-to-send reply from the follow-up summary — prepared, the employee reviews and presses send; never sent by itself */
+  draft: string | null;
   heat: FollowupSummary["heat"] | null;
   offerLine: string | null;
   destination: string | null;
@@ -160,6 +162,7 @@ export function rankDay(input: {
       wants: s?.wants || null,
       next: s?.next ?? null,
       advice: s?.advice || null,
+      draft: s?.draft || null,
       heat: s?.heat ?? null,
       offerLine: r?.offer_line ?? null,
       destination: r?.destination ?? (s?.destination || null),
@@ -211,6 +214,7 @@ export function rankDay(input: {
         wants: null,
         next: null,
         advice: null,
+        draft: null,
         heat: null,
         offerLine: null,
         destination: null,
