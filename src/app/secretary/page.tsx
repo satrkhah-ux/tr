@@ -3,6 +3,7 @@ import { TraveliunShell } from "@/components/traveliun/TraveliunShell";
 import { AdminSecretaryViewer } from "@/components/traveliun/secretary/AdminSecretaryViewer";
 import { SecretaryBoardSection } from "@/components/traveliun/secretary/SecretaryBoardSection";
 import { SecretaryChat } from "@/components/traveliun/secretary/SecretaryChat";
+import { SecretaryCompare } from "@/components/traveliun/secretary/SecretaryCompare";
 import { SecretaryEditRequest } from "@/components/traveliun/secretary/SecretaryEditRequest";
 import { adminSecretaryEmployees } from "@/lib/secretary/chat";
 import { getSecretaryBoard } from "@/lib/data/my-followups";
@@ -19,6 +20,7 @@ export default async function SecretaryPage() {
       </header>
       {/* the work screen first (the owner, 2026-10-26: «ليست رسالة للقراءة وإنما أداة للوصول السريع») */}
       {board && <SecretaryBoardSection initial={board} />}
+      {employee && <SecretaryCompare />}
       {employee && <SecretaryEditRequest />}
       {/* the administration also reads any employee's secretary THREAD (their chat and plans) */}
       {adminList && <AdminSecretaryViewer employees={adminList} />}
