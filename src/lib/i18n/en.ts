@@ -495,7 +495,7 @@ export const en = {
   "data.model.grid.city": "City",
   "data.model.grid.chooseCity": "Choose the city",
   "data.model.grid.currency": "Currency",
-  "data.model.grid.hint.transfers": "One vehicle's price from each airport or station of the city to its hotels — the way back costs the same. Reception and farewell are priced from it in the generator and Basic.",
+  "data.model.grid.hint.transfers": "One vehicle's price PER DIRECTION: airport or station to the city, and the city back to it — each priced on its own. Reception and farewell are priced from it in the generator and Basic.",
   "data.model.grid.hint.tours": "Each tour of the city, priced per car type. Basic and the generator take the price for the car chosen.",
   "data.model.grid.rowTransfers": "From",
   "data.model.grid.rowTours": "Tour",

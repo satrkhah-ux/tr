@@ -493,7 +493,7 @@ export const ar: Dictionary = {
   "data.model.grid.city": "المدينة",
   "data.model.grid.chooseCity": "اختر المدينة",
   "data.model.grid.currency": "العملة",
-  "data.model.grid.hint.transfers": "سعر السيارة الواحدة من كل مطار أو محطة في المدينة إلى فنادقها — والعودة بالسعر نفسه. يُسعَّر به الاستقبال والتوديع في المولّد وبيسك تلقائياً.",
+  "data.model.grid.hint.transfers": "سعر السيارة الواحدة لكل اتجاه: من المطار أو المحطة إلى المدينة، ومن المدينة إليه — كل اتجاه بسعره المستقل. يُسعَّر به الاستقبال والتوديع في المولّد وبيسك تلقائياً.",
   "data.model.grid.hint.tours": "سعر كل جولة في المدينة لكل نوع سيارة. يُجلب في بيسك والمولّد حسب السيارة المختارة.",
   "data.model.grid.rowTransfers": "من",
   "data.model.grid.rowTours": "الجولة",
