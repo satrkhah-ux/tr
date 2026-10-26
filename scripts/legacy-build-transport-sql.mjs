@@ -133,7 +133,7 @@ for (const p of load("transfer_cars_prices")) {
   } else {
     const from = cityText(collapse(t.point_1_arabic_name) || collapse(t.point_1_english_name));
     const to = cityText(collapse(t.point_2_arabic_name) || collapse(t.point_2_english_name));
-    transferPriceRows.push({ id: p.id, car, price, currency: iso(p.currency_id), from, to });
+    transferPriceRows.push({ id: p.id, car, price, currency: iso(p.currency_id), from, to, city: t.point_1_city ?? null });
   }
 }
 
@@ -162,21 +162,37 @@ w("  set price = excluded.price, currency = excluded.currency, provisional = fal
 w("  where public.tour_prices.provisional;");
 w("");
 // A placeholder tour (typed by staff, never in legacy_id_map) still gets the
-// old system's prices when its NAME matches a legacy tour.
-const namedTour = new Map(); // `${norm-ish base}-${car}` -> latest row
+// old system's prices when its NAME matches a legacy tour IN THE SAME COUNTRY.
+//
+// The first run matched by name alone, and the legacy fallback names are
+// GENERIC — «الجولة الأولى» exists in every country — so Indonesian rupiah
+// landed on Georgian tours (the owner, 2026-10-26: «اسعار الجولات خطأ، مكتوب
+// العملة متنوعة»). Now: a generic «الجولة …» name never matches at all, and
+// every other name must also agree on the country, resolved from the legacy
+// row's own starting city.
+const GENERIC_TOUR = /^(ال)?جول[ةه]\s+(ال)?(اول[يى]?|أول[ىي]?|ثاني[ةه]?|ثالث[ةه]?|رابع[ةه]?|خامس[ةه]?|سادس[ةه]?|سابع[ةه]?|ثامن[ةه]?|تاسع[ةه]?|عاشر[ةه]?)$/;
+const legacyCityCountry = new Map(load("cities").map((c) => [c.id, c.country_id]));
+const namedTour = new Map(); // `${base}-${car}` -> latest row
 for (const r of tourPriceRows) {
-  if (!r.base || !r.car) continue;
+  if (!r.base || !r.car || GENERIC_TOUR.test(r.base)) continue;
   const key = `${r.base}-${r.car}`;
   const prev = namedTour.get(key);
   if (!prev || r.id > prev.id) namedTour.set(key, r);
 }
-w("-- …and by NAME for tours our staff typed (never mapped): only placeholder prices move.");
-w("with incoming (base, car_type, price, currency) as (values");
-w([...namedTour.values()].map((r) => `  (${q(r.base)}, ${q(r.car)}, ${r.price}::numeric(12,2), ${q(r.currency)})`).join(",\n"));
+w("-- …and by NAME for tours our staff typed (never mapped): same country only,");
+w("-- never a generic «الجولة …» name; only placeholder prices move.");
+w("with incoming (base, car_type, price, currency, country_legacy) as (values");
+w([...namedTour.values()].map((r) => `  (${q(r.base)}, ${q(r.car)}, ${r.price}::numeric(12,2), ${q(r.currency)}, ${legacyCityCountry.get(r.city) ?? "null"})`).join(",\n"));
+w("),");
+w("located as (");
+w("  select i.*, (select m.new_id from public.legacy_id_map m");
+w("     where m.entity='country' and m.source='app' and m.legacy_id = i.country_legacy) as country_id");
+w("  from incoming i");
 w("),");
 w("matched as (");
 w("  select distinct on (t.id, i.car_type) t.id as tour_id, i.car_type, i.price, i.currency");
-w("  from incoming i join public.tours t on pg_temp.norm(t.arabic_name) = pg_temp.norm(i.base)");
+w("  from located i join public.tours t on pg_temp.norm(t.arabic_name) = pg_temp.norm(i.base)");
+w("    and t.country_id = i.country_id");
 w("  order by t.id, i.car_type");
 w(")");
 w("insert into public.tour_prices (tour_id, car_type, price, currency, provisional)");
@@ -235,13 +251,20 @@ for (const r of transferPriceRows) {
   const prev = namedRoad.get(key);
   if (!prev || r.id > prev.id) namedRoad.set(key, r);
 }
-w("-- …and by NAME for roads our staff typed (never mapped): only placeholder prices move.");
-w("with incoming (from_city, to_city, car_type, price, currency) as (values");
-w([...namedRoad.values()].map((r) => `  (${q(r.from)}, ${q(r.to)}, ${q(r.car)}, ${r.price}::numeric(12,2), ${q(r.currency)})`).join(",\n"));
+w("-- …and by NAME for roads our staff typed (never mapped): same country only;");
+w("-- only placeholder prices move.");
+w("with incoming (from_city, to_city, car_type, price, currency, country_legacy) as (values");
+w([...namedRoad.values()].map((r) => `  (${q(r.from)}, ${q(r.to)}, ${q(r.car)}, ${r.price}::numeric(12,2), ${q(r.currency)}, ${legacyCityCountry.get(r.city) ?? "null"})`).join(",\n"));
+w("),");
+w("located as (");
+w("  select i.*, (select m.new_id from public.legacy_id_map m");
+w("     where m.entity='country' and m.source='app' and m.legacy_id = i.country_legacy) as country_id");
+w("  from incoming i");
 w(")");
 w("update public.transfers t set price = i.price, currency = coalesce(i.currency, t.currency), provisional = false");
-w("from incoming i");
+w("from located i");
 w("where t.provisional");
+w("  and t.country_id is not distinct from i.country_id");
 w("  and pg_temp.norm(t.from_city) = pg_temp.norm(i.from_city)");
 w("  and pg_temp.norm(t.to_city) = pg_temp.norm(i.to_city)");
 w("  and pg_temp.norm(t.car_type) = pg_temp.norm(i.car_type);");
