@@ -145,6 +145,11 @@ export async function draft(me: StaffMember, chatId: number, content: string, ta
 
 /** «⏰ ذكّره بمن ينتظره»: the alert written from the colleague's own numbers, still shown first and confirmed. */
 export async function remindDraft(me: StaffMember, chatId: number, employeeId: string): Promise<void> {
+  // before any read: a forged «q:<id>» must not learn who waits on a colleague
+  if (!(await isBotManager(me.id))) {
+    await staffSend(chatId, REFUSED);
+    return;
+  }
   const who = (await colleagues()).find((c) => c.id === employeeId);
   const list = await listOpenConversations();
   if (!who?.agentId || !list) {
