@@ -620,11 +620,14 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
             <Lock className="size-5" />
           </button>
         ) : null}
-        <div className="mx-auto hidden min-w-0 max-w-[520px] shrink items-center gap-2 rounded-full border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2 text-[#a86a10] lg:flex">
+        <div title={t("notice.trial")} className="hidden shrink-0 items-center gap-1.5 rounded-full border border-[#f2e2b4] bg-[#fff8e8] px-3 py-1.5 text-[#a86a10] lg:flex">
           <AlertTriangle className="size-4 shrink-0" />
-          <span className="truncate text-[12.5px] font-bold leading-tight">{t("notice.trial")}</span>
+          <span className="text-[12px] font-bold leading-tight">{t("notice.trialShort")}</span>
         </div>
-        <div className="flex h-full shrink-0 items-center gap-1">
+        <div className="flex-1" />
+        <div className="flex shrink-0 items-center gap-3">
+          {/* what you reach for first: the quick search and the bell */}
+          <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={openPalette}
@@ -637,11 +640,12 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
             </kbd>
           </button>
 
-          {/* the guide, the calculator and the table view are our tools — a partner keeps settings and account */}
-          {partner ? null : (
-          <>
           {/* «مركز الإشعارات»: the bell and its unread count (notifications/NotificationBell.tsx) */}
-          <NotificationBell />
+          {partner ? null : <NotificationBell />}
+          </div>
+          {/* the guide, the calculator and the table view are our tools, together — a partner keeps settings and account */}
+          {partner ? null : (
+          <div className="hidden items-center gap-0.5 rounded-[12px] border border-[#e4ece8] bg-[#f7faf9] p-0.5 sm:flex">
           {guideLinks.length > 0 ? (
           <div className="hidden sm:block">
             <Popover open={panel === "guide"} onOpenChange={(o) => setPanel(o ? "guide" : null)}>
@@ -670,9 +674,10 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
               </PopoverContent>
             </Popover>
           </div>
-          </>
+          </div>
           )}
-
+          {/* the settings and the account, set apart at the edge */}
+          <div className="flex items-center gap-1 border-s border-[#e4ece8] ps-3">
           <Popover open={panel === "settings"} onOpenChange={(o) => setPanel(o ? "settings" : null)}>
             <PopoverTrigger render={<HeaderIcon label={t("settings")} icon={Settings} active={panel === "settings"} />} />
             <PopoverContent className="w-[min(320px,calc(100vw/var(--tv-zoom)_-_24px))]">
@@ -691,6 +696,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
               />
             </PopoverContent>
           </Popover>
+          </div>
         </div>
       </header>
       )}
@@ -1016,14 +1022,15 @@ const HeaderIcon = forwardRef<
       ref={ref}
       type="button"
       aria-label={label}
+      title={label}
       className={cn(
-        "flex h-full min-w-[66px] items-center justify-center border-e border-[#eef2f0] outline-none transition-colors hover:bg-[#f5f8f6] focus-visible:bg-[#e8f1ed]",
-        active ? "bg-[#e8f1ed] text-[var(--tv-brand)]" : muted ? "bg-[#f0f2f2] text-[#b2b7bc]" : "text-[var(--tv-brand)]",
+        "flex size-10 items-center justify-center rounded-[10px] outline-none transition-colors hover:bg-[#eef4f1] focus-visible:ring-2 focus-visible:ring-[#b7d0c7]",
+        active ? "bg-[#e8f1ed] text-[var(--tv-brand)]" : muted ? "rounded-full bg-[#e8f1ed] text-[var(--tv-brand)]" : "text-[var(--tv-brand)]",
         className,
       )}
       {...props}
     >
-      <Icon className="size-6" />
+      <Icon className="size-[22px]" />
     </button>
   );
 });

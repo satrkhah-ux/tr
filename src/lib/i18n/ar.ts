@@ -8,6 +8,7 @@ import type { Dictionary } from "./index";
 export const ar: Dictionary = {
   // ---------- brand / chrome ----------
   "brand": "ترافليون",
+  "notice.trialShort": "قيد التجربة",
   "notice.trial": "هذا النظام ما زال تحت التجربة الرجاء تدقيق العروض يدوياً في البداية",
   "quickSearch": "بحث سريع",
   "palettePlaceholder": "ابحث عن شاشة أو انتقل بسرعة...",

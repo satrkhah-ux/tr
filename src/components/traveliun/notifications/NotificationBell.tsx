@@ -121,7 +121,7 @@ export function NotificationBell() {
 
   return <Popover open={open} onOpenChange={setOpen}>
     <PopoverTrigger render={
-      <button type="button" aria-label="الإشعارات" className="relative flex size-10 items-center justify-center rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] text-[#6f8f88] hover:bg-[#eef4f1]">
+      <button type="button" aria-label="الإشعارات" title="الإشعارات" className="relative flex size-10 items-center justify-center rounded-[10px] border border-[#dbe6e1] bg-[#f5f8f7] text-[var(--tv-brand)] hover:bg-[#eef4f1]">
         <Bell className="size-[18px]" />
         {data.unread > 0 && <span className="absolute -top-1.5 -end-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#b3261e] px-1 text-[11px] font-extrabold text-white tabular-nums">{data.unread > 99 ? "99+" : data.unread}</span>}
       </button>

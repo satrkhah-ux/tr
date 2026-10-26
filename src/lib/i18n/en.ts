@@ -10,6 +10,7 @@
 export const en = {
   // ---------- brand / chrome ----------
   "brand": "Traveliun",
+  "notice.trialShort": "Trial",
   "notice.trial": "This system is still in trial — please verify offers manually for now.",
   "quickSearch": "Quick search",
   "palettePlaceholder": "Search for a screen or jump quickly…",
