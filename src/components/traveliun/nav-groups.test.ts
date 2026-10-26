@@ -43,9 +43,10 @@ describe("the sidebar", () => {
     expect(section("nav.dataSection")).toEqual([
       "/data-search",
       "/data-quality",
-      "/hotels",
       "/countries",
       "/cities",
+      "/hotels",
+      "/setting/climate",
       "/airlines",
       "/airports",
       "/cars-types",
@@ -55,8 +56,10 @@ describe("the sidebar", () => {
       "/visas",
       "/company-suppliers",
       "/offers/offer-includes",
-      "/setting/climate",
     ]);
+    // the links sit under six captions (the owner, 2026-10-26: «قسم البيانات يحتاج تنظيم»)
+    const captions = navGroupsFor(all, on).find((g) => g.labelKey === "nav.dataSection")?.children?.filter((c) => c.captionKey).map((c) => c.captionKey);
+    expect(captions).toEqual(["nav.dataCap.find", "nav.dataCap.places", "nav.dataCap.air", "nav.dataCap.transport", "nav.dataCap.services", "nav.dataCap.company"]);
     expect(section("nav.adminSection")).toEqual(["/employees", "/settings/pricing", "/settings/client-comms", "/settings/screens", "/settings/conversations", "/web-guide"]);
   });
 

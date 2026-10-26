@@ -236,27 +236,28 @@ export const navGroups: NavGroup[] = [
     labelKey: "nav.dataSection",
     href: "/hotels",
     icon: Database,
+    // grouped under captions (the owner, 2026-10-26: «قسم البيانات يحتاج تنظيم») — the same links, by what they are about
     children: [
       // a country, a city or a service — what the data holds for it, each figure a link (2026-10-22)
-      { labelKey: "nav.dataSearch", href: "/data-search" },
+      { labelKey: "nav.dataSearch", href: "/data-search", captionKey: "nav.dataCap.find" },
       // «جودة البيانات» + «مراجعة الأسعار»
       { labelKey: "nav.dataReview", href: "/data-quality" },
-      { labelKey: "nav.hotels", href: "/hotels" },
-      { labelKey: "nav.countries", href: "/countries" },
+      { labelKey: "nav.countries", href: "/countries", captionKey: "nav.dataCap.places" },
       { labelKey: "nav.cities", href: "/cities" },
-      { labelKey: "nav.airlines", href: "/airlines" },
+      { labelKey: "nav.hotels", href: "/hotels" },
+      { labelKey: "nav.climate", href: "/setting/climate" },
+      { labelKey: "nav.airlines", href: "/airlines", captionKey: "nav.dataCap.air" },
       { labelKey: "nav.airports", href: "/airports" },
-      { labelKey: "nav.carTypes", href: "/cars-types" },
+      { labelKey: "nav.carTypes", href: "/cars-types", captionKey: "nav.dataCap.transport" },
       // the transfers, the tours and the grid they are typed in
       { labelKey: "nav.transfersTours", href: "/cars/transfers" },
       { labelKey: "nav.tourPrograms", href: "/tour-programs" },
       // the service types and the services by country
-      { labelKey: "nav.services", href: "/services-types" },
+      { labelKey: "nav.services", href: "/services-types", captionKey: "nav.dataCap.services" },
       { labelKey: "nav.visas", href: "/visas" },
-      { labelKey: "nav.companySuppliers", href: "/company-suppliers" },
+      { labelKey: "nav.companySuppliers", href: "/company-suppliers", captionKey: "nav.dataCap.company" },
       // «يشمل», «لا يشمل» and the terms — one table, by kind
       { labelKey: "nav.termsIncludes", href: "/offers/offer-includes" },
-      { labelKey: "nav.climate", href: "/setting/climate" },
     ],
   },
 
