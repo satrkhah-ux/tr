@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { logAudit } from "./audit";
+import { revokeEmployeeExtensionLinks } from "@/lib/ext/revoke";
 import { currentCan, deniedForNonDeveloper } from "@/lib/roles/current";
 import { isDeveloperRole } from "@/lib/roles/roles";
 import { loginName, passwordProblem } from "@/lib/auth/password-rule";
@@ -277,6 +278,8 @@ export async function setEmployeePassword(employeeId: string, password: string):
       }
       const set = await setTemporaryPassword(admin as unknown as SupabaseClient, row.auth_user_id, password, "staff");
       if (set !== "ok") return { ok: false, message: TEMP_PASSWORD_REFUSAL[set] };
+      // the browser extension's device links go with the sessions (/extension)
+      await revokeEmployeeExtensionLinks(row.id);
       // a login already used is a reset: the old password and every session on it are gone (never the value)
       await logAudit({
         action: user.user.last_sign_in_at ? "employee.password_reset" : "employee.account_issued",

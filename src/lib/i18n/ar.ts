@@ -681,6 +681,7 @@ export const ar: Dictionary = {
   "nav.termsIncludes": "الشروط والمشمولات",
   "nav.integrations": "الربط الخارجي",
   "nav.screens": "الشاشات",
+  "nav.extension": "إضافة المتصفح",
   "nav.conversations": "إدارة المحادثات",
   "nav.externalTrips": "المؤكدون خارج النظام",
   // ---------- view-as + developer accounts + forced password (2026-10-17) ----------
