@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { responsesJson } from "@/lib/providers/openai";
 import type { RouteKey } from "./reception";
-import { TOPICS, type Knowledge, type Topic } from "./knowledge-topics";
+import { foldDue, TOPICS, type Knowledge, type Topic } from "./knowledge-topics";
 
 export { TOPICS, type Knowledge, type Topic };
 
@@ -19,8 +19,6 @@ const KIND_TOPIC: Partial<Record<RouteKey, Topic>> = { تأشيرات: "visa", �
 export const topicOf = (kind: RouteKey | string | null | undefined): Topic => KIND_TOPIC[kind as RouteKey] ?? "general";
 const kindsOf = (t: Topic): (string | null)[] => (t === "general" ? [null, "موظف", "غير واضح"] : Object.entries(KIND_TOPIC).filter(([, v]) => v === t).map(([k]) => k));
 
-const NEW_ENOUGH = 40;
-const STALE_MS = 12 * 3600_000;
 const READ_AT_MOST = 400;
 
 const SCHEMA = {
@@ -57,7 +55,7 @@ export async function foldKnowledge(service: SupabaseClient): Promise<Topic | nu
     const now = Date.now();
     const due = counts
       .map(([t, n]) => ({ t, n, was: known.topics[t] }))
-      .filter(({ n, was }) => n > 0 && (!was || n - was.lessons >= NEW_ENOUGH || now - Date.parse(was.at) > STALE_MS))
+      .filter(({ n, was }) => foldDue(n, was, now))
       .sort((a, b) => (b.n - (b.was?.lessons ?? 0)) - (a.n - (a.was?.lessons ?? 0)))[0];
     if (!due) return null;
 

@@ -1,4 +1,5 @@
 import "server-only";
+import { ourLastAsked, waitingCourtesy, waitingIsCourtesy } from "./teletel-courtesy";
 
 /**
  * Teletel customer platform (Chatwoot-compatible API) — lets agents pick a
@@ -489,8 +490,35 @@ async function readOpen(): Promise<OpenList | null> {
     seen.add(c.id);
     rows.push(toConversation(c as RawConversation & { id: number }));
   }
+  await settleAgreements(rows);
   openCache = { at: Date.now(), rows };
   return openCache;
+}
+
+/**
+ * «تمام» / «اوكي» / «فهمت» as the client's last message: a goodbye when our last message asked nothing, an answer when it did
+ * (teletel-courtesy.ts). Only these few conversations cost a read of their messages, and each is read once.
+ */
+const agreementMemo = new Map<string, boolean>();
+async function settleAgreements(rows: OpenConversation[]): Promise<void> {
+  if (agreementMemo.size > 500) agreementMemo.clear();
+  const todo = rows.filter((r) => waitingCourtesy(r) === "agreement").slice(0, 15);
+  await Promise.all(
+    todo.map(async (r) => {
+      const key = `${r.id}:${r.waitingSince}`;
+      let closed = agreementMemo.get(key);
+      if (closed === undefined) {
+        const data = await teletelGet<{ payload?: { message_type?: number; private?: boolean; content?: string | null; created_at?: number }[] }>(`/conversations/${r.id}/messages`);
+        const ours = (data?.payload ?? [])
+          .filter((m) => m.message_type === 1 && !m.private && (m.content ?? "").trim())
+          .sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0))[0];
+        // no message of ours to read: it keeps waiting
+        closed = ours ? !ourLastAsked(ours.content) : false;
+        if (data) agreementMemo.set(key, closed);
+      }
+      if (closed) r.waitingSince = 0;
+    }),
+  );
 }
 
 /**
@@ -512,6 +540,12 @@ export async function recentResolvedConversations(pages = 2): Promise<OpenConver
 
 function toConversation(c: RawConversation & { id: number }): OpenConversation {
   const sender = c.meta?.sender;
+  const conversation = toConversationRow(c, sender);
+  // «شكراً» … «عفواً» … «🌹»: the client's closing pleasantry is not a request (teletel-courtesy.ts)
+  return waitingIsCourtesy(conversation) ? { ...conversation, waitingSince: 0 } : conversation;
+}
+
+function toConversationRow(c: RawConversation & { id: number }, sender: NonNullable<RawConversation["meta"]>["sender"]): OpenConversation {
   return {
     id: c.id,
     inboxId: c.inbox_id ?? 0,
