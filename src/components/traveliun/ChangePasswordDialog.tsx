@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Loader2, X } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { clearMustChangePassword } from "@/lib/data/account-actions";
+import { revokeAllMyExtensionLinks } from "@/lib/data/extension-links";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
@@ -70,6 +71,8 @@ export function ChangePasswordDialog({
         setError(t("pwd.failed"));
         return;
       }
+      // a new password cuts off the browser extension on every device too (/extension)
+      await revokeAllMyExtensionLinks().catch(() => null);
       // The flag is the server's to clear (app_metadata is not user-writable);
       // a no-op for an account without it.
       const cleared = await clearMustChangePassword();

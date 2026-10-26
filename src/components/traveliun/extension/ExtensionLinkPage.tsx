@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, Puzzle, Trash2 } from "lucide-react";
-import { linkExtension, revokeExtensionLink, type ExtensionLink } from "@/lib/data/extension-links";
+import { linkExtension, revokeAllMyExtensionLinks, revokeExtensionLink, type ExtensionLink } from "@/lib/data/extension-links";
 import { FROM_PAGE, isExtMessage, type PageMessage } from "@/lib/ext/protocol";
 import { TraveliunShell } from "../TraveliunShell";
 
@@ -76,6 +76,21 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
     }
   }
 
+  async function revokeAll() {
+    if (!window.confirm("إلغاء الإضافة على كل أجهزتك؟ ستحتاج إلى ربط كل جهاز من جديد.")) return;
+    setBusy(true);
+    try {
+      const r = await revokeAllMyExtensionLinks();
+      setNote(r.ok ? { ok: true, text: `أُلغيت كل الأجهزة (${r.count})` } : { ok: false, text: "تعذّر الإلغاء — حاول مرة أخرى" });
+      if (r.ok) setExt((x) => (x ? { ...x, linked: false } : x));
+    } catch {
+      setNote({ ok: false, text: "تعذّر الإلغاء — حاول مرة أخرى" });
+    } finally {
+      setBusy(false);
+      router.refresh();
+    }
+  }
+
   async function revoke(id: string) {
     setBusy(true);
     try {
@@ -126,7 +141,20 @@ export function ExtensionLinkPage({ initial }: { initial: ExtensionLink[] }) {
         </section>
 
         <section className="rounded-[14px] border border-[#dbe6e1] bg-white p-5">
-          <h2 className="text-[14px] font-extrabold text-[#003c3a]">الأجهزة المربوطة</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="flex-1 text-[14px] font-extrabold text-[#003c3a]">الأجهزة المربوطة</h2>
+            {initial.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => void revokeAll()}
+                disabled={busy}
+                className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#f2c7c7] px-2.5 text-[12px] font-bold text-[#c43d3d] hover:bg-[#fff1f1] disabled:opacity-60"
+              >
+                <Trash2 className="size-3.5" />
+                ألغِ كل الأجهزة
+              </button>
+            ) : null}
+          </div>
           {initial.length === 0 ? (
             <p className="mt-2 text-[12.5px] font-semibold text-[#78948f]">لا جهاز مربوط بعد.</p>
           ) : (

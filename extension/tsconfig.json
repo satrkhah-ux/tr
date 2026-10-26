@@ -10,5 +10,7 @@
     "skipLibCheck": true,
     "isolatedModules": true
   },
-  "include": ["src/**/*.ts", "../src/lib/ext/protocol.ts"]
+  "include": ["src/**/*.ts", "../src/lib/ext/protocol.ts"],
+  // runs the build under Node — not the browser's code
+  "exclude": ["src/build.test.ts"]
 }

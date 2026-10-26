@@ -70,6 +70,27 @@ export async function linkExtension(): Promise<{ ok: true; id: string; token: st
   return { ok: true, id: linkId, token };
 }
 
+/**
+ * Every live device of the signed-in employee, revoked — «ألغِ كل الأجهزة» on /extension, and after they change
+ * their own password (ChangePasswordDialog): a new password cuts off every device, as a reset by the
+ * administration does (employee-accounts.ts). Any employee of ours, whatever they hold; never a partner.
+ */
+export async function revokeAllMyExtensionLinks(): Promise<{ ok: boolean; count: number }> {
+  if (await getPartnerSession()) return { ok: false, count: 0 };
+  const id = await getCurrentEmployeeId();
+  if (!id) return { ok: false, count: 0 };
+  const { data, error } = await db()
+    .from("extension_links")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("employee_id", id)
+    .is("revoked_at", null)
+    .select("id");
+  if (error) return { ok: false, count: 0 };
+  const count = (data ?? []).length;
+  if (count > 0) await logAudit({ action: "ext.revoked", entity: "extension_links", entity_id: id, meta: { all: true, count } });
+  return { ok: true, count };
+}
+
 export async function revokeExtensionLink(linkId: string): Promise<{ ok: boolean }> {
   const id = await me();
   if (!id) return { ok: false };
