@@ -5,6 +5,8 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
+const OPEN_REMINDERS_MAX = 200;
+
 /**
  * POST /api/ext/conversation/<id>/remind {dueAt, text} — «ذكّرني» from the side
  * panel: the employee's own reminder on this conversation, as «متابعتي»'s
@@ -20,7 +22,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const due = typeof body?.dueAt === "string" ? Date.parse(body.dueAt) : NaN;
   const text = typeof body?.text === "string" ? body.text.trim().slice(0, 500) : "";
   if (!Number.isFinite(due) || due < Date.now() - 60_000 || due > Date.now() + 62 * 86_400_000) return extJson({ ok: false, error: "bad_date" }, 400);
-  const { data, error } = await (createSupabaseServiceClient() as unknown as SupabaseClient)
+  const db = createSupabaseServiceClient() as unknown as SupabaseClient;
+  // a ceiling on one employee's open reminders: the table never grows on a loop
+  const { count, error: countError } = await db.from("my_followup_reminders").select("id", { count: "exact", head: true }).eq("employee_id", caller.employeeId).is("done_at", null);
+  if (countError) return extJson({ ok: false, error: "unavailable" }, 503);
+  if ((count ?? 0) >= OPEN_REMINDERS_MAX) return extJson({ ok: false, error: "too_many" }, 429);
+  const { data, error } = await db
     .from("my_followup_reminders")
     .insert({ employee_id: caller.employeeId, conversation_id: id, text, due_at: new Date(due).toISOString() })
     .select("id")

@@ -147,7 +147,7 @@ export async function conversationPanel(caller: ExtCaller, conversationId: numbe
     ok: true,
     conversationId,
     teletelUrl: teletelConversationUrl(conversationId),
-    client: lead
+    client: lead && (caller.can("clients.view") || seller)
       ? {
           leadId: lead.id,
           name: lead.name?.trim() ?? "",

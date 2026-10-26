@@ -18,10 +18,18 @@ const base = new URL(arg ? arg.slice("--base=".length) : "https://pkg.traveliun.
 const teletelArg = process.argv.find((a) => a.startsWith("--teletel="));
 const teletel = new URL(teletelArg ? teletelArg.slice("--teletel=".length) : "https://chat.teletel.io").origin;
 const teletelHost = `${new URL(teletel).protocol}//${new URL(teletel).hostname}`;
+// the package employees install is https only: a local address, plain http or the test variants (which open every
+// port of localhost, or the hotel sites over http) are refused unless --dev says this is a test build
+const dev = process.argv.includes("--dev");
+const insecure = [base, teletel].some((u) => new URL(u).protocol !== "https:") || process.argv.includes("--test-http");
+if (insecure && !dev) {
+  console.error("refusing: a distribution build is https only — add --dev for a local test build (never to be handed out)");
+  process.exit(1);
+}
 // match patterns name the host without its port
 const host = `${new URL(base).protocol}//${new URL(base).hostname}`;
 
-const VERSION = "0.2.0";
+const VERSION = "0.2.1";
 const HOTEL_SITES = ["https://www.agoda.com/*", "https://www.booking.com/*", "https://www.almosafer.com/*"];
 // --test-http: the same three over http too, for a stand-in served locally (Chrome's --host-resolver-rules) — tests only
 if (process.argv.includes("--test-http")) HOTEL_SITES.push(...HOTEL_SITES.map((p) => p.replace("https://", "http://")));
@@ -39,7 +47,7 @@ cpSync(join(here, "..", "public", "icons", "icon-192.png"), join(out, "icons", "
 
 const manifest = {
   manifest_version: 3,
-  name: "مساعد ترافليون",
+  name: dev ? "مساعد ترافليون (تجربة)" : "مساعد ترافليون",
   short_name: "ترافليون",
   description: "مساعد موظفي ترافليون: ملف العميل بجانب محادثة تيلي تيل، التنبيهات، وإرسال سعر فندق إلى الملف.",
   version: VERSION,
@@ -49,8 +57,9 @@ const manifest = {
   side_panel: { default_path: "panel.html" },
   background: { service_worker: "sw.js", type: "module" },
   permissions: ["storage", "sidePanel"],
-  // the system, Teletel, and the three hotel sites the capture button runs on — nothing else
-  host_permissions: [`${host}/*`, `${teletelHost}/*`, ...HOTEL_SITES],
+  // the system and Teletel only (the panel reads which conversation a tab shows); the hotel sites get their
+  // button through content_scripts alone — no host permission there
+  host_permissions: [`${host}/*`, `${teletelHost}/*`],
   // every page of ours, not /extension alone: the sign-in reaches /extension without a page load, and a script
   // matched to that path would never arrive — link.ts itself acts on /extension only
   content_scripts: [
