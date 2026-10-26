@@ -7,7 +7,7 @@ import type { FilterOptions } from "@/lib/data/types";
 import { TraveliunNotReady } from "./TraveliunNotReady";
 import { TraveliunTable } from "./TraveliunTable";
 
-const EMPTY_OPTIONS: FilterOptions = { countries: [], cities: [], employees: [], suppliers: [], static: [] };
+const EMPTY_OPTIONS: FilterOptions = { countries: [], cities: [], employees: [], suppliers: [], cars: [], places: [], static: [] };
 
 /** Server wrapper: resolves the DB-backed config for a route, loads filter
  *  options, and renders the persistent client table. */

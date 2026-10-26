@@ -746,28 +746,64 @@ function FilterBar({
             options = options.filter((o) => o.parent === country);
           }
           return (
-            <label key={def.key} className="grid gap-2 text-[13px] font-bold text-[#185045]">
-              {t(def.labelKey)}
-              <select
-                value={filterValues[def.key] ?? ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // a new country clears a city of the old one
-                  const cities = def.key === "country_id" ? (config.filters ?? []).filter((f) => f.key !== def.key && (f.source === "cities" || (f.options ?? []).some((o) => o.parent))) : [];
-                  setFilterValues((prev) => ({ ...prev, [def.key]: value, ...Object.fromEntries(cities.map((f) => [f.key, ""])) }));
-                }}
-                className={fieldClass}
-              >
-                <option value="">{t("all")}</option>
-                {options.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.labelKey ? t(opt.labelKey) : opt.label}</option>
-                ))}
-              </select>
-            </label>
+            <FilterSelect
+              key={def.key}
+              label={t(def.labelKey)}
+              options={options}
+              value={filterValues[def.key] ?? ""}
+              onChange={(value) => {
+                // a new country clears a city of the old one
+                const cities = def.key === "country_id" ? (config.filters ?? []).filter((f) => f.key !== def.key && (f.source === "cities" || (f.options ?? []).some((o) => o.parent))) : [];
+                setFilterValues((prev) => ({ ...prev, [def.key]: value, ...Object.fromEntries(cities.map((f) => [f.key, ""])) }));
+              }}
+            />
           );
         })}
       </div>
     </section>
+  );
+}
+
+/**
+ * One filter: a plain select while short, and a type-to-narrow search above it
+ * once the list is long (the owner, 2026-10-26: «نسق الشريط العلوي الدولة
+ * للبحث عن الدول») — matching the Arabic fold, so «سعوديه» finds «السعودية».
+ */
+function FilterSelect({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: FilterOption[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const { t } = useTraveliunUI();
+  const [query, setQuery] = useState("");
+  const folded = normAr(query);
+  const shown = options.filter((o) => o.value === value || !folded || normAr(o.label ?? "").includes(folded));
+  return (
+    <label className="grid gap-2 text-[13px] font-bold text-[#185045]">
+      {label}
+      {options.length > 12 ? (
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("data.tools.refSearch")}
+          aria-label={`${label} — ${t("data.tools.refSearch")}`}
+          className={`${fieldClass} h-9`}
+        />
+      ) : null}
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={fieldClass}>
+        <option value="">{t("all")}</option>
+        {shown.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.labelKey ? t(opt.labelKey) : opt.label}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -878,6 +914,20 @@ function RecordForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // the picked country fills the currency, unless a person already chose one
+  const country = form.country_id ?? "";
+  const lastAutoCurrency = useRef("");
+  useEffect(() => {
+    if (!("currency" in form)) return;
+    const def = filterOptions.countries.find((c) => c.value === country)?.currency?.trim().toUpperCase() ?? "";
+    if (!def) return;
+    setForm((prev) =>
+      !prev.currency || prev.currency === lastAutoCurrency.current ? { ...prev, currency: def } : prev,
+    );
+    lastAutoCurrency.current = def;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the country is the trigger; the rest is read fresh
+  }, [country]);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
@@ -928,9 +978,17 @@ function RecordForm({
                   required={required(column.key)}
                   onChange={(v) => setForm((prev) => ({ ...prev, [column.key]: v }))}
                 />
+              ) : column.key === "currency" && form.country_id !== undefined ? (
+                // «عند اختيار دولة اضافة عملتها او الريال السعودي» (the owner, 2026-10-26)
+                <CurrencySelect
+                  countryCurrency={filterOptions.countries.find((c) => c.value === form.country_id)?.currency ?? null}
+                  value={form[column.key] ?? ""}
+                  onChange={(v) => setForm((prev) => ({ ...prev, [column.key]: v }))}
+                />
               ) : (
                 <FieldInput
                   column={column}
+                  countryId={form.country_id ?? ""}
                   value={form[column.key] ?? ""}
                   required={required(column.key)}
                   onChange={(v) => setForm((prev) => ({ ...prev, [column.key]: v }))}
@@ -1019,9 +1077,24 @@ function RefSelect({
   );
 }
 
-function FieldInput({ column, value, required, onChange }: { column: ColumnDef; value: string; required?: boolean; onChange: (value: string) => void }) {
+/** The country's own currency or the Saudi riyal — or any code already stored (the owner, 2026-10-26). */
+function CurrencySelect({ countryCurrency, value, onChange }: { countryCurrency: string | null; value: string; onChange: (value: string) => void }) {
+  const { t } = useTraveliunUI();
+  const def = countryCurrency?.trim().toUpperCase() ?? "";
+  const codes = [...new Set([def, "SAR", value.trim().toUpperCase()].filter(Boolean))];
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={formField}>
+      <option value="">{t("chooseOption")}</option>
+      {codes.map((c) => (<option key={c} value={c}>{c}</option>))}
+    </select>
+  );
+}
+
+function FieldInput({ column, countryId, value, required, onChange }: { column: ColumnDef; countryId?: string; value: string; required?: boolean; onChange: (value: string) => void }) {
   const { t } = useTraveliunUI();
   const lookups = useContext(RefOptionsContext);
+  // «أخرى (اكتب)» on a place list: what the country's lists lack is typed free
+  const [free, setFree] = useState(false);
   if (BOOLEAN_KEYS.has(column.key)) {
     return (
       <select value={value} onChange={(e) => onChange(e.target.value)} className={formField}>
@@ -1030,15 +1103,30 @@ function FieldInput({ column, value, required, onChange }: { column: ColumnDef; 
       </select>
     );
   }
-  const listed = column.source ? (lookups?.[column.source] ?? []) : column.options;
+  let listed = column.source ? (lookups?.[column.source] ?? []) : column.options;
+  // the picked country narrows a list that knows countries (places, cities)
+  if (listed && countryId && listed.some((o) => o.parent)) listed = listed.filter((o) => !o.parent || o.parent === countryId);
   // a stored value the list lacks stays a choice: a select missing it shows «اختر» and saves it empty
   const choices = listed && value && !listed.some((o) => o.value === value) ? [...listed, { value, label: value }] : listed;
+  if (choices && column.source === "places" && free) {
+    return (
+      <span className="grid gap-1.5">
+        <input dir="auto" value={value} onChange={(e) => onChange(e.target.value)} className={formField} placeholder={t("data.form.freePlace")} />
+        <button type="button" onClick={() => setFree(false)} className="justify-self-start text-xs font-bold text-[#2a7d66] underline">{t("data.form.backToList")}</button>
+      </span>
+    );
+  }
   if (choices) {
     return (
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={formField}>
-        <option value="">{t("chooseOption")}</option>
-        {choices.map((opt) => (<option key={opt.value} value={opt.value}>{opt.labelKey ? t(opt.labelKey) : opt.label}</option>))}
-      </select>
+      <span className="grid gap-1.5">
+        <select value={value} onChange={(e) => onChange(e.target.value)} className={formField}>
+          <option value="">{t("chooseOption")}</option>
+          {choices.map((opt) => (<option key={opt.value} value={opt.value}>{opt.labelKey ? t(opt.labelKey) : opt.label}</option>))}
+        </select>
+        {column.source === "places" ? (
+          <button type="button" onClick={() => setFree(true)} className="justify-self-start text-xs font-bold text-[#2a7d66] underline">{t("data.form.addPlace")}</button>
+        ) : null}
+      </span>
     );
   }
   if (column.multiline) {

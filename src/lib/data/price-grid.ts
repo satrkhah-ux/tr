@@ -70,26 +70,35 @@ export async function getPriceGrid(mode: GridMode, cityId: string): Promise<{ ok
   const cells: PriceGrid["cells"] = {};
 
   if (mode === "transfers") {
-    const { data: points, error } = await db
-      .from("airports")
-      .select("id, arabic_name, code, kind, status")
-      .eq("city_id", cityId)
-      .order("arabic_name");
+    const [{ data: points, error }, { data: cityRow }] = await Promise.all([
+      db.from("airports").select("id, arabic_name, code, kind, status").eq("city_id", cityId).order("arabic_name"),
+      db.from("cities").select("arabic_name").eq("id", cityId).maybeSingle(),
+    ]);
     // `kind` is 0072's: before it is applied this screen has nothing to stand on
     if (error) return { ok: false, error: "data.model.grid.notReady" };
+    const cityName = (cityRow as { arabic_name?: string } | null)?.arabic_name ?? "المدينة";
+    // BOTH directions, each its own row and price (the owner, 2026-10-26: «يظهر
+    // الاتجاه من لكن الى؟ اين؟؟؟») — the id carries the direction for the save
     const rows = ((points ?? []) as { id: string; arabic_name: string; code: string | null; status: string | null }[])
       .filter((p) => p.status !== "Disabled")
-      .map((p) => ({ id: p.id, label: p.code ? `${p.arabic_name} (${p.code})` : p.arabic_name }));
+      .flatMap((p) => {
+        const name = p.code ? `${p.arabic_name} (${p.code})` : p.arabic_name;
+        return [
+          { id: `${p.id}|in`, label: `${name} ← ${cityName}` },
+          { id: `${p.id}|out`, label: `${cityName} ← ${name}` },
+        ];
+      });
     if (rows.length > 0) {
-      const { data: prices } = await db
-        .from("transfers")
-        .select("from_id, car_type, price, currency")
-        .eq("to_kind", "city")
-        .eq("to_id", cityId)
-        .in("from_id", rows.map((r) => r.id));
-      for (const p of (prices ?? []) as { from_id: string; car_type: string | null; price: number | string | null; currency: string | null }[]) {
-        if (p.car_type && p.price != null) cells[`${p.from_id}|${p.car_type}`] = { price: Number(p.price), currency: p.currency || "SAR" };
-      }
+      const ids = [...new Set(rows.map((r) => r.id.split("|")[0]))];
+      const [{ data: inbound }, { data: outbound }] = await Promise.all([
+        db.from("transfers").select("from_id, car_type, price, currency").eq("to_kind", "city").eq("to_id", cityId).in("from_id", ids),
+        db.from("transfers").select("to_id, car_type, price, currency").eq("from_kind", "city").eq("from_id", cityId).in("to_id", ids),
+      ]);
+      type P = { from_id?: string; to_id?: string; car_type: string | null; price: number | string | null; currency: string | null };
+      for (const p of (inbound ?? []) as P[])
+        if (p.car_type && p.price != null) cells[`${p.from_id}|in|${p.car_type}`] = { price: Number(p.price), currency: p.currency || "SAR" };
+      for (const p of (outbound ?? []) as P[])
+        if (p.car_type && p.price != null) cells[`${p.to_id}|out|${p.car_type}`] = { price: Number(p.price), currency: p.currency || "SAR" };
     }
     return { ok: true, grid: { rows, cars, cells } };
   }
@@ -134,14 +143,19 @@ export async function savePriceCell(input: {
     return error ? { ok: false, error: "err.updateFailed" } : { ok: true };
   }
 
+  // the grid's row id carries the direction: `<pointId>|in` (point → city) or `<pointId>|out`
+  const [pointId, direction = "in"] = input.rowId.split("|");
   const [{ data: point }, { data: city }] = await Promise.all([
-    db.from("airports").select("arabic_name, kind").eq("id", input.rowId).maybeSingle(),
+    db.from("airports").select("arabic_name, kind").eq("id", pointId).maybeSingle(),
     db.from("cities").select("arabic_name, country_id").eq("id", input.cityId).maybeSingle(),
   ]);
-  if (!point || !city) return { ok: false, error: "err.updateFailed" };
+  if (!point || !city || (direction !== "in" && direction !== "out")) return { ok: false, error: "err.updateFailed" };
   const p = point as { arabic_name: string; kind: string | null };
   const c = city as { arabic_name: string; country_id: string | null };
-  const key = { from_kind: pointKind(p.kind), from_id: input.rowId, to_kind: "city", to_id: input.cityId, car_type: car };
+  const pointSide = { kind: pointKind(p.kind), id: pointId, name: p.arabic_name };
+  const citySide = { kind: "city", id: input.cityId, name: c.arabic_name };
+  const [from, to] = direction === "in" ? [pointSide, citySide] : [citySide, pointSide];
+  const key = { from_kind: from.kind, from_id: from.id, to_kind: to.kind, to_id: to.id, car_type: car };
   const { error } =
     input.price == null
       ? await db
@@ -151,7 +165,7 @@ export async function savePriceCell(input: {
       : await db
           .from("transfers")
           .upsert(
-            { ...key, from_city: p.arabic_name, to_city: c.arabic_name, price: input.price, currency, country_id: c.country_id },
+            { ...key, from_city: from.name, to_city: to.name, price: input.price, currency, country_id: c.country_id },
             { onConflict: "from_kind,from_id,to_kind,to_id,car_type" },
           );
   return error ? { ok: false, error: "err.updateFailed" } : { ok: true };

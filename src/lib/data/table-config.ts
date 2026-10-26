@@ -285,7 +285,7 @@ const CONFIGS: TableConfig[] = [
     route: "/cars-capacities", table: "country_vehicles", titleKey: "nav.carCapacities",
     columns: [
       { key: "country_id", labelKey: "filter.country", source: "countries" },
-      { key: "car_type", labelKey: "col.carType" },
+      { key: "car_type", labelKey: "col.carType", source: "cars" },
       { key: "pax_capacity", labelKey: "col.paxCapacity", type: "number" },
       { key: "luggage_capacity", labelKey: "col.luggageCapacity", type: "number" },
     ],
@@ -334,7 +334,7 @@ const CONFIGS: TableConfig[] = [
       { key: "arabic_name", labelKey: "col.arabicName" },
       { key: "english_name", labelKey: "col.englishName" },
       { key: "mobile", labelKey: "col.mobile", type: "phone" },
-      { key: "car_type", labelKey: "col.carType" },
+      { key: "car_type", labelKey: "col.carType", source: "cars" },
       { key: "country_id", labelKey: "filter.country", source: "countries" },
       { key: "city_id", labelKey: "filter.city", source: "cities" },
       { key: "supplier_id", labelKey: "col.supplier", source: "suppliers" },
@@ -404,12 +404,13 @@ const CONFIGS: TableConfig[] = [
     route: "/cars/transfers", table: "transfers", titleKey: "nav.transfers",
     columns: [
       { key: "country_id", labelKey: "filter.country", source: "countries" },
-      { key: "from_city", labelKey: "col.fromCity" },
-      { key: "to_city", labelKey: "col.toCity" },
+      // the two ends and the vehicle are lists of the picked country, never bare text (the owner, 2026-10-26)
+      { key: "from_city", labelKey: "col.fromCity", source: "places" },
+      { key: "to_city", labelKey: "col.toCity", source: "places" },
       // what each end IS (0072) — set by the quick price grid and data-transfers, never typed
       { key: "from_kind", labelKey: "data.model.col.fromKind", options: POINT_KIND_OPTIONS, editable: false },
       { key: "to_kind", labelKey: "data.model.col.toKind", options: POINT_KIND_OPTIONS, editable: false },
-      { key: "car_type", labelKey: "col.carType" },
+      { key: "car_type", labelKey: "col.carType", source: "cars" },
       { key: "price", labelKey: "col.price", type: "currency" },
       { key: "currency", labelKey: "col.currency" },
     ],
