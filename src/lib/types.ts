@@ -579,6 +579,17 @@ export interface Transfer {
   created_at: IsoTimestamp;
 }
 
+/** A vehicle's capacity IN a country (20261026): the old system's `cars` rows; transportation_types holds the general fallback. */
+export interface CountryVehicle {
+  id: Uuid;
+  country_id: Uuid;
+  /** the vehicle as the fleet names it (transportation_types.arabic_name), like transfers.car_type */
+  car_type: string;
+  pax_capacity: number | null;
+  luggage_capacity: number | null;
+  created_at: IsoTimestamp;
+}
+
 /** A visa the agency arranges (0072), its country one of /countries. */
 export interface Visa {
   id: Uuid;
@@ -766,6 +777,7 @@ export interface Database {
       drivers: TableShape<Driver>;
       tours: TableShape<Tour>;
       transfers: TableShape<Transfer>;
+      country_vehicles: TableShape<CountryVehicle>;
       statuses: TableShape<Status>;
       supervisors: TableShape<Supervisor>;
       guide_informations: TableShape<GuideInformation>;

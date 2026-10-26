@@ -208,6 +208,7 @@ export const en = {
   "nav.ports": "Port Names",
   "nav.transportation": "Transportation",
   "nav.carTypes": "Car Types",
+  "nav.carCapacities": "Vehicle capacities",
   "nav.markupRules": "Markup Rules",
   "nav.cars": "Cars by Country",
   "nav.transfers": "Transfers",

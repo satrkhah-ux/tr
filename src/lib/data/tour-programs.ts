@@ -95,6 +95,27 @@ export async function getTourPrices(countryNames: string[]): Promise<(TourPrice 
  * picked among them (BasicEditor), so the reception finds its price in the list
  * (the owner's review, 2026-10-18: every transfer typed by hand). Names only; no price.
  */
+/**
+ * The trip's countries' own seat/bag counts (country_vehicles, 20261026) —
+ * BasicEditor lays them over the fleet's general figures, so the car picker
+ * and the group's default car both answer with the country's real capacity.
+ */
+export async function getCountryCarCapacities(countryNames: string[]): Promise<{ car_type: string; pax: number | null; luggage: number | null }[]> {
+  if (!(await currentCan("offers.write"))) return [];
+  const wanted = new Set(countryNames.map(normAr).filter(Boolean));
+  if (wanted.size === 0) return [];
+  try {
+    const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
+    const { data } = await supabase.from("country_vehicles").select("car_type, pax_capacity, luggage_capacity, countries(arabic_name)");
+    type Row = { car_type: string | null; pax_capacity: number | null; luggage_capacity: number | null; countries: { arabic_name: string } | null };
+    return ((data ?? []) as unknown as Row[])
+      .filter((r) => r.car_type?.trim() && r.countries && wanted.has(normAr(r.countries.arabic_name)))
+      .map((r) => ({ car_type: r.car_type!.trim(), pax: r.pax_capacity, luggage: r.luggage_capacity }));
+  } catch {
+    return [];
+  }
+}
+
 export async function getTransferCars(countryNames: string[]): Promise<string[]> {
   if (!(await currentCan("offers.write"))) return [];
   const wanted = new Set(countryNames.map(normAr).filter(Boolean));

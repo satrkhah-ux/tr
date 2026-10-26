@@ -1152,6 +1152,29 @@ export function withPackageProfit(
 /** Not chosen for a group by size alone: a limousine, an accessible vehicle. */
 const SPECIAL_CAR = /vip|ليموزين|ذوي الاحتياجات|مجهزة/i;
 
+/** A (car_type × this trip's country) capacity row, from /cars-capacities (country_vehicles). */
+export type CountryCarCapacity = { car_type: string; pax: number | null; luggage: number | null };
+
+/**
+ * The fleet with the trip's countries' OWN seat/bag counts over the general
+ * ones (the owner's transport order, 2026-10-26): the same «سيارة صغيرة» seats
+ * 2 in one country and 3 in another. Several countries naming the same car:
+ * the smallest pax wins — the group must fit everywhere it rides.
+ */
+export function withCountryCapacities<T extends { name: string; pax: number | null; luggage: number | null }>(carTypes: T[], caps: CountryCarCapacity[]): T[] {
+  if (caps.length === 0) return carTypes;
+  const by = new Map<string, CountryCarCapacity>();
+  for (const c of caps) {
+    const key = c.car_type.trim();
+    const prev = by.get(key);
+    if (!prev || (c.pax ?? Infinity) < (prev.pax ?? Infinity)) by.set(key, c);
+  }
+  return carTypes.map((t) => {
+    const c = by.get(t.name.trim());
+    return c ? { ...t, pax: c.pax ?? t.pax, luggage: c.luggage ?? t.luggage } : t;
+  });
+}
+
 /**
  * The car a group of `people` rides in: the smallest ordinary car that seats it
  * — with a seat to spare from three people up, for the luggage — else enough of
