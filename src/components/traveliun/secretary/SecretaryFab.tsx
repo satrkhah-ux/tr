@@ -20,6 +20,15 @@ const subscribeSeen = (cb: () => void) => { window.addEventListener("storage", c
 // a private window where storage throws just never shows the pill
 const readSeen = () => { try { return window.localStorage.getItem(SEEN_KEY) === "1"; } catch { return true; } };
 
+// the bell (NotificationBell) announces the unread count; مُراد's button wears the same number
+let notifCount = 0;
+const subscribeNotif = (cb: () => void) => {
+  const on = (e: Event) => { notifCount = Number((e as CustomEvent<{ count?: number }>).detail?.count ?? 0) || 0; cb(); };
+  window.addEventListener("tv-notifications", on);
+  return () => window.removeEventListener("tv-notifications", on);
+};
+const readNotif = () => notifCount;
+
 export function SecretaryFab() {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"plan" | "chat">("plan");
@@ -27,6 +36,7 @@ export function SecretaryFab() {
   const [loading, setLoading] = useState(false);
   const [clicked, setClicked] = useState(false);
   const seen = useSyncExternalStore(subscribeSeen, readSeen, () => true);
+  const unread = useSyncExternalStore(subscribeNotif, readNotif, () => 0);
   const firstTime = !seen && !clicked;
   const pathname = usePathname();
 
@@ -68,8 +78,9 @@ export function SecretaryFab() {
     <div className="fixed bottom-20 end-4 z-[69] flex items-center gap-2 md:bottom-5 md:end-5">
       {firstTime && !open && <span className="rounded-full bg-[var(--tv-brand)] px-3 py-1.5 text-xs font-bold text-white shadow-lg">مُراد — سكرتيرك الخاص</span>}
       <button type="button" onClick={toggle} aria-label="مُراد — سكرتيري الخاص"
-        className="flex size-14 items-center justify-center rounded-full bg-[var(--tv-brand)] text-[13px] font-extrabold text-white shadow-lg ring-2 ring-white/60 transition-transform hover:scale-105">
+        className="relative flex size-14 items-center justify-center rounded-full bg-[var(--tv-brand)] text-[13px] font-extrabold text-white shadow-lg ring-2 ring-white/60 transition-transform hover:scale-105">
         مُراد
+        {unread > 0 && <span className="absolute -top-1 -end-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#b3261e] px-1 text-[11px] font-extrabold text-white tabular-nums ring-2 ring-white">{unread > 99 ? "99+" : unread}</span>}
       </button>
     </div>
   </>;

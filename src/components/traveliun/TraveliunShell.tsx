@@ -23,6 +23,7 @@ import { DirText } from "@/components/DirText";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { SecretaryFab } from "@/components/traveliun/secretary/SecretaryFab";
+import { NotificationBell } from "@/components/traveliun/notifications/NotificationBell";
 import {
   AlertTriangle,
   BarChart3,
@@ -639,6 +640,8 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
           {/* the guide, the calculator and the table view are our tools — a partner keeps settings and account */}
           {partner ? null : (
           <>
+          {/* «مركز الإشعارات»: the bell and its unread count (notifications/NotificationBell.tsx) */}
+          <NotificationBell />
           {guideLinks.length > 0 ? (
           <div className="hidden sm:block">
             <Popover open={panel === "guide"} onOpenChange={(o) => setPanel(o ? "guide" : null)}>

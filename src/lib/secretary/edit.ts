@@ -4,6 +4,8 @@ import { logAudit } from "@/lib/data/audit";
 import { insertDraft, loadDraft } from "@/lib/data/draft-store";
 import { FOLLOWUP_SETTINGS_KEY, handlerOf, parseFollowupSettings } from "@/lib/followups/rules";
 import { muradJson } from "@/lib/murad/model";
+import { dedupeKeys } from "@/lib/notifications/core";
+import { notifyEmployee } from "@/lib/notifications/notify";
 import { conversationThread } from "@/lib/providers/teletel";
 import { applyClientEdit, CLIENT_EDIT_SCHEMA, type ClientEditPlan } from "./edit-core";
 import { currentSecretaryEmployee, secretaryDb, secretarySettings } from "./core";
@@ -126,6 +128,10 @@ export async function prepareClientEdit(conversationId: number, instruction: str
     `راجع الأسعار ثم أصدرها من /basic/${inserted.id} — الملف الأصلي كما هو، ولم يُرسل شيء للعميل.`,
   ].join("\n");
   await db.from("secretary_messages").insert({ employee_id: employee.id, role: "secretary", content: note }).select("id").maybeSingle();
+  await notifyEmployee({
+    employeeId: employee.id, kind: "draft_ready", source: "secretary", href: `/basic/${inserted.id}`,
+    title: `📝 مسودة طلب العميل جاهزة — ${d.customer.customer_name || "عميل"}`, body: (plan.summary || text).slice(0, 300), dedupeKey: dedupeKeys.draftReady(inserted.id),
+  }).catch(() => null);
   await logAudit({
     action: "secretary.file_prepared",
     entity: "offer_drafts",
