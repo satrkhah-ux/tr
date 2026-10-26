@@ -166,6 +166,8 @@ export type AuditAction =
   | "secretary.admin_view"
   // the secretary prepared a review-ready COPY of a file from the client's request (phase ب)
   | "secretary.file_prepared"
+  // cheaper same-star proposals prepared beside the offer (phase ج; drafts in meta)
+  | "secretary.suggested"
   // «الحسابات المالية» saved (developer only; the figures stay out of the log)
   | "finance.saved"
   | "catalog.imported"

@@ -14,9 +14,12 @@ const row = (over: Partial<WorkRow>): WorkRow => ({
 
 describe("«سكرتيري الخاص» settings", () => {
   it("defaults and survives bad JSON", () => {
-    expect(parseSecretarySettings(undefined)).toEqual({ off: false, dailyLimit: 60 });
-    expect(parseSecretarySettings("not json")).toEqual({ off: false, dailyLimit: 60 });
-    expect(parseSecretarySettings('{"off":true,"dailyLimit":10}')).toEqual({ off: true, dailyLimit: 10 });
+    const defaults = { off: false, dailyLimit: 60, suggest: { on: true, silentHours: 24, maxPerDay: 10, proposals: 2 } };
+    expect(parseSecretarySettings(undefined)).toEqual(defaults);
+    expect(parseSecretarySettings("not json")).toEqual(defaults);
+    expect(parseSecretarySettings('{"off":true,"dailyLimit":10,"suggest":{"on":false,"silentHours":48}}')).toEqual({
+      off: true, dailyLimit: 10, suggest: { on: false, silentHours: 48, maxPerDay: 10, proposals: 2 },
+    });
   });
 });
 

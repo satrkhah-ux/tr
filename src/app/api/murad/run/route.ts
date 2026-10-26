@@ -11,6 +11,7 @@ import { learnSweep } from "@/lib/murad/lessons";
 import { foldKnowledge } from "@/lib/murad/knowledge";
 import { sweepSharedAccounts } from "@/lib/routing/shared-sweep";
 import { sweepSecretaryPlans } from "@/lib/secretary/plan";
+import { sweepSecretarySuggestions } from "@/lib/secretary/suggest";
 import { readSettings } from "@/lib/murad/run";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -69,6 +70,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   after(() => recordCronRun("shared_sweep", sweepSharedAccounts).catch(() => null));
   // «سكرتيري الخاص»: the day plan on the first open of the system today (secretary/plan.ts)
   after(() => recordCronRun("secretary_plans", sweepSecretaryPlans).catch(() => null));
+  // «سكرتيري الخاص»: cheaper same-star proposals for a price objection or a day's silence (secretary/suggest.ts)
+  after(() => sweepSecretarySuggestions().catch(() => null));
   // every run leaves its trace for /developer, answered anyone or not (cron-runs.ts)
   // «المستقبل الآلي»: what the webhook missed, before Murad's own turns (no model, its turns claimed one by one)
   const received = await receptionSweep().catch(() => 0);
