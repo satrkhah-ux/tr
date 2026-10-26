@@ -11,7 +11,24 @@ void chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
 // the toolbar button opens the popup; the popup opens the side panel
 void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
 
-type Incoming = { type: "link"; token: string } | { type: "status" } | { type: "unlink" };
+type Incoming =
+  | { type: "link"; token: string }
+  | { type: "status" }
+  | { type: "unlink" }
+  | { type: "ctx"; ctx: unknown }
+  | { type: "capture"; data: Record<string, unknown> };
+
+/** the hotel sites the capture button runs on (manifest content_scripts) */
+const HOTEL_SITES = /^(www\.)?(agoda|booking|almosafer)\.com$/;
+function fromHotelSite(sender: chrome.runtime.MessageSender): number | null {
+  try {
+    return sender.tab?.id !== undefined && sender.frameId === 0 && HOTEL_SITES.test(new URL(sender.tab.url ?? sender.url ?? "").hostname) ? sender.tab.id : null;
+  } catch {
+    return null;
+  }
+}
+const short = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : "");
+const day = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
 
 /** only our own «ربط الإضافة» page, exactly */
 function fromLinkPage(url: string | undefined): boolean {
@@ -43,6 +60,43 @@ chrome.runtime.onMessage.addListener((msg: Incoming, sender, reply) => {
     })();
     return true;
   }
+  // «قارن» opened this tab for a proposal's stay: kept for the tab (session storage — gone with the browser)
+  if (msg?.type === "ctx") {
+    const tabId = fromHotelSite(sender);
+    const c = msg.ctx as { v?: unknown; d?: unknown; c?: unknown } | null;
+    if (tabId !== null && c?.v === 1 && typeof c.d === "string" && /^[0-9a-f-]{36}$/i.test(c.d) && typeof c.c === "string" && c.c.length <= 60) {
+      void chrome.storage.session.set({ [`ctx:${tabId}`]: { v: 1, d: c.d, c: c.c } });
+    }
+    return false;
+  }
+  // «أرسل السعر إلى الملف»: what the employee captured, to the side panel's form (nothing is sent from here)
+  if (msg?.type === "capture") {
+    const tabId = fromHotelSite(sender);
+    if (tabId === null) return false;
+    const d = msg.data ?? {};
+    const nights = Number(d.nights);
+    void (async () => {
+      const ctx = (await chrome.storage.session.get(`ctx:${tabId}`))[`ctx:${tabId}`] ?? null;
+      await chrome.storage.session.set({
+        [`cap:${tabId}`]: {
+          site: short(d.site, 30),
+          hotel: short(d.hotel, 150),
+          priceText: short(d.priceText, 200),
+          fromSelection: d.fromSelection === true,
+          checkIn: day(d.checkIn),
+          checkOut: day(d.checkOut),
+          nights: Number.isInteger(nights) && nights > 0 && nights < 100 ? nights : null,
+          page: short(d.page, 300),
+          ctx,
+          at: Date.now(),
+        },
+      });
+      // the press on the page counts as the user's: the panel opens beside it (else the employee opens it)
+      const opened = await chrome.sidePanel.open({ tabId }).then(() => true, () => false);
+      reply({ opened });
+    })();
+    return true;
+  }
   if (msg?.type === "status") {
     void token().then((t) => reply({ linked: Boolean(t) }));
     return true;
@@ -58,3 +112,6 @@ chrome.runtime.onMessage.addListener((msg: Incoming, sender, reply) => {
   }
   return false;
 });
+
+// a closed tab's capture and context go with it
+chrome.tabs.onRemoved.addListener((tabId) => void chrome.storage.session.remove([`ctx:${tabId}`, `cap:${tabId}`]));

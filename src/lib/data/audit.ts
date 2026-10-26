@@ -204,6 +204,9 @@ export type AuditAction =
   // «ربط الإضافة»: a device of the staff browser extension linked, or revoked (data/extension-links.ts)
   | "ext.linked"
   | "ext.revoked"
+  // from the extension's client panel beside Teletel: the employee's own reminder and note on a conversation
+  | "ext.reminder_set"
+  | "ext.note_saved"
   | "draft.deleted";
 
 export type AuditInput = {

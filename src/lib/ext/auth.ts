@@ -106,7 +106,7 @@ export async function extCaller(request: Request, need?: ExtScope): Promise<ExtC
 
   // when it was last used, for the devices list — at most a write every five minutes
   if (!link.last_used_at || now - Date.parse(link.last_used_at) > 5 * 60_000) {
-    void db().from("extension_links").update({ last_used_at: new Date(now).toISOString() }).eq("id", link.id).then(() => undefined);
+    await db().from("extension_links").update({ last_used_at: new Date(now).toISOString() }).eq("id", link.id);
   }
   const held = new Set(permissions);
   return {
