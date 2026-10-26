@@ -10,6 +10,8 @@ import { normAr } from "@/lib/catalog/norm";
 import { escapeHtml, staffSend } from "@/lib/telegram/staff-bot";
 import { siteUrl } from "@/lib/telegram/ops-bot";
 import { getRates } from "@/lib/data/rates-actions";
+import { dedupeKeys } from "@/lib/notifications/core";
+import { notifyEmployee } from "@/lib/notifications/notify";
 import { buildSuggestions, type CandidateHotel, rateKey, type StayAlternative } from "./suggest-core";
 import { alternativesFor } from "./suggest-sources";
 import { secretaryDb, secretarySettings } from "./core";
@@ -160,6 +162,11 @@ export async function sweepSecretarySuggestions(nowMs = Date.now()): Promise<Rec
       "راجع الأسعار ثم أرسل ما يناسب — لم يصل العميل شيء.",
     ].join("\n");
     await db.from("secretary_messages").insert({ employee_id: r.assigned_to!, role: "secretary", content: note });
+    // the bell: «العرض جاهز», once per followup (dedupe)
+    await notifyEmployee({
+      employeeId: r.assigned_to!, kind: "proposal_ready", source: "secretary", href: "/secretary",
+      title: `🗂 العرض جاهز — ${client} (${why})`, body: lines.join("\n").slice(0, 900), dedupeKey: dedupeKeys.proposal(r.id),
+    }).catch(() => null);
     const conv = (await listOpenConversations().catch(() => null))?.rows.find((c) => c.id === r.conversation_id);
     if (conv) await addTeletelNote(r.conversation_id, `💡 ${noteFor(conv)} جهزت لك عروضاً للعميل راجعها — «سكرتيري الخاص».`).catch(() => null);
     const { data: emp } = await db.from("employees").select("telegram_chat_id").eq("id", r.assigned_to!).maybeSingle();
