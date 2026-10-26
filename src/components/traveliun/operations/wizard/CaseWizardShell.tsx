@@ -24,6 +24,7 @@ import { PaymentStep, UnbackedStatus } from "./PaymentStep";
 import { AutoIssue, DocumentsStep } from "./DocumentsStep";
 import { WaitButton } from "./WaitButton";
 import { UploadAll } from "./UploadAll";
+import { SendAllRequests } from "./SendAllRequests";
 
 /**
  * «معالج الحجوزات» — the case page by default (the owner, 2026-10-17): six
@@ -120,16 +121,19 @@ export function CaseWizardShell({
             </div>
           ) : null}
 
-          {/* «ارفع كل الملفات» (the owner, 2026-10-22): every passport, ticket and hotel paper in one drop, above the steps */}
-          <button
-            type="button"
-            onClick={() => setUploading((v) => !v)}
-            aria-expanded={uploading}
-            className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-extrabold text-white hover:bg-[#0f4439] sm:w-auto"
-          >
-            <FileUp className="size-4" />
-            {t("wz.up.button")}
-          </button>
+          {/* «ارفع كل الملفات» (the owner, 2026-10-22) and «أرسل كل الطلبات» (2026-10-26), above the steps */}
+          <div className="mt-3 flex flex-wrap items-start gap-2">
+            <button
+              type="button"
+              onClick={() => setUploading((v) => !v)}
+              aria-expanded={uploading}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-[#185045] px-4 text-[13px] font-extrabold text-white hover:bg-[#0f4439]"
+            >
+              <FileUp className="size-4" />
+              {t("wz.up.button")}
+            </button>
+            <SendAllRequests operationId={op.id} />
+          </div>
 
           {/* the six steps: each tile coloured by its readiness, its items under it, and the switch to it */}
           <div className="mt-3 flex items-center gap-2">
