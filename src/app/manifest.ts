@@ -7,9 +7,9 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "ترافليون — نظام العمليات السياحية",
-    short_name: "Traveliun",
-    description: "نظام ترافليون لإدارة العروض والبكجات السياحية",
+    name: "ترافليون ون",
+    short_name: "ترافليون ون",
+    description: "ترافليون ون — نظام واحد لرحلة العميل كلها، من أول رسالة حتى العودة",
     id: "/dashboard",
     start_url: "/dashboard",
     scope: "/",
