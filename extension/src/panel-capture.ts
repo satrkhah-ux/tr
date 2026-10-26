@@ -55,7 +55,7 @@ export async function renderCapture(root: HTMLElement, cap: Capture) {
         .join("")}
     </select>
     <div class="line" id="capWarn"></div>
-    <div class="row"><button class="primary" id="capSend">أرسل إلى الملف</button></div>
+    <div class="row"><button class="primary" id="capSend">أرسل إلى الملف</button><button id="capCopy" title="للصق في «قارن» على صف الفندق في بيسك">انسخ السعر</button></div>
     <div class="status" id="capStatus"></div>
     <div class="muted" style="margin-top:6px">السعر بيدك أنت وتأكيده عليك — لا يصل للعميل شيء من هنا.</div>
   </div>`;
@@ -83,6 +83,14 @@ export async function renderCapture(root: HTMLElement, cap: Capture) {
   $("capStay").addEventListener("change", update);
   update();
 
+  // for «قارن» on a Basic hotel row: the price as read, to paste in its box (the file there is written by Basic itself)
+  $<HTMLButtonElement>("capCopy").addEventListener("click", async () => {
+    const a = amount();
+    if (!a) return;
+    const ok = await navigator.clipboard.writeText(`${a.total} ${a.currency}`).then(() => true, () => false);
+    $("capStatus").className = `status ${ok ? "ok" : "bad"}`;
+    $("capStatus").textContent = ok ? `نُسخ ${a.total.toLocaleString("en-US")} ${a.currency} — الصقه في «قارن» في بيسك.` : "تعذّر النسخ.";
+  });
   $<HTMLButtonElement>("capSend").addEventListener("click", async () => {
     const a = amount();
     const o = stayOf();
