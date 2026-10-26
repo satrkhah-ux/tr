@@ -156,6 +156,13 @@ export function OperationsBoard({
             })}
           </div>
           <div className="mt-2 flex flex-wrap items-start gap-2">
+            <Link
+              href="/operations/day"
+              className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-[#185045] bg-white px-4 text-[12.5px] font-extrabold text-[#185045] hover:bg-[#f0f7f4]"
+            >
+              <ClipboardCheck className="size-4" />
+              {t("nav.opsDay")}
+            </Link>
             <UploadPicker operations={listed} />
             <button
               type="button"
