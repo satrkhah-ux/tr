@@ -1,0 +1,56 @@
+:root {
+  --brand: #185045;
+  --brand-ink: #003c3a;
+  --muted: #78948f;
+  --line: #dbe6e1;
+  --soft: #f4f9f7;
+  --gold: #e0a92a;
+  --danger: #c43d3d;
+}
+* { box-sizing: border-box; }
+/* the buttons' own display would otherwise win over the attribute */
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  font: 600 13px/1.6 "Tajawal", "Segoe UI", Tahoma, system-ui, sans-serif;
+  color: var(--brand-ink);
+  background: #fff;
+}
+header.bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+}
+header.bar img { width: 22px; height: 22px; border-radius: 6px; background: #fff; }
+main { padding: 14px; }
+.card { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fff; }
+.card + .card { margin-top: 10px; }
+.muted { color: var(--muted); font-size: 12px; }
+.who { font-size: 14px; font-weight: 800; color: var(--brand); }
+.ok { color: var(--brand); }
+.warn { color: #8a5a00; background: #fff8eb; border-radius: 10px; padding: 8px 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+button, a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--brand);
+  font: inherit;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+button.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+button.danger { color: var(--danger); border-color: #f2c7c7; }
+button:disabled { opacity: 0.6; cursor: default; }

@@ -683,6 +683,7 @@ export const en = {
   "nav.termsIncludes": "Terms & inclusions",
   "nav.integrations": "External integrations",
   "nav.screens": "Screens",
+  "nav.extension": "Browser extension",
   "nav.conversations": "Conversations",
   "nav.externalTrips": "Confirmed outside the system",
   // ---------- view-as + developer accounts + forced password (2026-10-17) ----------

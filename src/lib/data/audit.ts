@@ -201,6 +201,9 @@ export type AuditAction =
   | "sla.rules_toggled"
   // «لا طلب بلا صاحب»: a client waiting on a shared Teletel login handed to a seller (routing/shared-sweep.ts)
   | "teletel.shared_reassigned"
+  // «ربط الإضافة»: a device of the staff browser extension linked, or revoked (data/extension-links.ts)
+  | "ext.linked"
+  | "ext.revoked"
   | "draft.deleted";
 
 export type AuditInput = {

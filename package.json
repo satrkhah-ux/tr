@@ -31,9 +31,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p extension",
     "test": "vitest run",
     "db:apply": "node scripts/db-apply.mjs",
+    "ext:build": "node extension/build.mjs",
     "check": "npm run lint && npm run typecheck && npm run build"
   },
   "dependencies": {
@@ -62,9 +63,11 @@
   "devDependencies": {
     "@pdf-lib/fontkit": "^1.1.1",
     "@tailwindcss/postcss": "^4",
+    "@types/chrome": "^0.3.6",
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "gifenc": "^1.0.3",
