@@ -6,7 +6,7 @@ import { currentPermissions } from "@/lib/roles/current";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit, type AuditAction } from "@/lib/data/audit";
 import { canSee, visaCaller, type VisaCaller } from "./access";
-import { isUuid } from "./rules";
+import { isUuid, nextSerial, serialYear } from "./rules";
 import { rowToFile, type VisaRowDb } from "./rows";
 import type { VisaEvent, VisaFile } from "./types";
 
@@ -100,4 +100,17 @@ export async function employeeNames(ids: (string | null | undefined)[]): Promise
   if (want.length === 0) return {};
   const { data } = await db().from("employees").select("id, arabic_name").in("id", want);
   return Object.fromEntries(((data ?? []) as { id: string; arabic_name: string }[]).map((e) => [e.id, e.arabic_name]));
+}
+
+/** Writes a new file under the next serial after the year's highest; the unique constraint settles two files opened in the same instant. */
+export async function insertVisaFile(row: Record<string, unknown>): Promise<{ id: string; serial: string } | null> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const year = serialYear();
+    const { data: last } = await db().from("visa_files").select("serial").like("serial", `VF-${String(year).padStart(2, "0")}-%`).order("serial", { ascending: false }).limit(1);
+    const serial = nextSerial(year, (last as { serial: string }[] | null)?.[0]?.serial ?? null);
+    const { data, error } = await db().from("visa_files").insert({ ...row, serial }).select("id, serial").single();
+    if (!error) return data as { id: string; serial: string };
+    if (error.code !== "23505") return null;
+  }
+  return null;
 }

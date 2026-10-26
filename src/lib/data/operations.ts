@@ -10,6 +10,7 @@ import { getPartnerSession } from "@/lib/partners/session";
 import { raisePartnerInvoice } from "@/lib/partners/ledger-server";
 import { syncOperation } from "@/lib/data/operation-sync";
 import { pullBookingsFromOffer } from "@/lib/data/offer-pull";
+import { openVisaFilesForSale } from "@/lib/visa-files/from-sale";
 import { setOfferStatus } from "@/lib/data/offer-status";
 import {
   canAdvanceClient,
@@ -234,6 +235,14 @@ async function recordConfirmation(
       await pullBookingsFromOffer(id);
     } catch {
       /* the wizard pulls when it opens */
+    }
+
+    // A sale with visas opens their files for the visa department (the owner, 2026-10-26): the client, the
+    // country, the heads and the services already in, new and unassigned. Best-effort, like the pull above.
+    try {
+      await openVisaFilesForSale(input.offer_id);
+    } catch {
+      /* the department opens it by hand from «ملف جديد» */
     }
 
     // Push it at the ops team rather than waiting for someone to open the board.
