@@ -26,4 +26,11 @@ describe("the menu consolidation (the owner, 2026-10-19)", () => {
     // «العملاء» draws its own row, «الأشخاص» in it
     expect(tabsFor("/clients")).toBeNull();
   });
+
+  it("puts the board and a new visa file in one row, a file's page under the board — the price list (/visas) keeps its own page", () => {
+    expect(tabsFor("/visa-files")?.tabs.map((t) => t.href)).toEqual(["/visa-files", "/visa-files/new"]);
+    expect(tabsFor("/visa-files/new")?.active).toBe("/visa-files/new");
+    expect(tabsFor("/visa-files/6f1c")?.active).toBe("/visa-files");
+    expect(tabsFor("/visas")).toBeNull();
+  });
 });

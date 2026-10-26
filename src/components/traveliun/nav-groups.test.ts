@@ -77,3 +77,28 @@ describe("a merged page's link (the walk of 94c84a7)", () => {
     expect(navGroupsFor(SALES, on).find((g) => g.labelKey === "nav.developer")).toBeUndefined();
   });
 });
+
+describe("«التأشيرات» (the owner, 2026-10-26)", () => {
+  const visas = (can: (p: Permission) => boolean) => navGroupsFor(can, on).find((g) => g.labelKey === "nav.visaFiles");
+  const hrefs = (can: (p: Permission) => boolean) => visas(can)?.children?.map((c) => c.href);
+
+  it("opens for the visa department and for the management — each key on its own", () => {
+    for (const key of ["visas.work", "visas.manage", "dashboard.admin", "developer.access"] as Permission[]) {
+      expect(hrefs(role([key]))).toEqual(["/visa-files", "/visa-files/new"]);
+      expect(visas(role([key]))?.href).toBe("/visa-files");
+    }
+  });
+
+  it("is not in sales' or operations' menu, although they open the price list under «البيانات»", () => {
+    expect(visas(SALES)).toBeUndefined();
+    expect(visas(OPS)).toBeUndefined();
+    expect(visas(role(["data.write"]))).toBeUndefined();
+    expect(navGroupsFor(SALES, on).find((g) => g.labelKey === "nav.dataSection")?.children?.map((c) => c.href)).toContain("/visas");
+  });
+
+  it("adds the price list (the existing /visas page) for whoever opens both the board and the data", () => {
+    expect(hrefs(role(["visas.work", "data.write"]))).toEqual(["/visa-files", "/visa-files/new", "/visas"]);
+    // the board's keys alone do not open /visas (data.write), so no dead link
+    expect(hrefs(role(["visas.manage"]))).not.toContain("/visas");
+  });
+});
