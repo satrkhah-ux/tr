@@ -1,4 +1,5 @@
 import "server-only";
+import { assertAiBudget, recordAiUsage } from "./ai-usage";
 
 /**
  * OpenAI-backed itinerary drafting — writes the «البرنامج اليومي» text.
@@ -198,8 +199,10 @@ async function postOpenAI(url: string, key: string, timeoutMs: number, body: str
 export async function openaiJson(req: { name: string; system: string; user: string; schema: Record<string, unknown>; images?: string[]; temperature?: number; timeoutMs?: number }): Promise<string | null> {
   const key = readEnv("OPENAI_API_KEY");
   if (!key) throw new Error("not_configured");
+  const model = readEnv("OPENAI_MODEL") ?? DEFAULT_MODEL;
+  await assertAiBudget(req.name, model);
   const res = await postOpenAI("https://api.openai.com/v1/chat/completions", key, req.timeoutMs ?? 45_000, JSON.stringify({
-      model: readEnv("OPENAI_MODEL") ?? DEFAULT_MODEL,
+      model,
       temperature: req.temperature ?? 0.3,
       messages: [
         { role: "system", content: req.system },
@@ -208,7 +211,9 @@ export async function openaiJson(req: { name: string; system: string; user: stri
       response_format: { type: "json_schema", json_schema: { name: req.name, strict: true, schema: req.schema } },
     }));
   if (!res.ok) throw new Error(`openai ${res.status}`);
-  return ((await res.json()) as ChatResponse).choices?.[0]?.message?.content ?? null;
+  const data = (await res.json()) as ChatResponse & { usage?: { prompt_tokens?: number; completion_tokens?: number } };
+  recordAiUsage(req.name, model, { input: data.usage?.prompt_tokens ?? 0, output: data.usage?.completion_tokens ?? 0 });
+  return data.choices?.[0]?.message?.content ?? null;
 }
 
 /**
@@ -219,6 +224,7 @@ export async function openaiJson(req: { name: string; system: string; user: stri
 export async function responsesJson(name: string, schema: Record<string, unknown>, content: Record<string, unknown>[], model: string, timeoutMs = 120_000): Promise<unknown> {
   const key = readEnv("OPENAI_API_KEY");
   if (!key) throw new Error("not_configured");
+  await assertAiBudget(name, model);
   const res = await postOpenAI("https://api.openai.com/v1/responses", key, timeoutMs, JSON.stringify({
       model,
       input: [{ role: "user", content }],
@@ -226,7 +232,8 @@ export async function responsesJson(name: string, schema: Record<string, unknown
       ...(/^(gpt-5|o\d)/.test(model) ? { reasoning: { effort: "low" } } : {}),
     }));
   if (!res.ok) throw new Error(`openai_${res.status}`);
-  const data = (await res.json()) as { output?: { content?: { type: string; text?: string }[] }[] };
+  const data = (await res.json()) as { output?: { content?: { type: string; text?: string }[] }[]; usage?: { input_tokens?: number; output_tokens?: number } };
+  recordAiUsage(name, model, { input: data.usage?.input_tokens ?? 0, output: data.usage?.output_tokens ?? 0 });
   const text = data.output?.flatMap((o) => o.content ?? []).find((c) => c.type === "output_text")?.text;
   return JSON.parse(text ?? "{}");
 }
