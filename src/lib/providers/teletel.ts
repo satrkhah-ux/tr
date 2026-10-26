@@ -1,4 +1,5 @@
 import "server-only";
+import { waitingIsCourtesy } from "./teletel-courtesy";
 
 /**
  * Teletel customer platform (Chatwoot-compatible API) — lets agents pick a
@@ -512,6 +513,12 @@ export async function recentResolvedConversations(pages = 2): Promise<OpenConver
 
 function toConversation(c: RawConversation & { id: number }): OpenConversation {
   const sender = c.meta?.sender;
+  const conversation = toConversationRow(c, sender);
+  // «شكراً» … «عفواً» … «🌹»: the client's closing pleasantry is not a request (teletel-courtesy.ts)
+  return waitingIsCourtesy(conversation) ? { ...conversation, waitingSince: 0 } : conversation;
+}
+
+function toConversationRow(c: RawConversation & { id: number }, sender: NonNullable<RawConversation["meta"]>["sender"]): OpenConversation {
   return {
     id: c.id,
     inboxId: c.inbox_id ?? 0,
