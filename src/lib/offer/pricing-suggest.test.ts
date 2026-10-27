@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   deriveTransportRows,
   emptyDraftData,
+  emptyFlight,
   emptyTransportPlan,
   normalizeDraftHotel,
   withRooms,
@@ -34,6 +35,7 @@ import {
   mergeSuggestions,
   resolveAirportCity,
   syncSuggestions,
+  syncTypedPricing,
   normalizeName,
   suggestPricing,
   type PointTransfer,
@@ -807,5 +809,21 @@ describe("a tour's price on the screens: typed, else the list's for its car (ا�
   it("adds a city's tours up as each car's price × its cars", () => {
     // 400 × 2 from the list + 300 typed × 1 (a pick from before the count) + a free day
     expect(toursTotal([pick({ cars: 2 }), pick({ title: "جولة خاصة", price: 300 }), pick({ free: true })], "فان", LIST, {})).toBe(1100);
+  });
+});
+
+
+describe("source card price edits", () => {
+  it("refreshes a priced flight after its card changes, keeping unrelated manual items", () => {
+    const draft = emptyDraftData();
+    draft.scope.flights_domestic = true;
+    draft.flights = [emptyFlight("internal")];
+    draft.flight_booking.dom_price = 1200;
+    const fresh = suggestPricing(draft, EMPTY, LABELS).find((i) => i.ref === "flight:dom");
+    expect(fresh).toBeDefined();
+    draft.pricing.items = [{ ...fresh!, sell_price: 600, buy_price: 600 }, { item_type: "other", description: "manual", quantity: 1, sell_price: 50, sell_currency: "SAR", buy_price: 50, buy_currency: "SAR", manual: true }];
+    const next = syncTypedPricing(draft);
+    expect(next.items[0].sell_price).toBe(1200);
+    expect(next.items[1].sell_price).toBe(50);
   });
 });

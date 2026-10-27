@@ -1,56 +1,39 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Dialog } from "@base-ui/react/dialog";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Loader2, X } from "lucide-react";
 import { getSecretaryBoard, type SecretaryBoard } from "@/lib/data/my-followups";
 import { SecretaryChat } from "./SecretaryChat";
 import { SecretaryDayBoard } from "./SecretaryDayBoard";
 
-/**
- * «مُراد — سكرتيري الخاص»: the floating button on EVERY page of the system
- * except sign-in (the owner, 2026-10-26: «اجعله عائماً على النظام بشكل كامل
- * باستثناء تسجيل الدخول») — focus mode included. Murad's name IS the button;
- * a first-time pill says what it is until the first click (localStorage).
- * The panel opens on the day board («خطتي») with a chat tab beside it.
- */
-const SEEN_KEY = "secretary_fab_seen";
-const subscribeSeen = (cb: () => void) => { window.addEventListener("storage", cb); return () => window.removeEventListener("storage", cb); };
-// a private window where storage throws just never shows the pill
-const readSeen = () => { try { return window.localStorage.getItem(SEEN_KEY) === "1"; } catch { return true; } };
-
+/** Permanent side handle with an accessible drawer. */
 export function SecretaryFab() {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"plan" | "chat">("plan");
   const [board, setBoard] = useState<SecretaryBoard | null>(null);
   const [loading, setLoading] = useState(false);
-  const [clicked, setClicked] = useState(false);
-  const seen = useSyncExternalStore(subscribeSeen, readSeen, () => true);
-  const firstTime = !seen && !clicked;
-  const pathname = usePathname();
-
-  if (pathname?.startsWith("/secretary")) return null;
-
-  function toggle() {
-    const next = !open;
+  function changeOpen(next: boolean) {
     setOpen(next);
-    if (firstTime) {
-      setClicked(true);
-      try { window.localStorage.setItem(SEEN_KEY, "1"); } catch { /* ignore */ }
-    }
-    if (next && !board && !loading) {
+    if (next && !loading) {
       setLoading(true);
-      getSecretaryBoard().then((b) => setBoard(b)).catch(() => null).finally(() => setLoading(false));
+      getSecretaryBoard().then(setBoard).catch(() => setBoard(null)).finally(() => setLoading(false));
     }
   }
 
-  return <>
-    {open && <div dir="rtl" className="fixed inset-x-3 bottom-24 z-[70] mx-auto flex max-h-[78vh] w-auto max-w-md flex-col overflow-hidden rounded-2xl border border-[#dfe8e4] bg-[#fbfdfc] shadow-2xl md:inset-x-auto md:end-5 md:bottom-24">
+  return <Sheet open={open} onOpenChange={changeOpen}>
+    <div className="fixed end-0 top-[74px] bottom-20 z-[100] flex w-10 items-center justify-center border-s border-[#dfe8e4] bg-[#eef3f1] md:bottom-0">
+      <SheetTrigger aria-label="استدعاء مُراد — سكرتيري الخاص" className="flex h-24 w-10 items-center justify-center rounded-s-xl bg-[var(--tv-brand)] text-[13px] font-extrabold text-white shadow-md focus-visible:outline-2 focus-visible:outline-offset-2">
+        مُراد
+      </SheetTrigger>
+    </div>
+    <SheetContent side="inline-end" dir="rtl" aria-describedby={undefined} className="w-[420px] max-w-[calc(100vw/var(--tv-zoom))] overflow-hidden bg-[#fbfdfc]">
       <div className="flex items-center gap-2 bg-[var(--tv-brand)] px-4 py-2.5 text-white">
         <span className="flex size-8 items-center justify-center rounded-full bg-white/15 text-[13px] font-extrabold">مُراد</span>
-        <strong className="flex-1 text-sm">سكرتيرك الخاص</strong>
-        <Link href="/secretary" className="text-xs underline">الصفحة الكاملة</Link>
+        <Dialog.Title className="flex-1 text-sm font-bold">مُراد — سكرتيرك الخاص</Dialog.Title>
+        <Link href="/secretary" onClick={() => setOpen(false)} className="text-xs underline">الصفحة الكاملة</Link>
         <button type="button" onClick={() => setOpen(false)} aria-label="أغلق" className="rounded p-1 hover:bg-white/10"><X className="size-4" /></button>
       </div>
       <div className="flex border-b border-[#dfe8e4] bg-white text-sm font-bold">
@@ -64,13 +47,6 @@ export function SecretaryFab() {
             {!loading && !board && <p className="p-2 text-sm text-[#557d78]">تعذّر قراءة خطتك الآن — افتح الصفحة الكاملة.</p>}
           </div>
         : <SecretaryChat tall />}
-    </div>}
-    <div className="fixed bottom-20 end-4 z-[69] flex items-center gap-2 md:bottom-5 md:end-5">
-      {firstTime && !open && <span className="rounded-full bg-[var(--tv-brand)] px-3 py-1.5 text-xs font-bold text-white shadow-lg">مُراد — سكرتيرك الخاص</span>}
-      <button type="button" onClick={toggle} aria-label="مُراد — سكرتيري الخاص"
-        className="flex size-14 items-center justify-center rounded-full bg-[var(--tv-brand)] text-[13px] font-extrabold text-white shadow-lg ring-2 ring-white/60 transition-transform hover:scale-105">
-        مُراد
-      </button>
-    </div>
-  </>;
+    </SheetContent>
+  </Sheet>;
 }

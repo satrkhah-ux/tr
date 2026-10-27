@@ -118,8 +118,8 @@ import {
   type PriceGroup,
 } from "@/lib/offer/basic";
 import { citiesWithoutHotel, validateDraft, type DraftIssue } from "@/lib/offer/draft-validation";
-import { computeOfferPricing, rebase, roundUpTotal } from "@/lib/offer/pricing";
-import { pricesForCity, repricedTour, syncSuggestions, type TourPrice } from "@/lib/offer/pricing-suggest";
+import { computeOfferPricing, editedPricing, rebase, roundUpTotal } from "@/lib/offer/pricing";
+import { pricesForCity, repricedTour, syncSuggestions, syncTypedPricing, type TourPrice } from "@/lib/offer/pricing-suggest";
 import { normAr } from "@/lib/catalog/norm";
 import { syncDepartureDates } from "@/lib/offer/schedule";
 import { useRole } from "@/lib/roles/RoleContext";
@@ -383,6 +383,12 @@ export function BasicEditor({
     // «بكج متقدم»: its dates follow Basic's until the agent types their own
     const advanced = merged.advanced?.on ? fillAdvanced(merged.advanced, advancedDefaults({ ...shaped, cities: chained })) : merged.advanced;
     const next = { ...shaped, hotels, advanced, days: basicDays({ ...shaped, hotels, advanced }) };
+    const pricing = partnerSession ? next.pricing : syncTypedPricing(next);
+    const priceChanged = pricing.items.some((item, i) => {
+      const old = latest.current.pricing.items[i];
+      return old && (item.sell_price !== old.sell_price || item.sell_currency !== old.sell_currency || item.quantity !== old.quantity);
+    });
+    next.pricing = priceChanged ? editedPricing(pricing, false) : pricing;
     latest.current = next;
     patch({
       ...slice,
@@ -392,6 +398,7 @@ export function BasicEditor({
       scope: nextScope,
       hotels,
       days: next.days,
+      pricing: next.pricing,
       ...(flight_booking !== merged.flight_booking ? { flight_booking } : {}),
       ...(advanced && advanced !== merged.advanced ? { advanced } : {}),
     });
@@ -905,12 +912,12 @@ export function BasicEditor({
     // a typed figure is what we pay and what we sell at — with or without a place to write it back
     const both = typedSheetPrice(slice, Boolean(at));
     const items = data.pricing.items.map((it, i) => (i === index ? { ...it, ...both } : it));
-    if (at) commit({ ...at, pricing: { ...data.pricing, items } });
-    else patch({ pricing: { ...data.pricing, items } });
+    if (at) commit({ ...at, pricing: editedPricing({ ...data.pricing, items }, Boolean(partnerSession)) });
+    else patch({ pricing: editedPricing({ ...data.pricing, items }, Boolean(partnerSession)) });
   }
 
   function setProfit(profit: NonNullable<DraftData["pricing"]["profit"]>) {
-    patch({ pricing: { ...data.pricing, profit } });
+    patch({ pricing: editedPricing({ ...data.pricing, profit }, Boolean(partnerSession)) });
   }
   // what the box shows: the file's own profit, else the administration's default margin
   const profit = packageProfitFor(data.pricing, profitSettings.default_pct) ?? { mode: "pct" as const, value: null };
@@ -937,9 +944,13 @@ export function BasicEditor({
 
   /** «حفظ» on a card: the sheet is written now, and a complete card folds — the agent sees it is done. */
   async function saveGroup(key: PriceGroup, complete: boolean) {
-    await flush();
-    setSavedGroup(key);
-    if (complete) setOpenGroups((o) => ({ ...o, [key]: false }));
+    try {
+      await flush();
+      setSavedGroup(key);
+      if (complete) setOpenGroups((o) => ({ ...o, [key]: false }));
+    } catch {
+      setPricingError(tx("serverLost"));
+    }
   }
 
   // ---------- what is still missing, and issuing ----------
@@ -1733,7 +1744,7 @@ export function BasicEditor({
                 <select
                   value={display}
                   onChange={(e) =>
-                    patch({ pricing: { ...data.pricing, display_currency: e.target.value } })
+                    patch({ pricing: { ...data.pricing, display_currency: e.target.value, final_total: null } })
                   }
                   className="h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-1.5 text-[12px] font-bold"
                 >
@@ -1903,12 +1914,12 @@ export function BasicEditor({
                   {/* for a partner this total is what the package costs IT — our prices at its terms */}
                   <span className="text-[13px] font-extrabold">{partnerSession ? t("pg.partnerCost") : tx("clientTotal")}</span>
                   <span className="tv-tnum text-[16px] font-extrabold">
-                    <DirText>{`${summary.total_sell.toLocaleString("en-US")} ${display}`}</DirText>
+                    <DirText>{`${(!partnerSession && data.pricing.final_total != null ? data.pricing.final_total : summary.total_sell).toLocaleString("en-US")} ${display}`}</DirText>
                   </span>
                 </div>
-                {partnerSession ? (
+                {canPricing ? (
                   <label className="flex flex-wrap items-center justify-between gap-2 rounded-[11px] border border-[#d8e6e0] bg-[#f8fbf9] px-3 py-2">
-                    <span className="text-[12.5px] font-extrabold text-[#0f3d38]">{t("pg.partnerSell")}</span>
+                    <span className="text-[12.5px] font-extrabold text-[#0f3d38]">{t(partnerSession ? "pg.partnerSell" : "pg.finalTotal")}</span>
                     <input
                       type="number"
                       min={0}
@@ -1918,7 +1929,7 @@ export function BasicEditor({
                       onChange={(e) => patch({ pricing: { ...data.pricing, final_total: typedNumber(e.target) } })}
                       className={`${basicField} tv-tnum w-36 text-center`}
                     />
-                    {data.pricing.final_total != null && data.pricing.final_total < summary.total_sell ? (
+                    {partnerSession && data.pricing.final_total != null && data.pricing.final_total < summary.total_sell ? (
                       <span role="alert" className="basis-full text-[11.5px] font-bold text-[#c22850]">
                         سعرك أقل من تكلفتك علينا بـ {(summary.total_sell - data.pricing.final_total).toLocaleString("en-US")} {display} — تأكد قبل الإصدار.
                       </span>

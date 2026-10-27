@@ -1,5 +1,6 @@
 "use server";
 
+import { syncTypedPricing } from "@/lib/offer/pricing-suggest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { OfferStatus } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
@@ -932,7 +933,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     // Its total is what they owe us (partner_cost, below).
     // our own file: a figure an agent typed is our cost, so the margin goes on it (typedAsCost);
     // a partner's sheet is re-priced below and carries no cost by design
-    let sheet = record.partner_company_id ? data.pricing.items : typedAsCost(data.pricing.items);
+    let sheet = record.partner_company_id ? data.pricing.items : typedAsCost(syncTypedPricing(data).items);
     // A file started from one of our ready packages owes at least that package
     // at their terms. Its price is read here by id — never the final_total their
     // browser can edit — and only ever raises what the sheet says, so pointing

@@ -22,6 +22,8 @@ Restore: pg_restore --no-owner --no-acl -d <db> db.dump (see the commit that
 added this file for the tested restore).
 """
 import json
+import pwd
+import fcntl
 import os
 import shutil
 import subprocess
@@ -164,17 +166,29 @@ def prune():
 
 
 def main():
+    # A manual root invocation must never create files the nightly deploy job cannot read.
+    if os.geteuid() == 0:
+        account = pwd.getpwnam("deploy")
+        os.initgroups(account.pw_name, account.pw_gid)
+        os.setgid(account.pw_gid)
+        os.setuid(account.pw_uid)
     os.umask(0o077)
+    lock = open(os.path.join(ROOT, ".backup.lock"), "a")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        log("another backup is running")
+        return 0
     env = read_env()
     base, key = env["NEXT_PUBLIC_SUPABASE_URL"].rstrip("/"), env["SUPABASE_SERVICE_ROLE_KEY"]
     day = datetime.now(RIYADH).strftime("%Y-%m-%d")
     out = os.path.join(ROOT, day)
-    os.makedirs(out, exist_ok=True)
-    os.chmod(ROOT, 0o700)
-    os.chmod(out, 0o700)
     started = time.time()
     status = {"day": day, "ok": False}
     try:
+        os.makedirs(out, exist_ok=True)
+        os.chmod(ROOT, 0o700)
+        os.chmod(out, 0o700)
         dump = os.path.join(out, "db.dump")
         status["dump_bytes"] = dump_database(env["SUPABASE_DB_URL"], dump + ".part")
         os.replace(dump + ".part", dump)

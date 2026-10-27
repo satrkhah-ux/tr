@@ -4,6 +4,7 @@ import {
   computeLine,
   computeOfferPricing,
   editedTotalSar,
+  editedPricing,
   offerSarTotal,
   offerTotals,
   ratesFor,
@@ -261,5 +262,17 @@ describe("the company's dollar (the owner, 2026-10-19)", () => {
     expect(usdSarRate("3.85")).toBe(3.85);
     expect(usdSarRate("38")).toBe(3.8);
     expect(usdSarRate("abc")).toBe(3.8);
+  });
+});
+
+
+describe("editing a previously fixed package price", () => {
+  it("uses the new staff line total rather than the old fixed quote", () => {
+    const pricing = editedPricing({ final_total: 1000 }, false);
+    const line = { quantity: 1, buy_price: 800, buy_currency: "SAR", sell_price: 1500, sell_currency: "SAR" };
+    expect(offerTotals([line], rates, "SAR", pricing.final_total).total).toBe(1500);
+  });
+  it("keeps a reseller's separate client quote", () => {
+    expect(editedPricing({ final_total: 2000 }, true).final_total).toBe(2000);
   });
 });
