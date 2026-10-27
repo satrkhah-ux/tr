@@ -4,6 +4,7 @@ import {
   firstConfirmations,
   MANAGER_DEFAULTS,
   normalizeManagerThresholds,
+  plainReason,
   ticker,
   type LeadFact,
   type ManagerFacts,
@@ -439,5 +440,14 @@ describe("travellers on the channel (order 2, «مؤكد — مسافر قريب
       ["اليوم", "سفر إلى جورجيا · لم يُسدَّد بالكامل", "amber"],
       ["غداً", "سفر إلى تركيا", "green"],
     ]);
+  });
+});
+
+describe("plainReason", () => {
+  it("drops the variable names a check printed — a wall screen speaks in words", () => {
+    expect(plainReason("غير مُعدّ — لا يوجد RESERVATIONS_IMAP_HOST / RESERVATIONS_IMAP_USER / RESERVATIONS_IMAP_PASSWORD في متغيرات البيئة")).toBe("غير مُعدّ");
+    expect(plainReason("Teletel: ردّ بخطأ 401")).toBe("Teletel: ردّ بخطأ 401");
+    expect(plainReason(null)).toBe("لا يعمل");
+    expect(plainReason("TELETEL_API_TOKEN")).toBe("لا يعمل");
   });
 });

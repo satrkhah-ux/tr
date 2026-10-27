@@ -126,6 +126,8 @@ const PUBLIC_PREFIXES = [
   // «الشاشات»: the office screens — open by the owner's decision; ads, destinations and kinds only (screen/[n]/route.ts)
   "/screen",
   "/b2b",
+  // «إضافة المتصفح»: no cookie — each route asks for the device's own token (lib/ext/auth.ts)
+  "/api/ext",
 ];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
 

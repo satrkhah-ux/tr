@@ -1,0 +1,19 @@
+From: noreply@tbo-fixture.example
+Subject: Booking Voucher - Your reservation is confirmed
+
+Dear Partner,
+
+We are pleased to inform you that the following reservation is confirmed.
+
+Confirmation No: 149322011
+Booking Reference: TR-1-1234-20261110
+Hotel: Grand Mirage Resort
+Lead Guest: Fahad Alqahtani
+Check-in: 2026-11-10
+Check-out: 2026-11-14
+Rooms: 2 Deluxe Double
+
+Total payable as per contract. The hotel voucher is attached.
+
+Regards,
+Reservations Desk (fixture)

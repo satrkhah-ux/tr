@@ -53,13 +53,13 @@ export function BasicHopFlight({
   const pax = data.trip.adults + data.trip.children;
 
   const edit = (id: string, change: LegChange) => onChange({ flights: changeLeg(current(), lookups.airports, id, change, pin) });
-  function hit(id: string, h: FlightLookupHit): boolean {
+  function hit(id: string, h: FlightLookupHit) {
     const d = current();
     const leg = d.flights.find((f) => f.id === id);
-    if (!leg) return false;
+    if (!leg) return null;
     const out = applyFlightHit(leg, h, { airports: lookups.airports, airlines: lookups.airlines, trip: d.trip });
     onChange({ flights: d.flights.map((f) => (f.id === id ? (pin ? { ...out.leg, from_city: pin.from, to_city: pin.to } : out.leg) : f)) });
-    return out.checkDate;
+    return out;
   }
   const remove = (id: string) => onChange({ flights: current().flights.filter((f) => f.id !== id) });
 

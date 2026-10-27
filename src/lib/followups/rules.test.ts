@@ -23,7 +23,12 @@ describe("follow-up access and work rules", () => {
   it("opens the section to the team and the sellers, not to client-list viewers", () => {
     expect(canOpenPath("/followups", (key) => key === "clients.view")).toBe(false);
     expect(canOpenPath("/followups/file", (key) => key === "followups.work")).toBe(true);
-    expect(canOpenPath("/followups", (key) => key === "offers.write")).toBe(true);
+    // the list is the team's and the administration's; a seller holds his own follow-up page, and «متابعتي» is every employee's (2026-10-26)
+    expect(canOpenPath("/followups", (key) => key === "offers.write")).toBe(false);
+    expect(canOpenPath("/followups", (key) => key === "dashboard.admin")).toBe(true);
+    expect(canOpenPath("/followups/6d24aac1", (key) => key === "offers.write")).toBe(true);
+    expect(canOpenPath("/my-followups", () => false)).toBe(true);
+    expect(canOpenPath("/my-followups/team", (key) => key === "offers.write")).toBe(false);
     expect(canOpenPath("/clients", (key) => key === "followups.work")).toBe(false);
   });
   it("needs a future time only when one is chosen, and a reason to close", () => {

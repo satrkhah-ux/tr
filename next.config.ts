@@ -29,6 +29,18 @@ const nextConfig: NextConfig = {
     "/repackage/flight-card/render": ["./public/fonts/**", "./node_modules/@sparticuz/chromium/**"],
     "/offer/[serial]/image": ["./public/fonts/**"],
   },
+  // «إضافة المتصفح»: the linking page and its routes are never shown inside another site's frame
+  async headers() {
+    const noFrame = [
+      { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+      { key: "X-Frame-Options", value: "DENY" },
+    ];
+    return [
+      { source: "/extension", headers: noFrame },
+      { source: "/extension/:path*", headers: noFrame },
+      { source: "/api/ext/:path*", headers: noFrame },
+    ];
+  },
   images: {
     remotePatterns: [
       {

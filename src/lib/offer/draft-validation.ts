@@ -24,7 +24,7 @@ import {
   stayOutsideCity,
 } from "./draft-types";
 import { finalOutbound, flightTiming, itineraryStartDate, localDatePart } from "./schedule";
-import { citiesFromFlights, citiesMatchFlights, domesticMismatches } from "./flight-cities";
+import { citiesFromFlights, citiesMatchFlights, domesticMismatches, hotelsOffFlights } from "./flight-cities";
 import { dayOneIsUsable } from "./timezones";
 import { sellBlocks } from "@/lib/pricing/markup";
 import { applyManualProfit } from "./pricing";
@@ -362,9 +362,21 @@ export function validateDraft(data: DraftData, opts: ValidateOptions = {}): Draf
   }
 
   // ---- flight guard rails (timezone-aware) ----
-  // An impossible flight (arrives before it departs, once both airports resolve).
+  // An impossible flight is never issued (the owner, 2026-10-26: MED 04:50 → CGK 08:20 «lands» before it
+  // leaves): both clocks are read on ONE clock, each in its own airport's zone (flightTiming) — a leg whose
+  // zone is not known is not judged.
   if (data.flights.some((f) => flightTiming(f).arrivalBeforeDeparture)) {
-    warnings.push({ severity: "warning", stage: "flights", field: "flights", key: "pg.warn.flightArrivalBeforeDeparture" });
+    blocking.push({ severity: "blocking", stage: "flights", field: "flights", key: "pg.warn.flightArrivalBeforeDeparture" });
+  }
+  // The hotels sit inside the flights' span (file 653144ab: a hotel night before the landing, the last night
+  // before the flight home with none). Only for what the flights state, in a sale with hotels; a partner's own
+  // file is advised, like the rules around it.
+  if (data.scope.hotels && data.scope.flights_intl && !data.flight_booking.later_intl) {
+    const key = { hotel_before_arrival: "pg.err.hotelBeforeArrival", night_no_hotel: "pg.err.nightNoHotel" } as const;
+    for (const issue of hotelsOffFlights(data.flights, cities)) {
+      const severity = opts.partnerFile ? "warning" : "blocking";
+      (opts.partnerFile ? warnings : blocking).push({ severity, stage: "hotels", field: "cities", key: key[issue] });
+    }
   }
   // The outbound flight lands on a different date than the declared trip arrival —
   // hotel dates follow the flight, so this is worth surfacing.

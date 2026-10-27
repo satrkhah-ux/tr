@@ -606,13 +606,13 @@ async function destinationOf(
   const sold = Boolean(draft?.scope.visas && draft.visas.some((v) => Number(v.count) > 0));
   const name = draft?.trip.country?.trim() || offerDestination?.trim() || "";
   if (!name) return { destination: null, sold };
-  const { data } = await supabase.from("countries").select("arabic_name, english_name, iso2, visa_required");
-  type Row = { arabic_name: string | null; english_name: string | null; iso2: string | null; visa_required: boolean | null };
+  const { data } = await supabase.from("countries").select("arabic_name, english_name, iso2, visa_required, saudi_entry");
+  type Row = { arabic_name: string | null; english_name: string | null; iso2: string | null; visa_required: boolean | null; saudi_entry: string | null };
   const rows = (data ?? []) as Row[];
   const hit =
     findLookupCountry(rows.map((r) => ({ ...r, name: r.arabic_name ?? "" })), name) ??
     findLookupCountry(rows.map((r) => ({ ...r, name: r.english_name ?? "" })), name);
-  return { destination: hit ? { iso2: hit.iso2, visa_required: hit.visa_required } : null, sold };
+  return { destination: hit ? { iso2: hit.iso2, visa_required: hit.visa_required, saudi_entry: hit.saudi_entry } : null, sold };
 }
 
 /**
@@ -651,6 +651,47 @@ async function revisitVisa(
     }
   } catch {
     /* best-effort — the passport itself is saved */
+  }
+}
+
+/**
+ * «الافتراضي لكل المسافرين بضغطة واحدة» (the owner, 2026-10-26): every traveller
+ * still on «يحتاج تحقق» gets visaFor's answer from the trip's destination and
+ * their nationality. A status an employee picked (anything but «check») is
+ * never touched, and a traveller whose answer stays «check» is left for a
+ * person to look at.
+ */
+export async function applyVisaDefaults(operationId: string): Promise<{ ok: true; changed: number } | Fail> {
+  const denied = await gateOperation(operationId);
+  if (denied) return { ok: false, error: denied };
+  try {
+    const supabase = db();
+    const { data: op } = await supabase
+      .from("operations")
+      .select("offer_id, offers!inner(serial, partner_company_id, destination)")
+      .eq("id", operationId)
+      .maybeSingle();
+    type Offer = { serial: string; partner_company_id: string | null; destination: string | null };
+    const row = op as { offer_id: string; offers: Offer | Offer[] | null } | null;
+    const offer = Array.isArray(row?.offers) ? (row.offers[0] ?? null) : (row?.offers ?? null);
+    if (!row || !offer) return { ok: false, error: "err.loadFailed" };
+    const raw = await issuedDraftData(supabase, { id: row.offer_id, serial: offer.serial, partner_company_id: offer.partner_company_id });
+    const visa = await destinationOf(supabase, raw ? normalizeDraftData(raw) : null, offer.destination ?? null);
+    const { data: travelers } = await supabase.from("operation_travelers").select("id, nationality, visa_status").eq("operation_id", operationId);
+    let changed = 0;
+    for (const t of (travelers ?? []) as { id: string; nationality: string | null; visa_status: VisaStatus | null }[]) {
+      if ((t.visa_status ?? "check") !== "check") continue;
+      const status = visaFor(t.nationality, visa.destination, visa.sold);
+      if (status === "check") continue;
+      const { error } = await supabase.from("operation_travelers").update({ visa_status: status, updated_at: new Date().toISOString() }).eq("id", t.id);
+      if (!error) {
+        changed++;
+        await logAudit({ action: "visa.updated", entity: "operation_travelers", entity_id: t.id, meta: { operation_id: operationId, status, auto: "defaults" } });
+      }
+    }
+    return { ok: true, changed };
+  } catch {
+    return { ok: false, error: "err.db" };
   }
 }
 

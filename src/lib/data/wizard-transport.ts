@@ -85,6 +85,8 @@ export type TransportSetup = {
   suppliers: AssigneeOption[];
   /** normalised city name → the supplier last handed a drive or tour there, on any case. */
   usual: Record<string, string>;
+  /** normalised city name → the driver last written there, on any case (the owner, 2026-10-26: «بأقل الإدخالات») */
+  usualDriver: Record<string, { name: string; phone: string }>;
 };
 
 /**
@@ -94,29 +96,35 @@ export type TransportSetup = {
  * when it changes agent.
  */
 export async function transportSuppliers(operationId: string, cities: string[]): Promise<TransportSetup> {
-  const none: TransportSetup = { suppliers: [], usual: {} };
+  const none: TransportSetup = { suppliers: [], usual: {}, usualDriver: {} };
   if (await gateOperation(operationId)) return none;
   try {
     // the one «ينفّذه» rule — the suppliers that sell transfers (a city's current one is kept by the card)
     const suppliers = assigneesFor(await listAssignees(), { kind: "transport", title: "" }, null, null).filter((a) => a.kind === "supplier");
     const names = [...new Set(cities.map((c) => c.trim()).filter(Boolean))].slice(0, 30);
-    if (names.length === 0) return { suppliers, usual: {} };
+    if (names.length === 0) return { suppliers, usual: {}, usualDriver: {} };
     const { data } = await service()
       .from("operation_bookings")
-      .select("city_name, assignee_supplier_id")
+      .select("city_name, assignee_supplier_id, detail")
       .in("kind", ["transport", "service"])
       .in("city_name", names)
-      .eq("assignee_kind", "supplier")
       .order("assigned_at", { ascending: false, nullsFirst: false })
-      .limit(200);
+      .limit(300);
     // only one the picker offers — a supplier since disabled is not suggested
     const offered = new Set(suppliers.map((s) => s.id));
     const usual: Record<string, string> = {};
-    for (const r of (data ?? []) as { city_name: string; assignee_supplier_id: string | null }[]) {
+    // the driver the office last wrote in that city — offered, never written for the clerk
+    const usualDriver: Record<string, { name: string; phone: string }> = {};
+    type Row = { city_name: string; assignee_supplier_id: string | null; detail: Record<string, string> | null };
+    for (const r of (data ?? []) as Row[]) {
       const key = normalizeName(r.city_name);
-      if (key && !usual[key] && r.assignee_supplier_id && offered.has(r.assignee_supplier_id)) usual[key] = r.assignee_supplier_id;
+      if (!key) continue;
+      if (!usual[key] && r.assignee_supplier_id && offered.has(r.assignee_supplier_id)) usual[key] = r.assignee_supplier_id;
+      const name = String(r.detail?.[DRV.driver] ?? "").trim();
+      const phone = String(r.detail?.[DRV.phone] ?? "").trim();
+      if (!usualDriver[key] && (name || phone)) usualDriver[key] = { name, phone };
     }
-    return { suppliers, usual };
+    return { suppliers, usual, usualDriver };
   } catch {
     return none;
   }

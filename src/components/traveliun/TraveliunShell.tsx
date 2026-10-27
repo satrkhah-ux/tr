@@ -23,6 +23,7 @@ import { DirText } from "@/components/DirText";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { SecretaryFab } from "@/components/traveliun/secretary/SecretaryFab";
+import { NotificationBell } from "@/components/traveliun/notifications/NotificationBell";
 import {
   AlertTriangle,
   BarChart3,
@@ -249,6 +250,8 @@ export const navGroups: NavGroup[] = [
       { labelKey: "nav.airlines", href: "/airlines", captionKey: "nav.dataCap.air" },
       { labelKey: "nav.airports", href: "/airports" },
       { labelKey: "nav.carTypes", href: "/cars-types", captionKey: "nav.dataCap.transport" },
+      // the step-by-step price screen (the owner's transport details order, 2026-10-26)
+      { labelKey: "nav.transportPrices", href: "/transport-prices" },
       // the transfers, the tours and the grid they are typed in
       { labelKey: "nav.transfersTours", href: "/cars/transfers" },
       { labelKey: "nav.tourPrograms", href: "/tour-programs" },
@@ -523,7 +526,8 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
   return (
     <DirectionProvider direction={dir}>
     <div className="tv-app min-h-screen bg-[#eef3f1] font-sans text-[#0f3d38]" dir={dir}>
-      {/* «مُراد — سكرتيري الخاص»: floating on the WHOLE system (the owner, 2026-10-26), focus mode included; partners are outside companies and never see it */}
+      {/* «مُراد — سكرتيري الخاص»: floating on the WHOLE system (the owner, 2026-10-26), focus mode included, and never over a
+          button or a field — it measures the page and moves off them (secretary/SecretaryFab.tsx); partners are outside companies and never see it */}
       {partner ? null : <SecretaryFab />}
       {focus ? null : (
       <div
@@ -617,11 +621,14 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
             <Lock className="size-5" />
           </button>
         ) : null}
-        <div className="mx-auto hidden min-w-0 max-w-[520px] shrink items-center gap-2 rounded-full border border-[#f2e2b4] bg-[#fff8e8] px-4 py-2 text-[#a86a10] lg:flex">
+        <div title={t("notice.trial")} className="hidden shrink-0 items-center gap-1.5 rounded-full border border-[#f2e2b4] bg-[#fff8e8] px-3 py-1.5 text-[#a86a10] lg:flex">
           <AlertTriangle className="size-4 shrink-0" />
-          <span className="truncate text-[12.5px] font-bold leading-tight">{t("notice.trial")}</span>
+          <span className="text-[12px] font-bold leading-tight">{t("notice.trialShort")}</span>
         </div>
-        <div className="flex h-full shrink-0 items-center gap-1">
+        <div className="flex-1" />
+        <div className="flex shrink-0 items-center gap-3">
+          {/* what you reach for first: the quick search and the bell */}
+          <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={openPalette}
@@ -634,9 +641,12 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
             </kbd>
           </button>
 
-          {/* the guide, the calculator and the table view are our tools — a partner keeps settings and account */}
+          {/* «مركز الإشعارات»: the bell and its unread count (notifications/NotificationBell.tsx) */}
+          {partner ? null : <NotificationBell />}
+          </div>
+          {/* the guide, the calculator and the table view are our tools, together — a partner keeps settings and account */}
           {partner ? null : (
-          <>
+          <div className="hidden items-center gap-0.5 rounded-[12px] border border-[#e4ece8] bg-[#f7faf9] p-0.5 sm:flex">
           {guideLinks.length > 0 ? (
           <div className="hidden sm:block">
             <Popover open={panel === "guide"} onOpenChange={(o) => setPanel(o ? "guide" : null)}>
@@ -665,9 +675,10 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
               </PopoverContent>
             </Popover>
           </div>
-          </>
+          </div>
           )}
-
+          {/* the settings and the account, set apart at the edge */}
+          <div className="flex items-center gap-1 border-s border-[#e4ece8] ps-3">
           <Popover open={panel === "settings"} onOpenChange={(o) => setPanel(o ? "settings" : null)}>
             <PopoverTrigger render={<HeaderIcon label={t("settings")} icon={Settings} active={panel === "settings"} />} />
             <PopoverContent className="w-[min(320px,calc(100vw/var(--tv-zoom)_-_24px))]">
@@ -686,6 +697,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
               />
             </PopoverContent>
           </Popover>
+          </div>
         </div>
       </header>
       )}
@@ -922,6 +934,8 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
   const { t } = useTraveliunUI();
   const partner = usePartnerBrand();
   const groups = useNavGroups();
+  // the section the page belongs to starts open
+  const [openKey, setOpenKey] = useState<string | null>(() => groups.find((g) => (g.children?.length ?? 0) > 1 && isGroupActive(pathname, g))?.labelKey ?? null);
   return (
     <>
       <div className="flex h-[76px] items-center justify-between border-b border-[#d9e0dc] px-5">
@@ -942,22 +956,51 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
           <X className="size-5" />
         </button>
       </div>
-      <nav className="p-3">
+      {/* a section with pages opens as a list under its row (the owner, 2026-10-26: «الأقسام في الموبايل لا تظهر كاملة») —
+          the bottom padding keeps the last row above the phone browser's toolbar */}
+      <nav className="p-3 pb-28">
         {groups.map((group) => {
           const Icon = group.icon;
           const active = isGroupActive(pathname, group);
+          const rowClass = `flex w-full items-center gap-3 rounded-md px-3 py-3 text-sm ${active ? "bg-[#e8f1ed] font-semibold text-[var(--tv-brand)]" : "text-[#557d78]"}`;
+          const badges = <>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}</>;
+          if (!group.children || group.children.length < 2) {
+            return (
+              <div key={group.labelKey} className="mb-1">
+                <Link href={group.href} className={rowClass} onClick={close}>
+                  <Icon className="size-5" />
+                  <span>{t(group.labelKey)}</span>{badges}
+                </Link>
+              </div>
+            );
+          }
+          const open = openKey === group.labelKey;
           return (
             <div key={group.labelKey} className="mb-1">
-              <Link
-                href={group.href}
-                className={`flex items-center gap-3 rounded-md px-3 py-3 text-sm ${
-                  active ? "bg-[#e8f1ed] font-semibold text-[var(--tv-brand)]" : "text-[#557d78]"
-                }`}
-                onClick={close}
-              >
+              <button type="button" className={rowClass} aria-expanded={open} onClick={() => setOpenKey(open ? null : group.labelKey)}>
                 <Icon className="size-5" />
-                <span>{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}
-              </Link>
+                <span className="flex-1 text-start">{t(group.labelKey)}</span>
+                <ChevronDown className={`size-4 transition-transform duration-200 ${open ? "" : "rotate-90 rtl:-rotate-90"}`} />
+              </button>
+              {open ? (
+                <div className="py-1">
+                  {group.children.map((child) => {
+                    const here = pathname === pageOf(child.href);
+                    return (
+                      <div key={child.href}>
+                        {child.captionKey ? <p className="mt-2 px-6 pb-1 text-[10.5px] font-extrabold text-[#9cafaa]">{t(child.captionKey)}</p> : null}
+                        <Link
+                          href={child.href}
+                          onClick={close}
+                          className={`block rounded-md px-6 py-2.5 text-[13.5px] ${here ? "bg-[#eef4f1] font-extrabold text-[var(--tv-brand)]" : "font-medium text-[#557d78]"}`}
+                        >
+                          {t(child.labelKey)}
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -980,14 +1023,15 @@ const HeaderIcon = forwardRef<
       ref={ref}
       type="button"
       aria-label={label}
+      title={label}
       className={cn(
-        "flex h-full min-w-[66px] items-center justify-center border-e border-[#eef2f0] outline-none transition-colors hover:bg-[#f5f8f6] focus-visible:bg-[#e8f1ed]",
-        active ? "bg-[#e8f1ed] text-[var(--tv-brand)]" : muted ? "bg-[#f0f2f2] text-[#b2b7bc]" : "text-[var(--tv-brand)]",
+        "flex size-10 items-center justify-center rounded-[10px] outline-none transition-colors hover:bg-[#eef4f1] focus-visible:ring-2 focus-visible:ring-[#b7d0c7]",
+        active ? "bg-[#e8f1ed] text-[var(--tv-brand)]" : muted ? "rounded-full bg-[#e8f1ed] text-[var(--tv-brand)]" : "text-[var(--tv-brand)]",
         className,
       )}
       {...props}
     >
-      <Icon className="size-6" />
+      <Icon className="size-[22px]" />
     </button>
   );
 });

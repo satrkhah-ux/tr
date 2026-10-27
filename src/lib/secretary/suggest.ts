@@ -9,7 +9,11 @@ import { normalizeDraftData, type DraftData } from "@/lib/offer/draft-types";
 import { normAr } from "@/lib/catalog/norm";
 import { escapeHtml, staffSend } from "@/lib/telegram/staff-bot";
 import { siteUrl } from "@/lib/telegram/ops-bot";
-import { buildSuggestions, type CandidateHotel, rateKey } from "./suggest-core";
+import { getRates } from "@/lib/data/rates-actions";
+import { dedupeKeys } from "@/lib/notifications/core";
+import { notifyEmployee } from "@/lib/notifications/notify";
+import { buildSuggestions, type CandidateHotel, rateKey, type StayAlternative } from "./suggest-core";
+import { alternativesFor } from "./suggest-sources";
 import { secretaryDb, secretarySettings } from "./core";
 
 /**
@@ -76,15 +80,6 @@ async function marketFor(db: SupabaseClient, draft: DraftData): Promise<Map<stri
   return market;
 }
 
-/** Typed-price difference between the original and a variant, when both sides are fully priced. */
-function savingsLine(original: DraftData, variant: DraftData): string | null {
-  const total = (d: DraftData) => d.hotels.reduce((n: number | null, h) => (n == null ? null : (h.rooms ?? []).reduce((m: number | null, r) => (m == null || r.price == null ? null : m + r.price), n)), 0 as number | null);
-  const a = total(original);
-  const b = total(variant);
-  if (a == null || b == null || b >= a) return null;
-  const cur = variant.hotels[0]?.manual_currency?.trim() || "";
-  return `فنادقه أرخص بنحو ${Math.round((a - b) * 100) / 100} ${cur}`.trim();
-}
 
 export async function sweepSecretarySuggestions(nowMs = Date.now()): Promise<Record<string, unknown>> {
   const db = secretaryDb();
@@ -121,20 +116,38 @@ export async function sweepSecretarySuggestions(nowMs = Date.now()): Promise<Rec
 
     const draft = normalizeDraftData(record.data);
     const market = await marketFor(db, draft).catch(() => new Map<string, CandidateHotel[]>());
-    const variants = buildSuggestions(draft, market, settings.suggest.proposals);
+    // every enabled source's alternatives, per stay (suggest-sources.ts: memory writes prices, a supplier's are told, never written)
+    const { sarPer } = await getRates().catch(() => ({ sarPer: {} as Record<string, number> }));
+    const alternatives = new Map<string, StayAlternative[]>();
+    for (const stay of draft.hotels) {
+      const city = draft.cities.find((c) => c.key === stay.city_key);
+      if (!city?.key) continue;
+      alternatives.set(city.key, await alternativesFor(settings.suggest.sources, {
+        draft, stay, cityName: city.city_name, nights: Math.max(city.nights, 1),
+        checkIn: city.check_in ?? null, checkOut: city.check_out ?? null,
+        memoryMarket: market.get(city.key) ?? [], sarPer, db,
+      }));
+    }
+    const variants = buildSuggestions(draft, alternatives, settings.suggest.proposals);
     if (!variants.length) { await mark([]); continue; }
 
     const client = draft.customer.customer_name || r.contact_name || `#${r.conversation_id}`;
+    const sourceLabel = { memory: "من ذاكرة أسعارنا", tbo: "من TBO" } as const;
     const ids: string[] = [];
     const lines: string[] = [];
+    let anyUnverified = false;
     for (let k = 0; k < variants.length; k += 1) {
-      const title = `مقترح سكرتيرك ${k + 1} — ${client}`;
-      const { data: inserted } = await db.from("offer_drafts").insert({ data: variants[k].data, title, created_by: r.assigned_to }).select("id").maybeSingle();
+      const v = variants[k];
+      const title = `مقترح سكرتيرك ${k + 1} — ${client}${v.unverified ? " (TBO — لم يُتحقق)" : ""}`;
+      const { data: inserted } = await db.from("offer_drafts").insert({ data: v.data, title, created_by: r.assigned_to }).select("id").maybeSingle();
       const id = (inserted as { id: string } | null)?.id;
       if (!id) continue;
       ids.push(id);
-      const saved = savingsLine(draft, variants[k].data);
-      lines.push([`مقترح ${k + 1}: ${variants[k].swapped.map((s) => `${s.city}: ${s.to} بدل ${s.from} (${s.stars}★)`).join("، ")}`, saved ? `— ${saved}` : ""].filter(Boolean).join(" "));
+      anyUnverified = anyUnverified || v.unverified;
+      lines.push(`مقترح ${k + 1}: ${v.swapped.map((s) => [
+        `${s.city}: ${s.to} بدل ${s.from} (${s.stars}★، ${sourceLabel[s.source]}${s.saveSar ? `، يوفر ≈${s.saveSar} ريال` : ""})`,
+        s.cancellation ? `الإلغاء: ${s.cancellation.slice(0, 100)}` : "",
+      ].filter(Boolean).join(" — ")).join("، ")}`);
     }
     if (!ids.length) { await mark([]); continue; }
     await mark(ids);
@@ -142,12 +155,18 @@ export async function sweepSecretarySuggestions(nowMs = Date.now()): Promise<Rec
 
     const why = reason === "objection" ? "اعترض على السعر" : "سكت بعد العرض";
     const note = [
-      `جهّزت لك عروضاً للعميل ${client} (${why}) — نفس المسار والتواريخ، فنادق بنفس التصنيف وسعر أقل من ذاكرة أسعارنا:`,
+      `جهّزت لك عروضاً للعميل ${client} (${why}) — نفس المسار والتواريخ، فنادق بنفس التصنيف وسعر أقل:`,
       ...lines,
+      ...(anyUnverified ? ["⚠️ أسعار TBO «لم يُتحقق منها بعد»: تركت غرف مقترحها بلا سعر عمداً — أكّد السعر عندهم واكتبه بنفسك، وبدونه الملف لا يُصدر."] : []),
       ...ids.map((id, k) => `مقترح ${k + 1}: ${siteUrl()}/basic/${id}`),
       "راجع الأسعار ثم أرسل ما يناسب — لم يصل العميل شيء.",
     ].join("\n");
     await db.from("secretary_messages").insert({ employee_id: r.assigned_to!, role: "secretary", content: note });
+    // the bell: «العرض جاهز», once per followup (dedupe)
+    await notifyEmployee({
+      employeeId: r.assigned_to!, kind: "proposal_ready", source: "secretary", href: "/secretary",
+      title: `🗂 العرض جاهز — ${client} (${why})`, body: lines.join("\n").slice(0, 900), dedupeKey: dedupeKeys.proposal(r.id),
+    }).catch(() => null);
     const conv = (await listOpenConversations().catch(() => null))?.rows.find((c) => c.id === r.conversation_id);
     if (conv) await addTeletelNote(r.conversation_id, `💡 ${noteFor(conv)} جهزت لك عروضاً للعميل راجعها — «سكرتيري الخاص».`).catch(() => null);
     const { data: emp } = await db.from("employees").select("telegram_chat_id").eq("id", r.assigned_to!).maybeSingle();

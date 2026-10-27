@@ -34,10 +34,10 @@ const inter = Inter({
  * absolute URL.
  */
 const SITE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://pkg.traveliun.com";
-const SITE_NAME = "ترافليون للسفر والسياحة";
-const SITE_TITLE = "ترافليون — نظام إدارة الباقات السياحية";
+const SITE_NAME = "ترافليون ون";
+const SITE_TITLE = "ترافليون ون — من أول رسالة حتى العودة";
 const SITE_DESCRIPTION =
-  "نظام ترافليون لبناء العروض السياحية وتسعيرها وإصدار مستند العميل الجاهز للإرسال — الباقات والفنادق والطيران والتأشيرات في مكان واحد.";
+  "ترافليون ون: نظام واحد لرحلة العميل كلها — العملاء والمتابعة والعروض والعمليات والحجوزات والتأشيرات والحسابات في مكان واحد.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -74,7 +74,7 @@ export const metadata: Metadata = {
   // iOS installed-app chrome (Android reads the manifest instead).
   appleWebApp: {
     capable: true,
-    title: "ترافليون",
+    title: "ترافليون ون",
     statusBarStyle: "default",
   },
   // an internal tool: keep it out of search results

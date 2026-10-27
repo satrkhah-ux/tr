@@ -39,7 +39,7 @@ export type Filter = {
   value: DataValue | DataValue[];
 };
 
-export type FilterSource = "countries" | "cities" | "employees" | "suppliers" | "static";
+export type FilterSource = "countries" | "cities" | "employees" | "suppliers" | "cars" | "places" | "static";
 
 export type FilterDef = {
   key: string;
@@ -109,5 +109,5 @@ export type MutateResult =
 export type DeleteResult = { ok: true } | { ok: false; error: TranslationKey };
 
 /** `labelKey`, when set, is translated in place of `label`; `parent`: a city's country id. */
-export type FilterOption = { value: string; label: string; labelKey?: TranslationKey; parent?: string | null };
+export type FilterOption = { value: string; label: string; labelKey?: TranslationKey; parent?: string | null; currency?: string | null };
 export type FilterOptions = Record<FilterSource, FilterOption[]>;

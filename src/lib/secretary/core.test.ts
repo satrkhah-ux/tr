@@ -11,11 +11,11 @@ const item = (kind: DayKind, name: string): DayItem => ({
 
 describe("«سكرتيري الخاص» settings", () => {
   it("defaults and survives bad JSON", () => {
-    const defaults = { off: false, dailyLimit: 60, suggest: { on: true, silentHours: 24, maxPerDay: 10, proposals: 2 } };
+    const defaults = { off: false, dailyLimit: 60, suggest: { on: true, silentHours: 24, maxPerDay: 10, proposals: 2, sources: ["memory"] } };
     expect(parseSecretarySettings(undefined)).toEqual(defaults);
     expect(parseSecretarySettings("not json")).toEqual(defaults);
-    expect(parseSecretarySettings('{"off":true,"dailyLimit":10,"suggest":{"on":false,"silentHours":48}}')).toEqual({
-      off: true, dailyLimit: 10, suggest: { on: false, silentHours: 48, maxPerDay: 10, proposals: 2 },
+    expect(parseSecretarySettings('{"off":true,"dailyLimit":10,"suggest":{"on":false,"silentHours":48,"sources":["memory","tbo","bogus"]}}')).toEqual({
+      off: true, dailyLimit: 10, suggest: { on: false, silentHours: 48, maxPerDay: 10, proposals: 2, sources: ["memory", "tbo"] },
     });
   });
 });

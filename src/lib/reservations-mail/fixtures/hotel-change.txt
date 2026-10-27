@@ -1,0 +1,18 @@
+From: operations@supplier-fixture.example
+Subject: Alternative hotel offered for your booking
+
+Dear Partner,
+
+Due to maintenance at the property, the hotel changed for the stay below and we
+offer an alternative hotel of the same category at no extra cost.
+
+Confirmation No: 77665544
+Hotel: Blue Horizon Palace
+Lead Guest: Nawaf Alharbi
+Check-in: 2027-01-05
+Check-out: 2027-01-09
+
+Please confirm acceptance of the alternative hotel within 24 hours.
+
+Regards,
+Operations (fixture)

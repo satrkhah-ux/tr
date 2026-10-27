@@ -12,6 +12,7 @@ import {
   hopKey,
   hopMode,
   intercityModes,
+  totalCityNights,
   withCityKeys,
   type DraftCity,
   type DraftData,
@@ -21,11 +22,11 @@ import {
   type LookupAirport,
   type TransportMode,
 } from "./draft-types";
-import { airportDisplay, byTravelOrder, cityMoves, findAirport, type CityMove } from "./basic";
-import { citiesFromFlights, flownInto } from "./flight-cities";
+import { airportDisplay, byTravelOrder, chainCities, cityMoves, findAirport, setCityNights, withTripDates, type CityMove } from "./basic";
+import { citiesFromFlights, flightEnds, flownInto } from "./flight-cities";
 import { withFare } from "./flight-fare";
 import { parseFlightNumber } from "./flight-number";
-import { autoDepartureDate, localDatePart, localTimePart, toInstant } from "./schedule";
+import { autoDepartureDate, flightTiming, localDatePart, localTimePart, toInstant } from "./schedule";
 
 const DAY_MS = 86_400_000;
 const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
@@ -199,12 +200,15 @@ export function legGaps(leg: DraftFlight, unpriced: boolean, moved: DraftFlight[
  * it lands. The number stays as the agent typed it (the provider may answer
  * with a codeshare's), the airline is the one the number names; our airport
  * rows win over the provider's names (they carry the zone and the city).
+ * `badTimes`: the clocks it brought land before they take off, read on one clock
+ * in the two airports' own zones (the owner, 2026-10-26) — they are NOT filled
+ * (the leg keeps its day and clocks) and the agent types them.
  */
 export function applyFlightHit(
   leg: DraftFlight,
   hit: FlightLookupHit,
   ctx: { airports: LookupAirport[]; airlines: { iata: string; name: string }[]; trip: Pick<DraftTrip, "arrival_date" | "departure_date"> },
-): { leg: DraftFlight; checkDate: boolean } {
+): { leg: DraftFlight; checkDate: boolean; badTimes: boolean } {
   const ours = (code: string, name: string) => {
     const a = code ? ctx.airports.find((x) => x.code?.toUpperCase() === code.toUpperCase()) : undefined;
     return a ? { value: airportDisplay(a), tz: a.timezone, city: a.city ?? "" } : { value: code ? (name ? `${name} (${code})` : code) : name, tz: null, city: "" };
@@ -225,24 +229,27 @@ export function applyFlightHit(
   }
   const departure_at = day ? `${day}T${depTime ?? localTimePart(leg.departure_at) ?? "00:00"}` : leg.departure_at;
   const arrival_at = day && arrTime ? `${addDays(day, offset)}T${arrTime}` : leg.arrival_at;
+  const filled: DraftFlight = {
+    ...leg,
+    flight_no: (parsed?.code ?? leg.flight_no).toUpperCase(),
+    airline: carrier?.name || hit.airline || leg.airline,
+    airline_iata: carrier?.iata ?? parsed?.carrier ?? leg.airline_iata,
+    from_airport: from.value || leg.from_airport,
+    to_airport: to.value || leg.to_airport,
+    from_tz: from.tz ?? hit.from_tz ?? leg.from_tz,
+    to_tz: to.tz ?? hit.to_tz ?? leg.to_tz,
+    from_city: from.city || (from.value ? "" : (leg.from_city ?? "")),
+    to_city: to.city || (to.value ? "" : (leg.to_city ?? "")),
+    departure_at,
+    arrival_at,
+    date_user_set: pinned,
+    ...(leg.leg_order === "internal" ? { auto: undefined } : {}),
+  };
+  const badTimes = flightTiming(filled).arrivalBeforeDeparture;
   return {
-    leg: {
-      ...leg,
-      flight_no: (parsed?.code ?? leg.flight_no).toUpperCase(),
-      airline: carrier?.name || hit.airline || leg.airline,
-      airline_iata: carrier?.iata ?? parsed?.carrier ?? leg.airline_iata,
-      from_airport: from.value || leg.from_airport,
-      to_airport: to.value || leg.to_airport,
-      from_tz: from.tz ?? hit.from_tz ?? leg.from_tz,
-      to_tz: to.tz ?? hit.to_tz ?? leg.to_tz,
-      from_city: from.city || (from.value ? "" : (leg.from_city ?? "")),
-      to_city: to.city || (to.value ? "" : (leg.to_city ?? "")),
-      departure_at,
-      arrival_at,
-      date_user_set: pinned,
-      ...(leg.leg_order === "internal" ? { auto: undefined } : {}),
-    },
+    leg: badTimes ? { ...filled, departure_at: leg.departure_at, arrival_at: leg.arrival_at, date_user_set: leg.date_user_set } : filled,
     checkDate: Boolean(hit.schedule_date && hit.schedule_date !== day),
+    badTimes,
   };
 }
 
@@ -315,5 +322,52 @@ export function withCitiesFromFlights(
     cities,
     hotels,
     transport_plan: { ...plan, intercity: { ...plan.intercity, modes: list, mode: list[0], hop_modes } },
+  };
+}
+
+/** What «اعتمد تواريخ الطيران» writes, and what the agent is told it changed. */
+export type FlightDatesFit = {
+  /** the days the flights state: where the group lands, and where it leaves for home */
+  arrival_date: string;
+  departure_date: string;
+  patch: Pick<DraftData, "trip" | "flights"> & Partial<Pick<DraftData, "cities" | "hotels" | "transport_plan">>;
+  /** the last city, when its nights moved to cover the span: nights added (+) or taken away (−) */
+  lastCity: { city: string; delta: number } | null;
+};
+
+/**
+ * One tap to bring the trip's dates to the flights' (the owner, 2026-10-26, file 653144ab: the card said
+ * 1/11 → 10/11 while the flight landed on 31/10 and the hotels ran to 9/11). Null while the flights do not
+ * state both the landing and the day they leave for home, or already say what the card says.
+ *
+ *  · the trip's arrival and departure become the flights' (nights and days follow, withTripDates);
+ *  · the flights keep their days — the two ends are pinned (`date_user_set`), or the trip's new day would
+ *    move them again and the card and the flights would chase each other;
+ *  · cities already there are fitted: the ones still marked from the flights follow them (withCitiesFromFlights),
+ *    and when the nights still do not cover the span the LAST city gets the missing ones (or gives back the
+ *    extra) — `lastCity` says so. Nothing else the agent typed is touched; no city yet: the cities step builds them.
+ */
+export function alignTripToFlights(data: DraftData, countryOf?: (city: string) => string | undefined): FlightDatesFit | null {
+  const ends = flightEnds(data.flights);
+  if (!ends || ends.leaving <= ends.landing) return null;
+  if (ends.landing === data.trip.arrival_date && ends.leaving === data.trip.departure_date) return null;
+  const trip = withTripDates(data.trip, { arrival_date: ends.landing, departure_date: ends.leaving });
+  const flights = data.flights.map((f) => (f.leg_order === "internal" || f.date_user_set ? f : { ...f, date_user_set: true }));
+  const fit = { arrival_date: ends.landing, departure_date: ends.leaving };
+  if (data.cities.length === 0) return { ...fit, patch: { trip, flights }, lastCity: null };
+
+  const dated = { ...data, trip, flights };
+  const built = withCitiesFromFlights(dated, countryOf);
+  const shaped: DraftData = { ...dated, ...(built ?? {}), cities: chainCities(dated, built?.cities ?? data.cities) };
+  const last = shaped.cities.length - 1;
+  const nights = shaped.cities[last].nights;
+  const missing = trip.nights - totalCityNights(shaped.cities);
+  // setCityNights keeps the stays' nightly rates; it refuses a city under one night — then nothing moves
+  const fitted = missing !== 0 ? setCityNights(shaped, last, nights + missing) : shaped;
+  const moved = fitted.cities[last].nights - nights;
+  return {
+    ...fit,
+    patch: { trip, flights, cities: fitted.cities, hotels: fitted.hotels, transport_plan: shaped.transport_plan },
+    lastCity: moved !== 0 ? { city: fitted.cities[last].city_name, delta: moved } : null,
   };
 }

@@ -11,11 +11,11 @@ import { riyadhDate } from "@/lib/operations/payments";
 import { employeeWorksVisas, visaPeople, type VisaEmployeeRow } from "@/lib/visa-files/access";
 import { buildBoard } from "@/lib/visa-files/board";
 import {
-  checkUpload, cleanFields, cleanFileName, cleanServices, cleanText, defaultServices, describeChange, diffFields, docPath, expectedDocs, fold, isUuid, money2, nextSerial,
-  parseInstant, parseProcessingDays, planStatus, requirementLines, serialYear, sniffMime, stampSubmitted, UPLOAD_MESSAGE,
+  checkUpload, cleanFields, cleanFileName, cleanServices, cleanText, defaultServices, describeChange, diffFields, docPath, expectedDocs, fold, isUuid, money2,
+  parseInstant, parseProcessingDays, planStatus, requirementLines, sniffMime, stampSubmitted, UPLOAD_MESSAGE,
 } from "@/lib/visa-files/rules";
 import { blankTraveler, BOARD_COLS, boardRowToFile, mergeTravelers, rowToEvent, rowToPayment, storedTravelers, toColumns, type BoardDb, type StoredTraveler } from "@/lib/visa-files/rows";
-import { audit, addEvents, BUCKET, db, employeeNames, ERR, gate, mutateFile, readFile } from "@/lib/visa-files/store";
+import { audit, addEvents, BUCKET, db, employeeNames, ERR, gate, insertVisaFile, mutateFile, readFile } from "@/lib/visa-files/store";
 import { downloadAttachment, findAttachment, pullConversation, searchConversations } from "@/lib/visa-files/teletel";
 import {
   VISA_DOC_KINDS, VISA_DOC_LABEL, VISA_OPEN, VISA_STATUSES, VISA_STATUS_LABEL,
@@ -210,24 +210,13 @@ export async function createVisaFile(input: NewVisaFile): Promise<VisaActionResu
       created_by: caller.employeeId,
     };
 
-    // the next serial after the year's highest; the unique constraint settles two files opened in the same instant
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const year = serialYear();
-      const { data: last } = await db().from("visa_files").select("serial").like("serial", `VF-${String(year).padStart(2, "0")}-%`).order("serial", { ascending: false }).limit(1);
-      const serial = nextSerial(year, (last as { serial: string }[] | null)?.[0]?.serial ?? null);
-      const { data, error } = await db().from("visa_files").insert({ ...row, serial }).select("id, serial").single();
-      if (error) {
-        if (error.code === "23505") continue;
-        return fail(ERR.db);
-      }
-      const made = data as { id: string; serial: string };
-      await addEvents(made.id, caller.employeeId, [{ kind: "created", text: `فُتح الملف — ${f.country}${visaType ? ` (${visaType})` : ""} · ${f.applicants} متقدم` }]);
-      await audit("visa.file.created", made.id, { serial: made.serial, country: f.country, applicants: f.applicants, conversation: conversationId, lead: leadId, catalog: f.visaCatalogId ?? null });
-      // a private note for the team in the conversation — never a message to the client
-      if (conversationId && getTeletelConfig()) await addTeletelNote(conversationId, `فُتح ملف تأشيرة ${made.serial} للعميل (${f.country})`).catch(() => false);
-      return { ok: true, id: made.id, serial: made.serial };
-    }
-    return fail(ERR.db);
+    const made = await insertVisaFile(row);
+    if (!made) return fail(ERR.db);
+    await addEvents(made.id, caller.employeeId, [{ kind: "created", text: `فُتح الملف — ${f.country}${visaType ? ` (${visaType})` : ""} · ${f.applicants} متقدم` }]);
+    await audit("visa.file.created", made.id, { serial: made.serial, country: f.country, applicants: f.applicants, conversation: conversationId, lead: leadId, catalog: f.visaCatalogId ?? null });
+    // a private note for the team in the conversation — never a message to the client
+    if (conversationId && getTeletelConfig()) await addTeletelNote(conversationId, `فُتح ملف تأشيرة ${made.serial} للعميل (${f.country})`).catch(() => false);
+    return { ok: true, id: made.id, serial: made.serial };
   } catch {
     return fail(ERR.db);
   }

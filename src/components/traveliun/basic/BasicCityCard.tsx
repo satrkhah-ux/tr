@@ -84,6 +84,7 @@ import { countryInName, propertyAmong } from "@/lib/operations/supplier-request"
 import { AddStayMenu, StayDatesLine } from "../generator/hotels/StayDates";
 import { basicField, typedNumber } from "./styles";
 import { HotelCombobox } from "./HotelCombobox";
+import { HotelCompare } from "./HotelCompare";
 import { SuggestInput } from "../SuggestInput";
 import { getHotelContact } from "@/lib/data/drafts";
 import { RefundControl } from "../generator/hotels/RefundControl";
@@ -932,6 +933,21 @@ export function HotelPanel({
                 <Plus className="size-3.5" />
                 {tx("addRoom")}
               </button>
+              {/* «قارن» (the owner, 2026-10-26): the public sites beside us, the price pasted back by hand — staff with the cost only */}
+              {canInternal && !partner ? (
+                <HotelCompare
+                  line={line}
+                  cityName={city.city_name}
+                  hotelNameEn={hotels.find((h) => h.id === line.hotel_id)?.name_en ?? null}
+                  checkIn={stay?.check_in ?? null}
+                  checkOut={stay?.check_out ?? null}
+                  nights={nights}
+                  adults={data.trip.adults || 2}
+                  sarPer={lookups.sarPer ?? {}}
+                  // the price is this stay's; a room change after it follows only the hotel
+                  onApply={(next) => follow(line, (l) => (l.id === line.id ? next : { ...l, hotel_id: next.hotel_id, hotel_name: next.hotel_name, hotel_name_en: next.hotel_name_en }))}
+                />
+              ) : null}
             </div>
           </div>
         );

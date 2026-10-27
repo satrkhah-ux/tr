@@ -1,0 +1,15 @@
+From: reservations@supplier-fixture.example
+Subject: Re: Room request - Golden Sands Hotel
+
+Dear Sir,
+
+We regret to inform you that the requested room category is sold out for the
+dates 12/12/2026 to 16/12/2026 and no availability remains at the hotel.
+
+Booking Ref: 88221144
+Guest Name: Salem Almutairi
+
+Kindly advise if the guest can consider other dates.
+
+Best regards,
+Hotel Desk (fixture)

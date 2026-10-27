@@ -15,18 +15,21 @@ import { HEAT_LABEL } from "@/lib/followups/summary-core";
 
 export type SecretaryEmployee = { id: string; name: string; agentId: number | null; chatId: number | null };
 
-/** `suggest`: phase ج — the cheaper proposals' switch, the silence that triggers them, and the day's cap. */
-export type SecretarySettings = { off: boolean; dailyLimit: number; suggest: { on: boolean; silentHours: number; maxPerDay: number; proposals: number } };
+/** `suggest`: phase ج — the cheaper proposals' switch, the silence that triggers them, the day's cap, and WHERE prices come from (the owner, 2026-10-26: external official suppliers too, the employee verifies). */
+export type SuggestSourceKey = "memory" | "tbo";
+export type SecretarySettings = { off: boolean; dailyLimit: number; suggest: { on: boolean; silentHours: number; maxPerDay: number; proposals: number; sources: SuggestSourceKey[] } };
 export const SECRETARY_SETTINGS_KEY = "secretary";
 
 export const secretaryDb = () => createSupabaseServiceClient() as unknown as SupabaseClient;
 
 export function parseSecretarySettings(raw: string | null | undefined): SecretarySettings {
-  const fallback: SecretarySettings = { off: false, dailyLimit: 60, suggest: { on: true, silentHours: 24, maxPerDay: 10, proposals: 2 } };
+  // sources default to the company's own memory until the owner switches a supplier on («tbo» waits for their Search to work)
+  const fallback: SecretarySettings = { off: false, dailyLimit: 60, suggest: { on: true, silentHours: 24, maxPerDay: 10, proposals: 2, sources: ["memory"] } };
   if (!raw) return fallback;
   try {
     const v = JSON.parse(raw) as Partial<SecretarySettings> & { suggest?: Partial<SecretarySettings["suggest"]> };
     const num = (x: unknown, d: number) => (Number.isFinite(x) && Number(x) > 0 ? Number(x) : d);
+    const sources = Array.isArray(v.suggest?.sources) ? v.suggest.sources.filter((s): s is SuggestSourceKey => s === "memory" || s === "tbo") : [];
     return {
       off: v.off === true,
       dailyLimit: num(v.dailyLimit, fallback.dailyLimit),
@@ -35,6 +38,7 @@ export function parseSecretarySettings(raw: string | null | undefined): Secretar
         silentHours: num(v.suggest?.silentHours, fallback.suggest.silentHours),
         maxPerDay: num(v.suggest?.maxPerDay, fallback.suggest.maxPerDay),
         proposals: Math.min(num(v.suggest?.proposals, fallback.suggest.proposals), 3),
+        sources: sources.length ? sources : fallback.suggest.sources,
       },
     };
   } catch { return fallback; }

@@ -22,7 +22,7 @@ describe("the menu consolidation (the owner, 2026-10-19)", () => {
     expect(tabsFor("/markup-rules")?.tabs.map((t) => t.href)).toEqual(["/settings/pricing", "/markup-rules"]);
     expect(tabsFor("/customers")?.active).toBe("/customers");
     // the transport family: one row of tabs from the vehicle types to the price grid
-    expect(tabsFor("/cars-capacities")?.tabs.map((t) => t.href)).toEqual(["/cars-types", "/cars-capacities", "/cars/transfers", "/cars/tours", "/tour-programs", "/drivers", "/ports", "/price-grid"]);
+    expect(tabsFor("/cars-capacities")?.tabs.map((t) => t.href)).toEqual(["/transport-prices", "/cars-types", "/cars-capacities", "/cars/transfers", "/cars/tours", "/tour-programs", "/drivers", "/ports", "/price-grid"]);
     expect(tabsFor("/drivers")?.active).toBe("/drivers");
     expect(tabsFor("/services-types")?.active).toBe("/services-types");
     expect(tabsFor("/hotels")).toBeNull();

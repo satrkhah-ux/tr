@@ -452,28 +452,47 @@ export async function duplicateRow(table: AllowedTable, id: string): Promise<Mut
 
 /** Options for the filter selects (countries / cities / employees). */
 export async function getFilterOptions(): Promise<FilterOptions> {
-  const empty: FilterOptions = { countries: [], cities: [], employees: [], suppliers: [], static: [] };
+  const empty: FilterOptions = { countries: [], cities: [], employees: [], suppliers: [], cars: [], places: [], static: [] };
   try {
     const supabase = await createSupabaseServerClient();
-    const [countries, cities, employees, suppliers] = await Promise.all([
-      supabase.from("countries").select("id, arabic_name").order("arabic_name"),
+    const [countries, cities, employees, suppliers, fleet, airports] = await Promise.all([
+      supabase.from("countries").select("id, arabic_name, default_currency").order("arabic_name"),
       supabase.from("cities").select("id, arabic_name, country_id").order("arabic_name"),
       supabase.from("employees").select("id, arabic_name").order("arabic_name"),
       supabase.from("company_suppliers").select("id, arabic_name").order("arabic_name"),
+      // «نوع السيارة يجب أن يظهر تلقائي» (the owner, 2026-10-26): the fleet as a list, never a bare text box
+      supabase.from("transportation_types").select("arabic_name, pax_capacity, status").eq("category", "fleet").order("pax_capacity", { ascending: true, nullsFirst: false }),
+      supabase.from("airports").select("arabic_name, code, country_id, status").order("arabic_name"),
     ]);
     type NamedRow = { id: string; arabic_name: string };
     const toOptions = (rows: unknown): { value: string; label: string }[] =>
       ((rows ?? []) as NamedRow[]).map((r) => ({ value: r.id, label: r.arabic_name }));
+    const cityOptions = ((cities.data ?? []) as (NamedRow & { country_id: string | null })[]).map((r) => ({
+      value: r.id,
+      label: r.arabic_name,
+      parent: r.country_id,
+    }));
     return {
-      countries: toOptions(countries.data),
-      // a city carries its country: the hotel form shows it, the country filter goes through it
-      cities: ((cities.data ?? []) as (NamedRow & { country_id: string | null })[]).map((r) => ({
+      // the country carries its currency: a form fills it in when the country is picked
+      countries: ((countries.data ?? []) as (NamedRow & { default_currency: string | null })[]).map((r) => ({
         value: r.id,
         label: r.arabic_name,
-        parent: r.country_id,
+        currency: r.default_currency,
       })),
+      // a city carries its country: the hotel form shows it, the country filter goes through it
+      cities: cityOptions,
       employees: toOptions(employees.data),
       suppliers: toOptions(suppliers.data),
+      cars: ((fleet.data ?? []) as { arabic_name: string | null; pax_capacity: number | null; status: string | null }[])
+        .filter((c) => c.status !== "Disabled" && c.arabic_name?.trim())
+        .map((c) => ({ value: c.arabic_name!.trim(), label: c.pax_capacity ? `${c.arabic_name!.trim()} (${c.pax_capacity})` : c.arabic_name!.trim() })),
+      // every place a transfer can start or end at, by NAME (the text the row stores), its country beside it
+      places: [
+        ...cityOptions.map((c) => ({ value: c.label, label: c.label, parent: c.parent })),
+        ...((airports.data ?? []) as { arabic_name: string; code: string | null; country_id: string | null; status: string | null }[])
+          .filter((a) => a.status !== "Disabled" && a.arabic_name?.trim())
+          .map((a) => ({ value: a.arabic_name.trim(), label: a.code ? `${a.arabic_name.trim()} (${a.code})` : a.arabic_name.trim(), parent: a.country_id })),
+      ],
       static: [],
     };
   } catch {

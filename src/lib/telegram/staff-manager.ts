@@ -2,10 +2,10 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
-import { agentSummaries, listOpenConversations } from "@/lib/providers/teletel";
+import { listOpenConversations } from "@/lib/providers/teletel";
 import { escapeHtml, staffCall, staffSend, type StaffMember } from "./staff-bot";
-import { riyadhDayStart, waitText } from "./staff-numbers";
-import { light, screenView, type ScreenView } from "./staff-screen";
+import { waitText } from "./staff-numbers";
+import { screenView, type ScreenView } from "./staff-screen";
 
 /**
  * «تنبيهاتي» for its managers. These are staffbot.manage (the bot's management,
@@ -14,8 +14,7 @@ import { light, screenView, type ScreenView } from "./staff-screen";
  * the ones taken away all count. It is checked again on every action, because
  * a button is not an authorisation.
  *
- *   - «👥 الفريق»: every colleague with a Teletel account, worst first
- *     (🔴🟡🟢), and each one's own screen;
+ *   - «👥 الفريق» lives in staff-admin.ts now; each colleague's own screen is here;
  *   - «📢 إعلان عام»: to every linked colleague;
  *   - «🔔 تنبيه له» / «⏰ ذكّره بمن ينتظره»: to one colleague.
  * Every send goes write → preview → confirm. The draft → sending claim makes a
@@ -45,49 +44,6 @@ export async function colleagues(): Promise<Colleague[]> {
   }));
 }
 
-// ---------- «👥 الفريق» ----------
-
-/** Every colleague with a Teletel account and their numbers now, the most urgent first. */
-export async function teamView(me: StaffMember): Promise<ScreenView> {
-  if (!(await isBotManager(me.id))) return { text: REFUSED, buttons: [] };
-  const nowMs = Date.now();
-  const nowSec = nowMs / 1000;
-  const [list, people, today] = await Promise.all([listOpenConversations(), colleagues(), agentSummaries(riyadhDayStart(nowMs), Math.floor(nowSec))]);
-  if (!list) return { text: "تعذّر الوصول إلى تيلي تيل الآن — جرّب بعد دقيقة.", buttons: [] };
-  const rows = people
-    .filter((p) => p.agentId)
-    .map((p) => {
-      const open = list.rows.filter((c) => c.assigneeId === p.agentId);
-      const waiting = open.filter((c) => c.waitingSince > 0);
-      const oldest = waiting.length ? Math.floor((nowSec - Math.min(...waiting.map((c) => c.waitingSince))) / 60) : null;
-      const n = { open: open.length, waiting: waiting.length, neverAnswered: open.filter((c) => !c.firstReplyAt).length, oldestWaitMin: oldest };
-      return { p, n, status: light(n) };
-    })
-    .sort((a, b) => "🔴🟡🟢".indexOf(a.status.icon) - "🔴🟡🟢".indexOf(b.status.icon) || b.n.waiting - a.n.waiting);
-  const sum = (pick: (n: (typeof rows)[number]["n"]) => number) => rows.reduce((t, r) => t + pick(r.n), 0);
-  const resolved = rows.reduce((t, r) => t + (today?.get(r.p.agentId as number)?.resolved ?? 0), 0);
-  return {
-    text: [
-      `👥 <b>الفريق الآن</b> — ${rows.length} موظف`,
-      "",
-      `📂 مفتوحة: <b>${sum((n) => n.open)}</b> · ⏳ بانتظار الرد: <b>${sum((n) => n.waiting)}</b> · 🆕 بلا رد: <b>${sum((n) => n.neverAnswered)}</b>`,
-      `✅ أُغلقت اليوم: <b>${resolved}</b>`,
-      "",
-      "🔴 عميل ينتظر ٣٠ د أو أكثر أو بلا رد · 🟡 ينتظر · 🟢 لا أحد ينتظر",
-      "اضغط على الموظف لترى شاشته وترسل له تنبيهاً.",
-    ].join("\n"),
-    buttons: [
-      ...rows.map((r) => [
-        {
-          text: `${r.status.icon} ${r.p.name.slice(0, 18)} — 📂${r.n.open} ⏳${r.n.waiting} 🆕${r.n.neverAnswered}${r.n.oldestWaitMin != null ? ` · ${waitText(r.n.oldestWaitMin)}` : ""}`,
-          callback_data: `e:${r.p.id}`,
-        },
-      ]),
-      [{ text: "🔄 تحديث", callback_data: "team" }, { text: "📄 الخطابات", callback_data: "lt" }, { text: "🎯 الأهداف", callback_data: "tg" }],
-    ],
-  };
-}
-
 /** One colleague's own screen, as they see it, with the alert buttons. */
 export async function memberView(me: StaffMember, employeeId: string): Promise<ScreenView> {
   if (!(await isBotManager(me.id))) return { text: REFUSED, buttons: [] };
@@ -98,14 +54,12 @@ export async function memberView(me: StaffMember, employeeId: string): Promise<S
     text: `${view?.text ?? `👤 <b>${escapeHtml(who.name)}</b>\nحسابه في تيلي تيل غير مربوط.`}${who.chatId ? "" : "\n\n⚠️ حسابه في تيليجرام غير مربوط — لا يصله تنبيه."}`,
     buttons: [
       ...(who.chatId
-        ? [
-            [
-              { text: "🔔 تنبيه له", callback_data: `a:${who.id}` },
-              ...(who.agentId ? [{ text: "⏰ ذكّره بمن ينتظره", callback_data: `q:${who.id}` }] : []),
-            ],
-          ]
+        ? [[{ text: "🔔 تنبيه له", callback_data: `a:${who.id}` }, ...(who.agentId ? [{ text: "⏰ ذكّره بمن ينتظره", callback_data: `q:${who.id}` }] : [])]]
         : []),
-      [{ text: "🔄 تحديث", callback_data: `e:${who.id}` }, { text: "↩️ الفريق", callback_data: "team" }],
+      [
+        { text: "🔄 تحديث", callback_data: `e:${who.id}` },
+        { text: "↩️ الفريق", callback_data: "team" },
+      ],
     ],
   };
 }
@@ -124,7 +78,9 @@ export async function promptFor(me: StaffMember, chatId: number, kind: "broadcas
     await staffSend(chatId, "حسابه في تيليجرام غير مربوط — لا يمكن تنبيهه من البوت.");
     return;
   }
-  await db().from("staff_bot_pending").upsert({ chat_id: chatId, kind, target_id: target?.id ?? null, created_at: new Date().toISOString() });
+  await db()
+    .from("staff_bot_pending")
+    .upsert({ chat_id: chatId, kind, target_id: target?.id ?? null, created_at: new Date().toISOString() });
   const count = people.filter((p) => p.chatId && p.id !== me.id).length;
   await staffSend(
     chatId,
@@ -164,23 +120,36 @@ export async function draft(me: StaffMember, chatId: number, content: string, ta
     await staffSend(chatId, "حسابه في تيليجرام لم يعد مربوطاً — لم يُحفظ التنبيه.");
     return;
   }
-  const { data, error } = await db().from("staff_bot_broadcasts").insert({ sender_id: me.id, content: text, target_id: target?.id ?? null }).select("id").single();
+  const { data, error } = await db()
+    .from("staff_bot_broadcasts")
+    .insert({ sender_id: me.id, content: text, target_id: target?.id ?? null })
+    .select("id")
+    .single();
   if (error || !data) {
     await staffSend(chatId, "تعذّر حفظه — جرّب مرة أخرى.");
     return;
   }
   const id = (data as { id: number }).id;
   const count = target ? 1 : people.filter((p) => p.chatId && p.id !== me.id).length;
-  await staffSend(chatId, `👁 <b>هكذا يصل ${target ? `إلى ${escapeHtml(target.name)}` : `إلى ${count} موظف`}:</b>\n\n${broadcastText(text, me.name, Boolean(target))}`, [
+  await staffSend(
+    chatId,
+    `👁 <b>هكذا يصل ${target ? `إلى ${escapeHtml(target.name)}` : `إلى ${count} موظف`}:</b>\n\n${broadcastText(text, me.name, Boolean(target))}`,
     [
-      { text: target ? "✅ إرسال" : `✅ إرسال للجميع (${count})`, callback_data: `b:send:${id}` },
-      { text: "✖️ إلغاء", callback_data: `b:no:${id}` },
+      [
+        { text: target ? "✅ إرسال" : `✅ إرسال للجميع (${count})`, callback_data: `b:send:${id}` },
+        { text: "✖️ إلغاء", callback_data: `b:no:${id}` },
+      ],
     ],
-  ]);
+  );
 }
 
 /** «⏰ ذكّره بمن ينتظره»: the alert written from the colleague's own numbers, still shown first and confirmed. */
 export async function remindDraft(me: StaffMember, chatId: number, employeeId: string): Promise<void> {
+  // before any read: a forged «q:<id>» must not learn who waits on a colleague
+  if (!(await isBotManager(me.id))) {
+    await staffSend(chatId, REFUSED);
+    return;
+  }
   const who = (await colleagues()).find((c) => c.id === employeeId);
   const list = await listOpenConversations();
   if (!who?.agentId || !list) {
@@ -257,9 +226,11 @@ export async function confirmDraft(me: StaffMember, chatId: number, previewId: n
       ? delivered
         ? `✅ وصل التنبيه إلى ${escapeHtml(people[0]?.name ?? "")}.`
         : `⚠️ لم يصل التنبيه إلى ${escapeHtml(people[0]?.name ?? "الموظف")} — لم يضغط «ابدأ» في البوت بعد.`
-      : [`✅ وصل الإعلان إلى <b>${delivered}</b> من ${people.length} موظف.`, missed.length ? `لم يصل إلى: ${missed.map(escapeHtml).join("، ")} — لم يضغطوا «ابدأ» في البوت بعد.` : null]
+      : [
+          `✅ وصل الإعلان إلى <b>${delivered}</b> من ${people.length} موظف.`,
+          missed.length ? `لم يصل إلى: ${missed.map(escapeHtml).join("، ")} — لم يضغطوا «ابدأ» في البوت بعد.` : null,
+        ]
           .filter(Boolean)
           .join("\n"),
   );
 }
-

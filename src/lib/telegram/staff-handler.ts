@@ -9,7 +9,22 @@ import { linkTeletelToken, promptReply, recentThread, rememberThread, sendReply,
 import { lettersView, resendLetter, signLetter, unsignedLetter } from "./staff-letters";
 import { targetView, teamTargetsView } from "./staff-target";
 import { openList, openScreen, screenView, unansweredList, weekView } from "./staff-screen";
-import { confirmDraft, draft, isBotManager, memberView, promptFor, remindDraft, takePending, teamView } from "./staff-manager";
+import { confirmDraft, draft, isBotManager, memberView, promptFor, remindDraft, takePending } from "./staff-manager";
+import { adminRows, ADMIN_KEYS, BACK_ADMIN, TO_ADMIN, type AdminKey } from "./staff-admin-core";
+import {
+  ADMIN_WELCOME,
+  adminTeamView,
+  alertPickView,
+  dayView,
+  faceOf,
+  moneyView,
+  opsVisaView,
+  performanceView,
+  seesMoney,
+  setFace,
+  systemView,
+} from "./staff-admin";
+import { confirmNudge, prepareNudge, waitingConvView, waitingListView, waitingPickView } from "./staff-waiting";
 import { decisionStep, decisionsView, decisionText, decisionView, interventionView, promptDecision, setDecisionStatus, signalView } from "./staff-decisions";
 import type { InlineButton } from "./ops-bot";
 
@@ -54,28 +69,39 @@ const KEYS = {
   token: "🔑 الرد باسمي",
   tone: "🎵 النغمة",
   teletel: "🌐 تيلي تيل",
-  team: "👥 الفريق",
-  broadcast: "📢 إعلان عام",
-  urgent: "🚨 يحتاج تدخلك",
-  decisions: "📋 قرارات الإدارة",
 } as const;
 type Key = keyof typeof KEYS;
 
-function keyboard(manager: boolean): Record<string, unknown> {
-  const rows: string[][] = [
-    [KEYS.screen, KEYS.waiting],
-    [KEYS.open, KEYS.unanswered],
-    [KEYS.today, KEYS.week, KEYS.goal],
-    [KEYS.token, KEYS.tone, KEYS.teletel],
-  ];
-  if (manager) rows.push([KEYS.urgent, KEYS.decisions], [KEYS.team, KEYS.broadcast]);
-  return {
-    keyboard: rows.map((row) => row.map((text) => ({ text }))),
-    resize_keyboard: true,
-    is_persistent: true,
-    input_field_placeholder: "اختر من القائمة، أو اسحب رسالة العميل لترد",
-  };
+const STAFF_ROWS: string[][] = [
+  [KEYS.screen, KEYS.waiting],
+  [KEYS.open, KEYS.unanswered],
+  [KEYS.today, KEYS.week, KEYS.goal],
+  [KEYS.token, KEYS.tone, KEYS.teletel],
+];
+const STAFF_HINT = "اختر من القائمة، أو اسحب رسالة العميل لترد";
+
+const markup = (rows: string[][], hint: string): Record<string, unknown> => ({
+  keyboard: rows.map((row) => row.map((text) => ({ text }))),
+  resize_keyboard: true,
+  is_persistent: true,
+  input_field_placeholder: hint,
+});
+
+/**
+ * The keyboard this person sees (the owner, 2026-10-26: «واجهته للإدارة إدارية وليس
+ * مثل واجهة الموظفين»): an employee's own; a manager's is the administration's
+ * (staff-admin-core), unless they switched to the employee's, which then carries
+ * the way back. The choice is kept (staff-admin faceOf).
+ */
+async function keyboardFor(me: StaffMember): Promise<{ markup: Record<string, unknown>; face: "employee" | "admin" | "staff" }> {
+  if (!(await isBotManager(me.id))) return { markup: markup(STAFF_ROWS, STAFF_HINT), face: "employee" };
+  if ((await faceOf(me.id)) === "admin") return { markup: markup(adminRows(await seesMoney(me.id)), "اختر من لوحة الإدارة"), face: "admin" };
+  return { markup: markup([...STAFF_ROWS, [TO_ADMIN]], STAFF_HINT), face: "staff" };
 }
+
+/** a manager's screen carries «↩️ لوحة الإدارة» once */
+const withBack = (v: Screen): Screen =>
+  v.buttons.some((row) => row.some((b) => (b as { callback_data?: string }).callback_data === "ad")) ? v : { ...v, buttons: [...v.buttons, [BACK_ADMIN]] };
 
 const NO_AGENT: Screen = {
   text: "حسابك في تيلي تيل غير مربوط بعد — اطلب من الإدارة ربطه من صفحة «الموظفين» لتصلك محادثاتك وأرقامك.",
@@ -83,7 +109,7 @@ const NO_AGENT: Screen = {
 };
 /** a button pressed before the letter is signed (Telegram's alert: 200 characters at most) */
 const LOCKED_ALERT = "🔒 اعتمد الخطاب الرسمي أولاً: اقرأه ثم اضغط تحته «✍️ اعتمدت الخطاب»، وبعدها يعمل البوت كالمعتاد.";
-const UNREACHABLE: Screen ={ text: "تعذّر الوصول إلى تيلي تيل الآن — جرّب بعد دقيقة.", buttons: [[BACK]] };
+const UNREACHABLE: Screen = { text: "تعذّر الوصول إلى تيلي تيل الآن — جرّب بعد دقيقة.", buttons: [[BACK]] };
 
 async function waiting(me: StaffMember): Promise<Screen> {
   if (!me.agentId) return NO_AGENT;
@@ -95,7 +121,9 @@ async function waiting(me: StaffMember): Promise<Screen> {
   return {
     text: [`⏳ <b>بانتظار ردك</b> — ${all.length}`, "", "الأقدم أولاً. اضغط على العميل لترى آخر رسائله وترد."].join("\n"),
     buttons: [
-      ...all.slice(0, 10).map((c) => [{ text: `${c.name.slice(0, 28)} — منذ ${waitText(Math.max(0, Math.floor((now - c.waitingSince) / 60)))}`, callback_data: `c:${c.id}` }]),
+      ...all
+        .slice(0, 10)
+        .map((c) => [{ text: `${c.name.slice(0, 28)} — منذ ${waitText(Math.max(0, Math.floor((now - c.waitingSince) / 60)))}`, callback_data: `c:${c.id}` }]),
       [{ text: "🔄 تحديث", callback_data: "w" }, BACK],
     ],
   };
@@ -192,14 +220,45 @@ async function onKey(me: StaffMember, chatId: number, key: Key): Promise<void> {
     return openScreen(me, chatId, NO_AGENT);
   }
   if (key === "tone") return sendTone(chatId);
-  if (key === "broadcast") return promptFor(me, chatId, "broadcast", null);
-  if (key === "team") return show(chatId, await teamView(me));
-  if (key === "urgent") return show(chatId, await interventionView(me));
-  if (key === "decisions") return show(chatId, await decisionsView(me));
   if (key === "teletel") return show(chatId, teletelLink());
   if (key === "goal") return show(chatId, await targetView(me));
-  const data: Record<Exclude<Key, "screen" | "tone" | "broadcast" | "team" | "urgent" | "decisions" | "teletel" | "goal">, string> = { waiting: "w", open: "o:0", unanswered: "u", today: "d", week: "wk", token: "k" };
+  const data: Record<Exclude<Key, "screen" | "tone" | "teletel" | "goal">, string> = {
+    waiting: "w",
+    open: "o:0",
+    unanswered: "u",
+    today: "d",
+    week: "wk",
+    token: "k",
+  };
   return show(chatId, await screenFor(me, data[key]));
+}
+
+type AdminAction = AdminKey | "toAdmin";
+const ADMIN_VIEWS: Record<Exclude<AdminKey, "broadcast" | "toStaff">, (me: StaffMember) => Promise<Screen>> = {
+  day: dayView,
+  waiting: (me) => waitingListView(me, "aw:all:0"),
+  urgent: (me) => interventionView(me),
+  decisions: decisionsView,
+  team: adminTeamView,
+  performance: performanceView,
+  money: moneyView,
+  alert: alertPickView,
+  ops: opsVisaView,
+  system: systemView,
+};
+
+/** The administration's keyboard: the manager checked again, every screen with its way back. */
+async function onAdminKey(me: StaffMember, chatId: number, key: AdminAction): Promise<void> {
+  if (!(await isBotManager(me.id))) {
+    await staffSend(chatId, "هذا للإدارة فقط.");
+    return;
+  }
+  if (key === "toStaff" || key === "toAdmin") {
+    await setFace(me.id, key === "toStaff" ? "staff" : "admin");
+    return welcome(me, chatId);
+  }
+  if (key === "broadcast") return promptFor(me, chatId, "broadcast", null);
+  return show(chatId, withBack(await ADMIN_VIEWS[key](me)));
 }
 
 const COMMANDS: Record<string, Key> = {
@@ -214,27 +273,36 @@ const COMMANDS: Record<string, Key> = {
   "/goal": "goal",
   "/token": "token",
   "/tone": "tone",
+};
+const ADMIN_COMMANDS: Record<string, AdminAction> = {
+  "/admin": "day",
   "/broadcast": "broadcast",
   "/team": "team",
   "/urgent": "urgent",
   "/decisions": "decisions",
 };
 
+export function welcomeText(name: string, linked: boolean, manager: boolean): string {
+  return [
+    `🔔 أهلاً ${escapeHtml(name)}`,
+    "",
+    "حسابك مربوط بترافليون ون ✅",
+    linked
+      ? "ستصلك هنا كل محادثة تُسند إليك في تيلي تيل لحظة إسنادها، ورسائل عملائك لترد عليهم من هنا، وتذكير إذا انتظرك عميل."
+      : "حسابك في تيلي تيل غير مربوط بعد — اطلب من الإدارة ربطه من «الموظفين» لتصلك تنبيهات محادثاتك.",
+    "",
+    "القائمة أسفل المحادثة دائماً — ابدأ بـ «🖥️ شاشتي» وثبّتها أعلى المحادثة، تتحدّث وحدها كل ٥ دقائق.",
+    ...(manager ? ["", `للعودة إلى واجهة الإدارة: «${TO_ADMIN}».`] : []),
+  ].join("\n");
+}
+
 async function welcome(me: StaffMember, chatId: number): Promise<void> {
+  const k = await keyboardFor(me);
   await staffSend(
     chatId,
-    [
-      `🔔 أهلاً ${escapeHtml(me.name)}`,
-      "",
-      "حسابك مربوط بنظام ترافليون ✅",
-      me.agentId
-        ? "ستصلك هنا كل محادثة تُسند إليك في تيلي تيل لحظة إسنادها، ورسائل عملائك لترد عليهم من هنا، وتذكير إذا انتظرك عميل."
-        : "حسابك في تيلي تيل غير مربوط بعد — اطلب من الإدارة ربطه من «الموظفين» لتصلك تنبيهات محادثاتك.",
-      "",
-      "القائمة أسفل المحادثة دائماً — ابدأ بـ «🖥️ شاشتي» وثبّتها أعلى المحادثة، تتحدّث وحدها كل ٥ دقائق.",
-    ].join("\n"),
+    k.face === "admin" ? ADMIN_WELCOME(me.name.trim()) : welcomeText(me.name, Boolean(me.agentId), k.face === "staff"),
     undefined,
-    { reply_markup: keyboard(await isBotManager(me.id)) },
+    { reply_markup: k.markup },
     // its own slot: the message that carries the keyboard is not swept away with the views
     "menu",
   );
@@ -256,23 +324,40 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
     if (data.startsWith("b:")) return confirmDraft(me, chatId, callback.message?.message_id, data);
     if (data.startsWith("a:")) return promptFor(me, chatId, "alert", data.slice(2));
     if (data.startsWith("q:")) return remindDraft(me, chatId, data.slice(2));
-    if (data === "team") return show(chatId, await teamView(me), callback.message?.message_id);
-    if (data.startsWith("e:")) return show(chatId, await memberView(me, data.slice(2)), callback.message?.message_id);
-    // «قرارات الإدارة»: the screen's items and the decisions (staff-decisions.ts, each step checks the manager again)
     const at = callback.message?.message_id;
-    if (data === "si" || data === "sw") return show(chatId, await interventionView(me, data === "sw"), at);
-    if (data.startsWith("sg:")) return show(chatId, await signalView(me, data.slice(3)), at);
+    // «🏢 لوحة الإدارة» (staff-admin.ts): each screen checks the manager again
+    const admin: Record<string, (m: StaffMember) => Promise<Screen>> = {
+      ad: dayView,
+      at: adminTeamView,
+      team: adminTeamView,
+      ap: performanceView,
+      am: moneyView,
+      ao: opsVisaView,
+      as: systemView,
+      an: alertPickView,
+    };
+    if (admin[data]) return show(chatId, withBack(await admin[data](me)), at);
+    // «⏳ المحادثات المنتظرة» (staff-waiting.ts): the list, one conversation read-only, and a nudge — each checks the manager first
+    if (data === "awp") return show(chatId, withBack(await waitingPickView(me)), at);
+    if (data.startsWith("aw:")) return show(chatId, withBack(await waitingListView(me, data)), at);
+    if (data.startsWith("av:")) return show(chatId, withBack(await waitingConvView(me, Number(data.slice(3)))), at);
+    if (data.startsWith("ax:") || data.startsWith("ay:")) return prepareNudge(me, chatId, Number(data.slice(3)), data.startsWith("ay:"));
+    if (data.startsWith("bw:")) return confirmNudge(me, chatId, at, data);
+    if (data.startsWith("e:")) return show(chatId, withBack(await memberView(me, data.slice(2))), at);
+    // «قرارات الإدارة»: the screen's items and the decisions (staff-decisions.ts, each step checks the manager again)
+    if (data === "si" || data === "sw") return show(chatId, withBack(await interventionView(me, data === "sw")), at);
+    if (data.startsWith("sg:")) return show(chatId, withBack(await signalView(me, data.slice(3))), at);
     if (data.startsWith("sd:")) return promptDecision(me, chatId, data.slice(3));
     if (data === "dn") return promptDecision(me, chatId, null);
-    if (/^d[odx]:/.test(data)) return show(chatId, await decisionStep(me, chatId, data), at);
-    if (data === "dl") return show(chatId, await decisionsView(me), at);
-    if (data.startsWith("dc:")) return show(chatId, await decisionView(me, data.slice(3)), at);
-    if (data.startsWith("ds:")) return show(chatId, await setDecisionStatus(me, data), at);
+    if (/^d[odx]:/.test(data)) return show(chatId, withBack(await decisionStep(me, chatId, data)), at);
+    if (data === "dl") return show(chatId, withBack(await decisionsView(me)), at);
+    if (data.startsWith("dc:")) return show(chatId, withBack(await decisionView(me, data.slice(3))), at);
+    if (data.startsWith("ds:")) return show(chatId, withBack(await setDecisionStatus(me, data)), at);
     // «الخطاب الرسمي»: the employee's signature, and the managers' summary
     if (data.startsWith("ls:")) return signLetter(me, chatId, Number(data.slice(3)), at);
-    if (data === "lt") return show(chatId, await lettersView(me), at);
+    if (data === "lt") return show(chatId, withBack(await lettersView(me)), at);
     // «🎯 هدفي»: the managers' targets of the whole team
-    if (data === "tg") return show(chatId, await teamTargetsView(me), at);
+    if (data === "tg") return show(chatId, withBack(await teamTargetsView(me)), at);
     await show(chatId, await screenFor(me, data), callback.message?.message_id);
     // a conversation's card can be answered with a Telegram «reply», like the client's own messages
     if (data.startsWith("c:") && callback.message) await rememberThread(chatId, callback.message.message_id, Number(data.slice(2)));
@@ -325,7 +410,7 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
   const later = () => keepInSlot(chatId, "view", message.message_id);
 
   // after «📢 إعلان عام» / «🔔 تنبيه له», the next text (reply or not) is the draft; the preview quotes it and still asks before anything goes
-  if (text && !text.startsWith("/") && !(Object.values(KEYS) as string[]).includes(text)) {
+  if (text && !text.startsWith("/") && ![...Object.values(KEYS), ...Object.values(ADMIN_KEYS), TO_ADMIN].includes(text)) {
     const pending = await takePending(chatId);
     if (pending) {
       if (pending.kind === "decision") await decisionText(me, chatId, text, pending.sourceKey);
@@ -345,6 +430,12 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
   // a pasted Teletel access token: one word of letters AND digits, nothing else (an English word alone is not one)
   if (/^(?=.*\d)(?=.*[A-Za-z])[A-Za-z0-9_-]{20,64}$/.test(text)) return linkTeletelToken(me, chatId, message.message_id, text);
 
+  const adminKey: AdminAction | undefined =
+    (Object.keys(ADMIN_KEYS) as AdminKey[]).find((k) => ADMIN_KEYS[k] === text) ?? (text === TO_ADMIN ? "toAdmin" : ADMIN_COMMANDS[text.split(/[\s@]/)[0]]);
+  if (adminKey) {
+    await drop();
+    return onAdminKey(me, chatId, adminKey);
+  }
   const key = text.startsWith("/start") ? "start" : ((Object.keys(KEYS) as Key[]).find((k) => KEYS[k] === text) ?? COMMANDS[text.split(/[\s@]/)[0]]);
   if (key) {
     await drop();
@@ -355,7 +446,7 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
     chatId,
     "اختر من القائمة أسفل المحادثة.\nللرد على عميل: اسحب رسالته (Reply) واكتب ردك، أو اضغط «✍️ رد».",
     undefined,
-    { reply_markup: keyboard(await isBotManager(me.id)) },
+    { reply_markup: (await keyboardFor(me)).markup },
     "menu",
   );
   await later();

@@ -21,7 +21,9 @@ import { featureForPath, type Feature } from "@/lib/features";
  * except the team, which stays employees.manage.
  *
  * First match wins, and a prefix is a whole path segment (/cars does not open
- * /cars-types), so the order only matters for a prefix inside another.
+ * /cars-types), so the order only matters for a prefix inside another. A prefix
+ * ending in «$» is that exact path and nothing under it (so a list can be the
+ * team's while the pages under it stay open to whoever holds them).
  */
 const SECTIONS: readonly (readonly [prefix: string, permission: Permission | readonly Permission[]])[] = [
   // «البيانات» — the reference tables the generator reads
@@ -36,8 +38,10 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   ["/airports", "data.write"],
   ["/ports", "data.write"],
   ["/cars-types", "data.write"],
+  ["/cars-capacities", "data.write"],
   ["/cars", "data.write"],
   ["/price-grid", "data.write"],
+  ["/transport-prices", "data.write"],
   // «مراجعة الأسعار»: the provisional and missing prices, with who changed what
   ["/price-review", "data.write"],
   ["/tour-programs", "data.write"],
@@ -73,11 +77,13 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   ["/confirmed-trips", "offers.write"],
   // «العملاء» (0107): a section like the others, so it can be taken from a role or a colleague
   ["/clients", "clients.view"],
-  // «المتابعة»: the team, and each seller for his own offers (the owner, 2026-10-23)
+  // «المتابعة» — the list is the follow-up team's and the administration's (the owner, 2026-10-26: «يظهر فقط للادارة ومن له
+  // صلاحيات قسم المتابعة»); a seller follows his own through «متابعتي», and one follow-up's own page under it still
+  // opens to the seller who holds it (the owner, 2026-10-23)
+  ["/followups$", ["followups.work", "followups.manage", "dashboard.admin", "developer.access"]],
   ["/followups", ["followups.work", "followups.manage", "dashboard.admin", "developer.access", "offers.write"]],
-  // «متابعتي»: each seller's own list; the follow-up team reads anyone's, and the team board is theirs (the owner, 2026-10-25)
+  // «متابعتي»: every employee's own list — no entry, so any signed-in employee (the owner, 2026-10-26); the team board is the team's
   ["/my-followups/team", ["followups.work", "followups.manage", "dashboard.admin", "developer.access"]],
-  ["/my-followups", ["offers.write", "followups.work", "followups.manage", "dashboard.admin", "developer.access"]],
   // «التأشيرات» — the visa department's files and board; the management sees all of it (the owner, 2026-10-26)
   ["/visa-files", ["visas.work", "visas.manage", "dashboard.admin", "developer.access"]],
   // the team and its roles
@@ -111,7 +117,7 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
 /** The permissions a path needs (any one opens it), or null when any employee may open it. Query and hash are ignored. */
 export function permissionsForPath(href: string): readonly Permission[] | null {
   const path = href.split(/[?#]/)[0];
-  const entry = SECTIONS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1];
+  const entry = SECTIONS.find(([prefix]) => (prefix.endsWith("$") ? path === prefix.slice(0, -1) : path === prefix || path.startsWith(`${prefix}/`)))?.[1];
   if (entry === undefined) return null;
   return typeof entry === "string" ? [entry] : entry;
 }

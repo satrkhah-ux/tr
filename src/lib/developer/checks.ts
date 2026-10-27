@@ -12,6 +12,7 @@ import { staffBotToken } from "@/lib/telegram/staff-bot";
 import { cronRunKey, type CronJob, type CronRun } from "@/lib/data/cron-runs";
 import { readyOffersSheet } from "@/lib/data/ready-offers";
 import { connect as tlsConnect } from "node:tls";
+import { ImapFlow } from "imapflow";
 import { backupHealth } from "./backup-health";
 import {
   ageStatus,
@@ -51,6 +52,7 @@ const SECRET_ENV = [
   "TELEGRAM_OPS_BOT_TOKEN",
   "TELEGRAM_WEBAPP_BOT_TOKEN",
   "TELEGRAM_STAFF_BOT_TOKEN",
+  "RESERVATIONS_IMAP_PASSWORD",
 ];
 
 const HOUR = 3_600_000;
@@ -521,6 +523,31 @@ const CHECKS: Check[] = [
       const h = backupHealth((data as { value?: string } | null)?.value, Date.now());
       if (h.status === "ok") return { status: "ok", latencyMs: null, detail: { key: "dev.d.backupOk", params: { day: h.day, mb: h.mb, objects: h.objects } } };
       return { status: "down", latencyMs: null, detail: { key: `dev.d.backup.${h.reason}`, params: { hours: h.hours ?? 0, error: h.error ?? "" } } };
+    },
+  },
+  {
+    id: "mail_reservations",
+    group: "api",
+    label: "dev.c.mailReservations",
+    // the reservations mailbox (reservations-mail/reader.ts): a verify-only IMAP
+    // login — connect, authenticate, log out; reads nothing, changes nothing
+    run: async () => {
+      const host = env("RESERVATIONS_IMAP_HOST");
+      const user = env("RESERVATIONS_IMAP_USER");
+      const pass = env("RESERVATIONS_IMAP_PASSWORD");
+      if (!host || !user || !pass) return unconfigured("RESERVATIONS_IMAP_HOST", "RESERVATIONS_IMAP_USER", "RESERVATIONS_IMAP_PASSWORD");
+      const client = new ImapFlow({
+        host,
+        port: 993,
+        secure: true,
+        auth: { user, pass },
+        logger: false,
+        verifyOnly: true,
+        connectionTimeout: CHECK_TIMEOUT_MS,
+        greetingTimeout: CHECK_TIMEOUT_MS,
+      });
+      const [, ms] = await timed(() => client.connect());
+      return ok(ms, { key: "dev.d.imapOk", params: { host: maskHost(host) } });
     },
   },
   { id: "sheet_ready_offers", group: "api", label: "dev.c.sheetReady", run: async () => sheetOutcome((await readyOffersSheet()).id) },

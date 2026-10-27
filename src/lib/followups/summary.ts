@@ -114,7 +114,7 @@ export async function summarizeDue(): Promise<{ made: number; noted: number }> {
       const fresh = row.offer_at && now - Date.parse(row.offer_at) <= TWO_HOUR_WINDOW_MS && isWorkingTime(new Date(now), hours);
       if (settings.murad === "note" && row.status === "open" && row.step === 0 && due && fresh && !row.client_waiting && !row.murad_note_at && summary.draft && seller) {
         const to = noteFor({ assignee: seller.name, assigneeId: seller.agentId, team: null });
-        const posted = await addTeletelNote(row.conversation_id, [`💡 مُراد — متابعة العرض بعد ساعتين ${to}`.trim(), summary.advice, `رسالة مقترحة:\n${summary.draft}`, "أرسلها من «المتابعة» كما هي أو بعد تعديلها."].filter(Boolean).join("\n\n"));
+        const posted = await addTeletelNote(row.conversation_id, [`💡 مُراد — متابعة العرض بعد ساعتين ${to}`.trim(), summary.advice, `رسالة مقترحة:\n${summary.draft}`, "أرسلها من «متابعتي» كما هي أو بعد تعديلها."].filter(Boolean).join("\n\n"));
         if (posted) {
           noted++;
           // the note itself moves the thread: count it as seen, so the summary is not made again for it

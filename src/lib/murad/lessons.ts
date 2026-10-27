@@ -1,3 +1,4 @@
+import { aiBudgetOpen } from "@/lib/providers/ai-usage";
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { responsesJson } from "@/lib/providers/openai";
@@ -91,6 +92,8 @@ let learning = false;
 export async function learnSweep(service: SupabaseClient, control: MuradControl, skip: string[]): Promise<number> {
   // one sweep at a time in the process: a slow minute must not read the same conversations twice
   if (!control.learn || learning) return 0;
+  // the day's background budget spent: stop BEFORE claiming conversations, so none is skipped unread (providers/ai-usage.ts)
+  if (!(await aiBudgetOpen("murad_lessons", process.env["OPENAI_LEARN_MODEL"] || "gpt-4o-mini"))) return 0;
   learning = true;
   try {
     return await sweep(service, skip);

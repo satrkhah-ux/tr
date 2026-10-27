@@ -178,6 +178,8 @@ export type AuditAction =
   | "secretary.file_prepared"
   // cheaper same-star proposals prepared beside the offer (phase ج; drafts in meta)
   | "secretary.suggested"
+  // «قارن»: a price the employee read on a public site, typed by their hand into their proposal draft
+  | "secretary.compare_applied"
   // «الحسابات المالية» saved (developer only; the figures stay out of the log)
   | "finance.saved"
   | "catalog.imported"
@@ -199,6 +201,12 @@ export type AuditAction =
   | "sla.rules_toggled"
   // «لا طلب بلا صاحب»: a client waiting on a shared Teletel login handed to a seller (routing/shared-sweep.ts)
   | "teletel.shared_reassigned"
+  // «ربط الإضافة»: a device of the staff browser extension linked, or revoked (data/extension-links.ts)
+  | "ext.linked"
+  | "ext.revoked"
+  // from the extension's client panel beside Teletel: the employee's own reminder and note on a conversation
+  | "ext.reminder_set"
+  | "ext.note_saved"
   | "draft.deleted";
 
 export type AuditInput = {
