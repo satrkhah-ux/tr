@@ -4,6 +4,53 @@ import { inferConversationDestination } from "./destination";
 const places = ["إسبانيا", "المدينة المنورة", "أذربيجان", "الكويت", "تركيا", "جورجيا", "اندونيسيا", "يلوا", "بالي", "النمسا", "التشيك", "جدة", "الولايات المتحدة الأمريكية"].map((name) => ({ name, country: name === "يلوا" ? "تركيا" : name === "بالي" ? "اندونيسيا" : name }));
 const read = (lines: [string, boolean, boolean?][]) => inferConversationDestination(lines.map(([text, fromClient, isPrivate], i) => ({ text, fromClient, isPrivate: isPrivate ?? false, id: i + 1, at: i })), places);
 describe("destination intent across the conversation", () => {
+  it.each(["الدنمارك", "العراق", "قيرغيزستان"])("keeps a requested country absent from the package catalogue: %s", country => {
+    expect(read([[`أريد تأشيرة ${country}`, true]]).destination).toBe(country);
+  });
+  it("does not confuse a timetable or ordinary words with a new departure question or country", () => {
+    expect(read([["بكج جورجيا",true],["تبليسي - المدينة\n\nالاقلاع : 01:45\nسعر التذكرة 2200 ريال",false],["طيب ابي الوصول جورجيا مالي حالي ارجع",true]]).destination).toBe("جورجيا");
+  });
+  it("keeps alternatives ambiguous instead of replacing them with the departure airport", () => {
+    expect(read([["تركيا",true],["او جورجيا",true],["شيك من مطار جدة",true]]).destination).toBeNull();
+  });
+  it("understands a destination question following a nationality question", () => {
+    expect(read([["الجنسيه؟",false],["واول دوله تريد السفر لها؟",false],["سوداني",true],["اسبانيا",true]]).destination).toBe("إسبانيا");
+  });
+  it("keeps the visa country when the client explains their onward travel", () => {
+    const catalog=["البحرين","الهند"].map(name=>({name,country:name}));
+    expect(inferConversationDestination(["تاشيره سياحه للبحرين", "لان انا فقط ابغا اسافر من المطار للهند"].map((text,i)=>({id:i+1,at:i,text,fromClient:true,isPrivate:false})),catalog).destination).toBe("البحرين");
+  });
+  it("understands Arabic request words without changing their ya spelling", () => {
+    expect(read([["كيف يمكنني السفر إلى أمريكا",true]]).destination).toBe("الولايات المتحدة الأمريكية");
+    expect(read([["ابي تأشيرة تركيا",true],["جورجيا",true]]).destination).toBe("تركيا");
+  });
+  it("does not replace a destination with an explicitly requested departure city", () => {
+    expect(read([["بكج تركيا",true],["من وين الاقلاع؟",false],["ابي جدة",true]]).destination).toBe("تركيا");
+  });
+  it.each(["الولايات المتحدة", "الولايات المتحدة الأمريكية"])("resolves America against the real catalog name %s", (country) => {
+    const catalog = [{ name: country, country }, { name: "جدة", country: "السعودية" }];
+    const thread = ["كنت عايز اسال علي تقديم لفيزا امريكا", "حتي لو عايز المعاد في جده ؟"].map((text, i) => ({ id: i + 1, at: i + 1, text, fromClient: true, isPrivate: false }));
+    expect(inferConversationDestination(thread, catalog).destination).toBe(country);
+  });
+  it.each(["عايز المعاد في جدة", "ابغى التبصيم في جدة", "موعد المقابلة بجدة", "انا موجود في جدة", "جنسيتي الكويت"])("does not confuse a local detail with travel: %s", text => {
+    expect(read([[text, true]]).destination).toBeNull();
+  });
+  it("keeps question context when the visit timestamp starts at the answer", () => {
+    const thread = [
+      { id: 1, at: 1, text: "تأشيرة أمريكا", fromClient: true, isPrivate: false },
+      { id: 2, at: 2, text: "مكان التبصيم؟", fromClient: false, isPrivate: false },
+      { id: 3, at: 3, text: "جدة", fromClient: true, isPrivate: false },
+    ];
+    expect(inferConversationDestination(thread, places, 3).destination).toBe("الولايات المتحدة الأمريكية");
+  });
+  it("recognizes a new destination on a later visit without losing the old request to courtesy", () => {
+    const thread = ["تركيا", "تمام", "جورجيا"].map((text,i)=>({id:i+1,at:i+1,text,fromClient:true,isPrivate:false}));
+    expect(inferConversationDestination(thread.slice(0,2),places,2).destination).toBe("تركيا");
+    expect(inferConversationDestination(thread,places,3).destination).toBe("جورجيا");
+  });
+  it("resolves catalog English city aliases to the Arabic city", () => {
+    expect(inferConversationDestination([{id:1,at:1,text:"I want a trip to Bangkok",fromClient:true,isPrivate:false}], [{name:"بانكوك",country:"تايلاند",aliases:["Bangkok"]}]).destination).toBe("بانكوك");
+  });
   it("ignores a business location and keeps Spain after a biometrics-location answer", () => {
     expect(read([
       ["افضل مكتب سياحي في المدينة المنورة - ترافليون للسفر و السياحة", true],

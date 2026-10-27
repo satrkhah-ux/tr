@@ -83,13 +83,13 @@ function clientName(c: OpenConversation): string | null {
 
 export async function loadPlaces(supabase: SupabaseClient): Promise<Place[]> {
   const [{ data: countries }, { data: cities }] = await Promise.all([
-    supabase.from("countries").select("id, arabic_name"),
-    supabase.from("cities").select("arabic_name, country_id"),
+    supabase.from("countries").select("id, arabic_name, english_name"),
+    supabase.from("cities").select("arabic_name, country_id, english_name"),
   ]);
   const countryName = new Map(((countries ?? []) as { id: string; arabic_name: string }[]).map((c) => [c.id, c.arabic_name]));
   return [
-    ...[...countryName.values()].map((name) => ({ name, country: name })),
-    ...((cities ?? []) as { arabic_name: string; country_id: string | null }[]).map((c) => ({ name: c.arabic_name, country: countryName.get(c.country_id ?? "") ?? "" })),
+    ...((countries ?? []) as { arabic_name: string; english_name: string | null }[]).map((c) => ({ name: c.arabic_name, country: c.arabic_name, aliases: c.english_name ? [c.english_name] : [] })),
+    ...((cities ?? []) as { arabic_name: string; country_id: string | null; english_name: string | null }[]).map((c) => ({ name: c.arabic_name, country: countryName.get(c.country_id ?? "") ?? "", aliases: c.english_name ? [c.english_name] : [] })),
   ];
 }
 
@@ -167,7 +167,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       if (changed.length) updates.push([had.id, { ...Object.fromEntries(changed), updated_at: new Date().toISOString() }]);
       const inquiry = (patch.inquiry as string | null | undefined) ?? had.inquiry;
       const destination = (patch.destination as string | null | undefined) ?? had.destination;
-      const mutableDestination = had.destination_source !== "manual" && (!had.destination || had.destination_source === "client" || had.destination_source === "labels");
+      const mutableDestination = had.destination_source !== "manual";
       if (had.inquiry_source !== "manual" || !inquiry || inquiry === "طلب غير واضح" || mutableDestination) vague.push({ c, inquiry, destination, mutableDestination, visitAt: Date.parse(String(patch.last_visit_at ?? had.last_visit_at ?? had.created_at)) / 1000 });
     } else {
       fresh.push({
@@ -217,8 +217,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
         if (!thread?.historyComplete) return;
         threadRead.set(c.id, c.lastActivityAt);
         const patch: Record<string, unknown> = {};
-        const visitInference = inferConversationDestination(thread.messages.filter((m) => m.at >= visitAt), places);
-        const inference = visitInference.evidenceId !== null ? visitInference : inferConversationDestination(thread.messages, places);
+        const inference = inferConversationDestination(thread.messages, places, visitAt);
         const kind = classifyConversationInquiry(thread.messages, places, visitAt, [c.serviceType ?? "", ...c.labels], byConversation.get(c.id)?.destination_source === "manual" ? destination : null);
         const origin = byConversation.get(c.id)?.inquiry_source;
         if ((origin !== "manual" || inquiry === "طلب غير واضح") && kind && kind !== inquiry) { patch.inquiry = kind; patch.inquiry_source = "auto"; }

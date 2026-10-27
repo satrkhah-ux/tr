@@ -1,5 +1,6 @@
 import { fold } from "./sheet";
 import { mentionsPlace } from "./place-match";
+import { requestText } from "./request-text";
 
 /**
  * «العملاء» phase two: what a Teletel conversation says about itself, with no
@@ -11,8 +12,8 @@ import { mentionsPlace } from "./place-match";
 const KINDS: [string, RegExp][] = [
   ["رخص دولية", /(رخصهدوليه|رخصهقيادهدوليه|internationaldriving)/i],
   ["بكج", /(بكج|باكج|باكدج|بكدج|باقه|باقات|برنامجسياحي|بكجات|package)/i],
-  ["تأشيرات", /(تاشير|تعشير|فيزا|فيزه|visa|شنغن|شينغن|schengen)/i],
-  ["فنادق", /(فندق|فنادق|حجزغرف|hotel)/i],
+  ["تأشيرات", /(تاشير|تعشير|فيزا|فيزه|تفاصيلعنفيوا|visa|شنغن|شينغن|schengen)/i],
+  ["فنادق", /(فندق|فنادق|حجزغرف|شققفندقيه|اكواخ|hotel)/i],
   ["طيران", /(طيران|تذكره|تذاكر|حجزرحله|رحلهطيران|flight|ticket)/i],
   ["مواصلات", /(مواصلات|سياره|سائق|توصيل|استقبالمنالمطار|transfer)/i],
 ];
@@ -22,22 +23,25 @@ const NOT_WANTED = /(?:بدون|بلا|من غير|غير شامل|ما يحتا
 
 /** «بكج» … from the labels first (staff put them), else the client's words; no recognized service is unclassified */
 export function classifyInquiry(labels: string[], text: string, context: { destination?: string | null } = {}): string {
+  text = requestText(text);
   for (const source of [labels.join(" "), text.replace(NOT_WANTED, " ")]) {
     const f = fold(source);
+    if (/طيران|تذاكر/.test(f) && /فندق|فنادق|شقق|سكن|اقامه/.test(f)) return "بكج";
     // Visa-centre appointments often omit the word “visa” entirely.
     if (/(?:^|[^a-z])(?:bls|vfs|tls)(?:[^a-z]|$)/i.test(source)
       && /موعد|مواعيد|حجز|تقديم|بصم|تاشير|appointment|booking/i.test(f)) return "تأشيرات";
+    if (/موعد|مواعيد|ميعاد|معاد|مقابل/.test(f) && /سفاره|قنصلي|تبصيم/.test(f)) return "تأشيرات";
     for (const [label, re] of KINDS) if (re.test(f)) return label;
   }
   // A verified destination is already a travel request, even when the client
   // answers with just «فيتنام». Missing dates/party are booking details, not ambiguity.
   if (context.destination?.trim()) return "بكج";
   const travel = text.replace(NOT_WANTED, " ");
-  if (/(?:برنامج|رحلة|رحله|سفرة|سفره)\s*(?:سياحي|سياحية|سياحيه)|شهر\s*عسل|(?:ال)?وجه[ةه]\s*[:：]?\s+[^\s؟?]+|honeymoon|tour\s*package/iu.test(travel)) return "بكج";
+  if (/(?:جدول|برنامج|رحلة|رحله|سفرة|سفره)\s*(?:سياحي|سياحية|سياحيه)|(?:رحلة|رحله|سفرة|سفره)\s+(?:إلى|الى)|شهر\s*عسل|(?:ال)?وجه[ةه]\s*[:：]?\s+[^\s؟?]+|honeymoon|tour\s*package/iu.test(travel)) return "بكج";
   return text.trim() ? "طلب غير واضح" : "";
 }
 
-export type Place = { name: string; country: string };
+export type Place = { name: string; country: string; aliases?: string[] };
 
 /**
  * The first place the conversation names — a country, or a city (reported as
