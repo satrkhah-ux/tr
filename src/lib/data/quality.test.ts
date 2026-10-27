@@ -8,6 +8,7 @@ import {
   guardHotels,
   hasArabicLetter,
   issueRowsFunction,
+  qualityReportError,
   verifyBlockers,
   weeklyLines,
 } from "./quality";
@@ -31,6 +32,17 @@ describe("issues ↔ 0071", () => {
     expect(issueRowsFunction("hotels", "hotel_no_arabic")).toBe("data_quality_hotels");
     expect(issueRowsFunction("cities", "hotel_no_arabic")).toBeNull();
     expect(issueRowsFunction("hotels", "drop table")).toBeNull();
+  });
+});
+
+describe("quality report errors", () => {
+  it("reports a missing database function only when the database says it is missing", () => {
+    expect(qualityReportError({ code: "PGRST202" })).toBe("data.quality.err.notReady");
+    expect(qualityReportError({ code: "42883" })).toBe("data.quality.err.notReady");
+    expect(qualityReportError({ code: "57014" })).toBe("data.quality.err.timeout");
+    expect(qualityReportError({ code: "PGRST301" })).toBe("err.session");
+    expect(qualityReportError({ code: "42501" })).toBe("err.forbidden");
+    expect(qualityReportError(new Error("network failure"))).toBe("err.db");
   });
 });
 

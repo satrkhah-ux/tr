@@ -7,10 +7,11 @@ import { weeklyLines, type IssueCounts } from "./quality";
 
 export type CountRow = { issue: string; total: number; used: number | null };
 
-/** Every card's number, from the database (0071). Null when the function is missing or refused. */
-export async function qualityCounts(supabase: SupabaseClient): Promise<CountRow[] | null> {
+/** Keep the RPC error so a timeout or expired session is not reported as a missing migration. */
+export async function qualityCounts(supabase: SupabaseClient): Promise<CountRow[]> {
   const { data, error } = await supabase.rpc("data_quality_counts");
-  return error ? null : ((data ?? []) as CountRow[]);
+  if (error) throw error;
+  return (data ?? []) as CountRow[];
 }
 
 /** Last week's numbers live in app_settings (0054) under this key: {"day":"YYYY-MM-DD","counts":{…}}. */
@@ -38,7 +39,6 @@ export async function sendWeeklyDataQuality(today: string): Promise<boolean> {
     if (prev?.day === today) return false;
 
     const rows = await qualityCounts(supabase);
-    if (!rows) return false;
     const counts: IssueCounts = Object.fromEntries(rows.map((r) => [r.issue, r.total]));
     const { error } = await supabase
       .from("app_settings")

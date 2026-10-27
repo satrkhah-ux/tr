@@ -13,6 +13,15 @@ import type { AllowedTable, DataValue } from "./types";
 
 export type IssueGroup = "hotels" | "cities" | "catalog" | "transport";
 
+export function qualityReportError(error: unknown): TranslationKey {
+  const code = error && typeof error === "object" && "code" in error ? error.code : null;
+  if (code === "PGRST202" || code === "42883") return "data.quality.err.notReady";
+  if (code === "57014") return "data.quality.err.timeout";
+  if (code === "PGRST301" || code === "PGRST303") return "err.session";
+  if (code === "42501") return "err.forbidden";
+  return "err.db";
+}
+
 export type QualityIssue = {
   key: string;
   table: AllowedTable;

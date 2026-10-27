@@ -10,6 +10,7 @@ import { allTableConfigs } from "./table-config";
 import { qualityCounts } from "./quality-weekly";
 import {
   QUALITY_ISSUES,
+  qualityReportError,
   guardHotels,
   verifyBlockers,
   type GuardIssue,
@@ -42,7 +43,6 @@ export async function getDataQualityReport(): Promise<QualityReport> {
   try {
     const supabase = await db();
     const rows = await qualityCounts(supabase);
-    if (!rows) return { ok: false, error: "data.quality.err.notReady" };
     const counts = new Map(rows.map((r) => [r.issue, r]));
 
     const hotelIssues = QUALITY_ISSUES.filter((issue) => issue.table === "hotels" && (counts.get(issue.key)?.total ?? 0) > 0);
@@ -76,8 +76,10 @@ export async function getDataQualityReport(): Promise<QualityReport> {
         top: tops.get(issue.key) ?? [],
       })),
     };
-  } catch {
-    return { ok: false, error: "err.db" };
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? error.code : "unknown";
+    console.error("[data-quality] report failed", { code });
+    return { ok: false, error: qualityReportError(error) };
   }
 }
 
