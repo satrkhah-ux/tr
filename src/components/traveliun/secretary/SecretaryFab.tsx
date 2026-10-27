@@ -46,7 +46,7 @@ export function SecretaryFab() {
             {!loading && board && <SecretaryDayBoard board={board} compact />}
             {!loading && !board && <p className="p-2 text-sm text-[#557d78]">تعذّر قراءة خطتك الآن — افتح الصفحة الكاملة.</p>}
           </div>
-        : <SecretaryChat tall />}
+        : <SecretaryChat />}
     </SheetContent>
   </Sheet>;
 }
