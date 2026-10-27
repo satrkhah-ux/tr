@@ -11,6 +11,16 @@ const on = (f: Feature) => FEATURE_DEFAULTS[f];
 const off = (feature: Feature) => (f: Feature) => f !== feature && FEATURE_DEFAULTS[f];
 
 describe("the sidebar", () => {
+  it("shows Murad settings as its own link for management and developers only", () => {
+    for (const permission of ["settings.manage", "developer.access"] as Permission[]) {
+      const links = navGroupsFor(role([permission]), on).filter((group) => group.href === "/murad-settings");
+      expect(links).toHaveLength(1);
+      expect(links[0].labelKey).toBe("nav.muradSettings");
+    }
+    expect(navGroupsFor(SALES, on).some((group) => group.href === "/murad-settings")).toBe(false);
+    expect(navGroupsFor(OPS, on).some((group) => group.href === "/murad-settings")).toBe(false);
+  });
+
   it("shows sales the home, «بيسك», the clients, operations and the data — nothing else", () => {
     // «متابعتي»: every employee's own list (2026-10-26); «المتابعة» is the team's and the administration's, so sales do not see it
     // «سكرتيري الخاص»: every employee's own assistant (owner order 2, 2026-10-24)
