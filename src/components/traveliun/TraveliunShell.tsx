@@ -287,6 +287,7 @@ export const navGroups: NavGroup[] = [
   { labelKey: "nav.sla", href: "/sla", icon: Timer },
   // «المطوّر» — the service switches and the external links' health (developer.access, section-access.ts)
   { labelKey: "nav.managementDecisions", href: "/management-decisions", icon: Gavel },
+  { labelKey: "nav.muradSettings", href: "/murad-settings", icon: BotMessageSquare },
   { labelKey: "nav.developer", href: "/developer", icon: Wrench },
 ];
 
@@ -830,7 +831,7 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
 
 /** Visual sections only: access filtering and link order stay in useNavGroups. */
 function menuSection(key: TranslationKey): TranslationKey {
-  if (["nav.dataSection", "nav.adminSection", "nav.sla", "nav.managementDecisions", "nav.developer"].includes(key)) return "nav.section.management";
+  if (["nav.dataSection", "nav.adminSection", "nav.sla", "nav.managementDecisions", "nav.muradSettings", "nav.developer"].includes(key)) return "nav.section.management";
   if (["nav.visaFiles", "nav.partnerCompanies", "nav.almatar", "nav.operations", "nav.commissions"].includes(key)) return "nav.section.services";
   return "nav.section.daily";
 }

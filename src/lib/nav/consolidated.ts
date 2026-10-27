@@ -94,11 +94,6 @@ export const TAB_GROUPS: SectionTab[][] = [
     { href: "/clients", labelKey: "nav.customers" },
     { href: "/customers", labelKey: "nav.people" },
   ],
-  // «قرارات الإدارة» and «إعدادات مُراد» — one page, each tab its own gate (2026-10-23)
-  [
-    { href: "/management-decisions", labelKey: "nav.managementDecisions" },
-    { href: "/murad-settings", labelKey: "nav.muradSettings" },
-  ],
   // «التأشيرات»: the board and a new file, one tap apart on a phone (the price list keeps its own page under «البيانات»)
   [
     { href: "/visa-files", labelKey: "nav.visaBoard" },

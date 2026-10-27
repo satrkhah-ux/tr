@@ -30,6 +30,12 @@ describe("the menu consolidation (the owner, 2026-10-19)", () => {
     expect(tabsFor("/clients")).toBeNull();
   });
 
+  it("keeps Murad settings independent from management decisions", () => {
+    expect(tabsFor("/murad-settings")).toBeNull();
+    expect(tabsFor("/management-decisions")).toBeNull();
+    expect(movedTo("/murad-settings")).toBeNull();
+  });
+
   it("puts the board and a new visa file in one row, a file's page under the board — the price list (/visas) keeps its own page", () => {
     expect(tabsFor("/visa-files")?.tabs.map((t) => t.href)).toEqual(["/visa-files", "/visa-files/new"]);
     expect(tabsFor("/visa-files/new")?.active).toBe("/visa-files/new");

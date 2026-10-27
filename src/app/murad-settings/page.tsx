@@ -30,12 +30,26 @@ export default async function MuradSettingsPage() {
   ]);
   const token = webhookToken();
   const site = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
-  return <TraveliunShell title="nav.muradSettings"><div className="space-y-5">
-    {live ? <>
-      <ReceptionPanel data={{ on: live[0].murad_reception, scope: live[2].scope, webhookUrl: token ? `${site}/api/teletel/webhook?token=${token}` : null, today: live[3] }} />
-      <MuradPanel data={live[1]} flags={{ suggest: live[0].murad_suggest, auto: live[0].murad_auto }} />
-    </> : null}
-    {teaching ? <MuradInstructions data={teaching} /> : null}
-    <MuradSettings setup={setup} /><ReceptionRoutes setup={reception} />{reception && <AutoOffers initial={reception.offers} usd={reception.usd} />}<MuradPolicies initial={visaFaq} setting="murad_visa_faq" /><MuradPolicies initial={policies} />
-  </div></TraveliunShell>;
+  return <TraveliunShell title="nav.muradSettings">
+    <MuradSettings
+      setup={setup}
+      routingDefaults={<ReceptionRoutes setup={reception} />}
+      knowledge={<>
+        {teaching ? <MuradInstructions data={teaching} /> : null}
+        <details className="rounded-2xl border border-[#dbe6e1] bg-white p-4 sm:p-6 dark:border-[#294039] dark:bg-[#12241f]">
+          <summary className="cursor-pointer font-bold">أسئلة وأجوبة التأشيرات</summary>
+          <div className="mt-4"><MuradPolicies initial={visaFaq} setting="murad_visa_faq" /></div>
+        </details>
+        <details className="rounded-2xl border border-[#dbe6e1] bg-white p-4 sm:p-6 dark:border-[#294039] dark:bg-[#12241f]">
+          <summary className="cursor-pointer font-bold">سياسات الشركة والردود</summary>
+          <div className="mt-4"><MuradPolicies initial={policies} /></div>
+        </details>
+      </>}
+      offers={reception ? <AutoOffers initial={reception.offers} usd={reception.usd} /> : undefined}
+      monitoring={live ? <>
+        <ReceptionPanel data={{ on: live[0].murad_reception, scope: live[2].scope, webhookUrl: token ? `${site}/api/teletel/webhook?token=${token}` : null, today: live[3] }} />
+        <MuradPanel data={live[1]} flags={{ suggest: live[0].murad_suggest, auto: live[0].murad_auto }} />
+      </> : undefined}
+    />
+  </TraveliunShell>;
 }
