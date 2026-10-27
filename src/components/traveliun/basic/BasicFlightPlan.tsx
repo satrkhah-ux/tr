@@ -17,10 +17,8 @@ import { SuggestInput, type Suggestion } from "../SuggestInput";
 import { basicField, typedNumber } from "./styles";
 import { useBasicLabels } from "./labels";
 
-/** a field's name above it where the wide row has no room for one */
+/** Keep field labels visible when the card wraps, regardless of viewport width. */
 const SMALL_CAPTION = "text-[10px] font-bold text-[#7a948f]";
-/** the leg rows' columns: its name, the number and «جلب», the two airports, the day, the two clocks, the price, remove */
-const COLS = "xl:grid-cols-[4rem_minmax(8rem,0.9fr)_minmax(11rem,1.4fr)_minmax(11rem,1.4fr)_9.5rem_6.5rem_8rem_7rem_2rem]";
 
 type Look = { busy?: boolean; note?: string; hits?: FlightLookupHit[] };
 
@@ -136,12 +134,14 @@ export function LegRow({
   }
 
   return (
-    <div className="space-y-1">
-      {/* below the wide row some cells carry a caption: bottom-aligned, so the fields line up */}
-      <div className={`grid grid-cols-2 items-end gap-2 sm:grid-cols-4 xl:items-center ${COLS}`}>
-        <span className="text-[11.5px] font-extrabold text-[#0f3d38] max-xl:col-span-full">{name}</span>
+    <div className="min-w-0 space-y-1">
+      {/* Fit the available card width, including sidebar and browser zoom. */}
+      <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] items-start gap-3">
+        {name ? <span className="col-span-full text-[11.5px] font-extrabold text-[#0f3d38]">{name}</span> : null}
         {/* the number first: «جلب» fills the rest */}
-        <span className="flex items-center gap-1">
+        <span className="grid min-w-0 gap-0.5">
+          <span className={SMALL_CAPTION}>{tx("domFlightNo")}</span>
+          <span className="flex min-w-0 items-center gap-1">
           <input
             dir="ltr"
             aria-label={tx("domFlightNo")}
@@ -163,26 +163,29 @@ export function LegRow({
               {tx("fetchFlight")}
             </button>
           ) : null}
+          </span>
         </span>
-        <span className="contents" onBlur={() => settle("from_airport", leg.from_airport)}>
+        <span className="grid min-w-0 gap-0.5" onBlur={() => settle("from_airport", leg.from_airport)}>
+          <span className={SMALL_CAPTION}>{tx("planFrom")}</span>
           <SuggestInput ariaLabel={tx("planFrom")} placeholder={tx("planFrom")} items={items.from} value={leg.from_airport} onChange={(v) => onEdit({ from_airport: v })} className={basicField} />
         </span>
-        <span className="contents" onBlur={() => settle("to_airport", leg.to_airport)}>
+        <span className="grid min-w-0 gap-0.5" onBlur={() => settle("to_airport", leg.to_airport)}>
+          <span className={SMALL_CAPTION}>{tx("planTo")}</span>
           <SuggestInput ariaLabel={tx("planTo")} placeholder={tx("planTo")} items={items.to} value={leg.to_airport} onChange={(v) => onEdit({ to_airport: v })} className={basicField} />
         </span>
         {/* under the wide row a phone shows an empty time as a blank box: each says what it is there */}
-        <label className="grid gap-0.5">
-          <span className={`${SMALL_CAPTION} xl:hidden`}>{tx("domDate")}</span>
-          <input type="date" dir="ltr" aria-label={tx("domDate")} value={day} onChange={(e) => onEdit({ date: e.target.value })} className={`${basicField} tv-tnum px-2`} />
+        <label className="grid min-w-0 gap-0.5">
+          <span className={SMALL_CAPTION}>{tx("domDate")}</span>
+          <input type="date" dir="ltr" aria-label={tx("domDate")} value={day} onChange={(e) => onEdit({ date: e.target.value })} className={`${basicField} tv-tnum min-w-0 max-w-full px-2`} />
         </label>
-        <label className="grid gap-0.5">
-          <span className={`${SMALL_CAPTION} xl:hidden`}>{tx("domDep")}</span>
-          <input type="time" dir="ltr" aria-label={tx("domDep")} value={time(leg.departure_at)} disabled={!day} onChange={(e) => onEdit({ dep: e.target.value })} className={`${basicField} tv-tnum px-2`} />
+        <label className="grid min-w-0 gap-0.5">
+          <span className={SMALL_CAPTION}>{tx("domDep")}</span>
+          <input type="time" dir="ltr" aria-label={tx("domDep")} value={time(leg.departure_at)} disabled={!day} onChange={(e) => onEdit({ dep: e.target.value })} className={`${basicField} tv-tnum min-w-0 max-w-full px-2`} />
         </label>
-        <span className="grid gap-0.5">
-          <span className={`${SMALL_CAPTION} xl:hidden`}>{tx("domArr")}</span>
+        <span className="grid min-w-0 gap-0.5">
+          <span className={SMALL_CAPTION}>{tx("domArr")}</span>
           <span className="flex items-center gap-1">
-            <input type="time" dir="ltr" aria-label={tx("domArr")} value={time(leg.arrival_at)} disabled={!day} onChange={(e) => onEdit({ arr: e.target.value })} className={`${basicField} tv-tnum px-2`} />
+            <input type="time" dir="ltr" aria-label={tx("domArr")} value={time(leg.arrival_at)} disabled={!day} onChange={(e) => onEdit({ arr: e.target.value })} className={`${basicField} tv-tnum min-w-0 max-w-full px-2`} />
             {nextDay ? (
               <span title={tx("nextDayHint", { city: leg.to_city ?? "" })} className="tv-tnum shrink-0 rounded-full bg-[#fff4dc] px-1.5 py-0.5 text-[10.5px] font-extrabold text-[#a86a10]">
                 {tx("nextDay")}
@@ -191,8 +194,8 @@ export function LegRow({
           </span>
         </span>
         {price ? (
-          <span className="grid gap-0.5">
-            <span className={`${SMALL_CAPTION} xl:hidden`}>{price.label}</span>
+          <span className="grid min-w-0 gap-0.5">
+            <span className={SMALL_CAPTION}>{price.label}</span>
             <input
               type="number"
               min={0}
@@ -201,13 +204,11 @@ export function LegRow({
               placeholder={price.label}
               value={leg.price ?? ""}
               onChange={(e) => onEdit({ price: typedNumber(e.target) })}
-              className={`${basicField} tv-tnum text-center`}
+              className={`${basicField} tv-tnum min-w-0 text-center`}
             />
             {price.caption ? <span className="tv-tnum text-center text-[10px] font-bold text-[#557d78]">{price.caption}</span> : null}
           </span>
-        ) : (
-          <span className="max-xl:hidden" />
-        )}
+        ) : null}
         {onRemove ? (
           <button
             type="button"
