@@ -162,7 +162,10 @@ export async function replaceOffer(serial: string, input: CreateOfferInput): Pro
       return rollback();
     }
 
-    const { error: headError } = await supabase
+    // The caller authorizes re-issue and computes these amounts from the saved
+    // draft. 0073 intentionally denies sessions updates to money/customer columns.
+    // Keep the offer lookup RLS-checked, then persist trusted figures server-side.
+    const { error: headError } = await cost
       .from("offers")
       .update({
         customer_id: input.customer_id,
@@ -179,7 +182,8 @@ export async function replaceOffer(serial: string, input: CreateOfferInput): Pro
       })
       .eq("id", offerId);
     if (headError) return rollback();
-    await cost.from("pricings").upsert({ offer_id: offerId, ...pricingRow(input) }, { onConflict: "offer_id" });
+    const { error: pricingError } = await cost.from("pricings").upsert({ offer_id: offerId, ...pricingRow(input) }, { onConflict: "offer_id" });
+    if (pricingError) return rollback();
 
     // every write landed: now the old rows go
     for (const { table, via } of tables) {

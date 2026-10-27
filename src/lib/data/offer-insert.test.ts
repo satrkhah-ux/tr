@@ -16,7 +16,7 @@ const state = vi.hoisted(() => ({
 }));
 
 /** An in-memory PostgREST: select/insert/upsert/update/delete with eq/in/not-in, run when awaited. */
-function fakeDb() {
+function fakeDb(trusted = false) {
   return {
     from(table: string) {
       const rows = () => (state.tables[table] ??= []);
@@ -42,6 +42,9 @@ function fakeDb() {
           return { data: null, error: null };
         }
         if (op.kind === "update") {
+          if (table === "offers" && !trusted && Object.keys(op.payload as object).some(k => ["customer_id", "total", "total_sar", "partner_cost"].includes(k))) {
+            return { data: null, error: { message: "permission denied for table offers" } };
+          }
           rows().filter(match).forEach((r) => Object.assign(r, op.payload));
           return { data: null, error: null };
         }
@@ -78,7 +81,7 @@ function fakeDb() {
 vi.mock("@/lib/supabase/server", () => ({
   getServerUser: async () => ({ id: "user-1" }),
   createSupabaseServerClient: async () => fakeDb(),
-  createSupabaseServiceClient: () => fakeDb(),
+  createSupabaseServiceClient: () => fakeDb(true),
 }));
 vi.mock("@/lib/data/metrics", () => ({ getCurrentEmployeeId: async () => "emp-1" }));
 vi.mock("@/lib/data/rates-actions", () => ({ getRates: async () => ({ sarPer: { SAR: 1 }, source: "fallback", updatedAt: null }) }));
