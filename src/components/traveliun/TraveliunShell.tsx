@@ -709,13 +709,13 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
       </Sheet>
 
       <main
-        className={
+        className={(partner ? "" : "me-10 ") + (
           focus
             ? ""
             : `pt-[60px] transition-[margin] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:pt-[74px] ${
                 menuOpen ? "lg:ms-[260px]" : "lg:ms-[74px]"
               }`
-        }
+        )}
       >
         {/* bottom padding on phones clears the fixed tab bar (+ safe area). */}
         <div className="px-4 py-4 pb-[calc(84px+env(safe-area-inset-bottom))] sm:px-5 lg:px-[30px] lg:pb-4">

@@ -1,5 +1,7 @@
 "use client";
 
+import { editedPricing } from "@/lib/offer/pricing";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
 import { syncSuggestions } from "@/lib/offer/pricing-suggest";
@@ -98,7 +100,7 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
   const currencies = currencyOptions(lookups.countries, display);
 
   function setItems(items: DraftPricingItem[]) {
-    patch({ pricing: { ...pricing, items } });
+    patch({ pricing: editedPricing({ ...pricing, items }, partner) });
   }
 
   function updateItem(index: number, slice: Partial<DraftPricingItem>) {

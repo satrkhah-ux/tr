@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { saveDraftStages } from "@/lib/data/drafts";
 import type { DraftData } from "@/lib/offer/draft-types";
 import { withFlightTotals } from "@/lib/offer/flight-fare";
+import { createSaveQueue } from "./save-queue";
 import { pendingToReplay } from "./pending-edits";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
@@ -80,43 +81,40 @@ export function useDraftState(
     return flight_booking === raw.flight_booking ? raw : { ...raw, flight_booking };
   }, [raw]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const pendingRef = useRef<Partial<DraftData>>({});
   const timerRef = useRef<number | null>(null);
   // the server's time of the last save this tab knows — what its kept edits build on
   const baseRef = useRef(savedAt);
   const [restored, setRestored] = useState(false);
 
+  const queue = useMemo(() => createSaveQueue<DraftData>(async (slice) => {
+    const result = await saveDraftStages(draftId, slice);
+    if (!result.ok) throw new Error(result.error);
+    if (result.savedAt) baseRef.current = result.savedAt;
+  }), [draftId]);
+
   const flush = useCallback(async () => {
-    const slice = pendingRef.current;
-    pendingRef.current = {};
-    if (Object.keys(slice).length === 0) return;
     setSaveState("saving");
     try {
-      const result = await saveDraftStages(draftId, slice);
-      if (!result.ok) pendingRef.current = { ...slice, ...pendingRef.current };
-      else if (result.savedAt) baseRef.current = result.savedAt;
-      if (savedAt) keepPending(draftId, pendingRef.current, baseRef.current);
-      setSaveState(result.ok ? "saved" : "error");
-    } catch {
-      // The call itself failed — offline, or this tab is from before a deploy
-      // and the server no longer knows its action. It never resolved before,
-      // so «جارٍ الحفظ» spun forever; now it says so, and the work is kept to
-      // go up with the next save.
-      pendingRef.current = { ...slice, ...pendingRef.current };
-      if (savedAt) keepPending(draftId, pendingRef.current, baseRef.current);
+      await queue.flush();
+      setSaveState("saved");
+    } catch (error) {
       setSaveState("error");
+      // Issuing must stop when the latest price has not reached the server.
+      throw error;
+    } finally {
+      if (savedAt) keepPending(draftId, queue.pending(), baseRef.current);
     }
-  }, [draftId, savedAt]);
+  }, [draftId, savedAt, queue]);
 
   const patch = useCallback(
     (slice: Partial<DraftData>) => {
       setData((current) => ({ ...current, ...slice }));
-      pendingRef.current = { ...pendingRef.current, ...slice };
-      if (savedAt) keepPending(draftId, pendingRef.current, baseRef.current);
+      queue.patch(slice);
+      if (savedAt) keepPending(draftId, queue.pending(), baseRef.current);
       if (timerRef.current) window.clearTimeout(timerRef.current);
-      timerRef.current = window.setTimeout(() => void flush(), 700);
+      timerRef.current = window.setTimeout(() => void flush().catch(() => undefined), 700);
     },
-    [draftId, flush, savedAt],
+    [draftId, flush, savedAt, queue],
   );
 
   // A save the last visit could not make comes back here, on top of the saved
@@ -126,28 +124,28 @@ export function useDraftState(
       const slice = savedAt ? readPending(draftId, savedAt) : null;
       if (!slice) return;
       setData((current) => ({ ...current, ...slice }));
-      pendingRef.current = { ...slice, ...pendingRef.current };
+      queue.patch({ ...slice, ...queue.pending() });
       setRestored(true);
-      void flush();
+      void flush().catch(() => undefined);
     }, 0);
     return () => window.clearTimeout(restore);
-  }, [draftId, flush, savedAt]);
+  }, [draftId, flush, savedAt, queue]);
 
   /** Adopt a draft the server already saved — WITHOUT scheduling a save back. */
   const replace = useCallback(
     (next: DraftData) => {
-      pendingRef.current = {};
+      queue.clear();
       if (savedAt) keepPending(draftId, {}, baseRef.current);
       setData(next);
     },
-    [draftId, savedAt],
+    [draftId, savedAt, queue],
   );
 
   // never lose pending work on unmount / stage navigation
   useEffect(() => {
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
-      void flush();
+      void flush().catch(() => undefined);
     };
   }, [flush]);
 

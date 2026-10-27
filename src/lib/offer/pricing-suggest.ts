@@ -796,6 +796,20 @@ export function suggestPricing(
  *   • anything the draft no longer produces is dropped (a removed hotel must
  *     not stay on the bill), unless it is one of the two above.
  */
+/** Refresh amounts typed on source cards without fetching or changing the company's list prices. */
+export function syncTypedPricing(data: DraftData): DraftData["pricing"] {
+  const fresh = suggestPricing(data, { rooms: [], services: [], transfers: [], fleet: [] }, { hotel: "الفندق", airline: "شركة الطيران" });
+  const typed = new Map(fresh.filter((i) => i.source === "typed" || i.source === "supplier").map((i) => [i.ref, i]));
+  const items = data.pricing.items.map((item) => {
+    const next = typed.get(item.ref);
+    if (!next || item.overridden || item.manual) return item;
+    const { source: _source, ...price } = next;
+    void _source;
+    return { ...item, ...price, list_sell: price.sell_price };
+  });
+  return { ...data.pricing, items };
+}
+
 export function syncSuggestions(
   existing: DraftPricingItem[],
   suggested: SuggestedItem[],
