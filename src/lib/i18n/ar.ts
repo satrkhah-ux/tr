@@ -144,6 +144,9 @@ export const ar: Dictionary = {
   "err.invalidStage": "مرحلة غير صحيحة.",
 
   // ---------- navigation ----------
+  "nav.section.daily": "العمل اليومي",
+  "nav.section.services": "الخدمات والتشغيل",
+  "nav.section.management": "الإدارة والرقابة",
   "nav.dashboard": "الرئيسية",
   "nav.executiveDashboard": "اللوحة التنفيذية",
   "nav.intelligenceHub": "مركز التشغيل الذكي",

@@ -146,6 +146,9 @@ export const en = {
   "err.invalidStage": "Invalid stage.",
 
   // ---------- navigation ----------
+  "nav.section.daily": "Daily work",
+  "nav.section.services": "Services & operations",
+  "nav.section.management": "Management & oversight",
   "nav.dashboard": "Dashboard",
   "nav.executiveDashboard": "Executive Dashboard",
   "nav.intelligenceHub": "Intelligence Hub",

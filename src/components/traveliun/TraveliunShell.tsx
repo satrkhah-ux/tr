@@ -555,7 +555,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
               className="h-12 w-12"
             />
           </Link>
-          <nav className="flex max-h-[calc(100vh/var(--tv-zoom)_-_74px)] flex-col overflow-hidden py-2">
+          <nav className="flex max-h-[calc(100vh/var(--tv-zoom)_-_74px)] flex-col overflow-y-auto py-2">
             {visibleNavGroups.map((group) => {
               const Icon = group.icon;
               const active = isGroupActive(pathname, group);
@@ -564,7 +564,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
                   key={group.labelKey}
                   type="button"
                   title={t(group.labelKey)}
-                  className={`relative flex h-[44px] items-center justify-center transition-colors duration-200 ${
+                  className={`relative flex h-[44px] shrink-0 items-center justify-center transition-colors duration-200 ${
                     active ? "bg-[#eef4f1] font-extrabold text-[var(--tv-brand)]" : "text-[#6f8f88] hover:bg-[#f4f8f6] hover:text-[var(--tv-brand)]"
                   }`}
                   onClick={() => {
@@ -828,6 +828,13 @@ function CommandPalette({ open, onOpenChange, pathname }: { open: boolean; onOpe
   );
 }
 
+/** Visual sections only: access filtering and link order stay in useNavGroups. */
+function menuSection(key: TranslationKey): TranslationKey {
+  if (["nav.dataSection", "nav.adminSection", "nav.sla", "nav.managementDecisions", "nav.developer"].includes(key)) return "nav.section.management";
+  if (["nav.visaFiles", "nav.partnerCompanies", "nav.almatar", "nav.operations", "nav.commissions"].includes(key)) return "nav.section.services";
+  return "nav.section.daily";
+}
+
 function SideMenu({
   activeGroup,
   pathname,
@@ -848,48 +855,52 @@ function SideMenu({
   };
   return (
     <aside className="traveliun-side-menu absolute start-0 top-0 z-30 h-screen w-[260px] overflow-hidden border-e border-[#d9e0dc] bg-white shadow-[0_8px_28px_rgba(0,0,0,0.12)]">
-      <div className="flex h-[96px] items-center justify-center bg-[var(--tv-brand)] px-6">
+      <div className="flex h-[80px] items-center justify-center bg-[var(--tv-brand)] px-6">
         <BrandMark
           logoUrl={partner?.logoUrl ?? null}
           name={partner?.name ?? "Traveliun"}
-          className="max-h-[68px] w-[170px]"
+          className="max-h-[54px] w-[150px]"
         />
       </div>
-      <nav className="h-[calc(100vh/var(--tv-zoom)_-_96px)] overflow-y-auto py-2 text-[var(--tv-brand)]">
-        {groups.map((group) => {
+      <nav className="h-[calc(100vh/var(--tv-zoom)_-_80px)] overflow-y-auto px-2.5 pb-8 pt-2 text-[var(--tv-brand)]">
+        {groups.map((group, index) => {
           const Icon = group.icon;
-          const active = group.labelKey === activeGroup?.labelKey;
+          const expanded = group.labelKey === activeGroup?.labelKey;
+          const active = isGroupActive(pathname, group);
+          const caption = !partner && (index === 0 || menuSection(groups[index - 1].labelKey) !== menuSection(group.labelKey));
           const hasChildren = Boolean(group.children?.length);
           return (
-            <div key={group.labelKey}>
+            <div key={group.labelKey} className="mb-0.5">
+              {caption ? <p className="mb-2 mt-4 px-3 text-[10px] font-bold text-[#8a9f99]">{t(menuSection(group.labelKey))}</p> : null}
               {hasChildren ? (
                 <button
                   type="button"
-                  onClick={() => setActiveMenu(active ? null : group.labelKey)}
-                  aria-expanded={active}
-                  className={`flex w-full items-center gap-3 px-4 py-[11px] text-start text-[13px] font-bold transition-colors duration-200 ${
-                    active ? "bg-[var(--tv-brand)] text-white" : "text-[var(--tv-brand)] hover:bg-[#eef4f1]"
+                  onClick={() => setActiveMenu(expanded ? null : group.labelKey)}
+                  aria-expanded={expanded}
+                  className={`flex min-h-10 w-full items-center gap-2.5 rounded-[10px] px-3 py-2 text-start text-[12.5px] font-semibold outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#b69a59] ${
+                    active ? "bg-[var(--tv-brand)] text-white shadow-sm" : "text-[#365e55] hover:bg-[#edf4f0]"
                   }`}
                 >
-                  <Icon className="size-5" />
+                  <Icon className={`size-[18px] shrink-0 ${active ? "text-white" : "text-[#6d8e83]"}`} strokeWidth={1.7} />
                   <span className="flex-1">{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}
-                  <ChevronDown className={`size-4 transition-transform duration-200 ${active ? "" : "rotate-90"}`} />
+                  <ChevronDown className={`size-4 transition-transform duration-200 ${expanded ? "" : "rotate-90 rtl:-rotate-90"}`} />
                 </button>
               ) : (
                 <Link
                   href={group.href}
                   onClick={group.href === "/developer" ? openFinance : undefined}
-                  className={`flex w-full items-center gap-3 px-4 py-[11px] text-start text-[13px] font-bold transition-colors duration-200 ${
-                    active ? "bg-[var(--tv-brand)] text-white" : "text-[var(--tv-brand)] hover:bg-[#eef4f1]"
+                  aria-current={active ? "page" : undefined}
+                  className={`flex min-h-10 w-full items-center gap-2.5 rounded-[10px] px-3 py-2 text-start text-[12.5px] font-semibold outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#b69a59] ${
+                    active ? "bg-[var(--tv-brand)] text-white shadow-sm" : "text-[#365e55] hover:bg-[#edf4f0]"
                   }`}
                 >
-                  <Icon className="size-5" />
+                  <Icon className={`size-[18px] shrink-0 ${active ? "text-white" : "text-[#6d8e83]"}`} strokeWidth={1.7} />
                   <span className="flex-1">{t(group.labelKey)}</span>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}
-                  <ChevronDown className="size-4 rotate-90" />
+
                 </Link>
               )}
-              {active && group.children ? (
-                <div className="py-1">
+              {expanded && group.children ? (
+                <div className="ms-5 me-1 border-s border-[#dce8e1] py-1 ps-2">
                   {group.children.map((child) => {
                     // «بكج جديد» makes a file and moves on — /basic itself is the files list, never «new»
                     const childActive = pathname === pageOf(child.href) && !child.href.includes("new=1");
@@ -903,7 +914,7 @@ function SideMenu({
                       <Link
                         key={child.href}
                         href={child.href}
-                        className={`relative mx-[10px] block rounded-[7px] px-6 py-[10px] text-[13px] transition-colors duration-200 ${
+                        className={`relative my-0.5 block rounded-[7px] px-3 py-2 text-[12px] transition-colors duration-200 ${
                           childActive
                             ? "bg-[#eef4f1] font-extrabold text-[var(--tv-brand)]"
                             : "font-medium text-[#557d78] hover:bg-[#f4f8f6] hover:text-[var(--tv-brand)]"
@@ -914,7 +925,7 @@ function SideMenu({
                             childActive ? "h-[18px]" : "h-0"
                           }`}
                         />
-                        <span className="ms-2">•</span>
+
                         {t(child.labelKey)}
                       </Link>
                       </div>
@@ -959,14 +970,17 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
       {/* a section with pages opens as a list under its row (the owner, 2026-10-26: «الأقسام في الموبايل لا تظهر كاملة») —
           the bottom padding keeps the last row above the phone browser's toolbar */}
       <nav className="p-3 pb-28">
-        {groups.map((group) => {
+        {groups.map((group, index) => {
           const Icon = group.icon;
+          const caption = !partner && (index === 0 || menuSection(groups[index - 1].labelKey) !== menuSection(group.labelKey))
+            ? <p className="mb-2 mt-4 px-3 text-[10px] font-bold text-[#8a9f99]">{t(menuSection(group.labelKey))}</p> : null;
           const active = isGroupActive(pathname, group);
           const rowClass = `flex w-full items-center gap-3 rounded-md px-3 py-3 text-sm ${active ? "bg-[#e8f1ed] font-semibold text-[var(--tv-brand)]" : "text-[#557d78]"}`;
           const badges = <>{group.href === "/followups" && <FollowupBadge />}{group.href === "/my-followups" && <MyFollowupBadge />}</>;
           if (!group.children || group.children.length < 2) {
             return (
               <div key={group.labelKey} className="mb-1">
+                {caption}
                 <Link href={group.href} className={rowClass} onClick={close}>
                   <Icon className="size-5" />
                   <span>{t(group.labelKey)}</span>{badges}
@@ -977,6 +991,7 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
           const open = openKey === group.labelKey;
           return (
             <div key={group.labelKey} className="mb-1">
+                {caption}
               <button type="button" className={rowClass} aria-expanded={open} onClick={() => setOpenKey(open ? null : group.labelKey)}>
                 <Icon className="size-5" />
                 <span className="flex-1 text-start">{t(group.labelKey)}</span>
