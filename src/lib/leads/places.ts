@@ -17,7 +17,7 @@ import { mentionsPlace } from "./place-match";
 export type Resolved = { kind: "destination"; country: string; city: string | null } | { kind: "origin"; place: string } | { kind: "none" };
 
 /** spellings the catalogue lacks: folded text → [country, city] */
-const ALIASES: [string, string, string | null][] = [
+export const PLACE_ALIASES: [string, string, string | null][] = [
   ["يلوا", "تركيا", "يلوا"],
   ["يالوفا", "تركيا", "يلوا"],
   ["بولو", "تركيا", "بولو"],
@@ -33,6 +33,13 @@ const ALIASES: [string, string, string | null][] = [
   ["الشمال التركي", "تركيا", "الشمال التركي"],
   ["الخرطوم", "السودان", "الخرطوم"],
   ["بورت سودان", "السودان", "بورتسودان"],
+  ["بورتسودان", "السودان", "بورتسودان"],
+  ["ايدر", "تركيا", "آيدر"],
+  ["اوزنجول", "تركيا", "أوزنجول"],
+  ["استنطبول", "تركيا", "اسطنبول"],
+  ["بوكت", "تايلاند", "بوكيت"],
+  ["بوكيت", "تايلاند", "بوكيت"],
+  ["مكه", "السعودية", "مكة"],
   ["فوكو", "فيتنام", "فوكوك"],
   ["شنغن", "شنغن (أوروبا)", null],
   ["شينغن", "شنغن (أوروبا)", null],
@@ -62,7 +69,7 @@ export function resolvePlace(text: string | null | undefined, places: Place[]): 
         const country = p.country || p.name;
         return { name: p.name, country, city: strip(p.name) === strip(country) ? null : p.name, len: fold(p.name).length };
       }),
-    ...ALIASES.filter(([k]) => mentionsPlace(raw, k)).map(([k, country, city]) => ({ name: city ?? country, country, city, len: fold(k).length })),
+    ...PLACE_ALIASES.filter(([k]) => mentionsPlace(raw, k)).map(([k, country, city]) => ({ name: city ?? country, country, city, len: fold(k).length })),
   ].sort((x, y) => y.len - x.len);
   // a destination wins over where the client is: «انا من السعودية وابي لندن» asks for London
   const dest = hits.find((h) => !isSaudi(h.country));

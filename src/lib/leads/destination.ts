@@ -1,6 +1,7 @@
 import { placeMention } from "./place-match";
 import { requestText } from "./request-text";
 import { withCountryNames } from "./country-names";
+import { PLACE_ALIASES } from "./places";
 
 type Place = { name: string; country: string; aliases?: string[] };
 type Message = { id: number; at: number; text: string; fromClient: boolean; isPrivate: boolean };
@@ -39,6 +40,12 @@ export function inferConversationDestination(messages: Message[], places: Place[
   ];
   const expanded = [...places];
   const canonicalNames = new Map<string, string>();
+  for (const [name, country, city] of PLACE_ALIASES) {
+    // Region labels are not individual countries; let a named country decide.
+    if (!city || expanded.some(p => normalize(p.name) === normalize(name))) continue;
+    expanded.push({ name, country });
+    canonicalNames.set(normalize(name), city);
+  }
   const jakarta = places.find(p => normalize(p.name) === "جاكرتا");
   if (jakarta) for (const name of ["جاكرتاء", "جاكارتا"]) {
     expanded.push({ name, country: jakarta.country });
@@ -76,6 +83,8 @@ export function inferConversationDestination(messages: Message[], places: Place[
       const clause = before.split(/[،,؛;!?\n]/).at(-1) ?? "";
       const after = text.slice(index + mention.length, index + mention.length + 24);
       const attachedIn = text[index] === "ب" && !name.startsWith("ب");
+      // Voco is also a hotel brand, not evidence of travel to Phu Quoc.
+      if (name === "فوكو" && /فندق\s*$/.test(clause)) continue;
       // A business address in an advert/contact greeting is not a trip request.
       const businessLocation = /(?:مكتب|شرك[ةه]|فرع|مقر|عنوان).{0,40}(?:في\s*|ب)$/.test(clause)
         || (attachedIn && /(?:مكتب|شرك[ةه]|فرع|مقر|عنوان).{0,40}$/.test(clause));
@@ -90,6 +99,7 @@ export function inferConversationDestination(messages: Message[], places: Place[
       const explicit = mention.directed || /(?:الى|ل|وجهتي|الوجه[ةه]|ابي|ابغى|اريد|نبي|رحل[ةه]|بكج|برنامج|فندق|فنادق|زيارة|تاشيرة|تاشيره|فيزا|لفيزا|اسافر|نسافر|ناوي|to|destination)\s*[:：]?\s*$/.test(clause);
       if (name === "مالي" && !explicit && text.trim() !== name && question !== "destination") continue;
       const changeRequested = /(?:ابي|ابغى|اريد|نبي|نبغى|عايز|عاوز|محتاج|احتاج|بدي|ودي|حاب|شوف|بدل|غيرت|خلها|غيرها|وجهتي|الوجه[ةه]).{0,45}$/.test(clause);
+      const namedRequest = explicit && (/^(?:تاشير[ةه]|فيز[اةه]|بكج|رحل[ةه]|فندق)\s/.test(text) || /(?:كم|ما)\s*(?:سعر|تكلف)/.test(text));
       if (excluded) {
         if (destination === place.name) { destination = null; evidenceId = message.id; ambiguous = true; }
         continue;
@@ -103,7 +113,7 @@ export function inferConversationDestination(messages: Message[], places: Place[
         && !/(?:بدل|غيرت|خلها|غيرها)/.test(text)
         && !/(?:تاشير|فيزا)\s*\S*\s*$/.test(clause)) continue;
       // A bare later place is not proof the client changed their destination.
-      if (destination && !changeRequested && !/^او\s/.test(text) && question !== "destination" && !(message.at >= since && evidenceAt < since)) continue;
+      if (destination && !changeRequested && !namedRequest && !/^او\s/.test(text) && question !== "destination" && !(message.at >= since && evidenceAt < since)) continue;
       if (!candidates.some((c) => normalize(c.place.name).includes(name))) candidates.push({ place, explicit, index });
     }
     if (!candidates.length) continue;

@@ -4,6 +4,15 @@ import { inferConversationDestination } from "./destination";
 const places = ["إسبانيا", "المدينة المنورة", "أذربيجان", "الكويت", "تركيا", "جورجيا", "اندونيسيا", "يلوا", "بالي", "النمسا", "التشيك", "جدة", "الولايات المتحدة الأمريكية"].map((name) => ({ name, country: name === "يلوا" ? "تركيا" : name === "بالي" ? "اندونيسيا" : name }));
 const read = (lines: [string, boolean, boolean?][]) => inferConversationDestination(lines.map(([text, fromClient, isPrivate], i) => ({ text, fromClient, isPrivate: isPrivate ?? false, id: i + 1, at: i })), places);
 describe("destination intent across the conversation", () => {
+  it("accepts a later explicit request instead of keeping an earlier bare city", () => {
+    expect(read([["جدة",true],["فيزا امريكا",true]]).destination).toBe("الولايات المتحدة الأمريكية");
+    expect(read([["تركيا",true],["كم سعر تذكرة من جدة إلى جورجيا",true]]).destination).toBe("جورجيا");
+  });
+  it("reads shared city aliases without confusing hotel brands with destinations", () => {
+    expect(read([["كم سعر تذكرة من المدينة المنورة لبورتسودان",true],["كم سعر تذكرة من المدينة إلى الخرطوم",true]]).destination).toBe("الخرطوم");
+    expect(read([["أبغى حجز فندق فوكو مكة",true]]).destination).toBe("مكة");
+    expect(read([["بكج الشمال التركي",true],["مدينة الاقلاع؟",false],["جدة",true]]).destination).toBe("الشمال التركي");
+  });
   it.each(["الدنمارك", "العراق", "قيرغيزستان"])("keeps a requested country absent from the package catalogue: %s", country => {
     expect(read([[`أريد تأشيرة ${country}`, true]]).destination).toBe(country);
   });

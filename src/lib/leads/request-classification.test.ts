@@ -12,6 +12,7 @@ describe("conversation request context",()=>{
     ["بكج تايلاند", "اريد فندق وجولات"],
     ["بكج تايلاند", "هل السائق بيروح معانا؟"],
     ["ابي جدول سياحي في تايلاند", "الفندق اللي معطيني هو نفس ذا؟"],
+    ["بكج تايلاند", "راح أعطيك الأكيد بكره بس بشوف الفندق بعد"],
   ])("keeps the package through service details: %s / %s", (request, detail) => {
     expect(classifyConversationInquiry(messages([request,detail]),places,0)).toBe("بكج");
   });
