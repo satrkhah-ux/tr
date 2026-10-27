@@ -23,7 +23,7 @@ const { classifyConversationInquiry } = load('src/lib/leads/request-classificati
 const apply = process.argv.includes('--apply');
 const offline = process.argv.includes('--offline');
 if (apply && offline) throw Error('Apply requires fresh provider checks');
-const db = new pg.Client({connectionString:process.env.SUPABASE_DB_URL,ssl:{rejectUnauthorized:false}});
+const db = new pg.Pool({connectionString:process.env.SUPABASE_DB_URL,ssl:{rejectUnauthorized:false},max:4});
 const root = path.resolve('output/classification-audit'); fs.mkdirSync(root,{recursive:true});
 const output = path.join(root, `${apply?'apply':'review'}-${Date.now()}.json`);
 const report = {mode:apply?'apply':'review',scanned:0,unchanged:0,manual:0,applied:0,conflicts:0,failures:[],changes:[]};
@@ -69,11 +69,13 @@ async function read(row) {
 }
 function labels(conv){ const c=conv.meta?.sender?.custom_attributes??{};return [c.service_type_list,c.service_type,...(conv.labels??[])].filter(v=>typeof v==='string'); }
 try {
-  await db.connect();
+  await db.query('select 1');
   if(apply) await db.query(`update public.integrations set used_by=concat_ws('؛ ',used_by,'مراجعة وتصحيح تصنيف المحادثات المفتوحة والمغلقة: scripts/repair-lead-destinations.mjs'),updated_at=now() where check_key='teletel' and coalesce(used_by,'') not like '%repair-lead-destinations.mjs%'`);
   const places=(await db.query(`select arabic_name as name,arabic_name as country,array_remove(array[english_name],null) as aliases from countries union all select c.arabic_name,coalesce(p.arabic_name,''),array_remove(array[c.english_name],null) from cities c left join countries p on p.id=c.country_id`)).rows;
   const rows=(await db.query(`select id,teletel_conversation_id,destination,destination_source,inquiry,inquiry_source,last_visit_at,created_at from client_leads where teletel_conversation_id is not null order by created_at desc`)).rows;
-  const limit=process.argv.find(a=>a.startsWith('--limit=')); const selected=limit?rows.slice(0,Number(limit.split('=')[1])):rows;
+  const scope=process.argv.find(a=>a.startsWith('--conversations='))?.split('=')[1].split(',');
+  const scoped=scope?rows.filter(row=>scope.includes(String(row.teletel_conversation_id))):rows;
+  const limit=process.argv.find(a=>a.startsWith('--limit=')); const selected=limit?scoped.slice(0,Number(limit.split('=')[1])):scoped;
   console.log(JSON.stringify({eligible:selected.length,report:output}));
   for(let start=0;start<selected.length;start+=4){
     await Promise.all(selected.slice(start,start+4).map(async row=>{
