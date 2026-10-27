@@ -10,7 +10,7 @@ import { priceOffer, type OfferCountry } from "@/lib/murad/auto-offer";
  * prices — with a worked example so a change is checked before it is saved.
  */
 
-const field = "h-8 w-full rounded-[7px] border border-[#dbe6e1] bg-white px-2 text-[12px] font-semibold text-[#185045] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]";
+const field = "min-h-11 w-full min-w-0 rounded-xl border border-[#dbe6e1] bg-white px-3 py-2 text-sm font-semibold text-[#185045] dark:border-[#294039] dark:bg-[#0f1f1b] dark:text-[#d6e5df]";
 
 export function AutoOffers({ initial, usd }: { initial: OfferCountry[]; usd: number }) {
   const [offers, setOffers] = useState<OfferCountry[]>(initial);
@@ -28,24 +28,23 @@ export function AutoOffers({ initial, usd }: { initial: OfferCountry[]; usd: num
   }
 
   return (
-    <section className="rounded-[14px] border border-[#e2ebe7] bg-white p-4 dark:border-[#22443b] dark:bg-[#12241f]">
-      <h2 className="text-[15px] font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">المستقبل الآلي — عروض آلية</h2>
-      <p className="mt-1 text-[12.5px] font-semibold text-[#78948f]">
-        حين يطلب العميل رحلة إلى دولة مفعّلة هنا، يسأله «مُراد» عن الناقص (الاسم، تاريخ الوصول، عدد الأيام، عدد الأشخاص)، ثم يرسل له برنامجاً مقترحاً بسعره ويحفظ الملف في بيسك ليؤكده الموظف.
-        الأسعار للسيارة في اليوم وللغرفة في الليلة (غرفة لكل شخصين)، والاستقبال والتوديع مرتان. أكثر من الحد أو مع أطفال: يُحوَّل لموظف.
+    <section className="min-w-0 rounded-2xl border border-[#e2ebe7] bg-white p-4 sm:p-6 dark:border-[#22443b] dark:bg-[#12241f]">
+      <h2 className="text-lg font-extrabold text-[#003c3a] dark:text-[#eaf3ef]">بكجات مُراد وأسعارها</h2>
+      <p className="mt-1 text-sm leading-6 text-[#67847c]">
+        حدّد الدول التي يجهّز لها مُراد برنامجاً مقترحاً، وأسعار الخدمات والمدن والفنادق. يحفظ البرنامج في بيسك ليؤكده الموظف.
       </p>
 
       {offers.map((o, i) => {
         const example = priceOffer(o, 10, 2, usd);
         return (
-          <div key={i} className="mt-3 rounded-[10px] border border-[#e3ece8] p-3">
+          <div key={i} className="mt-4 min-w-0 rounded-xl border border-[#e3ece8] p-3 sm:p-4">
             <div className="flex flex-wrap items-center gap-2">
               <input value={o.country} onChange={(e) => patch(i, { country: e.target.value })} className={`${field} w-40`} aria-label="الدولة" />
               <label className="flex items-center gap-1.5 text-[12px] font-bold text-[#185045]">
                 <input type="checkbox" checked={o.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} /> مفعّل
               </label>
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-6">
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
               {(
                 [
                   ["carPerDay", "السيارة لليوم"],
@@ -55,24 +54,25 @@ export function AutoOffers({ initial, usd }: { initial: OfferCountry[]; usd: num
                   ["maxPeople", "أقصى عدد أشخاص"],
                 ] as const
               ).map(([k, label]) => (
-                <label key={k} className="grid gap-1">
+                <label key={k} className="grid min-w-0 gap-1">
                   <span className="text-[11px] font-bold text-[#557d78]">{label}</span>
                   <input type="number" min={0} value={o[k]} onChange={(e) => patch(i, { [k]: Number(e.target.value) } as Partial<OfferCountry>)} className={field} />
                 </label>
               ))}
-              <label className="grid gap-1">
+              <label className="grid min-w-0 gap-1">
                 <span className="text-[11px] font-bold text-[#557d78]">العملة</span>
                 <input value={o.currency} onChange={(e) => patch(i, { currency: e.target.value.toUpperCase().slice(0, 3) })} className={field} dir="ltr" />
               </label>
             </div>
 
-            <p className="mt-3 text-[11.5px] font-extrabold text-[#557d78]">المدن بترتيبها، وليالي كل مدينة كنسبة (تُوزَّع على ليالي الرحلة)، وفندقها:</p>
+            <p className="mt-3 text-xs leading-6 text-[#67847c]">السيارة لليوم، والغرفة لليلة لكل شخصين. الاستقبال والتوديع مرتان. الطلبات مع أطفال أو فوق الحد المحدد تُحوّل لموظف.</p>
+            <p className="mt-4 text-sm font-bold text-[#557d78]">مسار الرحلة والفنادق</p><p className="text-xs leading-6 text-[#67847c]">تُوزّع ليالي الرحلة بين المدن وفق النسب المحددة.</p>
             {o.cities.map((c, k) => (
-              <div key={k} className="mt-1 grid grid-cols-[minmax(0,1fr)_5rem_minmax(0,1.6fr)_2rem] gap-2">
-                <input value={c.city} onChange={(e) => patch(i, { cities: o.cities.map((x, j) => (j === k ? { ...x, city: e.target.value } : x)) })} className={field} aria-label="المدينة" />
-                <input type="number" min={1} value={c.nights} onChange={(e) => patch(i, { cities: o.cities.map((x, j) => (j === k ? { ...x, nights: Number(e.target.value) } : x)) })} className={field} aria-label="الليالي" />
-                <input value={c.hotel} onChange={(e) => patch(i, { cities: o.cities.map((x, j) => (j === k ? { ...x, hotel: e.target.value } : x)) })} className={field} aria-label="الفندق" dir="auto" />
-                <button type="button" aria-label="حذف المدينة" onClick={() => patch(i, { cities: o.cities.filter((_, j) => j !== k) })} className="text-[#c22850]">
+              <div key={k} className="mt-3 grid grid-cols-[minmax(0,1fr)_4rem_2rem] gap-2 rounded-xl bg-[#f5f8f6] p-2 sm:grid-cols-[minmax(0,1fr)_5rem_minmax(0,1.6fr)_2rem] dark:bg-[#18372e]">
+                <label className="order-1 grid min-w-0 gap-1 text-xs text-[#557d78]">المدينة<input value={c.city} onChange={(e) => patch(i, { cities: o.cities.map((x, j) => (j === k ? { ...x, city: e.target.value } : x)) })} className={field} /></label>
+                <label className="order-2 grid min-w-0 gap-1 text-xs text-[#557d78]">الليالي<input type="number" min={1} value={c.nights} onChange={(e) => patch(i, { cities: o.cities.map((x, j) => (j === k ? { ...x, nights: Number(e.target.value) } : x)) })} className={field} /></label>
+                <label className="order-4 col-span-3 grid min-w-0 gap-1 text-xs text-[#557d78] sm:order-3 sm:col-span-1">الفندق<input value={c.hotel} onChange={(e) => patch(i, { cities: o.cities.map((x, j) => (j === k ? { ...x, hotel: e.target.value } : x)) })} className={field} dir="auto" /></label>
+                <button type="button" aria-label="حذف المدينة" onClick={() => patch(i, { cities: o.cities.filter((_, j) => j !== k) })} className="order-3 min-h-11 self-end text-[#c22850] sm:order-4">
                   ×
                 </button>
               </div>
@@ -98,8 +98,8 @@ export function AutoOffers({ initial, usd }: { initial: OfferCountry[]; usd: num
         );
       })}
 
-      <div className="mt-3 flex items-center gap-2">
-        <button type="button" onClick={save} disabled={saving} className="h-9 rounded-[9px] bg-[#185045] px-4 text-[12.5px] font-bold text-white hover:bg-[#0f4439] disabled:opacity-60">
+      <div className="sticky bottom-[calc(76px+env(safe-area-inset-bottom))] z-10 mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-[#dbe6e1] bg-white p-3 lg:bottom-0 dark:bg-[#12241f]">
+        <button type="button" onClick={save} disabled={saving} className="min-h-11 rounded-xl bg-[#185045] px-4 text-sm font-bold text-white hover:bg-[#0f4439] disabled:opacity-60">
           حفظ العروض الآلية
         </button>
         {note === "saved" ? <span className="text-[12px] font-bold text-[#0f7a52]">حُفظ.</span> : null}
