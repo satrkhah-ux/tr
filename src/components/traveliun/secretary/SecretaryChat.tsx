@@ -45,7 +45,7 @@ export function SecretaryChat({ tall = false, active = true }: { tall?: boolean;
 
   const when = (iso: string) => new Date(iso).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { timeZone: "Asia/Riyadh", dateStyle: "short", timeStyle: "short" });
 
-  return <div dir="rtl" className={`flex ${tall ? "h-[min(620px,65dvh)]" : "flex-1"} min-h-0 min-w-0 flex-col`}>
+  return <div dir="rtl" className={`flex ${tall ? "h-[clamp(280px,calc(100dvh/var(--tv-zoom)-340px),620px)]" : "flex-1"} min-h-0 min-w-0 flex-col`}>
     <div ref={messagesRef} role="log" aria-label="رسائل مُراد" aria-busy={loading || busy} className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-[#f5f8f6] p-4 sm:p-5">
       {loading && <p className="text-sm text-[#557d78]">يحمّل المحادثة…</p>}
       {!loading && !messages.length && !error && <div className="rounded-xl border border-[#dfe8e4] bg-[#f4f8f6] p-4 text-sm leading-7 text-[#185045]">
