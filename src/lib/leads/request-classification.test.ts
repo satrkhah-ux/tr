@@ -3,6 +3,14 @@ import { classifyConversationInquiry } from "./request-classification";
 const places = ["فيتنام","تايلاند","الكويت","النرويج"].map(name=>({name,country:name}));
 const messages = (texts:string[]) => texts.map((text,i)=>({id:i+1,at:i+1,text,fromClient:true,isPrivate:false}));
 describe("conversation request context",()=>{
+  it.each(["BLS", "VFS", "TLS"])("recognizes %s appointments after a package advert and later courtesy replies", (centre) => {
+    expect(classifyConversationInquiry(messages([
+      "مرحبا بكم في ترافليون\nاحجز بكجات سفر مع ترافليون\nانا مهتم بـ\nافضل مكتب سياحي في المدينة المنورة - ترافليون للسفر و السياحة",
+      `ابغى موعد ${centre} لإسبانيا`,
+      "ممكن تطلعونه",
+      "تمام",
+    ]), places, 4, ["بكج"])).toBe("تأشيرات");
+  });
   it("keeps a previously explained honeymoon when the visit restarts with a date",()=>{
     expect(classifyConversationInquiry(messages(["شهر عسل في النرويج","السلام عليكم","4 ديسمبر"]),places,3)).toBe("بكج");
   });

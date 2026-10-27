@@ -1,9 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { inferConversationDestination } from "./destination";
 
-const places = ["أذربيجان", "الكويت", "تركيا", "جورجيا", "اندونيسيا", "يلوا", "بالي", "النمسا", "التشيك", "جدة", "الولايات المتحدة الأمريكية"].map((name) => ({ name, country: name === "يلوا" ? "تركيا" : name === "بالي" ? "اندونيسيا" : name }));
+const places = ["إسبانيا", "المدينة المنورة", "أذربيجان", "الكويت", "تركيا", "جورجيا", "اندونيسيا", "يلوا", "بالي", "النمسا", "التشيك", "جدة", "الولايات المتحدة الأمريكية"].map((name) => ({ name, country: name === "يلوا" ? "تركيا" : name === "بالي" ? "اندونيسيا" : name }));
 const read = (lines: [string, boolean, boolean?][]) => inferConversationDestination(lines.map(([text, fromClient, isPrivate], i) => ({ text, fromClient, isPrivate: isPrivate ?? false, id: i + 1, at: i })), places);
 describe("destination intent across the conversation", () => {
+  it("ignores a business location and keeps Spain after a biometrics-location answer", () => {
+    expect(read([
+      ["افضل مكتب سياحي في المدينة المنورة - ترافليون للسفر و السياحة", true],
+      ["ابغى موعد BLS لإسبانيا", true],
+      ["تمام", true],
+      ["الجنسيه والتبصيم بجده ام الرياض", false],
+      ["جزائري", true],
+      ["جدة", true],
+    ]).destination).toBe("إسبانيا");
+  });
+  it("does not infer travel from an office address alone, but accepts a real trip there", () => {
+    expect(read([["افضل مكتب سياحي في المدينة المنورة", true]]).destination).toBeNull();
+    expect(read([["ابي رحلة الى المدينة المنورة", true]]).destination).toBe("المدينة المنورة");
+    expect(read([["مكتب سياحي في المدينة المنورة، ابغى موعد BLS لإسبانيا", true]]).destination).toBe("إسبانيا");
+  });
   it("keeps Azerbaijan when Kuwait answers a combined departure/date question", () => {
     expect(read([["حدد وجهتك وبرسلك التفاصيل كامله", false], ["اذربيجان", true], ["لشخص واحد", true], ["كم عدد الايام وتاريخ الذهاب ومدينه الاقلاع", false], ["الكويت\n٧\n١٢/٣٠", true]]).destination).toBe("أذربيجان");
   });

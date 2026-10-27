@@ -24,6 +24,9 @@ const NOT_WANTED = /(?:بدون|بلا|من غير|غير شامل|ما يحتا
 export function classifyInquiry(labels: string[], text: string, context: { destination?: string | null } = {}): string {
   for (const source of [labels.join(" "), text.replace(NOT_WANTED, " ")]) {
     const f = fold(source);
+    // Visa-centre appointments often omit the word “visa” entirely.
+    if (/(?:^|[^a-z])(?:bls|vfs|tls)(?:[^a-z]|$)/i.test(source)
+      && /موعد|مواعيد|حجز|تقديم|بصم|تاشير|appointment|booking/i.test(f)) return "تأشيرات";
     for (const [label, re] of KINDS) if (re.test(f)) return label;
   }
   // A verified destination is already a travel request, even when the client

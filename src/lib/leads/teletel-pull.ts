@@ -168,7 +168,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
       const inquiry = (patch.inquiry as string | null | undefined) ?? had.inquiry;
       const destination = (patch.destination as string | null | undefined) ?? had.destination;
       const mutableDestination = had.destination_source !== "manual" && (!had.destination || had.destination_source === "client" || had.destination_source === "labels");
-      if (!inquiry || inquiry === "طلب غير واضح" || mutableDestination) vague.push({ c, inquiry, destination, mutableDestination, visitAt: Date.parse(String(patch.last_visit_at ?? had.last_visit_at ?? had.created_at)) / 1000 });
+      if (had.inquiry_source !== "manual" || !inquiry || inquiry === "طلب غير واضح" || mutableDestination) vague.push({ c, inquiry, destination, mutableDestination, visitAt: Date.parse(String(patch.last_visit_at ?? had.last_visit_at ?? had.created_at)) / 1000 });
     } else {
       fresh.push({
         ...live,
@@ -221,7 +221,7 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
         const inference = visitInference.evidenceId !== null ? visitInference : inferConversationDestination(thread.messages, places);
         const kind = classifyConversationInquiry(thread.messages, places, visitAt, [c.serviceType ?? "", ...c.labels], byConversation.get(c.id)?.destination_source === "manual" ? destination : null);
         const origin = byConversation.get(c.id)?.inquiry_source;
-        if ((origin !== "manual" || inquiry === "طلب غير واضح") && (!inquiry || inquiry === "طلب غير واضح") && kind && kind !== inquiry) { patch.inquiry = kind; patch.inquiry_source = "auto"; }
+        if ((origin !== "manual" || inquiry === "طلب غير واضح") && kind && kind !== inquiry) { patch.inquiry = kind; patch.inquiry_source = "auto"; }
         const place = inference.destination;
         if (mutableDestination && (place !== destination || byConversation.get(c.id)?.destination_source !== "client")) {
           patch.destination = place;

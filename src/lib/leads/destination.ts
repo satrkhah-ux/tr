@@ -45,6 +45,8 @@ export function inferConversationDestination(messages: Message[], places: Place[
       const before = text.slice(Math.max(0, index - 55), index);
       const clause = before.split(/[،,؛;!?\n]/).at(-1) ?? "";
       const after = text.slice(index + mention.length, index + mention.length + 24);
+      // A business address in an advert/contact greeting is not a trip request.
+      const businessLocation = /(?:مكتب|شرك[ةه]|فرع|مقر|عنوان).{0,40}(?:في\s*|ب)$/.test(clause);
       const excluded = /(?:ما ابي|ماابي|لا اريد|مو|مش|ليس|بدون|الغاء|بدل)\s*(?:الذهاب\s*)?(?:الى\s*)?$/.test(clause);
       const origin = /(?:من|مقيم|ساكن|اقلاع من|مغادرة من|انطلاق من|from)\s*(?:(?:هنا\s*)?في\s*)?$/.test(clause)
         || /(?:مقيم|ساكن)\s*(?:هنا\s*)?(?:ب|في)?\s*$/.test(clause)
@@ -56,7 +58,7 @@ export function inferConversationDestination(messages: Message[], places: Place[
         if (destination === place.name) { destination = null; evidenceId = message.id; ambiguous = true; }
         continue;
       }
-      if (origin || (question === "origin" && !explicit)) continue;
+      if (businessLocation || origin || (question === "origin" && !explicit)) continue;
       // A bare later place is not proof the client changed their destination.
       if (destination && !changeRequested && question !== "destination") continue;
       if (!candidates.some((c) => normalize(c.place.name).includes(name))) candidates.push({ place, explicit });

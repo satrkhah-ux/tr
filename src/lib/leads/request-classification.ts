@@ -4,7 +4,7 @@ type Message = { id: number; at: number; text: string; fromClient: boolean; isPr
 /** Classify the current request first. A follow-on answer never erases an
  * already explained request merely because the client's visit clock changed. */
 export function classifyConversationInquiry(messages: Message[], places: Place[], since: number, labels: string[] = [], manualDestination: string | null = null): string {
-  const classify = (scope: Message[], destination: string | null): string => {
+  const classify = (scope: Message[], destination: string | null, fallbackLabels: string[] = []): string => {
     const client = scope.filter(m => m.fromClient && !m.isPrivate).sort((a,b) => b.at-a.at || b.id-a.id);
     // The most recent explicitly requested service wins over an earlier service.
     for (const message of client) {
@@ -13,9 +13,9 @@ export function classifyConversationInquiry(messages: Message[], places: Place[]
     }
     const inferred = inferConversationDestination(scope, places);
     const knownDestination = inferred.destination ?? (inferred.ambiguous && inferred.evidenceId !== null ? "وجهات متعددة" : destination);
-    return classifyInquiry(labels, client.map(m => m.text).join("\n"), { destination: knownDestination });
+    return classifyInquiry(fallbackLabels, client.map(m => m.text).join("\n"), { destination: knownDestination });
   };
-  const current = classify(messages.filter(m => m.at >= since), manualDestination);
+  const current = classify(messages.filter(m => m.at >= since), null);
   if (current && current !== "طلب غير واضح") return current;
-  return classify(messages, manualDestination) || "طلب غير واضح";
+  return classify(messages, manualDestination, labels) || "طلب غير واضح";
 }
