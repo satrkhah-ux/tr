@@ -12,6 +12,7 @@ import { allTableConfigs, DATA_TABLES, GRANTED_COLUMNS, INTERNAL_TABLES, SEARCH_
 import { FILTER_NOT_NULL, FILTER_NULL } from "./types";
 import { catalogSkel, normAr } from "@/lib/catalog/norm";
 import { hotelRuleError } from "@/lib/catalog/hotel-rules";
+import { referenceRuleError } from "@/lib/catalog/reference-rules";
 import { getHotelUsage } from "./hotel-tools";
 import { issueVouchersForHotel } from "./wizard-sync";
 import { logAudit } from "./audit";
@@ -324,6 +325,14 @@ export async function createRow(table: AllowedTable, values: DataRow): Promise<M
     const granted = await writeAccess(table);
     if (typeof granted === "string") return { ok: false, error: granted };
     const { supabase, columns, internal } = granted;
+    const referenceError = referenceRuleError(table, values, true);
+    if (referenceError) return { ok: false, error: referenceError };
+    // Reuse a city in the same country rather than creating it twice from two forms.
+    if (table === "cities") {
+      const { data: existing } = await supabase.from("cities").select("*").eq("country_id", String(values.country_id));
+      const same = (existing as DataRow[] | null)?.find((row) => normAr(String(row.arabic_name)) === normAr(String(values.arabic_name)));
+      if (same) return { ok: true, row: same as unknown as DataRow };
+    }
     if (table === "hotels" || table === "visas") {
       const checked = await (table === "hotels" ? hotelWrite : visaWrite)(supabase, values, true);
       if (typeof checked === "string") return { ok: false, error: checked };
@@ -351,6 +360,8 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
     const granted = await writeAccess(table);
     if (typeof granted === "string") return { ok: false, error: granted };
     const { supabase, columns, internal } = granted;
+    const referenceError = referenceRuleError(table, values, false);
+    if (referenceError) return { ok: false, error: referenceError };
     values = writable(table, values, internal);
     // 0073: sessions cannot UPDATE an offer's owner or money. The total and the
     // customer move for offers.write, through the service role; the company and

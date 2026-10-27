@@ -42,6 +42,8 @@ const CONFIGS: TableConfig[] = [
       { key: "default_hotel", labelKey: "col.defaultHotel", minWidth: "220px" },
       // lower first in the generator's city list (ماليزيا: كوالالمبور 1 …); empty = alphabetical after
       { key: "sort_order", labelKey: "col.sortOrder", type: "number" },
+      { key: "lat", labelKey: "data.form.latitude", type: "number" },
+      { key: "lng", labelKey: "data.form.longitude", type: "number" },
     ],
     searchable: ["arabic_name", "english_name", "default_hotel"],
     filters: [COUNTRY_FILTER],
@@ -234,6 +236,8 @@ const CONFIGS: TableConfig[] = [
     columns: [
       { key: "arabic_name", labelKey: "col.arabicName" },
       { key: "english_name", labelKey: "col.englishName" },
+      { key: "country_id", labelKey: "filter.country", source: "countries" },
+      { key: "city_id", labelKey: "filter.city", source: "cities" },
       // a station or a port has no IATA code; an airport's is three capital letters (0072 checks it)
       { key: "kind", labelKey: "data.model.col.kind", options: PLACE_KIND_OPTIONS },
       { key: "code", labelKey: "col.iata", type: "serial" },

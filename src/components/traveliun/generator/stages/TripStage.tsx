@@ -1,5 +1,10 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { CatalogAddDialog } from "../../CatalogAddDialog";
+import { withCatalogAdditions } from "@/lib/catalog/reference-lookups";
+import type { DataRow } from "@/lib/data/types";
+import { useRole } from "@/lib/roles/RoleContext";
 import { Clock } from "lucide-react";
 import { deriveCityDates, findLookupCountry, moveTripCountry, type DraftTrip } from "@/lib/offer/draft-types";
 import { itineraryStartDate, syncDepartureDates } from "@/lib/offer/schedule";
@@ -34,7 +39,11 @@ function addDaysIso(iso: string, days: number): string {
  * when the country changes, its approved «يشمل / لا يشمل / الشروط» lines swap
  * (and a priced «خدمة» line for one that left goes) — see moveTripCountry.
  */
-export function TripStage({ data, patch, lookups }: StageFormProps) {
+export function TripStage({ data, patch, lookups: initialLookups }: StageFormProps) {
+  const { can } = useRole();
+  const [addingCountry, setAddingCountry] = useState(false);
+  const [countries, setCountries] = useState<DataRow[]>([]);
+  const lookups = useMemo(() => withCatalogAdditions(initialLookups, countries, []), [initialLookups, countries]);
   const countryRing = useFieldRing("trip.country");
   const arrivalRing = useFieldRing("trip.arrival_date");
   const tzNote = describeOffsetAr(
@@ -140,7 +149,7 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
       <div className="grid gap-4 md:grid-cols-2">
         <label className={labelClass}>
           {t("pg.country")}
-          <select value={trip.country} onChange={(e) => setCountry(e.target.value)} className={`${fieldClass}${countryRing}`}>
+          <select value={trip.country} onChange={(e) => e.target.value === "__other__" ? setAddingCountry(true) : setCountry(e.target.value)} className={`${fieldClass}${countryRing}`}>
             <option value="">{t("pg.chooseCountry")}</option>
             {lookups.countries.map((country) => (
               <option key={country.id} value={country.name}>{country.name}</option>
@@ -148,6 +157,7 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
             {trip.country && !lookups.countries.some((c) => c.name === trip.country) ? (
               <option value={trip.country}>{trip.country}</option>
             ) : null}
+            {can("data.write") ? <option value="__other__">{t("data.form.otherAdd")}</option> : null}
           </select>
           <FieldIssue field="trip.country" />
           {/* Computed for the TRIP dates, not stored: 21 of our destinations
@@ -218,6 +228,10 @@ export function TripStage({ data, patch, lookups }: StageFormProps) {
       </div>
       <p className="mt-2 text-[11.5px] font-semibold text-[#93aaa3]">{t("pg.daysAuto")}</p>
 
+      {addingCountry ? <CatalogAddDialog table="countries" onClose={() => setAddingCountry(false)} onCreated={(row) => {
+        setCountries(prev => [...prev.filter(c => c.id !== row.id), row]);
+        setCountry(String(row.arabic_name));
+      }} /> : null}
     </section>
   );
 }

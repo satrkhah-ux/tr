@@ -28,13 +28,15 @@ import {
   createRow,
   deleteRow,
   duplicateRow,
+  getFilterOptions,
   listRows,
   updateRow,
 } from "@/lib/data/actions";
 import { qualityIssue } from "@/lib/data/quality";
 import { BOOLEAN_KEYS, coerceCell, refId } from "@/lib/data/table-csv";
 import { runsOn, splitNumbered } from "@/lib/data/numbered-lines";
-import { DATA_TABLES } from "@/lib/data/table-config";
+import { DATA_TABLES, resolveTableConfig } from "@/lib/data/table-config";
+import { CURRENCIES } from "@/lib/offer/draft-types";
 import { hotelRuleError } from "@/lib/catalog/hotel-rules";
 import { normAr } from "@/lib/catalog/norm";
 import type {
@@ -888,10 +890,10 @@ function editableColumns(config: TableConfig): ColumnDef[] {
   return config.columns.filter((c) => c.editable !== false && c.type !== "status");
 }
 
-function RecordForm({
+export function RecordForm({
   title,
   config,
-  filterOptions,
+  filterOptions: initialOptions,
   initial,
   onClose,
   onSubmit,
@@ -904,6 +906,10 @@ function RecordForm({
   onSubmit: (values: DataRow) => Promise<string | null>;
 }) {
   const { t, dir } = useTraveliunUI();
+  const { can } = useRole();
+  const router = useRouter();
+  const [filterOptions, setFilterOptions] = useState(initialOptions);
+  const [adding, setAdding] = useState<{ column: string; config: TableConfig; source: "countries" | "cities" | "suppliers" | "cars" } | null>(null);
   const columns = editableColumns(config);
   const isHotels = config.table === "hotels";
   // shown, not typed: a hotel's country is its city's
@@ -950,11 +956,24 @@ function RecordForm({
   }
 
   const required = (key: string) =>
-    (isHotels && (key === "arabic_name" || key === "city_id")) || (config.table === "visas" && key === "country_id");
+    (isHotels && (key === "arabic_name" || key === "city_id")) ||
+    (config.table === "cities" && (key === "arabic_name" || key === "country_id")) ||
+    (config.table === "countries" && key === "arabic_name") ||
+    (config.table === "visas" && key === "country_id");
+
+  function addReference(column: ColumnDef) {
+    const source = column.ref ?? column.source;
+    const route = source === "countries" ? "/countries" : source === "cities" ? "/cities" : source === "suppliers" ? "/company-suppliers" : source === "cars" ? "/cars-types" : null;
+    const nested = route ? resolveTableConfig(route) : null;
+    if (nested && (source === "countries" || source === "cities" || source === "suppliers" || source === "cars")) {
+      setAdding({ column: column.key, config: nested, source });
+    }
+  }
 
   return (
-    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/25 p-4" role="dialog" aria-modal="true" dir={dir}>
-      <form onSubmit={submit} className="max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[860px] overflow-y-auto rounded-2xl border border-[#e2ebe7] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
+    <RefOptionsContext.Provider value={filterOptions}>
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/25 p-4" role="dialog" aria-modal="true" aria-label={title} dir={dir}>
+      <form inert={Boolean(adding)} onSubmit={submit} className="max-h-[calc(90vh/var(--tv-zoom))] w-full max-w-[860px] overflow-y-auto rounded-2xl border border-[#e2ebe7] bg-white p-5 text-[#185045] shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
         <div className="mb-5 flex items-center justify-between border-b border-[#e1e9e5] pb-4">
           <div>
             <h2 className="text-lg font-extrabold">{title}</h2>
@@ -970,15 +989,17 @@ function RecordForm({
                 {t(column.labelKey)}
                 {required(column.key) ? <span className="text-[#c22850]" aria-hidden> *</span> : null}
               </span>
-              {column.ref ? (
+              {column.ref || column.source === "countries" || column.source === "cities" || column.source === "suppliers" || column.source === "cars" ? (
                 <RefSelect
-                  options={filterOptions[column.ref]}
+                  label={t(column.labelKey)}
+                  options={filterOptions[(column.ref ?? column.source) as "countries" | "cities" | "suppliers" | "cars"].filter((o) => column.key !== "city_id" || !form.country_id || !o.parent || o.parent === form.country_id || o.value === form[column.key])}
                   countries={filterOptions.countries}
                   value={form[column.key] ?? ""}
                   required={required(column.key)}
-                  onChange={(v) => setForm((prev) => ({ ...prev, [column.key]: v }))}
+                  onAdd={can("data.write") ? () => addReference(column) : undefined}
+                  onChange={(v) => setForm((prev) => ({ ...prev, [column.key]: v, ...(column.key === "country_id" && "city_id" in prev && filterOptions.cities.find(c => c.value === prev.city_id)?.parent !== v ? { city_id: "" } : {}) }))}
                 />
-              ) : column.key === "currency" && form.country_id !== undefined ? (
+              ) : column.key === "currency" || column.key.endsWith("_currency") ? (
                 // «عند اختيار دولة اضافة عملتها او الريال السعودي» (the owner, 2026-10-26)
                 <CurrencySelect
                   countryCurrency={filterOptions.countries.find((c) => c.value === form.country_id)?.currency ?? null}
@@ -1029,23 +1050,52 @@ function RecordForm({
           </button>
         </div>
       </form>
+      {adding ? (
+        <RecordForm
+          title={t("data.form.otherAdd")}
+          config={adding.config}
+          filterOptions={filterOptions}
+          initial={{ country_id: form.country_id || null, ...(adding.source === "cars" ? { category: "fleet" } : {}) }}
+          onClose={() => setAdding(null)}
+          onSubmit={async (values) => {
+            const result = await createRow(adding.config.table, { ...adding.config.fixedValues, ...values });
+            if (!result.ok) return t(result.error);
+            const option: FilterOption = {
+              value: String(adding.source === "cars" ? result.row.arabic_name : result.row.id),
+              label: String(result.row.arabic_name ?? ""),
+              parent: typeof result.row.country_id === "string" ? result.row.country_id : null,
+              currency: typeof result.row.default_currency === "string" ? result.row.default_currency : null,
+            };
+            const refreshed = await getFilterOptions();
+            setFilterOptions((prev) => ({ ...prev, ...refreshed, [adding.source]: [...(refreshed[adding.source].length ? refreshed[adding.source] : prev[adding.source]).filter((o) => o.value !== option.value), option] }));
+            setForm((prev) => ({ ...prev, [adding.column]: option.value, ...(adding.column === "country_id" && "city_id" in prev ? { city_id: "" } : {}) }));
+            router.refresh();
+            return null;
+          }}
+        />
+      ) : null}
     </div>
+    </RefOptionsContext.Provider>
   );
 }
 
 /** A long list (every city) narrowed by typing, then picked from a native select. */
 function RefSelect({
+  label,
   options,
   countries,
   value,
   required,
   onChange,
+  onAdd,
 }: {
+  label: string;
   options: FilterOption[];
   countries: FilterOption[];
   value: string;
   required: boolean;
   onChange: (value: string) => void;
+  onAdd?: () => void;
 }) {
   const { t } = useTraveliunUI();
   const [query, setQuery] = useState("");
@@ -1064,7 +1114,7 @@ function RefSelect({
         aria-label={t("data.tools.refSearch")}
         className={`${formField} h-9`}
       />
-      <select value={value} required={required} onChange={(e) => onChange(e.target.value)} className={formField}>
+      <select aria-label={label} value={value} required={required} onChange={(e) => e.target.value === "__add_reference__" ? onAdd?.() : onChange(e.target.value)} className={formField}>
         <option value="">{t("chooseOption")}</option>
         {shown.map((o) => (
           <option key={o.value} value={o.value}>
@@ -1072,7 +1122,9 @@ function RefSelect({
             {o.parent && countryName.get(o.parent) ? ` — ${countryName.get(o.parent)}` : ""}
           </option>
         ))}
+        {onAdd ? <option value="__add_reference__">{t("data.form.otherAdd")}</option> : null}
       </select>
+      {onAdd ? <button type="button" onClick={onAdd} className="justify-self-start text-xs font-bold text-[#2a7d66] underline">{t("data.form.otherAdd")}</button> : null}
     </span>
   );
 }
@@ -1080,12 +1132,14 @@ function RefSelect({
 /** The country's own currency or the Saudi riyal — or any code already stored (the owner, 2026-10-26). */
 function CurrencySelect({ countryCurrency, value, onChange }: { countryCurrency: string | null; value: string; onChange: (value: string) => void }) {
   const { t } = useTraveliunUI();
+  const [expanded, setExpanded] = useState(false);
   const def = countryCurrency?.trim().toUpperCase() ?? "";
-  const codes = [...new Set([def, "SAR", value.trim().toUpperCase()].filter(Boolean))];
+  const codes = [...new Set([def, "SAR", value.trim().toUpperCase(), ...(expanded ? [...CURRENCIES, ...Intl.supportedValuesOf("currency")] : [])].filter(Boolean))];
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={formField}>
+    <select value={value} onChange={(e) => e.target.value === "__other_currency__" ? setExpanded(true) : onChange(e.target.value)} className={formField}>
       <option value="">{t("chooseOption")}</option>
       {codes.map((c) => (<option key={c} value={c}>{c}</option>))}
+      {!expanded ? <option value="__other_currency__">{t("data.form.other")}</option> : null}
     </select>
   );
 }
@@ -1119,9 +1173,10 @@ function FieldInput({ column, countryId, value, required, onChange }: { column: 
   if (choices) {
     return (
       <span className="grid gap-1.5">
-        <select value={value} onChange={(e) => onChange(e.target.value)} className={formField}>
+        <select value={value} onChange={(e) => e.target.value === "__other_place__" ? setFree(true) : onChange(e.target.value)} className={formField}>
           <option value="">{t("chooseOption")}</option>
           {choices.map((opt) => (<option key={opt.value} value={opt.value}>{opt.labelKey ? t(opt.labelKey) : opt.label}</option>))}
+          {column.source === "places" ? <option value="__other_place__">{t("data.form.addPlace")}</option> : null}
         </select>
         {column.source === "places" ? (
           <button type="button" onClick={() => setFree(true)} className="justify-self-start text-xs font-bold text-[#2a7d66] underline">{t("data.form.addPlace")}</button>
@@ -1160,6 +1215,7 @@ function FieldInput({ column, countryId, value, required, onChange }: { column: 
   return (
     <input
       type={inputType}
+      step={inputType === "number" ? "any" : undefined}
       dir={dir}
       value={value}
       required={required}

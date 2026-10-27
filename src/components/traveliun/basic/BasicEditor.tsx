@@ -31,6 +31,9 @@ import {
   ScrollText,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
+import { CatalogAddDialog } from "../CatalogAddDialog";
+import { withCatalogAdditions } from "@/lib/catalog/reference-lookups";
+import type { DataRow } from "@/lib/data/types";
 import { getCountryHotels, produceOfferFromDraft } from "@/lib/data/drafts";
 import { getCountryCarCapacities, getTourPrices, getTourPrograms, getTransferCars } from "@/lib/data/tour-programs";
 import { autoTourPicks, withTours, type TourProgram } from "@/lib/offer/itinerary";
@@ -315,7 +318,7 @@ export function BasicEditor({
   draftId,
   initialData,
   savedAt,
-  lookups,
+  lookups: initialLookups,
   profitSettings,
   preload,
 }: {
@@ -331,6 +334,11 @@ export function BasicEditor({
   const tx = useBasicLabels();
   const { t, language } = useTraveliunUI();
   const { can } = useRole();
+  const partnerSession = usePartnerBrand();
+  const [addedCountries, setAddedCountries] = useState<DataRow[]>([]);
+  const [addedCities, setAddedCities] = useState<DataRow[]>([]);
+  const [catalogAdd, setCatalogAdd] = useState<{ table: "cities" | "countries"; target: "trip" | "bar"; countryId?: string } | null>(null);
+  const lookups = useMemo(() => withCatalogAdditions(initialLookups, addedCountries, addedCities), [initialLookups, addedCountries, addedCities]);
   // the full generator's pages, while the developer has the legacy generator on
   // (a partner always: it is their «ملفاتي») — off, its addresses only lead back here
   const legacyOpen = useCanOpen()({ href: "/package-generator" });
@@ -812,7 +820,6 @@ export function BasicEditor({
 
   // ---------- pricing (sell side only) ----------
   // a partner company prices its own file: the server hands it our prices at its terms
-  const partnerSession = usePartnerBrand();
   const canPricing = can("pricing.view") || partnerSession !== null;
   const canInternal = can("pricing.internal");
   // the agent sets the profit unless the administration keeps it for the managers
@@ -1399,11 +1406,12 @@ export function BasicEditor({
         <div className={`grid grid-cols-2 gap-2 ${SHOW_AGENT && !partnerSession ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
           <label className={basicLabel}>
             {tx("country")}
-            <select value={country?.name ?? trip.country} onChange={(e) => setCountry(e.target.value)} className={basicField}>
+            <select value={country?.name ?? trip.country} onChange={(e) => e.target.value === "__other__" ? setCatalogAdd({ table: "countries", target: "trip" }) : setCountry(e.target.value)} className={basicField}>
               <option value="">{tx("choose")}</option>
               {lookups.countries.map((c) => (
                 <option key={c.id} value={c.name}>{c.name}</option>
               ))}
+              {can("data.write") ? <option value="__other__">{t("data.form.otherAdd")}</option> : null}
             </select>
           </label>
           {/* who sells it is ours to choose — a partner's own file is already its own */}
@@ -1632,6 +1640,7 @@ export function BasicEditor({
               <select
                 value={barCountry?.name ?? ""}
                 onChange={(e) => {
+                  if (e.target.value === "__other__") { setCatalogAdd({ table: "countries", target: "bar" }); return; }
                   setNewCountry(e.target.value);
                   pickCity("");
                 }}
@@ -1641,15 +1650,17 @@ export function BasicEditor({
                 {lookups.countries.map((c) => (
                   <option key={c.id} value={c.name}>{c.name}</option>
                 ))}
+                {can("data.write") ? <option value="__other__">{t("data.form.otherAdd")}</option> : null}
               </select>
             </label>
             <label className={`${basicLabel} min-w-28 flex-1`}>
               {tx("city")}
-              <select value={newCity} onChange={(e) => pickCity(e.target.value)} disabled={!barCountry} className={basicField}>
+              <select value={newCity} onChange={(e) => e.target.value === "__other__" ? setCatalogAdd({ table: "cities", target: "bar", countryId: barCountry?.id }) : pickCity(e.target.value)} disabled={!barCountry} className={basicField}>
                 <option value="">{tx("choose")}</option>
                 {(barCountry?.cities ?? []).map((c) => (
                   <option key={c.id} value={c.name}>{c.name}</option>
                 ))}
+                {can("data.write") ? <option value="__other__">{t("data.form.otherAdd")}</option> : null}
               </select>
             </label>
             {/* the city chosen: its hotels, the room and how many — shown only now */}
@@ -2092,6 +2103,20 @@ export function BasicEditor({
 
   return (
     <TraveliunShell title="nav.basic">
+      {catalogAdd ? <CatalogAddDialog table={catalogAdd.table} countryId={catalogAdd.countryId} onClose={() => setCatalogAdd(null)} onCreated={(row, refreshedCountries) => {
+        const name = String(row.arabic_name);
+        if (catalogAdd.table === "countries") {
+          setAddedCountries(prev => [...prev.filter(c => c.id !== row.id), row]);
+          if (catalogAdd.target === "trip") setCountry(name);
+          else { setNewCountry(name); pickCity(""); }
+        } else {
+          setAddedCountries(prev => [...prev, ...refreshedCountries.filter(c => !prev.some(p => p.id === c.id))]);
+          setAddedCities(prev => [...prev.filter(c => c.id !== row.id), row]);
+          const parent = withCatalogAdditions(lookups, refreshedCountries, []).countries.find(c => c.id === row.country_id);
+          if (parent) setNewCountry(parent.name);
+          pickCity(name);
+        }
+      }} /> : null}
       <FieldIssueProvider issues={[...validation.blocking, ...validation.warnings]} render={issueText}>
         <div className="tv-fade-up space-y-3">
           {deployBar ? (
