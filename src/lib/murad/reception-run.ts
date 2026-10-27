@@ -321,13 +321,15 @@ async function markLead(
         ...routed,
         ...(!had.name && realName ? { name: realName } : {}),
         ...(fields.inquiry && had.inquiry_source !== "manual" ? { inquiry: fields.inquiry, inquiry_source: "murad" } : {}),
-        ...(fields.destination ? { destination: fields.destination } : {}),
         // a conversation WhatsApp reopened: this message is a new visit (0104)
         ...(had.status === "closed" || m.at - Date.parse(had.last_visit_at ?? had.created_at) / 1000 > 86_400
           ? { last_visit_at: new Date(m.at * 1000).toISOString(), status: "open" }
           : {}),
       })
       .eq("id", had.id);
+    if (fields.destination) await service.from("client_leads")
+      .update({ destination: fields.destination, destination_source: "client" })
+      .eq("id", had.id).or("destination_source.is.null,destination_source.neq.manual");
     return;
   }
   const first = new Date(m.at * 1000).toISOString();
@@ -339,6 +341,7 @@ async function markLead(
       inquiry: fields.inquiry,
       inquiry_source: "murad",
       destination: fields.destination,
+      destination_source: "client",
       status: "open",
       source: "teletel",
       teletel_conversation_id: m.conversationId,

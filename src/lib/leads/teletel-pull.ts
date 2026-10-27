@@ -93,6 +93,36 @@ export async function loadPlaces(supabase: SupabaseClient): Promise<Place[]> {
   ];
 }
 
+/** Closing a conversation before the next open-list pull must not freeze its
+ * last classification. Read the same complete history and protect manual edits. */
+export async function refreshClosedClassification(supabase: SupabaseClient, conversationId: number): Promise<void> {
+  const { data: row } = await supabase.from("client_leads")
+    .select("id, destination, destination_source, inquiry, inquiry_source, created_at, last_visit_at")
+    .eq("teletel_conversation_id", conversationId).maybeSingle();
+  if (!row || (row.destination_source === "manual" && row.inquiry_source === "manual")) return;
+  const [thread, places, conversation] = await Promise.all([
+    conversationThread(conversationId, 50, Date.parse(row.created_at) / 1000),
+    loadPlaces(supabase),
+    teletelGet<{ labels?: string[]; meta?: { sender?: { custom_attributes?: { service_type_list?: string; service_type?: string } } } }>(`/conversations/${conversationId}`),
+  ]);
+  if (!thread?.historyComplete || !conversation) return;
+  const since = Date.parse(row.last_visit_at ?? row.created_at) / 1000;
+  const attributes = conversation.meta?.sender?.custom_attributes;
+  const labels = [attributes?.service_type_list ?? "", attributes?.service_type ?? "", ...(conversation.labels ?? [])];
+  const destination = inferConversationDestination(thread.messages, places, since).destination;
+  const inquiry = classifyConversationInquiry(thread.messages, places, since, labels, row.destination_source === "manual" ? row.destination : null);
+  const patch: Record<string, unknown> = {};
+  if (row.destination_source !== "manual" && destination !== row.destination) Object.assign(patch, { destination, destination_source: "client" });
+  if (row.inquiry_source !== "manual" && inquiry !== row.inquiry) Object.assign(patch, { inquiry, inquiry_source: "auto" });
+  if (!Object.keys(patch).length) return;
+  let update = supabase.from("client_leads").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", row.id);
+  update = row.last_visit_at ? update.eq("last_visit_at", row.last_visit_at) : update.is("last_visit_at", null);
+  if (patch.destination_source) update = update.or("destination_source.is.null,destination_source.neq.manual");
+  if (patch.inquiry_source) update = update.or("inquiry_source.is.null,inquiry_source.neq.manual");
+  const { error } = await update;
+  if (error) throw error;
+}
+
 export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPullResult> {
   const result: TeletelPullResult = { read: 0, added: 0, updated: 0, merged: 0, closed: 0, classified: 0 };
   const list = await listOpenConversations();

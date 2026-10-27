@@ -4,6 +4,8 @@ import { alertReply } from "@/lib/followups/remind";
 import { clientWrote, conversationResolved } from "@/lib/leads/lifecycle";
 import { schedule, webhookToken } from "@/lib/murad/reception-run";
 import { staffOnTeletel, type TeletelEvent } from "@/lib/telegram/staff-events";
+import { refreshClosedClassification } from "@/lib/leads/teletel-pull";
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,6 +39,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (body) after(() => staffOnTeletel(body as TeletelEvent).catch(() => undefined));
   // a conversation resolved: who closed it, kept at once (leads/lifecycle.ts) — not five minutes later at the pull
   if (body?.event === "conversation_status_changed") after(() => conversationResolved(body as Record<string, unknown>).catch(() => undefined));
+  if (body?.event === "conversation_status_changed" && (body as Record<string, unknown>).status === "resolved" && body.id) {
+    after(() => refreshClosedClassification(createSupabaseServiceClient(), Number(body.id))
+      .catch(() => console.error("Closed conversation classification could not be refreshed")));
+  }
   const incoming = body?.message_type === "incoming" || body?.message_type === 0;
   if (!body || body.event !== "message_created" || !incoming || body.private) return NextResponse.json({ ok: true, ignored: true });
   const at = typeof body.created_at === "number" ? body.created_at : Math.floor(Date.parse(String(body.created_at ?? "")) / 1000) || Math.floor(Date.now() / 1000);
