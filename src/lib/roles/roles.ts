@@ -105,6 +105,14 @@ export const ALL_PERMISSIONS = [
    * roles and passwords. employees.manage holds it as well.
    */
   "staffbot.manage",
+  /**
+   * The status buttons beside مُراد (the owner, 2026-10-29): «لدي عميل», «لدي اتصال», «صلاة» — while one is on, no
+   * request is routed to the colleague and no delay is counted. Given per role or per colleague; «اجتماع» needs none
+   * (it appears to whoever the administration invited).
+   */
+  "status.client",
+  "status.call",
+  "status.prayer",
 ] as const;
 
 export type Permission = (typeof ALL_PERMISSIONS)[number];
@@ -239,6 +247,9 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     items: [
       { key: "employees.manage", kind: "do", sensitive: true },
       { key: "staffbot.manage", kind: "do", sensitive: true },
+      { key: "status.client", kind: "do" },
+      { key: "status.call", kind: "do" },
+      { key: "status.prayer", kind: "do" },
     ],
   },
   {

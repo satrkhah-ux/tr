@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { mineTick } from "@/lib/mine/remind";
+import { closeExpiredStatuses } from "@/lib/presence/sweep";
 import { listOpenConversations, teletelConversationUrl } from "@/lib/providers/teletel";
 import { clearSlot, escapeHtml, staffForAgent, staffSend } from "./staff-bot";
 import type { InlineButton } from "./ops-bot";
@@ -181,7 +182,7 @@ export async function dropGone(): Promise<number> {
 
 /** The minute job's share of «تنبيهاتي» (inside /api/murad/run, after the follow-ups sync refreshed the open list): the sweep, the delivery statuses, the waiting reminders, the live screens (every fifth minute), and from 23:00 Riyadh the evening reports. */
 export async function staffTick(): Promise<Record<string, unknown>> {
-  const [sweep, deliveries, reminders, screens, reports, decisions, letters, mine] = await Promise.all([
+  const [sweep, deliveries, reminders, screens, reports, decisions, letters, mine, statuses] = await Promise.all([
     staffSweep(),
     refreshDeliveries(),
     remindWaiting(),
@@ -190,6 +191,7 @@ export async function staffTick(): Promise<Record<string, unknown>> {
     pushDecisions(),
     lettersTick(),
     mineTick(),
+    closeExpiredStatuses().catch(() => null),
   ]);
   const dropped = await dropGone();
   return {
@@ -201,6 +203,7 @@ export async function staffTick(): Promise<Record<string, unknown>> {
     ...(decisions ? { decisions } : {}),
     ...(letters ? { letters } : {}),
     ...(mine ? { mine } : {}),
+    ...(statuses ? { statuses } : {}),
     ...(dropped ? { dropped } : {}),
   };
 }
