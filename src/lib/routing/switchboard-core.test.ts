@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_RULES, moveReason, parseRules, pickCandidate, type Candidate } from "./switchboard-core";
+import { DEFAULT_RULES, hintNotify, moveReason, parseRules, pickCandidate, type Candidate } from "./switchboard-core";
 
 const c = (agentId: number, over: Partial<Candidate> = {}): Candidate => ({
   agentId,
@@ -44,6 +44,26 @@ describe("«البدّالة» — who takes the client", () => {
       candidate: { agentId: 1 },
       why: "load",
     });
+  });
+
+  it("a caller who asked for a colleague goes to that colleague — not to the one who took the call — and they are told", () => {
+    // e2 took the call, the caller asked for e3 (hintTarget): the hint is e3
+    const hint = { employeeId: "e3", chosen: true };
+    const cands = [c(1), c(2), c(3, { waiting: 9 })];
+    const choice = pickCandidate(cands, { hintEmployeeId: hint.employeeId }, rules);
+    expect(choice).toMatchObject({ candidate: { agentId: 3 }, why: "hint" });
+    expect(hintNotify(choice, hint)).toEqual({ to: "e3", routedTo: null });
+    // e3 is off shift: the normal pick takes the client, and e3 is told whom it went to
+    const away = [c(1), c(2, { waiting: 2 }), c(3, { available: false, reason: "off_shift" })];
+    const fallback = pickCandidate(away, { hintEmployeeId: hint.employeeId }, rules);
+    expect(fallback).toMatchObject({ candidate: { agentId: 1 }, why: "load" });
+    expect(hintNotify(fallback, hint)).toEqual({ to: "e3", routedTo: "موظف 1" });
+    // nobody asked for: the one who took the call, as before; away — nobody is told
+    expect(hintNotify(pickCandidate(cands, { hintEmployeeId: "e2" }, rules), { employeeId: "e2", chosen: false })).toEqual({ to: "e2", routedTo: null });
+    expect(hintNotify(pickCandidate(away, { hintEmployeeId: "e3" }, rules), { employeeId: "e3", chosen: false })).toBeNull();
+    // the holder keeps their client; nobody free: the queue holds them — nobody is told either way
+    expect(hintNotify(pickCandidate(cands, { holderAgentId: 1, hintEmployeeId: "e3" }, rules), hint)).toBeNull();
+    expect(hintNotify(null, hint)).toBeNull();
   });
 
   it("respects a cap on waiting clients", () => {

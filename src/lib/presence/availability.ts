@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import {
   EXCUSE_LABEL,
   excuseAt,
+  hintTarget,
   LIMITS_KEY,
   parseLimits,
   phoneDigits,
@@ -269,13 +270,14 @@ export async function businessMinutesBetween(fromMs: number, toMs: number, opts:
 export const HINT_DAYS = 14;
 
 /**
- * The colleague who registered this client on «لدي عميل» / «لدي اتصال» in the last fourteen days — the newest — with
- * what they asked for: their next message goes to that colleague (the switchboard), who is told who it is.
+ * This client as registered on «لدي عميل» / «لدي اتصال» in the last fourteen days — the newest — with what they asked
+ * for: their next message goes to `employeeId` (the switchboard), who is told who it is — the colleague the client asked
+ * to speak to (`chosen`), else the one who met them or took the call (`takenBy`).
  */
 export async function clientHint(
   phoneRaw: string | null | undefined,
   at = Date.now(),
-): Promise<{ employeeId: string; kind: "client" | "call"; details: Record<string, unknown>; at: string } | null> {
+): Promise<{ employeeId: string; chosen: boolean; takenBy: string; kind: "client" | "call"; details: Record<string, unknown>; at: string } | null> {
   const phone = phoneDigits(phoneRaw);
   if (!phone) return null;
   const { data } = await db()
@@ -288,5 +290,5 @@ export async function clientHint(
     .limit(1)
     .maybeSingle();
   const row = data as { employee_id: string; kind: "client" | "call"; details: Record<string, unknown>; started_at: string } | null;
-  return row ? { employeeId: row.employee_id, kind: row.kind, details: row.details ?? {}, at: row.started_at } : null;
+  return row ? { ...hintTarget(row), takenBy: row.employee_id, kind: row.kind, details: row.details ?? {}, at: row.started_at } : null;
 }

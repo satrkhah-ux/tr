@@ -92,20 +92,39 @@ export function phoneDigits(raw: string | null | undefined): string | null {
 
 export const WANTS = ["تأشيرة", "بكج", "تذكرة", "غيره"] as const;
 export type Want = (typeof WANTS)[number];
-export type ClientDetails = { want: Want; destination: string; name: string; phone: string; note: string };
+/** the form inside the «لدي عميل» / «لدي اتصال» cover; `for_employee`: the colleague the client asked to speak to */
+export type ClientDetails = { want: Want | ""; destination: string; name: string; phone: string; note: string; for_employee: string };
 
-/** «لدي عميل» / «لدي اتصال»: what the short form must hold — the name and a phone we can find them by again */
-export function cleanClient(
-  input: Partial<Record<keyof ClientDetails, unknown>>,
-): { ok: true; details: ClientDetails; phone: string } | { ok: false; error: string } {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * «لدي عميل» / «لدي اتصال»: the status runs from the press, and every field is optional, typed while it runs (the owner,
+ * 2026-10-29: «عندما يدخل العميل … يضغط الموظف الزر ويبدأ العداد، وعليه أن يُدخل ما يطلبه العميل»). A phone that is not
+ * one stays as typed but finds nobody (`badPhone` — the cover says so).
+ */
+export function cleanClient(input: Partial<Record<keyof ClientDetails, unknown>>): { details: ClientDetails; phone: string | null; badPhone: boolean } {
   const text = (x: unknown, max: number) => (typeof x === "string" ? x.trim().slice(0, max) : "");
-  const want = WANTS.find((w) => w === input.want);
-  const name = text(input.name, 80);
-  const phone = phoneDigits(text(input.phone, 30));
-  if (!want) return { ok: false, error: "اختر ماذا يريد العميل." };
-  if (!name) return { ok: false, error: "اكتب اسم العميل." };
-  if (!phone) return { ok: false, error: "اكتب رقم هاتف صحيحاً." };
-  return { ok: true, details: { want, destination: text(input.destination, 80), name, phone, note: text(input.note, 200) }, phone };
+  const typed = text(input.phone, 30);
+  const phone = phoneDigits(typed);
+  const forEmployee = text(input.for_employee, 36);
+  return {
+    details: {
+      want: WANTS.find((w) => w === input.want) ?? "",
+      destination: text(input.destination, 80),
+      name: text(input.name, 80),
+      phone: phone ?? typed,
+      note: text(input.note, 200),
+      for_employee: UUID.test(forEmployee) ? forEmployee : "",
+    },
+    phone,
+    badPhone: Boolean(typed) && !phone,
+  };
+}
+
+/** whom a registered client's next message goes to: the colleague they asked for, else the one who met / took the call */
+export function hintTarget(row: { employee_id: string; details?: Record<string, unknown> | null }): { employeeId: string; chosen: boolean } {
+  const asked = row.details?.for_employee;
+  return typeof asked === "string" && UUID.test(asked) && asked !== row.employee_id ? { employeeId: asked, chosen: true } : { employeeId: row.employee_id, chosen: false };
 }
 
 /** a leave of `days` whole days from a Riyadh day */

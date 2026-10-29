@@ -8,7 +8,7 @@ import { logAudit } from "@/lib/data/audit";
 import { availabilityOf, clientHint } from "@/lib/presence/availability";
 import { saleHolder } from "@/lib/leads/lifecycle";
 import { escapeHtml, staffSend } from "@/lib/telegram/staff-bot";
-import { DEFAULT_RULES, moveReason, parseRules, pickCandidate, RULES_KEY, WHY_TEXT, type Candidate, type Choice, type Rules } from "./switchboard-core";
+import { DEFAULT_RULES, hintNotify, moveReason, parseRules, pickCandidate, RULES_KEY, WHY_TEXT, type Candidate, type Choice, type Rules } from "./switchboard-core";
 
 /**
  * «البدّالة» — the server side of switchboard-core: the colleagues of a department as candidates (Teletel's members,
@@ -80,8 +80,9 @@ function loadsOf(rows: { assigneeId: number | null; waitingSince: number }[]): M
 
 /**
  * Who in this department takes the client now (Murad's hand-over, the visa routing, the sweep): the holder when they
- * can, the colleague who registered this client's phone, else the least loaded available. Null: nobody can — the
- * department's queue holds the client (Murad's reception speaks for the office meanwhile). Undefined: Teletel unreadable.
+ * can, the colleague this client asked for or who registered their phone, else the least loaded available. Null: nobody
+ * can — the department's queue holds the client (Murad's reception speaks for the office meanwhile). Undefined: Teletel
+ * unreadable. `hint` is the registration, whether or not it decided (tellHinted says whom to tell).
  */
 export async function pickAgent(i: {
   teamId: number;
@@ -92,19 +93,34 @@ export async function pickAgent(i: {
   const [cands, rules, hint] = await Promise.all([candidatesFor(i.teamId, i.inboxId), loadRules(), clientHint(i.phone)]);
   if (!cands) return undefined;
   const choice = pickCandidate(cands, { holderAgentId: i.holderAgentId ?? null, hintEmployeeId: hint?.employeeId ?? null }, rules);
-  return choice ? { ...choice, hint: choice.why === "hint" ? hint : null } : null;
+  return choice ? { ...choice, hint } : null;
 }
 
-/** «👤 العميل الذي سجّلته راسلنا» — the colleague who met or called this client is told who it is and what they wanted */
-export async function tellHint(employeeId: string, conversationId: number, hint: NonNullable<Awaited<ReturnType<typeof clientHint>>>): Promise<void> {
-  const { data } = await db().from("employees").select("telegram_chat_id").eq("id", employeeId).maybeSingle();
-  const chat = Number((data as { telegram_chat_id?: number | string | null } | null)?.telegram_chat_id);
+/**
+ * «👤 العميل الذي سجّلته راسلنا» — once the client is assigned: the colleague it went to because of «لدي عميل» / «لدي
+ * اتصال» is told who it is and what they wanted; a colleague the client asked for who could not take them now is told
+ * whom it went to (switchboard-core hintNotify).
+ */
+export async function tellHinted(choice: Choice | null | undefined, hint: Awaited<ReturnType<typeof clientHint>>, conversationId: number): Promise<void> {
+  const n = hintNotify(choice, hint);
+  if (!n || !hint) return;
+  const { data } = await db().from("employees").select("id, arabic_name, telegram_chat_id").in("id", [n.to, hint.takenBy]);
+  const rows = (data ?? []) as { id: string; arabic_name: string | null; telegram_chat_id: number | string | null }[];
+  const chat = Number(rows.find((r) => r.id === n.to)?.telegram_chat_id);
   if (!chat) return;
+  const taker = rows.find((r) => r.id === hint.takenBy)?.arabic_name?.trim() || "زميلك";
   const d = hint.details as { name?: string; want?: string; destination?: string; note?: string };
+  const who = `👤 <b>${escapeHtml(d.name || "عميل")}</b>`;
+  const how = `«${hint.kind === "client" ? "لدي عميل" : "لدي اتصال"}»`;
+  const head = n.routedTo
+    ? `${who} طلب التحدث معك وراسلنا الآن — حُوّل إلى ${escapeHtml(n.routedTo)} لأنك غير متاح الآن (سجّله ${escapeHtml(taker)} ${how}).`
+    : hint.chosen
+      ? `${who} راسلنا الآن — حُوّل إليك لأنه طلب التحدث معك (سجّله ${escapeHtml(taker)} ${how}).`
+      : `${who} راسلنا الآن — حُوّل إليك لأنك سجّلته ${how}.`;
   await staffSend(
     chat,
     [
-      `👤 <b>${escapeHtml(d.name ?? "عميلك")}</b> راسلنا الآن — حُوّل إليك لأنك سجّلته «${hint.kind === "client" ? "لدي عميل" : "لدي اتصال"}».`,
+      head,
       [d.want, d.destination, d.note]
         .filter(Boolean)
         .map((x) => escapeHtml(String(x)))
@@ -112,7 +128,7 @@ export async function tellHint(employeeId: string, conversationId: number, hint:
     ]
       .filter(Boolean)
       .join("\n"),
-    [[{ text: "💬 افتح المحادثة", callback_data: `c:${conversationId}` }]],
+    n.routedTo ? [] : [[{ text: "💬 افتح المحادثة", callback_data: `c:${conversationId}` }]],
     {},
     `conv:${conversationId}`,
   ).catch(() => undefined);
@@ -202,7 +218,7 @@ export async function switchboardSweep(nowMs = Date.now(), opts: { dry?: boolean
     if (rules.mode === "on") {
       const note = `🔀 البدّالة: أُسندت إلى ${choice.candidate.name} — ${why}${c.assignee ? ` (كانت عند ${c.assignee})` : ""}.`;
       if (!(await move({ id: c.id, teamId }, choice.candidate, why, { id: null, label: "البدّالة" }, note))) continue;
-      if (choice.why === "hint" && hint && choice.candidate.employeeId) await tellHint(choice.candidate.employeeId, c.id, hint);
+      await tellHinted(choice, hint, c.id);
     }
     const l = loads.get(choice.candidate.agentId) ?? { waiting: 0, open: 0 };
     loads.set(choice.candidate.agentId, { waiting: l.waiting + 1, open: l.open + 1 });

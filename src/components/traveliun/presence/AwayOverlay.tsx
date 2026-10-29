@@ -4,11 +4,13 @@ import { useEffect, useRef, useState, type JSX, type Ref } from "react";
 import { createPortal } from "react-dom";
 import {
   AWAY_TEXT,
-  clientOf,
   elapsedMinutes,
+  formOf,
   minutesText,
   type AwayKind,
+  type ClientForm,
 } from "@/lib/presence/away-overlay";
+import { WANTS } from "@/lib/presence/excuse";
 
 /**
  * The whole page covered while a status button is on — every status alike (the owner, 2026-10-29: «لدي اتصال وعميل في
@@ -16,9 +18,12 @@ import {
  * a calm dark-green sky, the status's own motif (a mihrab arch over a mosque, a meeting table, a guest at the desk, a
  * telephone), the minutes running, and one way out — the big button, which ends the status like pressing it again and
  * leaves the colleague on the page they were on. Nothing of the system shows or answers behind it; Esc and a click
- * outside do nothing. «لدي عميل» and «لدي اتصال» show the client the colleague typed. When the limit ends the status on
- * the server, the next read clears it (`onExpired` at the cap).
+ * outside do nothing. «لدي عميل» and «لدي اتصال» run from the press, and the client is typed here while they run — every
+ * field optional, kept as it is typed (on leaving a field, a chip, the colleague picked) and once more with the end.
+ * When the limit ends the status on the server, the next read clears it (`onExpired` at the cap).
  */
+
+type Saved = { ok: boolean; error?: string; badPhone?: boolean } | null;
 
 export function AwayOverlay({
   kind,
@@ -27,8 +32,10 @@ export function AwayOverlay({
   serverNow,
   detail,
   details,
+  colleagues = [],
   busy,
   error,
+  onSave,
   onEnd,
   onExpired,
 }: {
@@ -39,16 +46,23 @@ export function AwayOverlay({
   serverNow: number;
   /** the meeting's title */
   detail?: string;
-  /** the status event's details: the client's name and request («لدي عميل / لدي اتصال») */
+  /** the status event's details: what was typed of the client so far («لدي عميل / لدي اتصال») */
   details?: Record<string, unknown>;
+  /** whom the client may ask to speak to */
+  colleagues?: { id: string; name: string }[];
   busy: boolean;
   error?: string;
-  onEnd: () => void;
+  onSave?: (form: ClientForm) => Promise<Saved>;
+  /** the form goes with the end of a client / a call, so nothing typed is lost */
+  onEnd: (form?: ClientForm) => void;
   onExpired: () => void;
 }) {
   const [offset] = useState(() => serverNow - Date.now());
   const [now, setNow] = useState(serverNow);
+  const [form, setForm] = useState(() => formOf(details));
+  const [note, setNote] = useState("");
   const button = useRef<HTMLButtonElement>(null);
+  const withForm = kind === "client" || kind === "call";
 
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now() + offset), 15_000);
@@ -78,26 +92,58 @@ export function AwayOverlay({
     };
   }, []);
 
+  const keep = (next: ClientForm) => {
+    setForm(next);
+    onSave?.(next)
+      .then((r) =>
+        setNote(
+          !r
+            ? ""
+            : !r.ok
+              ? (r.error ?? "تعذّر الحفظ")
+              : r.badPhone
+                ? "الرقم غير صحيح — لن نجد العميل به إن راسلنا"
+                : "حُفظ ✓",
+        ),
+      )
+      .catch(() => setNote("تعذّر الحفظ"));
+  };
+
   return createPortal(
     <AwayOverlayView
       kind={kind}
       minutes={elapsedMinutes(startedAt, now)}
       detail={detail}
-      client={kind === "client" || kind === "call" ? clientOf(details) : null}
+      form={
+        withForm
+          ? { values: form, colleagues, note, onChange: setForm, onKeep: keep }
+          : undefined
+      }
       busy={busy}
       error={error}
-      onEnd={onEnd}
+      onEnd={() => onEnd(withForm ? form : undefined)}
       buttonRef={button}
     />,
     document.body,
   );
 }
 
-const MOTIF: Record<AwayKind, () => JSX.Element> = {
+const MOTIF: Record<AwayKind, (p: { className: string }) => JSX.Element> = {
   prayer: Mihrab,
   meeting: Table,
   client: Guest,
   call: Telephone,
+};
+
+type FormProps = {
+  values: ClientForm;
+  colleagues: { id: string; name: string }[];
+  /** «حُفظ ✓», a bad phone, a failed save */
+  note: string;
+  /** typing */
+  onChange: (v: ClientForm) => void;
+  /** a field left, a chip tapped, a colleague picked: keep it on the status */
+  onKeep: (v: ClientForm) => void;
 };
 
 /** the full-page cover alone (server-renderable, for the test) */
@@ -105,7 +151,7 @@ export function AwayOverlayView({
   kind,
   minutes,
   detail,
-  client,
+  form,
   busy,
   error,
   onEnd,
@@ -114,7 +160,7 @@ export function AwayOverlayView({
   kind: AwayKind;
   minutes: number;
   detail?: string;
-  client?: { name: string; request: string } | null;
+  form?: FormProps;
   busy: boolean;
   error?: string;
   onEnd: () => void;
@@ -128,74 +174,165 @@ export function AwayOverlayView({
       aria-modal="true"
       aria-labelledby="away-title"
       dir="rtl"
-      className="fixed inset-0 z-[200] flex flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_28%,#22604f_0%,#123a31_45%,#0a201b_100%)] px-6 text-center text-white"
+      className="fixed inset-0 z-[200] overflow-y-auto bg-[radial-gradient(circle_at_50%_28%,#22604f_0%,#123a31_45%,#0a201b_100%)] text-white"
     >
       <Sky />
-      <Motif />
-      <h2
-        id="away-title"
-        className="relative mt-6 text-4xl font-extrabold sm:text-5xl"
-      >
-        {t.title}
-      </h2>
-      {client ? (
-        <div className="relative mt-4 max-w-xl rounded-2xl bg-white/[0.07] px-6 py-3">
-          {client.name && (
-            <p className="text-2xl font-bold text-[#e9d8a6]">{client.name}</p>
-          )}
-          {client.request && (
-            <p className="mt-1 text-lg text-white/85">{client.request}</p>
-          )}
-        </div>
-      ) : (
+      <div className="relative flex min-h-full flex-col items-center justify-center px-4 py-10 text-center sm:px-6">
+        <Motif
+          className={
+            form ? "relative size-16 sm:size-20" : "relative size-28 sm:size-32"
+          }
+        />
+        <h2
+          id="away-title"
+          className={`relative font-extrabold ${form ? "mt-4 text-3xl sm:text-4xl" : "mt-6 text-4xl sm:text-5xl"}`}
+        >
+          {t.title}
+        </h2>
         <p
           className={`relative mt-3 ${kind === "prayer" ? "text-3xl font-bold text-[#e9d8a6] sm:text-4xl" : "max-w-md text-lg text-white/80"}`}
         >
           {t.sub}
         </p>
-      )}
-      {detail && (
-        <p className="relative mt-3 text-xl font-bold text-[#e9d8a6]">
-          {detail}
-        </p>
-      )}
-      <p
-        className="relative mt-5 flex items-center gap-2 text-xl text-white/85"
-        aria-live="polite"
-      >
-        <span
-          className="size-2.5 rounded-full bg-[#e9d8a6] motion-safe:animate-pulse"
-          aria-hidden
-        />
-        منذ {minutesText(minutes)}
-      </p>
-      <button
-        ref={buttonRef}
-        type="button"
-        disabled={busy}
-        onClick={onEnd}
-        className="relative mt-10 min-h-16 rounded-2xl bg-white px-10 text-2xl font-extrabold text-[#123a31] shadow-xl transition-colors hover:bg-[#f3efe0] focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-[#e9d8a6] disabled:opacity-60"
-      >
-        {busy ? "لحظة…" : t.close}
-      </button>
-      {error && (
+        {detail && (
+          <p className="relative mt-3 text-xl font-bold text-[#e9d8a6]">
+            {detail}
+          </p>
+        )}
         <p
-          role="alert"
-          className="relative mt-4 rounded-xl bg-white/10 px-4 py-2 text-base"
+          className="relative mt-4 flex items-center gap-2 text-xl text-white/85"
+          aria-live="polite"
         >
-          {error}
+          <span
+            className="size-2.5 rounded-full bg-[#e9d8a6] motion-safe:animate-pulse"
+            aria-hidden
+          />
+          منذ {minutesText(minutes)}
         </p>
-      )}
+        {form && <ClientFields kind={kind} {...form} />}
+        <button
+          ref={buttonRef}
+          type="button"
+          disabled={busy}
+          onClick={onEnd}
+          className={`relative min-h-16 rounded-2xl bg-white px-10 text-2xl font-extrabold text-[#123a31] shadow-xl transition-colors hover:bg-[#f3efe0] focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-[#e9d8a6] disabled:opacity-60 ${form ? "mt-6" : "mt-10"}`}
+        >
+          {busy ? "لحظة…" : t.close}
+        </button>
+        {error && (
+          <p
+            role="alert"
+            className="relative mt-4 rounded-xl bg-white/10 px-4 py-2 text-base"
+          >
+            {error}
+          </p>
+        )}
+      </div>
       {kind === "prayer" && <Mosque />}
     </div>
   );
 }
 
+/** what the client wants, typed while the minutes run — all optional; the phone only finds them again */
+function ClientFields({
+  kind,
+  values,
+  colleagues,
+  note,
+  onChange,
+  onKeep,
+}: FormProps & { kind: AwayKind }) {
+  const field =
+    "mt-1 w-full rounded-xl border border-white/20 bg-[#0f2e27] px-3 py-2.5 text-base font-normal text-white placeholder:text-white/35 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#e9d8a6]";
+  const label = "block text-sm font-bold text-white/75";
+  const text = (
+    k: "name" | "phone" | "destination" | "note",
+    title: string,
+    extra: JSX.IntrinsicElements["input"] = {},
+  ) => (
+    <label className={label}>
+      {title}
+      <input
+        className={field}
+        value={values[k]}
+        onChange={(e) => onChange({ ...values, [k]: e.target.value })}
+        onBlur={() => onKeep(values)}
+        {...extra}
+      />
+    </label>
+  );
+  return (
+    <div className="relative mt-5 w-full max-w-xl rounded-2xl bg-white/[0.07] p-4 text-start sm:p-5">
+      <p className="text-sm text-white/60">
+        اكتب ما يطلبه {kind === "call" ? "المتصل" : "العميل"} متى شئت — اختياري،
+        والعداد يعمل.
+      </p>
+      <p className="mt-3 text-sm font-bold text-white/75">ماذا يريد؟</p>
+      <div className="mt-1.5 flex flex-wrap gap-2">
+        {WANTS.map((w) => (
+          <button
+            key={w}
+            type="button"
+            aria-pressed={values.want === w}
+            onClick={() =>
+              onKeep({ ...values, want: values.want === w ? "" : w })
+            }
+            className={`min-h-11 rounded-xl border px-4 text-base font-bold transition-colors focus-visible:outline-2 focus-visible:outline-[#e9d8a6] ${
+              values.want === w
+                ? "border-[#e9d8a6] bg-[#e9d8a6] text-[#123a31]"
+                : "border-white/25 text-white hover:bg-white/10"
+            }`}
+          >
+            {w}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {text("name", "اسم العميل", { maxLength: 80, autoComplete: "off" })}
+        {text("phone", "رقم الهاتف", {
+          maxLength: 30,
+          inputMode: "tel",
+          dir: "ltr",
+          placeholder: "05xxxxxxxx",
+          autoComplete: "off",
+        })}
+        {text("destination", "الوجهة", {
+          maxLength: 80,
+          placeholder: "مثال: جورجيا",
+        })}
+        {colleagues.length > 0 && (
+          <label className={label}>
+            يريد التحدث مع موظف
+            <select
+              className={field}
+              value={values.for_employee}
+              onChange={(e) =>
+                onKeep({ ...values, for_employee: e.target.value })
+              }
+            >
+              <option value="">— لا أحد بعينه —</option>
+              {colleagues.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+      <div className="mt-3">{text("note", "الطلب", { maxLength: 200 })}</div>
+      <p className="mt-2 min-h-5 text-sm text-white/60" aria-live="polite">
+        {note}
+      </p>
+    </div>
+  );
+}
+
 /** «لدي عميل»: a guest across the desk from the colleague, a cup between them */
-function Guest() {
+function Guest({ className }: { className: string }) {
   return (
     <svg
-      className="relative size-28 sm:size-32"
+      className={className}
       viewBox="0 0 120 120"
       fill="none"
       stroke="#e9d8a6"
@@ -217,10 +354,10 @@ function Guest() {
 }
 
 /** «لدي اتصال»: the receiver, and the call's waves */
-function Telephone() {
+function Telephone({ className }: { className: string }) {
   return (
     <svg
-      className="relative size-28 sm:size-32"
+      className={className}
       viewBox="0 0 120 120"
       fill="none"
       stroke="#e9d8a6"
@@ -252,7 +389,7 @@ function Sky() {
   ];
   return (
     <svg
-      className="pointer-events-none absolute inset-0 size-full"
+      className="pointer-events-none fixed inset-0 size-full"
       viewBox="0 0 100 100"
       preserveAspectRatio="xMidYMid slice"
       aria-hidden
@@ -272,10 +409,10 @@ function Sky() {
 }
 
 /** «صلاة»: a mihrab's pointed arch, an inner arch and its hanging lamp — no crescent (the owner, 2026-10-29) */
-function Mihrab() {
+function Mihrab({ className }: { className: string }) {
   return (
     <svg
-      className="relative size-28 sm:size-32"
+      className={className}
       viewBox="0 0 120 120"
       fill="none"
       stroke="#e9d8a6"
@@ -296,10 +433,10 @@ function Mihrab() {
 }
 
 /** «اجتماع»: a round table and its chairs, in the same quiet lines */
-function Table() {
+function Table({ className }: { className: string }) {
   return (
     <svg
-      className="relative size-28 sm:size-32"
+      className={className}
       viewBox="0 0 120 120"
       fill="none"
       stroke="#e9d8a6"

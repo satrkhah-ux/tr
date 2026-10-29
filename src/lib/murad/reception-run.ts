@@ -1,5 +1,5 @@
 import { routeCompletedVisa, retryVisaHandoffs } from "./visa-routing";
-import { pickAgent, tellHint } from "@/lib/routing/switchboard";
+import { pickAgent, tellHinted } from "@/lib/routing/switchboard";
 import type { MuradReceipt } from "./visa-assignment";
 import { inMuradScope, kindMode, onList, visaForAll, type MuradControl } from "./control";
 import { handOver } from "./handover";
@@ -955,7 +955,7 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     const choice = !handoff?.agentId && teamId ? await pickAgent({ teamId, inboxId: thread.inboxId ?? null, phone: m.phone }) : null;
     const agent = choice ? { id: choice.candidate.agentId, name: choice.candidate.name } : null;
     const assigned = await handOver(settings.control, m.conversationId, teamId, handoff?.agentId ?? agent?.id ?? null, m.phone);
-    if (assigned && choice?.hint && choice.candidate.employeeId) await tellHint(choice.candidate.employeeId, m.conversationId, choice.hint);
+    if (assigned && choice) await tellHinted(choice, choice.hint, m.conversationId);
     const kept = onList(m.phone, settings.control.noHandoff);
     // a travel request: what the salesperson needs, understood from the client's words (the owner: where, when, who, what)
     const travel = TRAVEL.has(decision.to) ? await readTravel(transcript) : null;

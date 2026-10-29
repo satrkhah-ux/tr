@@ -3,6 +3,7 @@ import {
   cleanClient,
   DEFAULT_LIMITS,
   excuseAt,
+  hintTarget,
   excusedMinutes,
   leaveRange,
   leaveWindow,
@@ -84,14 +85,32 @@ describe("the limits and the client's form", () => {
     expect([phoneDigits(""), phoneDigits("12"), phoneDigits(null)]).toEqual([null, null, null]);
   });
 
-  it("asks for what the client wants, a name and a phone", () => {
-    expect(cleanClient({ want: "بكج", name: " سالم ", phone: "0560258364", destination: "جورجيا" })).toEqual({
-      ok: true,
-      details: { want: "بكج", destination: "جورجيا", name: "سالم", phone: "966560258364", note: "" },
+  it("the form inside the cover: every field optional, a bad phone kept as typed but finding nobody", () => {
+    const sid = "0f0e0d0c-0b0a-4908-8706-050403020100";
+    expect(cleanClient({ want: "بكج", name: " سالم ", phone: "0560258364", destination: "جورجيا", for_employee: sid })).toEqual({
+      details: { want: "بكج", destination: "جورجيا", name: "سالم", phone: "966560258364", note: "", for_employee: sid },
       phone: "966560258364",
+      badPhone: false,
     });
-    expect(cleanClient({ want: "سيارة", name: "سالم", phone: "0560258364" })).toEqual({ ok: false, error: "اختر ماذا يريد العميل." });
-    expect(cleanClient({ want: "بكج", name: "", phone: "0560258364" })).toMatchObject({ ok: false });
-    expect(cleanClient({ want: "بكج", name: "سالم", phone: "12" })).toEqual({ ok: false, error: "اكتب رقم هاتف صحيحاً." });
+    // nothing typed: still a status, just no client to find again
+    expect(cleanClient({})).toEqual({
+      details: { want: "", destination: "", name: "", phone: "", note: "", for_employee: "" },
+      phone: null,
+      badPhone: false,
+    });
+    expect(cleanClient({ want: "سيارة", phone: "12", for_employee: "x' or 1=1" })).toEqual({
+      details: { want: "", destination: "", name: "", phone: "12", note: "", for_employee: "" },
+      phone: null,
+      badPhone: true,
+    });
+  });
+
+  it("a registered client goes to the colleague they asked for, else to the one who met them", () => {
+    const taker = "11111111-1111-4111-8111-111111111111";
+    const asked = "22222222-2222-4222-8222-222222222222";
+    expect(hintTarget({ employee_id: taker, details: { for_employee: asked } })).toEqual({ employeeId: asked, chosen: true });
+    expect(hintTarget({ employee_id: taker, details: { for_employee: "" } })).toEqual({ employeeId: taker, chosen: false });
+    expect(hintTarget({ employee_id: taker, details: { for_employee: taker } })).toEqual({ employeeId: taker, chosen: false });
+    expect(hintTarget({ employee_id: taker, details: null })).toEqual({ employeeId: taker, chosen: false });
   });
 });

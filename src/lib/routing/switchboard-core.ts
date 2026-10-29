@@ -110,6 +110,17 @@ export function pickCandidate(
   return best ? { candidate: best, why: "load" } : null;
 }
 
+/**
+ * Whom to tell when a registered client («لدي عميل» / «لدي اتصال») writes: the colleague it went to for that reason; or —
+ * when the client asked for a colleague who cannot take them now (leave, off shift, a button…) and the normal pick took
+ * them — that colleague, with whom it went to (`routedTo`). Nobody when the holder kept it or nobody took it.
+ */
+export function hintNotify(choice: Choice | null | undefined, hint: { employeeId: string; chosen: boolean } | null | undefined): { to: string; routedTo: string | null } | null {
+  if (!choice || !hint) return null;
+  if (choice.why === "hint") return choice.candidate.employeeId ? { to: choice.candidate.employeeId, routedTo: null } : null;
+  return hint.chosen && choice.why === "load" ? { to: hint.employeeId, routedTo: choice.candidate.name } : null;
+}
+
 export type Holder = { employeeId: string | null; available: boolean; reason: AvailabilityReason | null };
 
 /**
