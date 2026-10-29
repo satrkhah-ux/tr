@@ -263,11 +263,12 @@ function Fold({
  * «متابعة» with what still stops it, in words. No «السابق»: the sections above are
  * one line each, and a press on one opens it again (nothing entered is lost).
  */
-function NextButton({ missing, onNext }: { missing: string[]; onNext: () => void }) {
+function NextButton({ missing, onNext, tools }: { missing: string[]; onNext: () => void; tools?: ReactNode }) {
   const tx = useBasicLabels();
   return (
     <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-dashed border-[#DCE9E5] pt-2.5">
       {missing.length > 0 ? <span className="text-[11.5px] font-bold text-[#a86a10]">{tx("needFirst", { list: missing.join("، ") })}</span> : null}
+      {tools}
       <button
         type="button"
         onClick={onNext}
@@ -830,6 +831,7 @@ export function BasicEditor({
   const canSetProfit = canInternal || (profitSettings.by === "staff" && can("pricing.view"));
   const display = data.pricing.display_currency || "SAR";
   const [pricingBusy, setPricingBusy] = useState(false);
+  const [manualTotal, setManualTotal] = useState(false);
   // the profit is applied here for the eye and at issuing on the server — never written onto the lines,
   // so an agent without the cost (its lines arrive as sells) reads the same total the offer will carry
   const shownItems = useMemo(() => {
@@ -1392,7 +1394,7 @@ export function BasicEditor({
               {walkIn === "sent" ? <span className="text-[#0f7a52]">✓ ظهر على الشاشات</span> : walkIn === "sending" ? <span className="text-[#557d78]">…</span> : walkIn !== "on" && walkIn !== "off" ? <span className="text-[#a86a10]">{walkIn}</span> : null}
             </label>
           ) : null}
-            <NextButton missing={missingOf[step]} onNext={() => next(step)} />
+            <NextButton missing={missingOf[step]} onNext={() => next(step)} tools={step === "pricing" ? pricingTools : undefined} />
           </>
         )}
       </Fold>
@@ -1423,6 +1425,36 @@ export function BasicEditor({
       </DialogContent>
     </Dialog>
   );
+  // the price step's tools sit by its «متابعة» (the owner, 2026-10-29: «بجانب متابعة وليس فوق»)
+  const pricingTools = (
+    <>
+      <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#557d78]">
+        <span className="max-sm:sr-only">{tx("quote")}</span>
+        <select
+          value={display}
+          onChange={(e) =>
+            patch({ pricing: { ...data.pricing, display_currency: e.target.value, ...(data.source ? {} : { final_total: null }) } })
+          }
+          className="h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-1.5 text-[12px] font-bold"
+        >
+          {currencyOptions(lookups.countries, display).map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </label>
+      <button
+        type="button"
+        onClick={() => void calculate()}
+        disabled={pricingBusy}
+        className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
+      >
+        {pricingBusy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+        {pricingBusy ? tx("calcBusy") : tx("calc")}
+      </button>
+      {termsButton}
+    </>
+  );
+
   const body: Record<Section, ReactNode> = {
     // ---- the customer and the trip, and what the programme includes ----
     client: (
@@ -1822,32 +1854,6 @@ export function BasicEditor({
     // ---- the price (sell side only, for whoever may see prices) ----
     pricing: (
           <div>
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <label className="ms-auto inline-flex items-center gap-1.5 text-[11px] font-bold text-[#557d78]">
-                {tx("quote")}
-                <select
-                  value={display}
-                  onChange={(e) =>
-                    patch({ pricing: { ...data.pricing, display_currency: e.target.value, ...(data.source ? {} : { final_total: null }) } })
-                  }
-                  className="h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-1.5 text-[12px] font-bold"
-                >
-                  {currencyOptions(lookups.countries, display).map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="button"
-                onClick={() => void calculate()}
-                disabled={pricingBusy}
-                className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] font-bold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-60"
-              >
-                {pricingBusy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-                {pricingBusy ? tx("calcBusy") : tx("calc")}
-              </button>
-              {termsButton}
-            </div>
             {pricingError ? <p role="alert" className="mb-2 text-[12px] font-bold text-[#c22850]">{pricingError}</p> : null}
             {data.pricing.items.length === 0 ? (
               <p className="text-[12px] font-semibold text-[#93aaa3]">{tx("noLines")}</p>
@@ -2006,14 +2012,20 @@ export function BasicEditor({
                     }}
                   />
                 ) : null}
-                <div className="flex items-center justify-between rounded-[11px] bg-[#185045] px-3 py-2.5 text-white">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[11px] bg-[#185045] px-3 py-2.5 text-white">
                   {/* for a partner this total is what the package costs IT — our prices at its terms */}
                   <span className="text-[13px] font-extrabold">{partnerSession ? t("pg.partnerCost") : tx("clientTotal")}</span>
-                  <span className="tv-tnum text-[16px] font-extrabold">
+                  {/* our own total typed by hand is the exception: one press away, open while one is set */}
+                  {canPricing && !partnerSession && !manualTotal && data.pricing.final_total == null ? (
+                    <button type="button" onClick={() => setManualTotal(true)} className="text-[11px] font-bold text-white/75 underline underline-offset-2 hover:text-white">
+                      {t("pg.manualTotal")}
+                    </button>
+                  ) : null}
+                  <span className="tv-tnum ms-auto text-[16px] font-extrabold">
                     <DirText>{`${clientPays.toLocaleString("en-US")} ${display}`}</DirText>
                   </span>
                 </div>
-                {canPricing ? (
+                {canPricing && (partnerSession || manualTotal || data.pricing.final_total != null) ? (
                   <label className="flex flex-wrap items-center justify-between gap-2 rounded-[11px] border border-[#d8e6e0] bg-[#f8fbf9] px-3 py-2">
                     <span className="text-[12.5px] font-extrabold text-[#0f3d38]">{t(partnerSession ? "pg.partnerSell" : "pg.finalTotal")}</span>
                     <input
