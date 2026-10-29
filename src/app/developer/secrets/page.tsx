@@ -6,7 +6,7 @@ import { guardPath } from "@/lib/roles/current";
 
 export const dynamic = "force-dynamic";
 
-/** «المفاتيح والتوكنات» — «المطوّر» only (section-access /developer → developer.access) */
+/** «المفاتيح والتوكنات» — «المطوّر» and the administration (section-access /developer/secrets) */
 export default async function DeveloperSecretsPage() {
   await guardPath("/developer/secrets");
   const data = await listSecrets();

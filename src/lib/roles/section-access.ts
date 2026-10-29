@@ -113,6 +113,8 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   ["/management-decisions", ["dashboard.admin", "developer.access"]],
   // «الحسابات المالية»: the developer and the owner's own account — the page itself narrows dashboard.admin to that account (data/finance.ts)
   ["/finance", ["dashboard.admin", "developer.access"]],
+  // «المفاتيح والتوكنات»: the administration too (the owner, 2026-10-29: «افتحها الآن في صفحة الأدمن») — write-only, the rest of «المطوّر» stays the developer's
+  ["/developer/secrets", ["dashboard.admin", "developer.access"]],
   ["/developer", "developer.access"],
   // «SLA»: the administration and the developer only (the owner, 2026-10-17);
   // a follow-up's own page (/followups) opens to its assignee too (data/sla.ts)

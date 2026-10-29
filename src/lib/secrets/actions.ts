@@ -12,7 +12,7 @@ import { allowedSecrets, cleanSecretValue, lastFour, rateLimited, type Integrati
 import { forgetSecrets, secretSource } from "./get";
 
 /**
- * «المفاتيح والتوكنات» — developer.access only. Writes are WRITE-ONLY: a saved
+ * «المفاتيح والتوكنات» — developer.access or dashboard.admin (the owner, 2026-10-29). Writes are WRITE-ONLY: a saved
  * value is never returned, echoed or logged; the page learns only set / not
  * set, the source, the last four characters, and who changed it when. Every
  * save and clear is audited WITHOUT the value, and writes are rate-limited.
@@ -24,7 +24,7 @@ type Fail = { ok: false; error: string };
 const writes = new Map<string, number[]>();
 
 async function developer(): Promise<string | null> {
-  if (!(await currentCan("developer.access"))) return null;
+  if (!(await currentCan("developer.access")) && !(await currentCan("dashboard.admin"))) return null;
   return (await getCurrentEmployeeId()) ?? null;
 }
 
