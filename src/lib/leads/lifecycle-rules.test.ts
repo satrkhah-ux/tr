@@ -1,5 +1,46 @@
 import { describe, expect, it } from "vitest";
-import { closerOf, decideReturn, durationText, followedSince, heldSale, marksFollowed, phoneKey, readAutocloseHours, staleToClose, travellerReturn, travellersToClose, travelUntil } from "./lifecycle-rules";
+import { clientQuery, closerOf, decideReturn, durationText, followedSince, heldSale, marksFollowed, mergeClients, phoneForms, phoneKey, readAutocloseHours, sameClientTrips, staleToClose, travellerReturn, travellersToClose, travelUntil, type ClientRecord } from "./lifecycle-rules";
+
+describe("«المؤكدون خارج النظام»: the client pulled from what we have (the owner, 2026-10-29)", () => {
+  const rec = (r: Partial<ClientRecord>): ClientRecord => ({ phone: null, name: null, destination: null, travelStart: null, days: null, at: null, mine: false, source: "lead", ...r });
+
+  it("reads a number however written, else a name; nothing while too short", () => {
+    expect(["0551234567", "+966 55 123 4567", "00966551234567", "٠٥٥١٢٣٤٥٦٧"].map(clientQuery)).toEqual(Array(4).fill({ digits: "551234567" }));
+    expect(clientQuery("0551")).toEqual({ digits: "551" });
+    expect(clientQuery("محمد, (العتيبي)")).toEqual({ name: "محمد   العتيبي" });
+    expect([clientQuery("05"), clientQuery("م"), clientQuery("  ")]).toEqual([null, null, null]);
+    expect(phoneForms("0551234567")).toEqual(["966551234567", "0551234567", "+966551234567"]);
+    expect(phoneForms("+995 599 123 456")).toEqual(["995599123456", "+995599123456"]);
+    expect(phoneForms("123")).toEqual([]);
+  });
+
+  it("one client per mobile: our files' name over WhatsApp's, the newest recent trip, mine first", () => {
+    const out = mergeClients(
+      [
+        rec({ phone: "+966551234567", name: "Abu Fahad 🌴", destination: "جورجيا", at: "2026-10-20T10:00:00Z", source: "lead" }),
+        rec({ phone: "0551234567", name: "فهد العتيبي", destination: "أذربيجان", travelStart: "2026-08-01", days: 6, at: "2026-03-01T00:00:00Z", source: "offer" }),
+        rec({ phone: "0559999999", name: "سارة", at: "2026-01-01T00:00:00Z", mine: true, source: "file" }),
+        rec({ phone: "12", name: "no number" }),
+      ],
+      "2026-10-29",
+    );
+    expect(out).toEqual([
+      { phone: "966559999999", name: "سارة", mine: true, sources: ["file"], trip: null },
+      // the lead names the newest destination (no dates of its own — never borrowed from the old offer)
+      { phone: "966551234567", name: "فهد العتيبي", mine: false, sources: ["lead", "offer"], trip: { destination: "جورجيا", travelStart: null, days: null } },
+    ]);
+    // an offer older than 120 days pre-fills nothing
+    expect(mergeClients([rec({ phone: "0551234567", destination: "تركيا", at: "2026-01-01T00:00:00Z", source: "offer" })], "2026-10-29")[0].trip).toBeNull();
+  });
+
+  it("warns of the same mobile's trip here (not the one edited) and its confirmed operations file", () => {
+    const trips = [{ id: "t1", phone: "966551234567", destination: "جورجيا", travel_start: "2026-11-02" }];
+    const files = [{ serial: "AD-5-1", destination: "تركيا", phones: [null, "+966 55 123 4567"] }];
+    expect(sameClientTrips("0551234567", trips, files)).toEqual(["له رحلة مسجّلة هنا: جورجيا — 2026-11-02", "له ملف مؤكد في العمليات: AD-5-1 — تركيا"]);
+    expect(sameClientTrips("0551234567", trips, [], "t1")).toEqual([]);
+    expect(sameClientTrips("0551", trips, files)).toEqual([]);
+  });
+});
 
 describe("«@#@#@#»: the employee followed it, no reminder (the owner, 2026-10-29)", () => {
   it("the token anywhere in the note marks it; nothing else does", () => {

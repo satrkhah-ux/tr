@@ -161,6 +161,82 @@ export function externalTripEnd(travelStart: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+// ---------- its client, from what we already have (the owner, 2026-10-29: «رقم الجوال لا يتم سحبه من النظام!») ----------
+
+/**
+ * What is typed in «العميل»: a number's digits to find it by — 00 / 966 / 0 in front dropped, since our tables keep a
+ * mobile as it was written — else a name (safe inside a PostgREST or-filter). Null while too short to ask.
+ */
+export function clientQuery(raw: string): { digits: string } | { name: string } | null {
+  const t = raw.trim();
+  if (/\p{L}/u.test(t)) {
+    const name = t.replace(/[%*,()"\\]/g, " ").trim().slice(0, 60);
+    return name.length >= 2 ? { name } : null;
+  }
+  const digits = normalizePhone(t).replace(/^(?:966|0+)/, "");
+  return digits.length >= 3 ? { digits } : null;
+}
+
+/** the ways one normalised mobile is written in our tables (9665…، 05…، +9665…) — to find it with `in` */
+export function phoneForms(raw: string): string[] {
+  const p = normalizePhone(raw);
+  if (p.length < 9) return [];
+  return p.startsWith("966") ? [p, `0${p.slice(3)}`, `+${p}`] : [p, `+${p}`];
+}
+
+export type ClientSource = "lead" | "file" | "offer" | "operation";
+/** the client as one of our tables has them: a Teletel conversation, a Basic file, an offer, an operations file */
+export type ClientRecord = { phone: string | null; name: string | null; destination: string | null; travelStart: string | null; days: number | null; at: string | null; mine: boolean; source: ClientSource };
+/** one client to pick: one mobile, the best name, and the trip to pre-fill (null: nothing recent) */
+export type TripClient = { phone: string; name: string | null; mine: boolean; sources: ClientSource[]; trip: { destination: string; travelStart: string | null; days: number | null } | null };
+
+/** a lead or an offer older than this pre-fills nothing */
+const RECENT_DAYS = 120;
+
+/**
+ * Every record of the same mobile (phoneKey) is one client: the name our files hold before a WhatsApp profile name
+ * (the newest of each), the trip of the newest recent record that names a destination — its own dates, never another's.
+ * The employee's own clients first, then the newest.
+ */
+export function mergeClients(records: readonly ClientRecord[], today: string, limit = 8): TripClient[] {
+  const since = new Date(Date.parse(`${today}T00:00:00Z`) - RECENT_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const by = new Map<string, TripClient & { at: string; leadName: boolean }>();
+  for (const r of [...records].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""))) {
+    const k = phoneKey(r.phone);
+    if (!k) continue;
+    const c = by.get(k) ?? { phone: normalizePhone(r.phone ?? ""), name: null, mine: false, sources: [], trip: null, at: r.at ?? "", leadName: false };
+    by.set(k, c);
+    const name = r.name?.trim();
+    if (name && (!c.name || (c.leadName && r.source !== "lead"))) {
+      c.name = name;
+      c.leadName = r.source === "lead";
+    }
+    c.mine ||= r.mine;
+    if (!c.sources.includes(r.source)) c.sources.push(r.source);
+    const destination = r.destination?.trim();
+    if (!c.trip && destination && (r.at ?? "") >= since) c.trip = { destination, travelStart: r.travelStart || null, days: r.days && r.days > 0 ? Math.round(r.days) : null };
+  }
+  return [...by.values()]
+    .sort((a, b) => Number(b.mine) - Number(a.mine) || b.at.localeCompare(a.at))
+    .slice(0, limit)
+    .map((c) => ({ phone: c.phone, name: c.name, mine: c.mine, sources: c.sources, trip: c.trip }));
+}
+
+/** What the same mobile already has: a trip entered here (not the one being edited), a confirmed operations file. */
+export function sameClientTrips(
+  phone: string,
+  trips: readonly { id: string; phone: string; destination: string; travel_start: string }[],
+  files: readonly { serial: string | null; destination: string | null; phones: readonly (string | null)[] }[],
+  exceptId?: string,
+): string[] {
+  const k = phoneKey(phone);
+  if (!k) return [];
+  return [
+    ...trips.filter((t) => t.id !== exceptId && phoneKey(t.phone) === k).map((t) => `له رحلة مسجّلة هنا: ${t.destination} — ${t.travel_start}`),
+    ...files.filter((f) => f.phones.some((p) => phoneKey(p) === k)).map((f) => `له ملف مؤكد في العمليات: ${f.serial ?? "—"}${f.destination ? ` — ${f.destination}` : ""}`),
+  ];
+}
+
 /** «3 أيام»، «36 ساعة» */
 export function durationText(hours: number): string {
   if (hours % 24) return hours === 1 ? "ساعة" : hours === 2 ? "ساعتين" : `${hours} ${hours <= 10 ? "ساعات" : "ساعة"}`;
