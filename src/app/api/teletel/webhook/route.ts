@@ -1,7 +1,7 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 import { wakeFollowup } from "@/lib/followups/service";
 import { alertReply } from "@/lib/followups/remind";
-import { clientWrote, conversationResolved } from "@/lib/leads/lifecycle";
+import { clientWrote, conversationResolved, noteWritten } from "@/lib/leads/lifecycle";
 import { schedule, webhookToken } from "@/lib/murad/reception-run";
 import { staffOnTeletel, type TeletelEvent } from "@/lib/telegram/staff-events";
 import { refreshClosedClassification } from "@/lib/leads/teletel-pull";
@@ -44,8 +44,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       .catch(() => console.error("Closed conversation classification could not be refreshed")));
   }
   const incoming = body?.message_type === "incoming" || body?.message_type === 0;
+  const at = typeof body?.created_at === "number" ? body.created_at : Math.floor(Date.parse(String(body?.created_at ?? "")) / 1000) || Math.floor(Date.now() / 1000);
+  // a colleague's private note with «@#@#@#»: they followed it up — no reminder about it (leads/lifecycle.ts)
+  if (body?.event === "message_created" && body.private && body.conversation?.id) {
+    after(() => noteWritten(Number(body.conversation?.id), at, body.content, body.sender?.name ?? null).catch(() => undefined));
+  }
   if (!body || body.event !== "message_created" || !incoming || body.private) return NextResponse.json({ ok: true, ignored: true });
-  const at = typeof body.created_at === "number" ? body.created_at : Math.floor(Date.parse(String(body.created_at ?? "")) / 1000) || Math.floor(Date.now() / 1000);
   const sender = body.conversation?.meta?.sender ?? body.sender;
   const message = {
     conversationId: Number(body.conversation?.id) || 0,

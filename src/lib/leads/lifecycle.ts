@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { parseAutoPhones } from "@/lib/murad/core";
 import { addTeletelLabels, addTeletelNote, assignMuradHandoff, conversationEvents, intlPhone, listAssignableAgents, listLifecycleStages, listOpenConversations, setTeletelStatus, teletelGet, unassignTeletel, type OpenConversation } from "@/lib/providers/teletel";
-import { closerOf, CONFIRMED_TRIP, decideReturn, durationText, externalTripEnd, heldSale, phoneKey, staleToClose, TRAVEL_LABEL, travellerReturn, travellersToClose, travelUntil, type ClosedBy, type SaleFacts, type TravelFile } from "./lifecycle-rules";
+import { closerOf, CONFIRMED_TRIP, decideReturn, durationText, externalTripEnd, heldSale, marksFollowed, phoneKey, staleToClose, TRAVEL_LABEL, travellerReturn, travellersToClose, travelUntil, type ClosedBy, type SaleFacts, type TravelFile } from "./lifecycle-rules";
 
 // always the service role: the in-app «تحديث» runs the pull with a staff session, and closures are written by the system only
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
@@ -244,6 +244,39 @@ export async function saleHolder(conversationId: number): Promise<{ agentId: num
   const facts = await saleFacts();
   const held = !facts || heldSale({ assigneeId: holder, phone: conv?.meta?.sender?.phone_number ?? null, stageId: conv?.meta?.sender?.lifecycle_stage_id ?? null }, facts);
   return held ? { agentId: holder, name: conv?.meta?.assignee?.name ?? null } : null;
+}
+
+// ---------- «@#@#@#»: the employee followed it up (lifecycle-rules.ts followedSince) ----------
+
+/**
+ * A colleague's private note with the code (the webhook, the moment it is written; the pull as a fallback): kept
+ * on the conversation's row in «العملاء» — only a newer mark replaces an older one.
+ */
+export async function markFollowed(conversationId: number, atSec: number, by: string | null): Promise<void> {
+  if (!conversationId || !atSec) return;
+  const at = new Date(atSec * 1000).toISOString();
+  await db()
+    .from("client_leads")
+    .update({ followed_at: at, followed_by: by })
+    .eq("teletel_conversation_id", conversationId)
+    .or(`followed_at.is.null,followed_at.lt.${at}`);
+}
+
+/** The webhook's private note: the code in it marks the conversation followed. */
+export async function noteWritten(conversationId: number, atSec: number, text: string | null | undefined, by: string | null): Promise<void> {
+  if (marksFollowed(text)) await markFollowed(conversationId, atSec, by);
+}
+
+/**
+ * Each conversation's latest mark, for a reminder to check before it goes out. Empty when it cannot be read (the
+ * column not there yet included): a reminder is then sent as before — never silenced by our own failure.
+ */
+export async function followedMarks(conversationIds: readonly number[]): Promise<Map<number, string>> {
+  const ids = [...new Set(conversationIds.filter((x) => Number.isSafeInteger(x) && x > 0))];
+  if (!ids.length) return new Map();
+  const { data, error } = await db().from("client_leads").select("teletel_conversation_id, followed_at").in("teletel_conversation_id", ids).not("followed_at", "is", null);
+  if (error) return new Map();
+  return new Map(((data ?? []) as { teletel_conversation_id: number; followed_at: string }[]).map((r) => [Number(r.teletel_conversation_id), r.followed_at]));
 }
 
 // ---------- the system's closings ----------

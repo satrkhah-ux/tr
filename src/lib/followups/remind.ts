@@ -3,6 +3,15 @@ import { escapeHtml, staffSend } from "@/lib/telegram/staff-bot";
 import { siteUrl } from "@/lib/telegram/ops-bot";
 import { followupDb, followupRows } from "./service";
 import { FOLLOWUP_SETTINGS_KEY, handlerOf, parseFollowupSettings, STEP_LABELS, todayGroup, WORK_COLS, type WorkRow } from "./rules";
+import { followedMarks } from "@/lib/leads/lifecycle";
+import { followedSince } from "@/lib/leads/lifecycle-rules";
+
+/** the day a follow-up fell due (Riyadh), or the client's answer it waits on — a «@#@#@#» since then has followed it */
+const dueSince = (r: WorkRow): number => {
+  if (r.client_waiting) return Date.parse(r.last_client_at ?? "");
+  const at = Date.parse(r.next_followup_at ?? r.created_at ?? "");
+  return Number.isFinite(at) ? Date.parse(`${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(at)}T00:00:00+03:00`) : NaN;
+};
 
 /** «تنبيهاتي» for the follow-ups (owner order 4 D): each seller's files due today at 10:00 and 16:00 Riyadh. */
 const HOURS = [10, 16];
@@ -33,7 +42,10 @@ export async function followupDigest(nowMs = Date.now()): Promise<{ sent: number
   ]);
   const settings = parseFollowupSettings(setting?.value);
   const mine = new Map<string, WorkRow[]>();
+  // «@#@#@#»: the employee followed it up since it fell due — not in the reminder (the owner, 2026-10-29)
+  const marks = await followedMarks((data as WorkRow[]).map((r) => r.conversation_id));
   for (const r of data as WorkRow[]) {
+    if (followedSince(marks.get(r.conversation_id), dueSince(r))) continue;
     const who = todayGroup(r, nowMs) ? handlerOf(r, settings) : null;
     if (who && who !== "managers") mine.set(who, [...(mine.get(who) ?? []), r]);
   }

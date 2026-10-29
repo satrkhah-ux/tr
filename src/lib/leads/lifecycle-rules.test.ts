@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { closerOf, decideReturn, durationText, heldSale, phoneKey, readAutocloseHours, staleToClose, travellerReturn, travellersToClose, travelUntil } from "./lifecycle-rules";
+import { closerOf, decideReturn, durationText, followedSince, heldSale, marksFollowed, phoneKey, readAutocloseHours, staleToClose, travellerReturn, travellersToClose, travelUntil } from "./lifecycle-rules";
+
+describe("«@#@#@#»: the employee followed it, no reminder (the owner, 2026-10-29)", () => {
+  it("the token anywhere in the note marks it; nothing else does", () => {
+    expect(marksFollowed("تواصلت مع العميل بالهاتف @#@#@#")).toBe(true);
+    expect(marksFollowed("@#@#@")).toBe(false);
+    expect(marksFollowed(null)).toBe(false);
+  });
+  it("only a mark at or after what the reminder is about silences it", () => {
+    const waiting = Date.parse("2026-10-29T08:00:00Z");
+    expect(followedSince("2026-10-29T08:30:00Z", waiting)).toBe(true);
+    expect(followedSince("2026-10-29T08:00:00Z", waiting)).toBe(true);
+    expect(followedSince("2026-10-29T07:59:00Z", waiting)).toBe(false);
+    expect(followedSince(null, waiting)).toBe(false);
+    expect(followedSince("not a date", waiting)).toBe(false);
+  });
+});
 
 describe("a sale stays with its employee (the owner, 2026-10-29: 39733)", () => {
   const sold = { phones: new Set(["550000001"]), wonStages: new Set([36, 4]) };

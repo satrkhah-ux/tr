@@ -27,6 +27,18 @@ export function closerOf(events: readonly { kind: string; at: number; text: stri
 
 export type ReturnDecision = { act: "assign"; agentId: number } | { act: "keep" } | { act: "unassign" };
 
+/**
+ * «@#@#@#» in a private note: the employee followed this conversation up (the owner, 2026-10-29) — no reminder
+ * about it from Murad or the system for what came before the note. A newer client message is news again.
+ */
+export const FOLLOWED_TOKEN = "@#@#@#";
+export const marksFollowed = (text: string | null | undefined): boolean => Boolean(text?.includes(FOLLOWED_TOKEN));
+/** followed at or after the thing a reminder is about (a client's waiting, an offer, a due day) */
+export function followedSince(followedAt: string | null | undefined, anchorMs: number): boolean {
+  const t = followedAt ? Date.parse(followedAt) : NaN;
+  return Number.isFinite(t) && Number.isFinite(anchorMs) && t >= anchorMs;
+}
+
 /** who bought from us: the mobiles of every confirmed or completed trip, and Teletel's «won» classification stages */
 export type SaleFacts = { phones: ReadonlySet<string>; wonStages: ReadonlySet<number> };
 

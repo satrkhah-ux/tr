@@ -9,7 +9,8 @@ import { muradMessageIds } from "@/lib/murad/core";
 import { allRows } from "@/lib/data/all-rows";
 import { classifyConversationInquiry } from "./request-classification";
 import { inferConversationDestination } from "./destination";
-import { onClientReturn, recordClosed } from "./lifecycle";
+import { markFollowed, onClientReturn, recordClosed } from "./lifecycle";
+import { marksFollowed } from "./lifecycle-rules";
 
 /**
  * «العملاء» phase two (the owner, 2026-10-17: «كل شيء تلقائي، خاصة اسم العميل»):
@@ -284,6 +285,9 @@ export async function pullTeletel(supabase: SupabaseClient): Promise<TeletelPull
         toTrace.slice(i, i + 5).map(async (c) => {
           const events = await conversationEvents(c.id, TIMELINE_PAGES);
           if (!events) return;
+          // «@#@#@#» the webhook missed: the latest such note marks it followed (lifecycle.ts markFollowed)
+          const followed = events.filter((e) => e.isPrivate && marksFollowed(e.text)).at(-1);
+          if (followed) await markFollowed(c.id, followed.at, followed.sender);
           const stages = timelineFrom(events, c.createdAt, isTeam, ignore);
           const [first, second] = stages;
           const patch: Record<string, unknown> = { handoffs: stages, timeline_seen_at: c.lastActivityAt };

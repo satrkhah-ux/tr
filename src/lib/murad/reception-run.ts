@@ -33,7 +33,8 @@ import { getRates } from "@/lib/data/rates-actions";
 import { USD_SAR_DEFAULT } from "@/lib/offer/pricing";
 import { askText, holdToText, missing, offerDraftData, offerText, priceOffer, readOffers, routeCity, tripChanged, tripDays, tripSummary, type OfferAsk, type OfferCountry } from "./auto-offer";
 import { loadPlaces } from "@/lib/leads/teletel-pull";
-import { returnedToEmployee, saleHolder } from "@/lib/leads/lifecycle";
+import { followedMarks, returnedToEmployee, saleHolder } from "@/lib/leads/lifecycle";
+import { followedSince } from "@/lib/leads/lifecycle-rules";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
 import { withTeaching } from "./lessons-text";
@@ -1174,8 +1175,11 @@ async function holdSweep(service: SupabaseClient, fresh: OpenConversation[], now
     .gte("created_at", new Date((nowSec - VISIT_SEC) * 1000).toISOString());
   const rows = (data ?? []) as { conversation_id: number; reason: string | null; created_at: string }[];
   const hours = parseHours(hoursRaw);
+  // «@#@#@#»: the colleague followed it up since the client wrote — nothing to say, nobody to remind (the owner, 2026-10-29)
+  const followed = await followedMarks(late.map((c) => c.id));
   let n = 0;
   for (const c of late.slice(0, 5)) {
+    if (followedSince(followed.get(c.id), c.waitingSince * 1000)) continue;
     const mine = rows.filter((r) => Number(r.conversation_id) === c.id);
     const handedAt = Math.max(0, ...mine.filter((r) => r.reason?.startsWith("routed") || r.reason === "offer:sent" || r.reason === "offer:updated" || r.reason === "offer:handoff").map((r) => Date.parse(r.created_at) / 1000));
     // not handed over by Murad, or the client has waited since before (the hand-over was the answer)

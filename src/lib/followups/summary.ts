@@ -6,6 +6,8 @@ import { isWorkingTime, parseHours } from "@/lib/murad/reception";
 import { addTeletelNote, listOpenConversations, teletelGet, whatsappTemplateStatus } from "@/lib/providers/teletel";
 import { WA_TEMPLATES } from "@/lib/operations/client-messages";
 import { followupDb, followupPeople, followupRows } from "./service";
+import { followedMarks } from "@/lib/leads/lifecycle";
+import { followedSince } from "@/lib/leads/lifecycle-rules";
 import { FOLLOWUP_SETTINGS_KEY, isOfferRow, offerLine, parseFollowupSettings, readable, STEP_TEMPLATE, TWO_HOUR_WINDOW_MS, WORK_COLS, type RawThreadMsg, type WorkRow } from "./rules";
 import { parseSummary, renderThread, SUMMARY_SCHEMA, SUMMARY_VERSION, SUMMARY_SYSTEM, summaryPrompt, toSummaryMsg, unheardAfterUs, type FollowupSummary, type SummaryMsg } from "./summary-core";
 
@@ -103,6 +105,8 @@ export async function summarizeDue(): Promise<{ made: number; noted: number }> {
     }
     const settings = parseFollowupSettings(setting?.value);
     const people = settings.murad === "note" ? await followupPeople() : [];
+    // «@#@#@#» since the offer: the seller followed it up — Murad's two-hour note is not sent (the owner, 2026-10-29)
+    const marks = settings.murad === "note" ? await followedMarks(rows.map((r) => r.conversation_id)) : new Map<number, string>();
     let made = 0, noted = 0;
     for (const row of rows.slice(0, PER_RUN)) {
       const summary = await summarize(row, activity.get(row.conversation_id) ?? Math.floor(now / 1000)).catch(() => null);
@@ -112,7 +116,7 @@ export async function summarizeDue(): Promise<{ made: number; noted: number }> {
       const due = row.next_followup_at && Date.parse(row.next_followup_at) <= now;
       // the two-hour note only while it is news (the offer at most six hours old) and in the office's hours (murad_reception_hours)
       const fresh = row.offer_at && now - Date.parse(row.offer_at) <= TWO_HOUR_WINDOW_MS && isWorkingTime(new Date(now), hours);
-      if (settings.murad === "note" && row.status === "open" && row.step === 0 && due && fresh && !row.client_waiting && !row.murad_note_at && summary.draft && seller) {
+      if (settings.murad === "note" && row.status === "open" && row.step === 0 && due && fresh && !row.client_waiting && !row.murad_note_at && summary.draft && seller && !followedSince(marks.get(row.conversation_id), Date.parse(row.offer_at ?? ""))) {
         const to = noteFor({ assignee: seller.name, assigneeId: seller.agentId, team: null });
         const posted = await addTeletelNote(row.conversation_id, [`💡 مُراد — متابعة العرض بعد ساعتين ${to}`.trim(), summary.advice, `رسالة مقترحة:\n${summary.draft}`, "أرسلها من «متابعتي» كما هي أو بعد تعديلها."].filter(Boolean).join("\n\n"));
         if (posted) {

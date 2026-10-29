@@ -3,6 +3,8 @@ import { myDay } from "@/lib/mine/day";
 import { secretaryDb, secretarySettings } from "@/lib/secretary/core";
 import { dedupeKeys } from "./core";
 import { notifyEmployee } from "./notify";
+import { followedMarks } from "@/lib/leads/lifecycle";
+import { followedSince } from "@/lib/leads/lifecycle-rules";
 
 /**
  * The notification sweep on the minute job: for every employee whose system is
@@ -28,10 +30,14 @@ export async function sweepNotifications(nowMs = Date.now()): Promise<Record<str
 
   let created = 0;
   const today = riyadhDay(nowMs);
+  const dayStart = Date.parse(`${today}T00:00:00+03:00`);
   for (const employeeId of online) {
     const day = await myDay(employeeId, nowMs).catch(() => null);
     if (!day) continue;
+    // «@#@#@#»: the employee followed the conversation up — no reminder about it (the owner, 2026-10-29); their own «ذكّرني» stays
+    const marks = await followedMarks(day.items.map((i) => i.conversationId ?? 0));
     for (const i of day.items.slice(0, 12)) {
+      if (i.kind !== "reminder" && i.conversationId && followedSince(marks.get(i.conversationId), i.kind === "waiting" && i.since ? i.since : dayStart)) continue;
       const base = { employeeId, source: "secretary", href: "/secretary" as const };
       const name = i.name || (i.conversationId ? `عميل #${i.conversationId}` : "عميل");
       const r =
