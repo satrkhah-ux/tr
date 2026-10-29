@@ -409,6 +409,8 @@ export type OpenConversation = {
   preview: string;
   /** the conversation's Teletel labels («رحلة ماليزيا»…) — «العملاء» classifies by them */
   labels: string[];
+  /** the contact's Teletel classification (listLifecycleStages: «خدمة مكتملة» is a «won» stage) */
+  stageId?: number | null;
 };
 
 type RawConversation = {
@@ -422,7 +424,7 @@ type RawConversation = {
   last_non_activity_message?: { content?: string | null } | null;
   labels?: string[];
   meta?: {
-    sender?: { id?: number; name?: string | null; phone_number?: string | null; custom_attributes?: Record<string, unknown> | null };
+    sender?: { id?: number; name?: string | null; phone_number?: string | null; custom_attributes?: Record<string, unknown> | null; lifecycle_stage_id?: number | null };
     assignee?: { id?: number; name?: string | null } | null;
     team?: { id?: number; name?: string | null } | null;
   };
@@ -564,6 +566,7 @@ function toConversationRow(c: RawConversation & { id: number }, sender: NonNulla
     canReply: c.can_reply === true,
     preview: (c.last_non_activity_message?.content ?? "").slice(0, 160),
     labels: Array.isArray(c.labels) ? c.labels : [],
+    stageId: typeof sender?.lifecycle_stage_id === "number" ? sender.lifecycle_stage_id : null,
   };
 }
 
@@ -690,6 +693,24 @@ export async function teletelMessageStatus(conversationId: number, messageId: nu
 export function teletelConversationUrl(conversationId: number): string | null {
   const config = getTeletelConfig();
   return config ? `${config.baseUrl}/app/accounts/${config.accountId}/conversations/${conversationId}` : null;
+}
+
+export type LifecycleStage = { id: number; name: string; category: string };
+let stagesCache: { at: number; stages: LifecycleStage[] } | null = null;
+
+/**
+ * Teletel's client classification stages («جديد» … «تم الاستلام», «خدمة مكتملة») with their category —
+ * «won» is a client who bought. Kept ten minutes; the last copy when Teletel cannot be read.
+ */
+export async function listLifecycleStages(): Promise<LifecycleStage[]> {
+  if (stagesCache && Date.now() - stagesCache.at < 10 * 60_000) return stagesCache.stages;
+  const config = getTeletelConfig();
+  if (!config) return [];
+  const res = await api<{ payload?: { id?: number; name?: string; category?: string }[] }>(config, "/teletel/lifecycle/stages");
+  if (!Array.isArray(res?.payload)) return stagesCache?.stages ?? [];
+  const stages = res.payload.filter((x) => typeof x.id === "number").map((x) => ({ id: x.id as number, name: x.name ?? "", category: x.category ?? "" }));
+  stagesCache = { at: Date.now(), stages };
+  return stages;
 }
 
 export type TeletelTeam = { id: number; name: string };

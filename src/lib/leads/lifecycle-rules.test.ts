@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { closerOf, decideReturn, durationText, phoneKey, readAutocloseHours, staleToClose, travellerReturn, travellersToClose, travelUntil } from "./lifecycle-rules";
+import { closerOf, decideReturn, durationText, heldSale, phoneKey, readAutocloseHours, staleToClose, travellerReturn, travellersToClose, travelUntil } from "./lifecycle-rules";
+
+describe("a sale stays with its employee (the owner, 2026-10-29: 39733)", () => {
+  const sold = { phones: new Set(["550000001"]), wonStages: new Set([36, 4]) };
+  it("held by an employee and the client bought — a trip by the mobile, or Teletel's «won» stage — is protected", () => {
+    expect(heldSale({ assigneeId: 71, phone: "+966550000001", stageId: 50 }, sold)).toBe(true);
+    expect(heldSale({ assigneeId: 71, phone: "+966599999999", stageId: 36 }, sold)).toBe(true);
+    expect(heldSale({ assigneeId: 71, phone: "0550000001" }, sold)).toBe(true);
+  });
+  it("nobody holds it, or nothing was bought: the normal rules", () => {
+    expect(heldSale({ assigneeId: null, phone: "+966550000001", stageId: 36 }, sold)).toBe(false);
+    expect(heldSale({ assigneeId: 71, phone: "+966599999999", stageId: 50 }, sold)).toBe(false);
+    expect(heldSale({ assigneeId: 71, phone: null, stageId: null }, sold)).toBe(false);
+  });
+});
 
 const agents = [
   { id: 30, name: "محمد الحبيب ", email: "m.habib@traveliun.com" },

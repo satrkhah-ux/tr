@@ -2,8 +2,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { parseAutoPhones } from "@/lib/murad/core";
-import { addTeletelLabels, addTeletelNote, assignMuradHandoff, conversationEvents, intlPhone, listAssignableAgents, listOpenConversations, setTeletelStatus, teletelGet, unassignTeletel, type OpenConversation } from "@/lib/providers/teletel";
-import { closerOf, CONFIRMED_TRIP, decideReturn, durationText, externalTripEnd, phoneKey, staleToClose, TRAVEL_LABEL, travellerReturn, travellersToClose, travelUntil, type ClosedBy, type TravelFile } from "./lifecycle-rules";
+import { addTeletelLabels, addTeletelNote, assignMuradHandoff, conversationEvents, intlPhone, listAssignableAgents, listLifecycleStages, listOpenConversations, setTeletelStatus, teletelGet, unassignTeletel, type OpenConversation } from "@/lib/providers/teletel";
+import { closerOf, CONFIRMED_TRIP, decideReturn, durationText, externalTripEnd, heldSale, phoneKey, staleToClose, TRAVEL_LABEL, travellerReturn, travellersToClose, travelUntil, type ClosedBy, type SaleFacts, type TravelFile } from "./lifecycle-rules";
 
 // always the service role: the in-app «تحديث» runs the pull with a staff session, and closures are written by the system only
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
@@ -87,7 +87,7 @@ export async function onClientReturn(conversationId: number, atSec: number, byCl
     await service.from("client_leads").update({ conversation_state: "open", closed_at: null, closed_by_kind: null, closed_by_name: null }).eq("teletel_conversation_id", conversationId);
     return "kept";
   }
-  const conv = await teletelGet<{ meta?: { assignee?: { id?: number } | null; team?: { id?: number } | null; sender?: { phone_number?: string | null } | null } }>(`/conversations/${conversationId}`);
+  const conv = await teletelGet<{ meta?: { assignee?: { id?: number; name?: string } | null; team?: { id?: number } | null; sender?: { phone_number?: string | null; lifecycle_stage_id?: number | null } | null } }>(`/conversations/${conversationId}`);
   const assigneeId = conv?.meta?.assignee?.id ?? null;
   // Murad's test numbers come back unassigned, a new request: the owner tests on them, never an employee's (2026-10-23:
   // 5050 went to its test trip's owner on «مرحبا» — «لا تسندها لموظف»)
@@ -95,12 +95,15 @@ export async function onClientReturn(conversationId: number, atSec: number, byCl
   // a traveller before the return + 3 days: the trip's owner (who holds the file NOW); after, the normal rules
   const file = closure.travel_until && !test ? await travelFileOf(service, closure) : null;
   const travel = closure.travel_until && !test ? travellerReturn(closure.travel_until, riyadhDay(atSec), file?.ownerAgentId ?? null, assigneeId) : null;
-  const decision = test ? ({ act: "unassign" } as const) : (travel ?? decideReturn(closure, assigneeId));
+  // a client who bought, held by an employee: it stays with them — never unassigned, never moved (the owner, 2026-10-29)
+  const facts = test || !assigneeId ? null : await saleFacts();
+  const kept = !test && assigneeId !== null && (facts === null || heldSale({ assigneeId, phone: conv?.meta?.sender?.phone_number ?? null, stageId: conv?.meta?.sender?.lifecycle_stage_id ?? null }, facts));
+  const decision = test ? ({ act: "unassign" } as const) : kept ? ({ act: "keep" } as const) : (travel ?? decideReturn(closure, assigneeId));
   let done = true;
   if (decision.act === "assign") done = await assignMuradHandoff(conversationId, null, decision.agentId);
   if (decision.act === "unassign") done = await unassignTeletel(conversationId);
-  const action = travel ? "returned_to_file_owner" : decision.act === "unassign" ? "unassigned" : "returned_to_employee";
-  const to = decision.act === "assign" ? decision.agentId : decision.act === "keep" ? (travel ? assigneeId : (closure.closed_by_agent_id ?? assigneeId)) : null;
+  const action = kept ? "returned_to_employee" : travel ? "returned_to_file_owner" : decision.act === "unassign" ? "unassigned" : "returned_to_employee";
+  const to = decision.act === "assign" ? decision.agentId : decision.act === "keep" ? (travel || kept ? assigneeId : (closure.closed_by_agent_id ?? assigneeId)) : null;
   await service
     .from("conversation_closures")
     .update({ reopen_action: action, reopened_to_agent_id: to, ...(done ? {} : { reason: "تعذّر الإسناد عند العودة" }) })
@@ -112,7 +115,9 @@ export async function onClientReturn(conversationId: number, atSec: number, byCl
     conversationId,
     test
       ? "🧪 رقم تجربة مُراد — عاد بعد الإغلاق طلباً جديداً غير مسند."
-      : action === "returned_to_file_owner"
+      : kept
+        ? `🔒 عاد العميل — المحادثة باقية مع ${conv?.meta?.assignee?.name ?? "موظفها"}: العميل اشترى منّا، فلا يغلقها النظام ولا ينقلها.`
+        : action === "returned_to_file_owner"
       ? `✈️ عاد العميل المسافر${trip} — المحادثة لصاحب الرحلة ${file?.ownerName ?? ""}، وليست طلباً جديداً${failed}.`
       : action === "unassigned"
         ? "🔁 عاد العميل بعد إغلاق آلي — المحادثة طلب جديد غير مسند."
@@ -194,6 +199,53 @@ async function travelFileOf(service: SupabaseClient, c: Closure): Promise<Travel
   return null;
 }
 
+// ---------- a sale stays with its employee (lifecycle-rules.ts heldSale) ----------
+
+let factsCache: { at: number; facts: SaleFacts } | null = null;
+
+/**
+ * heldSale's facts — the mobiles of every confirmed or completed trip (operations files and the ones entered by
+ * hand) and Teletel's «won» stages — kept a minute. Null when our own files cannot be read: callers then hold still.
+ * ponytail: every trip's phones in memory; a normalized phone column when the trips run to the tens of thousands.
+ */
+export async function saleFacts(): Promise<SaleFacts | null> {
+  if (factsCache && Date.now() - factsCache.at < 60_000) return factsCache.facts;
+  const service = db();
+  const [ops, ext, stages] = await Promise.all([
+    service.from("operations").select("offers(customers!offers_customer_id_fkey(mobile, second_mobile))").in("client_status", [...CONFIRMED_TRIP, "completed"]).neq("execution_status", "cancelled"),
+    service.from("external_trips").select("phone").neq("status", "cancelled"),
+    listLifecycleStages(),
+  ]);
+  if (ops.error || ext.error) return null;
+  const phones = new Set<string>();
+  const add = (p: string | null | undefined) => {
+    const k = phoneKey(p);
+    if (k) phones.add(k);
+  };
+  for (const o of (ops.data ?? []) as unknown as { offers: { customers: { mobile: string | null; second_mobile: string | null } | null } | null }[]) {
+    add(o.offers?.customers?.mobile);
+    add(o.offers?.customers?.second_mobile);
+  }
+  for (const e of (ext.data ?? []) as { phone: string }[]) add(e.phone);
+  const facts: SaleFacts = { phones, wonStages: new Set<number>((stages as { id: number; category: string }[]).filter((x) => x.category === "won").map((x) => x.id)) };
+  factsCache = { at: Date.now(), facts };
+  return facts;
+}
+
+/**
+ * The employee a conversation stays with because the client bought (heldSale), read from Teletel now — null when it
+ * may move. Every hand-over Murad makes asks this first (murad/handover.ts), and so do his reception and the
+ * withdrawal after a warning letter.
+ */
+export async function saleHolder(conversationId: number): Promise<{ agentId: number; name: string | null } | null> {
+  const conv = await teletelGet<{ meta?: { assignee?: { id?: number; name?: string } | null; sender?: { phone_number?: string | null; lifecycle_stage_id?: number | null } | null } }>(`/conversations/${conversationId}`);
+  const holder = conv?.meta?.assignee?.id ?? null;
+  if (!holder) return null;
+  const facts = await saleFacts();
+  const held = !facts || heldSale({ assigneeId: holder, phone: conv?.meta?.sender?.phone_number ?? null, stageId: conv?.meta?.sender?.lifecycle_stage_id ?? null }, facts);
+  return held ? { agentId: holder, name: conv?.meta?.assignee?.name ?? null } : null;
+}
+
 // ---------- the system's closings ----------
 
 /** One closing by the system: recorded before Teletel is asked (the pull then reads it as the system's), undone if Teletel refuses. */
@@ -239,15 +291,20 @@ export async function closeIdle(opts: { hours: number | null; travellers: boolea
   if (!list) return out;
   const nowSec = Math.floor(Date.now() / 1000);
   const today = riyadhDay(nowSec);
+  // never a conversation an employee holds once the client bought (the owner, 2026-10-29: 39733 was closed seven
+  // times by the travellers' class while its seller worked it); our files unreadable: no closing this run
+  const facts = await saleFacts();
+  if (!facts) return out;
+  const free = list.rows.filter((c) => !heldSale(c, facts));
   const files = opts.travellers ? await travelFiles(service, today) : [];
-  for (const { c, file } of travellersToClose(list.rows, files, nowSec, today).slice(0, limit)) {
+  for (const { c, file } of travellersToClose(free, files, nowSec, today).slice(0, limit)) {
     const trip = [file.destination, file.serial].filter(Boolean).join(" · ") || "رحلة مؤكدة";
     const note = `✈️ مؤكد — مسافر قريباً (${trip}، ${file.travelStart ?? "؟"} ← ${file.travelEnd}). أُغلقت المحادثة؛ إذا كتب العميل حتى ${travelUntil(file.travelEnd)} تعود مباشرة إلى ${file.ownerName ?? "صاحب الرحلة"}.`;
     if (await closeOne(service, c, "مؤكد — مسافر قريباً", note, file)) out.travellers += 1;
   }
   if (opts.hours) {
     const travelling = new Set(files.filter((f) => today <= travelUntil(f.travelEnd)).flatMap((f) => f.phones.map((p) => phoneKey(p))).filter((k): k is string => k !== null));
-    const idle = list.rows.filter((c) => !travelling.has(phoneKey(c.phone) ?? ""));
+    const idle = free.filter((c) => !travelling.has(phoneKey(c.phone) ?? ""));
     for (const c of staleToClose(idle, nowSec, opts.hours).slice(0, limit)) {
       const note = `🤖 أُغلقت آلياً («إدارة المحادثات»): لا رد منذ ${durationText(opts.hours)} وآخر رسالة منّا. إذا كتب العميل تعود طلباً جديداً.`;
       if (await closeOne(service, c, `لا رد منذ ${durationText(opts.hours)} وآخر رسالة منّا`, note, null)) out.idle += 1;
