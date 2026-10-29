@@ -113,3 +113,41 @@ export async function createCheckout(input: CheckoutInput): Promise<SupplierOutc
     return { kind: "unreachable", message: err instanceof Error ? err.name : "network" };
   }
 }
+
+export type OrderStatus = { status: "paid" | "pending" | "failed" | "expired"; paidAmount?: number; mock: boolean };
+
+/**
+ * Tamara's order states → ours. Paid only once Tamara has AUTHORISED it
+ * (authorised / captured): «approved» still waits on the merchant's authorise
+ * call (or auto-authorise on the account), so it stays pending — never a
+ * payment recorded that may still fall through.
+ */
+export function parseOrderResponse(status: number, json: unknown): SupplierOutcome<OrderStatus> {
+  const body = (json ?? {}) as { status?: string; total_amount?: { amount?: number | string }; message?: string };
+  if (status < 200 || status >= 300 || !body.status) return { kind: "rejected", code: status, message: body.message || `HTTP ${status}` };
+  const s = body.status.toLowerCase();
+  const amount = Number(body.total_amount?.amount);
+  if (["authorised", "fully_captured", "partially_captured"].includes(s)) {
+    return { kind: "ok", data: { status: "paid", ...(Number.isFinite(amount) && amount > 0 ? { paidAmount: amount } : {}), mock: false } };
+  }
+  if (s === "expired") return { kind: "ok", data: { status: "expired", mock: false } };
+  if (s === "declined" || s === "canceled" || s === "cancelled") return { kind: "ok", data: { status: "failed", mock: false } };
+  return { kind: "ok", data: { status: "pending", mock: false } };
+}
+
+export async function getOrderStatus(orderId: string): Promise<SupplierOutcome<OrderStatus>> {
+  const { token, mock, base } = config();
+  if (mock) return { kind: "ok", data: { status: "pending", mock: true } };
+  try {
+    const res = await fetch(`${base}/orders/${encodeURIComponent(orderId)}`, {
+      headers: { authorization: `Bearer ${token}`, accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    const json: unknown = await res.json().catch(() => null);
+    if (json === null && res.status >= 500) return { kind: "unreachable", message: `HTTP ${res.status}` };
+    return parseOrderResponse(res.status, json);
+  } catch (err) {
+    return { kind: "unreachable", message: err instanceof Error ? err.name : "network" };
+  }
+}

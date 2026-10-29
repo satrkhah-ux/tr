@@ -2,7 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
@@ -82,6 +82,21 @@ export async function preparePaymentLink(operationId: string, input: { provider:
     }
     if (outcome.kind !== "ok") return { ok: false, error: outcome.kind === "rejected" ? "pay.err.rejected" : "pay.err.unreachable" };
 
+    // kept so the 10-minute job can record it once paid (payment-links-poll.ts) — service role: the table has no policy
+    const invoiceId = "invoiceId" in outcome.data ? outcome.data.invoiceId : (outcome.data.orderId ?? outcome.data.checkoutId);
+    const { error: kept } = await (createSupabaseServiceClient() as unknown as SupabaseClient).from("payment_links").insert({
+      operation_id: operationId,
+      provider: input.provider,
+      invoice_id: invoiceId,
+      amount,
+      currency: c.currency,
+      url: outcome.data.url,
+      mock: outcome.data.mock,
+      created_by: await getCurrentEmployeeId(),
+    });
+    // a link nobody would ever record must not reach the client
+    if (kept && kept.code !== "23505") return { ok: false, error: "err.db" };
+
     await logAudit({
       action: "payment_link.prepared",
       entity: "operations",
@@ -126,6 +141,7 @@ export async function sendPaymentLink(operationId: string, input: { url: string;
       approved_by: await getCurrentEmployeeId(),
       sent_at: new Date().toISOString(),
     });
+    await (createSupabaseServiceClient() as unknown as SupabaseClient).from("payment_links").update({ sent_at: new Date().toISOString() }).eq("operation_id", operationId).eq("url", input.url);
     await logAudit({ action: "payment_link.sent", entity: "operations", entity_id: operationId, meta: { url: input.url } });
     return { ok: true };
   } catch {

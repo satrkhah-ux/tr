@@ -19,6 +19,7 @@ for (const line of readFileSync(join(root, ".env.local"), "utf8").split(/\r?\n/)
 }
 
 const sql = readFileSync(join(root, "supabase/migrations/20261029140000_ops_payments.sql"), "utf8");
+const linksSql = readFileSync(join(root, "supabase/migrations/20261029140200_payment_links.sql"), "utf8");
 const c = new pg.Client({ connectionString: process.env.SUPABASE_DB_URL });
 await c.connect();
 const one = async (q) => (await c.query(q)).rows[0];
@@ -46,6 +47,29 @@ try {
     "select data_type, is_nullable from information_schema.columns where table_schema='public' and table_name='operation_payments' and column_name='expected_settlement_on'",
   );
   check("operation_payments.expected_settlement_on exists, a nullable date", sc?.data_type === "date" && sc?.is_nullable === "YES");
+  await c.query(linksSql);
+  const lt = await one("select relrowsecurity r from pg_class where oid = 'public.payment_links'::regclass");
+  check("payment_links exists with RLS on", lt?.r === true);
+  const grants = await one("select count(*)::int n from information_schema.role_table_grants where table_schema='public' and table_name='payment_links' and grantee in ('anon','authenticated')");
+  check("payment_links: no grant to anon/authenticated", grants.n === 0);
+  const ux = await one("select indexdef d from pg_indexes where schemaname='public' and indexname='operation_payments_provider_ref_key'");
+  check("operation_payments.provider_ref is unique", Boolean(ux?.d?.includes("UNIQUE")));
+  const op = await one("select id from public.operations limit 1");
+  if (op) {
+    await c.query("savepoint dup");
+    const ins = "insert into public.operation_payments (operation_id, amount, kind, method, paid_at, provider_ref) values ($1, 1, 'deposit', 'link', current_date, 'myfatoorah:dry-run')";
+    await c.query(ins, [op.id]);
+    let second = "inserted";
+    try {
+      await c.query(ins, [op.id]);
+    } catch (e) {
+      second = e.code;
+    }
+    await c.query("rollback to savepoint dup");
+    check(`a paid link twice → the second insert refused (${second})`, second === "23505");
+  }
+  const reg = await one("select count(*)::int n from public.integrations where check_key = 'job_payment_links'");
+  check("«الربط الخارجي» lists the job", reg.n === 1);
   const after = await one("select count(*)::int n from public.operation_payments");
   check(`no payment row touched (${before.n} before, ${after.n} after)`, before.n === after.n);
 } finally {

@@ -23,10 +23,9 @@ import {
 } from "@/lib/operations/state";
 import { currentCan } from "@/lib/roles/current";
 import { gateCaseManager, gateOperation, mayWork, opsAccess } from "@/lib/operations/access";
-import { mintReceipt } from "@/lib/data/payment-receipt";
-import { caseTotal, isIsoDate, riyadhDate } from "@/lib/operations/payments";
-import { expectedSettlement, isBnpl, type PayMethod } from "@/lib/payments/methods";
-import { getSettlementRule } from "@/lib/data/app-settings";
+import { caseTotal } from "@/lib/operations/payments";
+import type { PayMethod } from "@/lib/payments/methods";
+import { insertPayment } from "@/lib/operations/record-payment";
 
 /**
  * «العمليات» — the execution hub. A case's two statuses move in three places,
@@ -424,34 +423,11 @@ export async function recordPayment(input: {
   try {
     const supabase = await db();
     const kind = input.kind ?? "deposit";
-    const recordedBy = await getCurrentEmployeeId();
-    // the office's day, not UTC's — a payment taken at 1am Riyadh is today's
-    const paidAt = isIsoDate(input.paid_at) ? input.paid_at : riyadhDate();
-    let id = "";
-    // the receipt number is a Riyadh day + 4 random characters: a clash is rare, not impossible
-    for (let attempt = 0; !id; attempt++) {
-      const { data, error } = await supabase
-        .from("operation_payments")
-        .insert({
-          operation_id: input.operation_id,
-          amount: Math.round(input.amount * 100) / 100,
-          currency: input.currency ?? "SAR",
-          kind,
-          method: input.method ?? null,
-          reference: input.reference?.trim() || null,
-          paid_at: paidAt,
-          // Tabby/Tamara pay us out on their weekly day — the daily run reminds the seller then
-          expected_settlement_on: isBnpl(input.method) ? expectedSettlement(paidAt, await getSettlementRule()) : null,
-          recorded_by: recordedBy,
-          note: input.note?.trim() || null,
-          // a refund is money going out — it gets no «سند قبض»
-          ...(kind === "refund" ? {} : mintReceipt()),
-        })
-        .select("id")
-        .single();
-      if (data) id = (data as { id: string }).id;
-      else if (error?.code !== "23505" || attempt >= 2) return { ok: false, error: "err.createFailed" };
-    }
+    // named fields only — what the browser sends never reaches provider_ref
+    const { operation_id, amount, currency, method, reference, paid_at, note } = input;
+    const res = await insertPayment(supabase, { operation_id, amount, currency, kind, method, reference, paid_at, note, recorded_by: await getCurrentEmployeeId() });
+    if (!("id" in res)) return { ok: false, error: "err.createFailed" };
+    const id = res.id;
 
     await logAudit({
       action: "payment.recorded",

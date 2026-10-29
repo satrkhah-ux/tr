@@ -454,6 +454,16 @@ const CHECKS: Check[] = [
     ),
   },
   {
+    id: "job_payment_links",
+    group: "jobs",
+    label: "dev.c.paymentLinksJob",
+    // the VPS crontab: every 10 minutes (api/ops/payments/route.ts); late after 30
+    run: cronCheck("payment_links", 30 * 60 * 1000, (s) => ({
+      key: "dev.d.paymentLinksJob",
+      params: { checked: Number(s.checked ?? 0), paid: Number(s.paid ?? 0), closed: Number(s.closed ?? 0) },
+    })),
+  },
+  {
     id: "job_leads_pull",
     group: "jobs",
     label: "dev.c.leadsPullJob",

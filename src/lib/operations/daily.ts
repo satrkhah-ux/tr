@@ -13,10 +13,8 @@ import { hotelAtRisk, type ClientBookingRow } from "./client-booking-state";
 import { notifyDueWaits, travelBlockers } from "@/lib/data/wizard-case";
 import { translate } from "@/lib/i18n";
 import { readyLabel } from "./wizard/index";
-import { notifyEmployee } from "@/lib/notifications/notify";
-import { escapeHtml, staffSend } from "@/lib/telegram/staff-bot";
-import { siteUrl } from "@/lib/telegram/ops-bot";
 import { BNPL_METHODS, settlementReminder } from "@/lib/payments/methods";
+import { tellEmployee } from "./payment-links-poll";
 
 /**
  * The operations day (operations order 6), run once a morning by the server's
@@ -181,17 +179,7 @@ async function settlementReminders(supabase: SupabaseClient, today: string): Pro
     if (!offer?.employee_id) continue;
     const { error } = await supabase.from("operation_alerts").insert({ operation_id: p.operation_id, kind: "bnpl_settlement", ref: p.id });
     if (error) continue; // the unique key: already reminded
-    await notifyEmployee({
-      employeeId: offer.employee_id,
-      kind: "ops",
-      title: settlementReminder(name, p.method),
-      href: `/operations/${p.operation_id}`,
-      source: "operations",
-      dedupeKey: `bnpl:${p.id}`,
-    });
-    const { data: emp } = await supabase.from("employees").select("telegram_chat_id").eq("id", offer.employee_id).eq("status", "Active").maybeSingle();
-    const chat = Number((emp as { telegram_chat_id: number | string | null } | null)?.telegram_chat_id);
-    if (chat) await staffSend(chat, `💳 ${escapeHtml(settlementReminder(name, p.method))}`, [[{ text: "افتح الملف", url: `${siteUrl()}/operations/${p.operation_id}` }]], {}, null);
+    await tellEmployee(supabase, offer.employee_id, settlementReminder(name, p.method), `/operations/${p.operation_id}`, `bnpl:${p.id}`);
     sent += 1;
   }
   return sent;
