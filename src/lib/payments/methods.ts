@@ -62,6 +62,9 @@ export const DEFAULT_FEES: PaymentFees = {
   transfer: { pct: 0, fixed: 0 },
 };
 
+/** What a recorded payment may carry (operation_payments.method) — every PayMethod; kept for callers of 3b90d17. */
+export type RecordedMethod = PayMethod;
+
 export const isPayMethod = (v: unknown): v is PayMethod => typeof v === "string" && (PAY_METHODS as readonly string[]).includes(v);
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
