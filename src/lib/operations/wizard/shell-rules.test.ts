@@ -8,7 +8,7 @@ import { documentPlan, documentsReadiness, dueDocuments, sameDocument, snapshotK
 import { followUpOf, readWaits, withoutWaits } from "./followup";
 import { bookingStepStates, firstOpenStep, itemTone, ownStates, readiness, readyToTravel, staleWaits, stepStates, stepTone } from "./index";
 import { kindOnTrip, matchPassport, passportSummary, passportsReadiness, passportsState } from "./passports";
-import { clientStatusUnbacked, paidState, paymentPrefill, paymentReadiness } from "./payment";
+import { clientStatusUnbacked, paidState, paymentChoices, paymentPrefill, paymentReadiness } from "./payment";
 import { WIZARD_STEPS, type WizardCase } from "./types";
 
 const TODAY = "2026-10-17";
@@ -151,6 +151,20 @@ describe("payment", () => {
     expect(paymentPrefill(wizardCase({ payments: [pay(2000)] }))).toMatchObject({ amount: 3000, kind: "installment" });
     expect(paymentPrefill(wizardCase({ payments: [pay(10000)] }))).toBeNull();
     expect(paymentPrefill(wizardCase({ operation: op({ total: null }) }))).toBeNull();
+  });
+
+  it("offers «سدّد قسطاً» as the next line and «دفع كامل» as the whole rest (the owner, 2026-10-29)", () => {
+    expect(paymentChoices(wizardCase())).toMatchObject({
+      installment: { amount: 5000, kind: "deposit" },
+      full: { amount: 10000, kind: "final" },
+    });
+    expect(paymentChoices(wizardCase({ payments: [pay(2000)] }))).toMatchObject({
+      installment: { amount: 3000, kind: "installment" },
+      full: { amount: 8000, kind: "final" },
+    });
+    expect(paymentChoices(wizardCase({ payments: [pay(10000)] }))).toBeNull();
+    // the agreed price (a Tabby fee folded in) is what the choices count against
+    expect(paymentChoices(wizardCase({ operation: op({ total: 10600 }) }))?.full.amount).toBe(10600);
   });
 
   it("follows the agreed schedule when there is one", () => {
