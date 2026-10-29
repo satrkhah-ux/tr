@@ -113,7 +113,6 @@ export async function createRepackage(customer?: Partial<RepackageCustomer>): Pr
   }
 }
 
-export type { RepackageRecord };
 
 export async function getRepackage(id: string): Promise<RepackageRecord | null> {
   return loadRepackage(id);
