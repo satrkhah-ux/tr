@@ -5,7 +5,7 @@ import { buildOpsDigest } from "@/lib/telegram/ops-digest";
 import { AUTO_FOLLOWUP_MAX_MINUTES } from "@/lib/sla/classify";
 import { allRows } from "@/lib/data/all-rows";
 import { getTeletelConfig, teletelGet } from "@/lib/providers/teletel";
-import { anomalies, LEAD_TICKET_COLS, teletelEmployees, ticketMinutes, ticketsFromLeads, type LeadForTicket } from "./anomalies";
+import { anomalies, LEAD_TICKET_COLS, measuredTickets, teletelEmployees, ticketMinutes, ticketsFromLeads, type LeadForTicket } from "./anomalies";
 import type { EyeReport, EyeSnapshot, Note } from "./types";
 
 /**
@@ -48,9 +48,11 @@ type EmployeeRow = {
  * manager's office TV where visitors sit (lib/manager-screen); the bot's
  * briefing keeps them. `since` — the conversations the response figures read
  * from: the bot's last week by default, the TV's today («شاشة المدير لمعالجة
- * الأمور اليوم وليس للأيام السابقة», the owner, 2026-10-19).
+ * الأمور اليوم وليس للأيام السابقة», the owner, 2026-10-19). `exemptEmployeeIds` — the colleagues who carry no lateness
+ * («لا يُحسب عليهم تأخير», 2026-10-29): their tickets are not in the waiting and response figures or notes (the TV passes them;
+ * the bot's briefing does not).
  */
-export async function buildEyeReport({ clientNames = true, since }: { clientNames?: boolean; since?: string } = {}): Promise<EyeReport> {
+export async function buildEyeReport({ clientNames = true, since, exemptEmployeeIds }: { clientNames?: boolean; since?: string; exemptEmployeeIds?: ReadonlySet<string> } = {}): Promise<EyeReport> {
   const now = new Date();
   const nowIso = now.toISOString();
   const { day } = riyadhParts(now);
@@ -105,6 +107,7 @@ export async function buildEyeReport({ clientNames = true, since }: { clientName
     actionsByActor.set(entry.actor_id, (actionsByActor.get(entry.actor_id) ?? 0) + 1);
   }
 
+  const everyTicket = ticketsFromLeads(leadRes.data as LeadForTicket[], new Map(employees.map((e) => [e.id, e.arabic_name]))).map((t) => (clientNames ? t : { ...t, customer: null }));
   const snapshot: EyeSnapshot = {
     employees: employees.map((e) => {
       const att = attendance.get(e.id);
@@ -121,9 +124,7 @@ export async function buildEyeReport({ clientNames = true, since }: { clientName
         works_in_teletel: unknownAgents || inTeletel.has(e.id),
       };
     }),
-    tickets: ticketsFromLeads(leadRes.data as LeadForTicket[], new Map(employees.map((e) => [e.id, e.arabic_name]))).map((t) =>
-      clientNames ? t : { ...t, customer: null },
-    ),
+    tickets: measuredTickets(everyTicket, exemptEmployeeIds),
     audit: audit.map((a) => ({
       action: a.action,
       actor_id: a.actor_id,
@@ -143,7 +144,8 @@ export async function buildEyeReport({ clientNames = true, since }: { clientName
 
   const openTickets = snapshot.tickets.filter((t) => !t.responded_at);
   const answeredToday = snapshot.tickets.filter((t) => t.responded_at && riyadhParts(t.responded_at).day === day);
-  const openedToday = snapshot.tickets.filter((t) => riyadhParts(t.created_at).day === day);
+  // how many came in is a volume, not a wait: the exempt colleagues' conversations are in it
+  const openedToday = everyTicket.filter((t) => riyadhParts(t.created_at).day === day);
   const durations = answeredToday.map((t) => ticketMinutes(t, nowIso)).filter((m): m is number => m != null);
   const worst = [...openTickets].sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
 

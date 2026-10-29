@@ -222,7 +222,7 @@ function previousContact(r: { id: string; created_at: string }, samePhone: { id:
   return earlier.length ? earlier.reduce((a, b) => (Date.parse(a) > Date.parse(b) ? a : b)) : null;
 }
 
-export type LeadThread = { ok: true; messages: ThreadMessage[]; link: string | null } | { ok: false; error: string };
+export type LeadThread = { ok: true; messages: ThreadMessage[]; link: string | null; historyComplete: boolean } | { ok: false; error: string };
 
 /** What the client wrote: their Teletel conversation (its last five pages), by its id, else found by the phone. */
 export async function leadThread(id: string): Promise<LeadThread> {
@@ -236,7 +236,7 @@ export async function leadThread(id: string): Promise<LeadThread> {
   if (!conversation) return { ok: false, error: "لا توجد محادثة لهذا الرقم في Teletel" };
   const thread = await conversationThread(conversation, 5);
   if (!thread) return { ok: false, error: "تعذّر الوصول إلى Teletel" };
-  return { ok: true, messages: thread.messages, link: `${config.baseUrl}/app/accounts/${config.accountId}/conversations/${conversation}` };
+  return { ok: true, messages: thread.messages, link: `${config.baseUrl}/app/accounts/${config.accountId}/conversations/${conversation}`, historyComplete: thread.historyComplete };
 }
 
 /** a pull now, whatever the clock says («تحديث من الشيت») */

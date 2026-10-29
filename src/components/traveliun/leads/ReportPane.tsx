@@ -6,7 +6,7 @@ import type { Lead } from "@/lib/data/leads";
 import { getReportSupervision, incompleteReasons } from "@/lib/data/daily-report";
 import { toCsv } from "@/lib/data/table-csv";
 import type { Place } from "@/lib/leads/auto";
-import { resolvePlace } from "@/lib/leads/places";
+import { NOTHING, resolvePlace } from "@/lib/leads/places";
 import { fold } from "@/lib/leads/sheet";
 import {
   allRequestsText,
@@ -22,6 +22,7 @@ import {
   movePeriod,
   periodOf,
   placeOf,
+  readQueue,
   reportText,
   requestsFrom,
   visitKey,
@@ -69,11 +70,15 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
   const [q, setQ] = useState("");
   const [withSupervision, setWithSupervision] = useState(false);
   const [supervision, setSupervision] = useState<{ days: number; figures: SupervisionFigures | null } | null>(null);
-  const [busy, setBusy] = useState<"reasons" | "supervision" | null>(null);
+  const [reading, setReading] = useState(false);
+  const [loadingFigures, setLoadingFigures] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  // the conversations whose Teletel thread was already read for a reason — the next press goes on to the next ones
+  // the conversations whose Teletel thread was already read for a reason — the next press goes on to the next ones; and those
+  // Teletel could not answer, tried again after all the others
   const [tried, setTried] = useState<string[]>([]);
+  const [failedIds, setFailedIds] = useState<string[]>([]);
   const latest = useRef(0);
+  const resets = useRef(0);
 
   const nameOf = useMemo(() => new Map(team.map((e) => [e.id, e.arabic_name])), [team]);
   const people = useMemo(() => [...new Set(["مُراد", ...team.map((e) => e.arabic_name)])], [team]);
@@ -103,12 +108,12 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
 
   async function loadSupervision(want: number) {
     const mine = ++latest.current;
-    setBusy("supervision");
+    setLoadingFigures(true);
     const r = await getReportSupervision(want).catch(() => null);
     if (mine !== latest.current) return;
     setSupervision({ days: want, figures: r });
     setNote(r ? null : "أرقام المتابعة غير متاحة الآن — «إشراف المتابعة» لم يُفعَّل بعد أو لا صلاحية لك عليها.");
-    setBusy(null);
+    setLoadingFigures(false);
   }
 
   function go(next: { kind?: PeriodKind; anchor?: string }) {
@@ -159,49 +164,60 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
   }
 
   const open = report.requests.filter((r) => r.bucket === "incomplete" && !r.note?.trim());
-  const toRead = [...new Set(open.map((r) => r.id))].filter((id) => !tried.includes(id));
+  // the ones not read yet — those Teletel could not answer last time after all the others, so they never hold the queue back
+  const toRead = readQueue(open.map((r) => r.id), tried, failedIds);
 
   async function readReasons() {
-    if (toRead.length === 0) return;
-    setBusy("reasons");
+    if (toRead.length === 0 || reading) return;
+    setReading(true);
     setNote(null);
     const sent = toRead.slice(0, 20);
+    const mine = resets.current;
     const res = await incompleteReasons(sent).catch(() => null);
+    // «ألغِ كل التصحيحات» pressed while Teletel was being read: what came back belongs to the reviewer's old page
+    if (mine !== resets.current) {
+      setReading(false);
+      return;
+    }
     if (!res) {
       setNote("تعذّر الوصول إلى Teletel الآن — أعد المحاولة بعد قليل.");
-      setBusy(null);
+      setReading(false);
       return;
     }
     setTried((t) => [...t, ...res.tried]);
+    setFailedIds((f) => [...new Set([...f.filter((id) => !res.tried.includes(id)), ...res.failedIds])]);
     const found = Object.keys(res.reasons).length;
     if (found > 0) {
       setEdits((e) => {
         const next = { ...e };
-        // the reason is the conversation's — it is put on each of its open visits in this period
-        for (const r of open) {
+        // the reason is the conversation's — it goes on each of its visits still unclear and unexplained, in any period, as the page
+        // stands now (a note the reviewer typed meanwhile, or a request moved to another department, is left alone)
+        for (const r of applyEdits(requests, e)) {
           const reason = res.reasons[r.id];
-          if (reason) next[visitKey(r)] = { ...next[visitKey(r)], note: reason };
+          if (reason && r.bucket === "incomplete" && next[visitKey(r)]?.note === undefined) next[visitKey(r)] = { ...next[visitKey(r)], note: reason };
         }
         return next;
       });
     }
-    const left = toRead.length - res.tried.length;
+    const left = toRead.filter((id) => !sent.includes(id)).length;
     setNote(
       [
         found > 0 ? `قرأتُ سبب ${found} من ${res.tried.length} — والباقي يكتبه المراجع.` : res.tried.length > 0 ? "لم يتضح سبب أي طلب من كلام العميل — اكتبه يدوياً." : "",
-        res.failed > 0 ? `تعذّر الوصول إلى Teletel لـ ${res.failed} محادثة — أعد المحاولة لاحقاً.` : "",
-        left > 0 && res.failed === 0 ? `بقي ${left} — اضغط مرة أخرى لقراءة التالي.` : "",
+        res.failedIds.length > 0 ? `تعذّر الوصول إلى Teletel لـ ${res.failedIds.length} محادثة — أعد المحاولة لاحقاً.` : "",
+        left > 0 ? `بقي ${left} — اضغط مرة أخرى لقراءة التالي.` : "",
       ]
         .filter(Boolean)
         .join(" "),
     );
-    setBusy(null);
+    setReading(false);
   }
 
   function reset() {
     if (window.confirm(`تُلغى كل التصحيحات اليدوية (${Object.keys(edits).length})؟`)) {
+      resets.current += 1;
       setEdits({});
       setTried([]);
+      setFailedIds([]);
     }
   }
 
@@ -211,13 +227,20 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
   const at = Math.min(page, pages - 1);
   const edited = Object.keys(edits).length;
 
-  // the destination is typed freely and understood when the field is left: a place of the catalogue sets country and city; any other
-  // text is kept as the place the request is
+  // the destination is typed freely and understood when the field is left: a place of the catalogue sets country and city; a Saudi
+  // place stays the place the request is (never a package's destination); any other text is the country the reviewer means
   function setDestination(r: ReportRequest, typed: string) {
     const value = typed.trim();
     if (value === (placeOf(r) ?? "")) return;
     const hit = resolvePlace(value, places);
-    edit(r, hit.kind === "destination" ? { country: hit.country, city: hit.city, place: null } : { country: null, city: null, place: hit.kind === "origin" ? hit.place : value || null });
+    edit(
+      r,
+      hit.kind === "destination"
+        ? { country: hit.country, city: hit.city, place: null }
+        : hit.kind === "origin"
+          ? { country: null, city: null, place: hit.place }
+          : { country: value && !NOTHING.test(value) ? value : null, city: null, place: null },
+    );
   }
 
   return (
@@ -244,14 +267,14 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
             <input
               type="checkbox"
               checked={withSupervision}
-              disabled={!reachesToday || busy === "supervision"}
+              disabled={!reachesToday || loadingFigures}
               onChange={(e) => {
                 setWithSupervision(e.target.checked);
                 if (e.target.checked) void loadSupervision(days);
               }}
             />
             أضف أرقام متابعة الموظفين
-            {busy === "supervision" ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            {loadingFigures ? <Loader2 className="size-3.5 animate-spin" /> : null}
           </label>
         ) : null}
       </div>
@@ -313,8 +336,8 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
               </button>
             ) : null}
             {toRead.length > 0 ? (
-              <button type="button" onClick={() => void readReasons()} disabled={busy === "reasons"} className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-[#cfe0d9] px-3 text-[12px] font-bold text-[#185045] disabled:opacity-60">
-                {busy === "reasons" ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              <button type="button" onClick={() => void readReasons()} disabled={reading} className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-[#cfe0d9] px-3 text-[12px] font-bold text-[#185045] disabled:opacity-60">
+                {reading ? <Loader2 className="size-3.5 animate-spin" /> : null}
                 اقرأ سبب غير المكتمل ({toRead.length})
               </button>
             ) : null}

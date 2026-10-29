@@ -163,6 +163,14 @@ export function ticketsFromLeads(leads: LeadForTicket[], nameOf: ReadonlyMap<str
 }
 
 /**
+ * The tickets whose waiting is measured: the colleagues the administration exempted from lateness (app_settings
+ * lateness_exempt, «لا يُحسب عليهم تأخير») have none of their tickets in the response figures and notes.
+ */
+export function measuredTickets(tickets: EyeSnapshot["tickets"], exemptEmployeeIds?: ReadonlySet<string>): EyeSnapshot["tickets"] {
+  return exemptEmployeeIds?.size ? tickets.filter((t) => !t.employee_id || !exemptEmployeeIds.has(t.employee_id)) : tickets;
+}
+
+/**
  * Every note the snapshot raises, worst first.
  *
  * `now` is a full ISO instant (not a date) because the ticket rules measure hours;
