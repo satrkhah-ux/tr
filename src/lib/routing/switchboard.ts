@@ -4,8 +4,6 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { addTeletelNote, assignAgentThenTeam, listOpenConversations, teletelGet } from "@/lib/providers/teletel";
 import { readControl } from "@/lib/murad/control-store";
 import { onList } from "@/lib/murad/control";
-import { isWorkingTime, parseHours } from "@/lib/murad/reception";
-import { SETTING } from "@/lib/murad/core";
 import { logAudit } from "@/lib/data/audit";
 import { availabilityOf, clientHint } from "@/lib/presence/availability";
 import { saleHolder } from "@/lib/leads/lifecycle";
@@ -158,8 +156,8 @@ export async function switchboardSweep(nowMs = Date.now(), opts: { dry?: boolean
   // the rules screen's «ماذا ستفعل الآن»: the same pass, nothing moved
   const rules: Rules = opts.dry && saved.mode !== "off" ? { ...saved, mode: "dry" } : saved;
   if (rules.mode === "off") return { off: true };
-  const { data: hoursRow } = await db().from("app_settings").select("value").eq("key", SETTING.receptionHours).maybeSingle();
-  if (!isWorkingTime(new Date(nowMs), parseHours((hoursRow as { value?: string } | null)?.value))) return { mode: rules.mode, offShift: true };
+  // no office-wide stop any more: each colleague's own shift (or the office's) decides who can take a client now —
+  // at night only those on a night shift; nobody on shift = nobody picked, Murad's reception holds the client
   const open = await listOpenConversations();
   if (!open) return { unreachable: true };
   const nowSec = Math.floor(nowMs / 1000);

@@ -179,6 +179,7 @@ export async function adminTeamView(me: StaffMember): Promise<View> {
       [
         { text: "🔄 تحديث", callback_data: "at" },
         { text: "📄 الخطابات", callback_data: "lt" },
+        { text: "🕘 الدوام", callback_data: "sh" },
       ],
       // reassigning stays in the system for now (Teletel writes are not the bot's)
       [{ text: "🔀 إعادة التوزيع في «المتابعة»", url: `${siteUrl()}/followups` }],
@@ -311,3 +312,42 @@ export const ADMIN_WELCOME = (name: string) =>
     "",
     "تعمل على محادثات بنفسك؟ «👤 واجهة الموظف» تفتح شاشتك ومحادثاتك، و«🏢 واجهة الإدارة» تعيدك.",
   ].join("\n");
+
+/** «🕘 الدوام»: who works their own shift (employee_shifts) — everyone else works the office's hours */
+export async function shiftsView(me: StaffMember): Promise<View> {
+  if (!(await isBotManager(me.id))) return REFUSED;
+  const { activeShift } = await import("@/lib/presence/shift");
+  const { hoursText, parseHours } = await import("@/lib/murad/reception");
+  const { SETTING } = await import("@/lib/murad/core");
+  const today = new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
+  const [{ data: rows }, people, { data: office }] = await Promise.all([
+    db().from("employee_shifts").select("employee_id, hours, starts_on, ends_on, note").or(`ends_on.is.null,ends_on.gte.${today}`),
+    colleagues(),
+    db().from("app_settings").select("value").eq("key", SETTING.receptionHours).maybeSingle(),
+  ]);
+  const list = (rows ?? []) as { employee_id: string; hours: string; starts_on: string; ends_on: string | null; note: string }[];
+  const lines = people
+    .map((p) => {
+      const mine = list.filter((r) => r.employee_id === p.id);
+      const now = activeShift(mine, today);
+      const next = now ? null : [...mine].sort((a, b) => a.starts_on.localeCompare(b.starts_on))[0];
+      const r = now ?? next;
+      return r
+        ? `• <b>${escapeHtml(p.name.trim())}</b> — ${escapeHtml(r.hours)}${now ? "" : ` (يبدأ ${r.starts_on})`}${r.ends_on ? ` حتى ${r.ends_on}` : ""}${r.note ? ` · ${escapeHtml(r.note)}` : ""}`
+        : null;
+    })
+    .filter((l): l is string => l !== null);
+  return {
+    text: [
+      "🕘 <b>الدوام</b>",
+      "",
+      `دوام المكتب: ${escapeHtml(hoursText(parseHours((office as { value?: string } | null)?.value)))}`,
+      "",
+      lines.length ? "<b>دوام خاص:</b>" : "كل الموظفين على دوام المكتب.",
+      ...lines,
+      "",
+      "يُعدَّل من النظام: «الموظفين ← الحضور والإجازات».",
+    ].join("\n"),
+    buttons: [[{ text: "↩️ الفريق", callback_data: "at" }, BACK_ADMIN]],
+  };
+}

@@ -9,7 +9,8 @@ import { rememberThread, replyButtons } from "./staff-replies";
 import type { InlineButton } from "./ops-bot";
 import { loadSettings } from "@/lib/mine/day";
 import { onlineAgents } from "@/lib/mine/remind";
-import { excusedAgents } from "@/lib/presence/availability";
+import { excusedAgents, ownShifts } from "@/lib/presence/availability";
+import { isWorkingTime } from "@/lib/murad/reception";
 import { quiet, STOP_REMINDING_AT, waitLevelNow, waitLevels, type DaySettings } from "@/lib/mine/rank";
 import { followedMarks, latenessExempt } from "@/lib/leads/lifecycle";
 import { exemptConversation } from "@/lib/leads/lateness";
@@ -251,6 +252,8 @@ export async function remindWaiting(nowMs = Date.now()): Promise<{ reminded: num
   // «@#@#@#» since the client wrote: the colleague followed it up — no reminder; and no delay is counted against the
   // morning desk or the visa department (lateness_exempt) — no «ينتظر ردك منذ…» for them (the owner, 2026-10-29)
   const [followed, exempt] = await Promise.all([followedMarks(waiting.map((c) => c.id)), latenessExempt()]);
+  // a colleague on their own shift (employee_shifts) is not reminded outside it — the night shift sleeps by day
+  const shifts = await ownShifts([...byAgent.values()].map((w) => w.id), nowMs);
   const settings = new Map<string, Promise<DaySettings>>();
 
   let reminded = 0;
@@ -258,6 +261,8 @@ export async function remindWaiting(nowMs = Date.now()): Promise<{ reminded: num
     const who = byAgent.get(c.assigneeId as number);
     if (!who?.chat || (online && !online.has(c.assigneeId as number)) || excused.has(c.assigneeId as number)) continue;
     if (followedSince(followed.get(c.id), c.waitingSince * 1000) || exemptConversation(c, exempt)) continue;
+    const own = shifts.get(who.id);
+    if (own && !isWorkingTime(new Date(nowMs), own)) continue;
     if (!settings.has(who.id)) settings.set(who.id, loadSettings(who.id));
     const mine = await settings.get(who.id)!;
     if (quiet(mine, nowMs)) continue;

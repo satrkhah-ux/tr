@@ -67,7 +67,6 @@ export async function getSwitchboard(): Promise<SwitchboardData | null> {
     mode?: string;
     due?: number;
     moved?: { id: number; to: string; why: string }[];
-    offShift?: boolean;
     off?: boolean;
     unreachable?: boolean;
   };
@@ -93,7 +92,7 @@ export async function getSwitchboard(): Promise<SwitchboardData | null> {
     preview: {
       due: p.due ?? 0,
       moved: p.moved ?? [],
-      note: p.off ? "البدّالة متوقفة." : p.offShift ? "خارج ساعات العمل: مُراد يستقبل، ولا يُنقل أحد." : p.unreachable ? "تعذّر الوصول إلى تيلي تيل." : null,
+      note: p.off ? "البدّالة متوقفة." : p.unreachable ? "تعذّر الوصول إلى تيلي تيل." : null,
     },
     admin: w.admin,
     people: people.map((e) => ({ id: e.id, name: e.arabic_name.trim() })),

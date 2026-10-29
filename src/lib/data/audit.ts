@@ -129,6 +129,7 @@ export type AuditAction =
   | "presence.meeting_called"
   | "presence.meeting_ended"
   | "presence.limits_saved"
+  | "presence.shift_saved"
   // «البدّالة»: a client moved by the sweep, or by hand, and its rules
   | "switchboard.moved"
   | "switchboard.reassigned"

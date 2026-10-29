@@ -7,8 +7,21 @@ import type { Permission } from "@/lib/roles/roles";
 import { getCurrentEmployeeId } from "./metrics";
 import { logAudit } from "./audit";
 import { loadLimits } from "@/lib/presence/availability";
-import { cleanClient, LIMITS_KEY, overlaps, parseLimits, riyadhDay, STATUS_BUTTON, type StatusKind, type StatusLimits } from "@/lib/presence/excuse";
+import {
+  cleanClient,
+  dayStartMs,
+  LIMITS_KEY,
+  overlaps,
+  parseLimits,
+  riyadhDay,
+  STATUS_BUTTON,
+  type StatusKind,
+  type StatusLimits,
+} from "@/lib/presence/excuse";
 import { HOLIDAYS_KEY, parseHolidays } from "@/lib/presence/business";
+import { activeShift, daysFromShift, shiftFromDays, type ShiftRow } from "@/lib/presence/shift";
+import { hoursText, parseHours } from "@/lib/murad/reception";
+import { SETTING } from "@/lib/murad/core";
 import { escapeHtml, staffSend } from "@/lib/telegram/staff-bot";
 
 /**
@@ -162,9 +175,14 @@ export type AttendanceData = {
   limits: StatusLimits;
   /** public holidays (app_settings public_holidays): no working minute is counted on them */
   holidays: { day: string; name: string }[];
+  /** each colleague's own shift that covers today, or the next one set to start (employee_shifts) */
+  shifts: ShiftView[];
+  /** the office's hours (مُراد's reception hours), what everyone without a shift works */
+  officeHours: string;
   day: string;
   at: number;
 };
+export type ShiftView = { employeeId: string; name: string; hours: string; days: string[]; startsOn: string; endsOn: string | null; note: string };
 
 const nameMap = (rows: { id: string; arabic_name: string }[]) => new Map(rows.map((r) => [r.id, r.arabic_name.trim()]));
 
@@ -175,7 +193,7 @@ export async function getAttendance(dayIn?: string): Promise<AttendanceData | nu
   const day = dayIn && DAY.test(dayIn) ? dayIn : riyadhDay(now);
   const from = new Date(`${day}T00:00:00+03:00`).toISOString();
   const to = new Date(Date.parse(from) + 86_400_000).toISOString();
-  const [{ data: people }, leaves, log, meetings, limits, holidayRow] = await Promise.all([
+  const [{ data: people }, leaves, log, meetings, limits, holidayRow, shiftRows, officeRow] = await Promise.all([
     db().from("employees").select("id, arabic_name").eq("status", "Active").order("arabic_name"),
     db()
       .from("employee_leaves")
@@ -196,6 +214,12 @@ export async function getAttendance(dayIn?: string): Promise<AttendanceData | nu
       .order("starts_at", { ascending: false }),
     loadLimits(),
     db().from("app_settings").select("value").eq("key", HOLIDAYS_KEY).maybeSingle(),
+    db()
+      .from("employee_shifts")
+      .select("employee_id, hours, starts_on, ends_on, note")
+      .or(`ends_on.is.null,ends_on.gte.${riyadhDay(now)}`)
+      .order("starts_on"),
+    db().from("app_settings").select("value").eq("key", SETTING.receptionHours).maybeSingle(),
   ]);
   const names = nameMap((people ?? []) as { id: string; arabic_name: string }[]);
   const nm = (id: string | null) => (id ? (names.get(id) ?? "—") : null);
@@ -258,9 +282,71 @@ export async function getAttendance(dayIn?: string): Promise<AttendanceData | nu
     people: [...names].map(([id, name]) => ({ id, name })),
     limits: limits,
     holidays: holidaysOf((holidayRow.data as { value?: string } | null)?.value),
+    shifts: shiftsOf((shiftRows.data ?? []) as ShiftRow[], riyadhDay(now)).map((r) => ({
+      employeeId: r.employee_id,
+      name: nm(r.employee_id) ?? "—",
+      hours: r.hours,
+      days: daysFromShift(r.hours),
+      startsOn: r.starts_on,
+      endsOn: r.ends_on,
+      note: r.note ?? "",
+    })),
+    officeHours: hoursText(parseHours((officeRow.data as { value?: string } | null)?.value)),
     day,
     at: now,
   };
+}
+
+/** per colleague: the shift covering today, else the next one to start */
+function shiftsOf(rows: ShiftRow[], today: string): ShiftRow[] {
+  const by = new Map<string, ShiftRow[]>();
+  for (const r of rows) by.set(r.employee_id, [...(by.get(r.employee_id) ?? []), r]);
+  return [...by.values()].map((list) => activeShift(list, today) ?? [...list].sort((a, b) => a.starts_on.localeCompare(b.starts_on))[0]);
+}
+
+/** «دوام خاص»: the seven days (Saturday first) from a day on, until a day if given — a new row, the old one ended the day before */
+export async function saveShift(input: { employeeId: string; days: string[]; startsOn: string; endsOn: string | null; note: string }): Promise<Done> {
+  const me = await manager();
+  if (!me) return fail("forbidden");
+  if (!UUID.test(input.employeeId) || !DAY.test(input.startsOn) || (input.endsOn !== null && (!DAY.test(input.endsOn) || input.endsOn < input.startsOn)))
+    return fail("اختر الموظف وتاريخ البداية.");
+  const shift = shiftFromDays(input.days);
+  if (!shift.ok) return fail(shift.error);
+  // what ran before ends the day before this starts; one set to start later is replaced
+  const dayBefore = riyadhDay(dayStartMs(input.startsOn) - 43_200_000);
+  await db().from("employee_shifts").delete().eq("employee_id", input.employeeId).gte("starts_on", input.startsOn);
+  await db().from("employee_shifts").update({ ends_on: dayBefore }).eq("employee_id", input.employeeId).or(`ends_on.is.null,ends_on.gte.${input.startsOn}`);
+  const { error } = await db()
+    .from("employee_shifts")
+    .insert({
+      employee_id: input.employeeId,
+      hours: shift.hours,
+      starts_on: input.startsOn,
+      ends_on: input.endsOn,
+      note: (input.note ?? "").trim().slice(0, 200),
+      created_by: me,
+    });
+  if (error) return fail("تعذّر الحفظ، أعد المحاولة.");
+  await logAudit({
+    action: "presence.shift_saved",
+    entity: "employees",
+    entity_id: input.employeeId,
+    meta: { hours: shift.hours, from: input.startsOn, to: input.endsOn },
+  });
+  return { ok: true };
+}
+
+/** back to the office's (or the department's) hours from today */
+export async function endShift(employeeId: string): Promise<Done> {
+  const me = await manager();
+  if (!me || !UUID.test(employeeId)) return fail("forbidden");
+  const today = riyadhDay(Date.now());
+  const yesterday = riyadhDay(Date.now() - 86_400_000);
+  await db().from("employee_shifts").delete().eq("employee_id", employeeId).gte("starts_on", today);
+  const { error } = await db().from("employee_shifts").update({ ends_on: yesterday }).eq("employee_id", employeeId).or(`ends_on.is.null,ends_on.gte.${today}`);
+  if (error) return fail("تعذّر الحفظ، أعد المحاولة.");
+  await logAudit({ action: "presence.shift_saved", entity: "employees", entity_id: employeeId, meta: { ended: today } });
+  return { ok: true };
 }
 
 async function tell(employeeId: string, text: string, slot: string): Promise<void> {

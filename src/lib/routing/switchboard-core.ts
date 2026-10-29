@@ -5,12 +5,12 @@
  *
  *   who takes it   the colleague already holding it when they can; else the one who met or spoke to this client
  *                  («لدي عميل» / «لدي اتصال»); else the available colleague with the fewest clients waiting, then open
- *   who cannot     on leave, outside the working hours, on a status button, offline, paused («لا ترسل لفلان»), a shared
- *                  login, or without access to the conversation's inbox
+ *   who cannot     on leave, outside their working hours (their own shift, else the office's), on a status button,
+ *                  offline, paused («لا ترسل لفلان»), a shared login, or without access to the conversation's inbox
  *   when it moves  a client waiting on nobody (no agent, or a shared login) for `orphanMinutes`; a client waiting on a
- *                  colleague who is away (leave, button, offline) for `awayMinutes`. Never outside the working hours —
- *                  Murad's reception holds the office then — and never a conversation with a sale or a confirmed service
- *                  from the colleague who has it.
+ *                  colleague who is away (leave, button, offline) for `awayMinutes`. A colleague whose shift ended keeps
+ *                  their clients till it starts again; with nobody on shift, nobody is picked and Murad's reception
+ *                  holds the client. Never a conversation with a sale or a confirmed service from the colleague who has it.
  *
  * Pure: the colleagues, the loads and the rules are parameters (switchboard.ts reads them).
  */

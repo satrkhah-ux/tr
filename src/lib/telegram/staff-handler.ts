@@ -23,6 +23,7 @@ import {
   seesMoney,
   setFace,
   systemView,
+  shiftsView,
 } from "./staff-admin";
 import { confirmNudge, prepareNudge, waitingConvView, waitingListView, waitingPickView } from "./staff-waiting";
 import { grantLeave, leaveView } from "./staff-leave";
@@ -337,6 +338,7 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
       ao: opsVisaView,
       as: systemView,
       an: alertPickView,
+      sh: shiftsView,
     };
     if (admin[data]) return show(chatId, withBack(await admin[data](me)), at);
     // «⏳ المحادثات المنتظرة» (staff-waiting.ts): the list, one conversation read-only, and a nudge — each checks the manager first

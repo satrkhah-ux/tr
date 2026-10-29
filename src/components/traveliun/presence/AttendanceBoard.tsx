@@ -2,7 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addLeave, callMeeting, cancelLeave, endMeeting, saveHolidays, saveStatusLimits, type AttendanceData } from "@/lib/data/presence-status";
+import {
+  addLeave,
+  callMeeting,
+  cancelLeave,
+  endMeeting,
+  endShift,
+  saveHolidays,
+  saveShift,
+  saveStatusLimits,
+  type AttendanceData,
+} from "@/lib/data/presence-status";
+import { DAY_NAMES, SAT_FIRST_DAYS } from "@/lib/presence/shift";
 import { EXCUSE_LABEL, STATUS_KINDS, type StatusKind, type StatusLimits } from "@/lib/presence/excuse";
 
 /**
@@ -150,6 +161,12 @@ export function AttendanceBoard({ data }: { data: AttendanceData }) {
       </section>
 
       <LimitsForm limits={data.limits} busy={pending} onSave={(l) => run(() => saveStatusLimits(l), "حُفظت الحدود القصوى.")} />
+      <ShiftsSection
+        data={data}
+        busy={pending}
+        onSave={(v) => run(() => saveShift(v), "حُفظ الدوام الخاص.")}
+        onEnd={(id) => run(() => endShift(id), "عاد الموظف إلى دوام المكتب.")}
+      />
       <HolidaysForm holidays={data.holidays} busy={pending} onSave={(h) => run(() => saveHolidays(h), "حُفظت العطل الرسمية.")} />
     </div>
   );
@@ -322,6 +339,104 @@ function HolidaysForm({
           حفظ العطل
         </button>
       </div>
+    </section>
+  );
+}
+
+/** «الدوام الخاص»: a colleague's own hours over the office's — the seven days, Saturday first, each its windows */
+function ShiftsSection({
+  data,
+  busy,
+  onSave,
+  onEnd,
+}: {
+  data: AttendanceData;
+  busy: boolean;
+  onSave: (v: { employeeId: string; days: string[]; startsOn: string; endsOn: string | null; note: string }) => void;
+  onEnd: (employeeId: string) => void;
+}) {
+  const blank = { employeeId: "", days: ["", "", "", "", "", "", ""], startsOn: data.day, endsOn: "", note: "" };
+  const [v, setV] = useState(blank);
+  const pick = (employeeId: string) => {
+    const own = data.shifts.find((s) => s.employeeId === employeeId);
+    setV({ ...blank, employeeId, days: own ? own.days : blank.days, note: own?.note ?? "" });
+  };
+  return (
+    <section className={card}>
+      <h2 className="mb-1 font-extrabold">الدوام الخاص</h2>
+      <p className="mb-2 text-sm text-slate-500">
+        من له دوام غير دوام المكتب (ليلي، مقسّم، أيام أخرى). دوام المكتب: <bdi>{data.officeHours}</bdi>. لا تُحوَّل للموظف طلبات ولا يُحسب عليه تأخير خارج
+        دوامه.
+      </p>
+      {data.shifts.length ? (
+        <ul className="mb-3 space-y-1 text-sm">
+          {data.shifts.map((s) => (
+            <li key={s.employeeId} className="flex flex-wrap items-center gap-2 border-t border-[#E3E8E4] pt-1">
+              <b>{s.name}</b> <bdi>{s.hours}</bdi>
+              <span className="text-slate-500">
+                من {s.startsOn}
+                {s.endsOn ? ` إلى ${s.endsOn}` : ""}
+                {s.note ? ` · ${s.note}` : ""}
+              </span>
+              <button className="text-xs underline" onClick={() => pick(s.employeeId)}>
+                تعديل
+              </button>
+              <button className="text-xs text-[#9A3412] underline" disabled={busy} onClick={() => onEnd(s.employeeId)}>
+                إعادته لدوام المكتب
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mb-3 text-sm text-slate-500">كل الموظفين على دوام المكتب.</p>
+      )}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="text-xs font-bold">
+          الموظف
+          <select className={field} value={v.employeeId} onChange={(e) => pick(e.target.value)}>
+            <option value="">اختر…</option>
+            {data.people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs font-bold">
+          يبدأ من
+          <input type="date" className={field} min={data.day} value={v.startsOn} onChange={(e) => setV({ ...v, startsOn: e.target.value })} />
+        </label>
+        <label className="text-xs font-bold">
+          ينتهي في (اختياري)
+          <input type="date" className={field} min={v.startsOn} value={v.endsOn} onChange={(e) => setV({ ...v, endsOn: e.target.value })} />
+        </label>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {SAT_FIRST_DAYS.map((d, i) => (
+          <label key={d} className="flex items-center gap-2 text-xs font-bold">
+            <span className="w-16 shrink-0">{DAY_NAMES[d]}</span>
+            <input
+              className={field}
+              dir="ltr"
+              value={v.days[i]}
+              onChange={(e) => setV({ ...v, days: v.days.map((x, k) => (k === i ? e.target.value : x)) })}
+              placeholder="16:00-00:00 — فارغ = إجازة"
+              aria-label={`دوام ${DAY_NAMES[d]}`}
+            />
+          </label>
+        ))}
+      </div>
+      <label className="mt-3 block text-xs font-bold">
+        ملاحظة
+        <input className={field} maxLength={200} value={v.note} onChange={(e) => setV({ ...v, note: e.target.value })} placeholder="مثال: الفترة الليلية" />
+      </label>
+      <button
+        className={`${primary} mt-3`}
+        disabled={busy || !v.employeeId}
+        onClick={() => onSave({ employeeId: v.employeeId, days: v.days, startsOn: v.startsOn, endsOn: v.endsOn || null, note: v.note })}
+      >
+        حفظ الدوام
+      </button>
     </section>
   );
 }

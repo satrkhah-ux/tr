@@ -176,25 +176,50 @@ async function hoursFor(department: string | undefined, s: Map<string, string>) 
   return parseHours(s.get(SETTING.receptionHours));
 }
 
-/** every colleague asked for, at `atMs`: available, or why not (see AvailabilityReason) */
+/**
+ * Each colleague's own shift that covers the Riyadh day of `atMs` (employee_shifts, the owner 2026-10-29): it overrides
+ * the department's and the office's hours for them. A missing table reads as none.
+ */
+export async function ownShifts(employeeIds: string[], atMs = Date.now()): Promise<Map<string, import("@/lib/murad/reception").Hours>> {
+  const out = new Map<string, import("@/lib/murad/reception").Hours>();
+  if (!employeeIds.length) return out;
+  const { activeShift } = await import("./shift");
+  const { parseHours } = await import("@/lib/murad/reception");
+  const day = riyadhDay(atMs);
+  const { data } = await db().from("employee_shifts").select("employee_id, hours, starts_on, ends_on").in("employee_id", employeeIds).lte("starts_on", day);
+  const rows = (data ?? []) as { employee_id: string; hours: string; starts_on: string; ends_on: string | null }[];
+  for (const id of employeeIds) {
+    const own = activeShift(
+      rows.filter((r) => r.employee_id === id),
+      day,
+    );
+    if (own) out.set(id, parseHours(own.hours));
+  }
+  return out;
+}
+
+/** every colleague asked for, at `atMs`: available, or why not (see AvailabilityReason) — each by their own shift when they have one */
 export async function availabilityOf(employeeIds: string[], atMs = Date.now(), department?: string): Promise<Map<string, Availability>> {
   const out = new Map<string, Availability>();
   if (!employeeIds.length) return out;
   const { SETTING } = await import("@/lib/murad/core");
   const { isWorkingTime } = await import("@/lib/murad/reception");
-  const [excused, s, online, { data: emps }, exempt] = await Promise.all([
+  const [excused, s, online, { data: emps }, exempt, shifts] = await Promise.all([
     excusedNow(atMs),
     settings([SETTING.receptionHours, DEPARTMENT_HOURS_KEY]),
     onlineAgentIds(),
     db().from("employees").select("id, teletel_agent_id").in("id", employeeIds),
     exemptStaff(),
+    ownShifts(employeeIds, atMs),
   ]);
   const hours = await hoursFor(department, s);
-  const working = isWorkingTime(new Date(atMs), hours);
+  const officeWorking = isWorkingTime(new Date(atMs), hours);
   const row = new Map(((emps ?? []) as { id: string; teletel_agent_id: number | null }[]).map((e) => [e.id, e]));
   for (const id of employeeIds) {
     const e = row.get(id);
     const x = excused.get(id);
+    const own = shifts.get(id);
+    const working = own ? isWorkingTime(new Date(atMs), own) : officeWorking;
     const reason: AvailabilityReason | null =
       x?.reason === "leave"
         ? "leave"
@@ -217,21 +242,24 @@ export async function employeeAvailability(employeeId: string, atMs = Date.now()
 }
 
 /**
- * The working minutes of [fromMs, toMs): the office's windows (or the department's own), less public holidays (app_settings
- * public_holidays) and — with an employee — their leaves and status buttons. Judge a delay on this, not on the clock.
+ * The working minutes of [fromMs, toMs): the colleague's own shift when they have one, else the department's or the
+ * office's windows; less public holidays (app_settings public_holidays) and — with an employee — their leaves and status
+ * buttons. Judge a delay on this, not on the clock.
+ * ponytail: the shift that covers `fromMs` is used for the whole span; a span across a shift change is rare (a wait).
  */
 export async function businessMinutesBetween(fromMs: number, toMs: number, opts: { employeeId?: string; department?: string } = {}): Promise<number> {
   if (toMs <= fromMs) return 0;
   const { SETTING } = await import("@/lib/murad/core");
   const { businessMinutes, HOLIDAYS_KEY, parseHolidays } = await import("./business");
-  const [s, windows] = await Promise.all([
+  const [s, windows, shifts] = await Promise.all([
     settings([SETTING.receptionHours, DEPARTMENT_HOURS_KEY, HOLIDAYS_KEY]),
     opts.employeeId ? excusedWindows([opts.employeeId], fromMs, toMs) : Promise.resolve(new Map<string, Window[]>()),
+    opts.employeeId ? ownShifts([opts.employeeId], fromMs) : Promise.resolve(new Map<string, import("@/lib/murad/reception").Hours>()),
   ]);
   return businessMinutes({
     from: fromMs,
     to: toMs,
-    hours: await hoursFor(opts.department, s),
+    hours: (opts.employeeId && shifts.get(opts.employeeId)) || (await hoursFor(opts.department, s)),
     holidays: parseHolidays(s.get(HOLIDAYS_KEY)),
     excused: opts.employeeId ? (windows.get(opts.employeeId) ?? []) : [],
   });
