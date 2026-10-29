@@ -1,4 +1,5 @@
-import { onlineTeamAgent, routeCompletedVisa, retryVisaHandoffs } from "./visa-routing";
+import { routeCompletedVisa, retryVisaHandoffs } from "./visa-routing";
+import { pickAgent, tellHint } from "@/lib/routing/switchboard";
 import type { MuradReceipt } from "./visa-assignment";
 import { inMuradScope, kindMode, onList, visaForAll, type MuradControl } from "./control";
 import { handOver } from "./handover";
@@ -944,9 +945,12 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
     const handoff = settings.control.handoffs[decision.to];
     const teamId = handoff?.teamId ?? teamFor(readRoutes(reception.routesRaw, teams), decision.to);
     const team = teams.find((t) => t.id === teamId) ?? null;
-    // a visa: the visa agent who is online (the owner, 2026-10-22) — other teams' own auto-assignment picks the member
-    const agent = !handoff?.agentId && decision.to === "تأشيرات" && teamId ? await onlineTeamAgent(teamId, thread.inboxId ?? null, null, settings.control.paused) : null;
+    // «البدّالة» (routing/switchboard.ts, the owner 2026-10-29): the department's available colleague — not on leave, a status
+    // button or offline — the one who registered this client first, else the least loaded; nobody: the department's queue
+    const choice = !handoff?.agentId && teamId ? await pickAgent({ teamId, inboxId: thread.inboxId ?? null, phone: m.phone }) : null;
+    const agent = choice ? { id: choice.candidate.agentId, name: choice.candidate.name } : null;
     const assigned = await handOver(settings.control, m.conversationId, teamId, handoff?.agentId ?? agent?.id ?? null, m.phone);
+    if (assigned && choice?.hint && choice.candidate.employeeId) await tellHint(choice.candidate.employeeId, m.conversationId, choice.hint);
     const kept = onList(m.phone, settings.control.noHandoff);
     // a travel request: what the salesperson needs, understood from the client's words (the owner: where, when, who, what)
     const travel = TRAVEL.has(decision.to) ? await readTravel(transcript) : null;
