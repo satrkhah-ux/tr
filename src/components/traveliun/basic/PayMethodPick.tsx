@@ -6,6 +6,18 @@ import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
 /**
+ * The providers' own marks, as their merchant kits give them (public/images/payments — only the empty
+ * margin trimmed): Tabby's badge (its primary black-on-green), Tamara's wordmark, mada's dual-language
+ * logo — each with the kit's own version for a dark background. mada's rules: never under 60px wide,
+ * never smaller than the marks beside it, never in a white box on a coloured ground.
+ */
+const LOGO: Partial<Record<PayMethod, { light: string; dark: string; size: string; darkSize: string }>> = {
+  tabby: { light: "/images/payments/tabby.svg", dark: "/images/payments/tabby.svg", size: "h-6", darkSize: "h-6" },
+  tamara: { light: "/images/payments/tamara.svg", dark: "/images/payments/tamara-white.svg", size: "h-4", darkSize: "h-4" },
+  pos: { light: "/images/payments/mada.svg", dark: "/images/payments/mada-dark.png", size: "h-6", darkSize: "h-8" },
+};
+
+/**
  * «طريقة دفع العميل» (the owner, 2026-10-29): how this client will pay — one row of chips, and under it,
  * for the chosen way only and for the staff only, its charge and what is left to us. The chosen way's
  * total is the price the file issues at (issue-pricing.ts) and the total bar below shows it; the client
@@ -26,7 +38,8 @@ export function PayMethodPick({
   const { t } = useTraveliunUI();
   const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
   const chip = (on: boolean) =>
-    `h-8 shrink-0 rounded-full border px-3 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-50 ${on ? "border-[#185045] bg-[#185045] text-white" : "border-[#cfe0d9] bg-white text-[#185045] hover:bg-[#f4f8f6]"}`;
+    // chosen = a light tint and a dark ring, never a dark fill: the marks keep the ground their kits ask for
+    `inline-flex h-9 shrink-0 items-center rounded-full border px-3 text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-50 ${on ? "border-[#185045] bg-[#e9f4ef] text-[#0f3d38] ring-1 ring-[#185045] dark:border-[#91decf] dark:bg-[#12352c] dark:text-[#e7f0ec] dark:ring-[#91decf]" : "border-[#cfe0d9] bg-white text-[#185045] hover:bg-[#f4f8f6]"}`;
   const chosen = method ? quoteMethod(price, method, fees) : null;
   return (
     <div className="rounded-[11px] border border-[#d8e6e0] bg-[#f8fbf9] px-3 py-2">
@@ -39,6 +52,8 @@ export function PayMethodPick({
         </button>
         {PAY_METHODS.map((m) => {
           const unset = quoteMethod(price, m, fees).unset;
+          const name = t(`pg.payMethod.m.${m}` as TranslationKey);
+          const logo = LOGO[m];
           return (
             <button
               key={m}
@@ -50,7 +65,16 @@ export function PayMethodPick({
               onClick={() => onPick(m)}
               className={chip(method === m)}
             >
-              {t(`pg.payMethod.m.${m}` as TranslationKey)}
+              {logo ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- the providers' small files, shown as they are */}
+                  <img src={logo.light} alt={name} className={`${logo.size} w-auto dark:hidden`} />
+                  {/* eslint-disable-next-line @next/next/no-img-element -- see above */}
+                  <img src={logo.dark} alt={name} className={`hidden ${logo.darkSize} w-auto dark:block`} />
+                </>
+              ) : (
+                name
+              )}
             </button>
           );
         })}
