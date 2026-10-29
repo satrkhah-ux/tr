@@ -2178,6 +2178,7 @@ export const en = {
   "nav.finance": "Company finances",
   "nav.muradSettings": "Murad settings",
   "nav.developer": "Developer",
+  "nav.secrets": "Keys & tokens",
   "nav.sla": "SLA — response time",
   "nav.followups": "Follow-up",
   "nav.secretary": "My secretary",

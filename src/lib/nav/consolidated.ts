@@ -109,6 +109,8 @@ export const TAB_GROUPS: SectionTab[][] = [
     { href: "/developer", labelKey: "nav.developer" },
     // everything the system leans on outside itself, with its health and end dates (the owner, 2026-10-19)
     { href: "/settings/integrations", labelKey: "nav.integrations" },
+    // «المفاتيح والتوكنات»: a new key or token saved here works without a redeploy (the owner, 2026-10-29)
+    { href: "/developer/secrets", labelKey: "nav.secrets" },
     { href: "/settings/suppliers", labelKey: "nav.hotelSuppliers" },
     { href: "/settings/data-transfer", labelKey: "nav.dataTransfer" },
   ],
