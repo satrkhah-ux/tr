@@ -13,6 +13,10 @@ import { hotelAtRisk, type ClientBookingRow } from "./client-booking-state";
 import { notifyDueWaits, travelBlockers } from "@/lib/data/wizard-case";
 import { translate } from "@/lib/i18n";
 import { readyLabel } from "./wizard/index";
+import { notifyEmployee } from "@/lib/notifications/notify";
+import { escapeHtml, staffSend } from "@/lib/telegram/staff-bot";
+import { siteUrl } from "@/lib/telegram/ops-bot";
+import { BNPL_METHODS, settlementReminder } from "@/lib/payments/methods";
 
 /**
  * The operations day (operations order 6), run once a morning by the server's
@@ -151,7 +155,46 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
   result.alerts += await provisionalHotelAlerts(supabase, ops, today);
   // «قائمة متابعتك اليوم» — the waits whose day has come, once per case a day (wizard-case.ts)
   result.alerts += await notifyDueWaits(supabase, today);
+  result.alerts += await settlementReminders(supabase, today);
   return result;
+}
+
+/**
+ * Tabby/Tamara pay us out weekly (the owner, 2026-10-29): on the day a
+ * payment's money should land (operation_payments.expected_settlement_on), the
+ * case's seller is reminded to check it with finance — once per payment
+ * (operation_alerts «bnpl_settlement», ref = the payment), in-app and on «تنبيهاتي».
+ */
+async function settlementReminders(supabase: SupabaseClient, today: string): Promise<number> {
+  const { data } = await supabase
+    .from("operation_payments")
+    .select("id, method, operation_id, operations(offers(employee_id, customers(arabic_name)))")
+    .in("method", [...BNPL_METHODS])
+    .eq("expected_settlement_on", today)
+    .neq("kind", "refund");
+  type Row = { id: string; method: string; operation_id: string; operations: unknown };
+  const one = <T,>(v: T | T[] | null | undefined): T | undefined => (Array.isArray(v) ? v[0] : (v ?? undefined));
+  let sent = 0;
+  for (const p of (data ?? []) as Row[]) {
+    const offer = one(one(p.operations as { offers: unknown } | null)?.offers as { employee_id: string | null; customers: unknown } | null);
+    const name = one(offer?.customers as { arabic_name: string | null } | null)?.arabic_name ?? "";
+    if (!offer?.employee_id) continue;
+    const { error } = await supabase.from("operation_alerts").insert({ operation_id: p.operation_id, kind: "bnpl_settlement", ref: p.id });
+    if (error) continue; // the unique key: already reminded
+    await notifyEmployee({
+      employeeId: offer.employee_id,
+      kind: "ops",
+      title: settlementReminder(name, p.method),
+      href: `/operations/${p.operation_id}`,
+      source: "operations",
+      dedupeKey: `bnpl:${p.id}`,
+    });
+    const { data: emp } = await supabase.from("employees").select("telegram_chat_id").eq("id", offer.employee_id).eq("status", "Active").maybeSingle();
+    const chat = Number((emp as { telegram_chat_id: number | string | null } | null)?.telegram_chat_id);
+    if (chat) await staffSend(chat, `💳 ${escapeHtml(settlementReminder(name, p.method))}`, [[{ text: "افتح الملف", url: `${siteUrl()}/operations/${p.operation_id}` }]], {}, null);
+    sent += 1;
+  }
+  return sent;
 }
 
 /**

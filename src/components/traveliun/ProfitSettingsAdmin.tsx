@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { setProfitSettings, setUsdRate, type ProfitSettings } from "@/lib/data/app-settings";
-import type { PaymentFees } from "@/lib/payments/methods";
+import type { PaymentFees, SettlementRule } from "@/lib/payments/methods";
 import { PaymentFeesAdmin } from "./PaymentFeesAdmin";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 import { TraveliunShell } from "./TraveliunShell";
@@ -13,7 +13,7 @@ import { TraveliunShell } from "./TraveliunShell";
  * package (the agent issuing it, or the managers only) and, if it wants, the
  * margin every file starts with.
  */
-export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees }: { initial: ProfitSettings; usd: number; fees: PaymentFees }) {
+export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees, settlement }: { initial: ProfitSettings; usd: number; fees: PaymentFees; settlement: SettlementRule }) {
   const { t } = useTraveliunUI();
   const [by, setBy] = useState(initial.by);
   const [pct, setPct] = useState<number | null>(initial.default_pct);
@@ -127,7 +127,7 @@ export function ProfitSettingsAdmin({ initial, usd: usdInitial, fees }: { initia
           <p role="alert" className="mt-2 text-[11.5px] font-bold text-[#c22850]">{t("err.db")}</p>
         ) : null}
       </section>
-      <PaymentFeesAdmin initial={fees} />
+      <PaymentFeesAdmin initial={fees} settlement={settlement} />
     </TraveliunShell>
   );
 }

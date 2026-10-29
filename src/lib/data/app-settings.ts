@@ -11,9 +11,10 @@ import { SETTING as MURAD_SETTING } from "@/lib/murad/core";
 import { hoursText, parseDelay, parseHours, readRoutes, ROUTE_KEYS, type Routes } from "@/lib/murad/reception";
 import { readOffers, type OfferCountry } from "@/lib/murad/auto-offer";
 import { usdSarRate } from "@/lib/offer/pricing";
-import { PAY_METHODS, parseFees, type PaymentFees } from "@/lib/payments/methods";
+import { PAY_METHODS, parseFees, parseSettlement, type PaymentFees, type SettlementRule } from "@/lib/payments/methods";
 
 const PAYMENT_FEES_KEY = "payment_fees";
+const SETTLEMENT_KEY = "bnpl_settlement";
 
 /**
  * Choices the administration makes once for everyone (app_settings, 0054).
@@ -165,6 +166,36 @@ export async function setPaymentFees(next: PaymentFees): Promise<SetSettingResul
       .upsert({ key: PAYMENT_FEES_KEY, value: JSON.stringify(clean), updated_at: new Date().toISOString() });
     if (error) return { ok: false, error: "err.db" };
     await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: PAYMENT_FEES_KEY, meta: { before, after: clean } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/** Tabby/Tamara's payout rule — weekday + weeks of lag (lib/payments/methods.ts expectedSettlement). Server-side readers only. */
+export async function getSettlementRule(): Promise<SettlementRule> {
+  try {
+    const { data } = await (createSupabaseServiceClient() as unknown as SupabaseClient).from("app_settings").select("value").eq("key", SETTLEMENT_KEY).maybeSingle();
+    return parseSettlement((data as { value?: string } | null)?.value);
+  } catch {
+    return parseSettlement(null);
+  }
+}
+
+/** settings.manage; weekday 0–6, lag 0–8 weeks. Audited — before and after. Payments already recorded keep their date. */
+export async function setSettlementRule(next: SettlementRule): Promise<SetSettingResult> {
+  if (!(await currentCan("settings.manage"))) return { ok: false, error: "err.forbidden" };
+  if (!(Number.isInteger(next.weekday) && next.weekday >= 0 && next.weekday <= 6 && Number.isInteger(next.lagWeeks) && next.lagWeeks >= 0 && next.lagWeeks <= 8)) {
+    return { ok: false, error: "err.db" };
+  }
+  const clean = { weekday: next.weekday, lagWeeks: next.lagWeeks };
+  try {
+    const before = await getSettlementRule();
+    const { error } = await (createSupabaseServiceClient() as unknown as SupabaseClient)
+      .from("app_settings")
+      .upsert({ key: SETTLEMENT_KEY, value: JSON.stringify(clean), updated_at: new Date().toISOString() });
+    if (error) return { ok: false, error: "err.db" };
+    await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: SETTLEMENT_KEY, meta: { before, after: clean } });
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };

@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
-import { setPaymentFees } from "@/lib/data/app-settings";
-import { PAY_METHODS, type MethodFee, type PayMethod, type PaymentFees } from "@/lib/payments/methods";
+import { setPaymentFees, setSettlementRule } from "@/lib/data/app-settings";
+import { PAY_METHODS, type MethodFee, type PayMethod, type PaymentFees, type SettlementRule } from "@/lib/payments/methods";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "./TraveliunUIProvider";
 
@@ -15,13 +15,14 @@ const field = "h-9 w-20 rounded-[9px] border border-[#dbe6e1] bg-white px-2 text
  * update and the PDF all add (lib/payments/methods.ts). An empty share means
  * «غير محددة»: that method is shown without a price until it is set.
  */
-export function PaymentFeesAdmin({ initial }: { initial: PaymentFees }) {
+export function PaymentFeesAdmin({ initial, settlement }: { initial: PaymentFees; settlement: SettlementRule }) {
   const { t } = useTraveliunUI();
   const toText = (f: MethodFee) => ({ pct: f ? String(f.pct) : "", fixed: f && f.fixed ? String(f.fixed) : "" });
   const [rows, setRows] = useState<Record<PayMethod, { pct: string; fixed: string }>>(
     () => Object.fromEntries(PAY_METHODS.map((m) => [m, toText(initial[m])])) as Record<PayMethod, { pct: string; fixed: string }>,
   );
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [rule, setRule] = useState(settlement);
 
   async function save() {
     const next = Object.fromEntries(
@@ -31,8 +32,8 @@ export function PaymentFeesAdmin({ initial }: { initial: PaymentFees }) {
       }),
     ) as PaymentFees;
     setState("saving");
-    const res = await setPaymentFees(next);
-    setState(res.ok ? "saved" : "error");
+    const [res, ruleRes] = await Promise.all([setPaymentFees(next), setSettlementRule(rule)]);
+    setState(res.ok && ruleRes.ok ? "saved" : "error");
   }
 
   return (
@@ -48,7 +49,7 @@ export function PaymentFeesAdmin({ initial }: { initial: PaymentFees }) {
                 type="number"
                 min={0}
                 max={30}
-                step="0.01"
+                step="0.001"
                 dir="ltr"
                 value={rows[m].pct}
                 placeholder="—"
@@ -77,6 +78,33 @@ export function PaymentFeesAdmin({ initial }: { initial: PaymentFees }) {
             {rows[m].pct.trim() === "" ? <span className="text-[11px] font-bold text-[#a86a10]">{t("pay.fees.unset")}</span> : null}
           </div>
         ))}
+      </div>
+      <h3 className="mt-4 text-[13px] font-extrabold text-[#185045]">{t("pay.settle.title")}</h3>
+      <p className="mt-1 mb-2 text-[12px] font-semibold text-[#93aaa3]">{t("pay.settle.hint")}</p>
+      <div className="flex flex-wrap items-center gap-3 text-[12px] font-bold text-[#557d78]">
+        <label className="flex items-center gap-1.5">
+          {t("pay.settle.weekday")}
+          <select value={rule.weekday} onChange={(e) => setRule((r) => ({ ...r, weekday: Number(e.target.value) }))} className={`${field} w-28`}>
+            {[0, 1, 2, 3, 4, 5, 6].map((d) => (
+              <option key={d} value={d}>
+                {t(`pay.settle.day${d}` as TranslationKey)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input
+            type="number"
+            min={0}
+            max={8}
+            step={1}
+            dir="ltr"
+            value={rule.lagWeeks}
+            onChange={(e) => setRule((r) => ({ ...r, lagWeeks: Math.max(0, Math.min(8, Math.trunc(Number(e.target.value) || 0))) }))}
+            className={field}
+          />
+          {t("pay.settle.lag")}
+        </label>
       </div>
       <div className="mt-3 flex items-center gap-3">
         <button

@@ -10,6 +10,8 @@ import { syncOperation } from "@/lib/data/operation-sync";
 import { mintReceipt } from "@/lib/data/payment-receipt";
 import type { PaymentKind, PaymentMethod } from "@/lib/data/operations";
 import { PAYMENT_KINDS, PAYMENT_METHODS, isIsoDate } from "@/lib/operations/payments";
+import { getSettlementRule } from "@/lib/data/app-settings";
+import { expectedSettlement, isBnpl } from "@/lib/payments/methods";
 import { gateCaseManager, gateManagerRow, gateOperation, gateRow } from "@/lib/operations/access";
 
 /**
@@ -101,6 +103,7 @@ export async function updatePayment(id: string, input: PaymentInput): Promise<{ 
         method: input.method || null,
         reference: input.reference?.trim() || null,
         paid_at: input.paid_at,
+        expected_settlement_on: isBnpl(input.method) ? expectedSettlement(input.paid_at, await getSettlementRule()) : null,
         note: input.note?.trim() || null,
         updated_at: new Date().toISOString(),
         // a refund corrected into money IN is owed its receipt
