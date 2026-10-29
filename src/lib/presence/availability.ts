@@ -126,10 +126,24 @@ export type AvailabilityReason = "leave" | "off_shift" | "break" | "offline" | "
 export type Availability = { available: boolean; reason: AvailabilityReason | null };
 
 /**
- * session A's setting (it owns the screen and src/lib/leads/lateness.ts): {"employees": [uuid…], "roles": [roleId…],
- * "teams": [teletelTeamId…]} — staff, roles and whole Teletel teams with no lateness counted
+ * Everyone with no lateness counted — session A's setting (lateness_exempt: employees, roles, whole Teletel teams), read
+ * by its own latenessExempt (leads/lifecycle.ts); a team is opened to its members' agents here (cached a minute). For a
+ * time-independent «is this colleague exempt» — the evening report, the letters — ask this, not availabilityOf, whose
+ * «exempt» only shows when nothing else (off shift, leave…) comes first.
  */
-export const EXEMPT_KEY = "lateness_exempt";
+export async function exemptStaff(): Promise<{ employeeIds: ReadonlySet<string>; agentIds: ReadonlySet<number> }> {
+  const { latenessExempt } = await import("@/lib/leads/lifecycle");
+  const x = await latenessExempt().catch(() => null);
+  if (!x) return { employeeIds: new Set(), agentIds: new Set() };
+  const agentIds = new Set(x.agentIds);
+  if (x.teamIds.size) {
+    const { teamMembers } = await import("@/lib/providers/teletel");
+    for (const members of await Promise.all([...x.teamIds].map((t) => teamMembers(t).catch(() => [])))) for (const m of members) agentIds.add(m.id);
+  }
+  return { employeeIds: x.employeeIds, agentIds };
+}
+export const isExempt = (x: { employeeIds: ReadonlySet<string>; agentIds: ReadonlySet<number> }, m: { id: string; agentId: number | null }) =>
+  x.employeeIds.has(m.id) || (m.agentId !== null && x.agentIds.has(Number(m.agentId)));
 /** a department's own working hours, when it has them: {"<department>": "<hours text as مُراد's>"} */
 export const DEPARTMENT_HOURS_KEY = "department_hours";
 
@@ -168,30 +182,16 @@ export async function availabilityOf(employeeIds: string[], atMs = Date.now(), d
   if (!employeeIds.length) return out;
   const { SETTING } = await import("@/lib/murad/core");
   const { isWorkingTime } = await import("@/lib/murad/reception");
-  const [excused, s, online, { data: emps }] = await Promise.all([
+  const [excused, s, online, { data: emps }, exempt] = await Promise.all([
     excusedNow(atMs),
-    settings([SETTING.receptionHours, DEPARTMENT_HOURS_KEY, EXEMPT_KEY]),
+    settings([SETTING.receptionHours, DEPARTMENT_HOURS_KEY]),
     onlineAgentIds(),
-    db().from("employees").select("id, role_id, teletel_agent_id").in("id", employeeIds),
+    db().from("employees").select("id, teletel_agent_id").in("id", employeeIds),
+    exemptStaff(),
   ]);
   const hours = await hoursFor(department, s);
   const working = isWorkingTime(new Date(atMs), hours);
-  let exempt: { employees?: unknown; roles?: unknown; teams?: unknown } = {};
-  try {
-    exempt = JSON.parse(s.get(EXEMPT_KEY) ?? "{}") as typeof exempt;
-  } catch {
-    /* none */
-  }
-  const exEmp = new Set(Array.isArray(exempt.employees) ? (exempt.employees as string[]) : []);
-  const exRole = new Set(Array.isArray(exempt.roles) ? (exempt.roles as string[]) : []);
-  // a whole Teletel team (session A's third key, «قسم فيزا»): its members' agents — the members list is cached a minute
-  const exTeams = Array.isArray(exempt.teams) ? (exempt.teams as unknown[]).filter((t): t is number => Number.isInteger(t)) : [];
-  const exAgent = new Set<number>();
-  if (exTeams.length) {
-    const { teamMembers } = await import("@/lib/providers/teletel");
-    for (const members of await Promise.all(exTeams.map((t) => teamMembers(t).catch(() => [])))) for (const m of members) exAgent.add(m.id);
-  }
-  const row = new Map(((emps ?? []) as { id: string; role_id: string | null; teletel_agent_id: number | null }[]).map((e) => [e.id, e]));
+  const row = new Map(((emps ?? []) as { id: string; teletel_agent_id: number | null }[]).map((e) => [e.id, e]));
   for (const id of employeeIds) {
     const e = row.get(id);
     const x = excused.get(id);
@@ -204,7 +204,7 @@ export async function availabilityOf(employeeIds: string[], atMs = Date.now(), d
             ? "break"
             : online && !(e?.teletel_agent_id && online.has(Number(e.teletel_agent_id)))
               ? "offline"
-              : exEmp.has(id) || (e?.role_id && exRole.has(e.role_id)) || (e?.teletel_agent_id && exAgent.has(Number(e.teletel_agent_id)))
+              : isExempt(exempt, { id, agentId: e?.teletel_agent_id ?? null })
                 ? "exempt"
                 : null;
     out.set(id, { available: reason === null || reason === "exempt", reason });

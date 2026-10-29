@@ -8,6 +8,7 @@ import { isWorkingTime, parseHours } from "@/lib/murad/reception";
 import { SETTING } from "@/lib/murad/core";
 import { logAudit } from "@/lib/data/audit";
 import { availabilityOf, clientHint } from "@/lib/presence/availability";
+import { saleHolder } from "@/lib/leads/lifecycle";
 import { escapeHtml, staffSend } from "@/lib/telegram/staff-bot";
 import { DEFAULT_RULES, moveReason, parseRules, pickCandidate, RULES_KEY, WHY_TEXT, type Candidate, type Choice, type Rules } from "./switchboard-core";
 
@@ -120,22 +121,12 @@ export async function tellHint(employeeId: string, conversationId: number, hint:
 }
 
 /**
- * Interim «فيها بيع أو خدمة مؤكدة» until session A's predicate lands (the owner's fixed rule: never take such a
- * conversation from the colleague who has it): an offer followed on this conversation whose operations file is
- * confirmed, paid or done. Unreadable = protected — when in doubt, nothing moves.
- * ponytail: swap for A's predicate at the merge; one call site each in moveReason's input and reassignConversation.
+ * «فيها بيع أو خدمة مؤكدة» — the owner's fixed rule: such a conversation never leaves the colleague who has it. Session A's
+ * one predicate (leads/lifecycle.ts saleHolder: the holder when the client bought, read from Teletel now; unreadable
+ * facts count as a sale), so Murad, the warning letters and the switchboard all keep the same clients.
  */
 export async function hasSaleOrService(conversationId: number): Promise<boolean> {
-  const { data: f, error } = await db().from("sla_followups").select("offer_id").eq("conversation_id", conversationId).not("offer_id", "is", null);
-  if (error) return true;
-  const offers = ((f ?? []) as { offer_id: string }[]).map((r) => r.offer_id);
-  if (!offers.length) return false;
-  const { count, error: e2 } = await db()
-    .from("operations")
-    .select("id", { count: "exact", head: true })
-    .in("offer_id", offers)
-    .in("client_status", ["confirmed", "paid_partial", "paid_full", "completed"]);
-  return e2 ? true : (count ?? 0) > 0;
+  return (await saleHolder(conversationId).catch(() => ({ agentId: 0, name: null }))) !== null;
 }
 
 async function move(
