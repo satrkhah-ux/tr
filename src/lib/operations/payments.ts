@@ -5,6 +5,7 @@
  */
 
 import type { PaymentKind, PaymentMethod } from "@/lib/data/operations";
+import { PAY_METHOD_AR, PAY_METHODS } from "@/lib/payments/methods";
 
 export const DEPOSIT_SHARE = 0.5;
 export const BALANCE_DAYS_BEFORE_TRAVEL = 14;
@@ -18,6 +19,19 @@ export function riyadhDate(at: Date | string | number = new Date()): string {
 
 export const isIsoDate = (value: unknown): value is string =>
   typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+
+/**
+ * What the client owes on a case: the price he was quoted (operations.agreed_total —
+ * a payment fee, a discount) when the employee wrote one, else the offer's total.
+ * Every reader of a case's money goes through this, so the board, the gate, the
+ * receipts, the client's page and the profit can never disagree on it.
+ */
+export function caseTotal(offerTotal: number | string | null | undefined, agreedTotal: number | string | null | undefined): number | null {
+  const agreed = agreedTotal == null ? NaN : Number(agreedTotal);
+  if (Number.isFinite(agreed) && agreed > 0) return round2(agreed);
+  const offer = offerTotal == null ? NaN : Number(offerTotal);
+  return Number.isFinite(offer) ? offer : null;
+}
 
 /** Net money in: a refund is stored positive and subtracted here, in one place. */
 export function paidTotal(payments: { amount: number; kind: string }[]): number {
@@ -79,16 +93,12 @@ export function installmentStates<T extends Installment>(
 
 // ---------------------------------------------------------------- receipt ----
 
-export const PAYMENT_METHODS: PaymentMethod[] = ["transfer", "cash", "pos", "link"];
+/** «وسائل الدفع» — the one list and its Arabic (lib/payments/methods.ts), so the receipt, the form and the fees agree. */
+export const PAYMENT_METHODS: PaymentMethod[] = [...PAY_METHODS];
 export const PAYMENT_KINDS: PaymentKind[] = ["deposit", "installment", "final", "refund"];
 
 /** How the client paid, as the receipt prints it (always Arabic, like every client document). */
-export const METHOD_AR: Record<PaymentMethod, string> = {
-  cash: "نقداً",
-  transfer: "تحويل بنكي",
-  pos: "مدى",
-  link: "رابط دفع",
-};
+export const METHOD_AR: Record<PaymentMethod, string> = PAY_METHOD_AR;
 
 export const KIND_AR: Record<PaymentKind, string> = {
   deposit: "عربون",

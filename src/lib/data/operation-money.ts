@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
 import { gateManager, gateOperation } from "@/lib/operations/access";
-import { defaultSchedule, paidTotal, riyadhDate, type Installment } from "@/lib/operations/payments";
+import { caseTotal, defaultSchedule, paidTotal, riyadhDate, type Installment } from "@/lib/operations/payments";
 import { bookingCost } from "@/lib/operations/supplier-request";
 import {
   caseProfit,
@@ -95,6 +95,7 @@ type OpRow = {
   travel_start: string | null;
   confirmed_at: string;
   confirmed_by: string | null;
+  agreed_total: number | string | null;
   offers: OfferRow | OfferRow[] | null;
 };
 
@@ -144,7 +145,7 @@ export async function loadCases(db: SupabaseClient, operationId?: string): Promi
     let q = db
       .from("operations")
       .select(
-        "id, client_status, execution_status, travel_start, confirmed_at, confirmed_by, offers(id, serial, destination, total, currency, employee_id, partner_company_id, partner_cost)",
+        "id, client_status, execution_status, travel_start, confirmed_at, confirmed_by, agreed_total, offers(id, serial, destination, total, currency, employee_id, partner_company_id, partner_cost)",
       )
       .order("id");
     if (operationId) q = q.eq("id", operationId);
@@ -199,7 +200,8 @@ export async function loadCases(db: SupabaseClient, operationId?: string): Promi
   return ops.map((op) => {
     const offer = one(op.offers);
     const currency = offer?.currency || "SAR";
-    const total = offer?.total != null ? Number(offer.total) : null;
+    // the price the client actually owes — what the sale and the profit are measured against
+    const total = caseTotal(offer?.total, op.agreed_total);
     const partner = Boolean(offer?.partner_company_id);
     const inv = offer ? invoiceBy.get(offer.id) : undefined;
     const invoice: Money | null = inv
