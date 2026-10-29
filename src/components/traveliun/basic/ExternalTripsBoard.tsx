@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Pencil, Trash2 } from "lucide-react";
-import { deleteExternalTrip, saveExternalTrip, type ExternalTripRow } from "@/lib/data/external-trips";
-import { CONFIRMED_ITEMS, EXTERNAL_STATUS, externalTripEnd, type ExternalStatus } from "@/lib/leads/lifecycle-rules";
+import { Loader2, Pencil, Trash2, TriangleAlert, UserRound } from "lucide-react";
+import { deleteExternalTrip, findTripClients, saveExternalTrip, type ExternalTripRow } from "@/lib/data/external-trips";
+import { clientQuery, CONFIRMED_ITEMS, EXTERNAL_STATUS, externalTripEnd, phoneKey, type ExternalStatus, type TripClient } from "@/lib/leads/lifecycle-rules";
 import { EditSheet } from "@/components/ui/edit-sheet";
+import { SuggestInput, type Suggestion } from "../SuggestInput";
 import { TraveliunShell } from "../TraveliunShell";
 
 /**
@@ -21,8 +22,9 @@ const CARD = "rounded-[14px] border border-[#cfe0d9] bg-white p-4";
 const LABEL = "grid gap-1 text-[11.5px] font-bold text-[#185045]";
 const STATUS_COLOR: Record<ExternalStatus, string> = { confirmed: "bg-[#eef6ff] text-[#1d4f8a]", paid_partial: "bg-[#fff6e6] text-[#8a5a10]", paid_full: "bg-[#e8f6ef] text-[#185045]", cancelled: "bg-[#f2f4f3] text-[#7a8a86]" };
 
-type Form = { id?: string; phone: string; travelStart: string; days: string; destination: string; status: ExternalStatus; paid: string; confirmed: string[] };
-const EMPTY: Form = { phone: "", travelStart: "", days: "", destination: "", status: "confirmed", paid: "", confirmed: [] };
+/** `client`: what is typed in «العميل» (a name or a number); `phone`: the number saved; `name`: the picked client's */
+type Form = { id?: string; client: string; phone: string; name: string; travelStart: string; days: string; destination: string; status: ExternalStatus; paid: string; confirmed: string[] };
+const EMPTY: Form = { client: "", phone: "", name: "", travelStart: "", days: "", destination: "", status: "confirmed", paid: "", confirmed: [] };
 const showPhone = (p: string) => (p.startsWith("966") ? `0${p.slice(3)}` : p);
 
 export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripRow[]; me: string | null; admin: boolean } }) {
@@ -31,11 +33,62 @@ export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripR
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [mine, setMine] = useState(false);
+  // «العميل» pulled from what we already have (the owner, 2026-10-29: «رقم الجوال لا يتم سحبه من النظام!»)
+  const [hits, setHits] = useState<TripClient[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const seq = useRef(0);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
   const rows = mine ? initial.rows.filter((r) => r.employee_id === initial.me) : initial.rows;
   const canChange = (r: ExternalTripRow) => initial.admin || (initial.me !== null && r.employee_id === initial.me);
 
+  // debounced, and a late answer to an older query is dropped
+  useEffect(() => {
+    if (!clientQuery(form.client)) return;
+    const ask = ++seq.current;
+    const id = window.setTimeout(async () => {
+      const r = await findTripClients(form.client, form.id);
+      if (seq.current !== ask) return;
+      setHits(r.hits);
+      setWarnings(r.warnings);
+    }, 300);
+    return () => window.clearTimeout(id);
+  }, [form.client, form.id]);
+
+  const reset = (next: Form = EMPTY) => {
+    seq.current++;
+    setHits([]);
+    setWarnings([]);
+    setForm(next);
+  };
+  // picked: the client's mobile and name, and their recent trip into whatever is still empty; typed: a number is the number
+  const onClient = (value: string, picked: boolean) => {
+    setWarnings([]);
+    if (!clientQuery(value)) {
+      seq.current++;
+      setHits([]);
+    }
+    const hit = picked ? hits.find((h) => showPhone(h.phone) === value) : undefined;
+    setForm((f) =>
+      hit
+        ? { ...f, client: value, phone: value, name: hit.name ?? "", destination: f.destination || hit.trip?.destination || "", travelStart: f.travelStart || hit.trip?.travelStart || "", days: f.days || (hit.trip?.days ? String(hit.trip.days) : "") }
+        : { ...f, client: value, phone: /\p{L}/u.test(value) ? "" : value, name: "" },
+    );
+  };
+  const items: Suggestion[] = hits.map((h) => ({
+    value: showPhone(h.phone),
+    label: h.name ?? "عميل بلا اسم",
+    sub: [showPhone(h.phone), h.trip?.destination].filter(Boolean).join(" · "),
+    hint: h.mine ? "عميلك" : undefined,
+    keywords: `${h.name ?? ""} ${h.phone}`,
+  }));
+  // a number typed in full that we know shows its name too
+  const clientName = form.name || hits.find((h) => phoneKey(h.phone) !== null && phoneKey(h.phone) === phoneKey(form.phone))?.name || "";
+
   const save = async () => {
+    if (!form.phone.trim()) {
+      setMsg({ ok: false, text: "اختر العميل من القائمة أو اكتب رقم جواله" });
+      return;
+    }
     setBusy("save");
     setMsg(null);
     const r = await saveExternalTrip({
@@ -51,7 +104,7 @@ export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripR
     setBusy(null);
     setMsg(r.ok ? { ok: true, text: form.id ? "حُفظ التعديل" : "أُضيف العميل" } : { ok: false, text: r.error });
     if (r.ok) {
-      setForm(EMPTY);
+      reset();
       router.refresh();
     }
   };
@@ -64,17 +117,22 @@ export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripR
     if (res.ok) router.refresh();
   };
   const edit = (r: ExternalTripRow) => {
-    setForm({ id: r.id, phone: showPhone(r.phone), travelStart: r.travel_start, days: String(r.days), destination: r.destination, status: r.status, paid: r.paid_amount == null ? "" : String(r.paid_amount), confirmed: r.confirmed_items });
+    reset({ id: r.id, client: showPhone(r.phone), phone: showPhone(r.phone), name: r.client_name ?? "", travelStart: r.travel_start, days: String(r.days), destination: r.destination, status: r.status, paid: r.paid_amount == null ? "" : String(r.paid_amount), confirmed: r.confirmed_items });
   };
 
   // the same fields in the sheet (editing) and in the add card
   const formFields = (
     <>
           <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
-            <label className={LABEL}>
-              رقم الجوال
-              <input type="tel" inputMode="tel" dir="ltr" placeholder="05xxxxxxxx" value={form.phone} onChange={(e) => set("phone", e.target.value)} className={FIELD} />
-            </label>
+            <div className={`${LABEL} sm:col-span-2`}>
+              العميل — الاسم أو رقم الجوال
+              <SuggestInput value={form.client} items={items} onChange={onClient} placeholder="اكتب اسم العميل أو رقمه 05…" ariaLabel="العميل" arrow={false} className={`${FIELD} w-full`} />
+              {clientName ? (
+                <span className="inline-flex items-center gap-1 text-[12px] font-bold text-[#0f3d38]">
+                  <UserRound className="size-3.5 text-[#2aa87a]" /> {clientName}
+                </span>
+              ) : null}
+            </div>
             <label className={LABEL}>
               تاريخ السفر
               <input type="date" value={form.travelStart} onChange={(e) => set("travelStart", e.target.value)} className={FIELD} />
@@ -100,6 +158,16 @@ export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripR
               <input type="number" min={0} inputMode="decimal" value={form.paid} onChange={(e) => set("paid", e.target.value)} className={FIELD} />
             </label>
           </div>
+          {/* the same mobile already has a trip here or a confirmed file in operations — the sale is someone's (heldSale) */}
+          {warnings.length ? (
+            <div className="mt-3 grid gap-1 rounded-[10px] border border-[#f1d9a8] bg-[#fff8eb] px-3 py-2 text-[12px] font-bold text-[#8a5a10]">
+              {warnings.map((w) => (
+                <span key={w} className="inline-flex items-center gap-1.5">
+                  <TriangleAlert className="size-3.5 shrink-0" /> هذا الرقم {w}
+                </span>
+              ))}
+            </div>
+          ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-[11.5px] font-bold text-[#185045]">ما تم تأكيده:</span>
             {CONFIRMED_ITEMS.map((x) => {
@@ -116,7 +184,7 @@ export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripR
               {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : null} {form.id ? "حفظ التعديل" : "إضافة"}
             </button>
             {form.id ? (
-              <button type="button" onClick={() => setForm(EMPTY)} className="h-9 rounded-[8px] border border-[#dbe6e1] px-3 text-[12.5px] font-bold text-[#557d78]">إلغاء</button>
+              <button type="button" onClick={() => reset()} className="h-9 rounded-[8px] border border-[#dbe6e1] px-3 text-[12.5px] font-bold text-[#557d78]">إلغاء</button>
             ) : null}
           </div>
     </>
@@ -128,7 +196,7 @@ export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripR
         {msg ? <div className={`rounded-[10px] px-3 py-2 text-[12.5px] font-bold ${msg.ok ? "bg-[#e8f6ef] text-[#185045]" : "bg-[#fdecef] text-[#a3263f]"}`}>{msg.text}</div> : null}
 
         {/* «التعديل يفتح في مكانه»: a trip being edited opens in the side sheet — the row stays where it is (the owner, 2026-10-29) */}
-        <EditSheet open={form.id !== undefined} onClose={() => setForm(EMPTY)} title="تعديل رحلة">
+        <EditSheet open={form.id !== undefined} onClose={() => reset()} title="تعديل رحلة">
           {formFields}
         </EditSheet>
 
@@ -149,10 +217,11 @@ export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripR
           </div>
           {rows.length ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-right text-[12.5px]">
+              <table className="w-full min-w-[860px] text-right text-[12.5px]">
                 <thead className="text-[11.5px] text-[#557d78]">
                   <tr>
-                    <th className="py-1.5 font-bold">الجوال</th>
+                    <th className="py-1.5 font-bold">العميل</th>
+                    <th className="font-bold">الجوال</th>
                     <th className="font-bold">الوجهة</th>
                     <th className="font-bold">السفر</th>
                     <th className="font-bold">الأيام</th>
@@ -166,7 +235,8 @@ export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripR
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.id} className="border-t border-[#eef3f1] text-[#0f3d38]">
-                      <td dir="ltr" className="py-1.5 text-right">{showPhone(r.phone)}</td>
+                      <td className="py-1.5 font-bold">{r.client_name ?? "—"}</td>
+                      <td dir="ltr" className="text-right">{showPhone(r.phone)}</td>
                       <td>{r.destination}</td>
                       <td dir="ltr" className="text-right">{r.travel_start} ← {externalTripEnd(r.travel_start, r.days)}</td>
                       <td>{r.days}</td>
