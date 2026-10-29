@@ -57,6 +57,8 @@ const PERIODS: [PeriodKind, string][] = [
 const ROWS_PER_PAGE = 40;
 const FIELD = "h-8 w-full rounded-[8px] border border-[#cfe0d9] bg-white px-2 text-[12px] font-semibold text-[#185045]";
 
+const FIGURES_NOTE = "أرقام المتابعة غير متاحة الآن — «إشراف المتابعة» لم يُفعَّل بعد أو لا صلاحية لك عليها.";
+
 const daysBetween = (from: string, to: string) => Math.max(1, Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000) + 1);
 
 export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team: { id: string; arabic_name: string }[]; places: Place[]; today: string }) {
@@ -79,6 +81,8 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
   const [failedIds, setFailedIds] = useState<string[]>([]);
   const latest = useRef(0);
   const resets = useRef(0);
+  // moves between periods: a read that ends on another period says nothing about the one now shown
+  const moves = useRef(0);
 
   const nameOf = useMemo(() => new Map(team.map((e) => [e.id, e.arabic_name])), [team]);
   const people = useMemo(() => [...new Set(["مُراد", ...team.map((e) => e.arabic_name)])], [team]);
@@ -112,7 +116,8 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
     const r = await getReportSupervision(want).catch(() => null);
     if (mine !== latest.current) return;
     setSupervision({ days: want, figures: r });
-    if (!r) setNote("أرقام المتابعة غير متاحة الآن — «إشراف المتابعة» لم يُفعَّل بعد أو لا صلاحية لك عليها.");
+    // its own message only: a load that works removes the one left by a load that did not, and leaves the reasons' hint alone
+    setNote((n) => (r ? (n === FIGURES_NOTE ? null : n) : FIGURES_NOTE));
     setLoadingFigures(false);
   }
 
@@ -120,6 +125,7 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
     const k = next.kind ?? kind;
     // never a day that has not come
     const a = next.anchor && next.anchor > today ? today : (next.anchor ?? anchor);
+    moves.current += 1;
     setKind(k);
     setAnchor(a);
     setPage(0);
@@ -173,6 +179,7 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
     setNote(null);
     const sent = toRead.slice(0, 20);
     const mine = resets.current;
+    const movedAt = moves.current;
     const res = await incompleteReasons(sent).catch(() => null);
     // «ألغِ كل التصحيحات» pressed while Teletel was being read: what came back belongs to the reviewer's old page
     if (mine !== resets.current) {
@@ -200,15 +207,18 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
       });
     }
     const left = toRead.filter((id) => !sent.includes(id)).length;
-    setNote(
-      [
-        found > 0 ? `قرأتُ سبب ${found} من ${res.tried.length} — والباقي يكتبه المراجع.` : res.tried.length > 0 ? "لم يتضح سبب أي طلب من كلام العميل — اكتبه يدوياً." : "",
-        res.failedIds.length > 0 ? `تعذّر الوصول إلى Teletel لـ ${res.failedIds.length} محادثة — أعد المحاولة لاحقاً.` : "",
-        left > 0 ? `بقي ${left} — اضغط مرة أخرى لقراءة التالي.` : "",
-      ]
-        .filter(Boolean)
-        .join(" "),
-    );
+    // what was read is kept (any period's); the sentence about "this period" only if it is still the one shown
+    if (movedAt === moves.current) {
+      setNote(
+        [
+          found > 0 ? `قرأتُ سبب ${found} من ${res.tried.length} — والباقي يكتبه المراجع.` : res.tried.length > 0 ? "لم يتضح سبب أي طلب من كلام العميل — اكتبه يدوياً." : "",
+          res.failedIds.length > 0 ? `تعذّر الوصول إلى Teletel لـ ${res.failedIds.length} محادثة — أعد المحاولة لاحقاً.` : "",
+          left > 0 ? `بقي ${left} — اضغط مرة أخرى لقراءة التالي.` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+    }
     setReading(false);
   }
 
