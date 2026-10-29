@@ -21,6 +21,8 @@ export const PAY_LOGOS: Partial<Record<PayMethod, { light: string; dark: string;
   tabby: { light: "/images/payments/tabby.svg", dark: "/images/payments/tabby.svg", size: "h-4", darkSize: "h-4" },
   tamara: { light: "/images/payments/tamara.svg", dark: "/images/payments/tamara-white.svg", size: "h-4", darkSize: "h-4" },
   pos: { light: "/images/payments/mada.svg", dark: "/images/payments/mada-dark.png", size: "h-[22px]", darkSize: "h-8" },
+  // MyFatoorah's own logo from myfatoorah.com (MF-Logo-White); the light-mode copy only turns its white letters dark
+  link: { light: "/images/payments/myfatoorah.png", dark: "/images/payments/myfatoorah-white.png", size: "h-3.5", darkSize: "h-3.5" },
 };
 
 /**
