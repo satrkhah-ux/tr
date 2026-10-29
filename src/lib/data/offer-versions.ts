@@ -11,6 +11,9 @@ import { loadDraft, writeDraftStages } from "./draft-store";
 import { newestFrozen, reissueLocked, type FrozenDraft } from "./issued-draft";
 import { produceOfferFromDraft, type ProduceResult } from "./drafts";
 import { logAudit } from "./audit";
+import { issuePricing, issuedHotelRefs, ownIssueSheet } from "@/lib/offer/issue-pricing";
+import { getProfitSettings } from "./app-settings";
+import { getRates } from "./rates-actions";
 
 /**
  * «سجل النسخ» of an issued offer, and «استعادة نسخة سابقة».
@@ -100,10 +103,16 @@ export async function getOfferVersionDocument(serial: string, version: number): 
 }
 
 /**
- * Put version N back and issue it as the next version. The frozen draft of N
+ * «اعتمد هذه» — put version N back and issue it as the next version. The frozen draft of N
  * (or of the issue N re-published) replaces the file's draft — every top-level
  * key, so a section added after N does not linger — keeping the serial. Then
  * the ordinary re-issue runs: same validation, same gates, same «ما تغيّر».
+ *
+ * At N's OWN total (the owner, 2026-10-29: «إذا رجع العميل عن قراره يعيد النظام اعتماد تلك النسخة —
+ * سعرها وPDF ورابط العميل»): today's rates or today's default margin would reprice it, so the draft
+ * carries an `adopted` pin — N's total, and what the draft itself prices at now — and the issue keeps
+ * N's total while nothing priced changes (issue-pricing.ts). Our own files; a partner's is re-priced
+ * at their terms as before.
  */
 export async function restoreOfferVersion(draftId: string, version: number): Promise<ProduceResult | { ok: false; error: string }> {
   try {
@@ -133,6 +142,21 @@ export async function restoreOfferVersion(draftId: string, version: number): Pro
       [...new Set([...Object.keys(now), ...Object.keys(back)])].map((k) => [k, (back as unknown as Record<string, unknown>)[k]]),
     ) as Partial<DraftData>;
     slices.produced_serial = serial;
+    if (!record.partner_company_id) {
+      const { data: sent } = await db
+        .from("offer_renders")
+        .select("total:snapshot_json->total")
+        .eq("offer_id", offer.id)
+        .eq("variant", "client")
+        .eq("version", version)
+        .maybeSingle();
+      const total = Number((sent as { total: unknown } | null)?.total);
+      if (Number.isFinite(total) && total > 0) {
+        const [{ sarPer }, { default_pct }] = await Promise.all([getRates(), getProfitSettings()]);
+        const base = issuePricing(ownIssueSheet(back), back, issuedHotelRefs(back), default_pct, sarPer).unpinned;
+        slices.pricing = { ...back.pricing, adopted: { version, total, base } };
+      }
+    }
     const { data: last } = await db
       .from("offer_renders")
       .select("version")
@@ -154,7 +178,7 @@ export async function restoreOfferVersion(draftId: string, version: number): Pro
       action: "offer.version_restored",
       entity: "offers",
       entity_id: offer.id,
-      meta: { serial, version: issued.version ?? null, restored_from: version, replaced_version: leaving, draft_id: draftId, draft_before: now },
+      meta: { serial, version: issued.version ?? null, restored_from: version, replaced_version: leaving, draft_id: draftId, draft_before: now, adopted_total: slices.pricing?.adopted?.total ?? null },
     });
     return issued;
   } catch {

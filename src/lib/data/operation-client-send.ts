@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { gateOperation } from "@/lib/operations/access";
+import { isPackageLine } from "@/lib/repackage/package-line";
 import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { clientWhatsappAllowed, greeting, messageClient, type ClientSendResult, type OfferClient } from "@/lib/data/client-whatsapp";
@@ -59,7 +60,7 @@ async function loadCase(service: SupabaseClient, operationId: string): Promise<C
   const [bookingsRes, paymentsRes] = await Promise.all([
     service
       .from("operation_bookings")
-      .select("id, kind, title, city_name, start_date, end_date, status, confirmation_number, company_ref, pnr, ticket_numbers, flight_legs, is_paid, detail")
+      .select("id, kind, title, city_name, start_date, end_date, status, confirmation_number, company_ref, pnr, ticket_numbers, flight_legs, is_paid, detail, origin_ref")
       .eq("operation_id", operationId),
     service.from("operation_payments").select("amount, kind").eq("operation_id", operationId),
   ]);
@@ -76,7 +77,8 @@ async function loadCase(service: SupabaseClient, operationId: string): Promise<C
     offer: { ...rest, total: caseTotal(rest.total, op.agreed_total), customer: one(customers) },
     token,
     travel_start: op.travel_start,
-    bookings: (bookingsRes.data ?? []) as SummaryBooking[],
+    // the supplier's package line is our debt to the supplier, never a line of the client's message (repackage/package-line.ts)
+    bookings: ((bookingsRes.data ?? []) as (SummaryBooking & { origin_ref: string | null })[]).filter((b) => !isPackageLine(b.origin_ref)),
     paid: paidTotal(((paymentsRes.data ?? []) as { amount: number | string; kind: string }[]).map((p) => ({ amount: Number(p.amount) || 0, kind: p.kind }))),
   };
 }

@@ -34,7 +34,7 @@ import { itineraryStartDate } from "./schedule";
 import { clientStayLine, draftTransportNote } from "./itinerary";
 import { AIRPORT_TRANSFER_LINE, advancedDayNote, advancedLines, meetsElsewhere } from "./advanced";
 import { offerTotals, type CurrencyRates } from "./pricing";
-import { packageNights, packageStays, type ExtractedPackage, type RepackageData } from "@/lib/repackage/repackage-types";
+import { additionLine, clientTotal, packageNights, packageStays, printableAdditions, type ExtractedPackage, type RepackageData } from "@/lib/repackage/repackage-types";
 
 /** Placeholder serial shown while the offer has not been produced yet. */
 const PENDING_SERIAL = "—";
@@ -196,8 +196,9 @@ export function draftSellTotal(data: DraftData, sarPer: CurrencyRates = { SAR: 1
  * produceRepackageOffer issues (each stop its own hotel, dates chained from the
  * arrival) — so the preview shows the offer that button will actually create.
  *
- * `supplier_total` is deliberately NOT read: the client sees `final_total`, our
- * sell price, and the supplier's cost never enters this tree.
+ * `supplier_total` is deliberately NOT read: the client sees our sell price
+ * (`final_total` plus the priced additions), and the supplier's cost never
+ * enters this tree.
  */
 export function repackageToPreviewOffer(data: RepackageData): ClientOfferDTO | null {
   const pkg: ExtractedPackage | null = data.extracted;
@@ -211,8 +212,8 @@ export function repackageToPreviewOffer(data: RepackageData): ClientOfferDTO | n
     ...emptyBase(),
     serial: data.produced_serial ?? PENDING_SERIAL,
     destination: pkg.destination || pkg.country || null,
-    customer_name: pkg.customer_name.trim() || null,
-    customer_phone: pkg.customer_phone.trim() || null,
+    customer_name: data.customer.customer_name.trim() || null,
+    customer_phone: data.customer.customer_phone.trim() || null,
     arrival_date: pkg.arrival_date,
     // the issued document ends where its last stay checks out — so does this one
     departure_date: stays.at(-1)?.check_out ?? pkg.departure_date,
@@ -221,7 +222,8 @@ export function repackageToPreviewOffer(data: RepackageData): ClientOfferDTO | n
     adults: pkg.adults,
     children: pkg.children,
     infants: pkg.infants,
-    total: data.final_total,
+    // the package's sell price plus the priced additions — what the client pays
+    total: clientTotal(data),
     currency: data.final_currency,
     pricing: emptyPricing(data.final_currency),
     hotels: stays.map((s) => ({
@@ -257,7 +259,8 @@ export function repackageToPreviewOffer(data: RepackageData): ClientOfferDTO | n
     })),
     transport: pkg.transfers,
     visas: pkg.visas,
-    includes: pkg.includes,
+    // the agent's additions close the «يشمل» list, as the issued offer prints them
+    includes: [...pkg.includes, ...printableAdditions(data).map(additionLine)],
     excludes: pkg.excludes,
     terms: pkg.terms,
   };

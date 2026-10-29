@@ -1603,9 +1603,27 @@ export type DraftPricing = {
    * reports and the client total all read it the way they already read a profit.
    */
   profit?: PackageProfit;
+  /**
+   * «اعتمد هذه» (the owner, 2026-10-29): an older version taken back at ITS total. `base` is what
+   * this file itself priced at when adopted; while it still does, issuing keeps `total`
+   * (issue-pricing.ts adoptedPin), and any priced change lets the file price on its own again.
+   */
+  adopted?: { version: number; total: number; base: number | null };
 };
 
 export type PackageProfit = { mode: "pct" | "amount"; value: number | null };
+
+/** A stored «اعتمد هذه» pin kept only when every figure is a number — anything else prices on its own. */
+function withAdopted(pricing: DraftPricing): DraftPricing {
+  const a = pricing.adopted as { version?: unknown; total?: unknown; base?: unknown } | undefined;
+  if (a === undefined) return pricing;
+  const ok = !!a && Number.isInteger(a.version) && (a.version as number) > 0 && typeof a.total === "number" && Number.isFinite(a.total) && a.total >= 0
+    && (a.base === null || (typeof a.base === "number" && Number.isFinite(a.base)));
+  if (ok) return pricing;
+  const { adopted: _drop, ...rest } = pricing;
+  void _drop;
+  return rest;
+}
 
 /**
  * Provenance when the draft was seeded from a ready-made company package
@@ -1875,7 +1893,7 @@ export function normalizeDraftData(raw: Record<string, unknown> | null | undefin
     services: { ...empty.services, ...(source.services ?? {}) },
     visas: Array.isArray(source.visas) ? source.visas : [],
     days: normalizeDraftDays(source.days),
-    pricing: { ...empty.pricing, ...(source.pricing ?? {}) },
+    pricing: withAdopted({ ...empty.pricing, ...(source.pricing ?? {}) }),
     produced_serial: typeof source.produced_serial === "string" ? source.produced_serial : null,
     source: normalizeDraftSource(source.source),
     ...(advanced ? { advanced } : {}),

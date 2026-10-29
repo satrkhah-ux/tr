@@ -46,7 +46,7 @@ function extracted(over: Partial<ExtractedPackage> = {}): ExtractedPackage {
 }
 
 describe("repackageToPreviewOffer", () => {
-  const data = { ...emptyRepackageData(), extracted: extracted(), final_total: 4600, final_currency: "SAR" };
+  const data = { ...emptyRepackageData(), customer: { customer_name: "سارة أحمد", customer_phone: "0551234567" }, extracted: extracted(), final_total: 4600, final_currency: "SAR" };
   const preview = repackageToPreviewOffer(data)!;
 
   it("returns null before anything is imported", () => {

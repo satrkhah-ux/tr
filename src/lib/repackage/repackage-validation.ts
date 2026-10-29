@@ -8,8 +8,11 @@
  *    shared offer/invariants module for a bilingual message).
  *  - A visit with two or more hotels: their nights must add up to the visit's
  *    → BLOCKING on /review (the stays chain inside the visit).
- *  - The client's name/phone and the arrival/departure dates (departure =
- *    arrival + nights) → BLOCKING on /review: the document is addressed to them.
+ *  - The client's name/phone (RepackageData.customer — asked when the file is
+ *    started, or linked here later) and the arrival/departure dates (departure =
+ *    arrival + nights) → BLOCKING on /review: the document is addressed to them,
+ *    and the produced offer is filed under them.
+ *  - An addition carrying a price but no title → BLOCKING on /edit.
  *  - A missing sell price, or a sell BELOW the supplier cost → BLOCKING on /edit.
  *
  * When NO critical is uncertain and nights reconcile, /review has zero blocking
@@ -105,8 +108,8 @@ export function validateRepackage(data: RepackageData): RepackageValidation {
   // import carries the supplier's facts, never whom we are selling them to.
   const need = (key: TranslationKey, params?: RepackageIssue["params"]) =>
     blocking.push({ severity: "blocking", stage: "review", key, params });
-  if (!pkg.customer_name.trim()) need("pg.warn.noName");
-  if (!pkg.customer_phone.trim()) need("pg.warn.noPhone");
+  if (!data.customer.customer_name.trim()) need("pg.warn.noName");
+  if (!data.customer.customer_phone.trim()) need("pg.warn.noPhone");
   if (!pkg.arrival_date) need("pg.err.noArrival");
   if (!pkg.departure_date) need("rp.err.noDeparture");
   const nights = packageNights(pkg);
@@ -133,6 +136,11 @@ export function validateRepackage(data: RepackageData): RepackageValidation {
     blocking.push({ severity: "blocking", stage: "edit", key: "rp.err.priceBelowCost" });
   } else if (data.final_total <= 0) {
     blocking.push({ severity: "blocking", stage: "edit", key: "rp.err.priceInvalid" });
+  }
+
+  // ── additions: a price with no title would add money to the total that no line explains ──
+  if (data.additions.some((a) => a.sell_price != null && !a.title.trim())) {
+    blocking.push({ severity: "blocking", stage: "edit", key: "rp.err.additionNoTitle" });
   }
 
   // ── advisory ──────────────────────────────────────────────────────────

@@ -17,11 +17,14 @@ export function BasicPhoneLookup({
   phone,
   onPhone,
   onPick,
+  invalid = false,
 }: {
   label: string;
   phone: string;
   onPhone: (phone: string) => void;
   onPick: (hit: TeletelCustomerHit) => void;
+  /** a required number left empty — drawn in the generator's red (the repackage's client card). */
+  invalid?: boolean;
 }) {
   const { t } = useTraveliunUI();
   const [query, setQuery] = useState("");
@@ -77,7 +80,7 @@ export function BasicPhoneLookup({
           onBlur={() => window.setTimeout(() => setOpen(false), 150)}
           placeholder="05…"
           // the number is left to right whatever the page's direction: the icon and its room both on the left
-          className={`${basicField} pl-9`}
+          className={`${basicField} pl-9${invalid ? " border-[#e0879b] focus:border-[#c22850]" : ""}`}
         />
       </span>
       {open && query.trim().length >= 2 ? (

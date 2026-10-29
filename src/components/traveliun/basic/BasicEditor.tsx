@@ -151,6 +151,7 @@ import { advancedDefaults, advancedTripDates, emptyAdvanced, fillAdvanced, isSta
 import { IssueGuardNotice } from "../IssueGuardNotice";
 import { OfferVersions } from "../OfferVersions";
 import { ReissueOffer } from "../ReissueOffer";
+import { PriceUpdate } from "./PriceUpdate";
 import { OverlandHopNotice } from "../OverlandHopNotice";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -2081,6 +2082,10 @@ export function BasicEditor({
               </div>
             </>
           )}
+          {produced && !partnerSession ? (
+            // «تطبيق تحديث السعر»: the price moved since the issue — one button issues the next version at it
+            <PriceUpdate draftId={draftId} saved={saveState === "saved" ? data : null} refreshKey={statusTick} blocked={blocking.length > 0} flush={flush} onIssued={bumpStatus} />
+          ) : null}
           {produced && !partnerSession ? (
             <BasicFileStatus
               draftId={draftId}

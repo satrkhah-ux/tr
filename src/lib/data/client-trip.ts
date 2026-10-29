@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { isPackageLine } from "@/lib/repackage/package-line";
 import { clientService, type ClientService } from "@/lib/operations/drivers";
 import { toClientInfo, type ClientInfo } from "@/lib/operations/case-list";
 import { caseTotal } from "@/lib/operations/payments";
@@ -52,7 +53,7 @@ export async function getClientTrip(token: string): Promise<ClientTrip | null> {
     const [bookingsRes, daysRes, paymentsRes, infoRes] = await Promise.all([
       supabase
         .from("operation_bookings")
-        .select("kind, title, city_name, start_date, end_date, detail, status, confirmation_number, company_ref, pnr, ticket_numbers, flight_legs, is_paid")
+        .select("kind, title, city_name, start_date, end_date, detail, status, confirmation_number, company_ref, pnr, ticket_numbers, flight_legs, is_paid, origin_ref")
         .eq("operation_id", op.id)
         .neq("status", "cancelled")
         .order("start_date", { ascending: true, nullsFirst: false }),
@@ -70,7 +71,8 @@ export async function getClientTrip(token: string): Promise<ClientTrip | null> {
 
     // the company's day — the driver card turns on at the Riyadh midnight of the service date
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
-    const bookings = (bookingsRes.data ?? []) as ClientBookingRow[];
+    // the supplier's package line is our debt to the supplier, not a service the client booked (repackage/package-line.ts)
+    const bookings = ((bookingsRes.data ?? []) as (ClientBookingRow & { origin_ref: string | null })[]).filter((b) => !isPackageLine(b.origin_ref));
 
     // what each shows, and when — client-booking-state.ts (the owner, 2026-10-17)
     const flights = bookings.filter((b) => b.kind === "flight").map(clientFlight);

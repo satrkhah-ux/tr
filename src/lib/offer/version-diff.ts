@@ -11,9 +11,10 @@ import type { ClientOfferDTO } from "./dto";
  * travellers, the flights and the price. Stays are matched by position, not by
  * city: a hotel-less stay has no city to match on (the document resolves a
  * stay's city from its hotel), and that is exactly the stay a re-issue fixes.
- * A stay added or dropped shows as its hotel going from «—» or to «—».
+ * A stay added or dropped shows as its hotel going from «—» or to «—». Last,
+ * what the price includes — the lines a repackage's «إضافات» add or take away.
  */
-export type OfferChangeKind = "hotel" | "room" | "board" | "rooms" | "stayDates" | "dates" | "travellers" | "flights" | "price";
+export type OfferChangeKind = "hotel" | "room" | "board" | "rooms" | "stayDates" | "dates" | "travellers" | "flights" | "price" | "includes";
 
 export type OfferChange = {
   kind: OfferChangeKind;
@@ -28,7 +29,7 @@ const NONE = "—";
 type Doc = Pick<
   ClientOfferDTO,
   "hotels" | "flights" | "arrival_date" | "departure_date" | "adults" | "children" | "infants" | "total" | "currency"
->;
+> & { includes?: string[] };
 
 const day = (d: string | null | undefined) => (d ? d.slice(0, 10) : NONE);
 
@@ -62,5 +63,7 @@ export function offerChanges(before: Doc, after: Doc): OfferChange[] {
   add("flights", null, legs(before), legs(after));
   const price = (d: Doc) => (d.total == null ? NONE : `${Number(d.total).toLocaleString("en-US")} ${d.currency ?? ""}`.trim());
   add("price", null, price(before), price(after));
+  const lines = (d: Doc) => (d.includes ?? []).join(" · ") || NONE;
+  add("includes", null, lines(before), lines(after));
   return out;
 }

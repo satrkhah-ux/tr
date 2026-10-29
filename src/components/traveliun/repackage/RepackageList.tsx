@@ -3,19 +3,23 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { FileText, Loader2, Plane, Trash2, Wand2 } from "lucide-react";
+import { FileText, Loader2, Plane, Trash2, UserRound, Wand2 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { createRepackage, deleteRepackage, type RepackageSummary } from "@/lib/data/repackage";
-import { stageHref } from "@/lib/repackage/repackage-types";
+import { hasCustomer, stageHref, type RepackageCustomer } from "@/lib/repackage/repackage-types";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
+import { RepackageClientFields } from "./RepackageClientFields";
 
 /** /repackage — imported supplier programs; resumes exactly where it left off. */
 export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
   const router = useRouter();
   const { t } = useTraveliunUI();
   const [creating, setCreating] = useState(false);
+  // «ابدأ» first asks who the file is for — the same fields Basic asks with
+  const [asking, setAsking] = useState(false);
+  const [customer, setCustomer] = useState<RepackageCustomer>({ customer_name: "", customer_phone: "" });
   const [deleting, setDeleting] = useState<string | null>(null);
   const [rows, setRows] = useState(imports);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +28,7 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
     if (creating) return;
     setCreating(true);
     setError(null);
-    const result = await createRepackage();
+    const result = await createRepackage(customer);
     if (!result.ok) {
       setError(t(result.error));
       setCreating(false);
@@ -60,15 +64,36 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
             </Link>
             <button
               type="button"
-              onClick={() => void onCreate()}
+              onClick={() => setAsking((v) => !v)}
+              aria-expanded={asking}
               disabled={creating}
               className="inline-flex h-11 items-center gap-2 rounded-[11px] bg-[#185045] px-5 text-sm font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
             >
-              {creating ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
-              {creating ? t("pg.creating") : t("rp.new")}
+              <Wand2 className="size-4" />
+              {t("rp.new")}
             </button>
           </div>
         </section>
+
+        {asking ? (
+          <section className="rounded-2xl border border-[#cfe3db] bg-[#f6faf8] px-5 py-4">
+            <h2 className="text-[14px] font-extrabold text-[#003c3a]">{t("rp.start.title")}</h2>
+            <p className="mb-3 mt-0.5 text-[12px] font-semibold text-[#557d78]">{t("rp.start.hint")}</p>
+            <RepackageClientFields customer={customer} onChange={setCustomer} />
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void onCreate()}
+                disabled={creating}
+                className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-[#185045] px-5 text-[13px] font-bold text-white transition-colors hover:bg-[#0f4439] disabled:opacity-70"
+              >
+                {creating ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
+                {creating ? t("pg.creating") : hasCustomer(customer) ? t("rp.start.go") : t("rp.start.goNoClient")}
+              </button>
+              {!hasCustomer(customer) ? <span className="text-[11.5px] font-semibold text-[#a86a10]">{t("rp.start.laterNote")}</span> : null}
+            </div>
+          </section>
+        ) : null}
 
         {error ? (
           <p role="alert" className="rounded-[10px] border border-[#f4c9d4] bg-[#fdeef2] px-4 py-3 text-[13px] font-semibold text-[#c22850]">{error}</p>
@@ -89,6 +114,11 @@ export function RepackageList({ imports }: { imports: RepackageSummary[] }) {
                       <span className="shrink-0 rounded-full bg-[#e4f6ef] px-2.5 py-0.5 text-[10.5px] font-bold text-[#10966b]">{t("rp.produced")}</span>
                     ) : null}
                   </div>
+                  {/* whose it is — the client it is filed under, or a plain «بلا عميل» that the issue will ask for */}
+                  <p className={`flex items-center gap-1.5 text-[12.5px] font-bold ${row.customer_name ? "text-[#185045]" : "text-[#a86a10]"}`}>
+                    <UserRound className="size-3.5 shrink-0" />
+                    <span className="min-w-0 truncate">{row.customer_name ?? t("rp.noClient")}</span>
+                  </p>
                   {row.destination ? <p className="text-[12.5px] font-semibold text-[#557d78]">{row.destination}</p> : null}
                   {row.supplier_name ? <p className="text-[11.5px] font-semibold text-[#93aaa3]">{t("rp.supplier")}: {row.supplier_name}</p> : null}
                   <p className="tv-tnum mt-1.5 text-[11px] text-[#93aaa3]">{t("pg.lastUpdated")}: <DirText dir="ltr">{row.updated_at.slice(0, 16).replace("T", " ")}</DirText></p>

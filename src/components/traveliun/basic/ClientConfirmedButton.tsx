@@ -9,24 +9,37 @@ import { useBasicLabels } from "./labels";
 const CHANNELS = ["whatsapp", "phone", "office"] as const;
 type Channel = (typeof CHANNELS)[number];
 
+/** What a confirmation answers with — Basic's confirmFromBasic, and the repackage's confirmRepackageOrder. */
+export type ConfirmAnswer = { ok: true; operationId: string; canOpen: boolean } | { ok: false; error: string };
+
 /**
  * «العميل أكّد» on a file waiting on its client, right in the files list (the
  * owner, 2026-10-17: «كيف أغير الحالة إلى مؤكد كي أنتقل إلى قسم الحجوزات؟»).
  * One press asks how the client said yes; the choice confirms the file — the
  * same confirmation as the file's own panel and the kanban (confirmFromBasic →
  * confirmOffer: the operations case opens) — and goes straight to its bookings.
+ *
+ * A repackaged file asks the same way (`confirm`: its own id, the same
+ * confirmOffer) and stays on its screen (`onConfirmed`), where the supplier's
+ * order comes next.
  */
 export function ClientConfirmedButton({
   draftId,
   className = "",
   expired = false,
   secondary = false,
+  confirm: confirmWith = confirmFromBasic,
+  onConfirmed,
 }: {
   draftId: string;
   className?: string;
   expired?: boolean;
   /** before the file is sent: a framed button beside the filled «أرسل للعميل» */
   secondary?: boolean;
+  /** confirms the file known here by `draftId` — Basic's draft by default. */
+  confirm?: (id: string, channel: Channel) => Promise<ConfirmAnswer>;
+  /** called with the answer instead of opening the case. */
+  onConfirmed?: (answer: Extract<ConfirmAnswer, { ok: true }>) => void;
 }) {
   const tx = useBasicLabels();
   const router = useRouter();
@@ -39,9 +52,10 @@ export function ClientConfirmedButton({
     setBusy(channel);
     setError(null);
     try {
-      const r = await confirmFromBasic(draftId, channel);
-      if (!r.ok) return setError(tx(ERR[r.error] ?? "fileErr_failed"));
-      if (r.canOpen) router.push(`/operations/${r.operationId}`);
+      const r = await confirmWith(draftId, channel);
+      if (!r.ok) return setError(tx(ERR[r.error as FileError] ?? "fileErr_failed"));
+      if (onConfirmed) onConfirmed(r);
+      else if (r.canOpen) router.push(`/operations/${r.operationId}`);
       else router.refresh();
     } catch {
       setError(tx("fileErr_failed"));
