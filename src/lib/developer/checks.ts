@@ -14,6 +14,7 @@ import { readyOffersSheet } from "@/lib/data/ready-offers";
 import { connect as tlsConnect } from "node:tls";
 import { ImapFlow } from "imapflow";
 import { backupHealth } from "./backup-health";
+import { getSecret } from "@/lib/secrets/get";
 import {
   ageStatus,
   CHECK_TIMEOUT_MS,
@@ -532,9 +533,8 @@ const CHECKS: Check[] = [
     // the reservations mailbox (reservations-mail/reader.ts): a verify-only IMAP
     // login — connect, authenticate, log out; reads nothing, changes nothing
     run: async () => {
-      const host = env("RESERVATIONS_IMAP_HOST");
-      const user = env("RESERVATIONS_IMAP_USER");
-      const pass = env("RESERVATIONS_IMAP_PASSWORD");
+      // «المفاتيح والتوكنات» first, then the server's environment — a password saved on the page is tested at once
+      const [host, user, pass] = await Promise.all(["RESERVATIONS_IMAP_HOST", "RESERVATIONS_IMAP_USER", "RESERVATIONS_IMAP_PASSWORD"].map((n) => getSecret(n)));
       if (!host || !user || !pass) return unconfigured("RESERVATIONS_IMAP_HOST", "RESERVATIONS_IMAP_USER", "RESERVATIONS_IMAP_PASSWORD");
       const client = new ImapFlow({
         host,
@@ -546,8 +546,14 @@ const CHECKS: Check[] = [
         connectionTimeout: CHECK_TIMEOUT_MS,
         greetingTimeout: CHECK_TIMEOUT_MS,
       });
-      const [, ms] = await timed(() => client.connect());
-      return ok(ms, { key: "dev.d.imapOk", params: { host: maskHost(host) } });
+      try {
+        const [, ms] = await timed(() => client.connect());
+        return ok(ms, { key: "dev.d.imapOk", params: { host: maskHost(host) } });
+      } catch (error) {
+        // a vault password is not in SECRET_ENV: cut it (and the user) out of the server's answer here
+        const reason = scrub(error instanceof Error ? error.message : String(error), [pass, user, ...SECRET_ENV.map(env)]);
+        return { status: "down", latencyMs: null, detail: { key: "dev.d.failed", params: { reason } } };
+      }
     },
   },
   { id: "sheet_ready_offers", group: "api", label: "dev.c.sheetReady", run: async () => sheetOutcome((await readyOffersSheet()).id) },

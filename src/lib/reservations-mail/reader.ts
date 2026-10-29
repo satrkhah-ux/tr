@@ -8,6 +8,7 @@ import { notifyOps } from "@/lib/data/ops-notify";
 import { logAudit } from "@/lib/data/audit";
 import { classify, type MailKind } from "./classify";
 import { matchEmail, type MatchCandidate } from "./match";
+import { getSecret } from "@/lib/secrets/get";
 
 /**
  * The reservations mailbox reader (the owner, 2026-10-26): supplier replies
@@ -28,8 +29,14 @@ const service = (): SupabaseClient => createSupabaseServiceClient() as unknown a
 const UID_KEY = "reservations_mail_uid";
 const ENV_NAMES = ["RESERVATIONS_IMAP_HOST", "RESERVATIONS_IMAP_USER", "RESERVATIONS_IMAP_PASSWORD"] as const;
 
-export function reservationsMailConfigured(): boolean {
-  return ENV_NAMES.every((name) => Boolean(process.env[name]));
+/** the mailbox's login — from «المفاتيح والتوكنات» or the server's environment (getSecret), so a new password works without a redeploy */
+async function mailLogin(): Promise<{ host: string; user: string; pass: string } | null> {
+  const [host, user, pass] = await Promise.all(ENV_NAMES.map((name) => getSecret(name)));
+  return host && user && pass ? { host, user, pass } : null;
+}
+
+export async function reservationsMailConfigured(): Promise<boolean> {
+  return (await mailLogin()) !== null;
 }
 
 /** one parsed message, already free of mailparser — processMessage is testable without IMAP */
@@ -161,11 +168,13 @@ export type MailRunResult = { read: number; linked: number; unmatched: number } 
 async function fetchNewMail(): Promise<MailRunResult> {
   const db = service();
   const since = await lastUid(db);
+  const login = await mailLogin();
+  if (!login) return { skipped: "not_configured" };
   const client = new ImapFlow({
-    host: process.env["RESERVATIONS_IMAP_HOST"]!,
+    host: login.host,
     port: 993,
     secure: true,
-    auth: { user: process.env["RESERVATIONS_IMAP_USER"]!, pass: process.env["RESERVATIONS_IMAP_PASSWORD"]! },
+    auth: { user: login.user, pass: login.pass },
     logger: false,
   });
   const result = { read: 0, linked: 0, unmatched: 0 };
@@ -207,6 +216,6 @@ async function fetchNewMail(): Promise<MailRunResult> {
 
 /** The whole pass — /api/ops/mail calls it. No mailbox configured: skipped, not an error. */
 export async function runReservationsMail(): Promise<MailRunResult> {
-  if (!reservationsMailConfigured()) return { skipped: "not_configured" };
+  if (!(await reservationsMailConfigured())) return { skipped: "not_configured" };
   return asSystem({ name: "reservations-mail", can: [] }, fetchNewMail);
 }
