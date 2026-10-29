@@ -4,21 +4,20 @@ import { useEffect, useRef, useState, type JSX, type Ref } from "react";
 import { createPortal } from "react-dom";
 import {
   AWAY_TEXT,
-  canFold,
   clientOf,
   elapsedMinutes,
-  foldKey,
   minutesText,
   type AwayKind,
 } from "@/lib/presence/away-overlay";
 
 /**
- * The whole page covered while a status button is on: a calm dark-green sky, the status's own motif (a mihrab arch over a
- * mosque, a meeting table, a guest at the desk, a telephone), the minutes running, and one way out — the big button,
- * which ends the status like pressing it again. Esc and a click outside do nothing (the counter must not stop by
- * accident). «لدي عميل» and «لدي اتصال» show the client the colleague typed, and fold into a slim bar under the header
- * («افتح النظام للعمل مع العميل») — the timer and the same end button stay. When the limit ends the status on the
- * server, the next read clears it (`onExpired` at the cap).
+ * The whole page covered while a status button is on — every status alike (the owner, 2026-10-29: «لدي اتصال وعميل في
+ * المكتب يجب أن يكون باقي الأجزاء غير ظاهرة كي يبين له أنه خارج النظام مؤقتاً، بدون تسجيل خروج، فقط إيقاف العداد»):
+ * a calm dark-green sky, the status's own motif (a mihrab arch over a mosque, a meeting table, a guest at the desk, a
+ * telephone), the minutes running, and one way out — the big button, which ends the status like pressing it again and
+ * leaves the colleague on the page they were on. Nothing of the system shows or answers behind it; Esc and a click
+ * outside do nothing. «لدي عميل» and «لدي اتصال» show the client the colleague typed. When the limit ends the status on
+ * the server, the next read clears it (`onExpired` at the cap).
  */
 
 export function AwayOverlay({
@@ -49,25 +48,6 @@ export function AwayOverlay({
 }) {
   const [offset] = useState(() => serverNow - Date.now());
   const [now, setNow] = useState(serverNow);
-  // folded stays folded on the next page: every page mounts the buttons anew
-  const [folded, setFolded] = useState(() => {
-    try {
-      return (
-        canFold(kind) && sessionStorage.getItem(foldKey(startedAt)) === "1"
-      );
-    } catch {
-      return false;
-    }
-  });
-  const fold = (v: boolean) => {
-    setFolded(v);
-    try {
-      if (v) sessionStorage.setItem(foldKey(startedAt), "1");
-      else sessionStorage.removeItem(foldKey(startedAt));
-    } catch {
-      /* the fold is simply not remembered */
-    }
-  };
   const button = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -83,7 +63,6 @@ export function AwayOverlay({
   }, [capAt, offset, onExpired]);
 
   useEffect(() => {
-    if (folded) return;
     button.current?.focus();
     const body = document.body;
     const before = body.style.overflow;
@@ -97,34 +76,19 @@ export function AwayOverlay({
       body.style.overflow = before;
       window.removeEventListener("keydown", stop, true);
     };
-  }, [folded]);
+  }, []);
 
-  const minutes = elapsedMinutes(startedAt, now);
-  const client = canFold(kind) ? clientOf(details) : null;
   return createPortal(
-    folded ? (
-      <AwayBar
-        kind={kind}
-        minutes={minutes}
-        client={client}
-        busy={busy}
-        error={error}
-        onEnd={onEnd}
-        onOpen={() => fold(false)}
-      />
-    ) : (
-      <AwayOverlayView
-        kind={kind}
-        minutes={minutes}
-        detail={detail}
-        client={client}
-        busy={busy}
-        error={error}
-        onEnd={onEnd}
-        onFold={canFold(kind) ? () => fold(true) : undefined}
-        buttonRef={button}
-      />
-    ),
+    <AwayOverlayView
+      kind={kind}
+      minutes={elapsedMinutes(startedAt, now)}
+      detail={detail}
+      client={kind === "client" || kind === "call" ? clientOf(details) : null}
+      busy={busy}
+      error={error}
+      onEnd={onEnd}
+      buttonRef={button}
+    />,
     document.body,
   );
 }
@@ -145,7 +109,6 @@ export function AwayOverlayView({
   busy,
   error,
   onEnd,
-  onFold,
   buttonRef,
 }: {
   kind: AwayKind;
@@ -155,8 +118,6 @@ export function AwayOverlayView({
   busy: boolean;
   error?: string;
   onEnd: () => void;
-  /** «لدي عميل / لدي اتصال» only: fold into the bar */
-  onFold?: () => void;
   buttonRef?: Ref<HTMLButtonElement>;
 }) {
   const t = AWAY_TEXT[kind];
@@ -217,15 +178,6 @@ export function AwayOverlayView({
       >
         {busy ? "لحظة…" : t.close}
       </button>
-      {onFold && (
-        <button
-          type="button"
-          onClick={onFold}
-          className="relative mt-5 text-base text-white/80 underline underline-offset-4 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#e9d8a6]"
-        >
-          افتح النظام للعمل مع العميل
-        </button>
-      )}
       {error && (
         <p
           role="alert"
@@ -235,59 +187,6 @@ export function AwayOverlayView({
         </p>
       )}
       {kind === "prayer" && <Mosque />}
-    </div>
-  );
-}
-
-/** «لدي عميل / لدي اتصال» folded: a slim bar under the header — the system stays usable, the minutes keep running */
-export function AwayBar({
-  kind,
-  minutes,
-  client,
-  busy,
-  error,
-  onEnd,
-  onOpen,
-}: {
-  kind: AwayKind;
-  minutes: number;
-  client?: { name: string; request: string } | null;
-  busy: boolean;
-  error?: string;
-  onEnd: () => void;
-  onOpen: () => void;
-}) {
-  const t = AWAY_TEXT[kind];
-  return (
-    <div
-      role="status"
-      dir="rtl"
-      className="fixed inset-x-2 top-[66px] z-[200] mx-auto flex max-w-3xl items-center gap-3 rounded-2xl bg-[#123a31] px-3 py-2 text-sm text-white shadow-lg lg:top-[82px]"
-    >
-      <span
-        className="size-2.5 shrink-0 rounded-full bg-[#e9d8a6] motion-safe:animate-pulse"
-        aria-hidden
-      />
-      <span className="min-w-0 flex-1 truncate">
-        <b>{t.bar}</b>
-        {client?.name ? ` — ${client.name}` : ""} · منذ {minutesText(minutes)}
-        {error ? ` · ${error}` : ""}
-      </span>
-      <button
-        type="button"
-        onClick={onOpen}
-        className="shrink-0 text-xs text-white/75 underline underline-offset-2 hover:text-white"
-      >
-        كبّر
-      </button>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onEnd}
-        className="min-h-9 shrink-0 rounded-xl bg-white px-3 font-extrabold text-[#123a31] hover:bg-[#f3efe0] disabled:opacity-60"
-      >
-        {busy ? "لحظة…" : t.close}
-      </button>
     </div>
   );
 }
