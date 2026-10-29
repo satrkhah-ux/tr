@@ -107,6 +107,22 @@ async function manageAccess(table: AllowedTable): Promise<Access | TranslationKe
   return (await currentCan("settings.manage")) ? granted : "err.forbidden";
 }
 
+/**
+ * «شروط الدفع» and «الحسابات البنكية» print on the client's PDF — an account
+ * number a salesperson could change is money sent elsewhere. Those terms rows
+ * (and moving a row to or from those kinds) are the administration's.
+ */
+const MONEY_TERMS = new Set(["payment", "bank"]);
+async function moneyTermGuard(supabase: Access["supabase"], table: AllowedTable, values: DataRow, id?: string): Promise<TranslationKey | null> {
+  if (table !== "terms") return null;
+  let touches = MONEY_TERMS.has(String(values.kind ?? ""));
+  if (!touches && id) {
+    const { data } = await supabase.from("terms").select("kind").eq("id", id).maybeSingle();
+    touches = MONEY_TERMS.has(String((data as { kind?: string } | null)?.kind ?? ""));
+  }
+  return touches && !(await currentCan("settings.manage")) ? "err.forbidden" : null;
+}
+
 /** A write from someone who cannot see the cost never carries it. */
 function writable(table: AllowedTable, values: DataRow, internal: boolean): DataRow {
   if (internal) return values;
@@ -325,7 +341,7 @@ export async function createRow(table: AllowedTable, values: DataRow): Promise<M
     const granted = await writeAccess(table);
     if (typeof granted === "string") return { ok: false, error: granted };
     const { supabase, columns, internal } = granted;
-    const referenceError = referenceRuleError(table, values, true);
+    const referenceError = referenceRuleError(table, values, true) ?? (await moneyTermGuard(supabase, table, values));
     if (referenceError) return { ok: false, error: referenceError };
     // Reuse a city in the same country rather than creating it twice from two forms.
     if (table === "cities") {
@@ -360,7 +376,7 @@ export async function updateRow(table: AllowedTable, id: string, values: DataRow
     const granted = await writeAccess(table);
     if (typeof granted === "string") return { ok: false, error: granted };
     const { supabase, columns, internal } = granted;
-    const referenceError = referenceRuleError(table, values, false);
+    const referenceError = referenceRuleError(table, values, false) ?? (await moneyTermGuard(supabase, table, values, id));
     if (referenceError) return { ok: false, error: referenceError };
     values = writable(table, values, internal);
     // 0073: sessions cannot UPDATE an offer's owner or money. The total and the

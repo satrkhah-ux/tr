@@ -631,6 +631,12 @@ export type DraftRoomSpec = {
    * name, never a pricing key: prices and the rate memory stay on room_type_name.
    */
   hotel_room_name?: string;
+  /**
+   * «الإطلالة» (the owner, 2026-10-29): the catalogue's view in Arabic, or one
+   * the employee added (catalog-additions.ts). Printed with the room's name,
+   * never a pricing key.
+   */
+  room_view?: string;
   board_type: BoardType | null;
   /**
    * What THIS room costs for the whole stay.
@@ -655,8 +661,12 @@ export const hotelRoomName = (room: { hotel_room_name?: unknown }): string =>
   typeof room.hotel_room_name === "string" ? room.hotel_room_name.trim().slice(0, HOTEL_ROOM_NAME_MAX).trim() : "";
 
 /** The room as the client reads it — «غرفة مزدوجة — Deluxe Sea View»; the catalogue's name alone when the hotel's is not given. */
-export const roomLabel = (room: Pick<DraftRoomSpec, "room_type_name" | "hotel_room_name">): string =>
-  [room.room_type_name.trim(), hotelRoomName(room)].filter(Boolean).join(" — ");
+export const roomLabel = (room: Pick<DraftRoomSpec, "room_type_name" | "hotel_room_name" | "room_view">): string =>
+  [room.room_type_name.trim(), hotelRoomName(room), roomView(room)].filter(Boolean).join(" — ");
+
+/** The room's view, trimmed and capped; "" when none was given (every older file). */
+export const roomView = (room: { room_view?: unknown }): string =>
+  typeof room.room_view === "string" ? room.room_view.trim().slice(0, HOTEL_ROOM_NAME_MAX).trim() : "";
 
 export type RoomCodes = Required<Pick<DraftRoomSpec, "room_type_code" | "room_category_code" | "suite_subtype_code">>;
 
@@ -727,7 +737,7 @@ function cataloguedRoom(room: DraftRoomSpec): DraftRoomSpec {
  * different rooms printed only the first one's type.
  */
 export function roomTypesText(
-  rooms: Pick<DraftRoomSpec, "room_type_name" | "hotel_room_name" | "board_type">[],
+  rooms: Pick<DraftRoomSpec, "room_type_name" | "hotel_room_name" | "room_view" | "board_type">[],
   /** the board's printed name — given, so rooms on different boards say which is which. */
   boardLabel?: (board: BoardType) => string,
 ): string {
@@ -2383,7 +2393,23 @@ export type TermLibrary = {
   includes: TermLibraryItem[];
   excludes: TermLibraryItem[];
   terms: TermLibraryItem[];
+  /**
+   * «شروط وطرق الدفع» then «الحسابات البنكية» (the owner, 2026-10-29): printed
+   * under the client's total, by the programme's country (paymentLines).
+   */
+  payment?: TermLibraryItem[];
 };
+
+/**
+ * The payment and bank lines a programme in `countryId` prints: the lines for
+ * every country and that country's own, in the data team's order, once each.
+ * Empty when the data team wrote none — the document keeps its standing note.
+ */
+export function paymentLines(items: TermLibraryItem[] | undefined, countryId: string | null): string[] {
+  const out: string[] = [];
+  for (const i of items ?? []) if ((i.country_id === null || i.country_id === countryId) && !out.includes(i.text)) out.push(i.text);
+  return out;
+}
 
 export const emptyTermLibrary = (): TermLibrary => ({ includes: [], excludes: [], terms: [] });
 

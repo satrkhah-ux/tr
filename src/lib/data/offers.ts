@@ -1,6 +1,7 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { findLookupCountry, paymentLines } from "@/lib/offer/draft-types";
 import type { TranslationKey } from "@/lib/i18n";
 import { airlineLogoUrl } from "@/components/offer-doc/brand";
 import type { BoardType, PricingItemType } from "@/lib/types";
@@ -542,6 +543,26 @@ export async function getInternalOffer(serial: string): Promise<InternalOfferDTO
   return loadInternalOffer(serial);
 }
 
+/**
+ * «شروط وطرق الدفع» + «الحسابات البنكية» for the offer's country (its
+ * destination, matched the way the editor matches it): every country's lines
+ * and that country's own. A destination naming no one country gets the
+ * all-countries lines only.
+ */
+async function offerPaymentLines(supabase: SupabaseClient, destination: string | null): Promise<string[]> {
+  const [{ data: countries }, { data: rows }] = await Promise.all([
+    supabase.from("countries").select("id, arabic_name"),
+    supabase.from("terms").select("kind, arabic_text, country_id").in("kind", ["payment", "bank"]).order("sort", { ascending: true }),
+  ]);
+  const list = ((countries ?? []) as { id: string; arabic_name: string }[]).map((c) => ({ id: c.id, name: c.arabic_name }));
+  const country = destination ? findLookupCountry(list, destination) : undefined;
+  const items = ((rows ?? []) as { kind: string; arabic_text: string | null; country_id: string | null }[])
+    .filter((r) => r.arabic_text?.trim())
+    .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "payment" ? -1 : 1))
+    .map((r) => ({ text: r.arabic_text!.trim(), checked: true, country_id: r.country_id }));
+  return paymentLines(items, country?.id ?? null);
+}
+
 /** The internal offer, unchecked — not exported: its callers state their own gate. */
 async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | null> {
   try {
@@ -773,6 +794,7 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
       includes,
       excludes: serviceRows.filter((s) => s.kind === "exclude").map((s) => s.label),
       terms: termRows.map((t) => t.text),
+      payment: await offerPaymentLines(supabase, offer.destination).catch(() => []),
       climate,
       // numerics come back from pg as strings — coerce so the document formats
       // them as numbers instead of printing "30.0" verbatim.

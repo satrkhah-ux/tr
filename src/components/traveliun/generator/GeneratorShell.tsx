@@ -32,7 +32,7 @@ import { FieldIssueProvider, fieldAnchorId } from "./FieldIssue";
 import { TraveliunShell } from "../TraveliunShell";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
-import { draftBrand, draftToPreviewOffer } from "@/lib/offer/preview-dto";
+import { draftBrand, draftPaymentLines, draftToPreviewOffer } from "@/lib/offer/preview-dto";
 import { STAGE_FORMS } from "./stage-forms";
 import { useDraftState } from "./useDraftState";
 
@@ -247,7 +247,7 @@ export function GeneratorShell({
                   <p className="mb-2 text-[11px] font-bold text-[#93aaa3]">{t("pg.previewHint")}</p>
                   <div className="max-h-[calc(100vh/var(--tv-zoom)_-_160px)] overflow-y-auto rounded-[14px]">
                     <div className="origin-top scale-[0.62] rtl:origin-top-right ltr:origin-top-left" style={{ width: "161%" }}>
-                      <OfferDocument variant="client" offer={draftToPreviewOffer(data, lookups.airlines, lookups.sarPer)} {...draftBrand(data, lookups.partners, canPricing && !can("pricing.view"))} />
+                      <OfferDocument variant="client" offer={draftToPreviewOffer(data, lookups.airlines, lookups.sarPer, draftPaymentLines(data, lookups))} {...draftBrand(data, lookups.partners, canPricing && !can("pricing.view"))} />
                     </div>
                   </div>
                 </div>

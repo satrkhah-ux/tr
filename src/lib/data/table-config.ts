@@ -198,6 +198,31 @@ const CONFIGS: TableConfig[] = [
     filters: [COUNTRY_FILTER],
     defaultSort: { column: "sort", ascending: true },
   },
+  // «شروط الدفع» and «الحسابات البنكية» (the owner, 2026-10-29): printed in the
+  // client's PDF by the programme's country — a row with no country is for all.
+  // Writes are the administration's (actions.ts moneyTermGuard).
+  {
+    route: "/offers/payment-terms", table: "terms", titleKey: "nav.paymentTerms",
+    columns: [
+      { key: "arabic_text", labelKey: "col.arabicText", minWidth: "300px" },
+      { key: "english_text", labelKey: "col.englishText", minWidth: "300px" },
+    ],
+    searchable: ["arabic_text", "english_text"],
+    fixedValues: { kind: "payment" },
+    filters: [COUNTRY_FILTER],
+    defaultSort: { column: "sort", ascending: true },
+  },
+  {
+    route: "/offers/bank-accounts", table: "terms", titleKey: "nav.bankAccounts",
+    columns: [
+      { key: "arabic_text", labelKey: "col.bankAccount", minWidth: "320px" },
+      { key: "english_text", labelKey: "col.englishText", minWidth: "280px" },
+    ],
+    searchable: ["arabic_text", "english_text"],
+    fixedValues: { kind: "bank" },
+    filters: [COUNTRY_FILTER],
+    defaultSort: { column: "sort", ascending: true },
+  },
   // offers (with confirmed/unconfirmed toggle)
   {
     route: "/offers", table: "offers", titleKey: "nav.packages",

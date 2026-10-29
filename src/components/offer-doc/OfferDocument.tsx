@@ -1231,6 +1231,14 @@ const LIST_CHARS_PER_LINE = 38;
 const listCardMm = (items: string[]) =>
   16.4 + 8 + items.reduce((sum, item, i) => sum + 4 + 6.5 * Math.max(1, Math.ceil((item.length + String(i + 1).length + 2) / LIST_CHARS_PER_LINE)), 0);
 
+/**
+ * The payment note: the standing one is 19mm (measured, three lines); the
+ * data team's lines at ~95 characters and 6.2mm a line, plus their gaps.
+ * ponytail: an estimate like the cards — measure if a long bank list spills.
+ */
+const paymentNoteMm = (lines: string[] | undefined) =>
+  lines?.length ? 8 + lines.reduce((sum, l) => sum + 6.2 * Math.max(1, Math.ceil(l.length / 95)), 0) : 19;
+
 /** The block is tall and near-fixed: two list cards, the total, and the payment note. */
 function servicesHeightMm(offer: ClientOfferDTO, showPrices: boolean): number {
   const cards =
@@ -1238,7 +1246,7 @@ function servicesHeightMm(offer: ClientOfferDTO, showPrices: boolean): number {
   // price band (9 + 26.2) and the payment note (6 + 18.6), measured. A price-less
   // file loses both, so the estimate loses them too or the packer reserves
   // 60mm of nothing.
-  return cards + (showPrices ? 9 + 26.5 + 6 + 19 : 0);
+  return cards + (showPrices ? 9 + 26.5 + 6 + paymentNoteMm(offer.payment) : 0);
 }
 
 function ServicesAndPrice({
@@ -1286,7 +1294,15 @@ function ServicesAndPrice({
             <strong><Ltr>{offer.total != null ? fmtNum(offer.total, 2) : "—"}</Ltr></strong>
             <span>{offer.currency ?? ""}</span>
           </div>
-          <p className="od-note">{AR.paymentTerms}</p>
+          {offer.payment?.length ? (
+            <div className="od-note">
+              {offer.payment.map((line, i) => (
+                <p key={i} dir="auto">{line}</p>
+              ))}
+            </div>
+          ) : (
+            <p className="od-note">{AR.paymentTerms}</p>
+          )}
         </>
       ) : null}
     </>

@@ -54,6 +54,9 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   ["/offers/offer-includes", "data.write"],
   ["/offers/offer-not-includes", "data.write"],
   ["/offers/terms-and-conditions", "data.write"],
+  ["/offers/payment-terms", "settings.manage"],
+  ["/offers/bank-accounts", "settings.manage"],
+  ["/data-additions", "settings.manage"],
   // listed with the data, kept by the administration: the margin policy, and
   // the supplier credential vault (/settings/suppliers, under /settings below)
   ["/markup-rules", "settings.manage"],

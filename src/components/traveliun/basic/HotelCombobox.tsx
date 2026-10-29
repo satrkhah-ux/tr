@@ -4,6 +4,8 @@ import { Combobox } from "@base-ui/react/combobox";
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Loader2, X } from "lucide-react";
 import { pickSupplierHotel, searchSupplierHotels } from "@/lib/data/hotel-search";
+import { addStaffHotel } from "@/lib/data/catalog-additions";
+import { normAr, similarity } from "@/lib/catalog/norm";
 import { normalizeName } from "@/lib/offer/pricing-suggest";
 import { cn } from "@/lib/utils";
 import { unzoomedRoot, ZOOMED_POPUP } from "@/components/ui/overlay-root";
@@ -23,6 +25,8 @@ const TBO_ID = "tbo:";
 
 /** a stay whose hotel is not in this city's list keeps showing it (an old or typed name) */
 const CURRENT = "__current";
+/** «أضف … فندقاً جديداً»: the typed name, made a /hotels row of this city and sent to the data team */
+const ADD = "__add__";
 
 /**
  * The hotel of a city, picked by typing part of its name — a long city list
@@ -45,6 +49,7 @@ export function HotelCombobox({
   supplier,
   tboLabel,
   onFailed,
+  addCity,
 }: {
   hotels: HotelOption[];
   valueId: string | null;
@@ -57,6 +62,8 @@ export function HotelCombobox({
   tboLabel?: string;
   /** a TBO hotel that could not be added */
   onFailed?: () => void;
+  /** staff only (the owner, 2026-10-29): the city a typed hotel the list lacks is added to */
+  addCity?: string | null;
 }) {
   const { t } = useTraveliunUI();
   const listed = hotels.find((h) => h.id === valueId) ?? null;
@@ -100,7 +107,12 @@ export function HotelCombobox({
     };
   }, [where, latin, query, ours]);
   const shownRemote = supplier && latin && remote.q === query ? remote.hits : [];
-  const items = [...(current ? [current] : []), ...hotels, ...shownRemote];
+  // a name the city's list does not hold, typed by staff: offered as a new hotel — the close
+  // spellings stay in the list above it (the filter's «هل تقصد»), so a near-copy is seen first
+  const typedName = query.replace(/\s+/g, " ");
+  const known = typedName.length >= 3 && hotels.some((h) => normalizeName(h.name) === normalizeName(typedName));
+  const addItem: HotelOption[] = addCity && typedName.length >= 3 && !known ? [{ id: ADD, name: typedName }] : [];
+  const items = [...(current ? [current] : []), ...hotels, ...shownRemote, ...addItem];
   const chosen = listed ?? current;
 
   return (
@@ -131,6 +143,18 @@ export function HotelCombobox({
             .finally(() => n === picks.current && setAdding(false));
           return;
         }
+        if (next.id === ADD && addCity) {
+          setAdding(true);
+          void addStaffHotel({ city: addCity, typed: next.name, name: next.name })
+            .then((res) => {
+              if (n !== picks.current) return;
+              if (res.ok) pickRef.current(res.hotel);
+              else onFailed?.();
+            })
+            .catch(() => n === picks.current && onFailed?.())
+            .finally(() => n === picks.current && setAdding(false));
+          return;
+        }
         setAdding(false);
         onPick(next);
       }}
@@ -141,10 +165,13 @@ export function HotelCombobox({
         const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
         // TBO's hits: every typed word in the name, like the server asked
         if (h.id.startsWith(TBO_ID)) return words.every((w) => h.name.toLowerCase().includes(w));
+        if (h.id === ADD) return true;
         return (
           !query.trim() ||
           query === chosen?.name ||
           normalizeName(h.name).includes(normalizeName(query)) ||
+          // a misspelt name still finds its hotel: «هيلتن» → «هيلتون»
+          (query.trim().length >= 4 && similarity(normAr(h.name), normAr(query)) >= 0.75) ||
           // ours by its English name too, so a hotel linked to TBO is found by the name TBO gives it
           (words.length > 0 && Boolean(h.name_en) && words.every((w) => h.name_en!.toLowerCase().includes(w)))
         );
@@ -201,7 +228,9 @@ export function HotelCombobox({
                       <Check className="size-4 text-[#2aa87a]" />
                     </Combobox.ItemIndicator>
                   </span>
-                  <span className="min-w-0 flex-1" dir="auto">{h.name}</span>
+                  <span className="min-w-0 flex-1" dir="auto">
+                    {h.id === ADD ? <span className="font-extrabold text-[#0f7a52]">＋ أضف «{h.name}» فندقاً جديداً — يُرسل لقسم البيانات</span> : h.name}
+                  </span>
                   {h.tbo ? <span className="shrink-0 rounded-full bg-[#eef4ff] px-1.5 text-[10px] font-extrabold text-[#2b5bb5]">{tboLabel ?? "TBO"}</span> : null}
                   {h.stars ? <span className="shrink-0 text-[11px] text-[#c79a2b]">{"★".repeat(h.stars)}</span> : null}
                 </Combobox.Item>

@@ -142,6 +142,8 @@ export type InternalOfferDTO = {
   includes: string[];
   excludes: string[];
   terms: string[];
+  /** «شروط وطرق الدفع» + «الحسابات البنكية» for the programme's country; absent/empty = the standing note. */
+  payment?: string[];
   climate: ClimateLine[];
   /** day-by-day program; empty when the agent did not write one. */
   days: ItineraryDayLine[];

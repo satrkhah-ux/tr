@@ -20,7 +20,9 @@ import {
   baggageLabel,
   deriveCityDates,
   deriveHotelStays,
+  findLookupCountry,
   matchPartner,
+  paymentLines,
   mealPlanIncludeLine,
   roomTypesText,
   soldHotels,
@@ -76,12 +78,19 @@ const emptyBase = (): Pick<
  * produceOfferFromDraft derives them, so the preview and the produced offer
  * agree on check-in/check-out.
  */
+/** The trip country's payment and bank lines, from the lookups the editor already holds. */
+export function draftPaymentLines(data: Pick<DraftData, "trip">, lookups: Pick<GeneratorLookups, "countries" | "termLibrary">): string[] {
+  return paymentLines(lookups.termLibrary.payment, findLookupCountry(lookups.countries, data.trip.country)?.id ?? null);
+}
+
 export function draftToPreviewOffer(
   data: DraftData,
   /** carriers, so the preview draws the same marks the produced PDF will. */
   airlines: GeneratorLookups["airlines"] = [],
   /** SAR per unit, so the preview totals in the quote currency the way issuing does. */
   sarPer: CurrencyRates = { SAR: 1 },
+  /** the payment / bank lines of the trip's country (draftPaymentLines) — what the issued PDF prints */
+  payment: string[] = [],
 ): ClientOfferDTO {
   const start = itineraryStartDate(data.trip, data.flights);
   const cities = deriveCityDates(start, data.cities);
@@ -157,6 +166,7 @@ export function draftToPreviewOffer(
     ],
     excludes: [...route.excludes, ...data.services.excludes],
     terms: data.services.terms,
+    payment,
     days: data.days
       // index on the FULL list: the transport line depends on a day's neighbours
       .map((d, index) => ({ d, move: data.scope.transport ? advancedDayNote(draftTransportNote(data, data.days, index), data.advanced) : null }))

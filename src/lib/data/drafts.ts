@@ -633,7 +633,7 @@ function buildTermLibrary(rows: unknown): TermLibrary {
     list
       .filter((r) => r.kind === kind && r.arabic_text && r.arabic_text.trim())
       .map((r) => ({ text: (r.arabic_text as string).trim(), checked: r.checked !== false, country_id: r.country_id ?? null }));
-  return { includes: of("include"), excludes: of("exclude"), terms: of("term") };
+  return { includes: of("include"), excludes: of("exclude"), terms: of("term"), payment: [...of("payment"), ...of("bank")] };
 }
 
 /**

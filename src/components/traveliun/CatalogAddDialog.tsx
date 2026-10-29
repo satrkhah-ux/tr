@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createRow, getFilterOptions } from "@/lib/data/actions";
+import { recordReferenceAddition } from "@/lib/data/catalog-additions";
 import { resolveTableConfig } from "@/lib/data/table-config";
 import type { DataRow, FilterOptions } from "@/lib/data/types";
 import { RecordForm } from "./TraveliunTable";
@@ -22,6 +23,8 @@ export function CatalogAddDialog({ table, countryId, onClose, onCreated }: {
   return <RecordForm title={t("data.form.otherAdd")} config={config} filterOptions={options} initial={{ country_id: countryId ?? null }} onClose={onClose} onSubmit={async values => {
     const result = await createRow(table, values);
     if (!result.ok) return t(result.error);
+    // the data team reviews what an employee added (catalog-additions.ts); never waited on
+    void recordReferenceAddition(table, result.row).catch(() => undefined);
     const refreshed = await getFilterOptions();
     onCreated(result.row, refreshed.countries.map(country => ({ id: country.value, arabic_name: country.label, default_currency: country.currency ?? null })));
     return null;
