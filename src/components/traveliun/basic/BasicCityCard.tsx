@@ -38,6 +38,7 @@ import {
   hotelCoverage,
   HOTEL_ROOM_NAME_MAX,
   hotelRoomName,
+  roomView,
   perUnit,
   tourCars,
   withRooms,
@@ -89,6 +90,10 @@ import { SuggestInput } from "../SuggestInput";
 import { getHotelContact } from "@/lib/data/drafts";
 import { RefundControl } from "../generator/hotels/RefundControl";
 import { RoomTypePicker } from "../generator/hotels/RoomTypePicker";
+import { RoomViewPick } from "./CatalogNamePick";
+import { ROOM_VIEWS } from "@/lib/catalog/room-catalog";
+
+const VIEW_NAMES = ROOM_VIEWS.map((v) => v.label.ar);
 import { nightsText, useBasicLabels } from "./labels";
 import { CarCountSelect, CarOptions, ServiceKindSelect, TourRow, type TourCatalog } from "../tours/TourRow";
 
@@ -781,6 +786,7 @@ export function HotelPanel({
                       supplier={country && !partner ? { country: country.name, city: city.city_name } : null}
                       tboLabel={tx("tboChip")}
                       onFailed={() => setTboFailed(true)}
+                      addCity={partner ? null : city.city_name}
                       onPick={(h) => {
                         setTboFailed(false);
                         if (h?.tbo) {
@@ -829,6 +835,15 @@ export function HotelPanel({
                       }
                       selectClass={basicField}
                       extras={more}
+                    />
+                    {/* «الإطلالة» (the owner, 2026-10-29): always asked; one the list lacks is typed and sent to the data team */}
+                    <RoomViewPick
+                      value={roomView(r)}
+                      catalogue={VIEW_NAMES}
+                      label={tx("roomView")}
+                      fieldClass={basicField}
+                      // not setRoom: a view is no reason to drop a supplier's rate
+                      onChange={(view) => onLines([withRooms(line, line.rooms.map((x, k) => (k === j ? { ...x, room_view: view || undefined } : x)))])}
                     />
                     {/* the hotel's own name for the room (hotels name theirs differently): under «المزيد», said here once given */}
                     {more ? (
@@ -889,7 +904,8 @@ export function HotelPanel({
               );
             })}
             {/* refundable — part of the price, so under the price column (a supplier rate states its own) */}
-            {!line.sourcing && more ? (
+            {/* «مسترد / غير مسترد» always shown (the owner, 2026-10-29), with the last refund date when refundable */}
+            {!line.sourcing ? (
               <div className={`${rowGap} ${HOTEL_COLS}`}>
                 <span className="max-xl:hidden xl:col-span-3" />
                 <div className="col-span-2">
@@ -901,12 +917,6 @@ export function HotelPanel({
                   />
                 </div>
               </div>
-            ) : !line.sourcing && line.refundable != null ? (
-              // under «المزيد», and said once it is set
-              <span className={chip}>
-                {line.refundable ? tx("refundable") : tx("nonRefundable")}
-                {line.refundable && line.refundable_until ? ` · ${line.refundable_until}` : ""}
-              </span>
             ) : null}
             {tboOf(line.hotel_id) ? (
               <TboStayPrice

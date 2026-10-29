@@ -1,6 +1,11 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { findLookupCountry } from "@/lib/offer/draft-types";
+import { financeSection, type FinanceSection } from "@/lib/offer/finance-terms";
+import { loadFinanceTerms } from "./finance-terms";
+import { getPaymentFees } from "./app-settings";
+import { methodsForFees, sessionEFee, withMethodFees } from "@/lib/offer/payment-methods";
 import type { TranslationKey } from "@/lib/i18n";
 import { airlineLogoUrl } from "@/components/offer-doc/brand";
 import type { BoardType, PricingItemType } from "@/lib/types";
@@ -542,6 +547,26 @@ export async function getInternalOffer(serial: string): Promise<InternalOfferDTO
   return loadInternalOffer(serial);
 }
 
+/**
+ * «الشروط المالية» for the offer's country (its destination, matched the way
+ * the editor matches it): every country's rows and that country's own, the
+ * payment milestones dated from the travel date and priced on the total. A
+ * destination naming no one country gets the all-countries rows only.
+ */
+async function offerFinance(
+  supabase: SupabaseClient,
+  offer: { destination: string | null; total: number | null; currency: string | null },
+  dates: { travel: string | null; issue: string | null },
+): Promise<FinanceSection> {
+  const [{ data: countries }, items, fees] = await Promise.all([supabase.from("countries").select("id, arabic_name"), loadFinanceTerms(supabase), getPaymentFees()]);
+  const list = ((countries ?? []) as { id: string; arabic_name: string }[]).map((c) => ({ id: c.id, name: c.arabic_name }));
+  const country = offer.destination ? findLookupCountry(list, offer.destination) : undefined;
+  const section = financeSection(items, { countryId: country?.id ?? null, total: offer.total, currency: offer.currency, travelDate: dates.travel, issueDate: dates.issue });
+  // E's fees are set in riyals (a fixed part in SAR): quoted only on a riyal total
+  if (offer.currency && offer.currency !== "SAR") return section;
+  return { ...section, instalment: withMethodFees(section.instalment, offer.total, methodsForFees(), sessionEFee(fees)) };
+}
+
 /** The internal offer, unchecked — not exported: its callers state their own gate. */
 async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | null> {
   try {
@@ -773,6 +798,7 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
       includes,
       excludes: serviceRows.filter((s) => s.kind === "exclude").map((s) => s.label),
       terms: termRows.map((t) => t.text),
+      finance: await offerFinance(supabase, offer, { travel: arrival_date, issue: issue_date }).catch(() => undefined),
       climate,
       // numerics come back from pg as strings — coerce so the document formats
       // them as numbers instead of printing "30.0" verbatim.

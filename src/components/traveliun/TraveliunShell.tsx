@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   BarChart3,
   BotMessageSquare,
+  Landmark,
   Building2,
   BadgePercent,
   Car,
@@ -207,6 +208,8 @@ export const navGroups: NavGroup[] = [
   { labelKey: "nav.followups", href: "/followups", icon: Users },
   // «سكرتيري الخاص» — each employee's own assistant (secretary/*); open to every signed-in employee
   { labelKey: "nav.secretary", href: "/secretary", icon: BotMessageSquare },
+  // «الشروط المالية» as the client files print them — read-only for sales and follow-up (the owner, 2026-10-29)
+  { labelKey: "nav.financeTerms", href: "/financial-terms", icon: Landmark },
   // «التأشيرات» — the visa department's files and board (the owner, 2026-10-26). The price list stays under «البيانات»
   // and is linked here too, but only to whoever opens the board: its own gate (data.write) alone would show sales a
   // «التأشيرات» section holding that one link.

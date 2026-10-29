@@ -39,7 +39,7 @@ import { IssueGuardNotice } from "../IssueGuardNotice";
 import { ReissueOffer } from "../ReissueOffer";
 import { BasicFileStatus } from "../basic/BasicFileStatus";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
-import { draftBrand, draftToPreviewOffer } from "@/lib/offer/preview-dto";
+import { draftBrand, draftFinance, draftToPreviewOffer } from "@/lib/offer/preview-dto";
 
 /**
  * The package generator as ONE page of cards.
@@ -393,7 +393,7 @@ export function GeneratorFlow({
                 <div className="origin-top scale-[0.62]" style={{ width: "161%" }}>
                   <OfferDocument
                     variant="client"
-                    offer={draftToPreviewOffer(data, lookups.airlines, lookups.sarPer)}
+                    offer={draftToPreviewOffer(data, lookups.airlines, lookups.sarPer, draftFinance(data, lookups))}
                     {...draftBrand(data, lookups.partners, canPricing && !can("pricing.view"))}
                   />
                 </div>

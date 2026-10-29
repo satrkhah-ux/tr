@@ -71,6 +71,9 @@ export const TAB_GROUPS: SectionTab[][] = [
     { href: "/offers/offer-includes", labelKey: "nav.offerIncludes" },
     { href: "/offers/offer-not-includes", labelKey: "nav.offerExcludes" },
     { href: "/offers/terms-and-conditions", labelKey: "nav.terms" },
+    { href: "/offers/payment-terms", labelKey: "nav.paymentTerms" },
+    { href: "/offers/bank-accounts", labelKey: "nav.bankAccounts" },
+    { href: "/offers/instalment", labelKey: "nav.instalment" },
   ],
   // «قسم المواصلات» as one family of tabs (the owner's transport order, 2026-10-26)
   [
@@ -90,6 +93,7 @@ export const TAB_GROUPS: SectionTab[][] = [
   ],
   [
     { href: "/data-quality", labelKey: "data.quality.title" },
+    { href: "/data-additions", labelKey: "nav.dataAdditions" },
     { href: "/price-review", labelKey: "nav.priceReview" },
   ],
   // «الأشخاص» (the issued files' clients) inside «العملاء» — each tab keeps its own gate

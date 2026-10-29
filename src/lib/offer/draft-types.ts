@@ -7,6 +7,7 @@
  * no React, no Supabase — safe to import anywhere (client, server, tests).
  */
 
+import type { FinanceTerm } from "./finance-terms";
 import type { BoardType, FlightLegOrder, PricingItemType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
 import { normalizeAdvanced, withAdvancedTransport, type DraftAdvanced } from "./advanced";
@@ -631,6 +632,12 @@ export type DraftRoomSpec = {
    * name, never a pricing key: prices and the rate memory stay on room_type_name.
    */
   hotel_room_name?: string;
+  /**
+   * «الإطلالة» (the owner, 2026-10-29): the catalogue's view in Arabic, or one
+   * the employee added (catalog-additions.ts). Printed with the room's name,
+   * never a pricing key.
+   */
+  room_view?: string;
   board_type: BoardType | null;
   /**
    * What THIS room costs for the whole stay.
@@ -655,8 +662,12 @@ export const hotelRoomName = (room: { hotel_room_name?: unknown }): string =>
   typeof room.hotel_room_name === "string" ? room.hotel_room_name.trim().slice(0, HOTEL_ROOM_NAME_MAX).trim() : "";
 
 /** The room as the client reads it — «غرفة مزدوجة — Deluxe Sea View»; the catalogue's name alone when the hotel's is not given. */
-export const roomLabel = (room: Pick<DraftRoomSpec, "room_type_name" | "hotel_room_name">): string =>
-  [room.room_type_name.trim(), hotelRoomName(room)].filter(Boolean).join(" — ");
+export const roomLabel = (room: Pick<DraftRoomSpec, "room_type_name" | "hotel_room_name" | "room_view">): string =>
+  [room.room_type_name.trim(), hotelRoomName(room), roomView(room)].filter(Boolean).join(" — ");
+
+/** The room's view, trimmed and capped; "" when none was given (every older file). */
+export const roomView = (room: { room_view?: unknown }): string =>
+  typeof room.room_view === "string" ? room.room_view.trim().slice(0, HOTEL_ROOM_NAME_MAX).trim() : "";
 
 export type RoomCodes = Required<Pick<DraftRoomSpec, "room_type_code" | "room_category_code" | "suite_subtype_code">>;
 
@@ -727,7 +738,7 @@ function cataloguedRoom(room: DraftRoomSpec): DraftRoomSpec {
  * different rooms printed only the first one's type.
  */
 export function roomTypesText(
-  rooms: Pick<DraftRoomSpec, "room_type_name" | "hotel_room_name" | "board_type">[],
+  rooms: Pick<DraftRoomSpec, "room_type_name" | "hotel_room_name" | "room_view" | "board_type">[],
   /** the board's printed name — given, so rooms on different boards say which is which. */
   boardLabel?: (board: BoardType) => string,
 ): string {
@@ -2535,6 +2546,8 @@ export type GeneratorLookups = {
   carTypes: LookupCarType[];
   /** the admin-managed includes / excludes / terms lists. */
   termLibrary: TermLibrary;
+  /** «الشروط المالية» rows — banks, payment milestones, instalment (finance-terms.ts) */
+  finance?: FinanceTerm[];
   /**
    * Each country's services (from /services), one per name — offered under
    * «يشمل» as «خدمات الدولة». Names only: the prices stay on the server, and

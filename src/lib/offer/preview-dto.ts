@@ -20,6 +20,7 @@ import {
   baggageLabel,
   deriveCityDates,
   deriveHotelStays,
+  findLookupCountry,
   matchPartner,
   mealPlanIncludeLine,
   roomTypesText,
@@ -31,6 +32,7 @@ import {
   FLIGHTS_LATER_LINE,
 } from "./draft-types";
 import { itineraryStartDate } from "./schedule";
+import { financeSection, type FinanceTerm } from "./finance-terms";
 import { clientStayLine, draftTransportNote } from "./itinerary";
 import { AIRPORT_TRANSFER_LINE, advancedDayNote, advancedLines, meetsElsewhere } from "./advanced";
 import { offerTotals, type CurrencyRates } from "./pricing";
@@ -76,12 +78,20 @@ const emptyBase = (): Pick<
  * produceOfferFromDraft derives them, so the preview and the produced offer
  * agree on check-in/check-out.
  */
+/** The «الشروط المالية» rows and the trip's country, from the lookups the editor already holds. */
+export function draftFinance(data: Pick<DraftData, "trip">, lookups: Pick<GeneratorLookups, "countries" | "finance">): DraftFinance {
+  return { items: lookups.finance ?? [], countryId: findLookupCountry(lookups.countries, data.trip.country)?.id ?? null };
+}
+export type DraftFinance = { items: FinanceTerm[]; countryId: string | null };
+
 export function draftToPreviewOffer(
   data: DraftData,
   /** carriers, so the preview draws the same marks the produced PDF will. */
   airlines: GeneratorLookups["airlines"] = [],
   /** SAR per unit, so the preview totals in the quote currency the way issuing does. */
   sarPer: CurrencyRates = { SAR: 1 },
+  /** «الشروط المالية» rows + the trip's country (draftFinance) — what the issued PDF prints */
+  finance: DraftFinance = { items: [], countryId: null },
 ): ClientOfferDTO {
   const start = itineraryStartDate(data.trip, data.flights);
   const cities = deriveCityDates(start, data.cities);
@@ -157,6 +167,13 @@ export function draftToPreviewOffer(
     ],
     excludes: [...route.excludes, ...data.services.excludes],
     terms: data.services.terms,
+    finance: financeSection(finance.items, {
+      countryId: finance.countryId,
+      total: draftSellTotal(data, sarPer),
+      currency: data.pricing.display_currency,
+      travelDate: start,
+      issueDate: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }),
+    }),
     days: data.days
       // index on the FULL list: the transport line depends on a day's neighbours
       .map((d, index) => ({ d, move: data.scope.transport ? advancedDayNote(draftTransportNote(data, data.days, index), data.advanced) : null }))
