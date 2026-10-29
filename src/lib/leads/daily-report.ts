@@ -387,5 +387,6 @@ export const bucketLabel = (key: BucketKey) => BUCKET.get(key)!.label;
  */
 export function readQueue(ids: string[], tried: string[], failed: string[]): string[] {
   const unread = [...new Set(ids)].filter((id) => !tried.includes(id));
-  return [...unread.filter((id) => !failed.includes(id)), ...unread.filter((id) => failed.includes(id))];
+  // the retry line follows the order they failed in: the oldest failure first, and one that fails again goes to the back
+  return [...unread.filter((id) => !failed.includes(id)), ...failed.filter((id) => unread.includes(id))];
 }

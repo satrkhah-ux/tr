@@ -282,6 +282,9 @@ describe("the conversations of «العملاء» as tickets (care_tickets is em
     // nobody exempt: every ticket, as before
     expect(measuredTickets(tickets, new Set())).toEqual(tickets);
     expect(measuredTickets(tickets)).toEqual(tickets);
+    // an exempt Teletel team's colleague has no employee row: told by the name Teletel gives, whatever the spelling
+    const visa = ticketsFromLeads([lead({ id: "visa", received_by: null, received_by_name: "أحمد  الفيزا" }), lead({ id: "sales", received_by: "e2", received_by_name: "هاني" })], new Map());
+    expect(measuredTickets(visa, new Set(), ["احمد الفيزا"]).map((t) => t.id)).toEqual(["sales"]);
     // and a 14-hour wait of the exempt desk raises no note
     expect(anomalies(snap({ tickets: measuredTickets(ticketsFromLeads([lead({ received_by: "e1" })], new Map()), new Set(["e1"])) }), NOW, DAY).some((n) => n.code === "ticket_unanswered")).toBe(false);
     expect(anomalies(snap({ tickets: measuredTickets(ticketsFromLeads([lead({ received_by: "e1" })], new Map()), new Set(["e2"])) }), NOW, DAY).some((n) => n.code === "ticket_unanswered")).toBe(true);

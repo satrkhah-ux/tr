@@ -50,6 +50,11 @@ describe("the queue of reasons to read", () => {
     // what was read is not offered again; nothing left → empty
     expect(readQueue(ids, ["c20", "c21"], failed)).toEqual(failed);
     expect(readQueue(["a", "a", "b"], ["a", "b"], [])).toEqual([]);
+    // twenty that can never be read do not shut out five that failed once: the retry line is in the order they failed, and a repeat
+    // failure goes to the back
+    const more = Array.from({ length: 25 }, (_, i) => `c${i}`);
+    const order = [...more.slice(20), ...more.slice(0, 20)];
+    expect(readQueue(more, [], order).slice(0, 5)).toEqual(more.slice(20));
   });
 });
 

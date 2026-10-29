@@ -112,7 +112,7 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
     const r = await getReportSupervision(want).catch(() => null);
     if (mine !== latest.current) return;
     setSupervision({ days: want, figures: r });
-    setNote(r ? null : "أرقام المتابعة غير متاحة الآن — «إشراف المتابعة» لم يُفعَّل بعد أو لا صلاحية لك عليها.");
+    if (!r) setNote("أرقام المتابعة غير متاحة الآن — «إشراف المتابعة» لم يُفعَّل بعد أو لا صلاحية لك عليها.");
     setLoadingFigures(false);
   }
 
@@ -185,7 +185,7 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
       return;
     }
     setTried((t) => [...t, ...res.tried]);
-    setFailedIds((f) => [...new Set([...f.filter((id) => !res.tried.includes(id)), ...res.failedIds])]);
+    setFailedIds((f) => [...f.filter((id) => !res.tried.includes(id) && !res.failedIds.includes(id)), ...res.failedIds]);
     const found = Object.keys(res.reasons).length;
     if (found > 0) {
       setEdits((e) => {
@@ -194,7 +194,7 @@ export function ReportPane({ leads, team, places, today }: { leads: Lead[]; team
         // stands now (a note the reviewer typed meanwhile, or a request moved to another department, is left alone)
         for (const r of applyEdits(requests, e)) {
           const reason = res.reasons[r.id];
-          if (reason && r.bucket === "incomplete" && next[visitKey(r)]?.note === undefined) next[visitKey(r)] = { ...next[visitKey(r)], note: reason };
+          if (reason && r.bucket === "incomplete" && !r.note?.trim()) next[visitKey(r)] = { ...next[visitKey(r)], note: reason };
         }
         return next;
       });

@@ -5,6 +5,7 @@ import { buildOpsDigest } from "@/lib/telegram/ops-digest";
 import { AUTO_FOLLOWUP_MAX_MINUTES } from "@/lib/sla/classify";
 import { allRows } from "@/lib/data/all-rows";
 import { getTeletelConfig, teletelGet } from "@/lib/providers/teletel";
+import { exemptNow } from "@/lib/manager-screen/exempt";
 import { anomalies, LEAD_TICKET_COLS, measuredTickets, teletelEmployees, ticketMinutes, ticketsFromLeads, type LeadForTicket } from "./anomalies";
 import type { EyeReport, EyeSnapshot, Note } from "./types";
 
@@ -48,11 +49,12 @@ type EmployeeRow = {
  * manager's office TV where visitors sit (lib/manager-screen); the bot's
  * briefing keeps them. `since` — the conversations the response figures read
  * from: the bot's last week by default, the TV's today («شاشة المدير لمعالجة
- * الأمور اليوم وليس للأيام السابقة», the owner, 2026-10-19). `exemptEmployeeIds` — the colleagues who carry no lateness
- * («لا يُحسب عليهم تأخير», 2026-10-29): their tickets are not in the waiting and response figures or notes (the TV passes them;
- * the bot's briefing does not).
+ * الأمور اليوم وليس للأيام السابقة», the owner, 2026-10-19). The colleagues who carry no lateness
+ * («لا يُحسب عليهم تأخير», 2026-10-29) are left out of what measures waiting — the unanswered count, the reply average, the
+ * longest delay and the notes — in every caller (the TV, the bot's briefing); how many requests came in, and how many were
+ * answered, stay the day's volume.
  */
-export async function buildEyeReport({ clientNames = true, since, exemptEmployeeIds }: { clientNames?: boolean; since?: string; exemptEmployeeIds?: ReadonlySet<string> } = {}): Promise<EyeReport> {
+export async function buildEyeReport({ clientNames = true, since }: { clientNames?: boolean; since?: string } = {}): Promise<EyeReport> {
   const now = new Date();
   const nowIso = now.toISOString();
   const { day } = riyadhParts(now);
@@ -64,7 +66,7 @@ export async function buildEyeReport({ clientNames = true, since, exemptEmployee
 
   const supabase = db();
 
-  const [empRes, attRes, leadRes, auditRes, offerRes, bookingRes, digest, agents] = await Promise.all([
+  const [empRes, attRes, leadRes, auditRes, offerRes, bookingRes, digest, agents, exempt] = await Promise.all([
     supabase.from("employees").select("id, arabic_name, email, status, roles(arabic_name)").order("arabic_name"),
     supabase.from("attendance_days").select("employee_id, first_seen_at, last_seen_at, beats").eq("day", day),
     // «خدمة العملاء» went with the menu consolidation (the owner, 2026-10-19) and
@@ -77,6 +79,8 @@ export async function buildEyeReport({ clientNames = true, since, exemptEmployee
     buildOpsDigest(5),
     // who is a Teletel agent — their absence from the system is no absence (anomalies.ts)
     teletelGet<{ name?: string | null }[]>("/agents"),
+    // the colleagues who carry no lateness («لا يُحسب عليهم تأخير») — their tickets leave the waiting figures
+    exemptNow(supabase, true),
   ]);
 
   const employees = (empRes.data ?? []) as unknown as EmployeeRow[];
@@ -124,7 +128,7 @@ export async function buildEyeReport({ clientNames = true, since, exemptEmployee
         works_in_teletel: unknownAgents || inTeletel.has(e.id),
       };
     }),
-    tickets: measuredTickets(everyTicket, exemptEmployeeIds),
+    tickets: measuredTickets(everyTicket, exempt.employeeIds, exempt.names),
     audit: audit.map((a) => ({
       action: a.action,
       actor_id: a.actor_id,
@@ -144,8 +148,9 @@ export async function buildEyeReport({ clientNames = true, since, exemptEmployee
 
   const openTickets = snapshot.tickets.filter((t) => !t.responded_at);
   const answeredToday = snapshot.tickets.filter((t) => t.responded_at && riyadhParts(t.responded_at).day === day);
-  // how many came in is a volume, not a wait: the exempt colleagues' conversations are in it
+  // how many came in, and how many were answered, are the day's volume: the exempt colleagues' conversations are in them
   const openedToday = everyTicket.filter((t) => riyadhParts(t.created_at).day === day);
+  const answeredAll = everyTicket.filter((t) => t.responded_at && riyadhParts(t.responded_at).day === day);
   const durations = answeredToday.map((t) => ticketMinutes(t, nowIso)).filter((m): m is number => m != null);
   const worst = [...openTickets].sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
 
@@ -170,7 +175,7 @@ export async function buildEyeReport({ clientNames = true, since, exemptEmployee
     },
     response: {
       opened: openedToday.length,
-      answered: answeredToday.length,
+      answered: answeredAll.length,
       unanswered: openTickets.length,
       avgMinutes: durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : null,
       worstMinutes: worst ? ticketMinutes(worst, nowIso) : null,

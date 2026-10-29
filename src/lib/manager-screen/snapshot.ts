@@ -8,7 +8,7 @@ import { buildEyeReport, riyadhParts } from "@/lib/eye/report";
 import { textSummary } from "@/lib/eye/script";
 import { teletelEmployees } from "@/lib/eye/anomalies";
 import { buildOpsDigest } from "@/lib/telegram/ops-digest";
-import { listOpenConversations, teamMembers, teletelGet } from "@/lib/providers/teletel";
+import { listOpenConversations, teletelGet } from "@/lib/providers/teletel";
 import { slaClock } from "@/lib/sla/classify";
 import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { campaignDestination, resolvePlace } from "@/lib/leads/places";
@@ -85,10 +85,8 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
   const since = iso(dayStartMs(day));
   const evening = riyadhParts(now).time >= DAY_END;
   const service = db();
-  // «لا يُحسب عليهم تأخير»: the administration's exempt colleagues — no wait and no reply time of theirs on the channel
-  const exempt = await exemptNow(service);
 
-  const [settings, leads, open, agentsRaw, employees, audit, offers, confirms, files, adRows, adLatest, murad, integrations, places, ops, eye, closures, trips, inSystem] =
+  const [settings, leads, open, agentsRaw, employees, audit, offers, confirms, files, adRows, adLatest, murad, integrations, places, ops, eye, closures, trips, inSystem, exempt] =
     await Promise.all([
       service.from("app_settings").select("key, value").in("key", ["manager_screen", "pkg_backup", SETTING.receptionHours]),
       allRows<LeadRow>((a, b) => service.from("client_leads").select(LEAD_COLS).or(`created_at.gte.${since},last_visit_at.gte.${since}`).order("id").range(a, b)),
@@ -110,13 +108,16 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
       loadPlaces(service),
       buildOpsDigest(5),
       // the eye's written summary of today, without client names (visitors sit in the office)
-      evening ? buildEyeReport({ clientNames: false, since, exemptEmployeeIds: exempt.employeeIds }) : Promise.resolve(null),
+      evening ? buildEyeReport({ clientNames: false, since }) : Promise.resolve(null),
       // today's closings in Teletel and the returns (order 2's lifecycle)
       service.from("conversation_closures").select("closed_at, closed_by_kind, reopened_at, reopen_action, travel_until").or(`closed_at.gte.${since},reopened_at.gte.${since}`).limit(2000),
       // confirmed trips from outside the system leaving today or tomorrow — no phone read
       service.from("external_trips").select("travel_start, destination, status").gte("travel_start", day).lte("travel_start", new Date(Date.parse(`${day}T12:00:00Z`) + DAY_MS).toISOString().slice(0, 10)),
       // «فاتح النظام = متصل»: live sessions in our system, shown online whatever Teletel says
       presenceOnlineAgentIds(service),
+      // «لا يُحسب عليهم تأخير»: the administration's exempt colleagues — and the exempt teams' (the visa department's) — carry no wait
+      // and no reply time on the channel
+      exemptNow(service, true),
     ]);
 
   const setting = new Map(rows<{ key: string; value: string | null }>(settings).map((s) => [s.key, s.value]));
@@ -130,17 +131,10 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
         })
     : null;
   const nowSec = Math.floor(now / 1000);
-  // an exempt team's colleagues too (the visa department has one with no employee row): their agent ids and names, from the team
-  // itself — so they stay exempt when Teletel's /agents list is down
-  const members = (await Promise.all([...exempt.teamIds].map((t) => teamMembers(t).catch(() => [])))).flat();
+  // their names as Teletel spells them (its /agents list), beside the ones the system and the exempt teams give
   const exemptNames = [
-    ...new Set([
-      ...exempt.names,
-      ...members.map((m) => m.name),
-      ...(Array.isArray(agentsRaw) ? agentsRaw.filter((a) => typeof a.id === "number" && exempt.agentIds.has(a.id) && a.name?.trim()).map((a) => a.name!.trim()) : []),
-    ]),
+    ...new Set([...exempt.names, ...(Array.isArray(agentsRaw) ? agentsRaw.filter((a) => typeof a.id === "number" && exempt.agentIds.has(a.id) && a.name?.trim()).map((a) => a.name!.trim()) : [])]),
   ];
-  const exemptAll = { ...exempt, agentIds: new Set([...exempt.agentIds, ...members.map((m) => m.id)]) };
 
   const facts: ManagerFacts = {
     now,
@@ -162,7 +156,7 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
     })),
     waits:
       open?.rows
-        .filter((c) => !exemptConversation(c, exemptAll))
+        .filter((c) => !exemptConversation(c, exempt))
         .map((c) => ({ c, clock: slaClock(c, nowSec) }))
         .filter(({ clock }) => clock.kind !== "cold")
         .map(({ c, clock }) => ({

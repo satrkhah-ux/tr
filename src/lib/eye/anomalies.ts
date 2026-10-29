@@ -164,10 +164,13 @@ export function ticketsFromLeads(leads: LeadForTicket[], nameOf: ReadonlyMap<str
 
 /**
  * The tickets whose waiting is measured: the colleagues the administration exempted from lateness (app_settings
- * lateness_exempt, «لا يُحسب عليهم تأخير») have none of their tickets in the response figures and notes.
+ * lateness_exempt, «لا يُحسب عليهم تأخير») have none of their tickets in the waiting figures and notes. Told by the holder's
+ * employee id, else by name — an exempt Teletel team's colleague has no employee row, only the name Teletel gives.
  */
-export function measuredTickets(tickets: EyeSnapshot["tickets"], exemptEmployeeIds?: ReadonlySet<string>): EyeSnapshot["tickets"] {
-  return exemptEmployeeIds?.size ? tickets.filter((t) => !t.employee_id || !exemptEmployeeIds.has(t.employee_id)) : tickets;
+export function measuredTickets(tickets: EyeSnapshot["tickets"], exemptEmployeeIds?: ReadonlySet<string>, exemptNames: readonly string[] = []): EyeSnapshot["tickets"] {
+  const names = new Set(exemptNames.map(fold));
+  if (!exemptEmployeeIds?.size && names.size === 0) return tickets;
+  return tickets.filter((t) => !((t.employee_id && exemptEmployeeIds?.has(t.employee_id)) || (t.employee_name && names.has(fold(t.employee_name)))));
 }
 
 /**
