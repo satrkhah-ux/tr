@@ -3,7 +3,7 @@ import { myDay } from "@/lib/mine/day";
 import { secretaryDb, secretarySettings } from "@/lib/secretary/core";
 import { dedupeKeys } from "./core";
 import { notifyEmployee } from "./notify";
-import { followedMarks } from "@/lib/leads/lifecycle";
+import { followedMarks, latenessExempt } from "@/lib/leads/lifecycle";
 import { followedSince } from "@/lib/leads/lifecycle-rules";
 
 /**
@@ -29,6 +29,8 @@ export async function sweepNotifications(nowMs = Date.now()): Promise<Record<str
   if (!online.length) return { online: 0 };
 
   let created = 0;
+  // «لا يُحسب عليهم تأخير»: no «ينتظر ردك» / «لم تكلمه اليوم» for the morning desk and the visa department (the owner, 2026-10-29)
+  const exempt = await latenessExempt();
   const today = riyadhDay(nowMs);
   const dayStart = Date.parse(`${today}T00:00:00+03:00`);
   for (const employeeId of online) {
@@ -38,6 +40,7 @@ export async function sweepNotifications(nowMs = Date.now()): Promise<Record<str
     const marks = await followedMarks(day.items.map((i) => i.conversationId ?? 0));
     for (const i of day.items.slice(0, 12)) {
       if (i.kind !== "reminder" && i.conversationId && followedSince(marks.get(i.conversationId), i.kind === "waiting" && i.since ? i.since : dayStart)) continue;
+      if ((i.kind === "waiting" || i.kind === "hot") && exempt.employeeIds.has(employeeId)) continue;
       const base = { employeeId, source: "secretary", href: "/secretary" as const };
       const name = i.name || (i.conversationId ? `عميل #${i.conversationId}` : "عميل");
       const r =

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { previewAutoclose, saveAutoclose, saveTravellersClose, type ConversationsAdmin as Data } from "@/lib/data/conversation-settings";
+import { previewAutoclose, saveAutoclose, saveLatenessExempt, saveTravellersClose, type ConversationsAdmin as Data } from "@/lib/data/conversation-settings";
+import type { LatenessExempt } from "@/lib/leads/lateness";
 import { durationText } from "@/lib/leads/lifecycle-rules";
 import { TraveliunShell } from "../TraveliunShell";
 
@@ -29,6 +30,17 @@ export function ConversationsAdmin({ initial }: { initial: Data }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [preview, setPreview] = useState<{ close: number; waiting: number; open: number } | null>(null);
   const hours = Math.round(amount * (unit === "day" ? 24 : 1));
+  const [exempt, setExempt] = useState<LatenessExempt>(initial.exempt);
+  const toggle = <K extends keyof LatenessExempt>(k: K, v: LatenessExempt[K][number]) =>
+    setExempt((x) => ({ ...x, [k]: (x[k] as (typeof v)[]).includes(v) ? (x[k] as (typeof v)[]).filter((y) => y !== v) : [...(x[k] as (typeof v)[]), v] }));
+  const saveExempt = async () => {
+    setBusy("exempt");
+    setMsg(null);
+    const r = await saveLatenessExempt(exempt);
+    setBusy(null);
+    setMsg(r.ok ? { ok: true, text: "حُفظ — لا يُحسب عليهم تأخير من الآن" } : { ok: false, text: r.error });
+    if (r.ok) router.refresh();
+  };
 
   const check = async () => {
     setBusy("preview");
@@ -68,7 +80,7 @@ export function ConversationsAdmin({ initial }: { initial: Data }) {
             </span>
           </div>
           <p className="mb-3 text-[12.5px] leading-6 text-[#335f59]">
-            يغلق النظام المحادثة في تيلي تيل إذا مرّت هذه المدة دون أي رسالة وكانت آخر رسالة منّا. لا يُغلق أبداً عميلاً ينتظر رداً. إذا كتب العميل بعد ذلك تعود طلباً جديداً غير مسند ويستقبلها الاستقبال كأي طلب جديد. كل محادثة يغلقها تُسجّل هنا مع موظفها.
+            يغلق النظام المحادثة في تيلي تيل إذا مرّت هذه المدة دون أي رسالة وكانت آخر رسالة منّا. لا يُغلق أبداً عميلاً ينتظر رداً، ولا محادثة عميل اشترى منّا وهي مع موظف. إذا كتب العميل بعد ذلك تعود طلباً جديداً غير مسند ويستقبلها الاستقبال كأي طلب جديد. كل محادثة يغلقها تُسجّل هنا مع موظفها.
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <label className="grid gap-1 text-[11.5px] font-bold text-[#185045]">
@@ -107,14 +119,45 @@ export function ConversationsAdmin({ initial }: { initial: Data }) {
           </div>
           <p className="text-[12.5px] leading-6 text-[#335f59]">
             {initial.travellers ? "يعمل: " : "متوقف: "}
-            محادثة العميل الذي له رحلة مؤكدة — ملف عمليات أو مُدخل في «المؤكدون خارج النظام» — تُغلق بتصنيف «مسافر-قريبا» بعد ساعة من آخر رسالة منّا (ولا تُغلق إذا كان ينتظر رداً). إذا كتب العميل حتى ثلاثة أيام بعد عودته تذهب مباشرة لصاحب الرحلة وليس كطلب جديد، وبعدها القواعد العادية. الربط برقم الجوال؛ من ليس له رحلة مسجلة يتبع القواعد العادية.
+            محادثة العميل الذي له رحلة مؤكدة — ملف عمليات أو مُدخل في «المؤكدون خارج النظام» — تُغلق بتصنيف «مسافر-قريبا» بعد ساعة من آخر رسالة منّا، فقط إذا لم تكن مع موظف (ولا تُغلق إذا كان العميل ينتظر رداً). إذا كتب العميل حتى ثلاثة أيام بعد عودته تذهب مباشرة لصاحب الرحلة وليس كطلب جديد، وبعدها القواعد العادية. الربط برقم الجوال؛ من ليس له رحلة مسجلة يتبع القواعد العادية.
           </p>
+        </section>
+
+        <section className={CARD}>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className={H}>لا يُحسب عليهم تأخير</h2>
+            <button type="button" onClick={saveExempt} disabled={busy !== null} className={`${BTN} bg-[#2aa87a] text-white`}>
+              {busy === "exempt" ? <Loader2 className="size-4 animate-spin" /> : null} حفظ
+            </button>
+          </div>
+          <p className="mb-3 text-[12.5px] leading-6 text-[#335f59]">
+            من تختاره هنا لا يُحسب عليه أي تأخير في الشاشات والتقارير والتذكيرات والأداء، ولا يسحب مُراد محادثاته بسبب التأخير — النظام مساعد له. القسم يشمل كل موظفيه، وفريق تيلي تيل يشمل محادثاته.
+          </p>
+          {(
+            [
+              ["employees", "الموظفون", initial.choices.employees],
+              ["roles", "الأقسام", initial.choices.roles],
+              ["teams", "فرق تيلي تيل", initial.choices.teams],
+            ] as const
+          ).map(([k, label, list]) => (
+            <div key={k} className="mb-2 flex flex-wrap items-center gap-1.5">
+              <span className="w-24 text-[11.5px] font-bold text-[#185045]">{label}</span>
+              {list.map((o) => {
+                const on = (exempt[k] as (string | number)[]).includes(o.id);
+                return (
+                  <button key={o.id} type="button" aria-pressed={on} onClick={() => toggle(k, o.id as never)} className={`h-7 rounded-full border px-2.5 text-[11.5px] font-bold ${on ? "border-[#2aa87a] bg-[#e8f6ef] text-[#185045]" : "border-[#dbe6e1] bg-white text-[#557d78]"}`}>
+                    {o.name}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </section>
 
         <section className={CARD}>
           <h2 className={`${H} mb-2`}>إغلاق الموظف</h2>
           <p className="text-[12.5px] leading-6 text-[#335f59]">
-            المحادثة التي يغلقها الموظف في تيلي تيل تعود إليه هو إذا كتب العميل مرة أخرى، ولا تُعامل كطلب جديد ولا يتدخل فيها مُراد.
+            المحادثة التي يغلقها الموظف في تيلي تيل تعود إليه هو إذا كتب العميل مرة أخرى، ولا تُعامل كطلب جديد ولا يتدخل فيها مُراد. ومحادثة عميل اشترى منّا (رحلة مؤكدة أو «خدمة مكتملة» في تيلي تيل) لا يغلقها النظام ولا يرفع إسنادها ولا ينقلها مُراد ما دامت مع موظف.
           </p>
         </section>
 

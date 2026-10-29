@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { parseAutoPhones } from "@/lib/murad/core";
 import { addTeletelLabels, addTeletelNote, assignMuradHandoff, conversationEvents, intlPhone, listAssignableAgents, listLifecycleStages, listOpenConversations, setTeletelStatus, teletelGet, unassignTeletel, type OpenConversation } from "@/lib/providers/teletel";
+import { LATENESS_EXEMPT_KEY, parseLatenessExempt, type ExemptSet } from "./lateness";
 import { closerOf, CONFIRMED_TRIP, decideReturn, durationText, externalTripEnd, heldSale, marksFollowed, phoneKey, staleToClose, TRAVEL_LABEL, travellerReturn, travellersToClose, travelUntil, type ClosedBy, type SaleFacts, type TravelFile } from "./lifecycle-rules";
 
 // always the service role: the in-app «تحديث» runs the pull with a staff session, and closures are written by the system only
@@ -277,6 +278,31 @@ export async function followedMarks(conversationIds: readonly number[]): Promise
   const { data, error } = await db().from("client_leads").select("teletel_conversation_id, followed_at").in("teletel_conversation_id", ids).not("followed_at", "is", null);
   if (error) return new Map();
   return new Map(((data ?? []) as { teletel_conversation_id: number; followed_at: string }[]).map((r) => [Number(r.teletel_conversation_id), r.followed_at]));
+}
+
+// ---------- «لا يُحسب عليهم تأخير» (lateness.ts) ----------
+
+let exemptCache: { at: number; x: ExemptSet & { employeeIds: ReadonlySet<string> } } | null = null;
+
+/**
+ * Who no delay is counted against — the listed staff, every active member of the listed departments (roles), and the
+ * listed Teletel teams — kept a minute. Nobody when unreadable: then everything counts as before.
+ */
+export async function latenessExempt(): Promise<ExemptSet & { employeeIds: ReadonlySet<string> }> {
+  if (exemptCache && Date.now() - exemptCache.at < 60_000) return exemptCache.x;
+  const service = db();
+  const { data } = await service.from("app_settings").select("value").eq("key", LATENESS_EXEMPT_KEY).maybeSingle();
+  const set = parseLatenessExempt((data as { value: string } | null)?.value);
+  const people = [...(set.employees.length ? [`id.in.(${set.employees.join(",")})`] : []), ...(set.roles.length ? [`role_id.in.(${set.roles.join(",")})`] : [])];
+  const { data: emps } = people.length ? await service.from("employees").select("id, teletel_agent_id").eq("status", "Active").or(people.join(",")) : { data: [] };
+  const rows = (emps ?? []) as { id: string; teletel_agent_id: number | null }[];
+  const x = {
+    employeeIds: new Set(rows.map((e) => e.id)),
+    agentIds: new Set(rows.map((e) => e.teletel_agent_id).filter((a): a is number => typeof a === "number")),
+    teamIds: new Set(set.teams),
+  };
+  exemptCache = { at: Date.now(), x };
+  return x;
 }
 
 // ---------- the system's closings ----------

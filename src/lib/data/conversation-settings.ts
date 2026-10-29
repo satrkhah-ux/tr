@@ -4,7 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
 import { logAudit } from "@/lib/data/audit";
-import { getTeletelConfig, listOpenConversations } from "@/lib/providers/teletel";
+import { getTeletelConfig, listOpenConversations, listTeletelTeams } from "@/lib/providers/teletel";
+import { LATENESS_EXEMPT_KEY, parseLatenessExempt, type LatenessExempt } from "@/lib/leads/lateness";
 import { AUTOCLOSE_SETTING, readAutocloseHours, staleToClose, TRAVELLERS_SETTING } from "@/lib/leads/lifecycle-rules";
 
 /**
@@ -29,13 +30,17 @@ export type ClosureRow = {
   travel_until: string | null;
 };
 
-export type ConversationsAdmin = { hours: number | null; travellers: boolean; closures: ClosureRow[]; teletelBase: string | null };
+export type ExemptChoices = { employees: { id: string; name: string }[]; roles: { id: string; name: string }[]; teams: { id: number; name: string }[] };
+export type ConversationsAdmin = { hours: number | null; travellers: boolean; closures: ClosureRow[]; teletelBase: string | null; exempt: LatenessExempt; choices: ExemptChoices };
 
 export async function getConversationsAdmin(): Promise<ConversationsAdmin | null> {
   if (!(await allowed())) return null;
-  const [{ data: settings }, { data: closures }] = await Promise.all([
-    db().from("app_settings").select("key, value").in("key", [AUTOCLOSE_SETTING, TRAVELLERS_SETTING]),
+  const [{ data: settings }, { data: closures }, { data: emps }, { data: roles }, teams] = await Promise.all([
+    db().from("app_settings").select("key, value").in("key", [AUTOCLOSE_SETTING, TRAVELLERS_SETTING, LATENESS_EXEMPT_KEY]),
     db().from("conversation_closures").select("conversation_id, closed_at, closed_by_kind, closed_by_name, reason, reopened_at, reopen_action, travel_until").order("closed_at", { ascending: false }).limit(40),
+    db().from("employees").select("id, arabic_name").eq("status", "Active").order("arabic_name"),
+    db().from("roles").select("id, arabic_name").order("sort"),
+    listTeletelTeams(),
   ]);
   const v = new Map(((settings ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
   const config = getTeletelConfig();
@@ -44,7 +49,24 @@ export async function getConversationsAdmin(): Promise<ConversationsAdmin | null
     travellers: v.get(TRAVELLERS_SETTING) !== "off",
     closures: (closures ?? []) as ClosureRow[],
     teletelBase: config ? `${config.baseUrl}/app/accounts/${config.accountId}/conversations` : null,
+    exempt: parseLatenessExempt(v.get(LATENESS_EXEMPT_KEY)),
+    choices: {
+      employees: ((emps ?? []) as { id: string; arabic_name: string | null }[]).map((e) => ({ id: e.id, name: e.arabic_name ?? "—" })),
+      roles: ((roles ?? []) as { id: string; arabic_name: string | null }[]).map((r) => ({ id: r.id, name: r.arabic_name ?? "—" })),
+      teams: teams.map((t) => ({ id: t.id, name: t.name })),
+    },
   };
+}
+
+/** «لا يُحسب عليهم تأخير» (the owner, 2026-10-29): staff, departments and Teletel teams — the whole list replaced, audited. */
+export async function saveLatenessExempt(next: LatenessExempt): Promise<Result> {
+  if (!(await allowed())) return { ok: false, error: "لا صلاحية" };
+  const value = parseLatenessExempt(JSON.stringify(next));
+  const { data: before } = await db().from("app_settings").select("value").eq("key", LATENESS_EXEMPT_KEY).maybeSingle();
+  const { error } = await db().from("app_settings").upsert({ key: LATENESS_EXEMPT_KEY, value: JSON.stringify(value), updated_at: new Date().toISOString() });
+  if (error) return { ok: false, error: "تعذّر الحفظ" };
+  await logAudit({ action: "settings.updated", entity: "app_settings", entity_id: LATENESS_EXEMPT_KEY, meta: { before: (before as { value: string } | null)?.value ?? null, after: value } });
+  return { ok: true };
 }
 
 /** What a duration would close right now, and the clients waiting on us that it never touches. */

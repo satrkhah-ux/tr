@@ -33,7 +33,8 @@ import { getRates } from "@/lib/data/rates-actions";
 import { USD_SAR_DEFAULT } from "@/lib/offer/pricing";
 import { askText, holdToText, missing, offerDraftData, offerText, priceOffer, readOffers, routeCity, tripChanged, tripDays, tripSummary, type OfferAsk, type OfferCountry } from "./auto-offer";
 import { loadPlaces } from "@/lib/leads/teletel-pull";
-import { followedMarks, returnedToEmployee, saleHolder } from "@/lib/leads/lifecycle";
+import { followedMarks, latenessExempt, returnedToEmployee, saleHolder } from "@/lib/leads/lifecycle";
+import { exemptConversation } from "@/lib/leads/lateness";
 import { followedSince } from "@/lib/leads/lifecycle-rules";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
@@ -1116,7 +1117,9 @@ const LATE_KEY = 1e12;
 async function lateSweep(service: SupabaseClient, control: MuradControl, rows: OpenConversation[], nowSec: number): Promise<number> {
   const late = control.late;
   if (!late) return 0;
-  const open = rows.filter((c) => c.assigneeId !== late.agentId && !onList(c.phone, control.noHandoff));
+  // «لا يُحسب عليهم تأخير» (the owner, 2026-10-29): an exempt colleague's or team's wait is never «late» — nothing taken from them
+  const exempt = await latenessExempt();
+  const open = rows.filter((c) => c.assigneeId !== late.agentId && !onList(c.phone, control.noHandoff) && !exemptConversation(c, exempt));
   if (!open.length) return 0;
   const { data } = await service
     .from("murad_log")
@@ -1176,7 +1179,7 @@ async function holdSweep(service: SupabaseClient, fresh: OpenConversation[], now
   const rows = (data ?? []) as { conversation_id: number; reason: string | null; created_at: string }[];
   const hours = parseHours(hoursRaw);
   // «@#@#@#»: the colleague followed it up since the client wrote — nothing to say, nobody to remind (the owner, 2026-10-29)
-  const followed = await followedMarks(late.map((c) => c.id));
+  const [followed, exempt] = await Promise.all([followedMarks(late.map((c) => c.id)), latenessExempt()]);
   let n = 0;
   for (const c of late.slice(0, 5)) {
     if (followedSince(followed.get(c.id), c.waitingSince * 1000)) continue;
@@ -1200,7 +1203,8 @@ async function holdSweep(service: SupabaseClient, fresh: OpenConversation[], now
     if (claim.error || !claim.data) continue;
     const text = holdText({ assignee: c.assignee, team: c.team, opensAt: (await outOfHours(hours)) ? nextOpening(new Date(), hours) : null });
     const replyId = await sendTeletelMessage(c.id, text);
-    if (replyId && (c.assignee || c.team)) {
+    // the client is reassured either way; the «waiting N minutes» note is never written against an exempt colleague
+    if (replyId && (c.assignee || c.team) && !exemptConversation(c, exempt)) {
       await addTeletelNote(c.id, `🤖 ${noteFor(c)} العميل كتب بعد التحويل وينتظر منذ ${Math.round((nowSec - c.waitingSince) / 60)} دقائق بلا رد — طمأنه مُراد. ردّ عليه الآن.`);
     }
     await service
