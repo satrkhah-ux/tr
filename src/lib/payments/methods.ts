@@ -127,15 +127,18 @@ const money = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 
 
 /**
  * One method's charge as F (the price update) and G (the PDF) print it: `fee`
- * and `total` in SAR and `note`, the client-facing Arabic line («16,869.61 ريال
- * شامل الرسوم» / «بدون رسوم»). null for an unknown or unset method — print the
- * line as it is, never a guessed price. `fees` is getPaymentFees(), never a constant.
+ * and `total` in SAR (staff screens only) and `note`, the client-facing line —
+ * the TOTAL alone («16,869.61 ريال»). BINDING (the owner, 2026-10-29): Tabby,
+ * Tamara and MyFatoorah forbid telling the client the fee or its share, so no
+ * client text ever carries «رسوم», a fee amount or a %. null for an unknown or
+ * unset method — print the line as it is, never a guessed price. `fees` is
+ * getPaymentFees(), never a constant.
  */
 export function paymentFee(method: string, amount: number, fees: PaymentFees): { fee: number; total: number; note: string } | null {
   if (!isPayMethod(method)) return null;
   const q = quoteMethod(amount, method, fees);
   if (q.unset || !(amount > 0)) return null;
-  return { fee: q.fee, total: q.total, note: q.fee > 0 ? `${money(q.total)} ريال شامل الرسوم` : "بدون رسوم" };
+  return { fee: q.fee, total: q.total, note: `${money(q.total)} ريال` };
 }
 
 /** G's `fee` callback (withMethodFees(lines, total, PAYMENT_METHOD_LIST, methodFeeFn(fees))), the fees bound once. */

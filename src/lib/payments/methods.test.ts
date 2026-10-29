@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { ar } from "@/lib/i18n/ar";
+import { en } from "@/lib/i18n/en";
 import {
   DEFAULT_FEES,
   DEFAULT_SETTLEMENT,
   expectedSettlement,
   methodFeeFn,
+  PAY_METHOD_AR,
   PAY_METHODS,
   PAYMENT_METHOD_LIST,
   PAYMENT_METHODS,
@@ -47,9 +50,9 @@ describe("«وسائل الدفع ورسومها» (the owner, 2026-10-29)", () 
   });
 
   it("gives F and G one call — fee, total, the client's line — and null for an unknown or unset method", () => {
-    expect(paymentFee("tabby", 15_510, DEFAULT_FEES)).toEqual({ fee: 1359.61, total: 16_869.61, note: "16,869.61 ريال شامل الرسوم" });
-    expect(paymentFee("card", 10_000, DEFAULT_FEES)).toEqual({ fee: 250, total: 10_250, note: "10,250 ريال شامل الرسوم" });
-    expect(paymentFee("cash", 10_000, DEFAULT_FEES)).toEqual({ fee: 0, total: 10_000, note: "بدون رسوم" });
+    expect(paymentFee("tabby", 15_510, DEFAULT_FEES)).toEqual({ fee: 1359.61, total: 16_869.61, note: "16,869.61 ريال" });
+    expect(paymentFee("card", 10_000, DEFAULT_FEES)).toEqual({ fee: 250, total: 10_250, note: "10,250 ريال" });
+    expect(paymentFee("cash", 10_000, DEFAULT_FEES)).toEqual({ fee: 0, total: 10_000, note: "10,000 ريال" });
     expect(paymentFee("bitcoin", 10_000, DEFAULT_FEES)).toBeNull();
     expect(paymentFee("card", 10_000, parseFees(JSON.stringify({ card: null })))).toBeNull();
     // G's FeeFn shape: (methodId, amount) with the fees bound
@@ -92,5 +95,17 @@ describe("Tabby / Tamara settlement on Wednesdays (the owner, 2026-10-29)", () =
     expect(parseSettlement(null)).toEqual(DEFAULT_SETTLEMENT);
     expect(parseSettlement(JSON.stringify({ weekday: 9, lagWeeks: -1 }))).toEqual(DEFAULT_SETTLEMENT);
     expect(parseSettlement(JSON.stringify({ weekday: 0, lagWeeks: 2 }))).toEqual({ weekday: 0, lagWeeks: 2 });
+  });
+});
+
+describe("the client never sees a fee (the owner, 2026-10-29 — Tabby/Tamara/MyFatoorah terms)", () => {
+  it("no client-facing string carries «رسوم», «fee» or a %", () => {
+    const client = [
+      ...PAY_METHODS.flatMap((m) => [500, 4321, 15_510].map((n) => paymentFee(m, n, DEFAULT_FEES)?.note ?? "")),
+      ...Object.values(PAY_METHOD_AR),
+      ar["pay.message"],
+      en["pay.message"],
+    ];
+    for (const s of client) expect(s).not.toMatch(/رسوم|fee|%/i);
   });
 });
