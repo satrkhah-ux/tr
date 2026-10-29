@@ -18,6 +18,7 @@ import { DirectionProvider } from "@base-ui/react/direction-provider";
 import { Dialog as PaletteDialog } from "@base-ui/react/dialog";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { touchPresence } from "@/lib/data/metrics";
+import { PaymentPriceCalculator } from "./PaymentPriceCalculator";
 import { cn } from "@/lib/utils";
 import { DirText } from "@/components/DirText";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -1156,6 +1157,7 @@ function CalculatorPanel() {
           </p>
         </div>
       )}
+      <PaymentPriceCalculator />
     </div>
   );
 }

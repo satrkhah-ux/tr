@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { isPackageLine } from "@/lib/repackage/package-line";
 import { clientService, type ClientService } from "@/lib/operations/drivers";
 import { toClientInfo, type ClientInfo } from "@/lib/operations/case-list";
+import { caseTotal } from "@/lib/operations/payments";
 import { clientFlight, clientHotel, type ClientBookingRow, type TripFlight, type TripHotel } from "@/lib/operations/client-booking-state";
 
 /**
@@ -65,6 +66,8 @@ export async function getClientTrip(token: string): Promise<ClientTrip | null> {
       // 0064's column, on its own: a missing column must not take the whole page down
       supabase.from("operations").select("client_info").eq("id", op.id).maybeSingle(),
     ]);
+    // the agreed price (20261029140000), on its own for the same reason — absent, the offer's total stands
+    const agreedRes = await supabase.from("operations").select("agreed_total").eq("id", op.id).maybeSingle();
 
     // the company's day — the driver card turns on at the Riyadh midnight of the service date
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
@@ -102,7 +105,7 @@ export async function getClientTrip(token: string): Promise<ClientTrip | null> {
       (s, p) => s + (p.kind === "refund" ? -Number(p.amount) : Number(p.amount)),
       0,
     );
-    const total = offer?.total != null ? Number(offer.total) : null;
+    const total = caseTotal(offer?.total, (agreedRes.data as { agreed_total?: number | string | null } | null)?.agreed_total);
 
     return {
       today,

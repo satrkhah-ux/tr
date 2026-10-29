@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/data/audit";
 import { countAgentConversations, listOpenConversations, listTeletelTeams, returnToTeam } from "@/lib/providers/teletel";
+import { saleFacts } from "@/lib/leads/lifecycle";
+import { heldSale } from "@/lib/leads/lifecycle-rules";
 import { renderDocHtml } from "@/lib/offer-doc/html";
 import { documentToPng } from "@/lib/offer-doc/pdf";
 import { StaffLetterDocument, type PreviousLetter } from "@/components/offer-doc/StaffLetterDocument";
@@ -158,15 +160,16 @@ async function withdraw(row: LetterRow, m: Member): Promise<void> {
   if (!(await withdrawOn())) return;
   const { data: claimed } = await db().from("staff_letters").update({ withdrawn_at: new Date().toISOString() }).eq("id", row.id).is("withdrawn_at", null).select("id");
   if (!claimed?.length) return;
-  const [list, teams] = await Promise.all([listOpenConversations(true), listTeletelTeams()]);
+  const [list, teams, facts] = await Promise.all([listOpenConversations(true), listTeletelTeams(), saleFacts()]);
   const team = teams.find((t) => t.name === SALES_TEAM);
-  if (!list || !team) {
+  if (!list || !team || !facts) {
     // Teletel unreadable: released, the next tick tries again
     await db().from("staff_letters").update({ withdrawn_at: null }).eq("id", row.id);
     return;
   }
   const done: number[] = [];
-  for (const id of toWithdraw(list.rows, m.agentId, Date.now() / 1000)) if (await returnToTeam(id, team.id, m.agentId)) done.push(id);
+  // never a client who bought from them (the owner, 2026-10-29: a sale stays with its employee — leads/lifecycle-rules.ts heldSale)
+  for (const id of toWithdraw(list.rows.filter((c) => !heldSale(c, facts)), m.agentId, Date.now() / 1000)) if (await returnToTeam(id, team.id, m.agentId)) done.push(id);
   await db().from("staff_letters").update({ withdrawn: done }).eq("id", row.id);
   await logAudit({
     action: "staff_letter.withdrawn",

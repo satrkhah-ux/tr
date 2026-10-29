@@ -322,3 +322,34 @@ export async function saveInstallments(
     return { ok: false, error: "err.db" };
   }
 }
+
+/**
+ * «السعر المعروض المرسل للعميل» (the owner, 2026-10-29): the price the client
+ * was actually quoted — a payment method's fee, a discount — when it is not
+ * the offer's. It becomes what the case owes everywhere (payments.ts
+ * caseTotal). The manager's step, like the schedule: operations.write, or
+ * manage_own on one's own file. `null` (or the offer's own figure) clears it.
+ * Audited before and after; the paid rungs move at once (syncOperation).
+ */
+export async function setAgreedTotal(operationId: string, amount: number | null): Promise<{ ok: true } | Fail> {
+  const denied = await gateCaseManager(operationId);
+  if (denied) return { ok: false, error: denied };
+  if (amount !== null && !(Number.isFinite(amount) && amount > 0 && amount <= 10_000_000)) return { ok: false, error: "ops.pay.err.invalid" };
+  try {
+    const supabase = await db();
+    const { data: before } = await supabase.from("operations").select("agreed_total").eq("id", operationId).maybeSingle();
+    const next = amount === null ? null : Math.round(amount * 100) / 100;
+    const { error } = await supabase.from("operations").update({ agreed_total: next, updated_at: new Date().toISOString() }).eq("id", operationId);
+    if (error) return { ok: false, error: "err.updateFailed" };
+    await logAudit({
+      action: "payment.agreed_total_set",
+      entity: "operations",
+      entity_id: operationId,
+      meta: { before: (before as { agreed_total?: number | null } | null)?.agreed_total ?? null, after: next },
+    });
+    await syncOperation(operationId);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}

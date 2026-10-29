@@ -7,7 +7,7 @@ import { sendWeeklyDataQuality } from "@/lib/data/quality-weekly";
 import { sendClientMessage } from "@/lib/data/client-messages";
 import { messagesDueToday } from "./client-messages";
 import { passportAlerts, type AlertTraveler } from "./progress";
-import { defaultSchedule, installmentStates, paidTotal } from "./payments";
+import { caseTotal, defaultSchedule, installmentStates, paidTotal } from "./payments";
 import { canAdvanceClient, canAdvanceExecution, type ClientStatus, type ExecutionStatus } from "./state";
 import { hotelAtRisk, type ClientBookingRow } from "./client-booking-state";
 import { notifyDueWaits, travelBlockers } from "@/lib/data/wizard-case";
@@ -122,10 +122,10 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
       const [{ data: rows }, { data: pays }, { data: meta }] = await Promise.all([
         supabase.from("operation_installments").select("due_date, amount").eq("operation_id", op.id),
         supabase.from("operation_payments").select("amount, kind").eq("operation_id", op.id),
-        supabase.from("operations").select("confirmed_at, offers(total)").eq("id", op.id).maybeSingle(),
+        supabase.from("operations").select("confirmed_at, agreed_total, offers(total)").eq("id", op.id).maybeSingle(),
       ]);
-      const m = meta as unknown as { confirmed_at: string; offers: { total: number | string | null } | { total: number | string | null }[] | null } | null;
-      const total = (() => { const o = Array.isArray(m?.offers) ? m?.offers[0] : m?.offers; return o?.total != null ? Number(o.total) : null; })();
+      const m = meta as unknown as { confirmed_at: string; agreed_total: number | string | null; offers: { total: number | string | null } | { total: number | string | null }[] | null } | null;
+      const total = caseTotal((Array.isArray(m?.offers) ? m?.offers[0] : m?.offers)?.total, m?.agreed_total);
       const schedule = (rows ?? []).length
         ? ((rows ?? []) as { due_date: string | null; amount: number | string }[]).map((r) => ({ due_date: r.due_date, amount: Number(r.amount) }))
         : defaultSchedule({ total, confirmed_on: (m?.confirmed_at ?? today).slice(0, 10), travel_start: op.travel_start });

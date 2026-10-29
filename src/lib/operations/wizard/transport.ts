@@ -39,8 +39,10 @@ export type TransportCity = {
   trips: TransportTrip[];
   /** the supplier most of its trips are handed to — what the picker opens on. */
   supplierId: string | null;
-  /** every trip handed to one of our suppliers (readiness). */
+  /** every trip handed to one of our suppliers, or done «بدون مورد» (readiness). */
   supplied: boolean;
+  /** every trip done «بدون مورد» — the office runs it itself (the owner, 2026-10-29). */
+  noSupplier: boolean;
   /** every trip confirmed (readiness). */
   confirmed: boolean;
   /** where the city's request stands — its worst trip still open. */
@@ -53,6 +55,16 @@ export type TransportCity = {
 
 /** The city a trip belongs to: the booking's own, else the one its detail names (a tour). */
 export const cityOf = (b: Pick<OperationBooking, "city_name" | "detail">) => b.city_name.trim() || (b.detail?.["المدينة"] ?? "").trim();
+
+/**
+ * «بدون مورد» (the owner, 2026-10-29: «إذا لم يكن هناك سائق أو مورد مضاف … ويتم
+ * الأمر بنجاح دون عرقلة»): a detail key on the trip, like the driver's — no column,
+ * no supplier, and the trip counts as supplied. The reference written on the
+ * confirmation is NO_SUPPLIER_REF, what the voucher and the driver sheet show.
+ */
+export const NO_SUPPLIER_KEY = "بدون مورد";
+export const NO_SUPPLIER_REF = "تنفيذ مباشر";
+export const withoutSupplier = (b: Pick<OperationBooking, "detail">) => b.detail?.[NO_SUPPLIER_KEY] === "نعم";
 
 const driverOf = (b: OperationBooking): Driver => ({ name: (b.detail?.[DRV.driver] ?? "").trim(), phone: (b.detail?.[DRV.phone] ?? "").trim() });
 
@@ -97,7 +109,8 @@ export function transportCities(data: Pick<WizardCase, "bookings" | "supplierWor
         name: trips.map((t) => cityOf(t.booking)).find(Boolean) ?? "",
         trips,
         supplierId: mostCommon(supplierIds.filter((s): s is string => !!s), (a, b) => a === b),
-        supplied: supplierIds.every(Boolean),
+        supplied: trips.every((t, i) => Boolean(supplierIds[i]) || withoutSupplier(t.booking)),
+        noSupplier: trips.every((t) => withoutSupplier(t.booking)),
         confirmed: open.length === 0,
         request: open.length === 0 ? "confirmed" : (WORST.find((s) => states.includes(s)) ?? "none"),
         sentAt: sent[0] ?? null,

@@ -6,6 +6,7 @@ import { chooseVisaAgent, type VisaAgent, type MuradReceipt } from "./visa-assig
 import { currentAssignment } from "@/lib/leads/assignment";
 import { onList } from "./control";
 import { handOver } from "./handover";
+import { saleHolder } from "@/lib/leads/lifecycle";
 import { readControl } from "./control-store";
 
 /**
@@ -50,6 +51,13 @@ export async function routeCompletedVisa(service: SupabaseClient, logId: string)
     // the owner's own line is handed to no one: the flow ends here, as handed over
     if (onList(conversation.meta?.sender?.phone_number, control.noHandoff)) {
       await service.from("murad_log").update({ reason: "visa:handoff", error: null, intake: { ...data.intake, visa_handoff: { teamId: null, agentId: null, assignedAt: new Date().toISOString(), noHandoff: true } } }).eq("id", logId);
+      return true;
+    }
+    // a client who bought, held by an employee: it stays with them (the owner, 2026-10-29) — the flow ends here, as handed over
+    const holder = await saleHolder(id);
+    if (holder) {
+      await service.from("murad_log").update({ reason: "visa:handoff", error: null, intake: { ...data.intake, visa_handoff: { teamId: null, agentId: holder.agentId, assignedAt: new Date().toISOString(), keptWithSeller: true } } }).eq("id", logId);
+      await addTeletelNote(id, `مُراد: طلب التأشيرة لعميل اشترى منّا — بقي مع ${holder.name ?? "موظفه"} ولم يُحوَّل لقسم فيزا.`);
       return true;
     }
     const agent = await onlineTeamAgent(team.id, conversation.inbox_id ?? null, conversation.meta?.assignee?.id ?? null, control.paused);
