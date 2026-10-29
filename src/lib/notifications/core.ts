@@ -27,6 +27,7 @@ export const KIND_LABELS: Record<string, string> = {
   mail: "بريد",
   client_msg: "رسالة للعميل",
   data: "إضافات البيانات",
+  decision: "قرار إداري",
 };
 export const kindLabel = (kind: string) => KIND_LABELS[kind] ?? kind;
 

@@ -124,20 +124,19 @@ function caption(row: LetterRow): string {
     .join("\n");
 }
 
-/** The letter as a picture (same sheet as the PDF pipeline), with the signing button. Letter 2 reads letter 1 for the comparison. */
-async function deliver(row: LetterRow, m: Member): Promise<boolean> {
-  if (!m.chatId || !(await joined(m))) return false;
+/** The letter's sheet — the picture in the bot and the archive's PDF print the same. Letter 2 reads letter 1 for the comparison. */
+async function letterHtml(row: LetterRow, name: string): Promise<string | null> {
   let previous: PreviousLetter | undefined;
   if (row.number === 2) {
-    const { data } = await db().from("staff_letters").select("numbers, issued_at, signed_at").eq("employee_id", m.id).eq("number", 1).maybeSingle();
+    const { data } = await db().from("staff_letters").select("numbers, issued_at, signed_at").eq("employee_id", row.employee_id).eq("number", 1).maybeSingle();
     const first = data as { numbers: LetterNumbers; issued_at: string; signed_at: string | null } | null;
-    if (!first) return false;
+    if (!first) return null;
     previous = { numbers: first.numbers, date: dateText(Date.parse(first.issued_at)), signed: first.signed_at ? dateTimeText(Date.parse(first.signed_at)) : null };
   }
   const t = await loadTargets();
-  const html = await renderDocHtml((assets) =>
+  return renderDocHtml((assets) =>
     createElement(StaffLetterDocument, {
-      name: m.name,
+      name,
       number: row.number,
       numbers: row.numbers,
       targets: { firstReply: t.firstReply[0], reply: t.reply[0] },
@@ -147,6 +146,21 @@ async function deliver(row: LetterRow, m: Member): Promise<boolean> {
       assets,
     }),
   );
+}
+
+/** «أرشيف القرارات الإدارية»: one letter's sheet and whose it is — the caller checks who may read it */
+export async function letterSheet(id: number): Promise<{ employeeId: string; number: number; html: string } | null> {
+  const { data } = await db().from("staff_letters").select(`${COLS}, employees(arabic_name)`).eq("id", id).maybeSingle();
+  const row = data as (LetterRow & { employees: { arabic_name: string } | null }) | null;
+  const html = row ? await letterHtml(row, row.employees?.arabic_name?.trim() ?? "—") : null;
+  return row && html ? { employeeId: row.employee_id, number: row.number, html } : null;
+}
+
+/** The letter as a picture (same sheet as the PDF pipeline), with the signing button. */
+async function deliver(row: LetterRow, m: Member): Promise<boolean> {
+  if (!m.chatId || !(await joined(m))) return false;
+  const html = await letterHtml(row, m.name);
+  if (!html) return false;
   const png = await documentToPng(html);
   const sent = await staffSendPhoto(m.chatId, png, caption(row), [[{ text: "✍️ اعتمدت الخطاب", callback_data: `ls:${row.id}` }]], `letter:${row.number}`);
   if (!sent.ok) return false;

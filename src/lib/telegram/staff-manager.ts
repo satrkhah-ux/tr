@@ -93,7 +93,7 @@ export async function promptFor(me: StaffMember, chatId: number, kind: "broadcas
 }
 
 /** A pending prompt for this chat, taken (used once). Null when none, or older than ten minutes. */
-export type Pending = { kind: "broadcast" | "alert" | "decision"; targetId: string | null; sourceKey: string | null };
+export type Pending = { kind: "broadcast" | "alert" | "decision" | "admin_decision"; targetId: string | null; sourceKey: string | null };
 
 export async function takePending(chatId: number): Promise<Pending | null> {
   const { data } = await db().from("staff_bot_pending").delete().eq("chat_id", chatId).select("kind, target_id, source_key, created_at").maybeSingle();
