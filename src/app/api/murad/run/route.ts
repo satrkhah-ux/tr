@@ -9,7 +9,7 @@ import { followupDigest } from "@/lib/followups/remind";
 import { staffTick } from "@/lib/telegram/staff-events";
 import { learnSweep } from "@/lib/murad/lessons";
 import { foldKnowledge } from "@/lib/murad/knowledge";
-import { sweepSharedAccounts } from "@/lib/routing/shared-sweep";
+import { switchboardSweep } from "@/lib/routing/switchboard";
 import { sweepSecretaryPlans } from "@/lib/secretary/plan";
 import { sweepSecretarySuggestions } from "@/lib/secretary/suggest";
 import { sweepNotifications } from "@/lib/notifications/sweep";
@@ -68,8 +68,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // «ذاكرة مُراد»: one subject folded at most, when enough new lessons came in (knowledge.ts)
     if (settings.control.learn) await foldKnowledge(service).catch(() => null);
   });
-  // «لا طلب بلا صاحب»: a client waiting on a shared Teletel login goes to a seller (routing/shared-sweep.ts)
-  after(() => recordCronRun("shared_sweep", sweepSharedAccounts).catch(() => null));
+  // «البدّالة»: a client waiting on nobody, or on a colleague who is away, goes to an available colleague (routing/switchboard.ts)
+  after(() => recordCronRun("switchboard", () => switchboardSweep()).catch(() => null));
   // «سكرتيري الخاص»: the day plan on the first open of the system today (secretary/plan.ts)
   after(() => recordCronRun("secretary_plans", sweepSecretaryPlans).catch(() => null));
   // «سكرتيري الخاص»: cheaper same-star proposals for a price objection or a day's silence (secretary/suggest.ts)

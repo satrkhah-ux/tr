@@ -889,6 +889,7 @@ export const en = {
   "perm.status.call": "«On a call» button: no requests routed and no delay counted during a call",
   "perm.status.prayer": "«Prayer» button: no requests and no delay counted while praying",
   "nav.attendance": "Attendance & leave",
+  "nav.switchboard": "Switchboard",
   "perm.staffbot.manage": "Staff bot management: follow every colleague's numbers, announce to all, alert one",
   "perm.employees.manage.hint": "Add colleagues, move them between sections, change what a section grants.",
   "perm.guide.view": "The Traveliun guide",
