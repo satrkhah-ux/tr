@@ -85,9 +85,14 @@ export function MyFollowups({ view }: { view: MyFollowupsView }) {
             </select>
           )}
           {view.board && (
-            <Link href="/my-followups/team" className={btn}>
-              لوحة الفريق
-            </Link>
+            <>
+              <Link href="/followups/supervision" className={btn}>
+                إشراف المتابعة
+              </Link>
+              <Link href="/my-followups/team" className={btn}>
+                لوحة الفريق
+              </Link>
+            </>
           )}
           {!view.readOnly && (
             <>

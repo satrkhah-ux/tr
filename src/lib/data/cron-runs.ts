@@ -13,7 +13,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
  * "who did what", which «عين الإدارة» reads whole every evening. Only the last
  * run is ever asked for, and that is one row, not a log.
  */
-export type CronJob = "ops_daily" | "ops_flights" | "leads_pull" | "murad_run" | "followups_sync" | "staff_tick" | "shared_sweep" | "secretary_plans" | "notify_sweep" | "reservations_mail";
+export type CronJob = "ops_daily" | "ops_flights" | "leads_pull" | "murad_run" | "followups_sync" | "staff_tick" | "shared_sweep" | "secretary_plans" | "notify_sweep" | "reservations_mail" | "followup_supervision";
 export type CronRun = { at: string; ok: boolean; ms: number; summary: Record<string, unknown> };
 
 export const cronRunKey = (job: CronJob): string => `cron_last_run:${job}`;

@@ -2145,6 +2145,7 @@ export const en = {
   "nav.developer": "Developer",
   "nav.sla": "SLA — response time",
   "nav.followups": "Follow-up",
+  "nav.followupSupervision": "Follow-up supervision",
   "nav.secretary": "My secretary",
   "nav.myFollowups": "My follow-up",
   "nav.visaFiles": "Visas",
