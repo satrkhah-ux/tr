@@ -16,6 +16,9 @@
  *    logged with its result, a reassignment, the client's reply — never a click.
  */
 import { isClosingCourtesy } from "@/lib/providers/teletel-courtesy";
+import { businessMinutes as workingMinutes } from "@/lib/presence/business";
+import type { Window as ExcusedWindow } from "@/lib/presence/excuse";
+import type { Hours } from "@/lib/murad/reception";
 
 export type Priority = "high" | "normal" | "low";
 export type Reason = "client_waiting" | "followup_overdue" | "no_next_action" | "repeated_postpone";
@@ -134,19 +137,10 @@ function dayIntervals(dayStart: number, hours: OfficeHours, holidays: Set<string
 const riyadhDayStart = (ms: number) => Math.floor((ms + RIYADH_MS) / DAY_MS) * DAY_MS - RIYADH_MS;
 
 /** Working minutes between two instants (60 days at most are walked). */
-export function businessMinutes(fromMs: number, toMs: number, hours: OfficeHours, holidays: string[] = []): number {
+/** Working minutes between two instants — session B's working time (presence/business.ts): the office's windows, less holidays and the colleague's excused windows (leave, status buttons). */
+export function businessMinutes(fromMs: number, toMs: number, hours: OfficeHours, holidays: string[] = [], excused: ExcusedWindow[] = []): number {
   if (!(toMs > fromMs)) return 0;
-  const off = new Set(holidays);
-  let total = 0;
-  // the day before too: its window may run past midnight into ours
-  for (let day = riyadhDayStart(fromMs) - DAY_MS, k = 0; day <= toMs && k < 62; day += DAY_MS, k++) {
-    for (const [a, b] of dayIntervals(day, hours, off)) {
-      const s = Math.max(a, fromMs);
-      const e = Math.min(b, toMs);
-      if (e > s) total += e - s;
-    }
-  }
-  return Math.floor(total / 60_000);
+  return Math.floor(workingMinutes({ from: fromMs, to: toMs, hours: hours as Hours, holidays, excused }));
 }
 
 /** The instant `minutes` working minutes after `fromMs` (null when the office never opens within 60 days). */
@@ -186,6 +180,10 @@ export type FollowupFacts = {
   conversation: { waitingSince: number; lastActivityAt: number; preview: string; teamId: number | null; inboxId: number | null } | null;
   /** «later» results (postpones) in the last 14 days, and whether any result since closed the matter */
   postpones14d: number;
+  /** the employee's leave and status-button windows (session B) — not their lateness */
+  excused?: ExcusedWindow[];
+  /** session A's «lateness_exempt»: available, but no lateness is counted */
+  exempt?: boolean;
 };
 
 export type Finding = { reason: Reason; sinceMs: number; minutes: number };
@@ -213,9 +211,9 @@ export function clientWaitingSince(f: FollowupFacts): number | null {
 const ms = (iso: string | null) => (iso ? Date.parse(iso) : 0);
 
 export function detect(f: FollowupFacts, s: SupervisionSettings, hours: OfficeHours, nowMs: number): Finding[] {
-  if (f.status !== "open") return [];
+  if (f.status !== "open" || f.exempt) return [];
   const th = thresholdsFor(s, priorityOf(f), f.conversation?.teamId ?? null);
-  const bm = (from: number) => businessMinutes(from, nowMs, hours, s.holidays);
+  const bm = (from: number) => businessMinutes(from, nowMs, hours, s.holidays, f.excused ?? []);
   const out: Finding[] = [];
 
   const waiting = clientWaitingSince(f);

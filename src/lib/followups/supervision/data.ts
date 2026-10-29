@@ -6,6 +6,8 @@ import { followupRows } from "@/lib/followups/service";
 import { WORK_COLS, type WorkRow } from "@/lib/followups/rules";
 import { parseHours } from "@/lib/murad/reception";
 import { SETTING } from "@/lib/murad/core";
+import { availabilityOf, excusedWindows } from "@/lib/presence/availability";
+import { HOLIDAYS_KEY, parseHolidays } from "@/lib/presence/business";
 import { parseSupervisionSettings, SUPERVISION_SETTINGS_KEY, type FollowupFacts, type OfficeHours, type SupervisionSettings, type SupervisorRow } from "./core";
 
 /**
@@ -19,9 +21,12 @@ export const supervisionDb = () => createSupabaseServiceClient() as unknown as S
 const TABLE_MISSING = "42P01";
 
 export async function readSupervisionSettings(db: SupabaseClient): Promise<{ settings: SupervisionSettings; hours: OfficeHours }> {
-  const { data } = await db.from("app_settings").select("key, value").in("key", [SUPERVISION_SETTINGS_KEY, SETTING.receptionHours]);
+  const { data } = await db.from("app_settings").select("key, value").in("key", [SUPERVISION_SETTINGS_KEY, SETTING.receptionHours, HOLIDAYS_KEY]);
   const map = new Map(((data ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
-  return { settings: parseSupervisionSettings(map.get(SUPERVISION_SETTINGS_KEY)), hours: parseHours(map.get(SETTING.receptionHours)) as OfficeHours };
+  const settings = parseSupervisionSettings(map.get(SUPERVISION_SETTINGS_KEY));
+  // the public holidays are session B's one list (app_settings public_holidays), not a second one here
+  settings.holidays = [...new Set([...settings.holidays, ...parseHolidays(map.get(HOLIDAYS_KEY))])];
+  return { settings, hours: parseHours(map.get(SETTING.receptionHours)) as OfficeHours };
 }
 
 /** the attempts that count as a postpone: a «later» result (التواصل لاحقاً) */
@@ -53,6 +58,11 @@ export async function readFacts(db: SupabaseClient, onlyFollowupIds?: string[], 
     for (const at of attempts) postpones.set(at.followup_id, (postpones.get(at.followup_id) ?? 0) + 1);
   }
   const conv = new Map((open?.rows ?? []).map((c) => [c.id, c]));
+  // session B: each colleague's leave and status-button windows (not their lateness), and who is exempt from lateness
+  const employees = [...new Set(rows.map((r) => r.assigned_to).filter((x): x is string => Boolean(x)))];
+  const [excused, availability] = employees.length
+    ? await Promise.all([excusedWindows(employees, nowMs - 15 * 86_400_000, nowMs).catch(() => new Map()), availabilityOf(employees, nowMs).catch(() => new Map())])
+    : [new Map(), new Map()];
   const facts: FollowupFacts[] = rows.map((r) => {
     const c = conv.get(r.conversation_id);
     return {
@@ -71,6 +81,8 @@ export async function readFacts(db: SupabaseClient, onlyFollowupIds?: string[], 
       lastLine: r.last_line ?? r.client_line,
       conversation: c ? { waitingSince: c.waitingSince, lastActivityAt: c.lastActivityAt, preview: c.preview, teamId: c.teamId, inboxId: c.inboxId } : null,
       postpones14d: postpones.get(r.id) ?? 0,
+      excused: r.assigned_to ? (excused.get(r.assigned_to) ?? []) : [],
+      exempt: r.assigned_to ? availability.get(r.assigned_to)?.reason === "exempt" : false,
     };
   });
   return { facts, rows: new Map(rows.map((r) => [r.id, r])), teletel: open !== null };
@@ -98,12 +110,13 @@ export async function teamsOfEmployees(db: SupabaseClient, teamIds: number[]): P
   return out;
 }
 
-/**
- * Who is at work now. Session B's switchboard (leave, status buttons, shifts)
- * replaces this; meanwhile: the system open in the last few minutes (presence).
- */
-const PRESENCE_WINDOW_MS = 5 * 60_000;
-export async function availableEmployees(db: SupabaseClient, nowMs = Date.now()): Promise<Set<string>> {
-  const { data } = await db.from("presence").select("employee_id").gte("last_seen_at", new Date(nowMs - PRESENCE_WINDOW_MS).toISOString());
-  return new Set(((data ?? []) as { employee_id: string }[]).map((r) => r.employee_id));
+/** Who is at work now — session B's availability (leave, shift, status buttons, Teletel online; «exempt» counts as available). */
+export async function availableEmployees(db: SupabaseClient, nowMs = Date.now(), among?: string[]): Promise<Set<string>> {
+  let ids = among;
+  if (!ids) {
+    const { data } = await db.from("employees").select("id").eq("status", "Active");
+    ids = ((data ?? []) as { id: string }[]).map((e) => e.id);
+  }
+  const map = await availabilityOf(ids, nowMs).catch(() => new Map<string, { available: boolean }>());
+  return new Set([...map.entries()].filter(([, a]) => a.available).map(([id]) => id));
 }

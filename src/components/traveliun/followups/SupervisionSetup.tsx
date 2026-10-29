@@ -8,7 +8,7 @@ import { PRIORITY_LABEL, type Priority, type SupervisionSettings, type Threshold
 /**
  * The management's part of «إشراف المتابعة»: who supervises whom (an employee,
  * a Teletel team, a Teletel inbox, or everyone — primary and backup), and the
- * thresholds per priority, with a team's own override and the holidays.
+ * thresholds per priority, with a team's own override (holidays, leaves and status buttons are session B's).
  */
 
 type Data = NonNullable<Awaited<ReturnType<typeof listSupervisors>>>;
@@ -23,7 +23,6 @@ export function SupervisionSetup({ initial }: { initial: Data }) {
   const [data, setData] = useState(initial);
   const [form, setForm] = useState({ supervisorId: "", scopeKind: "employee" as SupervisorEntry["scope_kind"], scopeRef: "", role: "primary" as SupervisorEntry["role"] });
   const [settings, setSettings] = useState<SupervisionSettings>(initial.settings);
-  const [holidays, setHolidays] = useState(initial.settings.holidays.join("\n"));
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const name = (id: string) => data.people.find((p) => p.id === id)?.name ?? "—";
@@ -41,7 +40,7 @@ export function SupervisionSetup({ initial }: { initial: Data }) {
   async function saveSettings() {
     setBusy(true); setMsg("");
     try {
-      const r = await saveSupervisionSettings({ ...settings, holidays: holidays.split(/\s+/).filter(Boolean) });
+      const r = await saveSupervisionSettings({ ...settings, holidays: [] });
       setMsg(r.ok ? "حُفظت الإعدادات." : r.error);
     } catch { setMsg("تعذّر الاتصال."); } finally { setBusy(false); }
   }
@@ -84,9 +83,7 @@ export function SupervisionSetup({ initial }: { initial: Data }) {
           {(["high", "normal", "low"] as const).map((p) => <td key={p} className="p-1"><input type="number" min={1} value={settings.thresholds[p][k]} onChange={(e) => setT(p, k, Number(e.target.value))} className={`${field} w-24 text-center`} aria-label={`${T_LABEL[k]} — ${PRIORITY_LABEL[p]}`} /></td>)}
         </tr>)}</tbody>
       </table></div>
-      <label className="mt-3 block text-xs">الإجازات العامة (تاريخ في كل سطر، مثل 2026-12-02)
-        <textarea value={holidays} onChange={(e) => setHolidays(e.target.value)} rows={3} dir="ltr" className={`${field} mt-1 block w-full max-w-xs`} />
-      </label>
+      <p className="mt-3 text-xs text-[#557d78]">الإجازات العامة وإجازات الموظفين وأزرار الحالة («لدي عميل»، «صلاة»…) لا تُحسب تأخيراً — تُدار من قسم الحضور.</p>
       <label className="mt-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={settings.on} onChange={(e) => setSettings({ ...settings, on: e.target.checked })} /> الإشراف يعمل</label>
       <p className="mt-1 text-xs text-[#8ba09b]">مدد خاصة لقسم بعينه (فريق Teletel) تُحفظ في الإعداد نفسه وتعلو على هذه.</p>
       <button type="button" disabled={busy} onClick={() => void saveSettings()} className="mt-3 rounded-lg bg-[var(--tv-brand)] px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{busy ? <Loader2 size={13} className="animate-spin" /> : "احفظ الإعدادات"}</button>
