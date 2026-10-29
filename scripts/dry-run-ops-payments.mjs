@@ -42,6 +42,10 @@ try {
   check("operations.agreed_total exists, nullable", col?.data_type === "numeric" && col?.is_nullable === "YES");
   const set = await one("select count(*)::int n from public.operations where agreed_total is not null");
   check("no case has an agreed price yet — every case reads its offer total as before", set.n === 0);
+  const sc = await one(
+    "select data_type, is_nullable from information_schema.columns where table_schema='public' and table_name='operation_payments' and column_name='expected_settlement_on'",
+  );
+  check("operation_payments.expected_settlement_on exists, a nullable date", sc?.data_type === "date" && sc?.is_nullable === "YES");
   const after = await one("select count(*)::int n from public.operation_payments");
   check(`no payment row touched (${before.n} before, ${after.n} after)`, before.n === after.n);
 } finally {

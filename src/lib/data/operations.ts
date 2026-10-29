@@ -25,7 +25,8 @@ import { currentCan } from "@/lib/roles/current";
 import { gateCaseManager, gateOperation, mayWork, opsAccess } from "@/lib/operations/access";
 import { mintReceipt } from "@/lib/data/payment-receipt";
 import { caseTotal, isIsoDate, riyadhDate } from "@/lib/operations/payments";
-import type { PayMethod } from "@/lib/payments/methods";
+import { expectedSettlement, isBnpl, type PayMethod } from "@/lib/payments/methods";
+import { getSettlementRule } from "@/lib/data/app-settings";
 
 /**
  * «العمليات» — the execution hub. A case's two statuses move in three places,
@@ -424,6 +425,8 @@ export async function recordPayment(input: {
     const supabase = await db();
     const kind = input.kind ?? "deposit";
     const recordedBy = await getCurrentEmployeeId();
+    // the office's day, not UTC's — a payment taken at 1am Riyadh is today's
+    const paidAt = isIsoDate(input.paid_at) ? input.paid_at : riyadhDate();
     let id = "";
     // the receipt number is a Riyadh day + 4 random characters: a clash is rare, not impossible
     for (let attempt = 0; !id; attempt++) {
@@ -436,8 +439,9 @@ export async function recordPayment(input: {
           kind,
           method: input.method ?? null,
           reference: input.reference?.trim() || null,
-          // the office's day, not UTC's — a payment taken at 1am Riyadh is today's
-          paid_at: isIsoDate(input.paid_at) ? input.paid_at : riyadhDate(),
+          paid_at: paidAt,
+          // Tabby/Tamara pay us out on their weekly day — the daily run reminds the seller then
+          expected_settlement_on: isBnpl(input.method) ? expectedSettlement(paidAt, await getSettlementRule()) : null,
           recorded_by: recordedBy,
           note: input.note?.trim() || null,
           // a refund is money going out — it gets no «سند قبض»

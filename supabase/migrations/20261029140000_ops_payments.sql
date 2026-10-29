@@ -7,6 +7,9 @@
 --      client was actually quoted (a payment method's fee, a discount) when it
 --      differs from the offer's total. NULL = the offer's total stands, so
 --      every existing case reads exactly as before.
+--   3. operation_payments.expected_settlement_on — when a Tabby/Tamara payment
+--      should reach us (their weekly payout day, app_settings «bnpl_settlement»);
+--      the daily run reminds the case's seller on that day. NULL for every other method.
 --
 -- NOT applied by code: the coordinator applies it (backup first) BEFORE
 -- deploying branch ops-payments — that code selects agreed_total.
@@ -40,9 +43,17 @@ alter table public.operations
 comment on column public.operations.agreed_total is
   'The price sent to the client when it differs from offers.total (a payment fee, a discount). NULL = offers.total. Session E, 2026-10-29.';
 
+-- 3. the day a Tabby/Tamara payment should land
+alter table public.operation_payments
+  add column if not exists expected_settlement_on date;
+
+comment on column public.operation_payments.expected_settlement_on is
+  'Tabby/Tamara only: the payout day the money should reach us (lib/payments/methods.ts expectedSettlement). Session E, 2026-10-29.';
+
 notify pgrst, 'reload schema';
 
 -- ROLLBACK (manual) — refused while any payment already uses a new method:
+--   alter table public.operation_payments drop column if exists expected_settlement_on;
 --   alter table public.operations drop column if exists agreed_total;
 --   alter table public.operation_payments drop constraint if exists operation_payments_method_check;
 --   alter table public.operation_payments add constraint operation_payments_method_check
