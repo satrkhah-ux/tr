@@ -3,7 +3,7 @@ import type { OperationBooking } from "@/lib/data/operation-bookings";
 import type { SupplierWork } from "@/lib/data/supplier-work";
 import { buildSupplierRequest } from "@/lib/operations/supplier-request";
 import { isUnassigned } from "@/lib/operations/wizard";
-import { driverTargets, requestTrips, tourClashes, transportCities, transportReadiness, transportState } from "./transport";
+import { driverTargets, NO_SUPPLIER_KEY, NO_SUPPLIER_REF, requestTrips, tourClashes, transportCities, transportReadiness, transportState } from "./transport";
 import type { WizardCase } from "./types";
 
 // AD-2-7287 as the pull wrote it: 2 receptions, 3 tours in two cities, a hotel that is not transport
@@ -87,6 +87,21 @@ describe("«المواصلات» by city", () => {
     const done = [tzReception, tour1, tour2, istReception, istTour].map((b) => sup(b, b.city_name === "طرابزون" ? "agentTZ" : "agentIST", "confirmed"));
     expect(transportState(wc(done))).toBe("done");
     expect(transportReadiness(wc(done)).filter((r) => !r.optional).every((r) => r.ok)).toBe(true);
+  });
+
+  it("counts a city done «بدون مورد» — no supplier, no driver, nothing blocks (the owner, 2026-10-29)", () => {
+    const direct = (b: OperationBooking) =>
+      ({ ...b, assignee_kind: "ops", assignee_supplier_id: null, status: "confirmed", confirmation_number: NO_SUPPLIER_REF, detail: { ...b.detail, [NO_SUPPLIER_KEY]: "نعم" } }) as OperationBooking;
+    const sup = (b: OperationBooking) =>
+      ({ ...b, assignee_kind: "supplier", assignee_supplier_id: "agentIST", status: "confirmed" }) as OperationBooking;
+    // Trabzon run directly, Istanbul by its agent
+    const mixed = [direct(tzReception), direct(tour1), direct(tour2), sup(istReception), sup(istTour)];
+    expect(transportState(wc(mixed))).toBe("done");
+    expect(transportReadiness(wc(mixed)).filter((r) => !r.optional).every((r) => r.ok)).toBe(true);
+    const tz = transportCities(wc(mixed)).find((c) => c.name === "طرابزون");
+    expect(tz).toMatchObject({ supplied: true, confirmed: true, noSupplier: true });
+    // a plain unassigned trip ('ops' is the column's default) is NOT «بدون مورد»
+    expect(transportCities(wc([tzReception])).find((c) => c.name === "طرابزون")).toMatchObject({ supplied: false, noSupplier: false });
   });
 
   it("asks one supplier for the city's open trips — or nobody while they are split", () => {

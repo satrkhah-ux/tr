@@ -12,6 +12,7 @@ import { awaitingConfirmation } from "@/lib/operations/confirm-all";
 import { DRV, driverServiceKind } from "@/lib/operations/drivers";
 import { assigneesFor } from "@/lib/operations/supplier-request";
 import { parseHotelConfirmation } from "@/lib/operations/wizard/hotels";
+import { NO_SUPPLIER_KEY, NO_SUPPLIER_REF } from "@/lib/operations/wizard/transport";
 import { uploadText } from "@/lib/repackage/extract/upload-text";
 
 /**
@@ -147,6 +148,34 @@ export async function assignCitySupplier(input: { operation_id: string; booking_
     if (!done.ok) return done;
   }
   return { ok: true, assigned: move.length };
+}
+
+/**
+ * «بدون مورد» (the owner, 2026-10-29: «خيار بدون مورد ويتم الأمر بنجاح دون
+ * عرقلة»): the office runs the city's trips itself — no supplier, maybe no
+ * driver yet. Each trip is handed to the operations team (assignBooking kind
+ * "ops", which clears any supplier), carries the «بدون مورد» mark in its detail
+ * (merged, never replacing the driver or the times), and is confirmed under
+ * NO_SUPPLIER_REF through confirmBookings — so the city counts done, the case
+ * moves on and the audit log reads like any other confirmation.
+ */
+export async function confirmCityWithoutSupplier(input: { operation_id: string; booking_ids: string[] }): Promise<{ ok: true; confirmed: number } | Fail> {
+  const res = await cityTrips(input.operation_id, input.booking_ids);
+  if ("ok" in res) return res;
+  const open = res.trips.filter((t) => t.status !== "cancelled");
+  if (open.length === 0) return { ok: false, error: "ops.confirmAll.none" };
+  for (const t of open) {
+    const handed = await assignBooking({ booking_id: t.id, kind: "ops", handoff_note: t.handoff_note });
+    if (!handed.ok) return handed;
+    const marked = await updateBooking({ id: t.id, detail: { ...(t.detail ?? {}), [NO_SUPPLIER_KEY]: "نعم" } });
+    if (!marked.ok) return marked;
+  }
+  const waiting = open.filter((t) => awaitingConfirmation(t.status));
+  if (waiting.length === 0) return { ok: true, confirmed: 0 };
+  return confirmBookings({
+    operation_id: input.operation_id,
+    entries: waiting.map((t) => ({ booking_id: t.id, confirmation_number: NO_SUPPLIER_REF })),
+  });
 }
 
 /** ONE request for the city's open trips, for review — composeRequest with the rest as `alsoIds`. */
