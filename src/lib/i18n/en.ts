@@ -1743,6 +1743,7 @@ export const en = {
   "pg.priceUpdate.title": "The programme's price changed after it was issued",
   "pg.priceUpdate.compare": "Sent to the client: {issued} — after the changes: {next}",
   "pg.priceUpdate.button": "Apply the price update",
+  "pg.priceUpdate.methods": "At the new price, by payment method:",
   "pg.priceUpdate.done": "Version {n} issued at the new price {total} ✓",
   "pg.priceUpdate.doneHint": "The client link and the PDF now carry the new price; the previous version is kept in «Version history». Send it to the client from «Send to the client».",
   "pg.versions.noDraft": "This version has no saved draft (issued before drafts were kept) — it cannot be adopted automatically.",

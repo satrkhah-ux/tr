@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { produceOfferFromDraft, type ProduceResult } from "@/lib/data/drafts";
-import { checkPriceUpdate } from "@/lib/data/price-update";
+import { checkPriceUpdate, type MethodPrice } from "@/lib/data/price-update";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 
 const money = (n: number | null, currency: string) => (n == null ? "—" : `${n.toLocaleString("en-US")} ${currency}`);
@@ -31,7 +31,7 @@ export function PriceUpdate({
   onIssued: (result: Extract<ProduceResult, { ok: true }>) => void;
 }) {
   const { t } = useTraveliunUI();
-  const [state, setState] = useState<{ issued: number; next: number | null; currency: string } | null>(null);
+  const [state, setState] = useState<{ issued: number; next: number | null; currency: string; methods: MethodPrice[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ version: number; total: number | null; currency: string } | null>(null);
@@ -43,7 +43,7 @@ export function PriceUpdate({
       void checkPriceUpdate(draftId)
         .then((r) => {
           if (mine !== ticket.current) return;
-          setState(r.ok && r.changed ? { issued: r.issued, next: r.next, currency: r.currency } : null);
+          setState(r.ok && r.changed ? { issued: r.issued, next: r.next, currency: r.currency, methods: r.methods } : null);
         })
         .catch(() => undefined);
     }, 900);
@@ -85,6 +85,11 @@ export function PriceUpdate({
           <p className="mt-0.5 text-[12px] font-semibold text-[#5b4a1f]">
             {t("pg.priceUpdate.compare", { issued: money(state.issued, state.currency), next: money(state.next, state.currency) })}
           </p>
+          {state.methods.length > 0 ? (
+            <p className="mt-0.5 text-[11.5px] font-semibold text-[#7a6a3f]">
+              {t("pg.priceUpdate.methods")} {state.methods.map((m) => `${m.label} ${money(m.total, state.currency)}`).join(" · ")}
+            </p>
+          ) : null}
         </div>
         <button
           type="button"

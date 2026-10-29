@@ -5,7 +5,8 @@ import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/serve
 import { currentCan } from "@/lib/roles/current";
 import { partnerCaller } from "@/lib/partners/price-view";
 import { issuePricing, issuedHotelRefs, ownIssueSheet, priceMoved } from "@/lib/offer/issue-pricing";
-import { getProfitSettings } from "./app-settings";
+import { getPaymentFees, getProfitSettings } from "./app-settings";
+import { PAY_METHOD_AR, quoteAll } from "@/lib/payments/methods";
 import { getRates } from "./rates-actions";
 import { loadDraft } from "./draft-store";
 
@@ -19,7 +20,12 @@ import { loadDraft } from "./draft-store";
  * overnight is not a change the agent made; the new total shown is at today's rates — what the re-issue
  * will actually charge. Our own files only: a partner's sheet is re-priced at their terms on every issue.
  */
-export type PriceCheck = { ok: true; changed: false } | { ok: true; changed: true; issued: number; next: number | null; currency: string } | { ok: false; error: string };
+/** what the client pays at the new price by each way that adds a charge (session E's fees, added on top) */
+export type MethodPrice = { label: string; total: number };
+export type PriceCheck =
+  | { ok: true; changed: false }
+  | { ok: true; changed: true; issued: number; next: number | null; currency: string; methods: MethodPrice[] }
+  | { ok: false; error: string };
 
 export async function checkPriceUpdate(draftId: string): Promise<PriceCheck> {
   try {
@@ -44,7 +50,13 @@ export async function checkPriceUpdate(draftId: string): Promise<PriceCheck> {
     const thenRates = issuePricing(sheet, data, refs, default_pct, { ...sarPer, ...atIssue }).totals.total;
     if (!priceMoved(thenRates, issued)) return { ok: true, changed: false };
     const next = issuePricing(sheet, data, refs, default_pct, sarPer).totals.total;
-    return { ok: true, changed: true, issued, next, currency: row.currency || data.pricing.display_currency || "SAR" };
+    const currency = row.currency || data.pricing.display_currency || "SAR";
+    // the fees are in riyals (a share + a fixed SAR amount): quoted for a riyal price only, and only the ways that add something
+    const methods =
+      next != null && currency === "SAR"
+        ? quoteAll(next, await getPaymentFees()).flatMap((q) => (!q.unset && q.fee > 0 ? [{ label: PAY_METHOD_AR[q.method], total: q.total }] : []))
+        : [];
+    return { ok: true, changed: true, issued, next, currency, methods };
   } catch {
     return { ok: false, error: "err.db" };
   }

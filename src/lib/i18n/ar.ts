@@ -1741,6 +1741,7 @@ export const ar: Dictionary = {
   "pg.priceUpdate.title": "تغيّر سعر البرنامج بعد إصداره",
   "pg.priceUpdate.compare": "السعر الذي أُرسل للعميل: {issued} — السعر بعد التعديل: {next}",
   "pg.priceUpdate.button": "تطبيق تحديث السعر",
+  "pg.priceUpdate.methods": "بالسعر الجديد حسب طريقة الدفع:",
   "pg.priceUpdate.done": "صدرت النسخة {n} بالسعر الجديد {total} ✓",
   "pg.priceUpdate.doneHint": "رابط العميل وملف PDF صارا على السعر الجديد، والنسخة السابقة محفوظة في «سجل النسخ». أرسلها للعميل من «أرسل إلى العميل».",
   "pg.versions.noDraft": "هذه النسخة لا تحمل مسودة محفوظة (صدرت قبل تفعيل الحفظ) — لا يمكن اعتمادها تلقائياً.",

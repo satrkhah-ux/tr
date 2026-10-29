@@ -43,7 +43,7 @@ describe("the supplier's order — every detail it needs", () => {
 
   it("leaves out a flight the agent added: it is ours to book, not the supplier's", () => {
     const own = georgiaPackage().flights[0];
-    const added = { ...own, flight_no: "AT999", from_airport: "TBS", to_airport: "BUS", added: true };
+    const added = { ...own, flight_no: "AT999", from_airport: "TBS", to_airport: "BUS", added: true as const };
     const withAdded = order({ data: georgiaData({ extracted: georgiaPackage({ flights: [own, added] }) }) }).body;
     expect(withAdded).toContain("AT100");
     expect(withAdded).not.toContain("AT999");
