@@ -10,6 +10,7 @@ import { sendDailyReports } from "./staff-report";
 import { refreshScreens, remindWaiting } from "./staff-screen";
 import { pushDecisions } from "./staff-decisions";
 import { lettersTick } from "./staff-letters";
+import { decisionsTick } from "@/lib/decisions/decisions";
 import { forwardClientMessage, onMessageUpdated, refreshDeliveries, rememberThread, type TeletelMessageEvent } from "./staff-replies";
 
 /**
@@ -182,7 +183,7 @@ export async function dropGone(): Promise<number> {
 
 /** The minute job's share of «تنبيهاتي» (inside /api/murad/run, after the follow-ups sync refreshed the open list): the sweep, the delivery statuses, the waiting reminders, the live screens (every fifth minute), and from 23:00 Riyadh the evening reports. */
 export async function staffTick(): Promise<Record<string, unknown>> {
-  const [sweep, deliveries, reminders, screens, reports, decisions, letters, mine, statuses] = await Promise.all([
+  const [sweep, deliveries, reminders, screens, reports, decisions, letters, mine, statuses, decrees] = await Promise.all([
     staffSweep(),
     refreshDeliveries(),
     remindWaiting(),
@@ -192,6 +193,7 @@ export async function staffTick(): Promise<Record<string, unknown>> {
     lettersTick(),
     mineTick(),
     closeExpiredStatuses().catch(() => null),
+    decisionsTick().catch(() => null),
   ]);
   const dropped = await dropGone();
   return {
@@ -204,6 +206,7 @@ export async function staffTick(): Promise<Record<string, unknown>> {
     ...(letters ? { letters } : {}),
     ...(mine ? { mine } : {}),
     ...(statuses ? { statuses } : {}),
+    ...(decrees ? { decrees } : {}),
     ...(dropped ? { dropped } : {}),
   };
 }

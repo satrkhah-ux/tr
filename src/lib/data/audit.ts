@@ -138,6 +138,10 @@ export type AuditAction =
   | "switchboard.moved"
   | "switchboard.reassigned"
   | "switchboard.rules_saved"
+  // «القرارات الإدارية»: issued, acknowledged by a recipient, its settings
+  | "admin_decision.issued"
+  | "admin_decision.acknowledged"
+  | "admin_decision.settings_saved"
   | "employee.extra_permissions"
   | "employee.deleted"
   // «عين الإدارة» — what it said, and what management did about it

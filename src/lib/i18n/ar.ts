@@ -942,6 +942,8 @@ export const ar: Dictionary = {
   "perm.status.prayer": "زر «صلاة»: لا يستلم طلبات ولا يُحسب عليه تأخير أثناء الصلاة",
   "nav.attendance": "الحضور والإجازات",
   "nav.switchboard": "البدّالة",
+  "nav.decisions": "القرارات الإدارية",
+  "nav.myDecisions": "قراراتي وخطاباتي",
   "perm.staffbot.manage": "إدارة بوت الموظفين: متابعة أداء كل الموظفين، والإعلان العام، وتنبيه موظف",
   "perm.employees.manage.hint": "إضافة الزملاء ونقلهم بين الأقسام وتغيير ما يمنحه القسم.",
   "perm.guide.view": "دليل ترافليون",

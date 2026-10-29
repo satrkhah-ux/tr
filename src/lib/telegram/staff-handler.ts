@@ -27,6 +27,7 @@ import {
 } from "./staff-admin";
 import { confirmNudge, prepareNudge, waitingConvView, waitingListView, waitingPickView } from "./staff-waiting";
 import { grantLeave, leaveView } from "./staff-leave";
+import { decreeCallback, decreeHome, decreeText } from "./staff-decree";
 import { decisionStep, decisionsView, decisionText, decisionView, interventionView, promptDecision, setDecisionStatus, signalView } from "./staff-decisions";
 import type { InlineButton } from "./ops-bot";
 
@@ -240,6 +241,7 @@ const ADMIN_VIEWS: Record<Exclude<AdminKey, "broadcast" | "toStaff">, (me: Staff
   day: dayView,
   waiting: (me) => waitingListView(me, "aw:all:0"),
   leave: (me) => leaveView(me, "lv"),
+  decree: decreeHome,
   urgent: (me) => interventionView(me),
   decisions: decisionsView,
   team: adminTeamView,
@@ -317,8 +319,8 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
     const chatId = callback.message?.chat?.id;
     const me = chatId && callback.message?.chat?.type === "private" ? await staffForChat(chatId) : null;
     const data = callback.data ?? "s";
-    // an unsigned letter locks every button but the letter's own
-    const lock = me && !/^l[sr]:/.test(data) ? await unsignedLetter(me.id) : null;
+    // an unsigned letter locks every button but the letter's own (and a decision's «استلمت»: it is a signature too)
+    const lock = me && !/^(l[sr]|z[ys]):/.test(data) ? await unsignedLetter(me.id) : null;
     await staffCall("answerCallbackQuery", { callback_query_id: callback.id, ...(lock ? { text: LOCKED_ALERT, show_alert: true } : {}) });
     if (!me || !chatId || lock) return;
     if (data.startsWith("lr:")) return resendLetter(me, chatId, Number(data.slice(3)));
@@ -360,6 +362,11 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
     if (data === "dl") return show(chatId, withBack(await decisionsView(me)), at);
     if (data.startsWith("dc:")) return show(chatId, withBack(await decisionView(me, data.slice(3))), at);
     if (data.startsWith("ds:")) return show(chatId, withBack(await setDecisionStatus(me, data)), at);
+    // «📜 إصدار قرار» (staff-decree.ts): the management's steps check the manager first; «✅ استلمت» is the recipient's own
+    if (/^z[a-z](:|$)/.test(data)) {
+      const v = await decreeCallback(me, chatId, data, at);
+      return v ? show(chatId, withBack(v), at) : undefined;
+    }
     // «الخطاب الرسمي»: the employee's signature, and the managers' summary
     if (data.startsWith("ls:")) return signLetter(me, chatId, Number(data.slice(3)), at);
     if (data === "lt") return show(chatId, withBack(await lettersView(me)), at);
@@ -421,6 +428,7 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
     const pending = await takePending(chatId);
     if (pending) {
       if (pending.kind === "decision") await decisionText(me, chatId, text, pending.sourceKey);
+      else if (pending.kind === "admin_decision") await decreeText(me, chatId, text, pending.sourceKey);
       else await draft(me, chatId, text, pending.kind === "alert" ? pending.targetId : null);
       await drop();
       return;
