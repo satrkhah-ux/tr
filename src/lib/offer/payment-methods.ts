@@ -30,11 +30,16 @@ export function withMethodFees(lines: string[], total: number | null, methods: M
 /** E's methods by their printed Arabic names — «التقسيط عبر تابي» names تابي. */
 export const methodsForFees = (): MethodLike[] => PAY_METHODS.map((m) => ({ id: m, name: PAY_METHOD_AR[m] }));
 
-/** E's quote as the line's note; a method the administration left unset adds nothing. */
+/**
+ * E's quote as the line's note — the TOTAL only. Tabby, Tamara and MyFatoorah
+ * forbid telling the client the fee or its percentage (the owner, 2026-10-29,
+ * binding): nothing the client sees may say «رسوم» or a share. A method the
+ * administration left unset adds nothing.
+ */
 export const sessionEFee =
   (fees: PaymentFees): FeeFn =>
   (methodId, amount) => {
     const q = quoteMethod(amount, methodId as PayMethod, fees);
     if (q.unset || q.fee <= 0) return null;
-    return { fee: q.fee, total: q.total, note: `الإجمالي عبر ${PAY_METHOD_AR[q.method]} ${q.total.toLocaleString("en-US")} ريال (يشمل رسوم ${q.fee.toLocaleString("en-US")} ريال)` };
+    return { fee: q.fee, total: q.total, note: `الإجمالي ${q.total.toLocaleString("en-US")} ريال` };
   };
