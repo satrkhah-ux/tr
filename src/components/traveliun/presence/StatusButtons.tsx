@@ -2,16 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition, type ComponentType } from "react";
 import { Phone, UserRound, Users } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { endMyStatus, getMyPresence, startMyStatus, type MyPresence } from "@/lib/data/presence-status";
-import { STATUS_BUTTON, WANTS, type StatusKind } from "@/lib/presence/excuse";
-import { awayKindOf, once } from "@/lib/presence/away-overlay";
+import { endMyStatus, getMyPresence, getStatusColleagues, saveMyClient, startMyStatus, type MyPresence } from "@/lib/data/presence-status";
+import { STATUS_BUTTON, type StatusKind } from "@/lib/presence/excuse";
+import { awayKindOf, once, type ClientForm } from "@/lib/presence/away-overlay";
 import { AwayOverlay } from "./AwayOverlay";
 
 /**
  * The status buttons beside مُراد (the owner, 2026-10-29), in his own side strip — so they stand over no button or field.
  * Each colleague sees the ones their permissions give (and «اجتماع» while invited to an open meeting). On: no request is
- * routed to them and no delay is counted, up to the button's limit. Pressed again: off.
+ * routed to them and no delay is counted, up to the button's limit — from the press, «لدي عميل» / «لدي اتصال» too (their
+ * client is typed inside the cover). Pressed again: off.
  */
 
 /** «صلاة»: a mihrab's arch, in lucide's lines — no crescent anywhere (the owner, 2026-10-29) */
@@ -30,7 +30,7 @@ const minutesSince = (iso: string, now: number) => Math.max(0, Math.floor((now -
 
 export function StatusButtons() {
   const [p, setP] = useState<MyPresence | null>(null);
-  const [form, setForm] = useState<"client" | "call" | null>(null);
+  const [colleagues, setColleagues] = useState<{ id: string; name: string }[] | null>(null);
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
   const [now, setNow] = useState(0);
@@ -53,8 +53,8 @@ export function StatusButtons() {
   const awayStarted = awayKindOf(p?.active) ? p!.active!.startedAt : null;
   const endAway = useMemo(
     () =>
-      once(async () => {
-        const r = await endMyStatus();
+      once(async (form?: ClientForm) => {
+        const r = await endMyStatus(form);
         if (!r.ok) setError(r.error);
         load();
         return r;
@@ -63,13 +63,18 @@ export function StatusButtons() {
     [awayStarted, load],
   );
 
+  // whom a client may ask for — read once, the first time a client / a call is on
+  const withClient = p?.active?.kind === "client" || p?.active?.kind === "call";
+  useEffect(() => {
+    if (withClient && colleagues === null) getStatusColleagues().then(setColleagues, () => setColleagues([]));
+  }, [withClient, colleagues]);
+
   if (!p || (!p.allowed.length && !p.active)) return null;
   const away = awayKindOf(p.active);
 
   const press = (kind: StatusKind) => {
     setError("");
     if (p.active?.kind === kind) return start(async () => void (await endMyStatus().then(load)));
-    if (kind === "client" || kind === "call") return setForm(kind);
     start(async () => {
       const r = await startMyStatus(kind);
       if (!r.ok) setError(r.error);
@@ -88,9 +93,11 @@ export function StatusButtons() {
           serverNow={now}
           detail={away === "meeting" ? p.meeting?.title : undefined}
           details={p.active.details}
+          colleagues={colleagues ?? []}
           busy={pending}
           error={error}
-          onEnd={() => start(async () => void (await endAway()))}
+          onSave={saveMyClient}
+          onEnd={(form) => start(async () => void (await endAway(form)))}
           onExpired={load}
         />
       )}
@@ -122,118 +129,6 @@ export function StatusButtons() {
           </span>
         )}
       </div>
-      {form && (
-        <ClientForm
-          kind={form}
-          busy={pending}
-          onClose={() => setForm(null)}
-          onSave={(values) =>
-            start(async () => {
-              const r = await startMyStatus(form, values);
-              if (!r.ok) return setError(r.error);
-              setForm(null);
-              load();
-            })
-          }
-          error={error}
-        />
-      )}
     </>
-  );
-}
-
-function ClientForm({
-  kind,
-  busy,
-  error,
-  onClose,
-  onSave,
-}: {
-  kind: "client" | "call";
-  busy: boolean;
-  error: string;
-  onClose: () => void;
-  onSave: (v: Record<string, string>) => void;
-}) {
-  const [v, setV] = useState<Record<string, string>>({ want: "", destination: "", name: "", phone: "", note: "" });
-  const field = "mt-1 w-full rounded-xl border border-[#D5DED9] bg-white p-2.5 text-sm text-slate-900 dark:bg-[#0f1c19] dark:text-[#eaf3ef]";
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent dir="rtl">
-        <DialogHeader>
-          <DialogTitle>{kind === "client" ? "لدي عميل في المكتب" : "لدي اتصال"}</DialogTitle>
-        </DialogHeader>
-        <DialogDescription className="mb-3">
-          لن تُحوَّل إليك طلبات ولا يُحسب عليك تأخير حتى تنهيها. وإذا راسلنا هذا العميل لاحقاً يصل طلبه إليك مباشرة.
-        </DialogDescription>
-        <div className="space-y-3">
-          <div>
-            <span className="text-xs font-bold">ماذا يريد؟</span>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {WANTS.map((w) => (
-                <button
-                  key={w}
-                  type="button"
-                  onClick={() => setV({ ...v, want: w })}
-                  className={`min-h-10 rounded-xl border px-3 text-sm font-bold ${v.want === w ? "border-[#185045] bg-[#185045] text-white" : "border-[#D5DED9] bg-white text-[#185045]"}`}
-                >
-                  {w}
-                </button>
-              ))}
-            </div>
-          </div>
-          <label className="block text-xs font-bold">
-            الوجهة
-            <input
-              className={field}
-              maxLength={80}
-              value={v.destination}
-              onChange={(e) => setV({ ...v, destination: e.target.value })}
-              placeholder="مثال: جورجيا"
-            />
-          </label>
-          <label className="block text-xs font-bold">
-            اسم العميل
-            <input className={field} maxLength={80} value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} />
-          </label>
-          <label className="block text-xs font-bold">
-            رقم الهاتف
-            <input
-              className={field}
-              inputMode="tel"
-              dir="ltr"
-              maxLength={30}
-              value={v.phone}
-              onChange={(e) => setV({ ...v, phone: e.target.value })}
-              placeholder="05xxxxxxxx"
-            />
-          </label>
-          {kind === "call" && (
-            <label className="block text-xs font-bold">
-              الطلب
-              <input className={field} maxLength={200} value={v.note} onChange={(e) => setV({ ...v, note: e.target.value })} />
-            </label>
-          )}
-          {error && (
-            <p role="alert" className="text-sm font-bold text-[#9A3412]">
-              {error}
-            </p>
-          )}
-        </div>
-        <DialogFooter className="mt-4">
-          <button type="button" onClick={onClose} className="min-h-11 rounded-xl border border-[#D5DED9] px-4 text-sm font-bold text-[#185045]">
-            إلغاء
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onSave(v)}
-            className="min-h-11 rounded-xl bg-[#185045] px-4 text-sm font-bold text-white disabled:opacity-40"
-          >
-            ابدأ
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

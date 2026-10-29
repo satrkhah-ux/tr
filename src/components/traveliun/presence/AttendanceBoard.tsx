@@ -134,7 +134,7 @@ export function AttendanceBoard({ data }: { data: AttendanceData }) {
             </thead>
             <tbody>
               {data.log.map((s) => {
-                const d = s.details as { name?: string; want?: string; destination?: string; phone?: string; note?: string };
+                const d = s.details as { name?: string; want?: string; destination?: string; phone?: string; note?: string; for_name?: string };
                 return (
                   <tr key={s.id} className="border-t border-[#E3E8E4]">
                     <td className="p-2 font-bold">{s.name}</td>
@@ -143,7 +143,7 @@ export function AttendanceBoard({ data }: { data: AttendanceData }) {
                     <td className="p-2">{s.endedAt ? `${time(s.endedAt)} · ${ENDED[s.endedBy ?? ""] ?? ""}` : "ما زالت مفعّلة"}</td>
                     <td className="p-2">{s.minutes} د</td>
                     <td className="p-2 text-slate-600">
-                      {[d.want, d.destination, d.name, d.phone ? <bdi key="p">{d.phone}</bdi> : null, d.note].filter(Boolean).map((x, i) => (
+                      {[d.want, d.destination, d.name, d.phone ? <bdi key="p">{d.phone}</bdi> : null, d.note, d.for_name ? `يريد ${d.for_name}` : null].filter(Boolean).map((x, i) => (
                         <span key={i}>
                           {i ? " · " : ""}
                           {x}

@@ -5,7 +5,8 @@ import type { StatusKind } from "./excuse";
  * بشيء يوحي إلى الصلاة، وكذلك إمكانية الإغلاق كي ينتهي العداد»; then «ليس فقط الصلاة حتى لو كان لديه عميل أو اجتماع»):
  * every status has its own cover, its minutes, and one button that ends it — and every one is full-page, nothing of
  * the system behind it (the owner: «لدي اتصال وعميل في المكتب يجب أن يكون باقي الأجزاء غير ظاهرة كي يبين له أنه خارج
- * النظام مؤقتاً، بدون تسجيل خروج، فقط إيقاف العداد»).
+ * النظام مؤقتاً، بدون تسجيل خروج، فقط إيقاف العداد»). «لدي عميل» / «لدي اتصال» start at the press, and the client is
+ * typed inside their cover while the minutes run.
  * Pure: AwayOverlay.tsx draws it, StatusButtons.tsx decides when.
  */
 
@@ -42,18 +43,27 @@ export const AWAY_TEXT: Record<
   },
 };
 
-/** what the colleague typed in «لدي عميل / لدي اتصال»: the client's name, and the request in one line */
-export function clientOf(
+/** the fields typed inside the «لدي عميل» / «لدي اتصال» cover (excuse.ts cleanClient checks them on the server) */
+export const CLIENT_FIELDS = [
+  "want",
+  "destination",
+  "name",
+  "phone",
+  "note",
+  "for_employee",
+] as const;
+export type ClientForm = Record<(typeof CLIENT_FIELDS)[number], string>;
+
+/** the form as the status event already holds it — empty when nothing was typed yet */
+export const formOf = (
   details: Record<string, unknown> | null | undefined,
-): { name: string; request: string } | null {
-  const text = (k: string) =>
-    typeof details?.[k] === "string" ? (details[k] as string).trim() : "";
-  const name = text("name");
-  const request = [text("want"), text("destination"), text("note")]
-    .filter(Boolean)
-    .join(" · ");
-  return name || request ? { name, request } : null;
-}
+): ClientForm =>
+  Object.fromEntries(
+    CLIENT_FIELDS.map((k) => [
+      k,
+      typeof details?.[k] === "string" ? (details[k] as string) : "",
+    ]),
+  ) as ClientForm;
 
 export const elapsedMinutes = (startedAt: string, nowMs: number) =>
   Math.max(0, Math.floor((nowMs - Date.parse(startedAt)) / 60_000));
@@ -70,15 +80,15 @@ export function minutesText(n: number): string {
  * The end button ends the status once: a second tap while the first is on its way, or after it succeeded, does
  * nothing; a failed one may be tried again.
  */
-export function once<T extends { ok: boolean }>(
-  fn: () => Promise<T>,
-): () => Promise<T | null> {
+export function once<A extends unknown[], T extends { ok: boolean }>(
+  fn: (...args: A) => Promise<T>,
+): (...args: A) => Promise<T | null> {
   let state: "idle" | "busy" | "done" = "idle";
-  return async () => {
+  return async (...args: A) => {
     if (state !== "idle") return null;
     state = "busy";
     try {
-      const r = await fn();
+      const r = await fn(...args);
       state = r.ok ? "done" : "idle";
       return r;
     } catch (error) {

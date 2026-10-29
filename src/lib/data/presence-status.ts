@@ -97,20 +97,16 @@ export async function getMyPresence(): Promise<MyPresence | null> {
   return { allowed, active: live, meeting, onLeave: l ? { endsOn: l.ends_on } : null, limits, at: Date.now() };
 }
 
-/** a button pressed: whatever was on ends, this one starts — at most its limit long */
-export async function startMyStatus(kind: StatusKind, form?: Record<string, string>): Promise<Done> {
+/**
+ * A button pressed: whatever was on ends, this one starts now — at most its limit long. «لدي عميل» / «لدي اتصال» start
+ * at the press too (the owner, 2026-10-29: «لا أريد العداد يبدأ بعد إدخال المعلومات»); the client is typed inside the
+ * cover while it runs (saveMyClient), or not at all.
+ */
+export async function startMyStatus(kind: StatusKind): Promise<Done> {
   const me = await getCurrentEmployeeId();
   if (!me || !["client", "call", "prayer", "meeting"].includes(kind)) return fail("forbidden");
   const meeting = kind === "meeting" ? await openMeetingFor(me) : null;
   if (kind === "meeting" ? !meeting : !(await currentCan(PERM[kind as Exclude<StatusKind, "meeting">]))) return fail("forbidden");
-  let details: Record<string, unknown> = {};
-  let phone: string | null = null;
-  if (kind === "client" || kind === "call") {
-    const c = cleanClient(form ?? {});
-    if (!c.ok) return fail(c.error);
-    details = c.details;
-    phone = c.phone;
-  }
   const limits = await loadLimits();
   const now = Date.now();
   await db()
@@ -125,16 +121,57 @@ export async function startMyStatus(kind: StatusKind, form?: Record<string, stri
       kind,
       started_at: new Date(now).toISOString(),
       cap_at: new Date(now + limits[kind] * 60_000).toISOString(),
-      details,
-      client_phone: phone,
+      details: {},
+      client_phone: null,
       meeting_id: meeting?.id ?? null,
     });
   return error ? fail("تعذّر الحفظ، أعد المحاولة.") : { ok: true };
 }
 
-export async function endMyStatus(): Promise<Done> {
+/** the colleagues a client may ask to speak to — those the switchboard can give a client (Teletel-linked, active) */
+export async function getStatusColleagues(): Promise<{ id: string; name: string }[]> {
+  const me = await getCurrentEmployeeId();
+  if (!me || !((await currentCan("status.client")) || (await currentCan("status.call")))) return [];
+  const { data } = await db().from("employees").select("id, arabic_name").eq("status", "Active").not("teletel_agent_id", "is", null).order("arabic_name");
+  return ((data ?? []) as { id: string; arabic_name: string | null }[]).filter((e) => e.id !== me && e.arabic_name?.trim()).map((e) => ({ id: e.id, name: e.arabic_name!.trim() }));
+}
+
+/** the cover's form as the status event holds it: the colleague asked for must be one the switchboard can give a client */
+async function clientRow(form: Record<string, string>): Promise<{ details: Record<string, unknown>; client_phone: string | null; badPhone: boolean }> {
+  const c = cleanClient(form);
+  let forName = "";
+  if (c.details.for_employee) {
+    const { data } = await db()
+      .from("employees")
+      .select("arabic_name")
+      .eq("id", c.details.for_employee)
+      .eq("status", "Active")
+      .not("teletel_agent_id", "is", null)
+      .maybeSingle();
+    forName = (data as { arabic_name?: string | null } | null)?.arabic_name?.trim() ?? "";
+    if (!forName) c.details.for_employee = "";
+  }
+  return { details: { ...c.details, for_name: forName }, client_phone: c.phone, badPhone: c.badPhone };
+}
+
+/** «لدي عميل» / «لدي اتصال» on: what the colleague typed so far, kept on the status that runs */
+export async function saveMyClient(form: Record<string, string>): Promise<Done & { badPhone?: boolean }> {
   const me = await getCurrentEmployeeId();
   if (!me) return fail("forbidden");
+  const { badPhone, ...row } = await clientRow(form);
+  // ended meanwhile (the end carried the same form): nothing to keep
+  const { error } = await db().from("employee_status_events").update(row).eq("employee_id", me).is("ended_at", null).in("kind", ["client", "call"]);
+  return error ? fail("تعذّر الحفظ، أعد المحاولة.") : { ok: true, badPhone };
+}
+
+/** off — only the timer stops, nobody is signed out; «لدي عميل» / «لدي اتصال» keep what was typed (a phone keeps routing) */
+export async function endMyStatus(form?: Record<string, string>): Promise<Done> {
+  const me = await getCurrentEmployeeId();
+  if (!me) return fail("forbidden");
+  if (form) {
+    const saved = await saveMyClient(form);
+    if (!saved.ok) return saved;
+  }
   const { error } = await db()
     .from("employee_status_events")
     .update({ ended_at: new Date().toISOString(), ended_by: "employee" })
