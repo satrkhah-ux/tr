@@ -41,5 +41,5 @@ export const sessionEFee =
   (methodId, amount) => {
     const q = quoteMethod(amount, methodId as PayMethod, fees);
     if (q.unset || q.fee <= 0) return null;
-    return { fee: q.fee, total: q.total, note: `الإجمالي ${q.total.toLocaleString("en-US")} ريال` };
+    return { fee: q.fee, total: q.total, note: `الإجمالي ${q.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ريال` };
   };

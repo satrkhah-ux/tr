@@ -14,10 +14,14 @@ it("no total or no methods: the lines as written", () => {
   expect(withMethodFees(["الدفع عبر تابي"], 1000, [], fee)).toEqual(["الدفع عبر تابي"]);
 });
 
-it("session E's real quote: Tabby at 8.766% on 10,000 SAR prints the total only; an unset method adds nothing", () => {
-  const fees = { ...DEFAULT_FEES, tabby: { pct: 8.766, fixed: 0 } };
-  const lines = withMethodFees(["التقسيط عبر تابي على 4 دفعات", "التقسيط عبر تمارا"], 10000, methodsForFees(), sessionEFee(fees));
-  expect(lines).toEqual(["التقسيط عبر تابي على 4 دفعات — الإجمالي 10,877 ريال", "التقسيط عبر تمارا"]);
+it("session E's real quote: Tabby and Tamara at their default 8.766% on 10,000 SAR print the total only, to the halala", () => {
+  const lines = withMethodFees(["التقسيط عبر تابي على 4 دفعات", "التقسيط عبر تمارا"], 10000, methodsForFees(), sessionEFee(DEFAULT_FEES));
+  expect(lines).toEqual(["التقسيط عبر تابي على 4 دفعات — الإجمالي 10,876.60 ريال", "التقسيط عبر تمارا — الإجمالي 10,876.60 ريال"]);
+});
+
+it("a method the administration left unset adds nothing", () => {
+  const fees = { ...DEFAULT_FEES, tamara: null };
+  expect(withMethodFees(["التقسيط عبر تمارا"], 10000, methodsForFees(), sessionEFee(fees))).toEqual(["التقسيط عبر تمارا"]);
 });
 
 it("never tells the client a provider's fee or percentage (the owner, 2026-10-29)", () => {
