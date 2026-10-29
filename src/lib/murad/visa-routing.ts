@@ -1,8 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { addTeletelNote, conversationEvents, listOpenConversations, listTeletelTeams, teletelGet } from "@/lib/providers/teletel";
-import { presenceOnlineAgentIds } from "@/lib/routing/presence";
-import { chooseVisaAgent, type VisaAgent, type MuradReceipt } from "./visa-assignment";
+import { addTeletelNote, conversationEvents, listTeletelTeams, teletelGet } from "@/lib/providers/teletel";
+import { pickAgent } from "@/lib/routing/switchboard";
+import type { VisaAgent, MuradReceipt } from "./visa-assignment";
 import { currentAssignment } from "@/lib/leads/assignment";
 import { onList } from "./control";
 import { handOver } from "./handover";
@@ -10,24 +10,13 @@ import { saleHolder } from "@/lib/leads/lifecycle";
 import { readControl } from "./control-store";
 
 /**
- * The team member to take a conversation now: the one already holding it when
- * online, else the online member with the fewest open conversations. Null:
- * nobody online (the team's queue holds it); undefined: the team could not be read.
+ * The team member to take a conversation now — «البدّالة» decides (routing/switchboard.ts, the owner 2026-10-29): the one
+ * already holding it when available, else the available colleague (not on leave, a status button, offline or «موقوف»)
+ * with the fewest clients waiting. Null: nobody can (the team's queue holds it); undefined: the team could not be read.
  */
-export async function onlineTeamAgent(teamId: number, inboxId: number | null, holderId: number | null, paused: number[] = []): Promise<VisaAgent | null | undefined> {
-  const all = await teletelGet<VisaAgent[]>(`/teams/${teamId}/team_members`);
-  if (!Array.isArray(all)) return undefined;
-  // «فاتح النظام = متصل» (the owner, 2026-10-24): a live session in our system makes
-  // the agent online here, even when they set «غير متصل» in Teletel
-  const inSystem = await presenceOnlineAgentIds();
-  // «لا ترسل لفلان» (murad_control.paused): never chosen, even when online
-  const members = all
-    .filter((a) => !paused.includes(a.id))
-    .map((a) => (inSystem.has(a.id) ? { ...a, availability_status: "online" } : a));
-  const open = await listOpenConversations();
-  const workloads = new Map<number, number>();
-  for (const c of open?.rows ?? []) if (c.assigneeId) workloads.set(c.assigneeId, (workloads.get(c.assigneeId) ?? 0) + 1);
-  return chooseVisaAgent(members.filter((a) => a.id === holderId), inboxId, workloads) ?? chooseVisaAgent(members, inboxId, workloads);
+export async function onlineTeamAgent(teamId: number, inboxId: number | null, holderId: number | null): Promise<VisaAgent | null | undefined> {
+  const choice = await pickAgent({ teamId, inboxId, holderAgentId: holderId });
+  return choice === undefined ? undefined : choice ? { id: choice.candidate.agentId, name: choice.candidate.name } : null;
 }
 
 /** Claimed in the database so overlapping minute jobs cannot route the same request twice. */
@@ -60,7 +49,7 @@ export async function routeCompletedVisa(service: SupabaseClient, logId: string)
       await addTeletelNote(id, `مُراد: طلب التأشيرة لعميل اشترى منّا — بقي مع ${holder.name ?? "موظفه"} ولم يُحوَّل لقسم فيزا.`);
       return true;
     }
-    const agent = await onlineTeamAgent(team.id, conversation.inbox_id ?? null, conversation.meta?.assignee?.id ?? null, control.paused);
+    const agent = await onlineTeamAgent(team.id, conversation.inbox_id ?? null, conversation.meta?.assignee?.id ?? null);
     if (agent === undefined) throw Error("visa_members_unavailable");
     if (!(await handOver(control, id, team.id, agent?.id ?? null, conversation.meta?.sender?.phone_number))) throw Error("visa_assignment_failed");
     // Team auto-assignment must not silently give an offline employee this request.
