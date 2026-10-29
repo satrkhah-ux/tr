@@ -3,6 +3,10 @@
 import { logAudit } from "@/lib/data/audit";
 import { muradJson } from "@/lib/murad/model";
 import { currentCan } from "@/lib/roles/current";
+import { notifyEmployee } from "@/lib/notifications/notify";
+import { cleanErrorReport, errorDedupeKey, errorQuestion, explainKnownError, renderKnown } from "./error-core";
+import { helpReply } from "./help";
+import { isHowTo } from "./help-core";
 import { currentSecretaryEmployee, planText, renderBriefing, secretaryBriefing, secretaryDb, secretarySettings, type SecretaryEmployee } from "./core";
 
 /**
@@ -42,7 +46,20 @@ async function thread(employeeId: string, limit = 50): Promise<SecretaryMsg[] | 
   return ((data ?? []) as SecretaryMsg[]).reverse();
 }
 
-export type SecretaryThread = { ok: true; messages: SecretaryMsg[] } | { ok: false; error: string };
+/** the day's cap, per employee — the model costs money on every turn; the refusal text, or null to go on */
+async function overDailyCap(employeeId: string, limit: number): Promise<string | null> {
+  const dayStart = new Date(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(Date.now()) + "T00:00:00+03:00").toISOString();
+  const { count, error } = await secretaryDb()
+    .from("secretary_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("employee_id", employeeId)
+    .eq("role", "user")
+    .gte("created_at", dayStart);
+  if (error) return (error as { code?: string }).code === TABLE_MISSING ? "السكرتير لم يُفعَّل بعد (جدول الرسائل غير موجود)." : "تعذّر الوصول للرسائل.";
+  return (count ?? 0) >= limit ? "وصلت حد أسئلة اليوم — يتجدد غداً." : null;
+}
+
+export type SecretaryThread ={ ok: true; messages: SecretaryMsg[] } | { ok: false; error: string };
 
 export async function getSecretaryThread(): Promise<SecretaryThread> {
   const employee = await currentSecretaryEmployee();
@@ -61,20 +78,22 @@ export async function askSecretary(text: string): Promise<SecretaryThread> {
   const settings = await secretarySettings(db);
   if (settings.off) return { ok: false, error: "السكرتير موقوف حالياً من الإدارة." };
 
-  // the day's cap, per employee — the model costs money on every turn
-  const dayStart = new Date(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(Date.now()) + "T00:00:00+03:00").toISOString();
-  const { count, error: countError } = await db
-    .from("secretary_messages")
-    .select("id", { count: "exact", head: true })
-    .eq("employee_id", employee.id)
-    .eq("role", "user")
-    .gte("created_at", dayStart);
-  if (countError) return { ok: false, error: (countError as { code?: string }).code === TABLE_MISSING ? "السكرتير لم يُفعَّل بعد (جدول الرسائل غير موجود)." : "تعذّر الوصول للرسائل." };
-  if ((count ?? 0) >= settings.dailyLimit) return { ok: false, error: "وصلت حد أسئلة اليوم — يتجدد غداً." };
+  const capped = await overDailyCap(employee.id, settings.dailyLimit);
+  if (capped) return { ok: false, error: capped };
 
   const { error: insertError } = await db.from("secretary_messages").insert({ employee_id: employee.id, role: "user", content: question });
   if (insertError) return { ok: false, error: "تعذّر الحفظ." };
 
+  // «كيف أنشئ بكج؟» — the system guide, not the employee's day (help-core.ts)
+  const howTo = isHowTo(question);
+  const reply = howTo ? await helpReply(question) : await dayReply(employee, question);
+  await db.from("secretary_messages").insert({ employee_id: employee.id, role: "secretary", content: reply });
+  await logAudit({ action: "secretary.chat", entity: "secretary_messages", entity_id: employee.id, meta: { chars: question.length, help: howTo } });
+  const messages = await thread(employee.id);
+  return { ok: true, messages: messages ?? [] };
+}
+
+async function dayReply(employee: SecretaryEmployee, question: string): Promise<string> {
   const [briefing, history] = await Promise.all([secretaryBriefing(employee), thread(employee.id, 12)]);
   const context = [
     renderBriefing(employee, briefing),
@@ -91,11 +110,56 @@ export async function askSecretary(text: string): Promise<SecretaryThread> {
     const parsed = raw ? (JSON.parse(raw) as { reply?: string }) : null;
     if (parsed?.reply?.trim()) reply = parsed.reply.trim().slice(0, 4000);
   } catch { /* keep the holding reply */ }
+  return reply;
+}
 
+/* ---- «أرسل الخطأ لمُراد» (the owner, 2026-10-29): the employee sends an
+   error they met; مُراد explains it (our known texts first, error-core.ts,
+   then the cheap model), and «أبلغ الإدارة» records it once for the
+   developers. Only the cleaned message, page, action and time travel. ---- */
+
+export async function explainErrorToSecretary(raw: unknown): Promise<SecretaryThread> {
+  const report = cleanErrorReport(raw);
+  if (!report) return { ok: false, error: "لا يوجد نص خطأ لإرساله." };
+  const employee = await currentSecretaryEmployee();
+  if (!employee) return { ok: false, error: "سجّل الدخول بحساب موظف." };
+  const db = secretaryDb();
+  const settings = await secretarySettings(db);
+  if (settings.off) return { ok: false, error: "السكرتير موقوف حالياً من الإدارة." };
+  const known = explainKnownError(report.message);
+  // our own texts cost nothing; only a model answer counts against the day's cap
+  if (!known) {
+    const capped = await overDailyCap(employee.id, settings.dailyLimit);
+    if (capped) return { ok: false, error: capped };
+  }
+  const question = errorQuestion(report);
+  const { error: insertError } = await db.from("secretary_messages").insert({ employee_id: employee.id, role: "user", content: question });
+  if (insertError) return { ok: false, error: (insertError as { code?: string }).code === TABLE_MISSING ? "السكرتير لم يُفعَّل بعد (جدول الرسائل غير موجود)." : "تعذّر الحفظ." };
+  const reply = known ? renderKnown(known) : await helpReply(question, "error");
   await db.from("secretary_messages").insert({ employee_id: employee.id, role: "secretary", content: reply });
-  await logAudit({ action: "secretary.chat", entity: "secretary_messages", entity_id: employee.id, meta: { chars: question.length } });
+  await logAudit({ action: "secretary.error_explained", entity: "secretary_messages", entity_id: employee.id, meta: { route: report.route, action: report.action, known: !!known } });
   const messages = await thread(employee.id);
   return { ok: true, messages: messages ?? [] };
+}
+
+export async function reportErrorToAdmin(raw: unknown): Promise<{ ok: true; already: boolean } | { ok: false; error: string }> {
+  const report = cleanErrorReport(raw);
+  if (!report) return { ok: false, error: "لا يوجد نص خطأ لإرساله." };
+  const employee = await currentSecretaryEmployee();
+  if (!employee) return { ok: false, error: "سجّل الدخول بحساب موظف." };
+  const r = await notifyEmployee({
+    permission: "developer.access",
+    kind: "error_report",
+    title: `خطأ أبلغ عنه ${employee.name || "موظف"}: ${report.message}`,
+    body: `الصفحة ${report.route}${report.action ? ` — العملية ${report.action}` : ""} — ${report.at}`,
+    href: report.route.includes(":id") ? undefined : report.route,
+    source: "secretary",
+    dedupeKey: errorDedupeKey(employee.id, report),
+  });
+  if (!r.ok) return { ok: false, error: "تعذّر الإبلاغ الآن — جرّب بعد قليل." };
+  // one audit row per occurrence: a repeat press lands nothing new
+  if (r.created) await logAudit({ action: "secretary.error_reported", entity: "employee_notifications", entity_id: employee.id, meta: { ...report } });
+  return { ok: true, already: r.created === 0 };
 }
 
 /* ---- «مشاهدة الإدارة» (the owner, 2026-10-26): an admin opens any employee's
