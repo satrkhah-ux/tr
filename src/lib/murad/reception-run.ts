@@ -33,7 +33,7 @@ import { getRates } from "@/lib/data/rates-actions";
 import { USD_SAR_DEFAULT } from "@/lib/offer/pricing";
 import { askText, holdToText, missing, offerDraftData, offerText, priceOffer, readOffers, routeCity, tripChanged, tripDays, tripSummary, type OfferAsk, type OfferCountry } from "./auto-offer";
 import { loadPlaces } from "@/lib/leads/teletel-pull";
-import { returnedToEmployee } from "@/lib/leads/lifecycle";
+import { returnedToEmployee, saleHolder } from "@/lib/leads/lifecycle";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
 import { withTeaching } from "./lessons-text";
@@ -671,8 +671,9 @@ export async function receive(m: IncomingMessage): Promise<ReceptionOutcome> {
       ((trip.children ?? 0) > 0 ? "أطفال" : (trip.adults ?? 0) > c.maxPeople ? `أكثر من ${c.maxPeople} أشخاص` : null);
 
     // an employee closed it and the client came back: it went back to them (leads/lifecycle.ts) — theirs, not a new
-    // request. Not on the two test numbers: the owner closes his own test thread to try Murad again (2026-10-22)
-    if (!(phone && settings.autoList.includes(phone)) && (await returnedToEmployee(m.conversationId, visitStart))) {
+    // request; and a client who bought, held by an employee, is theirs too (the owner, 2026-10-29: 39733). Not on the
+    // two test numbers: the owner closes his own test thread to try Murad again (2026-10-22)
+    if (!(phone && settings.autoList.includes(phone)) && ((await returnedToEmployee(m.conversationId, visitStart)) || (await saleHolder(m.conversationId)))) {
       await finish({ reason: "none:assigned" });
       return "none:assigned";
     }

@@ -27,6 +27,22 @@ export function closerOf(events: readonly { kind: string; at: number; text: stri
 
 export type ReturnDecision = { act: "assign"; agentId: number } | { act: "keep" } | { act: "unassign" };
 
+/** who bought from us: the mobiles of every confirmed or completed trip, and Teletel's «won» classification stages */
+export type SaleFacts = { phones: ReadonlySet<string>; wonStages: ReadonlySet<number> };
+
+/**
+ * The owner's rule (2026-10-29, conversation 39733: «مؤكد — مسافر قريباً» closed it seven times in four days
+ * while the seller was working the trip with the client): a conversation an employee holds, once the client
+ * bought — a confirmed or completed trip, or Teletel's own «خدمة مكتملة» — is never closed, unassigned or
+ * taken by Murad or the system.
+ */
+export function heldSale(c: { assigneeId: number | null; phone: string | null; stageId?: number | null }, sold: SaleFacts): boolean {
+  if (!c.assigneeId) return false;
+  if (c.stageId != null && sold.wonStages.has(c.stageId)) return true;
+  const k = phoneKey(c.phone);
+  return k !== null && sold.phones.has(k);
+}
+
 /**
  * The client wrote again: the employee who closed it gets it back (already
  * theirs: nothing to do); the system's closing comes back unassigned — Teletel's

@@ -9,7 +9,7 @@ import { getCurrentEmployeeId } from "@/lib/data/metrics";
 import { logAudit } from "@/lib/data/audit";
 import { clientWhatsappAllowed, greeting, messageClient, type ClientSendResult, type OfferClient } from "@/lib/data/client-whatsapp";
 import { clientSummaryMessage, type SummaryBooking } from "@/lib/operations/client-summary";
-import { paidTotal, remainingBalance } from "@/lib/operations/payments";
+import { caseTotal, paidTotal, remainingBalance } from "@/lib/operations/payments";
 import { hotelAtRisk, preparedMessages, type PreparedMessage, type StayKey } from "@/lib/operations/client-booking-state";
 import { waParams } from "@/lib/operations/client-messages";
 
@@ -44,13 +44,14 @@ type OfferRow = Omit<CaseOffer, "customer"> & { customers: OfferClient["customer
 async function loadCase(service: SupabaseClient, operationId: string): Promise<CaseClient | null> {
   const { data } = await service
     .from("operations")
-    .select("id, client_token, client_token_revoked_at, travel_start, offers(serial, destination, total, currency, employee_id, partner_company_id, customers(arabic_name, mobile))")
+    .select("id, client_token, client_token_revoked_at, travel_start, agreed_total, offers(serial, destination, total, currency, employee_id, partner_company_id, customers(arabic_name, mobile))")
     .eq("id", operationId)
     .maybeSingle();
   const op = data as unknown as {
     client_token: string | null;
     client_token_revoked_at: string | null;
     travel_start: string | null;
+    agreed_total: number | string | null;
     offers: OfferRow | OfferRow[] | null;
   } | null;
   const offer = one(op?.offers);
@@ -71,7 +72,8 @@ async function loadCase(service: SupabaseClient, operationId: string): Promise<C
   }
   const { customers, ...rest } = offer;
   return {
-    offer: { ...rest, customer: one(customers) },
+    // the price the client was quoted, so «المتبقي» in his message matches what he owes
+    offer: { ...rest, total: caseTotal(rest.total, op.agreed_total), customer: one(customers) },
     token,
     travel_start: op.travel_start,
     bookings: (bookingsRes.data ?? []) as SummaryBooking[],

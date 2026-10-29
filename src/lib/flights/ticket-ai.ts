@@ -2,6 +2,7 @@ import "server-only";
 import type { AiImage } from "@/lib/repackage/extract/ai-extract";
 import { sanitizeTicket, type ParsedTicket } from "./ticket-parse";
 import { responsesJson } from "@/lib/providers/openai";
+import { PAY_METHODS, type PayMethod } from "@/lib/payments/methods";
 
 /**
  * The model, for a ticket — two narrow jobs and nothing else:
@@ -127,13 +128,13 @@ const MONEY_SCHEMA = {
     currency: { type: "string" },
     date: { type: "string" },
     reference: { type: "string" },
-    method: { type: "string", enum: ["transfer", "cash", "pos", "link", ""] },
+    method: { type: "string", enum: [...PAY_METHODS, ""] },
     paid: { type: "boolean" },
     sender: { type: "string" },
   },
 } as const;
 
-export type MoneyPaper = { issuer: string; hotel: string; amount: number | null; currency: string; date: string; reference: string; method: "transfer" | "cash" | "pos" | "link" | ""; paid: boolean; sender: string };
+export type MoneyPaper = { issuer: string; hotel: string; amount: number | null; currency: string; date: string; reference: string; method: PayMethod | ""; paid: boolean; sender: string };
 
 /**
  * A money paper's text → its figures («ارفع كل الملفات», 2026-10-23): an
@@ -150,7 +151,7 @@ export async function readMoneyPaper(text: string): Promise<MoneyPaper> {
       "issuer: who issued an invoice (the supplier's name as printed); hotel: the hotel named, if any.",
       "amount: the grand total to pay, or the amount transferred — digits and a dot only, no separators. currency: its ISO code (SAR, USD, EUR, TRY…).",
       "date: the invoice's or the payment's date as YYYY-MM-DD. reference: the invoice number, or the transfer's reference/transaction number.",
-      "method: for a slip — transfer, cash, pos (a card machine) or link (an online payment link); else empty. paid: true only when the paper says it is paid or settled.",
+      "method: for a slip — transfer, cash, pos (a card machine / mada), card (Visa/Mastercard online), link (a MyFatoorah or other payment link), tabby or tamara (buy-now-pay-later); else empty. paid: true only when the paper says it is paid or settled.",
       "sender: who sent a transfer, if printed. Empty string for anything not on the paper. Never guess.",
     ].join("\n"),
     text.slice(0, MAX_TEXT),
@@ -353,7 +354,7 @@ const PAPER_SCHEMA = {
         currency: STR,
         date: STR,
         reference: STR,
-        method: { type: "string", enum: ["transfer", "cash", "pos", "link", ""] },
+        method: { type: "string", enum: [...PAY_METHODS, ""] },
         paid: { type: "boolean" },
         sender: STR,
         booking_id: STR,

@@ -10,6 +10,7 @@ import { readMoneyPaper, type MoneyPaper } from "@/lib/flights/ticket-ai";
 import { MAX_TICKET_BYTES } from "@/lib/flights/ticket-parse";
 import { amountIn, matchSupplier } from "@/lib/operations/wizard/upload-all";
 import { caseBookings, sortBytes, staysOn, type PlacedStay, type SortedPaper } from "./paper-core";
+import { isPayMethod } from "@/lib/payments/methods";
 
 /**
  * «ارفع كل الملفات» — one file → which paper it is, and its words for the
@@ -98,7 +99,7 @@ export async function readMoney(
 function givenMoney(raw: MoneyPaper, blank: MoneyPaper): MoneyPaper {
   const str = (v: unknown, n = 120) => (typeof v === "string" ? v.trim().slice(0, n) : "");
   const amount = typeof raw.amount === "number" && Number.isFinite(raw.amount) && raw.amount > 0 ? Math.round(raw.amount * 100) / 100 : null;
-  const method = ["transfer", "cash", "pos", "link"].includes(raw.method) ? raw.method : "";
+  const method = isPayMethod(raw.method) ? raw.method : "";
   return {
     ...blank,
     issuer: str(raw.issuer),

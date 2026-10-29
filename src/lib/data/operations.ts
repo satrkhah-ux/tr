@@ -24,7 +24,8 @@ import {
 import { currentCan } from "@/lib/roles/current";
 import { gateCaseManager, gateOperation, mayWork, opsAccess } from "@/lib/operations/access";
 import { mintReceipt } from "@/lib/data/payment-receipt";
-import { isIsoDate, riyadhDate } from "@/lib/operations/payments";
+import { caseTotal, isIsoDate, riyadhDate } from "@/lib/operations/payments";
+import type { PayMethod } from "@/lib/payments/methods";
 
 /**
  * «العمليات» — the execution hub. A case's two statuses move in three places,
@@ -67,7 +68,12 @@ export type OperationCard = OperationRow & {
   destination: string | null;
   customer_name: string | null;
   customer_phone: string | null;
+  /** what the client owes: the agreed price when one was written, else the offer's (payments.ts caseTotal) */
   total: number | null;
+  /** the offer's own total, shown beside an agreed price that differs from it */
+  offer_total?: number | null;
+  /** «السعر المعروض المرسل للعميل» (20261029140000) — null when the offer's total stands */
+  agreed_total?: number | null;
   currency: string | null;
   paid: number;
   travelers_count: number;
@@ -381,7 +387,8 @@ export async function setExecutionStatus(
 }
 
 export type PaymentKind = "deposit" | "installment" | "final" | "refund";
-export type PaymentMethod = "transfer" | "cash" | "pos" | "link";
+/** «وسائل الدفع» — the one list (lib/payments/methods.ts); the column's check matches it (20261029140000). */
+export type PaymentMethod = PayMethod;
 
 export type OperationPayment = {
   id: string;
@@ -508,11 +515,11 @@ export async function listOperations(): Promise<OperationCard[]> {
     const { data } = await supabase
       .from("operations")
       .select(
-        "id, offer_id, render_id, client_status, execution_status, travel_start, travel_end, confirm_channel, confirmed_at, note, offers(serial, destination, total, currency, adults, children, infants, employee_id, customers(arabic_name, mobile), booking_partners(id, name))",
+        "id, offer_id, render_id, client_status, execution_status, travel_start, travel_end, confirm_channel, confirmed_at, note, agreed_total, offers(serial, destination, total, currency, adults, children, infants, employee_id, customers(arabic_name, mobile), booking_partners(id, name))",
       )
       .order("travel_start", { ascending: true, nullsFirst: false });
 
-    const rows = ((data ?? []) as unknown as (OperationRow & { offers: OfferJoin | OfferJoin[] | null })[]).filter((r) =>
+    const rows = ((data ?? []) as unknown as (OperationRow & { agreed_total: number | string | null; offers: OfferJoin | OfferJoin[] | null })[]).filter((r) =>
       mayWork(access, one(r.offers)?.employee_id),
     );
     if (rows.length === 0) return [];
@@ -551,7 +558,9 @@ export async function listOperations(): Promise<OperationCard[]> {
         destination: offer?.destination ?? null,
         customer_name: customer?.arabic_name ?? null,
         customer_phone: customer?.mobile ?? null,
-        total: offer?.total != null ? Number(offer.total) : null,
+        total: caseTotal(offer?.total, r.agreed_total),
+        offer_total: offer?.total != null ? Number(offer.total) : null,
+        agreed_total: r.agreed_total != null ? Number(r.agreed_total) : null,
         currency: offer?.currency ?? null,
         paid: paid.get(r.id) ?? 0,
         // the travellers entered, else the ones the offer was sold for — a new case is not «0»

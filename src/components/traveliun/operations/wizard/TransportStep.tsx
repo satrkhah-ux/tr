@@ -11,6 +11,7 @@ import {
   assignCitySupplier,
   attachCityConfirmation,
   confirmCity,
+  confirmCityWithoutSupplier,
   draftCityRequest,
   sendCityRequest,
   setTripsDriver,
@@ -63,6 +64,8 @@ export function TransportStep({ data }: StepProps) {
   const operationId = data.operation.id;
   const names = cities.map((c) => c.name).join("|");
   const [setup, setSetup] = useState<TransportSetup | null>(null);
+  // a finished city reopened by «تعديل»
+  const [picked, setPicked] = useState<string | null>(null);
 
   useEffect(() => {
     if (!names) return;
@@ -84,21 +87,68 @@ export function TransportStep({ data }: StepProps) {
   const now = new Date(data.supplierWork?.now ?? 0);
   // the trips whose supplier's paper is on file (one paper is filed on every trip it covers)
   const filed = new Set((data.supplierWork?.bookings ?? []).filter((b) => b.has_confirmation).map((b) => b.booking_id));
+  // like the hotels (the owner, 2026-10-29: «نفس فكرة صفوف الفنادق التي تُطوى عند الحفظ»): a finished
+  // city folds to one green line, the first one still open is the only one unfolded
+  const done = (c: TransportCity) => c.supplied && c.confirmed;
+  const openKey = picked ?? cities.find((c) => !done(c))?.key ?? null;
   return (
-    <section className="space-y-3">
+    <section className="space-y-2">
       <p className="text-[12px] font-semibold text-[#557d78]">{t("wz.transport.hint")}</p>
-      {cities.map((c) => (
-        <CityCard
-          key={c.key || "-"}
-          city={c}
-          clashes={clashes}
-          operationId={operationId}
-          setup={setup}
-          now={now}
-          filedId={c.trips.find((x) => filed.has(x.booking.id))?.booking.id ?? null}
-        />
-      ))}
+      {cities.map((c) =>
+        c.key === openKey ? (
+          <CityCard
+            key={c.key || "-"}
+            city={c}
+            clashes={clashes}
+            operationId={operationId}
+            setup={setup}
+            now={now}
+            filedId={c.trips.find((x) => filed.has(x.booking.id))?.booking.id ?? null}
+            onClose={done(c) ? () => setPicked(null) : undefined}
+          />
+        ) : (
+          <FoldedCity key={c.key || "-"} city={c} done={done(c)} supplierLabel={supplierLabel(c, setup)} onOpen={() => setPicked(c.key)} />
+        ),
+      )}
     </section>
+  );
+}
+
+/** The supplier's name as the folded line says it — or «بدون مورد». */
+function supplierLabel(c: TransportCity, setup: TransportSetup | null): string | null {
+  if (c.noSupplier) return null;
+  return setup?.suppliers.find((s) => s.id === c.supplierId)?.label ?? c.trips.find((x) => x.booking.assignee_supplier_id === c.supplierId)?.booking.assignee_label ?? null;
+}
+
+/**
+ * A city not being worked: finished → one green line (who runs it, its
+ * reference, how many trips) with «تعديل»; still open → one quiet line saying
+ * what it lacks. A press unfolds it.
+ */
+function FoldedCity({ city, done, supplierLabel, onOpen }: { city: TransportCity; done: boolean; supplierLabel: string | null; onOpen: () => void }) {
+  const { t } = useTraveliunUI();
+  const ref = city.trips.find((x) => x.booking.confirmation_number)?.booking.confirmation_number ?? null;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`flex w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-[12px] border px-3 py-2.5 text-start ${
+        done ? "border-[#cfe9dc] bg-[#f3faf6]" : "border-[#e2ebe7] bg-white hover:bg-[#f8fbf9]"
+      }`}
+    >
+      {done ? <CheckCircle2 className="size-4 shrink-0 text-[#0f7a52]" /> : <MapPin className="size-4 shrink-0 text-[#93aaa3]" />}
+      <span className="text-[13px] font-extrabold text-[#0f3d38]">{city.name || t("wz.transport.noCity")}</span>
+      <span className="text-[11.5px] font-semibold text-[#6d8a84]">{t("wz.transport.trips", { n: String(city.trips.length) })}</span>
+      {done ? (
+        <span className="text-[11.5px] font-bold text-[#0f7a52]">
+          {city.noSupplier ? t("wz.transport.noSupplierDone") : (supplierLabel ?? "")}
+          {ref && !city.noSupplier ? <DirText dir="ltr" className="tv-tnum ms-1.5">{ref}</DirText> : null}
+        </span>
+      ) : (
+        <span className="text-[11.5px] font-bold text-[#a86a10]">{t(city.supplied ? "wz.transport.lacksConfirm" : "wz.transport.lacksSupplier")}</span>
+      )}
+      <span className="ms-auto text-[11px] font-bold text-[#557d78] underline">{t(done ? "edit" : "wz.transport.open")}</span>
+    </button>
   );
 }
 
@@ -109,6 +159,7 @@ function CityCard({
   setup,
   now,
   filedId,
+  onClose,
 }: {
   city: TransportCity;
   /** the tours whose time fights their flight (transport.ts tourClashes). */
@@ -118,6 +169,8 @@ function CityCard({
   now: Date;
   /** a trip of the city with the supplier's paper on file — what «فتح الورقة» opens. */
   filedId: string | null;
+  /** a finished city reopened for an edit folds back unchanged */
+  onClose?: () => void;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -232,6 +285,11 @@ function CityCard({
         >
           {t(`ops.sup.state.${city.request}` as TranslationKey, { h: String(city.sentAt ? hoursSince(city.sentAt, now) : 0) })}
         </span>
+        {onClose ? (
+          <button type="button" onClick={onClose} className="text-[11.5px] font-bold text-[#557d78] underline">
+            {t("wz.transport.fold")}
+          </button>
+        ) : null}
       </header>
 
       <ul className="mt-3 space-y-1.5">
@@ -268,6 +326,23 @@ function CityCard({
           </button>
         ) : null}
         {mixed ? <p className="text-[11px] font-semibold text-[#a86a10] sm:col-span-2">{t("wz.transport.mixed")}</p> : null}
+        {/* «بدون مورد» (the owner, 2026-10-29): no supplier and maybe no driver yet — the city is done in one press */}
+        {city.confirmed && city.noSupplier ? (
+          <p className="flex items-center gap-1.5 text-[11.5px] font-bold text-[#0f7a52] sm:col-span-2">
+            <CheckCircle2 className="size-3.5" />
+            {t("wz.transport.noSupplierDone")}
+          </p>
+        ) : (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => act(() => confirmCityWithoutSupplier({ operation_id: operationId, booking_ids: ids }), () => setPick(""))}
+            className={`${secondary} justify-self-start sm:col-span-2`}
+          >
+            {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+            {t("wz.transport.noSupplier")}
+          </button>
+        )}
       </div>
 
       {/* one request, one confirmation */}

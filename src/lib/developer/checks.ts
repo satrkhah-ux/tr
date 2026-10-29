@@ -53,6 +53,8 @@ const SECRET_ENV = [
   "TELEGRAM_WEBAPP_BOT_TOKEN",
   "TELEGRAM_STAFF_BOT_TOKEN",
   "RESERVATIONS_IMAP_PASSWORD",
+  "MYFATOORAH_API_KEY",
+  "TAMARA_API_TOKEN",
 ];
 
 const HOUR = 3_600_000;
@@ -548,6 +550,43 @@ const CHECKS: Check[] = [
       });
       const [, ms] = await timed(() => client.connect());
       return ok(ms, { key: "dev.d.imapOk", params: { host: maskHost(host) } });
+    },
+  },
+  {
+    id: "myfatoorah",
+    group: "api",
+    label: "dev.c.myfatoorah",
+    // InitiatePayment only lists the account's payment methods — it creates no invoice
+    run: async () => {
+      const key = env("MYFATOORAH_API_KEY");
+      if (!key) return unconfigured("MYFATOORAH_API_KEY");
+      const base = env("MYFATOORAH_BASE_URL") ?? "https://apitest.myfatoorah.com";
+      const [res, ms] = await timed(() =>
+        fetch(`${base}/v2/InitiatePayment`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+          body: JSON.stringify({ InvoiceAmount: 1, CurrencyIso: "SAR" }),
+          signal: signal(),
+          cache: "no-store",
+        }),
+      );
+      if (!res.ok) return httpProblem(res.status, ms);
+      const body = (await res.json().catch(() => ({}))) as { IsSuccess?: boolean; Message?: string };
+      if (!body.IsSuccess) return { status: "down", latencyMs: ms, detail: { key: "dev.d.apiError", params: { reason: scrub(body.Message ?? "", [key]) } } };
+      return ok(ms, { key: "dev.d.paymentOk", params: { host: maskHost(base) } });
+    },
+  },
+  {
+    id: "tamara",
+    group: "api",
+    label: "dev.c.tamara",
+    // the payment types on offer for SA/SAR — a read; no checkout is created
+    run: async () => {
+      const token = env("TAMARA_API_TOKEN");
+      if (!token) return unconfigured("TAMARA_API_TOKEN");
+      const base = env("TAMARA_BASE_URL") ?? "https://api-sandbox.tamara.co";
+      const [res, ms] = await timed(() => get(`${base}/checkout/payment-types?country=SA&currency=SAR`, { authorization: `Bearer ${token}` }));
+      return res.ok ? ok(ms, { key: "dev.d.paymentOk", params: { host: maskHost(base) } }) : httpProblem(res.status, ms);
     },
   },
   { id: "sheet_ready_offers", group: "api", label: "dev.c.sheetReady", run: async () => sheetOutcome((await readyOffersSheet()).id) },

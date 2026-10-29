@@ -1,5 +1,6 @@
 import "server-only";
-import { assignAgentThenTeam, assignMuradHandoff } from "@/lib/providers/teletel";
+import { addTeletelNote, assignAgentThenTeam, assignMuradHandoff } from "@/lib/providers/teletel";
+import { saleHolder } from "@/lib/leads/lifecycle";
 import { onList, type MuradControl } from "./control";
 
 /**
@@ -12,6 +13,12 @@ import { onList, type MuradControl } from "./control";
 export async function handOver(control: MuradControl, conversationId: number, teamId: number | null, agentId: number | null, phone: string | null | undefined): Promise<boolean> {
   if (onList(phone, control.noHandoff)) return false;
   const agent = agentId && control.paused?.includes(agentId) ? null : agentId;
+  // never away from the employee holding a client who bought (the owner, 2026-10-29: 39733) — not handed over
+  const holder = await saleHolder(conversationId);
+  if (holder && holder.agentId !== agent) {
+    await addTeletelNote(conversationId, `🔒 مُراد لم يحوّل المحادثة: العميل اشترى منّا وهي مع ${holder.name ?? "موظفها"} — تبقى معه.`);
+    return false;
+  }
   if (teamId && agent && (await assignAgentThenTeam(conversationId, agent, teamId))) return true;
   return assignMuradHandoff(conversationId, teamId, agent);
 }

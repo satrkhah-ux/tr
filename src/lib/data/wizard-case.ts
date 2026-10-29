@@ -20,6 +20,7 @@ import { isOpenAIConfigured } from "@/lib/providers/openai";
 import { getOcrProvider } from "@/lib/repackage/extract/ocr";
 import { currentCan } from "@/lib/roles/current";
 import { hotelIdOf } from "@/lib/operations/voucher-dto";
+import { caseTotal } from "@/lib/operations/payments";
 import type { ReadinessItem, ReadyExceptions, WizardCase } from "@/lib/operations/wizard/types";
 
 /**
@@ -135,7 +136,7 @@ export async function travelBlockers(operationId: string): Promise<ReadinessItem
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data: op } = await supabase
       .from("operations")
-      .select("offer_id, travel_start, travel_end, client_token, client_token_revoked_at, ready_exceptions, offers(total, adults, children, infants)")
+      .select("offer_id, travel_start, travel_end, client_token, client_token_revoked_at, ready_exceptions, agreed_total, offers(total, adults, children, infants)")
       .eq("id", operationId)
       .maybeSingle();
     type Offer = { total: number | string | null; adults: number | null; children: number | null; infants: number | null };
@@ -146,6 +147,7 @@ export async function travelBlockers(operationId: string): Promise<ReadinessItem
       client_token: string | null;
       client_token_revoked_at: string | null;
       ready_exceptions: unknown;
+      agreed_total: number | string | null;
       offers: Offer | Offer[] | null;
     } | null;
     if (!row) return null;
@@ -159,7 +161,7 @@ export async function travelBlockers(operationId: string): Promise<ReadinessItem
     ]);
     const exceptions = row.ready_exceptions;
     const items = readiness({
-      operation: { total: offer?.total != null ? Number(offer.total) : null, travel_start: row.travel_start, travel_end: row.travel_end },
+      operation: { total: caseTotal(offer?.total, row.agreed_total), travel_start: row.travel_start, travel_end: row.travel_end },
       // every column, so a booking is the OperationBooking the rules read; the label is a screen's
       bookings: ((bookings.data ?? []) as OperationBooking[]).map((b) => ({ ...b, assignee_label: null })),
       documents: (documents.data ?? []) as OperationDocument[],

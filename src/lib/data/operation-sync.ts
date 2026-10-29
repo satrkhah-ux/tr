@@ -10,6 +10,7 @@ import { CLIENT_DOCUMENT_KINDS } from "@/lib/operations/voucher-dto";
 import { MESSAGE_ON_STATE } from "@/lib/operations/client-messages";
 import { sendClientMessage } from "@/lib/data/client-messages";
 import { autoIssueDocuments } from "@/lib/data/wizard-sync";
+import { caseTotal } from "@/lib/operations/payments";
 
 /**
  * The ONE place a case's statuses move by themselves (operations order 6):
@@ -31,7 +32,7 @@ export async function syncOperation(operationId: string): Promise<void> {
     const supabase = createSupabaseServiceClient() as unknown as SupabaseClient;
     const { data: op } = await supabase
       .from("operations")
-      .select("id, offer_id, client_status, execution_status, offers(total)")
+      .select("id, offer_id, client_status, execution_status, agreed_total, offers(total)")
       .eq("id", operationId)
       .maybeSingle();
     const row = op as unknown as {
@@ -39,6 +40,7 @@ export async function syncOperation(operationId: string): Promise<void> {
       offer_id: string;
       client_status: ClientStatus;
       execution_status: ExecutionStatus;
+      agreed_total: number | string | null;
       offers: { total: number | string | null } | { total: number | string | null }[] | null;
     } | null;
     if (!row) return;
@@ -66,7 +68,7 @@ export async function syncOperation(operationId: string): Promise<void> {
       (sum, p) => sum + (p.kind === "refund" ? -1 : 1) * (Number(p.amount) || 0),
       0,
     );
-    const total = offer?.total != null ? Number(offer.total) : null;
+    const total = caseTotal(offer?.total, row.agreed_total);
     const clientTo = derivedClient(paid, total);
     if (aheadOfClient(row.client_status, clientTo)) {
       await supabase.from("operations").update({ client_status: clientTo, updated_at: new Date().toISOString() }).eq("id", operationId);
