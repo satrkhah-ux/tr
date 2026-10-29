@@ -25,6 +25,7 @@ export const KIND_LABELS: Record<string, string> = {
   ops: "عمليات",
   visa: "تأشيرات",
   mail: "بريد",
+  client_msg: "رسالة للعميل",
 };
 export const kindLabel = (kind: string) => KIND_LABELS[kind] ?? kind;
 

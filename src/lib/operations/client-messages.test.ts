@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { arabicDay, defaultMessageBody, fillTemplate, messagesDueToday, programmeMessage, tidyWhatsapp, WA_TEMPLATES, waParams, waPreview } from "./client-messages";
+import { arabicDay, defaultMessageBody, fillTemplate, followerOf, messagesDueToday, programmeMessage, tidyWhatsapp, WA_TEMPLATES, waParams, waPreview } from "./client-messages";
+
+describe("a message the system sent a client is told to who follows them (the owner, 2026-10-29)", () => {
+  it("who holds the conversation now, else the case's operations employee, else the seller", () => {
+    expect(followerOf({ holderEmployeeId: "h", opsEmployeeId: "o", sellerId: "s" })).toBe("h");
+    expect(followerOf({ holderEmployeeId: null, opsEmployeeId: "o", sellerId: "s" })).toBe("o");
+    expect(followerOf({ holderEmployeeId: null, opsEmployeeId: null, sellerId: "s" })).toBe("s");
+    expect(followerOf({ holderEmployeeId: null, opsEmployeeId: null, sellerId: null })).toBeNull();
+  });
+});
 
 const fields = { name: "أحمد", destination: "ماليزيا", serial: "AD-6-3056", link: "https://pkg.traveliun.com/trip/x", rate_link: "https://pkg.traveliun.com/trip/x/rate" };
 

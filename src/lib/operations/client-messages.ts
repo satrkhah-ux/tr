@@ -18,6 +18,14 @@ export const CLIENT_MESSAGE_KEYS = [
 ] as const;
 export type ClientMessageKey = (typeof CLIENT_MESSAGE_KEYS)[number];
 
+/**
+ * Whom a message the system sent a client on its own is told to (the owner, 2026-10-29: «الموظف الذي يتابع العميل»):
+ * who holds the client's conversation now, else the case's operations employee, else the seller who issued it.
+ */
+export function followerOf(i: { holderEmployeeId: string | null; opsEmployeeId: string | null; sellerId: string | null }): string | null {
+  return i.holderEmployeeId ?? i.opsEmployeeId ?? i.sellerId ?? null;
+}
+
 export const CLIENT_MESSAGE_LABEL: Record<ClientMessageKey, string> = {
   bookings_confirmed: "تأكيد الحجوزات",
   documents_ready: "جاهزية المستندات",
