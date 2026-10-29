@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BriefcaseBusiness, CheckCircle2, Copy, Eye, FileText, History, Loader2, XCircle } from "lucide-react";
 import { cancelFile, confirmFromBasic, getFileStatus, type FileError, type FileStatusView } from "@/lib/data/file-status";
 import { AWAITING_CLIENT, SENDABLE, type FileState, type TimelineEntry } from "@/lib/offer/file-state";
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { OfferSend } from "../OfferSend";
+import { CoverChoice } from "../CoverChoice";
+import type { CoverStyle } from "@/components/offer-doc/cover-image";
 import { TripLinkSend } from "./TripLinkSend";
 import { FileStateChip } from "./FileStateChip";
 import { useBasicLabels } from "./labels";
@@ -70,6 +72,7 @@ export function BasicFileStatus({
   onChanged,
   known,
   extras,
+  autoOpen = false,
 }: {
   draftId: string;
   serial: string;
@@ -80,6 +83,8 @@ export function BasicFileStatus({
   known?: { state: FileState; version: number | null; sentVersion: number | null; stale: boolean; operationId: string | null };
   /** the editor's own parts of the issued section: «إصدار نسخة محدّثة», «سجل النسخ», the hotel-data line */
   extras?: { reissue?: ReactNode; versions?: ReactNode; guard?: ReactNode };
+  /** just issued from the editor: scroll this panel into view (the client document is opened by the editor) */
+  autoOpen?: boolean;
 }) {
   const tx = useBasicLabels();
   const { t, language } = useTraveliunUI();
@@ -94,6 +99,14 @@ export function BasicFileStatus({
   const [showVersions, setShowVersions] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [copied, setCopied] = useState(false);
+  // «غلاف الملف»: what the employee picked here (the server keeps it on the offer); until then the loaded value
+  const [coverPick, setCoverPick] = useState<CoverStyle | null>(null);
+
+  const panelRef = useRef<HTMLDivElement>(null);
+  const shownView = view !== null;
+  useEffect(() => {
+    if (autoOpen && shownView) panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [autoOpen, shownView]);
 
   useEffect(() => {
     let live = true;
@@ -214,7 +227,7 @@ export function BasicFileStatus({
   const quiet = "inline-flex items-center gap-1 text-[12px] font-bold text-[#185045] hover:underline";
 
   return (
-    <div className="mt-3 space-y-3 rounded-[12px] border border-[#dbe6e1] bg-white p-3">
+    <div ref={panelRef} className="mt-3 scroll-mt-20 space-y-3 rounded-[12px] border border-[#dbe6e1] bg-white p-3">
       {/* ① where the file stands, one line */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="tv-tnum text-[12.5px] font-extrabold text-[#103f37]" dir="ltr">
@@ -256,6 +269,20 @@ export function BasicFileStatus({
               PDF
             </a>
           </div>
+          {view.canAct && !view.partner ? (
+            <div className="mt-2">
+              <CoverChoice
+                draftId={draftId}
+                serial={serial}
+                value={coverPick ?? view.cover}
+                onChange={(c) => {
+                  setCoverPick(c);
+                  loaded.set(draftId, { ...view, cover: c });
+                }}
+                preview
+              />
+            </div>
+          ) : null}
         </Step>
         <Step
           n={2}
@@ -264,7 +291,7 @@ export function BasicFileStatus({
           status={step2}
         >
           {/* the filled button is the current step's only: framed once the file is past it */}
-          {sendable ? <OfferSend draftId={draftId} again={view.stale} onSent={changed} filled={step2 === "now"} /> : null}
+          {sendable ? <OfferSend draftId={draftId} again={view.stale} onSent={changed} filled={step2 === "now"} cover={coverPick ?? view.cover} onCover={(c) => setCoverPick(c)} /> : null}
         </Step>
         <Step
           n={3}

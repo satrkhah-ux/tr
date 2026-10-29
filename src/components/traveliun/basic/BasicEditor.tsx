@@ -1000,6 +1000,8 @@ export function BasicEditor({
   // the file's status (top bar + finish step) reads again after an issue, a send or a confirmation
   const [statusTick, setStatusTick] = useState(0);
   const bumpStatus = () => setStatusTick((n) => n + 1);
+  // set by a successful issue here: the issued panel scrolls into view (BasicFileStatus autoOpen)
+  const [justIssued, setJustIssued] = useState(false);
 
   async function produce() {
     if (producing || blocking.length > 0 || guardBlocked) return;
@@ -1011,6 +1013,9 @@ export function BasicEditor({
       const result = await produceOfferFromDraft(draftId);
       if (!result.ok) return setProduceError(t(result.error));
       patch({ produced_serial: result.serial });
+      // open the issued package for the employee at once: the client document (its chosen cover) in a new tab; nothing is sent
+      window.open(`/client-offer/${result.serial}`, "_blank", "noopener");
+      setJustIssued(true);
       // issued — nothing went to the client: the issuing section offers «أرسل إلى العميل عبر واتساب»
       bumpStatus();
     } catch {
@@ -2124,6 +2129,7 @@ export function BasicEditor({
               variant="panel"
               refresh={statusTick}
               onChanged={bumpStatus}
+              autoOpen={justIssued}
               extras={{
                 // edited since it was issued: the next version, same serial
                 reissue: <ReissueOffer compact draftId={draftId} hotels={data.hotels} blocked={blocking.length > 0} flush={flush} onIssued={bumpStatus} />,

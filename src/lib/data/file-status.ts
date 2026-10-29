@@ -11,6 +11,8 @@ import { setOfferStatus } from "./offer-status";
 import { confirmOffer } from "./operations";
 import { clientWhatsappAllowed, offerMessage, sendOfferToClient, type ClientSendResult } from "./client-whatsapp";
 import { loadFileStatus } from "./file-status-core";
+import { getOfferCover } from "./offer-cover";
+import type { CoverStyle } from "@/components/offer-doc/cover-image";
 
 /**
  * Basic's file status and its three actions (the owner, 2026-10-17):
@@ -71,6 +73,8 @@ export type FileStatusView = {
   canAct: boolean;
   /** a partner company's file: its client is theirs — no send from here. */
   partner: boolean;
+  /** the PDF's first page the employee chose («أساسي» / «فني») — read by the link, the PDF and the send */
+  cover: CoverStyle;
   timeline: TimelineEntry[];
 };
 
@@ -94,6 +98,7 @@ export async function getFileStatus(draftId: string): Promise<FileStatusView | F
       cancel: canCancelFile({ partner: Boolean(file.offer.partner_company_id), hasCase: Boolean(detail.operation), state: detail.state }),
       canAct: file.mine || manager,
       partner: Boolean(file.offer.partner_company_id),
+      cover: await getOfferCover(file.serial),
       timeline: detail.timeline.slice(0, 40),
     };
   } catch {
@@ -108,6 +113,8 @@ export type OfferMessageDraft = {
   toPhone: string;
   link: string;
   pdf: string;
+  serial: string;
+  cover: CoverStyle;
   /** why the system cannot send it itself now (the trial gate, no phone) — «أرسلته يدوياً» stays open */
   blocked: ClientSendResult | null;
   updated: boolean;
@@ -132,9 +139,29 @@ export async function prepareOfferMessage(draftId: string): Promise<OfferMessage
       toPhone: phone,
       link: message.link,
       pdf: message.pdf,
+      serial: file.serial,
+      cover: message.cover,
       blocked,
       updated,
     };
+  } catch {
+    return { ok: false, error: "failed" };
+  }
+}
+
+/**
+ * «غلاف الملف» — the first page of the client PDF, «أساسي» or «فني», kept on the offer: the client link, its PDF, the
+ * WhatsApp send and a re-issue (same serial) all follow it. The labels are for staff only; nothing prints them.
+ */
+export async function setPdfCover(draftId: string, cover: CoverStyle): Promise<{ ok: true; cover: CoverStyle } | Fail> {
+  try {
+    const file = await issuedFile(draftId, true);
+    if (failed(file)) return file;
+    if (file.offer.partner_company_id) return { ok: false, error: "partner" };
+    const next: CoverStyle = cover === "designed" ? "designed" : "basic";
+    const { error } = await db().from("offers").update({ pdf_cover: next }).eq("id", file.offer.id);
+    if (error) return { ok: false, error: "failed" };
+    return { ok: true, cover: next };
   } catch {
     return { ok: false, error: "failed" };
   }
@@ -164,8 +191,8 @@ const MAX_BODY = 4000;
  * way with the version it carried; a note left outside WhatsApp's 24 hours is
  * recorded as that, never as sent.
  */
-/** `cover`: the first page of the PDF the employee chose — «أساسي» (default) or «فني» (the designed cover) */
-export async function sendOfferMessage(draftId: string, body: string, manual = false, cover: "basic" | "designed" = "basic"): Promise<{ ok: true; result: ClientSendResult | "manual"; at: string } | Fail> {
+/** The first page of the PDF is the employee's stored choice for the offer (setPdfCover) — «أساسي» (default) or «فني». */
+export async function sendOfferMessage(draftId: string, body: string, manual = false): Promise<{ ok: true; result: ClientSendResult | "manual"; at: string } | Fail> {
   try {
     const file = await issuedFile(draftId, true);
     if (failed(file)) return file;
@@ -180,7 +207,8 @@ export async function sendOfferMessage(draftId: string, body: string, manual = f
       return { ok: true, result: "manual", at };
     }
     const updated = await newerThanSent(file.offer.id);
-    const result = await sendOfferToClient(file.serial, updated, text, cover === "designed" ? "designed" : "basic");
+    const result = await sendOfferToClient(file.serial, updated, text);
+    const cover = await getOfferCover(file.serial);
     // what happened on WhatsApp is recorded; the trial gate («off», «not_allowed») sent nothing and records nothing
     if (result === "sent" || result === "template" || result === "window" || result === "no_phone" || result === "unreachable") {
       await logAudit({ action: "offer.client_sent", entity: "offers", entity_id: file.offer.id, meta: { result, version, serial: file.serial, ...(cover === "designed" ? { cover } : {}) } });

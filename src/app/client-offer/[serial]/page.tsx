@@ -3,6 +3,8 @@ import { DirText } from "@/components/DirText";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
 import { resolveDocBrand } from "@/lib/data/doc-brand";
 import { getPublishedClientOffer } from "@/lib/data/offers";
+import { getOfferCover } from "@/lib/data/offer-cover";
+import { coverImagePath } from "@/components/offer-doc/cover-image";
 
 /**
  * PUBLIC client link. Renders the LATEST PUBLISHED client snapshot with the exact
@@ -18,6 +20,7 @@ const PREVIEW_FONT = `
 export default async function ClientOfferPage({ params }: { params: Promise<{ serial: string }> }) {
   const { serial } = await params;
   const published = await getPublishedClientOffer(serial);
+  const cover = await getOfferCover(serial);
   // Same resolution the PDF route uses, with no query override: the page and the
   // downloaded file must be the same document, and a public URL must not be able
   // to restyle or reprice it.
@@ -53,7 +56,7 @@ export default async function ClientOfferPage({ params }: { params: Promise<{ se
             </a>
           </div>
           <div className="overflow-hidden rounded-[14px] bg-white shadow-[0_10px_30px_rgba(0,60,58,0.12)]">
-            <OfferDocument variant="client" offer={published.offer} brand={brand} showPrices={showPrices} />
+            <OfferDocument variant="client" offer={published.offer} brand={brand} showPrices={showPrices} cover={cover} coverImage={cover === "designed" ? coverImagePath(published.offer.destination) : undefined} />
           </div>
         </div>
       )}

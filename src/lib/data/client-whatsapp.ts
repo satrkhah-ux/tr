@@ -15,6 +15,7 @@ import {
 import { programmeMessage, tidyWhatsapp, WA_TEMPLATES, waParams, waPreview, type WaTemplateKey } from "@/lib/operations/client-messages";
 import { clientOfferPdf, sendProgrammePdf } from "@/lib/offer-doc/client-pdf";
 import type { CoverStyle } from "@/components/offer-doc/cover-image";
+import { getOfferCover } from "./offer-cover";
 
 /**
  * The client hears about their file on WhatsApp, through Teletel (the owner,
@@ -196,6 +197,8 @@ export type OfferMessage = {
   /** none for a first send to a client who already confirmed: «traveliun_program_ready» promises the link he has */
   template?: WaTemplateSend;
   pdfName: string;
+  /** the first page of the PDF the link names (offers.pdf_cover) */
+  cover: CoverStyle;
 };
 
 /**
@@ -204,7 +207,9 @@ export type OfferMessage = {
  * owner (2026-10-17) wants every message reviewed and sent by a person, never
  * on issue (offer-send.ts).
  */
-export async function offerMessage(serial: string, updated: boolean, cover: CoverStyle = "basic"): Promise<OfferMessage | null> {
+export async function offerMessage(serial: string, updated: boolean): Promise<OfferMessage | null> {
+  // the first page is the one the employee chose for this offer (offers.pdf_cover); the link names it outright
+  const cover = await getOfferCover(serial);
   try {
     const { data } = await db()
       .from("offers")
@@ -257,6 +262,7 @@ export async function offerMessage(serial: string, updated: boolean, cover: Cove
       note,
       labels: [updated ? "عرض-محدث" : "عرض-مرسل"],
       pdfName,
+      cover,
       // after the 24 hours: the approved template — the same words, no link — the PDF riding as its document;
       // none for a confirmed client's first send (the text waits as a note for the agent)
       template: row.status === "confirmed" && !updated ? undefined : {
@@ -276,13 +282,13 @@ export async function offerMessage(serial: string, updated: boolean, cover: Cove
  * The PDF follows the text inside WhatsApp's 24 hours; after them it rides on
  * the approved template.
  */
-export async function sendOfferToClient(serial: string, updated: boolean, body?: string, cover: CoverStyle = "basic"): Promise<ClientSendResult> {
-  const message = await offerMessage(serial, updated, cover);
+export async function sendOfferToClient(serial: string, updated: boolean, body?: string): Promise<ClientSendResult> {
+  const message = await offerMessage(serial, updated);
   if (!message) return "unreachable";
   return messageClient(message.client, body?.trim() || message.text, {
     note: message.note,
     labels: message.labels,
-    pdf: { serial, name: message.pdfName, cover },
+    pdf: { serial, name: message.pdfName, cover: message.cover },
     template: message.template,
   });
 }
