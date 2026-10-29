@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Copy, CreditCard, Loader2, Send } from "lucide-react";
 import { basicPayLink, sendBasicPayLink } from "@/lib/data/file-status";
+import type { PayVia } from "@/lib/payments/pay-now-rules";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
@@ -12,10 +13,12 @@ const outline =
 /**
  * «رابط الدفع» on an issued file (the owner, 2026-10-29): our stable /pay/<serial> — copied, or put in a message
  * the employee reviews and sends with a press. An optional amount (a deposit, an instalment) is signed on the server.
+ * MyFatoorah or Tamara — the link takes the client to the gateway chosen here.
  */
 export function PayLinkTools({ draftId }: { draftId: string }) {
   const { t } = useTraveliunUI();
   const [pending, run] = useSafeTransition();
+  const [via, setVia] = useState<PayVia>("myfatoorah");
   const [amount, setAmount] = useState("");
   const [body, setBody] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -26,8 +29,8 @@ export function PayLinkTools({ draftId }: { draftId: string }) {
     run(async () => {
       setError(null);
       setSent(false);
-      const res = await basicPayLink(draftId, amount.trim() ? Number(amount) : null);
-      if (!res.ok) return setError(t(res.error));
+      const res = await basicPayLink(draftId, amount.trim() ? Number(amount) : null, via);
+      if (!res.ok) return setError(t(res.error, res.params));
       then(res.url, res.amount);
     });
 
@@ -45,7 +48,7 @@ export function PayLinkTools({ draftId }: { draftId: string }) {
       if (!body) return;
       setError(null);
       const res = await sendBasicPayLink(draftId, body);
-      if (!res.ok) return setError(t(res.error));
+      if (!res.ok) return setError(t(res.error, res.params));
       setSent(true);
       setBody(null);
     });
@@ -56,6 +59,23 @@ export function PayLinkTools({ draftId }: { draftId: string }) {
         <CreditCard className="size-3.5" />
         {t("pay.link.title")}
       </p>
+      <div className="mb-2 flex gap-1.5" role="radiogroup" aria-label={t("pay.link.title")}>
+        {(["myfatoorah", "tamara"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={via === v}
+            onClick={() => {
+              setVia(v);
+              setBody(null);
+            }}
+            className={`h-8 rounded-full border px-3 text-[11.5px] font-extrabold ${via === v ? "border-[#185045] bg-[#185045] text-white" : "border-[#dbe6e1] bg-white text-[#185045]"}`}
+          >
+            {t(v === "tamara" ? "pay.method.tamara" : "pay.link.viaMyFatoorah")}
+          </button>
+        ))}
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <input
           inputMode="decimal"

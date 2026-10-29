@@ -224,6 +224,8 @@ ${FIT_SCREEN}
 .od-price span{font-size:13pt;font-weight:500;}
 .od-price strong{font-size:23pt;font-weight:800;}
 .od-paynow{display:block;margin-top:4mm;border-radius:5mm;padding:4mm;background:#fff;border:0.6mm solid var(--od-green);color:var(--od-green);text-align:center;font-size:15pt;font-weight:800;text-decoration:none;break-inside:avoid;}
+.od-paytamara{display:flex;align-items:center;justify-content:center;gap:3mm;margin-top:4mm;border-radius:5mm;padding:4mm;background:#000;color:#fff;font-size:14pt;font-weight:800;text-decoration:none;break-inside:avoid;}
+.od-tamara-mark{height:5mm;width:auto;}
 
 /* ── terms ────────────────────────────────────────────────────────────────── */
 .od-terms{border:1px solid var(--od-line);border-radius:5mm;overflow:hidden;background:rgba(255,255,255,.97);}

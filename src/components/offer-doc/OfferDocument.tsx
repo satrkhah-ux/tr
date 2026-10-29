@@ -1,3 +1,4 @@
+import { TamaraMark } from "@/components/TamaraMark";
 import type { ReactNode } from "react";
 import { DirText } from "@/components/DirText";
 import type { ClientOfferDTO, InternalOfferDTO } from "@/lib/offer/dto";
@@ -82,6 +83,8 @@ export type OfferDocumentProps = (
    * only when the client pays by MyFatoorah (pay-now.ts payNowUrl); the button says the total's way, never a fee.
    */
   payUrl?: string;
+  /** whose button: MyFatoorah's «ادفع الآن» (default) or Tamara's branded one — the offer's one chosen way */
+  payVia?: "myfatoorah" | "tamara";
 };
 
 const Ltr = ({ children }: { children: ReactNode }) => <DirText dir="ltr">{children}</DirText>;
@@ -488,7 +491,7 @@ export function OfferDocument(props: OfferDocumentProps) {
     note: showPrices ? AR.servicesAndPriceNote : undefined,
     heightMm: servicesHeightMm(offer, showPrices) + (showPrices && props.payUrl ? 16 : 0),
     kind: "node",
-    node: <ServicesAndPrice offer={offer} nights={nights} days={days} showPrices={showPrices} payUrl={props.payUrl} />,
+    node: <ServicesAndPrice offer={offer} nights={nights} days={days} showPrices={showPrices} payUrl={props.payUrl} payVia={props.payVia} />,
   });
 
   if (props.variant === "internal") {
@@ -1321,12 +1324,14 @@ function ServicesAndPrice({
   days,
   showPrices,
   payUrl,
+  payVia,
 }: {
   offer: ClientOfferDTO;
   nights: number;
   days: number;
   showPrices: boolean;
   payUrl?: string;
+  payVia?: "myfatoorah" | "tamara";
 }) {
   return (
     <>
@@ -1362,7 +1367,12 @@ function ServicesAndPrice({
             <strong><Ltr>{offer.total != null ? fmtNum(offer.total, 2) : "—"}</Ltr></strong>
             <span>{offer.currency ?? ""}</span>
           </div>
-          {payUrl ? (
+          {payUrl && payVia === "tamara" ? (
+            <a className="od-paytamara" href={payUrl} target="_blank" rel="noopener noreferrer">
+              <TamaraMark className="od-tamara-mark" />
+              <span>{AR.payTamara}</span>
+            </a>
+          ) : payUrl ? (
             <a className="od-paynow" href={payUrl} target="_blank" rel="noopener noreferrer">
               {AR.payNow}
             </a>

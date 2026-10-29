@@ -192,3 +192,26 @@ describe("client OfferDocument — «ادفع الآن»", () => {
     expect(html.match(/<a class="od-paynow"[^>]*>([^<]*)<\/a>/)?.[1]).toBe("ادفع الآن");
   });
 });
+
+/** «ادفع بتمارا — قسّمها» (the owner, 2026-10-29): only for an offer issued with Tamara, to /pay/<serial>?m=tamara. */
+describe("client OfferDocument — the Tamara button", () => {
+  const offer = toClientOfferDTO({ ...internalOffer(), total: 16869.61 });
+  const url = "https://pkg.traveliun.com/pay/AD-7-1000?m=tamara";
+  const html = renderToStaticMarkup(createElement(OfferDocument, { variant: "client", offer, payUrl: url, payVia: "tamara" }));
+  const button = html.match(/<a class="od-paytamara"[^>]*>([\s\S]*?)<\/a>/);
+
+  it("a branded Tamara button linking to our page — and no MyFatoorah button beside it", () => {
+    expect(html).toContain('href="https://pkg.traveliun.com/pay/AD-7-1000?m=tamara"');
+    expect(button?.[1]).toContain("<svg");
+    expect(button?.[1]).toContain("ادفع بتمارا — قسّمها");
+    expect(html).not.toContain("<a class=\"od-paynow\"");
+    expect(html).not.toContain("tamara.co");
+  });
+
+  it("no fee wording on the button; a MyFatoorah offer never shows it", () => {
+    expect(button?.[1].replace(/<[^>]+>/g, "")).toBe("ادفع بتمارا — قسّمها");
+    const mf = renderToStaticMarkup(createElement(OfferDocument, { variant: "client", offer, payUrl: "https://pkg.traveliun.com/pay/AD-7-1000" }));
+    expect(mf).not.toContain("<a class=\"od-paytamara\"");
+    expect(mf).not.toContain("قسّمها");
+  });
+});

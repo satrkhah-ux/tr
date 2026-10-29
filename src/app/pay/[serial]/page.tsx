@@ -2,12 +2,13 @@ import { CreditCard, ShieldCheck } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { payPreview } from "@/lib/payments/pay-now";
 import { REFUSAL_AR, type PayRefusal } from "@/lib/payments/pay-now-rules";
+import { TamaraMark } from "@/components/TamaraMark";
 import { payNow } from "./actions";
 
 /**
  * PUBLIC «ادفع الآن» (the owner, 2026-10-29) — where the button in the client's PDF and page lands. Opening it
  * makes nothing (a link preview must not create invoices); the press does (actions.ts → pay-now.ts). The page
- * says the amount only: never a fee, a share or the word «رسوم».
+ * says the amount only: never a fee, a share or the word «رسوم». `?m=tamara` is the same page for Tamara.
  */
 export const dynamic = "force-dynamic";
 
@@ -20,10 +21,11 @@ const AFTER_PRESS: Record<string, string> = {
   gateway: "تعذّر فتح صفحة الدفع الآن. حاول بعد قليل، أو تواصل مع موظف المبيعات.",
 };
 
-export default async function PayPage({ params, searchParams }: { params: Promise<{ serial: string }>; searchParams: Promise<{ a?: string; e?: string }> }) {
+export default async function PayPage({ params, searchParams }: { params: Promise<{ serial: string }>; searchParams: Promise<{ a?: string; e?: string; m?: string }> }) {
   const { serial } = await params;
-  const { a, e } = await searchParams;
-  const preview = await payPreview(serial, a);
+  const { a, e, m } = await searchParams;
+  const tamara = m === "tamara";
+  const preview = await payPreview(serial, a, tamara ? "tamara" : "myfatoorah");
   const pressed = e ? (AFTER_PRESS[e] ?? REFUSAL_AR[e as PayRefusal]) : undefined;
 
   return (
@@ -47,12 +49,22 @@ export default async function PayPage({ params, searchParams }: { params: Promis
             <form action={payNow} className="mt-5">
               <input type="hidden" name="serial" value={serial} />
               {a ? <input type="hidden" name="a" value={a} /> : null}
-              <button type="submit" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-[12px] bg-[#185045] text-[16px] font-extrabold text-white hover:bg-[#0f4439]">
-                <CreditCard className="size-5" />
-                ادفع الآن
-              </button>
+              {tamara ? <input type="hidden" name="m" value="tamara" /> : null}
+              {tamara ? (
+                <button type="submit" className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-[12px] bg-black text-[16px] font-extrabold text-white hover:bg-[#222]">
+                  <TamaraMark className="h-[16px] w-auto" />
+                  ادفع بتمارا — قسّمها
+                </button>
+              ) : (
+                <button type="submit" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-[12px] bg-[#185045] text-[16px] font-extrabold text-white hover:bg-[#0f4439]">
+                  <CreditCard className="size-5" />
+                  ادفع الآن
+                </button>
+              )}
             </form>
-            <p className="mt-3 text-[12px] font-semibold text-[#8aa29b]">تنتقل إلى صفحة ماي فاتورة الآمنة للدفع بمدى أو البطاقة أو Apple Pay.</p>
+            <p className="mt-3 text-[12px] font-semibold text-[#8aa29b]">
+              {tamara ? "تنتقل إلى صفحة تمارا الآمنة لتقسيم المبلغ." : "تنتقل إلى صفحة ماي فاتورة الآمنة للدفع بمدى أو البطاقة أو Apple Pay."}
+            </p>
           </>
         ) : (
           <p className="mt-3 text-[15px] font-bold leading-relaxed text-[#103f37]">{REFUSAL_AR[preview.why]}</p>

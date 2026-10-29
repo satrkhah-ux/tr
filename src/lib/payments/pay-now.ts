@@ -5,8 +5,10 @@ import { issuedDraftData } from "@/lib/data/issued-draft";
 import { logAudit } from "@/lib/data/audit";
 import { caseTotal, paidTotal, riyadhDate } from "@/lib/operations/payments";
 import { createInvoiceLink } from "@/lib/providers/myfatoorah";
+import { createCheckout, getInstalmentLimits } from "@/lib/providers/tamara";
+import { tellEmployee } from "@/lib/operations/payment-links-poll";
 import { isPayMethod } from "./methods";
-import { payDecision, reusableLink, showsPayNow, type OpenLink, type PayFile, type PayRefusal } from "./pay-now-rules";
+import { payButtonFor, payDecision, reusableLink, REUSE_MS, TAMARA_REUSE_MS, type OpenLink, type PayFile, type PayRefusal, type PayVia, withinTamara } from "./pay-now-rules";
 import { readAmount, signAmount } from "./pay-token";
 
 /**
@@ -15,6 +17,10 @@ import { readAmount, signAmount } from "./pay-token";
  * the file NOW (the latest published version, or the case's agreed price), or reuses a young one of the same
  * amount, keeps it in payment_links (the 10-minute job records it once paid) and sends the client to MyFatoorah.
  * Service role throughout: the page has no session and the serial is the only thing it is told.
+ *
+ * Tamara (`?m=tamara`, the owner 2026-10-29): the same page and rules; the press makes a Tamara checkout session
+ * for what is owed, with the client's name and mobile from the offer, and Tamara sends the client back to
+ * /pay/<serial>/done — which only says thanks: the 10-minute job records the payment once Tamara authorises it.
  */
 
 const db = () => createSupabaseServiceClient() as unknown as SupabaseClient;
@@ -83,27 +89,44 @@ export async function loadPayFile(serial: string): Promise<Loaded | null> {
   };
 }
 
-/** The stable link: bare for the PDF's button, `?a=` with a server-signed amount for a deposit or an instalment. */
-export function payLink(serial: string, amount?: number | null): string {
+/** The stable link: bare for the PDF's button, `?a=` with a server-signed amount for a deposit or an instalment; `?m=tamara` for Tamara. */
+export function payLink(serial: string, amount?: number | null, via: PayVia = "myfatoorah"): string {
+  const q = new URLSearchParams();
+  if (via === "tamara") q.set("m", "tamara");
+  if (amount && amount > 0 && secret()) q.set("a", signAmount(secret(), serial, amount, Date.now(), via));
   const base = `${site()}/pay/${encodeURIComponent(serial)}`;
-  return amount && amount > 0 && secret() ? `${base}?a=${signAmount(secret(), serial, amount)}` : base;
+  return q.size ? `${base}?${q}` : base;
 }
 
-/** For the client's PDF and page: the button only when the client's way is MyFatoorah (link / card) and the file is ours. */
-export async function payNowUrl(serial: string): Promise<string | undefined> {
+/** For the staff tools: Tamara's limits when this amount falls outside them — null when it fits, or they cannot be read (Tamara's checkout decides then). */
+export async function tamaraLimitProblem(amount: number): Promise<{ min: string; max: string } | null> {
+  const limits = await getInstalmentLimits();
+  const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  return limits && !withinTamara(amount, limits) ? { min: fmt(limits.min), max: fmt(limits.max) } : null;
+}
+
+const readToken = (serial: string, token: string | undefined, via: PayVia) => (token === undefined ? undefined : readAmount(secret(), serial, token, Date.now(), via));
+
+/** For the client's PDF and page: the button of the ONE way the offer was issued with (MyFatoorah or Tamara), only on our own files. */
+export async function payNowUrl(serial: string): Promise<{ url: string; via: PayVia } | undefined> {
   try {
     const loaded = await loadPayFile(serial);
-    if (!loaded || loaded.file.partner || loaded.file.status === "cancelled" || !showsPayNow(loaded.file.method)) return undefined;
-    return payLink(serial);
+    const via = payButtonFor(loaded?.file.method);
+    if (!loaded || !via || loaded.file.partner || loaded.file.status === "cancelled") return undefined;
+    return { url: payLink(serial, null, via), via };
   } catch {
     return undefined;
   }
 }
 
 /** What the page shows before the press — the amount, or why not. */
-export async function payPreview(serial: string, token: string | undefined): Promise<{ ok: true; amount: number; currency: string } | { ok: false; why: PayRefusal }> {
+export async function payPreview(
+  serial: string,
+  token: string | undefined,
+  via: PayVia = "myfatoorah",
+): Promise<{ ok: true; amount: number; currency: string } | { ok: false; why: PayRefusal }> {
   const loaded = await loadPayFile(serial);
-  const d = payDecision(loaded?.file ?? null, token === undefined ? undefined : readAmount(secret(), serial, token), riyadhDate());
+  const d = payDecision(loaded?.file ?? null, readToken(serial, token, via), riyadhDate(), via);
   return d.ok ? { ok: true, amount: d.amount, currency: loaded!.file.currency } : d;
 }
 
@@ -121,38 +144,56 @@ function limited(key: string, max: number): boolean {
 
 export type PayStart = { ok: true; url: string } | { ok: false; why: PayRefusal | "busy" | "gateway" };
 
-/** «ادفع الآن» pressed: an invoice for what is owed now (or a young one reused), kept for the job, then MyFatoorah. */
-export async function startPayNow(serial: string, token: string | undefined, ip: string): Promise<PayStart> {
+/** «ادفع الآن» pressed: an invoice / a Tamara session for what is owed now (or a young one reused), kept for the job, then the gateway. */
+export async function startPayNow(serial: string, token: string | undefined, ip: string, via: PayVia = "myfatoorah"): Promise<PayStart> {
   if (limited(`ip:${ip}`, 10) || limited(`serial:${serial}`, 20)) return { ok: false, why: "busy" };
   const loaded = await loadPayFile(serial);
-  const d = payDecision(loaded?.file ?? null, token === undefined ? undefined : readAmount(secret(), serial, token), riyadhDate());
+  const d = payDecision(loaded?.file ?? null, readToken(serial, token, via), riyadhDate(), via);
   if (!d.ok || !loaded) return d.ok ? { ok: false, why: "missing" } : d;
+  // Tamara knows the buyer by mobile
+  if (via === "tamara" && !loaded.phone) return { ok: false, why: "noPhone" };
   const supabase = db();
 
   const { data: open } = await supabase
     .from("payment_links")
     .select("invoice_id, url, amount, mock, created_at")
     .eq("offer_id", loaded.offerId)
-    .eq("provider", "myfatoorah")
+    .eq("provider", via)
     .eq("status", "pending")
     .order("created_at", { ascending: false })
     .limit(20);
   const links = ((open ?? []) as (Omit<OpenLink, "amount"> & { amount: number | string })[]).map((l) => ({ ...l, amount: Number(l.amount) }));
-  const url = await createOrReuse(loaded, serial, d.amount, links);
+  const url = await createOrReuse(loaded, serial, d.amount, links, via);
   return url ? { ok: true, url } : { ok: false, why: "gateway" };
 }
 
-async function createOrReuse(loaded: Loaded, serial: string, amount: number, links: OpenLink[]): Promise<string | null> {
+/** The gateway's own words for a refusal — to the file's seller (bell + «تنبيهاتي»), never to the client. */
+async function tellFailure(loaded: Loaded, serial: string, via: PayVia, reason: string): Promise<void> {
+  await logAudit({ action: "payment_link.failed", entity: "offers", entity_id: loaded.offerId, meta: { provider: via, serial, reason }, actor: { id: null, label: "pay-now" } });
+  if (!loaded.employeeId) return;
+  const name = via === "tamara" ? "تمارا" : "ماي فاتورة";
+  const title = `تعذّر فتح ${name} للعميل على ملف ${serial}: ${reason.slice(0, 200)}`;
+  await tellEmployee(db(), loaded.employeeId, title, `/offer/${encodeURIComponent(serial)}`, `pay-fail:${serial}:${via}:${reason.slice(0, 60)}`).catch(() => undefined);
+}
+
+async function createOrReuse(loaded: Loaded, serial: string, amount: number, links: OpenLink[], via: PayVia): Promise<string | null> {
   // only a real invoice is reused — a test-mode one never stands in once the key is set
-  const reuse = reusableLink(links, amount, false);
+  const reuse = reusableLink(links, amount, false, Date.now(), via === "tamara" ? TAMARA_REUSE_MS : REUSE_MS);
   if (reuse) return reuse.url;
-  const outcome = await createInvoiceLink({ amount, currency: "SAR", customerName: loaded.name, customerMobile: loaded.phone, reference: serial, language: "ar" });
-  if (outcome.kind !== "ok") return null;
+  const outcome =
+    via === "tamara"
+      ? await tamaraSession(loaded, serial, amount)
+      : await createInvoiceLink({ amount, currency: "SAR", customerName: loaded.name, customerMobile: loaded.phone, reference: serial, language: "ar" });
+  if (outcome.kind !== "ok") {
+    await tellFailure(loaded, serial, via, outcome.message || outcome.kind);
+    return null;
+  }
   const { error } = await db().from("payment_links").insert({
     offer_id: loaded.offerId,
     operation_id: loaded.operationId,
-    provider: "myfatoorah",
-    invoice_id: outcome.data.invoiceId,
+    provider: via,
+    // the job asks Tamara by its order id (getOrderStatus), as the staff link keeps it
+    invoice_id: "invoiceId" in outcome.data ? outcome.data.invoiceId : (outcome.data.orderId ?? outcome.data.checkoutId),
     amount,
     currency: "SAR",
     url: outcome.data.url,
@@ -167,8 +208,24 @@ async function createOrReuse(loaded: Loaded, serial: string, amount: number, lin
     action: "payment_link.client_opened",
     entity: "offers",
     entity_id: loaded.offerId,
-    meta: { provider: "myfatoorah", amount, mock: outcome.data.mock, serial },
+    meta: { provider: via, amount, mock: outcome.data.mock, serial },
     actor: { id: null, label: "pay-now" },
   });
   return outcome.data.url;
+}
+
+/** A Tamara checkout session for this file: back to /pay/<serial>/done whatever happens there (that page records nothing). */
+function tamaraSession(loaded: Loaded, serial: string, amount: number) {
+  const [firstName = "", ...rest] = loaded.name.split(/\s+/);
+  const done = (s: string) => `${site()}/pay/${encodeURIComponent(serial)}/done?s=${s}`;
+  return createCheckout({
+    amount,
+    currency: "SAR",
+    reference: serial,
+    customer: { firstName: firstName || "—", lastName: rest.join(" "), phone: loaded.phone ?? "" },
+    description: `رحلة ${serial}`,
+    successUrl: done("ok"),
+    failureUrl: done("fail"),
+    cancelUrl: done("cancel"),
+  });
 }

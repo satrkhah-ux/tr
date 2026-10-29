@@ -14,8 +14,8 @@ import { loadFileStatus } from "./file-status-core";
 import { getOfferCover } from "./offer-cover";
 import type { CoverStyle } from "@/components/offer-doc/cover-image";
 import type { TranslationKey } from "@/lib/i18n";
-import { loadPayFile, payLink } from "@/lib/payments/pay-now";
-import { showsPayNow } from "@/lib/payments/pay-now-rules";
+import { loadPayFile, payLink, tamaraLimitProblem } from "@/lib/payments/pay-now";
+import { payButtonFor, type PayVia } from "@/lib/payments/pay-now-rules";
 import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
 
 /**
@@ -326,27 +326,31 @@ export async function deleteFiles(draftIds: string[]): Promise<{ ok: true; delet
   }
 }
 
-type PayFail = { ok: false; error: TranslationKey };
+type PayFail = { ok: false; error: TranslationKey; params?: Record<string, string> };
 
 /**
  * «رابط الدفع» in Basic (the owner, 2026-10-29): our stable /pay/<serial> — bare when the client pays by
  * MyFatoorah (the PDF's own button), or with a deposit / instalment `amount` signed on the server so the client
- * cannot change it. A file whose way is not MyFatoorah needs an amount: its total carries another way's charge.
+ * cannot change it. A file whose way is not this gateway needs an amount: its total carries another way's charge.
+ * `via` tamara: the same link to Tamara (`?m=tamara`), within Tamara's limits and with the client's mobile.
  */
-export async function basicPayLink(draftId: string, amount?: number | null): Promise<{ ok: true; url: string; amount: number } | PayFail> {
+export async function basicPayLink(draftId: string, amount?: number | null, via: PayVia = "myfatoorah"): Promise<{ ok: true; url: string; amount: number } | PayFail> {
   try {
     const file = await issuedFile(draftId, true);
     if (failed(file) || file.offer.partner_company_id || file.offer.status === "cancelled") return { ok: false, error: "pay.link.forbidden" };
     const loaded = await loadPayFile(file.serial);
     if (!loaded || loaded.file.total == null) return { ok: false, error: "pay.link.forbidden" };
-    if (loaded.file.currency !== "SAR") return { ok: false, error: "pay.err.sarOnly" };
-    if (amount != null && String(amount) !== "") {
-      const value = Math.round(Number(amount) * 100) / 100;
-      if (!Number.isFinite(value) || value <= 0 || value > 1_000_000) return { ok: false, error: "pay.err.amount" };
-      return { ok: true, url: payLink(file.serial, value), amount: value };
+    if (loaded.file.currency !== "SAR") return { ok: false, error: via === "tamara" ? "pay.err.tamaraSar" : "pay.err.sarOnly" };
+    if (via === "tamara" && !loaded.phone) return { ok: false, error: "pay.err.noPhone" };
+    const custom = amount != null && String(amount) !== "";
+    const value = custom ? Math.round(Number(amount) * 100) / 100 : Math.max(0, Math.round((loaded.file.total - loaded.file.paid) * 100) / 100);
+    if (custom && (!Number.isFinite(value) || value <= 0 || value > 1_000_000)) return { ok: false, error: "pay.err.amount" };
+    if (!custom && payButtonFor(loaded.file.method) !== via) return { ok: false, error: "pay.link.amountNeeded" };
+    if (via === "tamara") {
+      const outside = await tamaraLimitProblem(value);
+      if (outside) return { ok: false, error: "pay.err.tamaraLimits", params: outside };
     }
-    if (!showsPayNow(loaded.file.method)) return { ok: false, error: "pay.link.amountNeeded" };
-    return { ok: true, url: payLink(file.serial), amount: Math.max(0, Math.round((loaded.file.total - loaded.file.paid) * 100) / 100) };
+    return { ok: true, url: payLink(file.serial, custom ? value : null, via), amount: value };
   } catch {
     return { ok: false, error: "pay.link.forbidden" };
   }

@@ -13,6 +13,7 @@
 
 import "server-only";
 import { getSecret } from "@/lib/secrets/get";
+import { parseTamaraLimits, type TamaraLimits } from "@/lib/payments/pay-now-rules";
 import type { SupplierOutcome } from "./hotel-supplier";
 
 export const TAMARA_SANDBOX_URL = "https://api-sandbox.tamara.co";
@@ -113,6 +114,22 @@ export async function createCheckout(input: CheckoutInput): Promise<SupplierOutc
     return parseCheckoutResponse(res.status, json);
   } catch (err) {
     return { kind: "unreachable", message: err instanceof Error ? err.name : "network" };
+  }
+}
+
+/** Tamara's instalment limits for SA/SAR — null when they cannot be read (then Tamara's own checkout decides). */
+export async function getInstalmentLimits(): Promise<TamaraLimits | null> {
+  const { token, mock, base } = await config();
+  if (mock) return null;
+  try {
+    const res = await fetch(`${base}/checkout/payment-types?country=SA&currency=SAR`, {
+      headers: { authorization: `Bearer ${token}`, accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    return res.ok ? parseTamaraLimits(await res.json().catch(() => null)) : null;
+  } catch {
+    return null;
   }
 }
 

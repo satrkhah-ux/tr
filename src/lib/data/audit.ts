@@ -101,6 +101,7 @@ export type AuditAction =
   | "payment_link.client_opened"
   | "payment_link.paid_before_case"
   | "payment_link.sent"
+  | "payment_link.failed"
   | "voucher.issued"
   | "voucher.revoked"
   // partner companies (identity + branding)

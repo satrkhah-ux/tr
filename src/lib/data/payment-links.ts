@@ -9,7 +9,8 @@ import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/telete
 import { gateOperation } from "@/lib/operations/access";
 import { createInvoiceLink } from "@/lib/providers/myfatoorah";
 import { createCheckout } from "@/lib/providers/tamara";
-import { payLink } from "@/lib/payments/pay-now";
+import { payLink, tamaraLimitProblem } from "@/lib/payments/pay-now";
+import type { PayVia } from "@/lib/payments/pay-now-rules";
 
 /**
  * A payment link for one case: PREPARED here (the provider creates the link,
@@ -18,7 +19,7 @@ import { payLink } from "@/lib/payments/pay-now";
  * method fee included — no fee is computed here.
  */
 
-type Fail = { ok: false; error: TranslationKey };
+type Fail = { ok: false; error: TranslationKey; params?: Record<string, string> };
 export type PaymentProvider = "myfatoorah" | "tamara";
 export type PreparedLink = { ok: true; url: string; provider: PaymentProvider; mock: boolean; amount: number; currency: string };
 
@@ -68,20 +69,24 @@ export async function preparePaymentLink(operationId: string, input: { provider:
       // Tamara sells in riyals only, and identifies the buyer by phone
       if (c.currency !== "SAR") return { ok: false, error: "pay.err.tamaraSar" };
       if (!c.phone) return { ok: false, error: "pay.err.noPhone" };
+      const outside = await tamaraLimitProblem(amount);
+      if (outside) return { ok: false, error: "pay.err.tamaraLimits", params: outside };
       const [firstName = "", ...rest] = c.name.split(/\s+/);
-      // ponytail: the client lands on the site root after paying; a thank-you page and a webhook come with the status sync
+      // back to /pay/<serial>/done, which only says thanks — the 10-minute job records the payment once Tamara authorises it
+      const done = (s: string) => `${site()}/pay/${encodeURIComponent(c.serial)}/done?s=${s}`;
       outcome = await createCheckout({
         amount,
         currency: "SAR",
         reference: c.serial,
         customer: { firstName: firstName || "—", lastName: rest.join(" "), phone: c.phone },
         description: `رحلة ${c.serial}`,
-        successUrl: site(),
-        failureUrl: site(),
-        cancelUrl: site(),
+        successUrl: done("ok"),
+        failureUrl: done("fail"),
+        cancelUrl: done("cancel"),
       });
     }
-    if (outcome.kind !== "ok") return { ok: false, error: outcome.kind === "rejected" ? "pay.err.rejected" : "pay.err.unreachable" };
+    // the gateway's own words to the employee (a wrong merchant URL, a limit, a bad key) — never to the client
+    if (outcome.kind !== "ok") return outcome.kind === "rejected" && outcome.message ? { ok: false, error: "pay.err.gatewaySaid", params: { reason: outcome.message.slice(0, 300) } } : { ok: false, error: outcome.kind === "rejected" ? "pay.err.rejected" : "pay.err.unreachable" };
 
     // kept so the 10-minute job can record it once paid (payment-links-poll.ts) — service role: the table has no policy
     const invoiceId = "invoiceId" in outcome.data ? outcome.data.invoiceId : (outcome.data.orderId ?? outcome.data.checkoutId);
@@ -116,7 +121,7 @@ export async function preparePaymentLink(operationId: string, input: { provider:
  * so the client cannot change it. It never expires the way a MyFatoorah invoice does; the press on that page
  * makes the invoice (pay-now.ts). Sent like any link: review, then «أرسله للعميل».
  */
-export async function stablePayLink(operationId: string, amount: number): Promise<{ ok: true; url: string; amount: number; currency: string } | Fail> {
+export async function stablePayLink(operationId: string, amount: number, via: PayVia = "myfatoorah"): Promise<{ ok: true; url: string; amount: number; currency: string } | Fail> {
   const denied = await gateOperation(operationId);
   if (denied) return { ok: false, error: denied };
   const value = Math.round(Number(amount) * 100) / 100;
@@ -125,8 +130,13 @@ export async function stablePayLink(operationId: string, amount: number): Promis
     const c = await loadCase(operationId);
     if (!c) return { ok: false, error: "ops.err.notYours" };
     if (c.partner) return { ok: false, error: "pay.err.partner" };
-    if (c.currency !== "SAR") return { ok: false, error: "pay.err.sarOnly" };
-    return { ok: true, url: payLink(c.serial, value), amount: value, currency: c.currency };
+    if (c.currency !== "SAR") return { ok: false, error: via === "tamara" ? "pay.err.tamaraSar" : "pay.err.sarOnly" };
+    if (via === "tamara") {
+      if (!c.phone) return { ok: false, error: "pay.err.noPhone" };
+      const outside = await tamaraLimitProblem(value);
+      if (outside) return { ok: false, error: "pay.err.tamaraLimits", params: outside };
+    }
+    return { ok: true, url: payLink(c.serial, value, via), amount: value, currency: c.currency };
   } catch {
     return { ok: false, error: "err.db" };
   }

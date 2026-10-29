@@ -35,8 +35,8 @@ export async function clientOfferPdf(serial: string, coverChoice?: CoverStyle): 
   // the public link follows the offer's OWN branding — nothing a URL can override
   const { brand, showPrices } = await resolveDocBrand({ serial });
   // «ادفع الآن»: a link in the PDF to our stable /pay/<serial> when the client pays by MyFatoorah
-  const payUrl = showPrices ? await payNowUrl(serial) : undefined;
-  const html = await renderOfferDocumentHtml({ variant: "client", offer: published.offer, brand, showPrices, ...(payUrl ? { payUrl } : {}), ...(cover === "designed" ? { cover } : {}) });
+  const pay = showPrices ? await payNowUrl(serial) : undefined;
+  const html = await renderOfferDocumentHtml({ variant: "client", offer: published.offer, brand, showPrices, ...(pay ? { payUrl: pay.url, payVia: pay.via } : {}), ...(cover === "designed" ? { cover } : {}) });
   const pdf = await offerDocumentToPdf(html, {
     brand: brand.nameAr,
     serial,
