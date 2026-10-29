@@ -41,9 +41,10 @@ import {
 } from "@/lib/offer/draft-types";
 import { getEnabledHotelSuppliers } from "@/lib/providers/hotel-registry";
 import { draftSellTotal } from "@/lib/offer/preview-dto";
-import { applyManualProfit, offerTotals, rebase, type PricingLineInput } from "@/lib/offer/pricing";
+import { offerTotals, type PricingLineInput } from "@/lib/offer/pricing";
+import { issuePricing } from "@/lib/offer/issue-pricing";
 import { getProfitSettings } from "./app-settings";
-import { packageProfitFor, withPackageProfit, withScopeLines } from "@/lib/offer/basic";
+import { withScopeLines } from "@/lib/offer/basic";
 import { advancedDayNote, advancedLines } from "@/lib/offer/advanced";
 import { getRates } from "./rates-actions";
 import { allRows } from "./all-rows";
@@ -973,42 +974,37 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
         return { ok: false, error: "pg.err.priceMissing" };
       }
     }
-    const reconciledItems = withPackageProfit(
-      sheet.filter((it) => it.item_type !== "hotel" || validHotelRefs.has(it.ref ?? it.description ?? "")),
-      packageProfitFor(data.pricing, (await getProfitSettings()).default_pct),
-      rebase(rates.sarPer, quote) ?? {},
-      quote,
+    // priced the one way issue, «تطبيق تحديث السعر» and «اعتمد هذه» all read (issue-pricing.ts); an adopted
+    // version's own total stands for our files only — a partner's sheet is re-priced at their terms above
+    const issued = issuePricing(
+      sheet,
+      record.partner_company_id ? { pricing: { ...data.pricing, adopted: undefined } } : data,
+      validHotelRefs,
+      (await getProfitSettings()).default_pct,
+      rates.sarPer,
     );
+    const reconciledItems = issued.items;
+    const lines = issued.lines;
 
     // The sell the agent is actually looking at. A line priced with a manual
     // profit («٪» or a flat amount) stores the ORIGINAL sell, so publishing
     // `item.sell_price` directly would send the offer out at the price before
     // the markup — the one number nobody would notice was wrong until the
     // month's margin came in short.
-    const effectiveSell = (item: (typeof reconciledItems)[number]) =>
-      applyManualProfit(item.buy_price, item.sell_price, item.profit_pct, item.profit_amount);
-
-    const pricing_items: OfferPricingItemInput[] = reconciledItems.map((item) => ({
+    const pricing_items: OfferPricingItemInput[] = reconciledItems.map((item, i) => ({
       item_type: item.item_type,
       description: item.description || null,
       quantity: item.quantity,
       buy_price: item.buy_price,
       buy_currency: item.buy_currency || null,
-      sell_price: effectiveSell(item),
+      sell_price: lines[i].sell_price,
       sell_currency: item.sell_currency || null,
     }));
 
     // Into the quote currency line by line — never a raw sum of mixed
     // currencies (see offerTotals). A currency with no rate blocks issuing:
     // a total that silently skipped a line is worse than no total.
-    const lines = reconciledItems.map((item) => ({
-      quantity: item.quantity,
-      buy_price: item.buy_price,
-      buy_currency: item.buy_currency,
-      sell_price: effectiveSell(item),
-      sell_currency: item.sell_currency,
-    }));
-    const totals = offerTotals(lines, rates.sarPer, data.pricing.display_currency, data.pricing.final_total);
+    const totals = issued.totals;
     if (totals.missing_rates.length > 0) return { ok: false, error: "pg.err.missingRates" };
     const sellTotal = totals.total;
     const buyTotal = totals.buy_total;
