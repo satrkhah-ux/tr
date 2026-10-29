@@ -170,3 +170,17 @@ describe("reports", () => {
     expect(s).toMatchObject({ supervisorId: "s", reached: 2, actedBeforeEscalation: 1, escalated: 1, avgResponseMinutes: 40 });
   });
 });
+
+describe("session B's excuses (leave, status buttons) and exemption", () => {
+  const now = at("2026-11-01T08:00:00Z"); // 11:00 Riyadh
+  const waiting = facts({ conversation: { waitingSince: at("2026-11-01T07:00:00Z") / 1000, lastActivityAt: 0, preview: "متى الحجز؟", teamId: null, inboxId: null } });
+  it("time under «لدي عميل» or a prayer is not lateness", () => {
+    // 60 minutes waited, 45 of them excused → 15 working minutes, under the normal 30
+    const excused = [{ from: at("2026-11-01T07:10:00Z"), to: at("2026-11-01T07:55:00Z"), reason: "client" as const }];
+    expect(detect({ ...waiting, excused }, S, HOURS, now)).toEqual([]);
+    expect(businessMinutes(at("2026-11-01T07:00:00Z"), now, HOURS, [], excused)).toBe(15);
+  });
+  it("an exempt colleague has no lateness at all", () => {
+    expect(detect({ ...waiting, exempt: true }, S, HOURS, now)).toEqual([]);
+  });
+});

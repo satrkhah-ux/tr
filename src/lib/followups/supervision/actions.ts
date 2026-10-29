@@ -173,7 +173,7 @@ export async function reassignCase(id: string, toEmployeeId: string, reason: str
   const db = supervisionDb();
   const people = await followupPeople().catch(() => []);
   if (!people.some((p) => p.id === toEmployeeId && p.person)) return fail("هذا الموظف لا يعمل على المتابعة.");
-  if (!(await availableEmployees(db)).has(toEmployeeId)) return fail("الموظف غير متاح الآن — اختر من هو على رأس العمل.");
+  if (!(await availableEmployees(db, Date.now(), [toEmployeeId])).has(toEmployeeId)) return fail("الموظف غير متاح الآن — اختر من هو على رأس العمل.");
   const { error } = await db.from("sla_followups")
     .update({ assigned_to: toEmployeeId, assigned_by: x.w.me, assigned_at: nowIso() })
     .eq("id", x.c.followup_id).eq("status", "open");
