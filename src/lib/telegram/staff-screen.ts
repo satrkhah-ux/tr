@@ -9,6 +9,7 @@ import { rememberThread, replyButtons } from "./staff-replies";
 import type { InlineButton } from "./ops-bot";
 import { loadSettings } from "@/lib/mine/day";
 import { onlineAgents } from "@/lib/mine/remind";
+import { excusedAgents } from "@/lib/presence/availability";
 import { quiet, STOP_REMINDING_AT, waitLevelNow, waitLevels, type DaySettings } from "@/lib/mine/rank";
 import { followedMarks, latenessExempt } from "@/lib/leads/lifecycle";
 import { exemptConversation } from "@/lib/leads/lateness";
@@ -238,10 +239,12 @@ export async function remindWaiting(nowMs = Date.now()): Promise<{ reminded: num
   if (!waiting.length) return { reminded: 0 };
 
   const agents = [...new Set(waiting.map((c) => c.assigneeId as number))];
-  const [{ data }, online, { data: hotRows }] = await Promise.all([
+  const [{ data }, online, { data: hotRows }, excused] = await Promise.all([
     db().from("employees").select("id, telegram_chat_id, teletel_agent_id").eq("status", "Active").in("teletel_agent_id", agents).not("telegram_chat_id", "is", null),
     onlineAgents(),
     db().from("sla_followups").select("conversation_id").eq("status", "open").eq("summary->>heat", "hot").in("conversation_id", waiting.map((c) => c.id)),
+    // on leave, with a client, on a call, praying, in a meeting: no reminder (presence/availability.ts)
+    excusedAgents(nowMs).catch(() => new Map<number, unknown>()),
   ]);
   const byAgent = new Map(((data ?? []) as { id: string; telegram_chat_id: number | string; teletel_agent_id: number }[]).map((e) => [e.teletel_agent_id, { id: e.id, chat: Number(e.telegram_chat_id) }]));
   const hot = new Set(((hotRows ?? []) as { conversation_id: number }[]).map((r) => Number(r.conversation_id)));
@@ -253,7 +256,7 @@ export async function remindWaiting(nowMs = Date.now()): Promise<{ reminded: num
   let reminded = 0;
   for (const c of waiting) {
     const who = byAgent.get(c.assigneeId as number);
-    if (!who?.chat || (online && !online.has(c.assigneeId as number))) continue;
+    if (!who?.chat || (online && !online.has(c.assigneeId as number)) || excused.has(c.assigneeId as number)) continue;
     if (followedSince(followed.get(c.id), c.waitingSince * 1000) || exemptConversation(c, exempt)) continue;
     if (!settings.has(who.id)) settings.set(who.id, loadSettings(who.id));
     const mine = await settings.get(who.id)!;

@@ -6,6 +6,8 @@ vi.mock("@/lib/providers/teletel", () => ({
   listTeletelTeams: async () => [{ id: 1, name: "قسم فيزا" }],
   listOpenConversations: async () => ({ rows: [] }), conversationEvents: async () => [],
 }));
+// «البدّالة» decides who takes it (routing/switchboard.ts, tested on its own): here, nobody of the department is available
+vi.mock("@/lib/routing/switchboard", () => ({ pickAgent: async () => null }));
 import { routeCompletedVisa } from "./visa-routing";
 import type { SupabaseClient } from "@supabase/supabase-js";
 function service() {

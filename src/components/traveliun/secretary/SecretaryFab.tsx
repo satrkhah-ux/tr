@@ -8,6 +8,7 @@ import { Loader2, X } from "lucide-react";
 import { getSecretaryBoard, type SecretaryBoard } from "@/lib/data/my-followups";
 import { SecretaryChat } from "./SecretaryChat";
 import { SecretaryDayBoard } from "./SecretaryDayBoard";
+import { StatusButtons } from "@/components/traveliun/presence/StatusButtons";
 
 /** Permanent side handle with an accessible drawer. */
 export function SecretaryFab() {
@@ -24,10 +25,12 @@ export function SecretaryFab() {
   }
 
   return <Sheet open={open} onOpenChange={changeOpen}>
-    <div className="fixed end-0 top-[74px] bottom-20 z-[100] flex w-10 items-center justify-center border-s border-[#dfe8e4] bg-[#eef3f1] md:bottom-0">
+    <div className="fixed end-0 top-[74px] bottom-20 z-[100] flex w-10 flex-col items-center justify-center gap-3 border-s border-[#dfe8e4] bg-[#eef3f1] md:bottom-0">
       <SheetTrigger aria-label="استدعاء مُراد — سكرتيري الخاص" className="flex h-24 w-10 items-center justify-center rounded-s-xl bg-[var(--tv-brand)] text-[13px] font-extrabold text-white shadow-md focus-visible:outline-2 focus-visible:outline-offset-2">
         مُراد
       </SheetTrigger>
+      {/* the status buttons (presence, 2026-10-29): in مُراد's own strip, so they never stand over a button or a field */}
+      <StatusButtons />
     </div>
     <SheetContent side="inline-end" dir="rtl" aria-describedby={undefined} className="w-[420px] max-w-[calc(100vw/var(--tv-zoom))] overflow-hidden bg-[#fbfdfc]">
       <div className="flex items-center gap-2 bg-[var(--tv-brand)] px-4 py-2.5 text-white">

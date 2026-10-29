@@ -123,6 +123,16 @@ export type AuditAction =
   | "staff_letter.issued"
   | "staff_letter.signed"
   | "staff_letter.withdrawn"
+  // presence (the owner, 2026-10-29): leaves, meetings, the status buttons' limits
+  | "presence.leave_added"
+  | "presence.leave_cancelled"
+  | "presence.meeting_called"
+  | "presence.meeting_ended"
+  | "presence.limits_saved"
+  // «البدّالة»: a client moved by the sweep, or by hand, and its rules
+  | "switchboard.moved"
+  | "switchboard.reassigned"
+  | "switchboard.rules_saved"
   | "employee.extra_permissions"
   | "employee.deleted"
   // «عين الإدارة» — what it said, and what management did about it

@@ -1,4 +1,5 @@
 import "server-only";
+import { exemptStaff, isExempt } from "@/lib/presence/availability";
 import { createElement } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
@@ -85,12 +86,16 @@ async function salesTeam(): Promise<Member[]> {
     .eq("status", "Active")
     .in("role_id", ids)
     .not("teletel_agent_id", "is", null);
-  return ((data ?? []) as { id: string; arabic_name: string; telegram_chat_id: number | string | null; teletel_agent_id: number }[]).map((e) => ({
-    id: e.id,
-    name: e.arabic_name.trim(),
-    chatId: e.telegram_chat_id != null && Number(e.telegram_chat_id) ? Number(e.telegram_chat_id) : null,
-    agentId: e.teletel_agent_id,
-  }));
+  // no warning letter for whom no lateness is counted (lateness_exempt, the owner 2026-10-29)
+  const exempt = await exemptStaff();
+  return ((data ?? []) as { id: string; arabic_name: string; telegram_chat_id: number | string | null; teletel_agent_id: number }[])
+    .map((e) => ({
+      id: e.id,
+      name: e.arabic_name.trim(),
+      chatId: e.telegram_chat_id != null && Number(e.telegram_chat_id) ? Number(e.telegram_chat_id) : null,
+      agentId: e.teletel_agent_id,
+    }))
+    .filter((m) => !isExempt(exempt, m));
 }
 
 /** Telegram knows the chat only once they pressed «ابدأ». */

@@ -18,7 +18,8 @@ describe("the menu consolidation (the owner, 2026-10-19)", () => {
 
   it("puts each merged page's tabs over all of its parts, the most precise one active", () => {
     expect(tabsFor("/employees/accounts")).toMatchObject({ active: "/employees/accounts" });
-    expect(tabsFor("/employees")?.tabs.map((t) => t.href)).toEqual(["/employees", "/employees/accounts", "/employees/roles"]);
+    // «الحضور والإجازات» and «البدّالة» (presence, the owner 2026-10-29)
+    expect(tabsFor("/employees")?.tabs.map((t) => t.href)).toEqual(["/employees", "/employees/accounts", "/employees/roles", "/employees/attendance", "/employees/switchboard"]);
     expect(tabsFor("/markup-rules")?.tabs.map((t) => t.href)).toEqual(["/settings/pricing", "/markup-rules"]);
     expect(tabsFor("/customers")?.active).toBe("/customers");
     // the transport family: one row of tabs from the vehicle types to the price grid

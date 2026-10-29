@@ -1,4 +1,5 @@
 import "server-only";
+import { exemptStaff, isExempt } from "@/lib/presence/availability";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { agentSummaries, type AgentSummary } from "@/lib/providers/teletel";
@@ -145,12 +146,16 @@ export async function sendDailyReports(nowMs = Date.now()): Promise<{ sent: numb
     .eq("status", "Active")
     .not("telegram_chat_id", "is", null)
     .not("teletel_agent_id", "is", null);
-  const members = ((data ?? []) as { id: string; arabic_name: string; telegram_chat_id: number | string; teletel_agent_id: number }[]).map((e) => ({
-    id: e.id,
-    name: e.arabic_name,
-    chatId: Number(e.telegram_chat_id),
-    agentId: e.teletel_agent_id,
-  }));
+  // no evening report of delays for whom no lateness is counted (lateness_exempt, the owner 2026-10-29)
+  const exempt = await exemptStaff();
+  const members = ((data ?? []) as { id: string; arabic_name: string; telegram_chat_id: number | string; teletel_agent_id: number }[])
+    .map((e) => ({
+      id: e.id,
+      name: e.arabic_name,
+      chatId: Number(e.telegram_chat_id),
+      agentId: e.teletel_agent_id,
+    }))
+    .filter((m) => !isExempt(exempt, m));
   // the hour after REPORT_HOUR ticks every minute: once everyone has today's row, it asks Teletel nothing
   const { data: done } = await db().from("staff_bot_reports").select("employee_id").eq("day", day);
   const sentTo = new Set(((done ?? []) as { employee_id: string }[]).map((r) => r.employee_id));
