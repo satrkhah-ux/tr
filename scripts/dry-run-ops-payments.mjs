@@ -19,6 +19,7 @@ for (const line of readFileSync(join(root, ".env.local"), "utf8").split(/\r?\n/)
 }
 
 const sql = readFileSync(join(root, "supabase/migrations/20261029140000_ops_payments.sql"), "utf8");
+const gatewaysSql = readFileSync(join(root, "supabase/migrations/20261029140100_payment_providers_integrations.sql"), "utf8");
 const linksSql = readFileSync(join(root, "supabase/migrations/20261029140200_payment_links.sql"), "utf8");
 const c = new pg.Client({ connectionString: process.env.SUPABASE_DB_URL });
 await c.connect();
@@ -47,6 +48,9 @@ try {
     "select data_type, is_nullable from information_schema.columns where table_schema='public' and table_name='operation_payments' and column_name='expected_settlement_on'",
   );
   check("operation_payments.expected_settlement_on exists, a nullable date", sc?.data_type === "date" && sc?.is_nullable === "YES");
+  await c.query(gatewaysSql);
+  const gw = await one("select count(*)::int n from public.integrations where check_key in ('myfatoorah', 'tamara')");
+  check("«الربط الخارجي»: MyFatoorah and Tamara rows point at their checks («افحص الآن»)", gw.n === 2);
   await c.query(linksSql);
   const lt = await one("select relrowsecurity r from pg_class where oid = 'public.payment_links'::regclass");
   check("payment_links exists with RLS on", lt?.r === true);

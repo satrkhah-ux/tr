@@ -61,7 +61,7 @@ values (
   'job_payment_links',
   'لا رسالة للعميل من هذه المهمة أبداً. بلا مفتاح البوابة تبقى الروابط «بانتظار الدفع» (وضع تجريبي).'
 )
-on conflict (name) do nothing;
+on conflict (name) do update set check_key = excluded.check_key;
 
 notify pgrst, 'reload schema';
 

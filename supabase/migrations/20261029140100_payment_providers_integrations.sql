@@ -24,7 +24,7 @@ values
     'tamara',
     'الافتراضي sandbox api-sandbox.tamara.co؛ الحي https://api.tamara.co مع رمزه. PAYMENTS_MOCK=1 أو غياب الرمز = وضع تجريبي'
   )
-on conflict (name) do nothing;
+on conflict (name) do update set check_key = excluded.check_key;
 
 -- ROLLBACK (manual):
 --   delete from public.integrations where name in ('ماي فاتورة MyFatoorah', 'تمارا Tamara');

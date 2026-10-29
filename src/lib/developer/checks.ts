@@ -574,9 +574,9 @@ const CHECKS: Check[] = [
     label: "dev.c.myfatoorah",
     // InitiatePayment only lists the account's payment methods — it creates no invoice
     run: async () => {
-      const key = env("MYFATOORAH_API_KEY");
+      const [key, savedBase] = await Promise.all([getSecret("MYFATOORAH_API_KEY"), getSecret("MYFATOORAH_BASE_URL")]);
       if (!key) return unconfigured("MYFATOORAH_API_KEY");
-      const base = env("MYFATOORAH_BASE_URL") ?? "https://apitest.myfatoorah.com";
+      const base = savedBase ?? "https://apitest.myfatoorah.com";
       const [res, ms] = await timed(() =>
         fetch(`${base}/v2/InitiatePayment`, {
           method: "POST",
@@ -598,9 +598,9 @@ const CHECKS: Check[] = [
     label: "dev.c.tamara",
     // the payment types on offer for SA/SAR — a read; no checkout is created
     run: async () => {
-      const token = env("TAMARA_API_TOKEN");
+      const [token, savedBase] = await Promise.all([getSecret("TAMARA_API_TOKEN"), getSecret("TAMARA_BASE_URL")]);
       if (!token) return unconfigured("TAMARA_API_TOKEN");
-      const base = env("TAMARA_BASE_URL") ?? "https://api-sandbox.tamara.co";
+      const base = savedBase ?? "https://api-sandbox.tamara.co";
       const [res, ms] = await timed(() => get(`${base}/checkout/payment-types?country=SA&currency=SAR`, { authorization: `Bearer ${token}` }));
       return res.ok ? ok(ms, { key: "dev.d.paymentOk", params: { host: maskHost(base) } }) : httpProblem(res.status, ms);
     },

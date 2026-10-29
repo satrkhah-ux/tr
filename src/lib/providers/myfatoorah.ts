@@ -13,6 +13,7 @@
  */
 
 import "server-only";
+import { getSecret } from "@/lib/secrets/get";
 import type { SupplierOutcome } from "./hotel-supplier";
 
 export const MYFATOORAH_TEST_URL = "https://apitest.myfatoorah.com";
@@ -34,10 +35,11 @@ export type InvoiceStatus = { status: "paid" | "pending" | "failed" | "expired";
 
 type MfEnvelope<T> = { IsSuccess?: boolean; Message?: string | null; ValidationErrors?: { Name?: string; Error?: string }[] | null; Data?: T | null };
 
-const config = () => {
-  const key = process.env["MYFATOORAH_API_KEY"] || "";
+// «المفاتيح والتوكنات» first, else the server's env — a key saved on the page works within a minute, no redeploy
+const config = async () => {
+  const [key = "", base] = await Promise.all([getSecret("MYFATOORAH_API_KEY"), getSecret("MYFATOORAH_BASE_URL")]);
   const mock = process.env["PAYMENTS_MOCK"] === "1" || !key;
-  return { key, mock, base: (process.env["MYFATOORAH_BASE_URL"] || MYFATOORAH_TEST_URL).replace(/\/$/, "") };
+  return { key, mock, base: (base || MYFATOORAH_TEST_URL).replace(/\/$/, "") };
 };
 
 /** MyFatoorah wants the country code and the local number apart (max 11 digits); only a Saudi number is split, anything else is left out (it is optional). */
@@ -80,7 +82,7 @@ export function parseStatusResponse(json: unknown): SupplierOutcome<InvoiceStatu
 }
 
 async function post(path: string, body: unknown): Promise<SupplierOutcome<unknown>> {
-  const { key, base } = config();
+  const { key, base } = await config();
   try {
     const res = await fetch(`${base}${path}`, {
       method: "POST",
@@ -99,7 +101,7 @@ async function post(path: string, body: unknown): Promise<SupplierOutcome<unknow
 }
 
 export async function createInvoiceLink(input: InvoiceLinkInput): Promise<SupplierOutcome<InvoiceLink>> {
-  if (config().mock) {
+  if ((await config()).mock) {
     return { kind: "ok", data: { invoiceId: `mock-${input.reference}`, url: `https://pay.mock.local/myfatoorah/${encodeURIComponent(input.reference)}`, mock: true } };
   }
   const res = await post("/v2/SendPayment", buildSendPaymentBody(input));
@@ -107,7 +109,7 @@ export async function createInvoiceLink(input: InvoiceLinkInput): Promise<Suppli
 }
 
 export async function getInvoiceStatus(invoiceId: string): Promise<SupplierOutcome<InvoiceStatus>> {
-  if (config().mock) return { kind: "ok", data: { status: "pending", mock: true } };
+  if ((await config()).mock) return { kind: "ok", data: { status: "pending", mock: true } };
   const res = await post("/v2/GetPaymentStatus", { Key: invoiceId, KeyType: "InvoiceId" });
   return res.kind === "ok" ? parseStatusResponse(res.data) : res;
 }

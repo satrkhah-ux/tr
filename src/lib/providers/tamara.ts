@@ -12,6 +12,7 @@
  */
 
 import "server-only";
+import { getSecret } from "@/lib/secrets/get";
 import type { SupplierOutcome } from "./hotel-supplier";
 
 export const TAMARA_SANDBOX_URL = "https://api-sandbox.tamara.co";
@@ -33,10 +34,11 @@ export type CheckoutInput = {
 
 export type Checkout = { checkoutId: string; orderId: string | null; url: string; mock: boolean };
 
-const config = () => {
-  const token = process.env["TAMARA_API_TOKEN"] || "";
+// «المفاتيح والتوكنات» first, else the server's env — a token saved on the page works within a minute, no redeploy
+const config = async () => {
+  const [token = "", base] = await Promise.all([getSecret("TAMARA_API_TOKEN"), getSecret("TAMARA_BASE_URL")]);
   const mock = process.env["PAYMENTS_MOCK"] === "1" || !token;
-  return { token, mock, base: (process.env["TAMARA_BASE_URL"] || TAMARA_SANDBOX_URL).replace(/\/$/, "") };
+  return { token, mock, base: (base || TAMARA_SANDBOX_URL).replace(/\/$/, "") };
 };
 
 /** Tamara wants the number with its country code; a local 05… is read as Saudi. */
@@ -91,7 +93,7 @@ export function parseCheckoutResponse(status: number, json: unknown): SupplierOu
 }
 
 export async function createCheckout(input: CheckoutInput): Promise<SupplierOutcome<Checkout>> {
-  const { token, mock, base } = config();
+  const { token, mock, base } = await config();
   if (mock) {
     return {
       kind: "ok",
@@ -136,7 +138,7 @@ export function parseOrderResponse(status: number, json: unknown): SupplierOutco
 }
 
 export async function getOrderStatus(orderId: string): Promise<SupplierOutcome<OrderStatus>> {
-  const { token, mock, base } = config();
+  const { token, mock, base } = await config();
   if (mock) return { kind: "ok", data: { status: "pending", mock: true } };
   try {
     const res = await fetch(`${base}/orders/${encodeURIComponent(orderId)}`, {
