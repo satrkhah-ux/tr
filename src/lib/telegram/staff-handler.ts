@@ -25,6 +25,7 @@ import {
   systemView,
 } from "./staff-admin";
 import { confirmNudge, prepareNudge, waitingConvView, waitingListView, waitingPickView } from "./staff-waiting";
+import { grantLeave, leaveView } from "./staff-leave";
 import { decisionStep, decisionsView, decisionText, decisionView, interventionView, promptDecision, setDecisionStatus, signalView } from "./staff-decisions";
 import type { InlineButton } from "./ops-bot";
 
@@ -237,6 +238,7 @@ type AdminAction = AdminKey | "toAdmin";
 const ADMIN_VIEWS: Record<Exclude<AdminKey, "broadcast" | "toStaff">, (me: StaffMember) => Promise<Screen>> = {
   day: dayView,
   waiting: (me) => waitingListView(me, "aw:all:0"),
+  leave: (me) => leaveView(me, "lv"),
   urgent: (me) => interventionView(me),
   decisions: decisionsView,
   team: adminTeamView,
@@ -343,6 +345,9 @@ export async function handleStaffUpdate(update: StaffUpdate): Promise<void> {
     if (data.startsWith("av:")) return show(chatId, withBack(await waitingConvView(me, Number(data.slice(3)))), at);
     if (data.startsWith("ax:") || data.startsWith("ay:")) return prepareNudge(me, chatId, Number(data.slice(3)), data.startsWith("ay:"));
     if (data.startsWith("bw:")) return confirmNudge(me, chatId, at, data);
+    // «🏖️ منح إجازة» (staff-leave.ts): the colleague → days → reason → preview → grant, each step checks the manager first
+    if (data === "lv" || data.startsWith("lv:")) return show(chatId, withBack(await leaveView(me, data)), at);
+    if (data.startsWith("lvok:")) return grantLeave(me, chatId, data);
     if (data.startsWith("e:")) return show(chatId, withBack(await memberView(me, data.slice(2))), at);
     // «قرارات الإدارة»: the screen's items and the decisions (staff-decisions.ts, each step checks the manager again)
     if (data === "si" || data === "sw") return show(chatId, withBack(await interventionView(me, data === "sw")), at);

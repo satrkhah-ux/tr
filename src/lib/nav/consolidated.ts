@@ -59,6 +59,8 @@ export const TAB_GROUPS: SectionTab[][] = [
     { href: "/employees", labelKey: "nav.employees" },
     { href: "/employees/accounts", labelKey: "nav.employeeAccounts" },
     { href: "/employees/roles", labelKey: "nav.roles" },
+    // «الحضور والإجازات» (presence, the owner 2026-10-29)
+    { href: "/employees/attendance", labelKey: "nav.attendance" },
   ],
   [
     { href: "/settings/pricing", labelKey: "nav.profitPolicy" },

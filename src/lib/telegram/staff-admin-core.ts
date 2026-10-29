@@ -23,6 +23,7 @@ export const ADMIN_KEYS = {
   money: "💰 المال والتحصيل",
   broadcast: "📢 إعلان عام",
   alert: "🔔 نبّه موظفاً",
+  leave: "🏖️ منح إجازة",
   ops: "🧭 العمليات والتأشيرات",
   system: "🔌 النظام",
   toStaff: "👤 واجهة الموظف",
@@ -41,8 +42,9 @@ export function adminRows(money: boolean): string[][] {
     [k.urgent, k.decisions],
     [k.team, k.performance],
     money ? [k.money, k.alert] : [k.alert],
-    [k.broadcast, k.ops],
-    [k.system, k.toStaff],
+    [k.broadcast, k.leave],
+    [k.ops, k.system],
+    [k.toStaff],
   ];
 }
 
