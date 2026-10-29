@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Check, Copy, ExternalLink, FileText, Loader2, Send, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { prepareOfferMessage, sendOfferMessage, type FileError, type OfferMessageDraft } from "@/lib/data/file-status";
+import type { CoverStyle } from "@/components/offer-doc/cover-image";
+import { CoverChoice } from "./CoverChoice";
 import { useBasicLabels } from "./basic/labels";
 
 const ERR: Partial<Record<FileError, "fileErr_forbidden" | "fileErr_cancelled" | "fileErr_empty" | "fileErr_partner">> = {
@@ -45,6 +47,8 @@ export function OfferSend({
   onSent,
   className = "",
   filled = true,
+  cover: coverProp,
+  onCover,
 }: {
   draftId: string;
   again?: boolean;
@@ -53,6 +57,9 @@ export function OfferSend({
   className?: string;
   /** the file's current step is the filled button; otherwise a framed one */
   filled?: boolean;
+  /** the PDF cover when the parent shows the choice too (BasicFileStatus keeps it); otherwise the panel keeps its own */
+  cover?: CoverStyle;
+  onCover?: (cover: CoverStyle) => void;
 }) {
   const tx = useBasicLabels();
   const [draft, setDraft] = useState<OfferMessageDraft | null>(null);
@@ -61,8 +68,13 @@ export function OfferSend({
   const [said, setSaid] = useState<{ text: string; ok: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  // the first page of the PDF — «أساسي» or «فني»: the employee's choice, said nowhere in the client's PDF or link
-  const [cover, setCover] = useState<"basic" | "designed">("basic");
+  // the first page of the PDF — «أساسي» or «فني»: the employee's choice (kept on the offer), said nowhere in the client's PDF or link
+  const [ownCover, setOwnCover] = useState<CoverStyle>("basic");
+  const cover = coverProp ?? ownCover;
+  const setCover = (c: CoverStyle) => {
+    setOwnCover(c);
+    onCover?.(c);
+  };
 
   const fail = (e: FileError) => setError(tx(ERR[e] ?? "fileErr_failed"));
 
@@ -75,6 +87,7 @@ export function OfferSend({
       if (!r.ok) return fail(r.error);
       setDraft(r);
       setBody(r.body);
+      setOwnCover(r.cover);
     } catch {
       fail("failed");
     } finally {
@@ -86,7 +99,7 @@ export function OfferSend({
     setBusy(manual ? "manual" : "send");
     setError(null);
     try {
-      const r = await sendOfferMessage(draftId, body, manual, cover);
+      const r = await sendOfferMessage(draftId, body, manual);
       if (!r.ok) return fail(r.error);
       setSaid({ text: tx(SAID[r.result]), ok: r.result === "sent" || r.result === "template" || r.result === "manual" });
       // a send or a note left in the client's thread: the status moves on and the panel closes
@@ -133,21 +146,7 @@ export function OfferSend({
               {tx("previewPdf")}
             </a>
           </div>
-          <div role="radiogroup" aria-label={tx("coverChoice")} className="flex flex-wrap items-center gap-2 text-[12px] font-bold text-[#185045]">
-            <span>{tx("coverChoice")}:</span>
-            {(["basic", "designed"] as const).map((c) => (
-              <button
-                key={c}
-                type="button"
-                role="radio"
-                aria-checked={cover === c}
-                onClick={() => setCover(c)}
-                className={`h-8 rounded-full border px-3.5 text-[12px] font-bold ${cover === c ? "border-[#185045] bg-[#185045] text-white" : "border-[#cfe0d9] bg-white text-[#557d78] hover:bg-[#f0f7f4]"}`}
-              >
-                {tx(c === "basic" ? "coverBasic" : "coverDesigned")}
-              </button>
-            ))}
-          </div>
+          <CoverChoice draftId={draftId} serial={draft.serial} value={cover} onChange={setCover} />
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}

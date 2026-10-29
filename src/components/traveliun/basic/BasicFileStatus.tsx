@@ -8,6 +8,8 @@ import { AWAITING_CLIENT, SENDABLE, type FileState, type TimelineEntry } from "@
 import type { TranslationKey } from "@/lib/i18n";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { OfferSend } from "../OfferSend";
+import { CoverChoice } from "../CoverChoice";
+import type { CoverStyle } from "@/components/offer-doc/cover-image";
 import { TripLinkSend } from "./TripLinkSend";
 import { FileStateChip } from "./FileStateChip";
 import { useBasicLabels } from "./labels";
@@ -94,6 +96,8 @@ export function BasicFileStatus({
   const [showVersions, setShowVersions] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [copied, setCopied] = useState(false);
+  // «غلاف الملف»: what the employee picked here (the server keeps it on the offer); until then the loaded value
+  const [coverPick, setCoverPick] = useState<CoverStyle | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -256,6 +260,20 @@ export function BasicFileStatus({
               PDF
             </a>
           </div>
+          {view.canAct && !view.partner ? (
+            <div className="mt-2">
+              <CoverChoice
+                draftId={draftId}
+                serial={serial}
+                value={coverPick ?? view.cover}
+                onChange={(c) => {
+                  setCoverPick(c);
+                  loaded.set(draftId, { ...view, cover: c });
+                }}
+                preview
+              />
+            </div>
+          ) : null}
         </Step>
         <Step
           n={2}
@@ -264,7 +282,7 @@ export function BasicFileStatus({
           status={step2}
         >
           {/* the filled button is the current step's only: framed once the file is past it */}
-          {sendable ? <OfferSend draftId={draftId} again={view.stale} onSent={changed} filled={step2 === "now"} /> : null}
+          {sendable ? <OfferSend draftId={draftId} again={view.stale} onSent={changed} filled={step2 === "now"} cover={coverPick ?? view.cover} onCover={(c) => setCoverPick(c)} /> : null}
         </Step>
         <Step
           n={3}

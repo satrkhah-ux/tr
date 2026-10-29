@@ -1,3 +1,4 @@
+import { coverFromParam } from "@/lib/data/offer-cover";
 import { clientOfferPdf } from "@/lib/offer-doc/client-pdf";
 
 export const runtime = "nodejs";
@@ -12,10 +13,10 @@ export const maxDuration = 26;
  * client snapshot (never buy price / profit). Rendered once per version and kept
  * a while (client-pdf.ts) — WhatsApp fetches it for the programme template.
  */
-// `?c=d`: the designed first page, the employee's choice at sending (the WhatsApp message carries that link); it names no label
+// the first page is the employee's stored choice for the offer (offers.pdf_cover); `?c=d` / `?c=b` name one outright. No label is ever printed
 export async function GET(request: Request, { params }: { params: Promise<{ serial: string }> }) {
   const { serial } = await params;
-  const cover = new URL(request.url).searchParams.get("c") === "d" ? "designed" : "basic";
+  const cover = await coverFromParam(serial, new URL(request.url).searchParams.get("c"));
   const pdf = await clientOfferPdf(serial, cover);
   if (!pdf) return new Response("لم يتم نشر هذا العرض بعد", { status: 404 });
   return new Response(new Uint8Array(pdf), {

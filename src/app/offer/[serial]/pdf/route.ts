@@ -6,6 +6,7 @@ import { toClientOfferDTO } from "@/lib/offer/dto";
 import { renderOfferDocumentHtml } from "@/lib/offer-doc/html";
 import { offerDocumentToPdf } from "@/lib/offer-doc/pdf";
 import { currentCan } from "@/lib/roles/current";
+import { coverFromParam } from "@/lib/data/offer-cover";
 import { getPartnerSession } from "@/lib/partners/session";
 
 export const runtime = "nodejs";
@@ -56,7 +57,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ seri
     showPrices: partner ? undefined : pricesParam == null ? undefined : pricesParam !== "off",
   });
 
-  const html = await renderOfferDocumentHtml({ ...props, brand, showPrices });
+  const cover = props.variant === "client" ? await coverFromParam(serial, query.get("c")) : "basic";
+  const html = await renderOfferDocumentHtml({ ...props, brand, showPrices, ...(cover === "designed" ? { cover } : {}) });
   const pdf = await offerDocumentToPdf(html, {
     brand: brand.nameAr,
     serial,

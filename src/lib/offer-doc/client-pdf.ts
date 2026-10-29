@@ -6,6 +6,7 @@ import { renderOfferDocumentHtml } from "./html";
 import { offerDocumentToPdf } from "./pdf";
 import { sendTeletelAttachment } from "@/lib/providers/teletel";
 import type { CoverStyle } from "@/components/offer-doc/cover-image";
+import { getOfferCover } from "@/lib/data/offer-cover";
 
 /**
  * The client's programme PDF — the latest PUBLISHED snapshot, as the public
@@ -21,10 +22,11 @@ const cache = new Map<string, { at: number; bytes: Uint8Array }>();
 const KEEP_MS = 30 * 60_000;
 const MAX = 20;
 
-/** `cover`: the first page the employee chose at sending (a version is kept once per cover) */
-export async function clientOfferPdf(serial: string, cover: CoverStyle = "basic"): Promise<Uint8Array | null> {
+/** `cover`: the first page — the employee's stored choice for the offer unless named (a version is kept once per cover) */
+export async function clientOfferPdf(serial: string, coverChoice?: CoverStyle): Promise<Uint8Array | null> {
   const published = await getPublishedClientOffer(serial);
   if (!published) return null;
+  const cover = coverChoice ?? (await getOfferCover(serial));
   const key = `${serial}:${published.version}:${cover}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < KEEP_MS) return hit.bytes;
@@ -49,7 +51,7 @@ export async function clientOfferPdf(serial: string, cover: CoverStyle = "basic"
  * first send after a deploy missed it, 2026-10-24: AD-7-5934, 75 s after the container started). Each miss is said in
  * the log; null after both, and the caller leaves the agent its note (pdfMissedNote).
  */
-export async function sendProgrammePdf(conversationId: number, serial: string, name: string, cover: CoverStyle = "basic"): Promise<number | null> {
+export async function sendProgrammePdf(conversationId: number, serial: string, name: string, cover?: CoverStyle): Promise<number | null> {
   for (let attempt = 1; attempt <= 2; attempt++) {
     let reason: string;
     try {
