@@ -226,4 +226,24 @@ ${FIT_SCREEN}
 
 /* ── internal-only pricing (never in the client tree) ─────────────────────── */
 .od-internal-note{margin-bottom:5mm;font-size:10.5pt;font-weight:700;color:#a86a10;background:#fff8e8;border:1px solid #f2e2b4;border-radius:3mm;padding:3mm 4mm;}
+
+/* ── the designed cover (optional first page: the destination's landmark, a soft veil, a frosted card) ──── */
+.od-page.od-dc{height:297mm;min-height:297mm;overflow:hidden;padding:0;background:linear-gradient(160deg,var(--od-green),var(--od-green-2));}
+.od-page.od-dc::before,.od-page.od-dc::after,.od-page.od-dc .od-foot{display:none;}
+.od-page > .od-dc-photo{position:absolute;inset:0;width:210mm;height:297mm;object-fit:cover;z-index:0;}
+.od-page > .od-dc-veil{position:absolute;inset:0;z-index:1;
+  background:linear-gradient(180deg,rgba(19,85,73,.55) 0%,rgba(19,85,73,.12) 34%,rgba(11,52,45,.30) 58%,rgba(9,44,38,.92) 100%);}
+.od-page > .od-dc-top{position:absolute;inset-inline:13mm;top:13mm;z-index:2;}
+.od-dc-chip{display:inline-block;background:rgba(255,255,255,.90);border-radius:5mm;padding:3mm 6mm;box-shadow:0 6px 18px rgba(9,44,38,.22);}
+.od-dc-brand{display:flex;align-items:center;gap:5mm;}
+.od-dc-brand h2{margin:0;color:var(--od-green);font-size:15pt;font-weight:800;}
+.od-page > .od-dc-title{position:absolute;inset-inline:13mm;top:92mm;z-index:2;text-align:center;color:#fff;text-shadow:0 2px 14px rgba(5,30,26,.55);}
+.od-dc-eyebrow{font-size:13pt;letter-spacing:.3px;opacity:.92;margin-bottom:4mm;}
+.od-dc-title h1{margin:0;font-size:40pt;font-weight:800;line-height:1.2;}
+.od-dc-serial{margin-top:5mm;font-size:11pt;opacity:.85;}
+.od-page > .od-dc-card{position:absolute;inset-inline:13mm;bottom:15mm;z-index:2;background:rgba(255,255,255,.90);border-radius:6mm;
+  padding:6mm 8mm;display:grid;grid-template-columns:1fr 1fr;gap:4mm 10mm;box-shadow:0 10px 26px rgba(5,30,26,.30);}
+.od-dc-row{display:grid;gap:.6mm;}
+.od-dc-row span{color:var(--od-muted);font-size:9pt;}
+.od-dc-row strong{color:var(--od-green);font-size:13pt;font-weight:800;line-height:1.35;}
 `;

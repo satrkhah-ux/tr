@@ -47,6 +47,18 @@ export async function inlineImage(url: string): Promise<string | null> {
   }
 }
 
+/** One of our own public images (the designed cover's landmark) as a data URI — null when it is not there, so the cover falls back to the neutral one. */
+export async function inlinePublicImage(publicPath: string): Promise<string | null> {
+  if (!/^\/[\w\-/]+\.(webp|png|jpg)$/.test(publicPath)) return null;
+  try {
+    const bytes = await readFile(join(process.cwd(), "public", publicPath));
+    const type = publicPath.endsWith(".webp") ? "image/webp" : publicPath.endsWith(".png") ? "image/png" : "image/jpeg";
+    return `data:${type};base64,${bytes.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 let cache: OfferDocAssets | null = null;
 
 export async function loadOfferDocAssets(): Promise<OfferDocAssets> {

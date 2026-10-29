@@ -61,6 +61,8 @@ export function OfferSend({
   const [said, setSaid] = useState<{ text: string; ok: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // the first page of the PDF — «أساسي» or «فني»: the employee's choice, said nowhere in the client's PDF or link
+  const [cover, setCover] = useState<"basic" | "designed">("basic");
 
   const fail = (e: FileError) => setError(tx(ERR[e] ?? "fileErr_failed"));
 
@@ -84,7 +86,7 @@ export function OfferSend({
     setBusy(manual ? "manual" : "send");
     setError(null);
     try {
-      const r = await sendOfferMessage(draftId, body, manual);
+      const r = await sendOfferMessage(draftId, body, manual, cover);
       if (!r.ok) return fail(r.error);
       setSaid({ text: tx(SAID[r.result]), ok: r.result === "sent" || r.result === "template" || r.result === "manual" });
       // a send or a note left in the client's thread: the status moves on and the panel closes
@@ -126,10 +128,25 @@ export function OfferSend({
               <ExternalLink className="size-3.5" />
               {tx("previewLink")}
             </a>
-            <a href={draft.pdf} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] hover:bg-[#f0f7f4]">
+            <a href={cover === "designed" ? `${draft.pdf}?c=d` : draft.pdf} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-[#cfe0d9] bg-white px-2.5 text-[11.5px] hover:bg-[#f0f7f4]">
               <FileText className="size-3.5" />
               {tx("previewPdf")}
             </a>
+          </div>
+          <div role="radiogroup" aria-label={tx("coverChoice")} className="flex flex-wrap items-center gap-2 text-[12px] font-bold text-[#185045]">
+            <span>{tx("coverChoice")}:</span>
+            {(["basic", "designed"] as const).map((c) => (
+              <button
+                key={c}
+                type="button"
+                role="radio"
+                aria-checked={cover === c}
+                onClick={() => setCover(c)}
+                className={`h-8 rounded-full border px-3.5 text-[12px] font-bold ${cover === c ? "border-[#185045] bg-[#185045] text-white" : "border-[#cfe0d9] bg-white text-[#557d78] hover:bg-[#f0f7f4]"}`}
+              >
+                {tx(c === "basic" ? "coverBasic" : "coverDesigned")}
+              </button>
+            ))}
           </div>
           <textarea
             value={body}
