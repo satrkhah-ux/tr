@@ -89,9 +89,24 @@ export function BasicHome({
   useEffect(() => {
     if (!wantsNew || started.current) return;
     started.current = true;
-    void onCreate();
+    onCreate().catch(() => {
+      setError(tx("serverLost"));
+      setCreating(false);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per visit
   }, [wantsNew]);
+
+  // «بكج جديد» goes straight to the new file — never a glimpse of the files list on the way (the owner, 2026-10-30)
+  if (wantsNew && !error) {
+    return (
+      <TraveliunShell title="nav.basic">
+        <div className="flex min-h-[50vh] items-center justify-center gap-2 text-[14px] font-extrabold text-[#185045]">
+          <Loader2 className="size-5 animate-spin" />
+          {tx("openingNew")}
+        </div>
+      </TraveliunShell>
+    );
+  }
 
   return (
     <TraveliunShell title="nav.basic">

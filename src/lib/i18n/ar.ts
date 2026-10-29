@@ -222,7 +222,7 @@ export const ar: Dictionary = {
   "nav.packageGenerator": "مولد البكجات السياحية",
   "nav.issuePackage": "إصدار بكج سياحي",
   "nav.issuedOffers": "العروض السياحية",
-  "nav.sentOffers": "العروض المرسلة",
+  "nav.sentOffers": "برامجي السياحية",
   "nav.terms": "الشروط والأحكام",
   "nav.paymentTerms": "شروط وطرق الدفع",
   "nav.bankAccounts": "الحسابات البنكية",

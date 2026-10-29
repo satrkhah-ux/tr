@@ -224,7 +224,7 @@ export const en = {
   "nav.packageGenerator": "Package Generator",
   "nav.issuePackage": "Issue a Package",
   "nav.issuedOffers": "Issued Offers",
-  "nav.sentOffers": "Sent offers",
+  "nav.sentOffers": "My tour programmes",
   "nav.terms": "Terms & Conditions",
   "nav.paymentTerms": "Payment terms",
   "nav.bankAccounts": "Bank accounts",
