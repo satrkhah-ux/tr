@@ -54,6 +54,8 @@ const SECRET_ENV = [
   "TELEGRAM_WEBAPP_BOT_TOKEN",
   "TELEGRAM_STAFF_BOT_TOKEN",
   "RESERVATIONS_IMAP_PASSWORD",
+  "MYFATOORAH_API_KEY",
+  "TAMARA_API_TOKEN",
 ];
 
 const HOUR = 3_600_000;
@@ -453,6 +455,16 @@ const CHECKS: Check[] = [
     ),
   },
   {
+    id: "job_payment_links",
+    group: "jobs",
+    label: "dev.c.paymentLinksJob",
+    // the VPS crontab: every 10 minutes (api/ops/payments/route.ts); late after 30
+    run: cronCheck("payment_links", 30 * 60 * 1000, (s) => ({
+      key: "dev.d.paymentLinksJob",
+      params: { checked: Number(s.checked ?? 0), paid: Number(s.paid ?? 0), closed: Number(s.closed ?? 0) },
+    })),
+  },
+  {
     id: "job_leads_pull",
     group: "jobs",
     label: "dev.c.leadsPullJob",
@@ -554,6 +566,43 @@ const CHECKS: Check[] = [
         const reason = scrub(error instanceof Error ? error.message : String(error), [pass, user, ...SECRET_ENV.map(env)]);
         return { status: "down", latencyMs: null, detail: { key: "dev.d.failed", params: { reason } } };
       }
+    },
+  },
+  {
+    id: "myfatoorah",
+    group: "api",
+    label: "dev.c.myfatoorah",
+    // InitiatePayment only lists the account's payment methods — it creates no invoice
+    run: async () => {
+      const [key, savedBase] = await Promise.all([getSecret("MYFATOORAH_API_KEY"), getSecret("MYFATOORAH_BASE_URL")]);
+      if (!key) return unconfigured("MYFATOORAH_API_KEY");
+      const base = savedBase ?? "https://apitest.myfatoorah.com";
+      const [res, ms] = await timed(() =>
+        fetch(`${base}/v2/InitiatePayment`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+          body: JSON.stringify({ InvoiceAmount: 1, CurrencyIso: "SAR" }),
+          signal: signal(),
+          cache: "no-store",
+        }),
+      );
+      if (!res.ok) return httpProblem(res.status, ms);
+      const body = (await res.json().catch(() => ({}))) as { IsSuccess?: boolean; Message?: string };
+      if (!body.IsSuccess) return { status: "down", latencyMs: ms, detail: { key: "dev.d.apiError", params: { reason: scrub(body.Message ?? "", [key]) } } };
+      return ok(ms, { key: "dev.d.paymentOk", params: { host: maskHost(base) } });
+    },
+  },
+  {
+    id: "tamara",
+    group: "api",
+    label: "dev.c.tamara",
+    // the payment types on offer for SA/SAR — a read; no checkout is created
+    run: async () => {
+      const [token, savedBase] = await Promise.all([getSecret("TAMARA_API_TOKEN"), getSecret("TAMARA_BASE_URL")]);
+      if (!token) return unconfigured("TAMARA_API_TOKEN");
+      const base = savedBase ?? "https://api-sandbox.tamara.co";
+      const [res, ms] = await timed(() => get(`${base}/checkout/payment-types?country=SA&currency=SAR`, { authorization: `Bearer ${token}` }));
+      return res.ok ? ok(ms, { key: "dev.d.paymentOk", params: { host: maskHost(base) } }) : httpProblem(res.status, ms);
     },
   },
   { id: "sheet_ready_offers", group: "api", label: "dev.c.sheetReady", run: async () => sheetOutcome((await readyOffersSheet()).id) },

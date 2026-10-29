@@ -23,8 +23,9 @@ import {
 } from "@/lib/operations/state";
 import { currentCan } from "@/lib/roles/current";
 import { gateCaseManager, gateOperation, mayWork, opsAccess } from "@/lib/operations/access";
-import { mintReceipt } from "@/lib/data/payment-receipt";
-import { isIsoDate, riyadhDate } from "@/lib/operations/payments";
+import { caseTotal } from "@/lib/operations/payments";
+import type { PayMethod } from "@/lib/payments/methods";
+import { insertPayment } from "@/lib/operations/record-payment";
 
 /**
  * «العمليات» — the execution hub. A case's two statuses move in three places,
@@ -67,7 +68,12 @@ export type OperationCard = OperationRow & {
   destination: string | null;
   customer_name: string | null;
   customer_phone: string | null;
+  /** what the client owes: the agreed price when one was written, else the offer's (payments.ts caseTotal) */
   total: number | null;
+  /** the offer's own total, shown beside an agreed price that differs from it */
+  offer_total?: number | null;
+  /** «السعر المعروض المرسل للعميل» (20261029140000) — null when the offer's total stands */
+  agreed_total?: number | null;
   currency: string | null;
   paid: number;
   travelers_count: number;
@@ -381,7 +387,8 @@ export async function setExecutionStatus(
 }
 
 export type PaymentKind = "deposit" | "installment" | "final" | "refund";
-export type PaymentMethod = "transfer" | "cash" | "pos" | "link";
+/** «وسائل الدفع» — the one list (lib/payments/methods.ts); the column's check matches it (20261029140000). */
+export type PaymentMethod = PayMethod;
 
 export type OperationPayment = {
   id: string;
@@ -416,31 +423,11 @@ export async function recordPayment(input: {
   try {
     const supabase = await db();
     const kind = input.kind ?? "deposit";
-    const recordedBy = await getCurrentEmployeeId();
-    let id = "";
-    // the receipt number is a Riyadh day + 4 random characters: a clash is rare, not impossible
-    for (let attempt = 0; !id; attempt++) {
-      const { data, error } = await supabase
-        .from("operation_payments")
-        .insert({
-          operation_id: input.operation_id,
-          amount: Math.round(input.amount * 100) / 100,
-          currency: input.currency ?? "SAR",
-          kind,
-          method: input.method ?? null,
-          reference: input.reference?.trim() || null,
-          // the office's day, not UTC's — a payment taken at 1am Riyadh is today's
-          paid_at: isIsoDate(input.paid_at) ? input.paid_at : riyadhDate(),
-          recorded_by: recordedBy,
-          note: input.note?.trim() || null,
-          // a refund is money going out — it gets no «سند قبض»
-          ...(kind === "refund" ? {} : mintReceipt()),
-        })
-        .select("id")
-        .single();
-      if (data) id = (data as { id: string }).id;
-      else if (error?.code !== "23505" || attempt >= 2) return { ok: false, error: "err.createFailed" };
-    }
+    // named fields only — what the browser sends never reaches provider_ref
+    const { operation_id, amount, currency, method, reference, paid_at, note } = input;
+    const res = await insertPayment(supabase, { operation_id, amount, currency, kind, method, reference, paid_at, note, recorded_by: await getCurrentEmployeeId() });
+    if (!("id" in res)) return { ok: false, error: "err.createFailed" };
+    const id = res.id;
 
     await logAudit({
       action: "payment.recorded",
@@ -508,11 +495,11 @@ export async function listOperations(): Promise<OperationCard[]> {
     const { data } = await supabase
       .from("operations")
       .select(
-        "id, offer_id, render_id, client_status, execution_status, travel_start, travel_end, confirm_channel, confirmed_at, note, offers(serial, destination, total, currency, adults, children, infants, employee_id, customers(arabic_name, mobile), booking_partners(id, name))",
+        "id, offer_id, render_id, client_status, execution_status, travel_start, travel_end, confirm_channel, confirmed_at, note, agreed_total, offers(serial, destination, total, currency, adults, children, infants, employee_id, customers(arabic_name, mobile), booking_partners(id, name))",
       )
       .order("travel_start", { ascending: true, nullsFirst: false });
 
-    const rows = ((data ?? []) as unknown as (OperationRow & { offers: OfferJoin | OfferJoin[] | null })[]).filter((r) =>
+    const rows = ((data ?? []) as unknown as (OperationRow & { agreed_total: number | string | null; offers: OfferJoin | OfferJoin[] | null })[]).filter((r) =>
       mayWork(access, one(r.offers)?.employee_id),
     );
     if (rows.length === 0) return [];
@@ -551,7 +538,9 @@ export async function listOperations(): Promise<OperationCard[]> {
         destination: offer?.destination ?? null,
         customer_name: customer?.arabic_name ?? null,
         customer_phone: customer?.mobile ?? null,
-        total: offer?.total != null ? Number(offer.total) : null,
+        total: caseTotal(offer?.total, r.agreed_total),
+        offer_total: offer?.total != null ? Number(offer.total) : null,
+        agreed_total: r.agreed_total != null ? Number(r.agreed_total) : null,
         currency: offer?.currency ?? null,
         paid: paid.get(r.id) ?? 0,
         // the travellers entered, else the ones the offer was sold for — a new case is not «0»

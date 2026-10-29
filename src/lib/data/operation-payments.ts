@@ -10,6 +10,8 @@ import { syncOperation } from "@/lib/data/operation-sync";
 import { mintReceipt } from "@/lib/data/payment-receipt";
 import type { PaymentKind, PaymentMethod } from "@/lib/data/operations";
 import { PAYMENT_KINDS, PAYMENT_METHODS, isIsoDate } from "@/lib/operations/payments";
+import { getSettlementRule } from "@/lib/data/app-settings";
+import { expectedSettlement, isBnpl } from "@/lib/payments/methods";
 import { gateCaseManager, gateManagerRow, gateOperation, gateRow } from "@/lib/operations/access";
 
 /**
@@ -101,6 +103,7 @@ export async function updatePayment(id: string, input: PaymentInput): Promise<{ 
         method: input.method || null,
         reference: input.reference?.trim() || null,
         paid_at: input.paid_at,
+        expected_settlement_on: isBnpl(input.method) ? expectedSettlement(input.paid_at, await getSettlementRule()) : null,
         note: input.note?.trim() || null,
         updated_at: new Date().toISOString(),
         // a refund corrected into money IN is owed its receipt
@@ -317,6 +320,37 @@ export async function saveInstallments(
       entity_id: operationId,
       meta: { rows: rows.map((r) => ({ due_date: r.due_date, amount: r.amount })) },
     });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/**
+ * «السعر المعروض المرسل للعميل» (the owner, 2026-10-29): the price the client
+ * was actually quoted — a payment method's fee, a discount — when it is not
+ * the offer's. It becomes what the case owes everywhere (payments.ts
+ * caseTotal). The manager's step, like the schedule: operations.write, or
+ * manage_own on one's own file. `null` (or the offer's own figure) clears it.
+ * Audited before and after; the paid rungs move at once (syncOperation).
+ */
+export async function setAgreedTotal(operationId: string, amount: number | null): Promise<{ ok: true } | Fail> {
+  const denied = await gateCaseManager(operationId);
+  if (denied) return { ok: false, error: denied };
+  if (amount !== null && !(Number.isFinite(amount) && amount > 0 && amount <= 10_000_000)) return { ok: false, error: "ops.pay.err.invalid" };
+  try {
+    const supabase = await db();
+    const { data: before } = await supabase.from("operations").select("agreed_total").eq("id", operationId).maybeSingle();
+    const next = amount === null ? null : Math.round(amount * 100) / 100;
+    const { error } = await supabase.from("operations").update({ agreed_total: next, updated_at: new Date().toISOString() }).eq("id", operationId);
+    if (error) return { ok: false, error: "err.updateFailed" };
+    await logAudit({
+      action: "payment.agreed_total_set",
+      entity: "operations",
+      entity_id: operationId,
+      meta: { before: (before as { agreed_total?: number | null } | null)?.agreed_total ?? null, after: next },
+    });
+    await syncOperation(operationId);
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };

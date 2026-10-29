@@ -56,12 +56,15 @@ export function PaymentsPanel({
   installments,
   canManage,
   prefill,
+  planOpen = false,
 }: {
   operation: OperationCard;
   payments: OperationPayment[];
   installments: InstallmentRow[];
   /** «معالج الحجوزات»: the amount and kind owed next, already in the new-payment form. */
   prefill?: { amount: number; kind: PaymentKind } | null;
+  /** «دفع بالتقسيط» chosen: the schedule opens for editing (a manager's step) */
+  planOpen?: boolean;
   /**
    * The manager's step on this case — operations.write, or manage_own on one's
    * own file: correct / delete a payment, record a refund, set the schedule.
@@ -126,7 +129,7 @@ export function PaymentsPanel({
         </ul>
       ) : null}
 
-      <Schedule operation={operation} installments={installments} paid={paid} currency={currency} canManage={canManage} />
+      <Schedule key={planOpen ? "plan" : "view"} operation={operation} installments={installments} paid={paid} currency={currency} canManage={canManage} startEditing={planOpen} />
     </section>
   );
 }
@@ -150,7 +153,8 @@ function PaymentForm({
   const { t } = useTraveliunUI();
   const router = useRouter();
   // kept in this tab until saved — a reload after a deploy used to lose it
-  const [amount, setAmount, forgetAmount] = useSessionField(`pay:${operationId}:${editing?.id ?? "new"}`, editing ? String(editing.amount) : prefill ? String(prefill.amount) : "");
+  // one kept slot per choice («سدّد قسطاً» / «دفع كامل»): switching choice shows ITS amount, not one typed under the other
+  const [amount, setAmount, forgetAmount] = useSessionField(`pay:${operationId}:${editing?.id ?? `new-${prefill?.kind ?? ""}`}`, editing ? String(editing.amount) : prefill ? String(prefill.amount) : "");
   const [kind, setKind] = useState<PaymentKind>(editing?.kind ?? prefill?.kind ?? "deposit");
   const [method, setMethod] = useState<PaymentMethod | "">(editing?.method ?? "");
   const [reference, setReference] = useState(editing?.reference ?? "");
@@ -388,6 +392,7 @@ function Schedule({
   paid,
   currency,
   canManage,
+  startEditing = false,
 }: {
   operation: OperationCard;
   installments: InstallmentRow[];
@@ -395,6 +400,8 @@ function Schedule({
   currency: string;
   /** the client's payment terms are the manager's to set */
   canManage: boolean;
+  /** opened from «دفع بالتقسيط»: the editor is already open (for a manager) */
+  startEditing?: boolean;
 }) {
   const { t } = useTraveliunUI();
   const router = useRouter();
@@ -404,7 +411,13 @@ function Schedule({
     ? installments
     : defaultSchedule({ total: operation.total, confirmed_on: riyadhDate(operation.confirmed_at), travel_start: operation.travel_start });
   const rows = installmentStates(schedule, paid, today);
-  const [draft, setDraft] = useState<{ due_date: string; amount: string }[] | null>(null);
+  const [draft, setDraft] = useState<{ due_date: string; amount: string }[] | null>(() =>
+    startEditing && canManage
+      ? schedule.length > 0
+        ? schedule.map((r) => ({ due_date: r.due_date ?? "", amount: String(r.amount) }))
+        : [{ due_date: today, amount: operation.total != null ? String(operation.total) : "" }]
+      : null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useSafeTransition();
 

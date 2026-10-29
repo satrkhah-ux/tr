@@ -36,6 +36,18 @@ export function paymentPrefill(data: Money): PaymentPrefill | null {
   };
 }
 
+/**
+ * The step's three choices (the owner, 2026-10-29: «سدّد قسطاً / دفع كامل /
+ * دفع بالتقسيط»): «سدّد قسطاً» is the next line owed (paymentPrefill), «دفع
+ * كامل» the whole rest as the final payment; «دفع بالتقسيط» opens the
+ * schedule and needs no amount. null while nothing is owed.
+ */
+export function paymentChoices(data: Money): { installment: PaymentPrefill; full: PaymentPrefill } | null {
+  const next = paymentPrefill(data);
+  if (!next) return null;
+  return { installment: next, full: { amount: next.remaining, kind: "final", remaining: next.remaining, due_date: null } };
+}
+
 /** Settled = nothing left of a known total. */
 export function paymentSettled(data: Pick<ReadinessCase, "operation" | "payments">): boolean {
   const remaining = remainingBalance(data.operation.total, paidTotal(data.payments));

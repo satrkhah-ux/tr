@@ -7,12 +7,14 @@ import { sendWeeklyDataQuality } from "@/lib/data/quality-weekly";
 import { sendClientMessage } from "@/lib/data/client-messages";
 import { messagesDueToday } from "./client-messages";
 import { passportAlerts, type AlertTraveler } from "./progress";
-import { defaultSchedule, installmentStates, paidTotal } from "./payments";
+import { caseTotal, defaultSchedule, installmentStates, paidTotal } from "./payments";
 import { canAdvanceClient, canAdvanceExecution, type ClientStatus, type ExecutionStatus } from "./state";
 import { hotelAtRisk, type ClientBookingRow } from "./client-booking-state";
 import { notifyDueWaits, travelBlockers } from "@/lib/data/wizard-case";
 import { translate } from "@/lib/i18n";
 import { readyLabel } from "./wizard/index";
+import { BNPL_METHODS, settlementReminder } from "@/lib/payments/methods";
+import { tellEmployee } from "./payment-links-poll";
 
 /**
  * The operations day (operations order 6), run once a morning by the server's
@@ -122,10 +124,10 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
       const [{ data: rows }, { data: pays }, { data: meta }] = await Promise.all([
         supabase.from("operation_installments").select("due_date, amount").eq("operation_id", op.id),
         supabase.from("operation_payments").select("amount, kind").eq("operation_id", op.id),
-        supabase.from("operations").select("confirmed_at, offers(total)").eq("id", op.id).maybeSingle(),
+        supabase.from("operations").select("confirmed_at, agreed_total, offers(total)").eq("id", op.id).maybeSingle(),
       ]);
-      const m = meta as unknown as { confirmed_at: string; offers: { total: number | string | null } | { total: number | string | null }[] | null } | null;
-      const total = (() => { const o = Array.isArray(m?.offers) ? m?.offers[0] : m?.offers; return o?.total != null ? Number(o.total) : null; })();
+      const m = meta as unknown as { confirmed_at: string; agreed_total: number | string | null; offers: { total: number | string | null } | { total: number | string | null }[] | null } | null;
+      const total = caseTotal((Array.isArray(m?.offers) ? m?.offers[0] : m?.offers)?.total, m?.agreed_total);
       const schedule = (rows ?? []).length
         ? ((rows ?? []) as { due_date: string | null; amount: number | string }[]).map((r) => ({ due_date: r.due_date, amount: Number(r.amount) }))
         : defaultSchedule({ total, confirmed_on: (m?.confirmed_at ?? today).slice(0, 10), travel_start: op.travel_start });
@@ -151,7 +153,36 @@ export async function runOpsDaily(today: string): Promise<DailyResult> {
   result.alerts += await provisionalHotelAlerts(supabase, ops, today);
   // «قائمة متابعتك اليوم» — the waits whose day has come, once per case a day (wizard-case.ts)
   result.alerts += await notifyDueWaits(supabase, today);
+  result.alerts += await settlementReminders(supabase, today);
   return result;
+}
+
+/**
+ * Tabby/Tamara pay us out weekly (the owner, 2026-10-29): on the day a
+ * payment's money should land (operation_payments.expected_settlement_on), the
+ * case's seller is reminded to check it with finance — once per payment
+ * (operation_alerts «bnpl_settlement», ref = the payment), in-app and on «تنبيهاتي».
+ */
+async function settlementReminders(supabase: SupabaseClient, today: string): Promise<number> {
+  const { data } = await supabase
+    .from("operation_payments")
+    .select("id, method, operation_id, operations(offers(employee_id, customers(arabic_name)))")
+    .in("method", [...BNPL_METHODS])
+    .eq("expected_settlement_on", today)
+    .neq("kind", "refund");
+  type Row = { id: string; method: string; operation_id: string; operations: unknown };
+  const one = <T,>(v: T | T[] | null | undefined): T | undefined => (Array.isArray(v) ? v[0] : (v ?? undefined));
+  let sent = 0;
+  for (const p of (data ?? []) as Row[]) {
+    const offer = one(one(p.operations as { offers: unknown } | null)?.offers as { employee_id: string | null; customers: unknown } | null);
+    const name = one(offer?.customers as { arabic_name: string | null } | null)?.arabic_name ?? "";
+    if (!offer?.employee_id) continue;
+    const { error } = await supabase.from("operation_alerts").insert({ operation_id: p.operation_id, kind: "bnpl_settlement", ref: p.id });
+    if (error) continue; // the unique key: already reminded
+    await tellEmployee(supabase, offer.employee_id, settlementReminder(name, p.method), `/operations/${p.operation_id}`, `bnpl:${p.id}`);
+    sent += 1;
+  }
+  return sent;
 }
 
 /**

@@ -54,6 +54,7 @@ export type AuditAction =
   | "payment.deleted"
   | "payment.proof_viewed"
   | "payment.schedule_set"
+  | "payment.agreed_total_set"
   // the case itself: its owner, what the client page says, and the team's notes
   // (a note IS an audit row — locked to the service role, shown in the activity log)
   | "operation.assigned"
@@ -95,6 +96,9 @@ export type AuditAction =
   | "dispatch.sent"
   // a message to the client that WhatsApp held back (24 hours since they last wrote) — left as a Teletel note
   | "dispatch.held"
+  // a MyFatoorah / Tamara link for a case (payment-links.ts): created, then sent on the employee's press
+  | "payment_link.prepared"
+  | "payment_link.sent"
   | "voucher.issued"
   | "voucher.revoked"
   // partner companies (identity + branding)
