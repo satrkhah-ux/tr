@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
 import { deleteExternalTrip, saveExternalTrip, type ExternalTripRow } from "@/lib/data/external-trips";
 import { CONFIRMED_ITEMS, EXTERNAL_STATUS, externalTripEnd, type ExternalStatus } from "@/lib/leads/lifecycle-rules";
+import { EditSheet } from "@/components/ui/edit-sheet";
 import { TraveliunShell } from "../TraveliunShell";
 
 /**
@@ -64,18 +65,12 @@ export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripR
   };
   const edit = (r: ExternalTripRow) => {
     setForm({ id: r.id, phone: showPhone(r.phone), travelStart: r.travel_start, days: String(r.days), destination: r.destination, status: r.status, paid: r.paid_amount == null ? "" : String(r.paid_amount), confirmed: r.confirmed_items });
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  return (
-    <TraveliunShell title="nav.externalTrips">
-      <div className="space-y-4">
-        {msg ? <div className={`rounded-[10px] px-3 py-2 text-[12.5px] font-bold ${msg.ok ? "bg-[#e8f6ef] text-[#185045]" : "bg-[#fdecef] text-[#a3263f]"}`}>{msg.text}</div> : null}
-
-        <section className={CARD}>
-          <h2 className="mb-1 text-[14px] font-extrabold text-[#0f3d38]">{form.id ? "تعديل رحلة" : "إضافة عميل مؤكد"}</h2>
-          <p className="mb-3 text-[12px] text-[#557d78]">لعميل أكّد قبل النظام أو خارجه — لا يحتاج عرضاً ولا ملفاً. إذا راسلنا قبل عودته بثلاثة أيام تصل محادثته إليك مباشرة.</p>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+  // the same fields in the sheet (editing) and in the add card
+  const formFields = (
+    <>
+          <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
             <label className={LABEL}>
               رقم الجوال
               <input type="tel" inputMode="tel" dir="ltr" placeholder="05xxxxxxxx" value={form.phone} onChange={(e) => set("phone", e.target.value)} className={FIELD} />
@@ -124,7 +119,26 @@ export function ExternalTripsBoard({ initial }: { initial: { rows: ExternalTripR
               <button type="button" onClick={() => setForm(EMPTY)} className="h-9 rounded-[8px] border border-[#dbe6e1] px-3 text-[12.5px] font-bold text-[#557d78]">إلغاء</button>
             ) : null}
           </div>
+    </>
+  );
+
+  return (
+    <TraveliunShell title="nav.externalTrips">
+      <div className="space-y-4">
+        {msg ? <div className={`rounded-[10px] px-3 py-2 text-[12.5px] font-bold ${msg.ok ? "bg-[#e8f6ef] text-[#185045]" : "bg-[#fdecef] text-[#a3263f]"}`}>{msg.text}</div> : null}
+
+        {/* «التعديل يفتح في مكانه»: a trip being edited opens in the side sheet — the row stays where it is (the owner, 2026-10-29) */}
+        <EditSheet open={form.id !== undefined} onClose={() => setForm(EMPTY)} title="تعديل رحلة">
+          {formFields}
+        </EditSheet>
+
+        {form.id === undefined ? (
+        <section className={CARD}>
+          <h2 className="mb-1 text-[14px] font-extrabold text-[#0f3d38]">إضافة عميل مؤكد</h2>
+          <p className="mb-3 text-[12px] text-[#557d78]">لعميل أكّد قبل النظام أو خارجه — لا يحتاج عرضاً ولا ملفاً. إذا راسلنا قبل عودته بثلاثة أيام تصل محادثته إليك مباشرة.</p>
+          {formFields}
         </section>
+        ) : null}
 
         <section className={CARD}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
