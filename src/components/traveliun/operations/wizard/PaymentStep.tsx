@@ -78,6 +78,7 @@ export function PaymentStep({ data, canManage }: StepProps) {
         canManage={canManage}
         prefill={choice === "plan" ? null : prefill}
         planOpen={choice === "plan"}
+        defaultMethod={data.payMethod ?? null}
       />
 
       {/* ٣ — a payment link for the amount chosen: prepared, reviewed, then sent by press (never by itself) */}

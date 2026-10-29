@@ -43,18 +43,21 @@ export async function checkPriceUpdate(draftId: string): Promise<PriceCheck> {
     const atIssue = ((priced as { fx_rates: Record<string, number> | null } | null)?.fx_rates ?? {}) as Record<string, number>;
 
     const data = record.data;
-    const [{ sarPer }, { default_pct }] = await Promise.all([getRates(), getProfitSettings()]);
+    const [{ sarPer }, { default_pct }, fees] = await Promise.all([getRates(), getProfitSettings(), getPaymentFees()]);
     const sheet = ownIssueSheet(data);
     const refs = issuedHotelRefs(data);
     const issued = Number(row.total);
-    const thenRates = issuePricing(sheet, data, refs, default_pct, { ...sarPer, ...atIssue }).totals.total;
+    // the client's way of paying is part of the price: choosing another one after the issue moves it
+    const thenRates = issuePricing(sheet, data, refs, default_pct, { ...sarPer, ...atIssue }, fees).totals.total;
     if (!priceMoved(thenRates, issued)) return { ok: true, changed: false };
-    const next = issuePricing(sheet, data, refs, default_pct, sarPer).totals.total;
+    const nextPricing = issuePricing(sheet, data, refs, default_pct, sarPer, fees);
+    const next = nextPricing.totals.total;
+    const base = nextPricing.base;
     const currency = row.currency || data.pricing.display_currency || "SAR";
     // the fees are in riyals (a share + a fixed SAR amount): quoted for a riyal price only, and only the ways that add something
     const methods =
-      next != null && currency === "SAR"
-        ? quoteAll(next, await getPaymentFees()).flatMap((q) => (!q.unset && q.fee > 0 ? [{ label: PAY_METHOD_AR[q.method], total: q.total }] : []))
+      base != null && currency === "SAR"
+        ? quoteAll(base, fees).flatMap((q) => (!q.unset && q.fee > 0 ? [{ label: PAY_METHOD_AR[q.method], total: q.total }] : []))
         : [];
     return { ok: true, changed: true, issued, next, currency, methods };
   } catch {

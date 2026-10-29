@@ -21,6 +21,8 @@ import { getOcrProvider } from "@/lib/repackage/extract/ocr";
 import { currentCan } from "@/lib/roles/current";
 import { hotelIdOf } from "@/lib/operations/voucher-dto";
 import { caseTotal } from "@/lib/operations/payments";
+import { issuedDraftData } from "@/lib/data/issued-draft";
+import { isPayMethod } from "@/lib/payments/methods";
 import type { ReadinessItem, ReadyExceptions, WizardCase } from "@/lib/operations/wizard/types";
 
 /**
@@ -67,7 +69,7 @@ export async function loadWizardCase(operationId: string): Promise<WizardCase | 
   const operation = (await listOperations()).find((o) => o.id === operationId);
   if (!operation) return null;
   const supabase = (await createSupabaseServerClient()) as unknown as SupabaseClient;
-  const [travelers, payments, installments, bookings, documents, supplierWork, guide, days, op, offer, offerKinds, offerHotels] = await Promise.all([
+  const [travelers, payments, installments, bookings, documents, supplierWork, guide, days, op, offer, offerKinds, offerHotels, issued] = await Promise.all([
     // a new case starts with the travelers the offer was sold for
     listOrSeedTravelers(operationId),
     listOperationPayments(operationId),
@@ -83,7 +85,9 @@ export async function loadWizardCase(operationId: string): Promise<WizardCase | 
     offerBookingKinds(operationId),
     // the hotels the offer sold, by catalogue id: their missing address/phone/English name is a job here, not in sales
     supabase.from("offer_hotels").select("hotel_id, hotel_name").eq("offer_id", operation.offer_id),
+    issuedDraftData(createSupabaseServiceClient() as unknown as SupabaseClient, { id: operation.offer_id, serial: operation.serial, partner_company_id: operation.partner_id }).catch(() => null),
   ]);
+  const chosen = (issued?.pricing as { payment_method?: unknown } | undefined)?.payment_method;
   const row = op.data as { client_token: string | null; client_token_revoked_at: string | null; waits: unknown; ready_exceptions: unknown } | null;
   const pax = offer.data as { adults: number | null; children: number | null; infants: number | null } | null;
   const exceptions = row?.ready_exceptions;
@@ -106,6 +110,7 @@ export async function loadWizardCase(operationId: string): Promise<WizardCase | 
     offerHotels: ((offerHotels.data ?? []) as { hotel_id: string | null; hotel_name: string | null }[]).map((h) => ({ hotel_id: h.hotel_id, hotel_name: h.hotel_name ?? "" })),
     // the readers upload-text.ts tries for a picture; without either, only text reads
     readsImages: isOpenAIConfigured() || getOcrProvider().isConfigured(),
+    payMethod: isPayMethod(chosen) ? chosen : null,
     ...(await tboOf(bookings)),
   };
   // a step that is done no longer waits on anyone

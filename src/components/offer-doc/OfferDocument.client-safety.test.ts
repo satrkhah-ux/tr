@@ -5,6 +5,9 @@ import { OfferDocument } from "./OfferDocument";
 import { computeOfferPricing } from "@/lib/offer/pricing";
 import { toClientOfferDTO, type InternalOfferDTO } from "@/lib/offer/dto";
 import { AR } from "./labels";
+import { issuePricing } from "@/lib/offer/issue-pricing";
+import { methodsForFees, sessionEFee, withMethodFees } from "@/lib/offer/payment-methods";
+import { DEFAULT_FEES } from "@/lib/payments/methods";
 
 /**
  * The definitive client-safety proof: render the EXACT component the client PDF
@@ -123,5 +126,50 @@ describe("client OfferDocument — content + safety", () => {
     for (const key of ["supplier_id", "supplier_name", "rate_key", "net_base", "fx_rate", "ref_sell_base", "markup_amount"]) {
       expect(html).not.toContain(key);
     }
+  });
+});
+
+/**
+ * «طريقة دفع العميل» (the owner, 2026-10-29): a file priced 15,510 that the client pays by Tamara issues at
+ * 16,869.61 (issue-pricing.ts). The PDF prints that total — and, binding (Tabby/Tamara/MyFatoorah terms),
+ * never the charge, its share or the word «رسوم»; a country's instalment lines quote each way on OUR price
+ * (pricings.sell_total), so the chosen one reads the very same total and none is charged twice.
+ */
+describe("client OfferDocument — a chosen payment method", () => {
+  const fees = { ...DEFAULT_FEES };
+  const issued = issuePricing(
+    [{ item_type: "service", description: "برنامج", quantity: 1, buy_price: 14100, buy_currency: "SAR", sell_price: 15510, sell_currency: "SAR" }],
+    { pricing: { items: [], display_currency: "SAR", final_total: 15510, payment_method: "tamara" } },
+    new Set(),
+    null,
+    { SAR: 1 },
+    fees,
+  );
+  const base = internalOffer();
+  const offer: InternalOfferDTO = {
+    ...base,
+    total: issued.totals.total,
+    hotels: base.hotels.map((h) => ({ ...h, excluded_surcharges: [] })),
+    finance: {
+      banks: [],
+      payments: [],
+      instalment: withMethodFees(["التقسيط عبر تمارا", "التقسيط عبر تابي"], issued.base, methodsForFees(), sessionEFee(fees)),
+    },
+  };
+  const html = renderToStaticMarkup(createElement(OfferDocument, { variant: "client", offer: toClientOfferDTO(offer) }));
+  // what the page says — not its stylesheet (full of «%»)
+  const text = html.replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ");
+
+  it("prints the Tamara total, quoted once", () => {
+    expect(issued.totals.total).toBe(16869.61);
+    expect(text).toContain("16,869.61");
+    expect(text).not.toContain("18,348"); // the charge laid twice
+  });
+
+  it("never says the charge, its share or «رسوم»", () => {
+    expect(text).not.toContain("رسوم");
+    expect(text).not.toContain("%");
+    expect(text).not.toContain("1,359.61"); // the charge itself
+    expect(text).not.toContain("8.766");
   });
 });

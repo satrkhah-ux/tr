@@ -44,7 +44,7 @@ import { getEnabledHotelSuppliers } from "@/lib/providers/hotel-registry";
 import { draftSellTotal } from "@/lib/offer/preview-dto";
 import { offerTotals, type PricingLineInput } from "@/lib/offer/pricing";
 import { issuePricing } from "@/lib/offer/issue-pricing";
-import { getProfitSettings } from "./app-settings";
+import { getPaymentFees, getProfitSettings } from "./app-settings";
 import { withScopeLines } from "@/lib/offer/basic";
 import { advancedDayNote, advancedLines } from "@/lib/offer/advanced";
 import { getRates } from "./rates-actions";
@@ -978,12 +978,14 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
     }
     // priced the one way issue, «تطبيق تحديث السعر» and «اعتمد هذه» all read (issue-pricing.ts); an adopted
     // version's own total stands for our files only — a partner's sheet is re-priced at their terms above
+    // a partner's file: no pin and no client payment method — their price is their own business
     const issued = issuePricing(
       sheet,
-      record.partner_company_id ? { pricing: { ...data.pricing, adopted: undefined } } : data,
+      record.partner_company_id ? { pricing: { ...data.pricing, adopted: undefined, payment_method: undefined } } : data,
       validHotelRefs,
       (await getProfitSettings()).default_pct,
       rates.sarPer,
+      record.partner_company_id ? undefined : await getPaymentFees(),
     );
     const reconciledItems = issued.items;
     const lines = issued.lines;
@@ -1054,8 +1056,8 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       ? pkg
         ? Math.max(sheetOwed ?? 0, pkg.total ?? 0)
         : sheetOwed
-      : partnerCompanyId && sellTotal != null
-        ? partnerPrice(sellTotal, await viewerTerms(partnerCompanyId))
+      : partnerCompanyId && issued.base != null
+        ? partnerPrice(issued.base, await viewerTerms(partnerCompanyId))
         : null;
 
     const input: CreateOfferInput = {
@@ -1079,6 +1081,7 @@ export async function produceOfferFromDraft(draftId: string): Promise<ProduceRes
       infants: data.trip.infants,
       total: sellTotal,
       buy_total: buyTotal,
+      sell_total: issued.base,
       currency: data.pricing.display_currency,
       total_sar: totals.total_sar,
       // the rates this total was computed at, frozen with the offer

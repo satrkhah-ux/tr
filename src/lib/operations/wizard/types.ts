@@ -9,6 +9,7 @@
  * readiness gate show) and its screen in
  * src/components/traveliun/operations/wizard/<Step>Step.tsx.
  */
+import type { PayMethod } from "@/lib/payments/methods";
 import type { OperationBooking, OperationDocument } from "@/lib/data/operation-bookings";
 import type { OperationCard, OperationPayment } from "@/lib/data/operations";
 import type { InstallmentRow } from "@/lib/data/operation-payments";
@@ -81,6 +82,8 @@ export type WizardCase = {
   tboBookings?: string[];
   /** operations.book: may commit a booking at the supplier */
   canBook?: boolean;
+  /** how the client said he would pay (the issued draft's pricing.payment_method) — the payment form starts on it */
+  payMethod?: PayMethod | null;
 };
 
 /** What every step screen receives. `canManage`: the manager steps on THIS case (gateCaseManager). */

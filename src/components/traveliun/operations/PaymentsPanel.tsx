@@ -57,6 +57,7 @@ export function PaymentsPanel({
   canManage,
   prefill,
   planOpen = false,
+  defaultMethod = null,
 }: {
   operation: OperationCard;
   payments: OperationPayment[];
@@ -72,6 +73,8 @@ export function PaymentsPanel({
    * server refuses the rest either way (operation-payments.ts).
    */
   canManage: boolean;
+  /** the way the client chose on the file (pricing.payment_method): a new payment starts on it */
+  defaultMethod?: PaymentMethod | null;
 }) {
   const { t } = useTraveliunUI();
   const currency = operation.currency ?? "SAR";
@@ -112,6 +115,7 @@ export function PaymentsPanel({
         currency={currency}
         editing={editing}
         prefill={editing ? null : (prefill ?? null)}
+        defaultMethod={defaultMethod}
         canManage={canManage}
         onDone={(message) => {
           setEditing(null);
@@ -139,6 +143,7 @@ function PaymentForm({
   currency,
   editing,
   prefill,
+  defaultMethod,
   canManage,
   onDone,
 }: {
@@ -146,6 +151,7 @@ function PaymentForm({
   currency: string;
   editing: OperationPayment | null;
   prefill?: { amount: number; kind: PaymentKind } | null;
+  defaultMethod: PaymentMethod | null;
   canManage: boolean;
   /** saved; `message` when the payment is in but its slip is not. */
   onDone: (message?: string) => void;
@@ -156,7 +162,7 @@ function PaymentForm({
   // one kept slot per choice («سدّد قسطاً» / «دفع كامل»): switching choice shows ITS amount, not one typed under the other
   const [amount, setAmount, forgetAmount] = useSessionField(`pay:${operationId}:${editing?.id ?? `new-${prefill?.kind ?? ""}`}`, editing ? String(editing.amount) : prefill ? String(prefill.amount) : "");
   const [kind, setKind] = useState<PaymentKind>(editing?.kind ?? prefill?.kind ?? "deposit");
-  const [method, setMethod] = useState<PaymentMethod | "">(editing?.method ?? "");
+  const [method, setMethod] = useState<PaymentMethod | "">(editing ? (editing.method ?? "") : (defaultMethod ?? ""));
   const [reference, setReference] = useState(editing?.reference ?? "");
   const [date, setDate] = useState(editing?.paid_at ?? riyadhDate());
   const [note, setNote] = useState(editing?.note ?? "");

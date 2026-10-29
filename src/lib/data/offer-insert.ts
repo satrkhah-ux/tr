@@ -393,7 +393,7 @@ function pricingRow(input: CreateOfferInput) {
     total: input.total,
     currency: input.currency,
     buy_total: input.buy_total,
-    sell_total: input.total,
+    sell_total: input.sell_total ?? input.total,
     profit,
     ...(input.fx
       ? {

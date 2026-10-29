@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { adoptedPin, issuePricing, priceMoved } from "./issue-pricing";
+import { adoptedPin, beforeCharge, issuePricing, priceMoved } from "./issue-pricing";
+import { DEFAULT_FEES } from "@/lib/payments/methods";
 import type { DraftData, DraftPricingItem } from "./draft-types";
 
 const line = (over: Partial<DraftPricingItem>): DraftPricingItem => ({
@@ -52,5 +53,42 @@ describe("issue pricing", () => {
     expect(priceMoved(1651, 1651)).toBe(false);
     expect(priceMoved(1652, 1651)).toBe(true);
     expect(priceMoved(null, 1651)).toBe(false);
+  });
+
+  describe("the client's way of paying", () => {
+    const fees = DEFAULT_FEES;
+    // the owner's sheet: 15,510 by Tamara → 1,359.61 on top → 16,869.61; our cost 14,100
+    const sheet = [line({ buy_price: 14100, sell_price: 14100 })];
+    const pay = (extra: Partial<DraftData["pricing"]>, f: typeof fees | null = fees) =>
+      issuePricing(sheet, priced([], { final_total: 15510, ...extra }), none, null, { SAR: 1 }, f ?? undefined);
+
+    it("lays the chosen way's charge on the client total and on our cost — the profit does not move", () => {
+      const cash = pay({});
+      const tamara = pay({ payment_method: "tamara" });
+      expect([cash.totals.total, cash.fee]).toEqual([15510, 0]);
+      expect([tamara.totals.total, tamara.base, tamara.fee, tamara.totals.total_sar]).toEqual([16869.61, 15510, 1359.61, 16869.61]);
+      expect(tamara.totals.total! - tamara.totals.buy_total!).toBeCloseTo(cash.totals.total! - cash.totals.buy_total!, 2);
+      expect(pay({ payment_method: "link" }).totals.total).toBe(15897.75);
+      expect(pay({ payment_method: "cash" }).totals.total).toBe(15510);
+    });
+
+    it("a switched way is a price change («تطبيق تحديث السعر»)", () => {
+      expect(priceMoved(pay({ payment_method: "tabby" }).totals.total, pay({ payment_method: "cash" }).totals.total)).toBe(true);
+      expect(priceMoved(pay({ payment_method: "tabby" }).totals.total, pay({ payment_method: "tamara" }).totals.total)).toBe(false);
+    });
+
+    it("adds nothing without E's fees (a partner's file) or on a quote that is not in riyals", () => {
+      expect(pay({ payment_method: "tamara" }, null).totals.total).toBe(15510);
+      expect(pay({ payment_method: "tamara", display_currency: "USD" }).fee).toBe(0);
+    });
+
+    it("lays the charge on an adopted version's own price, and takes it back off for the pin", () => {
+      const adopted = { version: 1, total: 15000, base: 15510 };
+      expect(pay({ payment_method: "tamara", adopted }).totals.total).toBe(16314.9);
+      expect(beforeCharge(16869.61, "tamara", fees)).toBe(15510);
+      expect(beforeCharge(15897.75, "link", fees)).toBe(15510);
+      expect(beforeCharge(15510, undefined, fees)).toBe(15510);
+      expect(beforeCharge(15510, "cash", fees)).toBe(15510);
+    });
   });
 });

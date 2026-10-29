@@ -11,8 +11,8 @@ import { loadDraft, writeDraftStages } from "./draft-store";
 import { newestFrozen, reissueLocked, type FrozenDraft } from "./issued-draft";
 import { produceOfferFromDraft, type ProduceResult } from "./drafts";
 import { logAudit } from "./audit";
-import { issuePricing, issuedHotelRefs, ownIssueSheet } from "@/lib/offer/issue-pricing";
-import { getProfitSettings } from "./app-settings";
+import { beforeCharge, chargedMethod, issuePricing, issuedHotelRefs, ownIssueSheet } from "@/lib/offer/issue-pricing";
+import { getPaymentFees, getProfitSettings } from "./app-settings";
 import { getRates } from "./rates-actions";
 
 /**
@@ -150,10 +150,12 @@ export async function restoreOfferVersion(draftId: string, version: number): Pro
         .eq("variant", "client")
         .eq("version", version)
         .maybeSingle();
-      const total = Number((sent as { total: unknown } | null)?.total);
-      if (Number.isFinite(total) && total > 0) {
-        const [{ sarPer }, { default_pct }] = await Promise.all([getRates(), getProfitSettings()]);
+      const sentTotal = Number((sent as { total: unknown } | null)?.total);
+      if (Number.isFinite(sentTotal) && sentTotal > 0) {
+        const [{ sarPer }, { default_pct }, fees] = await Promise.all([getRates(), getProfitSettings(), getPaymentFees()]);
         const base = issuePricing(ownIssueSheet(back), back, issuedHotelRefs(back), default_pct, sarPer).unpinned;
+        // the pin is our price; N's way of paying (back with N's draft) lays its charge on again at issue
+        const total = beforeCharge(sentTotal, chargedMethod(back.pricing), fees);
         slices.pricing = { ...back.pricing, adopted: { version, total, base } };
       }
     }

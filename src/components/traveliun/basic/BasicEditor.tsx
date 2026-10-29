@@ -40,7 +40,9 @@ import { autoTourPicks, withTours, type TourProgram } from "@/lib/offer/itinerar
 import { suggestPricingForDraft } from "@/lib/data/pricing-suggest";
 import { announceWalkIn } from "@/lib/data/office-screens";
 import { displayName, serviceLine, walkInKind } from "@/lib/office-screens/config";
-import type { ProfitSettings } from "@/lib/data/app-settings";
+import { getPaymentFees, type ProfitSettings } from "@/lib/data/app-settings";
+import { quoteMethod, type PaymentFees } from "@/lib/payments/methods";
+import { chargedMethod } from "@/lib/offer/issue-pricing";
 import {
   AGE_BANDS,
   cityHotelLines,
@@ -152,6 +154,7 @@ import { IssueGuardNotice } from "../IssueGuardNotice";
 import { OfferVersions } from "../OfferVersions";
 import { ReissueOffer } from "../ReissueOffer";
 import { PriceUpdate } from "./PriceUpdate";
+import { PayMethodPick } from "./PayMethodPick";
 import { OverlandHopNotice } from "../OverlandHopNotice";
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -853,6 +856,22 @@ export function BasicEditor({
     const profit = Math.round((total_sell - raw.total_buy) * 100) / 100;
     return { ...raw, total_sell, profit, margin_pct: total_sell ? Math.round((profit / total_sell) * 10000) / 100 : null };
   }, [shownItems, display, lookups.sarPer]);
+  // how the client pays (our own riyal files): the chosen way's charge goes on top of our price — session E's fees
+  const [payFees, setPayFees] = useState<PaymentFees | null>(null);
+  useEffect(() => {
+    if (partnerSession) return;
+    let live = true;
+    getPaymentFees()
+      .then((f) => live && setPayFees(f))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [partnerSession]);
+  const ourPrice = !partnerSession && data.pricing.final_total != null ? data.pricing.final_total : summary.total_sell;
+  const payMethod = partnerSession ? undefined : chargedMethod(data.pricing);
+  const charged = payMethod && payFees ? quoteMethod(ourPrice, payMethod, payFees) : null;
+  const clientPays = charged && !charged.unset ? charged.total : ourPrice;
 
   // the transfers' list prices, worked out as the sheet would (the way back from the way there) and shown on
   // the city cards before anyone opens the sheet — the owner's review, 2026-10-18: four typed by hand
@@ -1249,7 +1268,7 @@ export function BasicEditor({
       .map((c) => (toursOn ? `${c.city_name} (${tx("toursCount")}: ${(c.tour_picks ?? []).slice(0, c.tours ?? 0).filter((p) => !p.free).length})` : c.city_name))
       .join(" · "),
     services: tx("servicesSummary", { a: data.services.includes.length, b: data.services.excludes.length }),
-    pricing: data.pricing.items.length > 0 ? `${tx("total")}: ${summary.total_sell.toLocaleString("en-US")} ${display}` : tx("noLines"),
+    pricing: data.pricing.items.length > 0 ? `${tx("total")}: ${clientPays.toLocaleString("en-US")} ${display}` : tx("noLines"),
     finish: produced ?? (blocking.length > 0 ? tx("missing") : tx("allGood")),
   };
   // plain headings — one page to the agent, never numbered stages (the owner, 2026-10-25)
@@ -1970,11 +1989,23 @@ export function BasicEditor({
                   </span>
                 </div>
                 ) : null}
+                {!partnerSession && display === "SAR" && payFees && ourPrice > 0 ? (
+                  <PayMethodPick
+                    price={ourPrice}
+                    method={payMethod}
+                    fees={payFees}
+                    onPick={(m) => {
+                      const { payment_method: _was, ...rest } = data.pricing;
+                      void _was;
+                      patch({ pricing: m ? { ...rest, payment_method: m } : rest });
+                    }}
+                  />
+                ) : null}
                 <div className="flex items-center justify-between rounded-[11px] bg-[#185045] px-3 py-2.5 text-white">
                   {/* for a partner this total is what the package costs IT — our prices at its terms */}
                   <span className="text-[13px] font-extrabold">{partnerSession ? t("pg.partnerCost") : tx("clientTotal")}</span>
                   <span className="tv-tnum text-[16px] font-extrabold">
-                    <DirText>{`${(!partnerSession && data.pricing.final_total != null ? data.pricing.final_total : summary.total_sell).toLocaleString("en-US")} ${display}`}</DirText>
+                    <DirText>{`${clientPays.toLocaleString("en-US")} ${display}`}</DirText>
                   </span>
                 </div>
                 {canPricing ? (

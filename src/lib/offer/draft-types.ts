@@ -13,6 +13,7 @@ import type { TranslationKey } from "@/lib/i18n";
 import { normalizeAdvanced, withAdvancedTransport, type DraftAdvanced } from "./advanced";
 import { withFlightTotals } from "./flight-fare";
 import { classifyRoomName, roomName, ROOM_CATEGORIES, ROOM_TYPES, SUITE_SUBTYPES } from "@/lib/catalog/room-catalog";
+import { isPayMethod, type PayMethod } from "@/lib/payments/methods";
 
 // ---------- stage registry ----------
 export const STAGE_KEYS = [
@@ -1620,12 +1621,23 @@ export type DraftPricing = {
    * (issue-pricing.ts adoptedPin), and any priced change lets the file price on its own again.
    */
   adopted?: { version: number; total: number; base: number | null };
+  /**
+   * How the client will pay (the owner, 2026-10-29): its charge (session E's fees) goes on top of
+   * the price the client is sent, and is our cost too, so the profit never moves (issue-pricing.ts).
+   * None = the cash price, as before. Our own riyal files only.
+   */
+  payment_method?: PayMethod;
 };
 
 export type PackageProfit = { mode: "pct" | "amount"; value: number | null };
 
-/** A stored «اعتمد هذه» pin kept only when every figure is a number — anything else prices on its own. */
+/** A stored method kept only when it is one of E's; a «اعتمد هذه» pin only when every figure is a number — anything else prices on its own. */
 function withAdopted(pricing: DraftPricing): DraftPricing {
+  if (pricing.payment_method !== undefined && !isPayMethod(pricing.payment_method)) {
+    const { payment_method: _unknown, ...rest } = pricing;
+    void _unknown;
+    pricing = rest;
+  }
   const a = pricing.adopted as { version?: unknown; total?: unknown; base?: unknown } | undefined;
   if (a === undefined) return pricing;
   const ok = !!a && Number.isInteger(a.version) && (a.version as number) > 0 && typeof a.total === "number" && Number.isFinite(a.total) && a.total >= 0

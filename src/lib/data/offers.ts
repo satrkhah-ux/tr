@@ -138,6 +138,11 @@ export type CreateOfferInput = {
   total: number | null;
   /** internal buy total — stored in pricings only, NEVER exposed to clients. */
   buy_total: number | null;
+  /**
+   * Our price before the client's way of paying added its charge (pricings.sell_total, internal):
+   * `total` and `buy_total` both carry that charge. Left out = `total`.
+   */
+  sell_total?: number | null;
   currency: string;
   /** `total` in riyals, for the KPIs (migration 0044). Left out: converted at today's rates. */
   total_sar?: number | null;
@@ -557,6 +562,8 @@ async function offerFinance(
   supabase: SupabaseClient,
   offer: { destination: string | null; total: number | null; currency: string | null },
   dates: { travel: string | null; issue: string | null },
+  /** our price before the client's chosen way of paying added its charge (pricings.sell_total) — the other ways are quoted on it */
+  base: number | null,
 ): Promise<FinanceSection> {
   const [{ data: countries }, items, fees] = await Promise.all([supabase.from("countries").select("id, arabic_name"), loadFinanceTerms(supabase), getPaymentFees()]);
   const list = ((countries ?? []) as { id: string; arabic_name: string }[]).map((c) => ({ id: c.id, name: c.arabic_name }));
@@ -564,7 +571,7 @@ async function offerFinance(
   const section = financeSection(items, { countryId: country?.id ?? null, total: offer.total, currency: offer.currency, travelDate: dates.travel, issueDate: dates.issue });
   // E's fees are set in riyals (a fixed part in SAR): quoted only on a riyal total
   if (offer.currency && offer.currency !== "SAR") return section;
-  return { ...section, instalment: withMethodFees(section.instalment, offer.total, methodsForFees(), sessionEFee(fees)) };
+  return { ...section, instalment: withMethodFees(section.instalment, base ?? offer.total, methodsForFees(), sessionEFee(fees)) };
 }
 
 /** The internal offer, unchecked — not exported: its callers state their own gate. */
@@ -596,7 +603,7 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
       supabase.from("offer_terms").select("text").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_pricing_items").select("item_type, description, quantity, buy_price, buy_currency, sell_price, sell_currency").eq("offer_id", offer.id).order("sort"),
       supabase.from("offer_days").select("day_number, day_date, city_name, title, activities, temp_max, temp_min, rain_chance, weather_code, weather_source, transport_note").eq("offer_id", offer.id).order("day_number"),
-      supabase.from("pricings").select("fx_rates").eq("offer_id", offer.id).limit(1).maybeSingle(),
+      supabase.from("pricings").select("fx_rates, sell_total, total").eq("offer_id", offer.id).limit(1).maybeSingle(),
       supabase.from("offer_cities").select("city_name, hotel_name, check_in, check_out").eq("offer_id", offer.id).order("sort"),
     ]);
 
@@ -736,6 +743,13 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
     // today's. In the offer's own currency, so this table and the client total
     // read in the same unit. A line with no currency is in it, as issuing assumed.
     const stored = (fxRes.data as { fx_rates: unknown } | null)?.fx_rates;
+    // our price before the client's way of paying added its charge — while the offer's total is still the one issued
+    // (a total edited by hand on /offers leaves the pricings row behind)
+    const priced = fxRes.data as { sell_total?: number | string | null; total?: number | string | null } | null;
+    const ourPrice =
+      priced?.sell_total != null && priced.total != null && offer.total != null && Math.abs(Number(priced.total) - Number(offer.total)) < 0.005
+        ? Number(priced.sell_total)
+        : null;
     const sarPer: CurrencyRates =
       stored && typeof stored === "object" && !Array.isArray(stored) ? (stored as CurrencyRates) : (await getRates()).sarPer;
     const quote = offer.currency || "SAR";
@@ -798,7 +812,7 @@ async function loadInternalOffer(serial: string): Promise<InternalOfferDTO | nul
       includes,
       excludes: serviceRows.filter((s) => s.kind === "exclude").map((s) => s.label),
       terms: termRows.map((t) => t.text),
-      finance: await offerFinance(supabase, offer, { travel: arrival_date, issue: issue_date }).catch(() => undefined),
+      finance: await offerFinance(supabase, offer, { travel: arrival_date, issue: issue_date }, ourPrice).catch(() => undefined),
       climate,
       // numerics come back from pg as strings — coerce so the document formats
       // them as numbers instead of printing "30.0" verbatim.
