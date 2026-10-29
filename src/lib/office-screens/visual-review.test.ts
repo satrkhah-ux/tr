@@ -33,7 +33,7 @@ it.skipIf(!existsSync("C:/Program Files/Google/Chrome/Application/chrome.exe"))(
     await new Promise((r) => setTimeout(r, 100)); expect(await page.$eval("#countries", (e) => e.className)).toBe("on");
     await page.setViewport({ width: 1920, height: 1080 });
     const built = buildScreen({ now, day: "2026-10-20", thresholds: MANAGER_DEFAULTS, hours: { open: "09:00", close: "23:00" }, leads: [], waits: [], open: [], agents: [], employees: [], audit: [], offers: [], confirms: [], drafts: [], ads: { currency: "USD", rows: [], latest: null }, murad: [], integrations: [], backup: null, ops: { live: [] } });
-    await page.setContent(managerPage({ ...built, now, build: "qa", at: new Date(now).toISOString(), day: "2026-10-20", thresholds: MANAGER_DEFAULTS, daily: null, ticker: [{ at: new Date(now).toISOString(), red: true, text: "قرار الإدارة: توزيع الطلبات المتأخرة على الموظفين المتصلين ومتابعة الرد قبل نهاية الدوام · قيد التنفيذ · الموعد 2026-10-20" }] }).replace("<head>", '<head><base href="http://qa.local/">'));
+    await page.setContent(managerPage({ ...built, now, build: "qa", at: new Date(now).toISOString(), day: "2026-10-20", thresholds: MANAGER_DEFAULTS, daily: null, ticker: [{ at: new Date(now).toISOString(), red: true, section: "قرار الإدارة يحتاج تنفيذ", text: "القرار: توزيع الطلبات المتأخرة على الموظفين المتصلين ومتابعة الرد قبل نهاية الدوام · قيد التنفيذ · الموعد 2026-10-20" }] }).replace("<head>", '<head><base href="http://qa.local/">'));
     await page.evaluate(() => document.fonts.ready); await new Promise((r) => setTimeout(r, 300));
     await page.screenshot({ path: "output/screen-review/manager-1920.png" });
     expect(errors).toEqual([]);

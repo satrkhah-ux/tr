@@ -72,7 +72,8 @@ export type Box = { title: string; note: string; kind: "bars" | "rows"; items: B
  */
 export type Panel = { key: PanelKey; title: string; short: string; status: Status; tiles: Tile[]; kpis: Kpi[]; boxes: Box[] };
 export type UrgentItem = Tile & { panel: PanelKey; panelTitle: string; /** what to do about it — the screen's gold «← …» */ action: string };
-export type TickerItem = { at: string; text: string; red: boolean };
+/** `section`: the department the news belongs to — the crawl names it once, then its items (the owner, 2026-10-29) */
+export type TickerItem = { at: string; text: string; red: boolean; section: string };
 
 /**
  * «قناة المدير» as an economic news channel (the user, 2026-10-22: «اعتبرها شاشة
@@ -251,6 +252,11 @@ export type ManagerFacts = {
   leads: LeadFact[];
   /** null: Teletel's conversations could not be read — said, never shown as «nobody waits» */
   waits: WaitFact[] | null;
+  /**
+   * «لا يُحسب عليهم تأخير» (the owner, 2026-10-29): the Teletel agents the administration exempted (the morning desk, the visa
+   * department) — no wait of theirs, no reply time of theirs, anywhere on the channel (manager-screen/exempt.ts)
+   */
+  exemptAgents?: string[];
   open: OpenFact[] | null;
   /** null: Teletel's agents could not be read */
   agents: AgentFact[] | null;
@@ -286,6 +292,12 @@ const DAY_MS = 86_400_000;
 const RECENT_WAIT_MIN = 1440;
 export const TICKER_HOURS = 6;
 const TICKER_MAX = 40;
+/** one section never crowds the others out */
+const TICKER_SECTION_MAX = 6;
+/** the decisions are the crawl's first section — put there by the snapshot (decisionTicker) */
+export const DECISION_SECTION = "قرار الإدارة يحتاج تنفيذ";
+/** the other sections, in the order the crawl reads them */
+const TICKER_SECTIONS = ["المحادثات", "المبيعات", "التأشيرات", "مُراد", "الإعلانات", "النظام"] as const;
 export const INQUIRY_KINDS = ["بكج", "فنادق", "طيران", "تأشيرات", "مواصلات", "رخص دولية", "طلب غير واضح"] as const;
 
 const minutesText = (m: number) => (m < 60 ? arCount(Math.round(m), "دقيقة", "دقيقتين", "دقائق") : agePhrase(m / 60));
@@ -322,7 +334,9 @@ const names = (list: string[], n = 5) => list.slice(0, n).join("، ") + (list.le
 export const dayStartMs = (day: string) => Date.parse(`${day}T00:00:00+03:00`);
 const nextDay = (day: string) => new Date(Date.parse(`${day}T12:00:00Z`) + DAY_MS).toISOString().slice(0, 10);
 const visitedOn = (l: LeadFact, day: string) => riyadhDay(l.created_at) === day || (l.last_visit_at != null && riyadhDay(l.last_visit_at) === day);
-const recentWaits = (f: ManagerFacts) => (f.waits ?? []).filter((w) => w.minutes >= f.thresholds.waitAmberMin && w.minutes < RECENT_WAIT_MIN);
+/** an exempt agent, by name as Teletel spells it */
+const isExempt = (f: ManagerFacts, name: string | null | undefined): boolean => Boolean(name) && (f.exemptAgents ?? []).some((a) => fold(a) === fold(name!));
+const recentWaits = (f: ManagerFacts) => (f.waits ?? []).filter((w) => !isExempt(f, w.agent) && w.minutes >= f.thresholds.waitAmberMin && w.minutes < RECENT_WAIT_MIN);
 
 /** What is not critical is amber at most while red is kept for the critical. */
 const soft = (f: ManagerFacts, s: Status): Status => (f.thresholds.redOnlyCritical && s === "red" ? "amber" : s);
@@ -381,7 +395,8 @@ function teamToday(f: ManagerFacts): TeamToday {
   const all: number[] = [];
   for (const l of f.leads) {
     for (const s of l.handoffs ?? []) {
-      if (s.from < dayStart || !s.reply) continue;
+      // an exempt colleague's reply time counts nowhere
+      if (s.from < dayStart || !s.reply || isExempt(f, s.agent)) continue;
       const m = Math.max(0, s.reply - s.from) / 60;
       turns.set(fold(s.agent), [...(turns.get(fold(s.agent)) ?? []), m]);
       all.push(m);
@@ -425,7 +440,7 @@ function conversations(f: ManagerFacts, today: LeadFact[], team: TeamToday): Sec
   const closed = today.length - open.length;
   const unassigned = open.filter((l) => !l.taken).length;
   const replies = today
-    .filter((l) => l.first_message_at && l.first_reply_at && riyadhDay(l.first_message_at) === f.day)
+    .filter((l) => l.first_message_at && l.first_reply_at && riyadhDay(l.first_message_at) === f.day && !isExempt(f, l.handoffs?.[0]?.agent))
     .map((l) => (Date.parse(l.first_reply_at!) - Date.parse(l.first_message_at!)) / MIN_MS)
     // a «first reply» before the message is an earlier conversation's (eye/anomalies ticketsFromLeads) — no measure
     .filter((m) => m >= 0);
@@ -902,49 +917,81 @@ function system(f: ManagerFacts): Section {
 export function ticker(f: ManagerFacts): TickerItem[] {
   const since = Math.max(dayStartMs(f.day), f.now - TICKER_HOURS * 3600_000);
   const items: TickerItem[] = [];
-  const push = (at: string | null | undefined, text: string, red = false) => {
+  const push = (section: (typeof TICKER_SECTIONS)[number], at: string | null | undefined, text: string, red = false) => {
     const ms = at ? Date.parse(at) : NaN;
-    if (ms >= since && ms <= f.now + MIN_MS) items.push({ at: new Date(ms).toISOString(), text, red });
+    if (ms >= since && ms <= f.now + MIN_MS) items.push({ at: new Date(ms).toISOString(), text, red, section });
   };
   const t = f.thresholds;
 
   for (const l of f.leads) {
     const what = [l.inquiry, l.country].filter(Boolean).join(" · ");
-    push(l.created_at, `محادثة جديدة${what ? ` — ${what}` : ""}`);
-    push(l.last_visit_at, `عميل سابق عاد${what ? ` — ${what}` : ""}`);
+    push("المحادثات", l.created_at, `محادثة جديدة${what ? ` — ${what}` : ""}`);
+    push("المحادثات", l.last_visit_at, `عميل سابق عاد${what ? ` — ${what}` : ""}`);
   }
   // the moment a wait turned red
   for (const w of f.waits ?? []) {
-    if (w.minutes >= t.waitRedMin && w.minutes < RECENT_WAIT_MIN) {
-      push(new Date(Date.parse(w.since) + t.waitRedMin * MIN_MS).toISOString(), `محادثة بانتظار الرد منذ ${minutesText(w.minutes)}${w.agent ? ` — ${w.agent}` : ""}`, true);
+    if (!isExempt(f, w.agent) && w.minutes >= t.waitRedMin && w.minutes < RECENT_WAIT_MIN) {
+      push("المحادثات", new Date(Date.parse(w.since) + t.waitRedMin * MIN_MS).toISOString(), `محادثة بانتظار الرد منذ ${minutesText(w.minutes)}${w.agent ? ` — ${w.agent}` : ""}`, true);
     }
   }
-  for (const o of f.offers) push(o.created_at, `صدر عرض ${o.country ? `${o.country} ` : ""}${o.serial}`);
+  for (const o of f.offers) push("المبيعات", o.created_at, `صدر عرض ${o.country ? `${o.country} ` : ""}${o.serial}`);
   for (const a of f.audit) {
     if (a.action !== "offer.client_sent") continue;
     const serial = typeof a.meta?.["serial"] === "string" ? ` ${a.meta["serial"]}` : "";
-    push(a.at, a.meta?.["by"] === "murad" ? `مُراد أرسل العرض${serial} للعميل` : `أُرسل العرض${serial} للعميل`);
+    push("المبيعات", a.at, a.meta?.["by"] === "murad" ? `مُراد أرسل العرض${serial} للعميل` : `أُرسل العرض${serial} للعميل`);
   }
-  for (const c of firstConfirmations(f.confirms)) push(c.at, `عميل أكد حجز${c.country ? ` ${c.country}` : ""}`);
+  for (const c of firstConfirmations(f.confirms)) push("المبيعات", c.at, `عميل أكد حجز${c.country ? ` ${c.country}` : ""}`);
   for (const m of f.murad) {
-    if (m.reason === "offer:handoff") push(m.at, "مُراد جهّز طلب بكج وسلّمه لزميل");
-    else if (m.reason === "visa:handoff") push(m.at, "مُراد جهّز طلب تأشيرة وسلّمه لزميل");
-    else if (m.reason === "visa:answered") push(m.at, "مُراد أجاب عميلاً عن تأشيرة");
-    else if (m.reason?.startsWith("routed:")) push(m.at, `مُراد حوّل محادثة إلى ${m.reason.slice(7)}`);
-    else if (muradFailed(m)) push(m.at, "تعذّر على مُراد إرسال رد", true);
+    if (m.reason === "offer:handoff") push("مُراد", m.at, "مُراد جهّز طلب بكج وسلّمه لزميل");
+    else if (m.reason === "visa:handoff") push("التأشيرات", m.at, "مُراد جهّز طلب تأشيرة وسلّمه لزميل");
+    else if (m.reason === "visa:answered") push("التأشيرات", m.at, "مُراد أجاب عميلاً عن تأشيرة");
+    else if (m.reason?.startsWith("routed:")) push("مُراد", m.at, `مُراد حوّل محادثة إلى ${m.reason.slice(7)}`);
+    else if (muradFailed(m)) push("مُراد", m.at, "تعذّر على مُراد إرسال رد", true);
   }
   for (const r of [...f.ads.rows].filter((x) => x.cost >= 1).sort((a, b) => b.cost - a.cost).slice(0, 3)) {
-    push(r.updated_at, `حملة ${r.dest === "عام" || r.dest === "تأشيرات" ? r.campaign : r.dest} صرفت ${money(r.cost, f.ads.currency)} اليوم`);
+    push("الإعلانات", r.updated_at, `حملة ${r.dest === "عام" || r.dest === "تأشيرات" ? r.campaign : r.dest} صرفت ${money(r.cost, f.ads.currency)} اليوم`);
   }
   try {
     const run = JSON.parse(f.backup ?? "{}") as { at?: string; ok?: boolean };
-    push(run.at, run.ok ? "تمت النسخة الاحتياطية" : "فشلت النسخة الاحتياطية", !run.ok);
+    push("النظام", run.at, run.ok ? "تمت النسخة الاحتياطية" : "فشلت النسخة الاحتياطية", !run.ok);
   } catch {
     /* an unreadable run is the backup tile's to say */
   }
-  for (const r of f.integrations) if (r.alerted === "fail") push(r.last_error_at, `${r.name} لا يعمل`, true);
+  for (const r of f.integrations) if (r.alerted === "fail") push("النظام", r.last_error_at, `${r.name} لا يعمل`, true);
 
-  return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, TICKER_MAX);
+  // grouped by section — each named once by the crawl, then its news, the red ones first and then the newest, no section more than a
+  // handful (a red event is never pushed out by newer calm ones)
+  return TICKER_SECTIONS.flatMap((section) =>
+    items
+      .filter((i) => i.section === section)
+      .sort((a, b) => Number(b.red) - Number(a.red) || b.at.localeCompare(a.at))
+      .slice(0, TICKER_SECTION_MAX),
+  ).slice(0, TICKER_MAX);
+}
+
+/**
+ * «قرار الإدارة يحتاج تنفيذ» — the decisions the management took and nobody has finished, each said whole: what was
+ * decided, who carries it out, and the step now (the owner, 2026-10-29). The step is the system's own: a decision
+ * born of a flagged tile says what that tile asks (`ACTIONS`); else where it stands — not started or under way.
+ * `names`: employees.id → arabic_name.
+ */
+export type DecisionFact = { title: string; due_on: string; status: string; owner_id: string | null; source_key: string | null };
+export function decisionTicker(rows: DecisionFact[], names: Map<string, string>, day: string, nowIso: string): TickerItem[] {
+  return rows
+    .filter((d) => d.status !== "done")
+    .map((d) => {
+      const owner = d.owner_id ? names.get(d.owner_id) : null;
+      const key = d.source_key?.split(":").slice(1).join(":") ?? "";
+      const asked = key ? (ACTIONS[key] ?? (key.startsWith("agent:") ? "راجع محادثاته المفتوحة" : null)) : null;
+      const step = asked ?? (d.status === "in_progress" ? "أكمله ثم أغلق القرار" : "ابدأ التنفيذ");
+      const overdue = d.due_on < day;
+      return {
+        at: nowIso,
+        red: overdue,
+        section: DECISION_SECTION,
+        text: `القرار: ${d.title} — ينفّذه: ${owner || "لم يُسنَد بعد"} — الخطوة: ${step} (${d.status === "in_progress" ? "قيد التنفيذ" : "لم يبدأ"}) — الموعد: ${d.due_on}${overdue ? " — متأخر" : ""}`,
+      };
+    });
 }
 
 /** «ملخص الساعة»: what the last hour of today brought, then what needs handling now. */

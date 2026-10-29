@@ -16,7 +16,9 @@ import { riyadhDay } from "@/lib/leads/sheet";
 import { parseHours } from "@/lib/murad/reception";
 import { SETTING } from "@/lib/murad/core";
 import type { Place, Stage } from "@/lib/leads/auto";
-import { buildScreen, dayStartMs, normalizeManagerThresholds, type AgentFact, type ClosureFact, type ExternalTripFact, type ManagerFacts, type ManagerSnapshot } from "./rules";
+import { exemptConversation } from "@/lib/leads/lateness";
+import { exemptNow } from "./exempt";
+import { buildScreen, dayStartMs, decisionTicker, normalizeManagerThresholds, type AgentFact, type DecisionFact, type ClosureFact, type ExternalTripFact, type ManagerFacts, type ManagerSnapshot } from "./rules";
 import { presenceOnlineAgentIds } from "@/lib/routing/presence";
 
 export type { ManagerScreenFeed, ManagerSnapshot } from "./rules";
@@ -126,6 +128,9 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
         })
     : null;
   const nowSec = Math.floor(now / 1000);
+  // «لا يُحسب عليهم تأخير»: the administration's exempt colleagues — no wait and no reply time of theirs on the channel
+  const exempt = await exemptNow(service);
+  const exemptAgents = Array.isArray(agentsRaw) ? agentsRaw.filter((a) => typeof a.id === "number" && exempt.agentIds.has(a.id) && a.name?.trim()).map((a) => a.name!.trim()) : [];
 
   const facts: ManagerFacts = {
     now,
@@ -147,6 +152,7 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
     })),
     waits:
       open?.rows
+        .filter((c) => !exemptConversation(c, exempt))
         .map((c) => ({ c, clock: slaClock(c, nowSec) }))
         .filter(({ clock }) => clock.kind !== "cold")
         .map(({ c, clock }) => ({
@@ -157,6 +163,7 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
           phone: c.phone || null,
           preview: c.preview || null,
         })) ?? null,
+    exemptAgents,
     open: open?.rows.map((c) => ({ agent: c.assignee?.trim() || null, activeAt: iso((c.lastActivityAt || c.createdAt) * 1000) })) ?? null,
     agents,
     employees: team,
@@ -206,16 +213,14 @@ export async function computeManagerSnapshot(): Promise<ManagerSnapshot> {
   };
 
   const built = buildScreen(facts);
-  const decisions = await db().from("management_decisions").select("title, due_on, status").neq("status", "done").order("due_on").limit(20);
-  const decisionTicker = (decisions.data ?? []).map((d: { title: string; due_on: string; status: string }) => ({
-    at: iso(now), red: d.due_on < day,
-    text: `قرار الإدارة: ${d.title} · ${d.status === "in_progress" ? "قيد التنفيذ" : "بانتظار التنفيذ"} · الموعد ${d.due_on}`,
-  }));
+  // «قرار الإدارة يحتاج تنفيذ»: each decision with who carries it out and the step (rules.ts decisionTicker)
+  const decisions = await db().from("management_decisions").select("title, due_on, status, owner_id, source_key").neq("status", "done").order("due_on").limit(20);
+  const decisionNews = decisionTicker((decisions.data ?? []) as DecisionFact[], new Map(team.map((e) => [e.id, e.name])), day, iso(now));
   return {
     at: iso(now),
     day,
     ...built,
-    ticker: [...decisionTicker, ...built.ticker],
+    ticker: [...decisionNews, ...built.ticker],
     daily: eye ? dailyLines(eye, agents, team) : null,
     thresholds: facts.thresholds,
   };
