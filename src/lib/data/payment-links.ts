@@ -9,6 +9,7 @@ import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/telete
 import { gateOperation } from "@/lib/operations/access";
 import { createInvoiceLink } from "@/lib/providers/myfatoorah";
 import { createCheckout } from "@/lib/providers/tamara";
+import { payLink } from "@/lib/payments/pay-now";
 
 /**
  * A payment link for one case: PREPARED here (the provider creates the link,
@@ -27,22 +28,22 @@ function db(): Promise<SupabaseClient> {
   return createSupabaseServerClient() as unknown as Promise<SupabaseClient>;
 }
 
-type CaseRow = { serial: string; currency: string; name: string; phone: string | null; partner: boolean };
+type CaseRow = { offerId: string; serial: string; currency: string; name: string; phone: string | null; partner: boolean };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
 
 /** The client and serial from the case itself — never from the browser. */
 async function loadCase(operationId: string): Promise<CaseRow | null> {
-  type Offer = { serial: string | null; currency: string | null; partner_company_id: string | null; customers: { arabic_name: string | null; mobile: string | null } | { arabic_name: string | null; mobile: string | null }[] | null };
+  type Offer = { id: string; serial: string | null; currency: string | null; partner_company_id: string | null; customers: { arabic_name: string | null; mobile: string | null } | { arabic_name: string | null; mobile: string | null }[] | null };
   const { data } = await (await db())
     .from("operations")
-    .select("id, offers(serial, currency, partner_company_id, customers(arabic_name, mobile))")
+    .select("id, offers(id, serial, currency, partner_company_id, customers(arabic_name, mobile))")
     .eq("id", operationId)
     .maybeSingle();
   const offer = one((data as { offers: Offer | Offer[] | null } | null)?.offers);
   if (!offer?.serial) return null;
   const customer = one(offer.customers);
-  return { serial: offer.serial, currency: offer.currency || "SAR", name: customer?.arabic_name?.trim() || "", phone: customer?.mobile || null, partner: Boolean(offer.partner_company_id) };
+  return { offerId: offer.id, serial: offer.serial, currency: offer.currency || "SAR", name: customer?.arabic_name?.trim() || "", phone: customer?.mobile || null, partner: Boolean(offer.partner_company_id) };
 }
 
 const site = () => (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
@@ -85,6 +86,7 @@ export async function preparePaymentLink(operationId: string, input: { provider:
     // kept so the 10-minute job can record it once paid (payment-links-poll.ts) — service role: the table has no policy
     const invoiceId = "invoiceId" in outcome.data ? outcome.data.invoiceId : (outcome.data.orderId ?? outcome.data.checkoutId);
     const { error: kept } = await (createSupabaseServiceClient() as unknown as SupabaseClient).from("payment_links").insert({
+      offer_id: c.offerId,
       operation_id: operationId,
       provider: input.provider,
       invoice_id: invoiceId,
@@ -104,6 +106,27 @@ export async function preparePaymentLink(operationId: string, input: { provider:
       meta: { provider: input.provider, amount, currency: c.currency, mock: outcome.data.mock },
     });
     return { ok: true, url: outcome.data.url, provider: input.provider, mock: outcome.data.mock, amount, currency: c.currency };
+  } catch {
+    return { ok: false, error: "err.db" };
+  }
+}
+
+/**
+ * «رابط الدفع» (the owner, 2026-10-29): our stable /pay/<serial> for this case, the amount signed on the server
+ * so the client cannot change it. It never expires the way a MyFatoorah invoice does; the press on that page
+ * makes the invoice (pay-now.ts). Sent like any link: review, then «أرسله للعميل».
+ */
+export async function stablePayLink(operationId: string, amount: number): Promise<{ ok: true; url: string; amount: number; currency: string } | Fail> {
+  const denied = await gateOperation(operationId);
+  if (denied) return { ok: false, error: denied };
+  const value = Math.round(Number(amount) * 100) / 100;
+  if (!Number.isFinite(value) || value <= 0 || value > MAX_AMOUNT) return { ok: false, error: "pay.err.amount" };
+  try {
+    const c = await loadCase(operationId);
+    if (!c) return { ok: false, error: "ops.err.notYours" };
+    if (c.partner) return { ok: false, error: "pay.err.partner" };
+    if (c.currency !== "SAR") return { ok: false, error: "pay.err.sarOnly" };
+    return { ok: true, url: payLink(c.serial, value), amount: value, currency: c.currency };
   } catch {
     return { ok: false, error: "err.db" };
   }

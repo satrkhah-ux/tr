@@ -7,6 +7,7 @@ import { offerDocumentToPdf } from "./pdf";
 import { sendTeletelAttachment } from "@/lib/providers/teletel";
 import type { CoverStyle } from "@/components/offer-doc/cover-image";
 import { getOfferCover } from "@/lib/data/offer-cover";
+import { payNowUrl } from "@/lib/payments/pay-now";
 
 /**
  * The client's programme PDF — the latest PUBLISHED snapshot, as the public
@@ -33,7 +34,9 @@ export async function clientOfferPdf(serial: string, coverChoice?: CoverStyle): 
 
   // the public link follows the offer's OWN branding — nothing a URL can override
   const { brand, showPrices } = await resolveDocBrand({ serial });
-  const html = await renderOfferDocumentHtml({ variant: "client", offer: published.offer, brand, showPrices, ...(cover === "designed" ? { cover } : {}) });
+  // «ادفع الآن»: a link in the PDF to our stable /pay/<serial> when the client pays by MyFatoorah
+  const payUrl = showPrices ? await payNowUrl(serial) : undefined;
+  const html = await renderOfferDocumentHtml({ variant: "client", offer: published.offer, brand, showPrices, ...(payUrl ? { payUrl } : {}), ...(cover === "designed" ? { cover } : {}) });
   const pdf = await offerDocumentToPdf(html, {
     brand: brand.nameAr,
     serial,

@@ -173,3 +173,22 @@ describe("client OfferDocument — a chosen payment method", () => {
     expect(text).not.toContain("8.766");
   });
 });
+
+/** «ادفع الآن» (the owner, 2026-10-29): the button points at OUR stable page, and says the total's way only. */
+describe("client OfferDocument — «ادفع الآن»", () => {
+  const offer = toClientOfferDTO({ ...internalOffer(), total: 16869.61 });
+  const html = renderToStaticMarkup(createElement(OfferDocument, { variant: "client", offer, payUrl: "https://pkg.traveliun.com/pay/AD-7-1000" }));
+  const text = html.replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ");
+
+  it("links to /pay/<serial>, never to a MyFatoorah invoice", () => {
+    expect(html).toContain('href="https://pkg.traveliun.com/pay/AD-7-1000"');
+    expect(text).toContain("ادفع الآن");
+    expect(html).not.toContain("myfatoorah.com");
+  });
+
+  it("no button without the link, and no fee wording with it", () => {
+    expect(renderToStaticMarkup(createElement(OfferDocument, { variant: "client", offer }))).not.toContain("ادفع الآن");
+    // the button says the way to pay and nothing else (the fixture's hotel resort fee is the hotel's, printed elsewhere)
+    expect(html.match(/<a class="od-paynow"[^>]*>([^<]*)<\/a>/)?.[1]).toBe("ادفع الآن");
+  });
+});

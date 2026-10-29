@@ -77,6 +77,11 @@ export type OfferDocumentProps = (
   cover?: CoverStyle;
   /** the picture of the designed cover; the print pipeline passes it inlined, the preview falls back to the public path */
   coverImage?: string | null;
+  /**
+   * «ادفع الآن» (the owner, 2026-10-29): OUR stable /pay/<serial> — never a MyFatoorah invoice, those expire. Set
+   * only when the client pays by MyFatoorah (pay-now.ts payNowUrl); the button says the total's way, never a fee.
+   */
+  payUrl?: string;
 };
 
 const Ltr = ({ children }: { children: ReactNode }) => <DirText dir="ltr">{children}</DirText>;
@@ -481,9 +486,9 @@ export function OfferDocument(props: OfferDocumentProps) {
     // not, so the heading must not promise a price.
     title: showPrices ? AR.servicesAndPrice : AR.servicesOnly,
     note: showPrices ? AR.servicesAndPriceNote : undefined,
-    heightMm: servicesHeightMm(offer, showPrices),
+    heightMm: servicesHeightMm(offer, showPrices) + (showPrices && props.payUrl ? 16 : 0),
     kind: "node",
-    node: <ServicesAndPrice offer={offer} nights={nights} days={days} showPrices={showPrices} />,
+    node: <ServicesAndPrice offer={offer} nights={nights} days={days} showPrices={showPrices} payUrl={props.payUrl} />,
   });
 
   if (props.variant === "internal") {
@@ -1315,11 +1320,13 @@ function ServicesAndPrice({
   nights,
   days,
   showPrices,
+  payUrl,
 }: {
   offer: ClientOfferDTO;
   nights: number;
   days: number;
   showPrices: boolean;
+  payUrl?: string;
 }) {
   return (
     <>
@@ -1355,6 +1362,11 @@ function ServicesAndPrice({
             <strong><Ltr>{offer.total != null ? fmtNum(offer.total, 2) : "—"}</Ltr></strong>
             <span>{offer.currency ?? ""}</span>
           </div>
+          {payUrl ? (
+            <a className="od-paynow" href={payUrl} target="_blank" rel="noopener noreferrer">
+              {AR.payNow}
+            </a>
+          ) : null}
           {hasFinance(offer.finance) ? <FinanceTerms finance={offer.finance} /> : <p className="od-note">{AR.paymentTerms}</p>}
         </>
       ) : null}

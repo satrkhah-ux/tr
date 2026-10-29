@@ -1,5 +1,6 @@
 "use server";
 
+import { carryOfferPayments } from "@/lib/operations/payment-links-poll";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { translate, type TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
@@ -241,6 +242,13 @@ async function recordConfirmation(
       await pullBookingsFromOffer(id);
     } catch {
       /* the wizard pulls when it opens */
+    }
+
+    // a client who paid from «ادفع الآن» before this confirmation: that money into the case now (once — provider_ref)
+    try {
+      await carryOfferPayments(input.offer_id, id);
+    } catch {
+      /* the 10-minute payment-links run carries it */
     }
 
     // A sale with visas opens their files for the visa department (the owner, 2026-10-26): the client, the

@@ -11,6 +11,7 @@ import { OfferSend } from "../OfferSend";
 import { CoverChoice } from "../CoverChoice";
 import type { CoverStyle } from "@/components/offer-doc/cover-image";
 import { TripLinkSend } from "./TripLinkSend";
+import { PayLinkTools } from "./PayLinkTools";
 import { FileStateChip } from "./FileStateChip";
 import { useBasicLabels } from "./labels";
 
@@ -292,6 +293,8 @@ export function BasicFileStatus({
         >
           {/* the filled button is the current step's only: framed once the file is past it */}
           {sendable ? <OfferSend draftId={draftId} again={view.stale} onSent={changed} filled={step2 === "now"} cover={coverPick ?? view.cover} onCover={(c) => setCoverPick(c)} /> : null}
+          {/* «رابط الدفع» (the owner, 2026-10-29): our stable /pay link — copied, or reviewed and sent */}
+          {view.canAct && !view.partner ? <div className="mt-2"><PayLinkTools draftId={draftId} /></div> : null}
         </Step>
         <Step
           n={3}
