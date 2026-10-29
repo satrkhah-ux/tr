@@ -11,6 +11,9 @@ import { SETTING as MURAD_SETTING } from "@/lib/murad/core";
 import { hoursText, parseDelay, parseHours, readRoutes, ROUTE_KEYS, type Routes } from "@/lib/murad/reception";
 import { readOffers, type OfferCountry } from "@/lib/murad/auto-offer";
 import { usdSarRate } from "@/lib/offer/pricing";
+import { parseFees, type PaymentFees } from "@/lib/payments/methods";
+
+const PAYMENT_FEES_KEY = "payment_fees";
 
 /**
  * Choices the administration makes once for everyone (app_settings, 0054).
@@ -126,6 +129,21 @@ export async function setUsdRate(rate: number): Promise<SetSettingResult> {
     return { ok: true };
   } catch {
     return { ok: false, error: "err.db" };
+  }
+}
+
+/**
+ * «رسوم وسائل الدفع» (the owner, 2026-10-29): the administration's share and
+ * fixed charge per method (lib/payments/methods.ts parseFees over its
+ * defaults). Read by anyone signed in — the calculator quotes from it — and by
+ * the price update and the PDF through this one function.
+ */
+export async function getPaymentFees(): Promise<PaymentFees> {
+  try {
+    const { data } = await (createSupabaseServiceClient() as unknown as SupabaseClient).from("app_settings").select("value").eq("key", PAYMENT_FEES_KEY).maybeSingle();
+    return parseFees((data as { value?: string } | null)?.value);
+  } catch {
+    return parseFees(null);
   }
 }
 
