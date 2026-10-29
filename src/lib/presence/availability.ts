@@ -125,7 +125,10 @@ export async function excusedAgents(at = Date.now()): Promise<Map<number, Excuse
 export type AvailabilityReason = "leave" | "off_shift" | "break" | "offline" | "exempt";
 export type Availability = { available: boolean; reason: AvailabilityReason | null };
 
-/** session A's setting: {"employees": [uuid…], "roles": [roleId…]} — staff and departments with no lateness counted */
+/**
+ * session A's setting (it owns the screen and src/lib/leads/lateness.ts): {"employees": [uuid…], "roles": [roleId…],
+ * "teams": [teletelTeamId…]} — staff, roles and whole Teletel teams with no lateness counted
+ */
 export const EXEMPT_KEY = "lateness_exempt";
 /** a department's own working hours, when it has them: {"<department>": "<hours text as مُراد's>"} */
 export const DEPARTMENT_HOURS_KEY = "department_hours";
@@ -173,7 +176,7 @@ export async function availabilityOf(employeeIds: string[], atMs = Date.now(), d
   ]);
   const hours = await hoursFor(department, s);
   const working = isWorkingTime(new Date(atMs), hours);
-  let exempt: { employees?: unknown; roles?: unknown } = {};
+  let exempt: { employees?: unknown; roles?: unknown; teams?: unknown } = {};
   try {
     exempt = JSON.parse(s.get(EXEMPT_KEY) ?? "{}") as typeof exempt;
   } catch {
@@ -181,6 +184,13 @@ export async function availabilityOf(employeeIds: string[], atMs = Date.now(), d
   }
   const exEmp = new Set(Array.isArray(exempt.employees) ? (exempt.employees as string[]) : []);
   const exRole = new Set(Array.isArray(exempt.roles) ? (exempt.roles as string[]) : []);
+  // a whole Teletel team (session A's third key, «قسم فيزا»): its members' agents — the members list is cached a minute
+  const exTeams = Array.isArray(exempt.teams) ? (exempt.teams as unknown[]).filter((t): t is number => Number.isInteger(t)) : [];
+  const exAgent = new Set<number>();
+  if (exTeams.length) {
+    const { teamMembers } = await import("@/lib/providers/teletel");
+    for (const members of await Promise.all(exTeams.map((t) => teamMembers(t).catch(() => [])))) for (const m of members) exAgent.add(m.id);
+  }
   const row = new Map(((emps ?? []) as { id: string; role_id: string | null; teletel_agent_id: number | null }[]).map((e) => [e.id, e]));
   for (const id of employeeIds) {
     const e = row.get(id);
@@ -194,7 +204,7 @@ export async function availabilityOf(employeeIds: string[], atMs = Date.now(), d
             ? "break"
             : online && !(e?.teletel_agent_id && online.has(Number(e.teletel_agent_id)))
               ? "offline"
-              : exEmp.has(id) || (e?.role_id && exRole.has(e.role_id))
+              : exEmp.has(id) || (e?.role_id && exRole.has(e.role_id)) || (e?.teletel_agent_id && exAgent.has(Number(e.teletel_agent_id)))
                 ? "exempt"
                 : null;
     out.set(id, { available: reason === null || reason === "exempt", reason });
