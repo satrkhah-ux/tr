@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
-import { Moon, Phone, UserRound, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, useTransition, type ComponentType } from "react";
+import { Phone, UserRound, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { endMyStatus, getMyPresence, startMyStatus, type MyPresence } from "@/lib/data/presence-status";
 import { STATUS_BUTTON, WANTS, type StatusKind } from "@/lib/presence/excuse";
+import { awayKindOf, once } from "@/lib/presence/away-overlay";
+import { AwayOverlay } from "./AwayOverlay";
 
 /**
  * The status buttons beside مُراد (the owner, 2026-10-29), in his own side strip — so they stand over no button or field.
@@ -12,7 +14,18 @@ import { STATUS_BUTTON, WANTS, type StatusKind } from "@/lib/presence/excuse";
  * routed to them and no delay is counted, up to the button's limit. Pressed again: off.
  */
 
-const ICON: Record<StatusKind, typeof UserRound> = { client: UserRound, call: Phone, prayer: Moon, meeting: Users };
+/** «صلاة»: a mihrab's arch, in lucide's lines — no crescent anywhere (the owner, 2026-10-29) */
+function MihrabIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d="M5 21v-9c0-4 4-6 7-9 3 3 7 5 7 9v9" />
+      <path d="M9 21v-6c0-2 1.5-3.5 3-5 1.5 1.5 3 3 3 5v6" />
+      <path d="M3 21h18" />
+    </svg>
+  );
+}
+
+const ICON: Record<StatusKind, ComponentType<{ className?: string }>> = { client: UserRound, call: Phone, prayer: MihrabIcon, meeting: Users };
 const minutesSince = (iso: string, now: number) => Math.max(0, Math.floor((now - Date.parse(iso)) / 60_000));
 
 export function StatusButtons() {
@@ -36,7 +49,22 @@ export function StatusButtons() {
     return () => clearInterval(timer);
   }, [load]);
 
+  // every status covers the page (away-overlay.ts); its button ends this status once — a new status, a new once
+  const awayStarted = awayKindOf(p?.active) ? p!.active!.startedAt : null;
+  const endAway = useMemo(
+    () =>
+      once(async () => {
+        const r = await endMyStatus();
+        if (!r.ok) setError(r.error);
+        load();
+        return r;
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one guard per status started
+    [awayStarted, load],
+  );
+
   if (!p || (!p.allowed.length && !p.active)) return null;
+  const away = awayKindOf(p.active);
 
   const press = (kind: StatusKind) => {
     setError("");
@@ -51,6 +79,21 @@ export function StatusButtons() {
 
   return (
     <>
+      {away && p.active && (
+        <AwayOverlay
+          key={p.active.startedAt}
+          kind={away}
+          startedAt={p.active.startedAt}
+          capAt={p.active.capAt}
+          serverNow={now}
+          detail={away === "meeting" ? p.meeting?.title : undefined}
+          details={p.active.details}
+          busy={pending}
+          error={error}
+          onEnd={() => start(async () => void (await endAway()))}
+          onExpired={load}
+        />
+      )}
       <div className="flex flex-col items-center gap-1.5" role="group" aria-label="حالتي الآن">
         {p.allowed.map((k) => {
           const Icon = ICON[k];
