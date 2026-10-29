@@ -819,7 +819,7 @@ export async function archiveEntries(
  * «قرار الإدارة» for the office screens (session D's ticker): the newest decision addressed to everyone in the last two
  * weeks, never a warning — its serial, kind, title and the first lines of its text. Null when there is none.
  */
-export async function latestOfficeDecision(
+export async function latestActiveDecision(
   nowMs = Date.now(),
 ): Promise<{
   serial: string;
