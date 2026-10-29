@@ -2146,6 +2146,7 @@ export const ar: Dictionary = {
   "nav.finance": "الحسابات المالية",
   "nav.muradSettings": "إعدادات مُراد",
   "nav.developer": "المطوّر",
+  "nav.secrets": "المفاتيح والتوكنات",
   "nav.sla": "SLA — سرعة الرد",
   "nav.followups": "المتابعة",
   "nav.followupSupervision": "إشراف المتابعة",

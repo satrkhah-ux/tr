@@ -203,6 +203,9 @@ export type AuditAction =
   | "supervision.settings_saved"
   // «الحسابات المالية» saved (developer only; the figures stay out of the log)
   | "finance.saved"
+  // «المفاتيح والتوكنات»: a key saved / replaced / cleared from «المطوّر» — the name only, never the value
+  | "secrets.saved"
+  | "secrets.cleared"
   | "catalog.imported"
   // «استعادة نسخة سابقة»: an older version's draft put back and issued as the next version
   | "offer.version_restored"
