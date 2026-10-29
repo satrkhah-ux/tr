@@ -103,6 +103,8 @@ export function FollowupWorkspace({ initial, initialId }: { initial: FollowupWor
       </div>
       <div className="flex flex-wrap gap-2">
         <button className={view === "quick" ? btnPrimary : btn} onClick={() => setView(view === "quick" ? "list" : "quick")}><Zap size={16} /> المتابعة السريعة</button>
+        {/* «إشراف المتابعة» (the owner, 2026-10-29): the late cases, inside «المتابعة» */}
+        <Link href="/followups/supervision" className={btn}>إشراف المتابعة</Link>
         {data.manager && <><button className={view === "review" ? btnPrimary : btn} onClick={() => setView(view === "review" ? "list" : "review")}>مراجعة قبل الأرشفة</button>
           <button className={view === "board" ? btnPrimary : btn} onClick={() => setView(view === "board" ? "list" : "board")}>لوحة المدير والإعدادات</button></>}
       </div>

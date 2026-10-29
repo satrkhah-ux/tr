@@ -13,6 +13,7 @@ import { switchboardSweep } from "@/lib/routing/switchboard";
 import { sweepSecretaryPlans } from "@/lib/secretary/plan";
 import { sweepSecretarySuggestions } from "@/lib/secretary/suggest";
 import { sweepNotifications } from "@/lib/notifications/sweep";
+import { sweepFollowupSupervision } from "@/lib/followups/supervision/sweep";
 import { readSettings } from "@/lib/murad/run";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -75,6 +76,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   after(() => sweepSecretarySuggestions().catch(() => null));
   // «مركز الإشعارات»: what «متابعتي» ranks for whoever is online lands in the bell (notifications/sweep.ts)
   after(() => recordCronRun("notify_sweep", sweepNotifications).catch(() => null));
+  // «إشراف المتابعة»: late follow-ups to the employee, then a supervisor, then the management (followups/supervision/sweep.ts)
+  after(() => recordCronRun("followup_supervision", sweepFollowupSupervision).catch(() => null));
   // every run leaves its trace for /developer, answered anyone or not (cron-runs.ts)
   // «المستقبل الآلي»: what the webhook missed, before Murad's own turns (no model, its turns claimed one by one)
   const received = await receptionSweep().catch(() => 0);

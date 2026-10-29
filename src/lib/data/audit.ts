@@ -191,6 +191,16 @@ export type AuditAction =
   | "secretary.suggested"
   // «قارن»: a price the employee read on a public site, typed by their hand into their proposal draft
   | "secretary.compare_applied"
+  // «إشراف المتابعة»: a case opened / moved up the chain / closed on a real act, and every supervisor action (old/new/reason in meta)
+  | "supervision.case_opened"
+  | "supervision.case_escalated"
+  | "supervision.case_closed"
+  | "supervision.directed"
+  | "supervision.rescheduled"
+  | "supervision.reassigned"
+  | "supervision.escalated"
+  | "supervision.supervisors_saved"
+  | "supervision.settings_saved"
   // «الحسابات المالية» saved (developer only; the figures stay out of the log)
   | "finance.saved"
   | "catalog.imported"
