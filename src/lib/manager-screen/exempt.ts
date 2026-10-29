@@ -13,9 +13,10 @@ export type ExemptNow = ExemptSet & {
 
 /**
  * «لا يُحسب عليهم تأخير» (the owner, 2026-10-29) for «قناة المدير» and the report: the morning desk and the visa department
- * are never shown late — no wait, no reply time. Who they are is the administration's setting (app_settings lateness_exempt,
- * read by session A's latenessExempt() in leads/lifecycle.ts the same way); read here for code that runs on the service
- * role. Nobody when the setting is missing or unreadable: then everything counts as before.
+ * are never shown late — no wait, no reply time. Who they are is the administration's setting (app_settings lateness_exempt); read
+ * here for code that runs on the service role — the same people as latenessExempt() (leads/lifecycle.ts), plus what the channel and
+ * the reports also need: names and the exempt teams' members. A colleague named in the setting stays exempt whatever their status; a department's members only while active.
+ * Nobody when the setting is missing or unreadable: then everything counts as before.
  *
  * `withTeams`: also read who is in the exempt Teletel teams (the visa department has a colleague with no employee row) — their
  * agent ids and names join the others, so a conversation or a reply time of theirs is exempt too. A live read of Teletel (a minute
@@ -25,7 +26,7 @@ export async function exemptNow(service: SupabaseClient, withTeams = false): Pro
   try {
     const { data } = await service.from("app_settings").select("value").eq("key", LATENESS_EXEMPT_KEY).maybeSingle();
     const set = parseLatenessExempt((data as { value: string } | null)?.value);
-    const people = [...(set.employees.length ? [`id.in.(${set.employees.join(",")})`] : []), ...(set.roles.length ? [`role_id.in.(${set.roles.join(",")})`] : [])];
+    const people = [...(set.employees.length ? [`id.in.(${set.employees.join(",")})`] : []), ...(set.roles.length ? [`and(role_id.in.(${set.roles.join(",")}),status.eq.Active)`] : [])];
     const { data: emps } = people.length ? await service.from("employees").select("id, arabic_name, teletel_agent_id").or(people.join(",")) : { data: [] };
     const list = (emps ?? []) as { id: string; arabic_name: string | null; teletel_agent_id: number | null }[];
     const members = withTeams ? (await Promise.all(set.teams.map((t) => teamMembers(t).catch(() => [])))).flat() : [];
