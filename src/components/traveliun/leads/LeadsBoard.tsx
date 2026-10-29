@@ -14,6 +14,7 @@ import { TraveliunShell } from "../TraveliunShell";
 import { useCanOpen } from "@/lib/roles/useCanOpen";
 import { campaignDestination, resolvePlace } from "@/lib/leads/places";
 import { SuggestInput } from "../SuggestInput";
+import { ReportPane } from "./ReportPane";
 
 const SENT = ["تم إرسال التفاصيل", "تم إرسال البرنامج", "تم إرسال المعلومات"];
 const TONE = new Map<string, (typeof INQUIRIES)[number]>(INQUIRIES.map((i) => [i.label, i]));
@@ -37,6 +38,8 @@ const PANES = [
   ["daily", "حصر الطلبات اليومية"],
   ["peak", "وقت الذروة"],
   ["team", "أداء الموظفين"],
+  // the follow-up staff's daily report, written from these same conversations (the owner, 2026-10-29)
+  ["report", "التقرير"],
 ] as const;
 type Pane = (typeof PANES)[number][0];
 
@@ -323,6 +326,9 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
   const pane: Pane = PANES.find(([k]) => k === params.get("tab"))?.[0] ?? "clients";
   const goPane = (p: Pane) => router.replace(p === "clients" ? "/clients" : `/clients?tab=${p}`, { scroll: false });
   const today = riyadhDay(Date.now());
+  // «التقرير» keeps its corrections and its text while the reviewer looks at another tab: mounted at the first visit, hidden after
+  const [reportSeen, setReportSeen] = useState(pane === "report");
+  if (pane === "report" && !reportSeen) setReportSeen(true);
   const [day, setDay] = useState(today);
   const [kind, setKind] = useState<string | null>(null);
   const [returningOnly, setReturningOnly] = useState(false);
@@ -501,7 +507,7 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
             </Link>
           ) : null}
         </nav>
-        {pane !== "clients" ? (
+        {pane !== "clients" && pane !== "report" ? (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11.5px] font-bold text-[#78948f]">المدة:</span>
             {RANGES.map(([r, label]) => (
@@ -846,6 +852,13 @@ export function LeadsBoard({ stats, leads, team, meId, pullError, twoWay, live, 
             {live ? "يوم المحادثة يوم بدئها في واتساب" : "يوم المحادثة يوم وصولها إلى النظام (الشيت لا يحمل تاريخاً)"}، والدولة من البرنامج المصدَر إن وُجد وإلا من خانة الدولة.
           </p>
         </section>
+        ) : null}
+
+        {/* ---------- «التقرير» ---------- */}
+        {reportSeen ? (
+          <div hidden={pane !== "report"}>
+            <ReportPane leads={leads} team={team} places={places} today={today} />
+          </div>
         ) : null}
 
         {/* ---------- a new conversation, and the conversations ---------- */}

@@ -279,8 +279,16 @@ const RUNTIME = String.raw`
     var key = F.at;
     if (shown.tick !== key) {
       shown.tick = key;
-      var words = "";
-      for (var j = 0; j < F.ticker.length; j++) words += (j ? '<span class="sep">◆</span>' : "") + '<span class="' + (F.ticker[j].red ? "ti red" : "ti") + '">' + esc(F.ticker[j].text) + "</span>";
+      // each section is named once — «التأشيرات    …الأخبار» — then its news, a dot between them (the owner, 2026-10-29)
+      var words = "", last = null;
+      for (var j = 0; j < F.ticker.length; j++) {
+        var it = F.ticker[j], sec = it.section || "";
+        if (sec !== last) {
+          words += (j ? '<span class="sep">◆</span>' : "") + (sec ? '<span class="' + (sec === "قرار الإدارة يحتاج تنفيذ" ? "sec warn" : "sec") + '">' + esc(sec) + "</span>" : "");
+          last = sec;
+        } else words += '<span class="dot">·</span>';
+        words += '<span class="' + (it.red ? "ti red" : "ti") + '">' + esc(it.text) + "</span>";
+      }
       $("tick").innerHTML = words || "لا أحداث في الساعات الأخيرة";
     }
     var el = $("tick"), w = el.offsetWidth, rail = $("rail").offsetWidth;
@@ -549,6 +557,9 @@ footer .now{position:relative;z-index:1;display:grid;place-items:center;padding:
 #tick{position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;white-space:nowrap;direction:rtl;font-size:${v(28)};font-weight:800;line-height:1.3;will-change:transform}
 .ti.red{color:#8a0f22}.ti.red:before{content:"● ";color:#c4122f}
 .sep{margin:0 ${v(26)};opacity:.5}
+#tick .sec{display:inline-block;margin-inline-end:${v(22)};padding:${v(2)} ${v(18)};border-radius:${v(8)};background:#04101a;color:var(--gold);font-size:${v(24)}}
+#tick .sec.warn{background:#8a0f22;color:#fff}
+#tick .dot{margin:0 ${v(14)};opacity:.55}
 
 /* on the hour */
 #summary{position:fixed;left:0;top:0;width:100%;height:100%;z-index:5;background:rgba(4,16,26,.97);display:flex;flex-direction:column;justify-content:center;padding:${v(80)} ${v(160)};opacity:0;pointer-events:none;transition:opacity .6s}

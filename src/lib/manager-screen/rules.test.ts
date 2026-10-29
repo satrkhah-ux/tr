@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildScreen,
+  decisionTicker,
   firstConfirmations,
   MANAGER_DEFAULTS,
   normalizeManagerThresholds,
@@ -296,7 +297,7 @@ describe("«النظام» — what is down now", () => {
 });
 
 describe("the ticker", () => {
-  it("carries today's real events only, newest first", () => {
+  it("carries today's real events only, the red ones first and then the newest", () => {
     const items = ticker(
       facts({
         leads: [lead({ created_at: ago(5) }), lead({ id: "old", created_at: ago(8 * 60) })],
@@ -306,13 +307,53 @@ describe("the ticker", () => {
       }),
     );
     expect(items.map((i) => i.text)).toEqual([
-      "محادثة جديدة — بكج · تركيا",
       "محادثة بانتظار الرد منذ 25 دقيقة — رشا",
+      "محادثة جديدة — بكج · تركيا",
       "مُراد أرسل العرض AD-6-1 للعميل",
       "صدر عرض جورجيا AD-6-1",
       "تمت النسخة الاحتياطية",
     ]);
     expect(items.find((i) => i.text.startsWith("محادثة بانتظار"))?.red).toBe(true);
+  });
+
+  it("names each section once and keeps its news together — the visa news under «التأشيرات», Murad's under «مُراد»", () => {
+    const items = ticker(
+      facts({
+        leads: [lead({ created_at: ago(5) })],
+        offers: [{ id: "o", serial: "AD-6-1", country: "جورجيا", created_at: ago(30) }],
+        murad: [
+          { conversation_id: 1, reason: "visa:handoff", error: null, replied: true, at: ago(20) },
+          { conversation_id: 2, reason: "offer:handoff", error: null, replied: true, at: ago(10) },
+          { conversation_id: 3, reason: "visa:answered", error: null, replied: true, at: ago(2) },
+        ],
+      }),
+    );
+    // the sections in their fixed order, each one's items together, newest first inside it
+    expect(items.map((i) => [i.section, i.text])).toEqual([
+      ["المحادثات", "محادثة جديدة — بكج · تركيا"],
+      ["المبيعات", "صدر عرض جورجيا AD-6-1"],
+      ["التأشيرات", "مُراد أجاب عميلاً عن تأشيرة"],
+      ["التأشيرات", "مُراد جهّز طلب تأشيرة وسلّمه لزميل"],
+      ["مُراد", "مُراد جهّز طلب بكج وسلّمه لزميل"],
+      ["النظام", "تمت النسخة الاحتياطية"],
+    ]);
+  });
+
+  it("lets no section crowd the others out", () => {
+    const many = Array.from({ length: 12 }, (_, i) => lead({ id: `l${i}`, created_at: ago(i + 1) }));
+    const items = ticker(facts({ leads: many, offers: [{ id: "o", serial: "AD-6-1", country: null, created_at: ago(30) }] }));
+    expect(items.filter((i) => i.section === "المحادثات")).toHaveLength(6);
+    expect(items.some((i) => i.section === "المبيعات")).toBe(true);
+  });
+
+  it("keeps a red event even when more than a section's worth of newer calm ones came after it", () => {
+    const many = Array.from({ length: 7 }, (_, i) => lead({ id: `l${i}`, created_at: ago(i + 1) }));
+    // a wait that turned red hours ago: older than all of them
+    const items = ticker(facts({ leads: many, waits: [{ minutes: 300, since: ago(300), agent: "رشا", client: null }] }));
+    const talk = items.filter((i) => i.section === "المحادثات");
+    expect(talk).toHaveLength(6);
+    expect(talk[0]).toMatchObject({ red: true });
+    expect(talk[0].text).toContain("بانتظار الرد");
   });
 
   it("does not reach back past midnight, even within its hours", () => {
@@ -325,6 +366,73 @@ describe("the ticker", () => {
       }),
     );
     expect(items.map((i) => i.text)).toEqual(["محادثة جديدة — طيران"]);
+  });
+});
+
+describe("«لا يُحسب عليهم تأخير» — the exempt colleagues (the owner, 2026-10-29)", () => {
+  const waits = [
+    { minutes: 25, since: ago(25), agent: "محمد الحبيب", client: "سارة القحطاني" },
+    { minutes: 9, since: ago(9), agent: "رشا", client: "منى" },
+  ];
+
+  it("shows no wait of theirs — not the tile, not the lanes, not the crawl", () => {
+    const all = buildScreen(facts({ waits }));
+    expect(tileOf(all, "conversations", "waiting")).toMatchObject({ status: "red", value: "2" });
+
+    const exempt = buildScreen(facts({ waits, exemptAgents: ["محمد الحبيب"] }));
+    expect(tileOf(exempt, "conversations", "waiting")).toMatchObject({ status: "amber", value: "1", reason: "أطولها منذ 9 دقائق — رشا" });
+    expect(exempt.channel.waiting.lanes.map((l) => l.agent)).toEqual(["رشا"]);
+    expect(exempt.urgent.map((u) => u.key)).not.toContain("waiting");
+    expect(ticker(facts({ waits, exemptAgents: ["محمد الحبيب"] })).some((i) => i.text.includes("محمد الحبيب"))).toBe(false);
+    // the same wait counts for anyone not exempt
+    expect(ticker(facts({ waits })).some((i) => i.text.includes("محمد الحبيب"))).toBe(true);
+  });
+
+  it("counts no reply time of theirs, in the team's average or the first-reply average", () => {
+    const slow = (agent: string) => lead({ first_message_at: ago(120), first_reply_at: ago(30), handoffs: [{ agent, from: (NOW - 120 * 60_000) / 1000, reply: (NOW - 30 * 60_000) / 1000, handed: null, by: null }] });
+    const agents = [{ name: "محمد الحبيب", status: "online" as const }, { name: "رشا", status: "online" as const }];
+    const counted = buildScreen(facts({ agents, leads: [slow("محمد الحبيب")] }));
+    expect(tileOf(counted, "conversations", "first_reply").value).not.toBe("—");
+    const skipped = buildScreen(facts({ agents, leads: [slow("محمد الحبيب")], exemptAgents: ["محمد الحبيب"] }));
+    expect(tileOf(skipped, "conversations", "first_reply").value).toBe("—");
+    expect(panel(skipped, "team").tiles.find((t) => t.key === "agent:محمد الحبيب")?.status ?? "green").toBe("green");
+  });
+
+  it("spells names as Teletel does, whatever the hamza or the spacing", () => {
+    const exempt = buildScreen(facts({ waits: [{ minutes: 25, since: ago(25), agent: "أحمد  الحبيب", client: null }], exemptAgents: ["احمد الحبيب"] }));
+    expect(tileOf(exempt, "conversations", "waiting").value).toBe("0");
+  });
+});
+
+describe("«قرار الإدارة يحتاج تنفيذ»", () => {
+  const names = new Map([["e1", "رشا"]]);
+  const day = "2026-10-19";
+  const at = "2026-10-19T12:00:00.000Z";
+
+  it("says what was decided, who carries it out, and the step — then the date", () => {
+    const [news] = decisionTicker([{ title: "وزّع المحادثات المنتظرة", due_on: "2026-10-21", status: "open", owner_id: "e1", source_key: null }], names, day, at);
+    expect(news).toMatchObject({ section: "قرار الإدارة يحتاج تنفيذ", red: false, at });
+    expect(news.text).toBe("القرار: وزّع المحادثات المنتظرة — ينفّذه: رشا — الخطوة: ابدأ التنفيذ (لم يبدأ) — الموعد: 2026-10-21");
+  });
+
+  it("takes the step from the tile the decision was born of, and marks a late one", () => {
+    const [news] = decisionTicker([{ title: "محادثات بلا رد", due_on: "2026-10-18", status: "in_progress", owner_id: null, source_key: "conversations:waiting" }], names, day, at);
+    expect(news.red).toBe(true);
+    expect(news.text).toBe("القرار: محادثات بلا رد — ينفّذه: لم يُسنَد بعد — الخطوة: أسندها لموظف متصل (قيد التنفيذ) — الموعد: 2026-10-18 — متأخر");
+  });
+
+  it("leaves finished decisions out, and gives an under-way one a step of its own", () => {
+    const news = decisionTicker(
+      [
+        { title: "منتهٍ", due_on: day, status: "done", owner_id: "e1", source_key: null },
+        { title: "جارٍ", due_on: day, status: "in_progress", owner_id: "e1", source_key: "team:agent:رشا" },
+        { title: "جارٍ آخر", due_on: day, status: "in_progress", owner_id: "e1", source_key: "x:unknown" },
+      ],
+      names,
+      day,
+      at,
+    );
+    expect(news.map((n) => n.text.match(/الخطوة: ([^(]+)/)?.[1]?.trim())).toEqual(["راجع محادثاته المفتوحة", "أكمله ثم أغلق القرار"]);
   });
 });
 
