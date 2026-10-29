@@ -575,19 +575,8 @@ export function OfferDocument(props: OfferDocumentProps) {
       designed: props.cover === "designed",
       body: props.cover === "designed" ? (
         <DesignedCover
-          // the logo and the name only — the contact block belongs to the inner pages, a cover is not a letterhead
-          header={(() => {
-            const logo = brand.vars ? brand.logoUrl : (brand.logoUrl ?? assets.logoUrl);
-            return (
-              <div className="od-dc-brand">
-                {logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className="od-logo" src={logo} alt={brand.nameLatin} />
-                ) : null}
-                <h2>{brand.nameAr}</h2>
-              </div>
-            );
-          })()}
+          // the company block and the logo, as on the plain cover — the same brand data, a partner's own for their file
+          header={<CompanyHeader brand={brand} logoUrl={brand.vars ? brand.logoUrl : (brand.logoUrl ?? assets.logoUrl)} />}
           imageUrl={props.coverImage !== undefined ? props.coverImage : coverImagePath(offer.destination)}
           eyebrow={AR.coverLabel}
           title={title}

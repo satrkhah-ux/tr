@@ -237,13 +237,16 @@ ${FIT_SCREEN}
 /* ── the designed cover (optional first page: the destination's landmark, a soft veil, a frosted card) ──── */
 .od-page.od-dc{height:297mm;min-height:297mm;overflow:hidden;padding:0;background:linear-gradient(160deg,var(--od-green),var(--od-green-2));}
 .od-page.od-dc::before,.od-page.od-dc::after,.od-page.od-dc .od-foot{display:none;}
-.od-page > .od-dc-photo{position:absolute;inset:0;width:210mm;height:297mm;object-fit:cover;z-index:0;}
+.od-page > .od-dc-photo{position:absolute;inset:0;width:210mm;height:297mm;object-fit:cover;z-index:0;filter:saturate(.55) contrast(.95);}
 .od-page > .od-dc-veil{position:absolute;inset:0;z-index:1;
-  background:linear-gradient(180deg,rgba(19,85,73,.55) 0%,rgba(19,85,73,.12) 34%,rgba(11,52,45,.30) 58%,rgba(9,44,38,.92) 100%);}
-.od-page > .od-dc-top{position:absolute;inset-inline:13mm;top:13mm;z-index:2;}
-.od-dc-chip{display:inline-block;background:rgba(255,255,255,.90);border-radius:5mm;padding:3mm 6mm;box-shadow:0 6px 18px rgba(9,44,38,.22);}
-.od-dc-brand{display:flex;align-items:center;gap:5mm;}
-.od-dc-brand h2{margin:0;color:var(--od-green);font-size:15pt;font-weight:800;}
+  background:linear-gradient(180deg,rgba(52,42,60,.40) 0%,rgba(66,50,72,.26) 38%,rgba(30,40,40,.30) 64%,rgba(16,32,29,.62) 100%);}
+.od-page > .od-dc-top{position:absolute;inset-inline:13mm;top:12mm;z-index:2;}
+.od-dc-chip{background:rgba(255,255,255,.90);border-radius:6mm;padding:7mm 10mm;box-shadow:0 8px 22px rgba(9,44,38,.22);}
+.od-dc-chip .od-top{display:flex;align-items:center;justify-content:space-between;gap:0;margin:0;padding:0;border:0;}
+.od-dc-chip .od-company{flex:1;padding-inline-end:9mm;border-inline-end:1.2mm solid var(--od-green);line-height:1.9;}
+.od-dc-chip .od-company h2{font-size:17pt;margin:0 0 1mm;}
+.od-dc-chip .od-top > div:last-child{flex:0 0 58mm;display:flex;justify-content:center;align-items:center;}
+.od-dc-chip .od-logo{height:31mm;width:auto;max-width:56mm;}
 .od-page > .od-dc-title{position:absolute;inset-inline:13mm;top:92mm;z-index:2;text-align:center;color:#fff;text-shadow:0 2px 14px rgba(5,30,26,.55);}
 .od-dc-eyebrow{font-size:13pt;letter-spacing:.3px;opacity:.92;margin-bottom:4mm;}
 .od-dc-title h1{margin:0;font-size:40pt;font-weight:800;line-height:1.2;}
