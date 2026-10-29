@@ -95,6 +95,9 @@ export type AuditAction =
   | "dispatch.sent"
   // a message to the client that WhatsApp held back (24 hours since they last wrote) — left as a Teletel note
   | "dispatch.held"
+  // a MyFatoorah / Tamara link for a case (payment-links.ts): created, then sent on the employee's press
+  | "payment_link.prepared"
+  | "payment_link.sent"
   | "voucher.issued"
   | "voucher.revoked"
   // partner companies (identity + branding)
