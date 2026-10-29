@@ -78,7 +78,7 @@ export async function buildEyeReport({ clientNames = true, since }: { clientName
     supabase.from("operation_bookings").select("id, operation_id, title, status, confirmed_at, confirmation_number").not("confirmed_at", "is", null),
     buildOpsDigest(5),
     // who is a Teletel agent — their absence from the system is no absence (anomalies.ts)
-    teletelGet<{ name?: string | null }[]>("/agents"),
+    teletelGet<{ id?: number; name?: string | null }[]>("/agents"),
     // the colleagues who carry no lateness («لا يُحسب عليهم تأخير») — their tickets leave the waiting figures
     exemptNow(supabase, true),
   ]);
@@ -111,6 +111,10 @@ export async function buildEyeReport({ clientNames = true, since }: { clientName
     actionsByActor.set(entry.actor_id, (actionsByActor.get(entry.actor_id) ?? 0) + 1);
   }
 
+  // the exempt colleagues by name: as the system spells them, and as Teletel does (a conversation names its holder the Teletel way)
+  const exemptNames = [
+    ...new Set([...exempt.names, ...(Array.isArray(agents) ? agents.filter((a) => typeof a.id === "number" && exempt.agentIds.has(a.id) && a.name?.trim()).map((a) => a.name!.trim()) : [])]),
+  ];
   const everyTicket = ticketsFromLeads(leadRes.data as LeadForTicket[], new Map(employees.map((e) => [e.id, e.arabic_name]))).map((t) => (clientNames ? t : { ...t, customer: null }));
   const snapshot: EyeSnapshot = {
     employees: employees.map((e) => {
@@ -128,7 +132,7 @@ export async function buildEyeReport({ clientNames = true, since }: { clientName
         works_in_teletel: unknownAgents || inTeletel.has(e.id),
       };
     }),
-    tickets: measuredTickets(everyTicket, exempt.employeeIds, exempt.names),
+    tickets: measuredTickets(everyTicket, exempt.employeeIds, exemptNames),
     audit: audit.map((a) => ({
       action: a.action,
       actor_id: a.actor_id,
