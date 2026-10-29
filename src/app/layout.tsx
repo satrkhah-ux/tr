@@ -68,7 +68,8 @@ export const metadata: Metadata = {
     images: ["/seo/og-cover.png"],
   },
   icons: {
-    icon: "/traveliun/favicon.ico",
+    // ?v: browsers keep a tab icon for weeks — the old blue logo was cached under the bare name
+    icon: [{ url: "/seo/favicon.svg", type: "image/svg+xml" }, { url: "/traveliun/favicon.ico?v=2", sizes: "48x48" }],
     apple: "/icons/apple-touch-icon.png",
   },
   // iOS installed-app chrome (Android reads the manifest instead).
