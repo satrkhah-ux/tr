@@ -36,6 +36,8 @@ import { askText, holdToText, missing, offerDraftData, offerText, priceOffer, re
 import { loadPlaces } from "@/lib/leads/teletel-pull";
 import { followedMarks, latenessExempt, returnedToEmployee, saleHolder } from "@/lib/leads/lifecycle";
 import { exemptConversation } from "@/lib/leads/lateness";
+import { excusedWindows } from "@/lib/presence/availability";
+import { excusedMinutes } from "@/lib/presence/excuse";
 import { followedSince } from "@/lib/leads/lifecycle-rules";
 import { fold, normalizePhone } from "@/lib/leads/sheet";
 import { isOpenAIConfigured, openaiJson } from "@/lib/providers/openai";
@@ -1118,6 +1120,14 @@ export async function receptionSweep(): Promise<number> {
  * apart from the reception's and the hold's own keys); Murad says nothing to the client here.
  */
 const LATE_KEY = 1e12;
+/** the minutes a colleague (by Teletel agent) was excused between two moments — their leave and status windows */
+async function excusedAgentMinutes(service: SupabaseClient, agentId: number, fromMs: number, toMs: number): Promise<number> {
+  const { data } = await service.from("employees").select("id").eq("teletel_agent_id", agentId).eq("status", "Active").maybeSingle();
+  const id = (data as { id: string } | null)?.id;
+  if (!id) return 0;
+  return excusedMinutes((await excusedWindows([id], fromMs, toMs)).get(id) ?? [], fromMs, toMs);
+}
+
 async function lateSweep(service: SupabaseClient, control: MuradControl, rows: OpenConversation[], nowSec: number): Promise<number> {
   const late = control.late;
   if (!late) return 0;
@@ -1137,6 +1147,9 @@ async function lateSweep(service: SupabaseClient, control: MuradControl, rows: O
     const mine = logged.filter((r) => Number(r.conversation_id) === c.id);
     const handedAt = Math.floor(Math.max(0, ...mine.filter((r) => /^(routed|offer:(sent|updated|handoff)$|visa:handoff$)/.test(r.reason ?? "")).map((r) => Date.parse(r.created_at) / 1000)));
     if (!handedAt || nowSec - handedAt < late.minutes * 60) continue;
+    // the minutes the holder was away for a reason the office accepts — leave, «لدي عميل», «لدي اتصال», صلاة, اجتماع
+    // (presence/excuse.ts) — are not their delay (the owner, 2026-10-29)
+    if (c.assigneeId && (nowSec - handedAt) / 60 - (await excusedAgentMinutes(service, c.assigneeId, handedAt * 1000, nowSec * 1000)) < late.minutes) continue;
     const claim = await service
       .from("murad_log")
       .insert({ conversation_id: c.id, client_message_id: -(LATE_KEY + handedAt), client_message_at: new Date(handedAt * 1000).toISOString(), phone: c.phone, mode: "reception" })
