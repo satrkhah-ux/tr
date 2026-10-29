@@ -130,6 +130,8 @@ const PUBLIC_PREFIXES = [
   "/api/ext",
   // «ادفع الآن»: the client's button in his PDF — no session; the serial is all it knows, the press makes the invoice (lib/payments/pay-now.ts)
   "/pay",
+  // Tamara's order notifications — no cookie; its signed tamaraToken is checked in the route
+  "/api/payments/tamara/webhook",
 ];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
 

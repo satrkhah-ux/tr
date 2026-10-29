@@ -5,12 +5,12 @@ import { logAudit } from "@/lib/data/audit";
 import { syncOperation } from "@/lib/data/operation-sync";
 import { notifyEmployee } from "@/lib/notifications/notify";
 import { getInvoiceStatus } from "@/lib/providers/myfatoorah";
-import { getOrderStatus } from "@/lib/providers/tamara";
+import { authoriseOrder, getOrderStatus } from "@/lib/providers/tamara";
 import { escapeHtml, staffSend } from "@/lib/telegram/staff-bot";
 import { siteUrl } from "@/lib/telegram/ops-bot";
 import { insertPayment } from "./record-payment";
 import { riyadhDate } from "./payments";
-import { linkNotice, pollLinks, type LinkRow, type LinkStatus } from "./payment-links-rules";
+import { linkNotice, pollLinks, type LinkEvent, type LinkRow, type LinkStatus } from "./payment-links-rules";
 
 /**
  * «تسجيل روابط السداد تلقائياً» (the owner, 2026-10-29): every 10 minutes
@@ -37,15 +37,15 @@ export async function tellEmployee(supabase: SupabaseClient, employeeId: string,
   if (chat) await staffSend(chat, `💳 ${escapeHtml(title)}`, [[{ text: "افتح الملف", url: `${siteUrl()}${href}` }]], {}, null);
 }
 
-async function pending(supabase: SupabaseClient): Promise<LinkRow[]> {
+async function pending(supabase: SupabaseClient, tamaraOrder?: string): Promise<LinkRow[]> {
   const since = new Date(Date.now() - LOOKBACK_DAYS * 86_400_000).toISOString();
-  const { data } = await supabase
+  const base = supabase
     .from("payment_links")
     .select("id, offer_id, operation_id, provider, invoice_id, amount, currency, offers(serial, employee_id, partner_company_id, customers(arabic_name))")
     .eq("status", "pending")
-    .eq("mock", false)
-    .gte("created_at", since)
-    .limit(200);
+    .eq("mock", false);
+  // one Tamara order (the webhook), whatever its age; else every link of the lookback
+  const { data } = await (tamaraOrder ? base.eq("provider", "tamara").eq("invoice_id", tamaraOrder) : base.gte("created_at", since)).limit(200);
   type Raw = { id: string; offer_id: string; operation_id: string | null; provider: LinkRow["provider"]; invoice_id: string; amount: number | string; currency: string; offers: unknown };
   return ((data ?? []) as Raw[]).map((r) => {
     const offer = one(r.offers as { serial: string; employee_id: string | null; partner_company_id: string | null; customers: unknown } | null);
@@ -166,20 +166,46 @@ async function close(supabase: SupabaseClient, link: LinkRow, to: "failed" | "ex
   return Boolean(data?.length);
 }
 
+const deps = (supabase: SupabaseClient) => ({
+    recordPaid: (link: LinkRow, amount: number) => recordPaid(supabase, link, amount),
+    close: (link: LinkRow, to: "failed" | "expired") => close(supabase, link, to),
+    touch: async (link: LinkRow) => {
+      await supabase.from("payment_links").update({ checked_at: new Date().toISOString() }).eq("id", link.id);
+    },
+    notify: async (link: LinkRow, what: LinkEvent) => {
+      const href = link.operation_id ? `/operations/${link.operation_id}` : `/offer/${encodeURIComponent(link.serial)}`;
+      if (link.employee_id) await tellEmployee(supabase, link.employee_id, linkNotice(link, what), href, `paylink:${link.id}:${what.kind}`);
+    },
+  });
+
+/**
+ * Tamara's webhook (api/payments/tamara/webhook), already verified: the very same decisions as the poll for that
+ * one order. «order_approved» is authorised by us first (auto-authorise on the account is not relied on); an
+ * authorised / captured order is paid; declined / expired / canceled close the link. The poll stays the fallback.
+ */
+export async function applyTamaraEvent(orderId: string, event: string): Promise<{ checked: number; paid: number; closed: number }> {
+  const supabase = db();
+  const statusFor = async (link: LinkRow): Promise<LinkStatus> => {
+    if (event === "order_approved") {
+      const res = await authoriseOrder(orderId);
+      if (res.kind === "ok" && res.data.status === "paid") return { status: "paid", paidAmount: res.data.paidAmount };
+      // already authorised (auto-authorise), or Tamara busy — ask the order itself
+      return status(link);
+    }
+    if (event === "order_authorised" || event === "order_captured") return status(link);
+    if (event === "order_declined" || event === "order_canceled") return { status: "failed" };
+    if (event === "order_expired") return { status: "expired" };
+    return { status: "pending" };
+  };
+  return pollLinks({ pending: () => pending(supabase, orderId), status: statusFor, ...deps(supabase) });
+}
+
 export async function runPaymentLinks(): Promise<{ checked: number; paid: number; closed: number }> {
   const supabase = db();
   await carryConfirmed(supabase);
   return pollLinks({
     pending: () => pending(supabase),
     status,
-    recordPaid: (link, amount) => recordPaid(supabase, link, amount),
-    close: (link, to) => close(supabase, link, to),
-    touch: async (link) => {
-      await supabase.from("payment_links").update({ checked_at: new Date().toISOString() }).eq("id", link.id);
-    },
-    notify: async (link, what) => {
-      const href = link.operation_id ? `/operations/${link.operation_id}` : `/offer/${encodeURIComponent(link.serial)}`;
-      if (link.employee_id) await tellEmployee(supabase, link.employee_id, linkNotice(link, what), href, `paylink:${link.id}:${what.kind}`);
-    },
+    ...deps(supabase),
   });
 }

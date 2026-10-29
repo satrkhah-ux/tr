@@ -56,6 +56,7 @@ const SECRET_ENV = [
   "RESERVATIONS_IMAP_PASSWORD",
   "MYFATOORAH_API_KEY",
   "TAMARA_API_TOKEN",
+  "TAMARA_NOTIFICATION_KEY",
 ];
 
 const HOUR = 3_600_000;
@@ -604,6 +605,13 @@ const CHECKS: Check[] = [
       const [res, ms] = await timed(() => get(`${base}/checkout/payment-types?country=SA&currency=SAR`, { authorization: `Bearer ${token}` }));
       return res.ok ? ok(ms, { key: "dev.d.paymentOk", params: { host: maskHost(base) } }) : httpProblem(res.status, ms);
     },
+  },
+  {
+    id: "tamara_webhook",
+    group: "api",
+    label: "dev.c.tamaraWebhook",
+    // Tamara calls us; what can be checked here is the key that verifies its calls being set
+    run: async () => ((await getSecret("TAMARA_NOTIFICATION_KEY")) ? ok(0, { key: "dev.d.keySet" }) : unconfigured("TAMARA_NOTIFICATION_KEY")),
   },
   { id: "sheet_ready_offers", group: "api", label: "dev.c.sheetReady", run: async () => sheetOutcome((await readyOffersSheet()).id) },
   { id: "sheet_leads", group: "api", label: "dev.c.sheetLeads", run: () => sheetOutcome(process.env["LEADS_SHEET_ID"] || "1jCwYe6c661ik3Az5RAu9X9jxQgOoY_TwNqGMg2YMi6s") },

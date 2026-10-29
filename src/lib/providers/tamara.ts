@@ -12,6 +12,7 @@
  */
 
 import "server-only";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { getSecret } from "@/lib/secrets/get";
 import { parseTamaraLimits, type TamaraLimits } from "@/lib/payments/pay-now-rules";
 import type { SupplierOutcome } from "./hotel-supplier";
@@ -166,6 +167,48 @@ export async function getOrderStatus(orderId: string): Promise<SupplierOutcome<O
     const json: unknown = await res.json().catch(() => null);
     if (json === null && res.status >= 500) return { kind: "unreachable", message: `HTTP ${res.status}` };
     return parseOrderResponse(res.status, json);
+  } catch (err) {
+    return { kind: "unreachable", message: err instanceof Error ? err.name : "network" };
+  }
+}
+
+/**
+ * Tamara's notification token (`tamaraToken` in the query and as `Authorization: Bearer`): a JWT signed HS256 with
+ * the Notification Token of the partner portal. True only for Tamara's own signature, unexpired, iss «Tamara».
+ */
+export function verifyNotificationToken(token: string, key: string, now = Date.now()): boolean {
+  const [h, p, sig] = token.split(".");
+  if (!h || !p || !sig || !key) return false;
+  try {
+    const header = JSON.parse(Buffer.from(h, "base64url").toString("utf8")) as { alg?: string };
+    if (header.alg !== "HS256") return false;
+    const want = createHmac("sha256", key).update(`${h}.${p}`).digest();
+    const got = Buffer.from(sig, "base64url");
+    if (want.length !== got.length || !timingSafeEqual(want, got)) return false;
+    const claims = JSON.parse(Buffer.from(p, "base64url").toString("utf8")) as { exp?: number; iss?: string };
+    if (typeof claims.exp !== "number" || claims.exp * 1000 < now) return false;
+    return claims.iss === undefined || claims.iss === "Tamara";
+  } catch {
+    return false;
+  }
+}
+
+/** The authorise call after «order_approved» — so recording a payment never waits on the account's auto-authorise. */
+export async function authoriseOrder(orderId: string): Promise<SupplierOutcome<OrderStatus>> {
+  const { token, mock, base } = await config();
+  if (mock) return { kind: "ok", data: { status: "pending", mock: true } };
+  try {
+    const res = await fetch(`${base}/orders/${encodeURIComponent(orderId)}/authorise`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    const json = (await res.json().catch(() => null)) as { status?: string; authorized_amount?: { amount?: number | string }[] | { amount?: number | string } } | null;
+    if (json === null && res.status >= 500) return { kind: "unreachable", message: `HTTP ${res.status}` };
+    // the reply names the amount `authorized_amount` (an array in the reference); parseOrderResponse reads total_amount
+    const authorised = Array.isArray(json?.authorized_amount) ? json?.authorized_amount[0] : json?.authorized_amount;
+    return parseOrderResponse(res.status, { ...json, total_amount: authorised });
   } catch (err) {
     return { kind: "unreachable", message: err instanceof Error ? err.name : "network" };
   }
