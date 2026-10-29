@@ -6,6 +6,7 @@ import { currentCan } from "@/lib/roles/current";
 import { notifyEmployee } from "@/lib/notifications/notify";
 import { teletelConversationUrl } from "@/lib/providers/teletel";
 import { followupPeople } from "@/lib/followups/service";
+import { reassignConversation } from "@/lib/routing/switchboard";
 import {
   addBusinessMinutes, businessMinutes, detect, employeeReport, parseSupervisionSettings, proofOf, REASON_LABEL, supervisorReport,
   SUPERVISION_SETTINGS_KEY, type Level, type Priority, type ProofKind, type Reason, type ReportCase, type SupervisionSettings, type SupervisorRow,
@@ -163,8 +164,12 @@ export async function rescheduleCase(id: string, dueAt: string, reason: string):
   return { ok: true };
 }
 
-/** «إعادة إسناد»: the follow-up file to an AVAILABLE colleague, with the reason (the conversation's owner in Teletel stays the switchboard's) */
-export async function reassignCase(id: string, toEmployeeId: string, reason: string): Promise<Ok | Fail> {
+/**
+ * «إعادة إسناد»: to an AVAILABLE colleague, with the reason — the Teletel conversation through session B's switchboard
+ * first (it refuses a conversation with a sale or a confirmed service unless an administrator forces it), then the
+ * follow-up file. Nothing moves if Teletel refuses.
+ */
+export async function reassignCase(id: string, toEmployeeId: string, reason: string, force = false): Promise<Ok | Fail> {
   const x = await caseFor(id, true);
   if (!x || x.c.status !== "open" || !x.c.followup_id || !UUID.test(toEmployeeId)) return fail("forbidden");
   const why = (reason ?? "").trim().slice(0, 500);
@@ -174,6 +179,10 @@ export async function reassignCase(id: string, toEmployeeId: string, reason: str
   const people = await followupPeople().catch(() => []);
   if (!people.some((p) => p.id === toEmployeeId && p.person)) return fail("هذا الموظف لا يعمل على المتابعة.");
   if (!(await availableEmployees(db, Date.now(), [toEmployeeId])).has(toEmployeeId)) return fail("الموظف غير متاح الآن — اختر من هو على رأس العمل.");
+  const { data: me } = await db.from("employees").select("arabic_name").eq("id", x.w.me).maybeSingle();
+  const actorName = ((me as { arabic_name?: string } | null)?.arabic_name ?? "المشرف").trim();
+  const moved = await reassignConversation(x.c.conversation_id, toEmployeeId, why, { id: x.w.me, name: actorName, admin: x.w.manager }, { force: force && x.w.manager });
+  if (!moved.ok) return fail(moved.error);
   const { error } = await db.from("sla_followups")
     .update({ assigned_to: toEmployeeId, assigned_by: x.w.me, assigned_at: nowIso() })
     .eq("id", x.c.followup_id).eq("status", "open");
