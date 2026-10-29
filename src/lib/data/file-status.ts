@@ -164,7 +164,8 @@ const MAX_BODY = 4000;
  * way with the version it carried; a note left outside WhatsApp's 24 hours is
  * recorded as that, never as sent.
  */
-export async function sendOfferMessage(draftId: string, body: string, manual = false): Promise<{ ok: true; result: ClientSendResult | "manual"; at: string } | Fail> {
+/** `cover`: the first page of the PDF the employee chose — «أساسي» (default) or «فني» (the designed cover) */
+export async function sendOfferMessage(draftId: string, body: string, manual = false, cover: "basic" | "designed" = "basic"): Promise<{ ok: true; result: ClientSendResult | "manual"; at: string } | Fail> {
   try {
     const file = await issuedFile(draftId, true);
     if (failed(file)) return file;
@@ -179,10 +180,10 @@ export async function sendOfferMessage(draftId: string, body: string, manual = f
       return { ok: true, result: "manual", at };
     }
     const updated = await newerThanSent(file.offer.id);
-    const result = await sendOfferToClient(file.serial, updated, text);
+    const result = await sendOfferToClient(file.serial, updated, text, cover === "designed" ? "designed" : "basic");
     // what happened on WhatsApp is recorded; the trial gate («off», «not_allowed») sent nothing and records nothing
     if (result === "sent" || result === "template" || result === "window" || result === "no_phone" || result === "unreachable") {
-      await logAudit({ action: "offer.client_sent", entity: "offers", entity_id: file.offer.id, meta: { result, version, serial: file.serial } });
+      await logAudit({ action: "offer.client_sent", entity: "offers", entity_id: file.offer.id, meta: { result, version, serial: file.serial, ...(cover === "designed" ? { cover } : {}) } });
     }
     return { ok: true, result, at };
   } catch {

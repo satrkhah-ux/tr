@@ -47,13 +47,16 @@ import { useTraveliunUI } from "./TraveliunUIProvider";
 import { ExecutiveOverview } from "./ExecutiveDashboardClient";
 import { OperationsSnapshot } from "./operations/OperationsSnapshot";
 import { MyDashboard } from "./MyDashboard";
+import { DepartmentHomes } from "./home/DepartmentHomes";
+import { homeKindsFor } from "@/lib/roles/homes";
+import type { VisaBoard } from "@/lib/visa-files/types";
 // SLA follow-ups a manager handed me — nothing when there are none
 import { MyFollowups } from "./sla/MyFollowups";
 import { LatestOfferPanel } from "./LatestOfferPanel";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import type { TranslationKey } from "@/lib/i18n";
 
-export function TraveliunDashboardClient({ opsSummary, mine, latest = null }: { opsSummary: OpsSummary; mine: MyDashboardData; latest?: ClientOffer | null }) {
+export function TraveliunDashboardClient({ opsSummary, mine, latest = null, visaBoard = null }: { opsSummary: OpsSummary; mine: MyDashboardData; latest?: ClientOffer | null; visaBoard?: VisaBoard | null }) {
   const { dashboardView } = useRole();
   const { t, dir } = useTraveliunUI();
 
@@ -64,7 +67,7 @@ export function TraveliunDashboardClient({ opsSummary, mine, latest = null }: { 
         {dashboardView === "admin" ? (
           <AdminHome opsSummary={opsSummary} mine={mine} latest={latest} />
         ) : dashboardView === "employee" ? (
-          <EmployeeHome opsSummary={opsSummary} mine={mine} />
+          <EmployeeHome opsSummary={opsSummary} mine={mine} visaBoard={visaBoard} />
         ) : (
           <section className="rounded-2xl border border-[#e2ebe7] bg-white shadow-[0_1px_2px_rgba(0,60,58,0.04)]">
             <EmptyState title={t("dash.noPermission")} description={t("dash.noPermissionDesc")} />
@@ -271,7 +274,17 @@ function AdminHome({ opsSummary, mine, latest }: { opsSummary: OpsSummary; mine:
 }
 
 // ---------- EMPLOYEE home: «لوحتي» first, then operations + sections ----------
-function EmployeeHome({ opsSummary, mine }: { opsSummary: OpsSummary; mine: MyDashboardData }) {
+function EmployeeHome({ opsSummary, mine, visaBoard }: { opsSummary: OpsSummary; mine: MyDashboardData; visaBoard: VisaBoard | null }) {
+  const { can } = useRole();
+  // a colleague of a department opens on that department's home (the owner, 2026-10-29); anyone else keeps the general one
+  if (homeKindsFor(can).length) {
+    return (
+      <div className="space-y-4">
+        <DepartmentHomes opsSummary={opsSummary} mine={mine} visaBoard={visaBoard} />
+        <PreviousSections />
+      </div>
+    );
+  }
   return (
     <div className="space-y-4">
       <MyFollowups />

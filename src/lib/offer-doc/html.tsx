@@ -2,7 +2,8 @@ import "server-only";
 import type { ReactNode } from "react";
 import { OfferDocument, type OfferDocumentProps } from "@/components/offer-doc/OfferDocument";
 import type { OfferDocAssets } from "@/components/offer-doc/assets";
-import { inlineImage, loadOfferDocAssets } from "./assets";
+import { coverImagePath } from "@/components/offer-doc/cover-image";
+import { inlineImage, inlinePublicImage, loadOfferDocAssets } from "./assets";
 import { fontFaceCss, loadFontFaces } from "./fonts";
 import { DEFAULT_DOC_FONT, type DocFont } from "./font-families";
 
@@ -41,7 +42,10 @@ export async function renderOfferDocumentHtml(props: OfferDocumentProps): Promis
       : props
   ) as OfferDocumentProps;
 
-  return renderDocHtml((assets) => <OfferDocument {...withMarks} brand={brand} assets={assets} />);
+  // the designed cover's picture rides inside the page like the logo: Chromium prints with no network
+  const coverImage = props.cover === "designed" && props.coverImage === undefined ? await inlinePublicImage(coverImagePath(props.offer.destination) ?? "") : props.coverImage;
+
+  return renderDocHtml((assets) => <OfferDocument {...withMarks} brand={brand} assets={assets} coverImage={coverImage} />);
 }
 
 /**

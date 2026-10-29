@@ -7,6 +7,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* the rest of the dark layer: every light colour the components use, generated (scripts/gen-dark-layer.mjs) */
+@import "./dark-extra.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -278,6 +280,8 @@
    Traveliun components, so the theme toggle produces a real dark UI without
    editing every component. Semantic status tints (badges) and the green
    brand color (#185045) are intentionally left untouched. */
+/* native controls (select lists, date pickers, scrollbars) draw dark too */
+.dark { color-scheme: dark; }
 .dark .tv-app { background-color: #0b1a17; }
 .dark ::selection { background: #1f5346; }
 .dark .tv-app ::-webkit-scrollbar-thumb { background: #33554b; border-color: #0b1a17; }

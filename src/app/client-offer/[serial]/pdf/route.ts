@@ -12,9 +12,11 @@ export const maxDuration = 26;
  * client snapshot (never buy price / profit). Rendered once per version and kept
  * a while (client-pdf.ts) — WhatsApp fetches it for the programme template.
  */
-export async function GET(_request: Request, { params }: { params: Promise<{ serial: string }> }) {
+// `?c=d`: the designed first page, the employee's choice at sending (the WhatsApp message carries that link); it names no label
+export async function GET(request: Request, { params }: { params: Promise<{ serial: string }> }) {
   const { serial } = await params;
-  const pdf = await clientOfferPdf(serial);
+  const cover = new URL(request.url).searchParams.get("c") === "d" ? "designed" : "basic";
+  const pdf = await clientOfferPdf(serial, cover);
   if (!pdf) return new Response("لم يتم نشر هذا العرض بعد", { status: 404 });
   return new Response(new Uint8Array(pdf), {
     headers: {

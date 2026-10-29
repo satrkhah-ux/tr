@@ -1,23 +1,10 @@
 "use client";
 
+import { EditSheet } from "@/components/ui/edit-sheet";
 import { FollowupTeamSettings } from "./followups/FollowupTeamSettings";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import {
-  AlertTriangle,
-  Check,
-  Eye,
-  KeyRound,
-  Loader2,
-  Pencil,
-  Plus,
-  ShieldAlert,
-  Trash2,
-  UserCog,
-  Users,
-  X,
-  Zap,
-} from "lucide-react";
+import { AlertTriangle, Check, Eye, KeyRound, Loader2, Pencil, Plus, ShieldAlert, Trash2, UserCog, Users, Zap,  } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { isDeveloperRole, PERMISSION_GROUPS, type Permission } from "@/lib/roles/roles";
 import { useRole } from "@/lib/roles/RoleContext";
@@ -126,16 +113,18 @@ export function TeamRoles({ roles, members }: { roles: TeamRole[]; members: Team
           </p>
         </section>
 
-        {draft ? (
-          <RoleForm
-            draft={draft}
-            setDraft={setDraft}
-            onSave={save}
-            onCancel={() => setDraft(null)}
-            pending={pending}
-            error={error}
-          />
-        ) : null}
+        <EditSheet open={draft !== null} onClose={() => setDraft(null)} title={draft?.id ? draft.arabic_name || t("edit") : t("team.addRole")}>
+          {draft ? (
+            <RoleForm
+              draft={draft}
+              setDraft={setDraft}
+              onSave={save}
+              onCancel={() => setDraft(null)}
+              pending={pending}
+              error={error}
+            />
+          ) : null}
+        </EditSheet>
 
         <div className="grid gap-3 2xl:grid-cols-2">
           {roles.map((role) => (
@@ -320,18 +309,7 @@ function RoleForm({
   };
 
   return (
-    <section className={card}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-extrabold text-[#185045]">{draft.id ? draft.arabic_name || t("edit") : t("team.addRole")}</h2>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6]"
-          aria-label={t("close")}
-        >
-          <X className="size-4" />
-        </button>
-      </div>
+    <section>
 
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         <label className={label}>

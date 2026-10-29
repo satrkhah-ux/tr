@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Bell, Check, KeyRound, LayoutGrid, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus, X } from "lucide-react";
+import { Bell, Check, KeyRound, LayoutGrid, Loader2, Pencil, Plus, Search, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import { DirText } from "@/components/DirText";
+import { EditSheet } from "@/components/ui/edit-sheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { deleteMember, saveMember, setMemberPermissions, setMemberRole, suspendMember, type PendingRegistration, type TeamMember, type TeamRole } from "@/lib/data/team";
 import { ALL_PERMISSIONS, isDeveloperRole, PERMISSION_GROUPS, type Permission } from "@/lib/roles/roles";
@@ -196,19 +197,9 @@ export function TeamMembers({
           ) : null}
         </section>
 
-        {draft ? (
-          <section className={card}>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-extrabold text-[#185045]">{draft.id ? t("edit") : t("add")}</h2>
-              <button
-                type="button"
-                onClick={() => setDraft(null)}
-                className="flex size-9 items-center justify-center rounded-[9px] border border-[#dbe6e1] text-[#557d78] hover:bg-[#f4f8f6]"
-                aria-label={t("close")}
-              >
-                <X className="size-4" />
-              </button>
-            </div>
+        <EditSheet open={draft !== null} onClose={() => setDraft(null)} title={draft?.id ? t("edit") : t("add")}>
+          {draft ? (
+          <section>
             <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(210px,1fr))]">
               <label className={label}>
                 {t("col.arabicName")}
@@ -267,6 +258,7 @@ export function TeamMembers({
             </div>
           </section>
         ) : null}
+        </EditSheet>
 
         {rows.length === 0 ? (
           <section className={card}>

@@ -26,6 +26,8 @@ import {
 import { DEFAULT_OFFER_DOC_ASSETS, type OfferDocAssets } from "./assets";
 import { TRAVELIUN_BRAND, type DocBrand } from "./brand";
 import { OFFER_DOC_CSS } from "./styles";
+import { DesignedCover } from "./DesignedCover";
+import { coverImagePath, type CoverStyle } from "./cover-image";
 
 /**
  * THE offer document — one fixed-layout React template rendered identically for
@@ -68,6 +70,13 @@ export type OfferDocumentProps = (
    * exactly those figures.
    */
   showPrices?: boolean;
+  /**
+   * «فني»: the first page is the designed cover (DesignedCover) instead of the plain one. The employee picks it
+   * when sending; the words «أساسي» / «فني» are never on a page.
+   */
+  cover?: CoverStyle;
+  /** the picture of the designed cover; the print pipeline passes it inlined, the preview falls back to the public path */
+  coverImage?: string | null;
 };
 
 const Ltr = ({ children }: { children: ReactNode }) => <DirText dir="ltr">{children}</DirText>;
@@ -563,7 +572,42 @@ export function OfferDocument(props: OfferDocumentProps) {
       key: "cover",
       section: `${brand.nameLatin} Travel Offer`,
       cover: true,
-      body: (
+      designed: props.cover === "designed",
+      body: props.cover === "designed" ? (
+        <DesignedCover
+          // the logo and the name only — the contact block belongs to the inner pages, a cover is not a letterhead
+          header={(() => {
+            const logo = brand.vars ? brand.logoUrl : (brand.logoUrl ?? assets.logoUrl);
+            return (
+              <div className="od-dc-brand">
+                {logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="od-logo" src={logo} alt={brand.nameLatin} />
+                ) : null}
+                <h2>{brand.nameAr}</h2>
+              </div>
+            );
+          })()}
+          imageUrl={props.coverImage !== undefined ? props.coverImage : coverImagePath(offer.destination)}
+          eyebrow={AR.coverLabel}
+          title={title}
+          serial={offer.serial}
+          rows={[
+            { label: AR.customer, value: offer.customer_name },
+            { label: AR.destination, value: offer.destination },
+            { label: AR.duration, value: nights > 0 ? AR.daysNights(days, nights) : null },
+            {
+              label: AR.travelers,
+              value: ([[offer.adults, AR.adults], [offer.children, AR.children], [offer.infants, AR.infants]] as const)
+                .filter(([n], i) => i === 0 || n > 0)
+                .map(([n, label]) => `${n} ${label}`)
+                .join(" | "),
+            },
+            { label: AR.programStart, value: offer.arrival_date ? <Ltr>{fmtDate(offer.arrival_date)}</Ltr> : null },
+            { label: AR.programEnd, value: offer.departure_date ? <Ltr>{fmtDate(offer.departure_date)}</Ltr> : null },
+          ]}
+        />
+      ) : (
         <Cover
           offer={offer}
           nights={nights}
@@ -577,7 +621,7 @@ export function OfferDocument(props: OfferDocumentProps) {
         />
       ),
     },
-    ...rendered.map((p) => ({ ...p, cover: false })),
+    ...rendered.map((p) => ({ ...p, cover: false, designed: false })),
   ];
 
   const lastKey = pages[pages.length - 1]?.key;
@@ -594,7 +638,7 @@ export function OfferDocument(props: OfferDocumentProps) {
     >
       <style dangerouslySetInnerHTML={{ __html: OFFER_DOC_CSS }} />
       {pages.map((p) => (
-        <section key={p.key} className={`od-page${p.cover ? " od-cover" : ""}`} data-section={p.section}>
+        <section key={p.key} className={`od-page${p.cover ? " od-cover" : ""}${p.designed ? " od-dc" : ""}`} data-section={p.section}>
           {p.body}
           <div className="od-foot">
             <span>{offer.serial}</span>

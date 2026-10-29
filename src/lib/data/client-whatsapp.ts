@@ -14,6 +14,7 @@ import {
 } from "@/lib/providers/teletel";
 import { programmeMessage, tidyWhatsapp, WA_TEMPLATES, waParams, waPreview, type WaTemplateKey } from "@/lib/operations/client-messages";
 import { clientOfferPdf, sendProgrammePdf } from "@/lib/offer-doc/client-pdf";
+import type { CoverStyle } from "@/components/offer-doc/cover-image";
 
 /**
  * The client hears about their file on WhatsApp, through Teletel (the owner,
@@ -91,7 +92,7 @@ export type WaTemplateSend = {
   key: WaTemplateKey;
   params: string[];
   /** the programme's PDF: its public URL (Meta fetches it) and the serial it is rendered from first. */
-  document?: { url: string; name: string; serial: string };
+  document?: { url: string; name: string; serial: string; cover?: CoverStyle };
 };
 
 
@@ -107,7 +108,7 @@ export type WaTemplateSend = {
 export async function messageClient(
   offer: OfferClient,
   text: string,
-  extra: { note?: string; labels?: string[]; template?: WaTemplateSend; pdf?: { serial: string; name: string } } = {},
+  extra: { note?: string; labels?: string[]; template?: WaTemplateSend; pdf?: { serial: string; name: string; cover?: CoverStyle } } = {},
 ): Promise<ClientSendResult> {
   try {
     const blocked = await clientWhatsappAllowed(offer);
@@ -134,10 +135,10 @@ export async function messageClient(
           // render it into the cache first, then send. After the response, so issuing
           // never waits; a failure is left on the thread for the agent, never hidden.
           const { conversationId } = thread;
-          const { serial } = template.document;
+          const { serial, cover } = template.document;
           try {
             after(async () => {
-              await clientOfferPdf(serial).catch(() => null);
+              await clientOfferPdf(serial, cover).catch(() => null);
               if ((await sendTeletelTemplate(conversationId, template)) === null) {
                 await addTeletelNote(conversationId, `تعذّر إرسال قالب «${def.name}» للعميل. أرسل له البرنامج يدوياً:\n\n${body}`);
               }
@@ -158,11 +159,11 @@ export async function messageClient(
     }
     const sent = (await sendTeletelMessage(thread.conversationId, body)) !== null;
     if (sent && extra.pdf) {
-      const { serial, name } = extra.pdf;
+      const { serial, name, cover } = extra.pdf;
       const conversationId = thread.conversationId;
       try {
         after(async () => {
-          const pdfId = await sendProgrammePdf(conversationId, serial, name);
+          const pdfId = await sendProgrammePdf(conversationId, serial, name, cover);
           // the text says «في الملف المرفق» and carries no link (2026-10-22): a PDF that did not go is the agent's to send
           if (pdfId === null) await addTeletelNote(conversationId, pdfMissedNote(serial)).catch(() => false);
         });
@@ -203,7 +204,7 @@ export type OfferMessage = {
  * owner (2026-10-17) wants every message reviewed and sent by a person, never
  * on issue (offer-send.ts).
  */
-export async function offerMessage(serial: string, updated: boolean): Promise<OfferMessage | null> {
+export async function offerMessage(serial: string, updated: boolean, cover: CoverStyle = "basic"): Promise<OfferMessage | null> {
   try {
     const { data } = await db()
       .from("offers")
@@ -228,6 +229,8 @@ export async function offerMessage(serial: string, updated: boolean): Promise<Of
     const base = (process.env["NEXT_PUBLIC_SITE_URL"] ?? "https://pkg.traveliun.com").replace(/\/$/, "");
     const where = [row.destination, row.duration ? `(${row.duration})` : ""].filter(Boolean).join(" ");
     const link = `${base}/client-offer/${row.serial}`;
+    // the PDF of the chosen first page — the link names no label (`c=d` is the designed one)
+    const pdfLink = `${link}/pdf${cover === "designed" ? "?c=d" : ""}`;
     const key = updated ? "programme_updated" : "programme";
     // short, and no link: the PDF follows, the bookings' link comes once the client confirms (client-messages.ts)
     const text = programmeMessage({
@@ -250,7 +253,7 @@ export async function offerMessage(serial: string, updated: boolean): Promise<Of
       text,
       client: { employee_id: row.employee_id, partner_company_id: row.partner_company_id, customer },
       link,
-      pdf: `${link}/pdf`,
+      pdf: pdfLink,
       note,
       labels: [updated ? "عرض-محدث" : "عرض-مرسل"],
       pdfName,
@@ -259,7 +262,7 @@ export async function offerMessage(serial: string, updated: boolean): Promise<Of
       template: row.status === "confirmed" && !updated ? undefined : {
         key,
         params: waParams(key, { name: customer?.arabic_name ?? "", destination: where, serial: row.serial, link, rate_link: "" }),
-        document: { url: `${link}/pdf`, name: pdfName, serial: row.serial },
+        document: { url: pdfLink, name: pdfName, serial: row.serial, cover },
       },
     };
   } catch {
@@ -273,13 +276,13 @@ export async function offerMessage(serial: string, updated: boolean): Promise<Of
  * The PDF follows the text inside WhatsApp's 24 hours; after them it rides on
  * the approved template.
  */
-export async function sendOfferToClient(serial: string, updated: boolean, body?: string): Promise<ClientSendResult> {
-  const message = await offerMessage(serial, updated);
+export async function sendOfferToClient(serial: string, updated: boolean, body?: string, cover: CoverStyle = "basic"): Promise<ClientSendResult> {
+  const message = await offerMessage(serial, updated, cover);
   if (!message) return "unreachable";
   return messageClient(message.client, body?.trim() || message.text, {
     note: message.note,
     labels: message.labels,
-    pdf: { serial, name: message.pdfName },
+    pdf: { serial, name: message.pdfName, cover },
     template: message.template,
   });
 }

@@ -23,10 +23,10 @@ export default async function OfferPreviewPage({
   searchParams,
 }: {
   params: Promise<{ serial: string }>;
-  searchParams: Promise<{ variant?: string; brand?: string; prices?: string }>;
+  searchParams: Promise<{ variant?: string; brand?: string; prices?: string; cover?: string }>;
 }) {
   const { serial } = await params;
-  const { variant: variantParam, brand: brandParam, prices: pricesParam } = await searchParams;
+  const { variant: variantParam, brand: brandParam, prices: pricesParam, cover: coverParam } = await searchParams;
 
   const canInternal = await currentCan("pricing.internal");
   const wantsInternal = variantParam === "internal";
@@ -66,7 +66,7 @@ export default async function OfferPreviewPage({
           {variant === "internal" ? (
             <OfferDocument variant="internal" offer={internal} brand={brand} />
           ) : (
-            <OfferDocument variant="client" offer={toClientOfferDTO(internal)} brand={brand} showPrices={showPrices} />
+            <OfferDocument variant="client" offer={toClientOfferDTO(internal)} brand={brand} showPrices={showPrices} cover={coverParam === "designed" ? "designed" : undefined} />
           )}
         </div>
       </div>
