@@ -49,7 +49,7 @@ export const PLACE_ALIASES: [string, string, string | null][] = [
   ["البوسنه", "البوسنة والهرسك", null],
 ];
 
-const NOTHING = /^(لم يحدد|غير محدد|لا يوجد|-|—)/u;
+export const NOTHING = /^(لم يحدد|غير محدد|لا يوجد|-|—)/u;
 // Saudi places in the short forms clients write («مكة», «المدينة») — the catalogue holds them in full
 const SAUDI_WORDS = /السعودي|^المملكه$|المملكهالعربيه|^داخلي$|^مكه|^المدينه$|^المدينهالمنوره/u;
 

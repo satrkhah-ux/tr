@@ -47,7 +47,7 @@ it.skipIf(!existsSync("C:/Program Files/Google/Chrome/Application/chrome.exe"))(
   try {
     const now = Date.parse("2026-10-20T12:10:05Z");
     const built = buildScreen({ now, day: "2026-10-20", thresholds: MANAGER_DEFAULTS, hours: { open: "09:00", close: "23:00" }, leads: [], waits: [], open: [], agents: [], employees: [], audit: [], offers: [], confirms: [], drafts: [], ads: { currency: "USD", rows: [], latest: null }, murad: [], integrations: [], backup: null, ops: { live: [] } });
-    const list = Array.from({ length: 14 }, (_, i) => ({ name: `موظف ${i + 1}`, presence: "online" as const, open: 14 - i, replies: i, avg: 5, status: "green" as const }));
+    const list = Array.from({ length: 14 }, (_, i) => ({ name: `موظف ${i + 1}`, presence: "online" as const, open: 14 - i, replies: i, avg: 5, status: "green" as const, exempt: false }));
     const watch = Array.from({ length: 30 }, (_, i) => ({ ...built.urgent[0], label: `بند ${i + 1}`, value: "1" }) as UrgentItem);
     const html = managerPage({ ...built, watch, channel: { ...built.channel, agents: { known: true, present: 14, total: 14, list } }, now, build: "qa", at: new Date(now).toISOString(), day: "2026-10-20", thresholds: MANAGER_DEFAULTS, daily: null, ticker: [] });
     const page = await browser.newPage();

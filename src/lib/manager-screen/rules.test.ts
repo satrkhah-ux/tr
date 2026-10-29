@@ -398,6 +398,16 @@ describe("«لا يُحسب عليهم تأخير» — the exempt colleagues (t
     expect(panel(skipped, "team").tiles.find((t) => t.key === "agent:محمد الحبيب")?.status ?? "green").toBe("green");
   });
 
+  it("says an online exempt colleague is not counted — never «لم يرد اليوم بعد» and a zero", () => {
+    const agents = [{ name: "محمد الحبيب", status: "online" as const }, { name: "رشا", status: "online" as const }];
+    const built = buildScreen(facts({ agents, exemptAgents: ["محمد الحبيب"] }));
+    const list = built.channel.agents.list;
+    expect(list.find((a) => a.name === "محمد الحبيب")).toMatchObject({ exempt: true, replies: 0, avg: null, status: "green" });
+    expect(list.find((a) => a.name === "رشا")?.exempt).toBe(false);
+    expect(panel(built, "team").tiles.find((t) => t.label === "محمد الحبيب")?.reason).toBe("لا يُحسب عليه تأخير");
+    expect(panel(built, "team").tiles.find((t) => t.label === "رشا")?.reason).toBe("لم يرد على محادثة اليوم بعد");
+  });
+
   it("spells names as Teletel does, whatever the hamza or the spacing", () => {
     const exempt = buildScreen(facts({ waits: [{ minutes: 25, since: ago(25), agent: "أحمد  الحبيب", client: null }], exemptAgents: ["احمد الحبيب"] }));
     expect(tileOf(exempt, "conversations", "waiting").value).toBe("0");

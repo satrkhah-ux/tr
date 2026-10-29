@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anomalies, firstName, requestCounts, teletelEmployees, ticketMinutes, ticketsFromLeads, type LeadForTicket } from "./anomalies";
+import { anomalies, firstName, measuredTickets, requestCounts, teletelEmployees, ticketMinutes, ticketsFromLeads, type LeadForTicket } from "./anomalies";
 import type { EyeSnapshot } from "./types";
 
 /**
@@ -273,6 +273,18 @@ describe("the conversations of «العملاء» as tickets (care_tickets is em
     expect(notes[0].code).toBe("ticket_unanswered");
     expect(notes[0].title).toBe("تذكرة بلا رد منذ 14 ساعة");
     expect(notes[0].detail).toBe("بكج · محمد · ريم الحربي");
+  });
+
+  it("leaves the exempt colleagues' tickets out of what is measured (لا يُحسب عليهم تأخير)", () => {
+    const rows = [lead({ id: "desk", received_by: "e1" }), lead({ id: "other", received_by: "e2", received_by_name: "هاني" }), lead({ id: "nobody", received_by: null, received_by_name: null })];
+    const tickets = ticketsFromLeads(rows, new Map());
+    expect(measuredTickets(tickets, new Set(["e1"])).map((t) => t.id)).toEqual(["other", "nobody"]);
+    // nobody exempt: every ticket, as before
+    expect(measuredTickets(tickets, new Set())).toEqual(tickets);
+    expect(measuredTickets(tickets)).toEqual(tickets);
+    // and a 14-hour wait of the exempt desk raises no note
+    expect(anomalies(snap({ tickets: measuredTickets(ticketsFromLeads([lead({ received_by: "e1" })], new Map()), new Set(["e1"])) }), NOW, DAY).some((n) => n.code === "ticket_unanswered")).toBe(false);
+    expect(anomalies(snap({ tickets: measuredTickets(ticketsFromLeads([lead({ received_by: "e1" })], new Map()), new Set(["e2"])) }), NOW, DAY).some((n) => n.code === "ticket_unanswered")).toBe(true);
   });
 
   it("names whoever it was handed to before whoever received it", () => {

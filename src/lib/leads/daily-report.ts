@@ -1,5 +1,5 @@
 import { fold, riyadhDay } from "./sheet";
-import { resolvePlace } from "./places";
+import { NOTHING, resolvePlace } from "./places";
 import type { Place } from "./auto";
 
 /**
@@ -110,7 +110,8 @@ export function requestsFrom(leads: LeadFacts[], nameOf: Map<string, string>, pl
       kind: l.inquiry?.trim() || null,
       country: place.kind === "destination" ? place.country : null,
       city: place.kind === "destination" ? place.city : null,
-      place: place.kind === "origin" ? place.place : place.kind === "none" ? text.slice(0, 40) || null : null,
+      // the system's own «nothing said» («لم يحدد طلب», «-») is no place
+      place: place.kind === "origin" ? place.place : place.kind === "none" && !NOTHING.test(text) ? text.slice(0, 40) || null : null,
       employee,
       assignee,
       note: null,
@@ -271,7 +272,7 @@ export type SupervisionFigures = { lines: SupervisionLine[]; days: number; all: 
 /** «متابعة الموظفين» — the lines the report adds when the follow-up figures are asked for. */
 export function supervisionBlock(lines: SupervisionLine[], span?: string, partial = false): string[] {
   // the window is the supervision's own rolling one (its last N×24 hours), said as it is; and whose it covers
-  const out = [`📋 متابعة الموظفين${span ? ` — ${span}` : ""}${partial ? " (ما تراه فقط)" : ""}`];
+  const out = [`📋 متابعة الموظفين${span ? ` — ${span}` : ""}${partial ? " (حسب نطاق صلاحيتك)" : ""}`];
   if (lines.length === 0) out.push(partial ? "لا حالات ظاهرة لك" : "لا حالات متابعة في هذه الفترة");
   for (const l of lines) out.push(`🔹 ${l.name} : المستحق ${l.due} _ المنجز ${l.done} _ المتأخر ${l.overdue} _ الالتزام ${l.compliance}%`);
   out.push(RULES[3]);
@@ -373,9 +374,18 @@ export function allRequestsText(r: Report): string {
 /** The rows of the export — a spreadsheet's header first. */
 export function exportRows(r: Report): string[][] {
   return [
-    ["اليوم", "القسم", "الوجهة", "المدينة", "الموظف المستلم", "ملاحظة"],
-    ...r.requests.map((x) => [x.day, BUCKET.get(x.bucket)!.label, x.country ?? "", x.city ?? "", employeeName(x), x.note ?? ""]),
+    ["اليوم", "القسم", "الوجهة", "المدينة", "المكان", "الموظف المستلم", "لمن أُسند", "ملاحظة"],
+    ...r.requests.map((x) => [x.day, BUCKET.get(x.bucket)!.label, x.country ?? "", x.city ?? "", x.place ?? "", employeeName(x), holderOf(x), x.note ?? ""]),
   ];
 }
 
 export const bucketLabel = (key: BucketKey) => BUCKET.get(key)!.label;
+
+/**
+ * The conversations to read the reason of next: the ones not read yet, and — after all of those — the ones Teletel could not
+ * answer last time (a conversation with no Teletel thread must not hold the queue back, nor be forgotten).
+ */
+export function readQueue(ids: string[], tried: string[], failed: string[]): string[] {
+  const unread = [...new Set(ids)].filter((id) => !tried.includes(id));
+  return [...unread.filter((id) => !failed.includes(id)), ...unread.filter((id) => failed.includes(id))];
+}

@@ -178,7 +178,7 @@ const RUNTIME = String.raw`
     for (var i = 0; i < list.length; i++) if (list[i].open > maxOpen) maxOpen = list[i].open;
     for (var j = 0; j < list.length; j++) {
       var x = list[j];
-      rows += '<div class="tr t5 row"><span class="c"><i class="pd p-' + esc(x.presence) + '"></i>' + esc(x.name) + '</span><span class="g"><i><u style="width:' + Math.max(4, Math.round(x.open / maxOpen * 100)) + '%"></u></i><b class="tnum">' + x.open + '</b></span><span class="n tnum">' + x.replies + '</span><span class="n tnum s-' + esc(x.status) + '">' + esc(mins(x.avg)) + "</span></div>";
+      rows += '<div class="tr t5 row"><span class="c"><i class="pd p-' + esc(x.presence) + '"></i>' + esc(x.name) + '</span><span class="g"><i><u style="width:' + Math.max(4, Math.round(x.open / maxOpen * 100)) + '%"></u></i><b class="tnum">' + x.open + '</b></span><span class="n tnum">' + (x.exempt ? "—" : x.replies) + '</span><span class="n tnum s-' + esc(x.status) + '">' + esc(mins(x.avg)) + "</span></div>";
     }
     var table = a.list.length ? '<div class="tbl" data-more="غيرهم تحركت محادثاتهم اليوم"><div class="th t5"><span>الموظف</span><span>مفتوحة اليوم</span><span>ردود اليوم</span><span>متوسط أول رد</span></div>' + rows + "</div>" : '<div class="calm">' + esc(a.known ? "لا أحد متصل ولا محادثة تحركت اليوم" : "تليتيل لا يرد") + "</div>";
     var head = a.known ? a.present + " متصلون على تليتيل من " + a.total : "تليتيل لا يرد — حالة الفريق غير معروفة";

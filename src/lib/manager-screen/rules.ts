@@ -83,7 +83,7 @@ export type TickerItem = { at: string; text: string; red: boolean; section: stri
  */
 export type ChannelWait = { minutes: number; status: Status; /** a first name, and only on red */ client: string | null };
 export type ChannelLane = { agent: string; presence: Presence | null; waits: ChannelWait[] };
-export type ChannelAgent = { name: string; presence: Presence; open: number; replies: number; avg: number | null; status: Status };
+export type ChannelAgent = { name: string; presence: Presence; open: number; replies: number; avg: number | null; status: Status; exempt: boolean };
 export type ChannelIndex = { key: string; label: string; value: string; unit?: string; note: string; status: Status };
 export type ManagerChannel = {
   /** the market strip across the top: today's headline figures */
@@ -384,7 +384,7 @@ const countBy = <T,>(xs: T[], key: (x: T) => string | null): [string, number][] 
 const clock = (iso: string) => new Date(Date.parse(iso) + 3 * 3600_000).toISOString().slice(11, 16);
 
 /** Teletel's team today — shared by «المحادثات اليوم» and «الفريق». */
-type AgentToday = { name: string; presence: Presence; open: number; replies: number; avg: number | null; status: Status };
+type AgentToday = { name: string; presence: Presence; open: number; replies: number; avg: number | null; status: Status; exempt: boolean };
 type TeamToday = { agents: AgentToday[]; present: number; total: number; turns: number[] };
 
 function teamToday(f: ManagerFacts): TeamToday {
@@ -411,7 +411,8 @@ function teamToday(f: ManagerFacts): TeamToday {
     .map((a): AgentToday => {
       const replies = turns.get(fold(a.name)) ?? [];
       const avg = mean(replies);
-      return { name: a.name, presence: a.status, open: open.get(fold(a.name)) ?? 0, replies: replies.length, avg, status: avg == null ? "green" : soft(f, level(avg, t.waitAmberMin, t.waitRedMin)) };
+      // an exempt colleague's own turns were left out above: the row says so, never a false «لم يرد» or a zero
+      return { name: a.name, presence: a.status, open: open.get(fold(a.name)) ?? 0, replies: replies.length, avg, status: avg == null ? "green" : soft(f, level(avg, t.waitAmberMin, t.waitRedMin)), exempt: isExempt(f, a.name) };
     })
     .sort((a, b) => ORDER[a.presence] - ORDER[b.presence] || b.open - a.open || b.replies - a.replies);
   return { agents, present: (f.agents ?? []).filter((a) => a.status !== "offline").length, total: f.agents?.length ?? 0, turns: all };
@@ -427,7 +428,7 @@ function agentBox(f: ManagerFacts, team: TeamToday, max: number): Box {
       label: a.name,
       presence: a.presence,
       value: `مفتوحة ${a.open}`,
-      detail: a.avg != null ? `أول رد ${durationText(a.avg)}` : a.presence === "offline" ? "غير متصل" : "لم يرد اليوم بعد",
+      detail: a.exempt ? "لا يُحسب عليه تأخير" : a.avg != null ? `أول رد ${durationText(a.avg)}` : a.presence === "offline" ? "غير متصل" : "لم يرد اليوم بعد",
       status: a.status,
     })),
     empty: f.agents === null ? "حالة الموظفين غير معروفة — تليتيل لا يرد" : "لا أحد متصل ولا محادثة تحركت اليوم",
@@ -672,7 +673,7 @@ function team(f: ManagerFacts, crew: TeamToday): Section {
     );
   }
   const people = crew.agents.map((a) => ({
-    ...tile(`agent:${fold(a.name)}`, a.name, `${a.open} مفتوحة اليوم`, a.status, a.avg == null ? "لم يرد على محادثة اليوم بعد" : `متوسط ردّه الأول ${minutesText(a.avg)} على ${a.replies} محادثة`),
+    ...tile(`agent:${fold(a.name)}`, a.name, `${a.open} مفتوحة اليوم`, a.status, a.exempt ? "لا يُحسب عليه تأخير" : a.avg == null ? "لم يرد على محادثة اليوم بعد" : `متوسط ردّه الأول ${minutesText(a.avg)} على ${a.replies} محادثة`),
     presence: a.presence,
   }));
   const openTile = tile("team_open", "مفتوحة مع الفريق", openToday, "green", "محادثات يحملها الفريق وتحركت اليوم");

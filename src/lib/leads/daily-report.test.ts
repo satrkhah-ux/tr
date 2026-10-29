@@ -10,6 +10,7 @@ import {
   exportRows,
   movePeriod,
   periodOf,
+  readQueue,
   reportText,
   requestsFrom,
   visitDays,
@@ -36,6 +37,19 @@ describe("the kinds the report names", () => {
     expect(["بكج", "طيران", "تأشيرات", "فنادق", "مواصلات", "رخص دولية", "طلب غير واضح", "", null].map(bucketOf)).toEqual(["package", "flight", "visa", "hotel", "transport", "other", "incomplete", "incomplete", "incomplete"]);
     // a kind the report does not know is incomplete, never a new department
     expect(bucketOf("شي غريب")).toBe("incomplete");
+  });
+});
+
+describe("the queue of reasons to read", () => {
+  it("goes on to the next ones, and keeps what Teletel could not answer for after them", () => {
+    const ids = Array.from({ length: 22 }, (_, i) => `c${i}`);
+    const failed = ids.slice(0, 20);
+    // the first twenty have no Teletel thread: the two readable ones come first, not the twenty again
+    expect(readQueue(ids, [], failed).slice(0, 2)).toEqual(["c20", "c21"]);
+    expect(readQueue(ids, [], failed)).toHaveLength(22);
+    // what was read is not offered again; nothing left → empty
+    expect(readQueue(ids, ["c20", "c21"], failed)).toEqual(failed);
+    expect(readQueue(["a", "a", "b"], ["a", "b"], [])).toEqual([]);
   });
 });
 
@@ -100,6 +114,14 @@ describe("requests from the conversations", () => {
       ["h", "فنادق", null, null, "مكة", "احمد القدسي", "رشا"],
       ["t", "مواصلات", null, null, "من المطار الى الفندق", null, "منى"],
     ]);
+  });
+
+  it("does not take the system's own «nothing said» for a place", () => {
+    const rows = requestsFrom([lead({ id: "a", inquiry: "فنادق", destination: "لم يحدد طلب" }), lead({ id: "b", inquiry: "فنادق", destination: "-" }), lead({ id: "c", inquiry: "فنادق", destination: "غير محدد" })], new Map(), places);
+    expect(rows.map((r) => r.place)).toEqual([null, null, null]);
+    const text = reportText(buildReport(rows, periodOf("day", "2026-10-26", "2026-10-29")));
+    expect(text).toContain("🏨 طلبات الفنادق : 3\n_ فندق : غير مسند");
+    expect(text).not.toContain("لم يحدد");
   });
 });
 
@@ -216,7 +238,7 @@ describe("the report, as the staff write it", () => {
     const lines = [{ name: "رشا", due: 5, done: 4, overdue: 1, compliance: 80 }];
     expect(reportText(quiet, { lines, days: 1, all: true })).toContain("📋 متابعة الموظفين — آخر 24 ساعة\n🔹 رشا : المستحق 5 _ المنجز 4 _ المتأخر 1 _ الالتزام 80%");
     expect(reportText(quiet, { lines, days: 7, all: true })).toContain("📋 متابعة الموظفين — آخر 7 أيام\n");
-    expect(reportText(quiet, { lines: [], days: 3, all: false })).toContain("📋 متابعة الموظفين — آخر 3 أيام (ما تراه فقط)\nلا حالات ظاهرة لك");
+    expect(reportText(quiet, { lines: [], days: 3, all: false })).toContain("📋 متابعة الموظفين — آخر 3 أيام (حسب نطاق صلاحيتك)\nلا حالات ظاهرة لك");
     expect(reportText(quiet)).not.toContain("متابعة الموظفين");
   });
 
@@ -235,8 +257,11 @@ describe("the report, as the staff write it", () => {
     expect(employeesText(report)).toContain("🔸 طلبات اخرى : 1 _ رخص دولية");
     expect(departmentsText(report)).toContain("🌍 البكجات السياحية : 4\n🔹 المغرب : محمد صالح");
     expect(allRequestsText(report).split("\n").filter((l) => l.startsWith("🌍")).length).toBe(4);
-    expect(exportRows(report)[0]).toEqual(["اليوم", "القسم", "الوجهة", "المدينة", "الموظف المستلم", "ملاحظة"]);
+    expect(exportRows(report)[0]).toEqual(["اليوم", "القسم", "الوجهة", "المدينة", "المكان", "الموظف المستلم", "لمن أُسند", "ملاحظة"]);
     expect(exportRows(report)).toHaveLength(11);
+    // a hotel in Makkah has no destination, and its place and whom it is with are in the spreadsheet as in the text
+    const hotel = buildReport([req({ bucket: "hotel", place: "مكة", employee: "احمد القدسي", assignee: "رشا" })], periodOf("day", "2026-10-26", "2026-10-29"));
+    expect(exportRows(hotel)[1]).toEqual(["2026-10-26", "طلبات الفنادق", "", "", "مكة", "احمد القدسي", "رشا", ""]);
   });
 
   it("is a quiet day, said plainly", () => {
