@@ -275,4 +275,9 @@ describe("editing a previously fixed package price", () => {
   it("keeps a reseller's separate client quote", () => {
     expect(editedPricing({ final_total: 2000 }, true).final_total).toBe(2000);
   });
+  it("keeps the locked price of a ready-package / Murad file, which has no lines to fall back on", () => {
+    const draft = { source: { ready_offer_id: "murad" }, pricing: { items: [], final_total: 4200 } };
+    const pricing = editedPricing(draft.pricing, Boolean(draft.source));
+    expect(offerTotals([], rates, "SAR", pricing.final_total).total).toBe(4200);
+  });
 });

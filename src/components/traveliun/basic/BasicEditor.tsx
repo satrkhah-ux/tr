@@ -397,7 +397,7 @@ export function BasicEditor({
       const old = latest.current.pricing.items[i];
       return old && (item.sell_price !== old.sell_price || item.sell_currency !== old.sell_currency || item.quantity !== old.quantity);
     });
-    next.pricing = priceChanged ? editedPricing(pricing, false) : pricing;
+    next.pricing = priceChanged ? editedPricing(pricing, Boolean(next.source)) : pricing;
     latest.current = next;
     patch({
       ...slice,
@@ -921,12 +921,12 @@ export function BasicEditor({
     // a typed figure is what we pay and what we sell at — with or without a place to write it back
     const both = typedSheetPrice(slice, Boolean(at));
     const items = data.pricing.items.map((it, i) => (i === index ? { ...it, ...both } : it));
-    if (at) commit({ ...at, pricing: editedPricing({ ...data.pricing, items }, Boolean(partnerSession)) });
-    else patch({ pricing: editedPricing({ ...data.pricing, items }, Boolean(partnerSession)) });
+    if (at) commit({ ...at, pricing: editedPricing({ ...data.pricing, items }, Boolean(partnerSession || data.source)) });
+    else patch({ pricing: editedPricing({ ...data.pricing, items }, Boolean(partnerSession || data.source)) });
   }
 
   function setProfit(profit: NonNullable<DraftData["pricing"]["profit"]>) {
-    patch({ pricing: editedPricing({ ...data.pricing, profit }, Boolean(partnerSession)) });
+    patch({ pricing: editedPricing({ ...data.pricing, profit }, Boolean(partnerSession || data.source)) });
   }
   // what the box shows: the file's own profit, else the administration's default margin
   const profit = packageProfitFor(data.pricing, profitSettings.default_pct) ?? { mode: "pct" as const, value: null };
@@ -1804,7 +1804,7 @@ export function BasicEditor({
                 <select
                   value={display}
                   onChange={(e) =>
-                    patch({ pricing: { ...data.pricing, display_currency: e.target.value, final_total: null } })
+                    patch({ pricing: { ...data.pricing, display_currency: e.target.value, ...(data.source ? {} : { final_total: null }) } })
                   }
                   className="h-8 rounded-[8px] border border-[#cfe0d9] bg-white px-1.5 text-[12px] font-bold"
                 >

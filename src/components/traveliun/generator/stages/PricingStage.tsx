@@ -100,7 +100,7 @@ export function PricingStage({ draftId, data, patch, lookups }: StageFormProps) 
   const currencies = currencyOptions(lookups.countries, display);
 
   function setItems(items: DraftPricingItem[]) {
-    patch({ pricing: editedPricing({ ...pricing, items }, partner) });
+    patch({ pricing: editedPricing({ ...pricing, items }, partner || Boolean(data.source)) });
   }
 
   function updateItem(index: number, slice: Partial<DraftPricingItem>) {

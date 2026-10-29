@@ -15,9 +15,13 @@ import type { PricingItemType } from "@/lib/types";
 
 export type CurrencyRates = Record<string, number>;
 
-/** A staff price edit resumes line-based pricing; a reseller keeps their separate client quote. */
-export function editedPricing<T extends { final_total: number | null }>(pricing: T, partner: boolean): T {
-  return partner ? pricing : { ...pricing, final_total: null };
+/**
+ * A staff price edit resumes line-based pricing. Kept (`keep`): a reseller's
+ * separate client quote, and the locked price of a file from a ready package or
+ * a Murad «عرض آلي» (`source`) — it has no lines, so clearing it prices it at 0.
+ */
+export function editedPricing<T extends { final_total: number | null }>(pricing: T, keep: boolean): T {
+  return keep ? pricing : { ...pricing, final_total: null };
 }
 
 export type PricingLineInput = {
