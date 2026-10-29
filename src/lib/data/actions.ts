@@ -112,7 +112,7 @@ async function manageAccess(table: AllowedTable): Promise<Access | TranslationKe
  * number a salesperson could change is money sent elsewhere. Those terms rows
  * (and moving a row to or from those kinds) are the administration's.
  */
-const MONEY_TERMS = new Set(["payment", "bank"]);
+const MONEY_TERMS = new Set(["payment", "bank", "instalment"]);
 async function moneyTermGuard(supabase: Access["supabase"], table: AllowedTable, values: DataRow, id?: string): Promise<TranslationKey | null> {
   if (table !== "terms") return null;
   let touches = MONEY_TERMS.has(String(values.kind ?? ""));

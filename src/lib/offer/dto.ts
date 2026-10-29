@@ -12,6 +12,7 @@
 
 import type { BoardType, FlightLegOrder, ClimateLevel } from "@/lib/types";
 import type { OfferPricingSummary } from "./pricing";
+import type { FinanceSection } from "./finance-terms";
 
 // ---------- internal (full) shapes ----------
 
@@ -142,8 +143,8 @@ export type InternalOfferDTO = {
   includes: string[];
   excludes: string[];
   terms: string[];
-  /** «شروط وطرق الدفع» + «الحسابات البنكية» for the programme's country; absent/empty = the standing note. */
-  payment?: string[];
+  /** «الشروط المالية» for the programme's country (finance-terms.ts); absent/empty = the standing payment note. */
+  finance?: FinanceSection;
   climate: ClimateLine[];
   /** day-by-day program; empty when the agent did not write one. */
   days: ItineraryDayLine[];

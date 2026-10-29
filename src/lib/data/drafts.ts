@@ -2,6 +2,7 @@
 
 import { syncTypedPricing } from "@/lib/offer/pricing-suggest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadFinanceTerms } from "./finance-terms";
 import type { OfferStatus } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
 import { createSupabaseServerClient, createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
@@ -560,8 +561,9 @@ export async function getGeneratorLookups(options: { catalog?: boolean } = {}): 
         luggage: t.luggage_capacity ?? null,
       }));
 
-    const rates = await ratesPromise;
+    const [rates, finance] = await Promise.all([ratesPromise, loadFinanceTerms(supabase as unknown as SupabaseClient)]);
     return {
+      finance,
       // the most-sold countries first, then alphabetical (country-priority.ts)
       countries: byUsage(builtCountries),
       roomTypes: ((roomTypesRes.data ?? []) as { id: string; arabic_name: string; hotel_id: string | null; default_board: GeneratorLookups["roomTypes"][number]["default_board"] }[]).map(
@@ -633,7 +635,7 @@ function buildTermLibrary(rows: unknown): TermLibrary {
     list
       .filter((r) => r.kind === kind && r.arabic_text && r.arabic_text.trim())
       .map((r) => ({ text: (r.arabic_text as string).trim(), checked: r.checked !== false, country_id: r.country_id ?? null }));
-  return { includes: of("include"), excludes: of("exclude"), terms: of("term"), payment: [...of("payment"), ...of("bank")] };
+  return { includes: of("include"), excludes: of("exclude"), terms: of("term") };
 }
 
 /**

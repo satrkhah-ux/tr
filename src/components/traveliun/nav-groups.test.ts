@@ -24,7 +24,8 @@ describe("the sidebar", () => {
   it("shows sales the home, «بيسك», the clients, operations and the data — nothing else", () => {
     // «متابعتي»: every employee's own list (2026-10-26); «المتابعة» is the team's and the administration's, so sales do not see it
     // «سكرتيري الخاص»: every employee's own assistant (owner order 2, 2026-10-24)
-    expect(navGroupsFor(SALES, on).map((g) => g.labelKey)).toEqual(["nav.dashboard", "nav.basic", "nav.customers", "nav.myFollowups", "nav.secretary", "nav.operations", "nav.dataSection"]);
+    // «الشروط المالية»: read-only, as the client files print them (the owner, 2026-10-29)
+    expect(navGroupsFor(SALES, on).map((g) => g.labelKey)).toEqual(["nav.dashboard", "nav.basic", "nav.customers", "nav.myFollowups", "nav.secretary", "nav.financeTerms", "nav.operations", "nav.dataSection"]);
   });
 
   it("holds the old «البكجات السياحية» inside «بيسك», the legacy generator only while it is on", () => {

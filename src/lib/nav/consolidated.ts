@@ -70,6 +70,7 @@ export const TAB_GROUPS: SectionTab[][] = [
     { href: "/offers/terms-and-conditions", labelKey: "nav.terms" },
     { href: "/offers/payment-terms", labelKey: "nav.paymentTerms" },
     { href: "/offers/bank-accounts", labelKey: "nav.bankAccounts" },
+    { href: "/offers/instalment", labelKey: "nav.instalment" },
   ],
   // «قسم المواصلات» as one family of tabs (the owner's transport order, 2026-10-26)
   [

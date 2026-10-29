@@ -15,6 +15,7 @@ import {
 } from "./labels";
 import { FLIGHTS_LATER_LINE, isFreeDay } from "@/lib/offer/draft-types";
 import { TOUR_CAR_LINE } from "@/lib/offer/itinerary";
+import { hasFinance, type FinanceSection } from "@/lib/offer/finance-terms";
 import {
   formatRainAr,
   formatTempsAr,
@@ -1232,12 +1233,39 @@ const listCardMm = (items: string[]) =>
   16.4 + 8 + items.reduce((sum, item, i) => sum + 4 + 6.5 * Math.max(1, Math.ceil((item.length + String(i + 1).length + 2) / LIST_CHARS_PER_LINE)), 0);
 
 /**
- * The payment note: the standing one is 19mm (measured, three lines); the
- * data team's lines at ~95 characters and 6.2mm a line, plus their gaps.
+ * The payment note: the standing one is 19mm (measured, three lines); «الشروط
+ * المالية» is its title (9mm) and padding (8mm), each paragraph's heading
+ * (7mm) and its lines at ~95 characters and 6.2mm a line.
  * ponytail: an estimate like the cards — measure if a long bank list spills.
  */
-const paymentNoteMm = (lines: string[] | undefined) =>
-  lines?.length ? 8 + lines.reduce((sum, l) => sum + 6.2 * Math.max(1, Math.ceil(l.length / 95)), 0) : 19;
+const paymentNoteMm = (finance: FinanceSection | undefined) => {
+  if (!hasFinance(finance)) return 19;
+  const lines = (list: string[]) => list.reduce((sum, l) => sum + 6.2 * Math.max(1, Math.ceil(l.length / 95)), 0);
+  return 17 + [finance.banks, finance.payments, finance.instalment].reduce((sum, list) => sum + (list.length ? 7 + lines(list) : 0), 0);
+};
+
+/** «الشروط المالية»: the bank accounts, the payment milestones, the instalment plan — each only when written. */
+function FinanceTerms({ finance }: { finance: FinanceSection }) {
+  const part = (title: string, list: string[]) =>
+    list.length ? (
+      <div className="od-fin-part">
+        <h4>{title}</h4>
+        <ul>
+          {list.map((line, i) => (
+            <li key={i} dir="auto">{line}</li>
+          ))}
+        </ul>
+      </div>
+    ) : null;
+  return (
+    <div className="od-note od-finance">
+      <h3>{AR.financeTerms}</h3>
+      {part(AR.financeBanks, finance.banks)}
+      {part(AR.financePayments, finance.payments)}
+      {part(AR.financeInstalment, finance.instalment)}
+    </div>
+  );
+}
 
 /** The block is tall and near-fixed: two list cards, the total, and the payment note. */
 function servicesHeightMm(offer: ClientOfferDTO, showPrices: boolean): number {
@@ -1246,7 +1274,7 @@ function servicesHeightMm(offer: ClientOfferDTO, showPrices: boolean): number {
   // price band (9 + 26.2) and the payment note (6 + 18.6), measured. A price-less
   // file loses both, so the estimate loses them too or the packer reserves
   // 60mm of nothing.
-  return cards + (showPrices ? 9 + 26.5 + 6 + paymentNoteMm(offer.payment) : 0);
+  return cards + (showPrices ? 9 + 26.5 + 6 + paymentNoteMm(offer.finance) : 0);
 }
 
 function ServicesAndPrice({
@@ -1294,15 +1322,7 @@ function ServicesAndPrice({
             <strong><Ltr>{offer.total != null ? fmtNum(offer.total, 2) : "—"}</Ltr></strong>
             <span>{offer.currency ?? ""}</span>
           </div>
-          {offer.payment?.length ? (
-            <div className="od-note">
-              {offer.payment.map((line, i) => (
-                <p key={i} dir="auto">{line}</p>
-              ))}
-            </div>
-          ) : (
-            <p className="od-note">{AR.paymentTerms}</p>
-          )}
+          {hasFinance(offer.finance) ? <FinanceTerms finance={offer.finance} /> : <p className="od-note">{AR.paymentTerms}</p>}
         </>
       ) : null}
     </>

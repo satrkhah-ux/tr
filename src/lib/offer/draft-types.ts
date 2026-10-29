@@ -7,6 +7,7 @@
  * no React, no Supabase — safe to import anywhere (client, server, tests).
  */
 
+import type { FinanceTerm } from "./finance-terms";
 import type { BoardType, FlightLegOrder, PricingItemType } from "@/lib/types";
 import type { TranslationKey } from "@/lib/i18n";
 import { normalizeAdvanced, withAdvancedTransport, type DraftAdvanced } from "./advanced";
@@ -2393,23 +2394,7 @@ export type TermLibrary = {
   includes: TermLibraryItem[];
   excludes: TermLibraryItem[];
   terms: TermLibraryItem[];
-  /**
-   * «شروط وطرق الدفع» then «الحسابات البنكية» (the owner, 2026-10-29): printed
-   * under the client's total, by the programme's country (paymentLines).
-   */
-  payment?: TermLibraryItem[];
 };
-
-/**
- * The payment and bank lines a programme in `countryId` prints: the lines for
- * every country and that country's own, in the data team's order, once each.
- * Empty when the data team wrote none — the document keeps its standing note.
- */
-export function paymentLines(items: TermLibraryItem[] | undefined, countryId: string | null): string[] {
-  const out: string[] = [];
-  for (const i of items ?? []) if ((i.country_id === null || i.country_id === countryId) && !out.includes(i.text)) out.push(i.text);
-  return out;
-}
 
 export const emptyTermLibrary = (): TermLibrary => ({ includes: [], excludes: [], terms: [] });
 
@@ -2543,6 +2528,8 @@ export type GeneratorLookups = {
   carTypes: LookupCarType[];
   /** the admin-managed includes / excludes / terms lists. */
   termLibrary: TermLibrary;
+  /** «الشروط المالية» rows — banks, payment milestones, instalment (finance-terms.ts) */
+  finance?: FinanceTerm[];
   /**
    * Each country's services (from /services), one per name — offered under
    * «يشمل» as «خدمات الدولة». Names only: the prices stay on the server, and

@@ -56,6 +56,7 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   ["/offers/terms-and-conditions", "data.write"],
   ["/offers/payment-terms", "settings.manage"],
   ["/offers/bank-accounts", "settings.manage"],
+  ["/offers/instalment", "settings.manage"],
   ["/data-additions", "settings.manage"],
   // listed with the data, kept by the administration: the margin policy, and
   // the supplier credential vault (/settings/suppliers, under /settings below)
@@ -85,6 +86,7 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   // opens to the seller who holds it (the owner, 2026-10-23)
   ["/followups$", ["followups.work", "followups.manage", "dashboard.admin", "developer.access"]],
   ["/followups", ["followups.work", "followups.manage", "dashboard.admin", "developer.access", "offers.write"]],
+  ["/financial-terms", ["offers.write", "followups.work", "followups.manage", "clients.view", "settings.manage"]],
   // «متابعتي»: every employee's own list — no entry, so any signed-in employee (the owner, 2026-10-26); the team board is the team's
   ["/my-followups/team", ["followups.work", "followups.manage", "dashboard.admin", "developer.access"]],
   // «التأشيرات» — the visa department's files and board; the management sees all of it (the owner, 2026-10-26)

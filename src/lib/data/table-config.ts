@@ -10,6 +10,7 @@ const EMPLOYEE_FILTER: FilterDef = { key: "employee_id", labelKey: "filter.emplo
 // ---- the data model's options (0072) ----
 const ROOM_CATEGORY_OPTIONS: FilterOption[] = ROOM_CATEGORIES.map((c) => ({ value: c, label: c, labelKey: `data.model.roomCat.${c}` as const }));
 const PLACE_KIND_OPTIONS: FilterOption[] = PLACE_KINDS.map((k) => ({ value: k, label: k, labelKey: `data.model.kind.${k}` as const }));
+const DUE_WHEN_OPTIONS: FilterOption[] = (["confirm", "after_confirm", "before_travel"] as const).map((k) => ({ value: k, label: k, labelKey: `fin.due.${k}` as const }));
 const POINT_KIND_OPTIONS: FilterOption[] = (["airport", "station", "port", "city"] as const).map((k) => ({ value: k, label: k, labelKey: `data.model.point.${k}` as const }));
 
 /** Every DB-backed route. The generic engine turns each entry into a real,
@@ -203,9 +204,14 @@ const CONFIGS: TableConfig[] = [
   // Writes are the administration's (actions.ts moneyTermGuard).
   {
     route: "/offers/payment-terms", table: "terms", titleKey: "nav.paymentTerms",
+    // a milestone: when (on confirmation / N days after it / N days before travel) and how much — the PDF prints the date and the amount
     columns: [
-      { key: "arabic_text", labelKey: "col.arabicText", minWidth: "300px" },
-      { key: "english_text", labelKey: "col.englishText", minWidth: "300px" },
+      { key: "arabic_text", labelKey: "col.arabicText", minWidth: "260px" },
+      { key: "due_when", labelKey: "fin.col.when", options: DUE_WHEN_OPTIONS },
+      { key: "due_days", labelKey: "fin.col.days", type: "number" },
+      { key: "due_percent", labelKey: "fin.col.percent", type: "number" },
+      { key: "due_amount", labelKey: "fin.col.amount", type: "number" },
+      { key: "english_text", labelKey: "col.englishText", minWidth: "240px" },
     ],
     searchable: ["arabic_text", "english_text"],
     fixedValues: { kind: "payment" },
@@ -216,10 +222,23 @@ const CONFIGS: TableConfig[] = [
     route: "/offers/bank-accounts", table: "terms", titleKey: "nav.bankAccounts",
     columns: [
       { key: "arabic_text", labelKey: "col.bankAccount", minWidth: "320px" },
+      // the tick: which accounts the client files print — switching accounts is changing the ticks
+      { key: "checked", labelKey: "fin.col.shown" },
       { key: "english_text", labelKey: "col.englishText", minWidth: "280px" },
     ],
     searchable: ["arabic_text", "english_text"],
     fixedValues: { kind: "bank" },
+    filters: [COUNTRY_FILTER],
+    defaultSort: { column: "sort", ascending: true },
+  },
+  {
+    route: "/offers/instalment", table: "terms", titleKey: "nav.instalment",
+    columns: [
+      { key: "arabic_text", labelKey: "col.arabicText", minWidth: "320px", multiline: true },
+      { key: "english_text", labelKey: "col.englishText", minWidth: "280px" },
+    ],
+    searchable: ["arabic_text", "english_text"],
+    fixedValues: { kind: "instalment" },
     filters: [COUNTRY_FILTER],
     defaultSort: { column: "sort", ascending: true },
   },

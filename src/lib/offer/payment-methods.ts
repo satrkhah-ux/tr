@@ -1,11 +1,12 @@
 import { normAr } from "@/lib/catalog/norm";
 
 /**
- * Where the data team's «شروط وطرق الدفع» lines meet session E's payment
- * methods (Tabby / Tamara / MyFatoorah — E owns the list and the fees; the
- * coordinator, 2026-10-29). The country decides WHICH methods show: a
- * country's payment line that names a method prints that method with E's fee
- * note for the offer's total. Only this file will import E's module.
+ * Where the data team's «تقسيط المبلغ» lines (finance-terms.ts) meet session
+ * E's payment methods (Tabby / Tamara / MyFatoorah — E owns the list and the
+ * fees; the coordinator, 2026-10-29). The country decides WHICH methods show:
+ * a country's instalment line that names a method prints it with E's fee note
+ * for the offer's total. Only this file will import E's module; the caller is
+ * offerFinance (data/offers.ts), on FinanceSection.instalment.
  *
  * Pure: E's list and fee function come in as arguments until they land.
  */

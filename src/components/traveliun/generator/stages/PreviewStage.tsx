@@ -11,7 +11,7 @@ import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { IssueGuardNotice } from "../../IssueGuardNotice";
 import { ReissueOffer } from "../../ReissueOffer";
 import { OfferDocument } from "@/components/offer-doc/OfferDocument";
-import { draftBrand, draftPaymentLines, draftToPreviewOffer } from "@/lib/offer/preview-dto";
+import { draftBrand, draftFinance, draftToPreviewOffer } from "@/lib/offer/preview-dto";
 import { usePartnerBrand } from "@/lib/partners/PartnerContext";
 import { sectionClass, type StageFormProps } from "../stage-props";
 
@@ -120,7 +120,7 @@ export function PreviewStage({ draftId, data, patch, flush, lookups }: StageForm
         </p>
       ) : null}
 
-      <OfferDocument variant="client" offer={draftToPreviewOffer(data, lookups.airlines, lookups.sarPer, draftPaymentLines(data, lookups))} {...draftBrand(data, lookups.partners, ownFile)} />
+      <OfferDocument variant="client" offer={draftToPreviewOffer(data, lookups.airlines, lookups.sarPer, draftFinance(data, lookups))} {...draftBrand(data, lookups.partners, ownFile)} />
     </div>
   );
 }

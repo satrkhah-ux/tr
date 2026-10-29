@@ -202,8 +202,13 @@ ${FIT_SCREEN}
 .od-day-free td{background:var(--od-soft);}
 .od-day-free .od-route{color:var(--od-muted);}
 .od-note{margin-top:6mm;border:1px solid var(--od-line);border-radius:4mm;background:var(--od-fill);padding:4mm 5mm;color:var(--od-muted);font-size:10.5pt;break-inside:avoid;}
-.od-note p{margin:0;}
-.od-note p+p{margin-top:1.5mm;}
+.od-finance{color:var(--od-ink);}
+.od-finance h3,.od-fin-part h4{color:var(--od-green);}
+.od-finance h3{margin:0 0 2mm;font-size:12pt;}
+.od-fin-part+.od-fin-part{margin-top:2.5mm;}
+.od-fin-part h4{margin:0 0 1mm;font-size:10.5pt;}
+.od-fin-part ul{margin:0;padding-inline-start:5mm;}
+.od-fin-part li{margin:0.5mm 0;}
 .od-strip{margin-top:6mm;display:grid;grid-template-columns:1fr 38mm;border:1px solid var(--od-line);border-radius:4mm;overflow:hidden;background:#fff;font-size:11pt;break-inside:avoid;}
 .od-strip div{padding:5mm;}
 .od-strip .od-strip-label{background:var(--od-green);color:#fff;font-weight:700;text-align:center;}
