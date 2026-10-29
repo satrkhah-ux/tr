@@ -17,8 +17,8 @@ import {
   type ConfidenceFieldKey,
   type ExtractedPackage,
 } from "@/lib/repackage/repackage-types";
-import { TeletelSearch } from "../../generator/TeletelSearch";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
+import { RepackageClientFields } from "../RepackageClientFields";
 import { addButtonClass, fieldClass, labelClass, removeButtonClass, sectionClass } from "../stage-props";
 import type { RepackageStageProps } from "../stage-props";
 
@@ -82,16 +82,11 @@ export function ReviewStage({ draftId, data, patch }: RepackageStageProps) {
       <section className={sectionClass}>
         <h3 className="text-[14px] font-extrabold text-[#0f3d38]">{t("rp.client.title")}</h3>
         <p className="mb-3 mt-0.5 text-[12px] text-[#557d78]">{t("rp.client.hint")}</p>
-        <TeletelSearch onPick={(hit) => update({ customer_name: hit.name, customer_phone: hit.phone })} />
+        {/* Basic's own customer fields — the file's client, asked when it was started or linked here */}
+        <div className="mb-3">
+          <RepackageClientFields customer={data.customer} onChange={(customer) => patch({ customer })} ring />
+        </div>
         <div className="grid gap-3 md:grid-cols-2">
-          <label className={labelClass}>
-            {t("pg.customerName")}
-            <input className={`${fieldClass}${ring(pkg.customer_name.trim())}`} value={pkg.customer_name} onChange={(e) => update({ customer_name: e.target.value })} />
-          </label>
-          <label className={labelClass}>
-            {t("pg.customerPhone")}
-            <input dir="ltr" inputMode="tel" placeholder="05xxxxxxxx" className={`${fieldClass} tv-tnum text-start${ring(pkg.customer_phone.trim())}`} value={pkg.customer_phone} onChange={(e) => update({ customer_phone: e.target.value })} />
-          </label>
           <div className="md:col-span-2">
             <FieldHead label={t("rp.field.dates")} confident={isFieldConfident(data, "dates")} confirmLabel={t("rp.review.confirm")} onConfirm={() => confirm("dates")} />
           </div>

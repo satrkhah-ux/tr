@@ -16,6 +16,7 @@ import { importFromPdf, listRepackageSuppliers, type RepackageSupplierOption } f
 import { stageHref } from "@/lib/repackage/repackage-types";
 import { useTraveliunUI } from "../../TraveliunUIProvider";
 import { SuggestInput } from "../../SuggestInput";
+import { RepackageClientFields } from "../RepackageClientFields";
 import { fieldClass, labelClass, sectionClass } from "../stage-props";
 import type { RepackageStageProps } from "../stage-props";
 
@@ -40,7 +41,7 @@ const READ_LABEL = {
   none: "rp.read.none",
 } as const;
 
-export function ImportStage({ draftId, data }: RepackageStageProps) {
+export function ImportStage({ draftId, data, patch, flush }: RepackageStageProps) {
   const router = useRouter();
   const { t } = useTraveliunUI();
   const [supplier, setSupplier] = useState(data.source.supplier_name);
@@ -78,6 +79,8 @@ export function ImportStage({ draftId, data }: RepackageStageProps) {
       if (kind === "text") fd.append("text", text);
       if (kind === "url") fd.append("url", url);
       fd.append("supplier", supplier);
+      // the client typed a moment ago is saved first: the import keeps the file's client, whoever it is
+      await flush();
       const res = await importFromPdf(draftId, fd);
       if (!res.ok) {
         setError(t(res.error));
@@ -130,6 +133,13 @@ export function ImportStage({ draftId, data }: RepackageStageProps) {
           ) : null}
         </div>
       ) : null}
+
+      {/* whose file it is — asked when it was started; linked here, or in the review, when it was not */}
+      <div className={sectionClass}>
+        <h3 className="text-[14px] font-extrabold text-[#0f3d38]">{t("rp.client.title")}</h3>
+        <p className="mb-3 mt-0.5 text-[12px] text-[#557d78]">{t("rp.start.hint")}</p>
+        <RepackageClientFields customer={data.customer} onChange={(customer) => patch({ customer })} />
+      </div>
 
       <div className={`${sectionClass} space-y-4`}>
         <label className={labelClass}>

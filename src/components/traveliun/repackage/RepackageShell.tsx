@@ -11,11 +11,12 @@ import {
   CircleDot,
   Loader2,
   MoonStar,
+  UserRound,
   XCircle,
 } from "lucide-react";
 import { DirText } from "@/components/DirText";
 import { saveRepackageStages } from "@/lib/data/repackage";
-import { STAGES, stageHref, type RepackageData, type StageKey } from "@/lib/repackage/repackage-types";
+import { STAGES, hasCustomer, stageHref, type RepackageData, type StageKey } from "@/lib/repackage/repackage-types";
 import { validateRepackage, type RepackageIssue, type StageStatus } from "@/lib/repackage/repackage-validation";
 import { useRole } from "@/lib/roles/RoleContext";
 import { TraveliunShell } from "../TraveliunShell";
@@ -124,6 +125,24 @@ export function RepackageShell({
             <ArrowRight className="size-4 rtl:rotate-0 ltr:rotate-180" />
             {t("rp.title")}
           </Link>
+          {/* whose file it is — linked from the start, or one tap away from linking */}
+          {hasCustomer(data.customer) ? (
+            <span className="inline-flex h-9 min-w-0 items-center gap-1.5 rounded-full border border-[#dbe6e1] bg-white px-3 text-[12.5px] font-bold text-[#185045]">
+              <UserRound className="size-3.5 shrink-0" />
+              <span className="truncate">{data.customer.customer_name || data.customer.customer_phone}</span>
+              {data.customer.customer_name && data.customer.customer_phone ? (
+                <span className="tv-tnum text-[#78948f]"><DirText dir="ltr">{data.customer.customer_phone}</DirText></span>
+              ) : null}
+            </span>
+          ) : (
+            <Link
+              href={stageHref(draftId, data.extracted ? "review" : "import")}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#f2e2b4] bg-[#fff8e8] px-3 text-[12.5px] font-bold text-[#a86a10] hover:bg-[#fdf0d2]"
+            >
+              <UserRound className="size-3.5" />
+              {t("rp.linkClient")}
+            </Link>
+          )}
           <span
             role="status"
             className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-bold ${
@@ -208,7 +227,7 @@ export function RepackageShell({
           </aside>
 
           <main className="min-w-0">
-            <StageForm draftId={draftId} data={data} patch={patch} replace={replace} />
+            <StageForm draftId={draftId} data={data} patch={patch} replace={replace} flush={flush} />
           </main>
         </div>
       </div>

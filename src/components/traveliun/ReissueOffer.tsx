@@ -19,6 +19,7 @@ const KIND_KEY: Record<OfferChangeKind, TranslationKey> = {
   travellers: "pg.reissue.kind.travellers",
   flights: "pg.reissue.kind.flights",
   price: "pg.reissue.kind.price",
+  includes: "pg.reissue.kind.includes",
 };
 
 /**
@@ -36,6 +37,7 @@ export function ReissueOffer({
   onIssued,
   className = "",
   compact = false,
+  issue,
 }: {
   draftId: string;
   /** the issued serial — «سجل النسخ» lists its versions under the button. */
@@ -48,6 +50,12 @@ export function ReissueOffer({
   className?: string;
   /** a small link in the issued file's secondary row — the guard and «سجل النسخ» live elsewhere there */
   compact?: boolean;
+  /**
+   * What issues the next version, by the id the file is known by here — a Basic
+   * draft's produceOfferFromDraft unless another wizard (the repackage's) says so.
+   * The history then lists the versions without «استعادة»: only a draft freezes what a restore needs.
+   */
+  issue?: (id: string) => Promise<ProduceResult>;
 }) {
   const { t, language } = useTraveliunUI();
   const [busy, setBusy] = useState(false);
@@ -63,7 +71,7 @@ export function ReissueOffer({
     setDone(null);
     try {
       await flush?.();
-      const result = await produceOfferFromDraft(draftId);
+      const result = await (issue ?? produceOfferFromDraft)(draftId);
       if (!result.ok) return setError(t(result.error));
       setDone({ version: result.version ?? 0, changes: result.changes ?? [] });
       setIssuedCount((n) => n + 1);
@@ -160,7 +168,7 @@ export function ReissueOffer({
           )}
         </div>
       ) : null}
-      {serial ? <OfferVersions serial={serial} draftId={draftId} refreshKey={issuedCount} flush={flush} /> : null}
+      {serial ? <OfferVersions serial={serial} draftId={issue ? undefined : draftId} refreshKey={issuedCount} flush={flush} /> : null}
     </div>
   );
 }

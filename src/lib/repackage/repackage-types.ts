@@ -71,6 +71,8 @@ export type ExtractedFlight = {
   to_airport: string;
   departure_at: string | null;
   arrival_at: string | null;
+  /** typed by the agent in «إضافات» — the supplier's file did not hold it. */
+  added?: true;
 };
 
 /**
@@ -80,7 +82,11 @@ export type ExtractedFlight = {
  * (mapped to buy_price internally, never shipped to a client).
  */
 export type ExtractedPackage = {
-  /** the client this package is re-issued FOR — printed on the document. */
+  /**
+   * What the FILE named as its traveller, if it did. The client the offer is
+   * for is `RepackageData.customer` (known from the moment the file is started,
+   * before any import) — this is only a fallback the import may seed it from.
+   */
   customer_name: string;
   customer_phone: string;
   destination: string;
@@ -152,6 +158,13 @@ export type ConfidenceMap = Partial<Record<ConfidenceFieldKey, number>>;
 export type RepackageSource = {
   supplier_name: string;
   supplier_id: string | null;
+  /**
+   * The registered supplier (company_suppliers — the one that holds contact
+   * data) this package is bought from; null until the order screen finds it by
+   * name or the employee picks / types it once. suppliers_repackage is only a
+   * name list, so the link lives here, in the jsonb — no column needed.
+   */
+  company_supplier_id: string | null;
   /** Storage path of the original file — internal audit only, NEVER on client output. */
   original_file_path: string | null;
   pdf_kind: "text" | "scanned" | null;
@@ -174,15 +187,36 @@ export type RepackageBefore = {
   terms: string[];
 };
 
+/** The client this repackage is FOR — asked when it is started, linked later if it was not. */
+export type RepackageCustomer = { customer_name: string; customer_phone: string };
+
+/**
+ * One line the agent adds to what the supplier's file held — an extra tour, a
+ * transfer, a SIM. Printed in the client's «يشمل» list, and, when it has a
+ * price, added to the client's total (its own pricing line, cost left empty).
+ * SELL-ONLY: there is no field for a cost here.
+ */
+export type RepackageAddition = {
+  id: string;
+  title: string;
+  detail: string;
+  /** what the client pays for it on top of the package; null = included at no charge. */
+  sell_price: number | null;
+};
+
 export type RepackageData = {
   source: RepackageSource;
+  /** who the offer is for — one source of truth for the document, the produced offer and the list. */
+  customer: RepackageCustomer;
   /** the working package (null until a file is imported). */
   extracted: ExtractedPackage | null;
   /** per-field extraction confidence (0..1). */
   confidence: ConfidenceMap;
   /** field keys the human has confirmed/corrected in /review. */
   reviewed: ConfidenceFieldKey[];
-  /** our client-facing SELL price (edit stage). */
+  /** what the agent added to the supplier's package (edit stage «إضافات»). */
+  additions: RepackageAddition[];
+  /** our SELL price of the supplier's package itself (edit stage); additions are priced on top of it. */
   final_total: number | null;
   final_currency: string;
   /** true when the sell was produced by the markup engine (vs typed by hand). */
@@ -223,6 +257,7 @@ export function emptyRepackageData(): RepackageData {
     source: {
       supplier_name: "",
       supplier_id: null,
+      company_supplier_id: null,
       original_file_path: null,
       pdf_kind: null,
       ocr_used: false,
@@ -231,9 +266,11 @@ export function emptyRepackageData(): RepackageData {
       how: null,
       summary: "",
     },
+    customer: { customer_name: "", customer_phone: "" },
     extracted: null,
     confidence: {},
     reviewed: [],
+    additions: [],
     final_total: null,
     final_currency: "SAR",
     markup_applied: false,
@@ -310,6 +347,7 @@ function normalizeExtracted(raw: unknown): ExtractedPackage | null {
             to_airport: str(ff.to_airport),
             departure_at: typeof ff.departure_at === "string" ? ff.departure_at : null,
             arrival_at: typeof ff.arrival_at === "string" ? ff.arrival_at : null,
+            ...(ff.added === true ? { added: true as const } : {}),
           };
         })
       : [],
@@ -321,6 +359,21 @@ function normalizeExtracted(raw: unknown): ExtractedPackage | null {
     supplier_total: numOrNull(e.supplier_total),
     supplier_currency: str(e.supplier_currency, empty.supplier_currency),
   };
+}
+
+function normalizeAdditions(raw: unknown): RepackageAddition[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((a, i) => {
+    const aa = (a ?? {}) as Partial<RepackageAddition>;
+    const price = numOrNull(aa.sell_price);
+    return {
+      id: typeof aa.id === "string" && aa.id ? aa.id : `add-${i + 1}`,
+      title: str(aa.title),
+      detail: str(aa.detail),
+      // a price is money the client pays: never negative
+      sell_price: price != null && price >= 0 ? price : null,
+    };
+  });
 }
 
 export function normalizeRepackageData(raw: Record<string, unknown> | null | undefined): RepackageData {
@@ -336,10 +389,14 @@ export function normalizeRepackageData(raw: Record<string, unknown> | null | und
     }
   }
   const before = s.before && typeof s.before === "object" ? (s.before as Partial<RepackageBefore>) : null;
+  const extracted = normalizeExtracted(s.extracted);
+  // a file started before the client was asked up front keeps the one its import carried
+  const stored = (s.customer && typeof s.customer === "object" ? s.customer : null) as Partial<RepackageCustomer> | null;
   return {
     source: {
       supplier_name: str(source.supplier_name),
       supplier_id: typeof source.supplier_id === "string" ? source.supplier_id : null,
+      company_supplier_id: typeof source.company_supplier_id === "string" ? source.company_supplier_id : null,
       original_file_path: typeof source.original_file_path === "string" ? source.original_file_path : null,
       pdf_kind: source.pdf_kind === "text" || source.pdf_kind === "scanned" ? source.pdf_kind : null,
       ocr_used: source.ocr_used === true,
@@ -351,12 +408,16 @@ export function normalizeRepackageData(raw: Record<string, unknown> | null | und
           : null,
       summary: str(source.summary),
     },
-    extracted: normalizeExtracted(s.extracted),
+    customer: stored
+      ? { customer_name: str(stored.customer_name), customer_phone: str(stored.customer_phone) }
+      : { customer_name: extracted?.customer_name ?? "", customer_phone: extracted?.customer_phone ?? "" },
+    extracted,
     confidence,
     reviewed: Array.isArray(s.reviewed)
       ? (s.reviewed.filter((k): k is ConfidenceFieldKey =>
           typeof k === "string" && (CONFIDENCE_FIELD_KEYS as string[]).includes(k)) as ConfidenceFieldKey[])
       : [],
+    additions: normalizeAdditions(s.additions),
     final_total: numOrNull(s.final_total),
     final_currency: str(s.final_currency, empty.final_currency),
     markup_applied: s.markup_applied === true,
@@ -389,6 +450,41 @@ export function uncertainFields(data: RepackageData): ConfidenceFieldKey[] {
 /** Any CRITICAL field still uncertain? If false + nights invariant holds, /review auto-skips. */
 export function hasUncertainCriticals(data: RepackageData): boolean {
   return CRITICAL_FIELDS.some((k) => !isFieldConfident(data, k));
+}
+
+// ---------- the client and the agent's additions ----------
+const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
+
+/** The customer is known: a name or a phone is on the file. */
+export function hasCustomer(c: RepackageCustomer): boolean {
+  return Boolean(c.customer_name.trim() || c.customer_phone.trim());
+}
+
+/** The additions that print — a line with no title says nothing (validation stops a priced one). */
+export function printableAdditions(data: Pick<RepackageData, "additions">): RepackageAddition[] {
+  return data.additions.filter((a) => a.title.trim());
+}
+
+/** «عنوان — تفصيل», the line the client's «يشمل» list prints. */
+export function additionLine(a: Pick<RepackageAddition, "title" | "detail">): string {
+  const title = a.title.trim();
+  const detail = a.detail.trim();
+  return detail ? `${title} — ${detail}` : title;
+}
+
+/** What the priced additions add to the client's total. */
+export function additionsTotal(data: Pick<RepackageData, "additions">): number {
+  return round2(printableAdditions(data).reduce((sum, a) => sum + (a.sell_price ?? 0), 0));
+}
+
+/** What the client pays: the package's sell price plus the priced additions. Null until the package is priced. */
+export function clientTotal(data: Pick<RepackageData, "additions" | "final_total">): number | null {
+  return data.final_total == null ? null : round2(data.final_total + additionsTotal(data));
+}
+
+/** The flights the agent typed beside the supplier's — shown in the edit stage's diff. */
+export function addedFlights(pkg: ExtractedPackage): ExtractedFlight[] {
+  return pkg.flights.filter((f) => f.added === true);
 }
 
 // ---------- stops, stays and the trip's dates ----------

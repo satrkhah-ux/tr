@@ -16,6 +16,9 @@ import type { BoardType } from "@/lib/types";
 import { normalizeDraftData } from "@/lib/offer/draft-types";
 import { flightRefresh, LATER, newBookings, offerHotelCity, oldPullStays, planBookingsFromDraft, type ExistingBooking, type HeldFlight } from "@/lib/operations/seed-plan";
 import { issuedDraftData } from "@/lib/data/issued-draft";
+import { registeredSupplier } from "@/lib/data/repackage-supplier";
+import { normalizeRepackageData } from "@/lib/repackage/repackage-types";
+import { isPackageLine, packageLine } from "@/lib/repackage/package-line";
 import { roomsJson, seededSpec } from "@/lib/operations/room-details";
 import { HOTEL_ID_KEY, ROOM_SPEC_KEY } from "@/lib/operations/voucher-dto";
 import type { OfferKinds } from "@/lib/operations/wizard/types";
@@ -66,6 +69,8 @@ type SeedRow = {
   cancellation_policy: string | null;
   quoted_net: number | null;
   currency: string;
+  /** the registered supplier a line is handed to when it is seeded (a repackage's package line). */
+  assignee_supplier_id?: string | null;
 };
 
 /** `failed`: the bookings that could not be written — each skipped and named, never the whole pull lost to one. */
@@ -92,8 +97,12 @@ type OfferCityRow = { id: string; city_name: string; check_in: string | null; ch
 /** What the offer books, and what the case already holds. */
 async function planFor(operationId: string): Promise<{ ok: true; rows: SeedRow[]; existing: ExistingBooking[] } | Fail> {
   const supabase = service();
-  type OfferRef = { serial: string; partner_company_id: string | null };
-  const opRes = await supabase.from("operations").select("id, offer_id, offers(serial, partner_company_id)").eq("id", operationId).maybeSingle();
+  type OfferRef = { serial: string; partner_company_id: string | null; source_kind: string | null; source_import_id: string | null };
+  const opRes = await supabase
+    .from("operations")
+    .select("id, offer_id, offers(serial, partner_company_id, source_kind, source_import_id)")
+    .eq("id", operationId)
+    .maybeSingle();
   const op = opRes.data as { id: string; offer_id: string; offers: OfferRef | OfferRef[] | null } | null;
   if (!op) return { ok: false, error: "ops.err.notFound" };
   const offer = Array.isArray(op.offers) ? op.offers[0] : op.offers;
@@ -234,6 +243,21 @@ async function planFor(operationId: string): Promise<{ ok: true; rows: SeedRow[]
       currency: "SAR",
     });
   }
+
+  // A repackaged file: the supplier's package is priced as a whole (pricings.buy_total), so the hotels
+  // above cost nothing — ONE line carries the debt, with the supplier and its cost, so «حسابات الموردين»
+  // lists it and the supplier's payments are recorded against it (repackage/package-line.ts).
+  if (offer?.source_kind === "repackaged" && offer.source_import_id) {
+    const { data: imported } = await supabase.from("repackage_imports").select("data").eq("id", offer.source_import_id).maybeSingle();
+    if (imported) {
+      const file = normalizeRepackageData((imported as { data: Record<string, unknown> }).data);
+      const line = packageLine(op.offer_id, file);
+      if (line) {
+        const supplier = line.assignee_supplier_id ? { id: line.assignee_supplier_id } : await registeredSupplier(supabase, file);
+        rows.push({ ...line, assignee_supplier_id: supplier?.id ?? null });
+      }
+    }
+  }
   return { ok: true, rows, existing };
 }
 
@@ -277,6 +301,25 @@ export async function pullBookingsFromOffer(operationId: string): Promise<SeedRe
     for (const { id, patch } of flightRefresh(rows, (held.data ?? []) as HeldFlight[])) {
       await writer.from("operation_bookings").update(patch).eq("id", id).eq("operation_id", operationId);
     }
+    // the supplier's package line follows the newest issue — its cost and its supplier — until the supplier confirms it
+    for (const r of rows.filter((x) => isPackageLine(x.origin_ref))) {
+      const open = ["pending", "prebooked", "in_flight", "failed"];
+      await writer
+        .from("operation_bookings")
+        .update({ quoted_net: r.quoted_net, currency: r.currency, supplier_name: r.supplier_name })
+        .eq("operation_id", operationId)
+        .eq("origin_ref", r.origin_ref)
+        .in("status", open);
+      if (r.assignee_supplier_id) {
+        // only while nobody else holds it: the clerk's own hand-off stays
+        await writer
+          .from("operation_bookings")
+          .update({ assignee_kind: "supplier", assignee_supplier_id: r.assignee_supplier_id })
+          .eq("operation_id", operationId)
+          .eq("origin_ref", r.origin_ref)
+          .eq("assignee_kind", "ops");
+      }
+    }
     // a booking typed by hand that IS a planned one takes its ref — the next pull matches it outright
     let linked = 0;
     for (const link of links) {
@@ -312,6 +355,8 @@ export async function pullBookingsFromOffer(operationId: string): Promise<SeedRe
       quoted_net: r.quoted_net,
       currency: r.currency,
       created_by: employeeId,
+      // the supplier's package line is born handed to its supplier (assignee_kind / assignee_supplier_id pair, 0063)
+      ...(r.assignee_supplier_id ? { assignee_kind: "supplier", assignee_supplier_id: r.assignee_supplier_id } : {}),
     }));
     let added = unique.length;
     const { error } = await writer.from("operation_bookings").insert(inserts);

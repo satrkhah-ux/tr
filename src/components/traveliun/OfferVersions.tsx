@@ -18,6 +18,7 @@ const KIND_KEY: Record<OfferChangeKind, TranslationKey> = {
   travellers: "pg.reissue.kind.travellers",
   flights: "pg.reissue.kind.flights",
   price: "pg.reissue.kind.price",
+  includes: "pg.reissue.kind.includes",
 };
 const VERSION_KIND: Record<OfferVersionKind, TranslationKey> = {
   issued: "pg.versions.kind.issued",
@@ -42,7 +43,8 @@ export function OfferVersions({
   defaultOpen = false,
 }: {
   serial: string;
-  draftId: string;
+  /** the Basic draft a restore re-issues; none (a repackage) lists and shows the versions without «استعادة». */
+  draftId?: string;
   refreshKey?: number;
   flush?: () => Promise<void>;
   /** opened from the files list's «سجل النسخ»: already unfolded. */
@@ -69,6 +71,7 @@ export function OfferVersions({
   }, [open, refreshKey, load]);
 
   async function restore(v: number) {
+    if (!draftId) return;
     setBusy(v);
     setError(null);
     try {
@@ -164,7 +167,7 @@ export function OfferVersions({
                     >
                       <Eye className="size-3.5" /> {t("pg.versions.view")}
                     </a>
-                    {!v.current && v.restorable ? (
+                    {!draftId ? null : !v.current && v.restorable ? (
                       confirming === v.version ? (
                         <>
                           <button

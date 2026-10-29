@@ -2,25 +2,31 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TranslationKey } from "@/lib/i18n";
-import type { BoardType } from "@/lib/types";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
 import { getActiveMarkupRules } from "@/lib/data/markup-rules";
 import { computeSell, selectRule } from "@/lib/pricing/markup";
+import { normAr } from "@/lib/catalog/norm";
+import { offerChanges, type OfferChange } from "@/lib/offer/version-diff";
 import {
   emptyRepackageData,
+  hasCustomer,
   impliedDeparture,
   normalizeRepackageData,
-  packageNights,
-  packageStays,
-  packageStops,
+  type RepackageCustomer,
   type RepackageData,
 } from "@/lib/repackage/repackage-types";
 import { validateRepackage } from "@/lib/repackage/repackage-validation";
+import { repackageOfferInput } from "@/lib/repackage/offer-input";
 import { runExtraction, type ExtractionHow, type ExtractionSource } from "@/lib/repackage/extract/extract";
-import { publishOffer, type OfferHotelInput } from "./offers";
-import { insertOffer } from "./offer-insert";
+import { getPublishedClientOffer, publishOffer } from "./offers";
+import { insertOffer, replaceOffer } from "./offer-insert";
 import { customerFor } from "./customer-row";
+import { getRates } from "./rates-actions";
+import { reissueLocked } from "./issued-draft";
+import { pullBookingsFromOffer } from "./offer-pull";
+import { logAudit } from "./audit";
+import { loadRepackage, repackageDb, writeRepackageStages, type RepackageRecord } from "./repackage-store";
 import { fetchPublic } from "@/lib/repackage/fetch-public";
 
 /**
@@ -33,10 +39,7 @@ import { fetchPublic } from "@/lib/repackage/fetch-public";
  * a try, so a refusal reads as the action's ordinary failure.
  */
 
-async function db(): Promise<SupabaseClient> {
-  if (!(await currentCan("repackage.write"))) throw new Error("repackage.write required");
-  return createSupabaseServiceClient() as unknown as SupabaseClient;
-}
+const db = repackageDb;
 
 const BUCKET = "repackage";
 
@@ -45,6 +48,8 @@ export type RepackageSummary = {
   id: string;
   title: string | null;
   destination: string | null;
+  /** the client it is for — null until one is linked. */
+  customer_name: string | null;
   supplier_name: string | null;
   produced_serial: string | null;
   updated_at: string;
@@ -65,6 +70,7 @@ export async function listRepackages(): Promise<RepackageSummary[]> {
           id: row.id,
           title: row.title,
           destination: d.extracted?.destination || d.extracted?.country || null,
+          customer_name: d.customer.customer_name.trim() || d.customer.customer_phone.trim() || null,
           supplier_name: d.source.supplier_name || null,
           produced_serial: d.produced_serial,
           updated_at: row.updated_at,
@@ -78,14 +84,26 @@ export async function listRepackages(): Promise<RepackageSummary[]> {
 
 export type CreateRepackageResult = { ok: true; id: string } | { ok: false; error: TranslationKey };
 
-export async function createRepackage(): Promise<CreateRepackageResult> {
+/**
+ * A new repackage. The client is asked for up front (the same picker Basic uses)
+ * so the file is theirs from the first screen; starting without one is allowed —
+ * it is linked later, and the issue waits for it (validateRepackage).
+ */
+export async function createRepackage(customer?: Partial<RepackageCustomer>): Promise<CreateRepackageResult> {
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
     const supabase = await db();
+    const start: RepackageData = {
+      ...emptyRepackageData(),
+      customer: {
+        customer_name: String(customer?.customer_name ?? "").trim().slice(0, 120),
+        customer_phone: String(customer?.customer_phone ?? "").trim().slice(0, 40),
+      },
+    };
     const { data, error } = await supabase
       .from("repackage_imports")
-      .insert({ data: emptyRepackageData() as unknown as Record<string, unknown> })
+      .insert({ data: start as unknown as Record<string, unknown> })
       .select("id")
       .single();
     if (error || !data) return { ok: false, error: "err.createFailed" };
@@ -95,49 +113,32 @@ export async function createRepackage(): Promise<CreateRepackageResult> {
   }
 }
 
-export type RepackageRecord = { id: string; data: RepackageData; updated_at: string };
+export type { RepackageRecord };
 
 export async function getRepackage(id: string): Promise<RepackageRecord | null> {
-  try {
-    const supabase = await db();
-    const { data } = await supabase
-      .from("repackage_imports")
-      .select("id, data, updated_at")
-      .eq("id", id)
-      .maybeSingle();
-    if (!data) return null;
-    const row = data as { id: string; data: Record<string, unknown>; updated_at: string };
-    return { id: row.id, data: normalizeRepackageData(row.data), updated_at: row.updated_at };
-  } catch {
-    return null;
-  }
+  return loadRepackage(id);
 }
 
 export type SaveRepackageResult = { ok: boolean; error?: TranslationKey };
 
-/** Shallow top-level merge of slices into the import's jsonb (mirror drafts). */
+/**
+ * Shallow top-level merge of slices into the import's jsonb (mirror drafts).
+ * What an issue wrote is the server's: produceRepackageOffer names the serial,
+ * the order screen links the supplier — a browser naming either could point
+ * this file's next «إصدار نسخة محدّثة» at an offer it never issued.
+ */
 export async function saveRepackageStages(id: string, slices: Partial<RepackageData>): Promise<SaveRepackageResult> {
   try {
     const user = await getServerUser();
     if (!user) return { ok: false, error: "err.session" };
-    const supabase = await db();
-    const { data: existing } = await supabase.from("repackage_imports").select("data").eq("id", id).maybeSingle();
-    if (!existing) return { ok: false, error: "err.loadFailed" };
-    const current = normalizeRepackageData((existing as { data: Record<string, unknown> }).data);
-    const merged: RepackageData = { ...current, ...slices };
-    const title = merged.source.supplier_name || merged.extracted?.destination || merged.extracted?.country || null;
-    const { error } = await supabase
-      .from("repackage_imports")
-      .update({
-        data: merged as unknown as Record<string, unknown>,
-        title,
-        supplier_id: merged.source.supplier_id,
-        original_file_path: merged.source.original_file_path,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-    if (error) return { ok: false, error: "err.updateFailed" };
-    return { ok: true };
+    const sent = { ...slices };
+    delete sent.produced_serial;
+    if (sent.source) {
+      const stored = await loadRepackage(id);
+      if (!stored) return { ok: false, error: "err.loadFailed" };
+      sent.source = { ...sent.source, company_supplier_id: stored.data.source.company_supplier_id };
+    }
+    return await writeRepackageStages(id, sent);
   } catch {
     return { ok: false, error: "err.db" };
   }
@@ -302,21 +303,27 @@ export async function importFromPdf(id: string, formData: FormData): Promise<Imp
 
     const record = await getRepackage(id);
     const base = record?.data ?? emptyRepackageData();
-    // The client is ours, not the supplier's: a re-import keeps whoever the
-    // employee already typed unless the new file names someone. A missing
-    // departure is the arrival + the nights, as the generator derives it.
+    // The client is ours, not the supplier's: the one the file was started for
+    // (or linked since) stays, and the supplier's file only fills an empty
+    // client with whoever it names. A missing departure is the arrival + the
+    // nights, as the generator derives it.
     const read = extraction.extracted;
     const pkg = {
       ...read,
-      customer_name: read.customer_name || base.extracted?.customer_name || "",
-      customer_phone: read.customer_phone || base.extracted?.customer_phone || "",
       departure_date: impliedDeparture(read),
     };
+    const customer = hasCustomer(base.customer)
+      ? base.customer
+      : { customer_name: read.customer_name, customer_phone: read.customer_phone };
+    // the registered supplier it was linked to stays while the supplier is the same one
+    const sameSupplier = normAr(base.source.supplier_name) === normAr(supplierName);
     const nextData: RepackageData = {
       ...base,
+      customer,
       source: {
         supplier_name: supplierName,
         supplier_id: supplierId,
+        company_supplier_id: sameSupplier ? base.source.company_supplier_id : null,
         original_file_path: originalPath,
         pdf_kind: extraction.pdf_kind,
         ocr_used: extraction.ocr_used,
@@ -338,10 +345,11 @@ export async function importFromPdf(id: string, formData: FormData): Promise<Imp
         excludes: [...pkg.excludes],
         terms: [...pkg.terms],
       },
-      produced_serial: null,
+      // an issued file stays that offer: the next «إصدار» is its next version, not a second offer
+      produced_serial: base.produced_serial,
     };
 
-    const saved = await saveRepackageStages(id, nextData);
+    const saved = await writeRepackageStages(id, nextData);
     if (!saved.ok) return { ok: false, error: saved.error ?? "err.db" };
 
     const validation = validateRepackage(nextData);
@@ -408,17 +416,25 @@ export async function suggestSellPrice(id: string): Promise<SellSuggestion> {
 }
 
 // ---------- produce the re-issued offer ----------
-export type ProduceResult = { ok: true; serial: string } | { ok: false; error: TranslationKey };
+export type ProduceResult =
+  | {
+      ok: true;
+      serial: string;
+      /** a re-issue only: the version it published and «ما تغيّر» against the one before. */
+      version?: number;
+      changes?: OfferChange[];
+    }
+  | { ok: false; error: TranslationKey };
 
-const BOARD_LABEL: Record<BoardType, string> = {
-  RO: "غرفة فقط",
-  BB: "شامل الإفطار",
-  HB: "نصف إقامة",
-  FB: "إقامة كاملة",
-  AI: "شامل كليًا",
-};
-
-/** Validate → map RepackageData onto a Traveliun offer → create + publish it. */
+/**
+ * Validate → map RepackageData onto a Traveliun offer → create + publish it.
+ *
+ * On a file that already issued an offer this is «إصدار نسخة محدّثة», exactly as
+ * Basic's: the SAME offer (serial) re-filled from the corrected file
+ * (replaceOffer) and published as its next version — never a second offer.
+ * Nothing goes to the client from here (the employee sends it, offer-send), and
+ * the gates are Basic's: offers.write, and a cancelled file is not issued again.
+ */
 export async function produceRepackageOffer(id: string): Promise<ProduceResult> {
   try {
     const user = await getServerUser();
@@ -426,123 +442,57 @@ export async function produceRepackageOffer(id: string): Promise<ProduceResult> 
     const record = await getRepackage(id);
     if (!record || !record.data.extracted) return { ok: false, error: "err.loadFailed" };
     const data = record.data;
-    const pkg = record.data.extracted;
+
+    const reissue = data.produced_serial;
+    if (
+      reissue &&
+      (!(await currentCan("offers.write")) || (await reissueLocked(createSupabaseServiceClient() as unknown as SupabaseClient, reissue)))
+    ) {
+      return { ok: false, error: "pg.err.issuedLocked" };
+    }
 
     // Re-run the confidence gate + price floor server-side (never trust the client).
     const validation = validateRepackage(data);
     if (!validation.ok) return { ok: false, error: "rp.err.blockingLeft" };
 
-    const nights = packageNights(pkg);
-    const days = nights > 0 ? nights + 1 : 0;
-
-    // One stay per hotel of each visit (a city visited twice keeps a hotel per
-    // visit; two hotels in one visit chain inside it), dates chained from the
-    // arrival — what the preview showed.
-    const stays = packageStays(pkg);
-
-    const hotels: OfferHotelInput[] = stays.flatMap((s) => {
-      const h = s.hotel;
-      if (!h) return [];
-      return [{
-        hotel_id: null,
-        hotel_name: h.hotel_name || null,
-        room_type_id: null,
-        rooms_count: 1,
-        board_type: s.board_type,
-        check_in: s.check_in,
-        check_out: s.check_out,
-        nights: s.nights,
-        // package priced as a whole (buy_total on pricings) → no per-line cost.
-        buy_price: null,
-        buy_currency: null,
-        sell_price: null,
-        sell_currency: null,
-        // IP-SAFE: carry facts only. No supplier name / logo / photos lifted from
-        // the PDF — supplier provenance stays as an opaque id on the offer row.
-        cancellation_policy: null,
-        excluded_surcharges: [],
-        valid_until: null,
-        supplier_id: null,
-        supplier_name: null,
-        rate_key: null,
-        net_base: null,
-        net_source_currency: null,
-        fx_rate: null,
-        fx_date: null,
-        ref_sell_base: null,
-        markup_amount: null,
-        markup_pct: null,
-        image_url: null,
-        facilities: [],
-        content_star_rating: null,
-        room_type_name: h.room_type || null,
-      }];
+    const built = repackageOfferInput(data, {
+      // the client the file is for: found by name and phone, else created — the offer is filed under them
+      customerId: await customerFor(data.customer, true),
+      importId: id,
+      rates: await getRates(),
     });
+    if (!built.ok) return { ok: false, error: built.error === "missingRates" ? "pg.err.missingRates" : "err.loadFailed" };
 
-    const transferIncludes = pkg.transfers.map((t) => `المواصلات: ${t}`);
-    const visaIncludes = pkg.visas.map((v) => `تأشيرة: ${v}`);
-
-    const result = await insertOffer({
-      // the client link and the PDF read the name and phone from this row
-      customer_id: await customerFor(pkg, true),
-      employee_id: null,
-      destination: pkg.destination || pkg.country,
-      duration: nights > 0 ? `${days} أيام / ${nights} ليالي` : null,
-      offer_date: pkg.arrival_date,
-      adults: pkg.adults,
-      children: pkg.children,
-      infants: pkg.infants,
-      total: data.final_total,          // our SELL
-      buy_total: pkg.supplier_total,    // supplier COST (internal — pricings only)
-      currency: data.final_currency,
-      // one row per VISIT, as the generator writes it: two hotels in one visit
-      // name the first and say how many follow; each hotel is its own offer_hotels row
-      cities: packageStops(pkg).map((stop, i) => {
-        const mine = stays.filter((s) => s.stop === i);
-        const first = mine[0];
-        const extra = mine.length > 1 ? ` + ${mine.length - 1}` : "";
-        return {
-          city_name: stop.city_name,
-          hotel_name: first?.hotel?.hotel_name ? `${first.hotel.hotel_name}${extra}` : null,
-          room_type: first?.hotel?.room_type || null,
-          nights: stop.nights,
-          check_in: first?.check_in ?? null,
-          check_out: mine.at(-1)?.check_out ?? null,
-          meals: first?.board_type ? BOARD_LABEL[first.board_type] : null,
-        };
-      }),
-      flights: pkg.flights.map((f) => ({
-        carrier: f.airline || null,
-        from_airport: f.from_airport || null,
-        to_airport: f.to_airport || null,
-        flight_date: f.departure_at ? f.departure_at.slice(0, 10) : null,
-        passengers: pkg.adults + pkg.children,
-        baggage: null,
-        airline: f.airline || null,
-        flight_no: f.flight_no || null,
-        departure_at: f.departure_at,
-        arrival_at: f.arrival_at,
-        cabin_class: null,
-        baggage_allowance: null,
-        leg_order: null,
-      })),
-      services: [
-        ...pkg.includes.map((label) => ({ label, kind: "include" as const })),
-        ...transferIncludes.map((label) => ({ label, kind: "include" as const })),
-        ...visaIncludes.map((label) => ({ label, kind: "include" as const })),
-        ...pkg.excludes.map((label) => ({ label, kind: "exclude" as const })),
-      ],
-      terms: pkg.terms,
-      hotels,
-      source_kind: "repackaged",
-      source_supplier_id: data.source.supplier_id,
-      source_import_id: id,
-    });
-
+    // the version the client has now, for «ما تغيّر» after the re-issue
+    const before = reissue ? await getPublishedClientOffer(reissue) : null;
+    const result = reissue ? await replaceOffer(reissue, built.input) : await insertOffer(built.input);
     if (!result.ok) return { ok: false, error: result.error };
-    await saveRepackageStages(id, { produced_serial: result.serial });
-    await publishOffer(result.serial);
-    return { ok: true, serial: result.serial };
+
+    await writeRepackageStages(id, { produced_serial: result.serial });
+    const published = await publishOffer(result.serial, Boolean(reissue));
+    if (!reissue) return { ok: true, serial: result.serial };
+
+    if (!published.ok) return { ok: false, error: published.error };
+    const after = await getPublishedClientOffer(result.serial);
+    const changes = before && after ? offerChanges(before.offer, after.offer) : [];
+    await logAudit({
+      action: "offer.reissued",
+      entity: "offers",
+      entity_id: result.id,
+      meta: { serial: result.serial, version: published.version, repackage_id: id, changes },
+    });
+    // a confirmed file's case books from the newest issue: what it adds is pulled, and the supplier's
+    // package line follows its cost (offer-pull.ts). Best-effort — the issue stands either way.
+    try {
+      const { data: cases } = await (createSupabaseServiceClient() as unknown as SupabaseClient)
+        .from("operations")
+        .select("id")
+        .eq("offer_id", result.id);
+      for (const c of (cases ?? []) as { id: string }[]) await pullBookingsFromOffer(c.id);
+    } catch {
+      /* the case pulls again from its own page */
+    }
+    return { ok: true, serial: result.serial, version: published.version, changes };
   } catch {
     return { ok: false, error: "err.db" };
   }

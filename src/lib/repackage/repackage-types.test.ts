@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  addedFlights,
+  additionLine,
+  additionsTotal,
+  clientTotal,
   emptyExtractedPackage,
   emptyRepackageData,
+  hasCustomer,
   keyHotels,
   normalizeRepackageData,
   packageStays,
   packageStops,
+  printableAdditions,
   splitVisitNights,
   visitNightsGaps,
   withArrival,
@@ -115,15 +121,18 @@ describe("the travel dates", () => {
   });
 });
 
+const CLIENT = { customer_name: "خالد", customer_phone: "0551234567" };
+
 describe("validation — the client's details come first", () => {
-  const ready = (pkg: ExtractedPackage): RepackageData => ({
+  const ready = (pkg: ExtractedPackage, customer = CLIENT): RepackageData => ({
     ...emptyRepackageData(),
+    customer,
     extracted: pkg,
     confidence: { country: 1, cities: 1, trip_nights: 1, hotels: 1, supplier_total: 1 },
     final_total: 5000,
   });
-  const reviewKeys = (pkg: ExtractedPackage) =>
-    validateRepackage(ready(pkg)).blocking.filter((i) => i.stage === "review").map((i) => i.key);
+  const reviewKeys = (pkg: ExtractedPackage, customer = CLIENT) =>
+    validateRepackage(ready(pkg, customer)).blocking.filter((i) => i.stage === "review").map((i) => i.key);
 
   it("passes a complete package", () => {
     const v = validateRepackage(ready(georgia()));
@@ -132,9 +141,16 @@ describe("validation — the client's details come first", () => {
   });
 
   it("stops on /review without the name, phone, arrival or departure", () => {
-    const empty = georgia({ customer_name: " ", customer_phone: "", arrival_date: null, departure_date: null });
-    expect(reviewKeys(empty)).toEqual(["pg.warn.noName", "pg.warn.noPhone", "pg.err.noArrival", "rp.err.noDeparture"]);
-    expect(validateRepackage(ready(empty)).reviewClear).toBe(false);
+    const empty = georgia({ arrival_date: null, departure_date: null });
+    const none = { customer_name: " ", customer_phone: "" };
+    expect(reviewKeys(empty, none)).toEqual(["pg.warn.noName", "pg.warn.noPhone", "pg.err.noArrival", "rp.err.noDeparture"]);
+    expect(validateRepackage(ready(empty, none)).reviewClear).toBe(false);
+  });
+
+  it("the client is the file's own (data.customer): what the supplier's file named does not stand in for it", () => {
+    // the package carries a name from the file, the file itself has no client linked: the issue still waits for one
+    const v = validateRepackage({ ...ready(georgia(), { customer_name: "", customer_phone: "" }), extracted: georgia({ customer_name: "من ملف المورّد", customer_phone: "0500000000" }) });
+    expect(v.blocking.map((i) => i.key)).toEqual(["pg.warn.noName", "pg.warn.noPhone"]);
   });
 
   it("blocks a departure that is not arrival + the package's nights", () => {
@@ -191,6 +207,7 @@ describe("several hotels in one visit", () => {
     expect(visitNightsGaps(london([4, 2]))).toEqual([{ city_name: "لندن", nights: 5, sum: 6 }]);
     const v = validateRepackage({
       ...emptyRepackageData(),
+      customer: CLIENT,
       extracted: london([4, 2]),
       confidence: { country: 1, cities: 1, trip_nights: 1, hotels: 1, supplier_total: 1 },
       final_total: 5000,
@@ -218,5 +235,82 @@ describe("several hotels in one visit", () => {
     const one = london([4, null], { hotels: [london([4, null]).hotels[0]] });
     expect(packageStays(one).map((s) => [s.nights, s.check_out])).toEqual([[5, "2026-12-31"]]);
     expect(visitNightsGaps(one)).toEqual([]);
+  });
+});
+
+describe("the client of a repackage — known from the start, one place", () => {
+  it("a new file carries an empty client, and a typed one survives a save and a reload", () => {
+    expect(emptyRepackageData().customer).toEqual({ customer_name: "", customer_phone: "" });
+    const typed = { ...emptyRepackageData(), customer: CLIENT };
+    const again = normalizeRepackageData(JSON.parse(JSON.stringify(typed)));
+    expect(again.customer).toEqual(CLIENT);
+    expect(normalizeRepackageData(again as unknown as Record<string, unknown>)).toEqual(again);
+  });
+
+  it("a file saved before the client was asked up front keeps the one its import carried", () => {
+    const old = { extracted: georgia() } as unknown as Record<string, unknown>;
+    expect(normalizeRepackageData(old).customer).toEqual(CLIENT);
+    // …and once a client is stored, the package's own fields no longer decide
+    const stored = { customer: { customer_name: "سالم", customer_phone: "0500000001" }, extracted: georgia() } as unknown as Record<string, unknown>;
+    expect(normalizeRepackageData(stored).customer).toEqual({ customer_name: "سالم", customer_phone: "0500000001" });
+  });
+
+  it("hasCustomer: a name or a phone is enough to be linked", () => {
+    expect(hasCustomer({ customer_name: "", customer_phone: "" })).toBe(false);
+    expect(hasCustomer({ customer_name: " ", customer_phone: " " })).toBe(false);
+    expect(hasCustomer({ customer_name: "خالد", customer_phone: "" })).toBe(true);
+    expect(hasCustomer({ customer_name: "", customer_phone: "055" })).toBe(true);
+  });
+});
+
+describe("«إضافات» — the agent's additions, sell-only", () => {
+  const withAdditions = (additions: RepackageData["additions"], over: Partial<RepackageData> = {}): RepackageData => ({
+    ...emptyRepackageData(),
+    customer: CLIENT,
+    extracted: georgia(),
+    confidence: { country: 1, cities: 1, trip_nights: 1, hotels: 1, supplier_total: 1 },
+    final_total: 5000,
+    additions,
+    ...over,
+  });
+  const line = (title: string, sell_price: number | null, detail = "") => ({ id: `a-${title}`, title, detail, sell_price });
+
+  it("prints «عنوان — تفصيل», and only the lines that have a title", () => {
+    expect(additionLine({ title: " جولة المدينة ", detail: " نصف يوم " })).toBe("جولة المدينة — نصف يوم");
+    expect(additionLine({ title: "شريحة اتصال", detail: "" })).toBe("شريحة اتصال");
+    expect(printableAdditions(withAdditions([line("جولة", 100), line(" ", null)])).map((a) => a.title)).toEqual(["جولة"]);
+  });
+
+  it("the client pays the package's price plus the priced additions — an unpriced one adds nothing", () => {
+    const data = withAdditions([line("جولة", 150.5), line("شريحة", null), line("تأمين", 49.5)]);
+    expect(additionsTotal(data)).toBe(200);
+    expect(clientTotal(data)).toBe(5200);
+    // no package price yet → no total to add to
+    expect(clientTotal(withAdditions([line("جولة", 100)], { final_total: null }))).toBeNull();
+    // cents never drift
+    expect(clientTotal(withAdditions([line("أ", 0.1), line("ب", 0.2)], { final_total: 1 }))).toBe(1.3);
+  });
+
+  it("a price with no title blocks the issue on /edit; a priced addition never touches the supplier-cost floor", () => {
+    const v = validateRepackage(withAdditions([line("", 100)]));
+    expect(v.blocking.map((i) => [i.stage, i.key])).toEqual([["edit", "rp.err.additionNoTitle"]]);
+    // the floor is the package's own: 5000 against a 5000 cost passes, with or without additions
+    const floor = validateRepackage(withAdditions([line("جولة", 100)], { extracted: georgia({ supplier_total: 5000 }) }));
+    expect(floor.ok).toBe(true);
+    expect(validateRepackage(withAdditions([], { extracted: georgia({ supplier_total: 5001 }) })).blocking.map((i) => i.key)).toEqual(["rp.err.priceBelowCost"]);
+  });
+
+  it("survives a save and a reload; a negative price is no price; a missing id is given one", () => {
+    const stored = normalizeRepackageData({ additions: [{ title: "جولة", detail: "x", sell_price: -5 }, { id: "keep", title: "تأمين", sell_price: 20 }, null] } as unknown as Record<string, unknown>);
+    expect(stored.additions.map((a) => [a.id, a.title, a.sell_price])).toEqual([["add-1", "جولة", null], ["keep", "تأمين", 20], ["add-3", "", null]]);
+    expect(normalizeRepackageData(stored as unknown as Record<string, unknown>)).toEqual(stored);
+  });
+
+  it("flights the agent typed are told apart from the supplier's, and stay told apart", () => {
+    const own = { airline: "SV", flight_no: "SV123", from_airport: "RUH", to_airport: "TBS", departure_at: "2026-10-19T04:20", arrival_at: null, added: true as const };
+    const theirs = { ...own, flight_no: "X1", added: undefined };
+    const pkg = normalizeRepackageData({ extracted: georgia({ flights: [theirs as never, own] }) } as unknown as Record<string, unknown>).extracted!;
+    expect(addedFlights(pkg).map((f) => f.flight_no)).toEqual(["SV123"]);
+    expect("added" in pkg.flights[0]).toBe(false);
   });
 });
