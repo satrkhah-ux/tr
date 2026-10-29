@@ -2,27 +2,63 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Send } from "lucide-react";
-import { askSecretary, getSecretaryThread, type SecretaryMsg } from "@/lib/secretary/chat";
+import { askSecretary, explainErrorToSecretary, getSecretaryThread, reportErrorToAdmin, type SecretaryMsg } from "@/lib/secretary/chat";
+import type { ErrorReport } from "@/lib/secretary/error-core";
+import { takePendingError } from "./send-error";
 
 /** «سكرتيري الخاص» — the chat itself, used by the floating panel and /secretary. */
-const QUICK = ["ما حال محادثاتي؟", "ما مهامي اليوم؟", "من الساخن؟"];
+const QUICK = ["ما حال محادثاتي؟", "ما مهامي اليوم؟", "من الساخن؟", "كيف أنشئ بكج جديد؟"];
 
-export function SecretaryChat({ tall = false, active = true }: { tall?: boolean; active?: boolean }) {
+/** pendingError: an error sent with «أرسل الخطأ لمُراد» (SecretaryFab); /secretary reads the one left in sessionStorage */
+export function SecretaryChat({ tall = false, active = true, pendingError = null, onPendingTaken }: { tall?: boolean; active?: boolean; pendingError?: ErrorReport | null; onPendingTaken?: () => void }) {
   const [messages, setMessages] = useState<SecretaryMsg[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const messagesRef = useRef<HTMLDivElement>(null);
+  const [lastError, setLastError] = useState<ErrorReport | null>(null);
+  const [reported, setReported] = useState("");
+  // an error explained before the thread loaded: the older thread must not overwrite its answer
+  const explaining = useRef(false);
 
   useEffect(() => {
     let active = true;
     getSecretaryThread()
-      .then((r) => { if (!active) return; if (r.ok) setMessages(r.messages); else setError(r.error); })
+      .then((r) => { if (!active || explaining.current) return; if (r.ok) setMessages(r.messages); else setError(r.error); })
       .catch(() => { if (active) setError("تعذّر الاتصال."); })
       .finally(() => { if (active) setLoading(false); });
+    const left = takePendingError();
+    if (left) void explain(left);
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!pendingError) return;
+    void explain(pendingError);
+    onPendingTaken?.();
+  }, [pendingError, onPendingTaken]);
+
+  async function explain(report: ErrorReport) {
+    setError("");
+    setReported("");
+    setBusy(true);
+    setLastError(report);
+    explaining.current = true;
+    try {
+      const r = await explainErrorToSecretary(report);
+      if (r.ok) setMessages(r.messages);
+      else setError(r.error);
+    } catch { setError("تعذّر الاتصال."); } finally { setBusy(false); }
+  }
+
+  async function report() {
+    if (!lastError) return;
+    try {
+      const r = await reportErrorToAdmin(lastError);
+      setReported(r.ok ? (r.already ? "أُبلغت الإدارة بهذا الخطأ من قبل." : "تم — وصل البلاغ للإدارة.") : r.error);
+    } catch { setReported("تعذّر الاتصال."); }
+  }
 
   useEffect(() => {
     const list = messagesRef.current;
@@ -61,7 +97,12 @@ export function SecretaryChat({ tall = false, active = true }: { tall?: boolean;
       </div>)}
       {busy && <p className="flex items-center gap-2 text-sm text-[#557d78]"><Loader2 className="size-4 animate-spin" /> سكرتيرك يكتب…</p>}
     </div>
-    {error && <p role="alert" className="px-3 pb-1 text-sm text-red-700">{error}</p>}
+    {error && <p role="alert" data-murad-own className="px-3 pb-1 text-sm text-red-700">{error}</p>}
+    {lastError && !busy && <div className="flex items-center gap-2 px-3 pt-2 text-xs">
+      <button type="button" onClick={() => void report()} disabled={!!reported}
+        className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 font-bold text-red-800 hover:bg-red-100 disabled:opacity-60">أبلغ الإدارة</button>
+      {reported && <span role="status" className="text-[#557d78]">{reported}</span>}
+    </div>}
     <div className="flex shrink-0 gap-2 overflow-x-auto border-t border-[#e7eeeb] px-3 pt-3 pb-1">
       {QUICK.map((q) => <button key={q} type="button" disabled={busy || loading} onClick={() => void send(q)}
         className="shrink-0 rounded-full border border-[#dfe8e4] bg-white px-3 py-1.5 text-xs font-semibold text-[#185045] hover:bg-[#f4f8f6] disabled:opacity-50">{q}</button>)}

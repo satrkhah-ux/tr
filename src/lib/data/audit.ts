@@ -195,6 +195,9 @@ export type AuditAction =
   | "secretary.suggested"
   // «قارن»: a price the employee read on a public site, typed by their hand into their proposal draft
   | "secretary.compare_applied"
+  // «أرسل الخطأ لمُراد»: an error explained to the employee / reported once to the developers (cleaned message, page, action, time in meta)
+  | "secretary.error_explained"
+  | "secretary.error_reported"
   // «إشراف المتابعة»: a case opened / moved up the chain / closed on a real act, and every supervisor action (old/new/reason in meta)
   | "supervision.case_opened"
   | "supervision.case_escalated"

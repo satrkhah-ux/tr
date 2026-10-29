@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Dialog } from "@base-ui/react/dialog";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -9,6 +9,9 @@ import { getSecretaryBoard, type SecretaryBoard } from "@/lib/data/my-followups"
 import { SecretaryChat } from "./SecretaryChat";
 import { SecretaryDayBoard } from "./SecretaryDayBoard";
 import { StatusButtons } from "@/components/traveliun/presence/StatusButtons";
+import type { ErrorReport } from "@/lib/secretary/error-core";
+import { ErrorWatch } from "./ErrorWatch";
+import { MURAD_ERROR_EVENT } from "./send-error";
 
 /** Permanent side handle with an accessible drawer. */
 export function SecretaryFab() {
@@ -16,6 +19,7 @@ export function SecretaryFab() {
   const [tab, setTab] = useState<"plan" | "chat">("plan");
   const [board, setBoard] = useState<SecretaryBoard | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pendingError, setPendingError] = useState<ErrorReport | null>(null);
   function changeOpen(next: boolean) {
     setOpen(next);
     if (next && !loading) {
@@ -24,7 +28,21 @@ export function SecretaryFab() {
     }
   }
 
+  const clearPending = useCallback(() => setPendingError(null), []);
+  // «أرسل الخطأ لمُراد» from anywhere on the page: open the chat with it
+  useEffect(() => {
+    const take = (e: Event) => {
+      e.preventDefault();
+      setPendingError((e as CustomEvent<ErrorReport>).detail);
+      setTab("chat");
+      setOpen(true);
+    };
+    window.addEventListener(MURAD_ERROR_EVENT, take);
+    return () => window.removeEventListener(MURAD_ERROR_EVENT, take);
+  }, []);
+
   return <Sheet open={open} onOpenChange={changeOpen}>
+    {!open && <ErrorWatch />}
     <div className="fixed end-0 top-[74px] bottom-20 z-[100] flex w-10 flex-col items-center justify-center gap-3 border-s border-[#dfe8e4] bg-[#eef3f1] md:bottom-0">
       <SheetTrigger aria-label="استدعاء مُراد — سكرتيري الخاص" className="flex h-24 w-10 items-center justify-center rounded-s-xl bg-[var(--tv-brand)] text-[13px] font-extrabold text-white shadow-md focus-visible:outline-2 focus-visible:outline-offset-2">
         مُراد
@@ -49,7 +67,7 @@ export function SecretaryFab() {
             {!loading && board && <SecretaryDayBoard board={board} compact />}
             {!loading && !board && <p className="p-2 text-sm text-[#557d78]">تعذّر قراءة خطتك الآن — افتح الصفحة الكاملة.</p>}
           </div>
-        : <SecretaryChat />}
+        : <SecretaryChat pendingError={pendingError} onPendingTaken={clearPending} />}
     </SheetContent>
   </Sheet>;
 }
