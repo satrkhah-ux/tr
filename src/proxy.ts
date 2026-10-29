@@ -128,6 +128,8 @@ const PUBLIC_PREFIXES = [
   "/b2b",
   // «إضافة المتصفح»: no cookie — each route asks for the device's own token (lib/ext/auth.ts)
   "/api/ext",
+  // «ادفع الآن»: the client's button in his PDF — no session; the serial is all it knows, the press makes the invoice (lib/payments/pay-now.ts)
+  "/pay",
 ];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
 

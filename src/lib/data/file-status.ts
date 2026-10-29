@@ -13,6 +13,10 @@ import { clientWhatsappAllowed, offerMessage, sendOfferToClient, type ClientSend
 import { loadFileStatus } from "./file-status-core";
 import { getOfferCover } from "./offer-cover";
 import type { CoverStyle } from "@/components/offer-doc/cover-image";
+import type { TranslationKey } from "@/lib/i18n";
+import { loadPayFile, payLink } from "@/lib/payments/pay-now";
+import { showsPayNow } from "@/lib/payments/pay-now-rules";
+import { conversationForPhone, sendTeletelMessage } from "@/lib/providers/teletel";
 
 /**
  * Basic's file status and its three actions (the owner, 2026-10-17):
@@ -319,5 +323,53 @@ export async function deleteFiles(draftIds: string[]): Promise<{ ok: true; delet
     return { ok: true, deleted, refused: ids.length - deleted };
   } catch {
     return { ok: false, error: "failed" };
+  }
+}
+
+type PayFail = { ok: false; error: TranslationKey };
+
+/**
+ * «رابط الدفع» in Basic (the owner, 2026-10-29): our stable /pay/<serial> — bare when the client pays by
+ * MyFatoorah (the PDF's own button), or with a deposit / instalment `amount` signed on the server so the client
+ * cannot change it. A file whose way is not MyFatoorah needs an amount: its total carries another way's charge.
+ */
+export async function basicPayLink(draftId: string, amount?: number | null): Promise<{ ok: true; url: string; amount: number } | PayFail> {
+  try {
+    const file = await issuedFile(draftId, true);
+    if (failed(file) || file.offer.partner_company_id || file.offer.status === "cancelled") return { ok: false, error: "pay.link.forbidden" };
+    const loaded = await loadPayFile(file.serial);
+    if (!loaded || loaded.file.total == null) return { ok: false, error: "pay.link.forbidden" };
+    if (loaded.file.currency !== "SAR") return { ok: false, error: "pay.err.sarOnly" };
+    if (amount != null && String(amount) !== "") {
+      const value = Math.round(Number(amount) * 100) / 100;
+      if (!Number.isFinite(value) || value <= 0 || value > 1_000_000) return { ok: false, error: "pay.err.amount" };
+      return { ok: true, url: payLink(file.serial, value), amount: value };
+    }
+    if (!showsPayNow(loaded.file.method)) return { ok: false, error: "pay.link.amountNeeded" };
+    return { ok: true, url: payLink(file.serial), amount: Math.max(0, Math.round((loaded.file.total - loaded.file.paid) * 100) / 100) };
+  } catch {
+    return { ok: false, error: "pay.link.forbidden" };
+  }
+}
+
+/** «أرسل رابط الدفع» — the text the employee reviewed, into the client's Teletel conversation; never automatic. */
+export async function sendBasicPayLink(draftId: string, body: string): Promise<{ ok: true } | PayFail> {
+  try {
+    const file = await issuedFile(draftId, true);
+    if (failed(file) || file.offer.partner_company_id || file.offer.status === "cancelled") return { ok: false, error: "pay.link.forbidden" };
+    const text = String(body ?? "").trim().slice(0, MAX_BODY);
+    if (!text.includes("/pay/")) return { ok: false, error: "pay.link.failed" };
+    const { data } = await db().from("offers").select("employee_id, partner_company_id, customers(arabic_name, mobile)").eq("id", file.offer.id).maybeSingle();
+    const row = data as { employee_id: string | null; partner_company_id: string | null; customers: unknown } | null;
+    const customer = (Array.isArray(row?.customers) ? row?.customers[0] : row?.customers) as { arabic_name: string | null; mobile: string | null } | null;
+    // the same gate the programme's send keeps (trial modes, a partner's client)
+    if (!row || (await clientWhatsappAllowed({ employee_id: row.employee_id, partner_company_id: row.partner_company_id, customer }))) return { ok: false, error: "pay.link.failed" };
+    const conversationId = customer?.mobile ? await conversationForPhone(customer.mobile) : null;
+    const sent = conversationId ? await sendTeletelMessage(conversationId, text) : null;
+    if (sent === null) return { ok: false, error: "pay.link.failed" };
+    await logAudit({ action: "payment_link.sent", entity: "offers", entity_id: file.offer.id, meta: { serial: file.serial, from: "basic" } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "pay.link.failed" };
   }
 }

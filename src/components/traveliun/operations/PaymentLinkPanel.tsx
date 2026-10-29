@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Copy, ExternalLink, Link2, Loader2, Send, X } from "lucide-react";
 import { DirText } from "@/components/DirText";
-import { preparePaymentLink, sendPaymentLink, type PaymentProvider } from "@/lib/data/payment-links";
+import { preparePaymentLink, sendPaymentLink, stablePayLink, type PaymentProvider } from "@/lib/data/payment-links";
 import { useTraveliunUI } from "../TraveliunUIProvider";
 import { useSafeTransition } from "../useSafeTransition";
 
@@ -12,7 +12,7 @@ const secondary =
 const primaryOutline =
   "inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#185045] bg-white px-4 text-[13px] font-extrabold text-[#185045] hover:bg-[#f0f7f4] disabled:opacity-60";
 
-type Prepared = { url: string; provider: PaymentProvider; mock: boolean };
+type Prepared = { url: string; provider: PaymentProvider; mock: boolean; stable?: boolean };
 
 /**
  * A payment link for the case: the link is created on a press, shown with an
@@ -38,6 +38,17 @@ export function PaymentLinkPanel({ operationId, amount, customerName }: { operat
       setSent(false);
     });
 
+  // «رابط الدفع الثابت»: our /pay link with this amount signed — the invoice is made when the client presses «ادفع الآن»
+  const prepareStable = () =>
+    run(async () => {
+      setError(null);
+      const res = await stablePayLink(operationId, amount);
+      if (!res.ok) return setError(t(res.error));
+      setPrepared({ url: res.url, provider: "myfatoorah", mock: false, stable: true });
+      setBody(t("pay.message", { name: customerName, amount: res.amount.toLocaleString("en-US"), currency: res.currency, url: res.url }));
+      setSent(false);
+    });
+
   const send = () =>
     run(async () => {
       if (!prepared) return;
@@ -59,6 +70,10 @@ export function PaymentLinkPanel({ operationId, amount, customerName }: { operat
             {pending ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}
             {t("pay.button.tamara")}
           </button>
+          <button type="button" disabled={pending || !(amount > 0)} onClick={prepareStable} title={t("pay.stable.hint")} className={primaryOutline}>
+            {pending ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}
+            {t("pay.button.stable")}
+          </button>
         </span>
         {error ? <span className="text-[11.5px] font-bold text-[#c22850]">{error}</span> : null}
       </span>
@@ -69,7 +84,7 @@ export function PaymentLinkPanel({ operationId, amount, customerName }: { operat
     <section className="w-full rounded-[12px] border border-[#d6eadf] bg-[#f8fbf9] p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="flex flex-wrap items-center gap-2 text-[13px] font-extrabold text-[#0f3d38]">
-          {t(prepared.provider === "tamara" ? "pay.button.tamara" : "pay.button.myfatoorah")}
+          {t(prepared.stable ? "pay.button.stable" : prepared.provider === "tamara" ? "pay.button.tamara" : "pay.button.myfatoorah")}
           {prepared.mock ? (
             <span className="rounded-full bg-[#fff4e0] px-2 py-0.5 text-[10.5px] font-bold text-[#a8650a]">{t("pay.mock")}</span>
           ) : null}

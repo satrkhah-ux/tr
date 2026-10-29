@@ -98,6 +98,8 @@ export type AuditAction =
   | "dispatch.held"
   // a MyFatoorah / Tamara link for a case (payment-links.ts): created, then sent on the employee's press
   | "payment_link.prepared"
+  | "payment_link.client_opened"
+  | "payment_link.paid_before_case"
   | "payment_link.sent"
   | "voucher.issued"
   | "voucher.revoked"
