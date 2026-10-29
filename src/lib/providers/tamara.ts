@@ -38,7 +38,7 @@ export type Checkout = { checkoutId: string; orderId: string | null; url: string
 const config = async () => {
   const [token = "", base] = await Promise.all([getSecret("TAMARA_API_TOKEN"), getSecret("TAMARA_BASE_URL")]);
   const mock = process.env["PAYMENTS_MOCK"] === "1" || !token;
-  return { token, mock, base: (base || TAMARA_SANDBOX_URL).replace(/\/$/, "") };
+  return { token, mock, base: (base || TAMARA_SANDBOX_URL).trim().replace(/\/+$/, "") };
 };
 
 /** Tamara wants the number with its country code; a local 05… is read as Saudi. */

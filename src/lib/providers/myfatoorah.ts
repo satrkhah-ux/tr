@@ -39,7 +39,7 @@ type MfEnvelope<T> = { IsSuccess?: boolean; Message?: string | null; ValidationE
 const config = async () => {
   const [key = "", base] = await Promise.all([getSecret("MYFATOORAH_API_KEY"), getSecret("MYFATOORAH_BASE_URL")]);
   const mock = process.env["PAYMENTS_MOCK"] === "1" || !key;
-  return { key, mock, base: (base || MYFATOORAH_TEST_URL).replace(/\/$/, "") };
+  return { key, mock, base: (base || MYFATOORAH_TEST_URL).trim().replace(/\/+$/, "") };
 };
 
 /** MyFatoorah wants the country code and the local number apart (max 11 digits); only a Saudi number is split, anything else is left out (it is optional). */

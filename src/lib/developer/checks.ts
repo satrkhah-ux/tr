@@ -576,7 +576,7 @@ const CHECKS: Check[] = [
     run: async () => {
       const [key, savedBase] = await Promise.all([getSecret("MYFATOORAH_API_KEY"), getSecret("MYFATOORAH_BASE_URL")]);
       if (!key) return unconfigured("MYFATOORAH_API_KEY");
-      const base = savedBase ?? "https://apitest.myfatoorah.com";
+      const base = (savedBase || "https://apitest.myfatoorah.com").trim().replace(/\/+$/, "");
       const [res, ms] = await timed(() =>
         fetch(`${base}/v2/InitiatePayment`, {
           method: "POST",
@@ -600,7 +600,7 @@ const CHECKS: Check[] = [
     run: async () => {
       const [token, savedBase] = await Promise.all([getSecret("TAMARA_API_TOKEN"), getSecret("TAMARA_BASE_URL")]);
       if (!token) return unconfigured("TAMARA_API_TOKEN");
-      const base = savedBase ?? "https://api-sandbox.tamara.co";
+      const base = (savedBase || "https://api-sandbox.tamara.co").trim().replace(/\/+$/, "");
       const [res, ms] = await timed(() => get(`${base}/checkout/payment-types?country=SA&currency=SAR`, { authorization: `Bearer ${token}` }));
       return res.ok ? ok(ms, { key: "dev.d.paymentOk", params: { host: maskHost(base) } }) : httpProblem(res.status, ms);
     },
