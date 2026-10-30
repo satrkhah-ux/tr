@@ -58,6 +58,10 @@ export type AuditAction =
   | "invoice.confirmed"
   // «المصروفات»: a company expense recorded or removed by the accounts team (meta: category — never the amount)
   | "expense.recorded"
+  // «الخصومات»: a coupon campaign made, a batch sent, a coupon used (meta: counts, the file it was used on)
+  | "discounts.campaign_created"
+  | "discounts.sent"
+  | "discounts.redeemed"
   | "expense.deleted"
   | "payment.agreed_total_set"
   | "payment.agreement_set"

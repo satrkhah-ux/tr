@@ -111,6 +111,9 @@ const SECTIONS: readonly (readonly [prefix: string, permission: Permission | rea
   ["/commissions", ["commissions.view", "commissions.manage", "commissions.approve"]],
   // «الحسابات»: the financial section's staff (2026-10-30)
   ["/accounts", "finance.accounts"],
+  // «الخصومات» (the owner, 2026-10-31): the reader for whoever serves clients, the campaigns for the administration
+  ["/discounts/scan", ["discounts.redeem", "discounts.manage"]],
+  ["/discounts", "discounts.manage"],
   // «المطوّر»: service switches and external links' health
   ["/murad-settings", ["settings.manage", "developer.access"]],
   ["/management-decisions", ["dashboard.admin", "developer.access"]],

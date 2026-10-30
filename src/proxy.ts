@@ -130,6 +130,8 @@ const PUBLIC_PREFIXES = [
   "/api/ext",
   // «ادفع الآن»: the client's button in his PDF — no session; the serial is all it knows, the press makes the invoice (lib/payments/pay-now.ts)
   "/pay",
+  // «الخصومات»: the client's coupon page — no session; its long token is all it knows (app/coupon)
+  "/coupon",
   // Tamara's order notifications — no cookie; its signed tamaraToken is checked in the route
   "/api/payments/tamara/webhook",
 ];

@@ -129,9 +129,9 @@ export function messagesDueToday(start: string | null, end: string | null, today
  * What a template is about: a stage message, the programme sent when a file is
  * issued, or a booking's update prepared for staff (client-booking-state.ts).
  */
-export type WaTemplateKey = ClientMessageKey | "programme" | "programme_updated" | "booking_update" | "payment_due" | "offer_followup_1" | "offer_followup_2" | "offer_followup_3";
+export type WaTemplateKey = ClientMessageKey | "programme" | "programme_updated" | "booking_update" | "payment_due" | "offer_followup_1" | "offer_followup_2" | "offer_followup_3" | "coupon";
 
-type WaField = "name" | "destination" | "serial" | "link" | "date";
+type WaField = "name" | "destination" | "serial" | "link" | "date" | "discount";
 
 export type WaTemplateDef = {
   /** the name it is approved under in Meta's WhatsApp Manager. */
@@ -266,6 +266,19 @@ export const WA_TEMPLATES: Record<WaTemplateKey, WaTemplateDef> = {
     params: ["name", "destination"],
     body: [HELLO, "هذه آخر متابعة منا لعرض رحلتك إلى {{2}}", "إن رغبت في إكماله أو تعديله فنحن بانتظارك، ويكفي أن ترد على هذه الرسالة", SIGN].join("\n\n"),
   },
+  // «قسم الخصومات» (the owner, 2026-10-31): a personal coupon — the link opens its page with the QR (lib/discounts)
+  coupon: {
+    name: "traveliun_coupon",
+    category: "MARKETING",
+    params: ["name", "discount", "date", "link"],
+    body: [
+      HELLO,
+      "تقديراً لثقتك بنا، أهديناك كوبون خصم {{2}} باسمك على أي باقة سياحية تطلبها قبل {{3}}",
+      "كوبونك ورمزه من هنا، اعرضه على موظفنا عند الطلب:",
+      "{{4}}",
+      SIGN,
+    ].join("\n\n"),
+  },
   rate_trip: {
     name: "traveliun_rate_trip",
     params: ["name", "destination", "link"],
@@ -274,8 +287,9 @@ export const WA_TEMPLATES: Record<WaTemplateKey, WaTemplateDef> = {
 };
 
 /** The template's values in its own order — the rating message points at the rating link. */
-export function waParams(key: WaTemplateKey, fields: Pick<MessageFields, "name" | "destination" | "serial" | "link" | "rate_link" | "date">): string[] {
+export function waParams(key: WaTemplateKey, fields: Pick<MessageFields, "name" | "destination" | "serial" | "link" | "rate_link" | "date"> & { discount?: string }): string[] {
   const value: Record<WaField, string> = {
+    discount: fields.discount?.trim() || "-",
     date: fields.date?.trim() || "-",
     name: fields.name.trim() || "العزيز",
     destination: fields.destination.trim() || "وجهتك",
