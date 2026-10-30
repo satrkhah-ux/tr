@@ -630,8 +630,9 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
           <AlertTriangle className="size-4 shrink-0" />
           <span className="text-[12px] font-bold leading-tight">{t("notice.trialShort")}</span>
         </div>
-        <div className="flex-1" />
-        <div className="flex shrink-0 items-center gap-3">
+        {/* phones: the title above takes the free width, so it is never cut to «الر…» */}
+        <div className="hidden flex-1 lg:block" />
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           {/* what you reach for first: the quick search and the bell */}
           <div className="flex items-center gap-1.5">
           <button
@@ -684,7 +685,7 @@ export function TraveliunShell({ title, focus = false, children }: TraveliunShel
           </div>
           )}
           {/* the settings and the account, set apart at the edge */}
-          <div className="flex items-center gap-1 border-s border-[#e4ece8] ps-3">
+          <div className="flex items-center gap-1 sm:border-s sm:border-[#e4ece8] sm:ps-3">
           <Popover open={panel === "settings"} onOpenChange={(o) => setPanel(o ? "settings" : null)}>
             <PopoverTrigger render={<HeaderIcon label={t("settings")} icon={Settings} active={panel === "settings"} />} />
             <PopoverContent className="w-[min(320px,calc(100vw/var(--tv-zoom)_-_24px))]">
@@ -962,7 +963,7 @@ function MobileMenu({ pathname, close }: { pathname: string; close: () => void }
             <span className="text-[13px] font-extrabold text-[var(--tv-brand)]">{partner.name}</span>
           </span>
         ) : (
-          <TraveliunLogo />
+          <TraveliunLogo className="h-12 w-auto" />
         )}
         <button
           type="button"
