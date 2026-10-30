@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { ArrowRight, ExternalLink, Send, Square } from "lucide-react";
-import { sendBatch, setExcluded } from "@/lib/data/discounts-actions";
+import { applyExclusions, sendBatch, setExcluded } from "@/lib/data/discounts-actions";
 import { couponState, discountLabel, lastNine } from "@/lib/discounts/rules";
-import type { Campaign, Coupon } from "@/lib/data/discounts";
+import type { Campaign, Coupon, Exclusions } from "@/lib/data/discounts";
+import { ExclusionPicker } from "./ExclusionPicker";
 import { card, field } from "./Campaigns";
 
 /**
@@ -23,6 +24,7 @@ export function CampaignView({ campaign, coupons, names, preview }: { campaign: 
   const [log, setLog] = useState("");
   const [running, setRunning] = useState(false);
   const stop = useRef(false);
+  const [exclude, setExclude] = useState<Exclusions>({ booked: true, followups: true, stages: [] });
   const [pending, start] = useTransition();
 
   const live = coupons.filter((c) => !c.excluded);
@@ -54,6 +56,12 @@ export function CampaignView({ campaign, coupons, names, preview }: { campaign: 
     router.refresh();
   };
 
+  const exclusions = () => start(async () => {
+    const r = await applyExclusions(campaign.id, exclude);
+    setLog(r.ok ? `استُثني ${r.excluded} عميل${r.failed.length ? ` · تعذّر قراءة: ${r.failed.join("، ")}` : ""}` : r.error);
+    router.refresh();
+  });
+
   const toggle = (c: Coupon) => start(async () => {
     const r = await setExcluded(c.id, !c.excluded);
     if (!r.ok) setLog(r.error);
@@ -77,8 +85,8 @@ export function CampaignView({ campaign, coupons, names, preview }: { campaign: 
         <p className="mt-1 text-[13px] font-semibold text-tv-text-faint">
           خصم {discountLabel(campaign.kind, campaign.value)} · {campaign.applies_to === "package" ? "على طلب باقة فقط" : "على أي طلب"} · صالح {campaign.valid_days} يوماً من وصوله
         </p>
-        <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {[["الكوبونات", live.length], ["أُرسل", sent], ["لم يُرسل", left], ["فتح الكوبون", opened], ["استُخدم", used]].map(([k, v]) => (
+        <dl className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {[["الكوبونات", live.length], ["مستثنى", coupons.length - live.length], ["أُرسل", sent], ["لم يُرسل", left], ["فتح الكوبون", opened], ["استُخدم", used]].map(([k, v]) => (
             <div key={k} className="rounded-xl bg-tv-surface-sunken px-3 py-2">
               <dt className="text-[11.5px] font-bold text-tv-text-faint">{k}</dt>
               <dd className="text-xl font-extrabold text-tv-text-strong tabular-nums">{Number(v).toLocaleString("en-US")}</dd>
@@ -86,6 +94,16 @@ export function CampaignView({ campaign, coupons, names, preview }: { campaign: 
           ))}
         </dl>
       </section>
+
+      {left > 0 && (
+        <section className={card}>
+          <ExclusionPicker value={exclude} onChange={setExclude} />
+          <button type="button" disabled={pending || running} onClick={exclusions}
+            className="mt-3 min-h-10 rounded-xl border border-tv-action-primary px-5 text-[13px] font-extrabold text-tv-text-brand disabled:opacity-50">
+            طبّق الاستثناءات على من لم يُرسل له
+          </button>
+        </section>
+      )}
 
       <section className={card}>
         <h2 className="text-[15px] font-extrabold text-tv-text-strong">الرسالة كما تصل العميل</h2>
@@ -137,7 +155,7 @@ export function CampaignView({ campaign, coupons, names, preview }: { campaign: 
                     <td className="px-2 py-1.5 font-bold text-tv-text-strong">{c.client_name ?? "—"}</td>
                     <td className="px-2 py-1.5 tabular-nums" dir="ltr">{c.phone}</td>
                     <td className="px-2 py-1.5 font-mono" dir="ltr">{c.code}</td>
-                    <td className="px-2 py-1.5">{c.sent_at ? day(c.sent_at) : c.send_result ?? "لم يُرسل"}</td>
+                    <td className="px-2 py-1.5">{c.sent_at ? day(c.sent_at) : c.send_result ?? (c.excluded ? "مستثنى" : "لم يُرسل")}</td>
                     <td className="px-2 py-1.5">{c.opened_at ? day(c.opened_at) : "—"}</td>
                     <td className="px-2 py-1.5">
                       {c.redeemed_at ? (

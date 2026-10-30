@@ -23,16 +23,17 @@ export type CouponDoc = {
 const CP_CSS = `
 .od-page.cp-page{width:1200px;height:630px;min-height:0;padding:0;display:flex;overflow:hidden;break-after:auto;}
 .od-page.cp-page::before{opacity:.55;}
+.od-page.cp-page::after{display:none;}
 .cp-page>*{position:relative;z-index:1;}
 .cp-main{flex:1;display:flex;flex-direction:column;padding:44px 56px 0 40px;}
 .cp-top{display:flex;align-items:center;justify-content:space-between;}
 .cp-logo{height:96px;width:auto;display:block;}
 .cp-tag{display:flex;align-items:center;gap:10px;color:var(--od-green);font-size:30px;font-weight:800;}
 .cp-tag::before{content:"";width:8px;height:34px;border-radius:4px;background:var(--od-gold);}
-.cp-to{margin-top:22px;color:var(--od-muted);font-size:22px;font-weight:500;}
+.cp-to{margin-top:40px;color:var(--od-muted);font-size:22px;font-weight:500;}
 .cp-name{margin-top:2px;color:var(--od-green);font-size:46px;font-weight:800;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:640px;}
-.cp-gift{margin-top:22px;display:flex;align-items:center;gap:26px;background:linear-gradient(135deg,var(--od-green),var(--od-green-2));color:#fff;border-radius:22px;padding:18px 30px;box-shadow:0 12px 28px var(--od-shadow);}
-.cp-amount{font-size:104px;font-weight:800;line-height:1;color:#fff;}
+.cp-gift{margin-top:30px;display:flex;align-items:center;gap:26px;background:linear-gradient(135deg,var(--od-green),var(--od-green-2));color:#fff;border-radius:22px;padding:24px 34px;box-shadow:0 12px 28px var(--od-shadow);}
+.cp-amount{font-size:116px;font-weight:800;line-height:1;color:#fff;}
 .cp-unit{font-size:30px;font-weight:700;color:var(--od-gold);margin-inline-start:8px;}
 .cp-scope{border-inline-start:2px solid rgba(255,255,255,.35);padding-inline-start:24px;font-size:27px;font-weight:700;line-height:1.5;}
 .cp-scope small{display:block;font-size:19px;font-weight:500;color:#cfe6df;}

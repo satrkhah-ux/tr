@@ -6,7 +6,8 @@ import { useEffect, useState, useTransition } from "react";
 import { ScanLine, TicketPercent } from "lucide-react";
 import { countAudience, createCampaign } from "@/lib/data/discounts-actions";
 import { AUDIENCE_LABEL, discountLabel, type Audience, type DiscountKind } from "@/lib/discounts/rules";
-import type { CampaignRow } from "@/lib/data/discounts";
+import type { CampaignRow, Exclusions } from "@/lib/data/discounts";
+import { ExclusionPicker } from "./ExclusionPicker";
 
 /** «حملات الكوبونات» — the campaigns and a new one: the discount, its validity and who gets it (discounts.manage). */
 
@@ -27,6 +28,7 @@ export function Campaigns({ rows }: { rows: CampaignRow[] }) {
     audience_days: "30",
   });
   const [counted, setCounted] = useState<{ key: string; n: number } | null>(null);
+  const [exclude, setExclude] = useState<Exclusions>({ booked: true, followups: true, stages: [] });
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -52,6 +54,7 @@ export function Campaigns({ rows }: { rows: CampaignRow[] }) {
         valid_days: Number(form.valid_days),
         audience: form.audience,
         audience_days: days,
+        exclude,
       });
       if (r.ok) router.push(`/discounts/${r.id}`);
       else setError(r.error);
@@ -98,8 +101,9 @@ export function Campaigns({ rows }: { rows: CampaignRow[] }) {
             <label className={label}>عدد الأيام<input value={form.audience_days} onChange={set("audience_days")} inputMode="numeric" className={`${field} mt-1`} /></label>
           )}
         </div>
+        <div className="mt-3"><ExclusionPicker value={exclude} onChange={setExclude} /></div>
         <p className="mt-3 rounded-xl bg-tv-surface-sunken px-3 py-2 text-[13px] font-bold text-tv-text-muted">
-          سيُنشأ كوبون خاص باسم ورقم كل عميل:{" "}
+          سيُنشأ كوبون خاص باسم ورقم كل عميل (المستثنون يظهرون في القائمة بسبب استثنائهم):{" "}
           <span className="text-tv-text-strong">{count === null ? "…" : count.toLocaleString("en-US")} عميل</span>
           {" "}، خصم {discountLabel(form.kind, Number(form.value) || 0)}، صالح {form.valid_days} يوماً.
           لا يُرسل شيء قبل أن تراجع الحملة وتضغط «أرسل».

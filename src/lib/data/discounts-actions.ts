@@ -6,10 +6,10 @@ import { currentCan } from "@/lib/roles/current";
 import { getCurrentEmployeeId } from "./metrics";
 import { logAudit } from "./audit";
 import { messageClient } from "./client-whatsapp";
-import { couponWith, db, getCampaign, recipients, site, type Campaign, type Coupon } from "./discounts";
-import { whatsappTemplateStatus } from "@/lib/providers/teletel";
+import { couponWith, db, excludedPhones, getCampaign, recipients, site, type Campaign, type Coupon, type Exclusions } from "./discounts";
+import { listLifecycleStages, whatsappTemplateStatus } from "@/lib/providers/teletel";
 import { WA_TEMPLATES, waParams, waPreview } from "@/lib/operations/client-messages";
-import { AUDIENCE_LABEL, arabicDate, couponCode, couponState, discountLabel, readScan, type Audience, type CouponState, type DiscountKind } from "@/lib/discounts/rules";
+import { AUDIENCE_LABEL, arabicDate, couponCode, couponState, discountLabel, lastNine, readScan, type Audience, type CouponState, type DiscountKind } from "@/lib/discounts/rules";
 
 type Fail = { ok: false; error: string };
 
@@ -41,11 +41,46 @@ export async function countAudience(audience: Audience, days: number | null): Pr
   return (await recipients(audience, days)).length;
 }
 
-/** «أنشئ الحملة»: the campaign and one coupon per recipient — nothing is sent yet. */
-export async function createCampaign(input: CampaignInput): Promise<{ ok: true; id: string } | Fail> {
+/** Teletel's classifications for the «استثنِ» choices — «won» (a client who bought) ticked by default. */
+export async function exclusionStages(): Promise<{ id: number; name: string; won: boolean }[]> {
+  if (!(await currentCan("discounts.manage"))) return [];
+  return (await listLifecycleStages()).map((s) => ({ id: s.id, name: s.name, won: s.category === "won" }));
+}
+
+function cleanExclusions(x: Exclusions | undefined): Exclusions {
+  return {
+    booked: x?.booked !== false,
+    followups: x?.followups !== false,
+    stages: Array.isArray(x?.stages) ? x.stages.filter((n) => Number.isInteger(n) && n > 0).slice(0, 20) : [],
+  };
+}
+
+async function stageNames(): Promise<Map<number, string>> {
+  return new Map((await listLifecycleStages()).map((s) => [s.id, s.name]));
+}
+
+/**
+ * «طبّق الاستثناءات» on a campaign not fully sent: every unsent coupon whose client matches is set aside
+ * with its reason (and can be brought back by hand). Never touches a coupon already sent.
+ */
+export async function applyExclusions(campaignId: string, input: Exclusions): Promise<{ ok: true; excluded: number; failed: string[] } | Fail> {
   if (!(await currentCan("discounts.manage"))) return { ok: false, error: "لا صلاحية" };
+  const data = await getCampaign(campaignId);
+  if (!data) return { ok: false, error: "حملة غير معروفة" };
+  const { reasons, failed } = await excludedPhones(cleanExclusions(input), await stageNames());
+  const hit = data.coupons.filter((c) => !c.sent_at && !c.excluded && reasons.has(lastNine(c.phone)));
+  const s = db();
+  for (const c of hit) await s.from("discount_coupons").update({ excluded: true, send_result: reasons.get(lastNine(c.phone)) }).eq("id", c.id).is("sent_at", null);
+  revalidatePath(`/discounts/${campaignId}`);
+  return { ok: true, excluded: hit.length, failed };
+}
+
+/** «أنشئ الحملة»: the campaign and one coupon per recipient — nothing is sent yet. */
+export async function createCampaign(input: CampaignInput & { exclude?: Exclusions }): Promise<{ ok: true; id: string; excluded: number; failed: string[] } | Fail> {
+  if (!(await currentCan("discounts.manage"))) return { ok: false, error: "لا صلاحية" };
+  const { exclude, ...rest } = input;
   const i: CampaignInput = {
-    ...input,
+    ...rest,
     title: String(input.title ?? "").trim(),
     value: Number(input.value),
     valid_days: Number(input.valid_days),
@@ -65,14 +100,21 @@ export async function createCampaign(input: CampaignInput): Promise<{ ok: true; 
   const id = (data as { id: string }).id;
   // set again when each coupon is sent: the days count from the client's message
   const expires = new Date(Date.now() + i.valid_days * 86_400_000).toISOString();
-  const rows = people.map((p) => ({
-    campaign_id: id,
-    code: couponCode(randomBytes(6)),
-    token: randomBytes(24).toString("base64url"),
-    client_name: p.name,
-    phone: p.phone,
-    expires_at: expires,
-  }));
+  // who bought, closed «غير مهتم», or sits in a picked classification: made, but set aside with the reason
+  const { reasons, failed } = await excludedPhones(cleanExclusions(exclude), await stageNames());
+  const rows = people.map((p) => {
+    const why = reasons.get(lastNine(p.phone));
+    return {
+      campaign_id: id,
+      code: couponCode(randomBytes(6)),
+      token: randomBytes(24).toString("base64url"),
+      client_name: p.name,
+      phone: p.phone,
+      expires_at: expires,
+      excluded: !!why,
+      send_result: why ?? null,
+    };
+  });
   for (let k = 0; k < rows.length; k += 500) {
     const { error: e } = await s.from("discount_coupons").insert(rows.slice(k, k + 500));
     if (e) {
@@ -82,14 +124,14 @@ export async function createCampaign(input: CampaignInput): Promise<{ ok: true; 
   }
   await logAudit({ action: "discounts.campaign_created", entity: "discount_campaigns", entity_id: id, meta: { coupons: rows.length, audience: i.audience } });
   revalidatePath("/discounts");
-  return { ok: true, id };
+  return { ok: true, id, excluded: rows.filter((r) => r.excluded).length, failed };
 }
 
 /** Leave one client out of the campaign (or bring them back) — before their coupon goes. */
 export async function setExcluded(couponId: string, excluded: boolean): Promise<{ ok: true } | Fail> {
   if (!(await currentCan("discounts.manage"))) return { ok: false, error: "لا صلاحية" };
   if (!/^[0-9a-f-]{36}$/.test(couponId)) return { ok: false, error: "كوبون غير معروف" };
-  const { error } = await db().from("discount_coupons").update({ excluded: !!excluded }).eq("id", couponId).is("sent_at", null);
+  const { error } = await db().from("discount_coupons").update(excluded ? { excluded: true } : { excluded: false, send_result: null }).eq("id", couponId).is("sent_at", null);
   return error ? { ok: false, error: "تعذّر الحفظ" } : { ok: true };
 }
 

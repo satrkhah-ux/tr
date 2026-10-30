@@ -714,6 +714,29 @@ export async function listLifecycleStages(): Promise<LifecycleStage[]> {
   return stages;
 }
 
+/**
+ * Every phone number classified in one stage (board/contacts, all activity), 100 a page — for «الخصومات»
+ * to leave out who already bought. Capped at 40 pages (4,000): «قديم - مهتم» holds ~27k and is not one to
+ * exclude. null when Teletel cannot be read — the caller must not take it for «nobody».
+ */
+export async function lifecycleStagePhones(stageId: number): Promise<string[] | null> {
+  const config = getTeletelConfig();
+  if (!config) return null;
+  const phones: string[] = [];
+  for (let page = 1; page <= 40; page++) {
+    const res = await api<{ payload?: { phone_number?: string | null }[]; meta?: { has_more?: boolean } }>(
+      config,
+      `/teletel/lifecycle/board/contacts?stage_id=${stageId}&page=${page}&per_page=100&activity=all`,
+      undefined,
+      15000,
+    );
+    if (!Array.isArray(res?.payload)) return page === 1 ? null : phones;
+    for (const c of res.payload) if (c.phone_number) phones.push(c.phone_number);
+    if (!res.meta?.has_more) break;
+  }
+  return phones;
+}
+
 export type TeletelTeam = { id: number; name: string };
 let teamsCache: { at: number; teams: TeletelTeam[] } | null = null;
 

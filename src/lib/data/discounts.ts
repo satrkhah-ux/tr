@@ -143,3 +143,44 @@ export async function couponWith(by: { token: string } | { code: string } | { id
   delete (coupon as Partial<typeof row>).discount_campaigns;
   return { coupon, campaign: { ...campaign, value: Number(campaign.value) } };
 }
+
+export type Exclusions = { booked: boolean; followups: boolean; stages: number[] };
+export const DEFAULT_EXCLUSIONS: Omit<Exclusions, "stages"> = { booked: true, followups: true };
+
+/**
+ * Who a campaign leaves out, by mobile (last nine) with the reason shown beside them (the owner, 2026-10-31:
+ * «لا نريد ان نرسله لمن اشترى من عندنا»): a client with a booking file, a follow-up closed «غير مهتم» /
+ * «حجز مؤكد», and the Teletel classifications picked (the «won» ones by default). A stage Teletel would not
+ * give is reported, never treated as empty.
+ */
+export async function excludedPhones(x: Exclusions, stageNames: Map<number, string>): Promise<{ reasons: Map<string, string>; failed: string[] }> {
+  const s = db();
+  const reasons = new Map<string, string>();
+  const mark = (phone: string | null | undefined, why: string) => {
+    const k = lastNine(phone);
+    if (k.length === 9 && !reasons.has(k)) reasons.set(k, why);
+  };
+  if (x.booked) {
+    const ops = await all<{ offers: { customers: { mobile: string | null } | { mobile: string | null }[] | null } | null }>((a, b) =>
+      s.from("operations").select("offers(customers(mobile))").order("id").range(a, b),
+    );
+    for (const o of ops) {
+      const c = o.offers?.customers;
+      for (const one of Array.isArray(c) ? c : c ? [c] : []) mark(one.mobile, "مستثنى: حجز معنا");
+    }
+  }
+  if (x.followups) {
+    const rows = await all<{ contact_phone: string | null; outcome: string }>((a, b) =>
+      s.from("sla_followups").select("contact_phone, outcome").in("outcome", ["not_interested", "completed"]).order("id").range(a, b),
+    );
+    for (const r of rows) mark(r.contact_phone, r.outcome === "completed" ? "مستثنى: حجز مؤكد" : "مستثنى: غير مهتم");
+  }
+  const failed: string[] = [];
+  const { lifecycleStagePhones } = await import("@/lib/providers/teletel");
+  for (const id of x.stages) {
+    const phones = await lifecycleStagePhones(id);
+    if (!phones) failed.push(stageNames.get(id) ?? String(id));
+    else for (const p of phones) mark(p, `مستثنى: ${stageNames.get(id) ?? "تصنيف"}`);
+  }
+  return { reasons, failed };
+}
