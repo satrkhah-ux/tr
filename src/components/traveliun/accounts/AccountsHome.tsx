@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, BadgePercent, ClipboardCheck, FileText, Landmark, Receipt, TrendingUp, Truck, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BadgePercent, BookOpen, ClipboardCheck, FileSignature, FileText, Landmark, Lock, Receipt, TrendingUp, Truck, Wallet } from "lucide-react";
 import type { AccountsHomeView } from "@/lib/data/accounts";
 import { TraveliunShell } from "../TraveliunShell";
 import { profitTone } from "../operations/CaseProfitCard";
@@ -15,6 +15,8 @@ export function AccountsHome({ home }: { home: AccountsHomeView }) {
     ["/accounts/invoices", "الفواتير", FileText],
     ["/accounts/expenses", "المصروفات", Receipt],
     ["/accounts/suppliers", "الموردون", Truck],
+    ["/accounts/quotes", "عروض الأسعار", FileSignature],
+    ["/accounts/journal", "القيود اليومية", BookOpen],
     ["/operations", "الحالات والدفعات", ClipboardCheck],
     ...(home.reports
       ? ([["/operations/cashflow", "التدفق النقدي", Wallet], ["/operations/profitability", "تقرير الربحية", TrendingUp]] as [string, string, typeof Wallet][])
@@ -42,6 +44,15 @@ export function AccountsHome({ home }: { home: AccountsHomeView }) {
                 )}{" "}
                 ناقص المصروفات <Num>{sar(home.expenses.total)}</Num> — الرواتب والإيجارات في «الحسابات المالية»
               </p>
+              {home.ownerFixed != null && (
+                <p className="mt-2 inline-flex flex-wrap items-center gap-1.5 rounded-lg bg-tv-surface-sunken px-3 py-1.5 text-[12.5px] font-bold text-tv-text-muted">
+                  <Lock className="size-3.5" />
+                  الرواتب والإيجارات والأقساط <Num>{sar(home.ownerFixed)}</Num>
+                  <span aria-hidden>·</span>
+                  الصافي بعدها <Num className={profitTone(home.net - home.ownerFixed)}>{sar(home.net - home.ownerFixed)}</Num>
+                  <span className="font-semibold text-tv-text-faint">— من «الحسابات المالية»، تظهر لك وحدك</span>
+                </p>
+              )}
             </div>
             <nav className="flex flex-wrap gap-1.5" aria-label="اختر الشهر">
               {home.months.map((m) => (

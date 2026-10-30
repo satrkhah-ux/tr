@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceClient, getServerUser } from "@/lib/supabase/server";
 import { currentCan } from "@/lib/roles/current";
 import { logAudit } from "./audit";
-import { parseBook, type FinanceBook } from "@/lib/finance/model";
+import { fixedCostIn, parseBook, type FinanceBook } from "@/lib/finance/model";
 
 /**
  * The book is one document; every save appends a version to finance_book_versions (closed table,
@@ -114,4 +114,19 @@ export async function saveFinance(next: unknown, base: string): Promise<{ ok: tr
   // the audit says that it changed, never the figures
   await logAudit({ action: "finance.saved", entity: "finance_book_versions", entity_id: String(data.id), meta: {} });
   return { ok: true, updatedAt: data.saved_at };
+}
+
+/**
+ * «الحسابات» links to the book (stage 4, 2026-10-30): a month's salaries, rents due and instalments — only
+ * for whoever opens the book and has unlocked it this session; null for everyone else (the accounts staff
+ * never see salaries).
+ */
+export async function financeFixedCost(month: string): Promise<number | null> {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !(await allowed())) return null;
+  const hash = await lockHash();
+  if (!hash || !(await unlocked(hash))) return null;
+  const book = await latest();
+  if (!book) return null;
+  const [y, m] = month.split("-").map(Number);
+  return fixedCostIn(book, y, m);
 }

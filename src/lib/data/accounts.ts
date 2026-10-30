@@ -8,6 +8,10 @@ import { accountsHome, recentMonths, type AccountsHome, type HomePayment, type H
 import { invoiceOf, type InvoiceStatus, type InvoiceView } from "@/lib/accounts/invoice";
 import { expenseTotals, type Expense } from "@/lib/accounts/expenses";
 import { listSupplierAccounts } from "./supplier-work";
+import { financeFixedCost } from "./finance";
+import { quotesView, type Quote, type QuotesView } from "@/lib/accounts/quotes";
+import { journal } from "@/lib/accounts/journal";
+import { byCurrency } from "@/lib/operations/money";
 import { loadCases, type LoadedCase } from "./operation-money";
 
 /**
@@ -41,6 +45,8 @@ export type AccountsHomeView = AccountsHome & {
   net: number;
   /** what we owe suppliers today, riyals (their confirmed bookings less what we paid them) */
   supplierOwed: number;
+  /** the month's salaries, rents and instalments from «الحسابات المالية» — only to whoever unlocked the book; else null */
+  ownerFixed: number | null;
 };
 
 export async function getAccountsHome(monthParam?: string): Promise<AccountsHomeView | null> {
@@ -86,17 +92,18 @@ export async function getAccountsHome(monthParam?: string): Promise<AccountsHome
 
   const clients = await clientNames(db, home.overdue.invoices.map((i) => i.id));
 
-  const [reports, spent, suppliersList] = await Promise.all([
+  const [reports, spent, suppliersList, ownerFixed] = await Promise.all([
     (async () => (await currentCan("pricing.internal")) && !(await gateManager()))(),
     readExpenses(db, month),
     listSupplierAccounts(),
+    financeFixedCost(month),
   ]);
   const expenses = expenseTotals(spent, month);
   const supplierOwed = (suppliersList?.suppliers ?? [])
     .flatMap((s) => s.balances)
     .filter((b) => b.currency === "SAR" && b.balance > 0)
     .reduce((sum, b) => sum + b.balance, 0);
-  return { ...home, months: recentMonths(thisMonth), clients, reports, expenses, net: Math.round((home.profit - expenses.total) * 100) / 100, supplierOwed: Math.round(supplierOwed * 100) / 100 };
+  return { ...home, months: recentMonths(thisMonth), clients, reports, expenses, net: Math.round((home.profit - expenses.total) * 100) / 100, supplierOwed: Math.round(supplierOwed * 100) / 100, ownerFixed };
 }
 
 /** the cases' client names, by case id */
@@ -212,4 +219,89 @@ export async function listExpenses(monthParam?: string): Promise<{ month: string
   const month = isMonth(monthParam) && monthParam <= thisMonth ? monthParam : thisMonth;
   const rows = await readExpenses(db(), month);
   return { month, months: recentMonths(thisMonth), rows, totals: expenseTotals(rows, month) };
+}
+
+// ------------------------------------------------------- «عروض الأسعار» ----
+
+const pickMonth = (monthParam?: string) => {
+  const thisMonth = riyadhDate().slice(0, 7);
+  return { thisMonth, month: isMonth(monthParam) && monthParam <= thisMonth ? monthParam : thisMonth };
+};
+
+export async function listQuotes(monthParam?: string): Promise<(QuotesView & { months: string[] }) | null> {
+  if (!(await allowed())) return null;
+  const supabase = db();
+  const { thisMonth, month } = pickMonth(monthParam);
+  const { data, error } = await supabase
+    .from("offers")
+    .select("id, serial, offer_date, created_at, valid_until, status, total, total_sar, currency, employee_id, partner_company_id, customers(arabic_name)")
+    .is("partner_company_id", null)
+    .order("created_at", { ascending: false })
+    .limit(5000);
+  if (error) throw error;
+  type Row = { id: string; serial: string; offer_date: string | null; created_at: string; valid_until: string | null; status: string; total: number | string | null; total_sar: number | string | null; currency: string | null; employee_id: string | null; customers: unknown };
+  const rows = (data ?? []) as Row[];
+  const sellerIds = [...new Set(rows.map((r) => r.employee_id).filter((x): x is string => !!x))];
+  const sellers = await chunked<{ id: string; arabic_name: string | null }>(sellerIds, (part) => supabase.from("employees").select("id, arabic_name").in("id", part));
+  const seller = new Map(sellers.map((e) => [e.id, e.arabic_name ?? ""]));
+  const quotes: Quote[] = rows.map((r) => ({
+    id: r.id,
+    serial: r.serial,
+    client: one(r.customers as { arabic_name: string | null } | null)?.arabic_name ?? "",
+    seller: r.employee_id ? (seller.get(r.employee_id) ?? "") : "",
+    date: r.offer_date?.slice(0, 10) ?? riyadhDate(r.created_at),
+    valid_until: r.valid_until?.slice(0, 10) ?? null,
+    status: r.status,
+    sar: r.total_sar != null ? Number(r.total_sar) : (r.currency ?? "SAR") === "SAR" && r.total != null ? Number(r.total) : null,
+  }));
+  return { ...quotesView(quotes, month, riyadhDate()), months: recentMonths(thisMonth) };
+}
+
+// ------------------------------------------------------ «القيود اليومية» ----
+
+export async function getJournal(monthParam?: string): Promise<(ReturnType<typeof journal> & { month: string; months: string[]; left: number }) | null> {
+  if (!(await allowed())) return null;
+  const supabase = db();
+  const { thisMonth, month } = pickMonth(monthParam);
+  const [y, m] = month.split("-").map(Number);
+  const from = `${month}-01`;
+  const to = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+
+  const cases = (await loadCases(supabase)).filter((c) => invoiceable(c) && c.currency === "SAR");
+  const byId = new Map(cases.map((c) => [c.id, c]));
+  const [clients, pays, sups, spent] = await Promise.all([
+    clientNames(supabase, cases.map((c) => c.id)),
+    supabase.from("operation_payments").select("operation_id, amount, currency, kind, paid_at, receipt_no")
+      .gte("paid_at", new Date(Date.UTC(y, m - 1, 0)).toISOString()).lt("paid_at", new Date(Date.UTC(y, m, 2)).toISOString()).limit(5000),
+    supabase.from("supplier_payments").select("supplier_id, operation_id, amount, currency, kind, paid_on, reference, company_suppliers(arabic_name)")
+      .gte("paid_on", from).lt("paid_on", to).limit(5000),
+    readExpenses(supabase, month),
+  ]);
+  if (pays.error) throw pays.error;
+  if (sups.error) throw sups.error;
+
+  type Pay = { operation_id: string; amount: number | string; currency: string | null; kind: string; paid_at: string | null; receipt_no: string | null };
+  type Sup = { operation_id: string | null; amount: number | string; currency: string; kind: "payment" | "refund"; paid_on: string; reference: string | null; company_suppliers: unknown };
+  // what the journal cannot carry (another currency, a partner's or cancelled file) is counted, never silently lost
+  let left = 0;
+  const clientPayments = ((pays.data ?? []) as Pay[]).flatMap((p) => {
+    const c = byId.get(p.operation_id);
+    const on = p.paid_at ? riyadhDate(p.paid_at) : "";
+    if (!on.startsWith(month)) return [];
+    if (!c || (p.currency ?? "SAR") !== "SAR") { left += 1; return []; }
+    return [{ serial: c.serial, client: clients[c.id] ?? "", on, amount: Number(p.amount), kind: p.kind, receipt: p.receipt_no }];
+  });
+  const supplierPayments = ((sups.data ?? []) as Sup[]).flatMap((p) => {
+    if (p.currency !== "SAR") { left += 1; return []; }
+    return [{ supplier: one(p.company_suppliers as { arabic_name: string } | null)?.arabic_name ?? "مورد", serial: (p.operation_id && byId.get(p.operation_id)?.serial) || "", on: p.paid_on, amount: Number(p.amount), kind: p.kind, reference: p.reference }];
+  });
+  const sales = cases.map((c) => ({
+    serial: c.serial,
+    client: clients[c.id] ?? "",
+    on: c.confirmed_on,
+    price: c.total ?? 0,
+    cost: byCurrency(c.facts.expectedCost).find((x) => x.currency === "SAR")?.amount ?? 0,
+  }));
+  const expenses = spent.filter((e) => e.currency === "SAR").map((e) => ({ on: e.spent_on, title: e.title, category: e.category, amount: e.amount }));
+  return { ...journal({ month, sales, clientPayments, supplierPayments, expenses }), month, months: recentMonths(thisMonth), left };
 }
